@@ -8,8 +8,8 @@ const StatusIcon = ({ className }: { className: string }) => (
 );
 
 export const StatusMenu = ({ envSlug, archived }: { envSlug: string; archived: boolean }) => {
-  const activeOption = { id: 'active', name: 'Active apps' };
-  const archivedOption = { id: 'archived', name: 'Archived apps' };
+  const activeOption = { id: 'active', name: 'Active functions' };
+  const archivedOption = { id: 'archived', name: 'Archived functions' };
   return (
     <Select
       onChange={() => null}
@@ -17,16 +17,17 @@ export const StatusMenu = ({ envSlug, archived }: { envSlug: string; archived: b
       label="Pause runs"
       multiple={false}
       value={archived ? archivedOption : activeOption}
-      className="mb-5"
+      className="z-50 mr-3 h-[30px]"
     >
-      <Select.Button className="w-[124px] px-4">
-        <div className="text-basis mr-2 flex flex-row items-center text-sm font-medium leading-tight">
+      <Select.Button className="h-[28px] w-[142px]">
+        <div className="mr-2 flex flex-row items-center text-sm">
           <StatusIcon className={`mr-2 ${archived ? 'bg-accent-subtle' : 'bg-primary-moderate'}`} />
           {archived ? 'Archived' : 'Active'}
         </div>
       </Select.Button>
+
       <Select.Options>
-        <Link href={`/env/${envSlug}/apps`} prefetch={true}>
+        <Link href={`/env/${envSlug}/functions`} prefetch={true}>
           <Select.Option key={activeOption.id} option={activeOption}>
             <div className="text-basis flex flex-row items-center text-sm font-medium">
               <StatusIcon className="bg-primary-moderate mr-2" />
@@ -34,7 +35,7 @@ export const StatusMenu = ({ envSlug, archived }: { envSlug: string; archived: b
             </div>
           </Select.Option>
         </Link>
-        <Link href={`/env/${envSlug}/apps?archived=true`} prefetch={true}>
+        <Link href={`/env/${envSlug}/functions?archived=true`} prefetch={true}>
           <Select.Option key={archivedOption.id} option={archivedOption}>
             <div className="text-basis flex flex-row items-center text-sm font-medium">
               <StatusIcon className="bg-accent-subtle mr-2" />

@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import type { Run } from '@inngest/components/RunsPage/types';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
@@ -22,6 +23,10 @@ import { usePlanFeatures } from '@/utils/usePlanFeatures';
 import { AppFilterDocument, CountRunsDocument, GetRunsDocument } from './queries';
 import { parseRunsData, toRunStatuses, toTimeField } from './utils';
 
+export type RefreshRunsRef = {
+  refresh: () => void;
+};
+
 type FnProps = {
   functionSlug: string;
   scope: 'fn';
@@ -34,8 +39,15 @@ type EnvProps = {
 
 type Props = FnProps | EnvProps;
 
-export function Runs({ functionSlug, scope }: Props) {
+export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
+  { functionSlug, scope }: Props,
+  ref
+) {
   const env = useEnvironment();
+  const pathName = usePathname();
+  //
+  // Don't do page level refresh on new runs section, it's a top nav action
+  const monitorRuns = pathName.includes(`/env/${env.slug}/runs`);
 
   const [{ data: pauseData }] = useQuery({
     pause: scope !== 'fn',
@@ -199,6 +211,12 @@ export function Runs({ functionSlug, scope }: Props) {
     fetchFirstPage();
   }, [fetchFirstPage, onScrollToTop]);
 
+  useImperativeHandle(ref, () => ({
+    refresh: () => {
+      onRefresh();
+    },
+  }));
+
   return (
     <RunsPage
       apps={appsRes.data?.env?.apps.map((app) => ({
@@ -214,7 +232,7 @@ export function Runs({ functionSlug, scope }: Props) {
       isLoadingInitial={firstPageRes.fetching}
       isLoadingMore={nextPageRes.fetching}
       getRun={getRun}
-      onRefresh={onRefresh}
+      onRefresh={monitorRuns ? undefined : onRefresh}
       onScroll={fetchMoreOnScroll}
       onScrollToTop={onScrollToTop}
       getTraceResult={getTraceResult}
@@ -226,4 +244,4 @@ export function Runs({ functionSlug, scope }: Props) {
       totalCount={totalCount}
     />
   );
-}
+});

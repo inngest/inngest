@@ -2,18 +2,18 @@ import { MetricsIcon } from '@inngest/components/icons/sections/Metrics';
 import { RunsIcon } from '@inngest/components/icons/sections/Runs';
 
 import type { Environment as EnvType } from '@/utils/environments';
+import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { MenuItem } from './MenuItem';
 import { getNavRoute } from './Navigation';
 
 export default function Monitor({
   activeEnv,
   collapsed,
-  isRunsEnabled,
 }: {
   activeEnv: EnvType;
   collapsed: boolean;
-  isRunsEnabled: boolean;
 }) {
+  const { isReady, value: isRunsEnabled } = useBooleanFlag('env-level-runs-page');
   return (
     <div className={`jusity-center flex flex-col ${collapsed ? 'mt-2' : 'mt-5'}`}>
       {collapsed ? (
@@ -33,7 +33,7 @@ export default function Monitor({
         collapsed={collapsed}
         text="Runs"
         icon={<RunsIcon className="h-18px w-[18px]" />}
-        comingSoon={!isRunsEnabled}
+        comingSoon={isReady && !isRunsEnabled}
       />
       {/* <MenuItem
         href={getNavRoute(activeEnv, 'events/monitor')}

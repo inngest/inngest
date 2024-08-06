@@ -29,11 +29,6 @@ const nextConfig = {
         permanent: false,
       },
       {
-        source: '/integrations/vercel',
-        destination: '/integrations/vercel/callback',
-        permanent: false,
-      },
-      {
         source: '/login',
         destination: '/sign-in',
         permanent: false,
