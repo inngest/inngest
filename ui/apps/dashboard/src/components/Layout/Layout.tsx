@@ -23,7 +23,7 @@ export default async function Layout({ activeEnv, children }: LayoutProps) {
     <div className="fixed z-50 flex h-screen w-full flex-row justify-start overflow-y-scroll overscroll-y-none">
       <SideBar collapsed={collapsed} activeEnv={activeEnv} profile={profile} />
 
-      <div className="z-40 flex w-full flex-col">
+      <div className="flex w-full flex-col">
         <IncidentBanner />
         {children}
       </div>
