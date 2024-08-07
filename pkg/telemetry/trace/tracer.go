@@ -196,6 +196,8 @@ func newTracer(ctx context.Context, opts TracerOpts) (Tracer, error) {
 		return newJaegerTraceProvider(ctx, opts)
 	case TracerTypeIO:
 		return newIOTraceProvider(ctx, opts)
+	case TracerTypeNATS:
+		return newNatsTraceProvider(ctx, opts)
 	default:
 		return newNoopTraceProvider(ctx, opts)
 	}
@@ -368,4 +370,31 @@ func newTextMapPropagator() propagation.TextMapPropagator {
 		propagation.TraceContext{},
 		propagation.Baggage{},
 	)
+}
+
+func newNatsTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
+	exp, err := NewNATSSpanExporter(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error creating NATS trace client: %w", err)
+	}
+
+	sp := trace.NewBatchSpanProcessor(exp)
+	tp := trace.NewTracerProvider(
+		trace.WithSpanProcessor(sp),
+		trace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String(opts.ServiceName),
+		)),
+	)
+
+	return &tracer{
+		provider:   tp,
+		propagator: newTextMapPropagator(),
+		processor:  sp,
+		shutdown: func(context.Context) {
+			_ = tp.ForceFlush(ctx)
+			_ = tp.Shutdown(ctx)
+			_ = exp.Shutdown(ctx)
+		},
+	}, nil
 }
