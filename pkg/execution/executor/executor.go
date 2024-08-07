@@ -983,7 +983,42 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 		return performedFinalization, nil
 	}
 
-	// TODO: Load all pauses for the function and remove, once we index pauses.
+	// We may be cancelling an in-progress run.  If that's the case, we want to delete any
+	// outstanding jobs from the queue, if possible.
+	//
+	// XXX: Remove this typecast and normalize queue interface to a single package
+	q, ok := e.queue.(redis_state.QueueManager)
+	if ok {
+		// Find all items for the current function run.
+		jobs, err := q.RunJobs(
+			ctx,
+			md.ID.Tenant.EnvID,
+			md.ID.FunctionID,
+			md.ID.RunID,
+			1000,
+			0,
+		)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error fetching run jobs", "error", err)
+		}
+
+		for _, j := range jobs {
+			qi, _ := j.Raw.(*redis_state.QueueItem)
+			if qi == nil {
+				continue
+			}
+
+			err := q.Dequeue(ctx, redis_state.QueuePartition{
+				WorkflowID:  md.ID.FunctionID,
+				WorkspaceID: md.ID.Tenant.EnvID,
+			}, *qi)
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("error dequeueing run job", "error", err)
+			}
+		}
+	}
+
+	// TODO: Load all pauses for the function and remove, also.
 
 	if e.finishHandler == nil {
 		return performedFinalization, nil
