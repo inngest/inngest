@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strconv"
 	"sync"
@@ -138,4 +139,24 @@ func (t *tracer) Export(span trace.ReadOnlySpan) error {
 
 	t.processor.OnEnd(span)
 	return nil
+}
+
+// NATS span exporter
+// TODO: Hold NATS connection
+// - client
+// - subject to write to
+// - is jetstream or not?
+type natsSpanExporter struct {
+}
+
+func NewNATSSpanExporter(ctx context.Context) (trace.SpanExporter, error) {
+	return &natsSpanExporter{}, fmt.Errorf("not implemented")
+}
+
+func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOnlySpan) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (e *natsSpanExporter) Shutdown(ctx context.Context) error {
+	return fmt.Errorf("not implemented")
 }
