@@ -308,6 +308,10 @@ func (u queueKeyGenerator) PartitionQueueSet(pType enums.PartitionType, scopeID,
 }
 
 func (u queueKeyGenerator) FnMetadata(fnID uuid.UUID) string {
+	if fnID == uuid.Nil {
+		// None supplied; this means ignore.
+		return fmt.Sprintf("{%s}:fnMeta:-", u.queueDefaultKey)
+	}
 	return fmt.Sprintf("{%s}:fnMeta:%s", u.queueDefaultKey, fnID)
 }
 
