@@ -20,7 +20,6 @@ export default async function Layout({ activeEnv, children }: LayoutProps) {
   const profile = {
     orgName: org?.name,
     displayName: user.displayName,
-    orgImageUrl: org?.imageUrl,
   };
 
   return (

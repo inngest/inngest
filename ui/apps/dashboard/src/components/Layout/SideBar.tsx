@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import type { Environment } from '@/utils/environments';
+import { Alert } from '../Navigation/Alert';
 import { Help } from '../Navigation/Help';
 import { Integrations } from '../Navigation/Integrations';
 import Logo from '../Navigation/Logo';
@@ -41,6 +42,8 @@ export default function SideBar({
         <Navigation collapsed={collapsed} activeEnv={activeEnv} />
 
         <div>
+          {!collapsed && <Alert />}
+
           <Integrations collapsed={collapsed} />
           <Help collapsed={collapsed} />
           <Profile collapsed={collapsed} profile={profile} />
