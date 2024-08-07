@@ -17,7 +17,11 @@ type LayoutProps = {
 export default async function Layout({ activeEnv, children }: LayoutProps) {
   const collapsed = await getNavCollapsed();
   const { user, org } = await getProfile();
-  const profile = { orgName: org?.name, displayName: user.displayName };
+  const profile = {
+    orgName: org?.name,
+    displayName: user.displayName,
+    orgImageUrl: org?.imageUrl,
+  };
 
   return (
     <div className="fixed z-50 flex h-screen w-full flex-row justify-start overflow-y-scroll overscroll-y-none">

@@ -1,10 +1,11 @@
 'use client';
 
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 
 import { ProfileMenu } from './ProfileMenu';
 
-export type ProfileType = { orgName?: string; displayName: string };
+export type ProfileType = { orgName?: string; displayName: string; orgImageUrl?: string };
 
 export const Profile = ({ collapsed, profile }: { collapsed: boolean; profile: ProfileType }) => {
   const pathname = usePathname();
@@ -16,7 +17,7 @@ export const Profile = ({ collapsed, profile }: { collapsed: boolean; profile: P
   return (
     <ProfileMenu>
       <div
-        className={`border-subtle mt-2 flex h-16 w-full flex-row items-center justify-start border-t pl-3.5 ${
+        className={`border-subtle mt-2 flex h-16 w-full flex-row items-center justify-start border-t p-3.5 ${
           collapsed ? 'justify-center' : 'justify-start'
         }`}
       >
@@ -29,9 +30,20 @@ export const Profile = ({ collapsed, profile }: { collapsed: boolean; profile: P
               : 'hover:bg-canvasSubtle text-muted'
           }`}
         >
-          <div className="bg-canvasMuted text-muted flex h-8 w-8 items-center justify-center rounded-full text-xs uppercase">
-            {profile.orgName?.substring(0, 2) || '?'}
-          </div>
+          {profile.orgImageUrl ? (
+            <Image
+              alt="Your profile picture"
+              src={profile.orgImageUrl}
+              width={32}
+              height={32}
+              className="bg-canvasMuted flex items-center justify-center rounded text-xs uppercase"
+            />
+          ) : (
+            <div className="bg-canvasMuted text-muted flex h-8 w-8 items-center justify-center rounded-full text-xs uppercase">
+              {profile.orgName?.substring(0, 2) || '?'}
+            </div>
+          )}
+
           {!collapsed && (
             <div className="ml-2 flex flex-col items-start justify-start">
               <div className="text-muted leading-1 text-sm">{profile.orgName}</div>
