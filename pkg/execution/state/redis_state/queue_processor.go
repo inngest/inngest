@@ -111,8 +111,7 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		WorkspaceID: item.WorkspaceID,
 		FunctionID:  item.Identifier.WorkflowID,
 		Data:        item,
-		// Only use the queue name if provided by queueKindMapping.
-		// Otherwise, this defaults to FunctionID.
+		// Only use the queue name if provided by queueKindMapping or set explicitly
 		QueueName:  queueName,
 		WallTimeMS: at.UnixMilli(),
 	}
@@ -746,7 +745,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 		// NOTE: would love to instrument this value to see it over time per function but
 		// it's likely too high of a cardinality
 		go telemetry.HistogramQueuePeekEWMA(ctx, peek, telemetry.HistogramOpt{PkgName: pkgName})
-		return q.Peek(peekCtx, p.zsetKey(q.u.kg), fetch, peek)
+		return q.Peek(peekCtx, p, fetch, peek)
 	})
 	if err != nil {
 		return err

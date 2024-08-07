@@ -682,7 +682,7 @@ func BenchmarkPeekTiming(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		id := uuid.New()
 		enqueue(id, int(QueuePeekMax))
-		items, err := q.Peek(ctx, id.String(), time.Now(), QueuePeekMax)
+		items, err := q.Peek(ctx, &QueuePartition{FunctionID: &id}, time.Now(), QueuePeekMax)
 		if err != nil {
 			panic(err)
 		}
@@ -690,6 +690,95 @@ func BenchmarkPeekTiming(b *testing.B) {
 			panic(fmt.Sprintf("expected %d, got %d", QueuePeekMax, len(items)))
 		}
 	}
+}
+
+func TestQueueSystemPartitions(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	customQueueName := "custom"
+	customTestLimit := 91414751920
+
+	q := NewQueue(
+		NewQueueClient(rc, QueueDefaultKey),
+		WithAllowQueueNames(customQueueName),
+		WithSystemConcurrencyLimitGetter(
+			func(ctx context.Context, p QueuePartition) int {
+				return customTestLimit
+			}),
+		WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) (fn, acct, custom int) {
+			return 1234, 2345, 3456
+		}),
+	)
+	ctx := context.Background()
+
+	start := time.Now().Truncate(time.Second)
+
+	id := uuid.New()
+
+	qi := QueueItem{
+		FunctionID: id,
+		Data: osqueue.Item{
+			Payload:   json.RawMessage("{\"test\":\"payload\"}"),
+			QueueName: &customQueueName,
+		},
+		QueueName: &customQueueName,
+	}
+
+	t.Run("It enqueues an item", func(t *testing.T) {
+		item, err := q.EnqueueItem(ctx, qi, start)
+		require.NoError(t, err)
+		require.NotEqual(t, item.ID, ulid.ULID{})
+		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
+
+		// Ensure that our data is set up correctly.
+		found := getQueueItem(t, r, item.ID)
+		require.Equal(t, item, found)
+
+		// Ensure the partition is inserted.
+		qp := getSystemPartition(t, r, customQueueName)
+		require.Equal(t, QueuePartition{
+			ID:               "custom",
+			PartitionType:    int(enums.PartitionTypeSystem),
+			ConcurrencyLimit: customTestLimit,
+		}, qp)
+	})
+
+	t.Run("peeks correct partition", func(t *testing.T) {
+		qp := getSystemPartition(t, r, customQueueName)
+
+		partitions, err := q.PartitionPeek(ctx, true, start, 100)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(partitions))
+		require.Equal(t, qp, *partitions[0])
+
+		items, err := q.Peek(ctx, &qp, start, 100)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(items))
+	})
+
+	t.Run("leases correct partition", func(t *testing.T) {
+		qp := getSystemPartition(t, r, customQueueName)
+
+		leaseId, availableCapacity, err := q.PartitionLease(ctx, &qp, time.Second)
+		require.NoError(t, err)
+		require.NotNil(t, leaseId)
+		require.Equal(t, 1234, availableCapacity)
+	})
+
+	t.Run("leases correct partition", func(t *testing.T) {
+		qp := getSystemPartition(t, r, customQueueName)
+
+		items, err := q.Peek(ctx, &qp, start, 100)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(items))
+		require.Equal(t, qi.Data.Payload, items[0].Data.Payload)
+	})
 }
 
 func TestQueuePeek(t *testing.T) {
@@ -709,7 +798,7 @@ func TestQueuePeek(t *testing.T) {
 	workflowID := uuid.UUID{}
 
 	t.Run("It returns none with no items enqueued", func(t *testing.T) {
-		items, err := q.Peek(ctx, workflowID.String(), time.Now().Add(time.Hour), 10)
+		items, err := q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, time.Now().Add(time.Hour), 10)
 		require.NoError(t, err)
 		require.EqualValues(t, 0, len(items))
 	})
@@ -727,7 +816,7 @@ func TestQueuePeek(t *testing.T) {
 		ic, err := q.EnqueueItem(ctx, QueueItem{ID: "c"}, c)
 		require.NoError(t, err)
 
-		items, err := q.Peek(ctx, workflowID.String(), time.Now().Add(time.Hour), 10)
+		items, err := q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, time.Now().Add(time.Hour), 10)
 		require.NoError(t, err)
 		require.EqualValues(t, 3, len(items))
 		require.EqualValues(t, []*QueueItem{&ia, &ib, &ic}, items)
@@ -736,24 +825,24 @@ func TestQueuePeek(t *testing.T) {
 		id, err := q.EnqueueItem(ctx, QueueItem{ID: "d"}, d)
 		require.NoError(t, err)
 
-		items, err = q.Peek(ctx, workflowID.String(), time.Now().Add(time.Hour), 10)
+		items, err = q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, time.Now().Add(time.Hour), 10)
 		require.NoError(t, err)
 		require.EqualValues(t, 4, len(items))
 		require.EqualValues(t, []*QueueItem{&ia, &ib, &ic, &id}, items)
 
 		t.Run("It should limit the list", func(t *testing.T) {
-			items, err = q.Peek(ctx, workflowID.String(), time.Now().Add(time.Hour), 2)
+			items, err = q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, time.Now().Add(time.Hour), 2)
 			require.NoError(t, err)
 			require.EqualValues(t, 2, len(items))
 			require.EqualValues(t, []*QueueItem{&ia, &ib}, items)
 		})
 
 		t.Run("It should apply a peek offset", func(t *testing.T) {
-			items, err = q.Peek(ctx, workflowID.String(), time.Now().Add(-1*time.Hour), QueuePeekMax)
+			items, err = q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, time.Now().Add(-1*time.Hour), QueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 0, len(items))
 
-			items, err = q.Peek(ctx, workflowID.String(), c, QueuePeekMax)
+			items, err = q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, c, QueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 3, len(items))
 			require.EqualValues(t, []*QueueItem{&ia, &ib, &ic}, items)
@@ -766,7 +855,7 @@ func TestQueuePeek(t *testing.T) {
 			_, err := q.Lease(ctx, p, ia, 50*time.Millisecond, time.Now(), nil)
 			require.NoError(t, err)
 
-			items, err = q.Peek(ctx, workflowID.String(), d, QueuePeekMax)
+			items, err = q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, d, QueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 3, len(items))
 			require.EqualValues(t, []*QueueItem{&ib, &ic, &id}, items)
@@ -787,7 +876,7 @@ func TestQueuePeek(t *testing.T) {
 			require.NoError(t, err)
 			require.EqualValues(t, 1, caught, "Items not found during scavenge\n%s", r.Dump())
 
-			items, err = q.Peek(ctx, workflowID.String(), d, QueuePeekMax)
+			items, err = q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, d, QueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 4, len(items))
 
@@ -1060,9 +1149,6 @@ func TestQueueLease(t *testing.T) {
 		p := QueuePartition{FunctionID: &itemA.FunctionID}
 
 		t.Run("With denylists it does not lease.", func(t *testing.T) {
-			// TODO: Bring back denylists with new key queues.
-			t.Skip()
-
 			list := newLeaseDenyList()
 			list.addConcurrency(newKeyError(ErrConcurrencyLimitCustomKey, "custom-level-key"))
 			_, err = q.Lease(ctx, p, itemA, 5*time.Second, time.Now(), list)
@@ -1690,7 +1776,7 @@ func TestQueueDequeue(t *testing.T) {
 		})
 
 		t.Run("It should remove the item from the queue index", func(t *testing.T) {
-			items, err := q.Peek(ctx, p.zsetKey(q.u.kg), time.Now().Add(time.Hour), 10)
+			items, err := q.Peek(ctx, &p, time.Now().Add(time.Hour), 10)
 			require.NoError(t, err)
 			require.EqualValues(t, 0, len(items))
 		})
@@ -2684,7 +2770,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 		require.Nil(t, err, r.Dump())
 
 		t.Run("It updates the queue's At time", func(t *testing.T) {
-			found, err := q.Peek(ctx, wsA.String(), at.Add(10*time.Second), 5)
+			found, err := q.Peek(ctx, &QueuePartition{FunctionID: &wsA}, at.Add(10*time.Second), 5)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(found))
 			require.NotEqual(t, item.AtMS, found[0].AtMS)
@@ -2755,7 +2841,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 		})
 
 		t.Run("It updates the queue's At time", func(t *testing.T) {
-			found, err := q.Peek(ctx, wsA.String(), at.Add(30*time.Second), 5)
+			found, err := q.Peek(ctx, &QueuePartition{FunctionID: &wsA}, at.Add(30*time.Second), 5)
 			require.NoError(t, err)
 			require.Equal(t, 5, len(found))
 			require.Equal(t, at.UnixMilli(), found[0].AtMS, "First job shouldn't change")
@@ -3488,6 +3574,18 @@ func getAccountPartitions(t *testing.T, rc rueidis.Client, accountId uuid.UUID) 
 	require.NoError(t, err)
 
 	return strSlice
+}
+
+func getSystemPartition(t *testing.T, r *miniredis.Miniredis, name string) QueuePartition {
+	t.Helper()
+	kg := &queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
+	val := r.HGet(kg.PartitionItem(), name)
+	require.NotEmpty(t, val, "expected item to be set", r.Dump())
+	qp := QueuePartition{}
+	err := json.Unmarshal([]byte(val), &qp)
+	require.NoError(t, err, "expected item to be valid json")
+	require.Equal(t, int(enums.PartitionTypeSystem), qp.PartitionType)
+	return qp
 }
 
 func getPartition(t *testing.T, r *miniredis.Miniredis, pType enums.PartitionType, id uuid.UUID, optionalHash ...string) QueuePartition {

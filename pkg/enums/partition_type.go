@@ -18,4 +18,6 @@ const (
 	PartitionTypeConcurrencyKey PartitionType = 1
 	// PartitionTypeThrottle represents a partition for a custom throttling key.
 	PartitionTypeThrottle PartitionType = 2
+	// PartitionTypeSystem represents a system partition (legacy partitions for pause-events, workspace pause timeouts, replays, etc.)
+	PartitionTypeSystem PartitionType = 3
 )
