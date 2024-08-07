@@ -8,18 +8,15 @@ import { EventKeyInfo } from './EventKeyInfo';
 import { SigningKeyInfo } from './SigningKeyInfo';
 import { WebhookInfo } from './WebhookInfo';
 
-export const ManageHeader = ({ envSlug }: { envSlug: string }) => {
-  const keysPath = `/env/${envSlug}/manage/keys`;
-  const hooksPath = `/env/${envSlug}/manage/webhooks`;
-  const signingPath = `/env/${envSlug}/manage/signing-key`;
+export const ManageHeader = () => {
   const pathname = usePathname();
 
   return (
     <Header
       breadcrumb={[
-        ...(pathname.includes('/webhooks') ? [{ text: 'Webhooks', href: hooksPath }] : []),
-        ...(pathname.includes('/keys') ? [{ text: 'Event Keys', href: keysPath }] : []),
-        ...(pathname.includes('/signing-key') ? [{ text: 'Signing Key', href: signingPath }] : []),
+        ...(pathname.includes('/webhooks') ? [{ text: 'Webhooks' }] : []),
+        ...(pathname.includes('/keys') ? [{ text: 'Event Keys' }] : []),
+        ...(pathname.includes('/signing-key') ? [{ text: 'Signing Key' }] : []),
       ]}
       infoIcon={
         <>

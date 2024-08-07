@@ -32,7 +32,7 @@ export default async function ManageLayout({ children, params }: ManageLayoutPro
   return (
     <>
       {newIANav ? (
-        <ManageHeader envSlug={params.environmentSlug} />
+        <ManageHeader />
       ) : (
         <OldHeader
           title="Manage Environment"

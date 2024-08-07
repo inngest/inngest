@@ -37,11 +37,11 @@ export function Modal({
         <Dialog.Portal container={container}>
           <Dialog.Overlay
             asChild
-            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] transition-opacity dark:bg-[#04060C]/90"
+            className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-[2px] transition-opacity dark:bg-[#04060C]/90"
             aria-hidden="true"
           >
             {/* Full-screen container to center the panel */}
-            <div className="fixed inset-0 z-50">
+            <div className="fixed inset-0 z-[100]">
               <motion.div
                 className={cn(
                   alignTop ? 'items-baseline' : 'items-center',

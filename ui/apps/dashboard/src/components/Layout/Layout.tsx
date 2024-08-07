@@ -20,7 +20,7 @@ export default async function Layout({ activeEnv, children }: LayoutProps) {
   const profile = { orgName: org?.name, displayName: user.displayName };
 
   return (
-    <div className="flex w-full flex-row justify-start">
+    <div className="fixed z-50 flex h-screen w-full flex-row justify-start overflow-y-scroll overscroll-y-none">
       <SideBar collapsed={collapsed} activeEnv={activeEnv} profile={profile} />
 
       <div className="flex w-full flex-col">

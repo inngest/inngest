@@ -105,7 +105,7 @@ export default function FunctionLayout({
       <Header
         breadcrumb={[
           { text: 'Functions', href: `/env/${environmentSlug}/functions` },
-          { text: fn?.name || 'Function', href: `/env/${environmentSlug}/functions/${slug}` },
+          { text: fn?.name || 'Function' },
         ]}
         infoIcon={
           isPaused && (

@@ -22,7 +22,8 @@ export default function NewReplayButton({ functionSlug }: NewReplayButtonProps) 
           label="New Replay"
           kind="primary"
           btnAction={() => setIsModalVisible(true)}
-          icon={<IconReplay className="h-5 w-5 text-white" />}
+          icon={<IconReplay className="h-5 w-5 py-2 text-white" />}
+          className="my-2"
         />
       )}
       <NewReplayModal

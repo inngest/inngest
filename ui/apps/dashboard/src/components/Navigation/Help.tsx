@@ -19,7 +19,7 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
   const status = useSystemStatus();
 
   return (
-    <div className="mx-2.5">
+    <div className={`${collapsed ? 'items-center' : 'ml-4'}`}>
       <Listbox>
         <Listbox.Button className="w-full ring-0">
           <MenuItem

@@ -2,7 +2,7 @@ import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import { RiPlugLine } from '@remixicon/react';
 
 export const Integrations = ({ collapsed }: { collapsed: boolean }) => (
-  <div className="mx-2.5">
+  <div className={`${collapsed ? 'items-center' : 'ml-4'}`}>
     <MenuItem
       href="/settings/integrations"
       collapsed={collapsed}
