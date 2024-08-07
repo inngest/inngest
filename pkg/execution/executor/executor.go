@@ -1008,6 +1008,12 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 				continue
 			}
 
+			jobID := queue.JobIDFromContext(ctx)
+			if jobID != "" && qi.ID == jobID {
+				// Do not dequeue the current job that we're working on.
+				continue
+			}
+
 			err := q.Dequeue(ctx, redis_state.QueuePartition{
 				WorkflowID:  md.ID.FunctionID,
 				WorkspaceID: md.ID.Tenant.EnvID,
