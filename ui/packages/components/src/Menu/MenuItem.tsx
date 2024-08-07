@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { OptionalLink } from '@inngest/components/Link/OptionalLink';
 
+import { Badge } from '../Badge';
 import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 
 export const MenuItem = ({
@@ -13,6 +14,7 @@ export const MenuItem = ({
   href,
   prefetch = true,
   comingSoon = false,
+  beta = false,
 }: {
   text: string;
   icon: ReactNode;
@@ -20,6 +22,7 @@ export const MenuItem = ({
   href?: string;
   prefetch?: boolean;
   comingSoon?: boolean;
+  beta?: boolean;
 }) => {
   const pathname = usePathname();
   const active = href && pathname.startsWith(href);
@@ -28,7 +31,7 @@ export const MenuItem = ({
     <OptionalLink href={comingSoon ? '' : href} prefetch={prefetch}>
       <OptionalTooltip tooltip={comingSoon ? 'Coming soon...' : collapsed ? text : ''}>
         <div
-          className={`m-1 flex h-8 flex-row items-center rounded px-1.5 ${
+          className={`m-1 flex h-8 flex-row items-center gap-x-2.5 rounded px-1.5 ${
             collapsed ? 'justify-center' : 'justify-start'
           }  ${
             active
@@ -39,7 +42,13 @@ export const MenuItem = ({
           `}
         >
           {icon}
-          {!collapsed && <span className="ml-2.5 text-sm leading-tight">{text}</span>}
+          {!collapsed && <span className="text-sm leading-tight">{text}</span>}
+
+          {!collapsed && beta && (
+            <Badge kind="solid" className="text-onContrast bg-btnPrimary h-5 px-1.5 py-1 text-xs">
+              Beta
+            </Badge>
+          )}
         </div>
       </OptionalTooltip>
     </OptionalLink>

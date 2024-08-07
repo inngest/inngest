@@ -12,6 +12,13 @@ export default function Monitor({ collapsed }: { collapsed: boolean }) {
         <div className="text-disabled leading-4.5 mx-2.5 mb-1 text-xs font-medium">Monitor</div>
       )}
       <MenuItem
+        href="/runs"
+        collapsed={collapsed}
+        text="Runs"
+        beta={true}
+        icon={<RiMistLine className="h-18px w-[18px]" />}
+      />
+      <MenuItem
         href="/stream"
         collapsed={collapsed}
         text="Stream"
