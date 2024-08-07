@@ -114,13 +114,13 @@ var (
 	ErrPartitionPaused               = fmt.Errorf("partition is paused")
 	ErrConfigAlreadyLeased           = fmt.Errorf("config scanner already leased")
 	ErrConfigLeaseExceedsLimits      = fmt.Errorf("config lease duration exceeds the maximum of %d seconds", int(ConfigLeaseMax.Seconds()))
-	ErrPartitionConcurrencyLimit     = fmt.Errorf("At partition concurrency limit")
-	ErrAccountConcurrencyLimit       = fmt.Errorf("At account concurrency limit")
+	ErrPartitionConcurrencyLimit     = fmt.Errorf("at partition concurrency limit")
+	ErrAccountConcurrencyLimit       = fmt.Errorf("at account concurrency limit")
 
 	// ErrConcurrencyLimitCustomKey represents a concurrency limit being hit for *some*, but *not all*
 	// jobs in a queue, via custom concurrency keys which are evaluated to a specific string.
 
-	ErrConcurrencyLimitCustomKey = fmt.Errorf("At concurrency limit")
+	ErrConcurrencyLimitCustomKey = fmt.Errorf("at concurrency limit")
 
 	// internal shard errors
 	errShardNotFound     = fmt.Errorf("shard not found")
@@ -1439,18 +1439,15 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	}
 
 	// Check to see if this key has already been denied in the lease iteration.
-	// If so, fail early.
+	// If partition concurrency limits were encountered previously, fail early.
 	if denies != nil && denies.denyConcurrency(item.FunctionID.String()) {
 		// Note that we do not need to wrap the key as the key is already present.
 		return nil, ErrPartitionConcurrencyLimit
 	}
+
+	// Same for account concurrency limits
 	if denies != nil && denies.denyConcurrency(item.Data.Identifier.AccountID.String()) {
 		return nil, ErrAccountConcurrencyLimit
-	}
-
-	leaseID, err := ulid.New(ulid.Timestamp(q.clock.Now().Add(duration).UTC()), rnd)
-	if err != nil {
-		return nil, fmt.Errorf("error generating id: %w", err)
 	}
 
 	// Grab all partitions for the queue item
@@ -1461,6 +1458,11 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		if denies != nil && partition.ConcurrencyKey != "" && denies.denyConcurrency(partition.ConcurrencyKey) {
 			return nil, ErrConcurrencyLimitCustomKey
 		}
+	}
+
+	leaseID, err := ulid.New(ulid.Timestamp(q.clock.Now().Add(duration).UTC()), rnd)
+	if err != nil {
+		return nil, fmt.Errorf("error generating id: %w", err)
 	}
 
 	// NOTE: The account limit is used for queue items within accounts, as well as system partitions
@@ -1842,8 +1844,12 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	}
 
 	switch result[0] {
-	case -1, -2, -3:
+	case -1:
+		return nil, 0, ErrAccountConcurrencyLimit
+	case -2:
 		return nil, 0, ErrPartitionConcurrencyLimit
+	case -3:
+		return nil, 0, ErrConcurrencyLimitCustomKey
 	case -4:
 		return nil, 0, ErrPartitionNotFound
 	case -5:
