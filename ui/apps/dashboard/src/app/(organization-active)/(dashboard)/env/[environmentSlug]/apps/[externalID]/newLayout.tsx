@@ -3,13 +3,13 @@
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert';
+import { Header } from '@inngest/components/Header/Header';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import type { CombinedError } from 'urql';
 
 import { ActionsMenu } from '@/components/Apps/ActionsMenu';
 import { ArchivedAppBanner } from '@/components/ArchivedAppBanner';
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { Header } from '@/components/Header/Header';
 import { ArchiveModal } from './ArchiveModal';
 import { ResyncButton } from './ResyncButton';
 import { ValidateModal } from './ValidateButton/ValidateModal';

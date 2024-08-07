@@ -16,8 +16,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     pollingInterval: 1500,
   });
 
-  const collapsed = localStorage.getItem('collapsed');
-
   return (
     <TooltipProvider delayDuration={0}>
       <Layout>

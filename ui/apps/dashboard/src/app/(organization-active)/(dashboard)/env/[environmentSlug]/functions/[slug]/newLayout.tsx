@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { Badge } from '@inngest/components/Badge';
+import { Header } from '@inngest/components/Header/Header';
 import { InvokeModal } from '@inngest/components/InvokeButton';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { RiPauseCircleLine } from '@remixicon/react';
@@ -12,7 +13,6 @@ import { useEnvironment } from '@/components/Environments/environment-context';
 import { ActionsMenu } from '@/components/Functions/ActionMenu';
 import { CancelFunctionModal } from '@/components/Functions/CancelFunction/CancelFunctionModal';
 import { PauseFunctionModal } from '@/components/Functions/PauseFunction/PauseModal';
-import { Header } from '@/components/Header/Header';
 import { graphql } from '@/gql';
 import { useFunction } from '@/queries';
 import NewReplayModal from './logs/NewReplayModal';

@@ -6,6 +6,7 @@ import { RiExpandUpDownLine } from '@remixicon/react';
 export const EnvironmentMenu = ({ collapsed }: { collapsed: boolean }) => {
   return (
     <NewButton
+      disabled={true}
       kind="secondary"
       appearance="outlined"
       {...(collapsed ? {} : { icon: <RiExpandUpDownLine className="text-disabled h-4 w-4" /> })}
