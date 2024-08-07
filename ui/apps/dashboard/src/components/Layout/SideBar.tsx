@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import type { Environment } from '@/utils/environments';
 import { Help } from '../Navigation/Help';
@@ -14,11 +14,20 @@ export default function SideBar({
   activeEnv,
   profile,
 }: {
-  collapsed: boolean;
+  collapsed: boolean | undefined;
   activeEnv?: Environment;
   profile: ProfileType;
 }) {
-  const [collapsed, setCollapsed] = useState(serverCollapsed);
+  const [collapsed, setCollapsed] = useState<boolean>(serverCollapsed ?? false);
+
+  useEffect(() => {
+    //
+    // if the user has not set a pref and they are on mobile, collapse by default
+    serverCollapsed === undefined &&
+      setCollapsed(
+        typeof window !== 'undefined' && window.matchMedia('(max-width: 800px)').matches
+      );
+  }, []);
 
   return (
     <nav
