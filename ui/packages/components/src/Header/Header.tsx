@@ -27,7 +27,7 @@ export const Header = ({
   backNav = false,
 }: HeaderType) => {
   return (
-    <div className="flex flex-col justify-start border-b">
+    <div className="border-subtle flex flex-col justify-start border-b">
       <div
         className={`bg-canvasBase border-subtle flex h-[52px] flex-row items-center justify-between px-4 ${className}`}
       >

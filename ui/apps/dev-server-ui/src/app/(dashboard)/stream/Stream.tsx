@@ -1,9 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { BlankSlate } from '@inngest/components/BlankSlate';
 import { Button } from '@inngest/components/Button';
+import { Header } from '@inngest/components/Header/Header';
+import { Info } from '@inngest/components/Info/Info';
 import { Pill, PillContent } from '@inngest/components/Pill';
 import { Table } from '@inngest/components/Table';
 import { fullDate } from '@inngest/components/utils/date';
@@ -231,24 +234,29 @@ export default function Stream() {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-col">
-      <div className="flex justify-end gap-1 px-5 py-2">
-        <Button
-          label={`${showInternalEvents ? 'Hide' : 'Show'} Internal Events`}
-          btnAction={() => setShowInternalEvents((prev) => !prev)}
-        />
-        <Button
-          label={freezeStream ? 'Resume Stream' : 'Freeze Stream'}
-          btnAction={() => setFreezeStream((prev) => !prev)}
-        />
-        <SendEventButton
-          label="Test Event"
-          data={JSON.stringify({
-            name: '',
-            data: {},
-            user: {},
-          })}
-        />
-      </div>
+      <Header
+        breadcrumb={[{ text: 'Stream' }]}
+        action={
+          <div className="flex justify-end gap-1 px-5 py-2">
+            <Button
+              label={`${showInternalEvents ? 'Hide' : 'Show'} Internal Events`}
+              btnAction={() => setShowInternalEvents((prev) => !prev)}
+            />
+            <Button
+              label={freezeStream ? 'Resume Stream' : 'Freeze Stream'}
+              btnAction={() => setFreezeStream((prev) => !prev)}
+            />
+            <SendEventButton
+              label="Test Event"
+              data={JSON.stringify({
+                name: '',
+                data: {},
+                user: {},
+              })}
+            />
+          </div>
+        }
+      />
       <div
         className="min-h-0 overflow-y-auto pb-10"
         onScroll={(e) => fetchMoreOnScroll(e.target as HTMLDivElement)}

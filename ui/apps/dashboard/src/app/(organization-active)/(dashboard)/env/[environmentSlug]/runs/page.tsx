@@ -2,9 +2,9 @@
 
 import { useRef } from 'react';
 import { NewButton } from '@inngest/components/Button';
+import { Header } from '@inngest/components/Header/Header';
 import { RiRefreshLine } from '@remixicon/react';
 
-import { Header } from '@/components/Header/Header';
 import { Runs } from '@/components/Runs';
 import type { RefreshRunsRef } from '@/components/Runs/Runs';
 

@@ -1,8 +1,8 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import { Header } from '@inngest/components/Header/Header';
 
-import { Header } from '@/components/Header/Header';
 import CreateKeyButton from '../../app/(organization-active)/(dashboard)/env/[environmentSlug]/manage/[ingestKeys]/CreateKeyButton';
 import { EventKeyInfo } from './EventKeyInfo';
 import { SigningKeyInfo } from './SigningKeyInfo';

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { Listbox } from '@headlessui/react';
+import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import {
   RiArticleLine,
   RiDiscordLine,
@@ -12,7 +13,6 @@ import {
 } from '@remixicon/react';
 
 import { useSystemStatus } from '@/app/(organization-active)/support/statusPage';
-import { MenuItem } from './MenuItem';
 import SystemStatusIcon from './old/SystemStatusIcon';
 
 export const Help = ({ collapsed }: { collapsed: boolean }) => {

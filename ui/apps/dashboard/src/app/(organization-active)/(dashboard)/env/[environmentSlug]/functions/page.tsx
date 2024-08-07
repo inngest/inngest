@@ -1,7 +1,8 @@
+import { Header } from '@inngest/components/Header/Header';
+
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import { FunctionInfo } from '@/components/Functions/FunctionInfo';
 import { FunctionList } from '@/components/Functions/FunctionsList';
-import { Header } from '@/components/Header/Header';
 import { FunctionsHeader } from './oldHeader';
 
 type FunctionLayoutProps = {

@@ -24,7 +24,10 @@
     "./svgo.config.js",
     "./sentry.client.config.ts",
     "./sentry.edge.config.ts",
-    "./sentry.server.config.ts"
+    "./sentry.server.config.ts",
+    "../../packages/components/src/Menu/MenuItem.tsx",
+    "../dev-server-ui/src/components/Layout/Logo.tsx",
+    "../../packages/components/src/Tooltip/OptionalTooltip.tsx"
   ],
   "exclude": ["node_modules"]
 }

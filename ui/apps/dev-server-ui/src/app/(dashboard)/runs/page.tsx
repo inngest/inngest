@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Badge } from '@inngest/components/Badge/Badge';
+import { Header } from '@inngest/components/Header/Header';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
@@ -149,27 +151,37 @@ export default function Page() {
   }, []);
 
   return (
-    <RunsPage
-      apps={appsRes.data?.apps || []}
-      cancelRun={cancelRun}
-      data={runs ?? []}
-      defaultVisibleColumns={['status', 'id', 'trigger', 'function', 'queuedAt', 'endedAt']}
-      features={{
-        history: Number.MAX_SAFE_INTEGER,
-      }}
-      hasMore={false}
-      isLoadingInitial={isFetching && runs === undefined}
-      isLoadingMore={isFetching && runs !== undefined}
-      getRun={getRun}
-      onScroll={onScroll}
-      onScrollToTop={onScrollToTop}
-      getTraceResult={getTraceResult}
-      getTrigger={getTrigger}
-      rerun={rerun}
-      pathCreator={pathCreator}
-      pollInterval={pollInterval}
-      scope="env"
-      totalCount={totalCount}
-    />
+    <>
+      <Header
+        breadcrumb={[{ text: 'Runs' }]}
+        infoIcon={
+          <Badge kind="solid" className="text-onContrast bg-btnPrimary h-5 px-1.5 py-1 text-xs">
+            Beta
+          </Badge>
+        }
+      />
+      <RunsPage
+        apps={appsRes.data?.apps || []}
+        cancelRun={cancelRun}
+        data={runs ?? []}
+        defaultVisibleColumns={['status', 'id', 'trigger', 'function', 'queuedAt', 'endedAt']}
+        features={{
+          history: Number.MAX_SAFE_INTEGER,
+        }}
+        hasMore={false}
+        isLoadingInitial={isFetching && runs === undefined}
+        isLoadingMore={isFetching && runs !== undefined}
+        getRun={getRun}
+        onScroll={onScroll}
+        onScrollToTop={onScrollToTop}
+        getTraceResult={getTraceResult}
+        getTrigger={getTrigger}
+        rerun={rerun}
+        pathCreator={pathCreator}
+        pollInterval={pollInterval}
+        scope="env"
+        totalCount={totalCount}
+      />
+    </>
   );
 }

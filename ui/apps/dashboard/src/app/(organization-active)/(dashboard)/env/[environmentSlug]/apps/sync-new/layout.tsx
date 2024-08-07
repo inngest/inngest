@@ -1,7 +1,7 @@
+import { Header } from '@inngest/components/Header/Header';
 import { IconApp } from '@inngest/components/icons/App';
 
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
-import { Header } from '@/components/Header/Header';
 import OldHeader from '@/components/Header/old/Header';
 
 type SyncNewLayoutProps = {

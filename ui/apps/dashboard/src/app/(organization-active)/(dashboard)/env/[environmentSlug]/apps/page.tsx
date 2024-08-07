@@ -1,11 +1,11 @@
 import { NewButton } from '@inngest/components/Button';
+import { Header } from '@inngest/components/Header/Header';
 import { Link } from '@inngest/components/Link/Link';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiAddLine, RiQuestionLine } from '@remixicon/react';
 
 import { StatusMenu } from '@/components/Apps/StatusMenu';
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
-import { Header } from '@/components/Header/Header';
 import { pathCreator } from '@/utils/urls';
 import { Apps } from './Apps';
 import Page from './oldPage';

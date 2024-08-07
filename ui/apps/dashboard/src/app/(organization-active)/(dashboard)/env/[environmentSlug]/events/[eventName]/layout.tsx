@@ -1,8 +1,8 @@
+import { Header } from '@inngest/components/Header/Header';
 import { IconEvent } from '@inngest/components/icons/Event';
 
 import SendEventButton from '@/components/Events/SendEventButton';
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
-import { Header } from '@/components/Header/Header';
 import OldHeader from '@/components/Header/old/Header';
 
 type EventLayoutProps = {

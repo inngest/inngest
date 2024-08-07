@@ -1,10 +1,14 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { BlankSlate } from '@inngest/components/BlankSlate';
+import { Header } from '@inngest/components/Header/Header';
+import { Info } from '@inngest/components/Info/Info';
 import { InvokeButton } from '@inngest/components/InvokeButton';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { Table } from '@inngest/components/Table';
+import { IconSpinner } from '@inngest/components/icons/Spinner';
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -143,13 +147,28 @@ export default function FunctionList() {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-col">
-      <SearchInput
-        placeholder="Search function..."
-        value={searchInput}
-        onChange={setSearchInput}
-        debouncedSearch={debouncedSearch}
-        className="py-4"
+      <Header
+        breadcrumb={[{ text: 'Functions' }]}
+        infoIcon={
+          <Info
+            text="List of all function in the development environment."
+            action={
+              <Link href={'https://www.inngest.com/docs/functions'} className="text-md">
+                Learn how to create a function
+              </Link>
+            }
+          />
+        }
+        action={
+          <SearchInput
+            placeholder="Search function..."
+            value={searchInput}
+            onChange={setSearchInput}
+            debouncedSearch={debouncedSearch}
+          />
+        }
       />
+
       <main className="min-h-0 overflow-y-auto" ref={tableContainerRef}>
         <Table
           options={{

@@ -45,7 +45,7 @@ export function Table<T>({
   }, 0);
 
   return (
-    <table className="dark:bg-slate-910 w-full border-b border-slate-200 bg-white text-sm dark:border-slate-700/30">
+    <table className="bg-canvasBase w-full border-b border-slate-200 text-sm dark:border-slate-700/30">
       <thead className="shadow-outline-primary-light sticky top-0 z-[3] text-left">
         {table.getHeaderGroups().map((headerGroup) => (
           <tr key={headerGroup.id}>
@@ -103,7 +103,7 @@ export function Table<T>({
               <tr
                 key={row.id}
                 {...(customRowProps ? customRowProps(row) : {})}
-                className=" dark:bg-slate-910 bg-white hover:bg-slate-100 dark:hover:bg-slate-900"
+                className="bg-canvasBase hover:bg-slate-100 dark:hover:bg-slate-900"
               >
                 {row.getVisibleCells().map((cell) => (
                   <td
