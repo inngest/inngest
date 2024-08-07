@@ -84,7 +84,7 @@ if fnConcurrency > 0 and #keyFnConcurrency > 0 then
 end
 
 if customConcurrency > 0 and #keyCustomConcurrency > 0 then
-    -- Check that there's capacity for this partition, based off of partition-level
+    -- Check that there's capacity for this partition, based off of custom
     -- concurrency keys.
     local customCap = check_concurrency(currentTime, keyCustomConcurrency, customConcurrency)
     if customCap <= 0 then

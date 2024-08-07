@@ -1814,8 +1814,6 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		p.customConcurrencyKey(q.u.kg),
 	}
 
-	// TODO: Enable checking of env and custom concurrency keys here.
-
 	args, err := StrSlice([]any{
 		p.Queue(),
 		leaseID.String(),
