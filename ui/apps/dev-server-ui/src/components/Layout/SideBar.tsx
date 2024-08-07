@@ -1,14 +1,22 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { EnvironmentMenu } from '../Navigation/Environments';
 import Manage from '../Navigation/Manage';
 import Monitor from '../Navigation/Monitor';
 import Logo from './Logo';
 
-export default function SideBar({ collapsed: initCollapsed }: { collapsed: boolean }) {
-  const [collapsed, setCollapsed] = useState(initCollapsed);
+export default function SideBar() {
+  const [collapsed, setCollapsed] = useState(true);
+
+  useEffect(() => {
+    //
+    // TODO: something better so we don't flash
+    typeof window !== 'undefined' &&
+      window.localStorage.getItem('navCollapsed') === 'false' &&
+      setCollapsed(false);
+  }, []);
 
   return (
     <nav

@@ -22,7 +22,7 @@ export default function Monitor({ collapsed }: { collapsed: boolean }) {
         href="/stream"
         collapsed={collapsed}
         text="Stream"
-        icon={<RiMistLine className="h-18px w-[18px]" />}
+        icon={<IconFeed className="h-18px w-[18px]" />}
       />
     </div>
   );
