@@ -43,6 +43,10 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
+const (
+	pkgName = "executor.execution.inngest"
+)
+
 var (
 	ErrRuntimeRegistered = fmt.Errorf("runtime is already registered")
 	ErrNoStateManager    = fmt.Errorf("no state manager provided")
@@ -2348,6 +2352,13 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 		}); err != nil {
 			return err
 		}
+
+		telemetry.IncrBatchScheduledCounter(ctx, telemetry.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"account_id": bi.AccountID.String(),
+			},
+		})
 	case enums.BatchFull:
 		// start execution immediately
 		batchID := ulid.MustParse(result.BatchID)
@@ -2364,6 +2375,7 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 		}); err != nil {
 			return fmt.Errorf("could not retrieve and schedule batch items: %w", err)
 		}
+
 	default:
 		return fmt.Errorf("invalid status of batch append ops: %d", result.Status)
 	}
@@ -2425,6 +2437,11 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		IdempotencyKey:   &key,
 		FunctionPausedAt: opts.FunctionPausedAt,
 	})
+	// Don't bother if it's already there
+	if err == redis_state.ErrQueueItemExists {
+		return nil
+	}
+	// TODO: check for known errors
 	if err != nil {
 		span.SetStatus(codes.Error, err.Error())
 		return err
@@ -2436,6 +2453,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 	}
 
+	// TODO: check if all errors can be blindly returned
 	if err := e.batcher.ExpireKeys(ctx, payload.FunctionID, payload.BatchID); err != nil {
 		return err
 	}

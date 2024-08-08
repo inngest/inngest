@@ -9,4 +9,5 @@ const (
 	BatchStatusPending BatchStatus = iota
 	BatchStatusReady
 	BatchStatusStarted
+	BatchStatusAbsent
 )
