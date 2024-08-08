@@ -104,7 +104,7 @@ export default function VercelConfigure() {
             projectID: project.id,
             path: joinedPaths,
             protectionBypassSecret: project.protectionBypassSecret,
-            originOverride: project.originOverride,
+            originOverride: project.originOverride ? project.originOverride : undefined,
           },
         })
       ).error;
