@@ -9,6 +9,7 @@ import { useMutation } from 'urql';
 
 import { ArchivedAppBanner } from '@/components/ArchivedAppBanner';
 import { useEnvironment } from '@/components/Environments/environment-context';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { ActionsMenu } from '@/components/Functions/ActionMenu';
 import { CancelFunctionModal } from '@/components/Functions/CancelFunction/CancelFunctionModal';
 import { PauseFunctionModal } from '@/components/Functions/PauseFunction/PauseModal';
@@ -44,6 +45,9 @@ export default function FunctionLayout({
   const [{ data, fetching }] = useFunction({ functionSlug });
   const [, invokeFunction] = useMutation(InvokeFunctionDocument);
   const env = useEnvironment();
+
+  const isNewRunsEnabled = useBooleanFlag('new-runs');
+  const isBulkCancellationEnabled = useBooleanFlag('bulk-cancellation-ui');
 
   const fn = data?.workspace.workflow;
   const { isArchived = false, isPaused } = fn ?? {};
@@ -133,25 +137,33 @@ export default function FunctionLayout({
             exactRouteMatch: true,
           },
           { children: 'Runs', href: `/env/${environmentSlug}/functions/${slug}/logs` },
-          {
-            children: (
-              <div className="m-0 flex flex-row items-center justify-start space-x-1 p-0">
-                <div>New runs</div>
-                <Badge
-                  kind="solid"
-                  className="text-onContrast bg-btnPrimary h-5 px-1.5 py-1 text-xs"
-                >
-                  Beta
-                </Badge>
-              </div>
-            ),
-            href: `/env/${environmentSlug}/functions/${slug}/runs`,
-          },
+          ...(isNewRunsEnabled.isReady && isNewRunsEnabled.value
+            ? [
+                {
+                  children: (
+                    <div className="m-0 flex flex-row items-center justify-start space-x-1 p-0">
+                      <div>New runs</div>
+                      <Badge
+                        kind="solid"
+                        className="text-onContrast bg-btnPrimary h-5 px-1.5 py-1 text-xs"
+                      >
+                        Beta
+                      </Badge>
+                    </div>
+                  ),
+                  href: `/env/${environmentSlug}/functions/${slug}/runs`,
+                },
+              ]
+            : []),
           { children: 'Replay history', href: `/env/${environmentSlug}/functions/${slug}/replay` },
-          {
-            children: 'Cancellation history',
-            href: `/env/${environmentSlug}/functions/${slug}/cancellations`,
-          },
+          ...(isBulkCancellationEnabled.isReady && isBulkCancellationEnabled.value
+            ? [
+                {
+                  children: 'Cancellation history',
+                  href: `/env/${environmentSlug}/functions/${slug}/cancellations`,
+                },
+              ]
+            : []),
         ]}
       />
       {fetching && <Skeleton className="h-36 w-full" />}
