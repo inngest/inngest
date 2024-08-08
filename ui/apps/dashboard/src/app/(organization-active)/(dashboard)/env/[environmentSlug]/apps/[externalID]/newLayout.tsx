@@ -82,6 +82,7 @@ export default function NewLayout({ children, params: { externalID } }: Props) {
           <div className="flex flex-row items-center justify-end gap-x-1">
             {res.data && (
               <ActionsMenu
+                isArchived={res.data.isArchived}
                 showArchive={() => setShowArchive(true)}
                 disableArchive={!res.data.latestSync?.url}
                 showValidate={() => setShowValidate(true)}

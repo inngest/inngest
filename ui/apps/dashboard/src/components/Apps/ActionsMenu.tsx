@@ -7,6 +7,7 @@ import { RiArchive2Line, RiFirstAidKitLine, RiMore2Line } from '@remixicon/react
 import { OptionalTooltip } from '../Navigation/OptionalTooltip';
 
 export type AppActions = {
+  isArchived: boolean;
   showArchive: () => void;
   showValidate: () => void;
   disableArchive?: boolean;
@@ -14,6 +15,7 @@ export type AppActions = {
 };
 
 export const ActionsMenu = ({
+  isArchived,
   showArchive,
   showValidate,
   disableArchive = false,
@@ -62,7 +64,7 @@ export const ActionsMenu = ({
                 size="medium"
                 icon={<RiArchive2Line className="h-4 w-4" />}
                 iconSide="left"
-                label="Archive app"
+                label={isArchived ? 'Unarchive app' : 'Archive app'}
                 className="m-0 w-full justify-start"
                 onClick={showArchive}
               />
