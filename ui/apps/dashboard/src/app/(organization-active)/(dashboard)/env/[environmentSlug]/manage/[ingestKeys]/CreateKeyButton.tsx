@@ -32,7 +32,7 @@ export default function CreateKeyButton() {
   const environment = useEnvironment();
   const [{ fetching }, createSourceKey] = useMutation(CreateSourceKey);
   const router = useRouter();
-  const { value: newIANav } = useBooleanFlag('new-ia-nav');
+  const newIANav = useBooleanFlag('new-ia-nav');
 
   if (!currentContent) {
     return null;
@@ -81,18 +81,18 @@ export default function CreateKeyButton() {
       <OptionalTooltip
         tooltip={environment.isArchived && 'Cannot create key. Environment is archived'}
       >
-        {newIANav ? (
-          <NewButton
+        {newIANav.isReady && !newIANav.value ? (
+          <Button
             icon={<RiAddLine />}
-            onClick={() => setModalOpen(true)}
+            btnAction={() => setModalOpen(true)}
             disabled={environment.isArchived}
             kind="primary"
             label={`Create ${currentContent.name}`}
           />
         ) : (
-          <Button
+          <NewButton
             icon={<RiAddLine />}
-            btnAction={() => setModalOpen(true)}
+            onClick={() => setModalOpen(true)}
             disabled={environment.isArchived}
             kind="primary"
             label={`Create ${currentContent.name}`}
