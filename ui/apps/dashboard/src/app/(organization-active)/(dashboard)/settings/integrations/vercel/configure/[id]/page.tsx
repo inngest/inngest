@@ -137,7 +137,7 @@ export default function VercelConfigure() {
 
   if (fetching) {
     return (
-      <div className="flex h-full w-full items-center justify-center">
+      <div className="mt-6 flex h-full w-full items-center justify-center">
         <LoadingIcon />
       </div>
     );

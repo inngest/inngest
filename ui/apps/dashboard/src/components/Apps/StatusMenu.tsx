@@ -20,7 +20,7 @@ export const StatusMenu = ({ envSlug, archived }: { envSlug: string; archived: b
       className="mb-5"
     >
       <Select.Button className="w-[124px] px-4">
-        <div className="text-basis mr-2 flex flex-row items-center text-xs font-medium leading-tight">
+        <div className="text-basis mr-2 flex flex-row items-center text-sm font-medium leading-tight">
           <StatusIcon className={`mr-2 ${archived ? 'bg-accent-subtle' : 'bg-primary-moderate'}`} />
           {archived ? 'Archived' : 'Active'}
         </div>
@@ -28,7 +28,7 @@ export const StatusMenu = ({ envSlug, archived }: { envSlug: string; archived: b
       <Select.Options>
         <Link href={`/env/${envSlug}/apps`} prefetch={true}>
           <Select.Option key={activeOption.id} option={activeOption}>
-            <div className="text-basis flex flex-row items-center text-xs font-medium">
+            <div className="text-basis flex flex-row items-center text-sm font-medium">
               <StatusIcon className="bg-primary-moderate mr-2" />
               {activeOption.name}
             </div>
@@ -36,7 +36,7 @@ export const StatusMenu = ({ envSlug, archived }: { envSlug: string; archived: b
         </Link>
         <Link href={`/env/${envSlug}/apps?archived=true`} prefetch={true}>
           <Select.Option key={archivedOption.id} option={archivedOption}>
-            <div className="text-basis flex flex-row items-center text-xs font-medium">
+            <div className="text-basis flex flex-row items-center text-sm font-medium">
               <StatusIcon className="bg-accent-subtle mr-2" />
               {archivedOption.name}
             </div>

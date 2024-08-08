@@ -1,10 +1,9 @@
-'use client';
-
 import { IconEvent } from '@inngest/components/icons/Event';
 
-import { useEnvironment } from '@/components/Environments/environment-context';
-import Header, { type HeaderLink } from '@/components/Header/old/Header';
-import SendEventButton from './SendEventButton';
+import SendEventButton from '@/components/Events/SendEventButton';
+import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import { Header } from '@/components/Header/Header';
+import OldHeader from '@/components/Header/old/Header';
 
 type EventLayoutProps = {
   children: React.ReactNode;
@@ -14,31 +13,55 @@ type EventLayoutProps = {
   };
 };
 
-export default function EventLayout({ children, params }: EventLayoutProps) {
-  const env = useEnvironment();
-
-  const navLinks: HeaderLink[] = [
-    {
-      href: `/env/${params.environmentSlug}/events/${params.eventName}`,
-      text: 'Dashboard',
-      active: 'exact',
-    },
-    {
-      href: `/env/${params.environmentSlug}/events/${params.eventName}/logs`,
-      text: 'Logs',
-    },
-  ];
+export default async function EventLayout({
+  children,
+  params: { environmentSlug: envSlug, eventName: eventSlug },
+}: EventLayoutProps) {
+  const newIANav = await getBooleanFlag('new-ia-nav');
+  const eventsPath = `/env/${envSlug}/events`;
+  const logsPath = `/env/${envSlug}/events/${eventSlug}/logs`;
+  const eventPath = `/env/${envSlug}/events/${eventSlug}`;
+  const eventName = decodeURIComponent(eventSlug);
 
   return (
     <>
-      <Header
-        icon={<IconEvent className="h-5 w-5 text-white" />}
-        title={decodeURIComponent(params.eventName)}
-        links={navLinks}
-        action={
-          !env.isArchived && <SendEventButton eventName={decodeURIComponent(params.eventName)} />
-        }
-      />
+      {newIANav ? (
+        <Header
+          breadcrumb={[
+            { text: 'Events', href: eventsPath },
+            { text: eventName, href: eventPath },
+          ]}
+          tabs={[
+            {
+              href: eventPath,
+              children: 'Dashboard',
+              exactRouteMatch: true,
+            },
+            {
+              href: logsPath,
+              children: 'Logs',
+            },
+          ]}
+          action={<SendEventButton eventName={eventName} newIANav={true} />}
+        />
+      ) : (
+        <OldHeader
+          icon={<IconEvent className="h-5 w-5 text-white" />}
+          title={eventName}
+          links={[
+            {
+              href: eventPath,
+              text: 'Dashboard',
+              active: 'exact',
+            },
+            {
+              href: logsPath,
+              text: 'Logs',
+            },
+          ]}
+          action={<SendEventButton eventName={eventName} />}
+        />
+      )}
       {children}
     </>
   );

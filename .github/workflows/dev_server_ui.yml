@@ -1,4 +1,13 @@
-name: Test Dev Server UI
+name: Dev Server UI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ui/**"
+  pull_request:
+    paths:
+      - "ui/**"
 
 jobs:
   build:
@@ -11,7 +20,9 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: "18"
-      - run: pnpm install
+      - name: Install
+        run: pnpm install
         working-directory: ui/apps/dev-server-ui
-      - run: pnpm test
+      - name: Type check
+        run: pnpm type-check
         working-directory: ui/apps/dev-server-ui

@@ -1,6 +1,8 @@
 import { RiToolsLine } from '@remixicon/react';
 
-import Header from '@/components/Header/old/Header';
+import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import OldHeader from '@/components/Header/old/Header';
+import { ManageHeader } from '@/components/Manage/Header';
 import { getEnvironment } from '@/queries/server-only/getEnvironment';
 import ChildEmptyState from './ChildEmptyState';
 import CreateKeyButton from './[ingestKeys]/CreateKeyButton';
@@ -16,39 +18,43 @@ export default async function ManageLayout({ children, params }: ManageLayoutPro
   const environment = await getEnvironment({
     environmentSlug: params.environmentSlug,
   });
+  const newIANav = await getBooleanFlag('new-ia-nav');
 
   const isChildEnvironment = environment.hasParent;
+  const keysPath = `/env/${params.environmentSlug}/manage/keys`;
+  const hooksPath = `/env/${params.environmentSlug}/manage/webhooks`;
+  const signingPath = `/env/${params.environmentSlug}/manage/signing-key`;
 
-  const navLinks = [
-    {
-      href: `/env/${params.environmentSlug}/manage/keys`,
-      text: 'Event Keys',
-    },
-    {
-      href: `/env/${params.environmentSlug}/manage/webhooks`,
-      text: 'Webhooks',
-    },
-    {
-      href: `/env/${params.environmentSlug}/manage/signing-key`,
-      text: 'Signing Key',
-    },
-  ];
+  if (isChildEnvironment) {
+    return <ChildEmptyState />;
+  }
 
   return (
     <>
-      {isChildEnvironment ? (
-        <ChildEmptyState />
+      {newIANav ? (
+        <ManageHeader />
       ) : (
-        <>
-          <Header
-            title="Manage Environment"
-            icon={<RiToolsLine className="h-4 w-4 text-white" />}
-            links={navLinks}
-            action={!environment.isArchived && <CreateKeyButton />}
-          />
-          {children}
-        </>
+        <OldHeader
+          title="Manage Environment"
+          icon={<RiToolsLine className="h-4 w-4 text-white" />}
+          links={[
+            {
+              href: keysPath,
+              text: 'Event Keys',
+            },
+            {
+              href: hooksPath,
+              text: 'Webhooks',
+            },
+            {
+              href: signingPath,
+              text: 'Signing Key',
+            },
+          ]}
+          action={<CreateKeyButton />}
+        />
       )}
+      {children}
     </>
   );
 }

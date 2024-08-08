@@ -75,9 +75,9 @@ const SelectedDisplay = ({
   selected: Environment | null;
   collapsed: boolean;
 }) => (
-  <span className="flex flex-row items-center ">
+  <span className={`flex  flex-row items-center ${collapsed ? '' : 'min-w-0 truncate'}`}>
     {selected ? (
-      <span className="block truncate">
+      <span className="block">
         {selected.type === EnvironmentType.BranchParent
           ? selectedName('Branch Environments', collapsed)
           : selectedName(selected.name, collapsed)}
@@ -85,7 +85,7 @@ const SelectedDisplay = ({
     ) : (
       <>
         {!collapsed && <RiCloudLine className="mr-2 h-4 w-4" />}
-        <span className="block truncate">{selectedName('All Environments', collapsed)}</span>
+        <span className="block">{selectedName('All Environments', collapsed)}</span>
       </>
     )}
   </span>
@@ -155,7 +155,7 @@ export default function EnvironmentSelectMenu({
             </Listbox.Button>
           </OptionalTooltip>
 
-          <Listbox.Options className="bg-canvasBase border-subtle absolute top-10 z-50 w-[188px] divide-none rounded border shadow focus:outline-none">
+          <Listbox.Options className="bg-canvasBase border-subtle absolute top-10 z-50 w-[188px] divide-none overflow-y-scroll rounded border shadow focus:outline-none">
             {defaultEnvironment !== null && <EnvironmentItem environment={defaultEnvironment} />}
 
             {legacyTestMode !== null && (

@@ -49,7 +49,7 @@ export default async function AppsPage({
     <>
       <Header
         breadcrumb={[{ text: 'Apps' }]}
-        icon={<AppInfo />}
+        infoIcon={<AppInfo />}
         action={
           !isArchived && (
             <NewButton
@@ -62,7 +62,7 @@ export default async function AppsPage({
           )
         }
       />
-      <div className="bg-canvasBase mx-auto my-16 flex h-full w-full max-w-[1200px] flex-col overflow-y-auto px-6">
+      <div className="bg-canvasBase mx-auto flex h-full w-full max-w-[1200px] flex-col overflow-y-auto px-6 pt-16">
         <div className="relative flex w-full flex-row justify-end">
           <StatusMenu archived={isArchived} envSlug={envSlug} />
         </div>

@@ -31,12 +31,12 @@ export const MenuItem = ({
           className={`m-1 flex h-8 flex-row items-center rounded px-1.5 ${
             collapsed ? 'justify-center ' : 'justify-start'
           }  ${
-            active
+            comingSoon
+              ? 'text-disabled hover:bg-disabled cursor-not-allowed'
+              : active
               ? 'bg-secondary-4xSubtle text-info hover:bg-secondary-3xSubtle'
               : 'hover:bg-canvasSubtle text-muted'
-          } ${comingSoon ? 'cursor-not-allowed' : 'cursor-pointer'}
-          
-          `}
+          } `}
         >
           {icon}
           {!collapsed && <span className="ml-2.5 text-sm leading-tight">{text}</span>}

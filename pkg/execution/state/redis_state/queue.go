@@ -722,9 +722,10 @@ func (q QueueItem) IsLeased(time time.Time) bool {
 	return q.LeaseID != nil && ulid.Time(q.LeaseID.Time()).After(time)
 }
 
+// RunJobs returns a list of jobs that are due to run for a given run ID.
 func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]osqueue.JobResponse, error) {
-	if limit > 10 || limit <= 0 {
-		limit = 10
+	if limit > 1000 || limit <= 0 {
+		limit = 1000
 	}
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RunJobs"), redis_telemetry.ScopeQueue)
@@ -768,6 +769,7 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 			Position: pos,
 			Kind:     qi.Data.Kind,
 			Attempt:  qi.Data.Attempt,
+			Raw:      qi,
 		})
 	}
 

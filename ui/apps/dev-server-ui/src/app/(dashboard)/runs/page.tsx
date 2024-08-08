@@ -5,6 +5,7 @@ import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   useSearchParam,
+  useStringArraySearchParam,
   useValidatedArraySearchParam,
   useValidatedSearchParam,
 } from '@inngest/components/hooks/useSearchParam';
@@ -25,6 +26,7 @@ import { client } from '@/store/baseApi';
 import {
   CountRunsDocument,
   GetRunsDocument,
+  useGetAppsQuery,
   type CountRunsQuery,
   type GetRunsQuery,
 } from '@/store/generated';
@@ -33,6 +35,7 @@ import { pathCreator } from '@/utils/pathCreator';
 const pollInterval = 2500;
 
 export default function Page() {
+  const [filterApp] = useStringArraySearchParam('filterApp');
   const [totalCount, setTotalCount] = useState<number>();
   const [filteredStatus] = useValidatedArraySearchParam('filterStatus', isFunctionRunStatus);
   const [timeField = FunctionRunTimeField.QueuedAt] = useValidatedSearchParam(
@@ -43,10 +46,12 @@ export default function Page() {
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
   const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
+  const appsRes = useGetAppsQuery();
 
   const queryFn = useCallback(
     async ({ pageParam }: { pageParam: string | null }) => {
       const data: GetRunsQuery = await client.request(GetRunsDocument, {
+        appIDs: filterApp,
         functionRunCursor: pageParam,
         startTime: calculatedStartTime,
         endTime: endTime,
@@ -72,7 +77,7 @@ export default function Page() {
         edges,
       };
     },
-    [filteredStatus, calculatedStartTime, timeField]
+    [filterApp, filteredStatus, calculatedStartTime, timeField]
   );
 
   const { data, fetchNextPage, isFetching } = useInfiniteQuery({
@@ -145,6 +150,7 @@ export default function Page() {
 
   return (
     <RunsPage
+      apps={appsRes.data?.apps || []}
       cancelRun={cancelRun}
       data={runs ?? []}
       defaultVisibleColumns={['status', 'id', 'trigger', 'function', 'queuedAt', 'endedAt']}

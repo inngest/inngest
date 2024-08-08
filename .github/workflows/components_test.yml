@@ -1,4 +1,4 @@
-name: Test UI components
+name: Shared UI
 
 on:
   push:
@@ -20,10 +20,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "18"
-      - run: pnpm install
-        working-directory: ui/packages/components
-      - run: pnpm test
+      - name: Install
+        run: pnpm install
         working-directory: ui/packages/components
       - name: Lint
         run: pnpm lint
+        working-directory: ui/packages/components
+      - name: Test
+        run: pnpm test
         working-directory: ui/packages/components

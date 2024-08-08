@@ -50,7 +50,7 @@ type Props = {
   hasMore: boolean;
   isLoadingInitial: boolean;
   isLoadingMore: boolean;
-  onRefresh: () => void;
+  onRefresh?: () => void;
   onScroll: UIEventHandler<HTMLDivElement>;
   onScrollToTop: () => void;
   pathCreator: React.ComponentProps<typeof RunDetails>['pathCreator'];
@@ -306,12 +306,14 @@ export function RunsPage({
             options={options}
           />
 
-          <Button
-            label="Refresh"
-            appearance="text"
-            btnAction={onRefresh}
-            icon={<RiLoopLeftLine />}
-          />
+          {onRefresh && (
+            <Button
+              label="Refresh"
+              appearance="text"
+              btnAction={onRefresh}
+              icon={<RiLoopLeftLine />}
+            />
+          )}
         </div>
       </div>
       <RunsTable
