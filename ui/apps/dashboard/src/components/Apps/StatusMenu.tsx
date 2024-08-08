@@ -26,7 +26,7 @@ export const StatusMenu = ({ envSlug, archived }: { envSlug: string; archived: b
         </div>
       </Select.Button>
       <Select.Options>
-        <Link href={`/env/${envSlug}/apps`} prefetch={true}>
+        <Link href={`/env/${envSlug}/apps`}>
           <Select.Option key={activeOption.id} option={activeOption}>
             <div className="text-basis flex flex-row items-center text-sm font-medium">
               <StatusIcon className="bg-primary-moderate mr-2" />
@@ -34,7 +34,7 @@ export const StatusMenu = ({ envSlug, archived }: { envSlug: string; archived: b
             </div>
           </Select.Option>
         </Link>
-        <Link href={`/env/${envSlug}/apps?archived=true`} prefetch={true}>
+        <Link href={`/env/${envSlug}/apps?archived=true`}>
           <Select.Option key={archivedOption.id} option={archivedOption}>
             <div className="text-basis flex flex-row items-center text-sm font-medium">
               <StatusIcon className="bg-accent-subtle mr-2" />

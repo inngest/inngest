@@ -11,7 +11,7 @@ export const MenuItem = ({
   icon,
   collapsed,
   href,
-  prefetch = true,
+  prefetch = false,
   comingSoon = false,
 }: {
   text: string;
