@@ -12,10 +12,6 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-const (
-	pkgName = "batch.execution.inngest"
-)
-
 // BatchManager represents an implementation-agnostic event batching, running functions
 // only when either the specified buffer is full or the specified time it up.
 //
