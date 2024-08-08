@@ -182,6 +182,9 @@ func (b redisBatchManager) StartExecution(ctx context.Context, functionId uuid.U
 	}
 
 	switch status {
+	case -1: // the batch status is gone somehow
+		return enums.BatchStatusAbsent.String(), nil
+
 	case 0: // haven't started, so mark mark it started
 		return enums.BatchStatusReady.String(), nil
 
