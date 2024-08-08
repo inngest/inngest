@@ -41,12 +41,8 @@ const NavToggle = ({ collapsed, setCollapsed }: LogoProps) => {
 
 export default function Logo({ collapsed, setCollapsed }: LogoProps) {
   return (
-    <div
-      className={`mt-4 flex h-[28px] w-full flex-row items-center ${
-        collapsed ? 'justify-center' : 'ml-4 justify-start'
-      }`}
-    >
-      <div className={`flex flex-row items-center justify-start ${collapsed ? '' : 'mr-2'} `}>
+    <div className={`mx-4 mt-4 flex h-[28px] flex-row items-center justify-between`}>
+      <div className={`flex flex-row items-center justify-start ${collapsed ? '' : 'mr-3'} `}>
         {collapsed ? (
           <div className="cursor-pointer group-hover:hidden">
             <InngestLogoSmallBW />
@@ -54,7 +50,7 @@ export default function Logo({ collapsed, setCollapsed }: LogoProps) {
         ) : (
           <>
             <Link href={process.env.NEXT_PUBLIC_HOME_PATH as Route}>
-              <InngestLogo className="text-basis mr-3" width={92} />
+              <InngestLogo className="text-basis mr-2" width={92} />
             </Link>
           </>
         )}

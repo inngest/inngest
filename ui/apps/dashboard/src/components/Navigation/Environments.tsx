@@ -75,7 +75,7 @@ const SelectedDisplay = ({
   selected: Environment | null;
   collapsed: boolean;
 }) => (
-  <span className={`flex  flex-row items-center ${collapsed ? '' : 'min-w-0 truncate'}`}>
+  <span className={`flex flex-row items-center ${collapsed ? '' : 'min-w-0 truncate'}`}>
     {selected ? (
       <span className="block">
         {selected.type === EnvironmentType.BranchParent
@@ -113,7 +113,7 @@ export default function EnvironmentSelectMenu({
   const [{ fetching, data: envs = [] }] = useEnvironments();
 
   if (fetching || !isNonEmptyArray(envs)) {
-    return <Skeleton className={`h-8 ${collapsed ? 'w-8 px-1' : 'w-[146px] px-2'}`} />;
+    return <Skeleton className={`h-8 ${collapsed ? 'w-8 px-1' : 'w-[158px]'}`} />;
   }
 
   const defaultEnvironment = getDefaultEnvironment(envs);
@@ -143,8 +143,8 @@ export default function EnvironmentSelectMenu({
           <OptionalTooltip tooltip={collapsed && tooltip(selected)}>
             <Listbox.Button
               className={`border-muted bg-canvasBase text-primary-intense hover:bg-canvasSubtle px-2 ${
-                collapsed ? `w-8` : !activeEnv ? 'w-[186px]' : 'w-[146px]'
-              } m-0 h-8 overflow-hidden rounded border text-sm ${open && 'border-primary-intense'}`}
+                collapsed ? `w-8` : !activeEnv ? 'w-[196px]' : 'w-[158px]'
+              } h-8 overflow-hidden rounded border text-sm ${open && 'border-primary-intense'}`}
             >
               <div
                 className={`flex flex-row items-center  ${
@@ -159,7 +159,7 @@ export default function EnvironmentSelectMenu({
             </Listbox.Button>
           </OptionalTooltip>
 
-          <Listbox.Options className="bg-canvasBase border-subtle absolute top-10 z-50 w-[188px] divide-none overflow-y-scroll rounded border shadow focus:outline-none">
+          <Listbox.Options className="bg-canvasBase border-subtle overflow-y-truncate absolute top-10 z-50 w-[188px] divide-none rounded border shadow focus:outline-none">
             {defaultEnvironment !== null && <EnvironmentItem environment={defaultEnvironment} />}
 
             {legacyTestMode !== null && (
@@ -233,7 +233,7 @@ function EnvironmentItem({
       )}
     >
       <span className={cn('block h-1.5 w-1.5 shrink-0 rounded-full', statusColorClass)} />
-      <span className="truncate">{name || environment.name}</span>
+      <span className="truncate">"{name || environment.name}"</span>
     </Listbox.Option>
   );
 }
