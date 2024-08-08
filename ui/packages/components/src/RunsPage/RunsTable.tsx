@@ -21,7 +21,7 @@ type RunsTableProps = {
   sorting?: SortingState;
   setSorting?: OnChangeFn<SortingState>;
   isLoading?: boolean;
-  renderSubComponent: (props: { id: string }) => React.ReactElement;
+  renderSubComponent: (props: Run) => React.ReactElement;
   getRowCanExpand: (row: Row<Run>) => boolean;
   visibleColumns?: VisibilityState;
   scope: ViewScope;
@@ -137,39 +137,42 @@ export default function RunsTable({
           </tr>
         )}
         {!isEmpty &&
-          table.getRowModel().rows.map((row) => (
-            <Fragment key={row.original.id}>
-              <tr
-                key={row.original.id}
-                className="hover:bg-canvasSubtle/50 h-12 cursor-pointer"
-                onClick={() => {
-                  if (expandedRunIDs.includes(row.original.id)) {
-                    setExpandedRunIDs((prev) => {
-                      return prev.filter((id) => id !== row.original.id);
-                    });
-                  } else {
-                    setExpandedRunIDs((prev) => {
-                      return [...prev, row.original.id];
-                    });
-                  }
-                }}
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <td className={tableColumnStyles} key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
-              {expandedRunIDs.includes(row.original.id) && !isLoadingRow(row.original) && (
-                // Overrides tableStyles divider color
-                <tr className="!border-transparent">
-                  <td colSpan={row.getVisibleCells().length}>
-                    {renderSubComponent({ id: row.original.id })}
-                  </td>
+          table.getRowModel().rows.map((row) => {
+            console.log(row, row.getVisibleCells());
+            return (
+              <Fragment key={row.original.id}>
+                <tr
+                  key={row.original.id}
+                  className="hover:bg-canvasSubtle/50 h-12 cursor-pointer"
+                  onClick={() => {
+                    if (expandedRunIDs.includes(row.original.id)) {
+                      setExpandedRunIDs((prev) => {
+                        return prev.filter((id) => id !== row.original.id);
+                      });
+                    } else {
+                      setExpandedRunIDs((prev) => {
+                        return [...prev, row.original.id];
+                      });
+                    }
+                  }}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <td className={tableColumnStyles} key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
                 </tr>
-              )}
-            </Fragment>
-          ))}
+                {expandedRunIDs.includes(row.original.id) && !isLoadingRow(row.original) && (
+                  // Overrides tableStyles divider color
+                  <tr className="!border-transparent">
+                    <td colSpan={row.getVisibleCells().length}>
+                      {renderSubComponent({ id: row.original.id, ...row.original })}
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
       </tbody>
       {!isEmpty && (
         <tfoot>

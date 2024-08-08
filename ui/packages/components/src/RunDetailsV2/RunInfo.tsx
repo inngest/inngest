@@ -3,15 +3,18 @@ import type { Route } from 'next';
 import { CancelRunButton } from '../CancelRunButton';
 import { Card } from '../Card';
 import {
+  ElementWrapper,
   IDElement,
   LazyElementWrapper,
   LinkElement,
+  OptimisticElementWrapper,
   TextElement,
   TimeElement,
 } from '../DetailsCard/Element';
 import { Link } from '../Link';
 import { RerunButton } from '../RerunButtonV2';
 import { RunResult } from '../RunResult';
+import type { Run as InitialRunData } from '../RunsPage/types';
 import type { Result } from '../types/functionRun';
 import { cn } from '../utils/classNames';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
@@ -27,6 +30,7 @@ type Props = {
     runPopout: (params: { runID: string }) => Route;
   };
   rerun: (args: { fnID: string; runID: string }) => Promise<unknown>;
+  initialRunData: InitialRunData;
   run: Lazy<Run>;
   runID: string;
   result?: Result;
@@ -57,6 +61,7 @@ export function RunInfo({
   className,
   pathCreator,
   rerun,
+  initialRunData,
   run,
   runID,
   standalone,
@@ -92,13 +97,16 @@ export function RunInfo({
         <Card.Content>
           <div>
             <dl className="flex flex-wrap gap-4">
-              <LazyElementWrapper label="Run ID" lazy={run}>
-                {(run: Run) => {
-                  return <IDElement>{run.id}</IDElement>;
-                }}
-              </LazyElementWrapper>
+              <ElementWrapper label="Run ID">
+                <IDElement>{runID}</IDElement>
+              </ElementWrapper>
 
-              <LazyElementWrapper label="App" lazy={run}>
+              <OptimisticElementWrapper
+                label="App"
+                lazy={run}
+                initial={initialRunData}
+                optimisticChildren={(initialRun: Run) => <>{initialRun.app.name}</>}
+              >
                 {(run: Run) => {
                   return (
                     <LinkElement
@@ -110,9 +118,14 @@ export function RunInfo({
                     </LinkElement>
                   );
                 }}
-              </LazyElementWrapper>
+              </OptimisticElementWrapper>
 
-              <LazyElementWrapper label="Function" lazy={run}>
+              <OptimisticElementWrapper
+                label="Function"
+                lazy={run}
+                initial={initialRunData}
+                optimisticChildren={(initialRun: Run) => <>{initialRun.function.name}</>}
+              >
                 {(run: Run) => {
                   return (
                     <LinkElement
@@ -124,7 +137,7 @@ export function RunInfo({
                     </LinkElement>
                   );
                 }}
-              </LazyElementWrapper>
+              </OptimisticElementWrapper>
 
               <LazyElementWrapper label="Duration" lazy={run}>
                 {(run: Run) => {
@@ -140,6 +153,19 @@ export function RunInfo({
                   return <TextElement>{durationText}</TextElement>;
                 }}
               </LazyElementWrapper>
+
+              <OptimisticElementWrapper
+                label="Queued at"
+                lazy={run}
+                initial={initialRunData}
+                optimisticChildren={(initialRun: Run) =>
+                  initialRun.queuedAt ?? <TimeElement date={new Date(initialRun.queuedAt)} />
+                }
+              >
+                {(run: Run) => {
+                  return <TimeElement date={new Date(run.trace.queuedAt)} />;
+                }}
+              </OptimisticElementWrapper>
 
               <LazyElementWrapper label="Queued at" lazy={run}>
                 {(run: Run) => {
