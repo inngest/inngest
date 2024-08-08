@@ -407,14 +407,15 @@ func NewQueue(u *QueueClient, opts ...QueueOpt) *queue {
 		pf: func(ctx context.Context, item QueueItem) uint {
 			return PriorityDefault
 		},
-		numWorkers:         defaultNumWorkers,
-		wg:                 &sync.WaitGroup{},
-		seqLeaseLock:       &sync.RWMutex{},
-		scavengerLeaseLock: &sync.RWMutex{},
-		pollTick:           defaultPollTick,
-		idempotencyTTL:     defaultIdempotencyTTL,
-		queueKindMapping:   make(map[string]string),
-		logger:             logger.From(context.Background()),
+		numWorkers:               defaultNumWorkers,
+		wg:                       &sync.WaitGroup{},
+		seqLeaseLock:             &sync.RWMutex{},
+		scavengerLeaseLock:       &sync.RWMutex{},
+		instrumentationLeaseLock: &sync.RWMutex{},
+		pollTick:                 defaultPollTick,
+		idempotencyTTL:           defaultIdempotencyTTL,
+		queueKindMapping:         make(map[string]string),
+		logger:                   logger.From(context.Background()),
 		partitionConcurrencyGen: func(ctx context.Context, p QueuePartition) (string, int) {
 			return p.Queue(), 10_000
 		},
@@ -507,6 +508,13 @@ type queue struct {
 	// seqLeaseLock ensures that there are no data races writing to
 	// or reading from seqLeaseID in parallel.
 	seqLeaseLock *sync.RWMutex
+
+	// instrumentationLeaseID stores the lease ID if executor is running queue
+	// instrumentations
+	instrumentationLeaseID *ulid.ULID
+	// instrumentationLeaseLock ensures that there are no data races writing to or
+	// reading from instrumentationLeaseID
+	instrumentationLeaseLock *sync.RWMutex
 
 	// scavengerLeaseID stores the lease ID if this queue is the scavenger processor.
 	// all runners attempt to claim this lease automatically.

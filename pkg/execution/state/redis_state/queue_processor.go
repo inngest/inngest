@@ -490,7 +490,7 @@ func (q *queue) runScavenger(ctx context.Context) {
 			if q.isScavenger() {
 				count, err := q.Scavenge(ctx)
 				if err != nil {
-					q.logger.Error().Err(err).Msg("error claiming scavenger lease")
+					q.logger.Error().Err(err).Msg("error scavenging")
 				}
 				if count > 0 {
 					q.logger.Info().Int("len", count).Msg("scavenged lost jobs")
@@ -528,6 +528,56 @@ func (q *queue) runScavenger(ctx context.Context) {
 }
 
 func (q *queue) singletonInstrumentation(ctx context.Context) {
+	leaseDur := ConfigLeaseDuration * 6
+
+	leaseID, err := q.ConfigLease(ctx, q.u.kg.Instrumentation(), leaseDur, q.instrumentationLease())
+	if err != ErrConfigAlreadyLeased && err != nil {
+		q.quit <- err
+		return
+	}
+
+	q.instrumentationLeaseLock.Lock()
+	q.instrumentationLeaseID = leaseID
+	q.instrumentationLeaseLock.Unlock()
+
+	tick := q.clock.NewTicker(leaseDur / 3)
+	instr := q.clock.NewTicker(20 * time.Second)
+
+	for {
+		select {
+		case <-ctx.Done():
+			tick.Stop()
+			instr.Stop()
+			return
+		case <-instr.Chan():
+			if q.isInstrumentator() {
+				// TODO: do things here
+			}
+		case <-tick.Chan():
+			leaseID, err := q.ConfigLease(ctx, q.u.kg.Instrumentation(), leaseDur, q.instrumentationLease())
+			if err == ErrConfigAlreadyLeased {
+				q.instrumentationLeaseLock.Lock()
+				q.instrumentationLeaseID = nil
+				q.instrumentationLeaseLock.Unlock()
+				continue
+			}
+
+			if err != nil {
+				q.logger.Error().Err(err).Msg("error claiming instrumentation lease")
+				q.instrumentationLeaseLock.Lock()
+				q.instrumentationLeaseID = nil
+				q.instrumentationLeaseLock.Unlock()
+				continue
+			}
+
+			q.instrumentationLeaseLock.Lock()
+			if q.instrumentationLeaseID == nil {
+				// TODO: add counter for running instrumentation
+			}
+			q.instrumentationLeaseID = leaseID
+			q.instrumentationLeaseLock.Unlock()
+		}
+	}
 }
 
 // worker runs a blocking process that listens to items being pushed into the
@@ -1164,6 +1214,18 @@ func (q *queue) sequentialLease() *ulid.ULID {
 	return &copied
 }
 
+// instrumentationLease is a helper method for concurrently reading the
+// instrumentation lease ID.
+func (q *queue) instrumentationLease() *ulid.ULID {
+	q.instrumentationLeaseLock.RLock()
+	defer q.instrumentationLeaseLock.RUnlock()
+	if q.instrumentationLeaseID == nil {
+		return nil
+	}
+	copied := *q.instrumentationLeaseID
+	return &copied
+}
+
 // scavengerLease is a helper method for concurrently reading the sequential
 // lease ID.
 func (q *queue) scavengerLease() *ulid.ULID {
@@ -1242,6 +1304,14 @@ func (q *queue) isSequential() bool {
 
 func (q *queue) isScavenger() bool {
 	l := q.scavengerLease()
+	if l == nil {
+		return false
+	}
+	return ulid.Time(l.Time()).After(q.clock.Now())
+}
+
+func (q *queue) isInstrumentator() bool {
+	l := q.instrumentationLease()
 	if l == nil {
 		return false
 	}
