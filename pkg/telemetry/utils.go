@@ -17,6 +17,12 @@ var (
 	registry = newRegistry()
 )
 
+//
+// NOTE:
+// Most of these maps probably can be done with generics.
+// Too lazy to try to get it work that way right now
+//
+
 // ========================
 //
 //	Counters
@@ -138,6 +144,24 @@ func (g *asyncGaugeMap) Add(name string, m metric.Int64ObservableGauge) {
 	g.m[name] = m
 }
 
+type gaugeMap struct {
+	rw sync.RWMutex
+	m  map[string]metric.Int64Gauge
+}
+
+func (g *gaugeMap) Get(name string) (metric.Int64Gauge, bool) {
+	g.rw.RLock()
+	defer g.rw.RUnlock()
+	v, ok := g.m[name]
+	return v, ok
+}
+
+func (g *gaugeMap) Add(name string, m metric.Int64Gauge) {
+	g.rw.Lock()
+	defer g.rw.Unlock()
+	g.m[name] = m
+}
+
 type GaugeOpt struct {
 	PkgName     string
 	Description string
@@ -158,6 +182,22 @@ func RegisterAsyncGauge(ctx context.Context, opts GaugeOpt) {
 	if err != nil {
 		log.From(ctx).Error().Err(err).Str("metric_name", metricName).Msg("error setting async gauge")
 	}
+}
+
+func RecordGaugeMetric(ctx context.Context, val int64, opts GaugeOpt) {
+	attrs := []attribute.KeyValue{}
+	if opts.Tags != nil {
+		attrs = append(attrs, parseAttributes(opts.Tags)...)
+	}
+
+	metricName := fmt.Sprintf("%s_%s", prefix, opts.MetricName)
+	c, err := registry.getGauge(ctx, opts)
+	if err != nil {
+		log.From(ctx).Error().Err(err).Str("metric_name", metricName).Msg("error accessing counter metric")
+		return
+	}
+
+	c.Record(ctx, val, metric.WithAttributes(attrs...))
 }
 
 // ========================
@@ -226,6 +266,7 @@ type metricsRegistry struct {
 	counters       *counterMap
 	updownCounters *upDownCounterMap
 	asyncGauges    *asyncGaugeMap
+	gauges         *gaugeMap
 	histograms     *histogramMap
 }
 
@@ -298,7 +339,7 @@ func (r *metricsRegistry) setAsyncGauge(ctx context.Context, opts GaugeOpt) (met
 
 	g, err := meter.Int64ObservableGauge(
 		name,
-		metric.WithDescription(opts.PkgName),
+		metric.WithDescription(opts.Description),
 		metric.WithUnit(opts.Unit),
 		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
 			value, err := opts.Callback(ctx)
@@ -315,6 +356,28 @@ func (r *metricsRegistry) setAsyncGauge(ctx context.Context, opts GaugeOpt) (met
 	)
 	if err == nil {
 		r.asyncGauges.Add(name, g)
+	}
+	return g, err
+}
+
+func (r *metricsRegistry) getGauge(ctx context.Context, opts GaugeOpt) (metric.Int64Gauge, error) {
+	name := fmt.Sprintf("%s_%s", prefix, opts.MetricName)
+	if g, ok := r.gauges.Get(name); ok {
+		return g, nil
+	}
+
+	meter := otel.Meter(opts.PkgName)
+	if opts.Meter != nil {
+		meter = opts.Meter
+	}
+
+	g, err := meter.Int64Gauge(
+		name,
+		metric.WithDescription(opts.Description),
+		metric.WithUnit(opts.Unit),
+	)
+	if err == nil {
+		r.gauges.Add(name, g)
 	}
 	return g, err
 }
