@@ -56,9 +56,9 @@ export default function Logo({ collapsed, setCollapsed }: LogoProps) {
             <Link href={process.env.NEXT_PUBLIC_HOME_PATH as Route}>
               <InngestLogo className="text-basis mr-3" width={92} />
             </Link>
-            <Search />
           </>
         )}
+        <Search collapsed={collapsed} />
       </div>
       <NavToggle collapsed={collapsed} setCollapsed={setCollapsed} />
     </div>
