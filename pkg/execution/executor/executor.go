@@ -43,6 +43,10 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
+const (
+	pkgName = "executor.execution.inngest"
+)
+
 var (
 	ErrRuntimeRegistered = fmt.Errorf("runtime is already registered")
 	ErrNoStateManager    = fmt.Errorf("no state manager provided")
@@ -2348,10 +2352,17 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 		}); err != nil {
 			return err
 		}
+
+		telemetry.IncrBatchScheduledCounter(ctx, telemetry.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"account_id": bi.AccountID.String(),
+			},
+		})
 	case enums.BatchFull:
 		// start execution immediately
 		batchID := ulid.MustParse(result.BatchID)
-		if err := e.RetrieveAndScheduleBatch(ctx, fn, batch.ScheduleBatchPayload{
+		err := e.RetrieveAndScheduleBatch(ctx, fn, batch.ScheduleBatchPayload{
 			BatchID:         batchID,
 			BatchPointer:    result.BatchPointerKey,
 			AccountID:       bi.AccountID,
@@ -2361,9 +2372,32 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 			FunctionVersion: bi.FunctionVersion,
 		}, &execution.BatchExecOpts{
 			FunctionPausedAt: opts.FunctionPausedAt,
-		}); err != nil {
+		})
+		if err != nil {
 			return fmt.Errorf("could not retrieve and schedule batch items: %w", err)
 		}
+
+		err = e.batcher.CancelExecution(ctx, batch.ScheduleBatchOpts{
+			ScheduleBatchPayload: batch.ScheduleBatchPayload{
+				BatchID:         batchID,
+				AccountID:       bi.AccountID,
+				WorkspaceID:     bi.WorkspaceID,
+				AppID:           bi.AppID,
+				FunctionID:      bi.FunctionID,
+				FunctionVersion: bi.FunctionVersion,
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("error cancelling scheduled batch job: %w", err)
+		}
+
+		telemetry.IncrBatchCancelledCounter(ctx, telemetry.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"account_id": bi.AccountID.String(),
+			},
+		})
+
 	default:
 		return fmt.Errorf("invalid status of batch append ops: %d", result.Status)
 	}
@@ -2425,6 +2459,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		IdempotencyKey:   &key,
 		FunctionPausedAt: opts.FunctionPausedAt,
 	})
+	// TODO: check for known errors
 	if err != nil {
 		span.SetStatus(codes.Error, err.Error())
 		return err
@@ -2436,6 +2471,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 	}
 
+	// TODO: check if all errors can be blindly returned
 	if err := e.batcher.ExpireKeys(ctx, payload.FunctionID, payload.BatchID); err != nil {
 		return err
 	}

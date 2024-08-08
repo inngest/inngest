@@ -2,6 +2,7 @@ package batch
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -34,6 +35,7 @@ type BatchManager interface {
 	RetrieveItems(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID) ([]BatchItem, error)
 	StartExecution(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID, batchPointer string) (string, error)
 	ScheduleExecution(ctx context.Context, opts ScheduleBatchOpts) error
+	CancelExecution(ctx context.Context, opts ScheduleBatchOpts) error
 	ExpireKeys(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID) error
 }
 
@@ -76,6 +78,10 @@ type ScheduleBatchOpts struct {
 	ScheduleBatchPayload
 
 	At time.Time `json:"at"`
+}
+
+func (o *ScheduleBatchOpts) JobID() string {
+	return fmt.Sprintf("%s:%s", o.WorkspaceID, o.BatchID)
 }
 
 type ScheduleBatchPayload struct {

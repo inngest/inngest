@@ -198,7 +198,7 @@ func (b redisBatchManager) StartExecution(ctx context.Context, functionId uuid.U
 
 // ScheduleExecution enqueues a job to run the batch job after the specified duration.
 func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleBatchOpts) error {
-	jobID := fmt.Sprintf("%s:%s", opts.WorkspaceID, opts.BatchID)
+	jobID := opts.JobID()
 	maxAttempts := 20
 
 	err := b.q.Enqueue(ctx, queue.Item{
@@ -230,6 +230,13 @@ func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleB
 	}
 
 	return nil
+}
+
+// CancelExecution cancels the queued timeout job
+func (b redisBatchManager) CancelExecution(ctx context.Context, opts ScheduleBatchOpts) error {
+	err := b.q.Dequeue(ctx, redis_state.QueuePartition{}, redis_state.QueueItem{})
+
+	return err
 }
 
 // ExpireKeys sets the TTL for the keys related to the provided batchID.
