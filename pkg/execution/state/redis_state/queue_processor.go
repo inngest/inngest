@@ -141,6 +141,7 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 	go q.claimShards(ctx)
 	go q.claimSequentialLease(ctx)
 	go q.runScavenger(ctx)
+	go q.singletonInstrumentation(ctx)
 
 	tick := q.clock.NewTicker(q.pollTick)
 
@@ -524,6 +525,9 @@ func (q *queue) runScavenger(ctx context.Context) {
 			q.scavengerLeaseLock.Unlock()
 		}
 	}
+}
+
+func (q *queue) singletonInstrumentation(ctx context.Context) {
 }
 
 // worker runs a blocking process that listens to items being pushed into the
