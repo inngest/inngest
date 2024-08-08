@@ -234,7 +234,27 @@ func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleB
 
 // CancelExecution cancels the queued timeout job
 func (b redisBatchManager) CancelExecution(ctx context.Context, opts ScheduleBatchOpts) error {
-	err := b.q.Dequeue(ctx, redis_state.QueuePartition{}, redis_state.QueueItem{})
+	queueName := queue.KindScheduleBatch
+
+	err := b.q.Dequeue(
+		ctx,
+		redis_state.QueuePartition{
+			QueueName:   &queueName,
+			WorkspaceID: opts.WorkspaceID,
+			WorkflowID:  opts.FunctionID,
+		},
+		redis_state.QueueItem{
+			// ID is hashed prior to storing, check EnqueueItem
+			ID:          redis_state.HashID(ctx, opts.JobID()),
+			QueueName:   &queueName,
+			WorkspaceID: opts.WorkspaceID,
+			WorkflowID:  opts.FunctionID,
+		},
+	)
+	// ignore if item is not there anymore
+	if err == redis_state.ErrQueueItemNotFound {
+		return nil
+	}
 
 	return err
 }

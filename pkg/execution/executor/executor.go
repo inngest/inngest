@@ -2377,6 +2377,8 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 			return fmt.Errorf("could not retrieve and schedule batch items: %w", err)
 		}
 
+		// Attempt to cancel the previously queued job when the batch was created
+		// This will save the internal queue of unnecessary work
 		err = e.batcher.CancelExecution(ctx, batch.ScheduleBatchOpts{
 			ScheduleBatchPayload: batch.ScheduleBatchPayload{
 				BatchID:         batchID,
@@ -2459,6 +2461,10 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		IdempotencyKey:   &key,
 		FunctionPausedAt: opts.FunctionPausedAt,
 	})
+	// Don't bother if it's already there
+	if err == redis_state.ErrQueueItemExists {
+		return nil
+	}
 	// TODO: check for known errors
 	if err != nil {
 		span.SetStatus(codes.Error, err.Error())
