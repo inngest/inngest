@@ -58,7 +58,7 @@ export default function FunctionLayout({
     }) ?? false;
 
   const invokeAction = useCallback(
-    (data: Record<string, unknown>) => {
+    ({ data }: { data: Record<string, unknown> }) => {
       invokeFunction({
         envID: env.id,
         data,
