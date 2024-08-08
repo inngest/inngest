@@ -7,9 +7,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/expressions"
-	"time"
+	"github.com/inngest/inngest/pkg/telemetry"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -236,6 +238,13 @@ func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleB
 func (b redisBatchManager) CancelExecution(ctx context.Context, opts ScheduleBatchOpts) error {
 	queueName := queue.KindScheduleBatch
 
+	item := redis_state.QueueItem{
+		QueueName:   &queueName,
+		WorkspaceID: opts.WorkspaceID,
+		WorkflowID:  opts.FunctionID,
+	}
+	item.SetID(ctx, opts.JobID())
+
 	err := b.q.Dequeue(
 		ctx,
 		redis_state.QueuePartition{
@@ -243,18 +252,19 @@ func (b redisBatchManager) CancelExecution(ctx context.Context, opts ScheduleBat
 			WorkspaceID: opts.WorkspaceID,
 			WorkflowID:  opts.FunctionID,
 		},
-		redis_state.QueueItem{
-			// ID is hashed prior to storing, check EnqueueItem
-			ID:          redis_state.HashID(ctx, opts.JobID()),
-			QueueName:   &queueName,
-			WorkspaceID: opts.WorkspaceID,
-			WorkflowID:  opts.FunctionID,
-		},
+		item,
 	)
 	// ignore if item is not there anymore
 	if err == redis_state.ErrQueueItemNotFound {
 		return nil
 	}
+
+	telemetry.IncrBatchCancelledCounter(ctx, telemetry.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"account_id": opts.AccountID.String(),
+		},
+	})
 
 	return err
 }

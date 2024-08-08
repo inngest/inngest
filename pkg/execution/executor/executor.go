@@ -2393,13 +2393,6 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 			return fmt.Errorf("error cancelling scheduled batch job: %w", err)
 		}
 
-		telemetry.IncrBatchCancelledCounter(ctx, telemetry.CounterOpt{
-			PkgName: pkgName,
-			Tags: map[string]any{
-				"account_id": bi.AccountID.String(),
-			},
-		})
-
 	default:
 		return fmt.Errorf("invalid status of batch append ops: %d", result.Status)
 	}
