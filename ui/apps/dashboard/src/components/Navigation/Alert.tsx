@@ -34,7 +34,10 @@ export const Alert = () => {
             onClick={() => dismiss()}
           />
         </div>
-        <Link href="https://www.inngest.com/blog/inngest-new-design" className="mt-4">
+        <Link
+          href=" https://www.inngest.com/blog/reimagining-information-architecture"
+          className="mt-4"
+        >
           Read about the redesign
         </Link>
       </div>
