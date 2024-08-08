@@ -1017,10 +1017,10 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 	if limit > QueuePeekMax {
 		// Lua's max unpack() length is 8000; don't allow users to peek more than
 		// 1k at a time regardless.
-		return nil, ErrQueuePeekMaxExceedsLimits
+		limit = QueuePeekMax
 	}
 	if limit <= 0 {
-		limit = QueuePeekMax
+		limit = QueuePeekMin
 	}
 	if isPeekNext {
 		limit = 1
@@ -2164,11 +2164,19 @@ func (q *queue) peekEWMA(ctx context.Context, fnID uuid.UUID) (int64, error) {
 		return 0, nil
 	}
 
-	// convert to float for
+	hasNonZero := false
 	vals := make([]float64, len(strlist))
 	for i, s := range strlist {
 		v, _ := strconv.ParseFloat(s, 64)
 		vals[i] = v
+		if v > 0 {
+			hasNonZero = true
+		}
+	}
+
+	if !hasNonZero {
+		// short-circuit.
+		return 0, nil
 	}
 
 	// create a simple EWMA, add all the numbers in it and get the final value
