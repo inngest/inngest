@@ -118,12 +118,3 @@ func IncrBatchScheduledCounter(ctx context.Context, opts CounterOpt) {
 		Tags:        opts.Tags,
 	})
 }
-
-func IncrBatchCancelledCounter(ctx context.Context, opts CounterOpt) {
-	RecordCounterMetric(ctx, 1, CounterOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "batch_cancelled_total",
-		Description: "Total number of batch timeout jobs that are cancelled",
-		Tags:        opts.Tags,
-	})
-}

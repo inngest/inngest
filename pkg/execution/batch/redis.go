@@ -11,7 +11,6 @@ import (
 
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/expressions"
-	"github.com/inngest/inngest/pkg/telemetry"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -232,41 +231,6 @@ func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleB
 	}
 
 	return nil
-}
-
-// CancelExecution cancels the queued timeout job
-func (b redisBatchManager) CancelExecution(ctx context.Context, opts ScheduleBatchOpts) error {
-	queueName := queue.KindScheduleBatch
-
-	item := redis_state.QueueItem{
-		QueueName:   &queueName,
-		WorkspaceID: opts.WorkspaceID,
-		WorkflowID:  opts.FunctionID,
-	}
-	item.SetID(ctx, opts.JobID())
-
-	err := b.q.Dequeue(
-		ctx,
-		redis_state.QueuePartition{
-			QueueName:   &queueName,
-			WorkspaceID: opts.WorkspaceID,
-			WorkflowID:  opts.FunctionID,
-		},
-		item,
-	)
-	// ignore if item is not there anymore
-	if err == redis_state.ErrQueueItemNotFound {
-		return nil
-	}
-
-	telemetry.IncrBatchCancelledCounter(ctx, telemetry.CounterOpt{
-		PkgName: pkgName,
-		Tags: map[string]any{
-			"account_id": opts.AccountID.String(),
-		},
-	})
-
-	return err
 }
 
 // ExpireKeys sets the TTL for the keys related to the provided batchID.

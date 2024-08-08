@@ -2362,7 +2362,7 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 	case enums.BatchFull:
 		// start execution immediately
 		batchID := ulid.MustParse(result.BatchID)
-		err := e.RetrieveAndScheduleBatch(ctx, fn, batch.ScheduleBatchPayload{
+		if err := e.RetrieveAndScheduleBatch(ctx, fn, batch.ScheduleBatchPayload{
 			BatchID:         batchID,
 			BatchPointer:    result.BatchPointerKey,
 			AccountID:       bi.AccountID,
@@ -2372,25 +2372,8 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 			FunctionVersion: bi.FunctionVersion,
 		}, &execution.BatchExecOpts{
 			FunctionPausedAt: opts.FunctionPausedAt,
-		})
-		if err != nil {
+		}); err != nil {
 			return fmt.Errorf("could not retrieve and schedule batch items: %w", err)
-		}
-
-		// Attempt to cancel the previously queued job when the batch was created
-		// This will save the internal queue of unnecessary work
-		err = e.batcher.CancelExecution(ctx, batch.ScheduleBatchOpts{
-			ScheduleBatchPayload: batch.ScheduleBatchPayload{
-				BatchID:         batchID,
-				AccountID:       bi.AccountID,
-				WorkspaceID:     bi.WorkspaceID,
-				AppID:           bi.AppID,
-				FunctionID:      bi.FunctionID,
-				FunctionVersion: bi.FunctionVersion,
-			},
-		})
-		if err != nil {
-			return fmt.Errorf("error cancelling scheduled batch job: %w", err)
 		}
 
 	default:
