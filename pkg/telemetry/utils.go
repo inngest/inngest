@@ -35,10 +35,6 @@ type counterMap struct {
 	m  map[string]metric.Int64Counter
 }
 
-func newCounterMap() *counterMap {
-	return &counterMap{m: map[string]metric.Int64Counter{}}
-}
-
 func (c *counterMap) Get(name string) (metric.Int64Counter, bool) {
 	c.rw.RLock()
 	defer c.rw.RUnlock()
@@ -55,10 +51,6 @@ func (c *counterMap) Add(name string, m metric.Int64Counter) {
 type upDownCounterMap struct {
 	rw sync.RWMutex
 	m  map[string]metric.Int64UpDownCounter
-}
-
-func newUpDownCounterMap() *upDownCounterMap {
-	return &upDownCounterMap{m: map[string]metric.Int64UpDownCounter{}}
 }
 
 func (c *upDownCounterMap) Get(name string) (metric.Int64UpDownCounter, bool) {
@@ -125,10 +117,6 @@ func RecordUpDownCounterMetric(ctx context.Context, val int64, opts CounterOpt) 
 type asyncGaugeMap struct {
 	rw sync.RWMutex
 	m  map[string]metric.Int64ObservableGauge
-}
-
-func newAsyncGaugeMap() *asyncGaugeMap {
-	return &asyncGaugeMap{m: map[string]metric.Int64ObservableGauge{}}
 }
 
 func (g *asyncGaugeMap) Get(name string) (metric.Int64ObservableGauge, bool) {
@@ -211,10 +199,6 @@ type histogramMap struct {
 	m  map[string]metric.Int64Histogram
 }
 
-func newHistogramMap() *histogramMap {
-	return &histogramMap{m: map[string]metric.Int64Histogram{}}
-}
-
 func (h *histogramMap) Get(name string) (metric.Int64Histogram, bool) {
 	h.rw.RLock()
 	defer h.rw.RUnlock()
@@ -272,10 +256,11 @@ type metricsRegistry struct {
 
 func newRegistry() *metricsRegistry {
 	return &metricsRegistry{
-		counters:       newCounterMap(),
-		updownCounters: newUpDownCounterMap(),
-		asyncGauges:    newAsyncGaugeMap(),
-		histograms:     newHistogramMap(),
+		counters:       &counterMap{m: map[string]metric.Int64Counter{}},
+		updownCounters: &upDownCounterMap{m: map[string]metric.Int64UpDownCounter{}},
+		asyncGauges:    &asyncGaugeMap{m: map[string]metric.Int64ObservableGauge{}},
+		gauges:         &gaugeMap{m: map[string]metric.Int64Gauge{}},
+		histograms:     &histogramMap{m: map[string]metric.Int64Histogram{}},
 	}
 }
 
