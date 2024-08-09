@@ -9,9 +9,10 @@ export default async function EnvsPage() {
 
   return newIANav ? (
     <Layout>
-      <div className="border-subtle flex h-[52px] w-full flex-row items-center justify-start border-b px-6">
+      <div className="border-subtle flex h-[52px] w-full shrink-0 flex-row items-center justify-start border-b px-6">
         <div className="text-basis text-base leading-tight">All Environments</div>
       </div>
+
       <Environments />
     </Layout>
   ) : (
