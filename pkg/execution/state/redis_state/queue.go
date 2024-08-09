@@ -1014,9 +1014,10 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 	return partitions
 }
 
+// RunJobs returns a list of jobs that are due to run for a given run ID.
 func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]osqueue.JobResponse, error) {
-	if limit > 10 || limit <= 0 {
-		limit = 10
+	if limit > 1000 || limit <= 0 {
+		limit = 1000
 	}
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RunJobs"), redis_telemetry.ScopeQueue)
@@ -1060,6 +1061,7 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 			Position: pos,
 			Kind:     qi.Data.Kind,
 			Attempt:  qi.Data.Attempt,
+			Raw:      qi,
 		})
 	}
 
@@ -1288,10 +1290,10 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 	if limit > QueuePeekMax {
 		// Lua's max unpack() length is 8000; don't allow users to peek more than
 		// 1k at a time regardless.
-		return nil, ErrQueuePeekMaxExceedsLimits
+		limit = QueuePeekMax
 	}
 	if limit <= 0 {
-		limit = QueuePeekMax
+		limit = QueuePeekMin
 	}
 	if isPeekNext {
 		limit = 1
@@ -2465,11 +2467,19 @@ func (q *queue) peekEWMA(ctx context.Context, fnID uuid.UUID) (int64, error) {
 		return 0, nil
 	}
 
-	// convert to float for
+	hasNonZero := false
 	vals := make([]float64, len(strlist))
 	for i, s := range strlist {
 		v, _ := strconv.ParseFloat(s, 64)
 		vals[i] = v
+		if v > 0 {
+			hasNonZero = true
+		}
+	}
+
+	if !hasNonZero {
+		// short-circuit.
+		return 0, nil
 	}
 
 	// create a simple EWMA, add all the numbers in it and get the final value

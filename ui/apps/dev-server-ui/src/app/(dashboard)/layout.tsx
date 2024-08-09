@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { Badge } from '@inngest/components/Badge';
 import { TooltipProvider } from '@inngest/components/Tooltip';
 import { IconApp } from '@inngest/components/icons/App';
 import { IconFunction } from '@inngest/components/icons/Function';
@@ -34,6 +35,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Header>
         <Navbar>
           <NavbarLink icon={<IconFeed />} href="/stream" tabName="Stream" />
+          <NavbarLink
+            icon={<IconFunction />}
+            href="/runs"
+            tabName="Runs"
+            badge={
+              <Badge kind="solid" className=" h-3.5 bg-indigo-500 px-[0.235rem] text-white">
+                Beta
+              </Badge>
+            }
+          />
           <NavbarLink icon={<IconApp />} href="/apps" hasError={hasSyncingError} tabName="Apps" />
           <NavbarLink icon={<IconFunction />} href="/functions" tabName="Functions" />
         </Navbar>

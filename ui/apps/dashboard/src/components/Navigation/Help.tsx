@@ -19,7 +19,7 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
   const status = useSystemStatus();
 
   return (
-    <div className="mx-2.5">
+    <div className={`${collapsed ? 'items-center' : 'mx-4'}`}>
       <Listbox>
         <Listbox.Button className="w-full ring-0">
           <MenuItem
@@ -30,7 +30,7 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
         </Listbox.Button>
         <div className="relative">
           <Listbox.Options className="bg-canvasBase absolute -right-48 bottom-0 z-50 ml-8 w-[199px] gap-y-0.5 rounded border shadow ring-0 focus:outline-none">
-            <Link href="https://www.inngest.com/docs?ref=support-center">
+            <Link href="https://www.inngest.com/docs?ref=support-center" target="_blank">
               <Listbox.Option
                 className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
                 value="docs"
@@ -41,7 +41,7 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
                 </div>
               </Listbox.Option>
             </Link>
-            <Link href="/support">
+            <Link href="/support" target="_blank">
               <Listbox.Option
                 className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
                 value="support"
@@ -52,7 +52,10 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
                 </div>
               </Listbox.Option>
             </Link>
-            <Link href="https://discord.com/channels/842170679536517141/1051516534029291581">
+            <Link
+              href="https://discord.com/channels/842170679536517141/1051516534029291581"
+              target="_blank"
+            >
               <Listbox.Option
                 className="text-subtle hover:bg-canvasSubtle mx-2 my-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
                 value="discord"
@@ -64,7 +67,7 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
               </Listbox.Option>
             </Link>
             <hr />
-            <Link href="https://roadmap.inngest.com/roadmap">
+            <Link href="https://roadmap.inngest.com/roadmap" target="_blank">
               <Listbox.Option
                 className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
                 value="roadmap"
@@ -75,7 +78,7 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
                 </div>
               </Listbox.Option>
             </Link>
-            <Link href="/support">
+            <Link href="/support" target="_blank">
               <Listbox.Option
                 className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
                 value="status"
@@ -86,7 +89,7 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
                 </div>
               </Listbox.Option>
             </Link>
-            <Link href="https://roadmap.inngest.com/changelog">
+            <Link href="https://roadmap.inngest.com/changelog" target="_blank">
               <Listbox.Option
                 className="text-subtle hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
                 value="releaseNotes"

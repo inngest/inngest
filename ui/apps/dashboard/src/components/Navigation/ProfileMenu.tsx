@@ -52,7 +52,7 @@ export const ProfileMenu = ({ children }: { children: ReactNode }) => {
               </div>
             </Listbox.Option>
           </Link>
-          <Link href="/organization-list">
+          <a href="/organization-list">
             <Listbox.Option
               className="text-subtle hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="switchOrg"
@@ -62,7 +62,7 @@ export const ProfileMenu = ({ children }: { children: ReactNode }) => {
                 <div>Switch Organization</div>
               </div>
             </Listbox.Option>
-          </Link>
+          </a>
 
           <hr />
 
