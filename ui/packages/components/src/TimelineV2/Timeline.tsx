@@ -9,10 +9,11 @@ type Props = {
   pathCreator: {
     runPopout: (params: { runID: string }) => Route;
   };
+  runID: string;
   trace: Lazy<React.ComponentProps<typeof Trace>['trace']>;
 };
 
-export function Timeline({ getResult, pathCreator, trace }: Props) {
+export function Timeline({ getResult, pathCreator, runID, trace }: Props) {
   if (!isLazyDone(trace)) {
     // TODO: Properly handle loading state
     return null;
@@ -30,6 +31,7 @@ export function Timeline({ getResult, pathCreator, trace }: Props) {
         maxTime={maxTime}
         minTime={minTime}
         pathCreator={pathCreator}
+        runID={runID}
         trace={{ ...trace, childrenSpans: [], name: 'Run' }}
       />
 
@@ -42,6 +44,7 @@ export function Timeline({ getResult, pathCreator, trace }: Props) {
             maxTime={maxTime}
             minTime={minTime}
             pathCreator={pathCreator}
+            runID={runID}
             trace={child}
           />
         );

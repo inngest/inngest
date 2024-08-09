@@ -367,14 +367,9 @@ export const GET_RUN = gql`
 `;
 
 export const GET_TRACE_RESULT = gql`
-  query GetTraceResult($traceID: String!) {
-    runTraceSpanOutputByID(outputID: $traceID) {
-      data
-      error {
-        message
-        name
-        stack
-      }
+  query GetTraceResult($runID: String!) {
+    run(runID: $runID) {
+      output
     }
   }
 `;
