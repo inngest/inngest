@@ -646,12 +646,13 @@ func (l traceLifecycle) OnInvokeFunction(
 ) {
 	ctx = l.extractTraceCtx(ctx, md, false)
 
-	meta := invocationEvt.InngestMetadata()
-	if meta == nil {
+	meta, err := invocationEvt.InngestMetadata()
+	if err != nil {
 		l.log.Error("invocation event metadata not available",
 			"lifecycle", "OnInvokeFunction",
 			"meta", md,
 			"evt", invocationEvt,
+			"error", err,
 		)
 		return
 	}

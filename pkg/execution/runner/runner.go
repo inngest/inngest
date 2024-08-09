@@ -443,7 +443,10 @@ func FindInvokedFunction(ctx context.Context, tracked event.TrackedEvent, fl cqr
 	}
 
 	fnID := ""
-	metadata := evt.InngestMetadata()
+	metadata, err := evt.InngestMetadata()
+	if err != nil {
+		return nil, err
+	}
 	if metadata != nil && metadata.InvokeFnID != "" {
 		fnID = metadata.InvokeFnID
 	}

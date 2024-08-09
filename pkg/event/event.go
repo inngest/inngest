@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -115,7 +116,7 @@ func (e Event) Validate(ctx context.Context) error {
 // CorrelationID returns the correlation ID for the event.
 func (e Event) CorrelationID() string {
 	if e.Name == InvokeFnName {
-		if metadata := e.InngestMetadata(); metadata != nil {
+		if metadata, err := e.InngestMetadata(); err == nil {
 			return metadata.InvokeCorrelationId
 		}
 	}
@@ -180,21 +181,21 @@ func (m *InngestMetadata) RunID() *ulid.ULID {
 	return nil
 }
 
-func (e Event) InngestMetadata() *InngestMetadata {
+func (e Event) InngestMetadata() (*InngestMetadata, error) {
 	rawData, ok := e.Data[consts.InngestEventDataPrefix].(map[string]interface{})
 	if !ok {
-		return nil
+		return nil, fmt.Errorf("no data found in prefix '%s'", consts.InngestEventDataPrefix)
 	}
 
 	var metadata InngestMetadata
 	jsonData, err := json.Marshal(rawData)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	if err := json.Unmarshal(jsonData, &metadata); err != nil {
-		return nil
+		return nil, err
 	}
-	return &metadata
+	return &metadata, nil
 }
 
 func NewOSSTrackedEvent(e Event) TrackedEvent {
