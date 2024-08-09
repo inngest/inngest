@@ -5,7 +5,7 @@ import { OptionalTooltip } from '../Navigation/OptionalTooltip';
 
 export const Back = ({ className }: { className?: string }) => {
   return (
-    <OptionalTooltip tooltip="Back to environment">
+    <OptionalTooltip tooltip="Back to environment" side={'bottom'}>
       <NewButton
         kind="secondary"
         appearance="outlined"
@@ -13,7 +13,6 @@ export const Back = ({ className }: { className?: string }) => {
         icon={<RiArrowLeftLine />}
         className={className}
         href="/"
-        scroll={false}
       />
     </OptionalTooltip>
   );
