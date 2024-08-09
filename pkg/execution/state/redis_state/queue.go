@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -239,14 +240,6 @@ func WithAsyncInstrumentation() QueueOpt {
 		telemetry.GaugeWorkerQueueCapacity(ctx, telemetry.GaugeOpt{
 			PkgName:  pkgName,
 			Callback: func(ctx context.Context) (int64, error) { return int64(q.numWorkers), nil },
-		})
-
-		telemetry.GaugeGlobalQueuePartitionCount(ctx, telemetry.GaugeOpt{
-			PkgName: pkgName,
-			Callback: func(ctx context.Context) (int64, error) {
-				dur := time.Hour * 24 * 365
-				return q.partitionSize(ctx, q.u.kg.GlobalPartitionIndex(), q.clock.Now().Add(dur))
-			},
 		})
 
 		telemetry.GaugeGlobalQueuePartitionAvailable(ctx, telemetry.GaugeOpt{
@@ -1890,6 +1883,72 @@ func (q *queue) InProgress(ctx context.Context, prefix string, concurrencyKey st
 		Max("+inf").
 		Build()
 	return q.u.unshardedRc.Do(ctx, cmd).AsInt64()
+}
+
+func (q *queue) Instrument(ctx context.Context) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Instrument"), redis_telemetry.ScopeQueue)
+
+	var offset, total int64
+	chunkSize := int64(1000)
+
+	r := q.u.unshardedRc
+	// iterate through all the partitions in the global partitions in chunks
+	wg := sync.WaitGroup{}
+	for {
+		// grab the global partition by chunks
+		cmd := r.B().Zrange().
+			Key(q.u.kg.GlobalPartitionIndex()).
+			Min("-inf").
+			Max("+inf").
+			Byscore().
+			Limit(offset, chunkSize).
+			Build()
+
+		pkeys, err := r.Do(ctx, cmd).AsStrSlice()
+		if err != nil {
+			return fmt.Errorf("error retrieving partitions for instrumentation: %w", err)
+		}
+
+		for _, pk := range pkeys {
+			wg.Add(1)
+
+			// check each partition concurrently
+			go func(ctx context.Context, pkey string) {
+				defer wg.Done()
+
+				cntCmd := r.B().Zcount().Key(q.u.kg.QueueIndex(pkey)).Min("-inf").Max("+inf").Build()
+				count, err := q.u.unshardedRc.Do(ctx, cntCmd).AsInt64()
+				if err != nil {
+					q.logger.Warn().Err(err).Str("pkey", pkey).Str("context", "instrumentation").Msg("error checking partition count")
+					return
+				}
+
+				telemetry.GaugePartitionSize(ctx, count, telemetry.GaugeOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						// NOTE: potentially high cardinality but this gives better clarify of stuff
+						"partition": pkey,
+					},
+				})
+
+				atomic.AddInt64(&total, 1)
+			}(ctx, pk)
+
+		}
+
+		offset += chunkSize
+
+		break
+	}
+
+	// instrument the total count of global partition
+	telemetry.GaugeGlobalPartitionSize(ctx, atomic.LoadInt64(&total), telemetry.GaugeOpt{
+		PkgName: pkgName,
+	})
+
+	wg.Wait()
+
+	return nil
 }
 
 // Scavenge attempts to find jobs that may have been lost due to killed workers.  Workers are shared

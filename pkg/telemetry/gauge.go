@@ -24,13 +24,22 @@ func GaugeWorkerQueueCapacity(ctx context.Context, opts GaugeOpt) {
 	})
 }
 
-func GaugeGlobalQueuePartitionCount(ctx context.Context, opts GaugeOpt) {
-	RegisterAsyncGauge(ctx, GaugeOpt{
+func GaugeGlobalPartitionSize(ctx context.Context, val int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, val, GaugeOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "queue_global_partition_count",
+		MetricName:  "global_partition_size",
 		Description: "Number of total partitions in the global queue",
 		Tags:        opts.Tags,
 		Callback:    opts.Callback,
+	})
+}
+
+func GaugePartitionSize(ctx context.Context, val int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, val, GaugeOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "partition_size",
+		Description: "Number of items in a particular partition",
+		Tags:        opts.Tags,
 	})
 }
 
