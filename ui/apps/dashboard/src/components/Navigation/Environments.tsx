@@ -5,7 +5,7 @@ import { type Route } from 'next';
 import Link from 'next/link';
 import { usePathname, useRouter, useSelectedLayoutSegments } from 'next/navigation';
 import { Listbox } from '@headlessui/react';
-import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
+import { Alert } from '@inngest/components/Alert/Alert';
 import { RiCloudFill, RiCloudLine, RiExpandUpDownLine, RiLoopLeftLine } from '@remixicon/react';
 
 import { useEnvironments } from '@/queries';
@@ -18,7 +18,6 @@ import {
   getTestEnvironments,
   type Environment,
 } from '@/utils/environments';
-import isNonEmptyArray from '@/utils/isNonEmptyArray';
 import { OptionalTooltip } from './OptionalTooltip';
 
 // Some URLs cannot just swap between environments,
@@ -110,10 +109,15 @@ export default function EnvironmentSelectMenu({
   const router = useRouter();
   const [selected, setSelected] = useState<Environment | null>(null);
   const nextPathname = useSwitchablePathname();
-  const [{ fetching, data: envs = [] }] = useEnvironments();
+  const [{ data: envs = [], error }] = useEnvironments();
 
-  if (fetching || !isNonEmptyArray(envs)) {
-    return <Skeleton className={`h-8 ${collapsed ? 'w-8 px-1' : 'w-[158px]'}`} />;
+  if (error) {
+    console.error('error fetching envs', error);
+    return (
+      <Alert severity="error" className="mx-auto flex h-8 w-full items-center text-sm">
+        Env Error
+      </Alert>
+    );
   }
 
   const defaultEnvironment = getDefaultEnvironment(envs);
@@ -233,7 +237,7 @@ function EnvironmentItem({
       )}
     >
       <span className={cn('block h-1.5 w-1.5 shrink-0 rounded-full', statusColorClass)} />
-      <span className="truncate">"{name || environment.name}"</span>
+      <span className="truncate">{name || environment.name}</span>
     </Listbox.Option>
   );
 }

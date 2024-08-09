@@ -10,6 +10,7 @@ export const Back = ({ className }: { className?: string }) => {
       icon={<RiArrowLeftLine />}
       className={className}
       href="/"
+      scroll={false}
     />
   );
 };

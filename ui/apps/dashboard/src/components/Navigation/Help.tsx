@@ -51,10 +51,7 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
               </div>
             </Listbox.Option>
           </Link>
-          <Link
-            href="https://discord.com/channels/842170679536517141/1051516534029291581"
-            target="_blank"
-          >
+          <Link href="https://www.inngest.com/discord" target="_blank">
             <Listbox.Option
               className="text-subtle hover:bg-canvasSubtle mx-2 my-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="discord"

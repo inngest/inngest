@@ -1,14 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { RiPlugLine } from '@remixicon/react';
 
 import type { Environment } from '@/utils/environments';
 import { Alert } from '../Navigation/Alert';
 import { Help } from '../Navigation/Help';
 import { Integrations } from '../Navigation/Integrations';
 import Logo from '../Navigation/Logo';
-import { MenuItem } from '../Navigation/MenuItem';
 import Navigation from '../Navigation/Navigation';
 import { Profile, type ProfileType } from '../Navigation/Profile';
 

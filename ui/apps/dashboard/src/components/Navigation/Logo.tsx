@@ -49,7 +49,7 @@ export default function Logo({ collapsed, setCollapsed }: LogoProps) {
           </div>
         ) : (
           <>
-            <Link href={process.env.NEXT_PUBLIC_HOME_PATH as Route}>
+            <Link href={process.env.NEXT_PUBLIC_HOME_PATH as Route} scroll={false}>
               <InngestLogo className="text-basis mr-2" width={92} />
             </Link>
           </>

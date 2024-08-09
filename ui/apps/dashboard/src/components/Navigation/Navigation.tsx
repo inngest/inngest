@@ -1,3 +1,6 @@
+import { Suspense } from 'react';
+import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
+
 import type { Environment as EnvType } from '@/utils/environments';
 import Environments from './Environments';
 import KeysMenu from './KeysMenu';
@@ -20,7 +23,9 @@ export default function Navigation({ collapsed, activeEnv }: NavProps) {
           collapsed ? 'flex-col' : 'flex-row'
         } w-full justify-between gap-x-1 gap-y-2`}
       >
-        <Environments activeEnv={activeEnv} collapsed={collapsed} />
+        <Suspense fallback={<Skeleton className={`h-8 w-full`} />}>
+          <Environments activeEnv={activeEnv} collapsed={collapsed} />
+        </Suspense>
 
         {activeEnv && <KeysMenu activeEnv={activeEnv} collapsed={collapsed} />}
       </div>
