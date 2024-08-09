@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+import type { Run as InitialRunData } from '../RunsPage/types';
 import { StatusCell } from '../Table';
 import { Trace } from '../TimelineV2';
 import { Timeline } from '../TimelineV2/Timeline';
@@ -18,6 +19,7 @@ type Props = {
   cancelRun: (runID: string) => Promise<unknown>;
   getResult: (outputID: string) => Promise<Result>;
   getRun: (runID: string) => Promise<Run>;
+  initialRunData: InitialRunData;
   getTrigger: React.ComponentProps<typeof TriggerDetails>['getTrigger'];
   pathCreator: React.ComponentProps<typeof RunInfo>['pathCreator'];
   pollInterval?: number;
@@ -106,6 +108,7 @@ export function RunDetails(props: Props) {
                 className="mb-4"
                 pathCreator={pathCreator}
                 rerun={rerun}
+                initialRunData={props.initialRunData}
                 run={nullishToLazy(run)}
                 runID={runID}
                 standalone={standalone}

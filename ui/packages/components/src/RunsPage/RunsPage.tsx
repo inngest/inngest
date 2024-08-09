@@ -208,18 +208,19 @@ export function RunsPage({
   );
 
   const renderSubComponent = useCallback(
-    ({ id }: { id: string }) => {
+    (rowData: Run) => {
       return (
         <div className="border-subtle border-l-4 pb-6">
           <RunDetails
             cancelRun={cancelRun}
             getResult={getTraceResult}
             getRun={getRun}
+            initialRunData={rowData}
             getTrigger={getTrigger}
             pathCreator={pathCreator}
             pollInterval={pollInterval}
             rerun={rerun}
-            runID={id}
+            runID={rowData.id}
             standalone={false}
           />
         </div>
