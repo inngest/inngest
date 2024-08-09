@@ -99,6 +99,7 @@ func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Meta
 		if byt, err := json.Marshal(evt); err == nil {
 			span.AddEvent(string(byt), trace.WithAttributes(
 				attribute.Bool(consts.OtelSysEventData, true),
+				attribute.String(consts.OtelSysEventInternalID, e.GetInternalID().String()),
 			))
 		}
 	}
@@ -230,10 +231,14 @@ func (l traceLifecycle) OnFunctionStarted(
 		span.SetAttributes(attribute.String(consts.OtelSysFunctionLink, *md.Config.TraceLink()))
 	}
 
-	for _, e := range evts {
-		span.AddEvent(string(e), trace.WithAttributes(
-			attribute.Bool(consts.OtelSysEventData, true),
-		))
+	if err := span.SetEvents(ctx, md.Config.EventIDs, evts); err != nil {
+		l.log.Error("error setting events",
+			"lifecycle", "OnFunctionStarted",
+			"errors", err,
+			"meta", md,
+			"item", item,
+			"evts", evts,
+		)
 	}
 }
 
@@ -307,10 +312,14 @@ func (l traceLifecycle) OnFunctionFinished(
 		span.SetAttributes(attribute.String(consts.OtelSysFunctionLink, *md.Config.TraceLink()))
 	}
 
-	for _, e := range evts {
-		span.AddEvent(string(e), trace.WithAttributes(
-			attribute.Bool(consts.OtelSysEventData, true),
-		))
+	if err := span.SetEvents(ctx, md.Config.EventIDs, evts); err != nil {
+		l.log.Error("error setting events",
+			"lifecycle", "OnFunctionFinished",
+			"errors", err,
+			"meta", md,
+			"item", item,
+			"evts", evts,
+		)
 	}
 
 	switch resp.StatusCode {
@@ -378,10 +387,14 @@ func (l traceLifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata
 		)
 	}
 
-	for _, evt := range evts {
-		span.AddEvent(string(evt), trace.WithAttributes(
-			attribute.Bool(consts.OtelSysEventData, true),
-		))
+	if err := span.SetEvents(ctx, md.Config.EventIDs, evts); err != nil {
+		l.log.Error("error setting events",
+			"lifecycle", "OnFunctionCancelled",
+			"errors", err,
+			"meta", md,
+			"req", req,
+			"evts", evts,
+		)
 	}
 }
 

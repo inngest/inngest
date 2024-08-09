@@ -5,13 +5,17 @@ import (
 	crand "crypto/rand"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry"
+	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/sdk/instrumentation"
@@ -412,7 +416,7 @@ func (s *Span) End(opts ...trace.SpanEndOption) {
 
 	if err := telemetry.UserTracer().Export(s); err != nil {
 		ctx := context.Background()
-		log.From(ctx).Error().Err(err).Msg("error ending span")
+		logger.StdlibLogger(ctx).Error("error ending span", "error", err)
 	}
 }
 
@@ -551,6 +555,52 @@ func (s *Span) setOutput(data any, key string) {
 			s.AddEvent(string(byt), trace.WithAttributes(attr...))
 		}
 	}
+}
+
+func (s *Span) SetEvents(ctx context.Context, ids []ulid.ULID, evts []json.RawMessage) error {
+	// if there's only one, no need to complicate things
+	if len(ids) == 1 && len(evts) == 1 {
+		id := ids[0]
+		evt := evts[0]
+
+		s.AddEvent(string(evt), trace.WithAttributes(
+			attribute.Bool(consts.OtelSysEventData, true),
+			attribute.String(consts.OtelSysEventInternalID, id.String()),
+		))
+
+		return nil
+	}
+
+	var errs error
+
+	// use map to find the IDs quickly
+	idMap := map[string]bool{}
+	for _, id := range ids {
+		idMap[id.String()] = true
+	}
+
+	for _, e := range evts {
+		var evt event.Event
+
+		err := json.Unmarshal(e, &evt)
+		if err != nil {
+			errs = multierror.Append(errs, fmt.Errorf("error parsing event data"))
+			continue
+		}
+
+		// okay to pass, idempotency mismatch won't show in multi events
+		if _, ok := idMap[evt.ID]; !ok {
+			errs = multierror.Append(errs, fmt.Errorf("event ID not found in config"))
+			continue
+		}
+
+		s.AddEvent(string(e), trace.WithAttributes(
+			attribute.Bool(consts.OtelSysEventData, true),
+			attribute.String(consts.OtelSysEventInternalID, evt.ID),
+		))
+	}
+
+	return errs
 }
 
 func newSpanIDGenerator() *spanIDGenerator {
