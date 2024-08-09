@@ -371,6 +371,7 @@ func createInmemoryRedisConnection(ctx context.Context) (rueidis.Client, error) 
 	}
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		AlwaysPipelining:  false,
 		InitAddress:       []string{redisSingleton.Addr()},
 		DisableCache:      true,
 		BlockingPoolSize:  1,
