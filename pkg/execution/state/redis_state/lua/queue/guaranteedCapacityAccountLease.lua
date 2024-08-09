@@ -1,39 +1,39 @@
 --[[]
 
 Output:
-    -1: Shard not found
+    -1: Guaranteed capacity not found
     -2: Lease already exists
     -3: Invalid lease index
     0: Success
 
 --]]
 
-local keyShardMap   = KEYS[1]
+local keyGuaranteedCapacityMap   = KEYS[1]
 
-local currentTimeMS = tonumber(ARGV[1])
-local shardName     = ARGV[2]
-local leaseID       = ARGV[3]
-local leaseIndex    = tonumber(ARGV[4])
+local currentTimeMS           = tonumber(ARGV[1])
+local guaranteedCapacityName  = ARGV[2]
+local leaseID                 = ARGV[3]
+local leaseIndex              = tonumber(ARGV[4])
 
--- $include(get_shard_item.lua)
+-- $include(get_guaranteed_capacity_item.lua)
 -- $include(decode_ulid_time.lua)
 
-local shard         = get_shard_item(keyShardMap, shardName)
-if shard == nil then
+local guaranteedCapacity         = get_guaranteed_capacity_item(keyGuaranteedCapacityMap, guaranteedCapacityName)
+if guaranteedCapacity == nil then
     return -1
 end
 
 -- TODO:
 -- Filter expired leases based off of currentTimeMS
 -- If index != remaining, fail.
--- Append lease to shard
+-- Append lease to guaranteed capacity
 -- Update map
 -- Return OK
 
 local validLeases = {}
 
-if shard.leases ~= nil and #shard.leases > 0 then
-    for _, lease in ipairs(shard.leases) do
+if guaranteedCapacity.leases ~= nil and #guaranteedCapacity.leases > 0 then
+    for _, lease in ipairs(guaranteedCapacity.leases) do
         if decode_ulid_time(lease) >= currentTimeMS then
             table.insert(validLeases, lease)
         end
@@ -52,8 +52,8 @@ end
 
 -- Add the new lease ID to valid leases, in effect garbage collecting expired leases.
 table.insert(validLeases, leaseID)
-shard.leases = validLeases
+guaranteedCapacity.leases = validLeases
 
-redis.call("HSET", keyShardMap, shardName, cjson.encode(shard))
+redis.call("HSET", keyGuaranteedCapacityMap, guaranteedCapacityName, cjson.encode(guaranteedCapacity))
 
 return 0

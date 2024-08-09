@@ -15,11 +15,10 @@ local partitionKey            = KEYS[1]
 local keyGlobalPartitionPtr   = KEYS[2]
 local keyGlobalAccountPointer = KEYS[3] -- accounts:sorted - zset
 local keyAccountPartitions    = KEYS[4] -- accounts:$accountId:partition:sorted - zset
-local keyShardPartitionPtr    = KEYS[5]
-local partitionMeta           = KEYS[6]
-local keyPartitionZset        = KEYS[7]
-local partitionConcurrencyKey = KEYS[8] -- We can only GC a partition if no running jobs occur.
-local queueKey                = KEYS[9]
+local partitionMeta           = KEYS[5]
+local keyPartitionZset        = KEYS[6]
+local partitionConcurrencyKey = KEYS[7] -- We can only GC a partition if no running jobs occur.
+local queueKey                = KEYS[8]
 
 local partitionID             = ARGV[1]
 local atMS                    = tonumber(ARGV[2]) -- time in milliseconds
@@ -29,11 +28,11 @@ local accountId               = ARGV[4]
 local atS = math.floor(atMS / 1000) -- in seconds;  partitions are currently second granularity, but this should change.
 
 -- $include(get_partition_item.lua)
--- $include(has_shard_key.lua)
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
 
+--
 local existing = get_partition_item(partitionKey, partitionID)
 if existing == nil then
     return 1
@@ -57,9 +56,6 @@ if tonumber(redis.call("ZCARD", keyPartitionZset)) == 0 and tonumber(redis.call(
       end
     end
 
-    if has_shard_key(keyShardPartitionPtr) then
-        redis.call("ZREM", keyShardPartitionPtr, partitionID) -- Remove the shard index
-    end
     return 2
 end
 
@@ -89,9 +85,5 @@ existing.leaseID = nil
 redis.call("HSET", partitionKey, partitionID, cjson.encode(existing))
 update_pointer_score_to(partitionID, keyGlobalPartitionPtr, atS)
 update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, atS)
-
-if has_shard_key(keyShardPartitionPtr) then
-    redis.call("ZADD", keyShardPartitionPtr, atS, partitionID) -- Update any index
-end
 
 return 0
