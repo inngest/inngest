@@ -9,6 +9,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/telemetry/exporters"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/jaeger"
@@ -377,7 +378,7 @@ func newNatsTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) 
 		return nil, fmt.Errorf("nats options not available")
 	}
 
-	exp, err := NewNATSSpanExporter(ctx, opts.NATS)
+	exp, err := exporters.NewNATSSpanExporter(ctx, opts.NATS)
 	if err != nil {
 		return nil, fmt.Errorf("error creating NATS trace client: %w", err)
 	}
