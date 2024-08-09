@@ -25,7 +25,7 @@ export const EventList = () => {
   }
 
   return (
-    <main className="min-h-0 flex-1 overflow-y-auto bg-slate-100">
+    <main className="min-h-0 flex-1 bg-slate-100">
       <table className="relative w-full border-b border-slate-200 bg-white">
         <thead className="shadow-outline-primary-light sticky top-0 z-10 bg-white">
           <tr>
