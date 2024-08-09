@@ -1,0 +1,61 @@
+syntax = "proto3";
+package span;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/any.proto";
+// reference other protobuf files
+import "run/v2/run.proto";
+
+option go_package = "github.com/inngest/inngest/proto/gen/run/v2;runv2";
+
+message Span {
+  SpanIdentifier id = 1;
+  SpanContext ctx = 2;
+
+  optional string name = 3;
+  optional run.v2.SpanStepOp kind = 4;
+  run.v2.SpanStatus status = 5;
+  string scope = 6;
+
+  google.protobuf.Timestamp timestamp = 7;
+  int64 duration = 8; // in miliseconds
+  map<string, google.protobuf.Any> attributes = 9;
+
+  repeated Trigger triggers = 10;
+
+  repeated bytes output = 11;
+  repeated SpanLink links = 12;
+  repeated SpanEvent events = 13;
+}
+
+message SpanIdentifier {
+  string account_id = 1;
+  string env_id = 2;
+  string app_id = 3;
+  string function_id = 4;
+  string run_id = 5;
+}
+
+message SpanContext {
+  string trace_id = 1;
+  optional string parent_span_id = 2;
+  string span_id = 3;
+}
+
+message Trigger {
+  string internal_id = 1; // Event ULID
+  repeated bytes body = 2;
+}
+
+message SpanEvent {
+  google.protobuf.Timestamp timestamp = 1;
+  string name = 2;
+  map<string, google.protobuf.Any> attributes = 3;
+}
+
+message SpanLink {
+  string trace_id = 1;
+  string span_id = 2;
+  string trace_state = 3;
+  map<string, google.protobuf.Any> attributes = 4;
+}
