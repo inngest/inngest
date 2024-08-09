@@ -373,7 +373,9 @@ func newTextMapPropagator() propagation.TextMapPropagator {
 }
 
 func newNatsTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
-	exp, err := NewNATSSpanExporter(ctx)
+	urls := opts.Endpoint()
+
+	exp, err := NewNATSSpanExporter(ctx, urls)
 	if err != nil {
 		return nil, fmt.Errorf("error creating NATS trace client: %w", err)
 	}
