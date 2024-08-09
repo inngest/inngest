@@ -55,6 +55,9 @@
             buf
             protoc-gen-go
             protoc-gen-connect-go
+            natscli
+            nats-server
+            nats-top
           ];
         };
       });
