@@ -30,6 +30,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
@@ -399,7 +400,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	evtMap := req.Events[0].GetEvent().Map()
 	factor, _ := req.Function.RunPriorityFactor(ctx, evtMap)
 	// function run spanID
-	spanID := telemetry.NewSpanID(ctx)
+	spanID := run.NewSpanID(ctx)
 
 	config := sv2.Config{
 		FunctionVersion: req.Function.FunctionVersion,
@@ -2114,7 +2115,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 	opcode := gen.Op.String()
 	now := time.Now()
 
-	sid := telemetry.NewSpanID(ctx)
+	sid := run.NewSpanID(ctx)
 	// NOTE: the context here still contains the execSpan's traceID & spanID,
 	// which is what we want because that's the parent that needs to be referenced later on
 	carrier := telemetry.NewTraceCarrier(
@@ -2255,7 +2256,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 	opcode := gen.Op.String()
 	now := time.Now()
 
-	sid := telemetry.NewSpanID(ctx)
+	sid := run.NewSpanID(ctx)
 	// NOTE: the context here still contains the execSpan's traceID & spanID,
 	// which is what we want because that's the parent that needs to be referenced later on
 	carrier := telemetry.NewTraceCarrier(
@@ -2417,11 +2418,11 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 	}
 
 	// root span for scheduling a batch
-	ctx, span := telemetry.NewSpan(ctx,
-		telemetry.WithScope(consts.OtelScopeBatch),
-		telemetry.WithName(consts.OtelSpanBatch),
-		telemetry.WithNewRoot(),
-		telemetry.WithSpanAttributes(
+	ctx, span := run.NewSpan(ctx,
+		run.WithScope(consts.OtelScopeBatch),
+		run.WithName(consts.OtelSpanBatch),
+		run.WithNewRoot(),
+		run.WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, payload.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, payload.WorkspaceID.String()),
