@@ -198,6 +198,8 @@ func (s *svc) Run(ctx context.Context) error {
 }
 
 func (s *svc) Stop(ctx context.Context) error {
+	s.exec.CloseLifecycleListeners(ctx)
+
 	// Wait for all in-flight queue runs to finish
 	s.wg.Wait()
 	return nil
@@ -289,6 +291,11 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 	}
 	if status == enums.BatchStatusStarted.String() {
 		// batch already started, abort
+		return nil
+	}
+	if status == enums.BatchStatusAbsent.String() {
+		// just attempt clean up, don't care about the result
+		_ = s.batcher.ExpireKeys(ctx, opts.FunctionID, batchID)
 		return nil
 	}
 

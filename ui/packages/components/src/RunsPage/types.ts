@@ -8,6 +8,8 @@ export type Run = {
     externalID: string;
     name: string;
   };
+  cronSchedule: string | null;
+  eventName: string | null;
   function: {
     name: string;
     slug: string;
@@ -15,6 +17,7 @@ export type Run = {
   status: FunctionRunStatus;
   durationMS: number | null;
   id: string;
+  isBatch: boolean;
   queuedAt: string;
   endedAt: string | null;
   startedAt: string | null;

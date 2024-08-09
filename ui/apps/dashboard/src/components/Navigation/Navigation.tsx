@@ -16,7 +16,7 @@ export default function Navigation({ collapsed, activeEnv }: NavProps) {
   return (
     <div
       className={`text-basis flex h-full w-full flex-col items-start ${
-        collapsed ? 'items-center' : 'ml-5'
+        collapsed ? 'items-center' : 'ml-4'
       } mt-5 flex`}
     >
       <div className="flex flex-col justify-start">

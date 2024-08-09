@@ -23,7 +23,7 @@ type RunsTableProps = {
   isLoading?: boolean;
   renderSubComponent: (props: { id: string }) => React.ReactElement;
   getRowCanExpand: (row: Row<Run>) => boolean;
-  columnVisibility?: VisibilityState;
+  visibleColumns?: VisibilityState;
   scope: ViewScope;
 };
 
@@ -34,7 +34,7 @@ export default function RunsTable({
   setSorting,
   getRowCanExpand,
   renderSubComponent,
-  columnVisibility,
+  visibleColumns: columnVisibility,
   scope,
 }: RunsTableProps) {
   const columns = useScopedColumns(scope);

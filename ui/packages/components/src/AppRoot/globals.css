@@ -150,7 +150,7 @@
     --color-background-warningContrast: var(--color-honey-800);
     --color-background-info: var(--color-breeze-0);
     --color-background-infoContrast: var(--color-breeze-900);
-    --color-background-codeEditor: var(--color-carbon-100);
+    --color-background-codeEditor: var(--color-carbon-50);
     --color-background-btn-primary: var(--color-matcha-600);
     --color-background-btn-primaryHover: var(--color-matcha-700);
     --color-background-btn-primaryPressed: var(--color-matcha-900);
@@ -195,6 +195,15 @@
     --color-foreground-btn-primaryDisabled: var(--color-matcha-300);
     --color-foreground-btn-danger: var(--color-ruby-600);
     --color-foreground-btn-dangerDisabled: var(--color-ruby-300);
+    --color-foreground-code-delimiterBracketJson: var(--color-carbon-800);
+    --color-foreground-code-stringKeyJson: var(--color-purplehaze-500);
+    --color-foreground-code-numberJson: var(--color-honey-600);
+    --color-foreground-code-stringValueJson: var(--color-matcha-600);
+    --color-foreground-code-keywordJson: var(--color-blush-500);
+    --color-foreground-code-comment: var(--color-carbon-500);
+    --color-foreground-code-string: var(--color-breeze-600);
+    --color-foreground-code-keyword: var(--color-purplehaze-500);
+    --color-foreground-code-entityNameFunction: var(--color-breeze-800);
 
     --color-secondary-4xSubtle: var(--color-breeze-0);
     --color-secondary-3xSubtle: var(--color-breeze-100);
@@ -244,7 +253,7 @@
     --color-background-warningContrast: var(--color-honey-100);
     --color-background-info: var(--color-breeze-900);
     --color-background-infoContrast: var(--color-breeze-100);
-    --color-background-codeEditor: var(--color-carbon-800);
+    --color-background-codeEditor: var(--color-carbon-900);
     --color-background-btn-primary: var(--color-matcha-600);
     --color-background-btn-primaryHover: var(--color-matcha-700);
     --color-background-btn-primaryPressed: var(--color-matcha-900);
@@ -289,6 +298,15 @@
     --color-foreground-btn-primaryDisabled: var(--color-matcha-800);
     --color-foreground-btn-danger: var(--color-ruby-500);
     --color-foreground-btn-dangerDisabled: var(--color-ruby-900);
+    --color-foreground-code-delimiterBracketJson: var(--color-carbon-200);
+    --color-foreground-code-stringKeyJson: var(--color-purplehaze-500);
+    --color-foreground-code-numberJson: var(--color-honey-400);
+    --color-foreground-code-stringValueJson: var(--color-matcha-400);
+    --color-foreground-code-keywordJson: var(--color-blush-500);
+    --color-foreground-code-comment: var(--color-carbon-500);
+    --color-foreground-code-string: var(--color-breeze-400);
+    --color-foreground-code-keyword: var(--color-purplehaze-500);
+    --color-foreground-code-entityNameFunction: var(--color-breeze-300);
 
     --color-secondary-4xSubtle: var(--color-breeze-1000);
     --color-secondary-3xSubtle: var(--color-breeze-900);

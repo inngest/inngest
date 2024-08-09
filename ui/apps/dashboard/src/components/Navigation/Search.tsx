@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useOrganization, useUser } from '@clerk/nextjs';
 import { NewButton } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
 import { cn } from '@inngest/components/utils/classNames';
@@ -224,15 +225,8 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
   );
 }
 
-export default function Search() {
+export default function Search({ collapsed }: { collapsed: boolean }) {
   const [isSearchModalVisible, setIsSearchModalVisible] = useState(false);
-
-  const modifierKey =
-    typeof window === 'undefined'
-      ? '⌘'
-      : navigator.platform.toUpperCase().indexOf('MAC') >= 0
-      ? '⌘'
-      : 'Ctrl';
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -251,22 +245,34 @@ export default function Search() {
 
   return (
     <>
-      <NewButton
-        kind="secondary"
-        appearance="outlined"
-        size="medium"
-        className="h-[28px] px-2"
-        onClick={() => setIsSearchModalVisible(true)}
-        aria-label="Search by ID"
-        icon={
-          <kbd className="mx-auto flex w-full items-center justify-center space-x-1">
-            <kbd className={`text-subtle ${modifierKey === '⌘' && 'text-[20px]'}`}>
-              {modifierKey}
-            </kbd>
-            <kbd className="text-subtle text-sm">K</kbd>
-          </kbd>
-        }
-      />
+      {collapsed ? null : (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <NewButton
+              kind="secondary"
+              appearance="outlined"
+              size="medium"
+              className="h-[28px] w-[42px] overflow-hidden px-2"
+              onClick={() => setIsSearchModalVisible(true)}
+              aria-label="Search by ID"
+              icon={
+                <kbd className="mx-auto flex w-full items-center justify-center space-x-1">
+                  <kbd className={`text-subtle text-[20px]`}>⌘</kbd>
+                  <kbd className="text-subtle text-xs">K</kbd>
+                </kbd>
+              }
+            />
+          </TooltipTrigger>
+          <TooltipContent
+            side="bottom"
+            sideOffset={2}
+            className="border-muted text-subtle rounded border text-xs"
+          >
+            Use <span className="font-bold">⌘ K</span> or <span className="font-bold">Ctrl K</span>{' '}
+            to search
+          </TooltipContent>
+        </Tooltip>
+      )}
 
       <SearchModal isOpen={isSearchModalVisible} onOpenChange={setIsSearchModalVisible} />
     </>

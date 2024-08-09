@@ -39,7 +39,7 @@ type devapi struct {
 	devserver *devserver
 }
 
-func newDevAPI(d *devserver) chi.Router {
+func NewDevAPI(d *devserver) chi.Router {
 	// Return a chi router, which lets us attach routes to a handler.
 	api := &devapi{
 		Router:    chi.NewMux(),
@@ -119,7 +119,7 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 	a.devserver.handlerLock.Lock()
 	defer a.devserver.handlerLock.Unlock()
 
-	all, _ := a.devserver.data.GetFunctions(r.Context())
+	all, _ := a.devserver.Data.GetFunctions(r.Context())
 	funcs := make([]inngest.Function, len(all))
 	for n, i := range all {
 		f := inngest.Function{}
@@ -129,7 +129,7 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 
 	ir := InfoResponse{
 		Version:   version.Print(),
-		StartOpts: a.devserver.opts,
+		StartOpts: a.devserver.Opts,
 		Functions: funcs,
 		Handlers:  a.devserver.handlers,
 	}
@@ -166,7 +166,7 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Re-initialize our cron manager.
-	if err := a.devserver.runner.InitializeCrons(ctx); err != nil {
+	if err := a.devserver.Runner.InitializeCrons(ctx); err != nil {
 		logger.From(ctx).Warn().Msgf("Error initializing crons:\n%s", err)
 		a.err(ctx, w, 400, err)
 		return
@@ -181,7 +181,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		return publicerr.Wrap(err, 400, "Invalid request")
 	}
 
-	if app, err := a.devserver.data.GetAppByChecksum(ctx, sum); err == nil {
+	if app, err := a.devserver.Data.GetAppByChecksum(ctx, sum); err == nil {
 		if !app.Error.Valid {
 			// Skip registration since the app was already successfully
 			// registered.
@@ -189,7 +189,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		}
 
 		// Clear app error.
-		_, err = a.devserver.data.UpdateAppError(
+		_, err = a.devserver.Data.UpdateAppError(
 			ctx,
 			cqrs.UpdateAppErrorParams{
 				ID:    app.ID,
@@ -206,9 +206,9 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 	//
 	// We need to do this as we always create an app when entering the URL
 	// via the UI.  This is a dev-server specific quirk.
-	app, err := a.devserver.data.GetAppByURL(ctx, r.URL)
+	app, err := a.devserver.Data.GetAppByURL(ctx, r.URL)
 	if err == nil && app != nil {
-		_ = a.devserver.data.DeleteApp(ctx, app.ID)
+		_ = a.devserver.Data.DeleteApp(ctx, app.ID)
 	}
 
 	// We need a UUID to register functions with.
@@ -226,7 +226,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		Checksum: sum,
 	}
 
-	tx, err := a.devserver.data.WithTx(ctx)
+	tx, err := a.devserver.Data.WithTx(ctx)
 	if err != nil {
 		return publicerr.Wrap(err, 500, "Error starting registration tx")
 	}
@@ -357,7 +357,7 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 	}
 	log.From(ctx).Trace().Int("len", traces.SpanCount()).Msg("recording otel trace spans")
 
-	handler := newSpanIngestionHandler(a.devserver.data)
+	handler := newSpanIngestionHandler(a.devserver.Data)
 
 	for i := 0; i < traces.ResourceSpans().Len(); i++ {
 		rs := traces.ResourceSpans().At(i)
@@ -462,14 +462,14 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, s := range handler.Spans() {
-		if err := a.devserver.data.InsertSpan(ctx, s); err != nil {
+		if err := a.devserver.Data.InsertSpan(ctx, s); err != nil {
 			log.From(ctx).Error().Err(err).Interface("span", *s).Msg("error inserting span")
 		}
 	}
 
 	for _, r := range handler.TraceRuns() {
 		// log.From(ctx).Debug().Interface("run", r).Msg("trace run")
-		if err := a.devserver.data.InsertTraceRun(ctx, r); err != nil {
+		if err := a.devserver.Data.InsertTraceRun(ctx, r); err != nil {
 			log.From(ctx).Error().Err(err).Interface("trace run", r).Msg("error inserting trace run")
 		}
 	}
@@ -480,18 +480,18 @@ func (a devapi) RemoveApp(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	url := r.FormValue("url")
 
-	app, err := a.devserver.data.GetAppByURL(ctx, url)
+	app, err := a.devserver.Data.GetAppByURL(ctx, url)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 404, "App not found: %s", url))
 		return
 	}
 
-	if err := a.devserver.data.DeleteFunctionsByAppID(ctx, app.ID); err != nil {
+	if err := a.devserver.Data.DeleteFunctionsByAppID(ctx, app.ID); err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Error deleting functions"))
 		return
 	}
 
-	if err := a.devserver.data.DeleteApp(ctx, app.ID); err != nil {
+	if err := a.devserver.Data.DeleteApp(ctx, app.ID); err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Error deleting app"))
 		return
 	}

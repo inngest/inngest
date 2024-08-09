@@ -6,11 +6,12 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/execution/state/v2"
+	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/oklog/ulid/v2"
 )
 
 // SkipState represents the subset of state.State's data required for OnFunctionSkipped.
@@ -33,15 +34,16 @@ type LifecycleListener interface {
 	// may start if and when there's capacity due to concurrency.
 	OnFunctionScheduled(
 		context.Context,
-		state.Metadata,
+		statev2.Metadata,
 		queue.Item,
+		[]event.TrackedEvent,
 	)
 
 	// OnFunctionSkipped is called when a function run is skipped.
 	// Currently, this happens iff the function is paused.
 	OnFunctionSkipped(
 		context.Context,
-		state.Metadata,
+		statev2.Metadata,
 		SkipState,
 	)
 
@@ -51,8 +53,9 @@ type LifecycleListener interface {
 	// function is scheduled.
 	OnFunctionStarted(
 		context.Context,
-		state.Metadata,
+		statev2.Metadata,
 		queue.Item,
+		[]json.RawMessage,
 	)
 
 	// OnFunctionFinished is called when a function finishes.  This will
@@ -62,8 +65,9 @@ type LifecycleListener interface {
 	// If failed, DriverResponse will contain a non nil Err string.
 	OnFunctionFinished(
 		context.Context,
-		state.Metadata,
+		statev2.Metadata,
 		queue.Item,
+		[]json.RawMessage,
 		statev1.DriverResponse,
 	)
 
@@ -72,7 +76,7 @@ type LifecycleListener interface {
 	// function or the API request information.
 	OnFunctionCancelled(
 		ctx context.Context,
-		md state.Metadata,
+		md statev2.Metadata,
 		cr CancelRequest,
 		fnEvents []json.RawMessage, // All triggering function events, for tracing.
 	)
@@ -81,7 +85,7 @@ type LifecycleListener interface {
 	// queue item which embeds the next step information.
 	OnStepScheduled(
 		context.Context,
-		state.Metadata,
+		statev2.Metadata,
 		queue.Item,
 		*string, // Step name.
 	)
@@ -89,7 +93,7 @@ type LifecycleListener interface {
 	// OnStepStarted is called when a step begins executing.
 	OnStepStarted(
 		ctx context.Context,
-		md state.Metadata,
+		md statev2.Metadata,
 		item queue.Item,
 		edge inngest.Edge,
 		url string,
@@ -99,39 +103,39 @@ type LifecycleListener interface {
 	// a success, a temporary error, or a failure.
 	OnStepFinished(
 		context.Context,
-		state.Metadata,
+		statev2.Metadata,
 		queue.Item,
 		inngest.Edge,
-		inngest.Step,
-		statev1.DriverResponse,
+		*statev1.DriverResponse,
+		error,
 	)
 
 	// OnWaitForEvent is called when a wait for event step is scheduled.  The
 	// statev1.GeneratorOpcode contains the wait for event details.
 	OnWaitForEvent(
 		context.Context,
-		state.Metadata,
+		statev2.Metadata,
 		queue.Item,
 		statev1.GeneratorOpcode,
+		state.Pause,
 	)
 
 	// OnWaitForEventResumed is called when a function is resumed from waiting for
 	// an event.
 	OnWaitForEventResumed(
 		context.Context,
-		state.Metadata,
+		statev2.Metadata,
+		state.Pause,
 		ResumeRequest,
-		string,
 	)
 
 	// OnInvokeFunction is called when a function is invoked from a step.
 	OnInvokeFunction(
 		context.Context,
-		state.Metadata,
+		statev2.Metadata,
 		queue.Item,
 		statev1.GeneratorOpcode,
-		ulid.ULID,
-		string,
+		event.Event,
 	)
 
 	// OnInvokeFunctionResumed is called when a function is resumed from an
@@ -139,16 +143,16 @@ type LifecycleListener interface {
 	// completed or the step timed out whilst waiting.
 	OnInvokeFunctionResumed(
 		context.Context,
-		state.Metadata,
+		statev2.Metadata,
+		state.Pause,
 		ResumeRequest,
-		string,
 	)
 
 	// OnSleep is called when a sleep step is scheduled.  The
 	// statev1.GeneratorOpcode contains the sleep details.
 	OnSleep(
 		context.Context,
-		state.Metadata,
+		statev2.Metadata,
 		queue.Item,
 		statev1.GeneratorOpcode,
 		time.Time, // Sleeping until this time.
@@ -158,7 +162,9 @@ type LifecycleListener interface {
 	//
 	// This is backend specific and may be a noop depending on the
 	// listener implementation.
-	Close() error
+	Close(
+		context.Context,
+	) error
 }
 
 // NoopLifecyceListener does nothing.  This can be embedded into a custom implementation
@@ -172,15 +178,16 @@ type NoopLifecyceListener struct{}
 // may start if and when there's capacity due to concurrency.
 func (NoopLifecyceListener) OnFunctionScheduled(
 	context.Context,
-	state.Metadata,
+	statev2.Metadata,
 	queue.Item,
+	[]event.TrackedEvent,
 ) {
 }
 
 // OnFunctionSkipped is called when a function run is skipped.
 func (NoopLifecyceListener) OnFunctionSkipped(
 	context.Context,
-	state.Metadata,
+	statev2.Metadata,
 	SkipState,
 ) {
 }
@@ -191,8 +198,9 @@ func (NoopLifecyceListener) OnFunctionSkipped(
 // function is scheduled.
 func (NoopLifecyceListener) OnFunctionStarted(
 	context.Context,
-	state.Metadata,
+	statev2.Metadata,
 	queue.Item,
+	[]json.RawMessage,
 ) {
 }
 
@@ -203,8 +211,9 @@ func (NoopLifecyceListener) OnFunctionStarted(
 // If failed, DriverResponse will contain a non nil Err string.
 func (NoopLifecyceListener) OnFunctionFinished(
 	context.Context,
-	state.Metadata,
+	statev2.Metadata,
 	queue.Item,
+	[]json.RawMessage,
 	statev1.DriverResponse,
 ) {
 }
@@ -214,7 +223,7 @@ func (NoopLifecyceListener) OnFunctionFinished(
 // function or the API request information.
 func (NoopLifecyceListener) OnFunctionCancelled(
 	context.Context,
-	state.Metadata,
+	statev2.Metadata,
 	CancelRequest,
 	[]json.RawMessage,
 ) {
@@ -224,7 +233,7 @@ func (NoopLifecyceListener) OnFunctionCancelled(
 // queue item which embeds the next step information.
 func (NoopLifecyceListener) OnStepScheduled(
 	context.Context,
-	state.Metadata,
+	statev2.Metadata,
 	queue.Item,
 	*string, // Step name
 ) {
@@ -232,7 +241,7 @@ func (NoopLifecyceListener) OnStepScheduled(
 
 func (NoopLifecyceListener) OnStepStarted(
 	ctx context.Context,
-	id state.Metadata,
+	id statev2.Metadata,
 	item queue.Item,
 	edge inngest.Edge,
 	url string,
@@ -241,19 +250,20 @@ func (NoopLifecyceListener) OnStepStarted(
 
 func (NoopLifecyceListener) OnStepFinished(
 	context.Context,
-	state.Metadata,
+	statev2.Metadata,
 	queue.Item,
 	inngest.Edge,
-	inngest.Step,
-	statev1.DriverResponse,
+	*statev1.DriverResponse,
+	error,
 ) {
 }
 
 func (NoopLifecyceListener) OnWaitForEvent(
 	context.Context,
-	state.Metadata,
+	statev2.Metadata,
 	queue.Item,
 	statev1.GeneratorOpcode,
+	state.Pause,
 ) {
 }
 
@@ -261,20 +271,19 @@ func (NoopLifecyceListener) OnWaitForEvent(
 // an event.
 func (NoopLifecyceListener) OnWaitForEventResumed(
 	context.Context,
-	state.Metadata,
+	statev2.Metadata,
+	state.Pause,
 	ResumeRequest,
-	string,
 ) {
 }
 
 // OnInvokeFunction is called when a function is invoked from a step.
 func (NoopLifecyceListener) OnInvokeFunction(
 	context.Context,
-	state.Metadata,
+	statev2.Metadata,
 	queue.Item,
 	statev1.GeneratorOpcode,
-	ulid.ULID,
-	string,
+	event.Event,
 ) {
 }
 
@@ -283,9 +292,9 @@ func (NoopLifecyceListener) OnInvokeFunction(
 // completed or the step timed out whilst waiting.
 func (NoopLifecyceListener) OnInvokeFunctionResumed(
 	context.Context,
-	state.Metadata,
+	statev2.Metadata,
+	state.Pause,
 	ResumeRequest,
-	string,
 ) {
 }
 
@@ -293,11 +302,11 @@ func (NoopLifecyceListener) OnInvokeFunctionResumed(
 // statev1.GeneratorOpcode contains the sleep details.
 func (NoopLifecyceListener) OnSleep(
 	context.Context,
-	state.Metadata,
+	statev2.Metadata,
 	queue.Item,
 	statev1.GeneratorOpcode,
 	time.Time,
 ) {
 }
 
-func (NoopLifecyceListener) Close() error { return nil }
+func (NoopLifecyceListener) Close(context.Context) error { return nil }
