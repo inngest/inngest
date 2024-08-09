@@ -27,7 +27,9 @@ export default async function FunctionPage({
       ) : (
         <FunctionsHeader />
       )}
-      <FunctionList envSlug={environmentSlug} archived={archived} />
+      <div className="bg-canvasBase flex h-full w-full flex-col">
+        <FunctionList envSlug={environmentSlug} archived={archived} />
+      </div>
     </>
   );
 }
