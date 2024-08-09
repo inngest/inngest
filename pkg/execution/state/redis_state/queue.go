@@ -39,6 +39,7 @@ import (
 const (
 	PartitionSelectionMax = int64(100)
 	PartitionPeekMax      = PartitionSelectionMax * 3
+	AccountPeekMax        = int64(25)
 )
 
 const (
@@ -110,6 +111,7 @@ var (
 	ErrPartitionNotFound             = fmt.Errorf("partition not found")
 	ErrPartitionAlreadyLeased        = fmt.Errorf("partition already leased")
 	ErrPartitionPeekMaxExceedsLimits = fmt.Errorf("peek exceeded the maximum limit of %d", PartitionPeekMax)
+	ErrAccountPeekMaxExceedsLimits   = fmt.Errorf("account peek exceeded the maximum limit of %d", AccountPeekMax)
 	ErrPartitionGarbageCollected     = fmt.Errorf("partition garbage collected")
 	ErrPartitionPaused               = fmt.Errorf("partition is paused")
 	ErrConfigAlreadyLeased           = fmt.Errorf("config scanner already leased")
@@ -1149,7 +1151,7 @@ func (q *queue) SetFunctionPaused(ctx context.Context, fnID uuid.UUID, paused bo
 	}
 
 	status, err := scripts["queue/fnSetPaused"].Exec(
-		redis_telemetry.WithScriptName(ctx, "partitionSetPaused"),
+		redis_telemetry.WithScriptName(ctx, "fnSetPaused"),
 		q.u.unshardedRc,
 		keys,
 		args,
@@ -1214,6 +1216,8 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		q.u.kg.QueueItem(),            // Queue item
 		q.u.kg.PartitionItem(),        // Partition item, map
 		q.u.kg.GlobalPartitionIndex(), // Global partition queue
+		q.u.kg.GlobalAccountIndex(),
+		q.u.kg.AccountPartitionIndex(i.Data.Identifier.AccountID), // new queue items always
 		q.u.kg.Idempotency(i.ID),
 		q.u.kg.FnMetadata(i.FunctionID),
 
@@ -1247,6 +1251,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		parts[0].ID,
 		parts[1].ID,
 		parts[2].ID,
+		i.Data.Identifier.AccountID.String(),
 	})
 
 	if err != nil {
@@ -1387,6 +1392,8 @@ func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) 
 		q.u.kg.QueueItem(),
 		q.u.kg.PartitionItem(), // Partition item, map
 		q.u.kg.GlobalPartitionIndex(),
+		q.u.kg.GlobalAccountIndex(),
+		q.u.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
 
 		parts[0].zsetKey(q.u.kg),
 		parts[1].zsetKey(q.u.kg),
@@ -1402,6 +1409,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) 
 		parts[0].ID,
 		parts[1].ID,
 		parts[2].ID,
+		i.Data.Identifier.AccountID.String(),
 	})
 	if err != nil {
 		return err
@@ -1474,6 +1482,8 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	var acctLimit int
 	accountConcurrencyKey := q.u.kg.Concurrency("account", item.Data.Identifier.AccountID.String())
 	if len(parts) == 1 && parts[0].PartitionType == int(enums.PartitionTypeSystem) {
+		// Always apply system partition-specific concurrency limits
+		// "account" prefix is used for backwards-compatibility
 		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
 		acctLimit = parts[0].ConcurrencyLimit
 	} else {
@@ -1499,6 +1509,8 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		parts[2].concurrencyKey(q.u.kg),
 		q.u.kg.ConcurrencyIndex(),
 		q.u.kg.GlobalPartitionIndex(),
+		q.u.kg.GlobalAccountIndex(),
+		q.u.kg.AccountPartitionIndex(item.Data.Identifier.AccountID),
 		q.u.kg.ThrottleKey(item.Data.Throttle),
 		// Finally, there are ALWAYS account-level concurrency keys.
 		accountConcurrencyKey,
@@ -1514,6 +1526,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		parts[1].ConcurrencyLimit,
 		parts[2].ConcurrencyLimit,
 		acctLimit,
+		item.Data.Identifier.AccountID,
 	})
 	if err != nil {
 		return nil, err
@@ -1652,6 +1665,8 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 		q.u.kg.Idempotency(i.ID),
 		q.u.kg.ConcurrencyIndex(),
 		q.u.kg.GlobalPartitionIndex(),
+		q.u.kg.GlobalAccountIndex(),
+		q.u.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
 		q.u.kg.PartitionItem(),
 	}
 	// Append indexes
@@ -1673,6 +1688,7 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 		parts[0].ID,
 		parts[1].ID,
 		parts[2].ID,
+		i.Data.Identifier.AccountID.String(),
 	})
 	if err != nil {
 		return err
@@ -1728,6 +1744,8 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		q.u.kg.QueueItem(),
 		q.u.kg.PartitionItem(), // Partition item, map
 		q.u.kg.GlobalPartitionIndex(),
+		q.u.kg.GlobalAccountIndex(),
+		q.u.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
 		parts[0].zsetKey(q.u.kg),
 		parts[1].zsetKey(q.u.kg),
 		parts[2].zsetKey(q.u.kg),
@@ -1756,6 +1774,7 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		parts[0].ID,
 		parts[1].ID,
 		parts[2].ID,
+		i.Data.Identifier.AccountID.String(),
 	})
 	if err != nil {
 		return err
@@ -1809,6 +1828,8 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	keys := []string{
 		q.u.kg.PartitionItem(),
 		q.u.kg.GlobalPartitionIndex(),
+		q.u.kg.GlobalAccountIndex(),
+		q.u.kg.AccountPartitionIndex(p.AccountID),
 		q.u.kg.FnMetadata(fnMetaKey),
 
 		// These concurrency keys are for fast checking of partition
@@ -1827,6 +1848,7 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		fnConcurrency,
 		customConcurrency,
 		now.Add(PartitionConcurrencyLimitRequeueExtension).Unix(),
+		p.AccountID.String(),
 	})
 
 	if err != nil {
@@ -1925,7 +1947,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		redis_telemetry.WithScriptName(ctx, "partitionPeek"),
 		q.u.Client(),
 		[]string{
-			q.u.kg.GlobalPartitionIndex(),
+			partitionKey,
 			q.u.kg.PartitionItem(),
 		},
 		args,
@@ -2063,6 +2085,87 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	return result, nil
 }
 
+func (q *queue) accountPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "accountPeek"), redis_telemetry.ScopeQueue)
+
+	if limit > AccountPeekMax {
+		return nil, ErrAccountPeekMaxExceedsLimits
+	}
+	if limit <= 0 {
+		limit = AccountPeekMax
+	}
+
+	ms := until.UnixMilli()
+
+	isSequential := 0
+	if sequential {
+		isSequential = 1
+	}
+
+	args, err := StrSlice([]any{
+		ms,
+		limit,
+		isSequential,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	peekRet, err := scripts["queue/accountPeek"].Exec(
+		redis_telemetry.WithScriptName(ctx, "accountPeek"),
+		q.u.unshardedRc,
+		[]string{
+			q.u.kg.GlobalAccountIndex(),
+		},
+		args,
+	).AsStrSlice()
+	if err != nil {
+		return nil, fmt.Errorf("error peeking accounts: %w", err)
+	}
+
+	items := make([]uuid.UUID, len(peekRet))
+
+	for i, s := range peekRet {
+		parsed, err := uuid.Parse(s)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse account id from global account queue: %w", err)
+		}
+
+		items[i] = parsed
+	}
+
+	weights := make([]float64, len(items))
+	for i := range items {
+		// TODO Do we need account-specific weights? Then we need to store
+		// a data structure like QueuePartition for accounts (QueueAccount?)
+		accountPriority := PriorityDefault
+		weights[i] = float64(10 - accountPriority)
+	}
+
+	// Some scanners run sequentially, ensuring we always work on the functions with
+	// the oldest run at times in order, no matter the priority.
+	if sequential {
+		n := int(math.Min(float64(len(items)), float64(PartitionSelectionMax)))
+		return items[0:n], nil
+	}
+
+	// We want to weighted shuffle the resulting array random.  This means that many
+	// shared nothing scanners can query for outstanding partitions and receive a
+	// randomized order favouring higher-priority queue items.  This reduces the chances
+	// of contention when leasing.
+	w := sampleuv.NewWeighted(weights, rnd)
+	result := make([]uuid.UUID, len(items))
+	for n := range result {
+		idx, ok := w.Take()
+		if !ok {
+			return nil, ErrWeightedSampleRead
+		}
+		result[n] = items[idx]
+	}
+
+	return result, nil
+}
+
 func checkList(check string, exact, prefixes map[string]*struct{}) bool {
 	for k := range exact {
 		if check == k {
@@ -2099,6 +2202,8 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 	keys := []string{
 		q.u.kg.PartitionItem(),
 		q.u.kg.GlobalPartitionIndex(),
+		q.u.kg.GlobalAccountIndex(),
+		q.u.kg.AccountPartitionIndex(p.AccountID),
 		q.u.kg.ShardPartitionIndex(shardName),
 		// NOTE: PartitionMeta is only here for backwards compat, and only clears up partitions.
 		q.u.kg.PartitionMeta(p.Queue()),
@@ -2114,6 +2219,7 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 		p.Queue(),
 		at.UnixMilli(),
 		force,
+		p.AccountID.String(),
 	})
 	if err != nil {
 		return err
@@ -2533,6 +2639,8 @@ func (q *queue) setPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) err
 
 //nolint:all
 func (q *queue) readFnMetadata(ctx context.Context, fnID uuid.UUID) (*FnMetadata, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "readFnMetadata"), redis_telemetry.ScopeQueue)
+
 	cmd := q.u.unshardedRc.B().Get().Key(q.u.kg.FnMetadata(fnID)).Build()
 	retv := FnMetadata{}
 	err := q.u.unshardedRc.Do(ctx, cmd).DecodeJSON(&retv)

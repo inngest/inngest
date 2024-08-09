@@ -7,7 +7,7 @@ local function enqueue_get_partition_item(partitionKey, id)
 	return nil
 end
 
-local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, queueScore, queueID, partitionTime, nowMS)
+local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
 	if partitionID == "" then
 		-- This is a blank partition, so don't even bother.  This allows us to pre-allocate
 		-- 3 partitions per item, even if an item only needs a single partition.
@@ -51,14 +51,16 @@ local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem,
 			--
 			-- This is the case when there's no force delay or we've waited enough time.
 			-- So, update the global index such that this partition is found, plz. Tyvm!!
-			redis.call("ZADD", keyGlobalPointer, partitionTime, partitionID)
+			update_pointer_score_to(partitionID, keyGlobalPointer, partitionTime)
+			update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, partitionTime)
 		end
 	end
 end
 
 -- requeue_to_partition is similar to enqueue, but always fetches the minimum score for a partition to
 -- update global pointers instead of using the current queue item's score.
-local function requeue_to_partition(keyPartitionSet, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, queueScore, queueID, nowMS)
+-- Requires: update_account_queues.lua which requires update_pointer_score.lua, ends_with.lua
+local function requeue_to_partition(keyPartitionSet, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountID)
 	if partitionID == "" then
 		-- This is a blank partition, so don't even bother.  This allows us to pre-allocate
 		-- 3 partitions per item, even if an item only needs a single partition.
@@ -106,7 +108,10 @@ local function requeue_to_partition(keyPartitionSet, partitionID, partitionItem,
 			--
 			-- This is the case when there's no force delay or we've waited enough time.
 			-- So, update the global index such that this partition is found, plz. Tyvm!!
-			redis.call("ZADD", keyGlobalPointer, earliestScore/1000, partitionID)
+			local updateTo = earliestScore/1000
+
+			update_pointer_score_to(partitionID, keyGlobalPointer, updateTo)
+			update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, updateTo)
 		end
 	end
 end

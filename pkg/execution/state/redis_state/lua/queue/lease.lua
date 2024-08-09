@@ -25,10 +25,12 @@ local keyConcurrencyA  = KEYS[5] -- Account concurrency level
 local keyConcurrencyB  = KEYS[6] -- When leasing an item we need to place the lease into this key.
 local keyConcurrencyC  = KEYS[7] -- Optional for eg. for concurrency amongst steps
 -- We push pointers to partition concurrency items to the partition concurrency item
-local concurrencyPointer     = KEYS[8]
-local globalPointerKey       = KEYS[9]
-local throttleKey            = KEYS[10] -- key used for throttling function run starts.
-local keyAcctConcurrency     = KEYS[11]       
+local concurrencyPointer      = KEYS[8]
+local keyGlobalPointer        = KEYS[9]
+local keyGlobalAccountPointer = KEYS[10] -- accounts:sorted - zset
+local keyAccountPartitions    = KEYS[11] -- accounts:$accountId:partition:sorted - zset
+local throttleKey             = KEYS[12] -- key used for throttling function run starts.
+local keyAcctConcurrency      = KEYS[13]
 
 local queueID      = ARGV[1]
 local newLeaseKey  = ARGV[2]
@@ -42,6 +44,7 @@ local concurrencyB    = tonumber(ARGV[8])
 local concurrencyC    = tonumber(ARGV[9])
 -- And we always check against account concurrency limits
 local concurrencyAcct = tonumber(ARGV[10])
+local accountId       = ARGV[11]
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -51,6 +54,8 @@ local concurrencyAcct = tonumber(ARGV[10])
 -- $include(update_pointer_score.lua)
 -- $include(has_shard_key.lua)
 -- $include(gcra.lua)
+-- $include(ends_with.lua)
+-- $include(update_account_queues.lua)
 
 -- first, get the queue item.  we must do this and bail early if the queue item
 -- was not found.
@@ -114,8 +119,9 @@ local function handleEnqueue(keyPartition, keyConcurrency, partitionID)
 	-- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress
 	-- and store din functionConcurrencyKey.
 	redis.call("ZREM", keyPartition, item.id)
+
 	-- Update the fn's score in the global pointer queue to the next job, if available.
-	local score = get_fn_partition_score(keyPartition)
+	local earliestScore = get_fn_partition_score(keyPartition)
 
 	-- NOTE: The global partition ID isn't the actual partition zset key for backwards compatibility.
 	-- Instead, they are the partition IDs, which is either the partition ZSET (for new concurrency
@@ -123,7 +129,10 @@ local function handleEnqueue(keyPartition, keyConcurrency, partitionID)
 	-- 
 	-- The first version of the queue used function UUIDs as queue names, and the global pointer
 	-- expected just the function UUIDs instead of a fully defined redis key.
-	update_pointer_score_to(partitionID, globalPointerKey, score)
+	update_pointer_score_to(partitionID, keyGlobalPointer, earliestScore)
+
+	-- Update account partitions and account pointers with new score of next item
+	update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, earliestScore)
 
 	-- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
 	-- so that expired leases can be re-processed.  We want to take the earliest time from the
