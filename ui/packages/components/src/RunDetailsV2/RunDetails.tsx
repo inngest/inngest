@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import type { Route } from 'next';
+import { useCallback, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { StatusCell } from '../Table';
@@ -10,7 +10,7 @@ import { Timeline } from '../TimelineV2/Timeline';
 import { TriggerDetails } from '../TriggerDetails';
 import type { Result } from '../types/functionRun';
 import { nullishToLazy } from '../utils/lazyLoad';
-import { withRetry } from '../utils/retry';
+import { ErrorCard } from './ErrorCard';
 import { RunInfo } from './RunInfo';
 
 type Props = {
@@ -40,56 +40,31 @@ type Run = {
 };
 
 export function RunDetails(props: Props) {
-  const { getResult, getRun, getTrigger, pathCreator, pollInterval, rerun, runID, standalone } =
-    props;
-  const [error, setError] = useState<Error>();
+  const { getResult, getRun, getTrigger, pathCreator, rerun, runID, standalone } = props;
+  const [pollInterval, setPollInterval] = useState(props.pollInterval);
 
-  const [run, setRun] = useState<Run>();
-  const endedAt = run?.trace?.endedAt;
-  useEffect(() => {
-    if (endedAt) {
-      // Don't poll if the run has ended
-      return;
-    }
+  const runRes = useQuery({
+    queryKey: ['run', runID],
+    queryFn: useCallback(() => {
+      return getRun(runID);
+    }, [getRun, runID]),
+    retry: 3,
+    refetchInterval: pollInterval,
+  });
 
-    if (!pollInterval) {
-      if (run) {
-        // Nothing left to fetch
-        return;
+  const outputID = runRes?.data?.trace.outputID;
+  const resultRes = useQuery({
+    enabled: Boolean(outputID),
+    queryKey: ['run-result', runID],
+    queryFn: useCallback(() => {
+      if (!outputID) {
+        // Unreachable
+        throw new Error('missing outputID');
       }
 
-      withRetry(() => getRun(runID))
-        .then((data) => {
-          setRun(data);
-        })
-        .catch(setError);
-      return;
-    }
-
-    const interval = setInterval(() => {
-      withRetry(() => getRun(runID))
-        .then((data) => {
-          setRun(data);
-        })
-        .catch(setError);
-    }, pollInterval);
-
-    return () => clearInterval(interval);
-  }, [endedAt, getRun, pollInterval, runID]);
-
-  const [result, setResult] = useState<Result>();
-  const outputID = run?.trace?.outputID;
-  useEffect(() => {
-    if (!result && outputID) {
-      withRetry(() => getResult(outputID))
-        .then((data) => {
-          setResult(data);
-        })
-        .catch(() => {
-          toast.error('Failed to fetch run result');
-        });
-    }
-  }, [result, outputID]);
+      return getResult(outputID);
+    }, [getResult, outputID]),
+  });
 
   const cancelRun = useCallback(async () => {
     try {
@@ -101,8 +76,10 @@ export function RunDetails(props: Props) {
     }
   }, [props.cancelRun]);
 
-  if (error) {
-    throw error;
+  const run = runRes.data;
+  if (run?.trace.endedAt && pollInterval) {
+    // Stop polling since ended runs are immutable
+    setPollInterval(undefined);
   }
 
   return (
@@ -118,16 +95,23 @@ export function RunDetails(props: Props) {
       <div className="flex gap-4">
         <div className="grow">
           <div className="ml-8">
-            <RunInfo
-              cancelRun={cancelRun}
-              className="mb-4"
-              pathCreator={pathCreator}
-              rerun={rerun}
-              run={nullishToLazy(run)}
-              runID={runID}
-              standalone={standalone}
-              result={result}
-            />
+            {runRes.error || resultRes.error ? (
+              <ErrorCard
+                error={runRes.error || resultRes.error}
+                reset={runRes.error ? () => runRes.refetch() : () => resultRes.refetch()}
+              />
+            ) : (
+              <RunInfo
+                cancelRun={cancelRun}
+                className="mb-4"
+                pathCreator={pathCreator}
+                rerun={rerun}
+                run={nullishToLazy(run)}
+                runID={runID}
+                standalone={standalone}
+                result={resultRes.data}
+              />
+            )}
           </div>
 
           {run && <Timeline getResult={getResult} pathCreator={pathCreator} trace={run.trace} />}

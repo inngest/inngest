@@ -9,9 +9,9 @@ import colors from 'tailwindcss/colors';
 
 import Block from '@/components/Block';
 import SimpleBarChart from '@/components/Charts/SimpleBarChart';
+import LatestLogsList from '@/components/Events/LatestLogsList';
 import Overlay from '@/components/Overlay';
 import { useEventType } from '@/queries';
-import LatestLogsList from './LatestLogsList';
 
 type EventDashboardProps = {
   params: {

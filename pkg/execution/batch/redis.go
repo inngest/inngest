@@ -7,9 +7,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/expressions"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -182,6 +183,9 @@ func (b redisBatchManager) StartExecution(ctx context.Context, functionId uuid.U
 	}
 
 	switch status {
+	case -1: // the batch status is gone somehow
+		return enums.BatchStatusAbsent.String(), nil
+
 	case 0: // haven't started, so mark mark it started
 		return enums.BatchStatusReady.String(), nil
 
@@ -195,7 +199,7 @@ func (b redisBatchManager) StartExecution(ctx context.Context, functionId uuid.U
 
 // ScheduleExecution enqueues a job to run the batch job after the specified duration.
 func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleBatchOpts) error {
-	jobID := fmt.Sprintf("%s:%s", opts.WorkspaceID, opts.BatchID)
+	jobID := opts.JobID()
 	maxAttempts := 20
 
 	err := b.q.Enqueue(ctx, queue.Item{

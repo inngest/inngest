@@ -1,26 +1,54 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 
+import type { Environment } from '@/utils/environments';
+import { Alert } from '../Navigation/Alert';
+import { Help } from '../Navigation/Help';
+import { Integrations } from '../Navigation/Integrations';
 import Logo from '../Navigation/Logo';
+import Navigation from '../Navigation/Navigation';
+import { Profile, type ProfileType } from '../Navigation/Profile';
 
 export default function SideBar({
   collapsed: serverCollapsed,
-  children,
+  activeEnv,
+  profile,
 }: {
-  collapsed: boolean;
-  children: ReactNode;
+  collapsed: boolean | undefined;
+  activeEnv?: Environment;
+  profile: ProfileType;
 }) {
-  const [collapsed, setCollapsed] = useState(serverCollapsed);
+  const [collapsed, setCollapsed] = useState<boolean>(serverCollapsed ?? false);
+
+  useEffect(() => {
+    //
+    // if the user has not set a pref and they are on mobile, collapse by default
+    serverCollapsed === undefined &&
+      setCollapsed(
+        typeof window !== 'undefined' && window.matchMedia('(max-width: 800px)').matches
+      );
+  }, []);
 
   return (
-    <div
-      className={`bg-canvasBase border-subtle top-0 flex h-screen flex-col justify-start ${
-        collapsed ? 'w-[64px]' : 'w-[224px]'
-      }  shrink-0 border-r transition-all delay-150 duration-300`}
+    <nav
+      className={`bg-canvasBase border-subtle group
+         top-0 flex h-screen flex-col justify-start ${
+           collapsed ? 'w-[64px]' : 'w-[224px]'
+         }  sticky z-[49] shrink-0 overflow-visible border-r`}
     >
       <Logo collapsed={collapsed} setCollapsed={setCollapsed} />
-      {children}
-    </div>
+      <div className="flex grow flex-col justify-between">
+        <Navigation collapsed={collapsed} activeEnv={activeEnv} />
+
+        <div>
+          {!collapsed && <Alert />}
+
+          <Integrations collapsed={collapsed} />
+          <Help collapsed={collapsed} />
+          <Profile collapsed={collapsed} profile={profile} />
+        </div>
+      </div>
+    </nav>
   );
 }

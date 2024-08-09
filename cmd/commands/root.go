@@ -81,6 +81,7 @@ func Execute() {
 	rootCmd.AddCommand(NewCmdDev())
 	rootCmd.AddCommand(NewCmdVersion())
 	rootCmd.AddCommand(NewCmdServe())
+	rootCmd.AddCommand(NewCmdLite())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

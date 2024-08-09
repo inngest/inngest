@@ -250,13 +250,14 @@ export const RERUN = gql`
 
 export const GET_RUNS = gql`
   query GetRuns(
+    $appIDs: [UUID!]
     $startTime: Time!
     $status: [FunctionRunStatus!]
     $timeField: RunsV2OrderByField!
     $functionRunCursor: String = null
   ) {
     runs(
-      filter: { from: $startTime, status: $status, timeField: $timeField }
+      filter: { appIDs: $appIDs, from: $startTime, status: $status, timeField: $timeField }
       orderBy: [{ field: $timeField, direction: DESC }]
       after: $functionRunCursor
     ) {
@@ -266,11 +267,14 @@ export const GET_RUNS = gql`
             externalID
             name
           }
+          cronSchedule
+          eventName
           function {
             name
             slug
           }
           id
+          isBatch
           queuedAt
           endedAt
           startedAt
@@ -283,6 +287,21 @@ export const GET_RUNS = gql`
         startCursor
         endCursor
       }
+    }
+  }
+`;
+
+export const COUNT_RUNS = gql`
+  query CountRuns(
+    $startTime: Time!
+    $status: [FunctionRunStatus!]
+    $timeField: RunsV2OrderByField!
+  ) {
+    runs(
+      filter: { from: $startTime, status: $status, timeField: $timeField }
+      orderBy: [{ field: $timeField, direction: DESC }]
+    ) {
+      totalCount
     }
   }
 `;

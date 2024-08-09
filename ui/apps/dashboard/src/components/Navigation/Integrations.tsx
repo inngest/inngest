@@ -1,14 +1,14 @@
-import { IntegrationsIcon } from '@inngest/components/icons/sections/Integrations';
+import { RiPlugLine } from '@remixicon/react';
 
 import { MenuItem } from './MenuItem';
 
 export const Integrations = ({ collapsed }: { collapsed: boolean }) => (
-  <div className="m-2.5">
+  <div className={`${collapsed ? 'items-center' : 'mx-4'}`}>
     <MenuItem
       href="/settings/integrations"
       collapsed={collapsed}
       text="Integrations"
-      icon={<IntegrationsIcon className="w-5" />}
+      icon={<RiPlugLine className="h-[18px] w-[18px]" />}
     />
   </div>
 );

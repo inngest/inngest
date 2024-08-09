@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -108,6 +110,28 @@ type Throttle struct {
 	Period int `json:"p"`
 }
 
+// SpanID generates a spanID based on the combination the jobID and attempt
+func (i Item) SpanID() (*trace.SpanID, error) {
+	if i.JobID == nil {
+		return nil, fmt.Errorf("no job ID for item")
+	}
+
+	data := map[string]any{
+		"id":      *i.JobID,
+		"attempt": i.Attempt,
+	}
+	byt, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+
+	hash := xxhash.New()
+	_, _ = hash.Write(byt)
+	sum := hash.Sum(nil)
+	spanID := trace.SpanID(sum[:8])
+	return &spanID, nil
+}
+
 func (i Item) GetConcurrencyKeys() []state.CustomConcurrency {
 	if len(i.Identifier.CustomConcurrencyKeys) > 0 {
 		// Only use this if specified.
@@ -187,6 +211,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 	i.RunInfo = temp.RunInfo
 	i.CustomConcurrencyKeys = temp.CustomConcurrencyKeys
 	i.PriorityFactor = temp.PriorityFactor
+	i.QueueName = temp.QueueName
 
 	// Save this for custom unmarshalling of other jobs.  This is overwritten
 	// for known queue kinds.

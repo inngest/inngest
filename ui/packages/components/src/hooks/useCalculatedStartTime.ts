@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { parseDuration, subtractDuration } from '@inngest/components/utils/date';
 
 type CalculatedStartTimeProps = {
@@ -9,17 +9,13 @@ type CalculatedStartTimeProps = {
 export const DEFAULT_TIME = '3d';
 
 export const useCalculatedStartTime = ({ lastDays, startTime }: CalculatedStartTimeProps): Date => {
-  const [calculatedStartTime, setCalculatedStartTime] = useState<Date>(new Date());
-
-  useEffect(() => {
+  return useMemo(() => {
     if (lastDays) {
-      setCalculatedStartTime(subtractDuration(new Date(), parseDuration(lastDays)));
+      return subtractDuration(new Date(), parseDuration(lastDays));
     } else if (startTime) {
-      setCalculatedStartTime(new Date(startTime));
+      return new Date(startTime);
     } else {
-      setCalculatedStartTime(subtractDuration(new Date(), parseDuration(DEFAULT_TIME)));
+      return subtractDuration(new Date(), parseDuration(DEFAULT_TIME));
     }
   }, [lastDays, startTime]);
-
-  return calculatedStartTime;
 };

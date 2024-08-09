@@ -135,7 +135,7 @@ func (d historyDriver) Write(ctx context.Context, h history.History) (err error)
 	}
 }
 
-func (historyDriver) Close() error { return nil }
+func (historyDriver) Close(ctx context.Context) error { return nil }
 
 func marshalJSONAsString(input any) (string, error) {
 	switch v := input.(type) {

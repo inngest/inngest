@@ -25,7 +25,7 @@ export function ContentCard({
   return (
     <div
       className={classNames(
-        active ? `bg-slate-910` : ``,
+        active ? `bg-canvasBase` : ``,
         `flex flex-1 shrink-0 flex-col overflow-hidden overflow-y-auto border border-slate-800/30`
       )}
     >

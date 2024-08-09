@@ -82,7 +82,19 @@ func (a *API) Start(ctx context.Context) error {
 		Handler: a.Router,
 	}
 	a.log.Info().Str("addr", a.server.Addr).Msg("starting server")
-	return a.server.ListenAndServe()
+
+	lerrChan := make(chan error)
+	go func() {
+		lerrChan <- a.server.ListenAndServe()
+	}()
+
+	select {
+	case <-ctx.Done():
+		a.log.Info().Msg("shutting down server")
+		return a.server.Shutdown(ctx)
+	case err := <-lerrChan:
+		return err
+	}
 }
 
 func (a API) Stop(ctx context.Context) error {

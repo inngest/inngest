@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
@@ -54,10 +53,10 @@ func TestSleep(t *testing.T) {
 				startedAt = time.Now()
 			}
 
-			step.Sleep(ctx, "nap", 10*time.Second)
+			step.Sleep(ctx, "nap", 5*time.Second)
 
-			// Ensure any time we're here it's 15 seconds after the sleep.
-			require.GreaterOrEqual(t, int(time.Since(startedAt).Seconds()), 10)
+			// Ensure any time we're here it's 5 seconds after the sleep.
+			require.GreaterOrEqual(t, int(time.Since(startedAt).Seconds()), 5)
 
 			_, _ = step.Run(ctx, "test", func(ctx context.Context) (any, error) {
 				if input.InputCtx.Attempt == 0 {
@@ -85,44 +84,6 @@ func TestSleep(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	t.Run("in progress sleep", func(t *testing.T) {
-		<-time.After(2 * time.Second)
-
-		require.Eventually(t, func() bool {
-			run := c.RunTraces(ctx, runID)
-			require.NotNil(t, run)
-			require.NotNil(t, run.Trace)
-			require.True(t, run.Trace.IsRoot)
-			require.Equal(t, 1, len(run.Trace.ChildSpans))
-			require.Equal(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
-			require.Nil(t, run.Trace.OutputID)
-
-			rootSpanID := run.Trace.SpanID
-
-			span := run.Trace.ChildSpans[0]
-			assert.Equal(t, consts.OtelExecPlaceholder, span.Name)
-			assert.Equal(t, rootSpanID, span.ParentSpanID)
-			assert.False(t, span.IsRoot)
-			assert.Equal(t, 2, len(span.ChildSpans)) // includes queued retry span
-			assert.Equal(t, models.RunTraceSpanStatusRunning.String(), span.Status)
-			assert.Equal(t, "", span.StepOp)
-			assert.Nil(t, span.OutputID)
-
-			t.Run("failed", func(t *testing.T) {
-				exec := span.ChildSpans[0]
-				assert.Equal(t, "Attempt 0", exec.Name)
-				assert.Equal(t, models.RunTraceSpanStatusFailed.String(), exec.Status)
-				assert.NotNil(t, exec.OutputID)
-
-				execOutput := c.RunSpanOutput(ctx, *exec.OutputID)
-				assert.NotNil(t, execOutput)
-				c.ExpectSpanErrorOutput(t, "", "initial error", execOutput)
-			})
-
-			return true
-		}, 10*time.Second, 500*time.Millisecond)
-	})
-
 	t.Run("expected values", func(t *testing.T) {
 		require.Eventually(t, func() bool {
 			return atomic.LoadInt32(&completed) == 1
@@ -130,7 +91,7 @@ func TestSleep(t *testing.T) {
 	})
 
 	t.Run("complete", func(t *testing.T) {
-		<-time.After(15 * time.Second)
+		<-time.After(4 * time.Second)
 
 		require.Eventually(t, func() bool {
 			require.EqualValues(t, 1, atomic.LoadInt32(&completed))

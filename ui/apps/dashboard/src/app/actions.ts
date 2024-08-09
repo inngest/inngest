@@ -2,8 +2,8 @@
 
 import { cookies } from 'next/headers';
 
-export async function toggleNav() {
+export async function getNavCollapsed(): Promise<boolean | undefined> {
   const cookieStore = cookies();
-  const collapsed = cookieStore.get('navCollapsed')?.value === 'true';
-  cookieStore.set('navCollapsed', collapsed ? 'false' : 'true');
+  const collapsed = cookieStore.get('navCollapsed')?.value;
+  return collapsed ? collapsed === 'true' : undefined;
 }

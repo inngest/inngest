@@ -1,7 +1,10 @@
 import { RiSettings3Line } from '@remixicon/react';
 
-import Header from '@/components/Header/Header';
+import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import Header from '@/components/Header/old/Header';
+import Layout from '@/components/Layout/Layout';
 import AppNavigation from '@/components/Navigation/old/AppNavigation';
+import { SettingsHeader } from '@/components/Settings/Header';
 import Toaster from '@/components/Toaster';
 
 type SettingsLayoutProps = {
@@ -9,6 +12,7 @@ type SettingsLayoutProps = {
 };
 
 export default async function SettingsLayout({ children }: SettingsLayoutProps) {
+  const newIANav = await getBooleanFlag('new-ia-nav');
   const navLinks = [
     {
       href: '/settings/user',
@@ -28,7 +32,13 @@ export default async function SettingsLayout({ children }: SettingsLayoutProps) 
     },
   ];
 
-  return (
+  return newIANav ? (
+    <Layout>
+      <SettingsHeader />
+      <div className="px-6">{children}</div>
+      <Toaster />
+    </Layout>
+  ) : (
     <div className="flex h-full flex-col">
       <AppNavigation envSlug="all" />
       <Header
