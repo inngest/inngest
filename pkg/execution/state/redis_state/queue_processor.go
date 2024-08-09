@@ -534,9 +534,17 @@ func (q *queue) runInstrumentation(ctx context.Context) {
 		return
 	}
 
-	q.instrumentationLeaseLock.Lock()
-	q.instrumentationLeaseID = leaseID
-	q.instrumentationLeaseLock.Unlock()
+	setLease := func(lease *ulid.ULID) {
+		q.instrumentationLeaseLock.Lock()
+		defer q.instrumentationLeaseLock.Unlock()
+		q.instrumentationLeaseID = lease
+
+		if lease != nil && q.instrumentationLeaseID == nil {
+			telemetry.IncrInstrumentationLeaseClaimsCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
+		}
+	}
+
+	setLease(leaseID)
 
 	tick := q.clock.NewTicker(ConfigLeaseMax / 3)
 	instr := q.clock.NewTicker(20 * time.Second)
@@ -556,26 +564,17 @@ func (q *queue) runInstrumentation(ctx context.Context) {
 		case <-tick.Chan():
 			leaseID, err := q.ConfigLease(ctx, q.u.kg.Instrumentation(), ConfigLeaseMax, q.instrumentationLease())
 			if err == ErrConfigAlreadyLeased {
-				q.instrumentationLeaseLock.Lock()
-				q.instrumentationLeaseID = nil
-				q.instrumentationLeaseLock.Unlock()
+				setLease(nil)
 				continue
 			}
 
 			if err != nil {
 				q.logger.Error().Err(err).Msg("error claiming instrumentation lease")
-				q.instrumentationLeaseLock.Lock()
-				q.instrumentationLeaseID = nil
-				q.instrumentationLeaseLock.Unlock()
+				setLease(nil)
 				continue
 			}
 
-			q.instrumentationLeaseLock.Lock()
-			if q.instrumentationLeaseID == nil {
-				telemetry.IncrInstrumentationLeaseClaimsCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
-			}
-			q.instrumentationLeaseID = leaseID
-			q.instrumentationLeaseLock.Unlock()
+			setLease(leaseID)
 		}
 	}
 }
