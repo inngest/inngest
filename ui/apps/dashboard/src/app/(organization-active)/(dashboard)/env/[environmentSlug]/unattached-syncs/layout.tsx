@@ -2,7 +2,7 @@
 
 import { IconApp } from '@inngest/components/icons/App';
 
-import Header from '@/components/Header/Header';
+import Header from '@/components/Header/old/Header';
 
 export default function Layout({ children }: React.PropsWithChildren) {
   return (

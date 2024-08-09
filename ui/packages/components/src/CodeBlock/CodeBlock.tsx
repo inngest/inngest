@@ -11,119 +11,16 @@ import { IconOverflowText } from '@inngest/components/icons/OverflowText';
 import { IconShrinkText } from '@inngest/components/icons/ShrinkText';
 import { IconWrapText } from '@inngest/components/icons/WrapText';
 import { cn } from '@inngest/components/utils/classNames';
+import { FONT, LINE_HEIGHT, createColors, createRules } from '@inngest/components/utils/monaco';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { RiDownload2Line } from '@remixicon/react';
 import { type editor } from 'monaco-editor';
 import { useLocalStorage } from 'react-use';
-import colors from 'tailwindcss/colors';
 
 import { isDark } from '../utils/theme';
 
-const DARK_RULES = [
-  {
-    token: 'delimiter.bracket.json',
-    foreground: colors.slate['300'],
-  },
-  {
-    token: 'string.key.json',
-    foreground: colors.indigo['400'],
-  },
-  {
-    token: 'number.json',
-    foreground: colors.amber['400'],
-  },
-  {
-    token: 'string.value.json',
-    foreground: colors.emerald['300'],
-  },
-  {
-    token: 'keyword.json',
-    foreground: colors.fuchsia['300'],
-  },
-  {
-    token: 'comment',
-    fontStyle: 'italic',
-    foreground: colors.slate['500'],
-  },
-  {
-    token: 'string',
-    foreground: colors.teal['400'],
-  },
-  {
-    token: 'keyword',
-    foreground: colors.indigo['400'],
-  },
-  {
-    token: 'entity.name.function',
-    foreground: colors.red['500'],
-  },
-];
-const LIGHT_RULES = [
-  {
-    token: 'delimiter.bracket.json',
-    foreground: colors.slate['700'],
-  },
-  {
-    token: 'string.key.json',
-    foreground: colors.indigo['600'],
-  },
-  {
-    token: 'number.json',
-    foreground: colors.amber['600'],
-  },
-  {
-    token: 'string.value.json',
-    foreground: colors.emerald['600'],
-  },
-  {
-    token: 'keyword.json',
-    foreground: colors.fuchsia['600'],
-  },
-  {
-    token: 'comment',
-    fontStyle: 'italic',
-    foreground: colors.slate['500'],
-  },
-  {
-    token: 'string',
-    foreground: colors.teal['600'],
-  },
-  {
-    token: 'keyword',
-    foreground: colors.indigo['600'],
-  },
-  {
-    token: 'entity.name.function',
-    foreground: colors.red['500'],
-  },
-];
-
-const DARK_COLORS = {
-  'editor.background': '#1e293b4d', // slate-800/40
-  'editorLineNumber.foreground': '#cbd5e14d', // slate-300/30
-  'editorLineNumber.activeForeground': colors.slate['300'], // slate-300
-  'editorWidget.background': colors.slate['800'],
-  'editorWidget.border': colors.slate['500'],
-  'editorBracketHighlight.foreground1': colors.amber['400'],
-};
-
-const LIGHT_COLORS = {
-  'editor.background': colors.slate['50'],
-  'editorLineNumber.foreground': colors.slate['400'],
-  'editorLineNumber.activeForeground': colors.slate['600'],
-  'editorWidget.background': colors.slate['50'],
-  'editorWidget.border': colors.slate['200'],
-  'editorBracketHighlight.foreground1': colors.amber['600'],
-};
-
-const LINE_HEIGHT = 26;
 const MAX_HEIGHT = 280; // Equivalent to 10 lines + padding
 const MAX_LINES = 10;
-const FONT = {
-  size: 13,
-  type: 'monospace',
-  font: 'CircularXXMono',
-};
 
 type MonacoEditorType = editor.IStandaloneCodeEditor | null;
 
@@ -180,8 +77,8 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
     monaco.editor.defineTheme('inngest-theme', {
       base: dark ? 'vs-dark' : 'vs',
       inherit: true,
-      rules: dark ? DARK_RULES : LIGHT_RULES,
-      colors: dark ? DARK_COLORS : LIGHT_COLORS,
+      rules: dark ? createRules(true) : createRules(false),
+      colors: dark ? createColors(true) : createColors(false),
     });
   }, [monaco, dark]);
 
@@ -339,7 +236,7 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
         <>
           <div
             className={cn(
-              'border-b border-b-slate-300 bg-slate-50 dark:border-slate-700/20 dark:bg-slate-800/40 dark:shadow'
+              'border-b-subtle bg-canvasBase border-b dark:border-slate-700/20  dark:shadow'
             )}
           >
             <div

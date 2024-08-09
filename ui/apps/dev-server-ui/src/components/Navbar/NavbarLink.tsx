@@ -6,12 +6,13 @@ import { classNames } from '@inngest/components/utils/classNames';
 
 export type NavbarLinkProps = {
   icon: React.ReactNode;
+  badge?: React.ReactNode;
   href: Route;
   hasError?: boolean;
   tabName: string;
 };
 
-export default function NavbarLink({ icon, href, tabName, hasError }: NavbarLinkProps) {
+export default function NavbarLink({ icon, href, tabName, hasError, badge }: NavbarLinkProps) {
   const pathname = usePathname();
   const isActive = pathname === href;
 
@@ -28,6 +29,7 @@ export default function NavbarLink({ icon, href, tabName, hasError }: NavbarLink
       {icon}
       {tabName}
       {hasError && <Badge kind={'error'} />}
+      {badge}
     </Link>
   );
 }

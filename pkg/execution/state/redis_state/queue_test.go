@@ -1079,6 +1079,7 @@ func TestQueueLease(t *testing.T) {
 			_, err = q.Lease(ctx, p, itemA, 5*time.Second, time.Now(), nil)
 			require.NoError(t, err)
 		})
+
 		t.Run("Errors without capacity", func(t *testing.T) {
 			id, err := q.Lease(ctx, p, itemB, 5*time.Second, time.Now(), nil)
 			require.Nil(t, id, "Leased item when concurrency limits are reached.\n%s", r.Dump())
@@ -1094,18 +1095,21 @@ func TestQueueLease(t *testing.T) {
 			return 1, 100, NoConcurrencyLimit
 		}
 
+		acctId := uuid.New()
+
 		// Create a new item
-		itemA, err := q.EnqueueItem(ctx, QueueItem{FunctionID: uuid.New()}, start)
+		itemA, err := q.EnqueueItem(ctx, QueueItem{FunctionID: uuid.New(), Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctId}}}, start)
 		require.NoError(t, err)
-		itemB, err := q.EnqueueItem(ctx, QueueItem{FunctionID: uuid.New()}, start)
+		itemB, err := q.EnqueueItem(ctx, QueueItem{FunctionID: uuid.New(), Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctId}}}, start)
 		require.NoError(t, err)
 		// Use the new item's workflow ID
-		p := QueuePartition{FunctionID: &itemA.FunctionID}
+		p := QueuePartition{AccountID: acctId, FunctionID: &itemA.FunctionID}
 
 		t.Run("Leases with capacity", func(t *testing.T) {
 			_, err = q.Lease(ctx, p, itemA, 5*time.Second, time.Now(), nil)
 			require.NoError(t, err)
 		})
+
 		t.Run("Errors without capacity", func(t *testing.T) {
 			id, err := q.Lease(ctx, p, itemB, 5*time.Second, time.Now(), nil)
 			require.Nil(t, id)
@@ -1120,37 +1124,41 @@ func TestQueueLease(t *testing.T) {
 			return 100, 100, 1
 		}
 
+		ck := createConcurrencyKey(enums.ConcurrencyScopeAccount, uuid.Nil, "foo", 1)
+
 		// Create a new item
 		itemA, err := q.EnqueueItem(ctx, QueueItem{
 			FunctionID: uuid.New(),
 			Data: osqueue.Item{
 				CustomConcurrencyKeys: []state.CustomConcurrency{
 					{
-						Key:   util.ConcurrencyKey(enums.ConcurrencyScopeAccount, uuid.Nil, "foo"),
+						Key:   ck.Key,
 						Limit: 1,
 					},
 				},
 			},
 		}, start)
 		require.NoError(t, err)
+
 		itemB, err := q.EnqueueItem(ctx, QueueItem{
 			FunctionID: uuid.New(),
 			Data: osqueue.Item{
 				CustomConcurrencyKeys: []state.CustomConcurrency{
 					{
-						Key:   util.ConcurrencyKey(enums.ConcurrencyScopeAccount, uuid.Nil, "foo"),
+						Key:   ck.Key,
 						Limit: 1,
 					},
 				},
 			},
 		}, start)
 		require.NoError(t, err)
+
 		// Use the new item's workflow ID
 		p := QueuePartition{FunctionID: &itemA.FunctionID}
 
 		t.Run("With denylists it does not lease.", func(t *testing.T) {
 			list := newLeaseDenyList()
-			list.addConcurrency(newKeyError(ErrConcurrencyLimitCustomKey, "custom-level-key"))
+			list.addConcurrency(newKeyError(ErrConcurrencyLimitCustomKey, ck.Key))
 			_, err = q.Lease(ctx, p, itemA, 5*time.Second, time.Now(), list)
 			require.NotNil(t, err)
 			require.ErrorIs(t, err, ErrConcurrencyLimitCustomKey)
@@ -1160,6 +1168,7 @@ func TestQueueLease(t *testing.T) {
 			_, err = q.Lease(ctx, p, itemA, 5*time.Second, time.Now(), nil)
 			require.NoError(t, err)
 		})
+
 		t.Run("Errors without capacity", func(t *testing.T) {
 			id, err := q.Lease(ctx, p, itemB, 5*time.Second, time.Now(), nil)
 			require.Nil(t, id)
@@ -2188,7 +2197,127 @@ func TestQueuePartitionLease(t *testing.T) {
 		require.NotZero(t, capacity)
 	})
 
-	// TODO: Capacity checks
+	t.Run("concurrency is checked early", func(t *testing.T) {
+		start := time.Now().Truncate(time.Second)
+
+		t.Run("With partition concurrency limits", func(t *testing.T) {
+			r.FlushAll()
+
+			// Only allow a single leased item
+			q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (acct, fn, custom int) {
+				return 1, 1, 1
+			}
+
+			fnID := uuid.New()
+			// Create a new item
+			itemA, err := q.EnqueueItem(ctx, QueueItem{FunctionID: fnID}, start)
+			require.NoError(t, err)
+			_, err = q.EnqueueItem(ctx, QueueItem{FunctionID: fnID}, start)
+			require.NoError(t, err)
+			// Use the new item's workflow ID
+			p := QueuePartition{ID: itemA.FunctionID.String(), FunctionID: &itemA.FunctionID}
+
+			t.Run("Leases with capacity", func(t *testing.T) {
+				_, err = q.Lease(ctx, p, itemA, 5*time.Second, time.Now(), nil)
+				require.NoError(t, err)
+			})
+
+			t.Run("Partition lease errors without capacity", func(t *testing.T) {
+				leaseId, _, err := q.PartitionLease(ctx, &p, 5*time.Second)
+				require.Nil(t, leaseId, "No lease id when leasing fails.\n%s", r.Dump())
+				require.Error(t, err)
+				require.ErrorIs(t, err, ErrPartitionConcurrencyLimit)
+			})
+		})
+
+		t.Run("With account concurrency limits", func(t *testing.T) {
+			r.FlushAll()
+
+			// Only allow a single leased item via account limits
+			q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (acct, fn, custom int) {
+				return 1, 100, NoConcurrencyLimit
+			}
+
+			acctId := uuid.New()
+
+			// Create a new item
+			itemA, err := q.EnqueueItem(ctx, QueueItem{FunctionID: uuid.New(), Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctId}}}, start)
+			require.NoError(t, err)
+
+			_, err = q.EnqueueItem(ctx, QueueItem{FunctionID: uuid.New(), Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctId}}}, start)
+			require.NoError(t, err)
+
+			// Use the new item's workflow ID
+			p := QueuePartition{AccountID: acctId, FunctionID: &itemA.FunctionID}
+
+			t.Run("Leases with capacity", func(t *testing.T) {
+				_, err = q.Lease(ctx, p, itemA, 5*time.Second, time.Now(), nil)
+				require.NoError(t, err)
+			})
+
+			t.Run("Partition lease errors without capacity", func(t *testing.T) {
+				leaseId, _, err := q.PartitionLease(ctx, &p, 5*time.Second)
+				require.Nil(t, leaseId, "No lease id when leasing fails.\n%s", r.Dump())
+				require.Error(t, err)
+				require.ErrorIs(t, err, ErrAccountConcurrencyLimit)
+			})
+		})
+
+		t.Run("With custom concurrency limits", func(t *testing.T) {
+			r.FlushAll()
+			// Only allow a single leased item via account limits
+			q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (acct, fn, custom int) {
+				return 100, 100, 1
+			}
+
+			ck := createConcurrencyKey(enums.ConcurrencyScopeAccount, uuid.Nil, "foo", 1)
+
+			// Create a new item
+			itemA, err := q.EnqueueItem(ctx, QueueItem{
+				FunctionID: uuid.New(),
+				Data: osqueue.Item{
+					CustomConcurrencyKeys: []state.CustomConcurrency{
+						{
+							Key:   ck.Key,
+							Limit: 1,
+						},
+					},
+				},
+			}, start)
+			require.NoError(t, err)
+
+			_, err = q.EnqueueItem(ctx, QueueItem{
+				FunctionID: uuid.New(),
+				Data: osqueue.Item{
+					CustomConcurrencyKeys: []state.CustomConcurrency{
+						{
+							Key:   ck.Key,
+							Limit: 1,
+						},
+					},
+				},
+			}, start)
+			require.NoError(t, err)
+
+			// Use the new item's workflow ID
+			p := QueuePartition{FunctionID: &itemA.FunctionID}
+
+			t.Run("Leases with capacity", func(t *testing.T) {
+				_, err = q.Lease(ctx, p, itemA, 5*time.Second, time.Now(), nil)
+				require.NoError(t, err)
+			})
+
+			t.Run("Partition lease errors without capacity", func(t *testing.T) {
+				_, _, hash, _ := ck.ParseKey()
+				qp := getPartition(t, r, enums.PartitionTypeConcurrencyKey, uuid.Nil, hash)
+
+				leaseId, _, err := q.PartitionLease(ctx, &qp, 5*time.Second)
+				require.Nil(t, leaseId, "No lease id when leasing fails.\n%s", r.Dump())
+				require.Error(t, err)
+				require.ErrorIs(t, err, ErrConcurrencyLimitCustomKey)
+			})
+		})
+	})
 }
 
 func TestQueuePartitionPeek(t *testing.T) {

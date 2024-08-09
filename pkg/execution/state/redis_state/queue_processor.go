@@ -32,6 +32,9 @@ var (
 	startedAtKey = startedAtCtxKey{}
 	sojournKey   = sojournCtxKey{}
 	latencyKey   = latencyCtxKey{}
+
+	errProcessNoCapacity   = fmt.Errorf("no capacity")
+	errProcessStopIterator = fmt.Errorf("stop iterator")
 )
 
 func init() {
@@ -538,212 +541,37 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 	}
 	telemetry.HistogramQueuePeekSize(ctx, int64(len(queue)), telemetry.HistogramOpt{PkgName: pkgName})
 
-	var (
-		processErr error
-
-		// These flags are used to handle partition rqeueueing.
-		ctrSuccess     int32
-		ctrConcurrency int32
-		ctrRateLimit   int32
-	)
-
 	// Record the number of partitions we're leasing.
 	telemetry.IncrQueuePartitionLeasedCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 
-	// staticTime is used as the processing time for all items in the queue.
-	// We process queue items sequentially, and time progresses linearly as each
-	// queue item is processed.  We want to use a static time to prevent out-of-order
-	// processing with regards to things like rate limiting;  if we use time.Now(),
-	// queue items later in the array may be processed before queue items earlier in
-	// the array depending on eg. a rate limit becoming available half way through
-	// iteration.
-	staticTime := q.clock.Now()
+	// parallel all queue names with internal mappings for now.
+	// XXX: Allow parallel partitions for all functions except for fns opting into FIFO
+	_, parallel := q.queueKindMapping[p.Queue()]
 
-	denies := newLeaseDenyList()
-
-ProcessLoop:
-	for _, item := range queue {
-		// TODO: Create an in-memory mapping of rate limit keys that have been hit,
-		//       and don't bother to process if the queue item has a limited key.  This
-		//       lessens work done in the queue, as we can `continue` immediately.
-		if item.IsLeased(q.clock.Now()) {
-			telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"status": "lease_contention"},
-			})
-			continue
-		}
-
-		// Cbeck if there's capacity from our local workers atomically prior to leasing our tiems.
-		if !q.sem.TryAcquire(1) {
-			telemetry.IncrQueuePartitionProcessNoCapacityCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
-			// Break the entire loop to prevent out of order work.
-			break ProcessLoop
-		}
-		telemetry.WorkerQueueCapacityCounter(ctx, 1, telemetry.CounterOpt{PkgName: pkgName})
-
-		// Attempt to lease this item before passing this to a worker.  We have to do this
-		// synchronously as we need to lease prior to requeueing the partition pointer. If
-		// we don't do this here, the workers may not lease the items before calling Peek
-		// to re-enqeueu the pointer, which then increases contention - as we requeue a
-		// pointer too early.
-		//
-		// This is safe:  only one process runs scan(), and we guard the total number of
-		// available workers with the above semaphore.
-		leaseID, err := duration(ctx, "lease", q.clock.Now(), func(ctx context.Context) (*ulid.ULID, error) {
-			return q.Lease(ctx, *p, *item, QueueLeaseDuration, staticTime, denies)
-		})
-
-		// NOTE: If this loop ends in an error, we must _always_ release an item from the
-		// semaphore to free capacity.  This will happen automatically when the worker
-		// finishes processing a queue item on success.
-		if err != nil {
-			// Continue on and handle the error below.
-			q.sem.Release(1)
-			telemetry.WorkerQueueCapacityCounter(ctx, -1, telemetry.CounterOpt{PkgName: pkgName})
-		}
-
-		// Check the sojourn delay for this item in the queue. Tracking system latency vs
-		// sojourn latency from concurrency is important.
-		//
-		// Firstly, we check:  does the job store the first peek time?  If so, the
-		// delta between now and that time is the sojourn latency.  If not, this is either
-		// one of two cases:
-		//   - This is a new job in the queue, and we're peeking it for the first time.
-		//     Sojourn latency is 0.  Easy.
-		//   - We've peeked the queue since adding the job.  At this point, the only
-		//     conclusion is that the job wasn't peeked because of concurrency/capacity
-		//     issues, so the delta between now - job added is sojourn latency.
-		//
-		// NOTE: You might see that we use tracking semaphores and the worker itself has
-		// a maximum capacity.  We must ALWAYS peek the available capacity in our worker
-		// via the above Peek() call so that worker capacity doesn't prevent us from accessing
-		// all jobs in a peek.  This would break sojourn latency:  it only works if we know
-		// we're quitting early because of concurrency issues in a user's function, NOT because
-		// of capacity issues in our system.
-		//
-		// Anyway, here we set the first peek item to the item's start time if there was a
-		// peek since the job was added.
-		if p.Last > 0 && p.Last > item.AtMS {
-			// Fudge the earliest peek time because we know this wasn't peeked and so
-			// the peek time wasn't set;  but, as we were still processing jobs after
-			// the job was added this item was concurrency-limited.
-			item.EarliestPeekTime = item.AtMS
-		}
-
-		// We may return a keyError, which masks the actual error underneath.  If so,
-		// grab the cause.
-		cause := err
-		var key keyError
-		if errors.As(err, &key) {
-			cause = key.cause
-		}
-
-		switch cause {
-		case ErrQueueItemThrottled:
-			// Here we denylist each throttled key that's been limited here, then ignore
-			// any other jobs from being leased as we continue to iterate through the loop.
-			// This maintains FIFO ordering amongst all custom concurrency keys.
-			denies.addThrottled(err)
-
-			ctrRateLimit++
-			processErr = nil
-			telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"status": "throttled"},
-			})
-			continue
-		case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit:
-			ctrConcurrency++
-			// Since the queue is at capacity on a fn or account level, no
-			// more jobs in this loop should be worked on - so break.
-			//
-			// Even if we have capacity for the next job in the loop we do NOT
-			// want to claim the job, as this breaks ordering guarantees.  The
-			// only safe thing to do when we hit a function or account level
-			// concurrency key.
-			var status string
-			switch cause {
-			case ErrPartitionConcurrencyLimit:
-				status = "partition_concurrency_limit"
-			case ErrAccountConcurrencyLimit:
-				status = "account_concurrency_limit"
-			}
-
-			processErr = nil
-			telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"status": status},
-			})
-			break ProcessLoop
-		case ErrConcurrencyLimitCustomKey:
-			ctrConcurrency++
-			// Custom concurrency keys are different.  Each job may have a different key,
-			// so we cannot break the loop in case the next job has a different key and
-			// has capacity.
-			//
-			// Here we denylist each concurrency key that's been limited here, then ignore
-			// any other jobs from being leased as we continue to iterate through the loop.
-			// This maintains FIFO ordering amongst all custom concurrency keys.
-			denies.addConcurrency(err)
-
-			telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"status": "custom_key_concurrency_limit"},
-			})
-			processErr = nil
-			continue
-		case ErrQueueItemNotFound:
-			// This is an okay error.  Move to the next job item.
-			ctrSuccess++ // count as a success for stats purposes.
-			processErr = nil
-			telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"status": "success"},
-			})
-			continue
-		case ErrQueueItemAlreadyLeased:
-			// This is an okay error.  Move to the next job item.
-			ctrSuccess++ // count as a success for stats purposes.
-			processErr = nil
-			telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"status": "success"},
-			})
-			continue
-		}
-
-		// Handle other errors.
-		if err != nil {
-			processErr = fmt.Errorf("error leasing in process: %w", err)
-			telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"status": "error"},
-			})
-			break ProcessLoop
-		}
-
-		// Assign the lease ID and pass this to be handled by the available worker.
-		// There should always be capacity on this queue as we track capacity via
-		// a semaphore.
-		item.LeaseID = leaseID
-
-		// increase success counter.
-		ctrSuccess++
-		telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
-			PkgName: pkgName,
-			Tags:    map[string]any{"status": "success"},
-		})
-		q.workers <- processItem{P: *p, I: *item, G: guaranteedCapacity}
+	iter := processor{
+		partition:          p,
+		items:              queue,
+		guaranteedCapacity: guaranteedCapacity,
+		queue:              q,
+		denies:             newLeaseDenyList(),
+		staticTime:         q.clock.Now(),
+		parallel:           parallel,
 	}
 
-	if err := q.setPeekEWMA(ctx, p.FunctionID, int64(ctrConcurrency+ctrRateLimit)); err != nil {
+	if processErr := iter.iterate(ctx); processErr != nil {
+		// Report the eerror.
+		q.logger.Error().Err(processErr).Interface("partition", p).Msg("error iterating queue items")
+		return processErr
+
+	}
+
+	if err := q.setPeekEWMA(ctx, p.FunctionID, int64(iter.ctrConcurrency+iter.ctrRateLimit)); err != nil {
 		log.From(ctx).Warn().Err(err).Msg("error recording concurrency limit for EWMA")
 	}
 
 	// If we've hit concurrency issues OR we've only hit rate limit issues, re-enqueue the partition
 	// with a force:  ensure that we won't re-scan it until 2 seconds in the future.
-	if ctrConcurrency > 0 || (ctrRateLimit > 0 && ctrConcurrency == 0 && ctrSuccess == 0) {
+	if iter.isRequeuable() {
 		for _, l := range q.lifecycles {
 			if p.FunctionID != nil {
 				go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
@@ -755,7 +583,7 @@ ProcessLoop:
 		}
 
 		requeue := PartitionConcurrencyLimitRequeueExtension
-		if ctrConcurrency == 0 {
+		if iter.ctrConcurrency == 0 {
 			// This has been throttled only.  Don't requeue so far ahead, otherwise we'll be waiting longer
 			// than the minimum throttle.
 			//
@@ -767,11 +595,6 @@ ProcessLoop:
 		// Requeue this partition as we hit concurrency limits.
 		telemetry.IncrQueuePartitionConcurrencyLimitCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 		return q.PartitionRequeue(ctx, p, q.clock.Now().Truncate(time.Second).Add(requeue), true)
-	}
-
-	if processErr != nil {
-		// This wasn't a concurrency error so handle things separately.
-		return processErr
 	}
 
 	// XXX: If we haven't been able to lease a single item, ensure we enqueue this
@@ -1151,4 +974,261 @@ func (t *trackingSemaphore) Acquire(ctx context.Context, n int64) error {
 func (t *trackingSemaphore) Release(n int64) {
 	t.Weighted.Release(n)
 	atomic.AddInt64(&t.counter, -n)
+}
+
+type processor struct {
+	partition          *QueuePartition
+	items              []*QueueItem
+	guaranteedCapacity *GuaranteedCapacity
+
+	// queue is the queue that owns this processor.
+	queue *queue
+
+	// denies records a denylist as keys hit concurrency and throttling limits.
+	// this lets us prevent lease attempts for consecutive keys, as soon as the first
+	// key is denied.
+	denies *leaseDenies
+
+	// error returned when processing
+	err error
+
+	// staticTime is used as the processing time for all items in the queue.
+	// We process queue items sequentially, and time progresses linearly as each
+	// queue item is processed.  We want to use a static time to prevent out-of-order
+	// processing with regards to things like rate limiting;  if we use time.Now(),
+	// queue items later in the array may be processed before queue items earlier in
+	// the array depending on eg. a rate limit becoming available half way through
+	// iteration.
+	staticTime time.Time
+
+	// parallel indicates whether the partition's jobs can be processed in parallel.
+	// parallel processing breaks best effort fifo but increases throughput.
+	parallel bool
+
+	// These flags are used to handle partition rqeueueing.
+	ctrSuccess     int32
+	ctrConcurrency int32
+	ctrRateLimit   int32
+}
+
+func (p *processor) iterate(ctx context.Context) error {
+	var err error
+
+	eg := errgroup.Group{}
+	for _, i := range p.items {
+		if p.parallel {
+			item := *i
+			eg.Go(func() error {
+				return p.process(ctx, &item)
+			})
+			continue
+		}
+
+		// non-parallel (sequential fifo) processing.
+		if err = p.process(ctx, i); err != nil {
+			// always break on the first error;  if processing returns an error we
+			// always assume that we stop iterating.
+			//
+			// we return errors when:
+			// * there's no capacity (so dont continue, because FIFO)
+			// * we hit fn concurrency limits (so don't continue, because FIFO too)
+			// * some other error, which means something went wrong.
+			break
+		}
+	}
+
+	if p.parallel {
+		// normalize errors from parallel
+		err = eg.Wait()
+	}
+
+	if errors.Is(err, errProcessStopIterator) {
+		// This is safe;  it's stopping safely but isn't an error.
+		return nil
+	}
+	if errors.Is(err, errProcessNoCapacity) {
+		// This is safe;  it's stopping safely but isn't an error.
+		return nil
+	}
+
+	// someting went wrong.  report the error.
+	return err
+}
+
+func (p *processor) process(ctx context.Context, item *QueueItem) error {
+	// TODO: Create an in-memory mapping of rate limit keys that have been hit,
+	//       and don't bother to process if the queue item has a limited key.  This
+	//       lessens work done in the queue, as we can `continue` immediately.
+	if item.IsLeased(p.queue.clock.Now()) {
+		telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"status": "lease_contention"},
+		})
+		return nil
+	}
+
+	// Cbeck if there's capacity from our local workers atomically prior to leasing our tiems.
+	if !p.queue.sem.TryAcquire(1) {
+		telemetry.IncrQueuePartitionProcessNoCapacityCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
+		// Break the entire loop to prevent out of order work.
+		return errProcessNoCapacity
+	}
+
+	telemetry.WorkerQueueCapacityCounter(ctx, 1, telemetry.CounterOpt{PkgName: pkgName})
+
+	// Attempt to lease this item before passing this to a worker.  We have to do this
+	// synchronously as we need to lease prior to requeueing the partition pointer. If
+	// we don't do this here, the workers may not lease the items before calling Peek
+	// to re-enqeueu the pointer, which then increases contention - as we requeue a
+	// pointer too early.
+	//
+	// This is safe:  only one process runs scan(), and we guard the total number of
+	// available workers with the above semaphore.
+	leaseID, err := duration(ctx, "lease", p.queue.clock.Now(), func(ctx context.Context) (*ulid.ULID, error) {
+		return p.queue.Lease(ctx, *p.partition, *item, QueueLeaseDuration, p.staticTime, p.denies)
+	})
+
+	// NOTE: If this loop ends in an error, we must _always_ release an item from the
+	// semaphore to free capacity.  This will happen automatically when the worker
+	// finishes processing a queue item on success.
+	if err != nil {
+		// Continue on and handle the error below.
+		p.queue.sem.Release(1)
+		telemetry.WorkerQueueCapacityCounter(ctx, -1, telemetry.CounterOpt{PkgName: pkgName})
+	}
+
+	// Check the sojourn delay for this item in the queue. Tracking system latency vs
+	// sojourn latency from concurrency is important.
+	//
+	// Firstly, we check:  does the job store the first peek time?  If so, the
+	// delta between now and that time is the sojourn latency.  If not, this is either
+	// one of two cases:
+	//   - This is a new job in the queue, and we're peeking it for the first time.
+	//     Sojourn latency is 0.  Easy.
+	//   - We've peeked the queue since adding the job.  At this point, the only
+	//     conclusion is that the job wasn't peeked because of concurrency/capacity
+	//     issues, so the delta between now - job added is sojourn latency.
+	//
+	// NOTE: You might see that we use tracking semaphores and the worker itself has
+	// a maximum capacity.  We must ALWAYS peek the available capacity in our worker
+	// via the above Peek() call so that worker capacity doesn't prevent us from accessing
+	// all jobs in a peek.  This would break sojourn latency:  it only works if we know
+	// we're quitting early because of concurrency issues in a user's function, NOT because
+	// of capacity issues in our system.
+	//
+	// Anyway, here we set the first peek item to the item's start time if there was a
+	// peek since the job was added.
+	if p.partition.Last > 0 && p.partition.Last > item.AtMS {
+		// Fudge the earliest peek time because we know this wasn't peeked and so
+		// the peek time wasn't set;  but, as we were still processing jobs after
+		// the job was added this item was concurrency-limited.
+		item.EarliestPeekTime = item.AtMS
+	}
+
+	// We may return a keyError, which masks the actual error underneath.  If so,
+	// grab the cause.
+	cause := err
+	var key keyError
+	if errors.As(err, &key) {
+		cause = key.cause
+	}
+
+	switch cause {
+	case ErrQueueItemThrottled:
+		// Here we denylist each throttled key that's been limited here, then ignore
+		// any other jobs from being leased as we continue to iterate through the loop.
+		// This maintains FIFO ordering amongst all custom concurrency keys.
+		p.denies.addThrottled(err)
+
+		p.ctrRateLimit++
+		telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"status": "throttled"},
+		})
+		return nil
+	case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit:
+		p.ctrConcurrency++
+		// Since the queue is at capacity on a fn or account level, no
+		// more jobs in this loop should be worked on - so break.
+		//
+		// Even if we have capacity for the next job in the loop we do NOT
+		// want to claim the job, as this breaks ordering guarantees.  The
+		// only safe thing to do when we hit a function or account level
+		// concurrency key.
+		var status string
+		switch cause {
+		case ErrPartitionConcurrencyLimit:
+			status = "partition_concurrency_limit"
+		case ErrAccountConcurrencyLimit:
+			status = "account_concurrency_limit"
+		}
+
+		telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"status": status},
+		})
+
+		return fmt.Errorf("concurrency hit: %w", errProcessStopIterator)
+	case ErrConcurrencyLimitCustomKey:
+		p.ctrConcurrency++
+
+		// Custom concurrency keys are different.  Each job may have a different key,
+		// so we cannot break the loop in case the next job has a different key and
+		// has capacity.
+		//
+		// Here we denylist each concurrency key that's been limited here, then ignore
+		// any other jobs from being leased as we continue to iterate through the loop.
+		p.denies.addConcurrency(err)
+
+		telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"status": "custom_key_concurrency_limit"},
+		})
+		return nil
+	case ErrQueueItemNotFound:
+		// This is an okay error.  Move to the next job item.
+		p.ctrSuccess++ // count as a success for stats purposes.
+		telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"status": "success"},
+		})
+		return nil
+	case ErrQueueItemAlreadyLeased:
+		// This is an okay error.  Move to the next job item.
+		p.ctrSuccess++ // count as a success for stats purposes.
+		telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"status": "success"},
+		})
+		return nil
+	}
+
+	// Handle other errors.
+	if err != nil {
+		p.err = fmt.Errorf("error leasing in process: %w", err)
+		telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"status": "error"},
+		})
+		return p.err
+	}
+
+	// Assign the lease ID and pass this to be handled by the available worker.
+	// There should always be capacity on this queue as we track capacity via
+	// a semaphore.
+	item.LeaseID = leaseID
+
+	// increase success counter.
+	p.ctrSuccess++
+	telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+		PkgName: pkgName,
+		Tags:    map[string]any{"status": "success"},
+	})
+	p.queue.workers <- processItem{P: *p.partition, I: *item, G: p.guaranteedCapacity}
+	return nil
+}
+
+func (p *processor) isRequeuable() bool {
+	// if we have concurrency OR we hit rate limiting/throttling.
+	return p.ctrConcurrency > 0 || (p.ctrRateLimit > 0 && p.ctrConcurrency == 0 && p.ctrSuccess == 0)
 }
