@@ -1673,7 +1673,6 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 	// consuming the pause to guarantee the event data is stored via the pause
 	// for the next run.  If the ConsumePause call comes after enqueue, the TCP
 	// conn may drop etc. and running the job may occur prior to saving state data.
-	// jobID := fmt.Sprintf("%s-%s", pause.Identifier.IdempotencyKey(), pause.DataKey+"-pause")
 	jobID := fmt.Sprintf("%s-%s", pause.Identifier.IdempotencyKey(), pause.DataKey)
 	err = e.queue.Enqueue(
 		ctx,
