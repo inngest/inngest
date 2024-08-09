@@ -712,7 +712,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 				return customTestLimit
 			}),
 		WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) (fn, acct, custom int) {
-			return 1234, 2345, 3456
+			return 1, 2, 3
 		}),
 	)
 	ctx := context.Background()
@@ -747,6 +747,10 @@ func TestQueueSystemPartitions(t *testing.T) {
 			PartitionType:    int(enums.PartitionTypeSystem),
 			ConcurrencyLimit: customTestLimit,
 		}, qp)
+
+		apIds := getAccountPartitions(t, rc, uuid.Nil)
+		require.Empty(t, apIds)
+		require.NotContains(t, apIds, qp.ID)
 	})
 
 	t.Run("peeks correct partition", func(t *testing.T) {
@@ -768,16 +772,85 @@ func TestQueueSystemPartitions(t *testing.T) {
 		leaseId, availableCapacity, err := q.PartitionLease(ctx, &qp, time.Second)
 		require.NoError(t, err)
 		require.NotNil(t, leaseId)
-		require.Equal(t, 1234, availableCapacity)
+		require.Equal(t, 1, availableCapacity)
 	})
 
-	t.Run("leases correct partition", func(t *testing.T) {
+	t.Run("peeks partition successfully", func(t *testing.T) {
 		qp := getSystemPartition(t, r, customQueueName)
 
 		items, err := q.Peek(ctx, &qp, start, 100)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(items))
 		require.Equal(t, qi.Data.Payload, items[0].Data.Payload)
+	})
+
+	t.Run("leases partition items while respecting concurrency", func(t *testing.T) {
+		qp := getSystemPartition(t, r, customQueueName)
+
+		item, err := q.EnqueueItem(ctx, qi, start)
+		require.NoError(t, err)
+		require.NotEqual(t, item.ID, ulid.ULID{})
+		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
+
+		item2, err := q.EnqueueItem(ctx, qi, start)
+		require.NoError(t, err)
+		require.NotEqual(t, item.ID, ulid.ULID{})
+		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
+
+		// Ensure that our data is set up correctly.
+		found := getQueueItem(t, r, item.ID)
+		require.Equal(t, item, found)
+
+		leaseId, err := q.Lease(ctx, qp, item, time.Second, time.Now(), nil)
+		require.NoError(t, err)
+		require.NotNil(t, leaseId)
+
+		leaseId, err = q.Lease(ctx, qp, item2, time.Second, time.Now(), nil)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrAccountConcurrencyLimit)
+		require.Nil(t, leaseId)
+	})
+
+	t.Run("It enqueues an item to account queues when account id is present", func(t *testing.T) {
+		r.FlushAll()
+
+		// This test case handles account-scoped system partitions
+
+		accountId := uuid.New()
+
+		qi := QueueItem{
+			FunctionID: id,
+			Data: osqueue.Item{
+				Identifier: state.Identifier{
+					AccountID: accountId,
+				},
+				Payload:   json.RawMessage("{\"test\":\"payload\"}"),
+				QueueName: &customQueueName,
+			},
+			QueueName: &customQueueName,
+		}
+
+		item, err := q.EnqueueItem(ctx, qi, start)
+		require.NoError(t, err)
+		require.NotEqual(t, item.ID, ulid.ULID{})
+		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
+
+		// Ensure that our data is set up correctly.
+		found := getQueueItem(t, r, item.ID)
+		require.Equal(t, item, found)
+
+		// Ensure the partition is inserted.
+		qp := getSystemPartition(t, r, customQueueName)
+		require.Equal(t, QueuePartition{
+			ID:               "custom",
+			PartitionType:    int(enums.PartitionTypeSystem),
+			ConcurrencyLimit: customTestLimit,
+			AccountID:        accountId,
+		}, qp)
+
+		apIds := getAccountPartitions(t, rc, accountId)
+		require.Equal(t, 1, len(apIds))
+		require.Contains(t, apIds, qp.ID)
 	})
 }
 

@@ -896,6 +896,9 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 		systemPartition := QueuePartition{
 			ID:            *i.Data.QueueName,
 			PartitionType: int(enums.PartitionTypeSystem),
+
+			// This may or may not be empty
+			AccountID: i.Data.Identifier.AccountID,
 		}
 		// Fetch most recent system concurrency limit
 		systemLimit := q.systemConcurrencyLimitGetter(ctx, systemPartition)
@@ -1517,7 +1520,9 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	var acctLimit int
 	accountConcurrencyKey := q.u.kg.Concurrency("account", item.Data.Identifier.AccountID.String())
 	if len(parts) == 1 && parts[0].PartitionType == int(enums.PartitionTypeSystem) {
-		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
+		if item.Data.Identifier.AccountID == uuid.Nil {
+			accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
+		}
 		acctLimit = parts[0].ConcurrencyLimit
 	} else {
 		// NOTE: This has been called in ItemPartitions.  We always need to fetch the latest
