@@ -5,8 +5,14 @@ import { type Route } from 'next';
 import Link from 'next/link';
 import { usePathname, useRouter, useSelectedLayoutSegments } from 'next/navigation';
 import { Listbox } from '@headlessui/react';
-import { Alert } from '@inngest/components/Alert/Alert';
-import { RiCloudFill, RiCloudLine, RiExpandUpDownLine, RiLoopLeftLine } from '@remixicon/react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
+import {
+  RiCloudFill,
+  RiCloudLine,
+  RiErrorWarningLine,
+  RiExpandUpDownLine,
+  RiLoopLeftLine,
+} from '@remixicon/react';
 
 import { useEnvironments } from '@/queries';
 import cn from '@/utils/cn';
@@ -114,9 +120,18 @@ export default function EnvironmentSelectMenu({
   if (error) {
     console.error('error fetching envs', error);
     return (
-      <Alert severity="error" className="mx-auto flex h-8 w-full items-center text-sm">
-        Env Error
-      </Alert>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="bg-error text-error flex h-8 w-full items-center justify-start gap-x-2 rounded px-2">
+            <RiErrorWarningLine className="w-4" />
+            {!collapsed && <div>Env Error</div>}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="right" className="text-error bg-error rounded text-xs">
+          Error loading environments. Please try again or contact support if the issue does not
+          resolve.
+        </TooltipContent>
+      </Tooltip>
     );
   }
 
