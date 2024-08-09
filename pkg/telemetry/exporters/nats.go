@@ -32,18 +32,17 @@ const (
 // - subject to write to
 // - is jetstream or not?
 type natsSpanExporter struct {
-	subject string
-	conn    *nats.Conn
+	subjects []string
+	conn     *nats.Conn
 }
 
 type NatsExporterOpts struct {
-	Subject string
-	URLs    []string
+	Subjects []string
+	URLs     []string
 }
 
 // NewNATSSpanExporter creates an otel compatible exporter that ships the spans to NATS
 func NewNATSSpanExporter(ctx context.Context, opts *NatsExporterOpts) (trace.SpanExporter, error) {
-
 	if opts == nil {
 		return nil, fmt.Errorf("nats exporter setup options unavailable")
 	}
@@ -52,9 +51,16 @@ func NewNATSSpanExporter(ctx context.Context, opts *NatsExporterOpts) (trace.Spa
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving hostname: %w", err)
 	}
+	name := fmt.Sprintf("trace-exporter-%s", host)
 
 	urls := strings.Join(opts.URLs, ",")
-	name := fmt.Sprintf("trace-exporter-%s", host)
+	if urls == "" {
+		urls = "nats://127.0.0.1:4222"
+	}
+
+	if len(opts.Subjects) == 0 {
+		return nil, fmt.Errorf("subject is required for nats exporter")
+	}
 
 	// urls should be comma delimited strings
 	conn, err := nats.Connect(urls,
@@ -70,8 +76,8 @@ func NewNATSSpanExporter(ctx context.Context, opts *NatsExporterOpts) (trace.Spa
 	)
 
 	return &natsSpanExporter{
-		subject: opts.Subject,
-		conn:    conn,
+		subjects: opts.Subjects,
+		conn:     conn,
 	}, nil
 }
 
@@ -163,15 +169,18 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 				return
 			}
 
-			// publish to NATS
-			if err := e.conn.Publish(e.subject, byt); err != nil {
-				logger.StdlibLogger(ctx).Error("error publishing span to NATS",
-					"error", err,
-					"acctID", id.AccountId,
-					"wsID", id.EnvId,
-					"wfID", id.FunctionId,
-					"runID", id.RunId,
-				)
+			// publish to all subjects defined
+			for _, subj := range e.subjects {
+				// publish to NATS
+				if err := e.conn.Publish(subj, byt); err != nil {
+					logger.StdlibLogger(ctx).Error("error publishing span to NATS",
+						"error", err,
+						"acctID", id.AccountId,
+						"wsID", id.EnvId,
+						"wfID", id.FunctionId,
+						"runID", id.RunId,
+					)
+				}
 			}
 		}(ctx, sp)
 	}
