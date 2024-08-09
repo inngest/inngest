@@ -1697,6 +1697,22 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		return fmt.Errorf("error enqueueing after pause: %w", err)
 	}
 
+	// And dequeue the timeout job to remove unneeded work from the queue, etc.
+	if q, ok := e.queue.(redis_state.QueueManager); ok {
+		jobID := fmt.Sprintf("%s-%s", md.IdempotencyKey(), pause.DataKey)
+		err := q.Dequeue(
+			ctx,
+			redis_state.QueuePartition{WorkflowID: md.ID.FunctionID},
+			redis_state.QueueItem{
+				ID:         redis_state.HashID(ctx, jobID),
+				WorkflowID: md.ID.FunctionID,
+			},
+		)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error dequeueing consumed pause job when resuming", "error", err)
+		}
+	}
+
 	if pause.IsInvoke() {
 		for _, e := range e.lifecycles {
 			go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, pause, r)
@@ -2151,7 +2167,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 	}
 
 	// Enqueue a job that will timeout the pause.
-	jobID := fmt.Sprintf("%s-%s-%s", i.md.IdempotencyKey(), gen.ID, "invoke")
+	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID)
 	// TODO I think this is fine sending no metadata, as we have no attempts.
 	err = e.queue.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
@@ -2281,7 +2297,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 	// the pause so this race will conclude by calling the function once, as only
 	// one thread can lease and consume a pause;  the other will find that the
 	// pause is no longer available and return.
-	jobID := fmt.Sprintf("%s-%s-%s", i.md.IdempotencyKey(), gen.ID, "wait")
+	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID)
 	// TODO Is this fine to leave? No attempts.
 	err = e.queue.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
