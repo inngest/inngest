@@ -30,6 +30,7 @@ import (
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/mattn/go-isatty"
 	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/propagation"
@@ -297,7 +298,7 @@ func (d *devserver) HandleEvent(ctx context.Context, e *event.Event) (string, er
 		Msg("publishing event")
 
 	carrier := telemetry.NewTraceCarrier()
-	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 	err = d.publisher.Publish(
 		ctx,

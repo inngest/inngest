@@ -32,6 +32,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/telemetry"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog"
@@ -427,7 +428,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	config.SetDebounceFlag(req.PreventDebounce)
 
 	carrier := telemetry.NewTraceCarrier(telemetry.WithTraceCarrierSpanID(&spanID))
-	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 	config.SetFunctionTrace(carrier)
 
 	metadata := sv2.Metadata{
@@ -2122,7 +2123,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		telemetry.WithTraceCarrierTimestamp(now),
 		telemetry.WithTraceCarrierSpanID(&sid),
 	)
-	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 	// Always create an invocation event.
 	evt := event.NewInvocationEvent(event.NewInvocationEventOpts{
@@ -2263,7 +2264,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		telemetry.WithTraceCarrierTimestamp(now),
 		telemetry.WithTraceCarrierSpanID(&sid),
 	)
-	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 	pause := state.Pause{
 		ID:          pauseID,
@@ -2539,7 +2540,7 @@ func extractTraceCtx(ctx context.Context, md sv2.Metadata) context.Context {
 		// NOTE:
 		// this gymastics happens because the carrier stores the spanID separately.
 		// it probably can be simplified
-		tmp := telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
+		tmp := itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
 		spanID, err := md.Config.GetSpanID()
 		if err != nil {
 			return ctx

@@ -19,6 +19,7 @@ import (
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/telemetry"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -111,7 +112,7 @@ func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Meta
 				meta := event.InngestMetadata{}
 				if err := meta.Decode(v); err == nil {
 					if meta.InvokeTraceCarrier != nil && meta.InvokeTraceCarrier.CanResumePause() {
-						ictx := telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(meta.InvokeTraceCarrier.Context))
+						ictx := itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(meta.InvokeTraceCarrier.Context))
 
 						sid := meta.InvokeTraceCarrier.SpanID()
 
@@ -715,7 +716,7 @@ func (l traceLifecycle) OnInvokeFunctionResumed(
 
 	carrier := telemetry.NewTraceCarrier()
 	if err := carrier.Unmarshal(meta); err == nil {
-		ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+		ctx = itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
 		if carrier.CanResumePause() {
 			// Used for spans
 			triggeringEventID := ""
@@ -862,7 +863,7 @@ func (l traceLifecycle) OnWaitForEventResumed(
 
 	carrier := telemetry.NewTraceCarrier()
 	if err := carrier.Unmarshal(meta); err == nil {
-		ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+		ctx = itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
 		if carrier.CanResumePause() {
 			_, span := NewSpan(ctx,
 				WithScope(consts.OtelScopeStep),
@@ -917,7 +918,7 @@ func (l *traceLifecycle) extractTraceCtx(ctx context.Context, md sv2.Metadata, i
 		// NOTE:
 		// this gymastics happens because the carrier stores the spanID separately.
 		// it probably can be simplified
-		tmp := telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
+		tmp := itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
 		// NOTE: this is getting complex
 		// need the original with the parent span
 		if isFnSpan {

@@ -44,6 +44,7 @@ import (
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
 	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/propagation"
@@ -392,7 +393,7 @@ func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic stri
 		}
 
 		carrier := telemetry.NewTraceCarrier()
-		telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+		itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 		err = pb.Publish(
 			ctx,
