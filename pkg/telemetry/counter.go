@@ -109,3 +109,12 @@ func WorkerQueueCapacityCounter(ctx context.Context, incr int64, opts CounterOpt
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrBatchScheduledCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "new_batch_scheduled_total",
+		Description: "Total number of new batch scheduled",
+		Tags:        opts.Tags,
+	})
+}

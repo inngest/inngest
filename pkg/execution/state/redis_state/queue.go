@@ -116,13 +116,13 @@ var (
 	ErrPartitionPaused               = fmt.Errorf("partition is paused")
 	ErrConfigAlreadyLeased           = fmt.Errorf("config scanner already leased")
 	ErrConfigLeaseExceedsLimits      = fmt.Errorf("config lease duration exceeds the maximum of %d seconds", int(ConfigLeaseMax.Seconds()))
-	ErrPartitionConcurrencyLimit     = fmt.Errorf("At partition concurrency limit")
-	ErrAccountConcurrencyLimit       = fmt.Errorf("At account concurrency limit")
+	ErrPartitionConcurrencyLimit     = fmt.Errorf("at partition concurrency limit")
+	ErrAccountConcurrencyLimit       = fmt.Errorf("at account concurrency limit")
 
 	// ErrConcurrencyLimitCustomKey represents a concurrency limit being hit for *some*, but *not all*
 	// jobs in a queue, via custom concurrency keys which are evaluated to a specific string.
 
-	ErrConcurrencyLimitCustomKey = fmt.Errorf("At concurrency limit")
+	ErrConcurrencyLimitCustomKey = fmt.Errorf("at concurrency limit")
 
 	// internal shard errors
 	errShardNotFound     = fmt.Errorf("shard not found")
@@ -1016,9 +1016,10 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 	return partitions
 }
 
+// RunJobs returns a list of jobs that are due to run for a given run ID.
 func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]osqueue.JobResponse, error) {
-	if limit > 10 || limit <= 0 {
-		limit = 10
+	if limit > 1000 || limit <= 0 {
+		limit = 1000
 	}
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RunJobs"), redis_telemetry.ScopeQueue)
@@ -1062,6 +1063,7 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 			Position: pos,
 			Kind:     qi.Data.Kind,
 			Attempt:  qi.Data.Attempt,
+			Raw:      qi,
 		})
 	}
 
@@ -1293,10 +1295,10 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 	if limit > QueuePeekMax {
 		// Lua's max unpack() length is 8000; don't allow users to peek more than
 		// 1k at a time regardless.
-		return nil, ErrQueuePeekMaxExceedsLimits
+		limit = QueuePeekMax
 	}
 	if limit <= 0 {
-		limit = QueuePeekMax
+		limit = QueuePeekMin
 	}
 	if isPeekNext {
 		limit = 1
@@ -1447,18 +1449,15 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	}
 
 	// Check to see if this key has already been denied in the lease iteration.
-	// If so, fail early.
+	// If partition concurrency limits were encountered previously, fail early.
 	if denies != nil && denies.denyConcurrency(item.FunctionID.String()) {
 		// Note that we do not need to wrap the key as the key is already present.
 		return nil, ErrPartitionConcurrencyLimit
 	}
+
+	// Same for account concurrency limits
 	if denies != nil && denies.denyConcurrency(item.Data.Identifier.AccountID.String()) {
 		return nil, ErrAccountConcurrencyLimit
-	}
-
-	leaseID, err := ulid.New(ulid.Timestamp(q.clock.Now().Add(duration).UTC()), rnd)
-	if err != nil {
-		return nil, fmt.Errorf("error generating id: %w", err)
 	}
 
 	// Grab all partitions for the queue item
@@ -1469,6 +1468,11 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		if denies != nil && partition.ConcurrencyKey != "" && denies.denyConcurrency(partition.ConcurrencyKey) {
 			return nil, ErrConcurrencyLimitCustomKey
 		}
+	}
+
+	leaseID, err := ulid.New(ulid.Timestamp(q.clock.Now().Add(duration).UTC()), rnd)
+	if err != nil {
+		return nil, fmt.Errorf("error generating id: %w", err)
 	}
 
 	// NOTE: The account limit is used for queue items within accounts, as well as system partitions
@@ -1833,8 +1837,6 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		p.customConcurrencyKey(q.u.kg),
 	}
 
-	// TODO: Enable checking of env and custom concurrency keys here.
-
 	args, err := StrSlice([]any{
 		p.Queue(),
 		leaseID.String(),
@@ -1864,8 +1866,12 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	}
 
 	switch result[0] {
-	case -1, -2, -3:
+	case -1:
+		return nil, 0, ErrAccountConcurrencyLimit
+	case -2:
 		return nil, 0, ErrPartitionConcurrencyLimit
+	case -3:
+		return nil, 0, ErrConcurrencyLimitCustomKey
 	case -4:
 		return nil, 0, ErrPartitionNotFound
 	case -5:
@@ -2565,11 +2571,19 @@ func (q *queue) peekEWMA(ctx context.Context, fnID uuid.UUID) (int64, error) {
 		return 0, nil
 	}
 
-	// convert to float for
+	hasNonZero := false
 	vals := make([]float64, len(strlist))
 	for i, s := range strlist {
 		v, _ := strconv.ParseFloat(s, 64)
 		vals[i] = v
+		if v > 0 {
+			hasNonZero = true
+		}
+	}
+
+	if !hasNonZero {
+		// short-circuit.
+		return 0, nil
 	}
 
 	// create a simple EWMA, add all the numbers in it and get the final value

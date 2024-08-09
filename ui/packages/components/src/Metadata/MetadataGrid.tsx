@@ -29,7 +29,7 @@ export function MetadataGrid({ metadataItems, columns = 3, loading = false }: Pr
 
   return (
     <dl
-      className={`dark:bg-slate-910 grid rounded-lg border border-slate-200 bg-white p-2.5 dark:border-slate-800 grid-cols-${gridColumns} grid-rows-${rows} gap-5`}
+      className={`bg-canvasBase grid rounded-lg border border-slate-200 p-2.5 dark:border-slate-800 grid-cols-${gridColumns} grid-rows-${rows} gap-5`}
     >
       {metadataItems.map((item, index) => {
         const spanIndex = currentIndex;

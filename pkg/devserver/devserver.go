@@ -7,11 +7,19 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/coocood/freecache"
+	"github.com/eko/gocache/lib/v4/cache"
+	freecachestore "github.com/eko/gocache/store/freecache/v4"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/api"
+	"github.com/inngest/inngest/pkg/api/apiv1"
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
 	_ "github.com/inngest/inngest/pkg/config/defaults"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/event"
@@ -33,6 +41,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
+	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
@@ -77,7 +86,7 @@ func New(ctx context.Context, opts StartOpts) error {
 }
 
 func start(ctx context.Context, opts StartOpts) error {
-	db, err := sqlitecqrs.New()
+	db, err := sqlitecqrs.New(sqlitecqrs.SqliteCQRSOptions{InMemory: true})
 	if err != nil {
 		return err
 	}
@@ -196,12 +205,12 @@ func start(ctx context.Context, opts StartOpts) error {
 			backoff.GetLinearBackoffFunc(time.Duration(opts.RetryInterval)*time.Second),
 		))
 	}
-	queue := redis_state.NewQueue(unshardedClient.Queue(), queueOpts...)
+	rq := redis_state.NewQueue(unshardedClient.Queue(), queueOpts...)
 
 	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
 
-	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), queue)
-	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queue)
+	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq)
+	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), rq)
 
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
@@ -219,6 +228,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("failed to create publisher: %w", err)
 	}
 
+	hmw := memory_writer.NewWriter(ctx, memory_writer.WriterOptions{DumpToFile: false})
+
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(sm),
@@ -226,24 +237,21 @@ func start(ctx context.Context, opts StartOpts) error {
 			drivers...,
 		),
 		executor.WithExpressionAggregator(agg),
-		executor.WithQueue(queue),
+		executor.WithQueue(rq),
 		executor.WithLogger(logger.From(ctx)),
 		executor.WithFunctionLoader(loader),
 		executor.WithLifecycleListeners(
 			history.NewLifecycleListener(
 				nil,
 				hd,
-				memory_writer.NewWriter(),
+				hmw,
 			),
-			lifecycle{
-				cqrs:       dbcqrs,
-				pb:         pb,
-				eventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
+			Lifecycle{
+				Cqrs:       dbcqrs,
+				Pb:         pb,
+				EventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
 			},
-			executor.NewTraceRunLifecycleListener(
-				nil,
-				smv2,
-			),
+			run.NewTraceLifecycleListener(nil),
 		),
 		executor.WithStepLimits(func(id sv2.ID) int {
 			if override, hasOverride := stepLimitOverrides[id.FunctionID.String()]; hasOverride {
@@ -275,7 +283,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		opts.Config,
 		executor.WithExecutionManager(dbcqrs),
 		executor.WithState(sm),
-		executor.WithServiceQueue(queue),
+		executor.WithServiceQueue(rq),
 		executor.WithServiceExecutor(exec),
 		executor.WithServiceBatcher(batcher),
 		executor.WithServiceDebouncer(debouncer),
@@ -288,7 +296,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithExecutionManager(dbcqrs),
 		runner.WithEventManager(event.NewManager()),
 		runner.WithStateManager(sm),
-		runner.WithRunnerQueue(queue),
+		runner.WithRunnerQueue(rq),
 		runner.WithTracker(t),
 		runner.WithRateLimiter(rl),
 		runner.WithBatchManager(batcher),
@@ -296,14 +304,62 @@ func start(ctx context.Context, opts StartOpts) error {
 	)
 
 	// The devserver embeds the event API.
-	ds := newService(opts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides)
+	ds := NewService(opts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hmw, nil)
 	// embed the tracker
-	ds.tracker = t
-	ds.state = sm
-	ds.queue = queue
-	ds.executor = exec
+	ds.Tracker = t
+	ds.State = sm
+	ds.Queue = rq
+	ds.Executor = exec
+	// start the API
+	// Create a new API endpoint which hosts SDK-related functionality for
+	// registering functions.
+	devAPI := NewDevAPI(ds)
 
-	return service.StartAll(ctx, ds, runner, executorSvc)
+	devAPI.Route("/v1", func(r chi.Router) {
+		// Add the V1 API to our dev server API.
+		cache := cache.New[[]byte](freecachestore.NewFreecache(freecache.NewCache(1024 * 1024)))
+		caching := apiv1.NewCacheMiddleware(cache)
+
+		apiv1.AddRoutes(r, apiv1.Opts{
+			CachingMiddleware: caching,
+			EventReader:       ds.Data,
+			FunctionReader:    ds.Data,
+			FunctionRunReader: ds.Data,
+			JobQueueReader:    ds.Queue.(queue.JobQueueReader),
+			Executor:          ds.Executor,
+		})
+	})
+
+	// ds.opts.Config.EventStream.Service.TopicName()
+
+	core, err := coreapi.NewCoreApi(coreapi.Options{
+		Data:         ds.Data,
+		Config:       ds.Opts.Config,
+		Logger:       logger.From(ctx),
+		Runner:       ds.Runner,
+		Tracker:      ds.Tracker,
+		State:        ds.State,
+		Queue:        ds.Queue,
+		EventHandler: ds.HandleEvent,
+		Executor:     ds.Executor,
+	})
+	if err != nil {
+		return err
+	}
+	// Create a new data API directly in the devserver.  This allows us to inject
+	// the data API into the dev server port, providing a single router for the dev
+	// server UI, events, and API for loading data.
+	//
+	// Merge the dev server API (for handling files & registration) with the data
+	// API into the event API router.
+	ds.Apiservice = api.NewService(
+		ds.Opts.Config,
+		api.Mount{At: "/", Router: devAPI},
+		api.Mount{At: "/v0", Router: core.Router},
+		api.Mount{At: "/debug", Handler: middleware.Profiler()},
+	)
+
+	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice)
 }
 
 func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Client, error) {

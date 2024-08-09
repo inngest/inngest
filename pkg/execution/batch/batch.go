@@ -2,6 +2,7 @@ package batch
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -76,6 +77,10 @@ type ScheduleBatchOpts struct {
 	ScheduleBatchPayload
 
 	At time.Time `json:"at"`
+}
+
+func (o *ScheduleBatchOpts) JobID() string {
+	return fmt.Sprintf("%s:%s", o.WorkspaceID, o.BatchID)
 }
 
 type ScheduleBatchPayload struct {

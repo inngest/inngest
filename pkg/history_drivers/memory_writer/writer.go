@@ -2,25 +2,84 @@ package memory_writer
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"os"
 	"time"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/history_drivers/memory_store"
 	"github.com/inngest/inngest/pkg/inngest/log"
 )
 
-func NewWriter() history.Driver {
-	return &writer{
-		store: memory_store.Singleton,
+type WriterOptions struct {
+	DumpToFile bool
+}
+
+func NewWriter(ctx context.Context, opts WriterOptions) history.Driver {
+	w := &writer{
+		store:   memory_store.Singleton,
+		options: opts,
 	}
+
+	if !opts.DumpToFile || len(memory_store.Singleton.Data) > 0 {
+		return w
+	}
+
+	l := log.From(ctx).With().Str("caller", "memory_writer").Logger()
+
+	// read data from file and populate memory_store.Singleton
+	file, err := os.ReadFile(fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerHistoryFile))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return w
+		}
+		l.Error().Err(err).Msg("failed to read history file")
+	}
+
+	err = json.Unmarshal(file, &memory_store.Singleton.Data)
+	if err != nil {
+		l.Error().Err(err).Msg("failed to unmarshal history file")
+	}
+
+	humanSize := fmt.Sprintf("%.2fKB", float64(len(file))/1024)
+	l.Info().Str("size", humanSize).Msg("imported history snapshot")
+
+	return w
 }
 
 type writer struct {
-	store *memory_store.RunStore
+	store   *memory_store.RunStore
+	options WriterOptions
 }
 
-func (w *writer) Close() error {
+func (w *writer) Close(ctx context.Context) error {
+	if !w.options.DumpToFile {
+		return nil
+	}
+
+	w.store.Mu.Lock()
+	// never unlock
+
+	l := log.From(ctx).With().Str("caller", "memory_writer").Logger()
+
+	b, err := json.Marshal(w.store.Data)
+	if err != nil {
+		l.Error().Err(err).Msg("error marshalling history data for export")
+		return err
+	}
+
+	err = os.WriteFile(fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerHistoryFile), b, 0600)
+	if err != nil {
+		l.Error().Err(err).Msg("error writing history data to file")
+		return err
+	}
+
+	humanSize := fmt.Sprintf("%.2fKB", float64(len(b))/1024)
+	l.Info().Str("size", humanSize).Msg("exported history snapshot")
+
 	return nil
 }
 
