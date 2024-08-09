@@ -32,6 +32,10 @@ gen:
 	go generate ./...
 	make gql queries
 
+.PHONY: protobuf
+protobuf:
+	buf generate
+
 # $GOBIN must be set and be in your path for this to work
 .PHONY: queries
 queries:
