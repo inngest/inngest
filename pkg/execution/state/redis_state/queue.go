@@ -1485,7 +1485,9 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	var acctLimit int
 	accountConcurrencyKey := q.u.kg.Concurrency("account", item.Data.Identifier.AccountID.String())
 	if len(parts) == 1 && parts[0].PartitionType == int(enums.PartitionTypeSystem) {
-		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
+		if item.Data.Identifier.AccountID == uuid.Nil {
+			accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
+		}
 		acctLimit = parts[0].ConcurrencyLimit
 	} else {
 		// NOTE: This has been called in ItemPartitions.  We always need to fetch the latest
