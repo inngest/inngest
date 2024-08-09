@@ -572,7 +572,7 @@ func (q *queue) runInstrumentation(ctx context.Context) {
 
 			q.instrumentationLeaseLock.Lock()
 			if q.instrumentationLeaseID == nil {
-				// TODO: add counter for running instrumentation
+				telemetry.IncrInstrumentationLeaseClaimsCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 			}
 			q.instrumentationLeaseID = leaseID
 			q.instrumentationLeaseLock.Unlock()

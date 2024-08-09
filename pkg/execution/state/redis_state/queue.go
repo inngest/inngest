@@ -1935,10 +1935,12 @@ func (q *queue) Instrument(ctx context.Context) error {
 			}(ctx, pk)
 
 		}
+		// end of pagination, exit
+		if len(pkeys) < int(chunkSize) {
+			break
+		}
 
 		offset += chunkSize
-
-		break
 	}
 
 	// instrument the total count of global partition
