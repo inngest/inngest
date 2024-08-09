@@ -230,56 +230,6 @@ func WithQueueItemIndexer(i QueueItemIndexer) QueueOpt {
 	}
 }
 
-// WithAsyncInstrumentation registers all the async instrumentation that needs to happen on
-// each instrumentation cycle
-// These are mostly gauges for point in time metrics
-func WithAsyncInstrumentation() QueueOpt {
-	ctx := context.Background()
-
-	return func(q *queue) {
-		telemetry.GaugeWorkerQueueCapacity(ctx, telemetry.GaugeOpt{
-			PkgName:  pkgName,
-			Callback: func(ctx context.Context) (int64, error) { return int64(q.numWorkers), nil },
-		})
-
-		telemetry.GaugeGlobalQueuePartitionAvailable(ctx, telemetry.GaugeOpt{
-			PkgName: pkgName,
-			Callback: func(ctx context.Context) (int64, error) {
-				return q.partitionSize(ctx, q.u.kg.GlobalPartitionIndex(), q.clock.Now().Add(PartitionLookahead))
-			},
-		})
-
-		// Shard instrumentations
-		shards, err := q.getShards(ctx)
-		if err != nil {
-			q.logger.Error().Err(err).Msg("error retrieving shards")
-		}
-
-		telemetry.GaugeQueueShardCount(ctx, int64(len(shards)), telemetry.GaugeOpt{PkgName: pkgName})
-		for _, shard := range shards {
-			tags := map[string]any{"shard_name": shard.Name}
-
-			telemetry.GaugeQueueShardGuaranteedCapacityCount(ctx, telemetry.GaugeOpt{
-				PkgName:  pkgName,
-				Tags:     tags,
-				Callback: func(ctx context.Context) (int64, error) { return int64(shard.GuaranteedCapacity), nil },
-			})
-			telemetry.GaugeQueueShardLeaseCount(ctx, telemetry.GaugeOpt{
-				PkgName:  pkgName,
-				Tags:     tags,
-				Callback: func(ctx context.Context) (int64, error) { return int64(len(shard.Leases)), nil },
-			})
-			telemetry.GaugeQueueShardPartitionAvailableCount(ctx, telemetry.GaugeOpt{
-				PkgName: pkgName,
-				Tags:    tags,
-				Callback: func(ctx context.Context) (int64, error) {
-					return q.partitionSize(ctx, q.u.kg.ShardPartitionIndex(shard.Name), q.clock.Now().Add(PartitionLookahead))
-				},
-			})
-		}
-	}
-}
-
 // WithDenyQueueNames specifies that the worker cannot select jobs from queue partitions
 // within the given list of names.  This means that the worker will never work on jobs
 // in the specified queues.
@@ -1888,6 +1838,39 @@ func (q *queue) InProgress(ctx context.Context, prefix string, concurrencyKey st
 func (q *queue) Instrument(ctx context.Context) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Instrument"), redis_telemetry.ScopeQueue)
 
+	// other queue instrumentation
+	go func(ctx context.Context) {
+		telemetry.GaugeWorkerQueueCapacity(ctx, int64(q.numWorkers), telemetry.GaugeOpt{PkgName: pkgName})
+
+		// Shard instrumentations
+		shards, err := q.getShards(ctx)
+		if err != nil {
+			q.logger.Error().Err(err).Msg("error retrieving shards")
+		}
+
+		telemetry.GaugeQueueShardCount(ctx, int64(len(shards)), telemetry.GaugeOpt{PkgName: pkgName})
+		for _, shard := range shards {
+			tags := map[string]any{"shard_name": shard.Name}
+
+			telemetry.GaugeQueueShardGuaranteedCapacityCount(ctx, int64(shard.GuaranteedCapacity), telemetry.GaugeOpt{
+				PkgName: pkgName,
+				Tags:    tags,
+			})
+			telemetry.GaugeQueueShardLeaseCount(ctx, int64(len(shard.Leases)), telemetry.GaugeOpt{
+				PkgName: pkgName,
+				Tags:    tags,
+			})
+
+			if size, err := q.partitionSize(ctx, q.u.kg.ShardPartitionIndex(shard.Name), q.clock.Now().Add(PartitionLookahead)); err == nil {
+				telemetry.GaugeQueueShardPartitionAvailableCount(ctx, size, telemetry.GaugeOpt{
+					PkgName: pkgName,
+					Tags:    tags,
+				})
+			}
+		}
+	}(ctx)
+
+	// Check on global partition and queue partition sizes
 	var offset, total int64
 	chunkSize := int64(1000)
 
