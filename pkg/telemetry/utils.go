@@ -12,6 +12,10 @@ import (
 	"go.opentelemetry.io/otel/metric"
 )
 
+const (
+	prefix = "inngest"
+)
+
 var (
 	registry = newRegistry()
 )
