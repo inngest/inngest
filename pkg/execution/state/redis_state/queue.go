@@ -1836,12 +1836,8 @@ func (q *queue) InProgress(ctx context.Context, prefix string, concurrencyKey st
 }
 
 func (q *queue) Instrument(ctx context.Context) error {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Instrument"), redis_telemetry.ScopeQueue)
-
 	// other queue instrumentation
 	go func(ctx context.Context) {
-		telemetry.GaugeWorkerQueueCapacity(ctx, int64(q.numWorkers), telemetry.GaugeOpt{PkgName: pkgName})
-
 		// Shard instrumentations
 		shards, err := q.getShards(ctx)
 		if err != nil {

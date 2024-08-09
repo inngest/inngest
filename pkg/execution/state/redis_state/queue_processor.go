@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/telemetry"
+	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
@@ -531,6 +532,8 @@ func (q *queue) runScavenger(ctx context.Context) {
 }
 
 func (q *queue) runInstrumentation(ctx context.Context) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Instrument"), redis_telemetry.ScopeQueue)
+
 	leaseID, err := q.ConfigLease(ctx, q.u.kg.Instrumentation(), ConfigLeaseMax, q.instrumentationLease())
 	if err != ErrConfigAlreadyLeased && err != nil {
 		q.quit <- err
@@ -565,6 +568,8 @@ func (q *queue) runInstrumentation(ctx context.Context) {
 				}
 			}
 		case <-tick.Chan():
+			telemetry.GaugeWorkerQueueCapacity(ctx, int64(q.numWorkers), telemetry.GaugeOpt{PkgName: pkgName})
+
 			leaseID, err := q.ConfigLease(ctx, q.u.kg.Instrumentation(), ConfigLeaseMax, q.instrumentationLease())
 			if err == ErrConfigAlreadyLeased {
 				setLease(nil)

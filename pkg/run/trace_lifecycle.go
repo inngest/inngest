@@ -635,7 +635,11 @@ func (l traceLifecycle) OnInvokeFunction(
 
 	meta := invocationEvt.InngestMetadata()
 	if meta == nil {
-		l.log.Error("invocation event metadata not available", "meta", md, "lifecycle", "OnInvokeFunction")
+		l.log.Error("invocation event metadata not available",
+			"lifecycle", "OnInvokeFunction",
+			"meta", md,
+			"evt", invocationEvt,
+		)
 		return
 	}
 
