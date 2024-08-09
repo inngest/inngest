@@ -28,7 +28,7 @@ export const MenuItem = ({
     <OptionalLink href={comingSoon ? '' : href} prefetch={prefetch}>
       <OptionalTooltip tooltip={comingSoon ? 'Coming soon...' : collapsed ? text : ''}>
         <div
-          className={`my-1 flex h-8 w-full w-full flex-row items-center rounded px-1.5  ${
+          className={`my-1 flex h-8 w-full flex-row items-center rounded px-1.5  ${
             comingSoon
               ? 'text-disabled hover:bg-disabled cursor-not-allowed'
               : active
