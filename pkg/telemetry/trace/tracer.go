@@ -9,7 +9,6 @@ import (
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/inngest/log"
-	"github.com/inngest/inngest/pkg/telemetry/exporters"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/jaeger"
@@ -65,8 +64,6 @@ type TracerOpts struct {
 	TraceEndpoint            string
 	TraceURLPath             string
 	TraceMaxPayloadSizeBytes int
-
-	NATS *exporters.NatsExporterOpts
 }
 
 func (o TracerOpts) Endpoint() string {
