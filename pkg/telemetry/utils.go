@@ -3,7 +3,6 @@ package telemetry
 import (
 	"context"
 	"fmt"
-	"os"
 	"reflect"
 	"sync"
 
@@ -391,14 +390,6 @@ func (r *metricsRegistry) getHistogram(ctx context.Context, opts HistogramOpt) (
 		r.histograms.Add(name, m)
 	}
 	return m, err
-}
-
-func env() string {
-	val := os.Getenv("ENV")
-	if val == "" {
-		val = "development"
-	}
-	return val
 }
 
 // parseAttributes parses the attribute map into otel compatible attributes

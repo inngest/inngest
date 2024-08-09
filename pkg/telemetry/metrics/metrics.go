@@ -1,4 +1,4 @@
-package telemetry
+package metrics
 
 import (
 	"context"
@@ -60,7 +60,6 @@ func NewPrometheusMeterProvider(ctx context.Context, svc string) (*meter, error)
 		metric.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String(svc),
-			semconv.DeploymentEnvironmentKey.String(env()),
 		)),
 	)
 
@@ -84,7 +83,6 @@ func NewIOMeterProvider(ctx context.Context, svc string) (*meter, error) {
 		metric.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String(svc),
-			semconv.DeploymentEnvironmentKey.String(env()),
 		)),
 	)
 
@@ -125,7 +123,6 @@ func NewOTLPMeterProvider(ctx context.Context, svc string) (*meter, error) {
 		metric.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String(svc),
-			semconv.DeploymentEnvironmentKey.String(env()),
 		)),
 	)
 
