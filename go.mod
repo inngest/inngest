@@ -75,7 +75,7 @@ require (
 	golang.org/x/term v0.21.0
 	gonum.org/v1/gonum v0.12.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20240701130421-f6361c86f094
-	google.golang.org/grpc v1.64.0
+	google.golang.org/grpc v1.64.1
 	google.golang.org/protobuf v1.34.2
 	lukechampine.com/frand v1.4.2
 	modernc.org/sqlite v1.25.0
