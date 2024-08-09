@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
@@ -11,20 +12,21 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-type lifecycle struct {
+type Lifecycle struct {
 	execution.NoopLifecyceListener
 
-	cqrs       cqrs.Manager
-	pb         pubsub.Publisher
-	eventTopic string
+	Cqrs       cqrs.Manager
+	Pb         pubsub.Publisher
+	EventTopic string
 }
 
-func (l lifecycle) OnFunctionScheduled(
+func (l Lifecycle) OnFunctionScheduled(
 	ctx context.Context,
 	md state.Metadata,
 	item queue.Item,
+	_ []event.TrackedEvent,
 ) {
-	_ = l.cqrs.InsertFunctionRun(ctx, cqrs.FunctionRun{
+	_ = l.Cqrs.InsertFunctionRun(ctx, cqrs.FunctionRun{
 		RunID:         md.ID.RunID,
 		RunStartedAt:  ulid.Time(md.ID.RunID.Time()),
 		FunctionID:    md.ID.FunctionID,
@@ -48,7 +50,7 @@ func (l lifecycle) OnFunctionScheduled(
 		)
 
 		if batch.IsMulti() {
-			_ = l.cqrs.InsertEventBatch(ctx, *batch)
+			_ = l.Cqrs.InsertEventBatch(ctx, *batch)
 		}
 	}
 }

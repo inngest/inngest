@@ -11,7 +11,7 @@ import (
 )
 
 type Driver interface {
-	Close() error
+	Close(context.Context) error
 	Write(context.Context, History) error
 }
 

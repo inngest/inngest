@@ -1,62 +1,52 @@
 import { type Route } from 'next';
 
-import cn from '@/utils/cn';
-import NavItem, { type ActiveMatching } from '../Navigation/old/NavItem';
-import Navigation from '../Navigation/old/Navigation';
+import { Back } from './Back';
+import { BreadCrumb } from './BreadCrumb';
+import { HeaderTab } from './HeaderTab';
 
-export type HeaderLink = {
-  href: string;
+export type BreadCrumbType = {
+  href?: string;
   text: string;
-  icon?: React.ReactNode;
-  active?: ActiveMatching | boolean;
-  badge?: React.ReactNode;
 };
 
-type HeaderTypes = {
-  children?: React.ReactNode;
-  links?: HeaderLink[];
-  title: string | React.ReactNode;
-  icon?: React.ReactNode;
+export type HeaderType = {
+  tabs?: HeaderTab[];
+  breadcrumb: BreadCrumbType[];
+  infoIcon?: React.ReactNode;
   action?: React.ReactNode;
   className?: string;
-  badge?: React.ReactNode;
+  backNav?: boolean;
 };
 
-export default function Header({
-  children,
-  links,
-  title,
-  icon,
+export const Header = ({
+  tabs,
+  breadcrumb,
+  infoIcon: icon,
   action,
-  badge,
   className = '',
-}: HeaderTypes) {
+  backNav = false,
+}: HeaderType) => {
   return (
-    <div className={cn('dark left-0 right-0 top-0 z-10 bg-slate-900', className)}>
-      <div className="flex items-center justify-between px-6">
-        <div>
-          <div className="flex items-center">
-            {icon ? (
-              <div className="mr-2 flex h-8 w-8 items-center justify-center rounded-md border border-slate-800">
-                {icon}
-              </div>
-            ) : (
-              ''
-            )}
-            <h1 className="py-3 text-lg font-medium tracking-wide text-white">{title}</h1>
-            <span className="pl-4">{badge}</span>
-          </div>
-          {links && (
-            <Navigation className="-ml-2 -mt-2">
-              {links.map(({ href, text, ...props }) => (
-                <NavItem key={href} href={href as Route} text={text} {...props} />
-              ))}
-            </Navigation>
-          )}
+    <div className="flex flex-col justify-start border-b">
+      <div
+        className={`bg-canvasBase border-subtle flex h-[52px] flex-row items-center justify-between px-4 ${className}`}
+      >
+        <div className="flex flex-row items-center justify-start align-baseline">
+          {backNav && <Back className="mr-2" />}
+          <BreadCrumb path={breadcrumb} />
+          {icon}
         </div>
         <div>{action}</div>
       </div>
-      <div>{children}</div>
+      {tabs && (
+        <div className="flex flex-row items-center justify-start space-x-3 px-4">
+          {tabs.map(({ href, children, exactRouteMatch }) => (
+            <HeaderTab key={href} href={href as Route} exactRouteMatch={exactRouteMatch}>
+              {children}
+            </HeaderTab>
+          ))}
+        </div>
+      )}
     </div>
   );
-}
+};

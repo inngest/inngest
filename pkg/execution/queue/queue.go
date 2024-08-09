@@ -150,6 +150,8 @@ type JobResponse struct {
 	Kind string `json:"kind"`
 	// Attempt
 	Attempt int `json:"attempt"`
+
+	Raw any
 }
 
 // JobQueueReader

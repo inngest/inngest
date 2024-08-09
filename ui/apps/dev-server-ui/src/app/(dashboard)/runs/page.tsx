@@ -5,6 +5,7 @@ import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   useSearchParam,
+  useStringArraySearchParam,
   useValidatedArraySearchParam,
   useValidatedSearchParam,
 } from '@inngest/components/hooks/useSearchParam';
@@ -25,6 +26,7 @@ import { client } from '@/store/baseApi';
 import {
   CountRunsDocument,
   GetRunsDocument,
+  useGetAppsQuery,
   type CountRunsQuery,
   type GetRunsQuery,
 } from '@/store/generated';
@@ -33,6 +35,7 @@ import { pathCreator } from '@/utils/pathCreator';
 const pollInterval = 2500;
 
 export default function Page() {
+  const [filterApp] = useStringArraySearchParam('filterApp');
   const [totalCount, setTotalCount] = useState<number>();
   const [filteredStatus] = useValidatedArraySearchParam('filterStatus', isFunctionRunStatus);
   const [timeField = FunctionRunTimeField.QueuedAt] = useValidatedSearchParam(
@@ -43,10 +46,12 @@ export default function Page() {
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
   const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
+  const appsRes = useGetAppsQuery();
 
   const queryFn = useCallback(
     async ({ pageParam }: { pageParam: string | null }) => {
       const data: GetRunsQuery = await client.request(GetRunsDocument, {
+        appIDs: filterApp,
         functionRunCursor: pageParam,
         startTime: calculatedStartTime,
         endTime: endTime,
@@ -67,13 +72,12 @@ export default function Page() {
           durationMS,
         };
       });
-
       return {
         ...data.runs,
         edges,
       };
     },
-    [filteredStatus, calculatedStartTime, timeField]
+    [filterApp, filteredStatus, calculatedStartTime, timeField]
   );
 
   const { data, fetchNextPage, isFetching } = useInfiniteQuery({
@@ -144,17 +148,15 @@ export default function Page() {
     // TODO: What should this do?
   }, []);
 
-  // Doesn't matter for the Dev Server
-  const functionSlug = '';
-
   return (
     <RunsPage
+      apps={appsRes.data?.apps || []}
       cancelRun={cancelRun}
       data={runs ?? []}
+      defaultVisibleColumns={['status', 'id', 'trigger', 'function', 'queuedAt', 'endedAt']}
       features={{
         history: Number.MAX_SAFE_INTEGER,
       }}
-      functionSlug={functionSlug}
       hasMore={false}
       isLoadingInitial={isFetching && runs === undefined}
       isLoadingMore={isFetching && runs !== undefined}
@@ -165,8 +167,6 @@ export default function Page() {
       getTrigger={getTrigger}
       rerun={rerun}
       pathCreator={pathCreator}
-      apps={[]}
-      functions={[]}
       pollInterval={pollInterval}
       scope="env"
       totalCount={totalCount}

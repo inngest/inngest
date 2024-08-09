@@ -1,85 +1,71 @@
-'use client';
+import { NewButton } from '@inngest/components/Button';
+import { Link } from '@inngest/components/Link/Link';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
+import { RiAddLine, RiQuestionLine } from '@remixicon/react';
 
-import NextLink from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
-import { HoverCardContent, HoverCardRoot, HoverCardTrigger } from '@inngest/components/HoverCard';
-import { Link } from '@inngest/components/Link';
-import { useBooleanSearchParam } from '@inngest/components/hooks/useSearchParam';
-import { IconApp } from '@inngest/components/icons/App';
-import { RiAddLine, RiInformationLine } from '@remixicon/react';
-
-import { useEnvironment } from '@/components/Environments/environment-context';
-import Header, { type HeaderLink } from '@/components/Header/Header';
+import { StatusMenu } from '@/components/Apps/StatusMenu';
+import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import { Header } from '@/components/Header/Header';
 import { pathCreator } from '@/utils/urls';
 import { Apps } from './Apps';
+import Page from './oldPage';
 
-export default function Page() {
-  const env = useEnvironment();
-  const router = useRouter();
+const AppInfo = () => (
+  <Tooltip>
+    <TooltipTrigger>
+      <RiQuestionLine className="text-muted h-[18px] w-[18px]" />
+    </TooltipTrigger>
+    <TooltipContent
+      side="right"
+      sideOffset={2}
+      className="border-muted text-subtle text-md mt-6 flex flex-col rounded-lg border p-0"
+    >
+      <div className="border-b px-4 py-2 ">Apps map directly to your products or services.</div>
 
-  const [isArchived] = useBooleanSearchParam('archived');
+      <div className="px-4 py-2">
+        <Link href={'https://www.inngest.com/docs/apps'} className="text-md">
+          Learn how apps work
+        </Link>
+      </div>
+    </TooltipContent>
+  </Tooltip>
+);
 
-  const navLinks: HeaderLink[] = [
-    {
-      active: isArchived !== true,
-      href: `/env/${env.slug}/apps`,
-      text: 'Active',
-    },
-    {
-      active: isArchived,
-      href: `/env/${env.slug}/apps?archived=true`,
-      text: 'Archived',
-    },
-  ];
+export default async function AppsPage({
+  params: { environmentSlug: envSlug },
+  searchParams: { archived },
+}: {
+  params: { environmentSlug: string };
+  searchParams: { archived: string };
+}) {
+  const newIANav = await getBooleanFlag('new-ia-nav');
+
+  if (!newIANav) {
+    return <Page />;
+  }
+  const isArchived = archived === 'true';
 
   return (
     <>
       <Header
-        icon={<IconApp className="h-5 w-5 text-white" />}
-        links={navLinks}
-        title="Apps"
+        breadcrumb={[{ text: 'Apps' }]}
+        infoIcon={<AppInfo />}
         action={
-          <div className="flex items-center gap-2">
-            {!isArchived && (
-              <Button
-                kind="primary"
-                label="Sync App"
-                btnAction={() => router.push(pathCreator.createApp({ envSlug: env.slug }))}
-                icon={<RiAddLine />}
-              />
-            )}
-            <HoverCardRoot>
-              <HoverCardTrigger asChild>
-                <NextLink
-                  className="flex cursor-pointer items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-slate-200 hover:border-white hover:text-white"
-                  href="https://www.inngest.com/docs/apps"
-                  target="_blank"
-                  rel="noreferrer noopener"
-                >
-                  <RiInformationLine className="h-5 w-5" />
-                  What are Apps?
-                </NextLink>
-              </HoverCardTrigger>
-              <HoverCardContent className="w-72 p-2.5 text-sm">
-                <p>
-                  When you serve your functions using Inngest&apos;s serve API handler, you are
-                  hosting a new Inngest app.
-                </p>
-                <br />
-                <p>
-                  Each time you deploy new code to your hosted platform, you must sync your app to
-                  Inngest. When using our Vercel or Netlify integrations, your app will be synced
-                  automatically.
-                </p>
-                <br />
-                <Link href="https://www.inngest.com/docs/apps/cloud">Read Docs</Link>
-              </HoverCardContent>
-            </HoverCardRoot>
-          </div>
+          !isArchived && (
+            <NewButton
+              kind="primary"
+              label="Sync new app"
+              href={pathCreator.createApp({ envSlug })}
+              icon={<RiAddLine />}
+              iconSide="left"
+            />
+          )
         }
       />
-      <div className="bg-canvasBase relative h-full overflow-y-auto px-6">
+      <div className="bg-canvasBase mx-auto flex h-full w-full max-w-[1200px] flex-col overflow-y-auto px-6 pt-16">
+        <div className="relative flex w-full flex-row justify-end">
+          <StatusMenu archived={isArchived} envSlug={envSlug} />
+        </div>
         <Apps isArchived={isArchived} />
       </div>
     </>

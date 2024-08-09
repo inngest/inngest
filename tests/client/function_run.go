@@ -373,14 +373,14 @@ func (c *Client) RunSpanOutput(ctx context.Context, outputID string) *models.Run
 	return data.Output
 }
 
-func (c *Client) ExpectSpanOutput(t *testing.T, expected string, output *models.RunTraceSpanOutput) {
+func (c *Client) ExpectSpanOutput(t require.TestingT, expected string, output *models.RunTraceSpanOutput) {
 	require.NotNil(t, output)
 	require.NotNil(t, output.Data)
 	require.Nil(t, output.Error)
 	require.Contains(t, *output.Data, expected)
 }
 
-func (c *Client) ExpectSpanErrorOutput(t *testing.T, msg string, stack string, output *models.RunTraceSpanOutput) {
+func (c *Client) ExpectSpanErrorOutput(t require.TestingT, msg string, stack string, output *models.RunTraceSpanOutput) {
 	require.NotNil(t, output)
 	require.Nil(t, output.Data)
 	require.NotNil(t, output.Error)

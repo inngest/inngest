@@ -78,7 +78,7 @@ export function RunDetails(props: Props) {
 
   const run = runRes.data;
   if (run?.trace.endedAt && pollInterval) {
-    // The run won't change anymore so no need to poll
+    // Stop polling since ended runs are immutable
     setPollInterval(undefined);
   }
 
