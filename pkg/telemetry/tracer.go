@@ -11,9 +11,11 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
+	runv2 "github.com/inngest/inngest/proto/gen/run/v2"
 	"github.com/nats-io/nats.go"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/trace"
+	"google.golang.org/protobuf/proto"
 )
 
 var (
@@ -151,11 +153,13 @@ func (t *tracer) Export(span trace.ReadOnlySpan) error {
 // - subject to write to
 // - is jetstream or not?
 type natsSpanExporter struct {
-	conn *nats.Conn
+	subject string
+	conn    *nats.Conn
 }
 
 type NatsExporterOpts struct {
-	URLs []string
+	Subject string
+	URLs    []string
 }
 
 // NewNATSSpanExporter creates an otel compatible exporter that ships the spans to NATS
@@ -186,12 +190,37 @@ func NewNATSSpanExporter(ctx context.Context, opts *NatsExporterOpts) (trace.Spa
 	)
 
 	return &natsSpanExporter{
-		conn: conn,
+		subject: opts.Subject,
+		conn:    conn,
 	}, nil
 }
 
 func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOnlySpan) error {
-	return fmt.Errorf("not implemented")
+	wg := sync.WaitGroup{}
+
+	for _, sp := range spans {
+		wg.Add(1)
+
+		go func(ctx context.Context, sp trace.ReadOnlySpan) {
+			defer wg.Done()
+
+			// TODO: fill the span in
+			span := &runv2.Span{}
+
+			byt, err := proto.Marshal(span)
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("error serializing span to protobuf", "error", "span", span)
+				return
+			}
+
+			if err := e.conn.Publish(e.subject, byt); err != nil {
+				logger.StdlibLogger(ctx).Error("error publishing span to NATS", "error", err, "span", span)
+			}
+		}(ctx, sp)
+	}
+
+	wg.Wait()
+	return nil
 }
 
 func (e *natsSpanExporter) Shutdown(ctx context.Context) error {
