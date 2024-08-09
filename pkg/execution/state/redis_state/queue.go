@@ -887,6 +887,9 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 		systemPartition := QueuePartition{
 			ID:            *i.Data.QueueName,
 			PartitionType: int(enums.PartitionTypeSystem),
+
+			// This may or may not be empty
+			AccountID: i.Data.Identifier.AccountID,
 		}
 		// Fetch most recent system concurrency limit
 		systemLimit := q.systemConcurrencyLimitGetter(ctx, systemPartition)
