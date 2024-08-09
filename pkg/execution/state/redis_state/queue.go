@@ -119,7 +119,6 @@ var (
 
 	// ErrConcurrencyLimitCustomKey represents a concurrency limit being hit for *some*, but *not all*
 	// jobs in a queue, via custom concurrency keys which are evaluated to a specific string.
-
 	ErrConcurrencyLimitCustomKey = fmt.Errorf("at concurrency limit")
 
 	// internal shard errors
@@ -476,7 +475,7 @@ type queue struct {
 	pf PriorityFinder
 	sf ShardFinder
 
-	lifecycles []QueueLifecycleListener
+	lifecycles QueueLifecycleListeners
 
 	concurrencyLimitGetter       ConcurrencyLimitGetter
 	systemConcurrencyLimitGetter SystemConcurrencyLimitGetter

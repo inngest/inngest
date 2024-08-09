@@ -648,28 +648,44 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 		_, capacity, err := q.PartitionLease(ctx, p, PartitionLeaseDuration)
 		return capacity, err
 	})
-	if err == ErrPartitionConcurrencyLimit {
-		for _, l := range q.lifecycles {
-			// Track lifecycles; this function hit a partition limit ahead of
-			// even being leased, meaning the function is at max capacity and we skip
-			// scanning of jobs altogether.
-			if p.FunctionID != nil {
-				go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
-			}
-			// else {
-			// TODO(cdzombak): lifecycles/metrics for other concurrency scopes
-			// https://linear.app/inngest/issue/INN-3246/lifecycles-add-new-lifecycles-for-fn-env-account-concurrency-limits
-			// }
+	if errors.Is(err, ErrPartitionConcurrencyLimit) {
+		if p.FunctionID != nil {
+			q.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
 		}
-		telemetry.IncrQueuePartitionConcurrencyLimitCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
+		telemetry.IncrQueuePartitionConcurrencyLimitCounter(ctx,
+			telemetry.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"kind": "function"},
+			},
+		)
 		return q.PartitionRequeue(ctx, p, q.clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
-	if err == ErrPartitionAlreadyLeased {
+	if errors.Is(err, ErrAccountConcurrencyLimit) {
+		q.lifecycles.OnAccountConcurrencyLimitReached(context.WithoutCancel(ctx), p.AccountID)
+		telemetry.IncrQueuePartitionConcurrencyLimitCounter(ctx,
+			telemetry.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"kind": "account"},
+			},
+		)
+		return q.PartitionRequeue(ctx, p, q.clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
+	}
+	if errors.Is(err, ErrConcurrencyLimitCustomKey) {
+		q.lifecycles.OnCustomKeyConcurrencyLimitReached(context.WithoutCancel(ctx), p.ConcurrencyKey)
+		telemetry.IncrQueuePartitionConcurrencyLimitCounter(ctx,
+			telemetry.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"kind": "custom"},
+			},
+		)
+		return q.PartitionRequeue(ctx, p, q.clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
+	}
+	if errors.Is(err, ErrPartitionAlreadyLeased) {
 		telemetry.IncrQueuePartitionLeaseContentionCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 		return nil
 	}
-	if err == ErrPartitionNotFound {
-		// Another worker must have pocessed this partition between
+	if errors.Is(err, ErrPartitionNotFound) {
+		// Another worker must have processed this partition between
 		// this worker's peek and process.  Increase partition
 		// contention metric and continue.  This is unsolvable.
 		telemetry.IncrPartitionGoneCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
@@ -743,16 +759,6 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	// If we've hit concurrency issues OR we've only hit rate limit issues, re-enqueue the partition
 	// with a force:  ensure that we won't re-scan it until 2 seconds in the future.
 	if iter.isRequeuable() {
-		for _, l := range q.lifecycles {
-			if p.FunctionID != nil {
-				go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
-			}
-			// else {
-			// TODO(cdzombak): lifecycles/metrics for other concurrency scopes
-			// https://linear.app/inngest/issue/INN-3246/lifecycles-add-new-lifecycles-for-fn-env-account-concurrency-limits
-			// }
-		}
-
 		requeue := PartitionConcurrencyLimitRequeueExtension
 		if iter.ctrConcurrency == 0 {
 			// This has been throttled only.  Don't requeue so far ahead, otherwise we'll be waiting longer
@@ -1239,7 +1245,7 @@ func (p *processor) process(ctx context.Context, item *QueueItem) error {
 		return nil
 	}
 
-	// Cbeck if there's capacity from our local workers atomically prior to leasing our tiems.
+	// Check if there's capacity from our local workers atomically prior to leasing our items.
 	if !p.queue.sem.TryAcquire(1) {
 		telemetry.IncrQueuePartitionProcessNoCapacityCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 		// Break the entire loop to prevent out of order work.
@@ -1331,8 +1337,12 @@ func (p *processor) process(ctx context.Context, item *QueueItem) error {
 		switch cause {
 		case ErrPartitionConcurrencyLimit:
 			status = "partition_concurrency_limit"
+			if p.partition.FunctionID != nil {
+				p.queue.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.partition.FunctionID)
+			}
 		case ErrAccountConcurrencyLimit:
 			status = "account_concurrency_limit"
+			p.queue.lifecycles.OnAccountConcurrencyLimitReached(context.WithoutCancel(ctx), p.partition.AccountID)
 		}
 
 		telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
@@ -1351,6 +1361,8 @@ func (p *processor) process(ctx context.Context, item *QueueItem) error {
 		// Here we denylist each concurrency key that's been limited here, then ignore
 		// any other jobs from being leased as we continue to iterate through the loop.
 		p.denies.addConcurrency(err)
+
+		p.queue.lifecycles.OnCustomKeyConcurrencyLimitReached(context.WithoutCancel(ctx), p.partition.ConcurrencyKey)
 
 		telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
 			PkgName: pkgName,
