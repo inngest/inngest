@@ -113,8 +113,7 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		WorkspaceID: item.WorkspaceID,
 		FunctionID:  item.Identifier.WorkflowID,
 		Data:        item,
-		// Only use the queue name if provided by queueKindMapping.
-		// Otherwise, this defaults to FunctionID.
+		// Only use the queue name if provided by queueKindMapping or set explicitly
 		QueueName:  queueName,
 		WallTimeMS: at.UnixMilli(),
 	}
@@ -176,7 +175,7 @@ LOOP:
 
 			if err := q.scan(ctx); err != nil {
 				// On scan errors, halt the worker entirely.
-				if errors.Unwrap(err) != context.Canceled {
+				if !errors.Is(err, context.Canceled) {
 					q.logger.Error().Err(err).Msg("error scanning partition pointers")
 				}
 				break LOOP
@@ -613,7 +612,7 @@ func (q *queue) scan(ctx context.Context) error {
 					// TODO: Increase internal metrics
 					return nil
 				}
-				if errors.Unwrap(err) != context.Canceled {
+				if !errors.Is(err, context.Canceled) {
 					q.logger.Error().Err(err).Msg("error processing partition")
 				}
 				return err
@@ -645,8 +644,9 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	// items are dynamic generators).  This means that we have to delay
 	// processing the partition by N seconds, meaning the latency is increased by
 	// up to this period for scheduled items behind the concurrency limits.
-	_, err := duration(ctx, "partition_lease", q.clock.Now(), func(ctx context.Context) (*ulid.ULID, error) {
-		return q.PartitionLease(ctx, p, PartitionLeaseDuration)
+	_, err := duration(ctx, "partition_lease", q.clock.Now(), func(ctx context.Context) (int, error) {
+		_, capacity, err := q.PartitionLease(ctx, p, PartitionLeaseDuration)
+		return capacity, err
 	})
 	if err == ErrPartitionConcurrencyLimit {
 		for _, l := range q.lifecycles {
@@ -705,7 +705,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 		// NOTE: would love to instrument this value to see it over time per function but
 		// it's likely too high of a cardinality
 		go telemetry.HistogramQueuePeekEWMA(ctx, peek, telemetry.HistogramOpt{PkgName: pkgName})
-		return q.Peek(peekCtx, p.Queue(), fetch, peek)
+		return q.Peek(peekCtx, p, fetch, peek)
 	})
 	if err != nil {
 		return err
@@ -747,14 +747,25 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 			if p.FunctionID != nil {
 				go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
 			}
-			//else {
+			// else {
 			// TODO(cdzombak): lifecycles/metrics for other concurrency scopes
 			// https://linear.app/inngest/issue/INN-3246/lifecycles-add-new-lifecycles-for-fn-env-account-concurrency-limits
-			//}
+			// }
 		}
+
+		requeue := PartitionConcurrencyLimitRequeueExtension
+		if iter.ctrConcurrency == 0 {
+			// This has been throttled only.  Don't requeue so far ahead, otherwise we'll be waiting longer
+			// than the minimum throttle.
+			//
+			// TODO: When we create throttle queues, requeue this appropriately depending on the throttle
+			//       period.
+			requeue = PartitionThrottleLimitRequeueExtension
+		}
+
 		// Requeue this partition as we hit concurrency limits.
 		telemetry.IncrQueuePartitionConcurrencyLimitCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
-		return q.PartitionRequeue(ctx, p, q.clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
+		return q.PartitionRequeue(ctx, p, q.clock.Now().Truncate(time.Second).Add(requeue), true)
 	}
 
 	// XXX: If we haven't been able to lease a single item, ensure we enqueue this
@@ -898,7 +909,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 		runInfo := osqueue.RunInfo{
 			Latency:      latency,
 			SojournDelay: sojourn,
-			Priority:     p.Priority,
+			Priority:     q.pf(ctx, p),
 			ShardName:    "<global>",
 		}
 		if s != nil {
@@ -1056,7 +1067,7 @@ func (q *queue) peekSize(ctx context.Context, p *QueuePartition) int64 {
 	}
 
 	dur := time.Hour * 24
-	qsize, _ := q.partitionSize(ctx, q.u.kg.QueueIndex(p.Queue()), q.clock.Now().Add(dur))
+	qsize, _ := q.partitionSize(ctx, p.zsetKey(q.u.kg), q.clock.Now().Add(dur))
 	if qsize > size {
 		size = qsize
 	}
@@ -1330,7 +1341,7 @@ func (p *processor) process(ctx context.Context, item *QueueItem) error {
 		})
 
 		return fmt.Errorf("concurrency hit: %w", errProcessStopIterator)
-	case ErrConcurrencyLimitCustomKey0, ErrConcurrencyLimitCustomKey1:
+	case ErrConcurrencyLimitCustomKey:
 		p.ctrConcurrency++
 
 		// Custom concurrency keys are different.  Each job may have a different key,

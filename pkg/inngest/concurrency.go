@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/syscode"
+	"github.com/inngest/inngest/pkg/util"
 )
 
 // ConcurrencyLimits represents concurrency limits specified for a function.
@@ -145,22 +146,11 @@ func (c Concurrency) Evaluate(ctx context.Context, scopeID uuid.UUID, input map[
 			evaluated = fmt.Sprintf("%v", v)
 		}
 	}
-	target := strconv.FormatUint(xxhash.Sum64String(evaluated), 36)
-	return fmt.Sprintf("%s:%s:%s", c.Prefix(), scopeID, target)
-
+	return util.ConcurrencyKey(c.Scope, scopeID, evaluated)
 }
 
 func (c Concurrency) Prefix() string {
-	switch c.Scope {
-	case enums.ConcurrencyScopeFn:
-		return "f"
-	case enums.ConcurrencyScopeEnv:
-		return "e"
-	case enums.ConcurrencyScopeAccount:
-		return "a"
-	default:
-		return "?"
-	}
+	return util.ConcurrencyScopePrefix(c.Scope)
 }
 
 func (c Concurrency) IsCustomLimit() bool {

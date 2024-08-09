@@ -281,6 +281,7 @@ func TestConcurrency_ScopeFunction_Key_Fn(t *testing.T) {
 					Key:   inngestgo.StrPtr("event.data.num"),
 				},
 			},
+			Retries: inngestgo.IntPtr(0),
 		},
 		inngestgo.EventTrigger(trigger, nil),
 		func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[any, any]]) (any, error) {

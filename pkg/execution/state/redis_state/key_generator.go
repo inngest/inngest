@@ -3,6 +3,7 @@ package redis_state
 import (
 	"context"
 	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -115,9 +116,6 @@ type QueueKeyGenerator interface {
 	// QueueItem returns the key for the hash containing all items within a
 	// queue for a function.
 	QueueItem() string
-	// QueueIndex returns the key containing the sorted zset for a function
-	// queue.
-	QueueIndex(id string) string
 
 	//
 	// Partition keys
@@ -309,7 +307,7 @@ func (u queueKeyGenerator) FnQueueSet(id string) string {
 
 func (u queueKeyGenerator) PartitionQueueSet(pType enums.PartitionType, scopeID, xxhash string) string {
 	switch pType {
-	case enums.PartitionTypeConcurrency:
+	case enums.PartitionTypeConcurrencyKey:
 		return fmt.Sprintf("{%s}:sorted:c:%s<%s>", u.queueDefaultKey, scopeID, xxhash)
 	case enums.PartitionTypeThrottle:
 		return fmt.Sprintf("{%s}:sorted:t:%s<%s>", u.queueDefaultKey, scopeID, xxhash)
@@ -320,6 +318,10 @@ func (u queueKeyGenerator) PartitionQueueSet(pType enums.PartitionType, scopeID,
 }
 
 func (u queueKeyGenerator) FnMetadata(fnID uuid.UUID) string {
+	if fnID == uuid.Nil {
+		// None supplied; this means ignore.
+		return fmt.Sprintf("{%s}:fnMeta:-", u.queueDefaultKey)
+	}
 	return fmt.Sprintf("{%s}:fnMeta:%s", u.queueDefaultKey, fnID)
 }
 
