@@ -43,7 +43,7 @@ message SpanContext {
 
 message Trigger {
   string internal_id = 1; // Event ULID
-  repeated bytes body = 2;
+  bytes body = 2;
 }
 
 message SpanEvent {
