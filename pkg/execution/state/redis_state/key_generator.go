@@ -309,7 +309,7 @@ func (u queueKeyGenerator) FnQueueSet(id string) string {
 
 func (u queueKeyGenerator) PartitionQueueSet(pType enums.PartitionType, scopeID, xxhash string) string {
 	switch pType {
-	case enums.PartitionTypeConcurrencyKey:
+	case enums.PartitionTypeConcurrency:
 		return fmt.Sprintf("{%s}:sorted:c:%s<%s>", u.queueDefaultKey, scopeID, xxhash)
 	case enums.PartitionTypeThrottle:
 		return fmt.Sprintf("{%s}:sorted:t:%s<%s>", u.queueDefaultKey, scopeID, xxhash)
