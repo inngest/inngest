@@ -1,4 +1,4 @@
-package telemetry
+package run
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/sdk/instrumentation"
@@ -409,7 +410,7 @@ func (s *Span) End(opts ...trace.SpanEndOption) {
 		// s.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 	}
 
-	if err := UserTracer().Export(s); err != nil {
+	if err := telemetry.UserTracer().Export(s); err != nil {
 		ctx := context.Background()
 		log.From(ctx).Error().Err(err).Msg("error ending span")
 	}
@@ -522,7 +523,7 @@ func (s *Span) SetAttributes(attrs ...attribute.KeyValue) {
 }
 
 func (s *Span) TracerProvider() trace.TracerProvider {
-	return UserTracer().Provider()
+	return telemetry.UserTracer().Provider()
 }
 
 func (s *Span) SetFnOutput(data any) {

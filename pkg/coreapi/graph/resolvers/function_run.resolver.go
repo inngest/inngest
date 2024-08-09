@@ -17,7 +17,7 @@ import (
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/history_reader"
-	"github.com/inngest/inngest/pkg/telemetry"
+	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
@@ -270,7 +270,7 @@ func (r *mutationResolver) Rerun(
 	accountID := uuid.New()
 	workspaceID := uuid.New()
 
-	run, err := r.Data.GetFunctionRun(
+	fnrun, err := r.Data.GetFunctionRun(
 		ctx,
 		accountID,
 		workspaceID,
@@ -283,7 +283,7 @@ func (r *mutationResolver) Rerun(
 	fnCQRS, err := r.Data.GetFunctionByInternalUUID(
 		ctx,
 		workspaceID,
-		run.FunctionID,
+		fnrun.FunctionID,
 	)
 	if err != nil {
 		return zero, err
@@ -294,16 +294,16 @@ func (r *mutationResolver) Rerun(
 		return zero, err
 	}
 
-	evt, err := r.Data.GetEventByInternalID(ctx, run.EventID)
+	evt, err := r.Data.GetEventByInternalID(ctx, fnrun.EventID)
 	if err != nil {
 		return zero, fmt.Errorf("failed to get run event: %w", err)
 	}
 
-	ctx, span := telemetry.NewSpan(ctx,
-		telemetry.WithName(consts.OtelSpanRerun),
-		telemetry.WithScope(consts.OtelScopeRerun),
-		telemetry.WithNewRoot(),
-		telemetry.WithSpanAttributes(
+	ctx, span := run.NewSpan(ctx,
+		run.WithName(consts.OtelSpanRerun),
+		run.WithScope(consts.OtelScopeRerun),
+		run.WithNewRoot(),
+		run.WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 		),
 	)
@@ -317,7 +317,7 @@ func (r *mutationResolver) Rerun(
 			// will result in the creation of a new ID
 			event.NewOSSTrackedEventWithID(evt.Event(), evt.InternalID()),
 		},
-		OriginalRunID: &run.RunID,
+		OriginalRunID: &fnrun.RunID,
 	})
 	if err != nil {
 		return zero, err
