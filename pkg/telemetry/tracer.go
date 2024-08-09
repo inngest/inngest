@@ -9,6 +9,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/nats-io/nats.go"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/trace"
 )
@@ -143,14 +144,23 @@ func (t *tracer) Export(span trace.ReadOnlySpan) error {
 
 // NATS span exporter
 // TODO: Hold NATS connection
-// - client
 // - subject to write to
 // - is jetstream or not?
 type natsSpanExporter struct {
+	conn *nats.Conn
 }
 
-func NewNATSSpanExporter(ctx context.Context) (trace.SpanExporter, error) {
-	return &natsSpanExporter{}, fmt.Errorf("not implemented")
+// NewNATSSpanExporter creates an otel compatible exporter that ships the spans to NATS
+func NewNATSSpanExporter(ctx context.Context, urls string) (trace.SpanExporter, error) {
+	// urls should be comma delimited strings
+	conn, err := nats.Connect(urls)
+	if err != nil {
+		return nil, fmt.Errorf("error connecting to NATS: %w", err)
+	}
+
+	return &natsSpanExporter{
+		conn: conn,
+	}, nil
 }
 
 func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOnlySpan) error {
@@ -158,5 +168,6 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 }
 
 func (e *natsSpanExporter) Shutdown(ctx context.Context) error {
-	return fmt.Errorf("not implemented")
+	e.conn.Close()
+	return nil
 }
