@@ -141,7 +141,7 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 	go q.claimShards(ctx)
 	go q.claimSequentialLease(ctx)
 	go q.runScavenger(ctx)
-	go q.singletonInstrumentation(ctx)
+	go q.runInstrumentation(ctx)
 
 	tick := q.clock.NewTicker(q.pollTick)
 
@@ -527,10 +527,8 @@ func (q *queue) runScavenger(ctx context.Context) {
 	}
 }
 
-func (q *queue) singletonInstrumentation(ctx context.Context) {
-	leaseDur := ConfigLeaseDuration * 6
-
-	leaseID, err := q.ConfigLease(ctx, q.u.kg.Instrumentation(), leaseDur, q.instrumentationLease())
+func (q *queue) runInstrumentation(ctx context.Context) {
+	leaseID, err := q.ConfigLease(ctx, q.u.kg.Instrumentation(), ConfigLeaseMax, q.instrumentationLease())
 	if err != ErrConfigAlreadyLeased && err != nil {
 		q.quit <- err
 		return
@@ -540,7 +538,7 @@ func (q *queue) singletonInstrumentation(ctx context.Context) {
 	q.instrumentationLeaseID = leaseID
 	q.instrumentationLeaseLock.Unlock()
 
-	tick := q.clock.NewTicker(leaseDur / 3)
+	tick := q.clock.NewTicker(ConfigLeaseMax / 3)
 	instr := q.clock.NewTicker(20 * time.Second)
 
 	for {
@@ -551,10 +549,12 @@ func (q *queue) singletonInstrumentation(ctx context.Context) {
 			return
 		case <-instr.Chan():
 			if q.isInstrumentator() {
-				// TODO: do things here
+				if err := q.Instrument(ctx); err != nil {
+					q.logger.Error().Err(err).Msg("error running instrumentation")
+				}
 			}
 		case <-tick.Chan():
-			leaseID, err := q.ConfigLease(ctx, q.u.kg.Instrumentation(), leaseDur, q.instrumentationLease())
+			leaseID, err := q.ConfigLease(ctx, q.u.kg.Instrumentation(), ConfigLeaseMax, q.instrumentationLease())
 			if err == ErrConfigAlreadyLeased {
 				q.instrumentationLeaseLock.Lock()
 				q.instrumentationLeaseID = nil
