@@ -13,8 +13,9 @@ local partitionIndexKey   = KEYS[5]           -- partition:sorted - zset
 local shardIndexKey       = KEYS[6]           -- shard:$name:sorted - zset
 local shardMapKey         = KEYS[7]           -- shards - hmap of shards
 local idempotencyKey      = KEYS[8]           -- seen:$key
-local keyItemIndexA       = KEYS[9]           -- custom item index 1
-local keyItemIndexB       = KEYS[10]          -- custom item index 2
+local keyFnMetadata       = KEYS[9]          -- fnMeta:$id - hash
+local keyItemIndexA       = KEYS[10]           -- custom item index 1
+local keyItemIndexB       = KEYS[11]          -- custom item index 2
 
 local queueItem           = ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID             = ARGV[2]           -- id
@@ -25,6 +26,7 @@ local partitionTime       = tonumber(ARGV[6]) -- score for partition, lower boun
 local shard               = ARGV[7]
 local shardName           = ARGV[8]
 local nowMS               = tonumber(ARGV[9]) -- now in ms
+local fnMetadata          = ARGV[10]          -- function meta: {paused}
 
 -- $include(get_partition_item.lua)
 
@@ -51,6 +53,9 @@ redis.call("ZADD", queueIndexKey, queueScore, queueID)
 redis.call("HSETNX", partitionKey, workflowID, partitionItem)
 redis.call("HSETNX", partitionCounterKey, "n", 0)    -- Atomic counter, currently leased (in progress) items.
 redis.call("HINCRBY", partitionCounterKey, "len", 1) -- Atomic counter, length of enqueued items, set to 1 or increased.
+
+-- note to future devs: if updating metadata, be sure you do not change the "off" (i.e. "paused") boolean in the function's metadata.
+redis.call("SET", keyFnMetadata, fnMetadata, "NX")
 
 -- If this is a sharded item, upsert the shard.
 if shard ~= "" and shard ~= "null" then
@@ -82,7 +87,6 @@ if currentScore == false or tonumber(currentScore) > partitionTime then
     if existing ~= nil then
         decoded.last = existing.last
         decoded.forceAtMS = existing.forceAtMS
-        decoded.off = existing.off
 
         if (nowMS > decoded.forceAtMS) then
             -- we've already passed the time at which this partition was forced,
