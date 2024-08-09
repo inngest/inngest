@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/telemetry"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -146,15 +146,15 @@ func (e Event) IsInvokeEvent() bool {
 // function. Note that this metadata is not present on all functions. For
 // accessing an event's correlation ID, prefer using `Event.CorrelationID()`.
 type InngestMetadata struct {
-	SourceAppID         string                  `json:"source_app_id"`
-	SourceFnID          string                  `json:"source_fn_id"`
-	SourceFnVersion     int                     `json:"source_fn_v"`
-	InvokeFnID          string                  `json:"fn_id"`
-	InvokeCorrelationId string                  `json:"correlation_id,omitempty"`
-	InvokeTraceCarrier  *telemetry.TraceCarrier `json:"tc,omitempty"`
-	InvokeExpiresAt     int64                   `json:"expire"`
-	InvokeGroupID       string                  `json:"gid"`
-	InvokeDisplayName   string                  `json:"name"`
+	SourceAppID         string               `json:"source_app_id"`
+	SourceFnID          string               `json:"source_fn_id"`
+	SourceFnVersion     int                  `json:"source_fn_v"`
+	InvokeFnID          string               `json:"fn_id"`
+	InvokeCorrelationId string               `json:"correlation_id,omitempty"`
+	InvokeTraceCarrier  *itrace.TraceCarrier `json:"tc,omitempty"`
+	InvokeExpiresAt     int64                `json:"expire"`
+	InvokeGroupID       string               `json:"gid"`
+	InvokeDisplayName   string               `json:"name"`
 }
 
 func (m *InngestMetadata) Decode(data any) error {
@@ -250,7 +250,7 @@ type NewInvocationEventOpts struct {
 	Event           Event
 	FnID            string
 	CorrelationID   *string
-	TraceCarrier    *telemetry.TraceCarrier
+	TraceCarrier    *itrace.TraceCarrier
 	ExpiresAt       int64
 	GroupID         string
 	DisplayName     string

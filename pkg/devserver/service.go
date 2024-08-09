@@ -29,7 +29,6 @@ import (
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/service"
-	"github.com/inngest/inngest/pkg/telemetry"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/mattn/go-isatty"
 	"github.com/redis/rueidis"
@@ -297,7 +296,7 @@ func (d *devserver) HandleEvent(ctx context.Context, e *event.Event) (string, er
 		Interface("event", trackedEvent.GetEvent()).
 		Msg("publishing event")
 
-	carrier := telemetry.NewTraceCarrier()
+	carrier := itrace.NewTraceCarrier()
 	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 	err = d.publisher.Publish(

@@ -43,7 +43,6 @@ import (
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/service"
-	"github.com/inngest/inngest/pkg/telemetry"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
 	"github.com/redis/rueidis"
@@ -392,7 +391,7 @@ func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic stri
 			return fmt.Errorf("error marshalling invocation event: %w", err)
 		}
 
-		carrier := telemetry.NewTraceCarrier()
+		carrier := itrace.NewTraceCarrier()
 		itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 		err = pb.Publish(

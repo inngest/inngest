@@ -427,7 +427,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	config.SetFunctionSlug(req.Function.GetSlug())
 	config.SetDebounceFlag(req.PreventDebounce)
 
-	carrier := telemetry.NewTraceCarrier(telemetry.WithTraceCarrierSpanID(&spanID))
+	carrier := itrace.NewTraceCarrier(itrace.WithTraceCarrierSpanID(&spanID))
 	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 	config.SetFunctionTrace(carrier)
 
@@ -2119,9 +2119,9 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 	sid := run.NewSpanID(ctx)
 	// NOTE: the context here still contains the execSpan's traceID & spanID,
 	// which is what we want because that's the parent that needs to be referenced later on
-	carrier := telemetry.NewTraceCarrier(
-		telemetry.WithTraceCarrierTimestamp(now),
-		telemetry.WithTraceCarrierSpanID(&sid),
+	carrier := itrace.NewTraceCarrier(
+		itrace.WithTraceCarrierTimestamp(now),
+		itrace.WithTraceCarrierSpanID(&sid),
 	)
 	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
@@ -2260,9 +2260,9 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 	sid := run.NewSpanID(ctx)
 	// NOTE: the context here still contains the execSpan's traceID & spanID,
 	// which is what we want because that's the parent that needs to be referenced later on
-	carrier := telemetry.NewTraceCarrier(
-		telemetry.WithTraceCarrierTimestamp(now),
-		telemetry.WithTraceCarrierSpanID(&sid),
+	carrier := itrace.NewTraceCarrier(
+		itrace.WithTraceCarrierTimestamp(now),
+		itrace.WithTraceCarrierSpanID(&sid),
 	)
 	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 

@@ -18,7 +18,6 @@ import (
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/telemetry"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
@@ -714,7 +713,7 @@ func (l traceLifecycle) OnInvokeFunctionResumed(
 		returnedEventID = r.EventID.String()
 	}
 
-	carrier := telemetry.NewTraceCarrier()
+	carrier := itrace.NewTraceCarrier()
 	if err := carrier.Unmarshal(meta); err == nil {
 		ctx = itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
 		if carrier.CanResumePause() {
@@ -804,7 +803,7 @@ func (l traceLifecycle) OnWaitForEvent(
 		l.log.Error("no trace propagation", "meta", md, "lifecycle", "OnWaitForEvent")
 		return
 	}
-	carrier, ok := v.(*telemetry.TraceCarrier)
+	carrier, ok := v.(*itrace.TraceCarrier)
 	if !ok {
 		l.log.Error("no trace carrier", "meta", md, "lifecycle", "OnWaitForEvent")
 		return
@@ -861,7 +860,7 @@ func (l traceLifecycle) OnWaitForEventResumed(
 		returnedEventID = r.EventID.String()
 	}
 
-	carrier := telemetry.NewTraceCarrier()
+	carrier := itrace.NewTraceCarrier()
 	if err := carrier.Unmarshal(meta); err == nil {
 		ctx = itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
 		if carrier.CanResumePause() {

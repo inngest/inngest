@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/telemetry"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -225,24 +225,24 @@ func (c *Config) DebounceFlag() bool {
 	return false
 }
 
-func (c *Config) SetFunctionTrace(carrier *telemetry.TraceCarrier) {
+func (c *Config) SetFunctionTrace(carrier *itrace.TraceCarrier) {
 	if c.Context == nil {
 		c.Context = map[string]any{}
 	}
 	c.Context[consts.OtelPropagationKey] = carrier
 }
 
-func (c *Config) FunctionTrace() *telemetry.TraceCarrier {
+func (c *Config) FunctionTrace() *itrace.TraceCarrier {
 	if c.Context == nil {
 		return nil
 	}
 
 	if data, ok := c.Context[consts.OtelPropagationKey]; ok {
 		switch v := data.(type) {
-		case *telemetry.TraceCarrier:
+		case *itrace.TraceCarrier:
 			return v
 		default:
-			carrier := telemetry.NewTraceCarrier()
+			carrier := itrace.NewTraceCarrier()
 			if err := carrier.Unmarshal(data); err == nil {
 				// reassign it so it doesn't need to do the decoding again
 				c.Context[consts.OtelPropagationKey] = carrier
