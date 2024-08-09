@@ -1096,11 +1096,10 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 			// Update the ewma
 			latencySem.Lock()
 			latencyAvg.Add(float64(latency))
-			// TODO: Add this back when sync gauge instrumentation is available - https://github.com/open-telemetry/opentelemetry-go/pull/5304
-			// telemetry.GaugeQueueItemLatencyEWMA(ctx, int64(latencyAvg.Value()/1e6), telemetry.GaugeOpt{
-			// 	PkgName: pkgName,
-			// 	Tags:    map[string]any{"kind": qi.Data.Kind},
-			// })
+			telemetry.GaugeQueueItemLatencyEWMA(ctx, int64(latencyAvg.Value()/1e6), telemetry.GaugeOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"kind": qi.Data.Kind},
+			})
 			latencySem.Unlock()
 
 			// Set the metrics historgram and gauge, which reports the ewma value.
