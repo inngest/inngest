@@ -426,6 +426,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// FunctionSlug is not stored in V1 format, so needs to be stored in Context
 	config.SetFunctionSlug(req.Function.GetSlug())
 	config.SetDebounceFlag(req.PreventDebounce)
+	config.SetEventIDMapping(req.Events)
 
 	carrier := itrace.NewTraceCarrier(itrace.WithTraceCarrierSpanID(&spanID))
 	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))

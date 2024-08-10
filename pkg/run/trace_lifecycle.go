@@ -231,8 +231,8 @@ func (l traceLifecycle) OnFunctionStarted(
 		span.SetAttributes(attribute.String(consts.OtelSysFunctionLink, *md.Config.TraceLink()))
 	}
 
-	if err := span.SetEvents(ctx, md.Config.EventIDs, evts); err != nil {
-		l.log.Error("error setting events",
+	if err := span.SetEvents(ctx, evts, md.Config.EventIDMapping()); err != nil {
+		l.log.Warn("error setting events",
 			"lifecycle", "OnFunctionStarted",
 			"errors", err,
 			"meta", md,
@@ -312,8 +312,8 @@ func (l traceLifecycle) OnFunctionFinished(
 		span.SetAttributes(attribute.String(consts.OtelSysFunctionLink, *md.Config.TraceLink()))
 	}
 
-	if err := span.SetEvents(ctx, md.Config.EventIDs, evts); err != nil {
-		l.log.Error("error setting events",
+	if err := span.SetEvents(ctx, evts, md.Config.EventIDMapping()); err != nil {
+		l.log.Warn("error setting events",
 			"lifecycle", "OnFunctionFinished",
 			"errors", err,
 			"meta", md,
@@ -387,8 +387,8 @@ func (l traceLifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata
 		)
 	}
 
-	if err := span.SetEvents(ctx, md.Config.EventIDs, evts); err != nil {
-		l.log.Error("error setting events",
+	if err := span.SetEvents(ctx, evts, md.Config.EventIDMapping()); err != nil {
+		l.log.Warn("error setting events",
 			"lifecycle", "OnFunctionCancelled",
 			"errors", err,
 			"meta", md,

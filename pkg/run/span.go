@@ -557,27 +557,8 @@ func (s *Span) setOutput(data any, key string) {
 	}
 }
 
-func (s *Span) SetEvents(ctx context.Context, ids []ulid.ULID, evts []json.RawMessage) error {
-	// if there's only one, no need to complicate things
-	if len(ids) == 1 && len(evts) == 1 {
-		id := ids[0]
-		evt := evts[0]
-
-		s.AddEvent(string(evt), trace.WithAttributes(
-			attribute.Bool(consts.OtelSysEventData, true),
-			attribute.String(consts.OtelSysEventInternalID, id.String()),
-		))
-
-		return nil
-	}
-
+func (s *Span) SetEvents(ctx context.Context, evts []json.RawMessage, mapping map[string]string) error {
 	var errs error
-
-	// use map to find the IDs quickly
-	idMap := map[string]bool{}
-	for _, id := range ids {
-		idMap[id.String()] = true
-	}
 
 	for _, e := range evts {
 		var evt event.Event
@@ -588,16 +569,29 @@ func (s *Span) SetEvents(ctx context.Context, ids []ulid.ULID, evts []json.RawMe
 			continue
 		}
 
-		// okay to pass, idempotency mismatch won't show in multi events
-		if _, ok := idMap[evt.ID]; !ok {
-			errs = multierror.Append(errs, fmt.Errorf("event ID not found in config"))
-			continue
+		var (
+			id string
+			ok bool
+		)
+		if mapping != nil {
+			id, ok = mapping[evt.ID]
+			if !ok {
+				errs = multierror.Append(errs, fmt.Errorf("event ID not found in mapping: %s", evt.ID))
+			}
 		}
 
-		s.AddEvent(string(e), trace.WithAttributes(
-			attribute.Bool(consts.OtelSysEventData, true),
-			attribute.String(consts.OtelSysEventInternalID, evt.ID),
-		))
+		ts := time.Now()
+		if uid, err := ulid.Parse(id); err == nil {
+			ts = ulid.Time(uid.Time())
+		}
+
+		s.AddEvent(string(e),
+			trace.WithTimestamp(ts),
+			trace.WithAttributes(
+				attribute.Bool(consts.OtelSysEventData, true),
+				attribute.String(consts.OtelSysEventInternalID, id),
+			),
+		)
 	}
 
 	return errs

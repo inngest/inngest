@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/event"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
@@ -17,6 +18,7 @@ const (
 	fnslugKey       = "__fnslug"
 	traceLinkKey    = "__tracelink"
 	debounceKey     = "__debounce"
+	evtmapKey       = "__evtmap"
 )
 
 type ID struct {
@@ -139,10 +141,14 @@ func (c *Config) GetSpanID() (*trace.SpanID, error) {
 	return nil, fmt.Errorf("invalid span id in run config")
 }
 
-func (c *Config) SetCronSchedule(schedule string) {
+func (c *Config) initContext() {
 	if c.Context == nil {
 		c.Context = map[string]any{}
 	}
+}
+
+func (c *Config) SetCronSchedule(schedule string) {
+	c.initContext()
 	c.Context[cronScheduleKey] = schedule
 }
 
@@ -162,9 +168,7 @@ func (c *Config) CronSchedule() *string {
 }
 
 func (c *Config) SetFunctionSlug(slug string) {
-	if c.Context == nil {
-		c.Context = map[string]any{}
-	}
+	c.initContext()
 	c.Context[fnslugKey] = slug
 }
 
@@ -184,9 +188,7 @@ func (c *Config) FunctionSlug() string {
 }
 
 func (c *Config) SetTraceLink(link string) {
-	if c.Context == nil {
-		c.Context = map[string]any{}
-	}
+	c.initContext()
 	c.Context[traceLinkKey] = link
 }
 
@@ -205,9 +207,7 @@ func (c *Config) TraceLink() *string {
 }
 
 func (c *Config) SetDebounceFlag(flag bool) {
-	if c.Context == nil {
-		c.Context = map[string]any{}
-	}
+	c.initContext()
 	c.Context[debounceKey] = flag
 }
 
@@ -226,9 +226,7 @@ func (c *Config) DebounceFlag() bool {
 }
 
 func (c *Config) SetFunctionTrace(carrier *itrace.TraceCarrier) {
-	if c.Context == nil {
-		c.Context = map[string]any{}
-	}
+	c.initContext()
 	c.Context[consts.OtelPropagationKey] = carrier
 }
 
@@ -252,6 +250,34 @@ func (c *Config) FunctionTrace() *itrace.TraceCarrier {
 		}
 
 	}
+	return nil
+}
+
+// SetEventIDMapping creates an event mapping that can be used for referencing
+// the events to their internal IDs
+func (c *Config) SetEventIDMapping(evts []event.TrackedEvent) {
+	c.initContext()
+
+	m := map[string]string{}
+	for _, e := range evts {
+		evt := e.GetEvent()
+		id := e.GetInternalID()
+		m[evt.ID] = id.String()
+	}
+	c.Context[evtmapKey] = m
+}
+
+func (c *Config) EventIDMapping() map[string]string {
+	if c.Context == nil {
+		return nil
+	}
+
+	if v, ok := c.Context[evtmapKey]; ok {
+		if m, ok := v.(map[string]string); ok {
+			return m
+		}
+	}
+
 	return nil
 }
 
