@@ -29,8 +29,12 @@ const (
 	attrCountLimit = 128
 )
 
-// type assertion
-var gen tracesdk.IDGenerator = newSpanIDGenerator()
+var (
+	// type assertion
+	gen tracesdk.IDGenerator = newSpanIDGenerator()
+
+	nilULID = ulid.ULID{}
+)
 
 type SpanOpt func(s *spanOpt)
 
@@ -557,7 +561,7 @@ func (s *Span) setOutput(data any, key string) {
 	}
 }
 
-func (s *Span) SetEvents(ctx context.Context, evts []json.RawMessage, mapping map[string]string) error {
+func (s *Span) SetEvents(ctx context.Context, evts []json.RawMessage, mapping map[string]ulid.ULID) error {
 	var errs error
 
 	for _, e := range evts {
@@ -569,27 +573,25 @@ func (s *Span) SetEvents(ctx context.Context, evts []json.RawMessage, mapping ma
 			continue
 		}
 
-		var (
-			id string
-			ok bool
-		)
+		var id ulid.ULID
 		if mapping != nil {
-			id, ok = mapping[evt.ID]
+			internalID, ok := mapping[evt.ID]
 			if !ok {
 				errs = multierror.Append(errs, fmt.Errorf("event ID not found in mapping: %s", evt.ID))
 			}
+			id = internalID
 		}
 
 		ts := time.Now()
-		if uid, err := ulid.Parse(id); err == nil {
-			ts = ulid.Time(uid.Time())
+		if id != nilULID {
+			ts = ulid.Time(id.Time())
 		}
 
 		s.AddEvent(string(e),
 			trace.WithTimestamp(ts),
 			trace.WithAttributes(
 				attribute.Bool(consts.OtelSysEventData, true),
-				attribute.String(consts.OtelSysEventInternalID, id),
+				attribute.String(consts.OtelSysEventInternalID, id.String()),
 			),
 		)
 	}
