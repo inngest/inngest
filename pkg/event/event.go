@@ -182,20 +182,26 @@ func (m *InngestMetadata) RunID() *ulid.ULID {
 }
 
 func (e Event) InngestMetadata() (*InngestMetadata, error) {
-	rawData, ok := e.Data[consts.InngestEventDataPrefix].(map[string]interface{})
+	raw, ok := e.Data[consts.InngestEventDataPrefix]
 	if !ok {
 		return nil, fmt.Errorf("no data found in prefix '%s'", consts.InngestEventDataPrefix)
 	}
 
-	var metadata InngestMetadata
-	jsonData, err := json.Marshal(rawData)
-	if err != nil {
-		return nil, err
+	switch v := raw.(type) {
+	case InngestMetadata:
+		return &v, nil
+
+	default:
+		var metadata InngestMetadata
+		jsonData, err := json.Marshal(raw)
+		if err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(jsonData, &metadata); err != nil {
+			return nil, err
+		}
+		return &metadata, nil
 	}
-	if err := json.Unmarshal(jsonData, &metadata); err != nil {
-		return nil, err
-	}
-	return &metadata, nil
 }
 
 func NewOSSTrackedEvent(e Event) TrackedEvent {
