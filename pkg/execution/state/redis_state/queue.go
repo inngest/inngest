@@ -1181,6 +1181,9 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		partitionTime = q.clock.Now()
 	}
 
+	parts := q.ItemPartitions(ctx, i)
+	isSystemPartition := parts[0].IsSystem()
+
 	var (
 		guaranteedCapacity *GuaranteedCapacity
 
@@ -1190,7 +1193,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 			AccountID: i.Data.Identifier.AccountID,
 		}.Key()
 	)
-	if q.gcf != nil {
+	if q.gcf != nil && !isSystemPartition {
 		// Fetch guaranteed capacity for the given account. If there is no guaranteed
 		// capacity configured, this will return nil, and we will remove any leftover
 		// items in the guaranteed capacity map
@@ -1201,8 +1204,6 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 			guaranteedCapacityKey = guaranteedCapacity.Key()
 		}
 	}
-
-	parts := q.ItemPartitions(ctx, i)
 
 	keys := []string{
 		q.u.kg.QueueItem(),            // Queue item
@@ -1478,7 +1479,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	// queue does not need to handle account-related details outside the account scope.
 	var acctLimit int
 	accountConcurrencyKey := q.u.kg.Concurrency("account", item.Data.Identifier.AccountID.String())
-	if len(parts) == 1 && parts[0].IsSystem() {
+	if len(parts) > 0 && parts[0].IsSystem() {
 		// Always apply system partition-specific concurrency limits
 		// "account" prefix is used for backwards-compatibility
 		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
@@ -1586,7 +1587,7 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 
 	parts := q.ItemPartitions(ctx, i)
 	accountConcurrencyKey := q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String())
-	if len(parts) == 1 && parts[0].IsSystem() {
+	if len(parts) > 0 && parts[0].IsSystem() {
 		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
 	}
 
@@ -1646,7 +1647,7 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 	// This is because a single queue item may be present in more than one queue.
 	parts := q.ItemPartitions(ctx, i)
 	accountConcurrencyKey := q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String())
-	if len(parts) == 1 && parts[0].IsSystem() {
+	if len(parts) > 0 && parts[0].IsSystem() {
 		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
 	}
 
@@ -1733,7 +1734,7 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 	// This is because a single queue item may be present in more than one queue.
 	parts := q.ItemPartitions(ctx, i)
 	accountConcurrencyKey := q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String())
-	if len(parts) == 1 && parts[0].IsSystem() {
+	if len(parts) > 0 && parts[0].IsSystem() {
 		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
 	}
 
