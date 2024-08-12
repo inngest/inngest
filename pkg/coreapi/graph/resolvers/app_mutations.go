@@ -13,7 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/event"
-	"github.com/inngest/inngest/pkg/telemetry"
+	"github.com/inngest/inngest/pkg/run"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -105,11 +105,11 @@ func (r *mutationResolver) InvokeFunction(
 		FnID: functionSlug,
 	})
 
-	ctx, span := telemetry.NewSpan(ctx,
-		telemetry.WithName(consts.OtelSpanInvoke),
-		telemetry.WithScope(consts.OtelScopeInvoke),
-		telemetry.WithNewRoot(),
-		telemetry.WithSpanAttributes(
+	ctx, span := run.NewSpan(ctx,
+		run.WithName(consts.OtelSpanInvoke),
+		run.WithScope(consts.OtelScopeInvoke),
+		run.WithNewRoot(),
+		run.WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysFunctionSlug, functionSlug),
 		),

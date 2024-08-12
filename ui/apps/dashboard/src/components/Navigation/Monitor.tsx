@@ -15,7 +15,7 @@ export default function Monitor({
 }) {
   const { isReady, value: isRunsEnabled } = useBooleanFlag('env-level-runs-page');
   return (
-    <div className={`jusity-center flex flex-col ${collapsed ? 'mt-2' : 'mt-5'}`}>
+    <div className={`flex w-full flex-col  ${collapsed ? 'mt-2' : 'mt-5'}`}>
       {collapsed ? (
         <hr className="bg-subtle mx-auto mb-1 w-6" />
       ) : (

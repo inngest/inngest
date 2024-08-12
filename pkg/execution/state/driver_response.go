@@ -34,6 +34,9 @@ type UserError struct {
 	// NoRetry is set when parsing the opcide via the retry header.
 	// It is NOT set via the SDK.
 	NoRetry bool `json:"noRetry,omitempty"`
+
+	// Cause allows nested errors to be passed back to the SDK.
+	Cause *UserError `json:"cause,omitempty"`
 }
 
 type GeneratorOpcode struct {

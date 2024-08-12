@@ -845,7 +845,8 @@ func TestQueueSystemPartitions(t *testing.T) {
 			ID:               "custom",
 			PartitionType:    int(enums.PartitionTypeSystem),
 			ConcurrencyLimit: customTestLimit,
-			AccountID:        accountId,
+			// We do not store the accountId for system partitions
+			AccountID: uuid.Nil,
 		}, qp)
 
 		apIds := getAccountPartitions(t, rc, accountId)

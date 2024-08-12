@@ -16,9 +16,7 @@ export const Profile = ({ collapsed, profile }: { collapsed: boolean; profile: P
   return (
     <ProfileMenu>
       <div
-        className={`border-subtle mt-2 flex h-16 w-full flex-row items-center justify-start border-t p-3.5 ${
-          collapsed ? 'justify-center' : 'justify-start'
-        }`}
+        className={`border-subtle mt-2 flex h-16 w-full flex-row items-center justify-start border-t px-2.5 `}
       >
         <div
           className={`flex w-full flex-row items-center rounded p-1 ${
