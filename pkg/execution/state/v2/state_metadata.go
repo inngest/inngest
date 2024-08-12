@@ -256,14 +256,16 @@ func (c *Config) FunctionTrace() *itrace.TraceCarrier {
 
 // SetEventIDMapping creates an event mapping that can be used for referencing
 // the events to their internal IDs
+//
+// - evtID => ULID
 func (c *Config) SetEventIDMapping(evts []event.TrackedEvent) {
 	c.initContext()
 
-	m := map[string]ulid.ULID{}
+	m := map[string]string{}
 	for _, e := range evts {
 		evt := e.GetEvent()
 		id := e.GetInternalID()
-		m[evt.ID] = id
+		m[evt.ID] = id.String()
 	}
 	c.Context[evtmapKey] = m
 }
@@ -279,9 +281,16 @@ func (c *Config) EventIDMapping() map[string]ulid.ULID {
 			return nil
 		}
 
-		var m map[string]ulid.ULID
+		var m map[string]string
 		if err := json.Unmarshal(byt, &m); err == nil {
-			return m
+			res := map[string]ulid.ULID{}
+			for k, v := range m {
+				if id, err := ulid.Parse(v); err == nil {
+					res[k] = id
+				}
+			}
+
+			return res
 		}
 	}
 
