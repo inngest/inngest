@@ -27,7 +27,7 @@ export const Header = ({
   backNav = false,
 }: HeaderType) => {
   return (
-    <div className="flex flex-col justify-start border-b">
+    <div className="sticky top-0 z-50 flex flex-col justify-start border-b">
       <div
         className={`bg-canvasBase border-subtle flex h-[52px] flex-row items-center justify-between px-4 ${className}`}
       >
@@ -39,7 +39,7 @@ export const Header = ({
         <div>{action}</div>
       </div>
       {tabs && (
-        <div className="flex flex-row items-center justify-start space-x-3 px-4">
+        <div className="bg-canvasBase flex flex-row items-center justify-start space-x-3 px-4">
           {tabs.map(({ href, children, exactRouteMatch }) => (
             <HeaderTab key={href} href={href as Route} exactRouteMatch={exactRouteMatch}>
               {children}

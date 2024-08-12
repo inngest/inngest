@@ -183,7 +183,7 @@ func start(ctx context.Context, opts StartOpts) error {
 				if f.ID == uuid.Nil {
 					f.ID = inngest.DeterministicUUID(*f)
 				}
-				if f.ID == p.WorkflowID && f.Concurrency != nil && f.Concurrency.PartitionConcurrency() > 0 {
+				if p.FunctionID != nil && f.ID == *p.FunctionID && f.Concurrency != nil && f.Concurrency.PartitionConcurrency() > 0 {
 					return p.Queue(), f.Concurrency.PartitionConcurrency()
 				}
 			}

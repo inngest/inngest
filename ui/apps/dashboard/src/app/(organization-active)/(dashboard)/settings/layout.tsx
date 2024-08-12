@@ -34,9 +34,11 @@ export default async function SettingsLayout({ children }: SettingsLayoutProps) 
 
   return newIANav ? (
     <Layout>
-      <SettingsHeader />
-      <div className="px-6">{children}</div>
-      <Toaster />
+      <div className="flex-col">
+        <SettingsHeader />
+        <div className="no-scrollbar overflow-y-scroll px-6">{children}</div>
+        <Toaster />
+      </div>
     </Layout>
   ) : (
     <div className="flex h-full flex-col">

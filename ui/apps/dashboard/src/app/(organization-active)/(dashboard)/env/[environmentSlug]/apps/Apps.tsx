@@ -24,7 +24,7 @@ export function Apps({ isArchived = false }: Props) {
   }
   if (res.isLoading && !res.data) {
     return (
-      <div className="mb-4 mt-16 flex items-center justify-center">
+      <div className="mb-4 flex items-center justify-center">
         <div className="w-full max-w-[1200px]">
           <SkeletonCard />
         </div>

@@ -118,3 +118,12 @@ func IncrBatchScheduledCounter(ctx context.Context, opts CounterOpt) {
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrInstrumentationLeaseClaimsCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_instrumentation_lease_claims_total",
+		Description: "Total number of instrumentation lease claimed by executors",
+		Tags:        opts.Tags,
+	})
+}
