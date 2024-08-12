@@ -572,6 +572,14 @@ type QueuePartition struct {
 	// partition.  By default, partitions are function-scoped without any
 	// custom keys.
 	PartitionType int `json:"pt,omitempty"`
+	// QueueName is used for manually overriding queue items to be enqueued for
+	// system jobs like pause events and timeouts, batch timeouts, and replays.
+	//
+	// NOTE: This field is required for backwards compatibility, as old system partitions
+	// simply set the queue name.
+	//
+	// This should almost always be nil.
+	QueueName *string `json:"queue,omitempty"`
 	// ConcurrencyScope is the int-value representation of the enums.ConcurrencyScope,
 	// if this is a concurrency-scoped partition.
 	ConcurrencyScope int `json:"cs,omitempty"`
@@ -625,12 +633,16 @@ type QueuePartition struct {
 	// TODO: Throttling;  embed max limit/period/etc?
 }
 
+func (qp QueuePartition) IsSystem() bool {
+	return qp.QueueName != nil && *qp.QueueName != ""
+}
+
 // zsetKey represents the key used to store the zset for this partition's items.
 // For default partitions, this is different to the ID (for backwards compatibility, it's just
 // the fn ID without prefixes)
 func (q QueuePartition) zsetKey(kg QueueKeyGenerator) string {
 	// For system partitions, return zset using custom queueName
-	if q.PartitionType == int(enums.PartitionTypeSystem) {
+	if q.IsSystem() {
 		return kg.PartitionQueueSet(enums.PartitionTypeDefault, q.Queue(), "")
 	}
 
@@ -654,7 +666,7 @@ func (q QueuePartition) zsetKey(kg QueueKeyGenerator) string {
 // requeueing partitions.
 func (q QueuePartition) concurrencyKey(kg QueueKeyGenerator) string {
 	switch enums.PartitionType(q.PartitionType) {
-	case enums.PartitionTypeSystem, enums.PartitionTypeDefault:
+	case enums.PartitionTypeDefault:
 		return q.fnConcurrencyKey(kg)
 	case enums.PartitionTypeConcurrencyKey:
 		// Hierarchically, custom keys take precedence.
@@ -668,7 +680,7 @@ func (q QueuePartition) concurrencyKey(kg QueueKeyGenerator) string {
 // entire function (not custom keys)
 func (q QueuePartition) fnConcurrencyKey(kg QueueKeyGenerator) string {
 	// Enable system partitions to use the queueName override instead of the fnId
-	if q.PartitionType == int(enums.PartitionTypeSystem) {
+	if q.IsSystem() {
 		return kg.Concurrency("p", q.Queue())
 	}
 
@@ -682,7 +694,7 @@ func (q QueuePartition) fnConcurrencyKey(kg QueueKeyGenerator) string {
 // entire account (not custom keys)
 func (q QueuePartition) acctConcurrencyKey(kg QueueKeyGenerator) string {
 	// Enable system partitions to use the queueName override instead of the accountId
-	if q.PartitionType == int(enums.PartitionTypeSystem) {
+	if q.IsSystem() {
 		return kg.Concurrency("account", q.Queue())
 	}
 	if q.AccountID == uuid.Nil {
@@ -695,7 +707,7 @@ func (q QueuePartition) acctConcurrencyKey(kg QueueKeyGenerator) string {
 // a custom concurrnecy limit.
 func (q QueuePartition) customConcurrencyKey(kg QueueKeyGenerator) string {
 	// This should never happen, but we attempt to handle it gracefully
-	if q.PartitionType == int(enums.PartitionTypeSystem) {
+	if q.IsSystem() {
 		return kg.Concurrency("custom", q.Queue())
 	}
 
@@ -708,8 +720,8 @@ func (q QueuePartition) customConcurrencyKey(kg QueueKeyGenerator) string {
 func (q QueuePartition) Queue() string {
 	// This is redundant but acts as a safeguard, so that
 	// we always return the ID (queueName) for system partitions
-	if q.PartitionType == int(enums.PartitionTypeSystem) {
-		return q.ID
+	if q.IsSystem() {
+		return *q.QueueName
 	}
 
 	if q.ID == "" && q.FunctionID != nil {
@@ -836,8 +848,7 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 	// The only case when we manually set a queueName is for system partitions
 	if i.Data.QueueName != nil {
 		systemPartition := QueuePartition{
-			ID:            *i.Data.QueueName,
-			PartitionType: int(enums.PartitionTypeSystem),
+			QueueName: i.Data.QueueName,
 		}
 		// Fetch most recent system concurrency limit
 		systemLimit := q.systemConcurrencyLimitGetter(ctx, systemPartition)
@@ -1432,7 +1443,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	// queue does not need to handle account-related details outside the account scope.
 	var acctLimit int
 	accountConcurrencyKey := q.u.kg.Concurrency("account", item.Data.Identifier.AccountID.String())
-	if len(parts) == 1 && parts[0].PartitionType == int(enums.PartitionTypeSystem) {
+	if len(parts) == 1 && parts[0].IsSystem() {
 		// Always apply system partition-specific concurrency limits
 		// "account" prefix is used for backwards-compatibility
 		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
@@ -1540,7 +1551,7 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 
 	parts := q.ItemPartitions(ctx, i)
 	accountConcurrencyKey := q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String())
-	if len(parts) == 1 && parts[0].PartitionType == int(enums.PartitionTypeSystem) {
+	if len(parts) == 1 && parts[0].IsSystem() {
 		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
 	}
 
@@ -1600,7 +1611,7 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 	// This is because a single queue item may be present in more than one queue.
 	parts := q.ItemPartitions(ctx, i)
 	accountConcurrencyKey := q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String())
-	if len(parts) == 1 && parts[0].PartitionType == int(enums.PartitionTypeSystem) {
+	if len(parts) == 1 && parts[0].IsSystem() {
 		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
 	}
 
@@ -1687,7 +1698,7 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 	// This is because a single queue item may be present in more than one queue.
 	parts := q.ItemPartitions(ctx, i)
 	accountConcurrencyKey := q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String())
-	if len(parts) == 1 && parts[0].PartitionType == int(enums.PartitionTypeSystem) {
+	if len(parts) == 1 && parts[0].IsSystem() {
 		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
 	}
 
