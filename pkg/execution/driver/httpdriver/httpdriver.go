@@ -24,7 +24,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/syscode"
-	"github.com/inngest/inngest/pkg/telemetry"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/propagation"
 )
@@ -234,7 +234,7 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 	}
 
 	// Add `traceparent` and `tracestate` headers to the request from `ctx`
-	telemetry.UserTracer().Propagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
+	itrace.UserTracer().Propagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
 
 	pre := time.Now()
 	resp, err := c.Do(req)

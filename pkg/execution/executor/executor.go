@@ -31,7 +31,8 @@ import (
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/run"
-	"github.com/inngest/inngest/pkg/telemetry"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog"
@@ -425,9 +426,10 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// FunctionSlug is not stored in V1 format, so needs to be stored in Context
 	config.SetFunctionSlug(req.Function.GetSlug())
 	config.SetDebounceFlag(req.PreventDebounce)
+	config.SetEventIDMapping(req.Events)
 
-	carrier := telemetry.NewTraceCarrier(telemetry.WithTraceCarrierSpanID(&spanID))
-	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	carrier := itrace.NewTraceCarrier(itrace.WithTraceCarrierSpanID(&spanID))
+	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 	config.SetFunctionTrace(carrier)
 
 	metadata := sv2.Metadata{
@@ -2118,11 +2120,11 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 	sid := run.NewSpanID(ctx)
 	// NOTE: the context here still contains the execSpan's traceID & spanID,
 	// which is what we want because that's the parent that needs to be referenced later on
-	carrier := telemetry.NewTraceCarrier(
-		telemetry.WithTraceCarrierTimestamp(now),
-		telemetry.WithTraceCarrierSpanID(&sid),
+	carrier := itrace.NewTraceCarrier(
+		itrace.WithTraceCarrierTimestamp(now),
+		itrace.WithTraceCarrierSpanID(&sid),
 	)
-	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 	// Always create an invocation event.
 	evt := event.NewInvocationEvent(event.NewInvocationEventOpts{
@@ -2259,11 +2261,11 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 	sid := run.NewSpanID(ctx)
 	// NOTE: the context here still contains the execSpan's traceID & spanID,
 	// which is what we want because that's the parent that needs to be referenced later on
-	carrier := telemetry.NewTraceCarrier(
-		telemetry.WithTraceCarrierTimestamp(now),
-		telemetry.WithTraceCarrierSpanID(&sid),
+	carrier := itrace.NewTraceCarrier(
+		itrace.WithTraceCarrierTimestamp(now),
+		itrace.WithTraceCarrierSpanID(&sid),
 	)
-	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 	pause := state.Pause{
 		ID:          pauseID,
@@ -2369,7 +2371,7 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 			return err
 		}
 
-		telemetry.IncrBatchScheduledCounter(ctx, telemetry.CounterOpt{
+		metrics.IncrBatchScheduledCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
 				"account_id": bi.AccountID.String(),
@@ -2539,7 +2541,7 @@ func extractTraceCtx(ctx context.Context, md sv2.Metadata) context.Context {
 		// NOTE:
 		// this gymastics happens because the carrier stores the spanID separately.
 		// it probably can be simplified
-		tmp := telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
+		tmp := itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
 		spanID, err := md.Config.GetSpanID()
 		if err != nil {
 			return ctx
