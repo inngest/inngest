@@ -31,6 +31,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   iconSide?: 'right' | 'left';
   keys?: string[];
   prefetch?: boolean;
+  scroll?: boolean;
 }
 
 export const LinkWrapper = ({
@@ -38,14 +39,16 @@ export const LinkWrapper = ({
   href,
   target,
   prefetch = false,
+  scroll = true,
 }: {
   children: ReactNode;
   href?: string | UrlObject;
   target?: string;
   prefetch?: boolean;
+  scroll?: boolean;
 }) =>
   href ? (
-    <Link href={href as Route} target={target} prefetch={prefetch}>
+    <Link href={href as Route} target={target} prefetch={prefetch} scroll={scroll}>
       {children}
     </Link>
   ) : (
@@ -86,6 +89,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       disabled,
       target,
       prefetch = false,
+      scroll = true,
       ...props
     }: ButtonProps,
     ref
@@ -140,7 +144,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 
     return (
       <TooltipWrapper tooltip={tooltip}>
-        <LinkWrapper href={href} target={target} prefetch={prefetch}>
+        <LinkWrapper href={href} target={target} prefetch={prefetch} scroll={scroll}>
           <button
             ref={ref}
             className={cn(
