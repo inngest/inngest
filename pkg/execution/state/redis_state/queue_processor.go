@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/telemetry"
+	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
@@ -144,6 +145,7 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 	go q.claimShards(ctx)
 	go q.claimSequentialLease(ctx)
 	go q.runScavenger(ctx)
+	go q.runInstrumentation(ctx)
 
 	tick := q.clock.NewTicker(q.pollTick)
 
@@ -492,7 +494,7 @@ func (q *queue) runScavenger(ctx context.Context) {
 			if q.isScavenger() {
 				count, err := q.Scavenge(ctx)
 				if err != nil {
-					q.logger.Error().Err(err).Msg("error claiming scavenger lease")
+					q.logger.Error().Err(err).Msg("error scavenging")
 				}
 				if count > 0 {
 					q.logger.Info().Int("len", count).Msg("scavenged lost jobs")
@@ -525,6 +527,62 @@ func (q *queue) runScavenger(ctx context.Context) {
 			}
 			q.scavengerLeaseID = leaseID
 			q.scavengerLeaseLock.Unlock()
+		}
+	}
+}
+
+func (q *queue) runInstrumentation(ctx context.Context) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Instrument"), redis_telemetry.ScopeQueue)
+
+	leaseID, err := q.ConfigLease(ctx, q.u.kg.Instrumentation(), ConfigLeaseMax, q.instrumentationLease())
+	if err != ErrConfigAlreadyLeased && err != nil {
+		q.quit <- err
+		return
+	}
+
+	setLease := func(lease *ulid.ULID) {
+		q.instrumentationLeaseLock.Lock()
+		defer q.instrumentationLeaseLock.Unlock()
+		q.instrumentationLeaseID = lease
+
+		if lease != nil && q.instrumentationLeaseID == nil {
+			telemetry.IncrInstrumentationLeaseClaimsCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
+		}
+	}
+
+	setLease(leaseID)
+
+	tick := q.clock.NewTicker(ConfigLeaseMax / 3)
+	instr := q.clock.NewTicker(20 * time.Second)
+
+	for {
+		select {
+		case <-ctx.Done():
+			tick.Stop()
+			instr.Stop()
+			return
+		case <-instr.Chan():
+			if q.isInstrumentator() {
+				if err := q.Instrument(ctx); err != nil {
+					q.logger.Error().Err(err).Msg("error running instrumentation")
+				}
+			}
+		case <-tick.Chan():
+			telemetry.GaugeWorkerQueueCapacity(ctx, int64(q.numWorkers), telemetry.GaugeOpt{PkgName: pkgName})
+
+			leaseID, err := q.ConfigLease(ctx, q.u.kg.Instrumentation(), ConfigLeaseMax, q.instrumentationLease())
+			if err == ErrConfigAlreadyLeased {
+				setLease(nil)
+				continue
+			}
+
+			if err != nil {
+				q.logger.Error().Err(err).Msg("error claiming instrumentation lease")
+				setLease(nil)
+				continue
+			}
+
+			setLease(leaseID)
 		}
 	}
 }
@@ -877,11 +935,10 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 			// Update the ewma
 			latencySem.Lock()
 			latencyAvg.Add(float64(latency))
-			// TODO: Add this back when sync gauge instrumentation is available - https://github.com/open-telemetry/opentelemetry-go/pull/5304
-			// telemetry.GaugeQueueItemLatencyEWMA(ctx, int64(latencyAvg.Value()/1e6), telemetry.GaugeOpt{
-			// 	PkgName: pkgName,
-			// 	Tags:    map[string]any{"kind": qi.Data.Kind},
-			// })
+			telemetry.GaugeQueueItemLatencyEWMA(ctx, int64(latencyAvg.Value()/1e6), telemetry.GaugeOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"kind": qi.Data.Kind},
+			})
 			latencySem.Unlock()
 
 			// Set the metrics historgram and gauge, which reports the ewma value.
@@ -998,6 +1055,18 @@ func (q *queue) sequentialLease() *ulid.ULID {
 	return &copied
 }
 
+// instrumentationLease is a helper method for concurrently reading the
+// instrumentation lease ID.
+func (q *queue) instrumentationLease() *ulid.ULID {
+	q.instrumentationLeaseLock.RLock()
+	defer q.instrumentationLeaseLock.RUnlock()
+	if q.instrumentationLeaseID == nil {
+		return nil
+	}
+	copied := *q.instrumentationLeaseID
+	return &copied
+}
+
 // scavengerLease is a helper method for concurrently reading the sequential
 // lease ID.
 func (q *queue) scavengerLease() *ulid.ULID {
@@ -1080,6 +1149,14 @@ func (q *queue) isSequential() bool {
 
 func (q *queue) isScavenger() bool {
 	l := q.scavengerLease()
+	if l == nil {
+		return false
+	}
+	return ulid.Time(l.Time()).After(q.clock.Now())
+}
+
+func (q *queue) isInstrumentator() bool {
+	l := q.instrumentationLease()
 	if l == nil {
 		return false
 	}

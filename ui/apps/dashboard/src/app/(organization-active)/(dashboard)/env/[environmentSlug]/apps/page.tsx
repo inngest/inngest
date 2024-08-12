@@ -62,8 +62,8 @@ export default async function AppsPage({
           )
         }
       />
-      <div className="bg-canvasBase mx-auto flex h-full w-full max-w-[1200px] flex-col overflow-y-auto px-6 pt-16">
-        <div className="relative flex w-full flex-row justify-end">
+      <div className="bg-canvasBase mx-auto flex h-full w-full max-w-[1200px] flex-col px-6 pt-16">
+        <div className="relative flex w-full flex-row justify-start">
           <StatusMenu archived={isArchived} envSlug={envSlug} />
         </div>
         <Apps isArchived={isArchived} />
