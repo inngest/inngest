@@ -281,16 +281,9 @@ func (c *Config) EventIDMapping() map[string]ulid.ULID {
 			return nil
 		}
 
-		var m map[string]string
+		var m map[string]ulid.ULID
 		if err := json.Unmarshal(byt, &m); err == nil {
-			res := map[string]ulid.ULID{}
-			for k, v := range m {
-				if id, err := ulid.Parse(v); err == nil {
-					res[k] = id
-				}
-			}
-
-			return res
+			return m
 		}
 	}
 
