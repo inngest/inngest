@@ -626,12 +626,12 @@ func TestQueueAllowList(t *testing.T) {
 	require.Equal(t, "", val)
 
 	// No more items in system partition
-	peekedItems, err := q.Peek(context.Background(), &QueuePartition{PartitionType: int(enums.PartitionTypeSystem), ID: allowedQueueName}, time.Now(), 1)
+	peekedItems, err := q.Peek(context.Background(), &QueuePartition{QueueName: &allowedQueueName}, time.Now(), 1)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(peekedItems))
 
 	// Still items in other and random partition
-	peekedItems, err = q.Peek(context.Background(), &QueuePartition{PartitionType: int(enums.PartitionTypeSystem), ID: otherQueueName}, time.Now(), 1)
+	peekedItems, err = q.Peek(context.Background(), &QueuePartition{QueueName: &otherQueueName}, time.Now(), 1)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(peekedItems))
 
@@ -738,12 +738,12 @@ func TestQueueDenyList(t *testing.T) {
 	require.Equal(t, *qi.QueueName, "denied")
 
 	// No more items in system partition
-	peekedItems, err := q.Peek(context.Background(), &QueuePartition{PartitionType: int(enums.PartitionTypeSystem), ID: deniedQueueName}, time.Now(), 1)
+	peekedItems, err := q.Peek(context.Background(), &QueuePartition{QueueName: &deniedQueueName}, time.Now(), 1)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(peekedItems))
 
 	// Still items in other and random partition
-	peekedItems, err = q.Peek(context.Background(), &QueuePartition{PartitionType: int(enums.PartitionTypeSystem), ID: otherQueueName}, time.Now(), 1)
+	peekedItems, err = q.Peek(context.Background(), &QueuePartition{QueueName: &otherQueueName}, time.Now(), 1)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(peekedItems))
 
