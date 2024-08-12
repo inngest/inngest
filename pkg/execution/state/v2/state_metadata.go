@@ -261,13 +261,15 @@ func (c *Config) FunctionTrace() *itrace.TraceCarrier {
 func (c *Config) SetEventIDMapping(evts []event.TrackedEvent) {
 	c.initContext()
 
-	m := map[string]string{}
+	m := map[string]ulid.ULID{}
 	for _, e := range evts {
 		evt := e.GetEvent()
 		id := e.GetInternalID()
-		m[evt.ID] = id.String()
+		m[evt.ID] = id
 	}
-	c.Context[evtmapKey] = m
+	if byt, err := json.Marshal(m); err == nil {
+		c.Context[evtmapKey] = string(byt)
+	}
 }
 
 func (c *Config) EventIDMapping() map[string]ulid.ULID {
@@ -276,14 +278,11 @@ func (c *Config) EventIDMapping() map[string]ulid.ULID {
 	}
 
 	if v, ok := c.Context[evtmapKey]; ok {
-		byt, err := json.Marshal(v)
-		if err != nil {
-			return nil
-		}
-
-		var m map[string]ulid.ULID
-		if err := json.Unmarshal(byt, &m); err == nil {
-			return m
+		if s, ok := v.(string); ok {
+			var m map[string]ulid.ULID
+			if err := json.Unmarshal([]byte(s), &m); err == nil {
+				return m
+			}
 		}
 	}
 
