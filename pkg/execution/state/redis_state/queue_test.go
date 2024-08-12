@@ -646,6 +646,8 @@ func TestQueueSystemPartitions(t *testing.T) {
 		// Ensure the partition is inserted.
 		qp := getSystemPartition(t, r, customQueueName)
 		require.Equal(t, QueuePartition{
+			ID:               customQueueName,
+			PartitionType:    int(enums.PartitionTypeDefault),
 			QueueName:        &customQueueName,
 			ConcurrencyLimit: customTestLimit,
 		}, qp)
