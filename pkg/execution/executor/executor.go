@@ -1706,6 +1706,9 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			redis_state.QueueItem{
 				ID:         redis_state.HashID(ctx, jobID),
 				WorkflowID: md.ID.FunctionID,
+				Data: queue.Item{
+					Kind: queue.KindPause,
+				},
 			},
 		)
 		if err != nil {
