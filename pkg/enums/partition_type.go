@@ -13,11 +13,10 @@ type PartitionType int
 const (
 	// PartitionTypeDefault indicates a regular partition for job items without
 	// concurrency keys, or with only a fn level concurrency key.
+	// NOTE: This also applies to system partitions for backwards compatibility
 	PartitionTypeDefault PartitionType = 0
 	// PartitionTypeConcurrencyKey represents a partition for a custom concurrency key
 	PartitionTypeConcurrencyKey PartitionType = 1
 	// PartitionTypeThrottle represents a partition for a custom throttling key.
 	PartitionTypeThrottle PartitionType = 2
-	// PartitionTypeSystem represents a system partition (legacy partitions for pause-events, workspace pause timeouts, replays, etc.)
-	PartitionTypeSystem PartitionType = 3
 )

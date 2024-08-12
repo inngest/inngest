@@ -646,8 +646,9 @@ func TestQueueSystemPartitions(t *testing.T) {
 		// Ensure the partition is inserted.
 		qp := getSystemPartition(t, r, customQueueName)
 		require.Equal(t, QueuePartition{
-			ID:               "custom",
-			PartitionType:    int(enums.PartitionTypeSystem),
+			ID:               customQueueName,
+			PartitionType:    int(enums.PartitionTypeDefault),
+			QueueName:        &customQueueName,
 			ConcurrencyLimit: customTestLimit,
 		}, qp)
 	})
@@ -3495,7 +3496,7 @@ func getSystemPartition(t *testing.T, r *miniredis.Miniredis, name string) Queue
 	qp := QueuePartition{}
 	err := json.Unmarshal([]byte(val), &qp)
 	require.NoError(t, err, "expected item to be valid json")
-	require.Equal(t, int(enums.PartitionTypeSystem), qp.PartitionType)
+	require.True(t, qp.IsSystem())
 	return qp
 }
 
