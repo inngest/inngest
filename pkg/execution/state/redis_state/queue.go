@@ -734,6 +734,7 @@ func (q QueuePartition) Queue() string {
 	if q.ID == "" && q.FunctionID != nil {
 		return q.FunctionID.String()
 	}
+
 	return q.ID
 }
 
@@ -857,6 +858,9 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 	// The only case when we manually set a queueName is for system partitions
 	if i.Data.QueueName != nil {
 		systemPartition := QueuePartition{
+			// NOTE: Never remove this. The ID is required to enqueue items to the
+			// partition, as it is used for conditional checks in Lua
+			ID:        *i.Data.QueueName,
 			QueueName: i.Data.QueueName,
 		}
 		// Fetch most recent system concurrency limit
