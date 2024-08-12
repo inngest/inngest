@@ -1706,10 +1706,11 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		jobID := fmt.Sprintf("%s-%s", md.IdempotencyKey(), pause.DataKey)
 		err := q.Dequeue(
 			ctx,
-			redis_state.QueuePartition{WorkflowID: md.ID.FunctionID},
+			// TODO (key queues) Double check if these need updates
+			redis_state.QueuePartition{FunctionID: &md.ID.FunctionID},
 			redis_state.QueueItem{
 				ID:         redis_state.HashID(ctx, jobID),
-				WorkflowID: md.ID.FunctionID,
+				FunctionID: md.ID.FunctionID,
 			},
 		)
 		if err != nil {
