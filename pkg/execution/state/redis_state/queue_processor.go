@@ -1010,6 +1010,10 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 		// Dequeue this entirely, as this permanently failed.
 		// XXX: Increase permanently failed counter here.
 		if err := q.Dequeue(context.WithoutCancel(ctx), p, qi); err != nil {
+			if err == ErrQueueItemNotFound {
+				// Safe. The executor may have dequeued.
+				return nil
+			}
 			return err
 		}
 
@@ -1021,6 +1025,10 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 
 	case <-doneCh:
 		if err := q.Dequeue(context.WithoutCancel(ctx), p, qi); err != nil {
+			if err == ErrQueueItemNotFound {
+				// Safe. The executor may have dequeued.
+				return nil
+			}
 			return err
 		}
 	}
