@@ -10,6 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	runv2 "github.com/inngest/inngest/proto/gen/run/v2"
 	"github.com/nats-io/nats.go"
 	"go.opentelemetry.io/otel/attribute"
@@ -168,6 +169,8 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 
 			// publish to all subjects defined
 			for _, subj := range e.subjects {
+				status := "success"
+
 				// publish to NATS
 				if err := e.conn.Publish(subj, byt); err != nil {
 					logger.StdlibLogger(ctx).Error("error publishing span to NATS",
@@ -177,7 +180,17 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 						"wfID", id.FunctionId,
 						"runID", id.RunId,
 					)
+
+					status = "error"
 				}
+
+				metrics.IncrExportedSpansCounter(ctx, metrics.CounterOpt{
+					PkgName: "",
+					Tags: map[string]any{
+						"subject": subj,
+						"status":  status,
+					},
+				})
 			}
 		}(ctx, sp)
 	}
