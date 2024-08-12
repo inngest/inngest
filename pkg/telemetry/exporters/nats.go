@@ -28,9 +28,6 @@ const (
 )
 
 // NATS span exporter
-// TODO: Hold NATS connection
-// - subject to write to
-// - is jetstream or not?
 type natsSpanExporter struct {
 	subjects []string
 	conn     *nats.Conn

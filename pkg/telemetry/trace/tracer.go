@@ -65,6 +65,8 @@ type TracerOpts struct {
 	TraceEndpoint            string
 	TraceURLPath             string
 	TraceMaxPayloadSizeBytes int
+
+	NATS *exporters.NatsExporterOpts
 }
 
 func (o TracerOpts) Endpoint() string {
