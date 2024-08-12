@@ -268,6 +268,7 @@ func (c *Config) SetEventIDMapping(evts []event.TrackedEvent) {
 		m[evt.ID] = id
 	}
 	if byt, err := json.Marshal(m); err == nil {
+		// store it as byte string to make it easier to store and retrieve
 		c.Context[evtmapKey] = string(byt)
 	}
 }
