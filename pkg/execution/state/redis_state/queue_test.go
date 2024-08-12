@@ -3298,6 +3298,7 @@ func TestGuaranteedCapacity(t *testing.T) {
 					},
 				},
 			}, time.Now())
+			require.NoError(t, err)
 
 			exists, err = rc.Do(ctx, rc.B().Hexists().Key(q.u.kg.GuaranteedCapacityMap()).Field(guaranteedCapacity.Key()).Build()).AsBool()
 			require.NoError(t, err)

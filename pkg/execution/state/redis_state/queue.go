@@ -2292,23 +2292,21 @@ func (q *queue) Instrument(ctx context.Context) error {
 		for _, guaranteedCapacity := range guaranteedCapacityMap {
 			tags := map[string]any{"account_id": guaranteedCapacity.AccountID}
 
-			telemetry.GaugeQueueAccountGuaranteedCapacityCount(ctx, telemetry.GaugeOpt{
-				PkgName:  pkgName,
-				Tags:     tags,
-				Callback: func(ctx context.Context) (int64, error) { return int64(guaranteedCapacity.GuaranteedCapacity), nil },
-			})
-			telemetry.GaugeQueueGuaranteedCapacityLeaseCount(ctx, telemetry.GaugeOpt{
-				PkgName:  pkgName,
-				Tags:     tags,
-				Callback: func(ctx context.Context) (int64, error) { return int64(len(guaranteedCapacity.Leases)), nil },
-			})
-			telemetry.GaugeQueueGuaranteedCapacityAccountPartitionAvailableCount(ctx, telemetry.GaugeOpt{
+			telemetry.GaugeQueueAccountGuaranteedCapacityCount(ctx, int64(guaranteedCapacity.GuaranteedCapacity), telemetry.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    tags,
-				Callback: func(ctx context.Context) (int64, error) {
-					return q.partitionSize(ctx, q.u.kg.AccountPartitionIndex(guaranteedCapacity.AccountID), q.clock.Now().Add(PartitionLookahead))
-				},
 			})
+			telemetry.GaugeQueueGuaranteedCapacityLeaseCount(ctx, int64(len(guaranteedCapacity.Leases)), telemetry.GaugeOpt{
+				PkgName: pkgName,
+				Tags:    tags,
+			})
+
+			if size, err := q.partitionSize(ctx, q.u.kg.AccountPartitionIndex(guaranteedCapacity.AccountID), q.clock.Now().Add(PartitionLookahead)); err == nil {
+				telemetry.GaugeQueueGuaranteedCapacityAccountPartitionAvailableCount(ctx, size, telemetry.GaugeOpt{
+					PkgName: pkgName,
+					Tags:    tags,
+				})
+			}
 		}
 	}(ctx)
 
