@@ -181,10 +181,10 @@ func start(ctx context.Context, opts StartOpts) error {
 						f.ID = inngest.DeterministicUUID(*f)
 					}
 					if p.FunctionID != nil && f.ID == *p.FunctionID && f.Concurrency != nil && f.Concurrency.PartitionConcurrency() > 0 {
-						return f.Concurrency.PartitionConcurrency(), consts.DefaultConcurrencyLimit, consts.DefaultBatchSizeLimit
+						return f.Concurrency.PartitionConcurrency(), consts.DefaultConcurrencyLimit, consts.DefaultConcurrencyLimit
 					}
 				}
-				return consts.DefaultBatchSizeLimit, consts.DefaultMaxStateSizeLimit, consts.DefaultMaxEventSize
+				return consts.DefaultConcurrencyLimit, consts.DefaultConcurrencyLimit, consts.DefaultConcurrencyLimit
 			}),
 	}
 
