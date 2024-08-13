@@ -1,6 +1,7 @@
 import { forwardRef, type InputHTMLAttributes } from 'react';
 
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
+  allowPasswordManager?: boolean;
   label?: string;
   error?: string | undefined;
   inngestSize?: 'base' | 'lg';
@@ -14,7 +15,20 @@ const sizeStyles = {
 };
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type = 'text', inngestSize = 'base', ...props }, ref) => {
+  (
+    { allowPasswordManager = false, className, type = 'text', inngestSize = 'base', ...props },
+    ref
+  ) => {
+    let passwordManagerProps: Record<string, unknown> = {
+      autocomplete: 'off',
+      'data-1p-ignore': true,
+      'data-bwignore': true,
+      'data-lpignore': true,
+    };
+    if (allowPasswordManager) {
+      passwordManagerProps = {};
+    }
+
     return (
       <div className="flex flex-col gap-1">
         {props.label && (
@@ -33,6 +47,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             }
             ${props.error && 'outline-error'}
             ${className}`}
+          {...passwordManagerProps}
           {...props}
         />
 
