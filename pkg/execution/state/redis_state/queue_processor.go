@@ -504,9 +504,10 @@ func (q *queue) scan(ctx context.Context) error {
 
 		// Scan and process account partitions in parallel
 		for _, account := range peekedAccounts {
-			partitionKey = q.u.kg.AccountPartitionIndex(account)
-
+			account := account
 			eg.Go(func() error {
+				partitionKey := q.u.kg.AccountPartitionIndex(account)
+
 				return q.scanPartition(ctx, partitionKey, peekSize, peekUntil, nil, metricShardName)
 			})
 		}
