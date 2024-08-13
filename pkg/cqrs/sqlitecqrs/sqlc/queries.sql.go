@@ -811,6 +811,55 @@ func (q *Queries) GetFunctions(ctx context.Context) ([]*Function, error) {
 	return items, nil
 }
 
+const getLatestQueueSnapshotId = `-- name: GetLatestQueueSnapshotId :one
+SELECT MAX(snapshot_id)
+FROM queue_snapshot_versions
+`
+
+func (q *Queries) GetLatestQueueSnapshotId(ctx context.Context) (interface{}, error) {
+	row := q.db.QueryRowContext(ctx, getLatestQueueSnapshotId)
+	var max interface{}
+	err := row.Scan(&max)
+	return max, err
+}
+
+const getQueueSnapshotChunks = `-- name: GetQueueSnapshotChunks :many
+
+SELECT chunk_id, data
+FROM queue_snapshot_chunks
+WHERE snapshot_id = ?
+ORDER BY chunk_id ASC
+`
+
+type GetQueueSnapshotChunksRow struct {
+	ChunkID int64
+	Data    []byte
+}
+
+// Lite queue snapshots
+func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID int64) ([]*GetQueueSnapshotChunksRow, error) {
+	rows, err := q.db.QueryContext(ctx, getQueueSnapshotChunks, snapshotID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetQueueSnapshotChunksRow
+	for rows.Next() {
+		var i GetQueueSnapshotChunksRow
+		if err := rows.Scan(&i.ChunkID, &i.Data); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTraceRun = `-- name: GetTraceRun :one
 SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule FROM trace_runs WHERE run_id = ?1
 `
@@ -1229,6 +1278,23 @@ func (q *Queries) InsertHistory(ctx context.Context, arg InsertHistoryParams) er
 		arg.InvokeFunctionResult,
 		arg.Result,
 	)
+	return err
+}
+
+const insertQueueSnapshotChunk = `-- name: InsertQueueSnapshotChunk :exec
+INSERT INTO queue_snapshot_chunks (snapshot_id, chunk_id, data)
+VALUES
+	(?, ?, ?)
+`
+
+type InsertQueueSnapshotChunkParams struct {
+	SnapshotID int64
+	ChunkID    int64
+	Data       []byte
+}
+
+func (q *Queries) InsertQueueSnapshotChunk(ctx context.Context, arg InsertQueueSnapshotChunkParams) error {
+	_, err := q.db.ExecContext(ctx, insertQueueSnapshotChunk, arg.SnapshotID, arg.ChunkID, arg.Data)
 	return err
 }
 

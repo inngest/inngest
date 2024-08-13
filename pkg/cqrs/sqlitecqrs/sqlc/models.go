@@ -109,6 +109,17 @@ type History struct {
 	Result               sql.NullString
 }
 
+type QueueSnapshotChunk struct {
+	SnapshotID int64
+	ChunkID    int64
+	Data       []byte
+}
+
+type QueueSnapshotVersion struct {
+	SnapshotID int64
+	CreatedAt  time.Time
+}
+
 type Trace struct {
 	Timestamp          time.Time
 	TimestampUnixMs    int64

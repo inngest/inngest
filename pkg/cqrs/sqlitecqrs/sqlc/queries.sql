@@ -195,3 +195,23 @@ SELECT * FROM traces WHERE trace_id = @trace_id AND run_id = @run_id ORDER BY ti
 
 -- name: GetTraceSpanOutput :many
 select * from traces where trace_id = @trace_id AND span_id = @span_id ORDER BY timestamp_unix_ms DESC, duration DESC;
+
+
+--
+-- Lite queue snapshots
+--
+
+-- name: GetQueueSnapshotChunks :many
+SELECT chunk_id, data
+FROM queue_snapshot_chunks
+WHERE snapshot_id = ?
+ORDER BY chunk_id ASC;
+
+-- name: GetLatestQueueSnapshotId :one
+SELECT MAX(snapshot_id)
+FROM queue_snapshot_versions;
+
+-- name: InsertQueueSnapshotChunk :exec
+INSERT INTO queue_snapshot_chunks (snapshot_id, chunk_id, data)
+VALUES
+	(?, ?, ?);
