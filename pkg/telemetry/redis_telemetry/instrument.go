@@ -2,7 +2,7 @@ package redis_telemetry
 
 import (
 	"context"
-	"github.com/inngest/inngest/pkg/telemetry"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/redis/rueidis"
 	"time"
 )
@@ -147,7 +147,7 @@ func (i instrumentedClient) report(ctx context.Context, start, end time.Time, co
 		tags["op"] = opName
 	}
 
-	telemetry.HistogramRedisCommandDuration(ctx, dur.Milliseconds(), telemetry.HistogramOpt{
+	metrics.HistogramRedisCommandDuration(ctx, dur.Milliseconds(), metrics.HistogramOpt{
 		PkgName: i.pkgName,
 		Tags:    tags,
 	})
