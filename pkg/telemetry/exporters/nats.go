@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -13,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	runv2 "github.com/inngest/inngest/proto/gen/run/v2"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/sdk/trace"
@@ -28,15 +30,22 @@ const (
 	spanEvtTypeOutput
 )
 
+const (
+	drainTimeout = 30 * time.Second
+)
+
 // NATS span exporter
 type natsSpanExporter struct {
+	wg       *sync.WaitGroup
 	subjects []string
 	conn     *nats.Conn
+	js       jetstream.JetStream
 }
 
 type NatsExporterOpts struct {
-	Subjects []string
-	URLs     []string
+	Subjects     []string
+	URLs         []string
+	DrainTimeout time.Duration
 }
 
 // NewNATSSpanExporter creates an otel compatible exporter that ships the spans to NATS
@@ -60,12 +69,29 @@ func NewNATSSpanExporter(ctx context.Context, opts *NatsExporterOpts) (trace.Spa
 		return nil, fmt.Errorf("subject is required for nats exporter")
 	}
 
+	timeout := drainTimeout
+	if opts.DrainTimeout > 0 {
+		timeout = opts.DrainTimeout
+	}
+
+	// used for waiting for connection drain before shutdown
+	wg := sync.WaitGroup{}
+
 	// urls should be comma delimited strings
 	conn, err := nats.Connect(urls,
 		nats.Name(name),
+		nats.DrainTimeout(timeout),
+		nats.ClosedHandler(func(c *nats.Conn) {
+			wg.Done() // mark conn as closed
+		}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to NATS: %w", err)
+	}
+
+	js, err := jetstream.New(conn)
+	if err != nil {
+		return nil, fmt.Errorf("error establishing jetstream conn: %w", err)
 	}
 
 	logger.StdlibLogger(ctx).Info("established connection with NATS server",
@@ -73,13 +99,17 @@ func NewNATSSpanExporter(ctx context.Context, opts *NatsExporterOpts) (trace.Spa
 		"name", name,
 	)
 
+	wg.Add(1)
 	return &natsSpanExporter{
+		wg:       &wg,
 		subjects: opts.Subjects,
 		conn:     conn,
+		js:       js,
 	}, nil
 }
 
 func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOnlySpan) error {
+	ctx = context.WithoutCancel(ctx)
 	wg := sync.WaitGroup{}
 
 	for _, sp := range spans {
@@ -172,7 +202,7 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 				status := "success"
 
 				// publish to NATS
-				if err := e.conn.Publish(subj, byt); err != nil {
+				if _, err := e.js.Publish(ctx, subj, byt); err != nil {
 					logger.StdlibLogger(ctx).Error("error publishing span to NATS",
 						"error", err,
 						"acctID", id.AccountId,
@@ -200,7 +230,12 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 }
 
 func (e *natsSpanExporter) Shutdown(ctx context.Context) error {
-	e.conn.Close()
+	if err := e.conn.Drain(); err != nil {
+		return err
+	}
+
+	// wait for conn to close so messages are not lost
+	e.wg.Wait()
 	return nil
 }
 
