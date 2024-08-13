@@ -19,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -560,9 +561,9 @@ func (l lifecycle) OnInvokeFunction(
 	invocationEvt event.Event,
 ) {
 	eventID := ulid.MustParse(invocationEvt.ID)
-	meta := invocationEvt.InngestMetadata()
-	if meta == nil {
-		// TODO: log warning here?
+	meta, err := invocationEvt.InngestMetadata()
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error retrieving inngest metadata", "error", err)
 		return
 	}
 	corrID := meta.InvokeCorrelationId
