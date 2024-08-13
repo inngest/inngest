@@ -26,7 +26,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
-	"github.com/inngest/inngest/pkg/telemetry"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
 	"github.com/robfig/cron/v3"
 	"go.opentelemetry.io/otel/attribute"
@@ -252,7 +252,7 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 				// before the function is run
 				ctx := context.Background()
 
-				ctx, span := telemetry.UserTracer().Provider().
+				ctx, span := itrace.UserTracer().Provider().
 					Tracer(consts.OtelScopeCron).
 					Start(ctx, "cron", trace.WithAttributes(
 						attribute.String(consts.OtelSysFunctionID, fn.ID.String()),
@@ -345,9 +345,9 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 
 	if m.Metadata != nil {
 		if trace, ok := m.Metadata[consts.OtelPropagationKey]; ok {
-			carrier := telemetry.NewTraceCarrier()
+			carrier := itrace.NewTraceCarrier()
 			if err := carrier.Unmarshal(trace); err == nil {
-				ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+				ctx = itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
 			}
 		}
 	}
@@ -443,7 +443,10 @@ func FindInvokedFunction(ctx context.Context, tracked event.TrackedEvent, fl cqr
 	}
 
 	fnID := ""
-	metadata := evt.InngestMetadata()
+	metadata, err := evt.InngestMetadata()
+	if err != nil {
+		return nil, err
+	}
 	if metadata != nil && metadata.InvokeFnID != "" {
 		fnID = metadata.InvokeFnID
 	}
