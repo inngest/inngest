@@ -64,8 +64,7 @@ var (
 	// step should be safely retried.
 	ErrHandledStepError = fmt.Errorf("handled step error")
 
-	PauseHandleConcurrency          = 100
-	PauseExpiredDeletionGracePeriod = time.Second * 10
+	PauseHandleConcurrency = 100
 )
 
 var (
@@ -1253,7 +1252,7 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 			if pause.Expires.Time().Before(time.Now()) {
 				l.Debug().Msg("encountered expired pause")
 
-				shouldDelete := pause.Expires.Time().Add(PauseExpiredDeletionGracePeriod).Before(time.Now())
+				shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
 				if shouldDelete {
 					// Consume this pause to remove it entirely
 					l.Debug().Msg("deleting expired pause")
@@ -1434,7 +1433,7 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 			if pause.Expires.Time().Before(time.Now()) {
 				l.Debug("encountered expired pause")
 
-				shouldDelete := pause.Expires.Time().Add(PauseExpiredDeletionGracePeriod).Before(time.Now())
+				shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
 				if shouldDelete {
 					// Consume this pause to remove it entirely
 					l.Debug("deleting expired pause")
@@ -1557,7 +1556,7 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 	if pause.Expires.Time().Before(time.Now()) {
 		l.Debug().Msg("encountered expired pause")
 
-		shouldDelete := pause.Expires.Time().Add(PauseExpiredDeletionGracePeriod).Before(time.Now())
+		shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
 		if shouldDelete {
 			// Consume this pause to remove it entirely
 			l.Debug().Msg("deleting expired pause")
