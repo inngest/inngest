@@ -27,6 +27,8 @@ const messages = {
   no_functions: 'No functions found in the app.',
   not_sdk: 'The URL is not hosting an Inngest SDK',
   server_kind_mismatch: 'The app is not in cloud mode',
+  sig_verification_failed:
+    'Signature verification failed. Is your app using the correct signing key?',
   signing_key_invalid: "The app's signing key is invalid.",
   signing_key_unspecified: 'The app is not using a signing key.',
   too_many_pings: 'Too many requests to register in a short time window.',
