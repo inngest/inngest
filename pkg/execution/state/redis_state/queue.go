@@ -31,7 +31,7 @@ import (
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/telemetry"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
 )
@@ -2304,21 +2304,21 @@ func (q *queue) Instrument(ctx context.Context) error {
 			q.logger.Error().Err(err).Msg("error retrieving guaranteedCapacityMap")
 		}
 
-		telemetry.GaugeQueueGuaranteedCapacityCount(ctx, int64(len(guaranteedCapacityMap)), telemetry.GaugeOpt{PkgName: pkgName})
+		metrics.GaugeQueueGuaranteedCapacityCount(ctx, int64(len(guaranteedCapacityMap)), metrics.GaugeOpt{PkgName: pkgName})
 		for _, guaranteedCapacity := range guaranteedCapacityMap {
 			tags := map[string]any{"account_id": guaranteedCapacity.AccountID}
 
-			telemetry.GaugeQueueAccountGuaranteedCapacityCount(ctx, int64(guaranteedCapacity.GuaranteedCapacity), telemetry.GaugeOpt{
+			metrics.GaugeQueueAccountGuaranteedCapacityCount(ctx, int64(guaranteedCapacity.GuaranteedCapacity), metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    tags,
 			})
-			telemetry.GaugeQueueGuaranteedCapacityLeaseCount(ctx, int64(len(guaranteedCapacity.Leases)), telemetry.GaugeOpt{
+			metrics.GaugeQueueGuaranteedCapacityLeaseCount(ctx, int64(len(guaranteedCapacity.Leases)), metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    tags,
 			})
 
 			if size, err := q.partitionSize(ctx, q.u.kg.AccountPartitionIndex(guaranteedCapacity.AccountID), q.clock.Now().Add(PartitionLookahead)); err == nil {
-				telemetry.GaugeQueueGuaranteedCapacityAccountPartitionAvailableCount(ctx, size, telemetry.GaugeOpt{
+				metrics.GaugeQueueGuaranteedCapacityAccountPartitionAvailableCount(ctx, size, metrics.GaugeOpt{
 					PkgName: pkgName,
 					Tags:    tags,
 				})
@@ -2368,7 +2368,7 @@ func (q *queue) Instrument(ctx context.Context) error {
 					return
 				}
 
-				telemetry.GaugePartitionSize(ctx, count, telemetry.GaugeOpt{
+				metrics.GaugePartitionSize(ctx, count, metrics.GaugeOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
 						// NOTE: potentially high cardinality but this gives better clarify of stuff
@@ -2389,7 +2389,7 @@ func (q *queue) Instrument(ctx context.Context) error {
 	}
 
 	// instrument the total count of global partition
-	telemetry.GaugeGlobalPartitionSize(ctx, atomic.LoadInt64(&total), telemetry.GaugeOpt{
+	metrics.GaugeGlobalPartitionSize(ctx, atomic.LoadInt64(&total), metrics.GaugeOpt{
 		PkgName: pkgName,
 	})
 

@@ -8,7 +8,7 @@ import (
 	"github.com/inngest/inngest/cmd/commands/internal/localconfig"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/lite"
-	"github.com/inngest/inngest/pkg/telemetry"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -54,9 +54,9 @@ func doLite(cmd *cobra.Command, args []string) {
 		conf.EventAPI.Addr = host
 	}
 
-	if err := telemetry.NewUserTracer(ctx, telemetry.TracerOpts{
+	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
 		ServiceName:   "lite",
-		Type:          telemetry.TracerTypeOTLPHTTP,
+		Type:          itrace.TracerTypeOTLPHTTP,
 		TraceEndpoint: "localhost:8288",
 		TraceURLPath:  "/dev/traces",
 	}); err != nil {
@@ -64,7 +64,7 @@ func doLite(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 	defer func() {
-		_ = telemetry.CloseUserTracer(ctx)
+		_ = itrace.CloseUserTracer(ctx)
 	}()
 
 	opts := lite.StartOpts{

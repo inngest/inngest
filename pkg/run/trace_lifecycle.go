@@ -18,7 +18,7 @@ import (
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/telemetry"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -111,7 +111,7 @@ func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Meta
 				meta := event.InngestMetadata{}
 				if err := meta.Decode(v); err == nil {
 					if meta.InvokeTraceCarrier != nil && meta.InvokeTraceCarrier.CanResumePause() {
-						ictx := telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(meta.InvokeTraceCarrier.Context))
+						ictx := itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(meta.InvokeTraceCarrier.Context))
 
 						sid := meta.InvokeTraceCarrier.SpanID()
 
@@ -231,8 +231,8 @@ func (l traceLifecycle) OnFunctionStarted(
 		span.SetAttributes(attribute.String(consts.OtelSysFunctionLink, *md.Config.TraceLink()))
 	}
 
-	if err := span.SetEvents(ctx, md.Config.EventIDs, evts); err != nil {
-		l.log.Error("error setting events",
+	if err := span.SetEvents(ctx, evts, md.Config.EventIDMapping()); err != nil {
+		l.log.Warn("error setting events",
 			"lifecycle", "OnFunctionStarted",
 			"errors", err,
 			"meta", md,
@@ -312,8 +312,8 @@ func (l traceLifecycle) OnFunctionFinished(
 		span.SetAttributes(attribute.String(consts.OtelSysFunctionLink, *md.Config.TraceLink()))
 	}
 
-	if err := span.SetEvents(ctx, md.Config.EventIDs, evts); err != nil {
-		l.log.Error("error setting events",
+	if err := span.SetEvents(ctx, evts, md.Config.EventIDMapping()); err != nil {
+		l.log.Warn("error setting events",
 			"lifecycle", "OnFunctionFinished",
 			"errors", err,
 			"meta", md,
@@ -387,8 +387,8 @@ func (l traceLifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata
 		)
 	}
 
-	if err := span.SetEvents(ctx, md.Config.EventIDs, evts); err != nil {
-		l.log.Error("error setting events",
+	if err := span.SetEvents(ctx, evts, md.Config.EventIDMapping()); err != nil {
+		l.log.Warn("error setting events",
 			"lifecycle", "OnFunctionCancelled",
 			"errors", err,
 			"meta", md,
@@ -646,12 +646,13 @@ func (l traceLifecycle) OnInvokeFunction(
 ) {
 	ctx = l.extractTraceCtx(ctx, md, false)
 
-	meta := invocationEvt.InngestMetadata()
-	if meta == nil {
+	meta, err := invocationEvt.InngestMetadata()
+	if err != nil {
 		l.log.Error("invocation event metadata not available",
 			"lifecycle", "OnInvokeFunction",
 			"meta", md,
 			"evt", invocationEvt,
+			"error", err,
 		)
 		return
 	}
@@ -713,9 +714,9 @@ func (l traceLifecycle) OnInvokeFunctionResumed(
 		returnedEventID = r.EventID.String()
 	}
 
-	carrier := telemetry.NewTraceCarrier()
+	carrier := itrace.NewTraceCarrier()
 	if err := carrier.Unmarshal(meta); err == nil {
-		ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+		ctx = itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
 		if carrier.CanResumePause() {
 			// Used for spans
 			triggeringEventID := ""
@@ -803,7 +804,7 @@ func (l traceLifecycle) OnWaitForEvent(
 		l.log.Error("no trace propagation", "meta", md, "lifecycle", "OnWaitForEvent")
 		return
 	}
-	carrier, ok := v.(*telemetry.TraceCarrier)
+	carrier, ok := v.(*itrace.TraceCarrier)
 	if !ok {
 		l.log.Error("no trace carrier", "meta", md, "lifecycle", "OnWaitForEvent")
 		return
@@ -860,9 +861,9 @@ func (l traceLifecycle) OnWaitForEventResumed(
 		returnedEventID = r.EventID.String()
 	}
 
-	carrier := telemetry.NewTraceCarrier()
+	carrier := itrace.NewTraceCarrier()
 	if err := carrier.Unmarshal(meta); err == nil {
-		ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+		ctx = itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
 		if carrier.CanResumePause() {
 			_, span := NewSpan(ctx,
 				WithScope(consts.OtelScopeStep),
@@ -917,7 +918,7 @@ func (l *traceLifecycle) extractTraceCtx(ctx context.Context, md sv2.Metadata, i
 		// NOTE:
 		// this gymastics happens because the carrier stores the spanID separately.
 		// it probably can be simplified
-		tmp := telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
+		tmp := itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
 		// NOTE: this is getting complex
 		// need the original with the parent span
 		if isFnSpan {

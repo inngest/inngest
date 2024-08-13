@@ -1,4 +1,4 @@
-package telemetry
+package trace
 
 import (
 	"encoding/json"
