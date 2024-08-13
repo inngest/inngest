@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"sync"
 
 	"github.com/inngest/inngest/pkg/logger"
@@ -13,8 +12,10 @@ import (
 )
 
 type NatsConnOpt struct {
+	// Name of this client
 	Name string
-	URLS []string
+	// Comma delimited URLs of NATS instances
+	URLS string
 	// JetStream signals that the connection should be using the JetStream APIs instead of the raw
 	// conn itself
 	JetStream bool
@@ -51,7 +52,7 @@ func NewNATSConnector(ctx context.Context, opts NatsConnOpt) (*NatsConnector, er
 
 	urls := "nats://127.0.0.1:4222"
 	if len(opts.URLS) > 0 {
-		urls = strings.Join(opts.URLS, ",")
+		urls = opts.URLS
 	}
 
 	wg := sync.WaitGroup{}

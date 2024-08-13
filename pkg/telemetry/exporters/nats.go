@@ -36,8 +36,8 @@ type natsSpanExporter struct {
 type NatsExporterOpts struct {
 	// The subjects this exporter will be publishing the spans to
 	Subjects []string
-	// URLs of the NATS server to use
-	URLs []string
+	// Comma delimited URLs of the NATS server to use
+	URLs string
 	// The path of the nkey file to be used for authentication
 	NkeyFile string
 }
