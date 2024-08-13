@@ -2306,14 +2306,24 @@ func (q *queue) setPeekEWMA(ctx context.Context, fnID uuid.UUID, val int64) erro
 
 func (q *queue) addContinue(p *QueuePartition, ctr uint) {
 	if ctr >= q.continuationLimit {
-		// Do nothing;  this is over the limit for conntinuing the partition.
+		// This is over the limit for conntinuing the partition, so force it to be
+		// removed in every case.
+		q.continuesLock.Lock()
+		delete(q.continues, p.Queue())
+		q.continuesLock.Unlock()
+
+		// TODO: Cooldown;  block this partition from having a continuation for the next
+		// 5 seconds.
+
 		return
 	}
 
 	q.continuesLock.Lock()
 	c, ok := q.continues[p.Queue()]
-	if ok && c.count < ctr {
-		// Update the continue count.
+	if !ok || c.count < ctr {
+		// Update the continue count if it doesn't exist, or the current counter
+		// is higher.  This ensures that we always have the highest continuation
+		// count stored for queue processing.
 		q.continues[p.Queue()] = continuation{partition: p, count: ctr}
 	}
 	q.continuesLock.Unlock()
