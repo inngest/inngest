@@ -605,7 +605,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 	defer rc.Close()
 
 	customQueueName := "custom"
-	customTestLimit := 91414751920
+	customTestLimit := 1
 
 	q := NewQueue(
 		NewQueueClient(rc, QueueDefaultKey),
@@ -615,7 +615,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 				return customTestLimit
 			}),
 		WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) (fn, acct, custom int) {
-			return 1234, 2345, 3456
+			return 5000, 5000, 5000
 		}),
 	)
 	ctx := context.Background()
@@ -672,7 +672,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 		leaseId, availableCapacity, err := q.PartitionLease(ctx, &qp, time.Second)
 		require.NoError(t, err)
 		require.NotNil(t, leaseId)
-		require.Equal(t, 1234, availableCapacity)
+		require.Equal(t, 5000, availableCapacity)
 	})
 
 	t.Run("leases correct partition", func(t *testing.T) {
@@ -682,6 +682,33 @@ func TestQueueSystemPartitions(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, len(items))
 		require.Equal(t, qi.Data.Payload, items[0].Data.Payload)
+	})
+
+	t.Run("leases partition items while respecting concurrency", func(t *testing.T) {
+		qp := getSystemPartition(t, r, customQueueName)
+
+		item, err := q.EnqueueItem(ctx, qi, start)
+		require.NoError(t, err)
+		require.NotEqual(t, item.ID, ulid.ULID{})
+		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
+
+		item2, err := q.EnqueueItem(ctx, qi, start)
+		require.NoError(t, err)
+		require.NotEqual(t, item.ID, ulid.ULID{})
+		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
+
+		// Ensure that our data is set up correctly.
+		found := getQueueItem(t, r, item.ID)
+		require.Equal(t, item, found)
+
+		leaseId, err := q.Lease(ctx, qp, item, time.Second, time.Now(), nil)
+		require.NoError(t, err)
+		require.NotNil(t, leaseId)
+
+		leaseId, err = q.Lease(ctx, qp, item2, time.Second, time.Now(), nil)
+		require.Error(t, err)
+		require.ErrorContains(t, err, ErrSystemConcurrencyLimit.Error(), r.Dump())
+		require.Nil(t, leaseId)
 	})
 }
 
