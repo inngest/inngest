@@ -601,6 +601,7 @@ github.com/muesli/termenv
 github.com/nats-io/nats.go
 github.com/nats-io/nats.go/encoders/builtin
 github.com/nats-io/nats.go/internal/parser
+github.com/nats-io/nats.go/jetstream
 github.com/nats-io/nats.go/util
 # github.com/nats-io/nkeys v0.4.7
 ## explicit; go 1.20
