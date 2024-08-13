@@ -11,7 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/service"
-	"github.com/inngest/inngest/pkg/telemetry"
+	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/spf13/cobra"
 )
 
@@ -87,7 +87,7 @@ func serve(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	close, err := telemetry.TracerSetup(svcName, telemetry.TracerTypeIO)
+	close, err := trace.TracerSetup(svcName, trace.TracerTypeIO)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)

@@ -32,7 +32,7 @@ import (
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/telemetry"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
 )
@@ -2170,21 +2170,21 @@ func (q *queue) Instrument(ctx context.Context) error {
 			q.logger.Error().Err(err).Msg("error retrieving shards")
 		}
 
-		telemetry.GaugeQueueShardCount(ctx, int64(len(shards)), telemetry.GaugeOpt{PkgName: pkgName})
+		metrics.GaugeQueueShardCount(ctx, int64(len(shards)), metrics.GaugeOpt{PkgName: pkgName})
 		for _, shard := range shards {
 			tags := map[string]any{"shard_name": shard.Name}
 
-			telemetry.GaugeQueueShardGuaranteedCapacityCount(ctx, int64(shard.GuaranteedCapacity), telemetry.GaugeOpt{
+			metrics.GaugeQueueShardGuaranteedCapacityCount(ctx, int64(shard.GuaranteedCapacity), metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    tags,
 			})
-			telemetry.GaugeQueueShardLeaseCount(ctx, int64(len(shard.Leases)), telemetry.GaugeOpt{
+			metrics.GaugeQueueShardLeaseCount(ctx, int64(len(shard.Leases)), metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    tags,
 			})
 
 			if size, err := q.partitionSize(ctx, q.u.kg.ShardPartitionIndex(shard.Name), q.clock.Now().Add(PartitionLookahead)); err == nil {
-				telemetry.GaugeQueueShardPartitionAvailableCount(ctx, size, telemetry.GaugeOpt{
+				metrics.GaugeQueueShardPartitionAvailableCount(ctx, size, metrics.GaugeOpt{
 					PkgName: pkgName,
 					Tags:    tags,
 				})
@@ -2234,7 +2234,7 @@ func (q *queue) Instrument(ctx context.Context) error {
 					return
 				}
 
-				telemetry.GaugePartitionSize(ctx, count, telemetry.GaugeOpt{
+				metrics.GaugePartitionSize(ctx, count, metrics.GaugeOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
 						// NOTE: potentially high cardinality but this gives better clarify of stuff
@@ -2255,7 +2255,7 @@ func (q *queue) Instrument(ctx context.Context) error {
 	}
 
 	// instrument the total count of global partition
-	telemetry.GaugeGlobalPartitionSize(ctx, atomic.LoadInt64(&total), telemetry.GaugeOpt{
+	metrics.GaugeGlobalPartitionSize(ctx, atomic.LoadInt64(&total), metrics.GaugeOpt{
 		PkgName: pkgName,
 	})
 
