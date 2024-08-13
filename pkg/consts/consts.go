@@ -100,6 +100,8 @@ const (
 	// in which priority factors are taken into account.
 	FutureAtLimit = 2 * time.Second
 
+	LiteMaxQueueChunkSize = 1024 * 1024 * 800 // 800MB
+
 	DevServerTempDir     = ".inngest"
 	DevServerDbFile      = "dev_db.db"
 	DevServerRdbFile     = "dev_state.rdb"
