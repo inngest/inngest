@@ -702,7 +702,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 	defer rc.Close()
 
 	customQueueName := "custom"
-	customTestLimit := 91414751920
+	customTestLimit := 1
 
 	q := NewQueue(
 		NewQueueClient(rc, QueueDefaultKey),
@@ -712,7 +712,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 				return customTestLimit
 			}),
 		WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) (fn, acct, custom int) {
-			return 1, 2, 3
+			return 5000, 5000, 5000
 		}),
 	)
 	ctx := context.Background()
@@ -773,7 +773,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 		leaseId, availableCapacity, err := q.PartitionLease(ctx, &qp, time.Second)
 		require.NoError(t, err)
 		require.NotNil(t, leaseId)
-		require.Equal(t, 1, availableCapacity)
+		require.Equal(t, 5000, availableCapacity)
 	})
 
 	t.Run("peeks partition successfully", func(t *testing.T) {
@@ -808,7 +808,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 
 		leaseId, err = q.Lease(ctx, qp, item2, time.Second, time.Now(), nil)
 		require.Error(t, err)
-		require.ErrorIs(t, err, ErrAccountConcurrencyLimit)
+		require.ErrorIs(t, err, ErrSystemConcurrencyLimit)
 		require.Nil(t, leaseId)
 	})
 
@@ -843,8 +843,9 @@ func TestQueueSystemPartitions(t *testing.T) {
 		// Ensure the partition is inserted.
 		qp := getSystemPartition(t, r, customQueueName)
 		require.Equal(t, QueuePartition{
-			ID:               "custom",
-			PartitionType:    int(enums.PartitionTypeSystem),
+			ID:               customQueueName,
+			QueueName:        &customQueueName,
+			PartitionType:    int(enums.PartitionTypeDefault),
 			ConcurrencyLimit: customTestLimit,
 			// We do not store the accountId for system partitions
 			AccountID: uuid.Nil,

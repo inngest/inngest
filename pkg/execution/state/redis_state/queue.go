@@ -117,12 +117,15 @@ var (
 	ErrPartitionPaused               = fmt.Errorf("partition is paused")
 	ErrConfigAlreadyLeased           = fmt.Errorf("config scanner already leased")
 	ErrConfigLeaseExceedsLimits      = fmt.Errorf("config lease duration exceeds the maximum of %d seconds", int(ConfigLeaseMax.Seconds()))
-	ErrPartitionConcurrencyLimit     = fmt.Errorf("at partition concurrency limit")
-	ErrAccountConcurrencyLimit       = fmt.Errorf("at account concurrency limit")
+
+	ErrPartitionConcurrencyLimit = fmt.Errorf("at partition concurrency limit")
+	ErrAccountConcurrencyLimit   = fmt.Errorf("at account concurrency limit")
+
+	// ErrSystemConcurrencyLimit represents a concurrency limit for system partitions
+	ErrSystemConcurrencyLimit = fmt.Errorf("at system concurrency limit")
 
 	// ErrConcurrencyLimitCustomKey represents a concurrency limit being hit for *some*, but *not all*
 	// jobs in a queue, via custom concurrency keys which are evaluated to a specific string.
-
 	ErrConcurrencyLimitCustomKey = fmt.Errorf("at concurrency limit")
 
 	// internal shard errors
@@ -1515,12 +1518,20 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	case 2:
 		return nil, ErrQueueItemAlreadyLeased
 	case 3:
-		// TODO: Refactor
-		// fn limit relevant to all runs in the fn
-		// return nil, newKeyError(ErrPartitionConcurrencyLimit, item.FunctionID.String())
+		// This partition is reused for function partitions without keys, system partions,
+		// and potentially concurrency key partitions. Errors should be returned based on
+		// the partition type
+
+		if p.IsSystem() {
+			return nil, newKeyError(ErrSystemConcurrencyLimit, parts[0].ID)
+		}
+
+		if p.PartitionType == int(enums.PartitionTypeDefault) {
+			return nil, newKeyError(ErrPartitionConcurrencyLimit, item.FunctionID.String())
+		}
+
 		return nil, newKeyError(ErrConcurrencyLimitCustomKey, parts[0].ConcurrencyKey)
 	case 4:
-		// return nil, newKeyError(ErrAccountConcurrencyLimit, item.Data.Identifier.AccountID.String())
 		return nil, newKeyError(ErrConcurrencyLimitCustomKey, parts[1].ConcurrencyKey)
 	case 5:
 		return nil, newKeyError(ErrConcurrencyLimitCustomKey, parts[2].ConcurrencyKey)
