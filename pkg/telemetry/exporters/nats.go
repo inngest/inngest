@@ -34,9 +34,12 @@ type natsSpanExporter struct {
 }
 
 type NatsExporterOpts struct {
+	// The subjects this exporter will be publishing the spans to
 	Subjects []string
-	URLs     []string
-	NatsOpts []nats.Option
+	// URLs of the NATS server to use
+	URLs []string
+	// The path of the nkey file to be used for authentication
+	NkeyFile string
 }
 
 // NewNATSSpanExporter creates an otel compatible exporter that ships the spans to NATS
@@ -45,11 +48,21 @@ func NewNATSSpanExporter(ctx context.Context, opts *NatsExporterOpts) (trace.Spa
 		return nil, fmt.Errorf("nats exporter setup options unavailable")
 	}
 
+	connOpts := []nats.Option{}
+	// attempt to parse nkey file is the option was passed in
+	if opts.NkeyFile != "" {
+		auth, err := nats.NkeyOptionFromSeed(opts.NkeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing nkey file for NATS: %w", err)
+		}
+		connOpts = append(connOpts, auth)
+	}
+
 	conn, err := broker.NewNATSConnector(ctx, broker.NatsConnOpt{
 		Name:      "span-exporter",
 		URLS:      opts.URLs,
 		JetStream: true,
-		Opts:      opts.NatsOpts,
+		Opts:      connOpts,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error setting up nats: %w", err)
