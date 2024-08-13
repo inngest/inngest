@@ -87,9 +87,34 @@ func MarshalV1(
 			return nil, fmt.Errorf("error loading state in driver marshaller: %w", err)
 		}
 
-		// We do not need to unmarshal state, as it's already marshalled.
-		for k, v := range steps {
-			req.Actions[k] = v
+		// Here we trust the stack to be correct and represent all memoized
+		// data for the function. We do this because we load steps separately
+		// (and later) than the metadata, meaning a race condition exists
+		// where more memoized step data could be added during that time.
+		//
+		// Therefore, we filter out any extraneous steps that aren't in the
+		// stack to __pretend__ that we have loaded both the stack and state
+		// atomically.
+		//
+		// Even though we are ignoring the most up-to-date state by using this
+		// method, no steps will be re-executed, as this race condition is
+		// only applicable to parallel steps, which are all planned and will
+		// be filtered out with Executor-level idempotency.
+		//
+		// This is a workaround for the fact that we do not atomically load
+		// both steps and the stack; that change should be made and this code
+		// removed.
+		for _, stepId := range md.Stack {
+			// We also account here for the situation in which the loaded
+			// step state does not contain a step ID in the stack. This is an
+			// error that is impossible to recover from and is observed to
+			// mean that step state has been entirely removed, such as at the
+			// end of a function run.
+			if _, ok := steps[stepId]; !ok {
+				return nil, fmt.Errorf("state and stack mismatch: %s not found in state; the function has probably ended", stepId)
+			}
+
+			req.Actions[stepId] = steps[stepId]
 		}
 
 		req.UseAPI = false

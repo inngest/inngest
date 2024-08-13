@@ -5,12 +5,13 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/telemetry"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -115,7 +116,7 @@ func (e Event) Validate(ctx context.Context) error {
 // CorrelationID returns the correlation ID for the event.
 func (e Event) CorrelationID() string {
 	if e.Name == InvokeFnName {
-		if metadata := e.InngestMetadata(); metadata != nil {
+		if metadata, err := e.InngestMetadata(); err == nil {
 			return metadata.InvokeCorrelationId
 		}
 	}
@@ -146,15 +147,15 @@ func (e Event) IsInvokeEvent() bool {
 // function. Note that this metadata is not present on all functions. For
 // accessing an event's correlation ID, prefer using `Event.CorrelationID()`.
 type InngestMetadata struct {
-	SourceAppID         string                  `json:"source_app_id"`
-	SourceFnID          string                  `json:"source_fn_id"`
-	SourceFnVersion     int                     `json:"source_fn_v"`
-	InvokeFnID          string                  `json:"fn_id"`
-	InvokeCorrelationId string                  `json:"correlation_id,omitempty"`
-	InvokeTraceCarrier  *telemetry.TraceCarrier `json:"tc,omitempty"`
-	InvokeExpiresAt     int64                   `json:"expire"`
-	InvokeGroupID       string                  `json:"gid"`
-	InvokeDisplayName   string                  `json:"name"`
+	SourceAppID         string               `json:"source_app_id"`
+	SourceFnID          string               `json:"source_fn_id"`
+	SourceFnVersion     int                  `json:"source_fn_v"`
+	InvokeFnID          string               `json:"fn_id"`
+	InvokeCorrelationId string               `json:"correlation_id,omitempty"`
+	InvokeTraceCarrier  *itrace.TraceCarrier `json:"tc,omitempty"`
+	InvokeExpiresAt     int64                `json:"expire"`
+	InvokeGroupID       string               `json:"gid"`
+	InvokeDisplayName   string               `json:"name"`
 }
 
 func (m *InngestMetadata) Decode(data any) error {
@@ -180,21 +181,27 @@ func (m *InngestMetadata) RunID() *ulid.ULID {
 	return nil
 }
 
-func (e Event) InngestMetadata() *InngestMetadata {
-	rawData, ok := e.Data[consts.InngestEventDataPrefix].(map[string]interface{})
+func (e Event) InngestMetadata() (*InngestMetadata, error) {
+	raw, ok := e.Data[consts.InngestEventDataPrefix]
 	if !ok {
-		return nil
+		return nil, fmt.Errorf("no data found in prefix '%s'", consts.InngestEventDataPrefix)
 	}
 
-	var metadata InngestMetadata
-	jsonData, err := json.Marshal(rawData)
-	if err != nil {
-		return nil
+	switch v := raw.(type) {
+	case InngestMetadata:
+		return &v, nil
+
+	default:
+		var metadata InngestMetadata
+		jsonData, err := json.Marshal(raw)
+		if err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(jsonData, &metadata); err != nil {
+			return nil, err
+		}
+		return &metadata, nil
 	}
-	if err := json.Unmarshal(jsonData, &metadata); err != nil {
-		return nil
-	}
-	return &metadata
 }
 
 func NewOSSTrackedEvent(e Event) TrackedEvent {
@@ -250,7 +257,7 @@ type NewInvocationEventOpts struct {
 	Event           Event
 	FnID            string
 	CorrelationID   *string
-	TraceCarrier    *telemetry.TraceCarrier
+	TraceCarrier    *itrace.TraceCarrier
 	ExpiresAt       int64
 	GroupID         string
 	DisplayName     string

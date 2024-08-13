@@ -29,7 +29,7 @@ import (
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/service"
-	"github.com/inngest/inngest/pkg/telemetry"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/mattn/go-isatty"
 	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/propagation"
@@ -92,8 +92,10 @@ func (devserver) Name() string {
 }
 
 func (d *devserver) Pre(ctx context.Context) error {
-	// Import Redis if we can
-	_, _ = d.importRedisSnapshot(ctx)
+	// Import Redis if we can and have persistence enabled
+	if d.persistenceInterval != nil {
+		_, _ = d.importRedisSnapshot(ctx)
+	}
 
 	// Autodiscover the URLs that are hosting Inngest SDKs on the local machine.
 	if d.Opts.Autodiscover {
@@ -294,8 +296,8 @@ func (d *devserver) HandleEvent(ctx context.Context, e *event.Event) (string, er
 		Interface("event", trackedEvent.GetEvent()).
 		Msg("publishing event")
 
-	carrier := telemetry.NewTraceCarrier()
-	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	carrier := itrace.NewTraceCarrier()
+	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 	err = d.publisher.Publish(
 		ctx,

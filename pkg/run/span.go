@@ -1,16 +1,21 @@
-package telemetry
+package run
 
 import (
 	"context"
 	crand "crypto/rand"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/logger"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/sdk/instrumentation"
@@ -24,8 +29,12 @@ const (
 	attrCountLimit = 128
 )
 
-// type assertion
-var gen tracesdk.IDGenerator = newSpanIDGenerator()
+var (
+	// type assertion
+	gen tracesdk.IDGenerator = newSpanIDGenerator()
+
+	nilULID = ulid.ULID{}
+)
 
 type SpanOpt func(s *spanOpt)
 
@@ -409,9 +418,9 @@ func (s *Span) End(opts ...trace.SpanEndOption) {
 		// s.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 	}
 
-	if err := UserTracer().Export(s); err != nil {
+	if err := itrace.UserTracer().Export(s); err != nil {
 		ctx := context.Background()
-		log.From(ctx).Error().Err(err).Msg("error ending span")
+		logger.StdlibLogger(ctx).Error("error ending span", "error", err)
 	}
 }
 
@@ -522,7 +531,7 @@ func (s *Span) SetAttributes(attrs ...attribute.KeyValue) {
 }
 
 func (s *Span) TracerProvider() trace.TracerProvider {
-	return UserTracer().Provider()
+	return itrace.UserTracer().Provider()
 }
 
 func (s *Span) SetFnOutput(data any) {
@@ -550,6 +559,44 @@ func (s *Span) setOutput(data any, key string) {
 			s.AddEvent(string(byt), trace.WithAttributes(attr...))
 		}
 	}
+}
+
+func (s *Span) SetEvents(ctx context.Context, evts []json.RawMessage, mapping map[string]ulid.ULID) error {
+	var errs error
+
+	for _, e := range evts {
+		var evt event.Event
+
+		err := json.Unmarshal(e, &evt)
+		if err != nil {
+			errs = multierror.Append(errs, fmt.Errorf("error parsing event data"))
+			continue
+		}
+
+		var id ulid.ULID
+		if mapping != nil {
+			internalID, ok := mapping[evt.ID]
+			if !ok {
+				errs = multierror.Append(errs, fmt.Errorf("event ID not found in mapping: %s", evt.ID))
+			}
+			id = internalID
+		}
+
+		ts := time.Now()
+		if id != nilULID {
+			ts = ulid.Time(id.Time())
+		}
+
+		s.AddEvent(string(e),
+			trace.WithTimestamp(ts),
+			trace.WithAttributes(
+				attribute.Bool(consts.OtelSysEventData, true),
+				attribute.String(consts.OtelSysEventInternalID, id.String()),
+			),
+		)
+	}
+
+	return errs
 }
 
 func newSpanIDGenerator() *spanIDGenerator {

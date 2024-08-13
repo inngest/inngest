@@ -15,7 +15,7 @@ export default function Manage({
   collapsed: boolean;
 }) {
   return (
-    <div className={`jusity-center flex flex-col ${collapsed ? 'mt-2' : 'mt-4'}`}>
+    <div className={`flex w-full flex-col ${collapsed ? 'mt-2' : 'mt-4'}`}>
       {collapsed ? (
         <hr className="bg-subtle mx-auto mb-1 w-6" />
       ) : (

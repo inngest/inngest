@@ -1,3 +1,6 @@
+import { Suspense } from 'react';
+import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
+
 import type { Environment as EnvType } from '@/utils/environments';
 import Environments from './Environments';
 import KeysMenu from './KeysMenu';
@@ -14,22 +17,21 @@ export const getNavRoute = (activeEnv: EnvType, link: string) => `/env/${activeE
 
 export default function Navigation({ collapsed, activeEnv }: NavProps) {
   return (
-    <div
-      className={`text-basis flex h-full w-full flex-col items-start ${
-        collapsed ? 'items-center' : 'ml-4'
-      } mt-5 flex`}
-    >
-      <div className="flex flex-col justify-start">
-        <div className={`flex ${collapsed ? 'flex-col' : 'flex-row'} items-center justify-center`}>
+    <div className={`text-basis mx-4 mt-5 flex h-full flex-col`}>
+      <div
+        className={`flex ${
+          collapsed ? 'flex-col' : 'flex-row'
+        } w-full justify-between gap-x-1 gap-y-2`}
+      >
+        <Suspense fallback={<Skeleton className={`h-8 w-full`} />}>
           <Environments activeEnv={activeEnv} collapsed={collapsed} />
+        </Suspense>
 
-          {activeEnv && <KeysMenu activeEnv={activeEnv} collapsed={collapsed} />}
-        </div>
-        <div className="flex flex-col">
-          {activeEnv && <Monitor activeEnv={activeEnv} collapsed={collapsed} />}
-          {activeEnv && <Manage activeEnv={activeEnv} collapsed={collapsed} />}
-        </div>
+        {activeEnv && <KeysMenu activeEnv={activeEnv} collapsed={collapsed} />}
       </div>
+
+      {activeEnv && <Monitor activeEnv={activeEnv} collapsed={collapsed} />}
+      {activeEnv && <Manage activeEnv={activeEnv} collapsed={collapsed} />}
     </div>
   );
 }

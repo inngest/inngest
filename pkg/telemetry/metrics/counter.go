@@ -1,4 +1,4 @@
-package telemetry
+package metrics
 
 import "context"
 
@@ -115,6 +115,15 @@ func IncrBatchScheduledCounter(ctx context.Context, opts CounterOpt) {
 		PkgName:     opts.PkgName,
 		MetricName:  "new_batch_scheduled_total",
 		Description: "Total number of new batch scheduled",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrInstrumentationLeaseClaimsCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_instrumentation_lease_claims_total",
+		Description: "Total number of instrumentation lease claimed by executors",
 		Tags:        opts.Tags,
 	})
 }

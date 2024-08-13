@@ -17,7 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/eventstream"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/publicerr"
-	"github.com/inngest/inngest/pkg/telemetry"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
@@ -130,7 +130,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	// Create a new trace that may have a link to a previous one
-	ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.HeaderCarrier(r.Header))
+	ctx = itrace.UserTracer().Propagator().Extract(ctx, propagation.HeaderCarrier(r.Header))
 
 	// Create a new channel which receives a stream of events from the incoming HTTP request
 	stream := make(chan eventstream.StreamItem)
@@ -192,7 +192,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 				return err
 			}
 
-			ctx, span := telemetry.UserTracer().Provider().
+			ctx, span := itrace.UserTracer().Provider().
 				Tracer(consts.OtelScopeEvent).
 				Start(ctx, consts.OtelSpanEvent,
 					trace.WithTimestamp(ts),

@@ -41,13 +41,13 @@ export default function SideBar({
       <div className="flex grow flex-col justify-between">
         <Navigation collapsed={collapsed} activeEnv={activeEnv} />
 
-        <div>
+        <div className="mx-4">
           {!collapsed && <Alert />}
 
           <Integrations collapsed={collapsed} />
           <Help collapsed={collapsed} />
-          <Profile collapsed={collapsed} profile={profile} />
         </div>
+        <Profile collapsed={collapsed} profile={profile} />
       </div>
     </nav>
   );

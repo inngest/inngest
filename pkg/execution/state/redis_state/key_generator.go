@@ -180,6 +180,9 @@ type QueueKeyGenerator interface {
 	// Scavenger returns the key which allows a worker to claim scavenger processing
 	// of the partitions for lost jobs
 	Scavenger() string
+	// Instrumentation returns the key which allows one worker to run instrumentation against
+	// the queue
+	Instrumentation() string
 	// Idempotency stores the map for storing idempotency keys in redis
 	Idempotency(key string) string
 	// Concurrency returns a key for a given concurrency string.  This stores an ordered
@@ -255,6 +258,10 @@ func (u queueKeyGenerator) Sequential() string {
 
 func (u queueKeyGenerator) Scavenger() string {
 	return fmt.Sprintf("{%s}:queue:scavenger", u.queueDefaultKey)
+}
+
+func (u queueKeyGenerator) Instrumentation() string {
+	return fmt.Sprintf("{%s}:queue:instrument", u.queueDefaultKey)
 }
 
 func (u queueKeyGenerator) Idempotency(key string) string {
