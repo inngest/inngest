@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/inngest/inngest/pkg/enums"
 	"math/rand"
 	"runtime/debug"
 	"sync"
@@ -661,6 +662,9 @@ func (q *queue) scan(ctx context.Context) error {
 				// no longer any available workers for partition, so we can skip
 				// work
 				metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
+				return nil
+			}
+			if p.PartitionType != int(enums.PartitionTypeDefault) {
 				return nil
 			}
 			if err := q.processPartition(ctx, &p, shard); err != nil {
