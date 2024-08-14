@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/enums"
 	"math"
 	"math/rand"
 	"runtime/debug"
@@ -13,15 +12,16 @@ import (
 	"time"
 
 	"github.com/VividCortex/ewma"
+	"github.com/oklog/ulid/v2"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
+	"gonum.org/v1/gonum/stat/sampleuv"
+
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
-	"github.com/oklog/ulid/v2"
-	"golang.org/x/sync/errgroup"
-	"golang.org/x/sync/semaphore"
-	"gonum.org/v1/gonum/stat/sampleuv"
 )
 
 const (
@@ -637,9 +637,6 @@ func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimi
 				// no longer any available workers for partition, so we can skip
 				// work
 				metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
-				return nil
-			}
-			if p.PartitionType != int(enums.PartitionTypeDefault) {
 				return nil
 			}
 			if err := q.processPartition(ctx, &p, shard); err != nil {
