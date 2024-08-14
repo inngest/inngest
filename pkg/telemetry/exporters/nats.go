@@ -216,18 +216,25 @@ func (e *natsSpanExporter) parseSpanAttributes(spanAttr []attribute.KeyValue) (*
 
 			switch key {
 			case consts.OtelSysAccountID:
+				attr[key] = val // TODO: remove this
 				id.AccountId = val
 			case consts.OtelSysWorkspaceID:
+				attr[key] = val // TODO: remove this
 				id.EnvId = val
 			case consts.OtelSysAppID:
+				attr[key] = val // TODO: remove this
 				id.AppId = val
 			case consts.OtelSysFunctionID:
+				attr[key] = val // TODO: remove this
 				id.FunctionId = val
 			case consts.OtelAttrSDKRunID:
+				attr[key] = val // TODO: remove this
 				id.RunId = val
 			case consts.OtelSysStepOpcode:
+				attr[key] = val // TODO: remove this
 				kind = e.toProtoKind(val)
 			case consts.OtelSysFunctionStatusCode:
+				attr[key] = val // TODO: remove this
 				code := kv.Value.AsInt64()
 				status = e.toProtoStatus(enums.RunCodeToStatus(code))
 
@@ -304,11 +311,14 @@ func (e *natsSpanExporter) parseSpanEvents(spanEvents []trace.Event) ([]*runv2.S
 				key := string(kv.Key)
 				switch key {
 				case consts.OtelSysEventData:
+					attr[key] = kv.Value.AsString() // TODO: remove this
 					typ = spanEvtTypeEvent
 				case consts.OtelSysEventInternalID:
+					attr[key] = kv.Value.AsString() // TODO: remove this
 					typ = spanEvtTypeEvent
 					evtID = kv.Value.AsString()
 				case consts.OtelSysFunctionOutput, consts.OtelSysStepOutput:
+					attr[key] = kv.Value.AsString() // TODO: remove this
 					typ = spanEvtTypeOutput
 				default:
 					attr[key] = kv.Value.AsString()
@@ -325,13 +335,14 @@ func (e *natsSpanExporter) parseSpanEvents(spanEvents []trace.Event) ([]*runv2.S
 			})
 		case spanEvtTypeOutput:
 			output = []byte(e.Name)
-		default:
-			events = append(events, &runv2.SpanEvent{
-				Name:       e.Name,
-				Timestamp:  timestamppb.New(e.Time),
-				Attributes: attr,
-			})
 		}
+
+		// TODO: should be moved into the default case for switch
+		events = append(events, &runv2.SpanEvent{
+			Name:       e.Name,
+			Timestamp:  timestamppb.New(e.Time),
+			Attributes: attr,
+		})
 	}
 
 	return events, triggers, output, nil
