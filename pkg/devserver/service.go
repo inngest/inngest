@@ -87,7 +87,11 @@ type devserver struct {
 	persistenceInterval *time.Duration
 }
 
-func (devserver) Name() string {
+func (d *devserver) Name() string {
+	if d.persistenceInterval != nil {
+		return "lite"
+	}
+
 	return "devserver"
 }
 
@@ -119,7 +123,7 @@ func (d *devserver) Run(ctx context.Context) error {
 			addr := fmt.Sprintf("%s:%d", d.Opts.Config.EventAPI.Addr, d.Opts.Config.EventAPI.Port)
 			fmt.Println("")
 			fmt.Println("")
-			fmt.Print(cli.BoldStyle.Render("\tInngest dev server online "))
+			fmt.Print(cli.BoldStyle.Render(fmt.Sprintf("\tInngest %s online ", d.Name())))
 			fmt.Printf(cli.TextStyle.Render(fmt.Sprintf("at %s, visible at the following URLs:", addr)) + "\n\n")
 			for n, ip := range localIPs() {
 				style := cli.BoldStyle
@@ -276,7 +280,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 func (d *devserver) HandleEvent(ctx context.Context, e *event.Event) (string, error) {
 	// ctx is the request context, so we need to re-add
 	// the caller here.
-	l := logger.From(ctx).With().Str("caller", "devserver").Logger()
+	l := logger.From(ctx).With().Str("caller", d.Name()).Logger()
 	ctx = logger.With(ctx, l)
 
 	l.Debug().Str("event", e.Name).Msg("handling event")
@@ -326,7 +330,7 @@ func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
 
 	snapshot := make(map[string]SnapshotValue)
 
-	l := logger.From(ctx).With().Str("caller", "devserver").Logger()
+	l := logger.From(ctx).With().Str("caller", d.Name()).Logger()
 	l.Info().Msg("exporting Redis snapshot")
 	defer func() {
 		if err != nil {
@@ -469,7 +473,7 @@ func (d *devserver) importRedisSnapshot(ctx context.Context) (err error, importe
 
 	var snapshot map[string]SnapshotValue
 
-	l := logger.From(ctx).With().Str("caller", "devserver").Logger()
+	l := logger.From(ctx).With().Str("caller", d.Name()).Logger()
 	l.Info().Msg("importing Redis snapshot")
 	defer func() {
 		if err != nil {
