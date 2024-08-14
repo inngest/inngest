@@ -14,7 +14,7 @@ const (
 	// PartitionTypeDefault indicates a regular partition for job items without
 	// concurrency keys, or with only a fn level concurrency key.
 	PartitionTypeDefault PartitionType = 0
-	// PartitionTypenConcurrency represents a partition for a concurrency partition.
+	// PartitionTypeConcurrency represents a partition for a concurrency partition.
 	PartitionTypeConcurrency PartitionType = 1
 	// PartitionTypeThrottle represents a partition for a custom throttling key.
 	PartitionTypeThrottle PartitionType = 2
