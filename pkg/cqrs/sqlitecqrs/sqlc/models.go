@@ -110,14 +110,9 @@ type History struct {
 }
 
 type QueueSnapshotChunk struct {
-	SnapshotID int64
+	SnapshotID interface{}
 	ChunkID    int64
 	Data       []byte
-}
-
-type QueueSnapshotVersion struct {
-	SnapshotID int64
-	CreatedAt  time.Time
 }
 
 type Trace struct {

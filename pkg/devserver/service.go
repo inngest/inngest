@@ -319,18 +319,21 @@ func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
 	d.snapshotLock.Lock()
 	defer d.snapshotLock.Unlock()
 
-	snapshot := make(map[string]cqrs.SnapshotValue)
+	var (
+		snapshotID cqrs.SnapshotID
+		snapshot   = make(map[string]cqrs.SnapshotValue)
+		l          = logger.From(ctx).With().Str("caller", "devserver").Logger()
+	)
 
-	l := logger.From(ctx).With().Str("caller", "devserver").Logger()
 	l.Info().Msg("exporting Redis snapshot")
 	defer func() {
 		if err != nil {
 			l.Error().Err(err).Msg("error exporting Redis snapshot")
-		} else {
-			jsonData, _ := json.Marshal(snapshot)
-			humanSize := fmt.Sprintf("%.2fKB", float64(len(jsonData))/1024)
-			l.Info().Str("size", humanSize).Msg("exported Redis snapshot")
 		}
+
+		jsonData, _ := json.Marshal(snapshot)
+		humanSize := fmt.Sprintf("%.2fKB", float64(len(jsonData))/1024)
+		l.Info().Str("size", humanSize).Str("snapshot_id", snapshotID.String()).Msg("exported Redis snapshot")
 	}()
 
 	// Get a dedicated client for this operation, which should block all other
@@ -438,55 +441,48 @@ func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
 		}
 	}
 
-	var file *os.File
-	file, err = os.Create(fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerRdbFile))
+	snapshotID, err = d.Data.InsertQueueSnapshot(ctx, cqrs.InsertQueueSnapshotParams{
+		Snapshot: snapshot,
+	})
 	if err != nil {
-		return
-	}
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	err = encoder.Encode(snapshot)
-	if err != nil {
+		err = fmt.Errorf("error inserting queue snapshot: %w", err)
 		return
 	}
 
-	return nil
+	return
 }
 
 func (d *devserver) importRedisSnapshot(ctx context.Context) (err error, imported bool) {
-	file, err := os.Open(fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerRdbFile))
-	if err != nil && os.IsNotExist(err) {
-		err = nil
-		return
-	}
-	defer file.Close()
-
-	var snapshot map[string]cqrs.SnapshotValue
+	d.snapshotLock.Lock()
+	defer d.snapshotLock.Unlock()
 
 	l := logger.From(ctx).With().Str("caller", "devserver").Logger()
 	l.Info().Msg("importing Redis snapshot")
+
+	snapshot, err := d.Data.GetLatestQueueSnapshot(ctx)
 	defer func() {
 		if err != nil {
 			l.Error().Err(err).Msg("error importing Redis snapshot")
-		} else {
+		} else if imported {
 			jsonData, _ := json.Marshal(snapshot)
 			humanSize := fmt.Sprintf("%.2fKB", float64(len(jsonData))/1024)
 			l.Info().Str("size", humanSize).Msg("imported Redis snapshot")
+		} else {
+			l.Info().Msg("no snapshot to import")
 		}
 	}()
-
-	decoder := json.NewDecoder(file)
-	err = decoder.Decode(&snapshot)
 	if err != nil {
-		err = fmt.Errorf("error decoding snapshot: %w", err)
+		err = fmt.Errorf("error getting latest queue snapshot: %w", err)
+		return
+	}
+	if snapshot == nil {
 		return
 	}
 
 	rc, done := d.redisClient.Dedicate()
 	defer done()
 
-	for key, data := range snapshot {
+	for key, data := range *snapshot {
 		switch data.Type {
 		case "string":
 			strVal := data.Value.(string)

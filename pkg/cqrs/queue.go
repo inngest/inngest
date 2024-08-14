@@ -2,6 +2,8 @@ package cqrs
 
 import (
 	"context"
+
+	"github.com/oklog/ulid/v2"
 )
 
 type SnapshotValue struct {
@@ -10,21 +12,21 @@ type SnapshotValue struct {
 }
 
 type QueueSnapshot = map[string]SnapshotValue
+type SnapshotID = ulid.ULID
 
-// LiteQueueSnapshotManager is a development-only function manager
+// LiteQueueSnapshotManager is a lite-only manager for queue snapshots.
 type LiteQueueSnapshotManager interface {
 	LiteQueueSnapshotReader
 	LiteQueueSnapshotWriter
 }
 
 type LiteQueueSnapshotReader interface {
-	GetQueueSnapshot(ctx context.Context, snapshotID int64) (QueueSnapshot, error)
-	GetLatestQueueSnapshot(ctx context.Context) (QueueSnapshot, error)
-	GetLatestQueueSnapshotID(ctx context.Context) (int64, error)
+	GetQueueSnapshot(ctx context.Context, snapshotID SnapshotID) (*QueueSnapshot, error)
+	GetLatestQueueSnapshot(ctx context.Context) (*QueueSnapshot, error)
 }
 
 type LiteQueueSnapshotWriter interface {
-	InsertQueueSnapshot(ctx context.Context, params InsertQueueSnapshotParams) (int64, error)
+	InsertQueueSnapshot(ctx context.Context, params InsertQueueSnapshotParams) (SnapshotID, error)
 	InsertQueueSnapshotChunk(ctx context.Context, params InsertQueueSnapshotChunkParams) error
 }
 
@@ -33,7 +35,7 @@ type InsertQueueSnapshotParams struct {
 }
 
 type InsertQueueSnapshotChunkParams struct {
-	SnapshotID int64
+	SnapshotID SnapshotID
 	ChunkID    int
 	Chunk      []byte
 }

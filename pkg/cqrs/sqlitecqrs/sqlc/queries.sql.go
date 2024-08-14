@@ -52,6 +52,24 @@ func (q *Queries) DeleteFunctionsByIDs(ctx context.Context, ids []uuid.UUID) err
 	return err
 }
 
+const deleteOldQueueSnapshots = `-- name: DeleteOldQueueSnapshots :execrows
+DELETE FROM queue_snapshot_chunks
+WHERE snapshot_id NOT IN (
+    SELECT snapshot_id
+    FROM queue_snapshot_chunks
+    ORDER BY snapshot_id DESC
+    LIMIT ?
+)
+`
+
+func (q *Queries) DeleteOldQueueSnapshots(ctx context.Context, limit int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteOldQueueSnapshots, limit)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const getAllApps = `-- name: GetAllApps :many
 SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url FROM apps
 `
@@ -811,16 +829,41 @@ func (q *Queries) GetFunctions(ctx context.Context) ([]*Function, error) {
 	return items, nil
 }
 
-const getLatestQueueSnapshotId = `-- name: GetLatestQueueSnapshotId :one
-SELECT MAX(snapshot_id)
-FROM queue_snapshot_versions
+const getLatestQueueSnapshotChunks = `-- name: GetLatestQueueSnapshotChunks :many
+SELECT chunk_id, data
+FROM queue_snapshot_chunks
+WHERE snapshot_id = (
+    SELECT MAX(snapshot_id) FROM queue_snapshot_chunks
+)
+ORDER BY chunk_id ASC
 `
 
-func (q *Queries) GetLatestQueueSnapshotId(ctx context.Context) (interface{}, error) {
-	row := q.db.QueryRowContext(ctx, getLatestQueueSnapshotId)
-	var max interface{}
-	err := row.Scan(&max)
-	return max, err
+type GetLatestQueueSnapshotChunksRow struct {
+	ChunkID int64
+	Data    []byte
+}
+
+func (q *Queries) GetLatestQueueSnapshotChunks(ctx context.Context) ([]*GetLatestQueueSnapshotChunksRow, error) {
+	rows, err := q.db.QueryContext(ctx, getLatestQueueSnapshotChunks)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetLatestQueueSnapshotChunksRow
+	for rows.Next() {
+		var i GetLatestQueueSnapshotChunksRow
+		if err := rows.Scan(&i.ChunkID, &i.Data); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getQueueSnapshotChunks = `-- name: GetQueueSnapshotChunks :many
@@ -837,7 +880,7 @@ type GetQueueSnapshotChunksRow struct {
 }
 
 // Lite queue snapshots
-func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID int64) ([]*GetQueueSnapshotChunksRow, error) {
+func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID interface{}) ([]*GetQueueSnapshotChunksRow, error) {
 	rows, err := q.db.QueryContext(ctx, getQueueSnapshotChunks, snapshotID)
 	if err != nil {
 		return nil, err
@@ -1288,7 +1331,7 @@ VALUES
 `
 
 type InsertQueueSnapshotChunkParams struct {
-	SnapshotID int64
+	SnapshotID interface{}
 	ChunkID    int64
 	Data       []byte
 }

@@ -290,7 +290,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	)
 
 	// The devserver embeds the event API.
-	persistenceInterval := time.Second * 60
+	persistenceInterval := consts.LiteDefaultPersistenceInterval
 	ds := devserver.NewService(devserver.StartOpts{
 		Config:  opts.Config,
 		RootDir: opts.RootDir,

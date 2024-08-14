@@ -207,11 +207,24 @@ FROM queue_snapshot_chunks
 WHERE snapshot_id = ?
 ORDER BY chunk_id ASC;
 
--- name: GetLatestQueueSnapshotId :one
-SELECT MAX(snapshot_id)
-FROM queue_snapshot_versions;
+-- name: GetLatestQueueSnapshotChunks :many
+SELECT chunk_id, data
+FROM queue_snapshot_chunks
+WHERE snapshot_id = (
+    SELECT MAX(snapshot_id) FROM queue_snapshot_chunks
+)
+ORDER BY chunk_id ASC;
 
 -- name: InsertQueueSnapshotChunk :exec
 INSERT INTO queue_snapshot_chunks (snapshot_id, chunk_id, data)
 VALUES
 	(?, ?, ?);
+
+-- name: DeleteOldQueueSnapshots :execrows
+DELETE FROM queue_snapshot_chunks
+WHERE snapshot_id NOT IN (
+    SELECT snapshot_id
+    FROM queue_snapshot_chunks
+    ORDER BY snapshot_id DESC
+    LIMIT ?
+);

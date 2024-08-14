@@ -2,6 +2,7 @@ package sqlitecqrs
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -83,45 +84,30 @@ func (w wrapper) Rollback(ctx context.Context) error {
 	return w.tx.Rollback()
 }
 
-func (w wrapper) GetLatestQueueSnapshot(ctx context.Context) (cqrs.QueueSnapshot, error) {
-	tx, err := w.WithTx(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error starting transaction: %w", err)
-	}
-
-	snapshotID, err := tx.GetLatestQueueSnapshotID(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error getting latest queue snapshot ID: %w", err)
-	}
-
-	snapshot, err := tx.GetQueueSnapshot(ctx, snapshotID)
+func (w wrapper) GetLatestQueueSnapshot(ctx context.Context) (*cqrs.QueueSnapshot, error) {
+	chunks, err := w.q.GetLatestQueueSnapshotChunks(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error getting queue snapshot: %w", err)
 	}
 
-	return snapshot, nil
+	var data []byte
+	for _, chunk := range chunks {
+		data = append(data, chunk.Data...)
+	}
+
+	if len(data) == 0 {
+		return nil, nil
+	}
+
+	var snapshot cqrs.QueueSnapshot
+	if err := json.Unmarshal(data, &snapshot); err != nil {
+		return nil, fmt.Errorf("error unmarshalling queue snapshot: %w", err)
+	}
+
+	return &snapshot, nil
 }
 
-func (w wrapper) GetLatestQueueSnapshotID(ctx context.Context) (int64, error) {
-	res, err := w.q.GetLatestQueueSnapshotId(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("error getting latest queue snapshot ID: %w", err)
-	}
-
-	// todo check works
-	if res == nil {
-		// no prev snapshot; 0
-		return 0, nil
-	}
-
-	if id, ok := res.(int64); ok {
-		return id, nil
-	}
-
-	return 0, fmt.Errorf("error parsing latest queue snapshot ID: %v", res)
-}
-
-func (w wrapper) GetQueueSnapshot(ctx context.Context, snapshotID int64) (cqrs.QueueSnapshot, error) {
+func (w wrapper) GetQueueSnapshot(ctx context.Context, snapshotID cqrs.SnapshotID) (*cqrs.QueueSnapshot, error) {
 	chunks, err := w.q.GetQueueSnapshotChunks(ctx, snapshotID)
 	if err != nil {
 		return nil, fmt.Errorf("error getting queue snapshot: %w", err)
@@ -132,30 +118,24 @@ func (w wrapper) GetQueueSnapshot(ctx context.Context, snapshotID int64) (cqrs.Q
 		data = append(data, chunk.Data...)
 	}
 
+	if len(data) == 0 {
+		return nil, nil
+	}
+
 	var snapshot cqrs.QueueSnapshot
 	if err := json.Unmarshal(data, &snapshot); err != nil {
 		return nil, fmt.Errorf("error unmarshalling queue snapshot: %w", err)
 	}
 
-	return snapshot, nil
+	return &snapshot, nil
 }
 
-func (w wrapper) InsertQueueSnapshot(ctx context.Context, params cqrs.InsertQueueSnapshotParams) (int64, error) {
-	tx, err := w.WithTx(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("error starting transaction: %w", err)
-	}
-
-	snapshotID, err := tx.GetLatestQueueSnapshotID(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("error getting latest queue snapshot ID: %w", err)
-	}
-
-	snapshotID++
+func (w wrapper) InsertQueueSnapshot(ctx context.Context, params cqrs.InsertQueueSnapshotParams) (cqrs.SnapshotID, error) {
+	var snapshotID cqrs.SnapshotID
 
 	byt, err := json.Marshal(params.Snapshot)
 	if err != nil {
-		return 0, fmt.Errorf("error marshalling snapshot: %w", err)
+		return snapshotID, fmt.Errorf("error marshalling snapshot: %w", err)
 	}
 
 	var chunks [][]byte
@@ -169,26 +149,41 @@ func (w wrapper) InsertQueueSnapshot(ctx context.Context, params cqrs.InsertQueu
 		}
 	}
 
+	snapshotID = ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader)
+
+	tx, err := w.WithTx(ctx)
+	if err != nil {
+		return snapshotID, fmt.Errorf("error starting transaction: %w", err)
+	}
+
 	// Insert each chunk of the snapshot.
 	for i, chunk := range chunks {
-		tx.InsertQueueSnapshotChunk(ctx, cqrs.InsertQueueSnapshotChunkParams{
+		err = tx.InsertQueueSnapshotChunk(ctx, cqrs.InsertQueueSnapshotChunkParams{
 			SnapshotID: snapshotID,
 			ChunkID:    i,
 			Chunk:      chunk,
 		})
+		if err != nil {
+			return snapshotID, fmt.Errorf("error inserting queue snapshot chunk: %w", err)
+		}
 	}
 
 	err = tx.Commit(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("error committing transaction: %w", err)
+		return snapshotID, fmt.Errorf("error committing transaction: %w", err)
 	}
+
+	// Asynchronously remove old snapshots.
+	go func() {
+		_, _ = w.q.DeleteOldQueueSnapshots(ctx, consts.LiteMaxQueueSnapshots)
+	}()
 
 	return snapshotID, nil
 }
 
 func (w wrapper) InsertQueueSnapshotChunk(ctx context.Context, params cqrs.InsertQueueSnapshotChunkParams) error {
 	err := w.q.InsertQueueSnapshotChunk(ctx, sqlc.InsertQueueSnapshotChunkParams{
-		SnapshotID: params.SnapshotID,
+		SnapshotID: params.SnapshotID.String(),
 		ChunkID:    int64(params.ChunkID),
 		Data:       params.Chunk,
 	})
