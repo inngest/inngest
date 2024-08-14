@@ -95,6 +95,16 @@ func (d *devserver) Name() string {
 	return "devserver"
 }
 
+func (d *devserver) PrettyName() string {
+	name := strings.Title(d.Name())
+
+	if name == "Devserver" {
+		return "Dev Server"
+	}
+
+	return name
+}
+
 func (d *devserver) Pre(ctx context.Context) error {
 	// Import Redis if we can and have persistence enabled
 	if d.persistenceInterval != nil {
@@ -123,7 +133,7 @@ func (d *devserver) Run(ctx context.Context) error {
 			addr := fmt.Sprintf("%s:%d", d.Opts.Config.EventAPI.Addr, d.Opts.Config.EventAPI.Port)
 			fmt.Println("")
 			fmt.Println("")
-			fmt.Print(cli.BoldStyle.Render(fmt.Sprintf("\tInngest %s online ", d.Name())))
+			fmt.Print(cli.BoldStyle.Render(fmt.Sprintf("\tInngest %s online ", d.PrettyName())))
 			fmt.Printf(cli.TextStyle.Render(fmt.Sprintf("at %s, visible at the following URLs:", addr)) + "\n\n")
 			for n, ip := range localIPs() {
 				style := cli.BoldStyle
