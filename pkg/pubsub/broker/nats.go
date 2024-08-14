@@ -20,7 +20,12 @@ type NatsConnOpt struct {
 	// conn itself
 	JetStream bool
 	// Consumers specifics the list of existing consumers to initialize
-	Consumers map[string]string
+	//   Key: stream name
+	//   Value: list of consumer names
+	//
+	// This will be combined as key-value for each consumer in the map, therefore if there results
+	// with duplicates, the last key-value string will likely take precendence
+	Consumers map[string][]string
 	Opts      []nats.Option
 }
 
@@ -94,14 +99,16 @@ func NewNATSConnector(ctx context.Context, opts NatsConnOpt) (*NatsConnector, er
 		if opts.Consumers != nil {
 			c.consumers = map[string]jetstream.Consumer{}
 
-			for stream, consumer := range opts.Consumers {
-				cons, err := js.Consumer(ctx, stream, consumer)
-				if err != nil {
-					return nil, fmt.Errorf("error initializing consumer: %w", err)
-				}
+			for stream, consumers := range opts.Consumers {
+				for _, consumer := range consumers {
+					cons, err := js.Consumer(ctx, stream, consumer)
+					if err != nil {
+						return nil, fmt.Errorf("error initializing consumer: %w", err)
+					}
 
-				key := fmt.Sprintf("%s-%s", stream, consumer)
-				c.consumers[key] = cons
+					key := fmt.Sprintf("%s-%s", stream, consumer)
+					c.consumers[key] = cons
+				}
 			}
 		}
 	}
