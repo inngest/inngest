@@ -59,7 +59,7 @@ func NewNATSSpanExporter(ctx context.Context, opts *NatsExporterOpts) (trace.Spa
 	}
 
 	conn, err := broker.NewNATSConnector(ctx, broker.NatsConnOpt{
-		Name:      "span-exporter",
+		Name:      "run-span-exporter",
 		URLS:      opts.URLs,
 		JetStream: true,
 		Opts:      connOpts,
