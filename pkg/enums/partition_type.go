@@ -15,7 +15,7 @@ const (
 	// concurrency keys, or with only a fn level concurrency key.
 	// NOTE: This also applies to system partitions for backwards compatibility
 	PartitionTypeDefault PartitionType = 0
-	// PartitionTypenConcurrency represents a partition for a custom concurrency key
+	// PartitionTypeConcurrencyKey represents a partition for a custom concurrency key
 	PartitionTypeConcurrencyKey PartitionType = 1
 	// PartitionTypeThrottle represents a partition for a custom throttling key.
 	PartitionTypeThrottle PartitionType = 2

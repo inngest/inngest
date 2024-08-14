@@ -1231,7 +1231,10 @@ func (m unshardedMgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.
 		}
 
 		if pause.Expires.Time().Before(time.Now()) {
-			expired = append(expired, pause)
+			shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
+			if shouldDelete {
+				expired = append(expired, pause)
+			}
 			continue
 		}
 
