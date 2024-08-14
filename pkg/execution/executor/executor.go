@@ -1250,9 +1250,15 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 			// time to process.  We handle that here and assume that the event
 			// did not occur in time.
 			if pause.Expires.Time().Before(time.Now()) {
-				// Consume this pause to remove it entirely
-				l.Debug().Msg("deleting expired pause")
-				_ = e.pm.DeletePause(context.Background(), *pause)
+				l.Debug().Msg("encountered expired pause")
+
+				shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
+				if shouldDelete {
+					// Consume this pause to remove it entirely
+					l.Debug().Msg("deleting expired pause")
+					_ = e.pm.DeletePause(context.Background(), *pause)
+				}
+
 				return
 			}
 
@@ -1425,10 +1431,16 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 			// time to process.  We handle that here and assume that the event
 			// did not occur in time.
 			if pause.Expires.Time().Before(time.Now()) {
-				// Consume this pause to remove it entirely
-				l.Debug("deleting expired pause")
-				_ = e.pm.DeletePause(context.Background(), pause)
-				_ = e.exprAggregator.RemovePause(ctx, pause)
+				l.Debug("encountered expired pause")
+
+				shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
+				if shouldDelete {
+					// Consume this pause to remove it entirely
+					l.Debug("deleting expired pause")
+					_ = e.pm.DeletePause(context.Background(), pause)
+					_ = e.exprAggregator.RemovePause(ctx, pause)
+				}
+
 				return
 			}
 
@@ -1542,9 +1554,15 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 	}
 
 	if pause.Expires.Time().Before(time.Now()) {
-		// Consume this pause to remove it entirely
-		l.Debug().Msg("deleting expired pause")
-		_ = e.pm.DeletePause(context.Background(), *pause)
+		l.Debug().Msg("encountered expired pause")
+
+		shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
+		if shouldDelete {
+			// Consume this pause to remove it entirely
+			l.Debug().Msg("deleting expired pause")
+			_ = e.pm.DeletePause(context.Background(), *pause)
+		}
+
 		return nil
 	}
 

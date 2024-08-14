@@ -21,6 +21,7 @@ const codes = [
   'no_functions',
   'not_sdk',
   'server_kind_mismatch',
+  'sig_verification_failed',
   'signing_key_invalid',
   'signing_key_unspecified',
   'too_many_pings',

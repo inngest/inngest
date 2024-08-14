@@ -520,6 +520,11 @@ func (q QueueShard) Partition() string {
 type QueuePartition struct {
 	QueueName *string `json:"queue,omitempty"`
 
+	// PartitionType is the int-value of the enums.PartitionType for this
+	// partition.  By default, partitions are function-scoped without any
+	// custom keys.
+	PartitionType int `json:"pt,omitempty"`
+
 	WorkflowID  uuid.UUID `json:"wid"`
 	WorkspaceID uuid.UUID `json:"wsID"`
 
