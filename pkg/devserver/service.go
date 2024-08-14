@@ -315,16 +315,11 @@ func (d *devserver) HandleEvent(ctx context.Context, e *event.Event) (string, er
 	return trackedEvent.GetInternalID().String(), err
 }
 
-type SnapshotValue struct {
-	Type  string      `json:"type"`
-	Value interface{} `json:"value"`
-}
-
 func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
 	d.snapshotLock.Lock()
 	defer d.snapshotLock.Unlock()
 
-	snapshot := make(map[string]SnapshotValue)
+	snapshot := make(map[string]cqrs.SnapshotValue)
 
 	l := logger.From(ctx).With().Str("caller", "devserver").Logger()
 	l.Info().Msg("exporting Redis snapshot")
@@ -376,7 +371,7 @@ func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
 				err = fmt.Errorf("error getting value for string key %s: %w", key, err)
 				return
 			}
-			snapshot[key] = SnapshotValue{
+			snapshot[key] = cqrs.SnapshotValue{
 				Type:  typ,
 				Value: val,
 			}
@@ -388,7 +383,7 @@ func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
 				err = fmt.Errorf("error getting values for list key %s: %w", key, err)
 				return
 			}
-			snapshot[key] = SnapshotValue{
+			snapshot[key] = cqrs.SnapshotValue{
 				Type:  typ,
 				Value: vals,
 			}
@@ -400,7 +395,7 @@ func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
 				err = fmt.Errorf("error getting values for set key %s: %w", key, err)
 				return
 			}
-			snapshot[key] = SnapshotValue{
+			snapshot[key] = cqrs.SnapshotValue{
 				Type:  typ,
 				Value: vals,
 			}
@@ -412,7 +407,7 @@ func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
 				err = fmt.Errorf("error getting values for zset key %s: %w", key, err)
 				return
 			}
-			snapshot[key] = SnapshotValue{
+			snapshot[key] = cqrs.SnapshotValue{
 				Type:  typ,
 				Value: vals,
 			}
@@ -429,7 +424,7 @@ func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
 				strVal, _ := v.ToString()
 				vals[k] = strVal
 			}
-			snapshot[key] = SnapshotValue{
+			snapshot[key] = cqrs.SnapshotValue{
 				Type:  typ,
 				Value: vals,
 			}
@@ -467,7 +462,7 @@ func (d *devserver) importRedisSnapshot(ctx context.Context) (err error, importe
 	}
 	defer file.Close()
 
-	var snapshot map[string]SnapshotValue
+	var snapshot map[string]cqrs.SnapshotValue
 
 	l := logger.From(ctx).With().Str("caller", "devserver").Logger()
 	l.Info().Msg("importing Redis snapshot")
