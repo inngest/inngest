@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/enums"
 	"math/rand"
 	"runtime/debug"
 	"sync"
@@ -665,9 +664,6 @@ func (q *queue) scan(ctx context.Context) error {
 				metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
 				return nil
 			}
-			if p.PartitionType != int(enums.PartitionTypeDefault) {
-				return nil
-			}
 			if err := q.processPartition(ctx, &p, shard); err != nil {
 				if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
 					// Another worker grabbed the partition, or the partition was deleted
@@ -809,10 +805,10 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 			if p.FunctionID != nil {
 				go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
 			}
-			//else {
+			// else {
 			// TODO(cdzombak): lifecycles/metrics for other concurrency scopes
 			// https://linear.app/inngest/issue/INN-3246/lifecycles-add-new-lifecycles-for-fn-env-account-concurrency-limits
-			//}
+			// }
 		}
 		// Requeue this partition as we hit concurrency limits.
 		metrics.IncrQueuePartitionConcurrencyLimitCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
