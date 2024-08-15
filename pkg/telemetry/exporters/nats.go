@@ -212,35 +212,39 @@ func (e *natsSpanExporter) parseSpanAttributes(spanAttr []attribute.KeyValue) (*
 	for _, kv := range spanAttr {
 		if kv.Valid() {
 			key := string(kv.Key)
-			val := kv.Value.AsString()
+			var val string
+			switch kv.Value.Type() {
+			case attribute.BOOL:
+				val = fmt.Sprintf("%t", kv.Value.AsBool())
+			case attribute.INT64:
+				val = fmt.Sprintf("%d", kv.Value.AsInt64())
+			case attribute.STRING:
+				val = kv.Value.AsString()
+			case attribute.FLOAT64:
+				val = fmt.Sprintf("%f", kv.Value.AsFloat64())
+			default:
+				fmt.Printf("Value type: %s\n\n", kv.Value.Type().String())
+			}
 
 			switch key {
 			case consts.OtelSysAccountID:
-				attr[key] = val // TODO: remove this
 				id.AccountId = val
 			case consts.OtelSysWorkspaceID:
-				attr[key] = val // TODO: remove this
 				id.EnvId = val
 			case consts.OtelSysAppID:
-				attr[key] = val // TODO: remove this
 				id.AppId = val
 			case consts.OtelSysFunctionID:
-				attr[key] = val // TODO: remove this
 				id.FunctionId = val
 			case consts.OtelAttrSDKRunID:
-				attr[key] = val // TODO: remove this
 				id.RunId = val
 			case consts.OtelSysStepOpcode:
-				attr[key] = val // TODO: remove this
 				kind = e.toProtoKind(val)
 			case consts.OtelSysFunctionStatusCode:
-				attr[key] = val // TODO: remove this
 				code := kv.Value.AsInt64()
 				status = e.toProtoStatus(enums.RunCodeToStatus(code))
-
-			default:
-				attr[key] = val
 			}
+			// TODO: move this into the default case so it doesn't record everything
+			attr[key] = val
 		}
 	}
 
