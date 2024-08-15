@@ -1982,7 +1982,10 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 
 	// Use parallel decoding as per Peek
 	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueuePartition, error) {
-		str, _ := val.(string)
+		str, ok := val.(string)
+		if !ok {
+			return nil, fmt.Errorf("unknown type in partition peek: %T", val)
+		}
 		item := &QueuePartition{}
 
 		if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), item); err != nil {
@@ -2017,7 +2020,10 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 			// partitions.
 			vals, _ := vals.([]any)
 			_, _ = util.ParallelDecode(vals, func(i any) (any, error) {
-				str, _ := i.(string)
+				str, ok := i.(string)
+				if !ok {
+					return nil, fmt.Errorf("unknown fnMeta type in partition peek: %T", i)
+				}
 				fnMeta := &FnMetadata{}
 				if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), fnMeta); err == nil {
 					fnIDsMu.Lock()
