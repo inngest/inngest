@@ -19,7 +19,7 @@ export const ProfileMenu = ({ children }: { children: ReactNode }) => {
       <Listbox.Button className="w-full cursor-pointer ring-0">{children}</Listbox.Button>
       <div className="relative">
         <Listbox.Options className="bg-canvasBase absolute -right-48 bottom-4 z-50 ml-8 w-[199px] rounded border shadow ring-0 focus:outline-none">
-          <Link href="/settings/organization/organization-settings">
+          <Link href="/settings/organization/organization-settings" scroll={false}>
             <Listbox.Option
               className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="org"
@@ -30,7 +30,7 @@ export const ProfileMenu = ({ children }: { children: ReactNode }) => {
               </div>
             </Listbox.Option>
           </Link>
-          <Link href="/settings/organization">
+          <Link href="/settings/organization" scroll={false}>
             <Listbox.Option
               className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="members"
@@ -41,7 +41,7 @@ export const ProfileMenu = ({ children }: { children: ReactNode }) => {
               </div>
             </Listbox.Option>
           </Link>
-          <Link href="/settings/billing">
+          <Link href="/settings/billing" scroll={false}>
             <Listbox.Option
               className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="billing"
@@ -52,7 +52,7 @@ export const ProfileMenu = ({ children }: { children: ReactNode }) => {
               </div>
             </Listbox.Option>
           </Link>
-          <Link href="/organization-list">
+          <a href="/organization-list">
             <Listbox.Option
               className="text-subtle hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="switchOrg"
@@ -62,11 +62,11 @@ export const ProfileMenu = ({ children }: { children: ReactNode }) => {
                 <div>Switch Organization</div>
               </div>
             </Listbox.Option>
-          </Link>
+          </a>
 
           <hr />
 
-          <Link href="/settings/user">
+          <Link href="/settings/user" scroll={false}>
             <Listbox.Option
               className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="userProfile"

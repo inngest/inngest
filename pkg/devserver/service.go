@@ -29,7 +29,7 @@ import (
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/service"
-	"github.com/inngest/inngest/pkg/telemetry"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/mattn/go-isatty"
 	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/propagation"
@@ -87,13 +87,29 @@ type devserver struct {
 	persistenceInterval *time.Duration
 }
 
-func (devserver) Name() string {
+func (d *devserver) Name() string {
+	if d.persistenceInterval != nil {
+		return "lite"
+	}
+
 	return "devserver"
 }
 
+func (d *devserver) PrettyName() string {
+	name := strings.Title(d.Name())
+
+	if name == "Devserver" {
+		return "Dev Server"
+	}
+
+	return name
+}
+
 func (d *devserver) Pre(ctx context.Context) error {
-	// Import Redis if we can
-	_, _ = d.importRedisSnapshot(ctx)
+	// Import Redis if we can and have persistence enabled
+	if d.persistenceInterval != nil {
+		_, _ = d.importRedisSnapshot(ctx)
+	}
 
 	// Autodiscover the URLs that are hosting Inngest SDKs on the local machine.
 	if d.Opts.Autodiscover {
@@ -117,7 +133,7 @@ func (d *devserver) Run(ctx context.Context) error {
 			addr := fmt.Sprintf("%s:%d", d.Opts.Config.EventAPI.Addr, d.Opts.Config.EventAPI.Port)
 			fmt.Println("")
 			fmt.Println("")
-			fmt.Print(cli.BoldStyle.Render("\tInngest dev server online "))
+			fmt.Print(cli.BoldStyle.Render(fmt.Sprintf("\tInngest %s online ", d.PrettyName())))
 			fmt.Printf(cli.TextStyle.Render(fmt.Sprintf("at %s, visible at the following URLs:", addr)) + "\n\n")
 			for n, ip := range localIPs() {
 				style := cli.BoldStyle
@@ -274,7 +290,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 func (d *devserver) HandleEvent(ctx context.Context, e *event.Event) (string, error) {
 	// ctx is the request context, so we need to re-add
 	// the caller here.
-	l := logger.From(ctx).With().Str("caller", "devserver").Logger()
+	l := logger.From(ctx).With().Str("caller", d.Name()).Logger()
 	ctx = logger.With(ctx, l)
 
 	l.Debug().Str("event", e.Name).Msg("handling event")
@@ -294,8 +310,8 @@ func (d *devserver) HandleEvent(ctx context.Context, e *event.Event) (string, er
 		Interface("event", trackedEvent.GetEvent()).
 		Msg("publishing event")
 
-	carrier := telemetry.NewTraceCarrier()
-	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	carrier := itrace.NewTraceCarrier()
+	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 	err = d.publisher.Publish(
 		ctx,
@@ -324,7 +340,7 @@ func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
 
 	snapshot := make(map[string]SnapshotValue)
 
-	l := logger.From(ctx).With().Str("caller", "devserver").Logger()
+	l := logger.From(ctx).With().Str("caller", d.Name()).Logger()
 	l.Info().Msg("exporting Redis snapshot")
 	defer func() {
 		if err != nil {
@@ -467,7 +483,7 @@ func (d *devserver) importRedisSnapshot(ctx context.Context) (err error, importe
 
 	var snapshot map[string]SnapshotValue
 
-	l := logger.From(ctx).With().Str("caller", "devserver").Logger()
+	l := logger.From(ctx).With().Str("caller", d.Name()).Logger()
 	l.Info().Msg("importing Redis snapshot")
 	defer func() {
 		if err != nil {

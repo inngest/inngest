@@ -22,7 +22,7 @@ export const Alert = () => {
 
   return (
     show && (
-      <div className="text-info bg-info border-secondary-2xSubtle pl- m-5 rounded border py-3 pl-3 pr-2 text-xs leading-tight">
+      <div className="text-info bg-info border-secondary-2xSubtle mb-5 rounded border py-3 pl-3 pr-2 text-xs leading-tight">
         <div className="gap-x flex flex-row items-start justify-between">
           <div>We&apos;ve reimagined our information architecture for better navigation.</div>
           <NewButton
@@ -34,7 +34,10 @@ export const Alert = () => {
             onClick={() => dismiss()}
           />
         </div>
-        <Link href="http://www.inngest.com/blog/reimaging-our-ia" className="mt-4">
+        <Link
+          href=" https://www.inngest.com/blog/reimagining-information-architecture"
+          className="mt-4"
+        >
           Read about the redesign
         </Link>
       </div>

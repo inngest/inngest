@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -30,7 +31,7 @@ import (
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/telemetry"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
 )
@@ -229,64 +230,6 @@ func WithQueueItemIndexer(i QueueItemIndexer) QueueOpt {
 	}
 }
 
-// WithAsyncInstrumentation registers all the async instrumentation that needs to happen on
-// each instrumentation cycle
-// These are mostly gauges for point in time metrics
-func WithAsyncInstrumentation() QueueOpt {
-	ctx := context.Background()
-
-	return func(q *queue) {
-		telemetry.GaugeWorkerQueueCapacity(ctx, telemetry.GaugeOpt{
-			PkgName:  pkgName,
-			Callback: func(ctx context.Context) (int64, error) { return int64(q.numWorkers), nil },
-		})
-
-		telemetry.GaugeGlobalQueuePartitionCount(ctx, telemetry.GaugeOpt{
-			PkgName: pkgName,
-			Callback: func(ctx context.Context) (int64, error) {
-				dur := time.Hour * 24 * 365
-				return q.partitionSize(ctx, q.u.kg.GlobalPartitionIndex(), q.clock.Now().Add(dur))
-			},
-		})
-
-		telemetry.GaugeGlobalQueuePartitionAvailable(ctx, telemetry.GaugeOpt{
-			PkgName: pkgName,
-			Callback: func(ctx context.Context) (int64, error) {
-				return q.partitionSize(ctx, q.u.kg.GlobalPartitionIndex(), q.clock.Now().Add(PartitionLookahead))
-			},
-		})
-
-		// Shard instrumentations
-		shards, err := q.getShards(ctx)
-		if err != nil {
-			q.logger.Error().Err(err).Msg("error retrieving shards")
-		}
-
-		telemetry.GaugeQueueShardCount(ctx, int64(len(shards)), telemetry.GaugeOpt{PkgName: pkgName})
-		for _, shard := range shards {
-			tags := map[string]any{"shard_name": shard.Name}
-
-			telemetry.GaugeQueueShardGuaranteedCapacityCount(ctx, telemetry.GaugeOpt{
-				PkgName:  pkgName,
-				Tags:     tags,
-				Callback: func(ctx context.Context) (int64, error) { return int64(shard.GuaranteedCapacity), nil },
-			})
-			telemetry.GaugeQueueShardLeaseCount(ctx, telemetry.GaugeOpt{
-				PkgName:  pkgName,
-				Tags:     tags,
-				Callback: func(ctx context.Context) (int64, error) { return int64(len(shard.Leases)), nil },
-			})
-			telemetry.GaugeQueueShardPartitionAvailableCount(ctx, telemetry.GaugeOpt{
-				PkgName: pkgName,
-				Tags:    tags,
-				Callback: func(ctx context.Context) (int64, error) {
-					return q.partitionSize(ctx, q.u.kg.ShardPartitionIndex(shard.Name), q.clock.Now().Add(PartitionLookahead))
-				},
-			})
-		}
-	}
-}
-
 // WithDenyQueueNames specifies that the worker cannot select jobs from queue partitions
 // within the given list of names.  This means that the worker will never work on jobs
 // in the specified queues.
@@ -407,14 +350,15 @@ func NewQueue(u *QueueClient, opts ...QueueOpt) *queue {
 		pf: func(ctx context.Context, item QueueItem) uint {
 			return PriorityDefault
 		},
-		numWorkers:         defaultNumWorkers,
-		wg:                 &sync.WaitGroup{},
-		seqLeaseLock:       &sync.RWMutex{},
-		scavengerLeaseLock: &sync.RWMutex{},
-		pollTick:           defaultPollTick,
-		idempotencyTTL:     defaultIdempotencyTTL,
-		queueKindMapping:   make(map[string]string),
-		logger:             logger.From(context.Background()),
+		numWorkers:               defaultNumWorkers,
+		wg:                       &sync.WaitGroup{},
+		seqLeaseLock:             &sync.RWMutex{},
+		scavengerLeaseLock:       &sync.RWMutex{},
+		instrumentationLeaseLock: &sync.RWMutex{},
+		pollTick:                 defaultPollTick,
+		idempotencyTTL:           defaultIdempotencyTTL,
+		queueKindMapping:         make(map[string]string),
+		logger:                   logger.From(context.Background()),
 		partitionConcurrencyGen: func(ctx context.Context, p QueuePartition) (string, int) {
 			return p.Queue(), 10_000
 		},
@@ -508,6 +452,13 @@ type queue struct {
 	// or reading from seqLeaseID in parallel.
 	seqLeaseLock *sync.RWMutex
 
+	// instrumentationLeaseID stores the lease ID if executor is running queue
+	// instrumentations
+	instrumentationLeaseID *ulid.ULID
+	// instrumentationLeaseLock ensures that there are no data races writing to or
+	// reading from instrumentationLeaseID
+	instrumentationLeaseLock *sync.RWMutex
+
 	// scavengerLeaseID stores the lease ID if this queue is the scavenger processor.
 	// all runners attempt to claim this lease automatically.
 	scavengerLeaseID *ulid.ULID
@@ -568,6 +519,11 @@ func (q QueueShard) Partition() string {
 // time of the earliest job within the workflow.
 type QueuePartition struct {
 	QueueName *string `json:"queue,omitempty"`
+
+	// PartitionType is the int-value of the enums.PartitionType for this
+	// partition.  By default, partitions are function-scoped without any
+	// custom keys.
+	PartitionType int `json:"pt,omitempty"`
 
 	WorkflowID  uuid.UUID `json:"wid"`
 	WorkspaceID uuid.UUID `json:"wsID"`
@@ -1017,10 +973,10 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 	if limit > QueuePeekMax {
 		// Lua's max unpack() length is 8000; don't allow users to peek more than
 		// 1k at a time regardless.
-		return nil, ErrQueuePeekMaxExceedsLimits
+		limit = QueuePeekMax
 	}
 	if limit <= 0 {
-		limit = QueuePeekMax
+		limit = QueuePeekMin
 	}
 	if isPeekNext {
 		limit = 1
@@ -1884,6 +1840,103 @@ func (q *queue) InProgress(ctx context.Context, prefix string, concurrencyKey st
 	return q.u.unshardedRc.Do(ctx, cmd).AsInt64()
 }
 
+func (q *queue) Instrument(ctx context.Context) error {
+	// other queue instrumentation
+	go func(ctx context.Context) {
+		// Shard instrumentations
+		shards, err := q.getShards(ctx)
+		if err != nil {
+			q.logger.Error().Err(err).Msg("error retrieving shards")
+		}
+
+		metrics.GaugeQueueShardCount(ctx, int64(len(shards)), metrics.GaugeOpt{PkgName: pkgName})
+		for _, shard := range shards {
+			tags := map[string]any{"shard_name": shard.Name}
+
+			metrics.GaugeQueueShardGuaranteedCapacityCount(ctx, int64(shard.GuaranteedCapacity), metrics.GaugeOpt{
+				PkgName: pkgName,
+				Tags:    tags,
+			})
+			metrics.GaugeQueueShardLeaseCount(ctx, int64(len(shard.Leases)), metrics.GaugeOpt{
+				PkgName: pkgName,
+				Tags:    tags,
+			})
+
+			if size, err := q.partitionSize(ctx, q.u.kg.ShardPartitionIndex(shard.Name), q.clock.Now().Add(PartitionLookahead)); err == nil {
+				metrics.GaugeQueueShardPartitionAvailableCount(ctx, size, metrics.GaugeOpt{
+					PkgName: pkgName,
+					Tags:    tags,
+				})
+			}
+		}
+	}(ctx)
+
+	// Check on global partition and queue partition sizes
+	var offset, total int64
+	chunkSize := int64(1000)
+
+	r := q.u.unshardedRc
+	// iterate through all the partitions in the global partitions in chunks
+	wg := sync.WaitGroup{}
+	for {
+		// grab the global partition by chunks
+		cmd := r.B().Zrange().
+			Key(q.u.kg.GlobalPartitionIndex()).
+			Min("-inf").
+			Max("+inf").
+			Byscore().
+			Limit(offset, chunkSize).
+			Build()
+
+		pkeys, err := r.Do(ctx, cmd).AsStrSlice()
+		if err != nil {
+			return fmt.Errorf("error retrieving partitions for instrumentation: %w", err)
+		}
+
+		for _, pk := range pkeys {
+			wg.Add(1)
+
+			// check each partition concurrently
+			go func(ctx context.Context, pkey string) {
+				defer wg.Done()
+
+				cntCmd := r.B().Zcount().Key(q.u.kg.QueueIndex(pkey)).Min("-inf").Max("+inf").Build()
+				count, err := q.u.unshardedRc.Do(ctx, cntCmd).AsInt64()
+				if err != nil {
+					q.logger.Warn().Err(err).Str("pkey", pkey).Str("context", "instrumentation").Msg("error checking partition count")
+					return
+				}
+
+				metrics.GaugePartitionSize(ctx, count, metrics.GaugeOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						// NOTE: potentially high cardinality but this gives better clarify of stuff
+						"partition": pkey,
+					},
+				})
+
+				atomic.AddInt64(&total, 1)
+			}(ctx, pk)
+
+		}
+		// end of pagination, exit
+		if len(pkeys) < int(chunkSize) {
+			break
+		}
+
+		offset += chunkSize
+	}
+
+	// instrument the total count of global partition
+	metrics.GaugeGlobalPartitionSize(ctx, atomic.LoadInt64(&total), metrics.GaugeOpt{
+		PkgName: pkgName,
+	})
+
+	wg.Wait()
+
+	return nil
+}
+
 // Scavenge attempts to find jobs that may have been lost due to killed workers.  Workers are shared
 // nothing, and each item in a queue has a lease.  If a worker dies, it will not finish the job and
 // cannot renew the item's lease.
@@ -2164,11 +2217,19 @@ func (q *queue) peekEWMA(ctx context.Context, fnID uuid.UUID) (int64, error) {
 		return 0, nil
 	}
 
-	// convert to float for
+	hasNonZero := false
 	vals := make([]float64, len(strlist))
 	for i, s := range strlist {
 		v, _ := strconv.ParseFloat(s, 64)
 		vals[i] = v
+		if v > 0 {
+			hasNonZero = true
+		}
+	}
+
+	if !hasNonZero {
+		// short-circuit.
+		return 0, nil
 	}
 
 	// create a simple EWMA, add all the numbers in it and get the final value

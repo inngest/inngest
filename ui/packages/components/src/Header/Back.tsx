@@ -1,19 +1,19 @@
-'use client';
-
-import { useRouter } from 'next/navigation';
 import { NewButton } from '@inngest/components/Button';
 import { RiArrowLeftLine } from '@remixicon/react';
 
+import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
+
 export const Back = ({ className }: { className?: string }) => {
-  const router = useRouter();
   return (
-    <NewButton
-      kind="secondary"
-      appearance="outlined"
-      size="small"
-      icon={<RiArrowLeftLine />}
-      className={className}
-      onClick={() => router.back()}
-    />
+    <OptionalTooltip tooltip="Back to environment" side="bottom">
+      <NewButton
+        kind="secondary"
+        appearance="outlined"
+        size="small"
+        icon={<RiArrowLeftLine />}
+        className={className}
+        href="/"
+      />
+    </OptionalTooltip>
   );
 };

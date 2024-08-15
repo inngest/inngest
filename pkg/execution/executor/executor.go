@@ -30,7 +30,9 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/telemetry"
+	"github.com/inngest/inngest/pkg/run"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog"
@@ -41,6 +43,10 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
+)
+
+const (
+	pkgName = "executor.execution.inngest"
 )
 
 var (
@@ -395,7 +401,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	evtMap := req.Events[0].GetEvent().Map()
 	factor, _ := req.Function.RunPriorityFactor(ctx, evtMap)
 	// function run spanID
-	spanID := telemetry.NewSpanID(ctx)
+	spanID := run.NewSpanID(ctx)
 
 	config := sv2.Config{
 		FunctionVersion: req.Function.FunctionVersion,
@@ -420,9 +426,10 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// FunctionSlug is not stored in V1 format, so needs to be stored in Context
 	config.SetFunctionSlug(req.Function.GetSlug())
 	config.SetDebounceFlag(req.PreventDebounce)
+	config.SetEventIDMapping(req.Events)
 
-	carrier := telemetry.NewTraceCarrier(telemetry.WithTraceCarrierSpanID(&spanID))
-	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	carrier := itrace.NewTraceCarrier(itrace.WithTraceCarrierSpanID(&spanID))
+	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 	config.SetFunctionTrace(carrier)
 
 	metadata := sv2.Metadata{
@@ -1243,9 +1250,15 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 			// time to process.  We handle that here and assume that the event
 			// did not occur in time.
 			if pause.Expires.Time().Before(time.Now()) {
-				// Consume this pause to remove it entirely
-				l.Debug().Msg("deleting expired pause")
-				_ = e.pm.DeletePause(context.Background(), *pause)
+				l.Debug().Msg("encountered expired pause")
+
+				shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
+				if shouldDelete {
+					// Consume this pause to remove it entirely
+					l.Debug().Msg("deleting expired pause")
+					_ = e.pm.DeletePause(context.Background(), *pause)
+				}
+
 				return
 			}
 
@@ -1418,10 +1431,16 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 			// time to process.  We handle that here and assume that the event
 			// did not occur in time.
 			if pause.Expires.Time().Before(time.Now()) {
-				// Consume this pause to remove it entirely
-				l.Debug("deleting expired pause")
-				_ = e.pm.DeletePause(context.Background(), pause)
-				_ = e.exprAggregator.RemovePause(ctx, pause)
+				l.Debug("encountered expired pause")
+
+				shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
+				if shouldDelete {
+					// Consume this pause to remove it entirely
+					l.Debug("deleting expired pause")
+					_ = e.pm.DeletePause(context.Background(), pause)
+					_ = e.exprAggregator.RemovePause(ctx, pause)
+				}
+
 				return
 			}
 
@@ -1535,9 +1554,15 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 	}
 
 	if pause.Expires.Time().Before(time.Now()) {
-		// Consume this pause to remove it entirely
-		l.Debug().Msg("deleting expired pause")
-		_ = e.pm.DeletePause(context.Background(), *pause)
+		l.Debug().Msg("encountered expired pause")
+
+		shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
+		if shouldDelete {
+			// Consume this pause to remove it entirely
+			l.Debug().Msg("deleting expired pause")
+			_ = e.pm.DeletePause(context.Background(), *pause)
+		}
+
 		return nil
 	}
 
@@ -1669,7 +1694,6 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 	// consuming the pause to guarantee the event data is stored via the pause
 	// for the next run.  If the ConsumePause call comes after enqueue, the TCP
 	// conn may drop etc. and running the job may occur prior to saving state data.
-	// jobID := fmt.Sprintf("%s-%s", pause.Identifier.IdempotencyKey(), pause.DataKey+"-pause")
 	jobID := fmt.Sprintf("%s-%s", pause.Identifier.IdempotencyKey(), pause.DataKey)
 	err = e.queue.Enqueue(
 		ctx,
@@ -1691,6 +1715,25 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 	)
 	if err != nil && err != redis_state.ErrQueueItemExists {
 		return fmt.Errorf("error enqueueing after pause: %w", err)
+	}
+
+	// And dequeue the timeout job to remove unneeded work from the queue, etc.
+	if q, ok := e.queue.(redis_state.QueueManager); ok {
+		jobID := fmt.Sprintf("%s-%s", md.IdempotencyKey(), pause.DataKey)
+		err := q.Dequeue(
+			ctx,
+			redis_state.QueuePartition{WorkflowID: md.ID.FunctionID},
+			redis_state.QueueItem{
+				ID:         redis_state.HashID(ctx, jobID),
+				WorkflowID: md.ID.FunctionID,
+				Data: queue.Item{
+					Kind: queue.KindPause,
+				},
+			},
+		)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error dequeueing consumed pause job when resuming", "error", err)
+		}
 	}
 
 	if pause.IsInvoke() {
@@ -2095,14 +2138,14 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 	opcode := gen.Op.String()
 	now := time.Now()
 
-	sid := telemetry.NewSpanID(ctx)
+	sid := run.NewSpanID(ctx)
 	// NOTE: the context here still contains the execSpan's traceID & spanID,
 	// which is what we want because that's the parent that needs to be referenced later on
-	carrier := telemetry.NewTraceCarrier(
-		telemetry.WithTraceCarrierTimestamp(now),
-		telemetry.WithTraceCarrierSpanID(&sid),
+	carrier := itrace.NewTraceCarrier(
+		itrace.WithTraceCarrierTimestamp(now),
+		itrace.WithTraceCarrierSpanID(&sid),
 	)
-	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 	// Always create an invocation event.
 	evt := event.NewInvocationEvent(event.NewInvocationEventOpts{
@@ -2147,7 +2190,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 	}
 
 	// Enqueue a job that will timeout the pause.
-	jobID := fmt.Sprintf("%s-%s-%s", i.md.IdempotencyKey(), gen.ID, "invoke")
+	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID)
 	// TODO I think this is fine sending no metadata, as we have no attempts.
 	err = e.queue.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
@@ -2236,14 +2279,14 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 	opcode := gen.Op.String()
 	now := time.Now()
 
-	sid := telemetry.NewSpanID(ctx)
+	sid := run.NewSpanID(ctx)
 	// NOTE: the context here still contains the execSpan's traceID & spanID,
 	// which is what we want because that's the parent that needs to be referenced later on
-	carrier := telemetry.NewTraceCarrier(
-		telemetry.WithTraceCarrierTimestamp(now),
-		telemetry.WithTraceCarrierSpanID(&sid),
+	carrier := itrace.NewTraceCarrier(
+		itrace.WithTraceCarrierTimestamp(now),
+		itrace.WithTraceCarrierSpanID(&sid),
 	)
-	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 	pause := state.Pause{
 		ID:          pauseID,
@@ -2277,7 +2320,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 	// the pause so this race will conclude by calling the function once, as only
 	// one thread can lease and consume a pause;  the other will find that the
 	// pause is no longer available and return.
-	jobID := fmt.Sprintf("%s-%s-%s", i.md.IdempotencyKey(), gen.ID, "wait")
+	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID)
 	// TODO Is this fine to leave? No attempts.
 	err = e.queue.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
@@ -2348,6 +2391,13 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 		}); err != nil {
 			return err
 		}
+
+		metrics.IncrBatchScheduledCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"account_id": bi.AccountID.String(),
+			},
+		})
 	case enums.BatchFull:
 		// start execution immediately
 		batchID := ulid.MustParse(result.BatchID)
@@ -2364,6 +2414,7 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 		}); err != nil {
 			return fmt.Errorf("could not retrieve and schedule batch items: %w", err)
 		}
+
 	default:
 		return fmt.Errorf("invalid status of batch append ops: %d", result.Status)
 	}
@@ -2390,11 +2441,11 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 	}
 
 	// root span for scheduling a batch
-	ctx, span := telemetry.NewSpan(ctx,
-		telemetry.WithScope(consts.OtelScopeBatch),
-		telemetry.WithName(consts.OtelSpanBatch),
-		telemetry.WithNewRoot(),
-		telemetry.WithSpanAttributes(
+	ctx, span := run.NewSpan(ctx,
+		run.WithScope(consts.OtelScopeBatch),
+		run.WithName(consts.OtelSpanBatch),
+		run.WithNewRoot(),
+		run.WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, payload.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, payload.WorkspaceID.String()),
@@ -2425,6 +2476,11 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		IdempotencyKey:   &key,
 		FunctionPausedAt: opts.FunctionPausedAt,
 	})
+	// Don't bother if it's already there
+	if err == redis_state.ErrQueueItemExists {
+		return nil
+	}
+	// TODO: check for known errors
 	if err != nil {
 		span.SetStatus(codes.Error, err.Error())
 		return err
@@ -2436,6 +2492,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 	}
 
+	// TODO: check if all errors can be blindly returned
 	if err := e.batcher.ExpireKeys(ctx, payload.FunctionID, payload.BatchID); err != nil {
 		return err
 	}
@@ -2505,7 +2562,7 @@ func extractTraceCtx(ctx context.Context, md sv2.Metadata) context.Context {
 		// NOTE:
 		// this gymastics happens because the carrier stores the spanID separately.
 		// it probably can be simplified
-		tmp := telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
+		tmp := itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
 		spanID, err := md.Config.GetSpanID()
 		if err != nil {
 			return ctx

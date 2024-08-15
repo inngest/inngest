@@ -22,8 +22,8 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
+	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/service"
-	"github.com/inngest/inngest/pkg/telemetry"
 	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/errgroup"
 )
@@ -293,6 +293,11 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 		// batch already started, abort
 		return nil
 	}
+	if status == enums.BatchStatusAbsent.String() {
+		// just attempt clean up, don't care about the result
+		_ = s.batcher.ExpireKeys(ctx, opts.FunctionID, batchID)
+		return nil
+	}
 
 	fn, err := s.findFunctionByID(ctx, opts.FunctionID)
 	if err != nil {
@@ -332,10 +337,10 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 				return err
 			}
 
-			ctx, span := telemetry.NewSpan(ctx,
-				telemetry.WithScope(consts.OtelScopeDebounce),
-				telemetry.WithName(consts.OtelSpanDebounce),
-				telemetry.WithSpanAttributes(
+			ctx, span := run.NewSpan(ctx,
+				run.WithScope(consts.OtelScopeDebounce),
+				run.WithName(consts.OtelSpanDebounce),
+				run.WithSpanAttributes(
 					attribute.String(consts.OtelSysAccountID, item.Identifier.AccountID.String()),
 					attribute.String(consts.OtelSysWorkspaceID, item.Identifier.WorkspaceID.String()),
 					attribute.String(consts.OtelSysAppID, item.Identifier.AppID.String()),

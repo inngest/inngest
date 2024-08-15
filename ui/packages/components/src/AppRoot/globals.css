@@ -43,6 +43,10 @@
   @apply rounded-b-lg;
 }
 
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
 @layer base {
   :root {
     /* Carbon Colors */

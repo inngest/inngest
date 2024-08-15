@@ -21,8 +21,7 @@ export default function KeysMenu({
           kind="secondary"
           appearance={collapsed ? 'ghost' : 'outlined'}
           size="medium"
-          icon={<RiEqualizer2Line className="fill-subtle" />}
-          className={collapsed ? 'mt-2.5' : 'ml-2.5'}
+          icon={<RiEqualizer2Line className="fill-subtle w-[18px]" />}
         />
       </Listbox.Button>
       <div className="relative">

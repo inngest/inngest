@@ -17,9 +17,9 @@ export const StatusMenu = ({ envSlug, archived }: { envSlug: string; archived: b
       label="Pause runs"
       multiple={false}
       value={archived ? archivedOption : activeOption}
-      className="z-50 mr-3 h-[30px]"
+      className="z-20 mr-3 h-[30px]"
     >
-      <Select.Button className="h-[28px] w-[142px]">
+      <Select.Button className="h-[28px] w-[142px] py-1 pl-2 pr-3">
         <div className="mr-2 flex flex-row items-center text-sm">
           <StatusIcon className={`mr-2 ${archived ? 'bg-accent-subtle' : 'bg-primary-moderate'}`} />
           {archived ? 'Archived' : 'Active'}
@@ -27,7 +27,7 @@ export const StatusMenu = ({ envSlug, archived }: { envSlug: string; archived: b
       </Select.Button>
 
       <Select.Options>
-        <Link href={`/env/${envSlug}/functions`} prefetch={true}>
+        <Link href={`/env/${envSlug}/functions`}>
           <Select.Option key={activeOption.id} option={activeOption}>
             <div className="text-basis flex flex-row items-center text-sm font-medium">
               <StatusIcon className="bg-primary-moderate mr-2" />
@@ -35,7 +35,7 @@ export const StatusMenu = ({ envSlug, archived }: { envSlug: string; archived: b
             </div>
           </Select.Option>
         </Link>
-        <Link href={`/env/${envSlug}/functions?archived=true`} prefetch={true}>
+        <Link href={`/env/${envSlug}/functions?archived=true`}>
           <Select.Option key={archivedOption.id} option={archivedOption}>
             <div className="text-basis flex flex-row items-center text-sm font-medium">
               <StatusIcon className="bg-accent-subtle mr-2" />

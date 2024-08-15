@@ -5,9 +5,15 @@ import { type Route } from 'next';
 import Link from 'next/link';
 import { usePathname, useRouter, useSelectedLayoutSegments } from 'next/navigation';
 import { Listbox } from '@headlessui/react';
-import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
-import { RiCloudFill, RiCloudLine, RiExpandUpDownLine, RiLoopLeftLine } from '@remixicon/react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
+import {
+  RiCloudFill,
+  RiCloudLine,
+  RiErrorWarningLine,
+  RiExpandUpDownLine,
+  RiLoopLeftLine,
+} from '@remixicon/react';
 
 import { useEnvironments } from '@/queries';
 import cn from '@/utils/cn';
@@ -19,7 +25,6 @@ import {
   getTestEnvironments,
   type Environment,
 } from '@/utils/environments';
-import isNonEmptyArray from '@/utils/isNonEmptyArray';
 
 // Some URLs cannot just swap between environments,
 // we need to redirect to a less specific resource URL that is shared across environments
@@ -75,7 +80,7 @@ const SelectedDisplay = ({
   selected: Environment | null;
   collapsed: boolean;
 }) => (
-  <span className={`flex  flex-row items-center ${collapsed ? '' : 'min-w-0 truncate'}`}>
+  <span className={`flex flex-row items-center ${collapsed ? '' : 'min-w-0 truncate'}`}>
     {selected ? (
       <span className="block">
         {selected.type === EnvironmentType.BranchParent
@@ -110,16 +115,34 @@ export default function EnvironmentSelectMenu({
   const router = useRouter();
   const [selected, setSelected] = useState<Environment | null>(null);
   const nextPathname = useSwitchablePathname();
-  const [{ fetching, data: envs = [] }] = useEnvironments();
+  const [{ data: envs = [], error }] = useEnvironments();
 
-  if (fetching || !isNonEmptyArray(envs)) {
-    return <Skeleton className={`h-8 ${collapsed ? 'w-8 px-1' : 'w-[146px] px-2'}`} />;
+  if (error) {
+    console.error('error fetching envs', error);
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="bg-error text-error flex h-8 w-full items-center justify-start gap-x-2 rounded px-2">
+            <RiErrorWarningLine className="w-4" />
+            {!collapsed && <div>Env Error</div>}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="right" className="text-error bg-error rounded text-xs">
+          Error loading environments. Please try again or contact support if the issue does not
+          resolve.
+        </TooltipContent>
+      </Tooltip>
+    );
   }
 
   const defaultEnvironment = getDefaultEnvironment(envs);
-  const legacyTestMode = getLegacyTestMode(envs);
-  const mostRecentlyCreatedBranchEnvironments = getSortedBranchEnvironments(envs).slice(0, 5);
-  const testEnvironments = getTestEnvironments(envs);
+  const includeArchived = false;
+  const legacyTestMode = getLegacyTestMode(envs, includeArchived);
+  const mostRecentlyCreatedBranchEnvironments = getSortedBranchEnvironments(
+    envs,
+    includeArchived
+  ).slice(0, 5);
+  const testEnvironments = getTestEnvironments(envs, includeArchived);
 
   if (selected === null && activeEnv) {
     setSelected(activeEnv);
@@ -139,8 +162,8 @@ export default function EnvironmentSelectMenu({
           <OptionalTooltip tooltip={collapsed && tooltip(selected)}>
             <Listbox.Button
               className={`border-muted bg-canvasBase text-primary-intense hover:bg-canvasSubtle px-2 ${
-                collapsed ? `w-8` : !activeEnv ? 'w-[186px]' : 'w-[146px]'
-              } m-0 h-8 overflow-hidden rounded border text-sm ${open && 'border-primary-intense'}`}
+                collapsed ? `w-8` : !activeEnv ? 'w-[196px]' : 'w-[158px]'
+              } h-8 overflow-hidden rounded border text-sm ${open && 'border-primary-intense'}`}
             >
               <div
                 className={`flex flex-row items-center  ${
@@ -155,7 +178,7 @@ export default function EnvironmentSelectMenu({
             </Listbox.Button>
           </OptionalTooltip>
 
-          <Listbox.Options className="bg-canvasBase border-subtle absolute top-10 z-50 w-[188px] divide-none overflow-y-scroll rounded border shadow focus:outline-none">
+          <Listbox.Options className="bg-canvasBase border-subtle overflow-y-truncate absolute top-10 z-50 w-[188px] divide-none rounded border shadow focus:outline-none">
             {defaultEnvironment !== null && <EnvironmentItem environment={defaultEnvironment} />}
 
             {legacyTestMode !== null && (

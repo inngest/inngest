@@ -11,7 +11,9 @@ export default async function Page({
   return (
     <ServerFeatureFlag flag="event-search">
       {newIANav && <EventsHeader envSlug={envSlug} eventSearch={true} sendEvents={false} />}
-      <EventSearch />
+      <div className="bg-canvasBase flex h-full w-full flex-col">
+        <EventSearch />
+      </div>
     </ServerFeatureFlag>
   );
 }

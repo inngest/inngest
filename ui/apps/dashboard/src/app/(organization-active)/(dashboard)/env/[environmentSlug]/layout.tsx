@@ -40,16 +40,18 @@ export default async function RootLayout({
   const env = await getEnv(environmentSlug);
   const newIANav = await getBooleanFlag('new-ia-nav');
 
-  return newIANav ? (
-    <Layout activeEnv={env}>
-      <Env env={env}>{children}</Env>
-    </Layout>
-  ) : (
+  return (
     <>
-      <div className="isolate flex h-full flex-col">
-        <AppNavigation activeEnv={env} envSlug={environmentSlug} />
-        <Env env={env}>{children}</Env>
-      </div>
+      {newIANav ? (
+        <Layout activeEnv={env}>
+          <Env env={env}>{children}</Env>
+        </Layout>
+      ) : (
+        <div className="isolate flex h-full flex-col">
+          <AppNavigation activeEnv={env} envSlug={environmentSlug} />
+          <Env env={env}>{children}</Env>
+        </div>
+      )}
       <Toaster
         toastOptions={{
           // Ensure that the toast is clickable when there are overlays/modals

@@ -2,7 +2,16 @@ import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 
+import { useGetAppsQuery } from '@/store/generated';
+
 export default function Mange({ collapsed }: { collapsed: boolean }) {
+  const { hasSyncingError } = useGetAppsQuery(undefined, {
+    selectFromResult: (result) => ({
+      hasSyncingError: result?.data?.apps?.some((app) => app.connected === false),
+    }),
+    pollingInterval: 1500,
+  });
+
   return (
     <div className={`jusity-center mt-5 flex flex-col`}>
       {collapsed ? (
@@ -15,6 +24,7 @@ export default function Mange({ collapsed }: { collapsed: boolean }) {
         collapsed={collapsed}
         text="Apps"
         icon={<AppsIcon className="h-18px w-[18px]" />}
+        error={hasSyncingError}
       />
 
       <MenuItem

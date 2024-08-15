@@ -18,7 +18,7 @@ import (
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/telemetry"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -51,11 +51,11 @@ func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Meta
 	}
 
 	// span that tells when the function was queued
-	_, span := telemetry.NewSpan(ctx,
-		telemetry.WithScope(consts.OtelScopeTrigger),
-		telemetry.WithName(consts.OtelSpanTrigger),
-		telemetry.WithTimestamp(ulid.Time(runID.Time())),
-		telemetry.WithSpanAttributes(
+	_, span := NewSpan(ctx,
+		WithScope(consts.OtelScopeTrigger),
+		WithName(consts.OtelSpanTrigger),
+		WithTimestamp(ulid.Time(runID.Time())),
+		WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
@@ -99,6 +99,7 @@ func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Meta
 		if byt, err := json.Marshal(evt); err == nil {
 			span.AddEvent(string(byt), trace.WithAttributes(
 				attribute.Bool(consts.OtelSysEventData, true),
+				attribute.String(consts.OtelSysEventInternalID, e.GetInternalID().String()),
 			))
 		}
 	}
@@ -110,7 +111,7 @@ func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Meta
 				meta := event.InngestMetadata{}
 				if err := meta.Decode(v); err == nil {
 					if meta.InvokeTraceCarrier != nil && meta.InvokeTraceCarrier.CanResumePause() {
-						ictx := telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(meta.InvokeTraceCarrier.Context))
+						ictx := itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(meta.InvokeTraceCarrier.Context))
 
 						sid := meta.InvokeTraceCarrier.SpanID()
 
@@ -126,12 +127,12 @@ func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Meta
 							mrunID = *meta.RunID()
 						}
 
-						_, ispan := telemetry.NewSpan(ictx,
-							telemetry.WithScope(consts.OtelScopeStep),
-							telemetry.WithName(consts.OtelSpanInvoke),
-							telemetry.WithTimestamp(meta.InvokeTraceCarrier.Timestamp),
-							telemetry.WithSpanID(sid),
-							telemetry.WithSpanAttributes(
+						_, ispan := NewSpan(ictx,
+							WithScope(consts.OtelScopeStep),
+							WithName(consts.OtelSpanInvoke),
+							WithTimestamp(meta.InvokeTraceCarrier.Timestamp),
+							WithSpanID(sid),
+							WithSpanAttributes(
 								attribute.Bool(consts.OtelUserTraceFilterKey, true),
 								attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 								attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
@@ -179,7 +180,7 @@ func (l traceLifecycle) OnFunctionStarted(
 	if err != nil {
 		// generate a new one here to be used for subsequent runs.
 		// this could happen for runs that started before this feature was introduced.
-		sid := telemetry.NewSpanID(ctx)
+		sid := NewSpanID(ctx)
 		spanID = &sid
 	}
 
@@ -192,12 +193,12 @@ func (l traceLifecycle) OnFunctionStarted(
 	}
 
 	// (re)Construct function span to force update the end time
-	_, span := telemetry.NewSpan(ctx,
-		telemetry.WithScope(consts.OtelScopeFunction),
-		telemetry.WithName(slug),
-		telemetry.WithTimestamp(start),
-		telemetry.WithSpanID(*spanID),
-		telemetry.WithSpanAttributes(
+	_, span := NewSpan(ctx,
+		WithScope(consts.OtelScopeFunction),
+		WithName(slug),
+		WithTimestamp(start),
+		WithSpanID(*spanID),
+		WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
@@ -230,10 +231,14 @@ func (l traceLifecycle) OnFunctionStarted(
 		span.SetAttributes(attribute.String(consts.OtelSysFunctionLink, *md.Config.TraceLink()))
 	}
 
-	for _, e := range evts {
-		span.AddEvent(string(e), trace.WithAttributes(
-			attribute.Bool(consts.OtelSysEventData, true),
-		))
+	if err := span.SetEvents(ctx, evts, md.Config.EventIDMapping()); err != nil {
+		l.log.Warn("error setting events",
+			"lifecycle", "OnFunctionStarted",
+			"errors", err,
+			"meta", md,
+			"item", item,
+			"evts", evts,
+		)
 	}
 }
 
@@ -257,7 +262,7 @@ func (l traceLifecycle) OnFunctionFinished(
 	if err != nil {
 		// generate a new one here to be used for subsequent runs.
 		// this could happen for runs that started before this feature was introduced.
-		sid := telemetry.NewSpanID(ctx)
+		sid := NewSpanID(ctx)
 		spanID = &sid
 	}
 
@@ -270,12 +275,12 @@ func (l traceLifecycle) OnFunctionFinished(
 	}
 
 	// (re)Construct function span to force update the end time
-	_, span := telemetry.NewSpan(ctx,
-		telemetry.WithScope(consts.OtelScopeFunction),
-		telemetry.WithName(slug),
-		telemetry.WithTimestamp(start),
-		telemetry.WithSpanID(*spanID),
-		telemetry.WithSpanAttributes(
+	_, span := NewSpan(ctx,
+		WithScope(consts.OtelScopeFunction),
+		WithName(slug),
+		WithTimestamp(start),
+		WithSpanID(*spanID),
+		WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
@@ -307,10 +312,14 @@ func (l traceLifecycle) OnFunctionFinished(
 		span.SetAttributes(attribute.String(consts.OtelSysFunctionLink, *md.Config.TraceLink()))
 	}
 
-	for _, e := range evts {
-		span.AddEvent(string(e), trace.WithAttributes(
-			attribute.Bool(consts.OtelSysEventData, true),
-		))
+	if err := span.SetEvents(ctx, evts, md.Config.EventIDMapping()); err != nil {
+		l.log.Warn("error setting events",
+			"lifecycle", "OnFunctionFinished",
+			"errors", err,
+			"meta", md,
+			"item", item,
+			"evts", evts,
+		)
 	}
 
 	switch resp.StatusCode {
@@ -347,12 +356,12 @@ func (l traceLifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata
 		evtIDs[i] = eid.String()
 	}
 
-	_, span := telemetry.NewSpan(ctx,
-		telemetry.WithScope(consts.OtelScopeFunction),
-		telemetry.WithName(md.Config.FunctionSlug()),
-		telemetry.WithTimestamp(start),
-		telemetry.WithSpanID(*fnSpanID),
-		telemetry.WithSpanAttributes(
+	_, span := NewSpan(ctx,
+		WithScope(consts.OtelScopeFunction),
+		WithName(md.Config.FunctionSlug()),
+		WithTimestamp(start),
+		WithSpanID(*fnSpanID),
+		WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
@@ -378,10 +387,14 @@ func (l traceLifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata
 		)
 	}
 
-	for _, evt := range evts {
-		span.AddEvent(string(evt), trace.WithAttributes(
-			attribute.Bool(consts.OtelSysEventData, true),
-		))
+	if err := span.SetEvents(ctx, evts, md.Config.EventIDMapping()); err != nil {
+		l.log.Warn("error setting events",
+			"lifecycle", "OnFunctionCancelled",
+			"errors", err,
+			"meta", md,
+			"req", req,
+			"evts", evts,
+		)
 	}
 }
 
@@ -407,12 +420,12 @@ func (l traceLifecycle) OnStepStarted(
 	}
 	runID := md.ID.RunID
 
-	_, span := telemetry.NewSpan(ctx,
-		telemetry.WithScope(consts.OtelScopeExecution),
-		telemetry.WithName(consts.OtelExecPlaceholder),
-		telemetry.WithTimestamp(start),
-		telemetry.WithSpanID(*spanID),
-		telemetry.WithSpanAttributes(
+	_, span := NewSpan(ctx,
+		WithScope(consts.OtelScopeExecution),
+		WithName(consts.OtelExecPlaceholder),
+		WithTimestamp(start),
+		WithSpanID(*spanID),
+		WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
@@ -442,7 +455,7 @@ func (l traceLifecycle) OnStepStarted(
 	// first step
 	if edge.Incoming == inngest.TriggerName {
 		// NOTE:
-		// annotate the step as the first step of the function run.
+		// annotate the step as the first step of the function
 		// this way the delay associated with this run is directly correlated to the delay of the
 		// function run itself.
 		if item.Attempt == 0 {
@@ -474,12 +487,12 @@ func (l traceLifecycle) OnStepFinished(
 	}
 	runID := md.ID.RunID
 
-	_, span := telemetry.NewSpan(ctx,
-		telemetry.WithScope(consts.OtelScopeExecution),
-		telemetry.WithName(consts.OtelExecPlaceholder),
-		telemetry.WithTimestamp(start),
-		telemetry.WithSpanID(*spanID),
-		telemetry.WithSpanAttributes(
+	_, span := NewSpan(ctx,
+		WithScope(consts.OtelScopeExecution),
+		WithName(consts.OtelExecPlaceholder),
+		WithTimestamp(start),
+		WithSpanID(*spanID),
+		WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
@@ -509,7 +522,7 @@ func (l traceLifecycle) OnStepFinished(
 	// first step
 	if edge.Incoming == inngest.TriggerName {
 		// NOTE:
-		// annotate the step as the first step of the function run.
+		// annotate the step as the first step of the function
 		// this way the delay associated with this run is directly correlated to the delay of the
 		// function run itself.
 		if item.Attempt == 0 {
@@ -600,11 +613,11 @@ func (l traceLifecycle) OnSleep(
 	startedAt := until.Add(-1 * dur)
 	runID := md.ID.RunID
 
-	_, span := telemetry.NewSpan(ctx,
-		telemetry.WithScope(consts.OtelScopeStep),
-		telemetry.WithName(consts.OtelSpanSleep),
-		telemetry.WithTimestamp(startedAt),
-		telemetry.WithSpanAttributes(
+	_, span := NewSpan(ctx,
+		WithScope(consts.OtelScopeStep),
+		WithName(consts.OtelSpanSleep),
+		WithTimestamp(startedAt),
+		WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
@@ -633,9 +646,14 @@ func (l traceLifecycle) OnInvokeFunction(
 ) {
 	ctx = l.extractTraceCtx(ctx, md, false)
 
-	meta := invocationEvt.InngestMetadata()
-	if meta == nil {
-		l.log.Error("invocation event metadata not available", "meta", md, "lifecycle", "OnInvokeFunction")
+	meta, err := invocationEvt.InngestMetadata()
+	if err != nil {
+		l.log.Error("invocation event metadata not available",
+			"lifecycle", "OnInvokeFunction",
+			"meta", md,
+			"evt", invocationEvt,
+			"error", err,
+		)
 		return
 	}
 
@@ -647,12 +665,12 @@ func (l traceLifecycle) OnInvokeFunction(
 	}
 	spanID := carrier.SpanID()
 
-	_, span := telemetry.NewSpan(ctx,
-		telemetry.WithScope(consts.OtelScopeStep),
-		telemetry.WithName(consts.OtelSpanInvoke),
-		telemetry.WithTimestamp(carrier.Timestamp),
-		telemetry.WithSpanID(spanID),
-		telemetry.WithSpanAttributes(
+	_, span := NewSpan(ctx,
+		WithScope(consts.OtelScopeStep),
+		WithName(consts.OtelSpanInvoke),
+		WithTimestamp(carrier.Timestamp),
+		WithSpanID(spanID),
+		WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
@@ -696,9 +714,9 @@ func (l traceLifecycle) OnInvokeFunctionResumed(
 		returnedEventID = r.EventID.String()
 	}
 
-	carrier := telemetry.NewTraceCarrier()
+	carrier := itrace.NewTraceCarrier()
 	if err := carrier.Unmarshal(meta); err == nil {
-		ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+		ctx = itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
 		if carrier.CanResumePause() {
 			// Used for spans
 			triggeringEventID := ""
@@ -716,12 +734,12 @@ func (l traceLifecycle) OnInvokeFunctionResumed(
 				runID = r.RunID.String()
 			}
 
-			_, span := telemetry.NewSpan(ctx,
-				telemetry.WithScope(consts.OtelScopeStep),
-				telemetry.WithName(consts.OtelSpanInvoke),
-				telemetry.WithTimestamp(carrier.Timestamp),
-				telemetry.WithSpanID(carrier.SpanID()),
-				telemetry.WithSpanAttributes(
+			_, span := NewSpan(ctx,
+				WithScope(consts.OtelScopeStep),
+				WithName(consts.OtelSpanInvoke),
+				WithTimestamp(carrier.Timestamp),
+				WithSpanID(carrier.SpanID()),
+				WithSpanAttributes(
 					attribute.Bool(consts.OtelUserTraceFilterKey, true),
 					attribute.String(consts.OtelSysAccountID, pause.Identifier.AccountID.String()),
 					attribute.String(consts.OtelSysWorkspaceID, pause.Identifier.WorkspaceID.String()),
@@ -786,18 +804,18 @@ func (l traceLifecycle) OnWaitForEvent(
 		l.log.Error("no trace propagation", "meta", md, "lifecycle", "OnWaitForEvent")
 		return
 	}
-	carrier, ok := v.(*telemetry.TraceCarrier)
+	carrier, ok := v.(*itrace.TraceCarrier)
 	if !ok {
 		l.log.Error("no trace carrier", "meta", md, "lifecycle", "OnWaitForEvent")
 		return
 	}
 
-	_, span := telemetry.NewSpan(ctx,
-		telemetry.WithScope(consts.OtelScopeStep),
-		telemetry.WithName(consts.OtelSpanWaitForEvent),
-		telemetry.WithTimestamp(carrier.Timestamp),
-		telemetry.WithSpanID(carrier.SpanID()),
-		telemetry.WithSpanAttributes(
+	_, span := NewSpan(ctx,
+		WithScope(consts.OtelScopeStep),
+		WithName(consts.OtelSpanWaitForEvent),
+		WithTimestamp(carrier.Timestamp),
+		WithSpanID(carrier.SpanID()),
+		WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeWaitForEvent.String()),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
@@ -843,16 +861,16 @@ func (l traceLifecycle) OnWaitForEventResumed(
 		returnedEventID = r.EventID.String()
 	}
 
-	carrier := telemetry.NewTraceCarrier()
+	carrier := itrace.NewTraceCarrier()
 	if err := carrier.Unmarshal(meta); err == nil {
-		ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+		ctx = itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
 		if carrier.CanResumePause() {
-			_, span := telemetry.NewSpan(ctx,
-				telemetry.WithScope(consts.OtelScopeStep),
-				telemetry.WithName(consts.OtelSpanWaitForEvent),
-				telemetry.WithTimestamp(carrier.Timestamp),
-				telemetry.WithSpanID(carrier.SpanID()),
-				telemetry.WithSpanAttributes(
+			_, span := NewSpan(ctx,
+				WithScope(consts.OtelScopeStep),
+				WithName(consts.OtelSpanWaitForEvent),
+				WithTimestamp(carrier.Timestamp),
+				WithSpanID(carrier.SpanID()),
+				WithSpanAttributes(
 					attribute.Bool(consts.OtelUserTraceFilterKey, true),
 					attribute.String(consts.OtelSysAccountID, pause.Identifier.AccountID.String()),
 					attribute.String(consts.OtelSysWorkspaceID, pause.Identifier.WorkspaceID.String()),
@@ -900,7 +918,7 @@ func (l *traceLifecycle) extractTraceCtx(ctx context.Context, md sv2.Metadata, i
 		// NOTE:
 		// this gymastics happens because the carrier stores the spanID separately.
 		// it probably can be simplified
-		tmp := telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
+		tmp := itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
 		// NOTE: this is getting complex
 		// need the original with the parent span
 		if isFnSpan {
