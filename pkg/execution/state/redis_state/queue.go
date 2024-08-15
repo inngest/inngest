@@ -439,7 +439,7 @@ type queue struct {
 	pf  PriorityFinder
 	gcf GuaranteedCapacityFinder
 
-	lifecycles []QueueLifecycleListener
+	lifecycles QueueLifecycleListeners
 
 	concurrencyLimitGetter       ConcurrencyLimitGetter
 	systemConcurrencyLimitGetter SystemConcurrencyLimitGetter
