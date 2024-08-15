@@ -37,7 +37,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
-	"github.com/inngest/inngest/pkg/history_drivers/memory_writer"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
@@ -92,6 +91,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Initialize the devserver
 	dbcqrs := sqlitecqrs.NewCQRS(db)
 	hd := sqlitecqrs.NewHistoryDriver(db)
+	hr := sqlitecqrs.NewHistoryReader(db)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	stepLimitOverrides := make(map[string]int)
@@ -214,8 +214,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("failed to create publisher: %w", err)
 	}
 
-	hmw := memory_writer.NewWriter(ctx, memory_writer.WriterOptions{DumpToFile: true})
-
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(sm),
@@ -230,7 +228,6 @@ func start(ctx context.Context, opts StartOpts) error {
 			history.NewLifecycleListener(
 				nil,
 				hd,
-				hmw,
 			),
 			devserver.Lifecycle{
 				Cqrs:       dbcqrs,
@@ -294,7 +291,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	ds := devserver.NewService(devserver.StartOpts{
 		Config:  opts.Config,
 		RootDir: opts.RootDir,
-	}, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hmw, &persistenceInterval)
+	}, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hd, &persistenceInterval)
 	// embed the tracker
 	ds.Tracker = t
 	ds.State = sm
@@ -323,15 +320,16 @@ func start(ctx context.Context, opts StartOpts) error {
 	// ds.opts.Config.EventStream.Service.TopicName()
 
 	core, err := coreapi.NewCoreApi(coreapi.Options{
-		Data:         ds.Data,
-		Config:       ds.Opts.Config,
-		Logger:       logger.From(ctx),
-		Runner:       ds.Runner,
-		Tracker:      ds.Tracker,
-		State:        ds.State,
-		Queue:        ds.Queue,
-		EventHandler: ds.HandleEvent,
-		Executor:     ds.Executor,
+		Data:          ds.Data,
+		Config:        ds.Opts.Config,
+		Logger:        logger.From(ctx),
+		Runner:        ds.Runner,
+		Tracker:       ds.Tracker,
+		State:         ds.State,
+		Queue:         ds.Queue,
+		EventHandler:  ds.HandleEvent,
+		Executor:      ds.Executor,
+		HistoryReader: hr,
 	})
 	if err != nil {
 		return err
