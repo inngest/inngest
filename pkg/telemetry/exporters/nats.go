@@ -13,7 +13,6 @@ import (
 	runv2 "github.com/inngest/inngest/proto/gen/run/v2"
 	"github.com/nats-io/nats.go"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -101,17 +100,6 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 					"spanAttr", sp.Attributes(),
 				)
 			}
-			// override the status if it's one of the step scopes
-			if scope == consts.OtelScopeExecution || scope == consts.OtelScopeStep {
-				switch sp.Status().Code {
-				case codes.Ok:
-					status = runv2.SpanStatus_OK
-				case codes.Error:
-					status = runv2.SpanStatus_ERORR
-				case codes.Unset:
-					status = runv2.SpanStatus_UNKNOWN
-				}
-			}
 
 			links := make([]*runv2.SpanLink, len(sp.Links()))
 			for i, spl := range sp.Links() {
@@ -148,6 +136,7 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 				Name:       sp.Name(),
 				Kind:       kind,
 				Status:     status,
+				StatusCode: sp.Status().Code.String(),
 				Scope:      scope,
 				Timestamp:  timestamppb.New(ts),
 				DurationMs: dur.Milliseconds(),
