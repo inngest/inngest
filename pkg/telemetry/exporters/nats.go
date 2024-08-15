@@ -115,10 +115,18 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 
 			links := make([]*runv2.SpanLink, len(sp.Links()))
 			for i, spl := range sp.Links() {
+				attrs := map[string]string{}
+				for _, kv := range spl.Attributes {
+					key := string(kv.Key)
+					val := e.attributeValueAsString(kv.Value)
+					attr[key] = val
+				}
+
 				links[i] = &runv2.SpanLink{
 					TraceId:    spl.SpanContext.TraceID().String(),
 					SpanId:     spl.SpanContext.SpanID().String(),
 					TraceState: spl.SpanContext.TraceFlags().String(),
+					Attributes: attrs,
 				}
 			}
 
@@ -212,19 +220,7 @@ func (e *natsSpanExporter) parseSpanAttributes(spanAttr []attribute.KeyValue) (*
 	for _, kv := range spanAttr {
 		if kv.Valid() {
 			key := string(kv.Key)
-			var val string
-			switch kv.Value.Type() {
-			case attribute.BOOL:
-				val = fmt.Sprintf("%t", kv.Value.AsBool())
-			case attribute.INT64:
-				val = fmt.Sprintf("%d", kv.Value.AsInt64())
-			case attribute.STRING:
-				val = kv.Value.AsString()
-			case attribute.FLOAT64:
-				val = fmt.Sprintf("%f", kv.Value.AsFloat64())
-			default:
-				fmt.Printf("Value type: %s\n\n", kv.Value.Type().String())
-			}
+			val := e.attributeValueAsString(kv.Value)
 
 			switch key {
 			case consts.OtelSysAccountID:
@@ -301,7 +297,7 @@ func (e *natsSpanExporter) parseSpanEvents(spanEvents []trace.Event) ([]*runv2.S
 	triggers := []*runv2.Trigger{}
 	var output []byte
 
-	for _, e := range spanEvents {
+	for _, evt := range spanEvents {
 		attr := map[string]string{}
 		var evtID string
 
@@ -310,23 +306,22 @@ func (e *natsSpanExporter) parseSpanEvents(spanEvents []trace.Event) ([]*runv2.S
 		//
 		// NOTE: event data and outputs should NEVER be in the same span event
 		var typ spanEvtType
-		for _, kv := range e.Attributes {
+		for _, kv := range evt.Attributes {
 			if kv.Valid() {
 				key := string(kv.Key)
+				val := e.attributeValueAsString(kv.Value)
+
 				switch key {
 				case consts.OtelSysEventData:
-					attr[key] = kv.Value.AsString() // TODO: remove this
 					typ = spanEvtTypeEvent
 				case consts.OtelSysEventInternalID:
-					attr[key] = kv.Value.AsString() // TODO: remove this
 					typ = spanEvtTypeEvent
 					evtID = kv.Value.AsString()
 				case consts.OtelSysFunctionOutput, consts.OtelSysStepOutput:
-					attr[key] = kv.Value.AsString() // TODO: remove this
 					typ = spanEvtTypeOutput
-				default:
-					attr[key] = kv.Value.AsString()
 				}
+				// TODO: move this into the default case section
+				attr[key] = val
 			}
 		}
 
@@ -335,19 +330,38 @@ func (e *natsSpanExporter) parseSpanEvents(spanEvents []trace.Event) ([]*runv2.S
 		case spanEvtTypeEvent:
 			triggers = append(triggers, &runv2.Trigger{
 				InternalId: evtID,
-				Body:       []byte(e.Name),
+				Body:       []byte(evt.Name),
 			})
 		case spanEvtTypeOutput:
-			output = []byte(e.Name)
+			output = []byte(evt.Name)
 		}
 
 		// TODO: should be moved into the default case for switch
 		events = append(events, &runv2.SpanEvent{
-			Name:       e.Name,
-			Timestamp:  timestamppb.New(e.Time),
+			Name:       evt.Name,
+			Timestamp:  timestamppb.New(evt.Time),
 			Attributes: attr,
 		})
 	}
 
 	return events, triggers, output, nil
+}
+
+func (e *natsSpanExporter) attributeValueAsString(v attribute.Value) string {
+	switch v.Type() {
+	case attribute.BOOL:
+		return fmt.Sprintf("%t", v.AsBool())
+	case attribute.INT64:
+		return fmt.Sprintf("%d", v.AsInt64())
+	case attribute.STRING:
+		return v.AsString()
+	case attribute.FLOAT64:
+		return fmt.Sprintf("%f", v.AsFloat64())
+	default:
+		logger.StdlibLogger(context.TODO()).Warn("not supported attribute value type",
+			"value", v,
+			"type", v.Type().String(),
+		)
+		return v.AsString()
+	}
 }
