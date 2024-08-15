@@ -3,6 +3,7 @@ package sqlitecqrs
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs/sqlc"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/history_reader"
 	"github.com/inngest/inngest/pkg/usage"
 	"github.com/oklog/ulid/v2"
@@ -149,7 +151,16 @@ func (r *reader) GetRunHistoryItemOutput(
 		return nil, history_reader.ErrNotFound
 	}
 
-	return &item.Result.String, nil
+	var (
+		result            *string
+		execHistoryResult history.Result
+	)
+
+	if err := json.Unmarshal([]byte(item.Result.String), &execHistoryResult); err == nil {
+		result = &execHistoryResult.Output
+	}
+
+	return result, nil
 }
 
 func (r *reader) GetRuns(
@@ -283,54 +294,59 @@ func sqlToRunHistory(item *sqlc.History) (*history_reader.RunHistory, error) {
 		return nil, fmt.Errorf("invalid history type: %w", err)
 	}
 
-	var result *history_reader.RunHistoryResult
+	var (
+		result            *history_reader.RunHistoryResult
+		execHistoryResult *history.Result
+	)
+
 	if item.Result.Valid {
-		result = &history_reader.RunHistoryResult{
-			//
+		err := json.Unmarshal([]byte(item.Result.String), &execHistoryResult)
+		if err == nil {
+			result = history_reader.NewRunHistoryResultFromHistoryResult(execHistoryResult)
 		}
 	}
 
 	var sleep *history_reader.RunHistorySleep
 	if item.Sleep.Valid {
-		sleep = &history_reader.RunHistorySleep{
-			// Until: item.Sleep.Until,
-		}
+		// sleep = &history_reader.RunHistorySleep{
+		// 	Until: item.Sleep.Until,
+		// }
 	}
 
 	var waitForEvent *history_reader.RunHistoryWaitForEvent
 	if item.WaitForEvent.Valid {
-		waitForEvent = &history_reader.RunHistoryWaitForEvent{
-			// EventName:  item.WaitForEvent.EventName,
-			// Expression: item.WaitForEvent.Expression,
-			// Timeout:    item.WaitForEvent.Timeout,
-		}
+		// waitForEvent = &history_reader.RunHistoryWaitForEvent{
+		// 	EventName:  item.WaitForEvent.EventName,
+		// 	Expression: item.WaitForEvent.Expression,
+		// 	Timeout:    item.WaitForEvent.Timeout,
+		// }
 	}
 
 	var waitResult *history_reader.RunHistoryWaitResult
 	if item.WaitResult.Valid {
-		waitResult = &history_reader.RunHistoryWaitResult{
-			// EventID: item.WaitResult.EventID,
-			// Timeout: item.WaitResult.Timeout,
-		}
+		// waitResult = &history_reader.RunHistoryWaitResult{
+		// 	EventID: item.WaitResult.EventID,
+		// 	Timeout: item.WaitResult.Timeout,
+		// }
 	}
 
 	var invokeFunction *history_reader.RunHistoryInvokeFunction
 	if item.InvokeFunction.Valid {
-		invokeFunction = &history_reader.RunHistoryInvokeFunction{
-			// CorrelationID: item.InvokeFunction.CorrelationID,
-			// EventID:       item.InvokeFunction.EventID,
-			// FunctionID:    item.InvokeFunction.FunctionID,
-			// Timeout:       item.InvokeFunction.Timeout,
-		}
+		// invokeFunction = &history_reader.RunHistoryInvokeFunction{
+		// 	CorrelationID: item.InvokeFunction.CorrelationID,
+		// 	EventID:       item.InvokeFunction.EventID,
+		// 	FunctionID:    item.InvokeFunction.FunctionID,
+		// 	Timeout:       item.InvokeFunction.Timeout,
+		// }
 	}
 
 	var invokeFunctionResult *history_reader.RunHistoryInvokeFunctionResult
 	if item.InvokeFunctionResult.Valid {
-		invokeFunctionResult = &history_reader.RunHistoryInvokeFunctionResult{
-			// EventID: item.InvokeFunctionResult.EventID,
-			// RunID:   item.InvokeFunctionResult.RunID,
-			// Timeout: item.InvokeFunctionResult.Timeout,
-		}
+		// invokeFunctionResult = &history_reader.RunHistoryInvokeFunctionResult{
+		// 	EventID: item.InvokeFunctionResult.EventID,
+		// 	RunID:   item.InvokeFunctionResult.RunID,
+		// 	Timeout: item.InvokeFunctionResult.Timeout,
+		// }
 	}
 
 	return &history_reader.RunHistory{

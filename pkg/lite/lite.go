@@ -317,8 +317,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		})
 	})
 
-	// ds.opts.Config.EventStream.Service.TopicName()
-
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		Data:          ds.Data,
 		Config:        ds.Opts.Config,
