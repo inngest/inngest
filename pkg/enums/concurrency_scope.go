@@ -10,7 +10,7 @@ const (
 	// ConcurrencyScopeEnv limits concurrency to the given environment, forcing environment limits across functions
 	// in the same environment.
 	ConcurrencyScopeEnv ConcurrencyScope = 1
-	// ConcurrencyScopeAccount limits concurrency to the entire account, foricng global concurrency limits across
+	// ConcurrencyScopeAccount limits concurrency to the entire account, forcing global concurrency limits across
 	// all functions within your account.
 	ConcurrencyScopeAccount ConcurrencyScope = 2
 )
