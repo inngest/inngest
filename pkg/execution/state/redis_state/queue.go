@@ -1975,6 +1975,24 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		return nil, fmt.Errorf("unknown return type from partitionPeek: %T", peekRet)
 	}
 
+	// begin temporary debugging code
+	for _, item := range encoded {
+		str, ok := item.(string)
+		if !ok {
+			return nil, fmt.Errorf(
+				"non-string type returned from partition peek: %T, partitionKey: %s, partitionItem: %s, args: %+v",
+				item, partitionKey, q.u.kg.PartitionItem(), args,
+			)
+		}
+		if str == "" {
+			return nil, fmt.Errorf(
+				"empty string returned from partition peek; partitionKey: %s, partitionItem: %s, args: %+v",
+				partitionKey, q.u.kg.PartitionItem(), args,
+			)
+		}
+	}
+	// end temporary debugging code
+
 	weights := []float64{}
 	items := make([]*QueuePartition, len(encoded))
 	fnIDs := make(map[uuid.UUID]bool)
