@@ -679,6 +679,54 @@ func (q *Queries) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([
 	return items, nil
 }
 
+const getFunctionRuns = `-- name: GetFunctionRuns :many
+SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_finishes.run_id, function_finishes.status, function_finishes.output, function_finishes.completed_step_count, function_finishes.created_at FROM function_runs
+LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
+`
+
+type GetFunctionRunsRow struct {
+	FunctionRun    FunctionRun
+	FunctionFinish FunctionFinish
+}
+
+func (q *Queries) GetFunctionRuns(ctx context.Context) ([]*GetFunctionRunsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getFunctionRuns)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetFunctionRunsRow
+	for rows.Next() {
+		var i GetFunctionRunsRow
+		if err := rows.Scan(
+			&i.FunctionRun.RunID,
+			&i.FunctionRun.RunStartedAt,
+			&i.FunctionRun.FunctionID,
+			&i.FunctionRun.FunctionVersion,
+			&i.FunctionRun.TriggerType,
+			&i.FunctionRun.EventID,
+			&i.FunctionRun.BatchID,
+			&i.FunctionRun.OriginalRunID,
+			&i.FunctionRun.Cron,
+			&i.FunctionFinish.RunID,
+			&i.FunctionFinish.Status,
+			&i.FunctionFinish.Output,
+			&i.FunctionFinish.CompletedStepCount,
+			&i.FunctionFinish.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFunctionRunsFromEvents = `-- name: GetFunctionRunsFromEvents :many
 SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_finishes.run_id, function_finishes.status, function_finishes.output, function_finishes.completed_step_count, function_finishes.created_at FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
@@ -827,6 +875,41 @@ func (q *Queries) GetFunctions(ctx context.Context) ([]*Function, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const getHistoryItem = `-- name: GetHistoryItem :one
+SELECT id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result FROM history WHERE id = ?
+`
+
+func (q *Queries) GetHistoryItem(ctx context.Context, id ulid.ULID) (*History, error) {
+	row := q.db.QueryRowContext(ctx, getHistoryItem, id)
+	var i History
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.RunStartedAt,
+		&i.FunctionID,
+		&i.FunctionVersion,
+		&i.RunID,
+		&i.EventID,
+		&i.BatchID,
+		&i.GroupID,
+		&i.IdempotencyKey,
+		&i.Type,
+		&i.Attempt,
+		&i.LatencyMs,
+		&i.StepName,
+		&i.StepID,
+		&i.Url,
+		&i.CancelRequest,
+		&i.Sleep,
+		&i.WaitForEvent,
+		&i.WaitResult,
+		&i.InvokeFunction,
+		&i.InvokeFunctionResult,
+		&i.Result,
+	)
+	return &i, err
 }
 
 const getLatestQueueSnapshotChunks = `-- name: GetLatestQueueSnapshotChunks :many
@@ -1042,6 +1125,17 @@ DELETE FROM apps WHERE id = ?
 func (q *Queries) HardDeleteApp(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.ExecContext(ctx, hardDeleteApp, id)
 	return err
+}
+
+const historyCountRuns = `-- name: HistoryCountRuns :one
+SELECT COUNT(DISTINCT run_id) FROM history
+`
+
+func (q *Queries) HistoryCountRuns(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, historyCountRuns)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }
 
 const insertApp = `-- name: InsertApp :one
