@@ -14,17 +14,18 @@ message Span {
   string name = 3;
   run.v2.SpanStepOp kind = 4;
   run.v2.SpanStatus status = 5;
-  string scope = 6;
+  string status_code = 6;
+  string scope = 7;
 
-  google.protobuf.Timestamp timestamp = 7;
-  int64 duration_ms = 8;
-  map<string, string> attributes = 9;
+  google.protobuf.Timestamp timestamp = 8;
+  int64 duration_ms = 9;
+  map<string, string> attributes = 10;
 
-  repeated Trigger triggers = 10;
+  repeated Trigger triggers = 11;
 
-  bytes output = 11;
-  repeated SpanLink links = 12;
-  repeated SpanEvent events = 13;
+  bytes output = 12;
+  repeated SpanLink links = 13;
+  repeated SpanEvent events = 14;
 }
 
 message SpanIdentifier {
