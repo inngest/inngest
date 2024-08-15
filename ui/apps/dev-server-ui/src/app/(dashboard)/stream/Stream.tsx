@@ -258,7 +258,7 @@ export default function Stream() {
         }
       />
       <div
-        className="min-h-0 overflow-y-auto pb-10"
+        className="bg-canvasBase min-h-0 overflow-y-auto pb-10"
         onScroll={(e) => fetchMoreOnScroll(e.target as HTMLDivElement)}
         ref={tableContainerRef}
       >

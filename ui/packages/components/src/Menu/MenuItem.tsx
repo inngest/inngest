@@ -37,7 +37,7 @@ export const MenuItem = ({
             comingSoon
               ? 'text-disabled hover:bg-disabled cursor-not-allowed'
               : active
-              ? 'bg-secondary-4xSubtle text-info hover:bg-secondary-3xSubtle'
+              ? 'bg-secondary-3xSubtle text-info hover:bg-secondary-2xSubtle'
               : 'hover:bg-canvasSubtle text-muted'
           } `}
         >
@@ -51,7 +51,9 @@ export const MenuItem = ({
               Beta
             </Badge>
           )}
-          {error && <Badge kind={'error'} className="ml-2.5 h-5 px-1.5 py-1 text-xs" />}
+          {!collapsed && error && (
+            <Badge kind={'error'} className="ml-2.5 h-5 px-1.5 py-1 text-xs" />
+          )}
         </div>
       </OptionalTooltip>
     </OptionalLink>

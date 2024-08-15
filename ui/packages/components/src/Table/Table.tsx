@@ -45,15 +45,15 @@ export function Table<T>({
   }, 0);
 
   return (
-    <table className="bg-canvasBase w-full border-b border-slate-200 text-sm dark:border-slate-700/30">
-      <thead className="shadow-outline-primary-light sticky top-0 z-[3] text-left">
+    <table className="bg-canvasBase border-subtle w-full border-b text-sm">
+      <thead className="border-subtle sticky top-0 z-[3] border-b text-left">
         {table.getHeaderGroups().map((headerGroup) => (
           <tr key={headerGroup.id}>
             {headerGroup.headers.map((header) => (
               <th
                 className={classNames(
                   cellStyles,
-                  'bg-white font-medium text-slate-600 dark:bg-slate-900 dark:text-slate-500',
+                  'bg-canvasBase text-subtle font-medium',
                   header.column.getIsPinned() && 'sticky left-0 z-[4]',
                   header.column.getCanSort() && 'cursor-pointer'
                 )}
@@ -81,7 +81,7 @@ export function Table<T>({
           </tr>
         ))}
       </thead>
-      <tbody className="divide-y divide-slate-100 text-slate-700 dark:divide-slate-800/30 dark:text-slate-400">
+      <tbody className="divide-subtle text-basis divide-y">
         {options.data.length < 1 && (
           <tr>
             <td className={classNames(cellStyles, 'text-center')} colSpan={colSpanTotalSum}>
@@ -103,7 +103,7 @@ export function Table<T>({
               <tr
                 key={row.id}
                 {...(customRowProps ? customRowProps(row) : {})}
-                className="bg-canvasBase hover:bg-slate-100 dark:hover:bg-slate-900"
+                className="bg-canvasBase hover:bg-canvasSubtle/50"
               >
                 {row.getVisibleCells().map((cell) => (
                   <td
@@ -135,7 +135,7 @@ export function Table<T>({
             <tr
               key={row.id}
               {...(customRowProps ? customRowProps(row) : {})}
-              className=" dark:bg-slate-910 bg-white hover:bg-slate-100 dark:hover:bg-slate-900"
+              className="bg-canvaseBase hover:bg-canvasSubtle/50"
             >
               {row.getVisibleCells().map((cell) => (
                 <td
