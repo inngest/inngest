@@ -2025,7 +2025,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 
 	// Use parallel decoding as per Peek
 	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueuePartition, error) {
-		if encoded == nil {
+		if val == nil {
 			q.logger.Error().Msgf("encoded nil item in partition peek; partitionKey: %s, partitionItem: %s, args: %+v", partitionKey, q.u.kg.PartitionItem(), args)
 			return nil, nil
 		}
