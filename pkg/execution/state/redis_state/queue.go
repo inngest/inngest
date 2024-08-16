@@ -1191,6 +1191,10 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	parts := q.ItemPartitions(ctx, i)
 	isSystemPartition := parts[0].IsSystem()
 
+	if i.Data.Identifier.AccountID == uuid.Nil && !isSystemPartition {
+		return QueueItem{}, fmt.Errorf("missing accountId in enqueue")
+	}
+
 	var (
 		guaranteedCapacity *GuaranteedCapacity
 
