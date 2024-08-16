@@ -39,7 +39,7 @@ func NewService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubs
 	// If the polling interval is 0, reset it to a sensible value to avoid
 	// hammering the SDKs and burning CPU.
 	if opts.PollInterval == 0 {
-		opts.PollInterval = 5
+		opts.PollInterval = DefaultPollInterval
 	}
 
 	return &devserver{
