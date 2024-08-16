@@ -46,7 +46,7 @@ export const MenuItem = ({
           {!collapsed && beta && (
             <Badge
               kind="solid"
-              className="text-onContrast bg-btnPrimary ml-2.5 h-5 px-1.5 py-1 text-xs"
+              className="text-alwaysWhite bg-btnPrimary ml-2.5 h-5 px-1.5 py-1 text-xs"
             >
               Beta
             </Badge>

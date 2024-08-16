@@ -56,7 +56,6 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
               </div>
             </Listbox.Option>
           </Link>
-          <hr className="border-subtle" />
           <Link href="https://roadmap.inngest.com/roadmap" target="_blank">
             <Listbox.Option
               className="text-subtle hover:bg-canvasSubtle mx-2 my-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"

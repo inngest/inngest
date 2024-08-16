@@ -155,7 +155,7 @@ export default function Page() {
       <Header
         breadcrumb={[{ text: 'Runs' }]}
         infoIcon={
-          <Badge kind="solid" className="text-onContrast bg-btnPrimary h-5 px-1.5 py-1 text-xs">
+          <Badge kind="solid" className="text-alwaysWhite bg-btnPrimary h-5 px-1.5 py-1 text-xs">
             Beta
           </Badge>
         }
