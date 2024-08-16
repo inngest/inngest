@@ -1,14 +1,13 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
 import { BlankSlate } from '@inngest/components/BlankSlate';
 import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
 import { InvokeButton } from '@inngest/components/InvokeButton';
+import { Link } from '@inngest/components/Link/Link';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { Table } from '@inngest/components/Table';
-import { IconSpinner } from '@inngest/components/icons/Spinner';
 import {
   createColumnHelper,
   getCoreRowModel,

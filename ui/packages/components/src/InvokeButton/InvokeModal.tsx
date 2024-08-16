@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
-import { Button } from '@inngest/components/Button';
+import { Button, NewButton } from '@inngest/components/Button';
 import { CodeBlock } from '@inngest/components/CodeBlock';
 import { Modal } from '@inngest/components/Modal';
 
@@ -81,8 +81,8 @@ export function InvokeModal({ doesFunctionAcceptPayload, isOpen, onCancel, onCon
         </Modal.Body>
 
         <Modal.Footer className="flex justify-end gap-2">
-          <Button appearance="outlined" btnAction={onCancel} label="Cancel" />
-          <Button appearance="solid" kind="primary" label="Invoke Function" type="submit" />
+          <NewButton kind="secondary" appearance="outlined" onClick={onCancel} label="Cancel" />
+          <NewButton appearance="solid" kind="primary" label="Invoke Function" type="submit" />
         </Modal.Footer>
       </form>
     </Modal>

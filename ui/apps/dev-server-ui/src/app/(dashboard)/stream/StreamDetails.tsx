@@ -125,7 +125,7 @@ export default function StreamDetails() {
   return (
     <div
       className={classNames(
-        'grid h-full text-white',
+        'text-basis absolute z-[500] grid h-full',
         eventResult.data ? 'grid-cols-2' : 'grid-cols-1'
       )}
     >

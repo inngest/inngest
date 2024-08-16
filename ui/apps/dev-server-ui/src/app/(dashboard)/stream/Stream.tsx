@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { BlankSlate } from '@inngest/components/BlankSlate';
-import { Button } from '@inngest/components/Button';
+import { Button, NewButton } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
 import { Pill, PillContent } from '@inngest/components/Pill';
@@ -238,13 +238,17 @@ export default function Stream() {
         breadcrumb={[{ text: 'Stream' }]}
         action={
           <div className="flex justify-end gap-1 px-5 py-2">
-            <Button
+            <NewButton
+              kind="secondary"
+              appearance="outlined"
               label={`${showInternalEvents ? 'Hide' : 'Show'} Internal Events`}
-              btnAction={() => setShowInternalEvents((prev) => !prev)}
+              onClick={() => setShowInternalEvents((prev) => !prev)}
             />
-            <Button
+            <NewButton
+              kind="secondary"
+              appearance="outlined"
               label={freezeStream ? 'Resume Stream' : 'Freeze Stream'}
-              btnAction={() => setFreezeStream((prev) => !prev)}
+              onClick={() => setFreezeStream((prev) => !prev)}
             />
             <SendEventButton
               label="Test Event"
