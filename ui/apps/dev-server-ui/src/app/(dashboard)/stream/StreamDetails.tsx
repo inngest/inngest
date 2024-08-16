@@ -4,8 +4,8 @@ import { ContentCard } from '@inngest/components/ContentCard';
 import { EventDetails } from '@inngest/components/EventDetails';
 import { Link } from '@inngest/components/Link';
 import { RunDetails } from '@inngest/components/RunDetails';
+import type { NavigateToRunFn } from '@inngest/components/Timeline/Timeline';
 import { classNames } from '@inngest/components/utils/classNames';
-import type { NavigateToRunFn } from 'node_modules/@inngest/components/src/Timeline/Timeline';
 import { toast } from 'sonner';
 import { ulid } from 'ulid';
 
@@ -125,7 +125,7 @@ export default function StreamDetails() {
   return (
     <div
       className={classNames(
-        'text-basis absolute z-[500] grid h-full',
+        'text-basis grid h-full',
         eventResult.data ? 'grid-cols-2' : 'grid-cols-1'
       )}
     >
