@@ -1861,6 +1861,9 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		q.u.kg.PartitionItem(),
 		q.u.kg.GlobalPartitionIndex(),
 		q.u.kg.GlobalAccountIndex(),
+		// NOTE: Old partitions will _not_ have an account ID until the next enqueue on the new code.
+		// Until this, we may not use account queues at all, as we cannot properly clean up
+		// here without knowing the Account ID
 		q.u.kg.AccountPartitionIndex(p.AccountID),
 		q.u.kg.FnMetadata(fnMetaKey),
 
@@ -2276,6 +2279,9 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 		q.u.kg.PartitionItem(),
 		q.u.kg.GlobalPartitionIndex(),
 		q.u.kg.GlobalAccountIndex(),
+		// NOTE: Old partitions will _not_ have an account ID until the next enqueue on the new code.
+		// Until this, we may not use account queues at all, as we cannot properly clean up
+		// here without knowing the Account ID
 		q.u.kg.AccountPartitionIndex(p.AccountID),
 		q.u.kg.PartitionMeta(p.Queue()), // TODO: Remove?
 		p.zsetKey(q.u.kg),               // Partition ZSET itself
