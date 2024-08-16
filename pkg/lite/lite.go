@@ -291,6 +291,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	ds := devserver.NewService(devserver.StartOpts{
 		Config:  opts.Config,
 		RootDir: opts.RootDir,
+		Tick:    tick,
 	}, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hd, &persistenceInterval)
 	// embed the tracker
 	ds.Tracker = t
