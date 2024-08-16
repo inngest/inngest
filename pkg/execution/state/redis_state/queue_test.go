@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/stretchr/testify/assert"
 	"os"
 	"strconv"
 	"strings"
@@ -582,6 +583,46 @@ func TestQueueEnqueueItem(t *testing.T) {
 				require.Equal(t, concurrencyPartitionB, *parts[1], "Got: %v", spew.Sdump(parts))
 			})
 		})
+	})
+
+	t.Run("Migrates old partitions to add accountId", func(t *testing.T) {
+		r.FlushAll()
+
+		id := uuid.MustParse("baac957a-3aa5-4e42-8c1d-f86dee5d58da")
+		envId := uuid.MustParse("e8c0aacd-fcb4-4d5a-b78a-7f0528841543")
+
+		oldPartitionSnapshot := "{\"at\":1723814830,\"p\":6,\"wsID\":\"e8c0aacd-fcb4-4d5a-b78a-7f0528841543\",\"wid\":\"baac957a-3aa5-4e42-8c1d-f86dee5d58da\",\"last\":1723814800026,\"forceAtMS\":0,\"off\":false}"
+
+		r.HSet(q.u.kg.PartitionItem(), id.String(), oldPartitionSnapshot)
+		assert.Equal(t, QueuePartition{
+			FunctionID: &id,
+			EnvID:      &envId,
+			// No accountId is present,
+			AccountID: uuid.UUID{},
+			LeaseID:   nil,
+			Last:      1723814800026,
+		}, getPartition(t, r, enums.PartitionTypeDefault, id))
+
+		item, err := q.EnqueueItem(ctx, QueueItem{
+			FunctionID: id,
+			Data: osqueue.Item{
+				Identifier: state.Identifier{
+					AccountID: accountId,
+				},
+			},
+		}, start)
+		require.NoError(t, err)
+		require.NotEqual(t, item.ID, ulid.ULID{})
+		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
+
+		assert.Equal(t, QueuePartition{
+			FunctionID: &id,
+			EnvID:      &envId,
+			// No accountId is present,
+			AccountID: accountId,
+			LeaseID:   nil,
+			Last:      1723814800026,
+		}, getPartition(t, r, enums.PartitionTypeDefault, id), r.Dump())
 	})
 }
 
@@ -3717,6 +3758,10 @@ func getPartition(t *testing.T, r *miniredis.Miniredis, pType enums.PartitionTyp
 	kg := &queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
 
 	key := kg.PartitionQueueSet(pType, id.String(), hash)
+	if pType == enums.PartitionTypeDefault {
+		key = id.String()
+	}
+
 	val := r.HGet(kg.PartitionItem(), key)
 
 	items, _ := r.HKeys(kg.PartitionItem())

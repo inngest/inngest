@@ -17,12 +17,27 @@ local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem,
 	-- Push the queue item's ID to the given partition set.
 	redis.call("ZADD", keyPartitionSet, queueScore, queueID)
 
+	-- NOTE: Old partition items for workflows do not include an accountId. This is bad.
+	-- We need the accountId for account queues, otherwise we cannot properly lease or gc the
+	-- partition in the account partitions pointer queue.
+	-- To solve this, we migrate old partitions just-in-time on enqueue, before we ever start
+	-- using account queues for a workflow.
+	local existingPartitionItem = enqueue_get_partition_item(keyPartitionMap, partitionID)
+	if existingPartitionItem ~= nil and existingPartitionItem.aID == nil then
+		-- This is an old partition item, so we need to update it with the accountId.
+		-- This is a one-time migration, so we don't need to worry about this again.
+		-- NOTE: We need to modify, not replace the existing item, to prevent deleting current leases
+		local latestPartitionItem = cjson.decode(partitionItem)
+		existingPartitionItem.aID = latestPartitionItem.aID
+		redis.call("HSET", keyPartitionMap, partitionID, cjson.encode(existingPartitionItem))
+	end
+
 	-- NOTE: For backwards compatibility, if a function has no concurrency or throttling keys its
 	--       partition set is "{q:v1}:queue:sorted:$workflowID", and the member stored in the global
 	--       set of functions is *just* the workflow ID.
 	--
 	--       For new key-based queues, we actually store the entire redis key here.  Much better.
-	--       
+	--
 	--       Because of this discrepancy, we have to pass in a "partitionID" to this function so
 	--       that we can properly do backcompat in the global queue of queues.
 	redis.call("HSETNX", keyPartitionMap, partitionID, partitionItem) -- store the partition
