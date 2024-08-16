@@ -36,6 +36,7 @@ var (
 	// end represents a ulid ending with 'Z', eg. a far out cursor.
 	endULID = ulid.ULID([16]byte{'Z'})
 	nilULID = ulid.ULID{}
+	nilUUID = uuid.UUID{}
 )
 
 func NewCQRS(db *sql.DB) cqrs.Manager {

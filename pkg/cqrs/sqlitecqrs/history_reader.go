@@ -251,9 +251,12 @@ func sqlToRun(item *sqlc.FunctionRun, finish *sqlc.FunctionFinish) (*history_rea
 	}
 
 	var (
-		endedAt *time.Time
-		output  *string
-		status  = enums.RunStatusRunning
+		endedAt       *time.Time
+		batchID       *ulid.ULID
+		output        *string
+		status        = enums.RunStatusRunning
+		originalRunID *ulid.ULID
+		cron          *string
 	)
 
 	if finish != nil && finish.Status.Valid {
@@ -262,20 +265,32 @@ func sqlToRun(item *sqlc.FunctionRun, finish *sqlc.FunctionFinish) (*history_rea
 		endedAt = &finish.CreatedAt.Time
 	}
 
+	if item.BatchID != nilULID {
+		batchID = &item.BatchID
+	}
+
+	if item.OriginalRunID != nilULID {
+		originalRunID = &item.OriginalRunID
+	}
+
+	if item.Cron.Valid && item.Cron.String != "" {
+		cron = &item.Cron.String
+	}
+
 	return &history_reader.Run{
-		AccountID:       uuid.UUID{},
-		BatchID:         &item.BatchID,
+		AccountID:       nilUUID,
+		BatchID:         batchID,
 		EndedAt:         endedAt,
 		EventID:         item.EventID,
 		ID:              item.RunID,
-		OriginalRunID:   &item.OriginalRunID,
+		OriginalRunID:   originalRunID,
 		Output:          output,
 		StartedAt:       item.RunStartedAt,
 		Status:          status,
 		WorkflowID:      item.FunctionID,
-		WorkspaceID:     uuid.UUID{},
+		WorkspaceID:     nilUUID,
 		WorkflowVersion: int(item.FunctionVersion),
-		Cron:            &item.Cron.String,
+		Cron:            cron,
 	}, nil
 }
 
