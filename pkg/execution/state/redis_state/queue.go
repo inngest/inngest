@@ -2545,7 +2545,13 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 			resultErr = multierror.Append(resultErr, fmt.Errorf("error fetching jobs for concurrency queue '%s' during scavenge: %w", partition, err))
 			continue
 		}
-		for _, item := range jobs {
+		for idx, item := range jobs {
+			if item == "" {
+				// THIS SHOULD NEVER HAPPEN. Handle this gracefully
+				q.logger.Error().Str("item_id", itemIDs[idx]).Str("partition", partition).Msgf("nil item in scavenge")
+				continue
+			}
+
 			qi := QueueItem{}
 			if err := json.Unmarshal([]byte(item), &qi); err != nil {
 				resultErr = multierror.Append(resultErr, fmt.Errorf("error unmarshalling job '%s': %w", item, err))
