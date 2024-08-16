@@ -9,7 +9,7 @@ export default function Monitor({ collapsed }: { collapsed: boolean }) {
       {collapsed ? (
         <div className="border-subtle mx-auto mb-1 w-6 border-b" />
       ) : (
-        <div className="text-disabled leading-4.5 mx-2.5 mb-1 text-xs font-medium">Monitor</div>
+        <div className="text-subtle leading-4.5 mx-2.5 mb-1 text-xs font-medium">Monitor</div>
       )}
       <MenuItem
         href="/runs"
