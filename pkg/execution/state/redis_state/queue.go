@@ -1262,8 +1262,6 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		return i, err
 	}
 
-	q.logger.Info().Interface("partitions", parts).Interface("partition0", parts[0]).Str("partition_id", parts[0].ID).Str("item", i.ID).Msg("enqueuing item")
-
 	status, err := scripts["queue/enqueue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "enqueue"),
 		q.u.Client(),
