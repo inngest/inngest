@@ -1340,7 +1340,12 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 	}
 
 	if isPeekNext {
-		i, err := q.decodeQueueItemFromPeek(items[0].(string), q.clock.Now())
+		str, ok := items[0].(string)
+		if !ok {
+			return nil, fmt.Errorf("non-string value in next peek response: %T", items[0])
+		}
+
+		i, err := q.decodeQueueItemFromPeek(str, q.clock.Now())
 		if err != nil {
 			return nil, err
 		}
@@ -1349,12 +1354,24 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 
 	now := q.clock.Now()
 	return util.ParallelDecode(items, func(val any) (*QueueItem, error) {
-		str, _ := val.(string)
+		if val == nil {
+			q.logger.Error().Str("partition", partition.zsetKey(q.u.kg)).Msg("nil item value in peek response")
+			return nil, nil
+		}
+
+		str, ok := val.(string)
+		if !ok {
+			return nil, fmt.Errorf("non-string value in peek response: %T", val)
+		}
 		return q.decodeQueueItemFromPeek(str, now)
 	})
 }
 
 func (q *queue) decodeQueueItemFromPeek(str string, now time.Time) (*QueueItem, error) {
+	if str == "" {
+		return nil, fmt.Errorf("received empty string in decode queue item from peek")
+	}
+
 	qi := &QueueItem{}
 	if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), qi); err != nil {
 		return nil, fmt.Errorf("error unmarshalling peeked queue item: %w", err)
@@ -1967,6 +1984,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		},
 		args,
 	).ToAny()
+
 	// NOTE: We use ToAny to force return a []any, allowing us to update the slice value with
 	// a JSON-decoded item without allocations
 	if err != nil {
@@ -1979,6 +1997,11 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 
 	// begin temporary debugging code
 	for _, item := range encoded {
+		if item == nil {
+			q.logger.Error().Msgf("nil item in partition peek; partitionKey: %s, partitionItem: %s, args: %+v", partitionKey, q.u.kg.PartitionItem(), args)
+			continue
+		}
+
 		str, ok := item.(string)
 		if !ok {
 			return nil, fmt.Errorf(
@@ -2002,6 +2025,11 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 
 	// Use parallel decoding as per Peek
 	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueuePartition, error) {
+		if encoded == nil {
+			q.logger.Error().Msgf("encoded nil item in partition peek; partitionKey: %s, partitionItem: %s, args: %+v", partitionKey, q.u.kg.PartitionItem(), args)
+			return nil, nil
+		}
+
 		str, ok := val.(string)
 		if !ok {
 			return nil, fmt.Errorf("unknown type in partition peek: %T", val)
@@ -2038,18 +2066,25 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 			// If this is an error, just ignore the error and continue.  The executor should gracefully handle
 			// accidental attempts at paused functions, as we cannot do this optimization for account or env-level
 			// partitions.
-			vals, _ := vals.([]any)
+			vals, ok := vals.([]any)
+			if !ok {
+				return nil, fmt.Errorf("unknown return type from mget fnMeta: %T", vals)
+			}
+
 			_, _ = util.ParallelDecode(vals, func(i any) (any, error) {
 				str, ok := i.(string)
 				if !ok {
 					return nil, fmt.Errorf("unknown fnMeta type in partition peek: %T", i)
 				}
 				fnMeta := &FnMetadata{}
-				if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), fnMeta); err == nil {
-					fnIDsMu.Lock()
-					fnIDs[fnMeta.FnID] = fnMeta.Paused
-					fnIDsMu.Unlock()
+				if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), fnMeta); err != nil {
+					return nil, fmt.Errorf("could not unmarshal fnMeta: %w", err)
 				}
+
+				fnIDsMu.Lock()
+				fnIDs[fnMeta.FnID] = fnMeta.Paused
+				fnIDsMu.Unlock()
+
 				return nil, nil
 			})
 		}
@@ -2057,6 +2092,12 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 
 	ignored := 0
 	for n, item := range partitions {
+		if item == nil {
+			// THIS SHOULD NEVER HAPPEN, prevent crashing and skip nil partition gracefully
+			ignored++
+			continue
+		}
+
 		// check pause
 		if item.FunctionID != nil {
 			if paused := fnIDs[*item.FunctionID]; paused {

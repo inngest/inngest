@@ -1109,6 +1109,12 @@ func (p *processor) iterate(ctx context.Context) error {
 
 	eg := errgroup.Group{}
 	for _, i := range p.items {
+		if i == nil {
+			// THIS SHOULD NEVER HAPPEN. Skip gracefully and log error
+			log.From(ctx).Error().Msg("nil queue item in partition")
+			continue
+		}
+
 		if p.parallel {
 			item := *i
 			eg.Go(func() error {
