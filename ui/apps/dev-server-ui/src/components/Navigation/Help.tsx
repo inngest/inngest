@@ -34,7 +34,7 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
               </div>
             </Listbox.Option>
           </Link>
-          <Link href="/support" target="_blank">
+          <Link href="https://app.inngest.com/support" target="_blank">
             <Listbox.Option
               className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="support"
