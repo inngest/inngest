@@ -99,6 +99,7 @@ type History struct {
 	LatencyMs            sql.NullInt64
 	StepName             sql.NullString
 	StepID               sql.NullString
+	StepType             sql.NullString
 	Url                  sql.NullString
 	CancelRequest        sql.NullString
 	Sleep                sql.NullString

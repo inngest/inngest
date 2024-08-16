@@ -74,6 +74,7 @@ CREATE TABLE history (
 	latency_ms INT,
 	step_name VARCHAR,
 	step_id VARCHAR,
+	step_type VARCHAR,
 	url VARCHAR,
 	cancel_request VARCHAR,
 	sleep VARCHAR,

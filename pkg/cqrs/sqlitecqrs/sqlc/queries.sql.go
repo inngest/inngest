@@ -629,7 +629,7 @@ func (q *Queries) GetFunctionRunFinishesByRunIDs(ctx context.Context, runIds []u
 }
 
 const getFunctionRunHistory = `-- name: GetFunctionRunHistory :many
-SELECT id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result FROM history WHERE run_id = ? ORDER BY created_at ASC
+SELECT id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, step_type, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result FROM history WHERE run_id = ? ORDER BY created_at ASC
 `
 
 func (q *Queries) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]*History, error) {
@@ -657,6 +657,7 @@ func (q *Queries) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([
 			&i.LatencyMs,
 			&i.StepName,
 			&i.StepID,
+			&i.StepType,
 			&i.Url,
 			&i.CancelRequest,
 			&i.Sleep,
@@ -878,7 +879,7 @@ func (q *Queries) GetFunctions(ctx context.Context) ([]*Function, error) {
 }
 
 const getHistoryItem = `-- name: GetHistoryItem :one
-SELECT id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result FROM history WHERE id = ?
+SELECT id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, step_type, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result FROM history WHERE id = ?
 `
 
 func (q *Queries) GetHistoryItem(ctx context.Context, id ulid.ULID) (*History, error) {
@@ -900,6 +901,7 @@ func (q *Queries) GetHistoryItem(ctx context.Context, id ulid.ULID) (*History, e
 		&i.LatencyMs,
 		&i.StepName,
 		&i.StepID,
+		&i.StepType,
 		&i.Url,
 		&i.CancelRequest,
 		&i.Sleep,
@@ -1358,8 +1360,8 @@ func (q *Queries) InsertFunctionRun(ctx context.Context, arg InsertFunctionRunPa
 const insertHistory = `-- name: InsertHistory :exec
 
 INSERT INTO history
-	(id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result) VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	(id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, step_type, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertHistoryParams struct {
@@ -1378,6 +1380,7 @@ type InsertHistoryParams struct {
 	LatencyMs            sql.NullInt64
 	StepName             sql.NullString
 	StepID               sql.NullString
+	StepType             sql.NullString
 	Url                  sql.NullString
 	CancelRequest        sql.NullString
 	Sleep                sql.NullString
@@ -1406,6 +1409,7 @@ func (q *Queries) InsertHistory(ctx context.Context, arg InsertHistoryParams) er
 		arg.LatencyMs,
 		arg.StepName,
 		arg.StepID,
+		arg.StepType,
 		arg.Url,
 		arg.CancelRequest,
 		arg.Sleep,

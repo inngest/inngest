@@ -280,92 +280,144 @@ func sqlToRun(item *sqlc.FunctionRun, finish *sqlc.FunctionFinish) (*history_rea
 }
 
 func sqlToRunHistory(item *sqlc.History) (*history_reader.RunHistory, error) {
-	var cancel *history_reader.RunHistoryCancel
-	if item.CancelRequest.Valid {
-		cancel = &history_reader.RunHistoryCancel{
-			// EventID:    item.Cancel.EventID,
-			// Expression: item.Cancel.Expression,
-			// UserID:     item.Cancel.UserID,
-		}
-	}
-
 	historyType, err := enums.HistoryTypeString(item.Type)
 	if err != nil {
 		return nil, fmt.Errorf("invalid history type: %w", err)
 	}
 
 	var (
+		cancel *history_reader.RunHistoryCancel
+
+		groupID *uuid.UUID
+
+		stepName *string
+
+		url *string
+
+		stepType *enums.HistoryStepType
+
 		result            *history_reader.RunHistoryResult
 		execHistoryResult *history.Result
+
+		sleep            *history_reader.RunHistorySleep
+		execHistorySleep *history.Sleep
+
+		waitForEvent            *history_reader.RunHistoryWaitForEvent
+		execHistoryWaitForEvent *history.WaitForEvent
+
+		waitResult            *history_reader.RunHistoryWaitResult
+		execHistoryWaitResult *history.WaitResult
+
+		invokeFunction            *history_reader.RunHistoryInvokeFunction
+		execHistoryInvokeFunction *history.InvokeFunction
+
+		invokeFunctionResult            *history_reader.RunHistoryInvokeFunctionResult
+		execHistoryInvokeFunctionResult *history.InvokeFunctionResult
 	)
 
-	if item.Result.Valid {
-		err := json.Unmarshal([]byte(item.Result.String), &execHistoryResult)
-		if err == nil {
-			result = history_reader.NewRunHistoryResultFromHistoryResult(execHistoryResult)
+	if item.CancelRequest.Valid {
+		_ = json.Unmarshal([]byte(item.CancelRequest.String), &cancel)
+	}
+
+	if item.GroupID.Valid {
+		if gid, err := uuid.Parse(item.GroupID.String); err == nil {
+			groupID = &gid
 		}
 	}
 
-	var sleep *history_reader.RunHistorySleep
+	if item.StepName.Valid {
+		stepName = &item.StepName.String
+	}
+
+	if item.Url.Valid {
+		url = &item.Url.String
+	}
+
+	if item.StepType.Valid {
+		if st, err := enums.HistoryStepTypeString(item.StepType.String); err == nil {
+			stepType = &st
+		}
+	}
+
+	if item.Result.Valid {
+		if err := json.Unmarshal([]byte(item.Result.String), &execHistoryResult); err == nil && execHistoryResult != nil {
+			result = &history_reader.RunHistoryResult{
+				DurationMS:  execHistoryResult.DurationMS,
+				ErrorCode:   execHistoryResult.ErrorCode,
+				Framework:   execHistoryResult.Framework,
+				Platform:    execHistoryResult.Platform,
+				SDKLanguage: execHistoryResult.SDKLanguage,
+				SDKVersion:  execHistoryResult.SDKVersion,
+				SizeBytes:   execHistoryResult.SizeBytes,
+			}
+		}
+	}
+
 	if item.Sleep.Valid {
-		// sleep = &history_reader.RunHistorySleep{
-		// 	Until: item.Sleep.Until,
-		// }
+		if err := json.Unmarshal([]byte(item.Sleep.String), &execHistorySleep); err == nil && execHistorySleep != nil {
+			sleep = &history_reader.RunHistorySleep{
+				Until: execHistorySleep.Until,
+			}
+		}
 	}
 
-	var waitForEvent *history_reader.RunHistoryWaitForEvent
 	if item.WaitForEvent.Valid {
-		// waitForEvent = &history_reader.RunHistoryWaitForEvent{
-		// 	EventName:  item.WaitForEvent.EventName,
-		// 	Expression: item.WaitForEvent.Expression,
-		// 	Timeout:    item.WaitForEvent.Timeout,
-		// }
+		if err := json.Unmarshal([]byte(item.WaitForEvent.String), &execHistoryWaitForEvent); err == nil && execHistoryWaitForEvent != nil {
+			waitForEvent = &history_reader.RunHistoryWaitForEvent{
+				EventName:  execHistoryWaitForEvent.EventName,
+				Expression: execHistoryWaitForEvent.Expression,
+				Timeout:    execHistoryWaitForEvent.Timeout,
+			}
+		}
 	}
 
-	var waitResult *history_reader.RunHistoryWaitResult
 	if item.WaitResult.Valid {
-		// waitResult = &history_reader.RunHistoryWaitResult{
-		// 	EventID: item.WaitResult.EventID,
-		// 	Timeout: item.WaitResult.Timeout,
-		// }
+		if err := json.Unmarshal([]byte(item.WaitResult.String), &execHistoryWaitResult); err == nil && execHistoryWaitResult != nil {
+			waitResult = &history_reader.RunHistoryWaitResult{
+				EventID: execHistoryWaitResult.EventID,
+				Timeout: execHistoryWaitResult.Timeout,
+			}
+		}
 	}
 
-	var invokeFunction *history_reader.RunHistoryInvokeFunction
 	if item.InvokeFunction.Valid {
-		// invokeFunction = &history_reader.RunHistoryInvokeFunction{
-		// 	CorrelationID: item.InvokeFunction.CorrelationID,
-		// 	EventID:       item.InvokeFunction.EventID,
-		// 	FunctionID:    item.InvokeFunction.FunctionID,
-		// 	Timeout:       item.InvokeFunction.Timeout,
-		// }
+		if err := json.Unmarshal([]byte(item.InvokeFunction.String), &execHistoryInvokeFunction); err == nil && execHistoryInvokeFunction != nil {
+			invokeFunction = &history_reader.RunHistoryInvokeFunction{
+				CorrelationID: execHistoryInvokeFunction.CorrelationID,
+				EventID:       execHistoryInvokeFunction.EventID,
+				FunctionID:    execHistoryInvokeFunction.FunctionID,
+				Timeout:       execHistoryInvokeFunction.Timeout,
+			}
+		}
 	}
 
-	var invokeFunctionResult *history_reader.RunHistoryInvokeFunctionResult
 	if item.InvokeFunctionResult.Valid {
-		// invokeFunctionResult = &history_reader.RunHistoryInvokeFunctionResult{
-		// 	EventID: item.InvokeFunctionResult.EventID,
-		// 	RunID:   item.InvokeFunctionResult.RunID,
-		// 	Timeout: item.InvokeFunctionResult.Timeout,
-		// }
+		if err := json.Unmarshal([]byte(item.InvokeFunctionResult.String), &execHistoryInvokeFunctionResult); err == nil && execHistoryInvokeFunctionResult != nil {
+			invokeFunctionResult = &history_reader.RunHistoryInvokeFunctionResult{
+				EventID: execHistoryInvokeFunctionResult.EventID,
+				RunID:   execHistoryInvokeFunctionResult.RunID,
+				Timeout: execHistoryInvokeFunctionResult.Timeout,
+			}
+		}
 	}
 
 	return &history_reader.RunHistory{
-		Attempt:         item.Attempt,
-		Cancel:          cancel,
-		CreatedAt:       item.CreatedAt,
-		FunctionVersion: item.FunctionVersion,
-		// GroupID:              item.GroupID,
+		Attempt:              item.Attempt,
+		Cancel:               cancel,
+		CreatedAt:            item.CreatedAt,
+		FunctionVersion:      item.FunctionVersion,
+		GroupID:              groupID,
 		ID:                   item.ID,
 		InvokeFunction:       invokeFunction,
 		InvokeFunctionResult: invokeFunctionResult,
 		Result:               result,
 		RunID:                item.RunID,
 		Sleep:                sleep,
-		// StepName:             item.StepName,
-		// StepType:             item.StepType,
-		Type: historyType,
-		// URL:                  item.URL,
-		WaitForEvent: waitForEvent,
-		WaitResult:   waitResult,
+		StepName:             stepName,
+		StepType:             stepType,
+		Type:                 historyType,
+		URL:                  url,
+		WaitForEvent:         waitForEvent,
+		WaitResult:           waitResult,
 	}, nil
 }
