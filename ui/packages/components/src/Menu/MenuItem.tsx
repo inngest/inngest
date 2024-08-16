@@ -38,7 +38,7 @@ export const MenuItem = ({
               ? 'text-disabled hover:bg-disabled cursor-not-allowed'
               : active
               ? 'bg-secondary-3xSubtle text-info hover:bg-secondary-2xSubtle'
-              : 'hover:bg-canvasSubtle text-muted'
+              : 'hover:bg-canvasSubtle text-muted hover:text-basis'
           } `}
         >
           {icon}
