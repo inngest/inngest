@@ -36,6 +36,12 @@ import (
 )
 
 func NewService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubsub.Publisher, stepLimitOverrides map[string]int, stateSizeLimitOverrides map[string]int, rc rueidis.Client, hw history.Driver, persistenceInterval *time.Duration) *devserver {
+	// If the polling interval is 0, reset it to a sensible value to avoid
+	// hammering the SDKs and burning CPU.
+	if opts.PollInterval == 0 {
+		opts.PollInterval = 5
+	}
+
 	return &devserver{
 		Data:                    data,
 		Runner:                  runner,
