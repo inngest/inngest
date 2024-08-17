@@ -57,7 +57,7 @@ export function InvokeModal({ doesFunctionAcceptPayload, isOpen, onCancel, onCon
     );
   } else {
     content = (
-      <p className="dark:text-white">
+      <p className="text-basis">
         Cron functions without event triggers cannot include payload data.
       </p>
     );
