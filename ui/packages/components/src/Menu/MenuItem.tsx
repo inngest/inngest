@@ -52,7 +52,10 @@ export const MenuItem = ({
             </Badge>
           )}
           {!collapsed && error && (
-            <Badge kind={'error'} className="ml-2.5 h-5 px-1.5 py-1 text-xs" />
+            <Badge
+              kind={'error'}
+              className="text-alwaysWhite bg-error ml-2.5 h-5 px-1.5 py-1 text-xs"
+            />
           )}
         </div>
       </OptionalTooltip>
