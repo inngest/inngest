@@ -1,6 +1,5 @@
+import { Header } from '@inngest/components/Header/Header';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
-
-import { Header } from '../Header/Header';
 
 export default function PageSkeleton({ text }: { text: string }) {
   return (

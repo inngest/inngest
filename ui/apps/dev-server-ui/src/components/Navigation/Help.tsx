@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { Listbox } from '@headlessui/react';
 import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import {
-  RiArticleLine,
   RiDiscordLine,
   RiExternalLinkLine,
   RiMailLine,
@@ -12,12 +11,7 @@ import {
   RiRoadMapLine,
 } from '@remixicon/react';
 
-import { useSystemStatus } from '@/app/(organization-active)/support/statusPage';
-import SystemStatusIcon from './old/SystemStatusIcon';
-
 export const Help = ({ collapsed }: { collapsed: boolean }) => {
-  const status = useSystemStatus();
-
   return (
     <Listbox>
       <Listbox.Button className="w-full ring-0">
@@ -28,8 +22,8 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
         />
       </Listbox.Button>
       <div className="relative">
-        <Listbox.Options className="bg-canvasBase absolute -right-48 bottom-0 z-50 ml-8 w-[199px] gap-y-0.5 rounded border shadow ring-0 focus:outline-none">
-          <Link href="https://www.inngest.com/docs?ref=support-center" target="_blank">
+        <Listbox.Options className="bg-canvasBase border-subtle absolute -right-48 bottom-0 z-50 ml-8 w-[199px] gap-y-0.5 rounded border shadow ring-0 focus:outline-none">
+          <Link href="https://www.inngest.com/docs/local-development" target="_blank">
             <Listbox.Option
               className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="docs"
@@ -40,7 +34,7 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
               </div>
             </Listbox.Option>
           </Link>
-          <Link href="/support" target="_blank">
+          <Link href="https://app.inngest.com/support" target="_blank">
             <Listbox.Option
               className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="support"
@@ -62,37 +56,14 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
               </div>
             </Listbox.Option>
           </Link>
-          <hr />
           <Link href="https://roadmap.inngest.com/roadmap" target="_blank">
             <Listbox.Option
-              className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              className="text-subtle hover:bg-canvasSubtle mx-2 my-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="roadmap"
             >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
                 <RiRoadMapLine className="text-subtle mr-2 h-4 w-4" />
                 <div>Inngest Roadmap</div>
-              </div>
-            </Listbox.Option>
-          </Link>
-          <Link href="/support" target="_blank">
-            <Listbox.Option
-              className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
-              value="status"
-            >
-              <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                <SystemStatusIcon status={status} className="mx-0 mr-2 h-3.5 w-3.5" />
-                <div>Status</div>
-              </div>
-            </Listbox.Option>
-          </Link>
-          <Link href="https://roadmap.inngest.com/changelog" target="_blank">
-            <Listbox.Option
-              className="text-subtle hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
-              value="releaseNotes"
-            >
-              <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                <RiArticleLine className="text-subtle mr-2 h-4 w-4" />
-                <div>Release Notes</div>
               </div>
             </Listbox.Option>
           </Link>

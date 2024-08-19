@@ -2,9 +2,8 @@
 
 import { Listbox } from '@headlessui/react';
 import { NewButton } from '@inngest/components/Button';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { RiArchive2Line, RiFirstAidKitLine, RiMore2Line } from '@remixicon/react';
-
-import { OptionalTooltip } from '../Navigation/OptionalTooltip';
 
 export type AppActions = {
   isArchived: boolean;

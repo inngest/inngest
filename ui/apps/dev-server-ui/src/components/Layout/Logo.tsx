@@ -1,13 +1,10 @@
 'use client';
 
-import type { Route } from 'next';
 import Link from 'next/link';
 import { NewButton } from '@inngest/components/Button';
 import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
 import { InngestLogoSmallBW } from '@inngest/components/icons/logos/InngestLogoSmall';
 import { RiContractLeftLine, RiContractRightLine } from '@remixicon/react';
-
-import Search from './Search';
 
 type LogoProps = {
   collapsed: boolean;
@@ -19,7 +16,7 @@ const NavToggle = ({ collapsed, setCollapsed }: LogoProps) => {
     const toggled = !collapsed;
     setCollapsed(toggled);
     typeof window !== 'undefined' &&
-      window.cookieStore.set('navCollapsed', toggled ? 'true' : 'false');
+      window.localStorage.setItem('navCollapsed', toggled ? 'true' : 'false');
   };
 
   return (
@@ -42,23 +39,23 @@ const NavToggle = ({ collapsed, setCollapsed }: LogoProps) => {
 export default function Logo({ collapsed, setCollapsed }: LogoProps) {
   return (
     <div
-      className={`${
-        collapsed ? 'mx-auto' : 'mx-4'
-      } mt-4 flex h-[28px] flex-row items-center justify-between`}
+      className={`my-5 flex h-10 w-full flex-row items-center ${
+        collapsed ? 'justify-center' : 'mx-4 justify-start'
+      }`}
     >
-      <div className={`flex flex-row items-center justify-start ${collapsed ? '' : 'mr-3'} `}>
+      <div className={`flex flex-row items-center justify-start ${collapsed ? '' : 'mr-1.5'} `}>
         {collapsed ? (
           <div className="cursor-pointer group-hover:hidden">
-            <InngestLogoSmallBW />
+            <InngestLogoSmallBW className="text-basis" />
           </div>
         ) : (
-          <>
-            <Link href={process.env.NEXT_PUBLIC_HOME_PATH as Route} scroll={false}>
-              <InngestLogo className="text-basis mr-2" width={92} />
+          <div className="flex flex-row items-center justify-start">
+            <Link href="/">
+              <InngestLogo className="text-basis mr-1.5" width={92} />
             </Link>
-          </>
+            <span className="text-primary-intense text-[11px] leading-none">DEV SERVER</span>
+          </div>
         )}
-        <Search collapsed={collapsed} />
       </div>
       <NavToggle collapsed={collapsed} setCollapsed={setCollapsed} />
     </div>

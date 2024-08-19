@@ -1,6 +1,6 @@
 import { Badge } from '@inngest/components/Badge';
+import { Header } from '@inngest/components/Header/Header';
 
-import { Header } from '../Header/Header';
 import { EventInfo } from './EventInfo';
 import SendEventButton from './SendEventButton';
 

@@ -37,7 +37,7 @@ export function Modal({
         <Dialog.Portal container={container}>
           <Dialog.Overlay
             asChild
-            className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-[2px] transition-opacity dark:bg-[#04060C]/90"
+            className="fixed inset-0 z-[100] backdrop-blur backdrop-invert-[10%] transition-opacity"
             aria-hidden="true"
           >
             {/* Full-screen container to center the panel */}
@@ -62,7 +62,7 @@ export function Modal({
                 <Dialog.Content
                   className={cn(
                     className,
-                    'dark:bg-slate-910 max-h-full overflow-y-auto overflow-x-hidden rounded-lg bg-white shadow-xl'
+                    'bg-canvasBase shadow-tooltip border-subtle max-h-full overflow-y-auto overflow-x-hidden rounded-lg border shadow-2xl'
                   )}
                 >
                   {(title || description) && <Header description={description}>{title}</Header>}
@@ -83,11 +83,7 @@ function Body({ children }: React.PropsWithChildren<{}>) {
 }
 
 function Footer({ children, className }: React.PropsWithChildren<{ className?: string }>) {
-  return (
-    <div className={cn('border-t border-slate-200 p-6 dark:border-slate-800', className)}>
-      {children}
-    </div>
-  );
+  return <div className={cn('border-subtle border-t p-6', className)}>{children}</div>;
 }
 
 function Header({
@@ -95,16 +91,10 @@ function Header({
   description,
 }: React.PropsWithChildren<{ description?: React.ReactNode }>) {
   return (
-    <div className="dark:bg-slate-910 border-b border-slate-200 bg-slate-900 p-6 dark:border-slate-800">
-      <Dialog.Title className="dark:bg-slate-910 bg-slate-900 text-xl font-semibold text-white">
-        {children}
-      </Dialog.Title>
+    <div className="bg-canvasBase border-subtle border-b p-6">
+      <Dialog.Title className="text-basis text-xlfont-semibold">{children}</Dialog.Title>
 
-      {description && (
-        <Dialog.Description className="dark:bg-slate-910 mt-2 bg-slate-900 text-indigo-100 dark:font-medium dark:text-slate-400">
-          {description}
-        </Dialog.Description>
-      )}
+      {description && <Dialog.Description className="">{description}</Dialog.Description>}
     </div>
   );
 }

@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import { Button, NewButton } from '@inngest/components/Button';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { OptionalTooltip } from '@/components/Navigation/OptionalTooltip';
 import { SendEventModal } from './SendEventModal';
 
 type SendEventButtonProps = {
