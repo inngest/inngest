@@ -245,7 +245,7 @@ export default function Stream() {
             <NewButton
               kind="secondary"
               appearance="outlined"
-              label={freezeStream ? 'Resume Stream' : 'Freeze Stream'}
+              label={freezeStream ? 'Enable auto-refresh' : 'Disable auto-refresh'}
               onClick={() => setFreezeStream((prev) => !prev)}
             />
             <SendEventButton
