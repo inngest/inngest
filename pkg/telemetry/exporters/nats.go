@@ -88,7 +88,7 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 			scope := sp.InstrumentationScope().Name
 
 			var psid *string
-			if sp.Parent().HasSpanID() && sp.Parent().SpanID().IsValid() {
+			if sp.Parent().HasSpanID() {
 				sid := sp.Parent().SpanID().String()
 				psid = &sid
 			}
