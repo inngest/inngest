@@ -2600,10 +2600,8 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 			resultErr = multierror.Append(resultErr, fmt.Errorf("error fetching jobs for concurrency queue '%s' during scavenge: %w", partition, err))
 			continue
 		}
-		for idx, item := range jobs {
+		for _, item := range jobs {
 			if item == "" {
-				// THIS SHOULD NEVER HAPPEN. Handle this gracefully
-				q.logger.Error().Str("item_id", itemIDs[idx]).Str("partition", partition).Msgf("nil item in scavenge")
 				continue
 			}
 
