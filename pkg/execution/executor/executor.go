@@ -896,7 +896,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 		if serr := e.HandleGeneratorResponse(ctx, i, resp); serr != nil {
 
 			// If this is an error compiling async expressions, fail the function.
-			shouldFailEarly := errors.Is(serr, &expressions.CompileError{}) || errors.Is(serr, state.ErrStateOverflowed)
+			shouldFailEarly := errors.Is(serr, &expressions.CompileError{}) || errors.Is(serr, state.ErrStateOverflowed) || errors.Is(serr, state.ErrFunctionOverflowed)
 			if shouldFailEarly {
 				var gracefulErr *state.WrappedStandardError
 				if hasGracefulErr := errors.As(serr, &gracefulErr); hasGracefulErr {
@@ -1781,6 +1781,16 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 				return fmt.Errorf("error updating function metadata: %w", err)
 			}
 		}
+	}
+
+	if len(resp.Generator) > consts.DefaultMaxStepLimit {
+		// Disallow parallel plans that exceed the step limit
+		return state.WrapInStandardError(
+			state.ErrFunctionOverflowed,
+			state.InngestErrFunctionOverflowed,
+			fmt.Sprintf("The function run exceeded the step limit of %d steps.", consts.DefaultMaxStepLimit),
+			"",
+		)
 	}
 
 	groups := opGroups(resp.Generator).All()
