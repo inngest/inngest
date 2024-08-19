@@ -1,12 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { BlankSlate } from '@inngest/components/BlankSlate';
 import { Button, NewButton } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
-import { Info } from '@inngest/components/Info/Info';
 import { Pill, PillContent } from '@inngest/components/Pill';
 import { Table } from '@inngest/components/Table';
 import { fullDate } from '@inngest/components/utils/date';

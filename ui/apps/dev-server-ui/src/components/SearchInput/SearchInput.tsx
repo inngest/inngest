@@ -24,7 +24,7 @@ export default function SearchInput({
     >
       <input
         type="text"
-        className="text-subtle placeholder-subtle w-96 bg-transparent py-1 pl-4"
+        className="text-subtle placeholder-subtle w-96 bg-transparent py-1 pl-4 outline-none"
         placeholder={props?.placeholder ?? 'Search...'}
         value={value ?? ''}
         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {

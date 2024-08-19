@@ -47,21 +47,25 @@ export function TimelineNode({ getOutput, node, children, isAttempt, navigateToR
 
   return (
     <AccordionPrimitive.Item
-      className="border-t border-slate-800/50"
+      className="border-subtle border-t"
       disabled={!isExpandable}
       value={value}
     >
-      <AccordionPrimitive.Header className="flex items-start gap-2 py-6">
+      <AccordionPrimitive.Header className="bg-canvasBase flex items-start gap-2 py-6">
         <div className="z-10 flex-1">
           <TimelineNodeHeader icon={icon} badge={badge} title={name} metadata={metadata} />
         </div>
 
         {isExpandable && (
-          <AccordionPrimitive.Trigger asChild onClick={() => toggleItem(value)}>
+          <AccordionPrimitive.Trigger
+            asChild
+            onClick={() => toggleItem(value)}
+            className="bg-canvasBase hover:bg-canvasSubtle"
+          >
             <Button
               className="group"
               icon={
-                <RiArrowDownSLine className="transform-90 text-slate-500 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
+                <RiArrowDownSLine className="transform-90 bg-canvasBase hover:bg-canvasSubtle text-muted transition-transform duration-500 group-data-[state=open]:-rotate-180" />
               }
             />
           </AccordionPrimitive.Trigger>
