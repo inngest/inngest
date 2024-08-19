@@ -60,12 +60,12 @@ export function TimelineNode({ getOutput, node, children, isAttempt, navigateToR
           <AccordionPrimitive.Trigger
             asChild
             onClick={() => toggleItem(value)}
-            className="bg-canvasBase hover:bg-canvasSubtle"
+            className="bg-canvasBase hover:bg-canvasSubtle group"
           >
             <Button
               className="group"
               icon={
-                <RiArrowDownSLine className="transform-90 bg-canvasBase hover:bg-canvasSubtle text-muted transition-transform duration-500 group-data-[state=open]:-rotate-180" />
+                <RiArrowDownSLine className="transform-90 bg-canvasBase group-hover:bg-canvasSubtle text-muted transition-transform duration-500 group-data-[state=open]:-rotate-180" />
               }
             />
           </AccordionPrimitive.Trigger>
