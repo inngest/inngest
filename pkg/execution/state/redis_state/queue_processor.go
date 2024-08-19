@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"math"
 	"math/rand"
 	"runtime/debug"
@@ -619,10 +620,10 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 	}
 }
 
-func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimit int64, peekUntil time.Time, shard *QueueShard, metricShardName string) error {
+func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimit int64, peekUntil time.Time, shard *QueueShard, metricShardName string, accountId *uuid.UUID) error {
 	// Peek 1s into the future to pull jobs off ahead of time, minimizing 0 latency
 	partitions, err := duration(ctx, "partition_peek", q.clock.Now(), func(ctx context.Context) ([]*QueuePartition, error) {
-		return q.partitionPeek(ctx, partitionKey, q.isSequential(), peekUntil, peekLimit)
+		return q.partitionPeek(ctx, partitionKey, q.isSequential(), peekUntil, peekLimit, accountId)
 	})
 	if err != nil {
 		return err
@@ -709,7 +710,7 @@ func (q *queue) scan(ctx context.Context) error {
 			eg.Go(func() error {
 				partitionKey := q.u.kg.AccountPartitionIndex(account)
 
-				return q.scanPartition(ctx, partitionKey, peekSize, peekUntil, shard, metricShardName)
+				return q.scanPartition(ctx, partitionKey, peekSize, peekUntil, shard, metricShardName, &account)
 			})
 		}
 
@@ -729,7 +730,7 @@ func (q *queue) scan(ctx context.Context) error {
 		metricShardName = "<shard>:" + shard.Name
 	}
 
-	return q.scanPartition(ctx, partitionKey, peekSize, peekUntil, shard, metricShardName)
+	return q.scanPartition(ctx, partitionKey, peekSize, peekUntil, shard, metricShardName, nil)
 }
 
 // NOTE: Shard is only passed as a reference if the partition was peeked from
