@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"math"
 	"math/rand"
 	"runtime/debug"
@@ -400,10 +401,10 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 	}
 }
 
-func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimit int64, peekUntil time.Time, guaranteedCapacity *GuaranteedCapacity, metricShardName string) error {
+func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimit int64, peekUntil time.Time, guaranteedCapacity *GuaranteedCapacity, metricShardName string, accountId *uuid.UUID) error {
 	// Peek 1s into the future to pull jobs off ahead of time, minimizing 0 latency
 	partitions, err := duration(ctx, "partition_peek", q.clock.Now(), func(ctx context.Context) ([]*QueuePartition, error) {
-		return q.partitionPeek(ctx, partitionKey, q.isSequential(), peekUntil, peekLimit)
+		return q.partitionPeek(ctx, partitionKey, q.isSequential(), peekUntil, peekLimit, accountId)
 	})
 	if err != nil {
 		return err
@@ -476,7 +477,7 @@ func (q *queue) scan(ctx context.Context) error {
 
 		// When account is leased, process it
 		partitionKey = q.u.kg.AccountPartitionIndex(guaranteedCapacity.AccountID)
-		return q.scanPartition(ctx, partitionKey, peekSize, peekUntil, guaranteedCapacity, metricShardName)
+		return q.scanPartition(ctx, partitionKey, peekSize, peekUntil, guaranteedCapacity, metricShardName, &guaranteedCapacity.AccountID)
 	}
 
 	processAccount := false
@@ -508,14 +509,14 @@ func (q *queue) scan(ctx context.Context) error {
 			eg.Go(func() error {
 				partitionKey := q.u.kg.AccountPartitionIndex(account)
 
-				return q.scanPartition(ctx, partitionKey, peekSize, peekUntil, nil, metricShardName)
+				return q.scanPartition(ctx, partitionKey, peekSize, peekUntil, nil, metricShardName, &account)
 			})
 		}
 
 		return eg.Wait()
 	}
 
-	return q.scanPartition(ctx, partitionKey, peekSize, peekUntil, nil, metricShardName)
+	return q.scanPartition(ctx, partitionKey, peekSize, peekUntil, nil, metricShardName, nil)
 }
 
 // NOTE: Shard is only passed as a reference if the partition was peeked from

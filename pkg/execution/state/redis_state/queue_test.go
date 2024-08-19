@@ -2442,12 +2442,15 @@ func TestQueuePartitionPeek(t *testing.T) {
 	idB := uuid.New()
 	idC := uuid.New()
 
+	accountId := uuid.New()
+
 	newQueueItem := func(id uuid.UUID) QueueItem {
 		return QueueItem{
 			FunctionID: id,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
 					WorkflowID: id,
+					AccountID:  accountId,
 				},
 			},
 		}
@@ -2496,9 +2499,9 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		require.EqualValues(t, []*QueuePartition{
-			{ID: idA.String(), FunctionID: &idA, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
-			{ID: idB.String(), FunctionID: &idB, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
-			{ID: idC.String(), FunctionID: &idC, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
+			{ID: idA.String(), FunctionID: &idA, AccountID: accountId, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
+			{ID: idB.String(), FunctionID: &idB, AccountID: accountId, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
+			{ID: idC.String(), FunctionID: &idC, AccountID: accountId, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
 		}, items)
 	})
 
@@ -2586,8 +2589,8 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		require.EqualValues(t, []*QueuePartition{
-			{ID: idB.String(), FunctionID: &idB, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
-			{ID: idC.String(), FunctionID: &idC, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
+			{ID: idB.String(), FunctionID: &idB, AccountID: accountId, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
+			{ID: idC.String(), FunctionID: &idC, AccountID: accountId, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
 		}, items)
 
 		// Try without sequential scans
@@ -2622,8 +2625,8 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		require.EqualValues(t, []*QueuePartition{
-			{ID: idB.String(), FunctionID: &idB, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
-			{ID: idC.String(), FunctionID: &idC, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
+			{ID: idB.String(), FunctionID: &idB, AccountID: accountId, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
+			{ID: idC.String(), FunctionID: &idC, AccountID: accountId, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
 		}, items)
 
 		// After unpausing A, it should be included in the peek:
@@ -2633,10 +2636,50 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		require.EqualValues(t, []*QueuePartition{
-			{ID: idA.String(), FunctionID: &idA, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
-			{ID: idB.String(), FunctionID: &idB, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
-			{ID: idC.String(), FunctionID: &idC, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
+			{ID: idA.String(), FunctionID: &idA, AccountID: accountId, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
+			{ID: idB.String(), FunctionID: &idB, AccountID: accountId, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
+			{ID: idC.String(), FunctionID: &idC, AccountID: accountId, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
 		}, items, r.Dump())
+	})
+
+	t.Run("Cleans up missing partitions in account queue", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		q := NewQueue(
+			NewQueueClient(rc, QueueDefaultKey),
+			WithPriorityFinder(func(_ context.Context, _ QueuePartition) uint {
+				return PriorityDefault
+			}),
+		)
+		enqueue(q)
+
+		// Create inconsistency: Delete partition item from partition hash and global partition index but _not_ account partitions
+		err = rc.Do(ctx, rc.B().Hdel().Key(q.u.kg.PartitionItem()).Field(idA.String()).Build()).Error()
+		require.NoError(t, err)
+		err = rc.Do(ctx, rc.B().Zrem().Key(q.u.kg.GlobalPartitionIndex()).Member(idA.String()).Build()).Error()
+		require.NoError(t, err)
+
+		// This should only select B and C, as id A is ignored and cleaned up:
+		items, err := q.partitionPeek(ctx, q.u.kg.AccountPartitionIndex(accountId), true, time.Now().Add(time.Hour), PartitionPeekMax, &accountId)
+		require.NoError(t, err)
+		require.Len(t, items, 2)
+		require.EqualValues(t, []*QueuePartition{
+			{ID: idB.String(), AccountID: accountId, FunctionID: &idB, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
+			{ID: idC.String(), AccountID: accountId, FunctionID: &idC, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
+		}, items)
+
+		// Ensure the partition is removed from the account queue
+		apIds := getAccountPartitions(t, rc, accountId)
+		assert.Equal(t, 2, len(apIds))
+		assert.NotContains(t, apIds, idA.String())
+		assert.Contains(t, apIds, idB.String())
+		assert.Contains(t, apIds, idC.String())
 	})
 }
 

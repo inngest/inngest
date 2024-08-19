@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"golang.org/x/sync/errgroup"
 	"math"
 	"strconv"
 	"strings"
@@ -1192,7 +1193,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	isSystemPartition := parts[0].IsSystem()
 
 	if i.Data.Identifier.AccountID == uuid.Nil && !isSystemPartition {
-		return QueueItem{}, fmt.Errorf("missing accountId in enqueue")
+		q.logger.Warn().Interface("item", i).Msg("attempting to enqueue item to non-system partition without account ID")
 	}
 
 	var (
@@ -1941,7 +1942,7 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 // randomly, with higher priority partitions more likely to be selected.  This reduces
 // lease contention amongst multiple shared-nothing workers.
 func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error) {
-	return q.partitionPeek(ctx, q.u.kg.GlobalPartitionIndex(), sequential, until, limit)
+	return q.partitionPeek(ctx, q.u.kg.GlobalPartitionIndex(), sequential, until, limit, nil)
 }
 
 func (q *queue) partitionSize(ctx context.Context, partitionKey string, until time.Time) (int64, error) {
@@ -1951,7 +1952,19 @@ func (q *queue) partitionSize(ctx context.Context, partitionKey string, until ti
 	return q.u.Client().Do(ctx, cmd).AsInt64()
 }
 
-func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error) {
+func (q *queue) cleanupNilPartitionInAccount(ctx context.Context, accountId uuid.UUID, partitionKey string) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "cleanupNilPartitionInAccount"), redis_telemetry.ScopeQueue)
+
+	cmd := q.u.Client().B().Zrem().Key(q.u.kg.AccountPartitionIndex(accountId)).Member(partitionKey).Build()
+	if err := q.u.Client().Do(ctx, cmd).Error(); err != nil {
+		return fmt.Errorf("failed to remove nil partition from account partitions pointer queue: %w", err)
+	}
+
+	return nil
+
+}
+
+func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequential bool, until time.Time, limit int64, accountId *uuid.UUID) ([]*QueuePartition, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "partitionPeek"), redis_telemetry.ScopeQueue)
 
 	if limit > PartitionPeekMax {
@@ -1995,9 +2008,23 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	if err != nil {
 		return nil, fmt.Errorf("error peeking partition items: %w", err)
 	}
-	encoded, ok := peekRet.([]any)
+	returnedSet, ok := peekRet.([]any)
 	if !ok {
 		return nil, fmt.Errorf("unknown return type from partitionPeek: %T", peekRet)
+	}
+
+	if len(returnedSet) != 2 {
+		return nil, fmt.Errorf("expected two items in set returned by partitionPeek: %v", returnedSet)
+	}
+
+	encoded, ok := returnedSet[0].([]any)
+	if !ok {
+		return nil, fmt.Errorf("unexpected first item in set returned from partitionPeek: %T", peekRet)
+	}
+
+	missingPartitions, ok := returnedSet[1].([]any)
+	if !ok {
+		return nil, fmt.Errorf("unexpected first item in set returned from partitionPeek: %T", peekRet)
 	}
 
 	// begin temporary debugging code
@@ -2030,13 +2057,14 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	// Use parallel decoding as per Peek
 	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueuePartition, error) {
 		if val == nil {
-			return nil, nil
+			return nil, fmt.Errorf("encountered nil partition item in pointer queue %q", partitionKey)
 		}
 
 		str, ok := val.(string)
 		if !ok {
 			return nil, fmt.Errorf("unknown type in partition peek: %T", val)
 		}
+
 		item := &QueuePartition{}
 
 		if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), item); err != nil {
@@ -2054,6 +2082,32 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error decoding partitions: %w", err)
+	}
+
+	if len(missingPartitions) > 0 {
+		if accountId == nil {
+			return nil, fmt.Errorf("encountered missing partitions in partition pointer queue %q", partitionKey)
+		}
+
+		eg := errgroup.Group{}
+		for _, partition := range missingPartitions {
+			if partition == nil {
+				return nil, fmt.Errorf("encountered nil partition key in pointer queue %q", partitionKey)
+			}
+
+			str, ok := partition.(string)
+			if !ok {
+				return nil, fmt.Errorf("encountered non-string partition key in pointer queue %q", partitionKey)
+			}
+
+			eg.Go(func() error {
+				return q.cleanupNilPartitionInAccount(ctx, *accountId, str)
+			})
+		}
+
+		if err := eg.Wait(); err != nil {
+			return nil, fmt.Errorf("error cleaning up nil partitions in account pointer queue: %w", err)
+		}
 	}
 
 	// mget all fn metas
@@ -2095,8 +2149,11 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 
 	ignored := 0
 	for n, item := range partitions {
+		// NOTE: Nil partitions were already reported above. If we got to this point, they're
+		// in the account partition pointer and should simply be skipped.
+		// This happens when rolling back from a newer deployment with account-queue
+		// support to the previous version.
 		if item == nil {
-			// THIS SHOULD NEVER HAPPEN, prevent crashing and skip nil partition gracefully
 			ignored++
 			continue
 		}
