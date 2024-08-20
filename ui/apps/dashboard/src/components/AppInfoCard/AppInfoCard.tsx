@@ -4,7 +4,7 @@ import { type Route } from 'next';
 import { Link } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
-import { classNames } from '@inngest/components/utils/classNames';
+import { cn } from '@inngest/components/utils/classNames';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { FrameworkInfo } from '@/components/FrameworkInfo';
@@ -88,9 +88,9 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
   return (
     <>
       <div
-        className={classNames('border-muted overflow-hidden rounded-lg border bg-white', className)}
+        className={cn('border-muted bg-canvasBase overflow-hidden rounded-lg border', className)}
       >
-        <h2 className="border-muted border-b px-6 py-3 text-sm font-medium text-slate-600">
+        <h2 className="border-muted text-basis border-b px-6 py-3 text-sm font-medium">
           App Information
         </h2>
 
@@ -152,8 +152,8 @@ function Description({
 }) {
   return (
     <div className={className}>
-      <dt className="pb-2 text-sm text-slate-400">{term}</dt>
-      {!loading && <dd className="leading-8 text-slate-800">{detail}</dd>}
+      <dt className="text-subtle pb-2 text-sm">{term}</dt>
+      {!loading && <dd className="text-basis leading-8">{detail}</dd>}
       {loading && <Skeleton className="mb-2 block h-6 w-full" />}
     </div>
   );

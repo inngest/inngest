@@ -57,7 +57,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
         collapsible
       >
         <CollapsibleCardItem value="syncedFunctions">
-          <CollapsibleCardHeader className="data-[state=open]:border-muted flex h-11 items-center justify-between border-b border-transparent px-6 text-sm font-medium text-slate-600">
+          <CollapsibleCardHeader className="data-[state=open]:border-muted text-basis flex h-11 items-center justify-between border-b border-transparent px-6 text-sm font-medium">
             <p>Synced Functions ({syncedFunctions.length})</p>
             <CollapsibleCardTrigger
               asChild
@@ -67,7 +67,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                 className="group"
                 appearance="outlined"
                 icon={
-                  <RiArrowDownSLine className="transform-90 text-slate-500 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
+                  <RiArrowDownSLine className="transform-90 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
                 }
               />
             </CollapsibleCardTrigger>
@@ -86,7 +86,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                       <div
                         className={cn(
                           defaultLinkStyles,
-                          'group flex w-full items-center gap-2 border-slate-200 py-3 pl-6 pr-2 text-sm font-medium hover:bg-slate-100',
+                          'border-muted hover:bg-canvasSubtle/50 group flex w-full items-center gap-2 py-3 pl-6 pr-2 text-sm font-medium',
                           !isLast && 'border-b'
                         )}
                       >
@@ -107,7 +107,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
         collapsible
       >
         <CollapsibleCardItem value="RemovedFunctions">
-          <CollapsibleCardHeader className="data-[state=open]:border-muted flex h-11 items-center justify-between border-b border-transparent px-6 text-sm font-medium text-slate-600">
+          <CollapsibleCardHeader className="data-[state=open]:border-muted text-basis flex h-11 items-center justify-between border-b border-transparent px-6 text-sm font-medium">
             <p>Removed Functions ({removedFunctions.length})</p>
             <CollapsibleCardTrigger
               asChild
@@ -117,7 +117,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                 className="group"
                 appearance="outlined"
                 icon={
-                  <RiArrowDownSLine className="transform-90 text-slate-500 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
+                  <RiArrowDownSLine className="transform-90 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
                 }
               />
             </CollapsibleCardTrigger>
@@ -135,7 +135,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                     <div
                       className={cn(
                         defaultLinkStyles,
-                        'group flex w-full items-center gap-2 border-slate-200 py-3 pl-6 pr-2 text-sm font-medium hover:bg-slate-100',
+                        'border-muted hover:bg-canvasSubtle/50 group flex w-full items-center gap-2 py-3 pl-6 pr-2 text-sm font-medium',
                         !isLast && 'border-b'
                       )}
                     >
@@ -147,7 +147,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
               })}
 
               {removedFunctions.length === 0 && (
-                <div className="p-2 text-center text-sm text-slate-600">No removed functions</div>
+                <div className="text-subtle p-2 text-center text-sm">No removed functions</div>
               )}
             </CollapsibleCardContent>
           )}
