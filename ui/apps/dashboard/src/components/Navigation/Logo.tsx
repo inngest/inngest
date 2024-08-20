@@ -49,7 +49,7 @@ export default function Logo({ collapsed, setCollapsed }: LogoProps) {
       <div className={`flex flex-row items-center justify-start ${collapsed ? '' : 'mr-3'} `}>
         {collapsed ? (
           <div className="cursor-pointer group-hover:hidden">
-            <InngestLogoSmallBW />
+            <InngestLogoSmallBW className="text-basis" />
           </div>
         ) : (
           <>

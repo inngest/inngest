@@ -44,10 +44,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   ref
 ) {
   const env = useEnvironment();
-  const pathName = usePathname();
-  //
-  // Don't do page level refresh on new runs section, it's a top nav action
-  const monitorRuns = pathName.includes(`/env/${env.slug}/runs`);
 
   const [{ data: pauseData }] = useQuery({
     pause: scope !== 'fn',
@@ -232,7 +228,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       isLoadingInitial={firstPageRes.fetching}
       isLoadingMore={nextPageRes.fetching}
       getRun={getRun}
-      onRefresh={monitorRuns ? undefined : onRefresh}
+      onRefresh={onRefresh}
       onScroll={fetchMoreOnScroll}
       onScrollToTop={onScrollToTop}
       getTraceResult={getTraceResult}

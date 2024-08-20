@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge } from '@inngest/components/Badge/Badge';
 import { Header } from '@inngest/components/Header/Header';
+import { RunsActionMenu } from '@inngest/components/RunsPage/ActionMenu';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
@@ -37,6 +38,7 @@ import { pathCreator } from '@/utils/pathCreator';
 const pollInterval = 2500;
 
 export default function Page() {
+  const [autoRefresh, setAutoRefresh] = useState(true);
   const [filterApp] = useStringArraySearchParam('filterApp');
   const [totalCount, setTotalCount] = useState<number>();
   const [filteredStatus] = useValidatedArraySearchParam('filterStatus', isFunctionRunStatus);
@@ -85,7 +87,7 @@ export default function Page() {
   const { data, fetchNextPage, isFetching } = useInfiniteQuery({
     queryKey: ['runs'],
     queryFn,
-    refetchInterval: pollInterval,
+    refetchInterval: autoRefresh ? pollInterval : false,
     initialPageParam: null,
     getNextPageParam: (lastPage) => {
       if (!lastPage) {
@@ -159,6 +161,13 @@ export default function Page() {
             Beta
           </Badge>
         }
+        action={
+          <RunsActionMenu
+            setAutoRefresh={() => setAutoRefresh(!autoRefresh)}
+            autoRefresh={autoRefresh}
+            intervalSeconds={pollInterval / 1000}
+          />
+        }
       />
       <RunsPage
         apps={appsRes.data?.apps || []}
@@ -174,6 +183,7 @@ export default function Page() {
         getRun={getRun}
         onScroll={onScroll}
         onScrollToTop={onScrollToTop}
+        onRefresh={fetchNextPage}
         getTraceResult={getTraceResult}
         getTrigger={getTrigger}
         rerun={rerun}

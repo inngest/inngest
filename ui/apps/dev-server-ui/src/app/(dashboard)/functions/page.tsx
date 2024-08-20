@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { BlankSlate } from '@inngest/components/BlankSlate';
 import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
@@ -117,9 +118,21 @@ export default function FunctionList() {
       desc: false,
     },
   ]);
-  const [searchInput, setSearchInput] = useState('');
-  const [globalFilter, setGlobalFilter] = useState('');
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const { replace } = useRouter();
+  const query = searchParams.get('query');
+  const [searchInput, setSearchInput] = useState(query);
+  const [globalFilter, setGlobalFilter] = useState(query);
+
   const debouncedSearch = useDebounce(() => {
+    const params = new URLSearchParams(searchParams);
+    if (searchInput) {
+      params.set('query', searchInput);
+    } else {
+      params.delete('query');
+    }
+    replace(`${pathname}?${params.toString()}`);
     setGlobalFilter(searchInput);
   });
 
