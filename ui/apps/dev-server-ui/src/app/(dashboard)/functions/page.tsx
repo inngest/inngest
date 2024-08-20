@@ -122,8 +122,8 @@ export default function FunctionList() {
   const pathname = usePathname();
   const { replace } = useRouter();
   const query = searchParams.get('query');
-  const [searchInput, setSearchInput] = useState(query);
-  const [globalFilter, setGlobalFilter] = useState(query);
+  const [searchInput, setSearchInput] = useState(query || '');
+  const [globalFilter, setGlobalFilter] = useState(query || '');
 
   const debouncedSearch = useDebounce(() => {
     const params = new URLSearchParams(searchParams);
