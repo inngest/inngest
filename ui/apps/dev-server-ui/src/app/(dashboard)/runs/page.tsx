@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge } from '@inngest/components/Badge/Badge';
 import { Header } from '@inngest/components/Header/Header';
+import { RunsActionMenu } from '@inngest/components/RunsPage/ActionMenu';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
@@ -19,6 +20,7 @@ import {
 import { toMaybeDate } from '@inngest/components/utils/date';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
+import SendEventButton from '@/components/Event/SendEventButton';
 import { useCancelRun } from '@/hooks/useCancelRun';
 import { useGetRun } from '@/hooks/useGetRun';
 import { useGetTraceResult } from '@/hooks/useGetTraceResult';
@@ -37,6 +39,7 @@ import { pathCreator } from '@/utils/pathCreator';
 const pollInterval = 2500;
 
 export default function Page() {
+  const [autoRefresh, setAutoRefresh] = useState(true);
   const [filterApp] = useStringArraySearchParam('filterApp');
   const [totalCount, setTotalCount] = useState<number>();
   const [filteredStatus] = useValidatedArraySearchParam('filterStatus', isFunctionRunStatus);
@@ -85,7 +88,7 @@ export default function Page() {
   const { data, fetchNextPage, isFetching } = useInfiniteQuery({
     queryKey: ['runs'],
     queryFn,
-    refetchInterval: pollInterval,
+    refetchInterval: autoRefresh ? pollInterval : false,
     initialPageParam: null,
     getNextPageParam: (lastPage) => {
       if (!lastPage) {
@@ -159,6 +162,23 @@ export default function Page() {
             Beta
           </Badge>
         }
+        action={
+          <div className="flex flex-row items-center gap-x-1">
+            <SendEventButton
+              label="Send Test Event"
+              data={JSON.stringify({
+                name: '',
+                data: {},
+                user: {},
+              })}
+            />
+            <RunsActionMenu
+              setAutoRefresh={() => setAutoRefresh(!autoRefresh)}
+              autoRefresh={autoRefresh}
+              intervalSeconds={pollInterval / 1000}
+            />
+          </div>
+        }
       />
       <RunsPage
         apps={appsRes.data?.apps || []}
@@ -174,6 +194,7 @@ export default function Page() {
         getRun={getRun}
         onScroll={onScroll}
         onScrollToTop={onScrollToTop}
+        onRefresh={fetchNextPage}
         getTraceResult={getTraceResult}
         getTrigger={getTrigger}
         rerun={rerun}

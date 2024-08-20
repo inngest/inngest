@@ -8,6 +8,7 @@ import { InvokeButton } from '@inngest/components/InvokeButton';
 import { Link } from '@inngest/components/Link/Link';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { Table } from '@inngest/components/Table';
+import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -117,9 +118,17 @@ export default function FunctionList() {
       desc: false,
     },
   ]);
-  const [searchInput, setSearchInput] = useState('');
-  const [globalFilter, setGlobalFilter] = useState('');
+  const [value, upsert, remove] = useSearchParam('query');
+
+  const [searchInput, setSearchInput] = useState(value || '');
+  const [globalFilter, setGlobalFilter] = useState(value || '');
+
   const debouncedSearch = useDebounce(() => {
+    if (searchInput) {
+      upsert(searchInput);
+    } else {
+      remove();
+    }
     setGlobalFilter(searchInput);
   });
 
