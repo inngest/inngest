@@ -1,9 +1,6 @@
 import { OrganizationProfile } from '@clerk/nextjs';
 
-import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
-
 export default async function OrganizationSettingsPage() {
-  const newIANav = await getBooleanFlag('new-ia-nav');
   return (
     <div className="min-h-0 flex-1">
       <OrganizationProfile
@@ -12,8 +9,7 @@ export default async function OrganizationSettingsPage() {
         appearance={{
           elements: {
             rootBox: 'h-full',
-            card: newIANav ? '' : 'divide-x divide-slate-100',
-            navbar: newIANav ? 'hidden' : 'p-8 border-none',
+            navbar: 'hidden',
             scrollBox: 'bg-white',
             pageScrollBox: '[scrollbar-width:none]', // hides the Clerk's scrollbar
           },

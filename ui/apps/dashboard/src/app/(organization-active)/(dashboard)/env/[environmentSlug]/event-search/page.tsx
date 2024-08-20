@@ -1,5 +1,5 @@
 import { EventsHeader } from '@/components/Events/EventsHeader';
-import { ServerFeatureFlag, getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import { ServerFeatureFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import { EventSearch } from './EventSearch';
 
 export default async function Page({
@@ -7,10 +7,9 @@ export default async function Page({
 }: {
   params: { environmentSlug: string };
 }) {
-  const newIANav = await getBooleanFlag('new-ia-nav');
   return (
     <ServerFeatureFlag flag="event-search">
-      {newIANav && <EventsHeader envSlug={envSlug} eventSearch={true} sendEvents={false} />}
+      <EventsHeader envSlug={envSlug} eventSearch={true} sendEvents={false} />
       <div className="bg-canvasBase flex h-full w-full flex-col">
         <EventSearch />
       </div>
