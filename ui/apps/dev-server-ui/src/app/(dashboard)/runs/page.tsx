@@ -20,6 +20,7 @@ import {
 import { toMaybeDate } from '@inngest/components/utils/date';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
+import SendEventButton from '@/components/Event/SendEventButton';
 import { useCancelRun } from '@/hooks/useCancelRun';
 import { useGetRun } from '@/hooks/useGetRun';
 import { useGetTraceResult } from '@/hooks/useGetTraceResult';
@@ -162,11 +163,21 @@ export default function Page() {
           </Badge>
         }
         action={
-          <RunsActionMenu
-            setAutoRefresh={() => setAutoRefresh(!autoRefresh)}
-            autoRefresh={autoRefresh}
-            intervalSeconds={pollInterval / 1000}
-          />
+          <div className="flex flex-row items-center gap-x-1">
+            <SendEventButton
+              label="Send Test Event"
+              data={JSON.stringify({
+                name: '',
+                data: {},
+                user: {},
+              })}
+            />
+            <RunsActionMenu
+              setAutoRefresh={() => setAutoRefresh(!autoRefresh)}
+              autoRefresh={autoRefresh}
+              intervalSeconds={pollInterval / 1000}
+            />
+          </div>
         }
       />
       <RunsPage
