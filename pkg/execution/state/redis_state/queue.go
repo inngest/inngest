@@ -683,7 +683,7 @@ func (q QueuePartition) concurrencyKey(kg QueueKeyGenerator) string {
 		// Hierarchically, custom keys take precedence.
 		return q.customConcurrencyKey(kg)
 	default:
-		return q.acctConcurrencyKey(kg)
+		panic(fmt.Sprintf("unexpected partition type encountered in concurrencyKey %q", q.PartitionType))
 	}
 }
 

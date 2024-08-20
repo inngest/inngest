@@ -56,7 +56,7 @@ redis.call("HSET", queueKey, queueID, queueItem)
 
 -- This extends the item in the zset and also ensures that scavenger queues are
 -- updated.
-local function handleDequeue(keyConcurrency)
+local function handleRequeue(keyConcurrency)
 	redis.call("ZREM", keyConcurrency, item.id)
 
 	-- Get the earliest item in the partition concurrency set.  We may be dequeueing
@@ -84,10 +84,11 @@ end
 --
 
 -- Remove this from the account concurrency queue
-handleDequeue(keyAcctConcurrency)
-handleDequeue(keyConcurrencyA)
-handleDequeue(keyConcurrencyB)
-handleDequeue(keyConcurrencyC)
+redis.call("ZREM", keyAcctConcurrency, item.id)
+
+handleRequeue(keyConcurrencyA)
+handleRequeue(keyConcurrencyB)
+handleRequeue(keyConcurrencyC)
 
 --
 -- Partition manipulation
