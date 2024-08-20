@@ -51,7 +51,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const defaultTick = time.Millisecond * 150
+const (
+	DefaultTick         = time.Millisecond * 150
+	DefaultPollInterval = 5
+)
 
 // StartOpts configures the dev server
 type StartOpts struct {
@@ -93,7 +96,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	if opts.Tick == 0 {
-		opts.Tick = defaultTick
+		opts.Tick = DefaultTick
 	}
 
 	// Initialize the devserver
@@ -371,10 +374,10 @@ func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Clien
 		return nil, err
 	}
 
-	// If tick is lower than 250ms, tick every 100ms.  This lets us save
+	// If tick is lower than the default, tick every 50ms.  This lets us save
 	// CPU for standard dev-server testing.
 	poll := time.Second
-	if tick < defaultTick {
+	if tick < DefaultTick {
 		poll = time.Millisecond * 50
 	}
 

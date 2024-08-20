@@ -1,8 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-
-import { Header, type BreadCrumbType } from '@/components/Header/Header';
+import { Header, type BreadCrumbType } from '@inngest/components/Header/Header';
 
 //
 // In the new IA, all the settings pages

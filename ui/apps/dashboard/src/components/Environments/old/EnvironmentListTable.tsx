@@ -164,10 +164,10 @@ function TableRow(props: { env: Environment }) {
   let statusColorClass: string;
   let statusText: string;
   if (isArchived) {
-    statusColorClass = 'bg-slate-300';
+    statusColorClass = 'bg-surfaceMuted';
     statusText = 'Archived';
   } else {
-    statusColorClass = 'bg-teal-500';
+    statusColorClass = 'bg-primary-moderate';
     statusText = 'Active';
   }
 
