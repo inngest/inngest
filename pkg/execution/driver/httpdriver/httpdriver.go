@@ -182,6 +182,26 @@ func DoRequest(ctx context.Context, c *http.Client, r Request) (*state.DriverRes
 	if resp.sysErr != nil {
 		dr.SetError(resp.sysErr)
 	}
+
+	if dr.Err == nil && resp.statusCode == 200 && !resp.isSDK {
+		log.From(ctx).Info().
+			Interface("headers", resp.header).
+			Str("run_id", r.RunID.String()).
+			Str("url", r.URL.String()).
+			Msg("response did not come from an Inngest SDK")
+
+		err := syscode.Error{
+			Code:    syscode.CodeNotSDK,
+			Message: fmt.Sprintf("%s: response did not come from an Inngest SDK", syscode.CodeNotSDK),
+		}
+
+		dr.SetError(err)
+
+		// We need to add the error to the output so the user can see it in the
+		// UI. Also keep the body in case that helps them debug
+		dr.Output = fmt.Sprintf("%s\n\n%s", err, body)
+	}
+
 	if resp.statusCode < 200 || resp.statusCode > 299 {
 		// Add an error to driver.Response if the status code isn't 2XX.
 		//
@@ -365,6 +385,14 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 		}
 	}
 
+	isSDK := false
+	for k := range resp.Header {
+		if strings.HasPrefix(strings.ToLower(k), "x-inngest-") {
+			isSDK = true
+			break
+		}
+	}
+
 	// Get the request version
 	rv, _ := strconv.Atoi(headers[headerRequestVersion])
 	return &response{
@@ -377,6 +405,7 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 		sdk:            headers[headerSDK],
 		header:         resp.Header,
 		sysErr:         sysErr,
+		isSDK:          isSDK,
 	}, err
 
 }
@@ -400,4 +429,5 @@ type response struct {
 	header http.Header
 
 	sysErr *syscode.Error
+	isSDK  bool
 }
