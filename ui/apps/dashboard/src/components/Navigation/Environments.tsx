@@ -237,9 +237,9 @@ function EnvironmentItem({
 }) {
   let statusColorClass: string;
   if (environment.isArchived) {
-    statusColorClass = 'bg-slate-300';
+    statusColorClass = 'bg-surfaceMuted';
   } else {
-    statusColorClass = 'bg-teal-500';
+    statusColorClass = 'bg-primary-moderate';
   }
 
   return (
