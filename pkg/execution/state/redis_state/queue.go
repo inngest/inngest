@@ -2602,6 +2602,7 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 		}
 		for _, item := range jobs {
 			if item == "" {
+				// THIS SHOULD NEVER HAPPEN. Handle this gracefully
 				continue
 			}
 
