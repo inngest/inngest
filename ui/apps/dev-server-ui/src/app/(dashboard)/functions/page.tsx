@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { BlankSlate } from '@inngest/components/BlankSlate';
 import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
@@ -9,6 +8,7 @@ import { InvokeButton } from '@inngest/components/InvokeButton';
 import { Link } from '@inngest/components/Link/Link';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { Table } from '@inngest/components/Table';
+import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -118,21 +118,17 @@ export default function FunctionList() {
       desc: false,
     },
   ]);
-  const searchParams = useSearchParams();
-  const pathname = usePathname();
-  const { replace } = useRouter();
-  const query = searchParams.get('query');
-  const [searchInput, setSearchInput] = useState(query || '');
-  const [globalFilter, setGlobalFilter] = useState(query || '');
+  const [value, upsert, remove] = useSearchParam('query');
+
+  const [searchInput, setSearchInput] = useState(value || '');
+  const [globalFilter, setGlobalFilter] = useState(value || '');
 
   const debouncedSearch = useDebounce(() => {
-    const params = new URLSearchParams(searchParams);
     if (searchInput) {
-      params.set('query', searchInput);
+      upsert(searchInput);
     } else {
-      params.delete('query');
+      remove();
     }
-    replace(`${pathname}?${params.toString()}`);
     setGlobalFilter(searchInput);
   });
 
