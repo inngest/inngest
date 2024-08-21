@@ -20,6 +20,9 @@ type Props = {
   flatSide?: 'left' | 'right';
 };
 
+/**
+ * @deprecated Use shared Pill component instead
+ */
 export function Badge({ children, className = '', kind = 'outlined', flatSide }: Props) {
   let roundedClasses = 'rounded-full';
   if (flatSide === 'left') {
