@@ -16,7 +16,7 @@ import (
 )
 
 const deleteApp = `-- name: DeleteApp :exec
-UPDATE apps SET deleted_at = NOW() WHERE id = ?
+UPDATE apps SET deleted_at = datetime('now') WHERE id = ?
 `
 
 func (q *Queries) DeleteApp(ctx context.Context, id uuid.UUID) error {
@@ -25,7 +25,7 @@ func (q *Queries) DeleteApp(ctx context.Context, id uuid.UUID) error {
 }
 
 const deleteFunctionsByAppID = `-- name: DeleteFunctionsByAppID :exec
-DELETE FROM functions WHERE app_id = ?
+UPDATE functions SET deleted_at = datetime('now') WHERE app_id = ?
 `
 
 func (q *Queries) DeleteFunctionsByAppID(ctx context.Context, appID uuid.UUID) error {
@@ -34,7 +34,7 @@ func (q *Queries) DeleteFunctionsByAppID(ctx context.Context, appID uuid.UUID) e
 }
 
 const deleteFunctionsByIDs = `-- name: DeleteFunctionsByIDs :exec
-DELETE FROM functions WHERE id IN (/*SLICE:ids*/?)
+UPDATE functions SET deleted_at = datetime('now') WHERE id IN (/*SLICE:ids*/?)
 `
 
 func (q *Queries) DeleteFunctionsByIDs(ctx context.Context, ids []uuid.UUID) error {
@@ -53,7 +53,7 @@ func (q *Queries) DeleteFunctionsByIDs(ctx context.Context, ids []uuid.UUID) err
 }
 
 const getAllApps = `-- name: GetAllApps :many
-SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url FROM apps
+SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url FROM apps WHERE deleted_at IS NULL
 `
 
 func (q *Queries) GetAllApps(ctx context.Context) ([]*App, error) {
@@ -117,7 +117,7 @@ func (q *Queries) GetApp(ctx context.Context, id uuid.UUID) (*App, error) {
 }
 
 const getAppByChecksum = `-- name: GetAppByChecksum :one
-SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url FROM apps WHERE checksum = ? LIMIT 1
+SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url FROM apps WHERE checksum = ? AND deleted_at IS NULL LIMIT 1
 `
 
 func (q *Queries) GetAppByChecksum(ctx context.Context, checksum string) (*App, error) {
@@ -165,7 +165,7 @@ func (q *Queries) GetAppByID(ctx context.Context, id uuid.UUID) (*App, error) {
 }
 
 const getAppByURL = `-- name: GetAppByURL :one
-SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url FROM apps WHERE url = ? LIMIT 1
+SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url FROM apps WHERE url = ? AND deleted_at IS NULL LIMIT 1
 `
 
 func (q *Queries) GetAppByURL(ctx context.Context, url string) (*App, error) {
@@ -189,7 +189,7 @@ func (q *Queries) GetAppByURL(ctx context.Context, url string) (*App, error) {
 }
 
 const getAppFunctions = `-- name: GetAppFunctions :many
-SELECT id, app_id, name, slug, config, created_at FROM functions WHERE app_id = ?
+SELECT id, app_id, name, slug, config, created_at, deleted_at FROM functions WHERE app_id = ? AND deleted_at IS NULL
 `
 
 func (q *Queries) GetAppFunctions(ctx context.Context, appID uuid.UUID) ([]*Function, error) {
@@ -208,6 +208,7 @@ func (q *Queries) GetAppFunctions(ctx context.Context, appID uuid.UUID) ([]*Func
 			&i.Slug,
 			&i.Config,
 			&i.CreatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -223,7 +224,7 @@ func (q *Queries) GetAppFunctions(ctx context.Context, appID uuid.UUID) ([]*Func
 }
 
 const getAppFunctionsBySlug = `-- name: GetAppFunctionsBySlug :many
-SELECT functions.id, functions.app_id, functions.name, functions.slug, functions.config, functions.created_at FROM functions JOIN apps ON apps.id = functions.app_id WHERE apps.name = ?
+SELECT functions.id, functions.app_id, functions.name, functions.slug, functions.config, functions.created_at, functions.deleted_at FROM functions JOIN apps ON apps.id = functions.app_id WHERE apps.name = ? AND functions.deleted_at IS NULL
 `
 
 func (q *Queries) GetAppFunctionsBySlug(ctx context.Context, name string) ([]*Function, error) {
@@ -242,6 +243,7 @@ func (q *Queries) GetAppFunctionsBySlug(ctx context.Context, name string) ([]*Fu
 			&i.Slug,
 			&i.Config,
 			&i.CreatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -498,7 +500,7 @@ func (q *Queries) GetEventsIDbound(ctx context.Context, arg GetEventsIDboundPara
 }
 
 const getFunctionByID = `-- name: GetFunctionByID :one
-SELECT id, app_id, name, slug, config, created_at FROM functions WHERE id = ?
+SELECT id, app_id, name, slug, config, created_at, deleted_at FROM functions WHERE id = ?
 `
 
 func (q *Queries) GetFunctionByID(ctx context.Context, id uuid.UUID) (*Function, error) {
@@ -511,12 +513,13 @@ func (q *Queries) GetFunctionByID(ctx context.Context, id uuid.UUID) (*Function,
 		&i.Slug,
 		&i.Config,
 		&i.CreatedAt,
+		&i.DeletedAt,
 	)
 	return &i, err
 }
 
 const getFunctionBySlug = `-- name: GetFunctionBySlug :one
-SELECT id, app_id, name, slug, config, created_at FROM functions WHERE slug = ?
+SELECT id, app_id, name, slug, config, created_at, deleted_at FROM functions WHERE slug = ? AND deleted_at IS NULL
 `
 
 func (q *Queries) GetFunctionBySlug(ctx context.Context, slug string) (*Function, error) {
@@ -529,6 +532,7 @@ func (q *Queries) GetFunctionBySlug(ctx context.Context, slug string) (*Function
 		&i.Slug,
 		&i.Config,
 		&i.CreatedAt,
+		&i.DeletedAt,
 	)
 	return &i, err
 }
@@ -778,7 +782,7 @@ func (q *Queries) GetFunctionRunsTimebound(ctx context.Context, arg GetFunctionR
 }
 
 const getFunctions = `-- name: GetFunctions :many
-SELECT id, app_id, name, slug, config, created_at FROM functions
+SELECT id, app_id, name, slug, config, created_at, deleted_at FROM functions WHERE deleted_at IS NULL
 `
 
 func (q *Queries) GetFunctions(ctx context.Context) ([]*Function, error) {
@@ -797,6 +801,7 @@ func (q *Queries) GetFunctions(ctx context.Context) ([]*Function, error) {
 			&i.Slug,
 			&i.Config,
 			&i.CreatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -943,15 +948,6 @@ func (q *Queries) GetTraceSpans(ctx context.Context, arg GetTraceSpansParams) ([
 	return items, nil
 }
 
-const hardDeleteApp = `-- name: HardDeleteApp :exec
-DELETE FROM apps WHERE id = ?
-`
-
-func (q *Queries) HardDeleteApp(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, hardDeleteApp, id)
-	return err
-}
-
 const insertApp = `-- name: InsertApp :one
 INSERT INTO apps
 	(id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url) VALUES
@@ -1073,7 +1069,7 @@ const insertFunction = `-- name: InsertFunction :one
 
 INSERT INTO functions
 	(id, app_id, name, slug, config, created_at) VALUES
-	(?, ?, ?, ?, ?, ?) RETURNING id, app_id, name, slug, config, created_at
+	(?, ?, ?, ?, ?, ?) RETURNING id, app_id, name, slug, config, created_at, deleted_at
 `
 
 type InsertFunctionParams struct {
@@ -1105,6 +1101,7 @@ func (q *Queries) InsertFunction(ctx context.Context, arg InsertFunctionParams) 
 		&i.Slug,
 		&i.Config,
 		&i.CreatedAt,
+		&i.DeletedAt,
 	)
 	return &i, err
 }
@@ -1336,6 +1333,52 @@ func (q *Queries) InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) 
 	return err
 }
 
+const updateApp = `-- name: UpdateApp :one
+UPDATE apps SET name = ?, sdk_language = ?, sdk_version = ?, framework = ?, metadata = ?, status = ?, error = ?, checksum = ?, deleted_at = NULL WHERE id = ? RETURNING id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url
+`
+
+type UpdateAppParams struct {
+	Name        string
+	SdkLanguage string
+	SdkVersion  string
+	Framework   sql.NullString
+	Metadata    string
+	Status      string
+	Error       sql.NullString
+	Checksum    string
+	ID          uuid.UUID
+}
+
+func (q *Queries) UpdateApp(ctx context.Context, arg UpdateAppParams) (*App, error) {
+	row := q.db.QueryRowContext(ctx, updateApp,
+		arg.Name,
+		arg.SdkLanguage,
+		arg.SdkVersion,
+		arg.Framework,
+		arg.Metadata,
+		arg.Status,
+		arg.Error,
+		arg.Checksum,
+		arg.ID,
+	)
+	var i App
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.SdkLanguage,
+		&i.SdkVersion,
+		&i.Framework,
+		&i.Metadata,
+		&i.Status,
+		&i.Error,
+		&i.Checksum,
+		&i.CreatedAt,
+		&i.DeletedAt,
+		&i.Url,
+	)
+	return &i, err
+}
+
 const updateAppError = `-- name: UpdateAppError :one
 UPDATE apps SET error = ? WHERE id = ? RETURNING id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url
 `
@@ -1395,7 +1438,7 @@ func (q *Queries) UpdateAppURL(ctx context.Context, arg UpdateAppURLParams) (*Ap
 }
 
 const updateFunctionConfig = `-- name: UpdateFunctionConfig :one
-UPDATE functions SET config = ? WHERE id = ? RETURNING id, app_id, name, slug, config, created_at
+UPDATE functions SET config = ? WHERE id = ? RETURNING id, app_id, name, slug, config, created_at, deleted_at
 `
 
 type UpdateFunctionConfigParams struct {
@@ -1413,6 +1456,7 @@ func (q *Queries) UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionCo
 		&i.Slug,
 		&i.Config,
 		&i.CreatedAt,
+		&i.DeletedAt,
 	)
 	return &i, err
 }

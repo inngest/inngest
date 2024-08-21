@@ -3,6 +3,9 @@ INSERT INTO apps
 	(id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url) VALUES
 	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *;
 
+-- name: UpdateApp :one
+UPDATE apps SET name = ?, sdk_language = ?, sdk_version = ?, framework = ?, metadata = ?, status = ?, error = ?, checksum = ?, deleted_at = NULL WHERE id = ? RETURNING *;
+
 -- name: GetApp :one
 SELECT * FROM apps WHERE id = ?;
 
@@ -10,22 +13,19 @@ SELECT * FROM apps WHERE id = ?;
 SELECT * FROM apps WHERE deleted_at IS NULL;
 
 -- name: GetAppByChecksum :one
-SELECT * FROM apps WHERE checksum = ? LIMIT 1;
+SELECT * FROM apps WHERE checksum = ? AND deleted_at IS NULL LIMIT 1;
 
 -- name: GetAppByID :one
 SELECT * FROM apps WHERE id = ? LIMIT 1;
 
 -- name: GetAppByURL :one
-SELECT * FROM apps WHERE url = ? LIMIT 1;
+SELECT * FROM apps WHERE url = ? AND deleted_at IS NULL LIMIT 1;
 
 -- name: GetAllApps :many
-SELECT * FROM apps;
+SELECT * FROM apps WHERE deleted_at IS NULL;
 
 -- name: DeleteApp :exec
-UPDATE apps SET deleted_at = NOW() WHERE id = ?;
-
--- name: HardDeleteApp :exec
-DELETE FROM apps WHERE id = ?;
+UPDATE apps SET deleted_at = datetime('now') WHERE id = ?;
 
 -- name: UpdateAppURL :one
 UPDATE apps SET url = ? WHERE id = ? RETURNING *;
@@ -46,30 +46,28 @@ INSERT INTO functions
 	(?, ?, ?, ?, ?, ?) RETURNING *;
 
 -- name: GetFunctions :many
-SELECT * FROM functions;
+SELECT * FROM functions WHERE deleted_at IS NULL;
 
 -- name: GetAppFunctions :many
-SELECT * FROM functions WHERE app_id = ?;
+SELECT * FROM functions WHERE app_id = ? AND deleted_at IS NULL;
 
 -- name: GetAppFunctionsBySlug :many
-SELECT functions.* FROM functions JOIN apps ON apps.id = functions.app_id WHERE apps.name = ?;
+SELECT functions.* FROM functions JOIN apps ON apps.id = functions.app_id WHERE apps.name = ? AND functions.deleted_at IS NULL;
 
 -- name: GetFunctionByID :one
 SELECT * FROM functions WHERE id = ?;
 
 -- name: GetFunctionBySlug :one
-SELECT * FROM functions WHERE slug = ?;
-
+SELECT * FROM functions WHERE slug = ? AND deleted_at IS NULL;
 
 -- name: UpdateFunctionConfig :one
 UPDATE functions SET config = ? WHERE id = ? RETURNING *;
 
 -- name: DeleteFunctionsByAppID :exec
-DELETE FROM functions WHERE app_id = ?;
+UPDATE functions SET deleted_at = datetime('now') WHERE app_id = ?;
 
 -- name: DeleteFunctionsByIDs :exec
-DELETE FROM functions WHERE id IN (sqlc.slice('ids'));
-
+UPDATE functions SET deleted_at = datetime('now') WHERE id IN (sqlc.slice('ids'));
 
 --
 -- function runs
