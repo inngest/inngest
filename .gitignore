@@ -19,3 +19,4 @@ Thumbs.db
 
 .idea
 /tmp/
+!/tmp/nats/.gitkeep

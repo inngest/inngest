@@ -1,4 +1,4 @@
-// Copyright 2012-2018 The NATS Authors
+// Copyright 2012-2023 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -26,7 +26,7 @@ type JsonEncoder struct {
 }
 
 // Encode
-func (je *JsonEncoder) Encode(subject string, v interface{}) ([]byte, error) {
+func (je *JsonEncoder) Encode(subject string, v any) ([]byte, error) {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return nil, err
@@ -35,7 +35,7 @@ func (je *JsonEncoder) Encode(subject string, v interface{}) ([]byte, error) {
 }
 
 // Decode
-func (je *JsonEncoder) Decode(subject string, data []byte, vPtr interface{}) (err error) {
+func (je *JsonEncoder) Decode(subject string, data []byte, vPtr any) (err error) {
 	switch arg := vPtr.(type) {
 	case *string:
 		// If they want a string and it is a JSON string, strip quotes

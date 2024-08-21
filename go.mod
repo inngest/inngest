@@ -40,6 +40,7 @@ require (
 	github.com/karlseguin/ccache/v2 v2.0.8
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mitchellh/go-homedir v1.1.0
+	github.com/nats-io/nats.go v1.36.0
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/pkg/errors v0.9.1
 	github.com/pquerna/cachecontrol v0.2.0
@@ -139,7 +140,7 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
-	github.com/klauspost/compress v1.16.7 // indirect
+	github.com/klauspost/compress v1.17.2 // indirect
 	github.com/lib/pq v1.10.6 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/magiconair/properties v1.8.5 // indirect
@@ -152,8 +153,7 @@ require (
 	github.com/mpvl/unique v0.0.0-20150818121801-cbe035fff7de // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/termenv v0.11.1-0.20220212125758-44cd13922739 // indirect
-	github.com/nats-io/nats.go v1.13.1-0.20220121202836-972a071d373d // indirect
-	github.com/nats-io/nkeys v0.3.0 // indirect
+	github.com/nats-io/nkeys v0.4.7 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/ohler55/ojg v1.21.0 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect

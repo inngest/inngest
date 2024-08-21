@@ -9,6 +9,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/telemetry/exporters"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/jaeger"
@@ -64,6 +65,8 @@ type TracerOpts struct {
 	TraceEndpoint            string
 	TraceURLPath             string
 	TraceMaxPayloadSizeBytes int
+
+	NATS *exporters.NatsExporterOpts
 }
 
 func (o TracerOpts) Endpoint() string {
@@ -196,6 +199,8 @@ func newTracer(ctx context.Context, opts TracerOpts) (Tracer, error) {
 		return newJaegerTraceProvider(ctx, opts)
 	case TracerTypeIO:
 		return newIOTraceProvider(ctx, opts)
+	case TracerTypeNATS:
+		return newNatsTraceProvider(ctx, opts)
 	default:
 		return newNoopTraceProvider(ctx, opts)
 	}
@@ -368,4 +373,35 @@ func newTextMapPropagator() propagation.TextMapPropagator {
 		propagation.TraceContext{},
 		propagation.Baggage{},
 	)
+}
+
+func newNatsTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
+	if opts.NATS == nil {
+		return nil, fmt.Errorf("nats options not available")
+	}
+
+	exp, err := exporters.NewNATSSpanExporter(ctx, opts.NATS)
+	if err != nil {
+		return nil, fmt.Errorf("error creating NATS trace client: %w", err)
+	}
+
+	sp := trace.NewBatchSpanProcessor(exp)
+	tp := trace.NewTracerProvider(
+		trace.WithSpanProcessor(sp),
+		trace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String(opts.ServiceName),
+		)),
+	)
+
+	return &tracer{
+		provider:   tp,
+		propagator: newTextMapPropagator(),
+		processor:  sp,
+		shutdown: func(context.Context) {
+			_ = tp.ForceFlush(ctx)
+			_ = tp.Shutdown(ctx)
+			_ = exp.Shutdown(ctx)
+		},
+	}, nil
 }
