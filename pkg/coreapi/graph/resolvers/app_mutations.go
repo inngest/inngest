@@ -31,7 +31,7 @@ func (r *mutationResolver) CreateApp(ctx context.Context, input models.CreateApp
 
 	// Create a new app which holds the error message.
 	params := cqrs.InsertAppParams{
-		ID:  uuid.New(),
+		ID:  uuid.NewSHA1(uuid.NameSpaceOID, []byte(input.URL)),
 		Url: input.URL,
 		Error: sql.NullString{
 			Valid:  true,

@@ -227,7 +227,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 
 		// Create a new app which holds the error message.
 		params := cqrs.InsertAppParams{
-			ID:  uuid.New(),
+			ID:  uuid.NewSHA1(uuid.NameSpaceOID, []byte(url)),
 			Url: url,
 			Error: sql.NullString{
 				Valid:  true,
