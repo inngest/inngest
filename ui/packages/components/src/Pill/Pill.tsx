@@ -32,7 +32,7 @@ export function Pill({
 
   if (href) {
     return (
-      <Link href={href} className={cn('rounded-full', classNames)}>
+      <Link href={href} className={cn('rounded', classNames)}>
         {children}
       </Link>
     );
