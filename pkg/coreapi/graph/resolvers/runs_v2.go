@@ -31,7 +31,7 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 		ecursor *string
 	)
 	// eventID to run map
-	evtRunMap := map[ulid.ULID]*models.FunctionRunV2{}
+	evtRunMap := map[ulid.ULID][]*models.FunctionRunV2{}
 	// used for retrieving eventIDs
 	evtIDs := []ulid.ULID{}
 
@@ -102,7 +102,10 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 
 				// track evtID only if it's not batch nor cron
 				if !r.IsBatch && r.CronSchedule == nil {
-					evtRunMap[id] = node
+					if _, ok := evtRunMap[id]; !ok {
+						evtRunMap[id] = []*models.FunctionRunV2{}
+					}
+					evtRunMap[id] = append(evtRunMap[id], node)
 					evtIDs = append(evtIDs, id)
 				}
 			}
@@ -126,11 +129,13 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 		go func(evt *cqrs.Event) {
 			defer wg.Done()
 
-			run, ok := evtRunMap[evt.GetInternalID()]
+			runs, ok := evtRunMap[evt.GetInternalID()]
 			if !ok {
 				return
 			}
-			run.EventName = &evt.EventName
+			for _, run := range runs {
+				run.EventName = &evt.EventName
+			}
 		}(e)
 	}
 	wg.Wait()
