@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Badge } from '@inngest/components/Badge/Badge';
 import { Header } from '@inngest/components/Header/Header';
+import { Pill } from '@inngest/components/Pill';
 import { RunsActionMenu } from '@inngest/components/RunsPage/ActionMenu';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
@@ -158,9 +158,9 @@ export default function Page() {
       <Header
         breadcrumb={[{ text: 'Runs' }]}
         infoIcon={
-          <Badge kind="solid" className="text-alwaysWhite bg-btnPrimary h-5 px-1.5 py-1 text-xs">
+          <Pill kind="info" appearance="solid">
             Beta
-          </Badge>
+          </Pill>
         }
         action={
           <div className="flex flex-row items-center gap-x-1">

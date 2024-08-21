@@ -3,9 +3,9 @@ import * as Tabs from '@radix-ui/react-tabs';
 import { RiArrowRightSLine } from '@remixicon/react';
 import { isBefore, type Duration } from 'date-fns';
 
-import { Badge } from '../Badge';
 import { NewButton } from '../Button';
 import { Input } from '../Forms/Input';
+import { Pill } from '../Pill';
 import { Popover, PopoverContent, PopoverTrigger } from '../Popover';
 import {
   DURATION_STRING_REGEX,
@@ -226,12 +226,9 @@ export const RangePicker = ({
                 >
                   {v}
                   {!planValid && (
-                    <Badge
-                      className="border-primary-intense text-primary-intense px-2 py-0.5 text-xs"
-                      kind="outlined"
-                    >
+                    <Pill kind="primary" appearance="outlined">
                       Upgrade Plan
-                    </Badge>
+                    </Pill>
                   )}
                 </div>
               );
