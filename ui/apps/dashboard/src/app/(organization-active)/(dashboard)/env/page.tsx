@@ -1,7 +1,8 @@
+import { Header } from '@inngest/components/Header/Header';
+
 import Environments from '@/components/Environments/Environments';
 import OldEnvs from '@/components/Environments/old/oldPage';
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
-import { Header } from '@/components/Header/Header';
 import Layout from '@/components/Layout/Layout';
 import AppNavigation from '@/components/Navigation/old/AppNavigation';
 

@@ -1,23 +1,29 @@
 import { useState } from 'react';
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
+import type { ButtonAppearance } from '@inngest/components/Button/Button';
 
 import SendEventModal from '@/components/Event/SendEventModal';
 
 type SendEventButtonProps = {
   data?: string | null;
   label: string;
-  appearance?: 'solid' | 'outlined' | 'text';
+  appearance?: ButtonAppearance;
 };
 
-export default function SendEventButton({ data, label, appearance }: SendEventButtonProps) {
+export default function SendEventButton({
+  data,
+  label,
+  appearance = 'outlined',
+}: SendEventButtonProps) {
   const [isSendEventModalVisible, setSendEventModalVisible] = useState(false);
 
   return (
     <>
-      <Button
+      <NewButton
         label={label}
+        kind="secondary"
         appearance={appearance}
-        btnAction={() => setSendEventModalVisible(true)}
+        onClick={() => setSendEventModalVisible(true)}
       />
       {isSendEventModalVisible && (
         <SendEventModal

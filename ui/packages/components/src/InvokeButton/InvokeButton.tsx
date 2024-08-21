@@ -1,5 +1,5 @@
 import { useCallback, useState, type ComponentProps } from 'react';
-import { Button } from '@inngest/components/Button';
+import { Button, NewButton } from '@inngest/components/Button';
 import { InvokeModal } from '@inngest/components/InvokeButton';
 import { RiFlashlightFill } from '@remixicon/react';
 
@@ -28,12 +28,14 @@ export function InvokeButton({
 
   return (
     <>
-      <Button
-        btnAction={() => setIsModalOpen(true)}
+      <NewButton
+        kind="secondary"
+        appearance="outlined"
+        onClick={() => setIsModalOpen(true)}
         disabled={disabled}
         icon={<RiFlashlightFill className="text-sky-500" />}
+        iconSide="left"
         label="Invoke"
-        appearance={btnAppearance}
       />
 
       <InvokeModal

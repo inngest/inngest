@@ -184,6 +184,7 @@
     --color-foreground-base: var(--color-carbon-900);
     --color-foreground-subtle: var(--color-carbon-600);
     --color-foreground-muted: var(--color-carbon-700);
+    --color-foreground-light: var(--color-carbon-400);
     --color-foreground-onContrast: var(--color-carbon-0);
     --color-foreground-alwaysWhite: var(--color-carbon-0);
     --color-foreground-alwaysBlack: var(--color-carbon-1000);
@@ -284,9 +285,10 @@
     --color-primary-xIntense: var(--color-matcha-300);
     --color-primary-2xIntense: var(--color-matcha-200);
 
-    --color-foreground-base: var(--color-carbon-100);
-    --color-foreground-subtle: var(--color-carbon-500);
-    --color-foreground-muted: var(--color-carbon-400);
+    --color-foreground-base: var(--color-carbon-50);
+    --color-foreground-subtle: var(--color-carbon-400);
+    --color-foreground-muted: var(--color-carbon-200);
+    --color-foreground-light: var(--color-carbon-500);
     --color-foreground-onContrast: var(--color-carbon-1000);
     --color-foreground-alwaysWhite: var(--color-carbon-0);
     --color-foreground-alwaysBlack: var(--color-carbon-1000);

@@ -27,9 +27,9 @@ export const Header = ({
   backNav = false,
 }: HeaderType) => {
   return (
-    <div className="sticky top-0 z-50 flex flex-col justify-start border-b">
+    <div className="border-subtle sticky top-0 z-50 flex flex-col justify-start border-b">
       <div
-        className={`bg-canvasBase border-subtle flex h-[52px] flex-row items-center justify-between px-4 ${className}`}
+        className={`bg-canvasBase flex h-[52px] flex-row items-center justify-between px-4 ${className}`}
       >
         <div className="flex flex-row items-center justify-start align-baseline">
           {backNav && <Back className="mr-2" />}

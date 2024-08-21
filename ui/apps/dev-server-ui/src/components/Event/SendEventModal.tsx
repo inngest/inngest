@@ -7,7 +7,7 @@ import {
   type KeyboardEvent,
   type SyntheticEvent,
 } from 'react';
-import { Button } from '@inngest/components/Button';
+import { Button, NewButton } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { toast } from 'sonner';
@@ -200,12 +200,13 @@ export default function SendEventModal({ data, isOpen, onClose }: SendEventModal
       description="Send an event manually by filling or pasting a payload"
       className="w-full max-w-5xl"
       footer={
-        <div className="flex items-center justify-between">
-          <Button label="Cancel" appearance="outlined" btnAction={onClose} />
-          <Button
+        <div className="flex items-center justify-end gap-2">
+          <NewButton kind="secondary" label="Cancel" appearance="outlined" onClick={onClose} />
+          <NewButton
+            kind="primary"
             disabled={sendEventState.isLoading}
             label="Send Event"
-            btnAction={() => sendEvent()}
+            onClick={() => sendEvent()}
             keys={[useModifierKey(), '↵']}
           />
         </div>

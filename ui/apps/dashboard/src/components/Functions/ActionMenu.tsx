@@ -2,6 +2,7 @@
 
 import { Listbox } from '@headlessui/react';
 import { NewButton } from '@inngest/components/Button';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { IconReplay } from '@inngest/components/icons/Replay';
 import {
   RiArrowDownSLine,
@@ -13,7 +14,6 @@ import {
 } from '@remixicon/react';
 
 import { useBooleanFlag } from '../FeatureFlags/hooks';
-import { OptionalTooltip } from '../Navigation/OptionalTooltip';
 
 export type FunctionActions = {
   showCancel: () => void;
