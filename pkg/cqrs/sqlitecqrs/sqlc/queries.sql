@@ -10,29 +10,29 @@ ON CONFLICT(id) DO UPDATE SET
     status = excluded.status,
     error = excluded.error,
     checksum = excluded.checksum,
-    deleted_at = NULL
+    archived_at = NULL
 RETURNING *;
 
 -- name: GetApp :one
 SELECT * FROM apps WHERE id = ?;
 
 -- name: GetApps :many
-SELECT * FROM apps WHERE deleted_at IS NULL;
+SELECT * FROM apps WHERE archived_at IS NULL;
 
 -- name: GetAppByChecksum :one
-SELECT * FROM apps WHERE checksum = ? AND deleted_at IS NULL LIMIT 1;
+SELECT * FROM apps WHERE checksum = ? AND archived_at IS NULL LIMIT 1;
 
 -- name: GetAppByID :one
 SELECT * FROM apps WHERE id = ? LIMIT 1;
 
 -- name: GetAppByURL :one
-SELECT * FROM apps WHERE url = ? AND deleted_at IS NULL LIMIT 1;
+SELECT * FROM apps WHERE url = ? AND archived_at IS NULL LIMIT 1;
 
 -- name: GetAllApps :many
-SELECT * FROM apps WHERE deleted_at IS NULL;
+SELECT * FROM apps WHERE archived_at IS NULL;
 
 -- name: DeleteApp :exec
-UPDATE apps SET deleted_at = datetime('now') WHERE id = ?;
+UPDATE apps SET archived_at = datetime('now') WHERE id = ?;
 
 -- name: UpdateAppURL :one
 UPDATE apps SET url = ? WHERE id = ? RETURNING *;
@@ -56,29 +56,29 @@ INSERT INTO functions
 SELECT functions.*
 FROM functions
 JOIN apps ON apps.id = functions.app_id
-WHERE functions.deleted_at IS NULL
-AND apps.deleted_at IS NULL;
+WHERE functions.archived_at IS NULL
+AND apps.archived_at IS NULL;
 
 -- name: GetAppFunctions :many
-SELECT * FROM functions WHERE app_id = ? AND deleted_at IS NULL;
+SELECT * FROM functions WHERE app_id = ? AND archived_at IS NULL;
 
 -- name: GetAppFunctionsBySlug :many
-SELECT functions.* FROM functions JOIN apps ON apps.id = functions.app_id WHERE apps.name = ? AND functions.deleted_at IS NULL;
+SELECT functions.* FROM functions JOIN apps ON apps.id = functions.app_id WHERE apps.name = ? AND functions.archived_at IS NULL;
 
 -- name: GetFunctionByID :one
 SELECT * FROM functions WHERE id = ?;
 
 -- name: GetFunctionBySlug :one
-SELECT * FROM functions WHERE slug = ? AND deleted_at IS NULL;
+SELECT * FROM functions WHERE slug = ? AND archived_at IS NULL;
 
 -- name: UpdateFunctionConfig :one
-UPDATE functions SET config = ?, deleted_AT = NULL WHERE id = ? RETURNING *;
+UPDATE functions SET config = ?, archived_at = NULL WHERE id = ? RETURNING *;
 
 -- name: DeleteFunctionsByAppID :exec
-UPDATE functions SET deleted_at = datetime('now') WHERE app_id = ?;
+UPDATE functions SET archived_at = datetime('now') WHERE app_id = ?;
 
 -- name: DeleteFunctionsByIDs :exec
-UPDATE functions SET deleted_at = datetime('now') WHERE id IN (sqlc.slice('ids'));
+UPDATE functions SET archived_at = datetime('now') WHERE id IN (sqlc.slice('ids'));
 
 --
 -- function runs

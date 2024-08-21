@@ -1381,7 +1381,7 @@ ON CONFLICT(id) DO UPDATE SET
     status = excluded.status,
     error = excluded.error,
     checksum = excluded.checksum,
-    deleted_at = NULL
+    archived_at = NULL
 RETURNING id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url
 `
 
