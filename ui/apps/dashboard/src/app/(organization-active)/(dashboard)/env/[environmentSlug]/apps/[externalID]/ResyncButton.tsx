@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { Button, NewButton } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import { RiRefreshLine } from '@remixicon/react';
 
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import ResyncModal from './ResyncModal';
 
 type Props = {

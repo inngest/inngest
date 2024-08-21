@@ -81,6 +81,10 @@ const documents = {
     "\n  mutation CompleteAWSMarketplaceSetup($input: AWSMarketplaceSetupInput!) {\n    completeAWSMarketplaceSetup(input: $input) {\n      message\n    }\n  }\n": types.CompleteAwsMarketplaceSetupDocument,
     "\n  query GetAccountSupportInfo {\n    account {\n      id\n      plan {\n        id\n        name\n        amount\n        features\n      }\n    }\n  }\n": types.GetAccountSupportInfoDocument,
     "\n  query GetArchivedAppBannerData($envID: ID!, $externalAppID: String!) {\n    environment: workspace(id: $envID) {\n      app: appByExternalID(externalID: $externalAppID) {\n        isArchived\n      }\n    }\n  }\n": types.GetArchivedAppBannerDataDocument,
+    "\n  mutation ArchiveEnvironment($id: ID!) {\n    archiveEnvironment(id: $id) {\n      id\n    }\n  }\n": types.ArchiveEnvironmentDocument,
+    "\n  mutation UnarchiveEnvironment($id: ID!) {\n    unarchiveEnvironment(id: $id) {\n      id\n    }\n  }\n": types.UnarchiveEnvironmentDocument,
+    "\n  mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {\n    disableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n": types.DisableEnvironmentAutoArchiveDocumentDocument,
+    "\n  mutation EnableEnvironmentAutoArchive($id: ID!) {\n    enableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n": types.EnableEnvironmentAutoArchiveDocument,
     "\n  mutation ArchiveEvent($environmentId: ID!, $name: String!) {\n    archiveEvent(workspaceID: $environmentId, name: $name) {\n      name\n    }\n  }\n": types.ArchiveEventDocument,
     "\n  query GetEventKeysForBlankSlate($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      ingestKeys(filter: { source: \"key\" }) {\n        name\n        presharedKey\n        createdAt\n      }\n    }\n  }\n": types.GetEventKeysForBlankSlateDocument,
     "\n  query GetLatestEventLogs($name: String, $environmentID: ID!) {\n    events(query: { name: $name, workspaceID: $environmentID }) {\n      data {\n        recent(count: 5) {\n          id\n          receivedAt\n          event\n          source {\n            name\n          }\n        }\n      }\n    }\n  }\n": types.GetLatestEventLogsDocument,
@@ -400,6 +404,22 @@ export function graphql(source: "\n  query GetAccountSupportInfo {\n    account 
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query GetArchivedAppBannerData($envID: ID!, $externalAppID: String!) {\n    environment: workspace(id: $envID) {\n      app: appByExternalID(externalID: $externalAppID) {\n        isArchived\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetArchivedAppBannerData($envID: ID!, $externalAppID: String!) {\n    environment: workspace(id: $envID) {\n      app: appByExternalID(externalID: $externalAppID) {\n        isArchived\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation ArchiveEnvironment($id: ID!) {\n    archiveEnvironment(id: $id) {\n      id\n    }\n  }\n"): (typeof documents)["\n  mutation ArchiveEnvironment($id: ID!) {\n    archiveEnvironment(id: $id) {\n      id\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation UnarchiveEnvironment($id: ID!) {\n    unarchiveEnvironment(id: $id) {\n      id\n    }\n  }\n"): (typeof documents)["\n  mutation UnarchiveEnvironment($id: ID!) {\n    unarchiveEnvironment(id: $id) {\n      id\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {\n    disableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n"): (typeof documents)["\n  mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {\n    disableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation EnableEnvironmentAutoArchive($id: ID!) {\n    enableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n"): (typeof documents)["\n  mutation EnableEnvironmentAutoArchive($id: ID!) {\n    enableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
