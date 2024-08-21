@@ -22,7 +22,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       {collapsed === undefined ? null : (
         <>
           <SideBar collapsed={collapsed} setCollapsed={setCollapsed} />
-          <div className="flex w-full flex-col">{children}</div>
+          <div className="no-scrollbar flex w-full flex-col overflow-x-scroll">{children}</div>
         </>
       )}
     </div>
