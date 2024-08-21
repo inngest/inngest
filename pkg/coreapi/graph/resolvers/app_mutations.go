@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/run"
 	"go.opentelemetry.io/otel/attribute"
 )
@@ -26,7 +27,7 @@ func (r *mutationResolver) CreateApp(ctx context.Context, input models.CreateApp
 
 	// Create a new app which holds the error message.
 	params := cqrs.UpsertAppParams{
-		ID:  uuid.NewSHA1(uuid.NameSpaceOID, []byte(input.URL)),
+		ID:  inngest.DeterministicAppUUID(input.URL),
 		Url: input.URL,
 		Error: sql.NullString{
 			Valid:  true,

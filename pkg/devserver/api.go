@@ -206,7 +206,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 	//
 	// We need to do this as we always create an app when entering the URL
 	// via the UI.  This is a dev-server specific quirk.
-	appID := uuid.NewSHA1(uuid.NameSpaceOID, []byte(r.URL))
+	appID := inngest.DeterministicAppUUID(r.URL)
 
 	tx, err := a.devserver.Data.WithTx(ctx)
 	if err != nil {
@@ -258,7 +258,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 	// For each function,
 	for _, fn := range funcs {
 		// Create a new UUID for the function.
-		fn.ID = inngest.DeterministicUUID(*fn)
+		fn.ID = fn.DeterministicUUID()
 
 		// Mark as seen.
 		seen[fn.ID] = struct{}{}

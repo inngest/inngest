@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cli"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -24,6 +23,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
@@ -227,7 +227,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 
 		// Create a new app which holds the error message.
 		params := cqrs.UpsertAppParams{
-			ID:  uuid.NewSHA1(uuid.NameSpaceOID, []byte(url)),
+			ID:  inngest.DeterministicAppUUID(url),
 			Url: url,
 			Error: sql.NullString{
 				Valid:  true,
@@ -628,7 +628,7 @@ func upsertErroredApp(
 		}
 	}
 
-	appID := uuid.NewSHA1(uuid.NameSpaceOID, []byte(appURL))
+	appID := inngest.DeterministicAppUUID(appURL)
 	_, err = tx.GetAppByID(ctx, appID)
 	if err == sql.ErrNoRows {
 		// App doesn't exist so create it.
