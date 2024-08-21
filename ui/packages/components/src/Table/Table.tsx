@@ -53,7 +53,7 @@ export function Table<T>({
               <th
                 className={classNames(
                   cellStyles,
-                  'bg-canvasBase text-subtle font-medium',
+                  'bg-canvasBase text-subtle text-sm font-semibold',
                   header.column.getIsPinned() && 'sticky left-0 z-[4]',
                   header.column.getCanSort() && 'cursor-pointer'
                 )}
