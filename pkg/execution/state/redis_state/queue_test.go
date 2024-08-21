@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"os"
 	"strconv"
 	"strings"
@@ -709,6 +710,97 @@ func TestQueueSystemPartitions(t *testing.T) {
 		require.Error(t, err)
 		require.ErrorContains(t, err, ErrSystemConcurrencyLimit.Error(), r.Dump())
 		require.Nil(t, leaseId)
+	})
+
+	t.Run("scavenges partition items with expired leases", func(t *testing.T) {
+		// wait til leases are expired
+		<-time.After(2 * time.Second)
+
+		requeued, err := q.Scavenge(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, 1, requeued, "expected one item with expired leases to be requeued by scavenge", r.Dump())
+	})
+
+	t.Run("scavenges previous partition items with expired leases", func(t *testing.T) {
+		r.FlushAll()
+
+		start := time.Now().Truncate(time.Second)
+
+		item, err := q.EnqueueItem(ctx, qi, start)
+		require.NoError(t, err)
+		require.NotEqual(t, item.ID, ulid.ULID{})
+		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
+
+		qp := getSystemPartition(t, r, customQueueName)
+
+		leaseStart := time.Now()
+		leaseExpires := q.clock.Now().Add(time.Second)
+
+		itemCountMatches := func(num int) {
+			zsetKey := qp.zsetKey(q.u.kg)
+			items, err := rc.Do(ctx, rc.B().
+				Zrangebyscore().
+				Key(zsetKey).
+				Min("-inf").
+				Max("+inf").
+				Build()).AsStrSlice()
+			require.NoError(t, err)
+			assert.Equal(t, num, len(items), "expected %d items in the queue %q", num, zsetKey, r.Dump())
+		}
+
+		concurrencyItemCountMatches := func(num int) {
+			items, err := rc.Do(ctx, rc.B().
+				Zrangebyscore().
+				Key(qp.concurrencyKey(q.u.kg)).
+				Min("-inf").
+				Max("+inf").
+				Build()).AsStrSlice()
+			require.NoError(t, err)
+			assert.Equal(t, num, len(items), "expected %d items in the concurrency queue", num, r.Dump())
+		}
+
+		itemCountMatches(1)
+		concurrencyItemCountMatches(0)
+
+		leaseId, err := q.Lease(ctx, qp, item, time.Second, leaseStart, nil)
+		require.NoError(t, err)
+		require.NotNil(t, leaseId)
+
+		itemCountMatches(0)
+		concurrencyItemCountMatches(1)
+
+		// wait til leases are expired
+		<-time.After(2 * time.Second)
+		require.True(t, time.Now().After(leaseExpires))
+
+		newConcurrencyIndexItem := q.u.kg.Concurrency("p", customQueueName)
+		oldConcurrencyIndexItem := customQueueName
+
+		removed, err := rc.Do(ctx, rc.B().Zrem().Key(q.u.kg.ConcurrencyIndex()).Member(newConcurrencyIndexItem).Build()).AsInt64()
+		require.NoError(t, err)
+		assert.Equal(t, int64(1), removed, "expected one previous item to be removed")
+
+		err = rc.Do(ctx, rc.B().Zadd().Key(q.u.kg.ConcurrencyIndex()).ScoreMember().ScoreMember(float64(leaseExpires.UnixMilli()), oldConcurrencyIndexItem).Build()).Error()
+		require.NoError(t, err)
+
+		requeued, err := q.Scavenge(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, 1, requeued, "expected one item with expired leases to be requeued by scavenge", r.Dump())
+
+		itemCountMatches(1)
+		concurrencyItemCountMatches(0)
+
+		indexItems, err := rc.Do(ctx, rc.B().Zcard().Key(q.u.kg.ConcurrencyIndex()).Build()).AsInt64()
+		require.NoError(t, err)
+		assert.Equal(t, 0, int(indexItems), "expected no items in the concurrency index", r.Dump())
+
+		newConcurrencyQueueItems, err := rc.Do(ctx, rc.B().Zcard().Key(newConcurrencyIndexItem).Build()).AsInt64()
+		require.NoError(t, err)
+		assert.Equal(t, 0, int(newConcurrencyQueueItems), "expected no items in the new concurrency queue", r.Dump())
+
+		oldConcurrencyQueueItems, err := rc.Do(ctx, rc.B().Zcard().Key(oldConcurrencyIndexItem).Build()).AsInt64()
+		require.NoError(t, err)
+		assert.Equal(t, 0, int(oldConcurrencyQueueItems), "expected no items in the old concurrency queue", r.Dump())
 	})
 }
 
@@ -1733,7 +1825,7 @@ func TestQueueRequeue(t *testing.T) {
 		requirePartitionInProgress(t, q, item.FunctionID, 1)
 
 		next := now.Add(time.Hour)
-		err = q.Requeue(ctx, p, item, next)
+		err = q.Requeue(ctx, item, next)
 		require.NoError(t, err)
 
 		t.Run("It should re-enqueue the item with the future time", func(t *testing.T) {
@@ -1761,7 +1853,7 @@ func TestQueueRequeue(t *testing.T) {
 			requirePartitionScoreEquals(t, r, pi.FunctionID, now)
 
 			next := now.Add(2 * time.Hour)
-			err = q.Requeue(ctx, pi, item, next)
+			err = q.Requeue(ctx, item, next)
 			require.NoError(t, err)
 
 			requirePartitionScoreEquals(t, r, pi.FunctionID, now)
@@ -1793,7 +1885,7 @@ func TestQueueRequeue(t *testing.T) {
 			require.EqualValues(t, at.UnixMilli(), scores[0])
 
 			next := now.Add(2 * time.Hour)
-			err = q.Requeue(ctx, pi, item, next)
+			err = q.Requeue(ctx, item, next)
 			require.NoError(t, err)
 
 			// Score should be the requeue time.
@@ -1862,7 +1954,7 @@ func TestQueueRequeue(t *testing.T) {
 
 		// Requeue
 		next := now.Add(time.Hour)
-		err = q.Requeue(ctx, QueuePartition{}, item, next)
+		err = q.Requeue(ctx, item, next)
 		require.NoError(t, err)
 
 		t.Run("It requeues all partitions", func(t *testing.T) {
@@ -3045,7 +3137,7 @@ func TestShardFinding(t *testing.T) {
 			})
 
 			t.Run("requeue modifies the shard partition", func(t *testing.T) {
-				err := q.Requeue(ctx, p, item, at.Add(30*time.Second))
+				err := q.Requeue(ctx, item, at.Add(30*time.Second))
 				require.NoError(t, err)
 
 				// Check shard partition score changed in the ptr.
