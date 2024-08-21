@@ -32,6 +32,10 @@ gen:
 	go generate ./...
 	make gql queries
 
+.PHONY: protobuf
+protobuf:
+	buf generate
+
 # $GOBIN must be set and be in your path for this to work
 .PHONY: queries
 queries:
@@ -56,3 +60,21 @@ build:
 .PHONY: gql
 gql:
 	go run github.com/99designs/gqlgen --verbose --config ./pkg/coreapi/gqlgen.yml
+
+.PHONY: nats-js
+nats-js:
+	nats-server -js -sd ./tmp/nats -m 8222
+
+.PHONY: nats-stream
+nats-stream:
+	nats stream add \
+		--subjects=inngest.run.spans \
+		--description='Trace span delivery pipeline' \
+		--retention=limits \
+		--max-msg-size=10mb \
+		--max-age=7d \
+		--storage=file \
+		--replicas=1 \
+		--discard=old \
+		--defaults \
+		trace

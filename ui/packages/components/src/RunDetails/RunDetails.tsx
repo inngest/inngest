@@ -119,9 +119,9 @@ export function RunDetails(props: Props) {
             <SleepingSummary history={history} />
           </div>
 
-          <hr className="mt-8 border-slate-800/50" />
+          <hr className="border-muted mt-8" />
           <div className="px-5 pt-4">
-            <h3 className="py-4 text-sm text-slate-400">Timeline</h3>
+            <h3 className="text-subtle py-4 text-sm">Timeline</h3>
             <Timeline
               getOutput={getHistoryItemOutput}
               history={history}

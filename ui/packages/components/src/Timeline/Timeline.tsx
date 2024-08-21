@@ -24,11 +24,11 @@ export function Timeline({ getOutput, history, navigateToRun }: Props) {
   return (
     <div>
       {nodes.length === 0 ? (
-        <div className=" text-center text-white">No history yet</div>
+        <div className=" text-basis text-center">No history yet</div>
       ) : (
         <AccordionPrimitive.Root
           type="multiple"
-          className="w-full text-slate-100 last:border-b last:border-slate-800/50"
+          className="border-subtle text-subtle w-full last:border-b"
         >
           {nodes.map((node, i) => {
             if (!isVisible(node)) {
@@ -45,7 +45,7 @@ export function Timeline({ getOutput, history, navigateToRun }: Props) {
                 {Object.values(node.attempts).length > 0 && (
                   <>
                     <div className="flex items-center gap-2 pt-4">
-                      <p className="py-4 text-sm text-slate-400">Attempts</p>
+                      <p className="text-muted py-4 text-sm">Attempts</p>
                       <Badge kind="outlined">
                         {Object.values(node.attempts).length.toString() || '0'}
                       </Badge>

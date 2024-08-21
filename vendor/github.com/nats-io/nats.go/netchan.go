@@ -1,4 +1,4 @@
-// Copyright 2013-2018 The NATS Authors
+// Copyright 2013-2023 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -23,7 +23,7 @@ import (
 // Data will be encoded and decoded via the EncodedConn and its associated encoders.
 
 // BindSendChan binds a channel for send operations to NATS.
-func (c *EncodedConn) BindSendChan(subject string, channel interface{}) error {
+func (c *EncodedConn) BindSendChan(subject string, channel any) error {
 	chVal := reflect.ValueOf(channel)
 	if chVal.Kind() != reflect.Chan {
 		return ErrChanArg
@@ -61,17 +61,17 @@ func chPublish(c *EncodedConn, chVal reflect.Value, subject string) {
 }
 
 // BindRecvChan binds a channel for receive operations from NATS.
-func (c *EncodedConn) BindRecvChan(subject string, channel interface{}) (*Subscription, error) {
+func (c *EncodedConn) BindRecvChan(subject string, channel any) (*Subscription, error) {
 	return c.bindRecvChan(subject, _EMPTY_, channel)
 }
 
 // BindRecvQueueChan binds a channel for queue-based receive operations from NATS.
-func (c *EncodedConn) BindRecvQueueChan(subject, queue string, channel interface{}) (*Subscription, error) {
+func (c *EncodedConn) BindRecvQueueChan(subject, queue string, channel any) (*Subscription, error) {
 	return c.bindRecvChan(subject, queue, channel)
 }
 
 // Internal function to bind receive operations for a channel.
-func (c *EncodedConn) bindRecvChan(subject, queue string, channel interface{}) (*Subscription, error) {
+func (c *EncodedConn) bindRecvChan(subject, queue string, channel any) (*Subscription, error) {
 	chVal := reflect.ValueOf(channel)
 	if chVal.Kind() != reflect.Chan {
 		return nil, ErrChanArg

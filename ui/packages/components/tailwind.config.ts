@@ -120,6 +120,7 @@ export default {
         basis: 'rgb(var(--color-foreground-base) / <alpha-value>)',
         subtle: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
         muted: 'rgb(var(--color-foreground-muted) / <alpha-value>)',
+        light: 'rgb(var(--color-foreground-light) / <alpha-value>)',
         onContrast: 'rgb(var(--color-foreground-onContrast) / <alpha-value>)',
         alwaysWhite: 'rgb(var(--color-foreground-alwaysWhite) / <alpha-value>)',
         alwaysBlack: 'rgb(var(--color-foreground-alwaysBlack) / <alpha-value>)',

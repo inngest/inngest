@@ -234,11 +234,7 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
     <>
       {monaco && (
         <>
-          <div
-            className={cn(
-              'border-b-subtle bg-canvasBase border-b dark:border-slate-700/20  dark:shadow'
-            )}
-          >
+          <div className={cn('bg-canvasBase border-subtle border-b')}>
             <div
               className={cn(
                 'flex items-center justify-between border-l-4 border-l-transparent',
@@ -374,12 +370,5 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
 }
 
 CodeBlock.Wrapper = ({ children }: React.PropsWithChildren) => {
-  return (
-    <div
-      className="border-muted w-full overflow-hidden rounded-lg
-     border dark:border-slate-700/30 dark:shadow"
-    >
-      {children}
-    </div>
-  );
+  return <div className="border-subtle w-full overflow-hidden rounded-lg border">{children}</div>;
 };

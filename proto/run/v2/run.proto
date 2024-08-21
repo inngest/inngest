@@ -35,6 +35,10 @@ message RunSpan {
 
 enum SpanStatus {
   UNKNOWN = 0;
+  OK = 10;
+  ERORR = 20;
+
+  // inngest status
   SCHEDULED = 100;
   QUEUED = 110;
   RUNNING = 200;
@@ -49,6 +53,9 @@ enum SpanStepOp {
   INVOKE = 1;
   SLEEP = 2;
   WAIT_FOR_EVENT = 3;
+  STEP = 4;
+  STEP_ERROR = 5;
+  NONE = 6;
 }
 
 message StepInfo {

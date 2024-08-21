@@ -5,6 +5,7 @@ import { type Route } from 'next';
 import Link from 'next/link';
 import { usePathname, useRouter, useSelectedLayoutSegments } from 'next/navigation';
 import { Listbox } from '@headlessui/react';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import {
   RiCloudFill,
@@ -24,7 +25,6 @@ import {
   getTestEnvironments,
   type Environment,
 } from '@/utils/environments';
-import { OptionalTooltip } from './OptionalTooltip';
 
 // Some URLs cannot just swap between environments,
 // we need to redirect to a less specific resource URL that is shared across environments
@@ -237,9 +237,9 @@ function EnvironmentItem({
 }) {
   let statusColorClass: string;
   if (environment.isArchived) {
-    statusColorClass = 'bg-slate-300';
+    statusColorClass = 'bg-surfaceMuted';
   } else {
-    statusColorClass = 'bg-teal-500';
+    statusColorClass = 'bg-primary-moderate';
   }
 
   return (

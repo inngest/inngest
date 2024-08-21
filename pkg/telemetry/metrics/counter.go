@@ -127,3 +127,12 @@ func IncrInstrumentationLeaseClaimsCounter(ctx context.Context, opts CounterOpt)
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrExportedSpansCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "exported_spans_total",
+		Description: "Total number of run spans exported",
+		Tags:        opts.Tags,
+	})
+}
