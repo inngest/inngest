@@ -74,6 +74,7 @@ function useColumns({ envSlug }: { envSlug: string }) {
             pills={triggers.map((trigger) => {
               return (
                 <Pill
+                  appearance="outlined"
                   href={
                     trigger.type === 'EVENT'
                       ? (`/env/${envSlug}/events/${encodeURIComponent(trigger.value)}` as Route)

@@ -149,6 +149,7 @@ function createColumns(environmentSlug: string) {
             pills={triggers.map((trigger) => {
               return (
                 <Pill
+                  appearance="outlined"
                   href={
                     trigger.type === 'EVENT'
                       ? (`/env/${environmentSlug}/events/${encodeURIComponent(
@@ -175,7 +176,10 @@ function createColumns(environmentSlug: string) {
         }
 
         return (
-          <Pill href={`/env/${environmentSlug}/apps/${encodeURIComponent(appExternalID)}` as Route}>
+          <Pill
+            appearance="outlined"
+            href={`/env/${environmentSlug}/apps/${encodeURIComponent(appExternalID)}` as Route}
+          >
             <PillContent type="APP">{appExternalID}</PillContent>
           </Pill>
         );
