@@ -1346,7 +1346,7 @@ func (q *Queries) UpdateAppURL(ctx context.Context, arg UpdateAppURLParams) (*Ap
 }
 
 const updateFunctionConfig = `-- name: UpdateFunctionConfig :one
-UPDATE functions SET config = ? WHERE id = ? RETURNING id, app_id, name, slug, config, created_at, deleted_at
+UPDATE functions SET config = ?, deleted_AT = NULL WHERE id = ? RETURNING id, app_id, name, slug, config, created_at, deleted_at
 `
 
 type UpdateFunctionConfigParams struct {

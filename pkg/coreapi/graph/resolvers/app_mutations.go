@@ -24,11 +24,6 @@ func (r *mutationResolver) CreateApp(ctx context.Context, input models.CreateApp
 		input.URL = "http://" + input.URL
 	}
 
-	// If we already have the app, return it.
-	if app, err := r.Data.GetAppByURL(ctx, input.URL); err == nil && app != nil {
-		return app, nil
-	}
-
 	// Create a new app which holds the error message.
 	params := cqrs.UpsertAppParams{
 		ID:  uuid.NewSHA1(uuid.NameSpaceOID, []byte(input.URL)),

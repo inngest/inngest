@@ -72,7 +72,7 @@ SELECT * FROM functions WHERE id = ?;
 SELECT * FROM functions WHERE slug = ? AND deleted_at IS NULL;
 
 -- name: UpdateFunctionConfig :one
-UPDATE functions SET config = ? WHERE id = ? RETURNING *;
+UPDATE functions SET config = ?, deleted_AT = NULL WHERE id = ? RETURNING *;
 
 -- name: DeleteFunctionsByAppID :exec
 UPDATE functions SET deleted_at = datetime('now') WHERE app_id = ?;
