@@ -660,7 +660,10 @@ func (l traceLifecycle) OnInvokeFunction(
 	runID := md.ID.RunID
 	carrier := meta.InvokeTraceCarrier
 	if carrier == nil {
-		l.log.Error("no trace carrier available", "meta", md, "lifecycle", "OnInvokeFunction")
+		l.log.Error("no trace carrier available",
+			"meta", md,
+			"lifecycle", "OnInvokeFunction",
+		)
 		return
 	}
 	spanID := carrier.SpanID()

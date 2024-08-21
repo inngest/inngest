@@ -99,21 +99,21 @@ export default function AppCard({ app }: { app: App }) {
   return (
     <div>
       <AppCardHeader synced={app.connected} functionCount={app.functionCount} />
-      <div className="divide-y divide-slate-700/30 rounded-b-md border border-slate-700/30 bg-slate-800/30">
+      <div className="bg-canvasSubtle border-muted divide-muted divide-y rounded-b-md border">
         {!app.name ? (
           <div className="flex items-center gap-2 p-4 pr-6">
             <IconSpinner />
-            <p className="text-lg font-normal text-slate-400">Syncing...</p>
+            <p className="text-muted text-lg font-normal">Syncing...</p>
           </div>
         ) : (
           <div className="flex items-center justify-between px-6 py-4 ">
             {!app.connected ? (
               <div className="flex items-center gap-2">
                 <IconSpinner />
-                <p className="text-lg font-normal text-slate-400">Syncing to {app.name}...</p>
+                <p className="text-muted text-lg font-normal">Syncing to {app.name}...</p>
               </div>
             ) : (
-              <p className=" text-lg text-white">{app.name}</p>
+              <p className=" text-basis text-lg">{app.name}</p>
             )}
             {app.autodiscovered && <Badge>Auto Detected</Badge>}
           </div>
@@ -129,11 +129,11 @@ export default function AppCard({ app }: { app: App }) {
                     <>{<IconStatusFailed />}Not synced to app</>
                   )}
                 </div>
-                <p className="ui-open:hidden pl-10 text-slate-300 xl:hidden">{app.url}</p>
+                <p className="ui-open:hidden text-subtle pl-10 xl:hidden">{app.url}</p>
               </div>
               <div className="flex items-center gap-4">
-                <p className="xl:ui-open:hidden hidden text-slate-300 xl:flex">{app.url}</p>
-                <RiArrowDownSLine className="ui-open:-rotate-180 transform-90 text-slate-500 transition-transform duration-500" />
+                <p className="xl:ui-open:hidden text-subtle hidden xl:flex">{app.url}</p>
+                <RiArrowDownSLine className="ui-open:-rotate-180 transform-90 text-muted transition-transform duration-500" />
               </div>
             </>
           }
@@ -141,20 +141,18 @@ export default function AppCard({ app }: { app: App }) {
             <>
               {!app.connected && (
                 <>
-                  <p className="pb-4 text-slate-400">
+                  <p className="text-muted pb-4">
                     The Inngest Dev Server can&apos;t find your application. Ensure your full URL is
                     correct, including the correct port. Inngest automatically scans{' '}
-                    <span className="text-white">multiple ports</span> by default.
+                    <span className="text-basis">multiple ports</span> by default.
                   </p>
-                  {app.error && (
-                    <p className="pb-4 font-medium text-rose-400	">Error: {app.error}</p>
-                  )}
+                  {app.error && <p className="text-error pb-4 font-medium	">Error: {app.error}</p>}
                 </>
               )}
               <form className="block pb-4 xl:flex xl:items-center xl:justify-between">
-                <label htmlFor="editAppUrl" className="text-sm font-semibold text-white">
+                <label htmlFor="editAppUrl" className="text-basis text-sm font-semibold">
                   App URL
-                  <span className="block text-sm font-normal text-slate-400">
+                  <span className="text-muted block text-sm font-normal">
                     The URL of your application
                   </span>
                 </label>
@@ -162,8 +160,8 @@ export default function AppCard({ app }: { app: App }) {
                   <input
                     id="editAppUrl"
                     className={cn(
-                      'w-full rounded-md bg-slate-800 px-4 py-2 text-slate-300 outline-2 outline-indigo-500 read-only:outline-transparent focus:outline',
-                      isUrlInvalid && ' outline-rose-400',
+                      'text-subtle bg-surfaceMuted read-only:outline-disabled w-full rounded-md px-4 py-2 outline-none',
+                      isUrlInvalid && ' outline-error',
                       isLoading && 'pr-6'
                     )}
                     value={inputUrl}
@@ -173,24 +171,22 @@ export default function AppCard({ app }: { app: App }) {
                   />
                   {isLoading && <IconSpinner className="absolute right-2 top-1/3" />}
                   {isUrlInvalid && (
-                    <p className="absolute left-14 top-10 text-rose-400">
-                      Please enter a valid URL
-                    </p>
+                    <p className="text-error absolute left-14 top-10">Please enter a valid URL</p>
                   )}
                 </div>
               </form>
-              <div className="mb-4 grid grid-cols-3 border-y border-slate-700/30">
+              <div className="border-muted mb-4 grid grid-cols-3 border-y">
                 <div className="py-4">
-                  <p className="text-sm font-semibold text-white">{app.framework || '-'}</p>
-                  <p className="text-sm text-slate-400">Framework</p>
+                  <p className="text-basis text-sm font-semibold">{app.framework || '-'}</p>
+                  <p className="text-muted text-sm">Framework</p>
                 </div>
                 <div className="py-4">
-                  <p className="text-sm font-semibold text-white">{app.sdkLanguage || '-'}</p>
-                  <p className="text-sm text-slate-400">Language</p>
+                  <p className="text-basis text-sm font-semibold">{app.sdkLanguage || '-'}</p>
+                  <p className="text-muted text-sm">Language</p>
                 </div>
                 <div className="py-4">
-                  <p className="text-sm font-semibold text-white">{app.sdkVersion || '-'}</p>
-                  <p className="text-sm text-slate-400">SDK Version</p>
+                  <p className="text-basis text-sm font-semibold">{app.sdkVersion || '-'}</p>
+                  <p className="text-muted text-sm">SDK Version</p>
                 </div>
               </div>
               {!app.connected && (
@@ -234,7 +230,7 @@ export default function AppCard({ app }: { app: App }) {
             <>
               {app.functionCount < 1 && (
                 <>
-                  <p className="pb-4 text-slate-400">
+                  <p className="text-muted pb-4">
                     There are currently no functions registered at this URL. Ensure you have created
                     a function and are exporting it correctly from your serve command.
                   </p>
@@ -250,7 +246,7 @@ export default function AppCard({ app }: { app: App }) {
                     .sort((a, b) => a.name.localeCompare(b.name))
                     .map((func) => {
                       return (
-                        <li key={func.id} className="py-1 text-slate-400">
+                        <li key={func.id} className="text-muted py-1">
                           {func.name}
                         </li>
                       );
@@ -261,7 +257,7 @@ export default function AppCard({ app }: { app: App }) {
           }
         />
         {!app.autodiscovered && (
-          <div className="p-4 pr-6 text-white">
+          <div className="text-basis p-4 pr-6">
             <AlertModal
               className="w-1/3 max-w-xl"
               isOpen={isAlertModalOpen}

@@ -50,8 +50,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const defaultTick = time.Millisecond * 150
-
 var redisSingleton *miniredis.Miniredis
 
 // StartOpts configures the dev server
@@ -87,7 +85,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
-	tick := defaultTick
+	tick := devserver.DefaultTick
 
 	// Initialize the devserver
 	dbcqrs := sqlitecqrs.NewCQRS(db)

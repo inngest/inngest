@@ -16,10 +16,15 @@ export default function SearchInput({
   ...props
 }: SearchInputProps) {
   return (
-    <div className={cn('bg-slate-910 relative flex items-center pl-6 text-slate-400 ', className)}>
+    <div
+      className={cn(
+        'bg-canvasBase text-subtle border-subtle relative flex items-center border pl-6',
+        className
+      )}
+    >
       <input
         type="text"
-        className="w-96 bg-transparent py-1 pl-4 text-slate-100 placeholder-slate-400"
+        className="text-subtle placeholder-subtle w-96 bg-transparent py-1 pl-4 outline-none"
         placeholder={props?.placeholder ?? 'Search...'}
         value={value ?? ''}
         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
@@ -28,7 +33,7 @@ export default function SearchInput({
         }}
         {...props}
       />
-      <RiSearchLine className="text--slate-400 absolute left-6 h-3 w-3" />
+      <RiSearchLine className="text-subtle absolute left-6 h-3 w-3" />
     </div>
   );
 }

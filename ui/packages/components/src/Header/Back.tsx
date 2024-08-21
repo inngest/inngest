@@ -1,7 +1,7 @@
 import { NewButton } from '@inngest/components/Button';
 import { RiArrowLeftLine } from '@remixicon/react';
 
-import { OptionalTooltip } from '../Navigation/OptionalTooltip';
+import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 
 export const Back = ({ className }: { className?: string }) => {
   return (

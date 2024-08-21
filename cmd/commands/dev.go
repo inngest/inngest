@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/cmd/commands/internal/localconfig"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/devserver"
+	"github.com/inngest/inngest/pkg/telemetry/exporters"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -88,10 +89,14 @@ func doDev(cmd *cobra.Command, args []string) {
 	tick := viper.GetInt("tick")
 
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
-		ServiceName:   "devserver",
-		Type:          itrace.TracerTypeOTLPHTTP,
+		ServiceName: "devserver",
+		Type:        itrace.TracerTypeOTLPHTTP,
+		// Type:          itrace.TracerTypeNATS,
 		TraceEndpoint: "localhost:8288",
 		TraceURLPath:  "/dev/traces",
+		NATS: &exporters.NatsExporterOpts{
+			Subjects: []string{"inngest.run.spans"},
+		},
 	}); err != nil {
 		fmt.Println(err)
 		os.Exit(1)

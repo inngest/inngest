@@ -120,7 +120,11 @@ function createColumns(environmentSlug: string) {
             <div
               className={cn(
                 'h-2.5 w-2.5 rounded-full',
-                isArchived ? 'bg-slate-300' : isPaused ? 'bg-amber-500' : 'bg-teal-500'
+                isArchived
+                  ? 'bg-surfaceMuted'
+                  : isPaused
+                  ? 'bg-accent-subtle'
+                  : 'bg-primary-moderate'
               )}
             />
             <Link

@@ -23,7 +23,7 @@ export default function SlideOver({ children, onClose, size }: SlideOverProps) {
 
   return (
     <Transition.Root show={isOpen} appear={true} as={Fragment}>
-      <Dialog as="div" className="relative z-10" onClose={handleClose}>
+      <Dialog as="div" className="relative z-50" onClose={handleClose}>
         <Transition.Child
           as={Fragment}
           appear={true}

@@ -115,7 +115,7 @@ export default function EnvironmentSelectMenu({ activeEnv }: EnvironmentSelectMe
                   <span
                     className={cn(
                       'mr-2 h-2 w-2 flex-shrink-0 rounded-full',
-                      selected.isArchived ? 'bg-slate-300' : 'bg-cyan-500'
+                      selected.isArchived ? 'bg-surfaceMuted' : 'bg-primary-moderate'
                     )}
                   />
                   <span className="block truncate">
@@ -201,9 +201,9 @@ function EnvironmentItem({
 }) {
   let statusColorClass: string;
   if (environment.isArchived) {
-    statusColorClass = 'bg-slate-300';
+    statusColorClass = 'bg-surfaceMuted';
   } else {
-    statusColorClass = 'bg-teal-500';
+    statusColorClass = 'bg-primary-moderate';
   }
 
   return (
