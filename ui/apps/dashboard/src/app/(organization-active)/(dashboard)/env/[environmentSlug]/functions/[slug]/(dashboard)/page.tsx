@@ -4,6 +4,7 @@ import type { Route } from 'next';
 import Link from 'next/link';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
+import { Pill } from '@inngest/components/Pill';
 import { Time } from '@inngest/components/Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { useCron } from '@inngest/components/hooks/useCron';
@@ -21,7 +22,6 @@ import { titleCase } from 'title-case';
 
 import FunctionConfiguration from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/(dashboard)/FunctionConfiguration';
 import type { TimeRange } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
-import { Badge as LegacyBadge } from '@/components/Badge/Badge';
 import Block from '@/components/Block';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useFunction, useFunctionUsage } from '@/queries';
@@ -131,7 +131,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <LegacyBadge size="sm">Beta</LegacyBadge>
+              <Pill>Beta</Pill>
               <DashboardTimeRangeFilter
                 selectedTimeRange={selectedTimeRange}
                 onTimeRangeChange={handleTimeRangeChange}

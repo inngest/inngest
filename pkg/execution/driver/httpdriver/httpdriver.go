@@ -190,16 +190,8 @@ func DoRequest(ctx context.Context, c *http.Client, r Request) (*state.DriverRes
 			Str("url", r.URL.String()).
 			Msg("response did not come from an Inngest SDK")
 
-		err := syscode.Error{
-			Code:    syscode.CodeNotSDK,
-			Message: fmt.Sprintf("%s: response did not come from an Inngest SDK", syscode.CodeNotSDK),
-		}
-
-		dr.SetError(err)
-
-		// We need to add the error to the output so the user can see it in the
-		// UI. Also keep the body in case that helps them debug
-		dr.Output = fmt.Sprintf("%s\n\n%s", err, body)
+		// TODO: Call dr.SetError and set dr.Output. We aren't doing that yet
+		// because we want to observe logs first
 	}
 
 	if resp.statusCode < 200 || resp.statusCode > 299 {

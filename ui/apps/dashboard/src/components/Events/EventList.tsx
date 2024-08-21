@@ -129,6 +129,7 @@ function EventTypesListPaginationPage({
                 alwaysVisibleCount={2}
                 pills={event.functions.map((function_) => (
                   <Pill
+                    appearance="outlined"
                     href={pathCreator.function({
                       envSlug: env.slug,
                       functionSlug: function_.slug,

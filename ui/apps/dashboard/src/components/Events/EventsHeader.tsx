@@ -1,5 +1,5 @@
-import { Badge } from '@inngest/components/Badge';
 import { Header } from '@inngest/components/Header/Header';
+import { Pill } from '@inngest/components/Pill';
 
 import { EventInfo } from './EventInfo';
 import SendEventButton from './SendEventButton';
@@ -27,14 +27,11 @@ export const EventsHeader = ({
         ? [
             {
               children: (
-                <div className="flex flex-row items-center">
+                <div className="flex flex-row items-center gap-1">
                   <div>Event Search</div>
-                  <Badge
-                    kind="solid"
-                    className="text-warning border-warning ml-2 h-4 bg-amber-100 px-1.5 text-xs"
-                  >
+                  <Pill appearance="outlined" kind="warning">
                     Experimental
-                  </Badge>
+                  </Pill>
                 </div>
               ),
               href: `/env/${envSlug}/event-search`,

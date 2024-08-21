@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { IDCell, StatusCell, TextCell, TimeCell } from '@inngest/components/Table';
+import { IDCell, PillCell, StatusCell, TextCell, TimeCell } from '@inngest/components/Table';
 import { type FunctionRunStatus } from '@inngest/components/types/functionRun';
 import { formatMilliseconds } from '@inngest/components/utils/date';
 import { createColumnHelper } from '@tanstack/react-table';
@@ -66,10 +66,10 @@ const columns = [
         return <TextCell>Batch</TextCell>;
       }
       if (data.cronSchedule) {
-        return <IDCell>{data.cronSchedule}</IDCell>;
+        return <PillCell type="CRON">{data.cronSchedule}</PillCell>;
       }
       if (data.eventName) {
-        return <TextCell>{data.eventName}</TextCell>;
+        return <PillCell type="EVENT">{data.eventName}</PillCell>;
       }
 
       // Unreachable

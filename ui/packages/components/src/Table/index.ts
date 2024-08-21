@@ -1,4 +1,4 @@
 export { Table } from './Table';
 export { TableFilter } from './Filter';
-export { IDCell, TextCell, TimeCell, StatusCell } from './Cell';
+export { IDCell, TextCell, TimeCell, StatusCell, PillCell } from './Cell';
 export { LoadingMore } from './LoadingMore';

@@ -1,13 +1,17 @@
-import AppNavigation from '@/components/Navigation/old/AppNavigation';
+import { Header } from '@inngest/components/Header/Header';
+
+import Layout from '@/components/Layout/Layout';
 import CreateEnvironment from './CreateEnvironment';
 
 export default async function Create() {
   return (
-    <div className="flex h-full flex-col">
-      <AppNavigation envSlug="all" />
-      <div className="mx-auto w-full max-w-[860px] px-12 py-16">
-        <CreateEnvironment />
+    <Layout>
+      <div className="flex-col">
+        <Header breadcrumb={[{ text: 'Environments', href: '/env' }, { text: 'Create' }]} />
+        <div className="no-scrollbar overflow-y-scroll p-6">
+          <CreateEnvironment />
+        </div>
       </div>
-    </div>
+    </Layout>
   );
 }
