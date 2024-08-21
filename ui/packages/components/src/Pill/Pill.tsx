@@ -41,7 +41,7 @@ export function Pill({
   return <span className={cn('rounded-2xl', classNames)}>{children}</span>;
 }
 
-type PillContentProps = {
+export type PillContentProps = {
   children: React.ReactNode;
   type: 'EVENT' | 'CRON' | 'FUNCTION' | 'APP';
 };
