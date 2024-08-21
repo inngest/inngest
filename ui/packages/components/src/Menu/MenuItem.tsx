@@ -45,7 +45,7 @@ export const MenuItem = ({
           {icon}
           {!collapsed && <span className="ml-2.5 text-sm leading-tight">{text}</span>}
           {!collapsed && beta && (
-            <Pill kind="info" appearance="solid" className="ml-2.5">
+            <Pill kind="primary" appearance="solid" className="ml-2.5">
               Beta
             </Pill>
           )}

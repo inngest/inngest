@@ -158,7 +158,7 @@ export default function Page() {
       <Header
         breadcrumb={[{ text: 'Runs' }]}
         infoIcon={
-          <Pill kind="info" appearance="solid">
+          <Pill kind="primary" appearance="solid">
             Beta
           </Pill>
         }
