@@ -213,65 +213,34 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		return publicerr.Wrap(err, 500, "Error starting registration tx")
 	}
 
-	app, err := tx.GetAppByID(ctx, appID)
-	if err == nil && app != nil {
-		defer func() {
-			appParams := cqrs.UpdateAppParams{
-				ID:          appID,
-				Name:        r.AppName,
-				SdkLanguage: r.SDKLanguage(),
-				SdkVersion:  r.SDKVersion(),
-				Framework: sql.NullString{
-					String: r.Framework,
-					Valid:  r.Framework != "",
-				},
-				Checksum: sum,
-			}
+	defer func() {
+		appParams := cqrs.UpsertAppParams{
+			// Use a deterministic ID for the app in dev.
+			ID:          appID,
+			Name:        r.AppName,
+			SdkLanguage: r.SDKLanguage(),
+			SdkVersion:  r.SDKVersion(),
+			Framework: sql.NullString{
+				String: r.Framework,
+				Valid:  r.Framework != "",
+			},
+			Url:      r.URL,
+			Checksum: sum,
+		}
 
-			if err != nil {
-				appParams.Error = sql.NullString{
-					String: err.Error(),
-					Valid:  true,
-				}
+		// We want to save an app at the end, after handling each error.
+		if err != nil {
+			appParams.Error = sql.NullString{
+				String: err.Error(),
+				Valid:  true,
 			}
-
-			// Update the existing app with the new checksum and status
-			_, _ = tx.UpdateApp(ctx, appParams)
-			err = tx.Commit(ctx)
-			if err != nil {
-				logger.From(ctx).Error().Err(err).Msg("error registering functions for existing app")
-			}
-		}()
-	} else {
-		defer func() {
-			appParams := cqrs.InsertAppParams{
-				// Use a deterministic ID for the app in dev.
-				ID:          appID,
-				Name:        r.AppName,
-				SdkLanguage: r.SDKLanguage(),
-				SdkVersion:  r.SDKVersion(),
-				Framework: sql.NullString{
-					String: r.Framework,
-					Valid:  r.Framework != "",
-				},
-				Url:      r.URL,
-				Checksum: sum,
-			}
-
-			// We want to save an app at the end, after handling each error.
-			if err != nil {
-				appParams.Error = sql.NullString{
-					String: err.Error(),
-					Valid:  true,
-				}
-			}
-			_, _ = tx.InsertApp(ctx, appParams)
-			err = tx.Commit(ctx)
-			if err != nil {
-				logger.From(ctx).Error().Err(err).Msg("error registering functions")
-			}
-		}()
-	}
+		}
+		_, _ = tx.UpsertApp(ctx, appParams)
+		err = tx.Commit(ctx)
+		if err != nil {
+			logger.From(ctx).Error().Err(err).Msg("error registering functions")
+		}
+	}()
 
 	// Get a list of all functions
 	existing, _ := tx.GetFunctionsByAppInternalID(ctx, uuid.UUID{}, appID)

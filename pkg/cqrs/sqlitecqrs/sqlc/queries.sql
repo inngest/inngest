@@ -1,10 +1,17 @@
--- name: InsertApp :one
-INSERT INTO apps
-	(id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url) VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *;
-
--- name: UpdateApp :one
-UPDATE apps SET name = ?, sdk_language = ?, sdk_version = ?, framework = ?, metadata = ?, status = ?, error = ?, checksum = ?, deleted_at = NULL WHERE id = ? RETURNING *;
+-- name: UpsertApp :one
+INSERT INTO apps (id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+    name = excluded.name,
+    sdk_language = excluded.sdk_language,
+    sdk_version = excluded.sdk_version,
+    framework = excluded.framework,
+    metadata = excluded.metadata,
+    status = excluded.status,
+    error = excluded.error,
+    checksum = excluded.checksum,
+    deleted_at = NULL
+RETURNING *;
 
 -- name: GetApp :one
 SELECT * FROM apps WHERE id = ?;
@@ -46,7 +53,11 @@ INSERT INTO functions
 	(?, ?, ?, ?, ?, ?) RETURNING *;
 
 -- name: GetFunctions :many
-SELECT * FROM functions WHERE deleted_at IS NULL;
+SELECT functions.*
+FROM functions
+JOIN apps ON apps.id = functions.app_id
+WHERE functions.deleted_at IS NULL
+AND apps.deleted_at IS NULL;
 
 -- name: GetAppFunctions :many
 SELECT * FROM functions WHERE app_id = ? AND deleted_at IS NULL;

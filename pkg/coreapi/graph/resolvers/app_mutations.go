@@ -30,7 +30,7 @@ func (r *mutationResolver) CreateApp(ctx context.Context, input models.CreateApp
 	}
 
 	// Create a new app which holds the error message.
-	params := cqrs.InsertAppParams{
+	params := cqrs.UpsertAppParams{
 		ID:  uuid.NewSHA1(uuid.NameSpaceOID, []byte(input.URL)),
 		Url: input.URL,
 		Error: sql.NullString{
@@ -38,7 +38,7 @@ func (r *mutationResolver) CreateApp(ctx context.Context, input models.CreateApp
 			String: deploy.DeployErrUnreachable.Error(),
 		},
 	}
-	app, _ := r.Data.InsertApp(ctx, params)
+	app, _ := r.Data.UpsertApp(ctx, params)
 
 	if res := deploy.Ping(ctx, input.URL); res.Err != nil {
 		return app, res.Err

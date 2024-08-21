@@ -782,7 +782,11 @@ func (q *Queries) GetFunctionRunsTimebound(ctx context.Context, arg GetFunctionR
 }
 
 const getFunctions = `-- name: GetFunctions :many
-SELECT id, app_id, name, slug, config, created_at, deleted_at FROM functions WHERE deleted_at IS NULL
+SELECT functions.id, functions.app_id, functions.name, functions.slug, functions.config, functions.created_at, functions.deleted_at
+FROM functions
+JOIN apps ON apps.id = functions.app_id
+WHERE functions.deleted_at IS NULL
+AND apps.deleted_at IS NULL
 `
 
 func (q *Queries) GetFunctions(ctx context.Context) ([]*Function, error) {
@@ -946,56 +950,6 @@ func (q *Queries) GetTraceSpans(ctx context.Context, arg GetTraceSpansParams) ([
 		return nil, err
 	}
 	return items, nil
-}
-
-const insertApp = `-- name: InsertApp :one
-INSERT INTO apps
-	(id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url) VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url
-`
-
-type InsertAppParams struct {
-	ID          uuid.UUID
-	Name        string
-	SdkLanguage string
-	SdkVersion  string
-	Framework   sql.NullString
-	Metadata    string
-	Status      string
-	Error       sql.NullString
-	Checksum    string
-	Url         string
-}
-
-func (q *Queries) InsertApp(ctx context.Context, arg InsertAppParams) (*App, error) {
-	row := q.db.QueryRowContext(ctx, insertApp,
-		arg.ID,
-		arg.Name,
-		arg.SdkLanguage,
-		arg.SdkVersion,
-		arg.Framework,
-		arg.Metadata,
-		arg.Status,
-		arg.Error,
-		arg.Checksum,
-		arg.Url,
-	)
-	var i App
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.SdkLanguage,
-		&i.SdkVersion,
-		&i.Framework,
-		&i.Metadata,
-		&i.Status,
-		&i.Error,
-		&i.Checksum,
-		&i.CreatedAt,
-		&i.DeletedAt,
-		&i.Url,
-	)
-	return &i, err
 }
 
 const insertEvent = `-- name: InsertEvent :exec
@@ -1333,52 +1287,6 @@ func (q *Queries) InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) 
 	return err
 }
 
-const updateApp = `-- name: UpdateApp :one
-UPDATE apps SET name = ?, sdk_language = ?, sdk_version = ?, framework = ?, metadata = ?, status = ?, error = ?, checksum = ?, deleted_at = NULL WHERE id = ? RETURNING id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url
-`
-
-type UpdateAppParams struct {
-	Name        string
-	SdkLanguage string
-	SdkVersion  string
-	Framework   sql.NullString
-	Metadata    string
-	Status      string
-	Error       sql.NullString
-	Checksum    string
-	ID          uuid.UUID
-}
-
-func (q *Queries) UpdateApp(ctx context.Context, arg UpdateAppParams) (*App, error) {
-	row := q.db.QueryRowContext(ctx, updateApp,
-		arg.Name,
-		arg.SdkLanguage,
-		arg.SdkVersion,
-		arg.Framework,
-		arg.Metadata,
-		arg.Status,
-		arg.Error,
-		arg.Checksum,
-		arg.ID,
-	)
-	var i App
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.SdkLanguage,
-		&i.SdkVersion,
-		&i.Framework,
-		&i.Metadata,
-		&i.Status,
-		&i.Error,
-		&i.Checksum,
-		&i.CreatedAt,
-		&i.DeletedAt,
-		&i.Url,
-	)
-	return &i, err
-}
-
 const updateAppError = `-- name: UpdateAppError :one
 UPDATE apps SET error = ? WHERE id = ? RETURNING id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url
 `
@@ -1457,6 +1365,66 @@ func (q *Queries) UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionCo
 		&i.Config,
 		&i.CreatedAt,
 		&i.DeletedAt,
+	)
+	return &i, err
+}
+
+const upsertApp = `-- name: UpsertApp :one
+INSERT INTO apps (id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+    name = excluded.name,
+    sdk_language = excluded.sdk_language,
+    sdk_version = excluded.sdk_version,
+    framework = excluded.framework,
+    metadata = excluded.metadata,
+    status = excluded.status,
+    error = excluded.error,
+    checksum = excluded.checksum,
+    deleted_at = NULL
+RETURNING id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url
+`
+
+type UpsertAppParams struct {
+	ID          uuid.UUID
+	Name        string
+	SdkLanguage string
+	SdkVersion  string
+	Framework   sql.NullString
+	Metadata    string
+	Status      string
+	Error       sql.NullString
+	Checksum    string
+	Url         string
+}
+
+func (q *Queries) UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, error) {
+	row := q.db.QueryRowContext(ctx, upsertApp,
+		arg.ID,
+		arg.Name,
+		arg.SdkLanguage,
+		arg.SdkVersion,
+		arg.Framework,
+		arg.Metadata,
+		arg.Status,
+		arg.Error,
+		arg.Checksum,
+		arg.Url,
+	)
+	var i App
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.SdkLanguage,
+		&i.SdkVersion,
+		&i.Framework,
+		&i.Metadata,
+		&i.Status,
+		&i.Error,
+		&i.Checksum,
+		&i.CreatedAt,
+		&i.DeletedAt,
+		&i.Url,
 	)
 	return &i, err
 }

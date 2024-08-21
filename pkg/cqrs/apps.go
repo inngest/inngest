@@ -42,10 +42,8 @@ type AppReader interface {
 }
 
 type AppWriter interface {
-	// InsertApp creates a new app.
-	InsertApp(ctx context.Context, arg InsertAppParams) (*App, error)
-	// UpdateApp updates an app.
-	UpdateApp(ctx context.Context, arg UpdateAppParams) (*App, error)
+	// UpsertApp creates or updates an app.
+	UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, error)
 	// UpdateAppError sets an app error.  A nil string
 	// clears the app error.
 	UpdateAppError(ctx context.Context, arg UpdateAppErrorParams) (*App, error)
@@ -55,7 +53,7 @@ type AppWriter interface {
 	DeleteApp(ctx context.Context, id uuid.UUID) error
 }
 
-type InsertAppParams struct {
+type UpsertAppParams struct {
 	ID          uuid.UUID
 	Name        string
 	SdkLanguage string
@@ -66,19 +64,6 @@ type InsertAppParams struct {
 	Error       sql.NullString
 	Checksum    string
 	Url         string
-}
-
-type UpdateAppParams struct {
-	ID          uuid.UUID
-	Name        string
-	SdkLanguage string
-	SdkVersion  string
-	Framework   sql.NullString
-	Metadata    string
-	Status      string
-	Error       sql.NullString
-	Checksum    string
-	DeletedAt   *time.Time
 }
 
 type UpdateAppErrorParams struct {

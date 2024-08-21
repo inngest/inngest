@@ -226,7 +226,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 		}
 
 		// Create a new app which holds the error message.
-		params := cqrs.InsertAppParams{
+		params := cqrs.UpsertAppParams{
 			ID:  uuid.NewSHA1(uuid.NameSpaceOID, []byte(url)),
 			Url: url,
 			Error: sql.NullString{
@@ -234,7 +234,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 				String: deploy.DeployErrUnreachable.Error(),
 			},
 		}
-		if _, err := d.Data.InsertApp(ctx, params); err != nil {
+		if _, err := d.Data.UpsertApp(ctx, params); err != nil {
 			log.From(ctx).Error().Err(err).Msg("error inserting app from scan")
 		}
 	}
@@ -632,8 +632,7 @@ func upsertErroredApp(
 	_, err = tx.GetAppByID(ctx, appID)
 	if err == sql.ErrNoRows {
 		// App doesn't exist so create it.
-
-		_, err = tx.InsertApp(ctx, cqrs.InsertAppParams{
+		_, err = tx.UpsertApp(ctx, cqrs.UpsertAppParams{
 			Error: sql.NullString{
 				String: pingError.Error(),
 				Valid:  true,
