@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef, type UIEventHandler } from 'react';
 import dynamic from 'next/dynamic';
-import { Button } from '@inngest/components/Button';
+import { Button, NewButton } from '@inngest/components/Button';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
 import { SelectGroup, type Option } from '@inngest/components/Select/Select';
@@ -15,7 +15,7 @@ import {
   type FunctionRunStatus,
 } from '@inngest/components/types/functionRun';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
-import { RiLoopLeftLine } from '@remixicon/react';
+import { RiLoopLeftLine, RiRefreshLine } from '@remixicon/react';
 import { type VisibilityState } from '@tanstack/react-table';
 import { useLocalStorage } from 'react-use';
 
@@ -305,15 +305,6 @@ export function RunsPage({
             setColumnVisibility={setColumnVisibility}
             options={options}
           />
-
-          {onRefresh && (
-            <Button
-              label="Refresh"
-              appearance="text"
-              btnAction={onRefresh}
-              icon={<RiLoopLeftLine />}
-            />
-          )}
         </div>
       </div>
       <RunsTable
@@ -324,15 +315,28 @@ export function RunsPage({
         visibleColumns={columnVisibility}
         scope={scope}
       />
-      {isLoadingMore && <LoadingMore />}
-      {!hasMore && !isLoadingInitial && !isLoadingMore && data.length > 1 && (
-        <div className="flex flex-col items-center py-8">
+      {!hasMore && data.length > 1 && (
+        <div className="flex flex-col items-center pt-8">
           <p className="text-subtle">No additional runs found.</p>
-          <Button
+          <NewButton
             label="Back to top"
             kind="primary"
-            appearance="text"
-            btnAction={() => scrollToTop(true)}
+            appearance="ghost"
+            onClick={() => scrollToTop(true)}
+          />
+        </div>
+      )}
+      {onRefresh && (
+        <div className="flex flex-col items-center pt-2">
+          <NewButton
+            kind="secondary"
+            appearance="outlined"
+            label="Refresh runs"
+            icon={<RiRefreshLine />}
+            iconSide="left"
+            onClick={onRefresh}
+            loading={isLoadingMore || isLoadingInitial}
+            disabled={isLoadingMore || isLoadingInitial}
           />
         </div>
       )}

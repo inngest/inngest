@@ -4,7 +4,8 @@ import type { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { OptionalLink } from '@inngest/components/Link/OptionalLink';
 
-import { OptionalTooltip } from './OptionalTooltip';
+import { Badge } from '../Badge';
+import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 
 export const MenuItem = ({
   text,
@@ -13,6 +14,8 @@ export const MenuItem = ({
   href,
   prefetch = false,
   comingSoon = false,
+  beta = false,
+  error = false,
 }: {
   text: string;
   icon: ReactNode;
@@ -20,6 +23,8 @@ export const MenuItem = ({
   href?: string;
   prefetch?: boolean;
   comingSoon?: boolean;
+  beta?: boolean;
+  error?: boolean;
 }) => {
   const pathname = usePathname();
   const active = href && pathname.startsWith(href);
@@ -32,12 +37,26 @@ export const MenuItem = ({
             comingSoon
               ? 'text-disabled hover:bg-disabled cursor-not-allowed'
               : active
-              ? 'bg-secondary-4xSubtle text-info hover:bg-secondary-3xSubtle'
-              : 'hover:bg-canvasSubtle text-muted'
+              ? 'bg-secondary-3xSubtle text-info hover:bg-secondary-2xSubtle'
+              : 'hover:bg-canvasSubtle text-muted hover:text-basis'
           } `}
         >
           {icon}
           {!collapsed && <span className="ml-2.5 text-sm leading-tight">{text}</span>}
+          {!collapsed && beta && (
+            <Badge
+              kind="solid"
+              className="text-alwaysWhite bg-btnPrimary ml-2.5 h-5 px-1.5 py-1 text-xs"
+            >
+              Beta
+            </Badge>
+          )}
+          {!collapsed && error && (
+            <Badge
+              kind={'error'}
+              className="text-alwaysWhite bg-error ml-2.5 h-5 px-1.5 py-1 text-xs"
+            />
+          )}
         </div>
       </OptionalTooltip>
     </OptionalLink>

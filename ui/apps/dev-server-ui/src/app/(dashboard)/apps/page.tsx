@@ -1,6 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
+import { Header } from '@inngest/components/Header/Header';
+import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link';
 import { IconApp } from '@inngest/components/icons/App';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
@@ -23,30 +25,39 @@ export default function AppList() {
   }, [apps]);
 
   return (
-    <div className="flex h-full flex-col overflow-y-scroll px-10 py-6">
-      <header className="mb-8">
-        <h1 className="text-lg text-slate-50">Synced Apps</h1>
-        <p className="my-4 flex gap-1">
-          This is a list of all apps. We auto-detect apps that you have defined in{' '}
-          <Link href="https://www.inngest.com/docs/local-development#connecting-apps-to-the-dev-server">
-            specific ports.
-          </Link>
-        </p>
-        <div className="flex items-center gap-5">
-          <AddAppButton />
-          <p className="flex items-center gap-2 text-sky-400">
-            <IconSpinner />
-            Auto-detecting Apps
+    <div className="flex h-full flex-col overflow-y-scroll">
+      <Header
+        breadcrumb={[{ text: 'Apps' }]}
+        infoIcon={
+          <Info
+            text="This is a list of all apps. We auto-detect apps that you have defined in specific ports."
+            action={
+              <Link href="https://www.inngest.com/docs/local-development#connecting-apps-to-the-dev-server">
+                Go to specific ports.
+              </Link>
+            }
+          />
+        }
+        action={
+          <div className="flex items-center gap-5">
+            <p className="text-btnPrimary flex items-center gap-2 text-sm leading-tight">
+              <IconSpinner className="fill-btnPrimary" />
+              Auto-detecting Apps
+            </p>
+            <AddAppButton />
+          </div>
+        }
+      />
+
+      <div className="px-10 py-6">
+        <div className="mb-4 flex items-center gap-3">
+          <IconApp />
+          <p className="text-muted">
+            {numberOfSyncedApps} / {apps.length} Apps Synced
           </p>
         </div>
-      </header>
-      <div className="mb-4 flex items-center gap-3">
-        <IconApp />
-        <p className="text-slate-200">
-          {numberOfSyncedApps} / {apps.length} Apps Synced
-        </p>
+        <div className="grid min-h-max grid-cols-1 gap-6 md:grid-cols-2">{memoizedAppCards}</div>
       </div>
-      <div className="grid min-h-max grid-cols-1 gap-6 md:grid-cols-2">{memoizedAppCards}</div>
     </div>
   );
 }

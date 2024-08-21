@@ -41,11 +41,15 @@ const NavToggle = ({ collapsed, setCollapsed }: LogoProps) => {
 
 export default function Logo({ collapsed, setCollapsed }: LogoProps) {
   return (
-    <div className={`mx-4 mt-4 flex h-[28px] flex-row items-center justify-between`}>
+    <div
+      className={`${
+        collapsed ? 'mx-auto' : 'mx-4'
+      } mt-4 flex h-[28px] flex-row items-center justify-between`}
+    >
       <div className={`flex flex-row items-center justify-start ${collapsed ? '' : 'mr-3'} `}>
         {collapsed ? (
           <div className="cursor-pointer group-hover:hidden">
-            <InngestLogoSmallBW />
+            <InngestLogoSmallBW className="text-basis" />
           </div>
         ) : (
           <>

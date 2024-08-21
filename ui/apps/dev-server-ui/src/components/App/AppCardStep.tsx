@@ -12,14 +12,11 @@ export default function AppCardStep({
   expandedContent,
 }: AppCardStepProps) {
   return (
-    <Disclosure
-      as="div"
-      className="ui-open:ring-inset ui-open:ring-1 ui-open:ring-slate-800 relative"
-    >
-      <span className="absolute w-px bg-slate-800" aria-hidden="true" />
+    <Disclosure as="div" className="ui-open:ring-inset ui-open:ring-1 ui-open:ring-subtle relative">
+      <span className="bg-canvasBase absolute w-px" aria-hidden="true" />
       <Disclosure.Button
         as={'div'}
-        className="flex w-full cursor-pointer items-center justify-between px-6 py-4 text-white"
+        className="text-basis flex w-full cursor-pointer items-center justify-between px-6 py-4"
       >
         {lineContent}
       </Disclosure.Button>
@@ -32,7 +29,7 @@ export default function AppCardStep({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <Disclosure.Panel className="pb-4 pl-14 pr-6 text-gray-500 ">
+          <Disclosure.Panel className="text-muted pb-4 pl-14 pr-6">
             {expandedContent}
           </Disclosure.Panel>
         </Transition>
