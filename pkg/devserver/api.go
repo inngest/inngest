@@ -206,48 +206,75 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 	//
 	// We need to do this as we always create an app when entering the URL
 	// via the UI.  This is a dev-server specific quirk.
-	app, err := a.devserver.Data.GetAppByURL(ctx, r.URL)
-	if err == nil && app != nil {
-		_ = a.devserver.Data.DeleteApp(ctx, app.ID)
-	}
-
-	// We need a UUID to register functions with.
-	appParams := cqrs.InsertAppParams{
-		// Use a deterministic ID for the app in dev.
-		ID:          uuid.NewSHA1(uuid.NameSpaceOID, []byte(r.URL)),
-		Name:        r.AppName,
-		SdkLanguage: r.SDKLanguage(),
-		SdkVersion:  r.SDKVersion(),
-		Framework: sql.NullString{
-			String: r.Framework,
-			Valid:  r.Framework != "",
-		},
-		Url:      r.URL,
-		Checksum: sum,
-	}
+	appID := uuid.NewSHA1(uuid.NameSpaceOID, []byte(r.URL))
 
 	tx, err := a.devserver.Data.WithTx(ctx)
 	if err != nil {
 		return publicerr.Wrap(err, 500, "Error starting registration tx")
 	}
 
-	defer func() {
-		// We want to save an app at the end, after handling each error.
-		if err != nil {
-			appParams.Error = sql.NullString{
-				String: err.Error(),
-				Valid:  true,
+	app, err := tx.GetAppByID(ctx, appID)
+	if err == nil && app != nil {
+		defer func() {
+			appParams := cqrs.UpdateAppParams{
+				ID:          appID,
+				Name:        r.AppName,
+				SdkLanguage: r.SDKLanguage(),
+				SdkVersion:  r.SDKVersion(),
+				Framework: sql.NullString{
+					String: r.Framework,
+					Valid:  r.Framework != "",
+				},
+				Checksum: sum,
 			}
-		}
-		_, _ = tx.InsertApp(ctx, appParams)
-		err = tx.Commit(ctx)
-		if err != nil {
-			logger.From(ctx).Error().Err(err).Msg("error registering functions")
-		}
-	}()
+
+			if err != nil {
+				appParams.Error = sql.NullString{
+					String: err.Error(),
+					Valid:  true,
+				}
+			}
+
+			// Update the existing app with the new checksum and status
+			_, _ = tx.UpdateApp(ctx, appParams)
+			err = tx.Commit(ctx)
+			if err != nil {
+				logger.From(ctx).Error().Err(err).Msg("error registering functions for existing app")
+			}
+		}()
+	} else {
+		defer func() {
+			appParams := cqrs.InsertAppParams{
+				// Use a deterministic ID for the app in dev.
+				ID:          appID,
+				Name:        r.AppName,
+				SdkLanguage: r.SDKLanguage(),
+				SdkVersion:  r.SDKVersion(),
+				Framework: sql.NullString{
+					String: r.Framework,
+					Valid:  r.Framework != "",
+				},
+				Url:      r.URL,
+				Checksum: sum,
+			}
+
+			// We want to save an app at the end, after handling each error.
+			if err != nil {
+				appParams.Error = sql.NullString{
+					String: err.Error(),
+					Valid:  true,
+				}
+			}
+			_, _ = tx.InsertApp(ctx, appParams)
+			err = tx.Commit(ctx)
+			if err != nil {
+				logger.From(ctx).Error().Err(err).Msg("error registering functions")
+			}
+		}()
+	}
 
 	// Get a list of all functions
-	existing, _ := tx.GetFunctionsByAppInternalID(ctx, uuid.UUID{}, appParams.ID)
+	existing, _ := tx.GetFunctionsByAppInternalID(ctx, uuid.UUID{}, appID)
 	// And get a list of functions that we've upserted.  We'll delete all existing functions not in
 	// this set.
 	seen := map[uuid.UUID]struct{}{}
@@ -288,7 +315,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 			ID:        fn.ID,
 			Name:      fn.Name,
 			Slug:      fn.Slug,
-			AppID:     appParams.ID,
+			AppID:     appID,
 			Config:    string(config),
 			CreatedAt: time.Now(),
 		})

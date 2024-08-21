@@ -135,6 +135,18 @@ func (w wrapper) InsertApp(ctx context.Context, arg cqrs.InsertAppParams) (*cqrs
 	)
 }
 
+func (w wrapper) UpdateApp(ctx context.Context, arg cqrs.UpdateAppParams) (*cqrs.App, error) {
+	return copyWriter(
+		ctx,
+		w.q.UpdateApp,
+		arg,
+		sqlc.UpdateAppParams{},
+		&cqrs.App{
+			ID: arg.ID,
+		},
+	)
+}
+
 func (w wrapper) UpdateAppError(ctx context.Context, arg cqrs.UpdateAppErrorParams) (*cqrs.App, error) {
 	// https://duckdb.org/docs/sql/indexes.html
 	//
@@ -145,7 +157,7 @@ func (w wrapper) UpdateAppError(ctx context.Context, arg cqrs.UpdateAppErrorPara
 	if err != nil {
 		return nil, err
 	}
-	if err := w.q.HardDeleteApp(ctx, arg.ID); err != nil {
+	if err := w.q.DeleteApp(ctx, arg.ID); err != nil {
 		return nil, err
 	}
 
@@ -176,7 +188,7 @@ func (w wrapper) UpdateAppURL(ctx context.Context, arg cqrs.UpdateAppURLParams) 
 	if err != nil {
 		return nil, err
 	}
-	if err := w.q.HardDeleteApp(ctx, arg.ID); err != nil {
+	if err := w.q.DeleteApp(ctx, arg.ID); err != nil {
 		return nil, err
 	}
 	app.Url = arg.Url
@@ -194,7 +206,7 @@ func (w wrapper) UpdateAppURL(ctx context.Context, arg cqrs.UpdateAppURLParams) 
 
 // DeleteApp deletes an app
 func (w wrapper) DeleteApp(ctx context.Context, id uuid.UUID) error {
-	return w.q.HardDeleteApp(ctx, id)
+	return w.q.DeleteApp(ctx, id)
 }
 
 //
