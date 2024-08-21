@@ -7,7 +7,7 @@ import { IconFunction } from '@inngest/components/icons/Function';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiTimeLine } from '@remixicon/react';
 
-export type PillKind = 'default' | 'information' | 'warning' | 'primary';
+export type PillKind = 'default' | 'info' | 'warning' | 'primary';
 export type PillAppearance = 'solid' | 'outlined';
 
 export function Pill({
@@ -68,25 +68,21 @@ export const getPillColors = ({
   clickable?: boolean;
 }) => {
   const solidPillStyles = {
-    default: `bg-canvasMuted text-basis, ${clickable && 'hover:bg-surfaceMuted'}`,
-    primary: `bg-primary-intense text-alwaysWhite, ${clickable && 'hover:bg-primary-xIntense'}`,
-    warning: `bg-accent-moderate text-alwaysWhite, ${clickable && 'hover:bg-accent-intense'}`,
-    information: `bg-secondary-moderate text-alwaysWhite, ${
-      clickable && 'hover:bg-secondary-intense'
-    }`,
+    default: `bg-canvasMuted text-basis ${clickable && 'hover:bg-surfaceMuted'}`,
+    primary: `bg-primary-intense text-alwaysWhite ${clickable && 'hover:bg-primary-xIntense'}`,
+    warning: `bg-accent-moderate text-alwaysWhite ${clickable && 'hover:bg-accent-intense'}`,
+    info: `bg-secondary-moderate text-alwaysWhite ${clickable && 'hover:bg-secondary-intense'}`,
   };
 
   const outlinedPillStyles = {
-    default: `border border-muted bg-canvasBase text-basis, ${clickable && 'hover:bg-canvasMuted'}`,
-    primary: `border border-success bg-success text-success, ${
+    default: `border border-muted bg-canvasBase text-basis ${clickable && 'hover:bg-canvasMuted'}`,
+    primary: `border border-success bg-success text-success ${
       clickable && 'hover:bg-primary-xSubtle'
     }`,
-    warning: `border border-warning bg-warning text-warning, ${
+    warning: `border border-warning bg-warning text-warning ${
       clickable && 'hover:bg-accent-xSubtle'
     }`,
-    information: `border border-info bg-info text-info, ${
-      clickable && 'hover:bg-secondary-xSubtle'
-    }`,
+    info: `border border-info bg-info text-info ${clickable && 'hover:bg-secondary-xSubtle'}`,
   };
 
   if (appearance === 'solid') {
