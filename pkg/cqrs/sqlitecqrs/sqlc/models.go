@@ -61,6 +61,7 @@ type Function struct {
 	Slug      string
 	Config    string
 	CreatedAt time.Time
+	DeletedAt sql.NullTime
 }
 
 type FunctionFinish struct {
