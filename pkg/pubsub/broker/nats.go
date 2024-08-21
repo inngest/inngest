@@ -11,6 +11,10 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 )
 
+const (
+	defaultNatsURL = "nats://127.0.0.1:4222"
+)
+
 type NatsConnOpt struct {
 	// Name of this client
 	Name string
@@ -55,7 +59,7 @@ func NewNATSConnector(ctx context.Context, opts NatsConnOpt) (*NatsConnector, er
 	}
 	name := fmt.Sprintf("%s-%s", opts.Name, host)
 
-	urls := "nats://127.0.0.1:4222"
+	urls := defaultNatsURL
 	if len(opts.URLS) > 0 {
 		urls = opts.URLS
 	}
