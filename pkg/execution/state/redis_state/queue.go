@@ -1646,7 +1646,12 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 	args, err := StrSlice([]any{
 		i.ID,
 		int(idempotency.Seconds()),
+
+		// NOTE: For backwards compatibility, we need to also remove the previously-used
+		// concurrency index item. While we use fully-qualified keys in concurrencyKey,
+		// previously we used function IDs or queueNames for system partitions.
 		p.Queue(),
+
 		parts[0].ID,
 		parts[1].ID,
 		parts[2].ID,

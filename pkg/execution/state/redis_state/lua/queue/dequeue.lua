@@ -25,7 +25,7 @@ local keyItemIndexB      = KEYS[14]  -- custom item index 2
 
 local queueID        = ARGV[1]
 local idempotencyTTL = tonumber(ARGV[2])
-local partitionName  = ARGV[3]
+local legacyPartitionName  = ARGV[3]
 local partitionIdA   = ARGV[4]
 local partitionIdB   = ARGV[5]
 local partitionIdC   = ARGV[6]
@@ -40,6 +40,8 @@ if item == nil then
 end
 
 redis.call("HDEL", keyQueueMap, queueID)
+
+-- TODO Are these calls safe? Should we check for present keys?
 redis.call("ZREM", keyPartitionA, queueID)
 redis.call("ZREM", keyPartitionB, queueID)
 redis.call("ZREM", keyPartitionC, queueID)
@@ -62,13 +64,16 @@ local function handleDequeue(keyConcurrency, keyPartitionSet, partitionID)
 	local concurrencyScores = redis.call("ZRANGE", keyConcurrency, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
 	if concurrencyScores == false then
 		redis.call("ZREM", concurrencyPointer, keyConcurrency)
+		redis.call("ZREM", concurrencyPointer, legacyPartitionName) -- remove previous item
 	else
 		local earliestLease = tonumber(concurrencyScores[2])
 		if earliestLease == nil then
 			redis.call("ZREM", concurrencyPointer, keyConcurrency)
+			redis.call("ZREM", concurrencyPointer, legacyPartitionName) -- remove previous item
 		else
 			-- Ensure that we update the score with the earliest lease
 			redis.call("ZADD", concurrencyPointer, earliestLease, keyConcurrency)
+			redis.call("ZREM", concurrencyPointer, legacyPartitionName) -- remove previous item
 		end
 	end
 
@@ -107,7 +112,6 @@ handleDequeue(keyConcurrencyC, keyPartitionC, partitionIdC)
 -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
 -- and Lease for respective ZADD calls.
 redis.call("ZREM", keyAcctConcurrency, item.id)
-
 
 -- Add optional indexes.
 if keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then

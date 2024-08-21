@@ -83,12 +83,14 @@ end
 -- Concurrency
 --
 
--- Remove item from the account concurrency queue
-redis.call("ZREM", keyAcctConcurrency, item.id)
-
 handleRequeue(keyConcurrencyA)
 handleRequeue(keyConcurrencyB)
 handleRequeue(keyConcurrencyC)
+
+-- Remove item from the account concurrency queue
+-- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
+-- and Lease for respective ZADD calls.
+redis.call("ZREM", keyAcctConcurrency, item.id)
 
 --
 -- Partition manipulation
