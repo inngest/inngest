@@ -57,6 +57,10 @@ var (
 	ErrNoRetryAfter  = fmt.Errorf("no retry after present")
 )
 
+type HTTPDoer interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 type executor struct {
 	Client     *http.Client
 	signingKey []byte
@@ -105,7 +109,7 @@ type Request struct {
 }
 
 // DoRequest executes the HTTP request with the given input.
-func DoRequest(ctx context.Context, c *http.Client, r Request) (*state.DriverResponse, error) {
+func DoRequest(ctx context.Context, c HTTPDoer, r Request) (*state.DriverResponse, error) {
 	if c == nil {
 		c = DefaultClient
 	}
@@ -182,18 +186,6 @@ func DoRequest(ctx context.Context, c *http.Client, r Request) (*state.DriverRes
 	if resp.sysErr != nil {
 		dr.SetError(resp.sysErr)
 	}
-
-	if dr.Err == nil && resp.statusCode == 200 && !resp.isSDK {
-		log.From(ctx).Info().
-			Interface("headers", resp.header).
-			Str("run_id", r.RunID.String()).
-			Str("url", r.URL.String()).
-			Msg("response did not come from an Inngest SDK")
-
-		// TODO: Call dr.SetError and set dr.Output. We aren't doing that yet
-		// because we want to observe logs first
-	}
-
 	if resp.statusCode < 200 || resp.statusCode > 299 {
 		// Add an error to driver.Response if the status code isn't 2XX.
 		//
@@ -220,7 +212,7 @@ func DoRequest(ctx context.Context, c *http.Client, r Request) (*state.DriverRes
 	return dr, err
 }
 
-func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
+func do(ctx context.Context, c HTTPDoer, r Request) (*response, error) {
 	if c == nil {
 		c = DefaultClient
 	}
@@ -377,14 +369,6 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 		}
 	}
 
-	isSDK := false
-	for k := range resp.Header {
-		if strings.HasPrefix(strings.ToLower(k), "x-inngest-") {
-			isSDK = true
-			break
-		}
-	}
-
 	// Get the request version
 	rv, _ := strconv.Atoi(headers[headerRequestVersion])
 	return &response{
@@ -397,7 +381,6 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 		sdk:            headers[headerSDK],
 		header:         resp.Header,
 		sysErr:         sysErr,
-		isSDK:          isSDK,
 	}, err
 
 }
@@ -421,5 +404,4 @@ type response struct {
 	header http.Header
 
 	sysErr *syscode.Error
-	isSDK  bool
 }
