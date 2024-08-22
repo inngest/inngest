@@ -352,6 +352,10 @@ func idempotencyKey(req execution.ScheduleRequest, runID ulid.ULID) string {
 // If this function has a debounce config, this will return ErrFunctionDebounced instead
 // of an identifier as the function is not scheduled immediately.
 func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*sv2.Metadata, error) {
+	if req.AppID == uuid.Nil {
+		return nil, fmt.Errorf("app ID is required to schedule a run")
+	}
+
 	if req.Function.Debounce != nil && !req.PreventDebounce {
 		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
 			AccountID:        req.AccountID,

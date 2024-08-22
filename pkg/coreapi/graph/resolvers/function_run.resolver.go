@@ -305,12 +305,17 @@ func (r *mutationResolver) Rerun(
 		run.WithNewRoot(),
 		run.WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysAppID, fnCQRS.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, fn.ID.String()),
+			attribute.String(consts.OtelSysFunctionSlug, fnCQRS.Slug),
+			attribute.String(consts.OtelSysEventIDs, evt.GetInternalID().String()),
 		),
 	)
 	defer span.End()
 
 	identifier, err := r.Executor.Schedule(ctx, execution.ScheduleRequest{
 		Function: *fn,
+		AppID:    fnCQRS.AppID,
 		Events: []event.TrackedEvent{
 			// We need NewOSSTrackedEventWithID to ensure that the tracked event
 			// has the same ID as the original event. Calling NewOSSTrackedEvent

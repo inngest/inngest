@@ -1,4 +1,4 @@
-// Copyright 2012-2020 The NATS Authors
+// Copyright 2012-2023 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -532,7 +532,7 @@ func (nc *Conn) processHeaderMsgArgs(arg []byte) error {
 	return nil
 }
 
-// Ascii numbers 0-9
+// ASCII numbers 0-9
 const (
 	ascii_0 = 48
 	ascii_9 = 57

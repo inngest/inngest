@@ -108,8 +108,8 @@ export default function LatestLogsList({ environmentSlug, eventName }: LatestLog
                         </Link>
                       </td>
                       <td>
-                        <Pill>
-                          <RiKey2Fill className="h-4 pr-1 text-indigo-500" />
+                        <Pill appearance="outlined">
+                          <RiKey2Fill className="text-basis h-4 pr-1" />
                           {e.source?.name}
                         </Pill>
                       </td>

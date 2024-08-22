@@ -57,6 +57,10 @@ var (
 	ErrNoRetryAfter  = fmt.Errorf("no retry after present")
 )
 
+type HTTPDoer interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 type executor struct {
 	Client     *http.Client
 	signingKey []byte
@@ -105,7 +109,7 @@ type Request struct {
 }
 
 // DoRequest executes the HTTP request with the given input.
-func DoRequest(ctx context.Context, c *http.Client, r Request) (*state.DriverResponse, error) {
+func DoRequest(ctx context.Context, c HTTPDoer, r Request) (*state.DriverResponse, error) {
 	if c == nil {
 		c = DefaultClient
 	}
@@ -189,17 +193,8 @@ func DoRequest(ctx context.Context, c *http.Client, r Request) (*state.DriverRes
 			Str("run_id", r.RunID.String()).
 			Str("url", r.URL.String()).
 			Msg("response did not come from an Inngest SDK")
-
-		err := syscode.Error{
-			Code:    syscode.CodeNotSDK,
-			Message: fmt.Sprintf("%s: response did not come from an Inngest SDK", syscode.CodeNotSDK),
-		}
-
-		dr.SetError(err)
-
-		// We need to add the error to the output so the user can see it in the
-		// UI. Also keep the body in case that helps them debug
-		dr.Output = fmt.Sprintf("%s\n\n%s", err, body)
+		// TODO: Call dr.SetError and set dr.Output. We aren't doing that yet
+		// because we want to observe logs first
 	}
 
 	if resp.statusCode < 200 || resp.statusCode > 299 {
@@ -228,7 +223,7 @@ func DoRequest(ctx context.Context, c *http.Client, r Request) (*state.DriverRes
 	return dr, err
 }
 
-func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
+func do(ctx context.Context, c HTTPDoer, r Request) (*response, error) {
 	if c == nil {
 		c = DefaultClient
 	}
@@ -402,10 +397,10 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 		retryAt:        retryAt,
 		noRetry:        noRetry,
 		requestVersion: rv,
+		isSDK:          isSDK,
 		sdk:            headers[headerSDK],
 		header:         resp.Header,
 		sysErr:         sysErr,
-		isSDK:          isSDK,
 	}, err
 
 }
