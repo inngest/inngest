@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Tab } from '@headlessui/react';
 import { Alert } from '@inngest/components/Alert';
-import { Button, NewButton } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import ky from 'ky';
 import { toast } from 'sonner';
 import { type JsonValue } from 'type-fest';
