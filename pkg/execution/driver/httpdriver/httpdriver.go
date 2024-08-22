@@ -47,7 +47,7 @@ var (
 	}
 	DefaultClient = &http.Client{
 		Timeout:       consts.MaxFunctionTimeout,
-		CheckRedirect: checkRedirect,
+		CheckRedirect: CheckRedirect,
 		Transport:     DefaultTransport,
 	}
 

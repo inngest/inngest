@@ -38,19 +38,35 @@ func Sign(ctx context.Context, key, body []byte) string {
 	return fmt.Sprintf("t=%d&s=%s", now, sig)
 }
 
-func checkRedirect(req *http.Request, via []*http.Request) (err error) {
+func CheckRedirect(req *http.Request, via []*http.Request) (err error) {
+	if len(via) == 0 {
+		return nil
+	}
+
 	if len(via) > 10 {
 		return fmt.Errorf("stopped after 10 redirects")
 	}
 
 	// If we're redirected we want to ensure that we retain the HTTP method.
 	req.Method = via[0].Method
-	req.Body, err = via[0].GetBody()
-	if err != nil {
-		return err
+
+	if via[0].Body != nil {
+		req.Body, err = via[0].GetBody()
+		if err != nil {
+			return err
+		}
 	}
+
 	req.ContentLength = via[0].ContentLength
 	req.Header = via[0].Header
+
+	// Retain the original query params
+	qp := req.URL.Query()
+	for k, v := range via[0].URL.Query() {
+		qp.Set(k, v[0])
+	}
+	req.URL.RawQuery = qp.Encode()
+
 	return nil
 }
 
