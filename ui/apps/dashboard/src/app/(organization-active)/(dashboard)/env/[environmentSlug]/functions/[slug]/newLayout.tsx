@@ -1,9 +1,9 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { Badge } from '@inngest/components/Badge';
 import { Header } from '@inngest/components/Header/Header';
 import { InvokeModal } from '@inngest/components/InvokeButton';
+import { Pill } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { RiPauseCircleLine } from '@remixicon/react';
 import { useMutation } from 'urql';
@@ -113,9 +113,9 @@ export default function FunctionLayout({
         ]}
         infoIcon={
           isPaused && (
-            <Badge kind="solid" className="text-warning h-6 bg-amber-100 text-xs">
-              <RiPauseCircleLine className="h-4 w-4" /> Paused
-            </Badge>
+            <Pill appearance="solid" kind="warning">
+              <RiPauseCircleLine className="mr-1 h-4 w-4" /> Paused
+            </Pill>
           )
         }
         action={
@@ -143,12 +143,9 @@ export default function FunctionLayout({
                   children: (
                     <div className="m-0 flex flex-row items-center justify-start space-x-1 p-0">
                       <div>New runs</div>
-                      <Badge
-                        kind="solid"
-                        className="text-onContrast bg-btnPrimary h-5 px-1.5 py-1 text-xs"
-                      >
+                      <Pill appearance="solid" kind="primary">
                         Beta
-                      </Badge>
+                      </Pill>
                     </div>
                   ),
                   href: `/env/${environmentSlug}/functions/${slug}/runs`,

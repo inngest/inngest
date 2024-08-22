@@ -853,8 +853,101 @@ func TestQueueSystemPartitions(t *testing.T) {
 		require.Nil(t, leaseId)
 	})
 
+	t.Run("scavenges partition items with expired leases", func(t *testing.T) {
+		// wait til leases are expired
+		<-time.After(2 * time.Second)
+
+		requeued, err := q.Scavenge(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, 1, requeued, "expected one item with expired leases to be requeued by scavenge", r.Dump())
+	})
+
+	t.Run("backcompat: scavenges previous partition items with expired leases", func(t *testing.T) {
+		r.FlushAll()
+
+		start := time.Now().Truncate(time.Second)
+
+		item, err := q.EnqueueItem(ctx, qi, start)
+		require.NoError(t, err)
+		require.NotEqual(t, item.ID, ulid.ULID{})
+		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
+
+		qp := getSystemPartition(t, r, customQueueName)
+
+		leaseStart := time.Now()
+		leaseExpires := q.clock.Now().Add(time.Second)
+
+		itemCountMatches := func(num int) {
+			zsetKey := qp.zsetKey(q.u.kg)
+			items, err := rc.Do(ctx, rc.B().
+				Zrangebyscore().
+				Key(zsetKey).
+				Min("-inf").
+				Max("+inf").
+				Build()).AsStrSlice()
+			require.NoError(t, err)
+			assert.Equal(t, num, len(items), "expected %d items in the queue %q", num, zsetKey, r.Dump())
+		}
+
+		concurrencyItemCountMatches := func(num int) {
+			items, err := rc.Do(ctx, rc.B().
+				Zrangebyscore().
+				Key(qp.concurrencyKey(q.u.kg)).
+				Min("-inf").
+				Max("+inf").
+				Build()).AsStrSlice()
+			require.NoError(t, err)
+			assert.Equal(t, num, len(items), "expected %d items in the concurrency queue", num, r.Dump())
+		}
+
+		itemCountMatches(1)
+		concurrencyItemCountMatches(0)
+
+		leaseId, err := q.Lease(ctx, qp, item, time.Second, leaseStart, nil)
+		require.NoError(t, err)
+		require.NotNil(t, leaseId)
+
+		itemCountMatches(0)
+		concurrencyItemCountMatches(1)
+
+		// wait til leases are expired
+		<-time.After(2 * time.Second)
+		require.True(t, time.Now().After(leaseExpires))
+
+		newConcurrencyIndexItem := q.u.kg.Concurrency("p", customQueueName)
+		oldConcurrencyIndexItem := customQueueName
+
+		removed, err := rc.Do(ctx, rc.B().Zrem().Key(q.u.kg.ConcurrencyIndex()).Member(newConcurrencyIndexItem).Build()).AsInt64()
+		require.NoError(t, err)
+		assert.Equal(t, int64(1), removed, "expected one previous item to be removed")
+
+		err = rc.Do(ctx, rc.B().Zadd().Key(q.u.kg.ConcurrencyIndex()).ScoreMember().ScoreMember(float64(leaseExpires.UnixMilli()), oldConcurrencyIndexItem).Build()).Error()
+		require.NoError(t, err)
+
+		requeued, err := q.Scavenge(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, 1, requeued, "expected one item with expired leases to be requeued by scavenge", r.Dump())
+
+		itemCountMatches(1)
+		concurrencyItemCountMatches(0)
+
+		indexItems, err := rc.Do(ctx, rc.B().Zcard().Key(q.u.kg.ConcurrencyIndex()).Build()).AsInt64()
+		require.NoError(t, err)
+		assert.Equal(t, 0, int(indexItems), "expected no items in the concurrency index", r.Dump())
+
+		newConcurrencyQueueItems, err := rc.Do(ctx, rc.B().Zcard().Key(newConcurrencyIndexItem).Build()).AsInt64()
+		require.NoError(t, err)
+		assert.Equal(t, 0, int(newConcurrencyQueueItems), "expected no items in the new concurrency queue", r.Dump())
+
+		oldConcurrencyQueueItems, err := rc.Do(ctx, rc.B().Zcard().Key(oldConcurrencyIndexItem).Build()).AsInt64()
+		require.NoError(t, err)
+		assert.Equal(t, 0, int(oldConcurrencyQueueItems), "expected no items in the old concurrency queue", r.Dump())
+	})
+
 	t.Run("It enqueues an item to account queues when account id is present", func(t *testing.T) {
 		r.FlushAll()
+
+		start := time.Now().Truncate(time.Second)
 
 		// This test case handles account-scoped system partitions
 
@@ -896,6 +989,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 		require.Equal(t, 1, len(apIds))
 		require.Contains(t, apIds, qp.ID)
 	})
+
 }
 
 func TestQueuePeek(t *testing.T) {
@@ -1952,6 +2046,83 @@ func TestQueueDequeue(t *testing.T) {
 		})
 	})
 
+	t.Run("backcompat: it should drop previous partition names from concurrency index", func(t *testing.T) {
+		// This tests backwards compatibility with the old concurrency index member naming scheme
+		r.FlushAll()
+		start := time.Now().Truncate(time.Second)
+
+		customQueueName := "custom-queue-name"
+		item, err := q.EnqueueItem(ctx, QueueItem{
+			FunctionID: uuid.New(),
+			Data: osqueue.Item{
+				QueueName: &customQueueName,
+			},
+			QueueName: &customQueueName,
+		}, start)
+		require.NoError(t, err)
+		parts := q.ItemPartitions(ctx, item)
+
+		itemCountMatches := func(num int) {
+			zsetKey := parts[0].zsetKey(q.u.kg)
+			items, err := rc.Do(ctx, rc.B().
+				Zrangebyscore().
+				Key(zsetKey).
+				Min("-inf").
+				Max("+inf").
+				Build()).AsStrSlice()
+			require.NoError(t, err)
+			assert.Equal(t, num, len(items), "expected %d items in the queue %q", num, zsetKey, r.Dump())
+		}
+
+		concurrencyItemCountMatches := func(num int) {
+			items, err := rc.Do(ctx, rc.B().
+				Zrangebyscore().
+				Key(parts[0].concurrencyKey(q.u.kg)).
+				Min("-inf").
+				Max("+inf").
+				Build()).AsStrSlice()
+			require.NoError(t, err)
+			assert.Equal(t, num, len(items), "expected %d items in the concurrency queue", num, r.Dump())
+		}
+
+		itemCountMatches(1)
+		concurrencyItemCountMatches(0)
+
+		_, err = q.Lease(ctx, parts[0], item, time.Second, time.Now(), nil)
+		require.NoError(t, err)
+
+		itemCountMatches(0)
+		concurrencyItemCountMatches(1)
+
+		leaseExpiry := time.Now().Add(time.Second)
+
+		// Ensure the concurrency index is updated.
+		mem, err := r.ZMembers(q.u.kg.ConcurrencyIndex())
+		require.NoError(t, err)
+		assert.Equal(t, 1, len(mem))
+		assert.Contains(t, mem[0], parts[0].concurrencyKey(q.u.kg))
+
+		// Rename the member to the old format
+		removed, err := r.ZRem(q.u.kg.ConcurrencyIndex(), parts[0].concurrencyKey(q.u.kg))
+		require.NoError(t, err)
+		assert.True(t, removed)
+
+		added, err := r.ZAdd(q.u.kg.ConcurrencyIndex(), float64(leaseExpiry.UnixMilli()), customQueueName)
+		require.NoError(t, err)
+		assert.True(t, added)
+
+		// Dequeue the item.
+		err = q.Dequeue(ctx, parts[0], item)
+		require.NoError(t, err)
+
+		itemCountMatches(0)
+		concurrencyItemCountMatches(0)
+
+		// Ensure the concurrency index is updated.
+		numMembers, err := rc.Do(ctx, rc.B().Zcard().Key(q.u.kg.ConcurrencyIndex()).Build()).AsInt64()
+		require.NoError(t, err, r.Dump())
+		assert.Equal(t, int64(0), numMembers, "concurrency index should be empty", mem)
+	})
 }
 
 func TestQueueRequeue(t *testing.T) {
@@ -1985,7 +2156,7 @@ func TestQueueRequeue(t *testing.T) {
 		requirePartitionInProgress(t, q, item.FunctionID, 1)
 
 		next := now.Add(time.Hour)
-		err = q.Requeue(ctx, p, item, next)
+		err = q.Requeue(ctx, item, next)
 		require.NoError(t, err)
 
 		t.Run("It should re-enqueue the item with the future time", func(t *testing.T) {
@@ -2013,7 +2184,7 @@ func TestQueueRequeue(t *testing.T) {
 			requirePartitionScoreEquals(t, r, pi.FunctionID, now)
 
 			next := now.Add(2 * time.Hour)
-			err = q.Requeue(ctx, pi, item, next)
+			err = q.Requeue(ctx, item, next)
 			require.NoError(t, err)
 
 			requirePartitionScoreEquals(t, r, pi.FunctionID, now)
@@ -2045,7 +2216,7 @@ func TestQueueRequeue(t *testing.T) {
 			require.EqualValues(t, at.UnixMilli(), scores[0])
 
 			next := now.Add(2 * time.Hour)
-			err = q.Requeue(ctx, pi, item, next)
+			err = q.Requeue(ctx, item, next)
 			require.NoError(t, err)
 
 			// Score should be the requeue time.
@@ -2120,7 +2291,7 @@ func TestQueueRequeue(t *testing.T) {
 
 		// Requeue
 		next := now.Add(time.Hour)
-		err = q.Requeue(ctx, QueuePartition{}, item, next)
+		err = q.Requeue(ctx, item, next)
 		require.NoError(t, err)
 
 		t.Run("It requeues all partitions", func(t *testing.T) {
@@ -3353,7 +3524,7 @@ func TestShardFinding(t *testing.T) {
 			})
 
 			t.Run("requeue modifies the shard partition", func(t *testing.T) {
-				err := q.Requeue(ctx, p, item, at.Add(30*time.Second))
+				err := q.Requeue(ctx, item, at.Add(30*time.Second))
 				require.NoError(t, err)
 
 				// Check shard partition score changed in the ptr.

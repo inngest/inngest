@@ -149,7 +149,7 @@ type QueueManager interface {
 	osqueue.Queue
 
 	Dequeue(ctx context.Context, p QueuePartition, i QueueItem) error
-	Requeue(ctx context.Context, p QueuePartition, i QueueItem, at time.Time) error
+	Requeue(ctx context.Context, i QueueItem, at time.Time) error
 	RequeueByJobID(ctx context.Context, jobID string, at time.Time) error
 }
 
@@ -1667,7 +1667,12 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 	args, err := StrSlice([]any{
 		i.ID,
 		int(idempotency.Seconds()),
+
+		// NOTE: For backwards compatibility, we need to also remove the previously-used
+		// concurrency index item. While we use fully-qualified keys in concurrencyKey,
+		// previously we used function IDs or queueNames for system partitions.
 		p.Queue(),
+
 		parts[0].ID,
 		parts[1].ID,
 		parts[2].ID,
@@ -1696,7 +1701,7 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 }
 
 // Requeue requeues an item in the future.
-func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at time.Time) error {
+func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Requeue"), redis_telemetry.ScopeQueue)
 
 	now := q.clock.Now()
@@ -1746,6 +1751,16 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		}
 	}
 
+	// NOTE: For backwards compatibility, we need to also remove the previously-used
+	// concurrency index item. While we use fully-qualified keys in concurrencyKey,
+	// previously we used function IDs or queueNames for system partitions.
+	legacyPartitionName := ""
+	for _, part := range parts {
+		if part.PartitionType == int(enums.PartitionTypeDefault) && part.Queue() != "" {
+			legacyPartitionName = part.Queue()
+		}
+	}
+
 	args, err := StrSlice([]any{
 		i,
 		i.ID,
@@ -1758,6 +1773,9 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		parts[1].ID,
 		parts[2].ID,
 		i.Data.Identifier.AccountID.String(),
+
+		// Backwards compatibility
+		legacyPartitionName,
 	})
 	if err != nil {
 		return err
@@ -2459,6 +2477,11 @@ func (q *queue) Instrument(ctx context.Context) error {
 	return nil
 }
 
+// isKeyPreviousConcurrencyPointerItem checks whether given string conforms to fully-qualified key as concurrency index item
+func isKeyConcurrencyPointerItem(partition string) bool {
+	return strings.HasPrefix(partition, "{")
+}
+
 // Scavenge attempts to find jobs that may have been lost due to killed workers.  Workers are shared
 // nothing, and each item in a queue has a lease.  If a worker dies, it will not finish the job and
 // cannot renew the item's lease.
@@ -2490,11 +2513,12 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 	var resultErr error
 	for _, partition := range pKeys {
 
-		// If this is a UUID, assume that this is an old partition queue
-		//
+		// NOTE: If this is not a fully-qualified Redis key to a concurrency queue,
+		// assume that this is an old queueName or function ID
+		// This is for backwards compatibility with the previous concurrency index item format
 		queueKey := partition
-		if isPartitionUUID(partition) {
-			queueKey = q.u.kg.PartitionQueueSet(enums.PartitionTypeDefault, partition, "")
+		if !isKeyConcurrencyPointerItem(partition) {
+			queueKey = q.u.kg.Concurrency("p", partition)
 		}
 
 		cmd := q.u.unshardedRc.B().Zrange().
@@ -2526,7 +2550,7 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 				resultErr = multierror.Append(resultErr, fmt.Errorf("error unmarshalling job '%s': %w", item, err))
 				continue
 			}
-			if err := q.Requeue(ctx, QueuePartition{}, qi, q.clock.Now()); err != nil {
+			if err := q.Requeue(ctx, qi, q.clock.Now()); err != nil {
 				resultErr = multierror.Append(resultErr, fmt.Errorf("error requeueing job '%s': %w", item, err))
 				continue
 			}

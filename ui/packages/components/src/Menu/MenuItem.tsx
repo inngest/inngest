@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { OptionalLink } from '@inngest/components/Link/OptionalLink';
 
 import { Badge } from '../Badge';
+import { Pill } from '../Pill';
 import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 
 export const MenuItem = ({
@@ -44,12 +45,9 @@ export const MenuItem = ({
           {icon}
           {!collapsed && <span className="ml-2.5 text-sm leading-tight">{text}</span>}
           {!collapsed && beta && (
-            <Badge
-              kind="solid"
-              className="text-alwaysWhite bg-btnPrimary ml-2.5 h-5 px-1.5 py-1 text-xs"
-            >
+            <Pill kind="primary" appearance="solid" className="ml-2.5">
               Beta
-            </Badge>
+            </Pill>
           )}
           {!collapsed && error && (
             <Badge

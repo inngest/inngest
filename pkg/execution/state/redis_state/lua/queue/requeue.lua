@@ -37,6 +37,7 @@ local partitionIdA        = ARGV[8]
 local partitionIdB        = ARGV[9]
 local partitionIdC        = ARGV[10]
 local accountId           = ARGV[11]
+local legacyPartitionName = ARGV[12]
 
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
@@ -57,7 +58,7 @@ redis.call("HSET", queueKey, queueID, queueItem)
 
 -- This extends the item in the zset and also ensures that scavenger queues are
 -- updated.
-local function handleDequeue(keyConcurrency)
+local function handleRequeue(keyConcurrency)
 	redis.call("ZREM", keyConcurrency, item.id)
 
 	-- Get the earliest item in the partition concurrency set.  We may be dequeueing
@@ -73,9 +74,11 @@ local function handleDequeue(keyConcurrency)
 		local earliestLease = tonumber(concurrencyScores[2])
 		if earliestLease == nil then
 			redis.call("ZREM", concurrencyPointer, keyConcurrency)
+			redis.call("ZREM", concurrencyPointer, legacyPartitionName) -- remove previous item
 		else
 			-- Ensure that we update the score with the earliest lease
 			redis.call("ZADD", concurrencyPointer, earliestLease, keyConcurrency)
+			redis.call("ZREM", concurrencyPointer, legacyPartitionName) -- clean up previous item
 		end
 	end
 end
@@ -84,11 +87,14 @@ end
 -- Concurrency
 --
 
--- Remove this from the account concurrency queue
-handleDequeue(keyAcctConcurrency)
-handleDequeue(keyConcurrencyA)
-handleDequeue(keyConcurrencyB)
-handleDequeue(keyConcurrencyC)
+handleRequeue(keyConcurrencyA)
+handleRequeue(keyConcurrencyB)
+handleRequeue(keyConcurrencyC)
+
+-- Remove item from the account concurrency queue
+-- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
+-- and Lease for respective ZADD calls.
+redis.call("ZREM", keyAcctConcurrency, item.id)
 
 --
 -- Partition manipulation

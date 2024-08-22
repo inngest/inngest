@@ -1074,7 +1074,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 			}
 
 			qi.AtMS = at.UnixMilli()
-			if err := q.Requeue(context.WithoutCancel(ctx), p, qi, at); err != nil {
+			if err := q.Requeue(context.WithoutCancel(ctx), qi, at); err != nil {
 				q.logger.Error().Err(err).Interface("item", qi).Msg("error requeuing job")
 				return err
 			}
