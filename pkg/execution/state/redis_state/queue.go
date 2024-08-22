@@ -1978,18 +1978,19 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		return nil, fmt.Errorf("unknown return type from partitionPeek: %T", peekRet)
 	}
 
-	if len(returnedSet) != 2 {
-		return nil, fmt.Errorf("expected two items in set returned by partitionPeek: %v", returnedSet)
-	}
+	var encoded, missingPartitions []any
+	if len(returnedSet) == 2 {
+		encoded, ok = returnedSet[0].([]any)
+		if !ok {
+			return nil, fmt.Errorf("unexpected first item in set returned from partitionPeek: %T", peekRet)
+		}
 
-	encoded, ok := returnedSet[0].([]any)
-	if !ok {
-		return nil, fmt.Errorf("unexpected first item in set returned from partitionPeek: %T", peekRet)
-	}
-
-	missingPartitions, ok := returnedSet[1].([]any)
-	if !ok {
-		return nil, fmt.Errorf("unexpected first item in set returned from partitionPeek: %T", peekRet)
+		missingPartitions, ok = returnedSet[1].([]any)
+		if !ok {
+			return nil, fmt.Errorf("unexpected first item in set returned from partitionPeek: %T", peekRet)
+		}
+	} else if len(returnedSet) != 0 {
+		return nil, fmt.Errorf("expected zero or two items in set returned by partitionPeek: %v", returnedSet)
 	}
 
 	weights := []float64{}
