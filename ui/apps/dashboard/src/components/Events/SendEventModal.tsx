@@ -130,7 +130,7 @@ export function SendEventModal({
   const serializeData = (code: string) => {
     try {
       //
-      // look for string like has json in it with name and data fields
+      // look for string that has json in it with name and data fields
       const matches = code.match(
         /\{[^{}]*"name"\s*:\s*"[^"]*"[^{}]*"data"\s*:\s*\{[^{}]*\}[^{}]*\}/g
       );
