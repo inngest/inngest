@@ -146,7 +146,7 @@ type QueueManager interface {
 	osqueue.Queue
 
 	Dequeue(ctx context.Context, p QueuePartition, i QueueItem) error
-	Requeue(ctx context.Context, p QueuePartition, i QueueItem, at time.Time) error
+	Requeue(ctx context.Context, i QueueItem, at time.Time) error
 	RequeueByJobID(ctx context.Context, jobID string, at time.Time) error
 }
 
