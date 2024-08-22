@@ -1,4 +1,5 @@
 import { RunStatusDot } from '@inngest/components/FunctionRunStatusIcons/RunStatusDot';
+import { Pill, PillContent, type PillContentProps } from '@inngest/components/Pill';
 import { Time } from '@inngest/components/Time';
 import { cn } from '@inngest/components/utils/classNames';
 
@@ -12,6 +13,14 @@ export function IDCell({ children }: React.PropsWithChildren) {
 
 export function TextCell({ children }: React.PropsWithChildren) {
   return <p className={cn(cellStyles, 'font-medium')}>{children}</p>;
+}
+
+export function PillCell({ children, type }: PillContentProps) {
+  return (
+    <Pill appearance="outlined">
+      <PillContent type={type}>{children}</PillContent>
+    </Pill>
+  );
 }
 
 export function TimeCell({ date }: { date: Date | string }) {

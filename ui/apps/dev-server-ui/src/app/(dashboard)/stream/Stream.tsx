@@ -41,7 +41,7 @@ const columns = [
   columnHelper.accessor('type', {
     header: () => <span>Trigger</span>,
     cell: (props) => (
-      <Pill className="text-sm font-normal">
+      <Pill appearance="outlined">
         <PillContent type={props.row.original.type}>{props.row.original.trigger}</PillContent>
       </Pill>
     ),
