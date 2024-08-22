@@ -10,6 +10,7 @@ import ky from 'ky';
 import { toast } from 'sonner';
 import { type JsonValue } from 'type-fest';
 import { useQuery } from 'urql';
+import { z } from 'zod';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import Modal from '@/components/Modal';
@@ -17,6 +18,11 @@ import CodeEditor from '@/components/Textarea/CodeEditor';
 import { graphql } from '@/gql';
 import { EnvironmentType } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
+
+const payloadSchema = z.object({
+  name: z.string(),
+  data: z.record(z.unknown()),
+});
 
 const GetEventKeysDocument = graphql(/* GraphQL */ `
   query GetEventKeys($environmentID: ID!) {
@@ -129,15 +135,9 @@ export function SendEventModal({
   // serialize data to state on change so we can persist it between editor tab changes
   const serializeData = (code: string) => {
     try {
-      //
-      // look for string that has json in it with name and data fields
-      const matches = code.match(
-        /\{[^{}]*"name"\s*:\s*"[^"]*"[^{}]*"data"\s*:\s*\{[^{}]*\}[^{}]*\}/g
-      );
-      const parsed = matches && JSON.parse(matches[0]);
-      setPayload(parsed);
+      setPayload(payloadSchema.parse(JSON.parse(code)));
     } catch (error) {
-      console.info("can't parse code editor payload, skipping serialization");
+      console.log("can't parse code editor payload, skipping serialization");
     }
   };
 
@@ -200,8 +200,6 @@ export function SendEventModal({
         as="section"
         className="space-y-6"
         onChange={() => {
-          //
-          // rebuild tabs on change to carry over any payload
           setTabs(
             buildTabs({
               envName,
