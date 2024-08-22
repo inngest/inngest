@@ -658,7 +658,7 @@ func (q QueuePartition) zsetKey(kg QueueKeyGenerator) string {
 		return kg.PartitionQueueSet(enums.PartitionTypeDefault, "-", "")
 	}
 
-	// q.ID is already a properly defined key.
+	// q.ID is already a properly defined key (concurrency key queues).
 	return q.ID
 }
 
@@ -2251,9 +2251,9 @@ func (q *queue) Instrument(ctx context.Context) error {
 			go func(ctx context.Context, pkey string) {
 				defer wg.Done()
 
-				// If this is a UUID, assume that this is an old partition queue
+				// If this is not a fully-qualified key, assume that this is an old (system) partition queue
 				queueKey := pkey
-				if isPartitionUUID(pkey) {
+				if !isKeyConcurrencyPointerItem(pkey) {
 					queueKey = q.u.kg.PartitionQueueSet(enums.PartitionTypeDefault, pkey, "")
 				}
 
@@ -2743,10 +2743,4 @@ func (l *leaseDenies) denyThrottle(key string) bool {
 	_, ok := l.throttle[key]
 	l.lock.RUnlock()
 	return ok
-}
-
-func isPartitionUUID(p string) bool {
-	// NOTE: We use 36 as a fast heuristic here and assume that the partition
-	// is a UUID.  This is not a proper UUID check, but still works.
-	return len(p) == 36
 }
