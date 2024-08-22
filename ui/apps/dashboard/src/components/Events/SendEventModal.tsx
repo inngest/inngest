@@ -1,10 +1,11 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Tab } from '@headlessui/react';
 import { Alert } from '@inngest/components/Alert';
-import { Button } from '@inngest/components/Button';
+import { Button, NewButton } from '@inngest/components/Button';
 import ky from 'ky';
 import { toast } from 'sonner';
 import { type JsonValue } from 'type-fest';
@@ -34,11 +35,73 @@ type SendEventModalProps = {
   onClose: () => void;
 };
 
+type TabType = {
+  payload: { name: string; data: {} };
+  eventKey?: string;
+  isBranchChild: boolean;
+  envName: string;
+  sendEventURL: string;
+  sendEventAction: (event: React.FormEvent<HTMLFormElement>) => void;
+  copyToClipboardAction: (event: React.FormEvent<HTMLFormElement>) => void;
+};
+
+const buildTabs = ({
+  payload,
+  eventKey,
+  envName,
+  sendEventURL,
+  isBranchChild,
+  sendEventAction,
+  copyToClipboardAction,
+}: TabType) => {
+  const hasEventKey = Boolean(eventKey);
+  return [
+    {
+      tabLabel: 'JSON Editor',
+      tabTitle: 'Send Custom JSON',
+      submitButtonLabel: 'Send Event',
+      submitButtonEnabled: hasEventKey,
+      submitAction: sendEventAction,
+      codeLanguage: 'json',
+      initialCode: JSON.stringify(payload, null, 2),
+    },
+    {
+      tabLabel: 'SDK',
+      tabTitle: 'Send with the SDK',
+      submitButtonLabel: 'Copy Code',
+      submitButtonEnabled: true,
+      submitAction: copyToClipboardAction,
+      codeLanguage: 'javascript',
+      initialCode: `import { Inngest } from 'inngest';
+
+const inngest = new Inngest({
+  name: 'Your App Name',
+  eventKey: '${eventKey || '<EVENT_KEY>'}',${isBranchChild ? `\n  env: '${envName}',` : ''}
+});
+
+await inngest.send(${JSON.stringify(payload, null, 2)});`,
+    },
+    {
+      tabLabel: 'cURL',
+      tabTitle: 'Send with cURL',
+      submitButtonLabel: 'Copy Code',
+      submitButtonEnabled: true,
+      submitAction: copyToClipboardAction,
+      codeLanguage: 'bash',
+      initialCode: `curl ${sendEventURL} \\${
+        isBranchChild ? `\n  -H "x-inngest-env: ${envName}" \\` : ''
+      }
+  --data '${JSON.stringify(payload)}'`,
+    },
+  ];
+};
+
 export function SendEventModal({
   eventName = 'Your Event Name',
   isOpen,
   onClose,
 }: SendEventModalProps) {
+  const [payload, setPayload] = useState({ name: eventName, data: {} });
   const router = useRouter();
   const environment = useEnvironment();
   const eventKey = usePreferDefaultEventKey();
@@ -50,6 +113,33 @@ export function SendEventModal({
 
   const isBranchChild = environment.type === EnvironmentType.BranchChild;
   const envName = environment.name;
+  const [tabs, setTabs] = useState(
+    buildTabs({
+      envName,
+      payload,
+      eventKey,
+      sendEventURL,
+      isBranchChild,
+      copyToClipboardAction,
+      sendEventAction,
+    })
+  );
+
+  //
+  // serialize data to state on change so we can persist it between editor tab changes
+  const serializeData = (code: string) => {
+    try {
+      //
+      // look for string like has json in it with name and data fields
+      const matches = code.match(
+        /\{[^{}]*"name"\s*:\s*"[^"]*"[^{}]*"data"\s*:\s*\{[^{}]*\}[^{}]*\}/g
+      );
+      const parsed = matches && JSON.parse(matches[0]);
+      setPayload(parsed);
+    } catch (error) {
+      console.info("can't parse code editor payload, skipping serialization");
+    }
+  };
 
   async function sendEventAction(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -104,61 +194,27 @@ export function SendEventModal({
     });
   }
 
-  const tabs = [
-    {
-      tabLabel: 'JSON Editor',
-      tabTitle: 'Send Custom JSON',
-      submitButtonLabel: 'Send Event',
-      submitButtonEnabled: hasEventKey,
-      submitAction: sendEventAction,
-      codeLanguage: 'json',
-      initialCode: JSON.stringify(
-        {
-          name: eventName,
-          data: {},
-        },
-        null,
-        2
-      ),
-    },
-    {
-      tabLabel: 'SDK',
-      tabTitle: 'Send with the SDK',
-      submitButtonLabel: 'Copy Code',
-      submitButtonEnabled: true,
-      submitAction: copyToClipboardAction,
-      codeLanguage: 'javascript',
-      initialCode: `import { Inngest } from 'inngest';
-
-const inngest = new Inngest({
-  name: 'Your App Name',
-  eventKey: '${eventKey || '<EVENT_KEY>'}',${isBranchChild ? `\n  env: '${envName}',` : ''}
-});
-
-await inngest.send({
-  name: '${eventName}' // e.g. 'app/user.signed.up',
-  data: {
-    // Your event data
-  }
-});`,
-    },
-    {
-      tabLabel: 'cURL',
-      tabTitle: 'Send with cURL',
-      submitButtonLabel: 'Copy Code',
-      submitButtonEnabled: true,
-      submitAction: copyToClipboardAction,
-      codeLanguage: 'bash',
-      initialCode: `curl ${sendEventURL} \\${
-        isBranchChild ? `\n  -H "x-inngest-env: ${envName}" \\` : ''
-      }
-  --data '{ "name": "${eventName}", "data": {} }'`,
-    },
-  ];
-
   return (
     <Modal className="max-w-6xl space-y-3 p-6" isOpen={isOpen} onClose={onClose}>
-      <Tab.Group as="section" className="space-y-6">
+      <Tab.Group
+        as="section"
+        className="space-y-6"
+        onChange={() => {
+          //
+          // rebuild tabs on change to carry over any payload
+          setTabs(
+            buildTabs({
+              envName,
+              payload,
+              eventKey,
+              sendEventURL,
+              isBranchChild,
+              copyToClipboardAction,
+              sendEventAction,
+            })
+          );
+        }}
+      >
         <header className="flex items-center justify-between">
           <span className="inline-flex items-center gap-2">
             <h2 className="text-lg font-medium">Send Event</h2>
@@ -202,7 +258,7 @@ await inngest.send({
               >
                 <header className="bg bg-slate-910 flex items-center justify-between rounded-t-md p-2">
                   <h3 className="px-2 text-white">{tabTitle}</h3>
-                  <Button
+                  <NewButton
                     type="submit"
                     disabled={!submitButtonEnabled}
                     label={submitButtonLabel}
@@ -215,6 +271,7 @@ await inngest.send({
                     initialCode={initialCode}
                     name="code"
                     className="h-80 w-[640px] bg-slate-900"
+                    onCodeChange={serializeData}
                   />
                 </div>
               </Tab.Panel>
@@ -222,7 +279,7 @@ await inngest.send({
           )}
         </Tab.Panels>
       </Tab.Group>
-      <Button btnAction={onClose} appearance="outlined" label="Close Modal" />
+      <NewButton onClick={onClose} appearance="outlined" label="Close Modal" />
     </Modal>
   );
 }
