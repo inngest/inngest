@@ -1160,7 +1160,7 @@ func TestQueueLease(t *testing.T) {
 	t.Run("It should update the global partition index", func(t *testing.T) {
 		t.Run("With no concurrency keys", func(t *testing.T) {
 			r.FlushAll()
-			q.customConcurrencyGen = func(ctx context.Context, i QueueItem) []state.CustomConcurrency {
+			q.customConcurrencyLimitRefresher = func(ctx context.Context, i QueueItem) []state.CustomConcurrency {
 				return nil
 			}
 

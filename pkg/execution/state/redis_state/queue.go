@@ -302,11 +302,11 @@ func WithLogger(l *zerolog.Logger) func(q *queue) {
 	}
 }
 
-// WithCustomConcurrencyKeyGenerator assigns a function that returns concurrency keys
-// for a given queue item, eg. a step in a function.
-func WithCustomConcurrencyKeyGenerator(f QueueItemConcurrencyKeyGenerator) func(q *queue) {
+// WithCustomConcurrencyKeyLimitRefresher assigns a function that returns concurrency keys with
+// current limits for a given queue item, eg. a step in a function.
+func WithCustomConcurrencyKeyLimitRefresher(f QueueItemConcurrencyKeyLimitRefresher) func(q *queue) {
 	return func(q *queue) {
-		q.customConcurrencyGen = f
+		q.customConcurrencyLimitRefresher = f
 	}
 }
 
@@ -346,12 +346,12 @@ func WithClock(c clockwork.Clock) func(q *queue) {
 	}
 }
 
-// QueueItemConcurrencyKeyGenerator returns concurrenc keys given a queue item to limits.
+// QueueItemConcurrencyKeyLimitRefresher returns concurrency keys with current limits given a queue item.
 //
 // Each queue item can have its own concurrency keys.  For example, you can define
 // concurrency limits for steps within a function.  This ensures that there will never be
 // more than N concurrent items running at once.
-type QueueItemConcurrencyKeyGenerator func(ctx context.Context, i QueueItem) []state.CustomConcurrency
+type QueueItemConcurrencyKeyLimitRefresher func(ctx context.Context, i QueueItem) []state.CustomConcurrency
 
 // ConcurrencyLimitGetter returns the fn, account, and custom limits for a given partition.
 type ConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) (fn, acct, custom int)
@@ -393,8 +393,8 @@ func NewQueue(u *QueueClient, opts ...QueueOpt) *queue {
 			}
 			return def
 		},
-		customConcurrencyGen: func(ctx context.Context, item QueueItem) []state.CustomConcurrency {
-			// Use whatever's in the queue item by default
+		customConcurrencyLimitRefresher: func(ctx context.Context, item QueueItem) []state.CustomConcurrency {
+			// No-op: Use whatever's in the queue item by default
 			return item.Data.GetConcurrencyKeys()
 		},
 		itemIndexer:    QueueItemIndexerFunc,
@@ -425,9 +425,9 @@ type queue struct {
 
 	lifecycles QueueLifecycleListeners
 
-	concurrencyLimitGetter       ConcurrencyLimitGetter
-	systemConcurrencyLimitGetter SystemConcurrencyLimitGetter
-	customConcurrencyGen         QueueItemConcurrencyKeyGenerator
+	concurrencyLimitGetter          ConcurrencyLimitGetter
+	systemConcurrencyLimitGetter    SystemConcurrencyLimitGetter
+	customConcurrencyLimitRefresher QueueItemConcurrencyKeyLimitRefresher
 
 	// idempotencyTTL is the default or static idempotency duration apply to jobs,
 	// if idempotencyTTLFunc is not defined.
@@ -877,9 +877,9 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 	// NOTE: This is an optimization that ensures we return *updated* concurrency keys
 	// for any recently published function configuration.  The embeddeed ckeys from the
 	// queue items above may be outdated.
-	if q.customConcurrencyGen != nil {
+	if q.customConcurrencyLimitRefresher != nil {
 		// As an optimization, allow fetching updated concurrency limits if desired.
-		updated := q.customConcurrencyGen(ctx, i)
+		updated := q.customConcurrencyLimitRefresher(ctx, i)
 		for _, update := range updated {
 			// This is quadratic, but concurrency keys are limited to 2 so it's
 			// okay.
