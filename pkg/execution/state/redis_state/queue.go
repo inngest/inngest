@@ -822,14 +822,15 @@ func (q QueueItem) Score(now time.Time) int64 {
 		return q.AtMS
 	}
 
-	// Only fudge the numbers if the run is older than the buffer time.
+	// Get the time for the function, based off of the run ID.
 	startAt := int64(q.Data.Identifier.RunID.Time())
-	if q.AtMS-startAt > FunctionStartScoreBufferTime.Milliseconds() {
-		// Remove the PriorityFactor from the time to push higher priority work
-		// earlier.
-		return startAt - q.Data.GetPriorityFactor()
+
+	if startAt == 0 {
+		return q.AtMS
 	}
 
+	// Remove the PriorityFactor from the time to push higher priority work
+	// earlier.
 	return startAt - q.Data.GetPriorityFactor()
 }
 
