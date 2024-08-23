@@ -6,6 +6,9 @@ export default async function UserSettingsPage() {
       routing="path"
       path="/settings/user"
       appearance={{
+        layout: {
+          logoPlacement: 'none',
+        },
         elements: {
           rootBox: 'h-full',
           card: '',

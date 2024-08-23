@@ -29,7 +29,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             colorDanger: colors.red['500'],
             colorSuccess: colors.teal['500'],
             colorWarning: colors.amber['500'],
-            colorAlphaShade: colors.slate['900'],
             colorText: colors.slate['800'],
             colorTextSecondary: colors.slate['600'],
           },

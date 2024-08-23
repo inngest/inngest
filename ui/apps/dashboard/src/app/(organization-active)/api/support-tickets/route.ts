@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { auth, currentUser } from '@clerk/nextjs';
+import { auth, currentUser } from '@clerk/nextjs/server';
 import {
   PlainClient,
   type CreateThreadInput,

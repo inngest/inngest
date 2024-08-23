@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react';
 
+import type { ProfileDisplayType } from '@/queries/server-only/profile';
 import type { Environment } from '@/utils/environments';
 import { Alert } from '../Navigation/Alert';
 import { Help } from '../Navigation/Help';
 import { Integrations } from '../Navigation/Integrations';
 import Logo from '../Navigation/Logo';
 import Navigation from '../Navigation/Navigation';
-import { Profile, type ProfileType } from '../Navigation/Profile';
+import { Profile } from '../Navigation/Profile';
 
 export default function SideBar({
   collapsed: serverCollapsed,
@@ -17,7 +18,7 @@ export default function SideBar({
 }: {
   collapsed: boolean | undefined;
   activeEnv?: Environment;
-  profile: ProfileType;
+  profile: ProfileDisplayType;
 }) {
   const [collapsed, setCollapsed] = useState<boolean>(serverCollapsed ?? false);
 

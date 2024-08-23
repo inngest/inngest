@@ -1,5 +1,5 @@
 import type { PropsWithChildren } from 'react';
-import { auth, clerkClient, currentUser } from '@clerk/nextjs';
+import { auth, clerkClient, currentUser } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 
 import { getLaunchDarklyClient } from '@/launchDarkly';
@@ -24,13 +24,12 @@ export async function getBooleanFlag(
   { defaultValue = false }: { defaultValue?: boolean } = {}
 ): Promise<boolean> {
   const user = await currentUser();
+  const clerk = clerkClient();
   const { orgId } = auth();
 
-  let organization:
-    | Awaited<ReturnType<typeof clerkClient.organizations.getOrganization>>
-    | undefined;
+  let organization: Awaited<ReturnType<typeof clerk.organizations.getOrganization>> | undefined;
   if (orgId) {
-    organization = await clerkClient.organizations.getOrganization({ organizationId: orgId });
+    organization = await clerk.organizations.getOrganization({ organizationId: orgId });
   }
 
   try {
