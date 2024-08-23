@@ -922,6 +922,8 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 		for _, key := range ckeys {
 			scope, id, checksum, _ := key.ParseKey()
 
+			// TODO: Is this supposed to stay? Then the comment below should change
+			// (if not, do we validate against this case from happening in cloud?)
 			if checksum == "" && key.Key != "" {
 				// For testing, use the key here.
 				checksum = key.Key
@@ -934,6 +936,9 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 				AccountID:        i.Data.Identifier.AccountID,
 				ConcurrencyScope: int(scope),
 				ConcurrencyKey:   key.Key,
+
+				// Note: This uses the latest limit for the key queue,
+				// retrieved from customConcurrencyLimitRefresher
 				ConcurrencyLimit: key.Limit,
 			}
 

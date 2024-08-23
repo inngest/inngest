@@ -32,3 +32,7 @@ func (k keyError) Unwrap() error {
 func (k keyError) Error() string {
 	return k.cause.Error()
 }
+
+func (k keyError) Unwrap() error {
+	return k.cause
+}
