@@ -131,7 +131,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		redis_state.WithIdempotencyTTL(time.Hour),
 		redis_state.WithNumWorkers(100),
 		redis_state.WithPollTick(tick),
-		redis_state.WithCustomConcurrencyKeyRefresher(func(ctx context.Context, i redis_state.QueueItem) []state.CustomConcurrency {
+		redis_state.WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i redis_state.QueueItem) []state.CustomConcurrency {
 			keys := i.Data.GetConcurrencyKeys()
 
 			fn, err := dbcqrs.GetFunctionByInternalUUID(ctx, i.Data.Identifier.WorkspaceID, i.Data.Identifier.WorkflowID)
