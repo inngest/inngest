@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/publicerr"
 )
@@ -28,7 +29,8 @@ var (
 	DeployErrUnsupportedProtocol = fmt.Errorf("unsupported_protocol")
 
 	Client = http.Client{
-		Timeout: 10 * time.Second,
+		Timeout:       10 * time.Second,
+		CheckRedirect: httpdriver.CheckRedirect,
 	}
 )
 
