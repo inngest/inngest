@@ -47,7 +47,7 @@ const columns = [
         <HorizontalPillList
           alwaysVisibleCount={2}
           pills={triggers.map((trigger, i) => (
-            <Pill className="text-sm font-normal" key={i}>
+            <Pill appearance="outlined" key={i}>
               <PillContent type={trigger.type}>{trigger.value}</PillContent>
             </Pill>
           ))}
@@ -60,7 +60,7 @@ const columns = [
   columnHelper.accessor('app', {
     header: () => <span>App</span>,
     cell: (props) => (
-      <Pill className="text-sm font-normal">
+      <Pill appearance="outlined">
         <PillContent type="APP">{props.getValue()?.name}</PillContent>
       </Pill>
     ),

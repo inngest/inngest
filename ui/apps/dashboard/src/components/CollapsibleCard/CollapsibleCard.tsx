@@ -12,7 +12,7 @@ const CollapsibleCardItem = forwardRef<
     <AccordionPrimitive.Item
       {...props}
       ref={forwardedRef}
-      className="border-muted rounded-lg border bg-white"
+      className="border-muted bg-canvasBase rounded-lg border"
     >
       {children}
     </AccordionPrimitive.Item>
