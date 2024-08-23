@@ -25,10 +25,6 @@ func (k keyError) Cause() error {
 	return k.cause
 }
 
-func (k keyError) Unwrap() error {
-	return k.cause
-}
-
 func (k keyError) Error() string {
 	return k.cause.Error()
 }
