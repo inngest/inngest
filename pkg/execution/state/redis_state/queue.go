@@ -2092,12 +2092,18 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 		}
 	}
 
+	functionId := uuid.Nil
+	if p.FunctionID != nil {
+		functionId = *p.FunctionID
+	}
+
 	keys := []string{
 		q.u.kg.PartitionItem(),
 		q.u.kg.GlobalPartitionIndex(),
 		q.u.kg.ShardPartitionIndex(shardName),
 		// NOTE: PartitionMeta is only here for backwards compat, and only clears up partitions.
 		q.u.kg.PartitionMeta(p.Queue()),
+		q.u.kg.FnMetadata(functionId),
 		p.zsetKey(q.u.kg), // Partition ZSET itself
 		p.concurrencyKey(q.u.kg),
 		q.u.kg.QueueItem(),

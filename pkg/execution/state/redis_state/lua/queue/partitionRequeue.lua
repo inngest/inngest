@@ -15,9 +15,10 @@ local partitionKey            = KEYS[1]
 local keyGlobalPartitionPtr   = KEYS[2]
 local keyShardPartitionPtr    = KEYS[3]
 local partitionMeta           = KEYS[4]
-local keyPartitionZset        = KEYS[5]
-local partitionConcurrencyKey = KEYS[6] -- We can only GC a partition if no running jobs occur.
-local queueKey                = KEYS[7]
+local keyFnMetadata           = KEYS[5]           -- fnMeta:$id - hash
+local keyPartitionZset        = KEYS[6]
+local partitionConcurrencyKey = KEYS[7] -- We can only GC a partition if no running jobs occur.
+local queueKey                = KEYS[8]
 
 local partitionID             = ARGV[1]
 local atMS                    = tonumber(ARGV[2]) -- time in milliseconds
@@ -27,6 +28,7 @@ local atS = math.floor(atMS / 1000) -- in seconds;  partitions are currently sec
 
 -- $include(get_partition_item.lua)
 -- $include(has_shard_key.lua)
+-- $include(ends_with.lua)
 
 local existing = get_partition_item(partitionKey, partitionID)
 if existing == nil then
@@ -38,10 +40,17 @@ end
 if tonumber(redis.call("ZCARD", keyPartitionZset)) == 0 and tonumber(redis.call("ZCARD", partitionConcurrencyKey)) == 0 then
     redis.call("HDEL", partitionKey, partitionID)             -- Remove the item
     redis.call("DEL", partitionMeta)                         -- Remove the meta
+
+    -- Clean up function metadata
+    if exists_without_ending(keyFnMetadata, ":fnMeta:-") == true then
+      redis.call("DEL", keyFnMetadata)
+    end
+
     redis.call("ZREM", keyGlobalPartitionPtr, partitionID)    -- Remove the index
     if has_shard_key(keyShardPartitionPtr) then
-        redis.call("ZREM", keyShardPartitionPtr, partitionID) -- Remove the shard index
+      redis.call("ZREM", keyShardPartitionPtr, partitionID) -- Remove the shard index
     end
+
     return 2
 end
 

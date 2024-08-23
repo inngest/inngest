@@ -2609,32 +2609,16 @@ func TestQueuePartitionRequeue(t *testing.T) {
 			})
 		})
 
-		// We no longer delete queues on requeue;  this should happen on a final dequeue.
-		// t.Run("Deletes the partition with an empty queue and a leased job", func(t *testing.T) {
-		// 	requirePartitionScoreEquals(t, r, &idA, next)
-
-		// 	// Leasing the only job available moves the job into the concurrency queue,
-		// 	// so the partition should be empty. when requeeing.
-		// 	_, err := q.Lease(ctx, p, qi, 10*time.Second, q.clock.Now(), nil)
-		// 	require.NoError(t, err)
-
-		// 	requirePartitionScoreEquals(t, r, &idA, next)
-
-		// 	next := now.Add(time.Hour)
-		// 	err = q.PartitionRequeue(ctx, &p, next, false)
-		// 	require.Error(t, ErrPartitionGarbageCollected, err)
-
-		// 	loaded := getDefaultPartition(t, r, idA)
-
-		// 	// This should unset the force at field.
-		// 	require.Empty(t, loaded.ForceAtMS)
-		// })
-
 		t.Run("It returns a partition not found error if deleted", func(t *testing.T) {
 			err := q.Dequeue(ctx, p, qi)
 			require.NoError(t, err)
+
 			err = q.PartitionRequeue(ctx, &p, time.Now().Add(time.Minute), false)
 			require.Equal(t, ErrPartitionGarbageCollected, err)
+
+			// ensure gc also drops fn metadata
+			require.False(t, r.Exists(q.u.kg.FnMetadata(*p.FunctionID)))
+
 			err = q.PartitionRequeue(ctx, &p, time.Now().Add(time.Minute), false)
 			require.Equal(t, ErrPartitionNotFound, err)
 		})
@@ -2654,6 +2638,32 @@ func TestQueuePartitionRequeue(t *testing.T) {
 
 			fnMeta := getFnMetadata(t, r, idA)
 			require.True(t, fnMeta.Paused)
+		})
+
+		// We no longer delete queues on requeue when the concurrency queue is not empty;  this should happen on a final dequeue.
+		t.Run("Does not garbage collect the partition with a non-empty concurrency queue", func(t *testing.T) {
+			r.FlushAll()
+
+			now := time.Now()
+			next = now.Add(10 * time.Second)
+
+			qi, err := q.EnqueueItem(ctx, QueueItem{FunctionID: idA}, now)
+
+			requirePartitionScoreEquals(t, r, &idA, now)
+
+			// Move the queue item to the concurrency (in-progress) queue
+			_, err = q.Lease(ctx, p, qi, 10*time.Second, q.clock.Now(), nil)
+			require.NoError(t, err)
+
+			next = now.Add(time.Hour)
+
+			// Requeuing cannot gc until queue item finishes processing
+			err = q.PartitionRequeue(ctx, &p, next, false)
+			require.NoError(t, err)
+
+			// So the partition metadata should still exist
+			loaded := getDefaultPartition(t, r, idA)
+			require.Equal(t, &idA, loaded.FunctionID)
 		})
 	})
 

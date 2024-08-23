@@ -110,12 +110,17 @@ end
 item.leaseID = newLeaseKey
 redis.call("HSET", keyQueueMap, queueID, cjson.encode(item))
 
-local function handleEnqueue(keyPartition, keyConcurrency, partitionID)
+local function handleLease(keyPartition, keyConcurrency, partitionID)
 	-- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress
-	-- and store din functionConcurrencyKey.
+	-- and stored in functionConcurrencyKey.
 	redis.call("ZREM", keyPartition, item.id)
+
 	-- Update the fn's score in the global pointer queue to the next job, if available.
 	local score = get_fn_partition_score(keyPartition)
+
+	-- TODO If score is 0 (there is no further item in the partition queue), remove the partition pointer
+	-- to prevent executors from spinning on guaranteed-empty partitions until the last in-progress item is done
+	-- and the partition is gc'd.
 
 	-- NOTE: The global partition ID isn't the actual partition zset key for backwards compatibility.
 	-- Instead, they are the partition IDs, which is either the partition ZSET (for new concurrency
@@ -147,15 +152,15 @@ redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
 -- mode.
 if concurrencyA > 0 then
 	redis.call("ZADD", keyConcurrencyA, nextTime, item.id)
-	handleEnqueue(keyPartitionA, keyConcurrencyA, partitionIdA)
+	handleLease(keyPartitionA, keyConcurrencyA, partitionIdA)
 end
 if concurrencyB > 0 then
 	redis.call("ZADD", keyConcurrencyB, nextTime, item.id)
-	handleEnqueue(keyPartitionB, keyConcurrencyB, partitionIdB)
+	handleLease(keyPartitionB, keyConcurrencyB, partitionIdB)
 end
 if concurrencyC > 0 then
 	redis.call("ZADD", keyConcurrencyC, nextTime, item.id)
-	handleEnqueue(keyPartitionC, keyConcurrencyC, partitionIdC)
+	handleLease(keyPartitionC, keyConcurrencyC, partitionIdC)
 end
 
 return 0
