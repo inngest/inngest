@@ -16,9 +16,10 @@ local keyGlobalPartitionPtr   = KEYS[2]
 local keyGlobalAccountPointer = KEYS[3] -- accounts:sorted - zset
 local keyAccountPartitions    = KEYS[4] -- accounts:$accountId:partition:sorted - zset
 local partitionMeta           = KEYS[5]
-local keyPartitionZset        = KEYS[6]
-local partitionConcurrencyKey = KEYS[7] -- We can only GC a partition if no running jobs occur.
-local queueKey                = KEYS[8]
+local keyFnMetadata           = KEYS[6]           -- fnMeta:$id - hash
+local keyPartitionZset        = KEYS[7]
+local partitionConcurrencyKey = KEYS[8] -- We can only GC a partition if no running jobs occur.
+local queueKey                = KEYS[9]
 
 local partitionID             = ARGV[1]
 local atMS                    = tonumber(ARGV[2]) -- time in milliseconds
@@ -43,6 +44,11 @@ end
 if tonumber(redis.call("ZCARD", keyPartitionZset)) == 0 and tonumber(redis.call("ZCARD", partitionConcurrencyKey)) == 0 then
     redis.call("HDEL", partitionKey, partitionID)             -- Remove the item
     redis.call("DEL", partitionMeta)                         -- Remove the meta
+
+    -- Clean up function metadata
+    if exists_without_ending(keyFnMetadata, ":fnMeta:-") == true then
+      redis.call("DEL", keyFnMetadata)
+    end
 
     redis.call("ZREM", keyGlobalPartitionPtr, partitionID)    -- Remove the partition from global index
 

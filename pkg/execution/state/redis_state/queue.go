@@ -2352,6 +2352,11 @@ func checkList(check string, exact, prefixes map[string]*struct{}) bool {
 func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time.Time, forceAt bool) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PartitionRequeue"), redis_telemetry.ScopeQueue)
 
+	functionId := uuid.Nil
+	if p.FunctionID != nil {
+		functionId = *p.FunctionID
+	}
+
 	keys := []string{
 		q.u.kg.PartitionItem(),
 		q.u.kg.GlobalPartitionIndex(),
@@ -2361,7 +2366,8 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 		// here without knowing the Account ID
 		q.u.kg.AccountPartitionIndex(p.AccountID),
 		q.u.kg.PartitionMeta(p.Queue()), // TODO: Remove?
-		p.zsetKey(q.u.kg),               // Partition ZSET itself
+		q.u.kg.FnMetadata(functionId),
+		p.zsetKey(q.u.kg), // Partition ZSET itself
 		p.concurrencyKey(q.u.kg),
 		q.u.kg.QueueItem(),
 	}
