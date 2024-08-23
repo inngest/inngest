@@ -636,6 +636,8 @@ type QueuePartition struct {
 	// This must be set so that we can fetch the latest concurrency limits dynamically when
 	// leasing a partition, if desired, via the ConcurrencyLimitGetter.
 	ConcurrencyKey string `json:"ck,omitempty"`
+	// TESTING: We might need the hashed but _unevaluated_ custom key for loading current limits in PartitionLease
+	ConcurrencyHash string `json:"ch,omitempty"`
 	// LimitOwner represents the function ID that set the max concurrency limit for
 	// this function.  This allows us to lower the max if the owner/enqueueing function
 	// ID matches - otherwise, once set, the max can never lower.
@@ -944,7 +946,9 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 				FunctionID:       &i.FunctionID,
 				AccountID:        i.Data.Identifier.AccountID,
 				ConcurrencyScope: int(scope),
-				ConcurrencyKey:   key.Key,
+
+				ConcurrencyKey:  key.Key,
+				ConcurrencyHash: key.Hash,
 
 				// Note: This uses the latest limit for the key queue,
 				// retrieved from customConcurrencyLimitRefresher
