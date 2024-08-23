@@ -43,9 +43,9 @@ end
 -- partition.
 if tonumber(redis.call("ZCARD", keyPartitionZset)) == 0 and tonumber(redis.call("ZCARD", partitionConcurrencyKey)) == 0 then
     redis.call("HDEL", partitionKey, partitionID)             -- Remove the item
-    redis.call("DEL", partitionMeta)                         -- Remove the meta
+    redis.call("DEL", partitionMeta)                         -- Remove the partition meta (this is to clean up legacy data)
 
-    -- Clean up function metadata
+    -- Clean up function metadata (which supersedes partition metadata)
     if exists_without_ending(keyFnMetadata, ":fnMeta:-") == true then
       redis.call("DEL", keyFnMetadata)
     end

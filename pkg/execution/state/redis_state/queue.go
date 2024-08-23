@@ -2365,8 +2365,13 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 		// Until this, we may not use account queues at all, as we cannot properly clean up
 		// here without knowing the Account ID
 		q.u.kg.AccountPartitionIndex(p.AccountID),
-		q.u.kg.PartitionMeta(p.Queue()), // TODO: Remove?
+
+		// NOTE: Partition metadata was replaced with function metadata and is being phased out
+		// We clean up all remaining partition metadata on completely empty partitions here
+		// and are adding function metadata on enqueue to migrate to the new system
+		q.u.kg.PartitionMeta(p.Queue()),
 		q.u.kg.FnMetadata(functionId),
+
 		p.zsetKey(q.u.kg), // Partition ZSET itself
 		p.concurrencyKey(q.u.kg),
 		q.u.kg.QueueItem(),
