@@ -2648,6 +2648,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 			next = now.Add(10 * time.Second)
 
 			qi, err := q.EnqueueItem(ctx, QueueItem{FunctionID: idA}, now)
+			require.NoError(t, err)
 
 			requirePartitionScoreEquals(t, r, &idA, now)
 
