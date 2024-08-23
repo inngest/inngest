@@ -1296,6 +1296,31 @@ func TestQueueLease(t *testing.T) {
 			require.Nil(t, id, "Leased item when concurrency limits are reached.\n%s", r.Dump())
 			require.Error(t, err)
 		})
+
+		// this test is the unit variant of TestConcurrency_ScopeFunction_FanOut in cloud
+		t.Run("with two distinct functions it processes both", func(t *testing.T) {
+			r.FlushAll()
+
+			// Only allow a single leased item
+			q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (acct, fn, custom int) {
+				return 1, 1, 1
+			}
+
+			q.customConcurrencyLimitRefresher = func(ctx context.Context, i QueueItem) []state.CustomConcurrency {
+				return i.Data.GetConcurrencyKeys()
+			}
+
+			fnID := uuid.New()
+			// Create a new item
+			itemA, err := q.EnqueueItem(ctx, QueueItem{FunctionID: fnID}, start)
+			require.NoError(t, err)
+			itemB, err := q.EnqueueItem(ctx, QueueItem{FunctionID: fnID}, start)
+			require.NoError(t, err)
+			// Use the new item's workflow ID
+			p := QueuePartition{ID: itemA.FunctionID.String(), FunctionID: &itemA.FunctionID}
+
+		})
+
 	})
 
 	t.Run("With account concurrency limits", func(t *testing.T) {
@@ -1390,7 +1415,7 @@ func TestQueueLease(t *testing.T) {
 	t.Run("It should update the global partition index", func(t *testing.T) {
 		t.Run("With no concurrency keys", func(t *testing.T) {
 			r.FlushAll()
-			q.customConcurrencyGen = func(ctx context.Context, i QueueItem) []state.CustomConcurrency {
+			q.customConcurrencyLimitRefresher = func(ctx context.Context, i QueueItem) []state.CustomConcurrency {
 				return nil
 			}
 
