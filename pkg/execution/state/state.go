@@ -139,7 +139,7 @@ func (c CustomConcurrency) ParseKey() (scope enums.ConcurrencyScope, id uuid.UUI
 	// is one of "f" | "e" | "a", depending on function, env, or account-level scopes.
 	//
 	// An example key is `f:${uuid}:${hash}`.
-	if len(c.Key) < 5 {
+	if len(c.Key) < 5 { // Note: Minimum length is 5, eg. "f:1:1"
 		return enums.ConcurrencyScopeFn, id, "", err
 	}
 

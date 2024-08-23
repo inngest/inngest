@@ -1410,6 +1410,66 @@ func TestQueueLease(t *testing.T) {
 			require.Nil(t, id)
 			require.Error(t, err)
 		})
+
+		// this test is the unit variant of TestConcurrency_ScopeFunction_FanOut in cloud
+		t.Run("with two distinct functions it processes both", func(t *testing.T) {
+			r.FlushAll()
+
+			q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (acct, fn, custom int) {
+				return 2, 123_456, 234_567
+			}
+
+			fnIDA := uuid.New()
+			fnIDB := uuid.New()
+
+			ckA := createConcurrencyKey(enums.ConcurrencyScopeFn, fnIDA, "foo", 1)
+			_, _, evaluatedKeyChecksumA, err := ckA.ParseKey()
+			require.NoError(t, err)
+
+			ckB := createConcurrencyKey(enums.ConcurrencyScopeFn, fnIDB, "foo", 1)
+			_, _, evaluatedKeyChecksumB, err := ckB.ParseKey()
+			require.NoError(t, err)
+
+			// Create a new item
+			itemA1, err := q.EnqueueItem(ctx, QueueItem{FunctionID: fnIDA, Data: osqueue.Item{CustomConcurrencyKeys: []state.CustomConcurrency{ckA}}}, start)
+			require.NoError(t, err)
+			itemA2, err := q.EnqueueItem(ctx, QueueItem{FunctionID: fnIDA, Data: osqueue.Item{CustomConcurrencyKeys: []state.CustomConcurrency{ckA}}}, start)
+			require.NoError(t, err)
+			itemB1, err := q.EnqueueItem(ctx, QueueItem{FunctionID: fnIDB, Data: osqueue.Item{CustomConcurrencyKeys: []state.CustomConcurrency{ckB}}}, start)
+			require.NoError(t, err)
+			itemB2, err := q.EnqueueItem(ctx, QueueItem{FunctionID: fnIDB, Data: osqueue.Item{CustomConcurrencyKeys: []state.CustomConcurrency{ckB}}}, start)
+			require.NoError(t, err)
+
+			// Use the new item's workflow ID
+			zsetKeyA := q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnIDA.String(), evaluatedKeyChecksumA)
+			pA := QueuePartition{ID: zsetKeyA, FunctionID: &itemA1.FunctionID, PartitionType: int(enums.PartitionTypeConcurrencyKey), ConcurrencyKey: ckA.Key, ConcurrencyLimit: 1}
+
+			require.Equal(t, pA, getPartition(t, r, enums.PartitionTypeConcurrencyKey, fnIDA, evaluatedKeyChecksumA))
+
+			zsetKeyB := q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnIDB.String(), evaluatedKeyChecksumB)
+			pB := QueuePartition{ID: zsetKeyB, FunctionID: &itemB1.FunctionID, PartitionType: int(enums.PartitionTypeConcurrencyKey), ConcurrencyKey: ckB.Key, ConcurrencyLimit: 1}
+			require.Equal(t, pB, getPartition(t, r, enums.PartitionTypeConcurrencyKey, fnIDB, evaluatedKeyChecksumB))
+
+			// Both key queues exist
+			require.True(t, r.Exists(zsetKeyA))
+			require.True(t, r.Exists(zsetKeyB))
+
+			// Lease item A1 - should work
+			_, err = q.Lease(ctx, pA, itemA1, 5*time.Second, time.Now(), nil)
+			require.NoError(t, err)
+
+			// Lease item B1 - should work
+			_, err = q.Lease(ctx, pB, itemB1, 5*time.Second, time.Now(), nil)
+			require.NoError(t, err)
+
+			// Lease item A2 - should fail due to custom concurrency limit
+			_, err = q.Lease(ctx, pA, itemA2, 5*time.Second, time.Now(), nil)
+			require.ErrorIs(t, err, ErrConcurrencyLimitCustomKey)
+
+			// Lease item B1 - should fail due to custom concurrency limit
+			_, err = q.Lease(ctx, pB, itemB2, 5*time.Second, time.Now(), nil)
+			require.ErrorIs(t, err, ErrConcurrencyLimitCustomKey)
+		})
 	})
 
 	t.Run("It should update the global partition index", func(t *testing.T) {
