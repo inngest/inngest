@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/api/apiv1"
 	"github.com/inngest/inngest/pkg/config"
 	_ "github.com/inngest/inngest/pkg/config/defaults"
+	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs"
@@ -54,8 +55,9 @@ var redisSingleton *miniredis.Miniredis
 
 // StartOpts configures the dev server
 type StartOpts struct {
-	Config  config.Config `json:"-"`
-	RootDir string        `json:"dir"`
+	Config     config.Config `json:"-"`
+	RootDir    string        `json:"dir"`
+	SigningKey *string       `json:"signing_key"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -201,7 +203,9 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	var drivers = []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
-		d, err := driverConfig.NewDriver()
+		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
+			SigningKey: opts.SigningKey,
+		})
 		if err != nil {
 			return err
 		}

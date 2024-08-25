@@ -55,9 +55,13 @@ func RegisterState(f func() any) {
 	registeredStates[driver.StateName()] = f
 }
 
+type NewDriverOpts struct {
+	SigningKey *string
+}
+
 // DriverConfig is an interface used to determine driver config structs.
 type DriverConfig interface {
-	NewDriver() (driver.Driver, error)
+	NewDriver(opts ...NewDriverOpts) (driver.Driver, error)
 
 	// DriverName returns the name of the specific driver.
 	DriverName() string

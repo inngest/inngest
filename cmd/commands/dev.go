@@ -34,7 +34,7 @@ func NewCmdDev() *cobra.Command {
 	cmd.Flags().Bool("no-poll", false, "Disable polling of apps for updates")
 	cmd.Flags().Int("poll-interval", 5, "Interval in seconds between polling for updates to apps")
 	cmd.Flags().Int("retry-interval", 0, "Retry interval in seconds for linear backoff when retrying functions - must be 1 or above")
-
+	cmd.Flags().String("signing-key", "", "Signing key")
 	cmd.Flags().Int("tick", 150, "The interval (in milliseconds) at which the executor checks for new work, during local development")
 
 	return cmd
@@ -86,6 +86,7 @@ func doDev(cmd *cobra.Command, args []string) {
 	noPoll := viper.GetBool("no-poll")
 	pollInterval := viper.GetInt("poll-interval")
 	retryInterval := viper.GetInt("retry-interval")
+	signingKey := viper.GetString("signing-key")
 	tick := viper.GetInt("tick")
 
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
@@ -113,6 +114,9 @@ func doDev(cmd *cobra.Command, args []string) {
 		PollInterval:  pollInterval,
 		RetryInterval: retryInterval,
 		Tick:          time.Duration(tick) * time.Millisecond,
+	}
+	if signingKey != "" {
+		opts.SigningKey = &signingKey
 	}
 
 	err = devserver.New(ctx, opts)
