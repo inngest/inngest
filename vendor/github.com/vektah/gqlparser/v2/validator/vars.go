@@ -11,7 +11,7 @@ import (
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
-var UnexpectedType = fmt.Errorf("Unexpected Type")
+var ErrUnexpectedType = fmt.Errorf("Unexpected Type")
 
 // VariableValues coerces and validates variable values
 func VariableValues(schema *ast.Schema, op *ast.OperationDefinition, variables map[string]interface{}) (map[string]interface{}, error) {
@@ -53,8 +53,8 @@ func VariableValues(schema *ast.Schema, op *ast.OperationDefinition, variables m
 			} else {
 				rv := reflect.ValueOf(val)
 
-				jsonNumber, isJsonNumber := val.(json.Number)
-				if isJsonNumber {
+				jsonNumber, isJSONNumber := val.(json.Number)
+				if isJSONNumber {
 					if v.Type.NamedType == "Int" {
 						n, err := jsonNumber.Int64()
 						if err != nil {
@@ -67,7 +67,6 @@ func VariableValues(schema *ast.Schema, op *ast.OperationDefinition, variables m
 							return nil, gqlerror.ErrorPathf(validator.path, "cannot use value %f as %s", f, v.Type.NamedType)
 						}
 						rv = reflect.ValueOf(f)
-
 					}
 				}
 				if rv.Kind() == reflect.Ptr || rv.Kind() == reflect.Interface {
@@ -222,7 +221,7 @@ func (v *varValidator) validateVarType(typ *ast.Type, val reflect.Value) (reflec
 				if fieldDef.Type.NonNull && field.IsNil() {
 					return val, gqlerror.ErrorPathf(v.path, "cannot be null")
 				}
-				//allow null object field and skip it
+				// allow null object field and skip it
 				if !fieldDef.Type.NonNull && field.IsNil() {
 					continue
 				}
