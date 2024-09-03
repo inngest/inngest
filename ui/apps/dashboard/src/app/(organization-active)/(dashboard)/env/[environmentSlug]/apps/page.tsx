@@ -5,10 +5,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Too
 import { RiAddLine, RiQuestionLine } from '@remixicon/react';
 
 import { StatusMenu } from '@/components/Apps/StatusMenu';
-import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import { pathCreator } from '@/utils/urls';
 import { Apps } from './Apps';
-import Page from './oldPage';
 
 const AppInfo = () => (
   <Tooltip>
@@ -38,11 +36,6 @@ export default async function AppsPage({
   params: { environmentSlug: string };
   searchParams: { archived: string };
 }) {
-  const newIANav = await getBooleanFlag('new-ia-nav');
-
-  if (!newIANav) {
-    return <Page />;
-  }
   const isArchived = archived === 'true';
 
   return (

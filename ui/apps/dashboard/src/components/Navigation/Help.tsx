@@ -13,7 +13,7 @@ import {
 } from '@remixicon/react';
 
 import { useSystemStatus } from '@/app/(organization-active)/support/statusPage';
-import SystemStatusIcon from './old/SystemStatusIcon';
+import SystemStatusIcon from './SystemStatusIcon';
 
 export const Help = ({ collapsed }: { collapsed: boolean }) => {
   const status = useSystemStatus();

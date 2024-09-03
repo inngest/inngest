@@ -11,7 +11,6 @@ import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import Input from '@/components/Forms/Input';
 import { graphql } from '@/gql';
 import { defaultTransform } from './[keyID]/TransformEvent';
@@ -32,7 +31,6 @@ export default function CreateKeyButton() {
   const environment = useEnvironment();
   const [{ fetching }, createSourceKey] = useMutation(CreateSourceKey);
   const router = useRouter();
-  const newIANav = useBooleanFlag('new-ia-nav');
 
   if (!currentContent) {
     return null;
@@ -81,23 +79,13 @@ export default function CreateKeyButton() {
       <OptionalTooltip
         tooltip={environment.isArchived && 'Cannot create key. Environment is archived'}
       >
-        {newIANav.isReady && !newIANav.value ? (
-          <Button
-            icon={<RiAddLine />}
-            btnAction={() => setModalOpen(true)}
-            disabled={environment.isArchived}
-            kind="primary"
-            label={`Create ${currentContent.name}`}
-          />
-        ) : (
-          <NewButton
-            icon={<RiAddLine />}
-            onClick={() => setModalOpen(true)}
-            disabled={environment.isArchived}
-            kind="primary"
-            label={`Create ${currentContent.name}`}
-          />
-        )}
+        <NewButton
+          icon={<RiAddLine />}
+          onClick={() => setModalOpen(true)}
+          disabled={environment.isArchived}
+          kind="primary"
+          label={`Create ${currentContent.name}`}
+        />
       </OptionalTooltip>
 
       <Modal

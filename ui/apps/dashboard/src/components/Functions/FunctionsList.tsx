@@ -2,7 +2,6 @@
 
 import { Button } from '@inngest/components/Button';
 
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { StatusMenu } from '@/components/Functions/StatusMenu';
 import { FunctionTable } from './FunctionTable';
 import { useRows } from './useRows';
@@ -13,8 +12,6 @@ type FunctionListProps = {
 };
 
 export const FunctionList = ({ envSlug, archived }: FunctionListProps) => {
-  const { value: newIANav } = useBooleanFlag('new-ia-nav');
-
   const { error, isLoading, hasMore, loadMore, rows } = useRows({ archived: !!archived });
   if (error) {
     throw error;
@@ -22,11 +19,10 @@ export const FunctionList = ({ envSlug, archived }: FunctionListProps) => {
 
   return (
     <div className="bg-canvasBase flex min-h-0 flex-1 flex-col divide-y">
-      {newIANav && (
-        <div className="mx-4 my-1 flex h-10 flex-row items-center justify-start">
-          <StatusMenu archived={!!archived} envSlug={envSlug} />
-        </div>
-      )}
+      <div className="mx-4 my-1 flex h-10 flex-row items-center justify-start">
+        <StatusMenu archived={!!archived} envSlug={envSlug} />
+      </div>
+
       <FunctionTable rows={rows} />
 
       {hasMore !== false && (
