@@ -111,7 +111,6 @@ const (
 
 	DevServerTempDir     = ".inngest"
 	DevServerDbFile      = "dev_db.db"
-	DevServerRdbFile     = "dev_state.rdb"
 	DevServerHistoryFile = "dev_history.json"
 
 	PauseExpiredDeletionGracePeriod = time.Second * 10
