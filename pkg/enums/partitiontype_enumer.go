@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _PartitionTypeName = "DefaultConcurrencyThrottle"
+const _PartitionTypeName = "DefaultConcurrencyKeyThrottle"
 
-var _PartitionTypeIndex = [...]uint8{0, 7, 18, 26}
+var _PartitionTypeIndex = [...]uint8{0, 7, 21, 29}
 
-const _PartitionTypeLowerName = "defaultconcurrencythrottle"
+const _PartitionTypeLowerName = "defaultconcurrencykeythrottle"
 
 func (i PartitionType) String() string {
 	if i < 0 || i >= PartitionType(len(_PartitionTypeIndex)-1) {
@@ -26,25 +26,25 @@ func (i PartitionType) String() string {
 func _PartitionTypeNoOp() {
 	var x [1]struct{}
 	_ = x[PartitionTypeDefault-(0)]
-	_ = x[PartitionTypeConcurrency-(1)]
+	_ = x[PartitionTypeConcurrencyKey-(1)]
 	_ = x[PartitionTypeThrottle-(2)]
 }
 
-var _PartitionTypeValues = []PartitionType{PartitionTypeDefault, PartitionTypeConcurrency, PartitionTypeThrottle}
+var _PartitionTypeValues = []PartitionType{PartitionTypeDefault, PartitionTypeConcurrencyKey, PartitionTypeThrottle}
 
 var _PartitionTypeNameToValueMap = map[string]PartitionType{
 	_PartitionTypeName[0:7]:        PartitionTypeDefault,
 	_PartitionTypeLowerName[0:7]:   PartitionTypeDefault,
-	_PartitionTypeName[7:18]:       PartitionTypeConcurrency,
-	_PartitionTypeLowerName[7:18]:  PartitionTypeConcurrency,
-	_PartitionTypeName[18:26]:      PartitionTypeThrottle,
-	_PartitionTypeLowerName[18:26]: PartitionTypeThrottle,
+	_PartitionTypeName[7:21]:       PartitionTypeConcurrencyKey,
+	_PartitionTypeLowerName[7:21]:  PartitionTypeConcurrencyKey,
+	_PartitionTypeName[21:29]:      PartitionTypeThrottle,
+	_PartitionTypeLowerName[21:29]: PartitionTypeThrottle,
 }
 
 var _PartitionTypeNames = []string{
 	_PartitionTypeName[0:7],
-	_PartitionTypeName[7:18],
-	_PartitionTypeName[18:26],
+	_PartitionTypeName[7:21],
+	_PartitionTypeName[21:29],
 }
 
 // PartitionTypeString retrieves an enum value from the enum constants string name.

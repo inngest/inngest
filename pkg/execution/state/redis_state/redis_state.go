@@ -7,13 +7,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"io/fs"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 
 	"github.com/google/uuid"
 	"github.com/inngest/expr"
@@ -87,6 +88,7 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 				val = strings.ReplaceAll(val, include[0], string(byt))
 			}
 		}
+
 		scripts[name] = rueidis.NewLuaScript(val)
 		retriableScripts[name] = NewClusterLuaScript(val)
 	}

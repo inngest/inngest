@@ -23,10 +23,11 @@ func TestCustomConcurrency_ParseKey(t *testing.T) {
 			Limit: 20,
 		}
 
-		scope, id, err := sut.ParseKey()
+		scope, id, hash, err := sut.ParseKey()
 		r.NoError(err)
 		r.Equal(enums.ConcurrencyScopeFn, scope)
 		r.Equal(someUUID, id)
+		r.Equal(someHash, hash)
 	})
 
 	t.Run("environment scope", func(t *testing.T) {
@@ -36,10 +37,11 @@ func TestCustomConcurrency_ParseKey(t *testing.T) {
 			Limit: 20,
 		}
 
-		scope, id, err := sut.ParseKey()
+		scope, id, hash, err := sut.ParseKey()
 		r.NoError(err)
 		r.Equal(enums.ConcurrencyScopeEnv, scope)
 		r.Equal(someUUID, id)
+		r.Equal(someHash, hash)
 	})
 }
 
