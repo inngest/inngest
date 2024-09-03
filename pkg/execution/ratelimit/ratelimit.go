@@ -64,9 +64,14 @@ func rateLimit(ctx context.Context, store throttled.GCRAStoreCtx, key string, c 
 		return true, -1, err
 	}
 
+	maxBurst := 0
+	if c.Burst != nil {
+		maxBurst = int(*c.Burst)
+	}
+
 	quota := throttled.RateQuota{
 		MaxRate:  throttled.PerDuration(int(c.Limit), dur),
-		MaxBurst: int(c.Limit) / 10,
+		MaxBurst: maxBurst,
 	}
 
 	limiter, err := throttled.NewGCRARateLimiterCtx(store, quota)
