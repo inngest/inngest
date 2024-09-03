@@ -472,7 +472,7 @@ func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
 	return
 }
 
-func (d *devserver) importRedisSnapshot(ctx context.Context) (err error, imported bool) {
+func (d *devserver) importRedisSnapshot(ctx context.Context) (imported bool, err error) {
 	d.snapshotLock.Lock()
 	defer d.snapshotLock.Unlock()
 
