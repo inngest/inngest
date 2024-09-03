@@ -95,6 +95,12 @@ type Function struct {
 	Edges []Edge `json:"edges,omitempty"`
 }
 
+// DeterministicUUID returns a deterministic V3 UUID based off of the SHA1
+// hash of the function's name.
+func (f *Function) DeterministicUUID() uuid.UUID {
+	return DeterministicSha1UUID(f.Name + f.Steps[0].URI)
+}
+
 // Throttle represents concurrency over time.
 type Throttle struct {
 	// Limit is how often the function can be called within the specified period.  The
@@ -481,10 +487,15 @@ func (f Function) AllEdges(ctx context.Context) ([]Edge, error) {
 	return edges, nil
 }
 
-// DeterministicUUID returns a deterministic V3 UUID based off of the SHA1
-// hash of the function's name.
-func DeterministicUUID(f Function) uuid.UUID {
-	str := f.Name + f.Steps[0].URI
+// DeterminsiticAppUUID returns a deterministic V3 UUID based off of the SHA1
+// hash of the app's URL.
+func DeterministicAppUUID(url string) uuid.UUID {
+	return DeterministicSha1UUID(url)
+}
+
+// DeterministicSha1UUID returns a deterministic V3 UUID based off of the SHA1
+// hash of the input string.
+func DeterministicSha1UUID(str string) uuid.UUID {
 	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(str))
 }
 

@@ -122,15 +122,15 @@ func (w wrapper) GetAllApps(ctx context.Context) ([]*cqrs.App, error) {
 }
 
 // InsertApp creates a new app.
-func (w wrapper) InsertApp(ctx context.Context, arg cqrs.InsertAppParams) (*cqrs.App, error) {
+func (w wrapper) UpsertApp(ctx context.Context, arg cqrs.UpsertAppParams) (*cqrs.App, error) {
 	// Normalize the URL before inserting into the DB.
 	arg.Url = util.NormalizeAppURL(arg.Url, forceHTTPS)
 
 	return copyWriter(
 		ctx,
-		w.q.InsertApp,
+		w.q.UpsertApp,
 		arg,
-		sqlc.InsertAppParams{},
+		sqlc.UpsertAppParams{},
 		&cqrs.App{},
 	)
 }
@@ -145,16 +145,16 @@ func (w wrapper) UpdateAppError(ctx context.Context, arg cqrs.UpdateAppErrorPara
 	if err != nil {
 		return nil, err
 	}
-	if err := w.q.HardDeleteApp(ctx, arg.ID); err != nil {
+	if err := w.q.DeleteApp(ctx, arg.ID); err != nil {
 		return nil, err
 	}
 
 	app.Error = arg.Error
-	params := sqlc.InsertAppParams{}
+	params := sqlc.UpsertAppParams{}
 	_ = copier.CopyWithOption(&params, app, copier.Option{DeepCopy: true})
 
 	// Recreate the app.
-	app, err = w.q.InsertApp(ctx, params)
+	app, err = w.q.UpsertApp(ctx, params)
 	if err != nil {
 		return nil, err
 	}
@@ -176,14 +176,14 @@ func (w wrapper) UpdateAppURL(ctx context.Context, arg cqrs.UpdateAppURLParams) 
 	if err != nil {
 		return nil, err
 	}
-	if err := w.q.HardDeleteApp(ctx, arg.ID); err != nil {
+	if err := w.q.DeleteApp(ctx, arg.ID); err != nil {
 		return nil, err
 	}
 	app.Url = arg.Url
-	params := sqlc.InsertAppParams{}
+	params := sqlc.UpsertAppParams{}
 	_ = copier.CopyWithOption(&params, app, copier.Option{DeepCopy: true})
 	// Recreate the app.
-	app, err = w.q.InsertApp(ctx, params)
+	app, err = w.q.UpsertApp(ctx, params)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +194,7 @@ func (w wrapper) UpdateAppURL(ctx context.Context, arg cqrs.UpdateAppURLParams) 
 
 // DeleteApp deletes an app
 func (w wrapper) DeleteApp(ctx context.Context, id uuid.UUID) error {
-	return w.q.HardDeleteApp(ctx, id)
+	return w.q.DeleteApp(ctx, id)
 }
 
 //
