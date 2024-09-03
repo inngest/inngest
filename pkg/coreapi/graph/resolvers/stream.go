@@ -91,7 +91,7 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 		if len(runs) > 0 {
 			// If any of the runs is a cron, then the stream item is a cron
 			for _, run := range runs {
-				if run.Cron != nil {
+				if run.Cron != nil && *run.Cron != "" {
 					items[n].Trigger = *run.Cron
 					items[n].Type = models.StreamTypeCron
 					break

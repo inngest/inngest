@@ -75,6 +75,7 @@ CREATE TABLE history (
 	latency_ms INT,
 	step_name VARCHAR,
 	step_id VARCHAR,
+	step_type VARCHAR,
 	url VARCHAR,
 	cancel_request VARCHAR,
 	sleep VARCHAR,
@@ -139,4 +140,11 @@ CREATE TABLE trace_runs (
 	is_debounce BOOLEAN NOT NULL,
 	batch_id BLOB,
 	cron_schedule TEXT
+);
+
+CREATE TABLE queue_snapshot_chunks (
+    snapshot_id CHAR(26) NOT NULL,
+    chunk_id INT NOT NULL,
+    data BLOB,
+    PRIMARY KEY (snapshot_id, chunk_id)
 );

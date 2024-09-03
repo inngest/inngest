@@ -2,6 +2,7 @@ package sqlitecqrs
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -35,6 +36,7 @@ var (
 	// end represents a ulid ending with 'Z', eg. a far out cursor.
 	endULID = ulid.ULID([16]byte{'Z'})
 	nilULID = ulid.ULID{}
+	nilUUID = uuid.UUID{}
 )
 
 func NewCQRS(db *sql.DB) cqrs.Manager {
@@ -81,6 +83,116 @@ func (w wrapper) Commit(ctx context.Context) error {
 
 func (w wrapper) Rollback(ctx context.Context) error {
 	return w.tx.Rollback()
+}
+
+func (w wrapper) GetLatestQueueSnapshot(ctx context.Context) (*cqrs.QueueSnapshot, error) {
+	chunks, err := w.q.GetLatestQueueSnapshotChunks(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error getting queue snapshot: %w", err)
+	}
+
+	var data []byte
+	for _, chunk := range chunks {
+		data = append(data, chunk.Data...)
+	}
+
+	if len(data) == 0 {
+		return nil, nil
+	}
+
+	var snapshot cqrs.QueueSnapshot
+	if err := json.Unmarshal(data, &snapshot); err != nil {
+		return nil, fmt.Errorf("error unmarshalling queue snapshot: %w", err)
+	}
+
+	return &snapshot, nil
+}
+
+func (w wrapper) GetQueueSnapshot(ctx context.Context, snapshotID cqrs.SnapshotID) (*cqrs.QueueSnapshot, error) {
+	chunks, err := w.q.GetQueueSnapshotChunks(ctx, snapshotID)
+	if err != nil {
+		return nil, fmt.Errorf("error getting queue snapshot: %w", err)
+	}
+
+	var data []byte
+	for _, chunk := range chunks {
+		data = append(data, chunk.Data...)
+	}
+
+	if len(data) == 0 {
+		return nil, nil
+	}
+
+	var snapshot cqrs.QueueSnapshot
+	if err := json.Unmarshal(data, &snapshot); err != nil {
+		return nil, fmt.Errorf("error unmarshalling queue snapshot: %w", err)
+	}
+
+	return &snapshot, nil
+}
+
+func (w wrapper) InsertQueueSnapshot(ctx context.Context, params cqrs.InsertQueueSnapshotParams) (cqrs.SnapshotID, error) {
+	var snapshotID cqrs.SnapshotID
+
+	byt, err := json.Marshal(params.Snapshot)
+	if err != nil {
+		return snapshotID, fmt.Errorf("error marshalling snapshot: %w", err)
+	}
+
+	var chunks [][]byte
+	for len(byt) > 0 {
+		if len(byt) > consts.LiteMaxQueueChunkSize {
+			chunks = append(chunks, byt[:consts.LiteMaxQueueChunkSize])
+			byt = byt[consts.LiteMaxQueueChunkSize:]
+		} else {
+			chunks = append(chunks, byt)
+			break
+		}
+	}
+
+	snapshotID = ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader)
+
+	tx, err := w.WithTx(ctx)
+	if err != nil {
+		return snapshotID, fmt.Errorf("error starting transaction: %w", err)
+	}
+
+	// Insert each chunk of the snapshot.
+	for i, chunk := range chunks {
+		err = tx.InsertQueueSnapshotChunk(ctx, cqrs.InsertQueueSnapshotChunkParams{
+			SnapshotID: snapshotID,
+			ChunkID:    i,
+			Chunk:      chunk,
+		})
+		if err != nil {
+			return snapshotID, fmt.Errorf("error inserting queue snapshot chunk: %w", err)
+		}
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return snapshotID, fmt.Errorf("error committing transaction: %w", err)
+	}
+
+	// Asynchronously remove old snapshots.
+	go func() {
+		_, _ = w.q.DeleteOldQueueSnapshots(ctx, consts.LiteMaxQueueSnapshots)
+	}()
+
+	return snapshotID, nil
+}
+
+func (w wrapper) InsertQueueSnapshotChunk(ctx context.Context, params cqrs.InsertQueueSnapshotChunkParams) error {
+	err := w.q.InsertQueueSnapshotChunk(ctx, sqlc.InsertQueueSnapshotChunkParams{
+		SnapshotID: params.SnapshotID.String(),
+		ChunkID:    int64(params.ChunkID),
+		Data:       params.Chunk,
+	})
+	if err != nil {
+		return fmt.Errorf("error inserting queue snapshot chunk: %w", err)
+	}
+
+	return nil
 }
 
 //

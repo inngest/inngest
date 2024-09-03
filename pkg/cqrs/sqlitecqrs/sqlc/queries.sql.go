@@ -52,6 +52,24 @@ func (q *Queries) DeleteFunctionsByIDs(ctx context.Context, ids []uuid.UUID) err
 	return err
 }
 
+const deleteOldQueueSnapshots = `-- name: DeleteOldQueueSnapshots :execrows
+DELETE FROM queue_snapshot_chunks
+WHERE snapshot_id NOT IN (
+    SELECT snapshot_id
+    FROM queue_snapshot_chunks
+    ORDER BY snapshot_id DESC
+    LIMIT ?
+)
+`
+
+func (q *Queries) DeleteOldQueueSnapshots(ctx context.Context, limit int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteOldQueueSnapshots, limit)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const getAllApps = `-- name: GetAllApps :many
 SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url FROM apps WHERE archived_at IS NULL
 `
@@ -615,7 +633,7 @@ func (q *Queries) GetFunctionRunFinishesByRunIDs(ctx context.Context, runIds []u
 }
 
 const getFunctionRunHistory = `-- name: GetFunctionRunHistory :many
-SELECT id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result FROM history WHERE run_id = ? ORDER BY created_at ASC
+SELECT id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, step_type, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result FROM history WHERE run_id = ? ORDER BY created_at ASC
 `
 
 func (q *Queries) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]*History, error) {
@@ -643,6 +661,7 @@ func (q *Queries) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([
 			&i.LatencyMs,
 			&i.StepName,
 			&i.StepID,
+			&i.StepType,
 			&i.Url,
 			&i.CancelRequest,
 			&i.Sleep,
@@ -651,6 +670,54 @@ func (q *Queries) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([
 			&i.InvokeFunction,
 			&i.InvokeFunctionResult,
 			&i.Result,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getFunctionRuns = `-- name: GetFunctionRuns :many
+SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_finishes.run_id, function_finishes.status, function_finishes.output, function_finishes.completed_step_count, function_finishes.created_at FROM function_runs
+LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
+`
+
+type GetFunctionRunsRow struct {
+	FunctionRun    FunctionRun
+	FunctionFinish FunctionFinish
+}
+
+func (q *Queries) GetFunctionRuns(ctx context.Context) ([]*GetFunctionRunsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getFunctionRuns)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetFunctionRunsRow
+	for rows.Next() {
+		var i GetFunctionRunsRow
+		if err := rows.Scan(
+			&i.FunctionRun.RunID,
+			&i.FunctionRun.RunStartedAt,
+			&i.FunctionRun.FunctionID,
+			&i.FunctionRun.FunctionVersion,
+			&i.FunctionRun.TriggerType,
+			&i.FunctionRun.EventID,
+			&i.FunctionRun.BatchID,
+			&i.FunctionRun.OriginalRunID,
+			&i.FunctionRun.Cron,
+			&i.FunctionFinish.RunID,
+			&i.FunctionFinish.Status,
+			&i.FunctionFinish.Output,
+			&i.FunctionFinish.CompletedStepCount,
+			&i.FunctionFinish.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -820,6 +887,116 @@ func (q *Queries) GetFunctions(ctx context.Context) ([]*Function, error) {
 	return items, nil
 }
 
+const getHistoryItem = `-- name: GetHistoryItem :one
+SELECT id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, step_type, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result FROM history WHERE id = ?
+`
+
+func (q *Queries) GetHistoryItem(ctx context.Context, id ulid.ULID) (*History, error) {
+	row := q.db.QueryRowContext(ctx, getHistoryItem, id)
+	var i History
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.RunStartedAt,
+		&i.FunctionID,
+		&i.FunctionVersion,
+		&i.RunID,
+		&i.EventID,
+		&i.BatchID,
+		&i.GroupID,
+		&i.IdempotencyKey,
+		&i.Type,
+		&i.Attempt,
+		&i.LatencyMs,
+		&i.StepName,
+		&i.StepID,
+		&i.StepType,
+		&i.Url,
+		&i.CancelRequest,
+		&i.Sleep,
+		&i.WaitForEvent,
+		&i.WaitResult,
+		&i.InvokeFunction,
+		&i.InvokeFunctionResult,
+		&i.Result,
+	)
+	return &i, err
+}
+
+const getLatestQueueSnapshotChunks = `-- name: GetLatestQueueSnapshotChunks :many
+SELECT chunk_id, data
+FROM queue_snapshot_chunks
+WHERE snapshot_id = (
+    SELECT MAX(snapshot_id) FROM queue_snapshot_chunks
+)
+ORDER BY chunk_id ASC
+`
+
+type GetLatestQueueSnapshotChunksRow struct {
+	ChunkID int64
+	Data    []byte
+}
+
+func (q *Queries) GetLatestQueueSnapshotChunks(ctx context.Context) ([]*GetLatestQueueSnapshotChunksRow, error) {
+	rows, err := q.db.QueryContext(ctx, getLatestQueueSnapshotChunks)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetLatestQueueSnapshotChunksRow
+	for rows.Next() {
+		var i GetLatestQueueSnapshotChunksRow
+		if err := rows.Scan(&i.ChunkID, &i.Data); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getQueueSnapshotChunks = `-- name: GetQueueSnapshotChunks :many
+
+SELECT chunk_id, data
+FROM queue_snapshot_chunks
+WHERE snapshot_id = ?
+ORDER BY chunk_id ASC
+`
+
+type GetQueueSnapshotChunksRow struct {
+	ChunkID int64
+	Data    []byte
+}
+
+// Lite queue snapshots
+func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID interface{}) ([]*GetQueueSnapshotChunksRow, error) {
+	rows, err := q.db.QueryContext(ctx, getQueueSnapshotChunks, snapshotID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetQueueSnapshotChunksRow
+	for rows.Next() {
+		var i GetQueueSnapshotChunksRow
+		if err := rows.Scan(&i.ChunkID, &i.Data); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTraceRun = `-- name: GetTraceRun :one
 SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule FROM trace_runs WHERE run_id = ?1
 `
@@ -950,6 +1127,17 @@ func (q *Queries) GetTraceSpans(ctx context.Context, arg GetTraceSpansParams) ([
 		return nil, err
 	}
 	return items, nil
+}
+
+const historyCountRuns = `-- name: HistoryCountRuns :one
+SELECT COUNT(DISTINCT run_id) FROM history
+`
+
+func (q *Queries) HistoryCountRuns(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, historyCountRuns)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }
 
 const insertEvent = `-- name: InsertEvent :exec
@@ -1123,8 +1311,8 @@ func (q *Queries) InsertFunctionRun(ctx context.Context, arg InsertFunctionRunPa
 const insertHistory = `-- name: InsertHistory :exec
 
 INSERT INTO history
-	(id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result) VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	(id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, step_type, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertHistoryParams struct {
@@ -1143,6 +1331,7 @@ type InsertHistoryParams struct {
 	LatencyMs            sql.NullInt64
 	StepName             sql.NullString
 	StepID               sql.NullString
+	StepType             sql.NullString
 	Url                  sql.NullString
 	CancelRequest        sql.NullString
 	Sleep                sql.NullString
@@ -1171,6 +1360,7 @@ func (q *Queries) InsertHistory(ctx context.Context, arg InsertHistoryParams) er
 		arg.LatencyMs,
 		arg.StepName,
 		arg.StepID,
+		arg.StepType,
 		arg.Url,
 		arg.CancelRequest,
 		arg.Sleep,
@@ -1180,6 +1370,23 @@ func (q *Queries) InsertHistory(ctx context.Context, arg InsertHistoryParams) er
 		arg.InvokeFunctionResult,
 		arg.Result,
 	)
+	return err
+}
+
+const insertQueueSnapshotChunk = `-- name: InsertQueueSnapshotChunk :exec
+INSERT INTO queue_snapshot_chunks (snapshot_id, chunk_id, data)
+VALUES
+	(?, ?, ?)
+`
+
+type InsertQueueSnapshotChunkParams struct {
+	SnapshotID interface{}
+	ChunkID    int64
+	Data       []byte
+}
+
+func (q *Queries) InsertQueueSnapshotChunk(ctx context.Context, arg InsertQueueSnapshotChunkParams) error {
+	_, err := q.db.ExecContext(ctx, insertQueueSnapshotChunk, arg.SnapshotID, arg.ChunkID, arg.Data)
 	return err
 }
 
