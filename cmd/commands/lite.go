@@ -24,6 +24,7 @@ func NewCmdLite() *cobra.Command {
 	cmd.Flags().String("config", "", "Path to the configuration file")
 	cmd.Flags().String("host", "", "host to run the API on")
 	cmd.Flags().StringP("port", "p", "8288", "port to run the API on")
+	cmd.Flags().String("redis-url", "", "URL to an external Redis instance to use")
 
 	return cmd
 }
@@ -69,6 +70,11 @@ func doLite(cmd *cobra.Command, args []string) {
 
 	opts := lite.StartOpts{
 		Config: *conf,
+	}
+
+	redisUrl := viper.GetString("redis-url")
+	if redisUrl != "" {
+		opts.RedisURL = redisUrl
 	}
 
 	err = lite.New(ctx, opts)
