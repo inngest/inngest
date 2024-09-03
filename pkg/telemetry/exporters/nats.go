@@ -39,6 +39,8 @@ type NatsExporterOpts struct {
 	URLs string
 	// The path of the nkey file to be used for authentication
 	NkeyFile string
+	// The credentials file to be used for authentication
+	CredsFile string
 }
 
 // NewNATSSpanExporter creates an otel compatible exporter that ships the spans to NATS
@@ -54,6 +56,12 @@ func NewNATSSpanExporter(ctx context.Context, opts *NatsExporterOpts) (trace.Spa
 		if err != nil {
 			return nil, fmt.Errorf("error parsing nkey file for NATS: %w", err)
 		}
+		connOpts = append(connOpts, auth)
+	}
+
+	// Use chain credentials file for auth
+	if opts.CredsFile != "" {
+		auth := nats.UserCredentials(opts.CredsFile)
 		connOpts = append(connOpts, auth)
 	}
 
