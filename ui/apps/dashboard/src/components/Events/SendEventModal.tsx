@@ -119,8 +119,8 @@ export function SendEventModal({
 
   const isBranchChild = environment.type === EnvironmentType.BranchChild;
   const envName = environment.name;
-  const [tabs, setTabs] = useState(
-    buildTabs({
+  const tabs = useMemo(() => {
+    return buildTabs({
       envName,
       payload,
       eventKey,
@@ -128,8 +128,16 @@ export function SendEventModal({
       isBranchChild,
       copyToClipboardAction,
       sendEventAction,
-    })
-  );
+    });
+  }, [
+    copyToClipboardAction,
+    envName,
+    eventKey,
+    isBranchChild,
+    payload,
+    sendEventAction,
+    sendEventURL,
+  ]);
 
   //
   // serialize data to state on change so we can persist it between editor tab changes
