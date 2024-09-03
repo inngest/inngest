@@ -15,12 +15,11 @@ local partitionKey            = KEYS[1]
 local keyGlobalPartitionPtr   = KEYS[2]
 local keyGlobalAccountPointer = KEYS[3] -- accounts:sorted - zset
 local keyAccountPartitions    = KEYS[4] -- accounts:$accountId:partition:sorted - zset
-local keyShardPartitionPtr    = KEYS[5]
-local partitionMeta           = KEYS[6]
-local keyFnMetadata           = KEYS[7]           -- fnMeta:$id - hash
-local keyPartitionZset        = KEYS[8]
-local partitionConcurrencyKey = KEYS[9] -- We can only GC a partition if no running jobs occur.
-local queueKey                = KEYS[10]
+local partitionMeta           = KEYS[5]
+local keyFnMetadata           = KEYS[6]           -- fnMeta:$id - hash
+local keyPartitionZset        = KEYS[7]
+local partitionConcurrencyKey = KEYS[8] -- We can only GC a partition if no running jobs occur.
+local queueKey                = KEYS[9]
 
 local partitionID             = ARGV[1]
 local atMS                    = tonumber(ARGV[2]) -- time in milliseconds
@@ -30,11 +29,11 @@ local accountId               = ARGV[4]
 local atS = math.floor(atMS / 1000) -- in seconds;  partitions are currently second granularity, but this should change.
 
 -- $include(get_partition_item.lua)
--- $include(has_shard_key.lua)
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
 
+--
 local existing = get_partition_item(partitionKey, partitionID)
 if existing == nil then
     return 1
@@ -44,9 +43,9 @@ end
 -- partition.
 if tonumber(redis.call("ZCARD", keyPartitionZset)) == 0 and tonumber(redis.call("ZCARD", partitionConcurrencyKey)) == 0 then
     redis.call("HDEL", partitionKey, partitionID)             -- Remove the item
-    redis.call("DEL", partitionMeta)                         -- Remove the meta
+    redis.call("DEL", partitionMeta)                         -- Remove the partition meta (this is to clean up legacy data)
 
-    -- Clean up function metadata
+    -- Clean up function metadata (which supersedes partition metadata)
     if exists_without_ending(keyFnMetadata, ":fnMeta:-") == true then
       redis.call("DEL", keyFnMetadata)
     end
@@ -61,10 +60,6 @@ if tonumber(redis.call("ZCARD", keyPartitionZset)) == 0 and tonumber(redis.call(
       if numAccountPartitions == 0 then
         redis.call("ZREM", keyGlobalAccountPointer, accountId)
       end
-    end
-
-    if has_shard_key(keyShardPartitionPtr) then
-      redis.call("ZREM", keyShardPartitionPtr, partitionID) -- Remove the shard index
     end
 
     return 2
@@ -96,9 +91,5 @@ existing.leaseID = nil
 redis.call("HSET", partitionKey, partitionID, cjson.encode(existing))
 update_pointer_score_to(partitionID, keyGlobalPartitionPtr, atS)
 update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, atS)
-
-if has_shard_key(keyShardPartitionPtr) then
-    redis.call("ZADD", keyShardPartitionPtr, atS, partitionID) -- Update any index
-end
 
 return 0

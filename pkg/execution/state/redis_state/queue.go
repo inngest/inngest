@@ -2,7 +2,6 @@ package redis_state
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -130,9 +129,9 @@ var (
 	ErrConcurrencyLimitCustomKey = fmt.Errorf("at concurrency limit")
 
 	// internal shard errors
-	errShardNotFound     = fmt.Errorf("shard not found")
-	errShardIndexLeased  = fmt.Errorf("shard index is already leased")
-	errShardIndexInvalid = fmt.Errorf("shard lease index is too high (a lease just expired)")
+	errGuaranteedCapacityNotFound     = fmt.Errorf("guaranteed capacity not found")
+	errGuaranteedCapacityIndexLeased  = fmt.Errorf("guaranteed capacity index is already leased")
+	errGuaranteedCapacityIndexInvalid = fmt.Errorf("guaranteed capacity lease index is too high (a lease just expired)")
 )
 
 var (
@@ -156,13 +155,13 @@ type QueueManager interface {
 // PriorityFinder returns the priority for a given queue partition.
 type PriorityFinder func(ctx context.Context, part QueuePartition) uint
 
-// ShardFinder returns the given shard for a workspace ID, or nil if we should
-// not shard for the workspace.  We use a workspace ID because each individual
+// GuaranteedCapacityFinder returns the given guaranteed capacity for an account ID, or nil if the
+// account does not have guaranteed capacity. We use an account ID because each individual
 // job AND partition/function lease requires this to be called.
 //
 // NOTE: This is called frequently:  for every enqueue, lease, partition lease, and so on.
 // Expect this to be called tens of thousands of times per second.
-type ShardFinder func(ctx context.Context, queueName string, workspaceID *uuid.UUID) *QueueShard
+type GuaranteedCapacityFinder func(ctx context.Context, accountId uuid.UUID) *GuaranteedCapacity
 
 type QueueOpt func(q *queue)
 
@@ -184,9 +183,9 @@ func WithPriorityFinder(pf PriorityFinder) QueueOpt {
 	}
 }
 
-func WithShardFinder(sf ShardFinder) QueueOpt {
+func WithGuaranteedCapacityFinder(sf GuaranteedCapacityFinder) QueueOpt {
 	return func(q *queue) {
-		q.sf = sf
+		q.gcf = sf
 	}
 }
 
@@ -342,6 +341,12 @@ func WithBackoffFunc(f backoff.BackoffFunc) func(q *queue) {
 	}
 }
 
+func WithRunMode(m QueueRunMode) func(q *queue) {
+	return func(q *queue) {
+		q.runMode = m
+	}
+}
+
 // WithClock allows replacing the queue's default (real) clock by a mock, for testing.
 func WithClock(c clockwork.Clock) func(q *queue) {
 	return func(q *queue) {
@@ -367,6 +372,13 @@ func NewQueue(u *QueueClient, opts ...QueueOpt) *queue {
 		u: u,
 		pf: func(_ context.Context, _ QueuePartition) uint {
 			return PriorityDefault
+		},
+		runMode: QueueRunMode{
+			Sequential:         true,
+			Scavenger:          true,
+			Partition:          true,
+			Account:            true,
+			GuaranteedCapacity: true,
 		},
 		numWorkers:               defaultNumWorkers,
 		wg:                       &sync.WaitGroup{},
@@ -400,11 +412,13 @@ func NewQueue(u *QueueClient, opts ...QueueOpt) *queue {
 			// No-op: Use whatever's in the queue item by default
 			return item.Data.GetConcurrencyKeys()
 		},
-		itemIndexer:    QueueItemIndexerFunc,
-		backoffFunc:    backoff.DefaultBackoff,
-		shardLeases:    []leasedShard{},
-		shardLeaseLock: &sync.Mutex{},
-		clock:          clockwork.NewRealClock(),
+		itemIndexer:                     QueueItemIndexerFunc,
+		backoffFunc:                     backoff.DefaultBackoff,
+		accountLeases:                   []leasedAccount{},
+		accountLeaseLock:                &sync.Mutex{},
+		guaranteedCapacityScanTickTime:  GuaranteedCapacityTickTime,
+		guaranteedCapacityLeaseTickTime: AccountLeaseTime,
+		clock:                           clockwork.NewRealClock(),
 	}
 
 	for _, opt := range opts {
@@ -422,9 +436,9 @@ type queue struct {
 	name string
 
 	// redis stores the redis connection to use.
-	u  *QueueClient
-	pf PriorityFinder
-	sf ShardFinder
+	u   *QueueClient
+	pf  PriorityFinder
+	gcf GuaranteedCapacityFinder
 
 	lifecycles QueueLifecycleListeners
 
@@ -504,14 +518,37 @@ type queue struct {
 	// or reading from scavengerLeaseID in parallel.
 	scavengerLeaseLock *sync.RWMutex
 
-	// shardLeases represents shards that are leased by the current queue worker.
-	shardLeases    []leasedShard
-	shardLeaseLock *sync.Mutex
+	// accountLeases represents accounts that are leased by the current queue worker.
+	accountLeases    []leasedAccount
+	accountLeaseLock *sync.Mutex
 
 	// backoffFunc is the backoff function to use when retrying operations.
 	backoffFunc backoff.BackoffFunc
 
 	clock clockwork.Clock
+
+	// runMode defines the processing scopes or capabilities of the queue instances
+	runMode QueueRunMode
+
+	guaranteedCapacityScanTickTime  time.Duration
+	guaranteedCapacityLeaseTickTime time.Duration
+}
+
+type QueueRunMode struct {
+	// Sequential determines whether Run() instance acquires sequential lease and processes items sequentially if lease is granted
+	Sequential bool
+
+	// Scavenger determines whether scavenger lease is acquired and scavenger is processed if lease is granted
+	Scavenger bool
+
+	// Partition determines whether partitions are processed
+	Partition bool
+
+	// Account determines whether accounts are processed
+	Account bool
+
+	// GuaranteedAccount determines whether accounts with guaranteed capacity are fetched, and one lease is acquired per instance to process the account
+	GuaranteedCapacity bool
 }
 
 // processItem references the queue partition and queue item to be processed by a worker.
@@ -520,37 +557,7 @@ type queue struct {
 type processItem struct {
 	P QueuePartition
 	I QueueItem
-	S *QueueShard
-}
-
-// QueueShard represents a sub-partition for a group of functions.  Shards maintain their
-// own partition queues for the functions within the shard.  Note that functions also
-// exist within the global partition queue.
-type QueueShard struct {
-	// Shard name, eg. the company name for isolated execution
-	Name string `json:"n"`
-	// Priority represents the priority for this shard.
-	Priority uint `json:"p"`
-	// GuaranteedCapacity represents the minimum number of workers that must
-	// always scan this shard.  If zero, there is no guaranteed capacity for
-	// the shard.
-	GuaranteedCapacity uint `json:"gc"`
-	// Leases stores the lease IDs from the workers which are currently leasing the
-	// shard.  The workers currently leasing the shard are almost guaranteed to use
-	// the shard's partition queue as their source of work.
-	Leases []ulid.ULID `json:"leases"`
-}
-
-// leasedShard represents a shard leased by a queue.
-type leasedShard struct {
-	Shard QueueShard
-	Lease ulid.ULID
-}
-
-// Partition returns the partition name for use when managing the pointer queue to
-// individual queues within the shard
-func (q QueueShard) Partition() string {
-	return q.Name
+	G *GuaranteedCapacity
 }
 
 // FnMetadata is stored within the queue for retrieving
@@ -629,6 +636,8 @@ type QueuePartition struct {
 	// This must be set so that we can fetch the latest concurrency limits dynamically when
 	// leasing a partition, if desired, via the ConcurrencyLimitGetter.
 	ConcurrencyKey string `json:"ck,omitempty"`
+	// TESTING: We might need the hashed but _unevaluated_ custom key for loading current limits in PartitionLease
+	ConcurrencyHash string `json:"ch,omitempty"`
 	// LimitOwner represents the function ID that set the max concurrency limit for
 	// this function.  This allows us to lower the max if the owner/enqueueing function
 	// ID matches - otherwise, once set, the max can never lower.
@@ -676,7 +685,7 @@ func (q QueuePartition) concurrencyKey(kg QueueKeyGenerator) string {
 		// Hierarchically, custom keys take precedence.
 		return q.customConcurrencyKey(kg)
 	default:
-		return q.acctConcurrencyKey(kg)
+		panic(fmt.Sprintf("unexpected partition type encountered in concurrencyKey %q", q.PartitionType))
 	}
 }
 
@@ -845,6 +854,8 @@ func (q QueueItem) IsLeased(time time.Time) bool {
 }
 
 // ItemPartitions returns up 3 item partitions for a given queue item.
+// Note: Currently, we only ever return 2 partitions (2x custom concurrency keys or function + custom concurrency key)
+// This will change with the implementation of throttling key queues.
 func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartition {
 	var (
 		partitions []QueuePartition
@@ -935,7 +946,9 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 				FunctionID:       &i.FunctionID,
 				AccountID:        i.Data.Identifier.AccountID,
 				ConcurrencyScope: int(scope),
-				ConcurrencyKey:   key.Key,
+
+				ConcurrencyKey:  key.Key,
+				ConcurrencyHash: key.Hash,
 
 				// Note: This uses the latest limit for the key queue,
 				// retrieved from customConcurrencyLimitRefresher
@@ -1193,6 +1206,27 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		q.logger.Warn().Interface("item", i).Msg("attempting to enqueue item to non-system partition without account ID")
 	}
 
+	var (
+		guaranteedCapacity *GuaranteedCapacity
+
+		// initialize guaranteed capacity key for automatic cleanup
+		guaranteedCapacityKey = GuaranteedCapacity{
+			Scope:     enums.GuaranteedCapacityScopeAccount,
+			AccountID: i.Data.Identifier.AccountID,
+		}.Key()
+	)
+	if q.gcf != nil && !isSystemPartition {
+		// Fetch guaranteed capacity for the given account. If there is no guaranteed
+		// capacity configured, this will return nil, and we will remove any leftover
+		// items in the guaranteed capacity map
+		// Note: This function is called _a lot_ so the calls should be memoized.
+		guaranteedCapacity = q.gcf(ctx, i.Data.Identifier.AccountID)
+		if guaranteedCapacity != nil {
+			guaranteedCapacity.Leases = []ulid.ULID{}
+			guaranteedCapacityKey = guaranteedCapacity.Key()
+		}
+	}
+
 	keys := []string{
 		q.u.kg.QueueItem(),            // Queue item
 		q.u.kg.PartitionItem(),        // Partition item, map
@@ -1201,6 +1235,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		q.u.kg.AccountPartitionIndex(i.Data.Identifier.AccountID), // new queue items always
 		q.u.kg.Idempotency(i.ID),
 		q.u.kg.FnMetadata(i.FunctionID),
+		q.u.kg.GuaranteedCapacityMap(),
 
 		// Add all 3 partition sets
 		parts[0].zsetKey(q.u.kg),
@@ -1229,15 +1264,19 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		parts[0],
 		parts[1],
 		parts[2],
+
 		parts[0].ID,
 		parts[1].ID,
 		parts[2].ID,
 		i.Data.Identifier.AccountID.String(),
-	})
 
+		guaranteedCapacity,
+		guaranteedCapacityKey,
+	})
 	if err != nil {
 		return i, err
 	}
+
 	status, err := scripts["queue/enqueue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "enqueue"),
 		q.u.Client(),
@@ -1314,7 +1353,12 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 	}
 
 	if isPeekNext {
-		i, err := q.decodeQueueItemFromPeek(items[0].(string), q.clock.Now())
+		str, ok := items[0].(string)
+		if !ok {
+			return nil, fmt.Errorf("non-string value in next peek response: %T", items[0])
+		}
+
+		i, err := q.decodeQueueItemFromPeek(str, q.clock.Now())
 		if err != nil {
 			return nil, err
 		}
@@ -1323,12 +1367,24 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 
 	now := q.clock.Now()
 	return util.ParallelDecode(items, func(val any) (*QueueItem, error) {
-		str, _ := val.(string)
+		if val == nil {
+			q.logger.Error().Str("partition", partition.zsetKey(q.u.kg)).Msg("nil item value in peek response")
+			return nil, nil
+		}
+
+		str, ok := val.(string)
+		if !ok {
+			return nil, fmt.Errorf("non-string value in peek response: %T", val)
+		}
 		return q.decodeQueueItemFromPeek(str, now)
 	})
 }
 
 func (q *queue) decodeQueueItemFromPeek(str string, now time.Time) (*QueueItem, error) {
+	if str == "" {
+		return nil, fmt.Errorf("received empty string in decode queue item from peek")
+	}
+
 	qi := &QueueItem{}
 	if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), qi); err != nil {
 		return nil, fmt.Errorf("error unmarshalling peeked queue item: %w", err)
@@ -1730,7 +1786,7 @@ func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 	// This is because a single queue item may be present in more than one queue.
 	parts := q.ItemPartitions(ctx, i)
 	accountConcurrencyKey := q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String())
-	if len(parts) == 1 && parts[0].IsSystem() {
+	if len(parts) > 0 && parts[0].IsSystem() {
 		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
 	}
 
@@ -1974,6 +2030,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		},
 		args,
 	).ToAny()
+
 	// NOTE: We use ToAny to force return a []any, allowing us to update the slice value with
 	// a JSON-decoded item without allocations
 	if err != nil {
@@ -1999,6 +2056,28 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		return nil, fmt.Errorf("expected zero or two items in set returned by partitionPeek: %v", returnedSet)
 	}
 
+	// begin temporary debugging code
+	for _, item := range encoded {
+		if item == nil {
+			continue
+		}
+
+		str, ok := item.(string)
+		if !ok {
+			return nil, fmt.Errorf(
+				"non-string type returned from partition peek: %T, partitionKey: %s, partitionItem: %s, args: %+v",
+				item, partitionKey, q.u.kg.PartitionItem(), args,
+			)
+		}
+		if str == "" {
+			return nil, fmt.Errorf(
+				"empty string returned from partition peek; partitionKey: %s, partitionItem: %s, args: %+v",
+				partitionKey, q.u.kg.PartitionItem(), args,
+			)
+		}
+	}
+	// end temporary debugging code
+
 	weights := []float64{}
 	items := make([]*QueuePartition, len(encoded))
 	fnIDs := make(map[uuid.UUID]bool)
@@ -2010,7 +2089,11 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 			return nil, fmt.Errorf("encountered nil partition item in pointer queue %q", partitionKey)
 		}
 
-		str, _ := val.(string)
+		str, ok := val.(string)
+		if !ok {
+			return nil, fmt.Errorf("unknown type in partition peek: %T", val)
+		}
+
 		item := &QueuePartition{}
 
 		if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), item); err != nil {
@@ -2069,15 +2152,25 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 			// If this is an error, just ignore the error and continue.  The executor should gracefully handle
 			// accidental attempts at paused functions, as we cannot do this optimization for account or env-level
 			// partitions.
-			vals, _ := vals.([]any)
+			vals, ok := vals.([]any)
+			if !ok {
+				return nil, fmt.Errorf("unknown return type from mget fnMeta: %T", vals)
+			}
+
 			_, _ = util.ParallelDecode(vals, func(i any) (any, error) {
-				str, _ := i.(string)
-				fnMeta := &FnMetadata{}
-				if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), fnMeta); err == nil {
-					fnIDsMu.Lock()
-					fnIDs[fnMeta.FnID] = fnMeta.Paused
-					fnIDsMu.Unlock()
+				str, ok := i.(string)
+				if !ok {
+					return nil, fmt.Errorf("unknown fnMeta type in partition peek: %T", i)
 				}
+				fnMeta := &FnMetadata{}
+				if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), fnMeta); err != nil {
+					return nil, fmt.Errorf("could not unmarshal fnMeta: %w", err)
+				}
+
+				fnIDsMu.Lock()
+				fnIDs[fnMeta.FnID] = fnMeta.Paused
+				fnIDsMu.Unlock()
+
 				return nil, nil
 			})
 		}
@@ -2218,7 +2311,7 @@ func (q *queue) accountPeek(ctx context.Context, sequential bool, until time.Tim
 		weights[i] = float64(10 - accountPriority)
 	}
 
-	// Some scanners run sequentially, ensuring we always work on the functions with
+	// Some scanners run sequentially, ensuring we always work on the accounts with
 	// the oldest run at times in order, no matter the priority.
 	if sequential {
 		n := int(math.Min(float64(len(items)), float64(PartitionSelectionMax)))
@@ -2268,13 +2361,6 @@ func checkList(check string, exact, prefixes map[string]*struct{}) bool {
 func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time.Time, forceAt bool) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PartitionRequeue"), redis_telemetry.ScopeQueue)
 
-	var shardName string
-	if q.sf != nil {
-		if shard := q.sf(ctx, p.Queue(), p.EnvID); shard != nil {
-			shardName = shard.Name
-		}
-	}
-
 	functionId := uuid.Nil
 	if p.FunctionID != nil {
 		functionId = *p.FunctionID
@@ -2288,10 +2374,13 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 		// Until this, we may not use account queues at all, as we cannot properly clean up
 		// here without knowing the Account ID
 		q.u.kg.AccountPartitionIndex(p.AccountID),
-		q.u.kg.ShardPartitionIndex(shardName),
-		// NOTE: PartitionMeta is only here for backwards compat, and only clears up partitions.
+
+		// NOTE: Partition metadata was replaced with function metadata and is being phased out
+		// We clean up all remaining partition metadata on completely empty partitions here
+		// and are adding function metadata on enqueue to migrate to the new system
 		q.u.kg.PartitionMeta(p.Queue()),
 		q.u.kg.FnMetadata(functionId),
+
 		p.zsetKey(q.u.kg), // Partition ZSET itself
 		p.concurrencyKey(q.u.kg),
 		q.u.kg.QueueItem(),
@@ -2391,26 +2480,26 @@ func (q *queue) Instrument(ctx context.Context) error {
 	// other queue instrumentation
 	go func(ctx context.Context) {
 		// Shard instrumentations
-		shards, err := q.getShards(ctx)
+		guaranteedCapacityMap, err := q.getGuaranteedCapacityMap(ctx)
 		if err != nil {
-			q.logger.Error().Err(err).Msg("error retrieving shards")
+			q.logger.Error().Err(err).Msg("error retrieving guaranteedCapacityMap")
 		}
 
-		metrics.GaugeQueueShardCount(ctx, int64(len(shards)), metrics.GaugeOpt{PkgName: pkgName})
-		for _, shard := range shards {
-			tags := map[string]any{"shard_name": shard.Name}
+		metrics.GaugeQueueGuaranteedCapacityCount(ctx, int64(len(guaranteedCapacityMap)), metrics.GaugeOpt{PkgName: pkgName})
+		for _, guaranteedCapacity := range guaranteedCapacityMap {
+			tags := map[string]any{"account_id": guaranteedCapacity.AccountID}
 
-			metrics.GaugeQueueShardGuaranteedCapacityCount(ctx, int64(shard.GuaranteedCapacity), metrics.GaugeOpt{
+			metrics.GaugeQueueAccountGuaranteedCapacityCount(ctx, int64(guaranteedCapacity.GuaranteedCapacity), metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    tags,
 			})
-			metrics.GaugeQueueShardLeaseCount(ctx, int64(len(shard.Leases)), metrics.GaugeOpt{
+			metrics.GaugeQueueGuaranteedCapacityLeaseCount(ctx, int64(len(guaranteedCapacity.Leases)), metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    tags,
 			})
 
-			if size, err := q.partitionSize(ctx, q.u.kg.ShardPartitionIndex(shard.Name), q.clock.Now().Add(PartitionLookahead)); err == nil {
-				metrics.GaugeQueueShardPartitionAvailableCount(ctx, size, metrics.GaugeOpt{
+			if size, err := q.partitionSize(ctx, q.u.kg.AccountPartitionIndex(guaranteedCapacity.AccountID), q.clock.Now().Add(PartitionLookahead)); err == nil {
+				metrics.GaugeQueueGuaranteedCapacityAccountPartitionAvailableCount(ctx, size, metrics.GaugeOpt{
 					PkgName: pkgName,
 					Tags:    tags,
 				})
@@ -2558,6 +2647,11 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 			continue
 		}
 		for _, item := range jobs {
+			if item == "" {
+				// THIS SHOULD NEVER HAPPEN. Handle this gracefully
+				continue
+			}
+
 			qi := QueueItem{}
 			if err := json.Unmarshal([]byte(item), &qi); err != nil {
 				resultErr = multierror.Append(resultErr, fmt.Errorf("error unmarshalling job '%s': %w", item, err))
@@ -2586,11 +2680,11 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 //
 // If the sequential key is leased, this allows a worker to peek partitions sequentially.
 func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ConfigLease"), redis_telemetry.ScopeQueue)
-
 	if duration > ConfigLeaseMax {
 		return nil, ErrConfigLeaseExceedsLimits
 	}
+
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ConfigLease"), redis_telemetry.ScopeQueue)
 
 	now := q.clock.Now()
 	newLeaseID, err := ulid.New(ulid.Timestamp(now.Add(duration)), rnd)
@@ -2629,126 +2723,6 @@ func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Durat
 	default:
 		return nil, fmt.Errorf("unknown response claiming config lease: %d", status)
 	}
-}
-
-func (q *queue) getShards(ctx context.Context) (map[string]*QueueShard, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "getShards"), redis_telemetry.ScopeQueue)
-
-	m, err := q.u.unshardedRc.Do(ctx, q.u.unshardedRc.B().Hgetall().Key(q.u.kg.Shards()).Build()).AsMap()
-	if rueidis.IsRedisNil(err) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("error fetching shards: %w", err)
-	}
-	shards := map[string]*QueueShard{}
-	for k, v := range m {
-		shard := &QueueShard{}
-		if err := v.DecodeJSON(shard); err != nil {
-			return nil, fmt.Errorf("error decoding shards: %w", err)
-		}
-		shards[k] = shard
-	}
-	return shards, nil
-}
-
-// leaseShard leases a shard for the given duration.  Shards can have more than one lease at a time;
-// you must provide an index to claim a lease. THe index This prevents multiple workers
-// from claiming the same lease index;  if workers A and B see a shard with 0 leases and both attempt
-// to claim lease "0", only one will succeed.
-func (q *queue) leaseShard(ctx context.Context, shard *QueueShard, duration time.Duration, n int) (*ulid.ULID, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "leaseShard"), redis_telemetry.ScopeQueue)
-
-	now := q.clock.Now()
-	leaseID, err := ulid.New(uint64(now.Add(duration).UnixMilli()), rand.Reader)
-	if err != nil {
-		return nil, err
-	}
-
-	keys := []string{q.u.kg.Shards()}
-	args, err := StrSlice([]any{
-		now.UnixMilli(),
-		shard.Name,
-		leaseID,
-		n,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	status, err := scripts["queue/shardLease"].Exec(
-		redis_telemetry.WithScriptName(ctx, "shardLease"),
-		q.u.unshardedRc,
-		keys,
-		args,
-	).AsInt64()
-	if err != nil {
-		return nil, fmt.Errorf("error leasing item: %w", err)
-	}
-	switch status {
-	case int64(-1):
-		return nil, errShardNotFound
-	case int64(-2):
-		return nil, errShardIndexLeased
-	case int64(-3):
-		return nil, errShardIndexInvalid
-	case int64(0):
-		return &leaseID, nil
-	default:
-		return nil, fmt.Errorf("unknown lease return value: %T(%v)", status, status)
-	}
-}
-
-func (q *queue) renewShardLease(ctx context.Context, shard *QueueShard, duration time.Duration, leaseID ulid.ULID) (*ulid.ULID, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RunJobs"), redis_telemetry.ScopeQueue)
-
-	now := q.clock.Now()
-	newLeaseID, err := ulid.New(uint64(now.Add(duration).UnixMilli()), rand.Reader)
-	if err != nil {
-		return nil, err
-	}
-
-	keys := []string{q.u.kg.Shards()}
-	args, err := StrSlice([]any{
-		now.UnixMilli(),
-		shard.Name,
-		leaseID,
-		newLeaseID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	status, err := scripts["queue/renewShardLease"].Exec(
-		redis_telemetry.WithScriptName(ctx, "renewShardLease"),
-		q.u.unshardedRc,
-		keys,
-		args,
-	).AsInt64()
-	if err != nil {
-		return nil, fmt.Errorf("error leasing item: %w", err)
-	}
-	switch status {
-	case int64(-1):
-		return nil, fmt.Errorf("shard not found")
-	case int64(-2):
-		return nil, fmt.Errorf("lease not found")
-	case int64(0):
-		return &newLeaseID, nil
-	default:
-		return nil, fmt.Errorf("unknown lease renew return value: %T(%v)", status, status)
-	}
-}
-
-//nolint:all
-func (q *queue) getShardLeases() []leasedShard {
-	q.shardLeaseLock.Lock()
-	existingLeases := make([]leasedShard, len(q.shardLeases))
-	for n, i := range q.shardLeases {
-		existingLeases[n] = i
-	}
-	q.shardLeaseLock.Unlock()
-	return existingLeases
 }
 
 // peekEWMA returns the calculated EWMA value from the list

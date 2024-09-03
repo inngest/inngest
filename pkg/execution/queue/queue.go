@@ -22,7 +22,8 @@ type RunInfo struct {
 	Latency      time.Duration
 	SojournDelay time.Duration
 	Priority     uint
-	ShardName    string
+
+	GuaranteedCapacityKey string
 }
 
 type RunFunc func(context.Context, RunInfo, Item) error

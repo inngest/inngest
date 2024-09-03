@@ -52,7 +52,6 @@ local accountId       = ARGV[11]
 -- $include(get_queue_item.lua)
 -- $include(set_item_peek_time.lua)
 -- $include(update_pointer_score.lua)
--- $include(has_shard_key.lua)
 -- $include(gcra.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
@@ -147,6 +146,8 @@ local function handleLease(keyPartition, keyConcurrency, partitionID)
 		local earliestLease = tonumber(inProgressScores[2])
 		-- Add the earliest time to the pointer queue for in-progress, allowing us to scavenge
 		-- lost jobs easily.
+		-- Note: Previously, we stored the queue name in the zset, so we have to add an extra
+		-- check to the scavenger logic to handle partition uuids for old queue items
 		redis.call("ZADD", concurrencyPointer, earliestLease, keyConcurrency)
 	end
 end
