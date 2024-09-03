@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/usage"
 	"github.com/oklog/ulid/v2"
 )
@@ -317,6 +318,22 @@ type RunHistoryResult struct {
 	SDKLanguage string  `json:"sdkLanguage"`
 	SDKVersion  string  `json:"sdkVersion"`
 	SizeBytes   int     `json:"sizeBytes"`
+}
+
+func NewRunHistoryResultFromHistoryResult(hr *history.Result) *RunHistoryResult {
+	if hr == nil {
+		return nil
+	}
+
+	return &RunHistoryResult{
+		DurationMS:  hr.DurationMS,
+		ErrorCode:   hr.ErrorCode,
+		Framework:   hr.Framework,
+		Platform:    hr.Platform,
+		SDKLanguage: hr.SDKLanguage,
+		SDKVersion:  hr.SDKVersion,
+		SizeBytes:   hr.SizeBytes,
+	}
 }
 
 type RunHistorySleep struct {

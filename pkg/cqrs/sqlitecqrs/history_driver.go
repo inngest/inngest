@@ -62,6 +62,12 @@ func (d historyDriver) Write(ctx context.Context, h history.History) (err error)
 			String: *h.StepID,
 		}
 	}
+	if h.StepType != nil {
+		params.StepType = sql.NullString{
+			Valid:  true,
+			String: h.StepType.String(),
+		}
+	}
 	if h.URL != nil {
 		params.Url = sql.NullString{
 			Valid:  true,
