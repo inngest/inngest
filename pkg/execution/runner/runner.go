@@ -718,7 +718,7 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 		// UUID for managing state.
 		//
 		// Using a remote API, this UUID may be a surrogate primary key.
-		fn.ID = inngest.DeterministicUUID(fn)
+		fn.ID = fn.DeterministicUUID()
 	}
 
 	// Use the custom event ID (a.k.a. event idempotency key) if it exists, else

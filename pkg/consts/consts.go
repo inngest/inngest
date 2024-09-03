@@ -100,9 +100,17 @@ const (
 	// in which priority factors are taken into account.
 	FutureAtLimit = 2 * time.Second
 
+	// LiteDefaultPersistenceInterval is the default interval at which the
+	// queue will be snapshotted and persisted to disk.
+	LiteDefaultPersistenceInterval = time.Second * 60
+	// LiteMaxQueueChunkSize is the default maximum size of a queue chunk.
+	// This is set to be comfortably within the 1GB limit of SQLite.
+	LiteMaxQueueChunkSize = 1024 * 1024 * 800 // 800MB
+	// LiteMaxQueueSnapshots is the maximum number of snapshots we keep.
+	LiteMaxQueueSnapshots = 5
+
 	DevServerTempDir     = ".inngest"
 	DevServerDbFile      = "dev_db.db"
-	DevServerRdbFile     = "dev_state.rdb"
 	DevServerHistoryFile = "dev_history.json"
 
 	PauseExpiredDeletionGracePeriod = time.Second * 10

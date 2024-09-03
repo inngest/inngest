@@ -352,6 +352,10 @@ func idempotencyKey(req execution.ScheduleRequest, runID ulid.ULID) string {
 // If this function has a debounce config, this will return ErrFunctionDebounced instead
 // of an identifier as the function is not scheduled immediately.
 func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*sv2.Metadata, error) {
+	if req.AppID == uuid.Nil {
+		return nil, fmt.Errorf("app ID is required to schedule a run")
+	}
+
 	if req.Function.Debounce != nil && !req.PreventDebounce {
 		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
 			AccountID:        req.AccountID,
@@ -2141,10 +2145,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		return execError{err: fmt.Errorf("failed to create expression to wait for invoked function completion: %w", err)}
 	}
 
-	pauseID := uuid.NewSHA1(
-		uuid.NameSpaceOID,
-		[]byte(i.md.ID.RunID.String()+gen.ID),
-	)
+	pauseID := inngest.DeterministicSha1UUID(i.md.ID.RunID.String() + gen.ID)
 	opcode := gen.Op.String()
 	now := time.Now()
 
@@ -2246,10 +2247,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		return fmt.Errorf("unable to parse wait for event expires: %w", err)
 	}
 
-	pauseID := uuid.NewSHA1(
-		uuid.NameSpaceOID,
-		[]byte(i.md.ID.RunID.String()+gen.ID),
-	)
+	pauseID := inngest.DeterministicSha1UUID(i.md.ID.RunID.String() + gen.ID)
 
 	expr := opts.If
 	if expr != nil && strings.Contains(*expr, "event.") {

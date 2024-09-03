@@ -56,11 +56,14 @@ export const ActionsMenu = ({
                 value="invoke"
               >
                 <OptionalTooltip
-                  tooltip={archived && 'Invoke not available, function is archived.'}
+                  tooltip={
+                    (archived || paused) &&
+                    `Invoke not available, function is ${archived ? 'archived' : 'paused'}.`
+                  }
                 >
                   <NewButton
                     onClick={showInvoke}
-                    disabled={archived}
+                    disabled={archived || paused}
                     appearance="ghost"
                     kind="secondary"
                     size="medium"
@@ -68,7 +71,7 @@ export const ActionsMenu = ({
                     iconSide="left"
                     label="Invoke"
                     className={`text-subtle m-0 w-full justify-start text-sm ${
-                      archived && 'cursor-not-allowed'
+                      (archived || paused) && 'cursor-not-allowed'
                     }`}
                   />
                 </OptionalTooltip>
@@ -120,7 +123,7 @@ export const ActionsMenu = ({
                     iconSide="left"
                     label="Replay"
                     className={`text-subtle m-0 w-full justify-start text-sm ${
-                      archived || (paused && 'cursor-not-allowed')
+                      (archived || paused) && 'cursor-not-allowed'
                     }`}
                   />
                 </OptionalTooltip>
