@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Tab } from '@headlessui/react';
@@ -60,13 +60,12 @@ const buildTabs = ({
   sendEventAction,
   copyToClipboardAction,
 }: TabType) => {
-  const hasEventKey = Boolean(eventKey);
   return [
     {
       tabLabel: 'JSON Editor',
       tabTitle: 'Send Custom JSON',
       submitButtonLabel: 'Send Event',
-      submitButtonEnabled: hasEventKey,
+      submitButtonEnabled: Boolean(eventKey),
       submitAction: sendEventAction,
       codeLanguage: 'json',
       initialCode: JSON.stringify(payload, null, 2),
@@ -119,7 +118,8 @@ export function SendEventModal({
 
   const isBranchChild = environment.type === EnvironmentType.BranchChild;
   const envName = environment.name;
-  const tabs = useMemo(() => {
+
+  let tabs = useMemo(() => {
     return buildTabs({
       envName,
       payload,
@@ -208,17 +208,15 @@ export function SendEventModal({
         as="section"
         className="space-y-6"
         onChange={() => {
-          setTabs(
-            buildTabs({
-              envName,
-              payload,
-              eventKey,
-              sendEventURL,
-              isBranchChild,
-              copyToClipboardAction,
-              sendEventAction,
-            })
-          );
+          tabs = buildTabs({
+            envName,
+            payload,
+            eventKey,
+            sendEventURL,
+            isBranchChild,
+            copyToClipboardAction,
+            sendEventAction,
+          });
         }}
       >
         <header className="flex items-center justify-between">
