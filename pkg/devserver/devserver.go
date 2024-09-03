@@ -39,7 +39,6 @@ import (
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/history_drivers/memory_reader"
 	"github.com/inngest/inngest/pkg/history_drivers/memory_writer"
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/run"
@@ -191,7 +190,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			for _, fn := range funcs {
 				f, _ := fn.InngestFunction()
 				if f.ID == uuid.Nil {
-					f.ID = inngest.DeterministicUUID(*f)
+					f.ID = f.DeterministicUUID()
 				}
 				if f.ID == p.WorkflowID && f.Concurrency != nil && f.Concurrency.PartitionConcurrency() > 0 {
 					return p.Queue(), f.Concurrency.PartitionConcurrency()

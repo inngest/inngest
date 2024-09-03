@@ -23,7 +23,7 @@ type App struct {
 	Error       sql.NullString
 	Checksum    string
 	CreatedAt   time.Time
-	DeletedAt   sql.NullTime
+	ArchivedAt  sql.NullTime
 	Url         string
 }
 
@@ -55,12 +55,13 @@ type EventBatch struct {
 }
 
 type Function struct {
-	ID        uuid.UUID
-	AppID     uuid.UUID
-	Name      string
-	Slug      string
-	Config    string
-	CreatedAt time.Time
+	ID         uuid.UUID
+	AppID      uuid.UUID
+	Name       string
+	Slug       string
+	Config     string
+	CreatedAt  time.Time
+	ArchivedAt sql.NullTime
 }
 
 type FunctionFinish struct {

@@ -16,7 +16,7 @@ import (
 )
 
 const deleteApp = `-- name: DeleteApp :exec
-UPDATE apps SET deleted_at = NOW() WHERE id = ?
+UPDATE apps SET archived_at = datetime('now') WHERE id = ?
 `
 
 func (q *Queries) DeleteApp(ctx context.Context, id uuid.UUID) error {
@@ -25,7 +25,7 @@ func (q *Queries) DeleteApp(ctx context.Context, id uuid.UUID) error {
 }
 
 const deleteFunctionsByAppID = `-- name: DeleteFunctionsByAppID :exec
-DELETE FROM functions WHERE app_id = ?
+UPDATE functions SET archived_at = datetime('now') WHERE app_id = ?
 `
 
 func (q *Queries) DeleteFunctionsByAppID(ctx context.Context, appID uuid.UUID) error {
@@ -34,7 +34,7 @@ func (q *Queries) DeleteFunctionsByAppID(ctx context.Context, appID uuid.UUID) e
 }
 
 const deleteFunctionsByIDs = `-- name: DeleteFunctionsByIDs :exec
-DELETE FROM functions WHERE id IN (/*SLICE:ids*/?)
+UPDATE functions SET archived_at = datetime('now') WHERE id IN (/*SLICE:ids*/?)
 `
 
 func (q *Queries) DeleteFunctionsByIDs(ctx context.Context, ids []uuid.UUID) error {
@@ -71,7 +71,7 @@ func (q *Queries) DeleteOldQueueSnapshots(ctx context.Context, limit int64) (int
 }
 
 const getAllApps = `-- name: GetAllApps :many
-SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url FROM apps
+SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url FROM apps WHERE archived_at IS NULL
 `
 
 func (q *Queries) GetAllApps(ctx context.Context) ([]*App, error) {
@@ -94,7 +94,7 @@ func (q *Queries) GetAllApps(ctx context.Context) ([]*App, error) {
 			&i.Error,
 			&i.Checksum,
 			&i.CreatedAt,
-			&i.DeletedAt,
+			&i.ArchivedAt,
 			&i.Url,
 		); err != nil {
 			return nil, err
@@ -111,7 +111,7 @@ func (q *Queries) GetAllApps(ctx context.Context) ([]*App, error) {
 }
 
 const getApp = `-- name: GetApp :one
-SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url FROM apps WHERE id = ?
+SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url FROM apps WHERE id = ?
 `
 
 func (q *Queries) GetApp(ctx context.Context, id uuid.UUID) (*App, error) {
@@ -128,14 +128,14 @@ func (q *Queries) GetApp(ctx context.Context, id uuid.UUID) (*App, error) {
 		&i.Error,
 		&i.Checksum,
 		&i.CreatedAt,
-		&i.DeletedAt,
+		&i.ArchivedAt,
 		&i.Url,
 	)
 	return &i, err
 }
 
 const getAppByChecksum = `-- name: GetAppByChecksum :one
-SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url FROM apps WHERE checksum = ? LIMIT 1
+SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url FROM apps WHERE checksum = ? AND archived_at IS NULL LIMIT 1
 `
 
 func (q *Queries) GetAppByChecksum(ctx context.Context, checksum string) (*App, error) {
@@ -152,14 +152,14 @@ func (q *Queries) GetAppByChecksum(ctx context.Context, checksum string) (*App, 
 		&i.Error,
 		&i.Checksum,
 		&i.CreatedAt,
-		&i.DeletedAt,
+		&i.ArchivedAt,
 		&i.Url,
 	)
 	return &i, err
 }
 
 const getAppByID = `-- name: GetAppByID :one
-SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url FROM apps WHERE id = ? LIMIT 1
+SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url FROM apps WHERE id = ? LIMIT 1
 `
 
 func (q *Queries) GetAppByID(ctx context.Context, id uuid.UUID) (*App, error) {
@@ -176,14 +176,14 @@ func (q *Queries) GetAppByID(ctx context.Context, id uuid.UUID) (*App, error) {
 		&i.Error,
 		&i.Checksum,
 		&i.CreatedAt,
-		&i.DeletedAt,
+		&i.ArchivedAt,
 		&i.Url,
 	)
 	return &i, err
 }
 
 const getAppByURL = `-- name: GetAppByURL :one
-SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url FROM apps WHERE url = ? LIMIT 1
+SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url FROM apps WHERE url = ? AND archived_at IS NULL LIMIT 1
 `
 
 func (q *Queries) GetAppByURL(ctx context.Context, url string) (*App, error) {
@@ -200,14 +200,14 @@ func (q *Queries) GetAppByURL(ctx context.Context, url string) (*App, error) {
 		&i.Error,
 		&i.Checksum,
 		&i.CreatedAt,
-		&i.DeletedAt,
+		&i.ArchivedAt,
 		&i.Url,
 	)
 	return &i, err
 }
 
 const getAppFunctions = `-- name: GetAppFunctions :many
-SELECT id, app_id, name, slug, config, created_at FROM functions WHERE app_id = ?
+SELECT id, app_id, name, slug, config, created_at, archived_at FROM functions WHERE app_id = ? AND archived_at IS NULL
 `
 
 func (q *Queries) GetAppFunctions(ctx context.Context, appID uuid.UUID) ([]*Function, error) {
@@ -226,6 +226,7 @@ func (q *Queries) GetAppFunctions(ctx context.Context, appID uuid.UUID) ([]*Func
 			&i.Slug,
 			&i.Config,
 			&i.CreatedAt,
+			&i.ArchivedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -241,7 +242,7 @@ func (q *Queries) GetAppFunctions(ctx context.Context, appID uuid.UUID) ([]*Func
 }
 
 const getAppFunctionsBySlug = `-- name: GetAppFunctionsBySlug :many
-SELECT functions.id, functions.app_id, functions.name, functions.slug, functions.config, functions.created_at FROM functions JOIN apps ON apps.id = functions.app_id WHERE apps.name = ?
+SELECT functions.id, functions.app_id, functions.name, functions.slug, functions.config, functions.created_at, functions.archived_at FROM functions JOIN apps ON apps.id = functions.app_id WHERE apps.name = ? AND functions.archived_at IS NULL
 `
 
 func (q *Queries) GetAppFunctionsBySlug(ctx context.Context, name string) ([]*Function, error) {
@@ -260,6 +261,7 @@ func (q *Queries) GetAppFunctionsBySlug(ctx context.Context, name string) ([]*Fu
 			&i.Slug,
 			&i.Config,
 			&i.CreatedAt,
+			&i.ArchivedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -275,7 +277,7 @@ func (q *Queries) GetAppFunctionsBySlug(ctx context.Context, name string) ([]*Fu
 }
 
 const getApps = `-- name: GetApps :many
-SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url FROM apps WHERE deleted_at IS NULL
+SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url FROM apps WHERE archived_at IS NULL
 `
 
 func (q *Queries) GetApps(ctx context.Context) ([]*App, error) {
@@ -298,7 +300,7 @@ func (q *Queries) GetApps(ctx context.Context) ([]*App, error) {
 			&i.Error,
 			&i.Checksum,
 			&i.CreatedAt,
-			&i.DeletedAt,
+			&i.ArchivedAt,
 			&i.Url,
 		); err != nil {
 			return nil, err
@@ -516,7 +518,7 @@ func (q *Queries) GetEventsIDbound(ctx context.Context, arg GetEventsIDboundPara
 }
 
 const getFunctionByID = `-- name: GetFunctionByID :one
-SELECT id, app_id, name, slug, config, created_at FROM functions WHERE id = ?
+SELECT id, app_id, name, slug, config, created_at, archived_at FROM functions WHERE id = ?
 `
 
 func (q *Queries) GetFunctionByID(ctx context.Context, id uuid.UUID) (*Function, error) {
@@ -529,12 +531,13 @@ func (q *Queries) GetFunctionByID(ctx context.Context, id uuid.UUID) (*Function,
 		&i.Slug,
 		&i.Config,
 		&i.CreatedAt,
+		&i.ArchivedAt,
 	)
 	return &i, err
 }
 
 const getFunctionBySlug = `-- name: GetFunctionBySlug :one
-SELECT id, app_id, name, slug, config, created_at FROM functions WHERE slug = ?
+SELECT id, app_id, name, slug, config, created_at, archived_at FROM functions WHERE slug = ? AND archived_at IS NULL
 `
 
 func (q *Queries) GetFunctionBySlug(ctx context.Context, slug string) (*Function, error) {
@@ -547,6 +550,7 @@ func (q *Queries) GetFunctionBySlug(ctx context.Context, slug string) (*Function
 		&i.Slug,
 		&i.Config,
 		&i.CreatedAt,
+		&i.ArchivedAt,
 	)
 	return &i, err
 }
@@ -845,7 +849,11 @@ func (q *Queries) GetFunctionRunsTimebound(ctx context.Context, arg GetFunctionR
 }
 
 const getFunctions = `-- name: GetFunctions :many
-SELECT id, app_id, name, slug, config, created_at FROM functions
+SELECT functions.id, functions.app_id, functions.name, functions.slug, functions.config, functions.created_at, functions.archived_at
+FROM functions
+JOIN apps ON apps.id = functions.app_id
+WHERE functions.archived_at IS NULL
+AND apps.archived_at IS NULL
 `
 
 func (q *Queries) GetFunctions(ctx context.Context) ([]*Function, error) {
@@ -864,6 +872,7 @@ func (q *Queries) GetFunctions(ctx context.Context) ([]*Function, error) {
 			&i.Slug,
 			&i.Config,
 			&i.CreatedAt,
+			&i.ArchivedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1120,15 +1129,6 @@ func (q *Queries) GetTraceSpans(ctx context.Context, arg GetTraceSpansParams) ([
 	return items, nil
 }
 
-const hardDeleteApp = `-- name: HardDeleteApp :exec
-DELETE FROM apps WHERE id = ?
-`
-
-func (q *Queries) HardDeleteApp(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, hardDeleteApp, id)
-	return err
-}
-
 const historyCountRuns = `-- name: HistoryCountRuns :one
 SELECT COUNT(DISTINCT run_id) FROM history
 `
@@ -1138,56 +1138,6 @@ func (q *Queries) HistoryCountRuns(ctx context.Context) (int64, error) {
 	var count int64
 	err := row.Scan(&count)
 	return count, err
-}
-
-const insertApp = `-- name: InsertApp :one
-INSERT INTO apps
-	(id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url) VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url
-`
-
-type InsertAppParams struct {
-	ID          uuid.UUID
-	Name        string
-	SdkLanguage string
-	SdkVersion  string
-	Framework   sql.NullString
-	Metadata    string
-	Status      string
-	Error       sql.NullString
-	Checksum    string
-	Url         string
-}
-
-func (q *Queries) InsertApp(ctx context.Context, arg InsertAppParams) (*App, error) {
-	row := q.db.QueryRowContext(ctx, insertApp,
-		arg.ID,
-		arg.Name,
-		arg.SdkLanguage,
-		arg.SdkVersion,
-		arg.Framework,
-		arg.Metadata,
-		arg.Status,
-		arg.Error,
-		arg.Checksum,
-		arg.Url,
-	)
-	var i App
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.SdkLanguage,
-		&i.SdkVersion,
-		&i.Framework,
-		&i.Metadata,
-		&i.Status,
-		&i.Error,
-		&i.Checksum,
-		&i.CreatedAt,
-		&i.DeletedAt,
-		&i.Url,
-	)
-	return &i, err
 }
 
 const insertEvent = `-- name: InsertEvent :exec
@@ -1261,7 +1211,7 @@ const insertFunction = `-- name: InsertFunction :one
 
 INSERT INTO functions
 	(id, app_id, name, slug, config, created_at) VALUES
-	(?, ?, ?, ?, ?, ?) RETURNING id, app_id, name, slug, config, created_at
+	(?, ?, ?, ?, ?, ?) RETURNING id, app_id, name, slug, config, created_at, archived_at
 `
 
 type InsertFunctionParams struct {
@@ -1293,6 +1243,7 @@ func (q *Queries) InsertFunction(ctx context.Context, arg InsertFunctionParams) 
 		&i.Slug,
 		&i.Config,
 		&i.CreatedAt,
+		&i.ArchivedAt,
 	)
 	return &i, err
 }
@@ -1544,7 +1495,7 @@ func (q *Queries) InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) 
 }
 
 const updateAppError = `-- name: UpdateAppError :one
-UPDATE apps SET error = ? WHERE id = ? RETURNING id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url
+UPDATE apps SET error = ? WHERE id = ? RETURNING id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url
 `
 
 type UpdateAppErrorParams struct {
@@ -1566,14 +1517,14 @@ func (q *Queries) UpdateAppError(ctx context.Context, arg UpdateAppErrorParams) 
 		&i.Error,
 		&i.Checksum,
 		&i.CreatedAt,
-		&i.DeletedAt,
+		&i.ArchivedAt,
 		&i.Url,
 	)
 	return &i, err
 }
 
 const updateAppURL = `-- name: UpdateAppURL :one
-UPDATE apps SET url = ? WHERE id = ? RETURNING id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url
+UPDATE apps SET url = ? WHERE id = ? RETURNING id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url
 `
 
 type UpdateAppURLParams struct {
@@ -1595,14 +1546,14 @@ func (q *Queries) UpdateAppURL(ctx context.Context, arg UpdateAppURLParams) (*Ap
 		&i.Error,
 		&i.Checksum,
 		&i.CreatedAt,
-		&i.DeletedAt,
+		&i.ArchivedAt,
 		&i.Url,
 	)
 	return &i, err
 }
 
 const updateFunctionConfig = `-- name: UpdateFunctionConfig :one
-UPDATE functions SET config = ? WHERE id = ? RETURNING id, app_id, name, slug, config, created_at
+UPDATE functions SET config = ?, archived_at = NULL WHERE id = ? RETURNING id, app_id, name, slug, config, created_at, archived_at
 `
 
 type UpdateFunctionConfigParams struct {
@@ -1620,6 +1571,67 @@ func (q *Queries) UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionCo
 		&i.Slug,
 		&i.Config,
 		&i.CreatedAt,
+		&i.ArchivedAt,
+	)
+	return &i, err
+}
+
+const upsertApp = `-- name: UpsertApp :one
+INSERT INTO apps (id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+    name = excluded.name,
+    sdk_language = excluded.sdk_language,
+    sdk_version = excluded.sdk_version,
+    framework = excluded.framework,
+    metadata = excluded.metadata,
+    status = excluded.status,
+    error = excluded.error,
+    checksum = excluded.checksum,
+    archived_at = NULL
+RETURNING id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url
+`
+
+type UpsertAppParams struct {
+	ID          uuid.UUID
+	Name        string
+	SdkLanguage string
+	SdkVersion  string
+	Framework   sql.NullString
+	Metadata    string
+	Status      string
+	Error       sql.NullString
+	Checksum    string
+	Url         string
+}
+
+func (q *Queries) UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, error) {
+	row := q.db.QueryRowContext(ctx, upsertApp,
+		arg.ID,
+		arg.Name,
+		arg.SdkLanguage,
+		arg.SdkVersion,
+		arg.Framework,
+		arg.Metadata,
+		arg.Status,
+		arg.Error,
+		arg.Checksum,
+		arg.Url,
+	)
+	var i App
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.SdkLanguage,
+		&i.SdkVersion,
+		&i.Framework,
+		&i.Metadata,
+		&i.Status,
+		&i.Error,
+		&i.Checksum,
+		&i.CreatedAt,
+		&i.ArchivedAt,
+		&i.Url,
 	)
 	return &i, err
 }

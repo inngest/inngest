@@ -9,7 +9,7 @@ CREATE TABLE apps (
 	error TEXT,
 	checksum VARCHAR NOT NULL,
 	created_at TIMESTAMP NOT NULL,
-	deleted_at TIMESTAMP,
+	archived_at TIMESTAMP,
 	url VARCHAR NOT NULL
 );
 
@@ -34,7 +34,8 @@ CREATE TABLE functions (
 	name VARCHAR NOT NULL,
 	slug VARCHAR NOT NULL,
 	config VARCHAR NOT NULL,
-	created_at TIMESTAMP NOT NULL
+	created_at TIMESTAMP NOT NULL,
+	archived_at TIMESTAMP
 );
 
 CREATE TABLE function_runs (
