@@ -89,6 +89,7 @@ type Identifier struct {
 	// CustomConcurrencyKeys stores custom concurrency keys for this function run.  This
 	// allows us to use custom concurrency keys for each job when processing steps for
 	// the function, with cached expression results.
+	// Deprecated: use CustomConcurrencyKeys on item instead
 	CustomConcurrencyKeys []CustomConcurrency `json:"cck,omitempty"`
 }
 

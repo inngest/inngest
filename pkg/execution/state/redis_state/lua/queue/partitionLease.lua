@@ -13,10 +13,12 @@ Output:
 
 local keyPartitionMap         = KEYS[1] -- key storing all partitions
 local keyGlobalPartitionPtr   = KEYS[2] -- global top-level partitioned queue
-local keyFnMeta               = KEYS[3]
-local keyAcctConcurrency      = KEYS[4] -- in progress queue for account
-local keyFnConcurrency        = KEYS[5] -- in progress queue for partition
-local keyCustomConcurrency    = KEYS[6] -- in progress queue for custom key
+local keyGlobalAccountPointer = KEYS[3] -- accounts:sorted - zset
+local keyAccountPartitions    = KEYS[4] -- accounts:$accountId:partition:sorted - zset
+local keyFnMeta               = KEYS[5]
+local keyAcctConcurrency      = KEYS[6] -- in progress queue for account
+local keyFnConcurrency        = KEYS[7] -- in progress queue for partition
+local keyCustomConcurrency    = KEYS[8] -- in progress queue for custom key
 
 
 local partitionID             = ARGV[1]
@@ -27,12 +29,15 @@ local acctConcurrency         = tonumber(ARGV[5]) -- concurrency limit for the a
 local fnConcurrency           = tonumber(ARGV[6]) -- concurrency limit for this fn
 local customConcurrency       = tonumber(ARGV[7]) -- concurrency limit for the custom key
 local noCapacityScore         = tonumber(ARGV[8]) -- score if limit concurrency limit is hit
+local accountId               = ARGV[9]
 
 -- $include(check_concurrency.lua)
 -- $include(get_partition_item.lua)
 -- $include(get_fn_meta.lua)
 -- $include(decode_ulid_time.lua)
 -- $include(update_pointer_score.lua)
+-- $include(ends_with.lua)
+-- $include(update_account_queues.lua)
 
 local existing = get_partition_item(keyPartitionMap, partitionID)
 if existing == nil or existing == false then
@@ -63,6 +68,7 @@ if acctConcurrency > 0 and #keyAcctConcurrency > 0 then
     local acctCap = check_concurrency(currentTime, keyAcctConcurrency, acctConcurrency)
     if acctCap <= 0 then
         requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
+        update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, noCapacityScore)
         return { -1 }
     end
     if acctCap <= capacity then
@@ -76,6 +82,7 @@ if fnConcurrency > 0 and #keyFnConcurrency > 0 then
     local fnCap = check_concurrency(currentTime, keyFnConcurrency, fnConcurrency)
     if fnCap <= 0 then
         requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
+        update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, noCapacityScore)
         return { -2 }
     end
     if fnCap <= capacity then
@@ -89,6 +96,7 @@ if customConcurrency > 0 and #keyCustomConcurrency > 0 then
     local customCap = check_concurrency(currentTime, keyCustomConcurrency, customConcurrency)
     if customCap <= 0 then
         requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
+        update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, noCapacityScore)
         return { -3 }
     end
     if customCap <= capacity then
@@ -102,6 +110,7 @@ existing.last = currentTime -- in ms.
 
 -- Update item and index score
 redis.call("HSET", keyPartitionMap, partitionID, cjson.encode(existing))
-redis.call("ZADD", keyGlobalPartitionPtr, leaseTime, partitionID) -- partition scored are in seconds.
+update_pointer_score_to(partitionID, keyGlobalPartitionPtr, leaseTime)
+update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, leaseTime)
 
 return { existingTime, capacity }

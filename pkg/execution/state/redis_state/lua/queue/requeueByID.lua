@@ -14,13 +14,15 @@ Return values:
 ]]
 --
 
-local keyQueueHash     = KEYS[1] -- queue:item - hash
-local keyPartitionMap  = KEYS[2] -- partition:item - hash: { $workflowID: $partition }
-local keyGlobalPointer = KEYS[3] -- partition:sorted - zset
+local keyQueueHash            = KEYS[1] -- queue:item - hash
+local keyPartitionMap         = KEYS[2] -- partition:item - hash: { $workflowID: $partition }
+local keyGlobalPointer        = KEYS[3] -- partition:sorted - zset
+local keyGlobalAccountPointer = KEYS[4] -- accounts:sorted - zset
+local keyAccountPartitions    = KEYS[5] -- accounts:$accountId:partition:sorted
 
-local keyPartitionA    = KEYS[4] -- queue:sorted:$workflowID - zset
-local keyPartitionB    = KEYS[5] -- e.g. sorted:c|t:$workflowID - zset
-local keyPartitionC    = KEYS[6] -- e.g. sorted:c|t:$workflowID - zset
+local keyPartitionA    = KEYS[6] -- queue:sorted:$workflowID - zset
+local keyPartitionB    = KEYS[7] -- e.g. sorted:c|t:$workflowID - zset
+local keyPartitionC    = KEYS[8] -- e.g. sorted:c|t:$workflowID - zset
 
 local jobID            = ARGV[1]           -- queue item ID
 local jobScore         = tonumber(ARGV[2]) -- enqueue at, in milliseconds
@@ -31,11 +33,13 @@ local partitionItemC      = ARGV[6]
 local partitionIdA        = ARGV[7]
 local partitionIdB        = ARGV[8]
 local partitionIdC        = ARGV[9]
+local accountId           = ARGV[10]
 
 -- $include(get_queue_item.lua)
 -- $include(update_pointer_score.lua)
 -- $include(get_partition_item.lua)
--- $include(has_shard_key.lua)
+-- $include(ends_with.lua)
+-- $include(update_account_queues.lua)
 -- $include(enqueue_to_partition.lua)
 
 local item = get_queue_item(keyQueueHash, jobID)
@@ -56,8 +60,8 @@ item.wt = jobScore
 redis.call("HSET", keyQueueHash, jobID, cjson.encode(item))
 
 -- Update and requeue all partitions
-requeue_to_partition(keyPartitionA, partitionIdA, partitionItemA, keyPartitionMap, keyGlobalPointer, jobScore, jobID, nowMS)
-requeue_to_partition(keyPartitionB, partitionIdB, partitionItemB, keyPartitionMap, keyGlobalPointer, jobScore, jobID, nowMS)
-requeue_to_partition(keyPartitionC, partitionIdC, partitionItemC, keyPartitionMap, keyGlobalPointer, jobScore, jobID, nowMS)
+requeue_to_partition(keyPartitionA, partitionIdA, partitionItemA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
+requeue_to_partition(keyPartitionB, partitionIdB, partitionItemB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
+requeue_to_partition(keyPartitionC, partitionIdC, partitionItemC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
 
 return 0

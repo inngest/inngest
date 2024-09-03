@@ -11,18 +11,20 @@ Output:
 local queueKey                = KEYS[1] -- queue:item - hash: { $itemID: $item }
 local keyPartitionMap         = KEYS[2] -- partition:item - hash: { $workflowID: $partition }
 local keyGlobalPointer        = KEYS[3] -- partition:sorted - zset
-local keyPartitionA           = KEYS[4] -- queue:sorted:$workflowID - zset
-local keyPartitionB           = KEYS[5] -- e.g. sorted:c|t:$workflowID - zset
-local keyPartitionC           = KEYS[6] -- e.g. sorted:c|t:$workflowID - zset
+local keyGlobalAccountPointer = KEYS[4] -- accounts:sorted - zset
+local keyAccountPartitions    = KEYS[5] -- accounts:$accountId:partition:sorted
+local keyPartitionA           = KEYS[6] -- queue:sorted:$workflowID - zset
+local keyPartitionB           = KEYS[7] -- e.g. sorted:c|t:$workflowID - zset
+local keyPartitionC           = KEYS[8] -- e.g. sorted:c|t:$workflowID - zset
 -- We remove our queue item ID from each concurrency queue
-local keyConcurrencyA    = KEYS[7] -- Account concurrency level
-local keyConcurrencyB    = KEYS[8] -- When leasing an item we need to place the lease into this key
-local keyConcurrencyC    = KEYS[9] -- Optional for eg. for concurrency amongst steps
-local keyAcctConcurrency = KEYS[10]       
+local keyConcurrencyA    = KEYS[9] -- Account concurrency level
+local keyConcurrencyB    = KEYS[10] -- When leasing an item we need to place the lease into this key
+local keyConcurrencyC    = KEYS[11] -- Optional for eg. for concurrency amongst steps
+local keyAcctConcurrency = KEYS[12]
 -- We push pointers to partition concurrency items to the partition concurrency item
-local concurrencyPointer      = KEYS[11]
-local keyItemIndexA           = KEYS[12]          -- custom item index 1
-local keyItemIndexB           = KEYS[13]          -- custom item index 2
+local concurrencyPointer      = KEYS[13]
+local keyItemIndexA           = KEYS[14]          -- custom item index 1
+local keyItemIndexB           = KEYS[15]          -- custom item index 2
 
 local queueItem           = ARGV[1]
 local queueID             = ARGV[2]           -- id
@@ -34,13 +36,14 @@ local partitionItemC      = ARGV[7]
 local partitionIdA        = ARGV[8]
 local partitionIdB        = ARGV[9]
 local partitionIdC        = ARGV[10]
-local legacyPartitionName = ARGV[11]
+local accountId           = ARGV[11]
+local legacyPartitionName = ARGV[12]
 
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
 -- $include(update_pointer_score.lua)
--- $include(has_shard_key.lua)
 -- $include(ends_with.lua)
+-- $include(update_account_queues.lua)
 -- $include(enqueue_to_partition.lua)
 
 local item = get_queue_item(queueKey, queueID)
@@ -95,9 +98,9 @@ redis.call("ZREM", keyAcctConcurrency, item.id)
 --
 -- Partition manipulation
 -- 
-requeue_to_partition(keyPartitionA, partitionIdA, partitionItemA, keyPartitionMap, keyGlobalPointer, queueScore, queueID, nowMS)
-requeue_to_partition(keyPartitionB, partitionIdB, partitionItemB, keyPartitionMap, keyGlobalPointer, queueScore, queueID, nowMS)
-requeue_to_partition(keyPartitionC, partitionIdC, partitionItemC, keyPartitionMap, keyGlobalPointer, queueScore, queueID, nowMS)
+requeue_to_partition(keyPartitionA, partitionIdA, partitionItemA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
+requeue_to_partition(keyPartitionB, partitionIdB, partitionItemB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
+requeue_to_partition(keyPartitionC, partitionIdC, partitionItemC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
 
 -- Add optional indexes.
 if keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then

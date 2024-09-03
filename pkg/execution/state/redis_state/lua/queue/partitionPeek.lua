@@ -27,4 +27,15 @@ if #items == 0 then
 	return {}
 end
 
-return redis.call("HMGET", partitionKey, unpack(items))
+local partitions = redis.call("HMGET", partitionKey, unpack(items))
+
+-- if there's a nil value in the partition at position i, we need to remove it and add it to a separate set of missing partitions
+local missingPartitions = {}
+for i, partition in ipairs(partitions) do
+	if partition == false then
+		table.insert(missingPartitions, items[i])
+		table.remove(partitions, i)
+	end
+end
+
+return {partitions, missingPartitions}

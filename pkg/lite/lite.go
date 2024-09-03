@@ -182,6 +182,7 @@ func start(ctx context.Context, opts StartOpts) error {
 						return f.Concurrency.PartitionConcurrency(), consts.DefaultConcurrencyLimit, consts.DefaultConcurrencyLimit
 					}
 				}
+
 				return consts.DefaultConcurrencyLimit, consts.DefaultConcurrencyLimit, consts.DefaultConcurrencyLimit
 			}),
 	}
