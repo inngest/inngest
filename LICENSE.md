@@ -500,7 +500,7 @@ you make available.
 
 14. Revised Versions of this License.
 
-MongoDB, Inc. may publish revised and/or new versions of the Server Side
+Inngest Inc. may publish revised and/or new versions of the Server Side
 Public License from time to time. Such new versions will be similar in
 spirit to the present version, but may differ in detail to address new
 problems or concerns.
@@ -509,9 +509,9 @@ Each version is given a distinguishing version number. If the Program
 specifies that a certain numbered version of the Server Side Public
 License “or any later version” applies to it, you have the option of
 following the terms and conditions either of that numbered version or of
-any later version published by MongoDB, Inc. If the Program does not
+any later version published by Inngest Inc. If the Program does not
 specify a version number of the Server Side Public License, you may
-choose any version ever published by MongoDB, Inc.
+choose any version ever published by Inngest Inc.
 
 If the Program specifies that a proxy can decide which future versions of
 the Server Side Public License can be used, that proxy's public statement

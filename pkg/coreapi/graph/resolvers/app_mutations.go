@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/run"
 	"go.opentelemetry.io/otel/attribute"
 )
@@ -24,21 +25,16 @@ func (r *mutationResolver) CreateApp(ctx context.Context, input models.CreateApp
 		input.URL = "http://" + input.URL
 	}
 
-	// If we already have the app, return it.
-	if app, err := r.Data.GetAppByURL(ctx, input.URL); err == nil && app != nil {
-		return app, nil
-	}
-
 	// Create a new app which holds the error message.
-	params := cqrs.InsertAppParams{
-		ID:  uuid.New(),
+	params := cqrs.UpsertAppParams{
+		ID:  inngest.DeterministicAppUUID(input.URL),
 		Url: input.URL,
 		Error: sql.NullString{
 			Valid:  true,
 			String: deploy.DeployErrUnreachable.Error(),
 		},
 	}
-	app, _ := r.Data.InsertApp(ctx, params)
+	app, _ := r.Data.UpsertApp(ctx, params)
 
 	if res := deploy.Ping(ctx, input.URL); res.Err != nil {
 		return app, res.Err

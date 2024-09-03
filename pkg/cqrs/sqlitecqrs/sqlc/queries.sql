@@ -1,31 +1,38 @@
--- name: InsertApp :one
-INSERT INTO apps
-	(id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url) VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *;
+-- name: UpsertApp :one
+INSERT INTO apps (id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+    name = excluded.name,
+    sdk_language = excluded.sdk_language,
+    sdk_version = excluded.sdk_version,
+    framework = excluded.framework,
+    metadata = excluded.metadata,
+    status = excluded.status,
+    error = excluded.error,
+    checksum = excluded.checksum,
+    archived_at = NULL
+RETURNING *;
 
 -- name: GetApp :one
 SELECT * FROM apps WHERE id = ?;
 
 -- name: GetApps :many
-SELECT * FROM apps WHERE deleted_at IS NULL;
+SELECT * FROM apps WHERE archived_at IS NULL;
 
 -- name: GetAppByChecksum :one
-SELECT * FROM apps WHERE checksum = ? LIMIT 1;
+SELECT * FROM apps WHERE checksum = ? AND archived_at IS NULL LIMIT 1;
 
 -- name: GetAppByID :one
 SELECT * FROM apps WHERE id = ? LIMIT 1;
 
 -- name: GetAppByURL :one
-SELECT * FROM apps WHERE url = ? LIMIT 1;
+SELECT * FROM apps WHERE url = ? AND archived_at IS NULL LIMIT 1;
 
 -- name: GetAllApps :many
-SELECT * FROM apps;
+SELECT * FROM apps WHERE archived_at IS NULL;
 
 -- name: DeleteApp :exec
-UPDATE apps SET deleted_at = NOW() WHERE id = ?;
-
--- name: HardDeleteApp :exec
-DELETE FROM apps WHERE id = ?;
+UPDATE apps SET archived_at = datetime('now') WHERE id = ?;
 
 -- name: UpdateAppURL :one
 UPDATE apps SET url = ? WHERE id = ? RETURNING *;
@@ -46,30 +53,32 @@ INSERT INTO functions
 	(?, ?, ?, ?, ?, ?) RETURNING *;
 
 -- name: GetFunctions :many
-SELECT * FROM functions;
+SELECT functions.*
+FROM functions
+JOIN apps ON apps.id = functions.app_id
+WHERE functions.archived_at IS NULL
+AND apps.archived_at IS NULL;
 
 -- name: GetAppFunctions :many
-SELECT * FROM functions WHERE app_id = ?;
+SELECT * FROM functions WHERE app_id = ? AND archived_at IS NULL;
 
 -- name: GetAppFunctionsBySlug :many
-SELECT functions.* FROM functions JOIN apps ON apps.id = functions.app_id WHERE apps.name = ?;
+SELECT functions.* FROM functions JOIN apps ON apps.id = functions.app_id WHERE apps.name = ? AND functions.archived_at IS NULL;
 
 -- name: GetFunctionByID :one
 SELECT * FROM functions WHERE id = ?;
 
 -- name: GetFunctionBySlug :one
-SELECT * FROM functions WHERE slug = ?;
-
+SELECT * FROM functions WHERE slug = ? AND archived_at IS NULL;
 
 -- name: UpdateFunctionConfig :one
-UPDATE functions SET config = ? WHERE id = ? RETURNING *;
+UPDATE functions SET config = ?, archived_at = NULL WHERE id = ? RETURNING *;
 
 -- name: DeleteFunctionsByAppID :exec
-DELETE FROM functions WHERE app_id = ?;
+UPDATE functions SET archived_at = datetime('now') WHERE app_id = ?;
 
 -- name: DeleteFunctionsByIDs :exec
-DELETE FROM functions WHERE id IN (sqlc.slice('ids'));
-
+UPDATE functions SET archived_at = datetime('now') WHERE id IN (sqlc.slice('ids'));
 
 --
 -- function runs
@@ -90,6 +99,10 @@ SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes)
   FROM function_runs
   LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
   WHERE function_runs.run_id = @run_id;
+
+-- name: GetFunctionRuns :many
+SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes) FROM function_runs
+LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id;
 
 -- name: GetFunctionRunsTimebound :many
 SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes) FROM function_runs
@@ -164,11 +177,17 @@ SELECT * FROM events WHERE internal_id < @cursor AND received_at <= @before AND 
 
 -- name: InsertHistory :exec
 INSERT INTO history
-	(id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result) VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+	(id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, step_type, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: GetHistoryItem :one
+SELECT * FROM history WHERE id = ?;
 
 -- name: GetFunctionRunHistory :many
 SELECT * FROM history WHERE run_id = ? ORDER BY created_at ASC;
+
+-- name: HistoryCountRuns :one
+SELECT COUNT(DISTINCT run_id) FROM history;
 
 
 --
@@ -195,3 +214,36 @@ SELECT * FROM traces WHERE trace_id = @trace_id AND run_id = @run_id ORDER BY ti
 
 -- name: GetTraceSpanOutput :many
 select * from traces where trace_id = @trace_id AND span_id = @span_id ORDER BY timestamp_unix_ms DESC, duration DESC;
+
+
+--
+-- Lite queue snapshots
+--
+
+-- name: GetQueueSnapshotChunks :many
+SELECT chunk_id, data
+FROM queue_snapshot_chunks
+WHERE snapshot_id = ?
+ORDER BY chunk_id ASC;
+
+-- name: GetLatestQueueSnapshotChunks :many
+SELECT chunk_id, data
+FROM queue_snapshot_chunks
+WHERE snapshot_id = (
+    SELECT MAX(snapshot_id) FROM queue_snapshot_chunks
+)
+ORDER BY chunk_id ASC;
+
+-- name: InsertQueueSnapshotChunk :exec
+INSERT INTO queue_snapshot_chunks (snapshot_id, chunk_id, data)
+VALUES
+	(?, ?, ?);
+
+-- name: DeleteOldQueueSnapshots :execrows
+DELETE FROM queue_snapshot_chunks
+WHERE snapshot_id NOT IN (
+    SELECT snapshot_id
+    FROM queue_snapshot_chunks
+    ORDER BY snapshot_id DESC
+    LIMIT ?
+);
