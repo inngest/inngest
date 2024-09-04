@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
 	"net/http"
+
+	"github.com/google/uuid"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
@@ -23,7 +24,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/headers"
-	"github.com/inngest/inngest/pkg/history_drivers/memory_reader"
+	"github.com/inngest/inngest/pkg/history_reader"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/oklog/ulid/v2"
@@ -33,18 +34,23 @@ import (
 type Options struct {
 	Data cqrs.Manager
 
-	Config       config.Config
-	Logger       *zerolog.Logger
-	Runner       runner.Runner
-	Tracker      *runner.Tracker
-	State        state.Manager
-	Queue        queue.JobQueueReader
-	EventHandler api.EventHandler
-	Executor     execution.Executor
+	Config        config.Config
+	Logger        *zerolog.Logger
+	Runner        runner.Runner
+	Tracker       *runner.Tracker
+	State         state.Manager
+	Queue         queue.JobQueueReader
+	EventHandler  api.EventHandler
+	Executor      execution.Executor
+	HistoryReader history_reader.Reader
 }
 
 func NewCoreApi(o Options) (*CoreAPI, error) {
 	logger := o.Logger.With().Str("caller", "coreapi").Logger()
+
+	if o.HistoryReader == nil {
+		return nil, fmt.Errorf("history reader is required")
+	}
 
 	a := &CoreAPI{
 		data:    o.Data,
@@ -72,7 +78,7 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 
 	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &resolvers.Resolver{
 		Data:          o.Data,
-		HistoryReader: memory_reader.NewReader(),
+		HistoryReader: o.HistoryReader,
 		Runner:        o.Runner,
 		Queue:         o.Queue,
 		EventHandler:  o.EventHandler,

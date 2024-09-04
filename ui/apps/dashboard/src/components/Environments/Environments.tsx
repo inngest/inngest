@@ -10,8 +10,8 @@ import Toaster from '@/components/Toaster';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useEnvironments } from '@/queries';
 import { EnvironmentType, LEGACY_TEST_MODE_NAME } from '@/utils/environments';
-import { EnvironmentArchiveButton } from './old/EnvironmentArchiveButton';
-import EnvironmentListTable from './old/EnvironmentListTable';
+import { EnvironmentArchiveButton } from './EnvironmentArchiveButton';
+import EnvironmentListTable from './EnvironmentListTable';
 
 export default function Environments() {
   const [{ data: envs = [], fetching }] = useEnvironments();

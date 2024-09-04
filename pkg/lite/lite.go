@@ -37,8 +37,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
-	"github.com/inngest/inngest/pkg/history_drivers/memory_writer"
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/run"
@@ -90,6 +88,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Initialize the devserver
 	dbcqrs := sqlitecqrs.NewCQRS(db)
 	hd := sqlitecqrs.NewHistoryDriver(db)
+	hr := sqlitecqrs.NewHistoryReader(db)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	stepLimitOverrides := make(map[string]int)
@@ -166,24 +165,28 @@ func start(ctx context.Context, opts StartOpts) error {
 			return keys
 		}),
 		redis_state.WithConcurrencyLimitGetter(
-			func(ctx context.Context, p redis_state.QueuePartition) (fn, acct, custom int) {
-				// Ensure that we return the correct concurrency values per
-				// partition.
+			func(ctx context.Context, p redis_state.QueuePartition) (fnLimit, acctLimit, customLimit int) {
+				fnLimit = consts.DefaultConcurrencyLimit
+				acctLimit = consts.DefaultConcurrencyLimit // NOTE: In the dev server there are no account concurrency limits.
+				customLimit = consts.DefaultConcurrencyLimit
+
+				// Ensure that we return the correct concurrency values per partition.
 				funcs, err := dbcqrs.GetFunctions(ctx)
 				if err != nil {
-					return consts.DefaultConcurrencyLimit, consts.DefaultConcurrencyLimit, consts.DefaultConcurrencyLimit
+					return
 				}
 				for _, fn := range funcs {
 					f, _ := fn.InngestFunction()
 					if f.ID == uuid.Nil {
-						f.ID = inngest.DeterministicUUID(*f)
+						f.ID = f.DeterministicUUID()
 					}
 					if p.FunctionID != nil && f.ID == *p.FunctionID && f.Concurrency != nil && f.Concurrency.PartitionConcurrency() > 0 {
-						return f.Concurrency.PartitionConcurrency(), consts.DefaultConcurrencyLimit, consts.DefaultConcurrencyLimit
+						fnLimit = f.Concurrency.PartitionConcurrency()
+						return
 					}
 				}
 
-				return consts.DefaultConcurrencyLimit, consts.DefaultConcurrencyLimit, consts.DefaultConcurrencyLimit
+				return
 			}),
 	}
 
@@ -210,8 +213,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("failed to create publisher: %w", err)
 	}
 
-	hmw := memory_writer.NewWriter(ctx, memory_writer.WriterOptions{DumpToFile: true})
-
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(sm),
@@ -226,7 +227,6 @@ func start(ctx context.Context, opts StartOpts) error {
 			history.NewLifecycleListener(
 				nil,
 				hd,
-				hmw,
 			),
 			devserver.Lifecycle{
 				Cqrs:       dbcqrs,
@@ -286,11 +286,12 @@ func start(ctx context.Context, opts StartOpts) error {
 	)
 
 	// The devserver embeds the event API.
-	persistenceInterval := time.Second * 60
+	persistenceInterval := consts.LiteDefaultPersistenceInterval
 	ds := devserver.NewService(devserver.StartOpts{
 		Config:  opts.Config,
 		RootDir: opts.RootDir,
-	}, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hmw, &persistenceInterval)
+		Tick:    tick,
+	}, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hd, &persistenceInterval)
 	// embed the tracker
 	ds.Tracker = t
 	ds.State = sm
@@ -316,18 +317,17 @@ func start(ctx context.Context, opts StartOpts) error {
 		})
 	})
 
-	// ds.opts.Config.EventStream.Service.TopicName()
-
 	core, err := coreapi.NewCoreApi(coreapi.Options{
-		Data:         ds.Data,
-		Config:       ds.Opts.Config,
-		Logger:       logger.From(ctx),
-		Runner:       ds.Runner,
-		Tracker:      ds.Tracker,
-		State:        ds.State,
-		Queue:        ds.Queue,
-		EventHandler: ds.HandleEvent,
-		Executor:     ds.Executor,
+		Data:          ds.Data,
+		Config:        ds.Opts.Config,
+		Logger:        logger.From(ctx),
+		Runner:        ds.Runner,
+		Tracker:       ds.Tracker,
+		State:         ds.State,
+		Queue:         ds.Queue,
+		EventHandler:  ds.HandleEvent,
+		Executor:      ds.Executor,
+		HistoryReader: hr,
 	})
 	if err != nil {
 		return err

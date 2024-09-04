@@ -23,7 +23,7 @@ type App struct {
 	Error       sql.NullString
 	Checksum    string
 	CreatedAt   time.Time
-	DeletedAt   sql.NullTime
+	ArchivedAt  sql.NullTime
 	Url         string
 }
 
@@ -55,12 +55,13 @@ type EventBatch struct {
 }
 
 type Function struct {
-	ID        uuid.UUID
-	AppID     uuid.UUID
-	Name      string
-	Slug      string
-	Config    string
-	CreatedAt time.Time
+	ID         uuid.UUID
+	AppID      uuid.UUID
+	Name       string
+	Slug       string
+	Config     string
+	CreatedAt  time.Time
+	ArchivedAt sql.NullTime
 }
 
 type FunctionFinish struct {
@@ -99,6 +100,7 @@ type History struct {
 	LatencyMs            sql.NullInt64
 	StepName             sql.NullString
 	StepID               sql.NullString
+	StepType             sql.NullString
 	Url                  sql.NullString
 	CancelRequest        sql.NullString
 	Sleep                sql.NullString
@@ -107,6 +109,12 @@ type History struct {
 	InvokeFunction       sql.NullString
 	InvokeFunctionResult sql.NullString
 	Result               sql.NullString
+}
+
+type QueueSnapshotChunk struct {
+	SnapshotID interface{}
+	ChunkID    int64
+	Data       []byte
 }
 
 type Trace struct {

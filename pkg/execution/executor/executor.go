@@ -2150,10 +2150,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		return execError{err: fmt.Errorf("failed to create expression to wait for invoked function completion: %w", err)}
 	}
 
-	pauseID := uuid.NewSHA1(
-		uuid.NameSpaceOID,
-		[]byte(i.md.ID.RunID.String()+gen.ID),
-	)
+	pauseID := inngest.DeterministicSha1UUID(i.md.ID.RunID.String() + gen.ID)
 	opcode := gen.Op.String()
 	now := time.Now()
 
@@ -2255,10 +2252,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		return fmt.Errorf("unable to parse wait for event expires: %w", err)
 	}
 
-	pauseID := uuid.NewSHA1(
-		uuid.NameSpaceOID,
-		[]byte(i.md.ID.RunID.String()+gen.ID),
-	)
+	pauseID := inngest.DeterministicSha1UUID(i.md.ID.RunID.String() + gen.ID)
 
 	expr := opts.If
 	if expr != nil && strings.Contains(*expr, "event.") {
