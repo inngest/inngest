@@ -41,8 +41,8 @@ const option: ChartProps['option'] = {
         label: {
           show: true,
           fontSize: 10,
-          formatter: ({ data }: { data: { name: string; value: string } }) => {
-            return [`{name| ${data.name}}`, `{value| ${data.value}}`].join('\n');
+          formatter: ({ data }: any): string => {
+            return [`{name| ${data?.name}}`, `{value| ${data?.value}}`].join('\n');
           },
           rich: {
             name: {

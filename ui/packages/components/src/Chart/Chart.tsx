@@ -29,7 +29,7 @@ export const Chart = ({ option, settings, theme = 'light' }: ChartProps) => {
   useEffect(() => {
     if (chartRef.current !== null) {
       const chart = getInstanceByDom(chartRef.current);
-      chart.setOption(option, settings);
+      chart?.setOption(option, settings);
     }
   }, [option, settings]);
 
