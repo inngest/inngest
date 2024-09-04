@@ -12,7 +12,7 @@ import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import { GetBillingPlanDocument } from '@/gql/graphql';
 
-export const AppFilterDocument = graphql(`
+const AppFilterDocument = graphql(`
   query AppFilter($envSlug: String!) {
     env: envBySlug(slug: $envSlug) {
       apps {
