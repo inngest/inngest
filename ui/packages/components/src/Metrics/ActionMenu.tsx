@@ -12,7 +12,7 @@ export type RunsActionMenuProps = {
   intervalSeconds?: number;
 };
 
-export const RunsActionMenu = ({
+export const MetricsActionMenu = ({
   autoRefresh,
   setAutoRefresh,
   intervalSeconds = 5,
