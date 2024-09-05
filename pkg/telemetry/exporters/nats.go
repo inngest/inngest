@@ -110,7 +110,7 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 
 				id, status, kind, attr, err := e.parseSpanAttributes(sp.Attributes())
 				if err != nil {
-					logger.StdlibLogger(ctx).Error("error parsing span attribures",
+					logger.StdlibLogger(ctx).Error("error parsing span attributes",
 						"error", err,
 						"spanAttr", sp.Attributes(),
 					)
@@ -138,6 +138,10 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 					logger.StdlibLogger(ctx).Error("error parsing span events",
 						"error", err,
 						"spanEvents", sp.Events(),
+						"acctID", id.AccountId,
+						"wsID", id.EnvId,
+						"wfID", id.FunctionId,
+						"runID", id.RunId,
 					)
 				}
 
