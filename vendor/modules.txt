@@ -119,6 +119,12 @@ github.com/99designs/gqlgen/plugin/federation/fieldset
 github.com/99designs/gqlgen/plugin/modelgen
 github.com/99designs/gqlgen/plugin/resolvergen
 github.com/99designs/gqlgen/plugin/servergen
+# github.com/Azure/azure-pipeline-go v0.2.3
+## explicit; go 1.14
+github.com/Azure/azure-pipeline-go/pipeline
+# github.com/Azure/azure-storage-blob-go v0.14.0
+## explicit; go 1.15
+github.com/Azure/azure-storage-blob-go/azblob
 # github.com/VividCortex/ewma v1.2.0
 ## explicit; go 1.12
 github.com/VividCortex/ewma
@@ -547,6 +553,9 @@ github.com/lucasb-eyer/go-colorful
 # github.com/magiconair/properties v1.8.5
 ## explicit; go 1.13
 github.com/magiconair/properties
+# github.com/mattn/go-ieproxy v0.0.3
+## explicit; go 1.14
+github.com/mattn/go-ieproxy
 # github.com/mattn/go-isatty v0.0.20
 ## explicit; go 1.15
 github.com/mattn/go-isatty
@@ -615,6 +624,9 @@ github.com/pelletier/go-toml
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
+# github.com/plasne/go-batcher/v2 v2.0.0-20210728174735-56c7e4a2309e
+## explicit; go 1.16
+github.com/plasne/go-batcher/v2
 # github.com/pmezard/go-difflib v1.0.0
 ## explicit
 github.com/pmezard/go-difflib/difflib
@@ -940,6 +952,7 @@ golang.org/x/mod/semver
 # golang.org/x/net v0.26.0
 ## explicit; go 1.18
 golang.org/x/net/http/httpguts
+golang.org/x/net/http/httpproxy
 golang.org/x/net/http2
 golang.org/x/net/http2/hpack
 golang.org/x/net/idna
