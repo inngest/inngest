@@ -44,6 +44,7 @@ func NewBatchSpanProcessor(ctx context.Context, exporter trace.SpanExporter, opt
 	processor := &batchSpanProcessor{
 		bufferSize:    defaultBatcherBufferSize,
 		flushInternal: defaultFlushInternal,
+		exporter:      exporter,
 	}
 
 	for _, apply := range opts {
