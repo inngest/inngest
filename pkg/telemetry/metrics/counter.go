@@ -136,3 +136,30 @@ func IncrExportedSpansCounter(ctx context.Context, opts CounterOpt) {
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrBatchProcessorEnqueuedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "batch_processor_enqueued_total",
+		Description: "Total number of spans enqueued for batch processing",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrBatchProcessorAttemptCounter(ctx context.Context, incr int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, incr, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "batch_processor_attempt_total",
+		Description: "Total number of spans attempted to export",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrBatchProcessorInvalidPayload(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "batch_processor_invalid_payload_total",
+		Description: "The total number of enqueued payload that are not spans",
+		Tags:        opts.Tags,
+	})
+}
