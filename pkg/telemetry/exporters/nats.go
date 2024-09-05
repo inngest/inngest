@@ -92,12 +92,10 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 	}
 	// publish to all subjects defined
 	for _, subj := range e.subjects {
-		sub := subj
-
 		for _, sp := range spans {
 			wg.Add(1)
 
-			go func(ctx context.Context, sp trace.ReadOnlySpan) {
+			go func(ctx context.Context, sub string, sp trace.ReadOnlySpan) {
 				defer wg.Done()
 
 				ts := sp.StartTime()
@@ -187,6 +185,7 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 						"wfID", id.FunctionId,
 						"runID", id.RunId,
 					)
+					return
 				}
 
 				pstatus := "unknown"
@@ -212,7 +211,7 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 						"status":  pstatus,
 					},
 				})
-			}(ctx, sp)
+			}(ctx, subj, sp)
 		}
 	}
 
