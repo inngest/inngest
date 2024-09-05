@@ -80,11 +80,7 @@ func (b *batchSpanProcessor) OnEnd(s trace.ReadOnlySpan) {
 }
 
 func (b *batchSpanProcessor) Shutdown(ctx context.Context) error {
-	if err := b.ForceFlush(ctx); err != nil {
-		// TODO: add metric
-		return err
-	}
-
+	b.batcher.Flush()
 	return b.exporter.Shutdown(ctx)
 }
 
