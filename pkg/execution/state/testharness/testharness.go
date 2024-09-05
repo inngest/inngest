@@ -322,14 +322,17 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 	require.EqualValues(t, r.Output, loaded)
 
 	// And that we have no state for the second step.
-	require.Empty(t, next.Actions()[w.Steps[1].ID])
+	anotherStepID := "step-2-id"
+	require.Empty(t, next.Actions()[anotherStepID])
 
 	//
 	// Check that saving a subsequent step saves the next output,
 	// as the second attempt.
 	//
 	r2 := state.DriverResponse{
-		Step: w.Steps[1],
+		Step: inngest.Step{
+			ID: anotherStepID,
+		},
 		Output: map[string]interface{}{
 			"status": float64(200),
 			"body": map[string]any{
@@ -353,12 +356,12 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 	require.NotEqualValues(t, s.Actions(), next.Actions())
 	require.Equal(t, 2, len(next.Actions()))
 	require.EqualValues(t, r.Output, next.Actions()[w.Steps[0].ID])
-	require.EqualValues(t, r2.Output, next.Actions()[w.Steps[1].ID])
+	require.EqualValues(t, r2.Output, next.Actions()[anotherStepID])
 	// Assert that requesting data for the given step ID works as expected.
 	loaded, err = next.ActionID(w.Steps[0].ID)
 	require.NoError(t, err)
 	require.EqualValues(t, r.Output, loaded)
-	loaded, err = next.ActionID(w.Steps[1].ID)
+	loaded, err = next.ActionID(anotherStepID)
 	require.NoError(t, err)
 	require.EqualValues(t, r2.Output, loaded)
 
@@ -377,15 +380,17 @@ func checkSaveResponse_stack(t *testing.T, m state.Manager) {
 	ctx := context.Background()
 	s := setup(t, m)
 
+	output := map[string]interface{}{
+		"status": float64(200),
+		"body": map[string]any{
+			"ok": true,
+		},
+	}
+
 	t.Run("It modifies the stack with step output", func(t *testing.T) {
 		r := state.DriverResponse{
-			Step: w.Steps[0],
-			Output: map[string]interface{}{
-				"status": float64(200),
-				"body": map[string]any{
-					"ok": true,
-				},
-			},
+			Step:   w.Steps[0],
+			Output: output,
 		}
 		err := m.SaveResponse(ctx, s.Identifier(), r.Step.ID, marshal(r.Output))
 		require.NoError(t, err)
@@ -400,7 +405,9 @@ func checkSaveResponse_stack(t *testing.T, m state.Manager) {
 
 	t.Run("It amends the stack with a subsequent step save", func(t *testing.T) {
 		r := state.DriverResponse{
-			Step:   w.Steps[1],
+			Step: inngest.Step{
+				ID: "foo-bar-baz",
+			},
 			Output: "this works",
 		}
 		err := m.SaveResponse(ctx, s.Identifier(), r.Step.ID, marshal(r.Output))
@@ -411,13 +418,13 @@ func checkSaveResponse_stack(t *testing.T, m state.Manager) {
 		require.NoError(t, err)
 		stack := next.Stack()
 		require.EqualValues(t, 2, len(stack))
-		require.Equal(t, []string{w.Steps[0].ID, w.Steps[1].ID}, stack)
+		require.Equal(t, []string{w.Steps[0].ID, r.Step.ID}, stack)
 		require.Equal(t, next.Actions()[r.Step.ID], "this works")
 	})
 
 	t.Run("It returns a duplicate error saving an ID twice", func(t *testing.T) {
 		r := state.DriverResponse{
-			Step:   w.Steps[1],
+			Step:   w.Steps[0],
 			Output: "do not save",
 		}
 
@@ -431,9 +438,9 @@ func checkSaveResponse_stack(t *testing.T, m state.Manager) {
 		stack := next.Stack()
 		require.EqualValues(t, 2, len(stack))
 
-		require.Equal(t, []string{w.Steps[0].ID, w.Steps[1].ID}, stack)
+		require.Equal(t, []string{w.Steps[0].ID, "foo-bar-baz"}, stack)
 		require.NotContains(t, next.Actions()[r.Step.ID], "do not save")
-		require.Equal(t, next.Actions()[r.Step.ID], "this works")
+		require.Equal(t, next.Actions()[r.Step.ID], output)
 	})
 }
 
