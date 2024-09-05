@@ -15,22 +15,42 @@ const (
 	defaultFlushInternal     = 200 * time.Millisecond
 )
 
+type BatchSpanProcessorOpt func(b *batchSpanProcessor)
+
+func WithBatchProcessorBufferSize(size uint32) BatchSpanProcessorOpt {
+	return func(b *batchSpanProcessor) {
+		b.bufferSize = size
+	}
+}
+
+func WithBatchProcessorInterval(flush time.Duration) BatchSpanProcessorOpt {
+	return func(b *batchSpanProcessor) {
+		b.flushInternal = flush
+	}
+}
+
 type batchSpanProcessor struct {
+	bufferSize    uint32
+	flushInternal time.Duration
+
 	exporter trace.SpanExporter
 	batcher  batcher.Batcher
 	watcher  batcher.Watcher
 }
 
-func NewBatchSpanProcessor(ctx context.Context, exporter trace.SpanExporter) (trace.SpanProcessor, error) {
-	b := batcher.
-		NewBatcherWithBuffer(defaultBatcherBufferSize).
-		WithFlushInterval(defaultFlushInternal)
-	if err := b.Start(ctx); err != nil {
-		return nil, fmt.Errorf("error starting batch processor: %w", err)
+func NewBatchSpanProcessor(ctx context.Context, exporter trace.SpanExporter, opts ...BatchSpanProcessorOpt) (trace.SpanProcessor, error) {
+	processor := &batchSpanProcessor{
+		bufferSize:    defaultBatcherBufferSize,
+		flushInternal: defaultFlushInternal,
 	}
 
-	processor := &batchSpanProcessor{
-		batcher: b,
+	for _, apply := range opts {
+		apply(processor)
+	}
+
+	processor.batcher = batcher.NewBatcherWithBuffer(processor.bufferSize).WithFlushInterval(processor.flushInternal)
+	if err := processor.batcher.Start(ctx); err != nil {
+		return nil, fmt.Errorf("error starting batch processor: %w", err)
 	}
 	processor.watcher = batcher.NewWatcher(processor.onReady)
 
