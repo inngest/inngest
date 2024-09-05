@@ -385,7 +385,7 @@ func newNatsTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) 
 		return nil, fmt.Errorf("error creating NATS trace client: %w", err)
 	}
 
-	sp := trace.NewBatchSpanProcessor(exp)
+	sp := exporters.NewBatchSpanProcessor(exp)
 	tp := trace.NewTracerProvider(
 		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(
