@@ -389,10 +389,12 @@ func newNatsTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) 
 	// configure options
 	bopts := []exporters.BatchSpanProcessorOpt{}
 	{
-
-		bufferSize, err := strconv.Atoi(os.Getenv("SPAN_BATCH_PROCESSOR_BUFFER_SIZE"))
-		if err == nil && bufferSize > 0 {
-			bopts = append(bopts, exporters.WithBatchProcessorBufferSize(uint32(bufferSize)))
+		val := os.Getenv("SPAN_BATCH_PROCESSOR_BUFFER_SIZE")
+		if val != "" {
+			bufferSize, err := strconv.ParseUint(val, 10, 32)
+			if err == nil && bufferSize > 0 {
+				bopts = append(bopts, exporters.WithBatchProcessorBufferSize(uint32(bufferSize)))
+			}
 		}
 	}
 
