@@ -5,7 +5,6 @@ import { Link } from '@inngest/components/Link/Link';
 import { AppGitCard } from '@/components/AppGitCard/AppGitCard';
 import { AppInfoCard } from '@/components/AppInfoCard';
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { SyncErrorCard } from '@/components/SyncErrorCard';
 import { FunctionList } from './FunctionList';
 import { useApp } from './useApp';
@@ -18,7 +17,6 @@ type Props = {
 };
 
 export default function Page({ params: { environmentSlug, externalID } }: Props) {
-  const { value: newIANav } = useBooleanFlag('new-ia-nav');
   externalID = decodeURIComponent(externalID);
   const env = useEnvironment();
 
@@ -45,21 +43,18 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-[1200px] px-6">
-        {newIANav ? (
-          <div className="relative my-16 mb-8 flex flex-row items-center justify-between">
-            <div className="flex flex-col">
-              <div className="text-basis text-2xl leading-tight">{appRes.data.name}</div>
-            </div>
-            <Link
-              internalNavigation={true}
-              href={`/env/${env.slug}/apps/${encodeURIComponent(externalID)}/syncs`}
-            >
-              See all syncs
-            </Link>
+        <div className="relative my-16 mb-8 flex flex-row items-center justify-between">
+          <div className="flex flex-col">
+            <div className="text-basis text-2xl leading-tight">{appRes.data.name}</div>
           </div>
-        ) : (
-          <div className="h-6" />
-        )}
+          <Link
+            internalNavigation={true}
+            href={`/env/${env.slug}/apps/${encodeURIComponent(externalID)}/syncs`}
+          >
+            See all syncs
+          </Link>
+        </div>
+
         {appRes.data.latestSync?.error && (
           <SyncErrorCard className="mb-4" error={appRes.data.latestSync.error} />
         )}
