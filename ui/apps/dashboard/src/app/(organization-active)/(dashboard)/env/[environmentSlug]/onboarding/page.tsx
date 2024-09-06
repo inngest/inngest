@@ -1,3 +1,9 @@
+import { ServerFeatureFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+
 export default function Onboarding() {
-  return <div>New onboarding page</div>;
+  return (
+    <ServerFeatureFlag flag="onboarding-flow-cloud">
+      <div>New onboarding page</div>
+    </ServerFeatureFlag>
+  );
 }
