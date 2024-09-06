@@ -1803,6 +1803,8 @@ func TestQueueExtendLease(t *testing.T) {
 		nextID, err := q.ExtendLease(ctx, p, item, *id, 10*time.Second)
 		require.NoError(t, err)
 
+		require.False(t, r.Exists(QueuePartition{}.concurrencyKey(q.u.kg)))
+
 		// Ensure the leased item has the next ID.
 		item = getQueueItem(t, r, item.ID)
 		require.NotNil(t, item.LeaseID)
