@@ -186,7 +186,7 @@ type ComplexityRoot struct {
 		CreateApp       func(childComplexity int, input models.CreateAppInput) int
 		DeleteApp       func(childComplexity int, id string) int
 		DeleteAppByName func(childComplexity int, name string) int
-		InvokeFunction  func(childComplexity int, data map[string]interface{}, functionSlug string) int
+		InvokeFunction  func(childComplexity int, data map[string]interface{}, functionSlug string, user map[string]interface{}) int
 		Rerun           func(childComplexity int, runID ulid.ULID) int
 		UpdateApp       func(childComplexity int, input models.UpdateAppInput) int
 	}
@@ -415,7 +415,7 @@ type MutationResolver interface {
 	UpdateApp(ctx context.Context, input models.UpdateAppInput) (*cqrs.App, error)
 	DeleteApp(ctx context.Context, id string) (string, error)
 	DeleteAppByName(ctx context.Context, name string) (bool, error)
-	InvokeFunction(ctx context.Context, data map[string]interface{}, functionSlug string) (*bool, error)
+	InvokeFunction(ctx context.Context, data map[string]interface{}, functionSlug string, user map[string]interface{}) (*bool, error)
 	CancelRun(ctx context.Context, runID ulid.ULID) (*models.FunctionRun, error)
 	Rerun(ctx context.Context, runID ulid.ULID) (ulid.ULID, error)
 }
@@ -1160,7 +1160,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.InvokeFunction(childComplexity, args["data"].(map[string]interface{}), args["functionSlug"].(string)), true
+		return e.complexity.Mutation.InvokeFunction(childComplexity, args["data"].(map[string]interface{}), args["functionSlug"].(string), args["user"].(map[string]interface{})), true
 
 	case "Mutation.rerun":
 		if e.complexity.Mutation.Rerun == nil {
@@ -2099,6 +2099,7 @@ type Mutation {
   invokeFunction(
     data: Map
     functionSlug: String!
+    user: Map
   ): Boolean
 
   cancelRun(runID: ULID!): FunctionRun!
@@ -2747,6 +2748,15 @@ func (ec *executionContext) field_Mutation_invokeFunction_args(ctx context.Conte
 		}
 	}
 	args["functionSlug"] = arg1
+	var arg2 map[string]interface{}
+	if tmp, ok := rawArgs["user"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("user"))
+		arg2, err = ec.unmarshalOMap2map(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["user"] = arg2
 	return args, nil
 }
 
@@ -7572,7 +7582,7 @@ func (ec *executionContext) _Mutation_invokeFunction(ctx context.Context, field 
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().InvokeFunction(rctx, fc.Args["data"].(map[string]interface{}), fc.Args["functionSlug"].(string))
+		return ec.resolvers.Mutation().InvokeFunction(rctx, fc.Args["data"].(map[string]interface{}), fc.Args["functionSlug"].(string), fc.Args["user"].(map[string]interface{}))
 	})
 	if err != nil {
 		ec.Error(ctx, err)

@@ -10,7 +10,10 @@ type Props = {
   doesFunctionAcceptPayload: boolean;
   isOpen: boolean;
   onCancel: () => void;
-  onConfirm: (payload: { data: Record<string, unknown> }) => void;
+  onConfirm: (payload: {
+    data: Record<string, unknown>;
+    user: Record<string, unknown> | null;
+  }) => void;
 };
 
 export function InvokeModal({ doesFunctionAcceptPayload, isOpen, onCancel, onConfirm }: Props) {
@@ -21,11 +24,11 @@ export function InvokeModal({ doesFunctionAcceptPayload, isOpen, onCancel, onCon
     event.preventDefault();
 
     try {
-      let payload;
+      let payload: ReturnType<typeof parseCode>;
       if (doesFunctionAcceptPayload) {
         payload = parseCode(rawPayload);
       } else {
-        payload = { data: {} };
+        payload = { data: {}, user: null };
       }
 
       onConfirm(payload);
@@ -90,10 +93,13 @@ export function InvokeModal({ doesFunctionAcceptPayload, isOpen, onCancel, onCon
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function parseCode(code: string): { data: Record<string, unknown> } {
+function parseCode(code: string): {
+  data: Record<string, unknown>;
+  user: Record<string, unknown> | null;
+} {
   if (typeof code !== 'string') {
     throw new Error("The payload form field isn't a string");
   }
@@ -114,12 +120,20 @@ function parseCode(code: string): { data: Record<string, unknown> } {
     throw new Error('The "data" field must be an object or null');
   }
 
-  const supportedKeys = ['data'];
+  let user: Record<string, unknown> | null = null;
+  if (payload.user) {
+    if (!isRecord(payload.user)) {
+      throw new Error('The "user" field must be an object or null');
+    }
+    user = payload.user;
+  }
+
+  const supportedKeys = ['data', 'user'];
   for (const key of Object.keys(payload)) {
     if (!supportedKeys.includes(key)) {
       throw new Error(`Property "${key}" is not supported when invoking a function`);
     }
   }
 
-  return { data };
+  return { data, user };
 }

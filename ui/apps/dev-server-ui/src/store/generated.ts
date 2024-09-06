@@ -285,6 +285,7 @@ export type MutationDeleteAppByNameArgs = {
 export type MutationInvokeFunctionArgs = {
   data: InputMaybe<Scalars['Map']>;
   functionSlug: Scalars['String'];
+  user: InputMaybe<Scalars['Map']>;
 };
 
 
@@ -691,6 +692,7 @@ export type GetHistoryItemOutputQuery = { __typename?: 'Query', functionRun: { _
 export type InvokeFunctionMutationVariables = Exact<{
   functionSlug: Scalars['String'];
   data: InputMaybe<Scalars['Map']>;
+  user: InputMaybe<Scalars['Map']>;
 }>;
 
 
@@ -1001,8 +1003,8 @@ export const GetHistoryItemOutputDocument = `
 }
     `;
 export const InvokeFunctionDocument = `
-    mutation InvokeFunction($functionSlug: String!, $data: Map) {
-  invokeFunction(data: $data, functionSlug: $functionSlug)
+    mutation InvokeFunction($functionSlug: String!, $data: Map, $user: Map) {
+  invokeFunction(data: $data, functionSlug: $functionSlug, user: $user)
 }
     `;
 export const CancelRunDocument = `

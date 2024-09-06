@@ -19,8 +19,8 @@ import { useFunction } from '@/queries';
 import NewReplayModal from './logs/NewReplayModal';
 
 const InvokeFunctionDocument = graphql(`
-  mutation InvokeFunction($envID: UUID!, $data: Map, $functionSlug: String!) {
-    invokeFunction(envID: $envID, data: $data, functionSlug: $functionSlug)
+  mutation InvokeFunction($envID: UUID!, $data: Map, $functionSlug: String!, $user: Map) {
+    invokeFunction(envID: $envID, data: $data, functionSlug: $functionSlug, user: $user)
   }
 `);
 
@@ -58,10 +58,11 @@ export default function FunctionLayout({
     }) ?? false;
 
   const invokeAction = useCallback(
-    ({ data }: { data: Record<string, unknown> }) => {
+    ({ data, user }: { data: Record<string, unknown>; user: Record<string, unknown> | null }) => {
       invokeFunction({
         envID: env.id,
         data,
+        user,
         functionSlug,
       });
       setInvokeOpen(false);

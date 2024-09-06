@@ -93,10 +93,12 @@ func (r *mutationResolver) InvokeFunction(
 	ctx context.Context,
 	data map[string]any,
 	functionSlug string,
+	user map[string]any,
 ) (*bool, error) {
 	evt := event.NewInvocationEvent(event.NewInvocationEventOpts{
 		Event: event.Event{
 			Data: data,
+			User: user,
 		},
 		FnID: functionSlug,
 	})

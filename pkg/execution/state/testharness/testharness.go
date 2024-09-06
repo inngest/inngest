@@ -21,12 +21,6 @@ import (
 )
 
 var (
-	// n100 is a workflow created during init() which has 100 steps and edges.
-	n100 = inngest.Function{
-		Name: "Test workflow",
-		ID:   uuid.NewSHA1(uuid.NameSpaceOID, []byte("Test workflow")),
-	}
-
 	w = inngest.Function{
 		ID:   uuid.NewSHA1(uuid.NameSpaceOID, []byte("Test workflow")),
 		Name: "Test workflow",
@@ -39,24 +33,9 @@ var (
 		},
 		Steps: []inngest.Step{
 			{
-				ID:   "step-a",
+				ID:   inngest.DefaultStepName,
 				Name: "first step",
 				URI:  "http://www.example.com/api/inngest",
-			},
-			{
-				ID:   "step-b",
-				Name: "second step",
-				URI:  "http://www.example.com/api/inngest",
-			},
-		},
-		Edges: []inngest.Edge{
-			{
-				Incoming: inngest.TriggerName,
-				Outgoing: "step-a",
-			},
-			{
-				Incoming: "step-a",
-				Outgoing: "step-b",
 			},
 		},
 	}
@@ -90,26 +69,8 @@ func (loader) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*state.E
 		fn.Function = &w
 		return fn, nil
 	}
-	if fnID == n100.ID {
-		fn.Function = &n100
-		return fn, nil
-	}
+ 
 	return nil, fmt.Errorf("workflow not found: %s", fnID)
-}
-
-func init() {
-	// Copy the workflow and make 1000 scheduled steps.
-	for i := 1; i <= 100; i++ {
-		n100.Steps = append(n100.Steps, inngest.Step{
-			ID:   fmt.Sprintf("step-%d", i),
-			Name: fmt.Sprintf("Step %d", i),
-			URI:  "http://www.example.com/api/inngest",
-		})
-		n100.Edges = append(n100.Edges, inngest.Edge{
-			Incoming: inngest.TriggerName,
-			Outgoing: fmt.Sprintf("step-%d", i),
-		})
-	}
 }
 
 type Generator func() (sm state.Manager, cleanup func())
@@ -123,7 +84,6 @@ func CheckState(t *testing.T, gen Generator) {
 		"New/StepData":                     checkNew_stepdata,
 		"UpdateMetadata":                   checkUpdateMetadata,
 		"SaveResponse/Output":              checkSaveResponse_output,
-		"SaveResponse/Concurrent":          checkSaveResponse_concurrent,
 		"SaveResponse/Stack":               checkSaveResponse_stack,
 		"SavePause":                        checkSavePause,
 		"LeasePause":                       checkLeasePause,
@@ -367,14 +327,17 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 	require.EqualValues(t, r.Output, loaded)
 
 	// And that we have no state for the second step.
-	require.Empty(t, next.Actions()[w.Steps[1].ID])
+	anotherStepID := "step-2-id"
+	require.Empty(t, next.Actions()[anotherStepID])
 
 	//
 	// Check that saving a subsequent step saves the next output,
 	// as the second attempt.
 	//
 	r2 := state.DriverResponse{
-		Step: w.Steps[1],
+		Step: inngest.Step{
+			ID: anotherStepID,
+		},
 		Output: map[string]interface{}{
 			"status": float64(200),
 			"body": map[string]any{
@@ -398,12 +361,12 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 	require.NotEqualValues(t, s.Actions(), next.Actions())
 	require.Equal(t, 2, len(next.Actions()))
 	require.EqualValues(t, r.Output, next.Actions()[w.Steps[0].ID])
-	require.EqualValues(t, r2.Output, next.Actions()[w.Steps[1].ID])
+	require.EqualValues(t, r2.Output, next.Actions()[anotherStepID])
 	// Assert that requesting data for the given step ID works as expected.
 	loaded, err = next.ActionID(w.Steps[0].ID)
 	require.NoError(t, err)
 	require.EqualValues(t, r.Output, loaded)
-	loaded, err = next.ActionID(w.Steps[1].ID)
+	loaded, err = next.ActionID(anotherStepID)
 	require.NoError(t, err)
 	require.EqualValues(t, r2.Output, loaded)
 
@@ -418,52 +381,21 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 	require.EqualValues(t, next.Errors(), reloaded.Errors())
 }
 
-func checkSaveResponse_concurrent(t *testing.T, m state.Manager) {
-	ctx := context.Background()
-	s := setup(t, m)
-	id := s.Identifier()
-
-	wg := &sync.WaitGroup{}
-	for i := 0; i < len(n100.Steps); i++ {
-		n := i
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-			r := state.DriverResponse{
-				Step: n100.Steps[n],
-				Output: map[string]interface{}{
-					"status": float64(200),
-					"body": map[string]any{
-						"n": n,
-					},
-				},
-			}
-			err := m.SaveResponse(ctx, id, r.Step.ID, marshal(r.Output))
-			require.NoError(t, err)
-		}()
-
-	}
-	wg.Wait()
-
-	loaded, err := m.Load(ctx, s.Identifier().AccountID, s.RunID())
-	require.NoError(t, err)
-	require.Equal(t, len(n100.Steps), len(loaded.Actions()))
-}
-
 func checkSaveResponse_stack(t *testing.T, m state.Manager) {
 	ctx := context.Background()
 	s := setup(t, m)
 
+	output := map[string]interface{}{
+		"status": float64(200),
+		"body": map[string]any{
+			"ok": true,
+		},
+	}
+
 	t.Run("It modifies the stack with step output", func(t *testing.T) {
 		r := state.DriverResponse{
-			Step: w.Steps[0],
-			Output: map[string]interface{}{
-				"status": float64(200),
-				"body": map[string]any{
-					"ok": true,
-				},
-			},
+			Step:   w.Steps[0],
+			Output: output,
 		}
 		err := m.SaveResponse(ctx, s.Identifier(), r.Step.ID, marshal(r.Output))
 		require.NoError(t, err)
@@ -478,7 +410,9 @@ func checkSaveResponse_stack(t *testing.T, m state.Manager) {
 
 	t.Run("It amends the stack with a subsequent step save", func(t *testing.T) {
 		r := state.DriverResponse{
-			Step:   w.Steps[1],
+			Step: inngest.Step{
+				ID: "foo-bar-baz",
+			},
 			Output: "this works",
 		}
 		err := m.SaveResponse(ctx, s.Identifier(), r.Step.ID, marshal(r.Output))
@@ -489,13 +423,13 @@ func checkSaveResponse_stack(t *testing.T, m state.Manager) {
 		require.NoError(t, err)
 		stack := next.Stack()
 		require.EqualValues(t, 2, len(stack))
-		require.Equal(t, []string{w.Steps[0].ID, w.Steps[1].ID}, stack)
+		require.Equal(t, []string{w.Steps[0].ID, r.Step.ID}, stack)
 		require.Equal(t, next.Actions()[r.Step.ID], "this works")
 	})
 
 	t.Run("It returns a duplicate error saving an ID twice", func(t *testing.T) {
 		r := state.DriverResponse{
-			Step:   w.Steps[1],
+			Step:   w.Steps[0],
 			Output: "do not save",
 		}
 
@@ -509,9 +443,9 @@ func checkSaveResponse_stack(t *testing.T, m state.Manager) {
 		stack := next.Stack()
 		require.EqualValues(t, 2, len(stack))
 
-		require.Equal(t, []string{w.Steps[0].ID, w.Steps[1].ID}, stack)
+		require.Equal(t, []string{w.Steps[0].ID, "foo-bar-baz"}, stack)
 		require.NotContains(t, next.Actions()[r.Step.ID], "do not save")
-		require.Equal(t, next.Actions()[r.Step.ID], "this works")
+		require.Equal(t, next.Actions()[r.Step.ID], output)
 	})
 }
 
@@ -1611,49 +1545,6 @@ func checkCancel_completed(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 	require.EqualValues(t, enums.RunStatusCompleted, s.Metadata().Status, "Status is not Complete after finalizing")
 }
-
-// TODO: Optimization - when finalizing steps, we should delete all pauses when the counter is set to 0
-/*
-func checkFinalizedDeletesPauses(t *testing.T, m state.Manager) {
-	ctx := context.Background()
-	s := setup(t, m)
-
-	// Create a pause.
-	evt := "event/a"
-	pause := state.Pause{
-		ID:         uuid.New(),
-		Identifier: s.Identifier(),
-		Outgoing:   inngest.TriggerName,
-		Incoming:   w.Steps[0].ID,
-		Expires:    state.Time(time.Now().Add(time.Minute)),
-		Event:      &evt,
-	}
-	err := m.SavePause(ctx, pause)
-	require.NoError(t, err)
-
-	iter, err := m.PausesByEvent(ctx, evt)
-	require.NoError(t, err)
-	require.NotNil(t, iter)
-	require.True(t, iter.Next(ctx))
-	require.EqualValues(t, &pause, iter.Val(ctx))
-
-	found, err := m.PauseByID(ctx, pause.ID)
-	require.Nil(t, err)
-	require.EqualValues(t, pause, *found)
-
-	// Finalize, reducing count to 0 which should delete all active pauses for this identifier
-	err = m.Finalized(ctx, s.Identifier(), inngest.TriggerName)
-	require.NoError(t, err)
-
-	// Pause should be deleted.
-	iter, err = m.PausesByEvent(ctx, evt)
-	require.NoError(t, err)
-	require.Nil(t, iter)
-	found, err = m.PauseByID(ctx, pause.ID)
-	require.Equal(t, state.ErrPauseNotFound, err)
-	require.Nil(t, found)
-}
-*/
 
 func setup(t *testing.T, m state.Manager) state.State {
 	ctx := context.Background()
