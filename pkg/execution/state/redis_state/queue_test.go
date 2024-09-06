@@ -752,8 +752,8 @@ func TestQueueSystemPartitions(t *testing.T) {
 			func(ctx context.Context, p QueuePartition) int {
 				return customTestLimit
 			}),
-		WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) (fn, acct, custom int) {
-			return 5000, 5000, 5000
+		WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+			return PartitionConcurrencyLimits{5000, 5000, 5000}
 		}),
 	)
 	ctx := context.Background()
@@ -1265,8 +1265,8 @@ func TestQueueLease(t *testing.T) {
 		r.FlushAll()
 
 		// Only allow a single leased item
-		q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (acct, fn, custom int) {
-			return 1, 1, 1
+		q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+			return PartitionConcurrencyLimits{1, 1, 1}
 		}
 
 		fnID := uuid.New()
@@ -1304,8 +1304,12 @@ func TestQueueLease(t *testing.T) {
 		r.FlushAll()
 
 		// Only allow a single leased item via account limits
-		q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (acct, fn, custom int) {
-			return 1, 100, NoConcurrencyLimit
+		q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+			return PartitionConcurrencyLimits{
+				AccountLimit:   1,
+				FunctionLimit:  100,
+				CustomKeyLimit: NoConcurrencyLimit,
+			}
 		}
 
 		acctId := uuid.New()
@@ -1334,8 +1338,12 @@ func TestQueueLease(t *testing.T) {
 		t.Run("with account keys", func(t *testing.T) {
 			r.FlushAll()
 			// Only allow a single leased item via account limits
-			q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (acct, fn, custom int) {
-				return 100, 100, 1
+			q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+				return PartitionConcurrencyLimits{
+					AccountLimit:   100,
+					FunctionLimit:  100,
+					CustomKeyLimit: 1,
+				}
 			}
 
 			ck := createConcurrencyKey(enums.ConcurrencyScopeAccount, uuid.Nil, "foo", 1)
@@ -1397,8 +1405,12 @@ func TestQueueLease(t *testing.T) {
 			fnId := uuid.New()
 
 			// Only allow a single leased item via account limits
-			q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (acct, fn, custom int) {
-				return 100, 100, 1
+			q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+				return PartitionConcurrencyLimits{
+					AccountLimit:   100,
+					FunctionLimit:  100,
+					CustomKeyLimit: 1,
+				}
 			}
 
 			ck := createConcurrencyKey(enums.ConcurrencyScopeFn, fnId, "foo", 1)
@@ -1495,8 +1507,12 @@ func TestQueueLease(t *testing.T) {
 		t.Run("with two distinct functions it processes both", func(t *testing.T) {
 			r.FlushAll()
 
-			q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (acct, fn, custom int) {
-				return 2, 123_456, 234_567
+			q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+				return PartitionConcurrencyLimits{
+					FunctionLimit:  1,
+					AccountLimit:   123_456,
+					CustomKeyLimit: 234_567,
+				}
 			}
 
 			fnIDA := uuid.New()
@@ -2657,8 +2673,8 @@ func TestQueuePartitionLease(t *testing.T) {
 			r.FlushAll()
 
 			// Only allow a single leased item
-			q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (acct, fn, custom int) {
-				return 1, 1, 1
+			q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+				return PartitionConcurrencyLimits{1, 1, 1}
 			}
 
 			fnID := uuid.New()
@@ -2687,8 +2703,12 @@ func TestQueuePartitionLease(t *testing.T) {
 			r.FlushAll()
 
 			// Only allow a single leased item via account limits
-			q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (acct, fn, custom int) {
-				return 1, 100, NoConcurrencyLimit
+			q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+				return PartitionConcurrencyLimits{
+					AccountLimit:   1,
+					FunctionLimit:  100,
+					CustomKeyLimit: NoConcurrencyLimit,
+				}
 			}
 
 			acctId := uuid.New()
@@ -2719,8 +2739,12 @@ func TestQueuePartitionLease(t *testing.T) {
 		t.Run("With custom concurrency limits", func(t *testing.T) {
 			r.FlushAll()
 			// Only allow a single leased item via account limits
-			q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (acct, fn, custom int) {
-				return 100, 100, 1
+			q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+				return PartitionConcurrencyLimits{
+					AccountLimit:   100,
+					FunctionLimit:  100,
+					CustomKeyLimit: 1,
+				}
 			}
 
 			ck := createConcurrencyKey(enums.ConcurrencyScopeAccount, uuid.Nil, "foo", 1)
@@ -3325,8 +3349,8 @@ func TestQueueRequeueByJobID(t *testing.T) {
 	q.pf = func(ctx context.Context, p QueuePartition) uint {
 		return PriorityMin
 	}
-	q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (acct, fn, custom int) {
-		return 100, 100, 100
+	q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+		return PartitionConcurrencyLimits{100, 100, 100}
 	}
 	q.itemIndexer = QueueItemIndexerFunc
 	q.clock = clockwork.NewRealClock()

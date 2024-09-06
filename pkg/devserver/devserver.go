@@ -176,15 +176,17 @@ func start(ctx context.Context, opts StartOpts) error {
 
 			return keys
 		}),
-		redis_state.WithConcurrencyLimitGetter(func(ctx context.Context, p redis_state.QueuePartition) (account, fn, custom int) {
+		redis_state.WithConcurrencyLimitGetter(func(ctx context.Context, p redis_state.QueuePartition) redis_state.PartitionConcurrencyLimits {
 			// In the dev server, there are never account limits.
-			account = redis_state.NoConcurrencyLimit
+			limits := redis_state.PartitionConcurrencyLimits{
+				AccountLimit: redis_state.NoConcurrencyLimit,
+			}
 
 			// Ensure that we return the correct concurrency values per
 			// partition.
 			funcs, err := dbcqrs.GetFunctions(ctx)
 			if err != nil {
-				return redis_state.NoConcurrencyLimit, consts.DefaultConcurrencyLimit, redis_state.NoConcurrencyLimit
+				return redis_state.PartitionConcurrencyLimits{redis_state.NoConcurrencyLimit, consts.DefaultConcurrencyLimit, redis_state.NoConcurrencyLimit}
 			}
 			for _, fun := range funcs {
 				f, _ := fun.InngestFunction()
@@ -193,14 +195,14 @@ func start(ctx context.Context, opts StartOpts) error {
 				}
 				// Update the function's concurrency here with latest defaults
 				if p.FunctionID != nil && f.ID == *p.FunctionID && f.Concurrency != nil && f.Concurrency.PartitionConcurrency() > 0 {
-					fn = f.Concurrency.PartitionConcurrency()
+					limits.FunctionLimit = f.Concurrency.PartitionConcurrency()
 				}
 			}
 			if p.ConcurrencyKey != "" {
-				custom = p.ConcurrencyLimit
+				limits.CustomKeyLimit = p.ConcurrencyLimit
 			}
 
-			return account, fn, custom
+			return limits
 		}),
 	}
 	if opts.RetryInterval > 0 {

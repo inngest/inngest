@@ -316,13 +316,13 @@ func WithCustomConcurrencyKeyLimitRefresher(f QueueItemConcurrencyKeyLimitRefres
 // for a given partition.
 func WithConcurrencyLimitGetter(f ConcurrencyLimitGetter) func(q *queue) {
 	return func(q *queue) {
-		q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (acct, fn, custom int) {
-			acct, fn, custom = f(ctx, p)
+		q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+			limits := f(ctx, p)
 			// Always clip limits for accounts to impose _some_ limit.
-			if acct <= 0 {
-				acct = consts.DefaultConcurrencyLimit
+			if limits.AccountLimit <= 0 {
+				limits.AccountLimit = consts.DefaultConcurrencyLimit
 			}
-			return acct, fn, custom
+			return limits
 		}
 	}
 }
@@ -361,8 +361,19 @@ func WithClock(c clockwork.Clock) func(q *queue) {
 // more than N concurrent items running at once.
 type QueueItemConcurrencyKeyLimitRefresher func(ctx context.Context, i QueueItem) []state.CustomConcurrency
 
+type PartitionConcurrencyLimits struct {
+	// AccountLimit returns the current account concurrency limit, which is always applied. Defaults to maximum concurrency.
+	AccountLimit int
+
+	// FunctionLimit returns the function-scoped concurrency limit, if configured. Defaults to maximum concurrency.
+	FunctionLimit int
+
+	// CustomKeyLimit returns the custom concurrency limit for a concurrency key partition. Defaults to maximum concurrency.
+	CustomKeyLimit int
+}
+
 // ConcurrencyLimitGetter returns the fn, account, and custom limits for a given partition.
-type ConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) (fn, acct, custom int)
+type ConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits
 
 // SystemConcurrencyLimitGetter returns the concurrency limits for a given system partition.
 type SystemConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) int
@@ -389,17 +400,21 @@ func NewQueue(u *QueueClient, opts ...QueueOpt) *queue {
 		idempotencyTTL:           defaultIdempotencyTTL,
 		queueKindMapping:         make(map[string]string),
 		logger:                   logger.From(context.Background()),
-		concurrencyLimitGetter: func(ctx context.Context, p QueuePartition) (account, fn, custom int) {
+		concurrencyLimitGetter: func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
 			def := defaultConcurrency
 			if p.ConcurrencyLimit > 0 {
 				def = p.ConcurrencyLimit
 			}
 			// Use the defaults, and add no concurrency limits to custom keys.
-			account, fn, custom = def, def, -1
-			if p.ConcurrencyKey == "" {
-				custom = NoConcurrencyLimit
+			limits := PartitionConcurrencyLimits{
+				AccountLimit:   def,
+				FunctionLimit:  def,
+				CustomKeyLimit: -1,
 			}
-			return account, fn, custom
+			if p.ConcurrencyKey == "" {
+				limits.CustomKeyLimit = NoConcurrencyLimit
+			}
+			return limits
 		},
 		systemConcurrencyLimitGetter: func(ctx context.Context, p QueuePartition) int {
 			def := defaultConcurrency
@@ -915,11 +930,11 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 			AccountID:     i.Data.Identifier.AccountID,
 		}
 		// The concurrency limit for fns MUST be added for leasing.
-		acct, fn, _ := q.concurrencyLimitGetter(ctx, fnPartition)
-		limit := fn
-		if fn <= 0 {
+		limits := q.concurrencyLimitGetter(ctx, fnPartition)
+		limit := limits.FunctionLimit
+		if limit <= 0 {
 			// Use account-level limits, as there are no function level limits
-			limit = acct
+			limit = limits.AccountLimit
 		}
 		if limit <= 0 {
 			// Use default limits
@@ -981,14 +996,14 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 		if len(ckeys) == 1 {
 			// Get the function limit from the `concurrencyLimitGetter`.  If this returns
 			// a limit (> 0), create a new PartitionTypeDefault queue partition for the function.
-			_, fn, _ := q.concurrencyLimitGetter(ctx, partitions[0])
-			if fn > 0 {
+			limits := q.concurrencyLimitGetter(ctx, partitions[0])
+			if limits.FunctionLimit > 0 {
 				partitions = append(partitions, QueuePartition{
 					ID:               i.FunctionID.String(),
 					PartitionType:    int(enums.PartitionTypeDefault), // Function partition
 					FunctionID:       &i.FunctionID,
 					AccountID:        i.Data.Identifier.AccountID,
-					ConcurrencyLimit: fn,
+					ConcurrencyLimit: limits.FunctionLimit,
 				})
 			}
 		}
@@ -1528,7 +1543,8 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		// account concurrency limit.
 		//
 		// TODO: Refactor this to be nicer/remove dupe calls
-		acctLimit, _, _ = q.concurrencyLimitGetter(ctx, parts[0])
+		limits := q.concurrencyLimitGetter(ctx, parts[0])
+		acctLimit = limits.AccountLimit
 		if acctLimit <= 0 {
 			acctLimit = consts.DefaultConcurrencyLimit
 		}
@@ -1871,7 +1887,7 @@ func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration) (*ulid.ULID, int, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PartitionLease"), redis_telemetry.ScopeQueue)
 
-	acctConcurrency, fnConcurrency, customConcurrency := q.concurrencyLimitGetter(ctx, *p)
+	limits := q.concurrencyLimitGetter(ctx, *p)
 
 	// XXX: Check for function throttling prior to leasing;  if it's throttled we can requeue
 	// the pointer and back off.  A question here is enqueuing new items onto the partition
@@ -1910,9 +1926,9 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		leaseID.String(),
 		now.UnixMilli(),
 		leaseExpires.Unix(),
-		acctConcurrency,
-		fnConcurrency,
-		customConcurrency,
+		limits.AccountLimit,
+		limits.FunctionLimit,
+		limits.CustomKeyLimit,
 		now.Add(PartitionConcurrencyLimitRequeueExtension).Unix(),
 		p.AccountID.String(),
 	})
@@ -1947,7 +1963,7 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	case -6:
 		return nil, 0, ErrPartitionPaused
 	default:
-		limit := fnConcurrency
+		limit := limits.FunctionLimit
 		if len(result) == 2 {
 			limit = int(result[1])
 		}
