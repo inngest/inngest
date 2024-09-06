@@ -1858,7 +1858,7 @@ func (e *executor) handleGenerator(ctx context.Context, i *runInstance, gen stat
 		// then need to coalesce back to a single thread after all 10 have finished.  We expect
 		// drivers/the SDK to return OpcodeNone for all but the last of parallel steps.
 		return nil
-	case enums.OpcodeStep, enums.OpcodeStepRun:
+	case enums.OpcodeStep, enums.OpcodeStepRun, enums.OpcodeStepNotFound:
 		return e.handleGeneratorStep(ctx, i, gen, edge)
 	case enums.OpcodeStepError:
 		return e.handleStepError(ctx, i, gen, edge)
@@ -1875,8 +1875,11 @@ func (e *executor) handleGenerator(ctx context.Context, i *runInstance, gen stat
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
 }
 
-// handleGeneratorStep handles OpcodeStep and OpcodeStepRun, both indicating that a function step
-// has finished
+// handleGeneratorStep handles OpcodeStep and OpcodeStepRun, both indicating
+// that a function step has finished.
+//
+// It also handles OpcodeStepNotFound, in which we still enqueue discovery steps
+// to recover from non-deterministic or changed functions.
 func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
 	nextEdge := inngest.Edge{
 		Outgoing: gen.ID,             // Going from the current step
@@ -1889,12 +1892,14 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		return err
 	}
 
-	if err := e.validateStateSize(len(output), i.md); err != nil {
-		return err
-	}
+	if output != "" {
+		if err := e.validateStateSize(len(output), i.md); err != nil {
+			return err
+		}
 
-	if err := e.smv2.SaveStep(ctx, i.md.ID, gen.ID, []byte(output)); err != nil {
-		return err
+		if err := e.smv2.SaveStep(ctx, i.md.ID, gen.ID, []byte(output)); err != nil {
+			return err
+		}
 	}
 
 	// Update the group ID in context;  we've already saved this step's success and we're now
