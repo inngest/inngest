@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 
 import type { Environment } from '@/utils/environments';
 import { Alert } from '../Navigation/Alert';
@@ -9,6 +10,11 @@ import { Integrations } from '../Navigation/Integrations';
 import Logo from '../Navigation/Logo';
 import Navigation from '../Navigation/Navigation';
 import { Profile, type ProfileType } from '../Navigation/Profile';
+
+// Disable SSR in Onboarding Widget Table, to prevent hydration errors. It requires windows info
+const OnboardingWidget = dynamic(() => import('../Navigation/OnboardingWidget'), {
+  ssr: false,
+});
 
 export default function SideBar({
   collapsed: serverCollapsed,
@@ -43,7 +49,7 @@ export default function SideBar({
 
         <div className="mx-4">
           {!collapsed && <Alert />}
-
+          {<OnboardingWidget collapsed={collapsed} />}
           <Integrations collapsed={collapsed} />
           <Help collapsed={collapsed} />
         </div>
