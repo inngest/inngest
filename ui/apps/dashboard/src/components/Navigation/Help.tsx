@@ -21,7 +21,7 @@ import SystemStatusIcon from './SystemStatusIcon';
 
 export const Help = ({ collapsed }: { collapsed: boolean }) => {
   const { value: onBoardingFlow } = useBooleanFlag('onboarding-flow-cloud');
-  const [_, setIsOnboardingWidgetOpen] = useLocalStorage('showOnboardingWidget');
+  const [, setIsOnboardingWidgetOpen] = useLocalStorage('showOnboardingWidget');
   const status = useSystemStatus();
 
   return (

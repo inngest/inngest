@@ -15,7 +15,6 @@ type OnboardingStepsString = `${OnboardingSteps}`;
 
 export default function OnboardingWidget({ collapsed }: { collapsed: boolean }) {
   const { value: onBoardingFlow } = useBooleanFlag('onboarding-flow-cloud');
-  if (!onBoardingFlow) return;
 
   const [isOnboardingWidgetOpen, setIsOnboardingWidgetOpen] = useLocalStorage(
     'showOnboardingWidget',
@@ -26,12 +25,13 @@ export default function OnboardingWidget({ collapsed }: { collapsed: boolean }) 
     'onboardingWidgetStep',
     '1'
   );
-  const currentStep: OnboardingSteps = (Number(onboardingWidgetStep) as OnboardingSteps) || 1;
+  const currentStep: OnboardingSteps = Number(onboardingWidgetStep) as OnboardingSteps;
   const finalStep = currentStep === 4;
   const stepContent = onboardingWidgetStep
     ? onboardingWidgetContent.step[currentStep]
     : onboardingWidgetContent.step[1];
 
+  if (!onBoardingFlow) return;
   return (
     isOnboardingWidgetOpen && (
       <>
