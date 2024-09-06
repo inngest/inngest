@@ -11,9 +11,9 @@ export default function SegmentedProgressBar({
     <div
       className={`grid gap-1 grid-cols-${segments}`}
       role="progressbar"
-      aria-Valuenow={value}
-      aria-Valuemin="0"
-      aria-Valuemax="100"
+      aria-valuenow={value}
+      aria-valuemin={0}
+      aria-valuemax={100}
     >
       {[...Array(segments)].map((_, index) => {
         const completed = index < segmentsCompleted;

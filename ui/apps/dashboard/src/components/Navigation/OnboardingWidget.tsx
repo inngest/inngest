@@ -7,6 +7,7 @@ import { RiBookReadLine, RiCheckboxCircleFill, RiCloseLine } from '@remixicon/re
 import { useLocalStorage } from 'react-use';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
+import { pathCreator } from '@/utils/urls';
 import { onboardingWidgetContent } from '../Onboarding/content';
 import { type OnboardingSteps } from '../Onboarding/types';
 
@@ -14,7 +15,7 @@ type OnboardingStepsString = `${OnboardingSteps}`;
 
 export default function OnboardingWidget({ collapsed }: { collapsed: boolean }) {
   const { value: onBoardingFlow } = useBooleanFlag('onboarding-flow-cloud');
-  if (onBoardingFlow) return;
+  if (!onBoardingFlow) return;
 
   const [isOnboardingWidgetOpen, setIsOnboardingWidgetOpen] = useLocalStorage(
     'showOnboardingWidget',
@@ -36,7 +37,7 @@ export default function OnboardingWidget({ collapsed }: { collapsed: boolean }) 
       <>
         {collapsed && (
           <MenuItem
-            href=""
+            href={pathCreator.onboarding()}
             className="border-muted border"
             collapsed={collapsed}
             text="Onboarding guide"
@@ -46,7 +47,7 @@ export default function OnboardingWidget({ collapsed }: { collapsed: boolean }) 
 
         {!collapsed && (
           <Link
-            href=""
+            href={pathCreator.onboarding()}
             className="text-basis bg-canvasBase hover:bg-canvasSubtle border-subtle mb-5 block rounded border p-3 leading-tight"
           >
             <div className="flex h-[110px] flex-col justify-between">
