@@ -96,10 +96,11 @@ const columns = [
           disabled={false}
           doesFunctionAcceptPayload={doesFunctionAcceptPayload}
           btnAppearance="outlined"
-          btnAction={(data) => {
+          btnAction={({ data, user }) => {
             invokeFunction({
               data,
               functionSlug: props.row.original.slug,
+              user,
             });
           }}
         />
