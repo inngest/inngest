@@ -5,17 +5,23 @@ import { Listbox } from '@headlessui/react';
 import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import {
   RiArticleLine,
+  RiBookReadLine,
   RiDiscordLine,
   RiExternalLinkLine,
   RiMailLine,
   RiQuestionLine,
   RiRoadMapLine,
 } from '@remixicon/react';
+import { useLocalStorage } from 'react-use';
 
 import { useSystemStatus } from '@/app/(organization-active)/support/statusPage';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
+import { pathCreator } from '@/utils/urls';
 import SystemStatusIcon from './SystemStatusIcon';
 
 export const Help = ({ collapsed }: { collapsed: boolean }) => {
+  const { value: onBoardingFlow } = useBooleanFlag('onboarding-flow-cloud');
+  const [_, setIsOnboardingWidgetOpen] = useLocalStorage('showOnboardingWidget');
   const status = useSystemStatus();
 
   return (
@@ -96,6 +102,22 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
               </div>
             </Listbox.Option>
           </Link>
+          {onBoardingFlow && (
+            <>
+              <hr />
+              <Link href={pathCreator.onboarding()} onClick={() => setIsOnboardingWidgetOpen(true)}>
+                <Listbox.Option
+                  className="text-subtle hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+                  value="onboardingGuide"
+                >
+                  <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
+                    <RiBookReadLine className="text-subtle mr-2 h-4 w-4" />
+                    <div>Show onboarding guide</div>
+                  </div>
+                </Listbox.Option>
+              </Link>
+            </>
+          )}
         </Listbox.Options>
       </div>
     </Listbox>
