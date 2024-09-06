@@ -9,7 +9,8 @@ export default function SegmentedProgressBar({
 
   return (
     <div
-      className={`grid gap-1 grid-cols-${segments}`}
+      className="grid gap-1"
+      style={{ gridTemplateColumns: `repeat(${segments}, minmax(0, 1fr))` }}
       role="progressbar"
       aria-valuenow={value}
       aria-valuemin={0}

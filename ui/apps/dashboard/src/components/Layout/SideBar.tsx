@@ -10,6 +10,7 @@ import { Integrations } from '../Navigation/Integrations';
 import Logo from '../Navigation/Logo';
 import Navigation from '../Navigation/Navigation';
 import { Profile, type ProfileType } from '../Navigation/Profile';
+import useOnboardingWidget from '../Onboarding/useOnboardingWidget';
 
 // Disable SSR in Onboarding Widget Table, to prevent hydration errors. It requires windows info
 const OnboardingWidget = dynamic(() => import('../Navigation/OnboardingWidget'), {
@@ -26,6 +27,7 @@ export default function SideBar({
   profile: ProfileType;
 }) {
   const [collapsed, setCollapsed] = useState<boolean>(serverCollapsed ?? false);
+  const { isWidgetOpen, showWidget, closeWidget } = useOnboardingWidget();
 
   useEffect(() => {
     //
@@ -49,9 +51,9 @@ export default function SideBar({
 
         <div className="mx-4">
           {!collapsed && <Alert />}
-          {<OnboardingWidget collapsed={collapsed} />}
+          {isWidgetOpen && <OnboardingWidget collapsed={collapsed} closeWidget={closeWidget} />}
           <Integrations collapsed={collapsed} />
-          <Help collapsed={collapsed} />
+          <Help collapsed={collapsed} showWidget={showWidget} />
         </div>
         <Profile collapsed={collapsed} profile={profile} />
       </div>

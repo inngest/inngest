@@ -12,16 +12,14 @@ import {
   RiQuestionLine,
   RiRoadMapLine,
 } from '@remixicon/react';
-import { useLocalStorage } from 'react-use';
 
 import { useSystemStatus } from '@/app/(organization-active)/support/statusPage';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { pathCreator } from '@/utils/urls';
 import SystemStatusIcon from './SystemStatusIcon';
 
-export const Help = ({ collapsed }: { collapsed: boolean }) => {
-  const { value: onBoardingFlow } = useBooleanFlag('onboarding-flow-cloud');
-  const [, setIsOnboardingWidgetOpen] = useLocalStorage('showOnboardingWidget');
+export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget: () => void }) => {
+  const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
   const status = useSystemStatus();
 
   return (
@@ -102,10 +100,10 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
               </div>
             </Listbox.Option>
           </Link>
-          {onBoardingFlow && (
+          {onboardingFlow && (
             <>
               <hr />
-              <Link href={pathCreator.onboarding()} onClick={() => setIsOnboardingWidgetOpen(true)}>
+              <Link href={pathCreator.onboarding()} onClick={() => showWidget()}>
                 <Listbox.Option
                   className="text-subtle hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
                   value="onboardingGuide"
