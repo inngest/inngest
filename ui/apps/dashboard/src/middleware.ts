@@ -63,8 +63,8 @@ const afterAuth = async (
 export default clerkMiddleware((auth, request) => {
   if (!isPublicRoute(request)) {
     auth().protect();
+    return afterAuth(auth, request);
   }
-  return afterAuth(auth, request);
 });
 
 export const config = {
