@@ -790,6 +790,7 @@ export type MutationInvokeFunctionArgs = {
   data: InputMaybe<Scalars['Map']>;
   envID: Scalars['UUID'];
   functionSlug: Scalars['String'];
+  user: InputMaybe<Scalars['Map']>;
 };
 
 

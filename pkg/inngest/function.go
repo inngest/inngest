@@ -5,9 +5,9 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
-	"sort"
 	"strings"
 	"time"
 
@@ -90,9 +90,49 @@ type Function struct {
 	// Actions represents the actions to take for this function.  If empty, this assumes
 	// that we have a single action specified in the current directory using
 	Steps []Step `json:"steps,omitempty"`
+}
 
-	// Edges represent edges between steps in the dag.
-	Edges []Edge `json:"edges,omitempty"`
+type RateLimit struct {
+	// Limit is how often the function can be called within the specified period
+	Limit uint `json:"limit"`
+	// Period represents the time period for throttling the function
+	Period string `json:"period"`
+	// Key is an optional string to constrain throttling using event data.  For
+	// example, if you want to throttle incoming notifications based off of a user's
+	// ID in an event you can use the following key: "{{ event.user.id }}".  This ensures
+	// that we throttle functions for each user independently.
+	Key *string `json:"key,omitempty"`
+}
+
+func (r RateLimit) IsValid(ctx context.Context) error {
+	if r.Limit <= 0 {
+		return errors.New("limit must be greater than 0")
+	}
+
+	if r.Key != nil {
+		if err := expressions.Validate(ctx, *r.Key); err != nil {
+			return fmt.Errorf("key is invalid: %w", err)
+		}
+	}
+
+	if r.Period == "" {
+		return errors.New("period must be specified")
+	}
+	dur, err := str2duration.ParseDuration(r.Period)
+	if err != nil {
+		return fmt.Errorf("failed to parse time duration: %w", err)
+	}
+	if dur > consts.FunctionIdempotencyPeriod {
+		return fmt.Errorf("period must be less than %s", consts.FunctionIdempotencyPeriod)
+	}
+
+	return nil
+}
+
+// DeterministicUUID returns a deterministic V3 UUID based off of the SHA1
+// hash of the function's name.
+func (f *Function) DeterministicUUID() uuid.UUID {
+	return DeterministicSha1UUID(f.Name + f.Steps[0].URI)
 }
 
 // Throttle represents concurrency over time.
@@ -290,36 +330,8 @@ func (f Function) Validate(ctx context.Context) error {
 		}
 	}
 
-	edges, aerr := f.AllEdges(ctx)
-	if aerr != nil {
-		return multierror.Append(err, aerr)
-	}
-
 	if len(f.Steps) != 1 {
 		err = multierror.Append(err, fmt.Errorf("Functions must contain one step"))
-	}
-
-	// Validate edges.
-	for _, edge := range edges {
-		// Ensure that any expressions are also valid.
-		if edge.Metadata == nil {
-			continue
-		}
-		if edge.Metadata.If != "" {
-			if _, verr := expressions.NewExpressionEvaluator(ctx, edge.Metadata.If); verr != nil {
-				err = multierror.Append(err, verr)
-			}
-		}
-		if edge.Metadata.Wait != nil {
-			// Ensure that this is a valid duration or expression.
-			if _, err := str2duration.ParseDuration(*edge.Metadata.Wait); err == nil {
-				continue
-			}
-			if _, err := expressions.NewExpressionEvaluator(ctx, *edge.Metadata.Wait); err == nil {
-				continue
-			}
-			err = multierror.Append(err, fmt.Errorf("Unable to parse wait as a duration or expression: %s", *edge.Metadata.Wait))
-		}
 	}
 
 	// Validate priority expression
@@ -433,58 +445,15 @@ func (f Function) URI() (*url.URL, error) {
 	return nil, fmt.Errorf("No steps configured")
 }
 
-// AllEdges produces edge configuration for steps defined within the function.
-// If no edges for a step exists, an automatic step from the tirgger is added.
-func (f Function) AllEdges(ctx context.Context) ([]Edge, error) {
-	edges := []Edge{}
-
-	// O1 lookup of steps.
-	stepmap := map[string]Step{}
-	// Track whether incoming edges exist for each step
-	seen := map[string]bool{}
-	for _, s := range f.Steps {
-		stepmap[s.ID] = s
-		seen[s.ID] = false
-	}
-
-	var err error
-
-	// Map all edges for incoming steps.
-	for _, edge := range f.Edges {
-		if _, ok := seen[edge.Incoming]; !ok {
-			err = multierror.Append(
-				err,
-				fmt.Errorf("Step '%s' doesn't exist within edge", edge.Incoming),
-			)
-			continue
-		}
-		seen[edge.Incoming] = true
-		edges = append(edges, edge)
-	}
-
-	// For all unseen edges, add a trigger edge.
-	for step, ok := range seen {
-		if ok {
-			continue
-		}
-		edges = append(edges, Edge{
-			Outgoing: TriggerName,
-			Incoming: step,
-		})
-	}
-
-	// Ensure that the edges are sorted by name, giving us
-	// deterministic output.
-	sort.SliceStable(edges, func(i, j int) bool {
-		return edges[i].Outgoing < edges[j].Outgoing
-	})
-	return edges, nil
+// DeterminsiticAppUUID returns a deterministic V3 UUID based off of the SHA1
+// hash of the app's URL.
+func DeterministicAppUUID(url string) uuid.UUID {
+	return DeterministicSha1UUID(url)
 }
 
-// DeterministicUUID returns a deterministic V3 UUID based off of the SHA1
-// hash of the function's name.
-func DeterministicUUID(f Function) uuid.UUID {
-	str := f.Name + f.Steps[0].URI
+// DeterministicSha1UUID returns a deterministic V3 UUID based off of the SHA1
+// hash of the input string.
+func DeterministicSha1UUID(str string) uuid.UUID {
 	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(str))
 }
 

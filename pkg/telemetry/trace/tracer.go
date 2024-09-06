@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/inngest/log"
@@ -385,7 +386,32 @@ func newNatsTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) 
 		return nil, fmt.Errorf("error creating NATS trace client: %w", err)
 	}
 
-	sp := trace.NewBatchSpanProcessor(exp)
+	// configure options
+	bopts := []exporters.BatchSpanProcessorOpt{}
+	{
+		val := os.Getenv("SPAN_BATCH_PROCESSOR_BUFFER_SIZE")
+		if val != "" {
+			bufferSize, err := strconv.ParseUint(val, 10, 32)
+			if err == nil && bufferSize > 0 {
+				bopts = append(bopts, exporters.WithBatchProcessorBufferSize(uint32(bufferSize)))
+			}
+		}
+	}
+
+	{
+		val := os.Getenv("SPAN_BATCH_PROCESSOR_INTERVAL")
+		if val != "" {
+			if dur, err := time.ParseDuration(val); err == nil {
+				bopts = append(bopts, exporters.WithBatchProcessorInterval(dur))
+			}
+		}
+	}
+
+	sp, err := exporters.NewBatchSpanProcessor(ctx, exp, bopts...)
+	if err != nil {
+		return nil, err
+	}
+
 	tp := trace.NewTracerProvider(
 		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(

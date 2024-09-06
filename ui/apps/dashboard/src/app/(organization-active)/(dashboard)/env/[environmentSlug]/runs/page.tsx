@@ -25,7 +25,7 @@ export default function Page() {
           />
         }
       />
-      <Runs scope="env" ref={ref} />;
+      <Runs scope="env" ref={ref} />
     </>
   );
 }
