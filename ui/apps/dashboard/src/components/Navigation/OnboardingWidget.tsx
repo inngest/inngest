@@ -55,7 +55,7 @@ export default function OnboardingWidget({
             <div>
               <div className="flex items-center justify-between">
                 <p
-                  className={`${finalStep && 'text-success'} flex items-center gap-px font-medium`}
+                  className={`${finalStep && 'text-success'} flex items-center gap-0.5 font-medium`}
                 >
                   {finalStep && <RiCheckboxCircleFill className="text-success h-5 w-5" />}
                   {stepContent.title}
@@ -87,6 +87,7 @@ export default function OnboardingWidget({
                 appearance="outlined"
                 className="hover:bg-canvasBase w-full text-sm"
                 label={stepContent.cta}
+                href="/settings/billing"
               />
             )}
           </div>
