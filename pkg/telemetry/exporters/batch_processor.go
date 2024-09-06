@@ -70,8 +70,18 @@ func (b *batchSpanProcessor) OnEnd(s trace.ReadOnlySpan) {
 
 	status := "success"
 	if err := b.batcher.Enqueue(op); err != nil {
-		logger.StdlibLogger(ctx).Error("error enqueueing span for batch", "error", err)
-		status = "error"
+		// attempt to export directly if it's full or in the process of shutting down
+		// to ensure data is not lost
+		switch err {
+		case batcher.BufferFullError, batcher.BufferIsShutdown:
+			if err := b.exporter.ExportSpans(ctx, []trace.ReadOnlySpan{s}); err != nil {
+				status = "error"
+				logger.StdlibLogger(ctx).Error("error exporting span directly", "error", err)
+			}
+		default:
+			logger.StdlibLogger(ctx).Error("error enqueueing span for batch", "error", err)
+			status = "error"
+		}
 	}
 
 	metrics.IncrBatchProcessorEnqueuedCounter(ctx, metrics.CounterOpt{
