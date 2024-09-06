@@ -159,15 +159,15 @@ redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
 -- NOTE: We check if concurrency > 0 here because this disables concurrency.  AccountID
 -- and custom concurrency items may not be set, but the keys need to be set for clustered
 -- mode.
-if concurrencyA > 0 then
+if exists_without_ending(keyConcurrencyA, ":-") == true and concurrencyA > 0 then
 	redis.call("ZADD", keyConcurrencyA, nextTime, item.id)
 	handleLease(keyPartitionA, keyConcurrencyA, partitionIdA)
 end
-if concurrencyB > 0 then
+if exists_without_ending(keyConcurrencyB, ":-") == true and concurrencyB > 0 then
 	redis.call("ZADD", keyConcurrencyB, nextTime, item.id)
 	handleLease(keyPartitionB, keyConcurrencyB, partitionIdB)
 end
-if concurrencyC > 0 then
+if exists_without_ending(keyConcurrencyC, ":-") == true and concurrencyC > 0 then
 	redis.call("ZADD", keyConcurrencyC, nextTime, item.id)
 	handleLease(keyPartitionC, keyConcurrencyC, partitionIdC)
 end
