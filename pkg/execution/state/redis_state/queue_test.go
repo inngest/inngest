@@ -1128,29 +1128,6 @@ func TestQueueLease(t *testing.T) {
 
 	start := time.Now().Truncate(time.Second)
 
-	t.Run("It does nothing for a zero value partition", func(t *testing.T) {
-		item, err := q.EnqueueItem(ctx, QueueItem{}, start)
-		require.NoError(t, err)
-
-		item = getQueueItem(t, r, item.ID)
-		require.Nil(t, item.LeaseID)
-
-		p := QueuePartition{} // Empty partition
-
-		now := time.Now()
-		id, err := q.Lease(ctx, p, item, time.Second, time.Now(), nil)
-		require.NoError(t, err)
-
-		item = getQueueItem(t, r, item.ID)
-		require.NotNil(t, item.LeaseID)
-		require.EqualValues(t, id, item.LeaseID)
-		require.WithinDuration(t, now.Add(time.Second), ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
-
-		t.Run("It should NOT add the item to the function's in-progress concurrency queue", func(t *testing.T) {
-			require.False(t, r.Exists(p.concurrencyKey(q.u.kg)))
-		})
-	})
-
 	t.Run("It leases an item", func(t *testing.T) {
 		item, err := q.EnqueueItem(ctx, QueueItem{}, start)
 		require.NoError(t, err)
@@ -1762,6 +1739,31 @@ func TestQueueLease(t *testing.T) {
 			require.NoError(t, err)
 			require.EqualValues(t, itemB.AtMS/1000, int(nextScore))
 			require.NotEqualValues(t, int(score), int(nextScore), "score should not equal previous score")
+		})
+	})
+
+	t.Run("It does nothing for a zero value partition", func(t *testing.T) {
+		r.FlushAll()
+
+		item, err := q.EnqueueItem(ctx, QueueItem{}, start)
+		require.NoError(t, err)
+
+		item = getQueueItem(t, r, item.ID)
+		require.Nil(t, item.LeaseID)
+
+		p := QueuePartition{} // Empty partition
+
+		now := time.Now()
+		id, err := q.Lease(ctx, p, item, time.Second, time.Now(), nil)
+		require.NoError(t, err)
+
+		item = getQueueItem(t, r, item.ID)
+		require.NotNil(t, item.LeaseID)
+		require.EqualValues(t, id, item.LeaseID)
+		require.WithinDuration(t, now.Add(time.Second), ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
+
+		t.Run("It should NOT add the item to the function's in-progress concurrency queue", func(t *testing.T) {
+			require.False(t, r.Exists(p.concurrencyKey(q.u.kg)))
 		})
 	})
 }

@@ -115,6 +115,9 @@ item.leaseID = newLeaseKey
 redis.call("HSET", keyQueueMap, queueID, cjson.encode(item))
 
 local function handleLease(keyPartition, keyConcurrency, partitionID)
+	-- Add item to in-progress/concurrency queue and set score to lease expiry time to be picked up by scavenger
+	redis.call("ZADD", keyConcurrency, nextTime, item.id)
+
 	-- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress
 	-- and stored in functionConcurrencyKey.
 	redis.call("ZREM", keyPartition, item.id)
@@ -160,15 +163,12 @@ redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
 -- and custom concurrency items may not be set, but the keys need to be set for clustered
 -- mode.
 if exists_without_ending(keyConcurrencyA, ":-") == true and concurrencyA > 0 then
-	redis.call("ZADD", keyConcurrencyA, nextTime, item.id)
 	handleLease(keyPartitionA, keyConcurrencyA, partitionIdA)
 end
 if exists_without_ending(keyConcurrencyB, ":-") == true and concurrencyB > 0 then
-	redis.call("ZADD", keyConcurrencyB, nextTime, item.id)
 	handleLease(keyPartitionB, keyConcurrencyB, partitionIdB)
 end
 if exists_without_ending(keyConcurrencyC, ":-") == true and concurrencyC > 0 then
-	redis.call("ZADD", keyConcurrencyC, nextTime, item.id)
 	handleLease(keyPartitionC, keyConcurrencyC, partitionIdC)
 end
 
