@@ -1,5 +1,6 @@
 'use client';
 
+import type { Route } from 'next';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { NewLink } from '@inngest/components/Link';
@@ -12,7 +13,7 @@ import { type OnboardingSteps, type OnboardingStepsString } from '../Onboarding/
 import { onboardingMenuStepContent } from './content';
 import { type OnboardingMenuStepContent as OnboardingMenuStepContentProps } from './types';
 
-export default function Menu() {
+export default function Menu({ envSlug }: { envSlug: string }) {
   const [onboardingLastStepCompleted] = useLocalStorage<OnboardingStepsString>(
     'onboardingLastStepCompleted',
     '1',
@@ -35,12 +36,14 @@ export default function Menu() {
             const isCompleted = stepNumber <= lastCompletedStep;
             const isActive = activeStep === stepNumber.toString();
             const stepContent = onboardingMenuStepContent.step[stepNumber];
+            const url = pathCreator.onboardingSteps({ envSlug: envSlug, step: stepNumber });
             return (
               <MenuItem
                 key={stepNumber}
                 stepContent={stepContent}
                 isCompleted={isCompleted}
                 isActive={isActive}
+                url={url}
               />
             );
           })}
@@ -78,14 +81,16 @@ const MenuItem = ({
   stepContent,
   isCompleted,
   isActive,
+  url,
 }: {
   stepContent: OnboardingMenuStepContentProps;
   isCompleted: boolean;
   isActive: boolean;
+  url: Route;
 }) => {
   const { title, description, icon: Icon } = stepContent;
   return (
-    <Link href="">
+    <Link href={url}>
       <li className="bg-canvasBase hover:bg-canvasSubtle group flex items-center gap-4 rounded-md p-1.5">
         <div
           className={cn(
