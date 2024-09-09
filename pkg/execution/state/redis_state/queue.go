@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/inngest/inngest/pkg/enums"
 	"math"
 	"strconv"
 	"strings"
@@ -1651,6 +1652,12 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 			continue
 		}
 
+		// Filter out non-default partitions until new code is fully rolled out
+		if item.PartitionType != int(enums.PartitionTypeDefault) {
+			ignored++
+			continue
+		}
+
 		// NOTE: The queue does two conflicting things:  we peek ahead of now() to fetch partitions
 		// shortly available, and we also requeue partitions if there are concurrency conflicts.
 		//
@@ -1958,6 +1965,7 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 		Limit(0, 100).
 		Build()
 
+	// NOTE: Received keys can be legacy (workflow IDs or system/internal queue names) or new (full Redis keys)
 	pKeys, err := q.u.unshardedRc.Do(ctx, cmd).AsStrSlice()
 	if err != nil {
 		return 0, fmt.Errorf("error scavenging for lost items: %w", err)
@@ -1979,6 +1987,17 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 			continue
 		}
 
+		p := QueuePartition{}
+		if err := json.Unmarshal(partitionJSON, &p); err != nil {
+			resultErr = multierror.Append(resultErr, fmt.Errorf("error unmarshalling partition '%s': %w", partitionJSON, err))
+			continue
+		}
+
+		// Filter out non-default partitions until new code is fully rolled out
+		if p.PartitionType != int(enums.PartitionTypeDefault) {
+			continue
+		}
+
 		cmd := q.u.unshardedRc.B().Zrange().
 			Key(q.u.kg.Concurrency("p", partition)).
 			Min("-inf").
@@ -1992,12 +2011,6 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 			continue
 		}
 		if len(itemIDs) == 0 {
-			continue
-		}
-
-		p := QueuePartition{}
-		if err := json.Unmarshal([]byte(partitionJSON), &p); err != nil {
-			resultErr = multierror.Append(resultErr, fmt.Errorf("error unmarshalling partition '%s': %w", partitionJSON, err))
 			continue
 		}
 
