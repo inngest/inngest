@@ -1,6 +1,9 @@
 import { type RemixiconComponentType } from '@remixicon/react';
 
 export type OnboardingSteps = 1 | 2 | 3 | 4;
+// For localStorage
+export type OnboardingStepsString = `${OnboardingSteps}`;
+
 type OnboardingWidgetStepContent = {
   title: string;
   description: string;

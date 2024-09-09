@@ -9,9 +9,7 @@ import { useLocalStorage } from 'react-use';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { pathCreator } from '@/utils/urls';
 import { onboardingWidgetContent } from '../Onboarding/content';
-import { type OnboardingSteps } from '../Onboarding/types';
-
-type OnboardingStepsString = `${OnboardingSteps}`;
+import { type OnboardingSteps, type OnboardingStepsString } from '../Onboarding/types';
 
 export default function OnboardingWidget({
   collapsed,
@@ -22,14 +20,14 @@ export default function OnboardingWidget({
 }) {
   const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
 
-  const [onboardingWidgetStep] = useLocalStorage<OnboardingStepsString>(
-    'onboardingWidgetStep',
+  const [onboardingLastStepCompleted] = useLocalStorage<OnboardingStepsString>(
+    'onboardingLastStepCompleted',
     '1',
     { raw: true }
   );
-  const currentStep: OnboardingSteps = Number(onboardingWidgetStep) as OnboardingSteps;
+  const currentStep: OnboardingSteps = Number(onboardingLastStepCompleted) as OnboardingSteps;
   const finalStep = currentStep === 4;
-  const stepContent = onboardingWidgetStep
+  const stepContent = onboardingLastStepCompleted
     ? onboardingWidgetContent.step[currentStep]
     : onboardingWidgetContent.step[1];
 
