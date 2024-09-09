@@ -7,6 +7,7 @@ import { OptionalLink } from '@inngest/components/Link/OptionalLink';
 import { Badge } from '../Badge';
 import { Pill } from '../Pill';
 import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
+import { cn } from '../utils/classNames';
 
 export const MenuItem = ({
   text,
@@ -17,6 +18,7 @@ export const MenuItem = ({
   comingSoon = false,
   beta = false,
   error = false,
+  className,
 }: {
   text: string;
   icon: ReactNode;
@@ -26,6 +28,7 @@ export const MenuItem = ({
   comingSoon?: boolean;
   beta?: boolean;
   error?: boolean;
+  className?: string;
 }) => {
   const pathname = usePathname();
   const active = href && pathname.startsWith(href);
@@ -34,13 +37,16 @@ export const MenuItem = ({
     <OptionalLink href={comingSoon ? '' : href} prefetch={prefetch}>
       <OptionalTooltip tooltip={comingSoon ? 'Coming soon...' : collapsed ? text : ''}>
         <div
-          className={`my-1 flex h-8 w-full flex-row items-center rounded px-1.5  ${
-            comingSoon
-              ? 'text-disabled hover:bg-disabled cursor-not-allowed'
-              : active
-              ? 'bg-secondary-3xSubtle text-info hover:bg-secondary-2xSubtle'
-              : 'hover:bg-canvasSubtle text-muted hover:text-basis'
-          } `}
+          className={cn(
+            `my-1 flex h-8 w-full flex-row items-center rounded px-1.5  ${
+              comingSoon
+                ? 'text-disabled hover:bg-disabled cursor-not-allowed'
+                : active
+                ? 'bg-secondary-3xSubtle text-info hover:bg-secondary-2xSubtle'
+                : 'hover:bg-canvasSubtle text-muted hover:text-basis'
+            } `,
+            className
+          )}
         >
           {icon}
           {!collapsed && <span className="ml-2.5 text-sm leading-tight">{text}</span>}
