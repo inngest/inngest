@@ -69,6 +69,7 @@ export function URQLProvider({ children }: { children: React.ReactNode }) {
         }),
         authExchange(async (utils) => {
           let sessionToken = await getToken();
+          console.log('token', sessionToken);
           return {
             addAuthToOperation: (operation) => {
               if (!sessionToken) return operation;

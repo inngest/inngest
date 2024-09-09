@@ -43,7 +43,7 @@ export const FunctionStatus = () => {
       {
         name: 'Function Runs',
         type: 'pie',
-        radius: ['45%', '80%'],
+        radius: ['35%', '60%'],
         center: ['25%', '50%'],
         itemStyle: {
           borderColor: '#fff',
@@ -80,9 +80,9 @@ export const FunctionStatus = () => {
     ],
   };
   return (
-    <div className="bg-canvasBase border-subtle flex h-[300px] w-[448px] flex-col rounded-lg p-5">
+    <div className="bg-canvasBase border-subtle relative flex h-[300px] w-[448px] shrink-0 flex-col rounded-lg p-5">
       <div className="text-subtle flex flex-row items-center gap-x-2 text-lg">
-        Function Status <FunctionInfo />
+        Functions Status <FunctionInfo />
       </div>
       <Chart option={option} />
     </div>

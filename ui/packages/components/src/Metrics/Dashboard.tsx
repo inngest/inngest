@@ -5,6 +5,7 @@ import { RangePicker } from '../DatePicker';
 import EntityFilter from '../Filter/EntityFilter';
 import { Pill } from '../Pill';
 import { subtractDuration } from '../utils/date';
+import { FailedFunctions } from './FailedFunctions';
 import { FunctionStatus } from './FunctionStatus';
 
 type EntityType = {
@@ -81,8 +82,9 @@ export const Dashboard = ({
             <hr className="border-subtle w-full" />
           </div>
           {overviewOpen && (
-            <div className="flex flex-row items-center justify-start">
+            <div className="relative flex w-full flex-row items-center justify-start gap-2 overflow-hidden">
               <FunctionStatus />
+              <FailedFunctions />
             </div>
           )}
         </div>
