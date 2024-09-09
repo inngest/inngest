@@ -95,12 +95,12 @@ func start(ctx context.Context, opts StartOpts) error {
 	stepLimitOverrides := make(map[string]int)
 	stateSizeLimitOverrides := make(map[string]int)
 
-	shardedRc, err := createRedisConnection(ctx, opts.RedisURL)
+	shardedRc, err := connectToOrCreateRedis(ctx, opts.RedisURL)
 	if err != nil {
 		return err
 	}
 
-	unshardedRc, err := createRedisConnection(ctx, opts.RedisURL)
+	unshardedRc, err := connectToOrCreateRedis(ctx, opts.RedisURL)
 	if err != nil {
 		return err
 	}
@@ -356,7 +356,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice)
 }
 
-func createRedisConnection(ctx context.Context, redisURL string) (rueidis.Client, error) {
+func connectToOrCreateRedis(ctx context.Context, redisURL string) (rueidis.Client, error) {
 	if redisURL == "" {
 		return createInmemoryRedisConnection(ctx)
 	}
