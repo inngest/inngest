@@ -54,7 +54,7 @@ var redisSingleton *miniredis.Miniredis
 type StartOpts struct {
 	Config   config.Config `json:"-"`
 	RootDir  string        `json:"dir"`
-	RedisURL string        `json:"redis-url"`
+	RedisURI string        `json:"redis-uri"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -95,12 +95,12 @@ func start(ctx context.Context, opts StartOpts) error {
 	stepLimitOverrides := make(map[string]int)
 	stateSizeLimitOverrides := make(map[string]int)
 
-	shardedRc, err := connectToOrCreateRedis(ctx, opts.RedisURL)
+	shardedRc, err := connectToOrCreateRedis(ctx, opts.RedisURI)
 	if err != nil {
 		return err
 	}
 
-	unshardedRc, err := connectToOrCreateRedis(ctx, opts.RedisURL)
+	unshardedRc, err := connectToOrCreateRedis(ctx, opts.RedisURI)
 	if err != nil {
 		return err
 	}
@@ -287,12 +287,12 @@ func start(ctx context.Context, opts StartOpts) error {
 	// The devserver embeds the event API.
 	pi := consts.LiteDefaultPersistenceInterval
 	persistenceInterval := &pi
-	if opts.RedisURL != "" {
+	if opts.RedisURI != "" {
 		// If we're using an external Redis, we rely on that to persist and
 		// manage snapshotting
 		persistenceInterval = nil
 
-		logger.From(ctx).Info().Msgf("using external Redis %s; disabling in-memory persistence and snapshotting", opts.RedisURL)
+		logger.From(ctx).Info().Msgf("using external Redis %s; disabling in-memory persistence and snapshotting", opts.RedisURI)
 	}
 
 	ds := devserver.NewService(devserver.StartOpts{
@@ -356,12 +356,12 @@ func start(ctx context.Context, opts StartOpts) error {
 	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice)
 }
 
-func connectToOrCreateRedis(ctx context.Context, redisURL string) (rueidis.Client, error) {
-	if redisURL == "" {
+func connectToOrCreateRedis(ctx context.Context, redisURI string) (rueidis.Client, error) {
+	if redisURI == "" {
 		return createInmemoryRedisConnection(ctx)
 	}
 
-	url := redisURL
+	url := redisURI
 	// strip the redis:// prefix if we have one; connection fails with it
 	if len(url) > 8 && url[:8] == "redis://" {
 		url = url[8:]
