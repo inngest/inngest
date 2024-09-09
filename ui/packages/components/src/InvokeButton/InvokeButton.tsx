@@ -6,7 +6,10 @@ import { RiFlashlightFill } from '@remixicon/react';
 type Props = {
   disabled?: boolean;
   doesFunctionAcceptPayload: boolean;
-  btnAction: (data: Record<string, unknown>) => void;
+  btnAction: (payload: {
+    data: Record<string, unknown>;
+    user: Record<string, unknown> | null;
+  }) => void;
   btnAppearance?: ComponentProps<typeof Button>['appearance'];
 };
 
@@ -19,9 +22,9 @@ export function InvokeButton({
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const onConfirm = useCallback(
-    ({ data }: { data: Record<string, unknown> }) => {
+    (payload: { data: Record<string, unknown>; user: Record<string, unknown> | null }) => {
       setIsModalOpen(false);
-      btnAction(data);
+      btnAction(payload);
     },
     [setIsModalOpen, btnAction]
   );
