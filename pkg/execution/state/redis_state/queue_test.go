@@ -1475,6 +1475,7 @@ func TestQueueLease(t *testing.T) {
 				require.Contains(t, memPart, itemB.ID)
 
 				memConcurrency, err := r.ZMembers(pA.concurrencyKey(q.u.kg))
+				require.NoError(t, err)
 				require.Equal(t, 0, len(memConcurrency))
 
 				// Both key queues exist

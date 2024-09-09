@@ -186,7 +186,11 @@ func start(ctx context.Context, opts StartOpts) error {
 			// partition.
 			funcs, err := dbcqrs.GetFunctions(ctx)
 			if err != nil {
-				return redis_state.PartitionConcurrencyLimits{redis_state.NoConcurrencyLimit, consts.DefaultConcurrencyLimit, redis_state.NoConcurrencyLimit}
+				return redis_state.PartitionConcurrencyLimits{
+					AccountLimit:   redis_state.NoConcurrencyLimit,
+					FunctionLimit:  consts.DefaultConcurrencyLimit,
+					CustomKeyLimit: consts.DefaultConcurrencyLimit,
+				}
 			}
 			for _, fun := range funcs {
 				f, _ := fun.InngestFunction()
