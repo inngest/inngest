@@ -1,7 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { NewLink } from '@inngest/components/Link';
+import { cn } from '@inngest/components/utils/classNames';
 import { RiDiscordLine, RiExternalLinkLine, RiMailLine } from '@remixicon/react';
 import { useLocalStorage } from 'react-use';
 
@@ -83,18 +85,25 @@ const MenuItem = ({
 }) => {
   const { title, description, icon: Icon } = stepContent;
   return (
-    <li className={`flex items-center gap-4 p-1.5`}>
-      <div
-        className={`border-muted rounded-md border p-2 ${isActive && 'border-contrast'} ${
-          isCompleted && 'bg-primary-moderate'
-        }`}
-      >
-        <Icon className="h-5 w-5" />
-      </div>
-      <div>
-        <h4 className="text-sm font-medium">{title}</h4>
-        <p className="text-muted text-sm">{description}</p>
-      </div>
-    </li>
+    <Link href="">
+      <li className="bg-canvasBase hover:bg-canvasSubtle group flex items-center gap-4 rounded-md p-1.5">
+        <div
+          className={cn(
+            'group-hover:bg-contrast rounded-md border p-2',
+            isActive
+              ? isCompleted
+                ? 'border-primary-moderate bg-primary-3xSubtle group-hover:bg-primary-moderate'
+                : 'border-contrast'
+              : 'border-muted'
+          )}
+        >
+          <Icon className="group-hover:text-onContrast h-5 w-5" />
+        </div>
+        <div>
+          <h4 className="text-sm font-medium">{title}</h4>
+          <p className="text-muted text-sm">{description}</p>
+        </div>
+      </li>
+    </Link>
   );
 };

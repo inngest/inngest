@@ -173,6 +173,7 @@
     --color-border-warning: var(--color-honey-600);
     --color-border-info: var(--color-purplehaze-700);
 
+    --color-primary-3xSubtle: var(--color-matcha-100);
     --color-primary-2xSubtle: var(--color-matcha-200);
     --color-primary-xSubtle: var(--color-matcha-300);
     --color-primary-subtle: var(--color-matcha-400);
@@ -277,6 +278,7 @@
     --color-border-warning: var(--color-honey-300);
     --color-border-info: var(--color-purplehaze-300);
 
+    --color-primary-3xSubtle: var(--color-matcha-900);
     --color-primary-2xSubtle: var(--color-matcha-800);
     --color-primary-xSubtle: var(--color-matcha-700);
     --color-primary-subtle: var(--color-matcha-600);

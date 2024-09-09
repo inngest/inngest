@@ -16,6 +16,7 @@ export default {
           940: '#080D19',
         },
         primary: {
+          '3xSubtle': 'rgb(var(--color-primary-3xSubtle) / <alpha-value>)',
           '2xSubtle': 'rgb(var(--color-primary-2xSubtle) / <alpha-value>)',
           xSubtle: 'rgb(var(--color-primary-xSubtle) / <alpha-value>)',
           subtle: 'rgb(var(--color-primary-subtle) / <alpha-value>)',
