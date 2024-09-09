@@ -55,10 +55,14 @@ end
 redis.call("HSET", queueKey, queueID, queueItem)
 
 
--- This extends the item in the zset and also ensures that scavenger queues are
--- updated.
-local function handleRequeue(keyConcurrency)
-	redis.call("ZREM", keyConcurrency, item.id)
+-- This removes the queue item from the concurrency/in-progress queue and ensures that the concurrency
+-- index/scavenger queue is updated to the next earliest item.
+-- This is the first half of requeueing: Removing the in-progress item, which must be followed up
+-- by enqueueing back to the partition queues
+local function handleRequeueConcurrency(keyConcurrency)
+	redis.call("ZREM", keyConcurrency, item.id) -- Remove from in-progress queue
+
+	redis.call("ZREM", concurrencyPointer, legacyPartitionName) -- always clean up previous item
 
 	-- Get the earliest item in the partition concurrency set.  We may be dequeueing
 	-- the only in-progress job and should remove this from the partition concurrency
@@ -73,11 +77,9 @@ local function handleRequeue(keyConcurrency)
 		local earliestLease = tonumber(concurrencyScores[2])
 		if earliestLease == nil then
 			redis.call("ZREM", concurrencyPointer, keyConcurrency)
-			redis.call("ZREM", concurrencyPointer, legacyPartitionName) -- remove previous item
 		else
 			-- Ensure that we update the score with the earliest lease
 			redis.call("ZADD", concurrencyPointer, earliestLease, keyConcurrency)
-			redis.call("ZREM", concurrencyPointer, legacyPartitionName) -- clean up previous item
 		end
 	end
 end
@@ -86,9 +88,9 @@ end
 -- Concurrency
 --
 
-handleRequeue(keyConcurrencyA)
-handleRequeue(keyConcurrencyB)
-handleRequeue(keyConcurrencyC)
+handleRequeueConcurrency(keyConcurrencyA)
+handleRequeueConcurrency(keyConcurrencyB)
+handleRequeueConcurrency(keyConcurrencyC)
 
 -- Remove item from the account concurrency queue
 -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
@@ -96,7 +98,7 @@ handleRequeue(keyConcurrencyC)
 redis.call("ZREM", keyAcctConcurrency, item.id)
 
 --
--- Partition manipulation
+-- Enqueue item to partition queues again
 -- 
 requeue_to_partition(keyPartitionA, partitionIdA, partitionItemA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
 requeue_to_partition(keyPartitionB, partitionIdB, partitionItemB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)

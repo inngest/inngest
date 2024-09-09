@@ -58,10 +58,13 @@ if idempotencyTTL > 0 then
 	redis.call("SETEX", keyIdempotency, idempotencyTTL, "")
 end
 
--- This extends the item in the zset and also ensures that scavenger queues are
--- updated.
-local function handleDequeue(keyConcurrency, keyPartitionSet, partitionID)
-	redis.call("ZREM", keyConcurrency, item.id)
+-- This removes the current queue item from the concurrency/in-progress queue,
+-- ensures the concurrency index/scavenger queue is updated to the next earliest in-progress item,
+-- and updates the global and account partition pointers to the next earliest item score
+local function handleDequeueConcurrency(keyConcurrency, keyPartitionSet, partitionID)
+	redis.call("ZREM", keyConcurrency, item.id) -- remove from concurrency/in-progress queue
+
+	redis.call("ZREM", concurrencyPointer, legacyPartitionName) -- always clean up previous item
 
 	-- Get the earliest item in the partition concurrency set.  We may be dequeueing
 	-- the only in-progress job and should remove this from the partition concurrency
@@ -72,16 +75,13 @@ local function handleDequeue(keyConcurrency, keyPartitionSet, partitionID)
 	local concurrencyScores = redis.call("ZRANGE", keyConcurrency, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
 	if concurrencyScores == false then
 		redis.call("ZREM", concurrencyPointer, keyConcurrency)
-		redis.call("ZREM", concurrencyPointer, legacyPartitionName) -- remove previous item
 	else
 		local earliestLease = tonumber(concurrencyScores[2])
 		if earliestLease == nil then
 			redis.call("ZREM", concurrencyPointer, keyConcurrency)
-			redis.call("ZREM", concurrencyPointer, legacyPartitionName) -- remove previous item
 		else
 			-- Ensure that we update the score with the earliest lease
 			redis.call("ZADD", concurrencyPointer, earliestLease, keyConcurrency)
-			redis.call("ZREM", concurrencyPointer, legacyPartitionName) -- remove previous item
 		end
 	end
 
@@ -114,9 +114,9 @@ local function handleDequeue(keyConcurrency, keyPartitionSet, partitionID)
 	end
 end
 
-handleDequeue(keyConcurrencyA, keyPartitionA, partitionIdA)
-handleDequeue(keyConcurrencyB, keyPartitionB, partitionIdB)
-handleDequeue(keyConcurrencyC, keyPartitionC, partitionIdC)
+handleDequeueConcurrency(keyConcurrencyA, keyPartitionA, partitionIdA)
+handleDequeueConcurrency(keyConcurrencyB, keyPartitionB, partitionIdB)
+handleDequeueConcurrency(keyConcurrencyC, keyPartitionC, partitionIdC)
 
 -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
 -- and Lease for respective ZADD calls.
