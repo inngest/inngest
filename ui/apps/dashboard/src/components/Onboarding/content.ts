@@ -55,4 +55,4 @@ export const onboardingMenuStepContent: OnboardingMenuContent = {
       icon: RiMagicLine,
     },
   },
-};
+} as const;
