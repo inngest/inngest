@@ -460,7 +460,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 			ck := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "test", 1)
 			_, _, hash, _ := ck.ParseKey() // get the hash of the "test" string / evaluated input.
 
-			_, err := q.EnqueueItem(ctx, QueueItem{
+			qi := QueueItem{
 				FunctionID: fnID,
 				Data: osqueue.Item{
 					CustomConcurrencyKeys: []state.CustomConcurrency{ck},
@@ -468,7 +468,25 @@ func TestQueueEnqueueItem(t *testing.T) {
 						AccountID: accountId,
 					},
 				},
-			}, now.Add(10*time.Second))
+			}
+
+			actualItemPartions := q.ItemPartitions(ctx, qi)
+			assert.Equal(t, 3, len(actualItemPartions))
+
+			customkeyQueuePartition := QueuePartition{
+				ID:               q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hash),
+				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
+				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
+				FunctionID:       &fnID,
+				AccountID:        accountId,
+				ConcurrencyLimit: 1,
+				ConcurrencyKey:   ck.Key,
+				ConcurrencyHash:  ck.Hash,
+			}
+
+			assert.Equal(t, customkeyQueuePartition, actualItemPartions[0])
+
+			i, err := q.EnqueueItem(ctx, qi, now.Add(10*time.Second))
 			require.NoError(t, err)
 
 			// There should be 2 partitions - custom key, and the function
@@ -477,16 +495,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 			require.Equal(t, 2, len(items))
 
 			concurrencyPartition := getPartition(t, r, enums.PartitionTypeConcurrencyKey, fnID, hash) // nb. also asserts that the partition exists
-
-			require.Equal(t, QueuePartition{
-				ID:               q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hash),
-				FunctionID:       &fnID,
-				AccountID:        accountId,
-				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
-				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
-				ConcurrencyLimit: 1,
-				ConcurrencyKey:   util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "test"),
-			}, concurrencyPartition)
+			require.Equal(t, customkeyQueuePartition, concurrencyPartition)
 
 			accountIds := getGlobalAccounts(t, rc)
 			require.Equal(t, 1, len(accountIds))
@@ -501,14 +510,19 @@ func TestQueueEnqueueItem(t *testing.T) {
 			// workflow partition for backwards compatibility
 			require.Contains(t, apIds, fnID.String())
 
-			// We do not add the fn to the function-specific queue.
-			//
-			// fnDefaultPartition := getDefaultPartition(t, r, fnID) // nb. also asserts that the partition exists
-			// require.Equal(t, QueuePartition{
-			// 	ID:            fnID.String(),
-			// 	FunctionID:    &fnID,
-			// 	PartitionType: int(enums.PartitionTypeDefault),
-			// }, fnDefaultPartition)
+			// We enqueue to the function-specific queue for backwards-compatibility reasons
+			defaultPartition := getDefaultPartition(t, r, fnID)
+			assert.Equal(t, QueuePartition{
+				ID:               fnID.String(),
+				FunctionID:       &fnID,
+				AccountID:        accountId,
+				ConcurrencyLimit: consts.DefaultConcurrencyLimit,
+			}, defaultPartition)
+
+			mem, err := r.ZMembers(defaultPartition.zsetKey(q.u.kg))
+			require.NoError(t, err)
+			require.Equal(t, 1, len(mem))
+			require.Contains(t, mem, i.ID)
 		})
 
 		t.Run("Two keys, function scope", func(t *testing.T) {
@@ -516,71 +530,95 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 			// Enqueueing an item
 			ckA := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "test", 1)
-			ckB := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "plz", 2)
 			_, _, hashA, _ := ckA.ParseKey() // get the hash of the "test" string / evaluated input.
+
+			ckB := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "plz", 2)
 			_, _, hashB, _ := ckB.ParseKey() // get the hash of the "test" string / evaluated input.
 
-			_, err := q.EnqueueItem(ctx, QueueItem{
+			qi := QueueItem{
 				FunctionID: fnID,
 				Data: osqueue.Item{
 					CustomConcurrencyKeys: []state.CustomConcurrency{ckA, ckB},
 					Identifier: state.Identifier{
 						AccountID: accountId,
 					}},
-			}, now.Add(10*time.Second))
+			}
+
+			actualItemPartitions := q.ItemPartitions(ctx, qi)
+			assert.Equal(t, 3, len(actualItemPartitions))
+			keyQueueA := QueuePartition{
+				ID:               q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hashA),
+				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
+				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
+				FunctionID:       &fnID,
+				AccountID:        accountId,
+				ConcurrencyLimit: 1,
+				ConcurrencyKey:   ckA.Key,
+				ConcurrencyHash:  ckA.Hash,
+			}
+			assert.Equal(t, keyQueueA, actualItemPartitions[0])
+
+			keyQueueB := QueuePartition{
+				ID:               q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hashB),
+				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
+				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
+				FunctionID:       &fnID,
+				AccountID:        accountId,
+				ConcurrencyLimit: 2,
+				ConcurrencyKey:   ckB.Key,
+				ConcurrencyHash:  ckB.Hash,
+			}
+			assert.Equal(t, keyQueueB, actualItemPartitions[1])
+
+			// We enqueue to the function-specific queue for backwards-compatibility reasons
+			expectedDefaultPartition := QueuePartition{
+				ID:               fnID.String(),
+				FunctionID:       &fnID,
+				AccountID:        accountId,
+				ConcurrencyLimit: consts.DefaultConcurrencyLimit,
+			}
+			assert.Equal(t, expectedDefaultPartition, actualItemPartitions[2])
+
+			i, err := q.EnqueueItem(ctx, qi, now.Add(10*time.Second))
 			require.NoError(t, err)
 
-			// 2 partitions
+			// 3 partitions (2 custom concurrency keys + 1 default)
 			items, _ := r.HKeys(q.u.kg.PartitionItem())
-			require.Equal(t, 2, len(items))
+			require.Equal(t, 3, len(items))
 
 			concurrencyPartitionA := getPartition(t, r, enums.PartitionTypeConcurrencyKey, fnID, hashA) // nb. also asserts that the partition exists
+			require.Equal(t, keyQueueA, concurrencyPartitionA)
+
 			concurrencyPartitionB := getPartition(t, r, enums.PartitionTypeConcurrencyKey, fnID, hashB) // nb. also asserts that the partition exists
-
-			require.Equal(t, QueuePartition{
-				ID:               q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hashA),
-				FunctionID:       &fnID,
-				AccountID:        accountId,
-				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
-				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
-				ConcurrencyLimit: 1,
-				ConcurrencyKey:   util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "test"),
-			}, concurrencyPartitionA)
-
-			require.Equal(t, QueuePartition{
-				ID:               q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hashB),
-				FunctionID:       &fnID,
-				AccountID:        accountId,
-				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
-				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
-				ConcurrencyLimit: 2,
-				ConcurrencyKey:   util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "plz"),
-			}, concurrencyPartitionB)
+			require.Equal(t, keyQueueB, concurrencyPartitionB)
 
 			accountIds := getGlobalAccounts(t, rc)
 			require.Equal(t, 1, len(accountIds))
 			require.Contains(t, accountIds, accountId.String())
 
 			apIds := getAccountPartitions(t, rc, accountId)
-			require.Equal(t, 2, len(apIds))
+			require.Equal(t, 3, len(apIds))
 			require.Contains(t, apIds, concurrencyPartitionA.ID)
 			require.Contains(t, apIds, concurrencyPartitionB.ID)
 
-			// We do not add the fn to the function-specific queue.
-			//
-			// fnDefaultPartition := getDefaultPartition(t, r, fnID) // nb. also asserts that the partition exists
-			// require.Equal(t, QueuePartition{
-			// 	ID:            fnID.String(),
-			// 	FunctionID:    &fnID,
-			// 	PartitionType: int(enums.PartitionTypeDefault),
-			// }, fnDefaultPartition)
+			require.Contains(t, apIds, expectedDefaultPartition.ID)
 
-			t.Run("Peeking partitions returns the two partitions", func(t *testing.T) {
+			assert.True(t, r.Exists(expectedDefaultPartition.zsetKey(q.u.kg)), "expected default partition to exist")
+			defaultPartition := getDefaultPartition(t, r, fnID)
+			assert.Equal(t, expectedDefaultPartition, defaultPartition)
+
+			mem, err := r.ZMembers(defaultPartition.zsetKey(q.u.kg))
+			require.NoError(t, err)
+			require.Equal(t, 1, len(mem))
+			require.Contains(t, mem, i.ID)
+
+			t.Run("Peeking partitions returns the three partitions", func(t *testing.T) {
 				parts, err := q.PartitionPeek(ctx, true, time.Now().Add(time.Hour), 10)
 				require.NoError(t, err)
-				require.Equal(t, 2, len(parts))
-				require.Equal(t, concurrencyPartitionA, *parts[0], "Got: %v", spew.Sdump(parts))
-				require.Equal(t, concurrencyPartitionB, *parts[1], "Got: %v", spew.Sdump(parts))
+				require.Equal(t, 3, len(parts))
+				require.Equal(t, expectedDefaultPartition, *parts[0], "Got: %v", spew.Sdump(parts), r.Dump())
+				require.Equal(t, concurrencyPartitionA, *parts[1], "Got: %v", spew.Sdump(parts), r.Dump())
+				require.Equal(t, concurrencyPartitionB, *parts[2], "Got: %v", spew.Sdump(parts), r.Dump())
 			})
 		})
 	})
@@ -4342,8 +4380,7 @@ func createConcurrencyKey(scope enums.ConcurrencyScope, scopeID uuid.UUID, value
 	return state.CustomConcurrency{
 		Key:   hash,
 		Limit: limit,
-		// NOTE: Hash isn't really necessary;  it's used as an optimization to find the latest
-		// concurrency values within function config by matching the unevaluated concurrency keys.
+		Hash:  value,
 	}
 }
 

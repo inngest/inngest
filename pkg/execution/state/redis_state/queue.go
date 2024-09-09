@@ -920,28 +920,27 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 		}
 	}
 
+	fnPartition := QueuePartition{
+		ID:            i.FunctionID.String(),
+		PartitionType: int(enums.PartitionTypeDefault), // Function partition
+		FunctionID:    &i.FunctionID,
+		AccountID:     i.Data.Identifier.AccountID,
+	}
+
+	// Get the function limit from the `concurrencyLimitGetter`.  If this returns
+	// a limit (> 0), create a new PartitionTypeDefault queue partition for the function.
+	limits := q.concurrencyLimitGetter(ctx, fnPartition)
+
+	// The concurrency limit for fns MUST be added for leasing.
+	fnPartition.ConcurrencyLimit = limits.FunctionLimit
+	if fnPartition.ConcurrencyLimit <= 0 {
+		// Use account-level limits, as there are no function level limits
+		fnPartition.ConcurrencyLimit = limits.AccountLimit
+	}
+
 	// If there are no concurrency keys, we're putting this queue item into a partition
 	// for the function itself.
 	if len(ckeys) == 0 {
-		fnPartition := QueuePartition{
-			ID:            i.FunctionID.String(),
-			PartitionType: int(enums.PartitionTypeDefault), // Function partition
-			FunctionID:    &i.FunctionID,
-			AccountID:     i.Data.Identifier.AccountID,
-		}
-		// The concurrency limit for fns MUST be added for leasing.
-		limits := q.concurrencyLimitGetter(ctx, fnPartition)
-		limit := limits.FunctionLimit
-		if limit <= 0 {
-			// Use account-level limits, as there are no function level limits
-			limit = limits.AccountLimit
-		}
-		if limit <= 0 {
-			// Use default limits
-			limit = consts.DefaultConcurrencyLimit
-		}
-		// Always add a concurrency limit
-		fnPartition.ConcurrencyLimit = limit
 		partitions = append(partitions, fnPartition)
 	} else {
 		// Up to 2 concurrency keys.
@@ -983,6 +982,13 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 			partitions = append(partitions, partition)
 		}
 
+		// NOTE (INN-3565): For backwards compatibility, we always enqueue to the default function partition,
+		// even if users supply two custom concurrency keys
+		// This can be removed once we trust the system sufficiently to exclusively use key queues  if possible
+		if len(ckeys) == 2 {
+			partitions = append(partitions, fnPartition)
+		}
+
 		// BACKWARDS COMPATABILITY FOR PRE-MULTIPLE-PARTITION-PER-ITEM QUEUES.
 		//
 		// As of 2024-07-26, we've refactored this system to have many queues per
@@ -993,25 +999,15 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 		// the above example) for older queue items.
 		//
 		// NOTE: New queue items now always create two concurrency keys in this case.
-		if len(ckeys) == 1 {
-			// Get the function limit from the `concurrencyLimitGetter`.  If this returns
-			// a limit (> 0), create a new PartitionTypeDefault queue partition for the function.
-			limits := q.concurrencyLimitGetter(ctx, partitions[0])
-			if limits.FunctionLimit > 0 {
-				partitions = append(partitions, QueuePartition{
-					ID:               i.FunctionID.String(),
-					PartitionType:    int(enums.PartitionTypeDefault), // Function partition
-					FunctionID:       &i.FunctionID,
-					AccountID:        i.Data.Identifier.AccountID,
-					ConcurrencyLimit: limits.FunctionLimit,
-				})
-			}
+		if len(ckeys) == 1 && limits.FunctionLimit > 0 {
+			partitions = append(partitions, fnPartition)
 		}
+
 	}
 
 	// TODO: check for throttle keys
 
-	for i := len(partitions) - 1; i < 3; i++ {
+	for i := len(partitions); i < 3; i++ {
 		// Pad to 3 partitions, and add empty partitions to the item.
 		// We MUST ignore empty partitions when managing queues.
 		partitions = append(partitions, QueuePartition{})
