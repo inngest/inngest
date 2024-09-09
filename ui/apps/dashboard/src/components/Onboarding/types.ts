@@ -1,3 +1,5 @@
+import { type RemixiconComponentType } from '@remixicon/react';
+
 export type OnboardingSteps = 1 | 2 | 3 | 4;
 type OnboardingWidgetStepContent = {
   title: string;
@@ -13,4 +15,17 @@ export type OnboardingWidgetContent = {
   tooltip: {
     close: string;
   };
+};
+
+type OnboardingMenuStepContent = {
+  title: string;
+  description: string;
+  icon: RemixiconComponentType | React.ReactNode;
+};
+
+export type OnboardingMenuContent = {
+  step: {
+    [K in OnboardingSteps]: OnboardingMenuStepContent;
+  };
+  title: string;
 };
