@@ -492,7 +492,7 @@ func (q *queue) runScavenger(ctx context.Context) {
 		case <-scavenge.Chan():
 			// Scavenge the items
 			if q.isScavenger() {
-				count, err := q.Scavenge(ctx)
+				count, err := q.Scavenge(ctx, ScavengePeekSize)
 				if err != nil {
 					q.logger.Error().Err(err).Msg("error scavenging")
 				}

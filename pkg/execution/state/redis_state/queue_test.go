@@ -551,7 +551,7 @@ func TestQueuePeek(t *testing.T) {
 
 		t.Run("Expired leases should move back via scavenging", func(t *testing.T) {
 			// Run scavenging.
-			caught, err := q.Scavenge(ctx)
+			caught, err := q.Scavenge(ctx, ScavengePeekSize)
 			require.NoError(t, err)
 			require.EqualValues(t, 0, caught)
 
@@ -560,7 +560,7 @@ func TestQueuePeek(t *testing.T) {
 
 			// Run scavenging.
 			scavengeAt := time.Now().UnixMilli()
-			caught, err = q.Scavenge(ctx)
+			caught, err = q.Scavenge(ctx, ScavengePeekSize)
 			require.NoError(t, err)
 			require.EqualValues(t, 1, caught)
 

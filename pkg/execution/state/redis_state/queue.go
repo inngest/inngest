@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/inngest/inngest/pkg/enums"
 	"math"
+	mathRand "math/rand"
 	"strconv"
 	"strings"
 	"sync"
@@ -76,6 +77,8 @@ const (
 	QueueLeaseDuration            = 20 * time.Second
 	ConfigLeaseDuration           = 10 * time.Second
 	ConfigLeaseMax                = 20 * time.Second
+
+	ScavengePeekSize = 100
 
 	PriorityMax     uint = 0
 	PriorityDefault uint = 5
@@ -1950,19 +1953,31 @@ func (q *queue) Instrument(ctx context.Context) error {
 // cannot renew the item's lease.
 //
 // We scan all partition concurrency queues - queues of leases - to find leases that have expired.
-func (q *queue) Scavenge(ctx context.Context) (int, error) {
+func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Scavenge"), redis_telemetry.ScopeQueue)
 
 	// Find all items that have an expired lease - eg. where the min time for a lease is between
 	// (0-now] in unix milliseconds.
 	now := fmt.Sprintf("%d", q.clock.Now().UnixMilli())
 
+	// local count = redis.call("ZCOUNT", partitionIndex, "-inf", peekUntil)
+	count, err := q.u.unshardedRc.Do(ctx, q.u.unshardedRc.B().Zcount().Key(q.u.kg.ConcurrencyIndex()).Min("-inf").Max(now).Build()).AsInt64()
+	if err != nil {
+		return 0, fmt.Errorf("error counting concurrency index: %w", err)
+	}
+
+	var offset int64
+	if count > int64(limit) {
+		r := mathRand.New(mathRand.NewSource(q.clock.Now().UnixMilli()))
+		offset = r.Int63n((count-int64(limit))+1) - 1
+	}
+
 	cmd := q.u.unshardedRc.B().Zrange().
 		Key(q.u.kg.ConcurrencyIndex()).
 		Min("-inf").
 		Max(now).
 		Byscore().
-		Limit(0, 100).
+		Limit(offset, int64(limit)).
 		Build()
 
 	// NOTE: Received keys can be legacy (workflow IDs or system/internal queue names) or new (full Redis keys)
