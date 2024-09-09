@@ -20,10 +20,10 @@ export type OnboardingWidgetContent = {
   };
 };
 
-type OnboardingMenuStepContent = {
+export type OnboardingMenuStepContent = {
   title: string;
   description: string;
-  icon: RemixiconComponentType | React.ReactNode;
+  icon: RemixiconComponentType;
 };
 
 export type OnboardingMenuContent = {
