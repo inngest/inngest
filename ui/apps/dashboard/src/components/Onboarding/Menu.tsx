@@ -5,7 +5,12 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { NewLink } from '@inngest/components/Link';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiDiscordLine, RiExternalLinkLine, RiMailLine } from '@remixicon/react';
+import {
+  RiCheckboxCircleFill,
+  RiDiscordLine,
+  RiExternalLinkLine,
+  RiMailLine,
+} from '@remixicon/react';
 import { useLocalStorage } from 'react-use';
 
 import { pathCreator } from '@/utils/urls';
@@ -94,15 +99,21 @@ const MenuItem = ({
       <li className="bg-canvasBase hover:bg-canvasSubtle group flex items-center gap-4 rounded-md p-1.5">
         <div
           className={cn(
-            'group-hover:bg-contrast rounded-md border p-2',
+            'group-hover:bg-contrast box-border flex h-[38px] w-[38px] items-center justify-center rounded-md border group-hover:border-none',
             isActive
               ? isCompleted
                 ? 'border-primary-moderate bg-primary-3xSubtle group-hover:bg-primary-moderate'
                 : 'border-contrast'
+              : isCompleted
+              ? 'bg-primary-3xSubtle group-hover:bg-primary-moderate border-none'
               : 'border-muted'
           )}
         >
-          <Icon className="group-hover:text-onContrast h-5 w-5" />
+          {isCompleted ? (
+            <RiCheckboxCircleFill className="text-primary-moderate group-hover:text-alwaysWhite" />
+          ) : (
+            <Icon className="group-hover:text-onContrast h-5 w-5" />
+          )}
         </div>
         <div>
           <h4 className="text-sm font-medium">{title}</h4>
