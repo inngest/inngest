@@ -148,6 +148,7 @@ export default {
       },
       textDecorationColor: {
         link: 'rgb(var(--color-foreground-link) / <alpha-value>)',
+        subtle: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
       },
       placeholderColor: {
         disabled: 'rgb(var(--color-foreground-disabled) / <alpha-value>)',
