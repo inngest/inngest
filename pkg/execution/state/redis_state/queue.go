@@ -1974,7 +1974,6 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 	// (0-now] in unix milliseconds.
 	now := fmt.Sprintf("%d", q.clock.Now().UnixMilli())
 
-	// local count = redis.call("ZCOUNT", partitionIndex, "-inf", peekUntil)
 	count, err := q.u.unshardedRc.Do(ctx, q.u.unshardedRc.B().Zcount().Key(q.u.kg.ConcurrencyIndex()).Min("-inf").Max(now).Build()).AsInt64()
 	if err != nil {
 		return 0, fmt.Errorf("error counting concurrency index: %w", err)
