@@ -69,15 +69,16 @@ func TestInvoke(t *testing.T) {
 	r.NoError(err)
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
+		r := require.New(t)
 		run := c.WaitForRunTraces(ctx, t, &runID, models.FunctionStatusCompleted)
 
-		require.NotNil(t, run.Trace)
-		require.Equal(t, 1, len(run.Trace.ChildSpans))
-		require.True(t, run.Trace.IsRoot)
-		require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
+		r.NotNil(run.Trace)
+		r.Equal(1, len(run.Trace.ChildSpans))
+		r.True(run.Trace.IsRoot)
+		r.Equal(models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
 
 		// output test
-		require.NotNil(t, run.Trace.OutputID)
+		r.NotNil(run.Trace.OutputID)
 		output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
 		c.ExpectSpanOutput(t, "success", output)
 
