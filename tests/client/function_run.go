@@ -215,6 +215,8 @@ func (c *Client) WaitForRunStatus(
 	return run
 }
 
+// WaitForRunTracesWithTimeout waits for run traces with a matching status for a predefined timeout and interval.
+// Once run traces are available, they are returned and tests continue. If run traces are missing or invalid, the test will fail.
 func (c *Client) WaitForRunTracesWithTimeout(ctx context.Context, t *testing.T, runID *string, status models.FunctionStatus, timeout time.Duration, interval time.Duration) *RunV2 {
 	var traces *RunV2
 	require.NotNil(t, runID)
@@ -234,6 +236,7 @@ func (c *Client) WaitForRunTracesWithTimeout(ctx context.Context, t *testing.T, 
 	return traces
 }
 
+// WaitForRunTraces waits for run traces with a matching status for up to 10 seconds, checking every 2 seconds.
 func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *string, status models.FunctionStatus) *RunV2 {
 	return c.WaitForRunTracesWithTimeout(ctx, t, runID, status, 10*time.Second, 2*time.Second)
 }
