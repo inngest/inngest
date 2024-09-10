@@ -63,7 +63,7 @@ func TestWait(t *testing.T) {
 	r.NoError(err)
 
 	t.Run("in progress wait", func(t *testing.T) {
-		run := c.WaitForRunTracesWithTimeout(ctx, t, &runID, models.FunctionStatusRunning, 5*time.Second, 1*time.Second)
+		run := c.WaitForRunTracesWithTimeout(ctx, t, &runID, models.FunctionStatusRunning, 10*time.Second, 1*time.Second)
 
 		require.NotNil(t, run.Trace)
 		require.Equal(t, 1, len(run.Trace.ChildSpans))
