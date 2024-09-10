@@ -62,40 +62,33 @@ func TestFunctionFailure(t *testing.T) {
 	require.EqualValues(t, counter, 1)
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
-		<-time.After(3 * time.Second)
+		run := c.WaitForRunTraces(ctx, t, &runID, models.FunctionStatusFailed)
 
-		require.Eventually(t, func() bool {
-			// function run
-			run := c.MustRunTraces(ctx, runID)
-			require.NotNil(t, run)
-			require.NotNil(t, run.Trace)
-			require.True(t, run.Trace.IsRoot)
-			require.Equal(t, 1, len(run.Trace.ChildSpans))
-			require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
+		require.NotNil(t, run.Trace)
+		require.True(t, run.Trace.IsRoot)
+		require.Equal(t, 1, len(run.Trace.ChildSpans))
+		require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
+		// output test
+		require.NotNil(t, run.Trace.OutputID)
+		runOutput := c.RunSpanOutput(ctx, *run.Trace.OutputID)
+		require.NotNil(t, runOutput)
+		c.ExpectSpanErrorOutput(t, "", "nope!", runOutput)
+
+		rootSpanID := run.Trace.SpanID
+
+		t.Run("failed run", func(t *testing.T) {
+			span := run.Trace.ChildSpans[0]
+			assert.Equal(t, consts.OtelExecFnErr, span.Name)
+			assert.False(t, span.IsRoot)
+			assert.Equal(t, rootSpanID, span.ParentSpanID)
+			assert.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
+			assert.NotNil(t, span.OutputID)
+
 			// output test
-			require.NotNil(t, run.Trace.OutputID)
-			runOutput := c.RunSpanOutput(ctx, *run.Trace.OutputID)
-			require.NotNil(t, runOutput)
-			c.ExpectSpanErrorOutput(t, "", "nope!", runOutput)
-
-			rootSpanID := run.Trace.SpanID
-
-			t.Run("failed run", func(t *testing.T) {
-				span := run.Trace.ChildSpans[0]
-				assert.Equal(t, consts.OtelExecFnErr, span.Name)
-				assert.False(t, span.IsRoot)
-				assert.Equal(t, rootSpanID, span.ParentSpanID)
-				assert.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
-				assert.NotNil(t, span.OutputID)
-
-				// output test
-				output := c.RunSpanOutput(ctx, *span.OutputID)
-				assert.NotNil(t, output)
-				c.ExpectSpanErrorOutput(t, "", "nope!", output)
-			})
-
-			return true
-		}, 10*time.Second, 2*time.Second)
+			output := c.RunSpanOutput(ctx, *span.OutputID)
+			assert.NotNil(t, output)
+			c.ExpectSpanErrorOutput(t, "", "nope!", output)
+		})
 	})
 }
 
