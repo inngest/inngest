@@ -291,7 +291,7 @@ func newOTLPHTTPTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, err
 		return nil, fmt.Errorf("error create otlp http trace client: %w", err)
 	}
 
-	sp := trace.NewBatchSpanProcessor(exp)
+	sp := trace.NewBatchSpanProcessor(exp, trace.WithBatchTimeout(100*time.Millisecond))
 	tp := trace.NewTracerProvider(
 		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(
