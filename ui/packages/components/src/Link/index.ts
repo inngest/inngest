@@ -3,6 +3,6 @@ export {
   type NewLinkProps,
   Link,
   defaultLinkStyles,
-  type OldLinkProps as LinkPropsm,
+  type OldLinkProps as LinkProps,
 } from './Link';
 export { OptionalLink } from './OptionalLink';
