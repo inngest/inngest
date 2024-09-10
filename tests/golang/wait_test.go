@@ -66,7 +66,7 @@ func TestWait(t *testing.T) {
 		<-time.After(5 * time.Second)
 
 		require.Eventually(t, func() bool {
-			run := c.RunTraces(ctx, runID)
+			run := c.MustRunTraces(ctx, runID)
 			require.NotNil(t, models.FunctionStatusRunning.String(), run.Status)
 			require.NotNil(t, run.Trace)
 			require.Equal(t, 1, len(run.Trace.ChildSpans))
@@ -110,7 +110,7 @@ func TestWait(t *testing.T) {
 		<-time.After(5 * time.Second)
 
 		require.Eventually(t, func() bool {
-			run := c.RunTraces(ctx, runID)
+			run := c.MustRunTraces(ctx, runID)
 			require.NotNil(t, run)
 			require.Equal(t, models.FunctionStatusCompleted.String(), run.Status)
 			require.NotNil(t, run.Trace)
@@ -209,7 +209,7 @@ func TestWaitGroup(t *testing.T) {
 		<-time.After(3 * time.Second)
 
 		require.Eventually(t, func() bool {
-			run := c.RunTraces(ctx, runID)
+			run := c.MustRunTraces(ctx, runID)
 			require.NotNil(t, models.FunctionStatusRunning.String(), run.Status)
 			require.NotNil(t, run.Trace)
 			require.Equal(t, 1, len(run.Trace.ChildSpans))
@@ -252,7 +252,7 @@ func TestWaitGroup(t *testing.T) {
 		<-time.After(5 * time.Second)
 
 		require.Eventually(t, func() bool {
-			run := c.RunTraces(ctx, runID)
+			run := c.MustRunTraces(ctx, runID)
 			require.NotNil(t, run)
 			require.Equal(t, models.FunctionStatusCompleted.String(), run.Status)
 			require.NotNil(t, run.Trace)

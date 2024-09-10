@@ -37,6 +37,15 @@ func (c *Client) NewRequest(method string, path string, body io.Reader) (*http.R
 }
 
 func (c *Client) MustDoGQL(ctx context.Context, input graphql.RawParams) *graphql.Response {
+	resp, err := c.DoGQL(ctx, input)
+	if err != nil {
+		c.Fatalf(err.Error())
+	}
+
+	return resp
+}
+
+func (c *Client) DoGQL(ctx context.Context, input graphql.RawParams) (*graphql.Response, error) {
 	c.Helper()
 
 	resp := c.doGQL(ctx, input)
@@ -45,10 +54,10 @@ func (c *Client) MustDoGQL(ctx context.Context, input graphql.RawParams) *graphq
 		for i := 0; i < len(resp.Errors); i++ {
 			str[i] = resp.Errors[i].Message
 		}
-		c.Fatalf("err with gql: %#v", strings.Join(str, ", "))
+		return nil, fmt.Errorf("err with gql: %#v", strings.Join(str, ", "))
 	}
 
-	return resp
+	return resp, nil
 }
 
 func (c *Client) doGQL(ctx context.Context, input graphql.RawParams) *graphql.Response {

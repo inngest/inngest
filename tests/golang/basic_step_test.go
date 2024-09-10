@@ -156,7 +156,7 @@ func TestFunctionSteps(t *testing.T) {
 		<-time.After(3 * time.Second)
 
 		require.Eventually(t, func() bool {
-			run := c.RunTraces(ctx, runID)
+			run := c.MustRunTraces(ctx, runID)
 			require.NotNil(t, run)
 			require.Equal(t, models.FunctionStatusCompleted.String(), run.Status)
 			require.False(t, run.IsBatch)

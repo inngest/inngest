@@ -95,7 +95,7 @@ func TestSleep(t *testing.T) {
 
 		require.Eventually(t, func() bool {
 			require.EqualValues(t, 1, atomic.LoadInt32(&completed))
-			run := c.RunTraces(ctx, runID)
+			run := c.MustRunTraces(ctx, runID)
 			require.NotNil(t, run)
 			require.NotNil(t, run.Trace)
 			require.True(t, run.Trace.IsRoot)

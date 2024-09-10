@@ -43,6 +43,7 @@ func TestInvoke(t *testing.T) {
 	// This function will invoke the other function
 	runID := ""
 	evtName := "invoke-me"
+	var done bool
 	mainFn := inngestgo.CreateFunction(
 		inngestgo.FunctionOpts{
 			Name: "main-fn",
@@ -57,6 +58,8 @@ func TestInvoke(t *testing.T) {
 				step.InvokeOpts{FunctionId: appID + "-" + invokedFnName},
 			)
 
+			done = true
+
 			return "success", nil
 		},
 	)
@@ -69,29 +72,50 @@ func TestInvoke(t *testing.T) {
 	r.NoError(err)
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
-		<-time.After(4 * time.Second)
+		// Wait for function run to complete
+		require.Eventually(t, func() bool {
+			return done
+		}, time.Second*4, time.Second)
 
 		require.EventuallyWithT(t, func(ct *assert.CollectT) {
-			r := require.New(ct)
+			assert.NotEmpty(ct, runID)
+			run, err := c.RunTraces(ctx, runID)
+			assert.NoError(ct, err)
+			assert.NotNil(ct, run)
 
-			run := c.RunTraces(ctx, runID)
-			r.NotNil(run)
-			r.Equal(models.FunctionStatusCompleted.String(), run.Status)
-			r.NotNil(run.Trace)
-			r.Equal(1, len(run.Trace.ChildSpans))
-			r.True(run.Trace.IsRoot)
-			r.Equal(models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
+			// NOTE: require tracks the error above but does not always exit immediately,
+			// so we force the function to return with an internal error to prevent panics in the
+			// next assertion.
+			// We cannot use require.NotNil as this will cause an uncaught panic (see https://github.com/stretchr/testify/issues/1457)
+			if run == nil {
+				return
+			}
+
+			assert.Equal(ct, models.FunctionStatusCompleted.String(), run.Status)
+			assert.NotNil(ct, run.Trace)
+			// same as above: exit early and retry without panic
+			if run.Trace == nil {
+				return
+			}
+
+			assert.Equal(ct, 1, len(run.Trace.ChildSpans))
+			assert.True(ct, run.Trace.IsRoot)
+			assert.Equal(ct, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
 
 			// output test
-			r.NotNil(run.Trace.OutputID)
+			assert.NotNil(ct, run.Trace.OutputID)
+			// same as above: exit early and retry without panic
+			if run.Trace.OutputID == nil {
+				return
+			}
+
 			output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
 			c.ExpectSpanOutput(ct, "success", output)
 
 			rootSpanID := run.Trace.SpanID
 
 			t.Run("invoke", func(t *testing.T) {
-				as := assert.New(ct)
-
+				as := assert.New(t)
 				invoke := run.Trace.ChildSpans[0]
 				as.Equal("invoke", invoke.Name)
 				as.Equal(0, invoke.Attempts)
@@ -181,7 +205,7 @@ func TestInvokeGroup(t *testing.T) {
 		require.EventuallyWithT(t, func(ct *assert.CollectT) {
 			r := require.New(ct)
 
-			run := c.RunTraces(ctx, runID)
+			run := c.MustRunTraces(ctx, runID)
 			r.Nil(run.EndedAt)
 			r.Nil(run.Trace.EndedAt)
 			r.NotNil(models.FunctionStatusRunning.String(), run.Status)
@@ -224,7 +248,7 @@ func TestInvokeGroup(t *testing.T) {
 			r := require.New(ct)
 			as := assert.New(ct)
 
-			run := c.RunTraces(ctx, runID)
+			run := c.MustRunTraces(ctx, runID)
 			r.NotNil(run)
 			r.Equal(models.FunctionStatusCompleted.String(), run.Status)
 			r.NotNil(run.Trace)
@@ -326,7 +350,7 @@ func TestInvokeTimeout(t *testing.T) {
 		errMsg := "Timed out waiting for invoked function to complete"
 
 		require.Eventually(t, func() bool {
-			run := c.RunTraces(ctx, runID)
+			run := c.MustRunTraces(ctx, runID)
 			require.NotNil(t, run)
 			require.Equal(t, models.FunctionStatusFailed.String(), run.Status)
 			require.NotNil(t, run.Trace)

@@ -217,11 +217,22 @@ func (c *Client) WaitForRunStatus(
 
 // retrieve run with traces
 // TODO: add the traces once implemented
-func (c *Client) RunTraces(ctx context.Context, runID string) *RunV2 {
+func (c *Client) MustRunTraces(ctx context.Context, runID string) *RunV2 {
+	c.Helper()
+
+	data, err := c.RunTraces(ctx, runID)
+	if err != nil {
+		c.Fatalf(err.Error())
+	}
+
+	return data
+}
+
+func (c *Client) RunTraces(ctx context.Context, runID string) (*RunV2, error) {
 	c.Helper()
 
 	if runID == "" {
-		return nil
+		return nil, nil
 	}
 
 	query := `
@@ -282,14 +293,14 @@ func (c *Client) RunTraces(ctx context.Context, runID string) *RunV2 {
 		}
 	`
 
-	resp := c.MustDoGQL(ctx, graphql.RawParams{
+	resp, err := c.DoGQL(ctx, graphql.RawParams{
 		Query: query,
 		Variables: map[string]any{
 			"runID": runID,
 		},
 	})
-	if len(resp.Errors) > 0 {
-		c.Fatalf("err with fnrun trace query: %#v", resp.Errors)
+	if err != nil {
+		return nil, fmt.Errorf("err with fnrun trace query: %w", err)
 	}
 
 	type response struct {
@@ -297,10 +308,10 @@ func (c *Client) RunTraces(ctx context.Context, runID string) *RunV2 {
 	}
 	data := &response{}
 	if err := json.Unmarshal(resp.Data, data); err != nil {
-		c.Fatalf(err.Error())
+		return nil, fmt.Errorf("could not unmarshal response data: %w", err)
 	}
 
-	return &data.Run
+	return &data.Run, nil
 }
 
 type RunV2 struct {
