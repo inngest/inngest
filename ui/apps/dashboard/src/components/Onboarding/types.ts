@@ -1,4 +1,4 @@
-import { type RemixiconComponentType } from '@remixicon/react';
+import { type MenuStepContent } from '@inngest/components/Steps/StepsMenu';
 
 export type OnboardingSteps = 1 | 2 | 3 | 4;
 // For localStorage
@@ -20,15 +20,9 @@ export type OnboardingWidgetContent = {
   };
 };
 
-export type OnboardingMenuStepContent = {
-  title: string;
-  description: string;
-  icon: RemixiconComponentType;
-};
-
 export type OnboardingMenuContent = {
   step: {
-    [K in OnboardingSteps]: OnboardingMenuStepContent;
+    [K in OnboardingSteps]: MenuStepContent;
   };
   title: string;
 };
