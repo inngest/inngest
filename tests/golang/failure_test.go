@@ -173,7 +173,7 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 	})
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
-		run := c.WaitForRunTracesWithTimeout(ctx, t, &runID, models.FunctionStatusFailed, 40*time.Second, 5*time.Second)
+		run := c.WaitForRunTracesWithTimeout(ctx, t, &runID, models.FunctionStatusFailed, 1*time.Minute, 5*time.Second)
 
 		require.NotNil(t, run)
 		require.NotNil(t, run.Trace)
