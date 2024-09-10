@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"github.com/inngest/inngest/pkg/enums"
 	"math"
-	mathRand "math/rand"
+	mrand "math/rand"
 	"strconv"
 	"strings"
 	"sync"
@@ -1951,7 +1951,7 @@ func (q *queue) Instrument(ctx context.Context) error {
 func (q *queue) randomScavengeOffset(seed int64, count int64, limit int) int64 {
 	// only apply random offset if there are more total items to scavenge than the limit
 	if count > int64(limit) {
-		r := mathRand.New(mathRand.NewSource(seed))
+		r := mrand.New(mrand.NewSource(seed))
 
 		// the result of count-limit must be greater than 0 as we have already checked count > limit
 		// we increase the argument by 1 to make the highest possible index accessible
