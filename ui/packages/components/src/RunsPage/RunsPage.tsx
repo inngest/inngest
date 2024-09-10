@@ -335,8 +335,18 @@ export function RunsPage({
             icon={<RiRefreshLine />}
             iconSide="left"
             onClick={onRefresh}
-            loading={isLoadingMore || isLoadingInitial}
-            disabled={isLoadingMore || isLoadingInitial}
+            // Do not disable or show the button as loading if the poll interval is less than 1 second
+            // Changing state too quickly can cause the button to flicker
+            loading={
+              pollInterval && pollInterval < 1000
+                ? isLoadingInitial
+                : isLoadingMore || isLoadingInitial
+            }
+            disabled={
+              pollInterval && pollInterval < 1000
+                ? isLoadingInitial
+                : isLoadingMore || isLoadingInitial
+            }
           />
         </div>
       )}
