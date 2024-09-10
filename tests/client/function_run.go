@@ -215,20 +215,7 @@ func (c *Client) WaitForRunStatus(
 	return run
 }
 
-// retrieve run with traces
-// TODO: add the traces once implemented
-func (c *Client) MustRunTraces(ctx context.Context, runID string) *RunV2 {
-	c.Helper()
-
-	data, err := c.RunTraces(ctx, runID)
-	if err != nil {
-		c.Fatalf(err.Error())
-	}
-
-	return data
-}
-
-func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *string, status models.FunctionStatus) *RunV2 {
+func (c *Client) WaitForRunTracesWithTimeout(ctx context.Context, t *testing.T, runID *string, status models.FunctionStatus, timeout time.Duration, interval time.Duration) *RunV2 {
 	var traces *RunV2
 	require.NotNil(t, runID)
 	require.Eventually(t, func() bool {
@@ -242,9 +229,13 @@ func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *stri
 		// NOTE: we force the function to return early to prevent panics in the next assertion.
 		// We cannot use require.NotNil as this will cause an uncaught panic (see https://github.com/stretchr/testify/issues/1457)
 		return err == nil && run != nil && run.Status == status.String()
-	}, 10*time.Second, 2*time.Second)
+	}, timeout, interval)
 
 	return traces
+}
+
+func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *string, status models.FunctionStatus) *RunV2 {
+	return c.WaitForRunTracesWithTimeout(ctx, t, runID, status, 10*time.Second, 2*time.Second)
 }
 
 func (c *Client) RunTraces(ctx context.Context, runID string) (*RunV2, error) {
