@@ -5,6 +5,11 @@ import { type OnboardingMenuContent, type OnboardingWidgetContent } from './type
 
 export const onboardingWidgetContent: OnboardingWidgetContent = {
   step: {
+    0: {
+      title: 'Getting started',
+      description: "Let's get your system up and running on Inngest.",
+      eta: 'Est. 10 mins remaining',
+    },
     1: {
       title: 'Getting started',
       description: "Let's get your system up and running on Inngest.",

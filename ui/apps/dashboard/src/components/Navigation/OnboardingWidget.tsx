@@ -4,12 +4,11 @@ import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import SegmentedProgressBar from '@inngest/components/ProgressBar/SegmentedProgressBar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiBookReadLine, RiCheckboxCircleFill, RiCloseLine } from '@remixicon/react';
-import { useLocalStorage } from 'react-use';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { pathCreator } from '@/utils/urls';
 import { onboardingWidgetContent } from '../Onboarding/content';
-import { type OnboardingSteps, type OnboardingStepsString } from '../Onboarding/types';
+import useOnboardingStep from '../Onboarding/useOnboardingStep';
 
 export default function OnboardingWidget({
   collapsed,
@@ -19,17 +18,12 @@ export default function OnboardingWidget({
   closeWidget: () => void;
 }) {
   const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
+  const { lastCompletedStep } = useOnboardingStep();
 
-  const [onboardingLastStepCompleted] = useLocalStorage<OnboardingStepsString>(
-    'onboardingLastStepCompleted',
-    '1',
-    { raw: true }
-  );
-  const currentStep: OnboardingSteps = Number(onboardingLastStepCompleted) as OnboardingSteps;
-  const finalStep = currentStep === 4;
-  const stepContent = onboardingLastStepCompleted
-    ? onboardingWidgetContent.step[currentStep]
-    : onboardingWidgetContent.step[1];
+  const finalStep = lastCompletedStep === 4;
+  const stepContent = lastCompletedStep
+    ? onboardingWidgetContent.step[lastCompletedStep]
+    : onboardingWidgetContent.step[0];
 
   if (!onboardingFlow) return;
   return (
@@ -76,7 +70,9 @@ export default function OnboardingWidget({
               </div>
               <p className="text-muted text-sm">{stepContent.description}</p>
             </div>
-            {!finalStep && <SegmentedProgressBar segmentsCompleted={currentStep} segments={4} />}
+            {!finalStep && (
+              <SegmentedProgressBar segmentsCompleted={lastCompletedStep} segments={4} />
+            )}
             {stepContent.eta && (
               <p className="text-light text-[10px] font-medium uppercase">{stepContent.eta}</p>
             )}

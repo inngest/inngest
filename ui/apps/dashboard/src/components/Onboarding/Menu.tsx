@@ -11,27 +11,22 @@ import {
   RiExternalLinkLine,
   RiMailLine,
 } from '@remixicon/react';
-import { useLocalStorage } from 'react-use';
 
 import { pathCreator } from '@/utils/urls';
-import { type OnboardingSteps, type OnboardingStepsString } from '../Onboarding/types';
+import { type OnboardingSteps } from '../Onboarding/types';
 import { onboardingMenuStepContent } from './content';
 import { type OnboardingMenuStepContent as OnboardingMenuStepContentProps } from './types';
+import useOnboardingStep from './useOnboardingStep';
 
 export default function Menu({ envSlug }: { envSlug: string }) {
-  const [onboardingLastStepCompleted] = useLocalStorage<OnboardingStepsString>(
-    'onboardingLastStepCompleted',
-    '1',
-    { raw: true }
-  );
-  const lastCompletedStep: OnboardingSteps = Number(onboardingLastStepCompleted) as OnboardingSteps;
+  const { lastCompletedStep } = useOnboardingStep();
   const pathname = usePathname();
 
   const activeStep = pathname.split('/').pop() || '1';
   const stepNumbers: OnboardingSteps[] = [1, 2, 3, 4];
 
   return (
-    <div className="flex flex-col">
+    <div className="mr-12 flex flex-col">
       <nav className="mb-12">
         <h3 className="text-muted text-xs font-medium uppercase">
           {onboardingMenuStepContent.title}

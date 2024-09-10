@@ -13,7 +13,7 @@ type OnboardingWidgetStepContent = {
 
 export type OnboardingWidgetContent = {
   step: {
-    [K in OnboardingSteps]: OnboardingWidgetStepContent;
+    [K in 0 | OnboardingSteps]: OnboardingWidgetStepContent;
   };
   tooltip: {
     close: string;

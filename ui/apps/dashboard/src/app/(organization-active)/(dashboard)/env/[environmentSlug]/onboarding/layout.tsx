@@ -1,8 +1,13 @@
+import dynamic from 'next/dynamic';
 import { Header } from '@inngest/components/Header/Header';
 
 import { ServerFeatureFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
-import Menu from '@/components/Onboarding/Menu';
 import { pathCreator } from '@/utils/urls';
+
+// Disable SSR in Menu, to prevent hydration errors. It requires windows info
+const Menu = dynamic(() => import('@/components/Onboarding/Menu'), {
+  ssr: false,
+});
 
 export default function Layout({
   children,
