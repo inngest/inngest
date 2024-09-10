@@ -1948,6 +1948,20 @@ func (q *queue) Instrument(ctx context.Context) error {
 	return nil
 }
 
+func (q *queue) randomScavengeOffset(seed int64, count int64, limit int) int64 {
+	// only apply random offset if there are more total items to scavenge than the limit
+	if count > int64(limit) {
+		r := mathRand.New(mathRand.NewSource(seed))
+
+		// the result of count-limit must be greater than 0 as we have already checked count > limit
+		// we increase the argument by 1 to make the highest possible index accessible
+		// example: for count = 9, limit = 3, we want to access indices 0 through 6, not 0 through 5
+		return r.Int63n(count - int64(limit) + 1)
+	}
+
+	return 0
+}
+
 // Scavenge attempts to find jobs that may have been lost due to killed workers.  Workers are shared
 // nothing, and each item in a queue has a lease.  If a worker dies, it will not finish the job and
 // cannot renew the item's lease.
@@ -1966,18 +1980,12 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 		return 0, fmt.Errorf("error counting concurrency index: %w", err)
 	}
 
-	var offset int64
-	if count > int64(limit) {
-		r := mathRand.New(mathRand.NewSource(q.clock.Now().UnixMilli()))
-		offset = r.Int63n((count-int64(limit))+1) - 1
-	}
-
 	cmd := q.u.unshardedRc.B().Zrange().
 		Key(q.u.kg.ConcurrencyIndex()).
 		Min("-inf").
 		Max(now).
 		Byscore().
-		Limit(offset, int64(limit)).
+		Limit(q.randomScavengeOffset(q.clock.Now().UnixMilli(), count, limit), int64(limit)).
 		Build()
 
 	// NOTE: Received keys can be legacy (workflow IDs or system/internal queue names) or new (full Redis keys)
