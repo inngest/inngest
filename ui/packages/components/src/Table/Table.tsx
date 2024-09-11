@@ -3,7 +3,7 @@ import { RiArrowDownSLine } from '@remixicon/react';
 import { flexRender, useReactTable, type Row, type TableOptions } from '@tanstack/react-table';
 import { useVirtual } from 'react-virtual';
 
-const cellStyles = 'pl-6 pr-2 py-3 whitespace-nowrap';
+const cellStyles = 'pl-4 pr-2 py-3 whitespace-nowrap';
 
 type TableProps<T> = {
   options: TableOptions<T>;
