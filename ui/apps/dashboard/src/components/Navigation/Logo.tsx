@@ -30,9 +30,9 @@ const NavToggle = ({ collapsed, setCollapsed }: LogoProps) => {
       className={'hidden group-hover:block'}
       icon={
         collapsed ? (
-          <RiContractRightLine className="text-subtle h-5 w-5" />
+          <RiContractRightLine className="text-muted h-5 w-5" />
         ) : (
-          <RiContractLeftLine className="text-subtle h-5 w-5" />
+          <RiContractLeftLine className="text-muted h-5 w-5" />
         )
       }
     />

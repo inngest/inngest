@@ -36,7 +36,7 @@ import {
 } from '@/store/generated';
 import { pathCreator } from '@/utils/pathCreator';
 
-const pollInterval = 2500;
+const pollInterval = 400;
 
 export default function Page() {
   const [autoRefresh, setAutoRefresh] = useState(true);

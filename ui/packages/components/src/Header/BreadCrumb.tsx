@@ -11,14 +11,14 @@ export const BreadCrumb = ({ path }: { path: BreadCrumbType[] }) => {
         <OptionalLink href={part.href}>
           <span
             className={`${
-              last ? 'text-basis' : 'text-subtle hover:bg-canvasSubtle'
+              last ? 'text-basis' : 'text-muted hover:bg-canvasSubtle'
             } mr-2 rounded p-1 text-sm`}
           >
             {part.text}
           </span>
         </OptionalLink>
 
-        {!last && <RiArrowRightSLine className="text-subtle mr-1 h-5 w-5" />}
+        {!last && <RiArrowRightSLine className="text-muted mr-1 h-5 w-5" />}
       </div>
     );
   });

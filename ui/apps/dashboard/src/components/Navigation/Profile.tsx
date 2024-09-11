@@ -24,17 +24,17 @@ export const Profile = ({ collapsed, profile }: { collapsed: boolean; profile: P
           } ${
             active
               ? 'bg-secondary-4xSubtle text-info hover:bg-secondary-3xSubtle'
-              : 'hover:bg-canvasSubtle text-muted'
+              : 'hover:bg-canvasSubtle text-subtle'
           }`}
         >
-          <div className="bg-canvasMuted text-muted flex h-8 w-8 items-center justify-center rounded-full text-xs uppercase">
+          <div className="bg-canvasMuted text-subtle flex h-8 w-8 items-center justify-center rounded-full text-xs uppercase">
             {profile.orgName?.substring(0, 2) || '?'}
           </div>
 
           {!collapsed && (
             <div className="ml-2 flex flex-col items-start justify-start">
-              <div className="text-muted leading-1 text-sm">{profile.orgName}</div>
-              <div className="text-subtle text-xs leading-4">{profile.displayName}</div>
+              <div className="text-subtle leading-1 text-sm">{profile.orgName}</div>
+              <div className="text-muted text-xs leading-4">{profile.displayName}</div>
             </div>
           )}
         </div>

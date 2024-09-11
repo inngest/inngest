@@ -65,7 +65,7 @@ export function TimelineNode({ getOutput, node, children, isAttempt, navigateToR
             <Button
               className="group"
               icon={
-                <RiArrowDownSLine className="transform-90 bg-canvasBase group-hover:bg-canvasSubtle text-muted transition-transform duration-500 group-data-[state=open]:-rotate-180" />
+                <RiArrowDownSLine className="transform-90 bg-canvasBase group-hover:bg-canvasSubtle text-subtle transition-transform duration-500 group-data-[state=open]:-rotate-180" />
               }
             />
           </AccordionPrimitive.Trigger>

@@ -12,7 +12,7 @@ import Navigation from '../Navigation/Navigation';
 import { Profile, type ProfileType } from '../Navigation/Profile';
 import useOnboardingWidget from '../Onboarding/useOnboardingWidget';
 
-// Disable SSR in Onboarding Widget Table, to prevent hydration errors. It requires windows info
+// Disable SSR in Onboarding Widget, to prevent hydration errors. It requires windows info
 const OnboardingWidget = dynamic(() => import('../Navigation/OnboardingWidget'), {
   ssr: false,
 });

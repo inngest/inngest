@@ -15,11 +15,14 @@ import {
 
 import { useSystemStatus } from '@/app/(organization-active)/support/statusPage';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
+import { EnvironmentType } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
+import useOnboardingStep from '../Onboarding/useOnboardingStep';
 import SystemStatusIcon from './SystemStatusIcon';
 
 export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget: () => void }) => {
   const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
+  const { nextStep } = useOnboardingStep();
   const status = useSystemStatus();
 
   return (
@@ -35,33 +38,33 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
         <Listbox.Options className="bg-canvasBase absolute -right-48 bottom-0 z-50 ml-8 w-[199px] gap-y-0.5 rounded border shadow ring-0 focus:outline-none">
           <Link href="https://www.inngest.com/docs?ref=support-center" target="_blank">
             <Listbox.Option
-              className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="docs"
             >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                <RiExternalLinkLine className="text-subtle mr-2 h-4 w-4 " />
+                <RiExternalLinkLine className="text-muted mr-2 h-4 w-4 " />
                 <div>Inngest Documentation</div>
               </div>
             </Listbox.Option>
           </Link>
           <Link href="/support" target="_blank">
             <Listbox.Option
-              className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="support"
             >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                <RiMailLine className="text-subtle mr-2 h-4 w-4" />
+                <RiMailLine className="text-muted mr-2 h-4 w-4" />
                 <div>Support</div>
               </div>
             </Listbox.Option>
           </Link>
           <Link href="https://www.inngest.com/discord" target="_blank">
             <Listbox.Option
-              className="text-subtle hover:bg-canvasSubtle mx-2 my-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              className="text-muted hover:bg-canvasSubtle mx-2 my-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="discord"
             >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                <RiDiscordLine className="text-subtle mr-2 h-4 w-4" />
+                <RiDiscordLine className="text-muted mr-2 h-4 w-4" />
                 <div>Join Discord</div>
               </div>
             </Listbox.Option>
@@ -69,18 +72,18 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
           <hr />
           <Link href="https://roadmap.inngest.com/roadmap" target="_blank">
             <Listbox.Option
-              className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="roadmap"
             >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                <RiRoadMapLine className="text-subtle mr-2 h-4 w-4" />
+                <RiRoadMapLine className="text-muted mr-2 h-4 w-4" />
                 <div>Inngest Roadmap</div>
               </div>
             </Listbox.Option>
           </Link>
           <Link href="/support" target="_blank">
             <Listbox.Option
-              className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="status"
             >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
@@ -91,11 +94,11 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
           </Link>
           <Link href="https://roadmap.inngest.com/changelog" target="_blank">
             <Listbox.Option
-              className="text-subtle hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="releaseNotes"
             >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                <RiArticleLine className="text-subtle mr-2 h-4 w-4" />
+                <RiArticleLine className="text-muted mr-2 h-4 w-4" />
                 <div>Release Notes</div>
               </div>
             </Listbox.Option>
@@ -103,13 +106,19 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
           {onboardingFlow && (
             <>
               <hr />
-              <Link href={pathCreator.onboarding()} onClick={() => showWidget()}>
+              <Link
+                href={pathCreator.onboardingSteps({
+                  envSlug: EnvironmentType.Production.toLowerCase(),
+                  step: nextStep,
+                })}
+                onClick={() => showWidget()}
+              >
                 <Listbox.Option
-                  className="text-subtle hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+                  className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
                   value="onboardingGuide"
                 >
                   <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                    <RiBookReadLine className="text-subtle mr-2 h-4 w-4" />
+                    <RiBookReadLine className="text-muted mr-2 h-4 w-4" />
                     <div>Show onboarding guide</div>
                   </div>
                 </Listbox.Option>

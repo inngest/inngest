@@ -52,7 +52,7 @@ export default function AppList() {
       <div className="px-10 py-6">
         <div className="mb-4 flex items-center gap-3">
           <IconApp />
-          <p className="text-muted">
+          <p className="text-subtle">
             {numberOfSyncedApps} / {apps.length} Apps Synced
           </p>
         </div>

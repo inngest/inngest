@@ -32,7 +32,7 @@ export const RunsActionMenu = ({
       <div className="relative">
         <Listbox.Options className="bg-canvasBase border-subtle shadow-tooltip absolute right-1 top-1 z-50 h-[52px] w-[247px] gap-y-0.5 rounded border shadow-2xl">
           <Listbox.Option
-            className="text-subtle mx-2 mt-2 flex cursor-pointer flex-row items-center justify-between text-[13px]"
+            className="text-muted mx-2 mt-2 flex cursor-pointer flex-row items-center justify-between text-[13px]"
             value="toggleAutoRefresh"
           >
             <div className="flex flex-col">
