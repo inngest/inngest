@@ -18,7 +18,7 @@ export default function SearchInput({
   return (
     <div
       className={cn(
-        'bg-canvasBase text-subtle border-subtle relative flex items-center border pl-6',
+        'bg-canvasBase text-subtle border-subtle relative flex items-center border pl-4',
         className
       )}
     >
@@ -33,7 +33,7 @@ export default function SearchInput({
         }}
         {...props}
       />
-      <RiSearchLine className="text-subtle absolute left-6 h-3 w-3" />
+      <RiSearchLine className="text-subtle absolute left-2 h-4 w-4" />
     </div>
   );
 }
