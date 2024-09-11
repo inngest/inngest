@@ -100,11 +100,12 @@ func TestRetry(t *testing.T) {
 	})
 
 	t.Run("trace run should have the appropriate data", func(t *testing.T) {
-		run := c.WaitForRunTracesWithTimeout(ctx, t, &runID, models.FunctionStatusCompleted, 15*time.Second, 3*time.Second)
-
-		require.NotNil(t, run.Trace)
-		require.True(t, run.Trace.IsRoot)
-		require.Equal(t, 2, len(run.Trace.ChildSpans))
+		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
+			Status:         models.FunctionStatusCompleted,
+			ChildSpanCount: 2,
+			Timeout:        15 * time.Second,
+			Interval:       3 * time.Second,
+		})
 
 		// output test
 		require.NotNil(t, run.Trace.OutputID)
