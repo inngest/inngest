@@ -50,9 +50,10 @@ type batchSpanProcessor struct {
 	maxSize     int
 	concurrency int
 	timeout     time.Duration
-	in          chan *trace.ReadOnlySpan
 	buffer      map[string][]trace.ReadOnlySpan
 	pointer     uuid.UUID
+	in          chan *trace.ReadOnlySpan
+	out         chan string
 }
 
 func NewBatchSpanProcessor(ctx context.Context, exporter trace.SpanExporter, opts ...BatchSpanProcessorOpt) trace.SpanProcessor {
@@ -70,6 +71,7 @@ func NewBatchSpanProcessor(ctx context.Context, exporter trace.SpanExporter, opt
 		apply(p)
 	}
 	p.in = make(chan *trace.ReadOnlySpan, p.maxSize)
+	p.out = make(chan string, p.maxSize)
 
 	// start process loop
 	for i := 0; i < p.concurrency; i++ {
@@ -102,6 +104,11 @@ func (b *batchSpanProcessor) ForceFlush(ctx context.Context) error {
 func (b *batchSpanProcessor) run(ctx context.Context) {
 	for {
 		select {
+		case id := <-b.out:
+			if err := b.send(ctx, id); err != nil {
+				logger.StdlibLogger(ctx).Error("error sending out batched spans", "error", err, "batch_id", id)
+			}
+
 		case span := <-b.in:
 			b.append(ctx, span)
 
@@ -138,12 +145,8 @@ func (b *batchSpanProcessor) append(ctx context.Context, span *trace.ReadOnlySpa
 		newPointer := uuid.New()
 		b.pointer = newPointer
 
-		// start execution right away
-		go func() {
-			if err := b.send(ctx, p.String()); err != nil {
-				logger.StdlibLogger(ctx).Error("error sending spans on full batch", "error", err)
-			}
-		}()
+		// start execution
+		b.out <- p.String()
 	}
 }
 
@@ -153,20 +156,30 @@ func (b *batchSpanProcessor) sendLater(ctx context.Context, id string) {
 
 	// update the pointer to something else so it doesn't attempt to update the same buffer
 	b.mt.Lock()
+	defer b.mt.Unlock()
+
 	// only update if the pointer value is still the same
 	if b.pointer.String() == id {
 		b.pointer = uuid.New()
 	}
-	b.mt.Unlock()
 
-	if err := b.send(ctx, id); err != nil {
-		logger.StdlibLogger(ctx).Error("error sending spans after delay", "error", err)
+	_, ok := b.buffer[id]
+	if !ok {
+		// already processed, not need to deal with it
+		return
 	}
+
+	b.out <- id
 }
 
 // send attempts to process the buffer of spans identified by id
 func (b *batchSpanProcessor) send(ctx context.Context, id string) error {
 	b.mt.Lock()
+	// if the pointer and the id is still the same, change it so nothing can append to the same buffer
+	if b.pointer.String() == id {
+		b.pointer = uuid.New()
+	}
+
 	spans, ok := b.buffer[id]
 	b.mt.Unlock()
 
