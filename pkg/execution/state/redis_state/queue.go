@@ -2683,7 +2683,12 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 		for i, item := range jobs {
 			itemID := itemIDs[i]
 			if item == "" {
-				q.logger.Error().Interface("item_id", itemID).Msg("missing queue item in concurrency queue")
+				q.logger.
+					Error().
+					Str("index_partition", partition).
+					Str("concurrency_queue_key", queueKey).
+					Str("item_id", itemID).
+					Msg("missing queue item in concurrency queue")
 
 				// Drop item reference to prevent spinning on this item
 				err := q.u.unshardedRc.Do(ctx, q.u.unshardedRc.B().Zrem().Key(queueKey).Member(itemID).Build()).Error()
