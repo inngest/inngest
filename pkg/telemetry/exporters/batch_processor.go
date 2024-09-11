@@ -14,6 +14,7 @@ import (
 
 const (
 	defaultBatchMaxSize = 10_000
+	defaultConcurrency  = 100
 	defaultBatchTimeout = 200 * time.Millisecond
 )
 
@@ -35,24 +36,34 @@ func WithBatchProcessorInterval(timeout time.Duration) BatchSpanProcessorOpt {
 	}
 }
 
+func WithBatchProcessorConcurrency(c int) BatchSpanProcessorOpt {
+	return func(b *batchSpanProcessor) {
+		if c > 0 {
+			b.concurrency = c
+		}
+	}
+}
+
 type batchSpanProcessor struct {
-	mt       sync.RWMutex
-	exporter trace.SpanExporter
-	maxSize  int
-	timeout  time.Duration
-	in       chan *trace.ReadOnlySpan
-	buffer   map[string][]trace.ReadOnlySpan
-	pointer  uuid.UUID
+	mt          sync.RWMutex
+	exporter    trace.SpanExporter
+	maxSize     int
+	concurrency int
+	timeout     time.Duration
+	in          chan *trace.ReadOnlySpan
+	buffer      map[string][]trace.ReadOnlySpan
+	pointer     uuid.UUID
 }
 
 func NewBatchSpanProcessor(ctx context.Context, exporter trace.SpanExporter, opts ...BatchSpanProcessorOpt) trace.SpanProcessor {
 	p := &batchSpanProcessor{
-		mt:       sync.RWMutex{},
-		exporter: exporter,
-		maxSize:  defaultBatchMaxSize,
-		timeout:  defaultBatchTimeout,
-		buffer:   map[string][]trace.ReadOnlySpan{},
-		pointer:  uuid.New(),
+		mt:          sync.RWMutex{},
+		exporter:    exporter,
+		maxSize:     defaultBatchMaxSize,
+		timeout:     defaultBatchTimeout,
+		concurrency: defaultConcurrency,
+		buffer:      map[string][]trace.ReadOnlySpan{},
+		pointer:     uuid.New(),
 	}
 
 	for _, apply := range opts {
@@ -61,7 +72,9 @@ func NewBatchSpanProcessor(ctx context.Context, exporter trace.SpanExporter, opt
 	p.in = make(chan *trace.ReadOnlySpan, p.maxSize)
 
 	// start process loop
-	go p.run(ctx)
+	for i := 0; i < p.concurrency; i++ {
+		go p.run(ctx)
+	}
 
 	return p
 }
