@@ -1,3 +1,6 @@
+//go:build !ios && !iossimulator
+// +build !ios,!iossimulator
+
 package ieproxy
 
 /*
@@ -58,6 +61,7 @@ func cfArrayGetGoStrings(cfArray C.CFArrayRef) []string {
 func writeConf() {
 	cfDictProxy := C.CFDictionaryRef(C.CFNetworkCopySystemProxySettings())
 	defer C.CFRelease(C.CFTypeRef(cfDictProxy))
+	darwinProxyConf = ProxyConf{}
 
 	cfNumHttpEnable := C.CFNumberRef(C.CFDictionaryGetValue(cfDictProxy, unsafe.Pointer(C.kCFNetworkProxiesHTTPEnable)))
 	if unsafe.Pointer(cfNumHttpEnable) != C.NULL && cfNumberGetGoInt(cfNumHttpEnable) > 0 {
@@ -73,7 +77,7 @@ func writeConf() {
 	}
 
 	cfNumHttpsEnable := C.CFNumberRef(C.CFDictionaryGetValue(cfDictProxy, unsafe.Pointer(C.kCFNetworkProxiesHTTPSEnable)))
-	if unsafe.Pointer(cfNumHttpEnable) != C.NULL && cfNumberGetGoInt(cfNumHttpsEnable) > 0 {
+	if unsafe.Pointer(cfNumHttpsEnable) != C.NULL && cfNumberGetGoInt(cfNumHttpsEnable) > 0 {
 		darwinProxyConf.Static.Active = true
 		if darwinProxyConf.Static.Protocols == nil {
 			darwinProxyConf.Static.Protocols = make(map[string]string)

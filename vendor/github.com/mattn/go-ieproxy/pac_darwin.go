@@ -98,7 +98,10 @@ char* _getPacUrl() {
 
 */
 import "C"
-import "unsafe"
+import (
+	"net/url"
+	"unsafe"
+)
 
 func (psc *ProxyScriptConf) findProxyForURL(URL string) string {
 	if !psc.Active {
@@ -108,15 +111,18 @@ func (psc *ProxyScriptConf) findProxyForURL(URL string) string {
 	return proxy
 }
 
-func getProxyForURL(pacFileURL, url string) string {
+func getProxyForURL(pacFileURL, targetURL string) string {
 	if pacFileURL == "" {
 		pacFileURL = getPacUrl()
 	}
 	if pacFileURL == "" {
 		return ""
 	}
+	if u, err := url.Parse(pacFileURL); err != nil || u.Scheme == "" {
+		return ""
+	}
 
-	csUrl := C.CString(url)
+	csUrl := C.CString(targetURL)
 	csPac := C.CString(pacFileURL)
 	csRet := C._getProxyUrlFromPac(csPac, csUrl)
 

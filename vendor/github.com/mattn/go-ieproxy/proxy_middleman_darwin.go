@@ -1,3 +1,6 @@
+//go:build !ios && !iossimulator
+// +build !ios,!iossimulator
+
 package ieproxy
 
 import (
