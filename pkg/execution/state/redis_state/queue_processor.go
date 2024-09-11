@@ -457,27 +457,32 @@ func (q *queue) scan(ctx context.Context) error {
 		metricShardName    = "<global>" // default global name for metrics in this function
 	)
 
-	// By default, use the global partition
-	partitionKey := q.u.kg.GlobalPartitionIndex()
-
-	peekSize := PartitionPeekMax
 	peekUntil := q.clock.Now().Add(PartitionLookahead)
 
 	// If this worker has leased accounts, those take priority 95% of the time.  There's a 5% chance that the
 	// worker still works on the global queue.
 	existingLeases := q.getAccountLeases()
-
 	if len(existingLeases) > 0 {
 		// Pick a random guaranteed capacity if we leased multiple
 		i := rand.Intn(len(existingLeases))
 		guaranteedCapacity = &existingLeases[i].GuaranteedCapacity
 
+		metrics.IncrQueueScanCounter(ctx,
+			metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"kind":       "guaranteed_capacity",
+					"account_id": guaranteedCapacity.AccountID.String(),
+				},
+			},
+		)
+
 		// Backwards-compatible metrics names
 		metricShardName = "<guaranteed-capacity>:" + guaranteedCapacity.Key()
 
 		// When account is leased, process it
-		partitionKey = q.u.kg.AccountPartitionIndex(guaranteedCapacity.AccountID)
-		return q.scanPartition(ctx, partitionKey, peekSize, peekUntil, guaranteedCapacity, metricShardName, &guaranteedCapacity.AccountID)
+		partitionKey := q.u.kg.AccountPartitionIndex(guaranteedCapacity.AccountID)
+		return q.scanPartition(ctx, partitionKey, PartitionPeekMax, peekUntil, guaranteedCapacity, metricShardName, &guaranteedCapacity.AccountID)
 	}
 
 	processAccount := false
@@ -486,6 +491,15 @@ func (q *queue) scan(ctx context.Context) error {
 	}
 
 	if processAccount {
+		metrics.IncrQueueScanCounter(ctx,
+			metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"kind": "accounts",
+				},
+			},
+		)
+
 		peekedAccounts, err := q.accountPeek(ctx, q.isSequential(), peekUntil, AccountPeekMax)
 		if err != nil {
 			return fmt.Errorf("could not peek accounts: %w", err)
@@ -501,7 +515,7 @@ func (q *queue) scan(ctx context.Context) error {
 		// Note: This is not optimal as some accounts may have fewer partitions than others and
 		// we're leaving capacity on the table. We'll need to find a better way to determine the
 		// optimal peek size in this case.
-		peekSize = int64(math.Round(float64(PartitionPeekMax / int64(len(peekedAccounts)))))
+		peekSize := int64(math.Round(float64(PartitionPeekMax / int64(len(peekedAccounts)))))
 
 		// Scan and process account partitions in parallel
 		for _, account := range peekedAccounts {
@@ -516,7 +530,19 @@ func (q *queue) scan(ctx context.Context) error {
 		return eg.Wait()
 	}
 
-	return q.scanPartition(ctx, partitionKey, peekSize, peekUntil, nil, metricShardName, nil)
+	metrics.IncrQueueScanCounter(ctx,
+		metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"kind": "partitions",
+			},
+		},
+	)
+
+	// By default, use the global partition
+	partitionKey := q.u.kg.GlobalPartitionIndex()
+
+	return q.scanPartition(ctx, partitionKey, PartitionPeekMax, peekUntil, nil, metricShardName, nil)
 }
 
 // NOTE: Shard is only passed as a reference if the partition was peeked from

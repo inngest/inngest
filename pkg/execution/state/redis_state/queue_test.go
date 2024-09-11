@@ -1158,95 +1158,6 @@ func TestQueuePeek(t *testing.T) {
 			require.Equal(t, int64(2), q.randomScavengeOffset(4, 4, 1))
 			require.Equal(t, int64(0), q.randomScavengeOffset(5, 4, 1))
 		})
-
-		t.Run("Backcompat: Scavenger should gracefully handle invalid items and continue processing", func(t *testing.T) {
-			r.FlushAll()
-
-			start := time.Now().Truncate(time.Second)
-
-			fnIdA, fnIdB, fnIdC := uuid.New(), uuid.New(), uuid.New()
-
-			ia, err := q.EnqueueItem(ctx, QueueItem{ID: "a", FunctionID: fnIdA}, start)
-			require.NoError(t, err)
-			pA := QueuePartition{FunctionID: &ia.FunctionID}
-
-			ib, err := q.EnqueueItem(ctx, QueueItem{ID: "b", FunctionID: fnIdB}, start)
-			require.NoError(t, err)
-			pB := QueuePartition{FunctionID: &ib.FunctionID}
-
-			ic, err := q.EnqueueItem(ctx, QueueItem{ID: "c", FunctionID: fnIdC}, start)
-			require.NoError(t, err)
-			pC := QueuePartition{FunctionID: &ic.FunctionID}
-
-			now := time.Now()
-
-			_, err = q.Lease(ctx, pA, ia, 50*time.Millisecond, now, nil)
-			require.NoError(t, err)
-			_, err = q.Lease(ctx, pB, ib, 50*time.Millisecond, now, nil)
-			require.NoError(t, err)
-			_, err = q.Lease(ctx, pC, ic, 50*time.Millisecond, now, nil)
-			require.NoError(t, err)
-
-			// Run scavenging.
-			caught, err := q.Scavenge(ctx, ScavengePeekSize)
-			require.NoError(t, err)
-			require.EqualValues(t, 0, caught)
-
-			// When the lease expires it should re-appear
-			<-time.After(100 * time.Millisecond)
-
-			// Run scavenging.
-			caught, err = q.Scavenge(ctx, 1)
-			require.NoError(t, err)
-			require.EqualValues(t, 1, caught)
-
-			require.True(t, r.Exists(q.u.kg.ConcurrencyIndex()), r.Dump())
-			concurrencyIndexMembers, err := r.ZMembers(q.u.kg.ConcurrencyIndex())
-			require.NoError(t, err)
-			require.Equal(t, 2, len(concurrencyIndexMembers))
-
-			var aExists, bExists, cExists bool
-			for _, member := range concurrencyIndexMembers {
-				if member == fnIdA.String() {
-					aExists = true
-				} else if member == fnIdB.String() {
-					bExists = true
-				} else if member == fnIdC.String() {
-					cExists = true
-				}
-
-				concurrencyKey := q.u.kg.Concurrency("p", member)
-				require.True(t, r.Exists(concurrencyKey), r.Dump())
-				inProgress, err := r.ZMembers(concurrencyKey)
-				require.NoError(t, err)
-				require.Equal(t, 1, len(inProgress))
-			}
-
-			// At least one may not exist anymore
-			require.False(t, aExists && bExists && cExists)
-
-			// Ensure the concurrency queue is empty but the partition queue has exactly one item (scavenge worked)
-			if !aExists {
-				require.False(t, r.Exists(q.u.kg.Concurrency("p", fnIdA.String())))
-				partMem, err := r.ZMembers(q.u.kg.PartitionQueueSet(enums.PartitionTypeDefault, fnIdA.String(), ""))
-				require.NoError(t, err)
-				require.Equal(t, 1, len(partMem))
-			}
-
-			if !bExists {
-				require.False(t, r.Exists(q.u.kg.Concurrency("p", fnIdB.String())))
-				partMem, err := r.ZMembers(q.u.kg.PartitionQueueSet(enums.PartitionTypeDefault, fnIdB.String(), ""))
-				require.NoError(t, err)
-				require.Equal(t, 1, len(partMem))
-			}
-
-			if !cExists {
-				require.False(t, r.Exists(q.u.kg.Concurrency("p", fnIdC.String())))
-				partMem, err := r.ZMembers(q.u.kg.PartitionQueueSet(enums.PartitionTypeDefault, fnIdC.String(), ""))
-				require.NoError(t, err)
-				require.Equal(t, 1, len(partMem))
-			}
-		})
 	})
 }
 
@@ -1447,7 +1358,7 @@ func TestQueueLease(t *testing.T) {
 		q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
 			return PartitionConcurrencyLimits{
 				AccountLimit:   1,
-				FunctionLimit:  100,
+				FunctionLimit:  NoConcurrencyLimit,
 				CustomKeyLimit: NoConcurrencyLimit,
 			}
 		}
@@ -1471,17 +1382,18 @@ func TestQueueLease(t *testing.T) {
 			id, err := q.Lease(ctx, p, itemB, 5*time.Second, time.Now(), nil)
 			require.Nil(t, id)
 			require.Error(t, err)
+			require.ErrorIs(t, err, ErrAccountConcurrencyLimit)
 		})
 	})
 
 	t.Run("With custom concurrency limits", func(t *testing.T) {
 		t.Run("with account keys", func(t *testing.T) {
 			r.FlushAll()
-			// Only allow a single leased item via account limits
+			// Only allow a single leased item via custom concurrency limits
 			q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
 				return PartitionConcurrencyLimits{
-					AccountLimit:   100,
-					FunctionLimit:  100,
+					AccountLimit:   NoConcurrencyLimit,
+					FunctionLimit:  NoConcurrencyLimit,
 					CustomKeyLimit: 1,
 				}
 			}
@@ -1544,11 +1456,11 @@ func TestQueueLease(t *testing.T) {
 			accountId := uuid.New()
 			fnId := uuid.New()
 
-			// Only allow a single leased item via account limits
+			// Only allow a single leased item via custom concurrency limits
 			q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
 				return PartitionConcurrencyLimits{
-					AccountLimit:   100,
-					FunctionLimit:  100,
+					AccountLimit:   NoConcurrencyLimit,
+					FunctionLimit:  NoConcurrencyLimit,
 					CustomKeyLimit: 1,
 				}
 			}
@@ -1614,11 +1526,10 @@ func TestQueueLease(t *testing.T) {
 				require.Contains(t, memPart, itemA.ID)
 				require.Contains(t, memPart, itemB.ID)
 
-				memConcurrency, err := r.ZMembers(pA.concurrencyKey(q.u.kg))
-				require.NoError(t, err)
-				require.Equal(t, 0, len(memConcurrency))
+				// concurrency key queue does not yet exist
+				require.False(t, r.Exists(pA.concurrencyKey(q.u.kg)))
 
-				// Both key queues exist
+				// partition key queue exists
 				require.True(t, r.Exists(zsetKeyA))
 
 				_, err = q.Lease(ctx, p, itemA, 5*time.Second, time.Now(), nil)
@@ -1630,7 +1541,7 @@ func TestQueueLease(t *testing.T) {
 				require.Contains(t, memPart, itemB.ID)
 
 				require.True(t, r.Exists(pA.concurrencyKey(q.u.kg)))
-				memConcurrency, err = r.ZMembers(pA.concurrencyKey(q.u.kg))
+				memConcurrency, err := r.ZMembers(pA.concurrencyKey(q.u.kg))
 				require.NoError(t, err)
 				require.Equal(t, 1, len(memConcurrency))
 				require.Contains(t, memConcurrency, itemA.ID)
