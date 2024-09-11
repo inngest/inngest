@@ -222,19 +222,25 @@ func (b *batchSpanProcessor) flush(ctx context.Context) error {
 // neither should be increasing over time
 func (b *batchSpanProcessor) instrument(ctx context.Context) {
 	for {
-		<-time.After(20 * time.Second)
+		select {
+		case <-ctx.Done():
+			return
 
-		var keys, total int64
+		default:
+			<-time.After(20 * time.Second)
 
-		// count things very quickly
-		b.mt.Lock()
-		for _, spans := range b.buffer {
-			keys += 1
-			total += int64(len(spans))
+			var keys, total int64
+
+			// count things very quickly
+			b.mt.Lock()
+			for _, spans := range b.buffer {
+				keys += 1
+				total += int64(len(spans))
+			}
+			b.mt.Unlock()
+
+			metrics.GaugeSpanBatchProcessorBufferKeys(ctx, keys, metrics.GaugeOpt{PkgName: pkgName})
+			metrics.GaugeSpanBatchProcessorBufferSize(ctx, total, metrics.GaugeOpt{PkgName: pkgName})
 		}
-		b.mt.Unlock()
-
-		metrics.GaugeSpanBatchProcessorBufferKeys(ctx, keys, metrics.GaugeOpt{PkgName: pkgName})
-		metrics.GaugeSpanBatchProcessorBufferSize(ctx, total, metrics.GaugeOpt{PkgName: pkgName})
 	}
 }
