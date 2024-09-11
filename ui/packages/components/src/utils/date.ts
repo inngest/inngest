@@ -159,3 +159,11 @@ export function durationToString(duration: Duration): string {
 
   return `${value}${shortUnit}`;
 }
+
+export const toDate = (dateString?: string): Date | null => {
+  if (!dateString) {
+    return null;
+  }
+  const d = new Date(dateString);
+  return isNaN(d.getTime()) ? null : d;
+};

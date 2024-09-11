@@ -1,6 +1,5 @@
-import { color } from 'framer-motion';
+import { Chart, type ChartProps } from '@inngest/components/Chart/Chart';
 
-import { Chart, type ChartProps } from '../Chart/Chart';
 import { FunctionInfo } from './FunctionInfo';
 
 const data = [
@@ -29,6 +28,12 @@ const holeLabel = {
 };
 
 export const FunctionStatus = () => {
+  // const {
+  //   environment: { savedVercelProjects: savedProjects = [] },
+  // } = await graphqlAPI.request(GetSavedVercelProjectsDocument, {
+  //   environmentID,
+  // });
+
   const option: ChartProps['option'] = {
     legend: {
       orient: 'vertical',

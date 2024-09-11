@@ -1,7 +1,6 @@
+import { Link } from '@inngest/components/Link';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { RiQuestionLine } from '@remixicon/react';
-
-import { Link } from '../Link';
-import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
 
 export const FunctionInfo = () => (
   <Tooltip>
