@@ -77,6 +77,7 @@ func NewBatchSpanProcessor(ctx context.Context, exporter trace.SpanExporter, opt
 	for i := 0; i < p.concurrency; i++ {
 		go p.run(ctx)
 	}
+	go p.instrument(ctx)
 
 	return p
 }
