@@ -857,7 +857,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 		// wait til leases are expired
 		<-time.After(2 * time.Second)
 
-		requeued, err := q.Scavenge(ctx)
+		requeued, err := q.Scavenge(ctx, ScavengePeekSize)
 		require.NoError(t, err)
 		assert.Equal(t, 1, requeued, "expected one item with expired leases to be requeued by scavenge", r.Dump())
 	})
@@ -924,7 +924,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 		err = rc.Do(ctx, rc.B().Zadd().Key(q.u.kg.ConcurrencyIndex()).ScoreMember().ScoreMember(float64(leaseExpires.UnixMilli()), oldConcurrencyIndexItem).Build()).Error()
 		require.NoError(t, err)
 
-		requeued, err := q.Scavenge(ctx)
+		requeued, err := q.Scavenge(ctx, ScavengePeekSize)
 		require.NoError(t, err)
 		assert.Equal(t, 1, requeued, "expected one item with expired leases to be requeued by scavenge", r.Dump())
 
@@ -1128,17 +1128,17 @@ func TestQueuePeek(t *testing.T) {
 
 			fnIdA, fnIdB, fnIdC := uuid.New(), uuid.New(), uuid.New()
 
-			ia, err := q.EnqueueItem(ctx, QueueItem{ID: "a", WorkflowID: fnIdA}, start)
+			ia, err := q.EnqueueItem(ctx, QueueItem{ID: "a", FunctionID: fnIdA}, start)
 			require.NoError(t, err)
-			pA := QueuePartition{WorkflowID: ia.WorkflowID}
+			pA := QueuePartition{FunctionID: &ia.FunctionID}
 
-			ib, err := q.EnqueueItem(ctx, QueueItem{ID: "b", WorkflowID: fnIdB}, start)
+			ib, err := q.EnqueueItem(ctx, QueueItem{ID: "b", FunctionID: fnIdB}, start)
 			require.NoError(t, err)
-			pB := QueuePartition{WorkflowID: ib.WorkflowID}
+			pB := QueuePartition{FunctionID: &ib.FunctionID}
 
-			ic, err := q.EnqueueItem(ctx, QueueItem{ID: "c", WorkflowID: fnIdC}, start)
+			ic, err := q.EnqueueItem(ctx, QueueItem{ID: "c", FunctionID: fnIdC}, start)
 			require.NoError(t, err)
-			pC := QueuePartition{WorkflowID: ic.WorkflowID}
+			pC := QueuePartition{FunctionID: &ic.FunctionID}
 
 			now := time.Now()
 
@@ -1190,21 +1190,21 @@ func TestQueuePeek(t *testing.T) {
 			// Ensure the concurrency queue is empty but the partition queue has exactly one item (scavenge worked)
 			if !aExists {
 				require.False(t, r.Exists(q.u.kg.Concurrency("p", fnIdA.String())))
-				partMem, err := r.ZMembers(q.u.kg.QueueIndex(fnIdA.String()))
+				partMem, err := r.ZMembers(q.u.kg.PartitionQueueSet(enums.PartitionTypeDefault, fnIdA.String(), ""))
 				require.NoError(t, err)
 				require.Equal(t, 1, len(partMem))
 			}
 
 			if !bExists {
 				require.False(t, r.Exists(q.u.kg.Concurrency("p", fnIdB.String())))
-				partMem, err := r.ZMembers(q.u.kg.QueueIndex(fnIdB.String()))
+				partMem, err := r.ZMembers(q.u.kg.PartitionQueueSet(enums.PartitionTypeDefault, fnIdB.String(), ""))
 				require.NoError(t, err)
 				require.Equal(t, 1, len(partMem))
 			}
 
 			if !cExists {
 				require.False(t, r.Exists(q.u.kg.Concurrency("p", fnIdC.String())))
-				partMem, err := r.ZMembers(q.u.kg.QueueIndex(fnIdC.String()))
+				partMem, err := r.ZMembers(q.u.kg.PartitionQueueSet(enums.PartitionTypeDefault, fnIdC.String(), ""))
 				require.NoError(t, err)
 				require.Equal(t, 1, len(partMem))
 			}
