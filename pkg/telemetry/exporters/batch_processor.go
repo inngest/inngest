@@ -87,7 +87,7 @@ func (b *batchSpanProcessor) OnStart(ctx context.Context, s trace.ReadWriteSpan)
 func (b *batchSpanProcessor) OnEnd(s trace.ReadOnlySpan) {
 	// pass span into the channel
 	b.in <- &s
-	metrics.IncrBatchProcessorEnqueuedCounter(context.TODO(), metrics.CounterOpt{PkgName: pkgName})
+	metrics.IncrSpanBatchProcessorEnqueuedCounter(context.TODO(), metrics.CounterOpt{PkgName: pkgName})
 }
 
 func (b *batchSpanProcessor) Shutdown(ctx context.Context) error {
@@ -189,7 +189,7 @@ func (b *batchSpanProcessor) send(ctx context.Context, id string) error {
 	}
 
 	count := len(spans)
-	metrics.IncrBatchProcessorAttemptCounter(ctx, int64(count), metrics.CounterOpt{PkgName: pkgName})
+	metrics.IncrSpanBatchProcessorAttemptCounter(ctx, int64(count), metrics.CounterOpt{PkgName: pkgName})
 
 	err := b.exporter.ExportSpans(ctx, spans)
 	if err != nil {
@@ -215,4 +215,25 @@ func (b *batchSpanProcessor) flush(ctx context.Context) error {
 	}
 
 	return errs
+}
+
+// instrument checks on the size of the buffer and keys used
+// neither should be increasing over time
+func (b *batchSpanProcessor) instrument(ctx context.Context) {
+	for {
+		<-time.After(20 * time.Second)
+
+		var keys, total int64
+
+		// count things very quickly
+		b.mt.Lock()
+		for _, spans := range b.buffer {
+			keys += 1
+			total += int64(len(spans))
+		}
+		b.mt.Unlock()
+
+		metrics.GaugeSpanBatchProcessorBufferKeys(ctx, keys, metrics.GaugeOpt{PkgName: pkgName})
+		metrics.GaugeSpanBatchProcessorBufferSize(ctx, total, metrics.GaugeOpt{PkgName: pkgName})
+	}
 }
