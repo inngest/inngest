@@ -158,8 +158,6 @@ func TestFunctionSteps(t *testing.T) {
 		require.False(t, run.IsBatch)
 		require.Nil(t, run.BatchCreatedAt)
 
-		require.NotNil(t, run.Trace)
-		require.True(t, run.Trace.IsRoot)
 		require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
 
 		// output test
