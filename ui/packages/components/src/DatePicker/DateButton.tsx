@@ -35,7 +35,7 @@ export const DateSelectButton = forwardRef<HTMLButtonElement, DateButtonProps>(
       >
         {children}
         <RiArrowDownSLine
-          className="text-subtle h-4 w-4 transition-transform duration-500 group-data-[state=open]:-rotate-180"
+          className="text-muted h-4 w-4 transition-transform duration-500 group-data-[state=open]:-rotate-180"
           aria-hidden="true"
         />
       </button>

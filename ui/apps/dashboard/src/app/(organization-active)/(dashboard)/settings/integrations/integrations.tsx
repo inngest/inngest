@@ -91,7 +91,7 @@ export default function IntegrationsList({ integration }: { integration: VercelI
                 )}
               </div>
               <div className="text-basis mt-[18px] text-lg font-medium">{i.title}</div>
-              <div className="text-subtle mt-2 text-sm leading-tight">{i.description}</div>
+              <div className="text-muted mt-2 text-sm leading-tight">{i.description}</div>
             </div>
           </Card>
         ))}

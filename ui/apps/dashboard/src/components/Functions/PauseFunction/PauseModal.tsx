@@ -108,7 +108,7 @@ export function PauseFunctionModal({
           <p className="p-6 pb-0 text-base">
             Are you sure you want to resume “<span className="font-semibold">{functionName}</span>”?
           </p>
-          <p className="text-subtle p-6 pb-0 pt-3 text-sm">
+          <p className="text-muted p-6 pb-0 pt-3 text-sm">
             This function will resume normal functionality and will be invoked as new events are
             received. Events received during pause will not be automatically replayed.
           </p>
@@ -119,7 +119,7 @@ export function PauseFunctionModal({
           <p className="p-6 pb-0 text-base">
             Are you sure you want to pause “<span className="font-semibold">{functionName}</span>”?
           </p>
-          <ul className="text-subtle list-inside list-disc p-6 pb-0 pt-3 text-sm leading-6">
+          <ul className="text-muted list-inside list-disc p-6 pb-0 pt-3 text-sm leading-6">
             <li>Functions can be resumed at any time.</li>
             <li>No new runs will be queued or invoked while the function is paused.</li>
             <li>
@@ -131,7 +131,7 @@ export function PauseFunctionModal({
             <hr className="border-muted" />
           </div>
           <label className="flex w-full flex-col gap-2 p-6 pb-5 pt-3 text-sm leading-6">
-            <span className="text-subtle">
+            <span className="text-muted">
               Choose what to do with currently-running function runs:
             </span>
             <Select

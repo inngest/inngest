@@ -19,7 +19,7 @@ export default async function SuccessPage({ searchParams }: SuccessProps) {
       <div className="text-basis mb-2 text-2xl leading-loose">
         Inngest successfully installed on Vercel!
       </div>
-      <div className="text-subtle mb-7 text-base">
+      <div className="text-muted mb-7 text-base">
         The Inngest integration has successfully been installed on your Vercel account.
       </div>
       <>
@@ -29,7 +29,7 @@ export default async function SuccessPage({ searchParams }: SuccessProps) {
               <div className="bg-primary-moderate mr-3 mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-[50%] ">
                 <RiCheckLine size={12} className="text-onContrast" />
               </div>
-              <div className="text-subtle text-base">
+              <div className="text-muted text-base">
                 Each Vercel project will have{' '}
                 <span className="font-semibold">INNGEST_SIGNING_KEY</span> and{' '}
                 <span className="font-semibold">INNGEST_EVENT_KEY</span> environment variables set.
@@ -39,7 +39,7 @@ export default async function SuccessPage({ searchParams }: SuccessProps) {
               <div className="bg-primary-moderate mr-3 mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-[50%]">
                 <RiCheckLine size={12} className="text-white" />
               </div>
-              <div className="text-subtle text-base">
+              <div className="text-muted text-base">
                 The next time you deploy your project to Vercel your functions will automatically
                 appear in the Inngest dashboard.
               </div>
@@ -48,7 +48,7 @@ export default async function SuccessPage({ searchParams }: SuccessProps) {
         </Card>
         <div className="flex flex-row items-center justify-start rounded py-6">
           <RiInformationLine size={20} className="text-disabled mr-1" />
-          <div className="text-subtle text-sm font-normal leading-tight">
+          <div className="text-muted text-sm font-normal leading-tight">
             Advanced configuration options are available on the Inngest dashboard.
           </div>
         </div>

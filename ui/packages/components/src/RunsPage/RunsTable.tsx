@@ -103,7 +103,7 @@ export default function RunsTable({
             {headerGroup.headers.map((header) => (
               <th
                 key={header.id}
-                className={cn(tableColumnStyles, 'text-subtle text-left text-sm font-semibold')}
+                className={cn(tableColumnStyles, 'text-muted text-left text-sm font-semibold')}
               >
                 {header.isPlaceholder ? null : (
                   <div
@@ -129,7 +129,7 @@ export default function RunsTable({
         {isEmpty && (
           <tr>
             <td
-              className="text-subtle pt-28 text-center align-top font-medium"
+              className="text-muted pt-28 text-center align-top font-medium"
               colSpan={numberOfVisibleColumns || table.getVisibleFlatColumns().length}
             >
               No results were found.

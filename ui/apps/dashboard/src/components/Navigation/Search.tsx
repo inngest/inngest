@@ -257,8 +257,8 @@ export default function Search({ collapsed }: { collapsed: boolean }) {
               aria-label="Search by ID"
               icon={
                 <kbd className="mx-auto flex w-full items-center justify-center space-x-1">
-                  <kbd className={`text-subtle text-[20px]`}>⌘</kbd>
-                  <kbd className="text-subtle text-xs">K</kbd>
+                  <kbd className={`text-muted text-[20px]`}>⌘</kbd>
+                  <kbd className="text-muted text-xs">K</kbd>
                 </kbd>
               }
             />
@@ -266,7 +266,7 @@ export default function Search({ collapsed }: { collapsed: boolean }) {
           <TooltipContent
             side="bottom"
             sideOffset={2}
-            className="border-muted text-subtle rounded border text-xs"
+            className="border-muted text-muted rounded border text-xs"
           >
             Use <span className="font-bold">⌘ K</span> or <span className="font-bold">Ctrl K</span>{' '}
             to search
