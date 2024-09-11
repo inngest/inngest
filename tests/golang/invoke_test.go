@@ -70,10 +70,9 @@ func TestInvoke(t *testing.T) {
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
 		r := require.New(t)
-		run := c.WaitForRunTraces(ctx, t, &runID, models.FunctionStatusCompleted)
+		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusCompleted, WaitForChildSpans: 1})
 
 		r.NotNil(run.Trace)
-		r.Equal(1, len(run.Trace.ChildSpans))
 		r.True(run.Trace.IsRoot)
 		r.Equal(models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
 
@@ -170,13 +169,11 @@ func TestInvokeGroup(t *testing.T) {
 	r.NoError(err)
 
 	t.Run("in progress", func(t *testing.T) {
-		run := c.WaitForRunTraces(ctx, t, &runID, models.FunctionStatusRunning)
+		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusRunning, WaitForChildSpans: 1})
 		r := require.New(t)
 
 		r.Nil(run.EndedAt)
 		r.Nil(run.Trace.EndedAt)
-		r.NotNil(run.Trace)
-		r.Equal(1, len(run.Trace.ChildSpans))
 		r.Equal(models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
 		r.Nil(run.Trace.OutputID)
 
@@ -207,13 +204,10 @@ func TestInvokeGroup(t *testing.T) {
 	})
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
-		run := c.WaitForRunTraces(ctx, t, &runID, models.FunctionStatusCompleted)
+		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusCompleted, WaitForChildSpans: 1})
 
 		as := assert.New(t)
 
-		r.Equal(models.FunctionStatusCompleted.String(), run.Status)
-		r.NotNil(run.Trace)
-		r.Equal(1, len(run.Trace.ChildSpans))
 		r.True(run.Trace.IsRoot)
 		r.Equal(models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
 
@@ -307,7 +301,7 @@ func TestInvokeTimeout(t *testing.T) {
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
 		errMsg := "Timed out waiting for invoked function to complete"
-		run := c.WaitForRunTraces(ctx, t, &runID, models.FunctionStatusFailed)
+		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusFailed})
 
 		require.NotNil(t, run.Trace)
 		require.True(t, run.Trace.IsRoot)

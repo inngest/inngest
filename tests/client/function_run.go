@@ -215,9 +215,16 @@ func (c *Client) WaitForRunStatus(
 	return run
 }
 
-// WaitForRunTracesWithTimeout waits for run traces with a matching status for a predefined timeout and interval.
+// WaitForRunTraces waits for run traces with a matching status for a predefined timeout and interval.
 // Once run traces are available, they are returned and tests continue. If run traces are missing or invalid, the test will fail.
-func (c *Client) WaitForRunTracesWithTimeout(ctx context.Context, t *testing.T, runID *string, status models.FunctionStatus, timeout time.Duration, interval time.Duration) *RunV2 {
+func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *string, opts WaitForRunTracesOptions) *RunV2 {
+	if opts.Interval == 0 {
+		opts.Interval = 2 * time.Second
+	}
+	if opts.Timeout == 0 {
+		opts.Timeout = 10 * time.Second
+	}
+
 	var traces *RunV2
 	require.NotNil(t, runID)
 	require.Eventually(t, func() bool {
@@ -230,15 +237,24 @@ func (c *Client) WaitForRunTracesWithTimeout(ctx context.Context, t *testing.T, 
 
 		// NOTE: we force the function to return early to prevent panics in the next assertion.
 		// We cannot use require.NotNil as this will cause an uncaught panic (see https://github.com/stretchr/testify/issues/1457)
-		return err == nil && run != nil && run.Status == status.String()
-	}, timeout, interval)
+		ready := err == nil && run != nil && run.Status == opts.Status.String()
+
+		if opts.WaitForChildSpans > 0 {
+			ready = ready && run.Trace != nil && run.Trace.IsRoot && len(run.Trace.ChildSpans) == opts.WaitForChildSpans
+		}
+
+		return ready
+	}, opts.Timeout, opts.Interval)
 
 	return traces
 }
 
-// WaitForRunTraces waits for run traces with a matching status for up to 10 seconds, checking every 2 seconds.
-func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *string, status models.FunctionStatus) *RunV2 {
-	return c.WaitForRunTracesWithTimeout(ctx, t, runID, status, 10*time.Second, 2*time.Second)
+type WaitForRunTracesOptions struct {
+	Status   models.FunctionStatus
+	Timeout  time.Duration
+	Interval time.Duration
+
+	WaitForChildSpans int
 }
 
 func (c *Client) RunTraces(ctx context.Context, runID string) (*RunV2, error) {

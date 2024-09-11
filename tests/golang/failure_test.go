@@ -62,11 +62,10 @@ func TestFunctionFailure(t *testing.T) {
 	require.EqualValues(t, counter, 1)
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
-		run := c.WaitForRunTraces(ctx, t, &runID, models.FunctionStatusFailed)
+		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusFailed, WaitForChildSpans: 1})
 
 		require.NotNil(t, run.Trace)
 		require.True(t, run.Trace.IsRoot)
-		require.Equal(t, 1, len(run.Trace.ChildSpans))
 		require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
 		// output test
 		require.NotNil(t, run.Trace.OutputID)
@@ -138,10 +137,9 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 	require.EqualValues(t, counter, 1)
 
 	t.Run("in progress run", func(t *testing.T) {
-		run := c.WaitForRunTraces(ctx, t, &runID, models.FunctionStatusRunning)
+		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusRunning, WaitForChildSpans: 1})
 		require.NotNil(t, run.Trace)
 		require.True(t, run.Trace.IsRoot)
-		require.Equal(t, 1, len(run.Trace.ChildSpans))
 		require.Equal(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
 		require.Nil(t, run.Trace.OutputID)
 
@@ -173,12 +171,11 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 	})
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
-		run := c.WaitForRunTracesWithTimeout(ctx, t, &runID, models.FunctionStatusFailed, 1*time.Minute, 5*time.Second)
+		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusFailed, Timeout: 1 * time.Minute, Interval: 5 * time.Second, WaitForChildSpans: 1})
 
 		require.NotNil(t, run)
 		require.NotNil(t, run.Trace)
 		require.True(t, run.Trace.IsRoot)
-		require.Equal(t, 1, len(run.Trace.ChildSpans))
 		require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
 		// output test
 		require.NotNil(t, run.Trace.OutputID)
