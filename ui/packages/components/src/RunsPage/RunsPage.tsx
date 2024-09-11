@@ -322,7 +322,7 @@ export function RunsPage({
       />
       {!hasMore && data.length > 1 && (
         <div className="flex flex-col items-center pt-8">
-          <p className="text-subtle">No additional runs found.</p>
+          <p className="text-muted">No additional runs found.</p>
           <NewButton
             label="Back to top"
             kind="primary"

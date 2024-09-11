@@ -19,7 +19,7 @@ export default function StepsMenu({
   return (
     <div className="mr-12 flex flex-col">
       <nav className="mb-12">
-        <h3 className="text-muted text-xs font-medium uppercase">{title}</h3>
+        <h3 className="text-subtle text-xs font-medium uppercase">{title}</h3>
         <ul className="my-2">{children}</ul>
       </nav>
       {links}
@@ -62,7 +62,7 @@ function StepMenuItem({
         </div>
         <div>
           <h4 className="text-sm font-medium">{title}</h4>
-          <p className="text-muted text-sm">{description}</p>
+          <p className="text-subtle text-sm">{description}</p>
         </div>
       </li>
     </Link>
@@ -72,7 +72,7 @@ function StepMenuItem({
 function StepLink({ children, href, ...props }: React.PropsWithChildren<NewLinkProps>) {
   return (
     <NewLink
-      className="text-muted hover:decoration-subtle mx-1.5 my-1"
+      className="text-subtle hover:decoration-subtle mx-1.5 my-1"
       href={href}
       size="small"
       {...props}

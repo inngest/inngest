@@ -61,7 +61,7 @@ export default function OnboardingWidget({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <NewButton
-                      icon={<RiCloseLine className="text-muted" />}
+                      icon={<RiCloseLine className="text-subtle" />}
                       kind="secondary"
                       appearance="ghost"
                       size="small"
@@ -74,7 +74,7 @@ export default function OnboardingWidget({
                   </TooltipContent>
                 </Tooltip>
               </div>
-              <p className="text-muted text-sm">{stepContent.description}</p>
+              <p className="text-subtle text-sm">{stepContent.description}</p>
             </div>
             {!isFinalStep && (
               <SegmentedProgressBar segmentsCompleted={lastCompletedStep} segments={4} />
