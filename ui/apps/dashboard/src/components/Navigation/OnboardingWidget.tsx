@@ -6,6 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Too
 import { RiBookReadLine, RiCheckboxCircleFill, RiCloseLine } from '@remixicon/react';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
+import { EnvironmentType } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import { onboardingWidgetContent } from '../Onboarding/content';
 import useOnboardingStep from '../Onboarding/useOnboardingStep';
@@ -18,19 +19,19 @@ export default function OnboardingWidget({
   closeWidget: () => void;
 }) {
   const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
-  const { lastCompletedStep } = useOnboardingStep();
+  const { lastCompletedStep, isFinalStep, nextStep } = useOnboardingStep();
 
-  const finalStep = lastCompletedStep === 4;
-  const stepContent = lastCompletedStep
-    ? onboardingWidgetContent.step[lastCompletedStep]
-    : onboardingWidgetContent.step[0];
+  const stepContent = onboardingWidgetContent.step[lastCompletedStep];
 
   if (!onboardingFlow) return;
   return (
     <>
       {collapsed && (
         <MenuItem
-          href={pathCreator.onboarding()}
+          href={pathCreator.onboardingSteps({
+            envSlug: EnvironmentType.Production.toLowerCase(),
+            step: nextStep,
+          })}
           className="border-muted border"
           collapsed={collapsed}
           text="Onboarding guide"
@@ -40,16 +41,21 @@ export default function OnboardingWidget({
 
       {!collapsed && (
         <Link
-          href={pathCreator.onboarding()}
+          href={pathCreator.onboardingSteps({
+            envSlug: EnvironmentType.Production.toLowerCase(),
+            step: nextStep,
+          })}
           className="text-basis bg-canvasBase hover:bg-canvasSubtle border-subtle mb-5 block rounded border p-3 leading-tight"
         >
           <div className="flex h-[110px] flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
                 <p
-                  className={`${finalStep && 'text-success'} flex items-center gap-0.5 font-medium`}
+                  className={`${
+                    isFinalStep && 'text-success'
+                  } flex items-center gap-0.5 font-medium`}
                 >
-                  {finalStep && <RiCheckboxCircleFill className="text-success h-5 w-5" />}
+                  {isFinalStep && <RiCheckboxCircleFill className="text-success h-5 w-5" />}
                   {stepContent.title}
                 </p>
                 <Tooltip>
@@ -70,7 +76,7 @@ export default function OnboardingWidget({
               </div>
               <p className="text-muted text-sm">{stepContent.description}</p>
             </div>
-            {!finalStep && (
+            {!isFinalStep && (
               <SegmentedProgressBar segmentsCompleted={lastCompletedStep} segments={4} />
             )}
             {stepContent.eta && (

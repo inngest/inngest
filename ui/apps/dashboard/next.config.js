@@ -30,7 +30,12 @@ const nextConfig = {
       },
       {
         source: '/env/:slug/onboarding',
-        destination: '/env/:slug/onboarding/1',
+        destination: '/env/production/onboarding/1',
+        permanent: false,
+      },
+      {
+        source: '/env/:slug((?!production)[^/]+)/onboarding/:step',
+        destination: '/env/production/onboarding/:step',
         permanent: false,
       },
       {

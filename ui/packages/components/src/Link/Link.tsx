@@ -15,6 +15,8 @@ type CustomLinkProps = {
   arrowOnHover?: boolean;
 };
 
+export type NewLinkProps = CustomLinkProps & LinkProps;
+
 export function NewLink({
   href,
   className,
@@ -24,7 +26,7 @@ export function NewLink({
   children,
   arrowOnHover,
   ...props
-}: React.PropsWithChildren<CustomLinkProps & LinkProps>) {
+}: React.PropsWithChildren<NewLinkProps>) {
   return (
     <NextLink
       className={cn(
