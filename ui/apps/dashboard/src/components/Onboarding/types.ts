@@ -1,8 +1,11 @@
 import { type MenuStepContent } from '@inngest/components/Steps/StepsMenu';
 
 export type OnboardingSteps = 1 | 2 | 3 | 4;
+export type OnboardingStepsArray = OnboardingSteps[];
 // For localStorage
 export type OnboardingStepsString = `${OnboardingSteps}`;
+
+export type OnboardingStepsCompleted = 0 | OnboardingSteps;
 
 type OnboardingWidgetStepContent = {
   title: string;
@@ -13,7 +16,7 @@ type OnboardingWidgetStepContent = {
 
 export type OnboardingWidgetContent = {
   step: {
-    [K in 0 | OnboardingSteps]: OnboardingWidgetStepContent;
+    [K in OnboardingStepsCompleted]: OnboardingWidgetStepContent;
   };
   tooltip: {
     close: string;
