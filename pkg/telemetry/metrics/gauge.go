@@ -78,7 +78,7 @@ func GaugeQueueShardPartitionAvailableCount(ctx context.Context, val int64, opts
 func GaugeSpanBatchProcessorBufferSize(ctx context.Context, val int64, opts GaugeOpt) {
 	RecordGaugeMetric(ctx, val, GaugeOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "batch_processor_buffer_size",
+		MetricName:  "span_batch_processor_buffer_size",
 		Description: "The number of items in buffer point in time",
 		Tags:        opts.Tags,
 	})
@@ -87,7 +87,7 @@ func GaugeSpanBatchProcessorBufferSize(ctx context.Context, val int64, opts Gaug
 func GaugeSpanBatchProcessorBufferKeys(ctx context.Context, val int64, opts GaugeOpt) {
 	RecordGaugeMetric(ctx, val, GaugeOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "batch_processor_buffer_keys",
+		MetricName:  "span_batch_processor_buffer_keys",
 		Description: "The number of keys used in buffer point in time",
 		Tags:        opts.Tags,
 	})
