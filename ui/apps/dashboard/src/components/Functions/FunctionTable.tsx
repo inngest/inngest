@@ -63,7 +63,7 @@ export function FunctionTable({ rows = [] }: Props) {
                   key={header.id}
                   className={cn(
                     'w-fit whitespace-nowrap px-2 py-3 text-left text-xs font-semibold text-slate-600',
-                    index === 0 && 'pl-6',
+                    index === 0 && 'pl-4',
                     index === columns.length - 1 && 'w-0'
                   )}
                 >
@@ -81,7 +81,7 @@ export function FunctionTable({ rows = [] }: Props) {
               {row.getVisibleCells().map((cell, index) => (
                 <td
                   key={cell.id}
-                  className={cn('whitespace-nowrap', index === columns.length - 1 && 'pr-6')}
+                  className={cn('whitespace-nowrap', index === columns.length - 1 && 'pr-4')}
                 >
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </td>
@@ -116,7 +116,7 @@ function createColumns(environmentSlug: string) {
         const { isPaused, isArchived, slug } = info.row.original;
 
         return (
-          <div className="flex items-center pl-6">
+          <div className="flex items-center pl-4">
             <div
               className={cn(
                 'h-2.5 w-2.5 rounded-full',

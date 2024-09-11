@@ -86,7 +86,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                       <div
                         className={cn(
                           defaultLinkStyles,
-                          'border-muted hover:bg-canvasSubtle/50 group flex w-full items-center gap-2 py-3 pl-6 pr-2 text-sm font-medium',
+                          'border-muted hover:bg-canvasSubtle/50 group flex w-full items-center gap-2 py-3 pl-4 pr-2 text-sm font-medium',
                           !isLast && 'border-b'
                         )}
                       >
@@ -135,7 +135,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                     <div
                       className={cn(
                         defaultLinkStyles,
-                        'border-muted hover:bg-canvasSubtle/50 group flex w-full items-center gap-2 py-3 pl-6 pr-2 text-sm font-medium',
+                        'border-muted hover:bg-canvasSubtle/50 group flex w-full items-center gap-2 py-3 pl-4 pr-2 text-sm font-medium',
                         !isLast && 'border-b'
                       )}
                     >
