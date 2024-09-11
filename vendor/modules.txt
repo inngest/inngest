@@ -553,8 +553,8 @@ github.com/lucasb-eyer/go-colorful
 # github.com/magiconair/properties v1.8.5
 ## explicit; go 1.13
 github.com/magiconair/properties
-# github.com/mattn/go-ieproxy v0.0.12
-## explicit; go 1.17
+# github.com/mattn/go-ieproxy v0.0.3
+## explicit; go 1.14
 github.com/mattn/go-ieproxy
 # github.com/mattn/go-isatty v0.0.20
 ## explicit; go 1.15
