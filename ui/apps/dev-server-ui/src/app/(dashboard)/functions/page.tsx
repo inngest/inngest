@@ -131,7 +131,7 @@ export default function FunctionList() {
       remove();
     }
     setGlobalFilter(searchInput);
-  });
+  }, 200);
 
   const { data, isFetching } = useGetFunctionsQuery(undefined, {
     refetchOnMountOrArgChange: true,
