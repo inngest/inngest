@@ -249,11 +249,7 @@ export function RunsPage({
     pollInterval && pollInterval < 1000 ? isLoadingInitial : isLoadingMore || isLoadingInitial;
 
   return (
-    <main
-      className="bg-canvasBase text-basis h-full min-h-0"
-      onScroll={onScroll}
-      ref={containerRef}
-    >
+    <main className="bg-canvasBase text-basis" onScroll={onScroll} ref={containerRef}>
       <div className="bg-canvasBase sticky top-[53px] z-50 flex flex-col px-4">
         <div className="flex h-[58px] items-center justify-between gap-2">
           <div className="flex items-center gap-2">
