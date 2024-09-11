@@ -164,7 +164,7 @@ export function EventDetails({
           <hr className="border-subtle mt-8" />
           <div className="flex flex-col gap-6 px-5 py-4">
             <div className="flex items-center gap-2 pt-4">
-              <h3 className="text-muted text-sm">Functions</h3>
+              <h3 className="text-subtle text-sm">Functions</h3>
               <Badge kind="outlined">{functionRuns.length.toString() || '0'}</Badge>
             </div>
             {functionRuns

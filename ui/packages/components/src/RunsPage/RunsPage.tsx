@@ -243,13 +243,18 @@ export function RunsPage({
     return out;
   }, [columns]);
 
+  // Do not disable or show the button as loading if the poll interval is less than 1 second
+  // Changing state too quickly can cause the button to flicker
+  const disableRefreshButton =
+    pollInterval && pollInterval < 1000 ? isLoadingInitial : isLoadingMore || isLoadingInitial;
+
   return (
     <main
       className="bg-canvasBase text-basis h-full min-h-0 overflow-y-auto"
       onScroll={onScroll}
       ref={containerRef}
     >
-      <div className="bg-canvasBase sticky top-0 z-10 flex items-center justify-between gap-2 px-8 py-2">
+      <div className="bg-canvasBase sticky top-0 z-10 flex items-center justify-between gap-2 px-4 py-2">
         <div className="flex items-center gap-2">
           <SelectGroup>
             <TimeFieldFilter selectedTimeField={timeField} onTimeFieldChange={onTimeFieldChange} />
@@ -317,7 +322,7 @@ export function RunsPage({
       />
       {!hasMore && data.length > 1 && (
         <div className="flex flex-col items-center pt-8">
-          <p className="text-subtle">No additional runs found.</p>
+          <p className="text-muted">No additional runs found.</p>
           <NewButton
             label="Back to top"
             kind="primary"
@@ -335,8 +340,8 @@ export function RunsPage({
             icon={<RiRefreshLine />}
             iconSide="left"
             onClick={onRefresh}
-            loading={isLoadingMore || isLoadingInitial}
-            disabled={isLoadingMore || isLoadingInitial}
+            loading={disableRefreshButton}
+            disabled={disableRefreshButton}
           />
         </div>
       )}

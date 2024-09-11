@@ -16,6 +16,7 @@ export default {
           940: '#080D19',
         },
         primary: {
+          '3xSubtle': 'rgb(var(--color-primary-3xSubtle) / <alpha-value>)',
           '2xSubtle': 'rgb(var(--color-primary-2xSubtle) / <alpha-value>)',
           xSubtle: 'rgb(var(--color-primary-xSubtle) / <alpha-value>)',
           subtle: 'rgb(var(--color-primary-subtle) / <alpha-value>)',
@@ -148,6 +149,7 @@ export default {
       },
       textDecorationColor: {
         link: 'rgb(var(--color-foreground-link) / <alpha-value>)',
+        subtle: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
       },
       placeholderColor: {
         disabled: 'rgb(var(--color-foreground-disabled) / <alpha-value>)',

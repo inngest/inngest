@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/enums"
 	"math/rand"
 	"runtime/debug"
 	"sync"
@@ -493,7 +492,7 @@ func (q *queue) runScavenger(ctx context.Context) {
 		case <-scavenge.Chan():
 			// Scavenge the items
 			if q.isScavenger() {
-				count, err := q.Scavenge(ctx)
+				count, err := q.Scavenge(ctx, ScavengePeekSize)
 				if err != nil {
 					q.logger.Error().Err(err).Msg("error scavenging")
 				}
@@ -663,9 +662,6 @@ func (q *queue) scan(ctx context.Context) error {
 				// no longer any available workers for partition, so we can skip
 				// work
 				metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
-				return nil
-			}
-			if p.PartitionType != int(enums.PartitionTypeDefault) {
 				return nil
 			}
 			if err := q.processPartition(ctx, &p, shard); err != nil {

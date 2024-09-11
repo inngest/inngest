@@ -215,13 +215,37 @@ func (c *Client) WaitForRunStatus(
 	return run
 }
 
-// retrieve run with traces
-// TODO: add the traces once implemented
-func (c *Client) RunTraces(ctx context.Context, runID string) *RunV2 {
+// WaitForRunTracesWithTimeout waits for run traces with a matching status for a predefined timeout and interval.
+// Once run traces are available, they are returned and tests continue. If run traces are missing or invalid, the test will fail.
+func (c *Client) WaitForRunTracesWithTimeout(ctx context.Context, t *testing.T, runID *string, status models.FunctionStatus, timeout time.Duration, interval time.Duration) *RunV2 {
+	var traces *RunV2
+	require.NotNil(t, runID)
+	require.Eventually(t, func() bool {
+		if *runID == "" {
+			return false
+		}
+
+		run, err := c.RunTraces(ctx, *runID)
+		traces = run
+
+		// NOTE: we force the function to return early to prevent panics in the next assertion.
+		// We cannot use require.NotNil as this will cause an uncaught panic (see https://github.com/stretchr/testify/issues/1457)
+		return err == nil && run != nil && run.Status == status.String()
+	}, timeout, interval)
+
+	return traces
+}
+
+// WaitForRunTraces waits for run traces with a matching status for up to 10 seconds, checking every 2 seconds.
+func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *string, status models.FunctionStatus) *RunV2 {
+	return c.WaitForRunTracesWithTimeout(ctx, t, runID, status, 10*time.Second, 2*time.Second)
+}
+
+func (c *Client) RunTraces(ctx context.Context, runID string) (*RunV2, error) {
 	c.Helper()
 
 	if runID == "" {
-		return nil
+		return nil, nil
 	}
 
 	query := `
@@ -282,14 +306,14 @@ func (c *Client) RunTraces(ctx context.Context, runID string) *RunV2 {
 		}
 	`
 
-	resp := c.MustDoGQL(ctx, graphql.RawParams{
+	resp, err := c.DoGQL(ctx, graphql.RawParams{
 		Query: query,
 		Variables: map[string]any{
 			"runID": runID,
 		},
 	})
-	if len(resp.Errors) > 0 {
-		c.Fatalf("err with fnrun trace query: %#v", resp.Errors)
+	if err != nil {
+		return nil, fmt.Errorf("err with fnrun trace query: %w", err)
 	}
 
 	type response struct {
@@ -297,10 +321,10 @@ func (c *Client) RunTraces(ctx context.Context, runID string) *RunV2 {
 	}
 	data := &response{}
 	if err := json.Unmarshal(resp.Data, data); err != nil {
-		c.Fatalf(err.Error())
+		return nil, fmt.Errorf("could not unmarshal response data: %w", err)
 	}
 
-	return &data.Run
+	return &data.Run, nil
 }
 
 type RunV2 struct {

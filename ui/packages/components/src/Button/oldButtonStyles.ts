@@ -92,7 +92,7 @@ export const getDisabledStyles = ({ appearance, kind }: ButtonColorParams) => {
   if (appearance === 'solid') {
     return 'disabled:cursor-not-allowed disabled:text-slate-400 disabled:bg-slate-200 dark:disabled:text-slate-500 dark:disabled:bg-slate-800 ';
   } else if (appearance === 'outlined') {
-    return 'disabled:cursor-not-allowed disabled:text-slate-400 disabled:border-slate-200 disabled:bg-slate-100 dark:disabled:text-slate-500 dark:disabled:border-slate-800 dark:disabled:bg-slate-900';
+    return 'disabled:cursor-not-allowed disabled:text-disabled disabled:border-disabled disabled:bg-disabled';
   }
   return 'disabled:cursor-not-allowed disabled:text-slate-400 dark:disabled:text-slate-500 disabled:hover:no-underline';
 };
