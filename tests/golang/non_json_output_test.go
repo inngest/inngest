@@ -27,7 +27,7 @@ func TestNonJSONOutput(t *testing.T) {
 		// Start proxy which simulates a 504 response from the user's gateway
 		proxy := NewHTTPServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusGatewayTimeout)
-			w.Write([]byte("<html>502 Bad Gateway</html>"))
+			_, _ = w.Write([]byte("<html>502 Bad Gateway</html>"))
 		}))
 		defer proxy.Close()
 		proxyURL, err := url.Parse(proxy.URL())
