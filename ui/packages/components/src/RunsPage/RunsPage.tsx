@@ -243,6 +243,11 @@ export function RunsPage({
     return out;
   }, [columns]);
 
+  // Do not disable or show the button as loading if the poll interval is less than 1 second
+  // Changing state too quickly can cause the button to flicker
+  const disableRefreshButton =
+    pollInterval && pollInterval < 1000 ? isLoadingInitial : isLoadingMore || isLoadingInitial;
+
   return (
     <main
       className="bg-canvasBase text-basis h-full min-h-0 overflow-y-auto"
@@ -335,8 +340,8 @@ export function RunsPage({
             icon={<RiRefreshLine />}
             iconSide="left"
             onClick={onRefresh}
-            loading={isLoadingMore || isLoadingInitial}
-            disabled={isLoadingMore || isLoadingInitial}
+            loading={disableRefreshButton}
+            disabled={disableRefreshButton}
           />
         </div>
       )}
