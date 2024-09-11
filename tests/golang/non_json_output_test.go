@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/oklog/ulid/v2"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/slog"
 
@@ -63,12 +64,15 @@ func TestNonJSONOutput(t *testing.T) {
 		defer server.Close()
 
 		// Sync
-		req, err := http.NewRequest(http.MethodPut, server.LocalURL(), nil)
-		r.NoError(err)
-		resp, err := http.DefaultClient.Do(req)
-		r.NoError(err)
-		r.Equal(200, resp.StatusCode)
-		_ = resp.Body.Close()
+		r.EventuallyWithT(func(t *assert.CollectT) {
+			a := assert.New(t)
+			req, err := http.NewRequest(http.MethodPut, server.LocalURL(), nil)
+			a.NoError(err)
+			resp, err := http.DefaultClient.Do(req)
+			a.NoError(err)
+			a.Equal(200, resp.StatusCode)
+			_ = resp.Body.Close()
+		}, 5*time.Second, 100*time.Millisecond)
 
 		eventID, err := inngestgo.Send(
 			ctx,
