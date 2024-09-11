@@ -235,7 +235,7 @@ export default function Stream() {
       <Header
         breadcrumb={[{ text: 'Stream' }]}
         action={
-          <div className="flex justify-end gap-1 px-5 py-2">
+          <div className="flex justify-end gap-1 py-2">
             <NewButton
               kind="secondary"
               appearance="outlined"

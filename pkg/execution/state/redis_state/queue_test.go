@@ -1074,7 +1074,7 @@ func TestQueuePeek(t *testing.T) {
 
 		t.Run("Expired leases should move back via scavenging", func(t *testing.T) {
 			// Run scavenging.
-			caught, err := q.Scavenge(ctx)
+			caught, err := q.Scavenge(ctx, ScavengePeekSize)
 			require.NoError(t, err)
 			require.EqualValues(t, 0, caught)
 
@@ -1083,7 +1083,7 @@ func TestQueuePeek(t *testing.T) {
 
 			// Run scavenging.
 			scavengeAt := time.Now().UnixMilli()
-			caught, err = q.Scavenge(ctx)
+			caught, err = q.Scavenge(ctx, ScavengePeekSize)
 			require.NoError(t, err)
 			require.EqualValues(t, 1, caught, "Items not found during scavenge\n%s", r.Dump())
 
@@ -1106,6 +1106,108 @@ func TestQueuePeek(t *testing.T) {
 			ia.AtMS = items[0].AtMS
 			ia.WallTimeMS = items[0].WallTimeMS
 			require.EqualValues(t, []*QueueItem{&ia, &ib, &ic, &id}, items)
+		})
+
+		t.Run("Random scavenge offset should work", func(t *testing.T) {
+			// When count is within limits, do not apply offset
+			require.Equal(t, int64(0), q.randomScavengeOffset(1, 1, 1))
+			require.Equal(t, int64(0), q.randomScavengeOffset(1, 2, 3))
+
+			// Some random fixtures to verify we stay within the range
+			require.Equal(t, int64(2), q.randomScavengeOffset(1, 4, 1))
+			require.Equal(t, int64(3), q.randomScavengeOffset(2, 4, 1))
+			require.Equal(t, int64(1), q.randomScavengeOffset(3, 4, 1))
+			require.Equal(t, int64(2), q.randomScavengeOffset(4, 4, 1))
+			require.Equal(t, int64(0), q.randomScavengeOffset(5, 4, 1))
+		})
+
+		t.Run("Backcompat: Scavenger should gracefully handle invalid items and continue processing", func(t *testing.T) {
+			r.FlushAll()
+
+			start := time.Now().Truncate(time.Second)
+
+			fnIdA, fnIdB, fnIdC := uuid.New(), uuid.New(), uuid.New()
+
+			ia, err := q.EnqueueItem(ctx, QueueItem{ID: "a", WorkflowID: fnIdA}, start)
+			require.NoError(t, err)
+			pA := QueuePartition{WorkflowID: ia.WorkflowID}
+
+			ib, err := q.EnqueueItem(ctx, QueueItem{ID: "b", WorkflowID: fnIdB}, start)
+			require.NoError(t, err)
+			pB := QueuePartition{WorkflowID: ib.WorkflowID}
+
+			ic, err := q.EnqueueItem(ctx, QueueItem{ID: "c", WorkflowID: fnIdC}, start)
+			require.NoError(t, err)
+			pC := QueuePartition{WorkflowID: ic.WorkflowID}
+
+			now := time.Now()
+
+			_, err = q.Lease(ctx, pA, ia, 50*time.Millisecond, now, nil)
+			require.NoError(t, err)
+			_, err = q.Lease(ctx, pB, ib, 50*time.Millisecond, now, nil)
+			require.NoError(t, err)
+			_, err = q.Lease(ctx, pC, ic, 50*time.Millisecond, now, nil)
+			require.NoError(t, err)
+
+			// Run scavenging.
+			caught, err := q.Scavenge(ctx, ScavengePeekSize)
+			require.NoError(t, err)
+			require.EqualValues(t, 0, caught)
+
+			// When the lease expires it should re-appear
+			<-time.After(100 * time.Millisecond)
+
+			// Run scavenging.
+			caught, err = q.Scavenge(ctx, 1)
+			require.NoError(t, err)
+			require.EqualValues(t, 1, caught)
+
+			require.True(t, r.Exists(q.u.kg.ConcurrencyIndex()), r.Dump())
+			concurrencyIndexMembers, err := r.ZMembers(q.u.kg.ConcurrencyIndex())
+			require.NoError(t, err)
+			require.Equal(t, 2, len(concurrencyIndexMembers))
+
+			var aExists, bExists, cExists bool
+			for _, member := range concurrencyIndexMembers {
+				if member == fnIdA.String() {
+					aExists = true
+				} else if member == fnIdB.String() {
+					bExists = true
+				} else if member == fnIdC.String() {
+					cExists = true
+				}
+
+				concurrencyKey := q.u.kg.Concurrency("p", member)
+				require.True(t, r.Exists(concurrencyKey), r.Dump())
+				inProgress, err := r.ZMembers(concurrencyKey)
+				require.NoError(t, err)
+				require.Equal(t, 1, len(inProgress))
+			}
+
+			// At least one may not exist anymore
+			require.False(t, aExists && bExists && cExists)
+
+			// Ensure the concurrency queue is empty but the partition queue has exactly one item (scavenge worked)
+			if !aExists {
+				require.False(t, r.Exists(q.u.kg.Concurrency("p", fnIdA.String())))
+				partMem, err := r.ZMembers(q.u.kg.QueueIndex(fnIdA.String()))
+				require.NoError(t, err)
+				require.Equal(t, 1, len(partMem))
+			}
+
+			if !bExists {
+				require.False(t, r.Exists(q.u.kg.Concurrency("p", fnIdB.String())))
+				partMem, err := r.ZMembers(q.u.kg.QueueIndex(fnIdB.String()))
+				require.NoError(t, err)
+				require.Equal(t, 1, len(partMem))
+			}
+
+			if !cExists {
+				require.False(t, r.Exists(q.u.kg.Concurrency("p", fnIdC.String())))
+				partMem, err := r.ZMembers(q.u.kg.QueueIndex(fnIdC.String()))
+				require.NoError(t, err)
+				require.Equal(t, 1, len(partMem))
+			}
 		})
 	})
 }

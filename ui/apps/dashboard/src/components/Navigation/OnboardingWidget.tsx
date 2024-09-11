@@ -4,14 +4,12 @@ import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import SegmentedProgressBar from '@inngest/components/ProgressBar/SegmentedProgressBar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiBookReadLine, RiCheckboxCircleFill, RiCloseLine } from '@remixicon/react';
-import { useLocalStorage } from 'react-use';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
+import { EnvironmentType } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import { onboardingWidgetContent } from '../Onboarding/content';
-import { type OnboardingSteps } from '../Onboarding/types';
-
-type OnboardingStepsString = `${OnboardingSteps}`;
+import useOnboardingStep from '../Onboarding/useOnboardingStep';
 
 export default function OnboardingWidget({
   collapsed,
@@ -21,24 +19,19 @@ export default function OnboardingWidget({
   closeWidget: () => void;
 }) {
   const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
+  const { lastCompletedStep, isFinalStep, nextStep } = useOnboardingStep();
 
-  const [onboardingWidgetStep] = useLocalStorage<OnboardingStepsString>(
-    'onboardingWidgetStep',
-    '1',
-    { raw: true }
-  );
-  const currentStep: OnboardingSteps = Number(onboardingWidgetStep) as OnboardingSteps;
-  const finalStep = currentStep === 4;
-  const stepContent = onboardingWidgetStep
-    ? onboardingWidgetContent.step[currentStep]
-    : onboardingWidgetContent.step[1];
+  const stepContent = onboardingWidgetContent.step[lastCompletedStep];
 
   if (!onboardingFlow) return;
   return (
     <>
       {collapsed && (
         <MenuItem
-          href={pathCreator.onboarding()}
+          href={pathCreator.onboardingSteps({
+            envSlug: EnvironmentType.Production.toLowerCase(),
+            step: nextStep,
+          })}
           className="border-muted border"
           collapsed={collapsed}
           text="Onboarding guide"
@@ -48,22 +41,27 @@ export default function OnboardingWidget({
 
       {!collapsed && (
         <Link
-          href={pathCreator.onboarding()}
+          href={pathCreator.onboardingSteps({
+            envSlug: EnvironmentType.Production.toLowerCase(),
+            step: nextStep,
+          })}
           className="text-basis bg-canvasBase hover:bg-canvasSubtle border-subtle mb-5 block rounded border p-3 leading-tight"
         >
           <div className="flex h-[110px] flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
                 <p
-                  className={`${finalStep && 'text-success'} flex items-center gap-0.5 font-medium`}
+                  className={`${
+                    isFinalStep && 'text-success'
+                  } flex items-center gap-0.5 font-medium`}
                 >
-                  {finalStep && <RiCheckboxCircleFill className="text-success h-5 w-5" />}
+                  {isFinalStep && <RiCheckboxCircleFill className="text-success h-5 w-5" />}
                   {stepContent.title}
                 </p>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <NewButton
-                      icon={<RiCloseLine className="text-muted" />}
+                      icon={<RiCloseLine className="text-subtle" />}
                       kind="secondary"
                       appearance="ghost"
                       size="small"
@@ -76,9 +74,11 @@ export default function OnboardingWidget({
                   </TooltipContent>
                 </Tooltip>
               </div>
-              <p className="text-muted text-sm">{stepContent.description}</p>
+              <p className="text-subtle text-sm">{stepContent.description}</p>
             </div>
-            {!finalStep && <SegmentedProgressBar segmentsCompleted={currentStep} segments={4} />}
+            {!isFinalStep && (
+              <SegmentedProgressBar segmentsCompleted={lastCompletedStep} segments={4} />
+            )}
             {stepContent.eta && (
               <p className="text-light text-[10px] font-medium uppercase">{stepContent.eta}</p>
             )}

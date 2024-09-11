@@ -81,7 +81,7 @@ function Button({
     >
       {children}
       <RiArrowDownSLine
-        className="ui-open:-rotate-180 text-subtle h-4 w-4 transition-transform duration-500"
+        className="ui-open:-rotate-180 text-muted h-4 w-4 transition-transform duration-500"
         aria-hidden="true"
       />
     </Component>

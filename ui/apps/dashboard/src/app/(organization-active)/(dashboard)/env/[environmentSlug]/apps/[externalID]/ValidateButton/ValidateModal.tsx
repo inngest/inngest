@@ -72,7 +72,7 @@ export function ValidateModal(props: Props) {
           Securely validate the configuration of the app at the given URL.
         </p>
 
-        <p className="text-subtle text-sm">
+        <p className="text-muted text-sm">
           Note: The app will only return privileged information if {"it's"} using this{' '}
           {"environment's"} signing key.
         </p>

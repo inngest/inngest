@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/inngest/inngest/pkg/enums"
 	"golang.org/x/sync/errgroup"
 	"math"
+	mrand "math/rand"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,7 +30,6 @@ import (
 
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
@@ -82,6 +83,8 @@ const (
 	QueueLeaseDuration            = 20 * time.Second
 	ConfigLeaseDuration           = 10 * time.Second
 	ConfigLeaseMax                = 20 * time.Second
+
+	ScavengePeekSize = 100
 
 	PriorityMax     uint = 0
 	PriorityDefault uint = 5
@@ -2600,26 +2603,46 @@ func isKeyConcurrencyPointerItem(partition string) bool {
 	return strings.HasPrefix(partition, "{")
 }
 
+func (q *queue) randomScavengeOffset(seed int64, count int64, limit int) int64 {
+	// only apply random offset if there are more total items to scavenge than the limit
+	if count > int64(limit) {
+		r := mrand.New(mrand.NewSource(seed))
+
+		// the result of count-limit must be greater than 0 as we have already checked count > limit
+		// we increase the argument by 1 to make the highest possible index accessible
+		// example: for count = 9, limit = 3, we want to access indices 0 through 6, not 0 through 5
+		return r.Int63n(count - int64(limit) + 1)
+	}
+
+	return 0
+}
+
 // Scavenge attempts to find jobs that may have been lost due to killed workers.  Workers are shared
 // nothing, and each item in a queue has a lease.  If a worker dies, it will not finish the job and
 // cannot renew the item's lease.
 //
 // We scan all partition concurrency queues - queues of leases - to find leases that have expired.
-func (q *queue) Scavenge(ctx context.Context) (int, error) {
+func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Scavenge"), redis_telemetry.ScopeQueue)
 
 	// Find all items that have an expired lease - eg. where the min time for a lease is between
 	// (0-now] in unix milliseconds.
 	now := fmt.Sprintf("%d", q.clock.Now().UnixMilli())
 
+	count, err := q.u.unshardedRc.Do(ctx, q.u.unshardedRc.B().Zcount().Key(q.u.kg.ConcurrencyIndex()).Min("-inf").Max(now).Build()).AsInt64()
+	if err != nil {
+		return 0, fmt.Errorf("error counting concurrency index: %w", err)
+	}
+
 	cmd := q.u.unshardedRc.B().Zrange().
 		Key(q.u.kg.ConcurrencyIndex()).
 		Min("-inf").
 		Max(now).
 		Byscore().
-		Limit(0, 100).
+		Limit(q.randomScavengeOffset(q.clock.Now().UnixMilli(), count, limit), int64(limit)).
 		Build()
 
+	// NOTE: Received keys can be legacy (workflow IDs or system/internal queue names) or new (full Redis keys)
 	pKeys, err := q.u.unshardedRc.Do(ctx, cmd).AsStrSlice()
 	if err != nil {
 		return 0, fmt.Errorf("error scavenging for lost items: %w", err)
@@ -2630,7 +2653,6 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 	// Each of the items is a concurrency queue with lost items.
 	var resultErr error
 	for _, partition := range pKeys {
-
 		// NOTE: If this is not a fully-qualified Redis key to a concurrency queue,
 		// assume that this is an old queueName or function ID
 		// This is for backwards compatibility with the previous concurrency index item format
@@ -2662,9 +2684,16 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 			resultErr = multierror.Append(resultErr, fmt.Errorf("error fetching jobs for concurrency queue '%s' during scavenge: %w", partition, err))
 			continue
 		}
-		for _, item := range jobs {
+		for i, item := range jobs {
+			itemID := itemIDs[i]
 			if item == "" {
-				// THIS SHOULD NEVER HAPPEN. Handle this gracefully
+				q.logger.Error().Interface("item_id", itemID).Msg("missing queue item in concurrency queue")
+
+				// Drop item reference to prevent spinning on this item
+				err := q.u.unshardedRc.Do(ctx, q.u.unshardedRc.B().Zrem().Key(queueKey).Member(itemID).Build()).Error()
+				if err != nil {
+					resultErr = multierror.Append(resultErr, fmt.Errorf("error removing missing item '%s' from concurrency queue '%s': %w", itemID, partition, err))
+				}
 				continue
 			}
 
