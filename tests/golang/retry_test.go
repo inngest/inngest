@@ -101,10 +101,10 @@ func TestRetry(t *testing.T) {
 
 	t.Run("trace run should have the appropriate data", func(t *testing.T) {
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
-			Status:            models.FunctionStatusCompleted,
-			WaitForChildSpans: 2,
-			Timeout:           15 * time.Second,
-			Interval:          3 * time.Second,
+			Status:         models.FunctionStatusCompleted,
+			ChildSpanCount: 2,
+			Timeout:        15 * time.Second,
+			Interval:       3 * time.Second,
 		})
 
 		// output test

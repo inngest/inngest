@@ -70,7 +70,7 @@ func TestInvoke(t *testing.T) {
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
 		r := require.New(t)
-		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusCompleted, WaitForChildSpans: 1})
+		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusCompleted, ChildSpanCount: 1})
 
 		r.NotNil(run.Trace)
 		r.True(run.Trace.IsRoot)
@@ -169,7 +169,7 @@ func TestInvokeGroup(t *testing.T) {
 	r.NoError(err)
 
 	t.Run("in progress", func(t *testing.T) {
-		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusRunning, WaitForChildSpans: 1})
+		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusRunning, ChildSpanCount: 1})
 		r := require.New(t)
 
 		r.Nil(run.EndedAt)
@@ -204,7 +204,7 @@ func TestInvokeGroup(t *testing.T) {
 	})
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
-		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusCompleted, WaitForChildSpans: 1})
+		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusCompleted, ChildSpanCount: 1})
 
 		as := assert.New(t)
 

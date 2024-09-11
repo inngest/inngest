@@ -64,8 +64,8 @@ func TestWait(t *testing.T) {
 
 	t.Run("in progress wait", func(t *testing.T) {
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
-			Status:            models.FunctionStatusRunning,
-			WaitForChildSpans: 1,
+			Status:         models.FunctionStatusRunning,
+			ChildSpanCount: 1,
 		})
 
 		require.Equal(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
@@ -103,8 +103,8 @@ func TestWait(t *testing.T) {
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
-			Status:            models.FunctionStatusCompleted,
-			WaitForChildSpans: 1,
+			Status:         models.FunctionStatusCompleted,
+			ChildSpanCount: 1,
 		})
 
 		require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
@@ -196,8 +196,8 @@ func TestWaitGroup(t *testing.T) {
 
 	t.Run("in progress wait", func(t *testing.T) {
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
-			Status:            models.FunctionStatusRunning,
-			WaitForChildSpans: 1,
+			Status:         models.FunctionStatusRunning,
+			ChildSpanCount: 1,
 		})
 
 		require.Equal(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
@@ -235,8 +235,8 @@ func TestWaitGroup(t *testing.T) {
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
-			Status:            models.FunctionStatusCompleted,
-			WaitForChildSpans: 1,
+			Status:         models.FunctionStatusCompleted,
+			ChildSpanCount: 1,
 		})
 
 		require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)

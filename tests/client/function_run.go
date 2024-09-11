@@ -239,8 +239,8 @@ func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *stri
 		// We cannot use require.NotNil as this will cause an uncaught panic (see https://github.com/stretchr/testify/issues/1457)
 		ready := err == nil && run != nil && run.Status == opts.Status.String()
 
-		if opts.WaitForChildSpans > 0 {
-			ready = ready && run.Trace != nil && run.Trace.IsRoot && len(run.Trace.ChildSpans) == opts.WaitForChildSpans
+		if opts.ChildSpanCount > 0 {
+			ready = ready && run.Trace != nil && run.Trace.IsRoot && len(run.Trace.ChildSpans) == opts.ChildSpanCount
 		}
 
 		return ready
@@ -254,7 +254,7 @@ type WaitForRunTracesOptions struct {
 	Timeout  time.Duration
 	Interval time.Duration
 
-	WaitForChildSpans int
+	ChildSpanCount int
 }
 
 func (c *Client) RunTraces(ctx context.Context, runID string) (*RunV2, error) {

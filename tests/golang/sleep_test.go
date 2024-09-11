@@ -92,10 +92,10 @@ func TestSleep(t *testing.T) {
 
 	t.Run("complete", func(t *testing.T) {
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
-			Status:            models.FunctionStatusCompleted,
-			WaitForChildSpans: 3,
-			Timeout:           9 * time.Second,
-			Interval:          3 * time.Second,
+			Status:         models.FunctionStatusCompleted,
+			ChildSpanCount: 3,
+			Timeout:        9 * time.Second,
+			Interval:       3 * time.Second,
 		})
 		require.EqualValues(t, 1, atomic.LoadInt32(&completed))
 
