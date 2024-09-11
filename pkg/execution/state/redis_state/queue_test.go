@@ -1590,12 +1590,12 @@ func TestQueueLease(t *testing.T) {
 
 			// Use the new item's workflow ID
 			zsetKeyA := q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnIDA.String(), evaluatedKeyChecksumA)
-			pA := QueuePartition{ID: zsetKeyA, FunctionID: &itemA1.FunctionID, PartitionType: int(enums.PartitionTypeConcurrencyKey), ConcurrencyKey: ckA.Key, ConcurrencyLimit: 1}
+			pA := QueuePartition{ID: zsetKeyA, FunctionID: &itemA1.FunctionID, PartitionType: int(enums.PartitionTypeConcurrencyKey), ConcurrencyKey: ckA.Key, ConcurrencyLimit: 1, ConcurrencyHash: ckA.Hash}
 
 			require.Equal(t, pA, getPartition(t, r, enums.PartitionTypeConcurrencyKey, fnIDA, evaluatedKeyChecksumA))
 
 			zsetKeyB := q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnIDB.String(), evaluatedKeyChecksumB)
-			pB := QueuePartition{ID: zsetKeyB, FunctionID: &itemB1.FunctionID, PartitionType: int(enums.PartitionTypeConcurrencyKey), ConcurrencyKey: ckB.Key, ConcurrencyLimit: 1}
+			pB := QueuePartition{ID: zsetKeyB, FunctionID: &itemB1.FunctionID, PartitionType: int(enums.PartitionTypeConcurrencyKey), ConcurrencyKey: ckB.Key, ConcurrencyLimit: 1, ConcurrencyHash: ckB.Hash}
 			require.Equal(t, pB, getPartition(t, r, enums.PartitionTypeConcurrencyKey, fnIDB, evaluatedKeyChecksumB))
 
 			// Both key queues exist
@@ -1713,6 +1713,8 @@ func TestQueueLease(t *testing.T) {
 				}, at)
 				require.NoError(t, err)
 
+				defaultPartition := getDefaultPartition(t, r, uuid.Nil)
+
 				// The partition should use a custom ID for the concurrency key.
 				pa1 := q.ItemPartitions(ctx, itemA)[0]
 				pa2 := q.ItemPartitions(ctx, itemA)[1]
@@ -1750,7 +1752,11 @@ func TestQueueLease(t *testing.T) {
 
 				t.Run("The scavenger queue is updated with all queue items", func(t *testing.T) {
 					mem, _ := r.ZMembers(q.u.kg.ConcurrencyIndex())
-					require.Equal(t, 2, len(mem), "scavenge queue not updated", mem)
+					require.Equal(t, 3, len(mem), "scavenge queue not updated", mem)
+					require.Contains(t, mem, pa1.concurrencyKey(q.u.kg))
+					require.Contains(t, mem, pa2.concurrencyKey(q.u.kg))
+					require.NotContains(t, mem, defaultPartition.concurrencyKey(q.u.kg))
+					require.Contains(t, mem, defaultPartition.FunctionID.String())
 				})
 
 				t.Run("Pointer queues don't update with a single tqueue item", func(t *testing.T) {
