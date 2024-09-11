@@ -27,9 +27,6 @@ export default function StepsMenu({
   );
 }
 
-StepsMenu.MenuItem = StepMenuItem;
-StepsMenu.Link = StepLink;
-
 function StepMenuItem({
   stepContent,
   isCompleted,
@@ -84,3 +81,6 @@ function StepLink({ children, href, ...props }: React.PropsWithChildren<NewLinkP
     </NewLink>
   );
 }
+
+StepsMenu.MenuItem = StepMenuItem;
+StepsMenu.Link = StepLink;
