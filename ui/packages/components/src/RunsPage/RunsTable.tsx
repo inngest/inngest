@@ -96,7 +96,7 @@ export default function RunsTable({
   const isEmpty = data.length < 1 && !isLoading;
 
   return (
-    <table className={cn(isEmpty && 'h-[calc(100%-58px)] border-b-0', tableStyles)}>
+    <table className={cn(tableStyles, isEmpty && 'h-[calc(100%-58px)] border-b-0')}>
       <thead className={tableHeadStyles}>
         {table.getHeaderGroups().map((headerGroup) => (
           <tr key={headerGroup.id} className="h-12">
