@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
-import { Button } from '@inngest/components/Button';
+import { Button, NewButton } from '@inngest/components/Button';
 import { CopyButton } from '@inngest/components/CopyButton';
 import { maxRenderedOutputSizeBytes } from '@inngest/components/constants';
 import { useCopyToClipboard } from '@inngest/components/hooks/useCopyToClipboard';
@@ -254,16 +254,17 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
               {!isOutputTooLarge && (
                 <div className="mr-4 flex items-center gap-2 py-2">
                   {actions.map(({ label, title, icon, onClick, disabled }, idx) => (
-                    <Button
+                    <NewButton
                       key={idx}
                       icon={icon}
-                      btnAction={onClick}
+                      onClick={onClick}
                       size="small"
                       aria-label={label}
                       title={title ?? label}
                       label={label}
                       disabled={disabled}
                       appearance="outlined"
+                      kind="secondary"
                     />
                   ))}
                   <CopyButton
@@ -273,23 +274,25 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
                     handleCopyClick={handleCopyClick}
                     appearance="outlined"
                   />
-                  <Button
+                  <NewButton
                     icon={isWordWrap ? <IconOverflowText /> : <IconWrapText />}
-                    btnAction={handleWrapText}
+                    onClick={handleWrapText}
                     size="small"
                     aria-label={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
                     title={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
                     tooltip={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
                     appearance="outlined"
+                    kind="secondary"
                   />
-                  <Button
-                    btnAction={handleFullHeight}
+                  <NewButton
+                    onClick={handleFullHeight}
                     size="small"
                     icon={isFullHeight ? <IconShrinkText /> : <IconExpandText />}
                     aria-label={isFullHeight ? 'Shrink text' : 'Expand text'}
                     title={isFullHeight ? 'Shrink text' : 'Expand text'}
                     tooltip={isFullHeight ? 'Shrink text' : 'Expand text'}
                     appearance="outlined"
+                    kind="secondary"
                   />
                 </div>
               )}

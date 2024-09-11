@@ -15,26 +15,6 @@
   }
 }
 
-/* width */
-.dark ::-webkit-scrollbar {
-  width: 10px;
-}
-
-/* Track */
-.dark ::-webkit-scrollbar-track {
-  @apply bg-slate-900;
-}
-
-/* Handle */
-.dark ::-webkit-scrollbar-thumb {
-  @apply rounded-lg bg-slate-800;
-}
-
-/* Handle on hover */
-.dark ::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-700;
-}
-
 .dark #modals {
   @apply text-sm text-slate-400;
 }
@@ -173,6 +153,7 @@
     --color-border-warning: var(--color-honey-600);
     --color-border-info: var(--color-purplehaze-700);
 
+    --color-primary-3xSubtle: var(--color-matcha-100);
     --color-primary-2xSubtle: var(--color-matcha-200);
     --color-primary-xSubtle: var(--color-matcha-300);
     --color-primary-subtle: var(--color-matcha-400);
@@ -277,6 +258,7 @@
     --color-border-warning: var(--color-honey-300);
     --color-border-info: var(--color-purplehaze-300);
 
+    --color-primary-3xSubtle: var(--color-matcha-900);
     --color-primary-2xSubtle: var(--color-matcha-800);
     --color-primary-xSubtle: var(--color-matcha-700);
     --color-primary-subtle: var(--color-matcha-600);
@@ -350,4 +332,32 @@
 #maze-contextual-widget-host,
 #maze-media-host {
   pointer-events: auto;
+}
+
+/* width */
+.dark ::-webkit-scrollbar {
+  width: 10px;
+}
+
+/* Track */
+.dark ::-webkit-scrollbar-track {
+  background: rgb(var(--color-carbon-700));
+}
+
+/* Handle */
+.dark ::-webkit-scrollbar-thumb {
+  @apply rounded-lg;
+  background: rgb(var(--color-carbon-400));
+}
+
+/* Handle on hover */
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--color-carbon-200));
+}
+
+.dark {
+  /* scrollbar-color: <thumb> <track> */
+  scrollbar-color: rgb(var(--color-carbon-400)) rgb(var(--color-carbon-700));
+  scrollbar-width: 10px;
+  scrollbar-gutter: 10px;
 }
