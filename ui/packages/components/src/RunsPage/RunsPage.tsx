@@ -2,11 +2,11 @@
 
 import { useCallback, useMemo, useRef, type UIEventHandler } from 'react';
 import dynamic from 'next/dynamic';
-import { Button, NewButton } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
 import { SelectGroup, type Option } from '@inngest/components/Select/Select';
-import { LoadingMore, TableFilter } from '@inngest/components/Table';
+import { TableFilter } from '@inngest/components/Table';
 import { DEFAULT_TIME } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   FunctionRunTimeField,
@@ -15,7 +15,7 @@ import {
   type FunctionRunStatus,
 } from '@inngest/components/types/functionRun';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
-import { RiLoopLeftLine, RiRefreshLine } from '@remixicon/react';
+import { RiRefreshLine } from '@remixicon/react';
 import { type VisibilityState } from '@tanstack/react-table';
 import { useLocalStorage } from 'react-use';
 
@@ -250,101 +250,108 @@ export function RunsPage({
 
   return (
     <main
-      className="bg-canvasBase text-basis h-full min-h-0 overflow-y-auto"
+      className="bg-canvasBase text-basis h-full min-h-0"
       onScroll={onScroll}
       ref={containerRef}
     >
-      <div className="bg-canvasBase sticky top-0 z-10 flex items-center justify-between gap-2 px-4 py-2">
-        <div className="flex items-center gap-2">
-          <SelectGroup>
-            <TimeFieldFilter selectedTimeField={timeField} onTimeFieldChange={onTimeFieldChange} />
-            <TimeFilter
-              daysAgoMax={features.history}
-              onDaysChange={onDaysChange}
-              defaultValue={
-                lastDays
-                  ? {
-                      type: 'relative',
-                      duration: parseDuration(lastDays),
-                    }
-                  : startTime && endTime
-                  ? {
-                      type: 'absolute',
-                      start: new Date(startTime),
-                      end: new Date(endTime),
-                    }
-                  : {
-                      type: 'relative',
-                      duration: parseDuration(DEFAULT_TIME),
-                    }
-              }
+      <div className="bg-canvasBase sticky top-[53px] z-50 flex flex-col px-4">
+        <div className="flex h-[58px] items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <SelectGroup>
+              <TimeFieldFilter
+                selectedTimeField={timeField}
+                onTimeFieldChange={onTimeFieldChange}
+              />
+              <TimeFilter
+                daysAgoMax={features.history}
+                onDaysChange={onDaysChange}
+                defaultValue={
+                  lastDays
+                    ? {
+                        type: 'relative',
+                        duration: parseDuration(lastDays),
+                      }
+                    : startTime && endTime
+                    ? {
+                        type: 'absolute',
+                        start: new Date(startTime),
+                        end: new Date(endTime),
+                      }
+                    : {
+                        type: 'relative',
+                        duration: parseDuration(DEFAULT_TIME),
+                      }
+                }
+              />
+            </SelectGroup>
+            <StatusFilter
+              selectedStatuses={filteredStatus}
+              onStatusesChange={onStatusFilterChange}
+              functionIsPaused={functionIsPaused}
             />
-          </SelectGroup>
-          <StatusFilter
-            selectedStatuses={filteredStatus}
-            onStatusesChange={onStatusFilterChange}
-            functionIsPaused={functionIsPaused}
-          />
-          {apps && (
-            <EntityFilter
-              type="app"
-              onFilterChange={onAppFilterChange}
-              selectedEntities={filteredApp}
-              entities={apps}
-            />
-          )}
-          {functions && (
-            <EntityFilter
-              type="function"
-              onFilterChange={onFunctionFilterChange}
-              selectedEntities={filteredFunction}
-              entities={functions}
-            />
-          )}
+            {apps && (
+              <EntityFilter
+                type="app"
+                onFilterChange={onAppFilterChange}
+                selectedEntities={filteredApp}
+                entities={apps}
+              />
+            )}
+            {functions && (
+              <EntityFilter
+                type="function"
+                onFilterChange={onFunctionFilterChange}
+                selectedEntities={filteredFunction}
+                entities={functions}
+              />
+            )}
 
-          <TotalCount totalCount={totalCount} />
-        </div>
-        <div className="flex items-center gap-2">
-          <TableFilter
-            columnVisibility={columnVisibility}
-            setColumnVisibility={setColumnVisibility}
-            options={options}
-          />
+            <TotalCount totalCount={totalCount} />
+          </div>
+          <div className="flex items-center gap-2">
+            <TableFilter
+              columnVisibility={columnVisibility}
+              setColumnVisibility={setColumnVisibility}
+              options={options}
+            />
+          </div>
         </div>
       </div>
-      <RunsTable
-        data={data}
-        isLoading={isLoadingInitial}
-        renderSubComponent={renderSubComponent}
-        getRowCanExpand={() => true}
-        visibleColumns={columnVisibility}
-        scope={scope}
-      />
-      {!hasMore && data.length > 1 && (
-        <div className="flex flex-col items-center pt-8">
-          <p className="text-muted">No additional runs found.</p>
-          <NewButton
-            label="Back to top"
-            kind="primary"
-            appearance="ghost"
-            onClick={() => scrollToTop(true)}
-          />
-        </div>
-      )}
-      {onRefresh && (
-        <div className="flex flex-col items-center pt-2">
-          <NewButton
-            kind="secondary"
-            appearance="outlined"
-            label="Refresh runs"
-            icon={<RiRefreshLine />}
-            iconSide="left"
-            onClick={onRefresh}
-            loading={disableRefreshButton}
-            disabled={disableRefreshButton}
-          />
-        </div>
-      )}
+      <div className=" overflow-y-auto">
+        <RunsTable
+          data={data}
+          isLoading={isLoadingInitial}
+          renderSubComponent={renderSubComponent}
+          getRowCanExpand={() => true}
+          visibleColumns={columnVisibility}
+          scope={scope}
+        />
+        {!hasMore && data.length > 1 && (
+          <div className="flex flex-col items-center pt-8">
+            <p className="text-muted">No additional runs found.</p>
+            <NewButton
+              label="Back to top"
+              kind="primary"
+              appearance="ghost"
+              onClick={() => scrollToTop(true)}
+            />
+          </div>
+        )}
+        {onRefresh && (
+          <div className="flex flex-col items-center pt-2">
+            <NewButton
+              kind="secondary"
+              appearance="outlined"
+              label="Refresh runs"
+              icon={<RiRefreshLine />}
+              iconSide="left"
+              onClick={onRefresh}
+              loading={disableRefreshButton}
+              disabled={disableRefreshButton}
+            />
+          </div>
+        )}
+      </div>
     </main>
   );
 }
