@@ -5,7 +5,7 @@ import StepsMenu from '@inngest/components/Steps/StepsMenu';
 import { RiDiscordLine, RiExternalLinkLine, RiMailLine } from '@remixicon/react';
 
 import { pathCreator } from '@/utils/urls';
-import { type OnboardingSteps } from '../Onboarding/types';
+import { type OnboardingStepsArray } from '../Onboarding/types';
 import { onboardingMenuStepContent } from './content';
 import useOnboardingStep from './useOnboardingStep';
 
@@ -14,7 +14,7 @@ export default function Menu({ envSlug }: { envSlug: string }) {
   const pathname = usePathname();
 
   const activeStep = pathname.split('/').pop() || '1';
-  const stepNumbers: OnboardingSteps[] = [1, 2, 3, 4];
+  const stepNumbers: OnboardingStepsArray = [1, 2, 3, 4];
 
   return (
     <StepsMenu title={onboardingMenuStepContent.title} links={links}>
