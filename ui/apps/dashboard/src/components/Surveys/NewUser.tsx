@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { NewButton } from '@inngest/components/Button/index';
 import { NewLink } from '@inngest/components/Link';
