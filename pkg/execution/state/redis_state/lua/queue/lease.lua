@@ -151,7 +151,14 @@ local function handleLease(keyPartition, keyConcurrency, partitionID)
 		-- lost jobs easily.
 		-- Note: Previously, we stored the queue name in the zset, so we have to add an extra
 		-- check to the scavenger logic to handle partition uuids for old queue items
-		redis.call("ZADD", concurrencyPointer, earliestLease, keyConcurrency)
+
+		-- Backwards compatibility: For default partitions, use the partition ID (function ID) as the pointer
+		local pointerMember = keyConcurrency
+		if exists_without_ending(keyConcurrency, ":concurrency:p:" .. partitionID) == false then
+			pointerMember = partitionID
+		end
+
+		redis.call("ZADD", concurrencyPointer, earliestLease, pointerMember)
 	end
 end
 
