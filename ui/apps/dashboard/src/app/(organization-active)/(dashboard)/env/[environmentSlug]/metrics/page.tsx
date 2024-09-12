@@ -35,7 +35,7 @@ export default async function MetricsPage({ params: { environmentSlug: envSlug }
       />
       <div className="bg-canvasSubtle mx-auto flex h-full w-full flex-col">
         <Dashboard
-          apps={apps?.map((app: { id: string; externalID: string }) => ({
+          apps={apps.map((app: { id: string; externalID: string }) => ({
             id: app.id,
             name: app.externalID,
           }))}

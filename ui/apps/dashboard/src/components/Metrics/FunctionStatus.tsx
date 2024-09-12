@@ -13,7 +13,7 @@ import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
 import { FunctionInfo } from './FunctionInfo';
 
 const {
-  theme: { backgroundColor, textColor, borderColor, colors },
+  theme: { backgroundColor, colors },
 } = resolveConfig(tailwindConfig);
 
 export type MetricsFilters = {
