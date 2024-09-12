@@ -407,6 +407,16 @@ func newNatsTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) 
 		}
 	}
 
+	{
+		val := os.Getenv("SPAN_BATCH_PROCESSOR_CONCURRENCY")
+		if val != "" {
+			c, err := strconv.Atoi(val)
+			if err == nil && c > 0 {
+				bopts = append(bopts, exporters.WithBatchProcessorConcurrency(c))
+			}
+		}
+	}
+
 	sp := exporters.NewBatchSpanProcessor(ctx, exp, bopts...)
 	tp := trace.NewTracerProvider(
 		trace.WithSpanProcessor(sp),

@@ -474,3 +474,43 @@ func (c *Client) RunTrigger(ctx context.Context, runID string) *models.RunTraceT
 
 	return data.RunTrigger
 }
+
+type runByEventID struct {
+	ID string `json:"id"`
+}
+
+func (c *Client) RunsByEventID(ctx context.Context, eventID string) ([]runByEventID, error) {
+	c.Helper()
+
+	query := `
+		query Q($eventID: ID!) {
+			event(query: { eventId: $eventID }) {
+				functionRuns {
+					id
+				}
+			}
+		}`
+
+	resp := c.doGQL(ctx, graphql.RawParams{
+		Query: query,
+		Variables: map[string]any{
+			"eventID": eventID,
+		},
+	})
+	if len(resp.Errors) > 0 {
+		return nil, fmt.Errorf("err with gql: %#v", resp.Errors)
+	}
+
+	type response struct {
+		Event struct {
+			FunctionRuns []runByEventID `json:"functionRuns"`
+		} `json:"event"`
+	}
+
+	data := &response{}
+	if err := json.Unmarshal(resp.Data, data); err != nil {
+		c.Fatalf(err.Error())
+	}
+
+	return data.Event.FunctionRuns, nil
+}
