@@ -2,18 +2,21 @@
 
 import { useEffect, useState } from 'react';
 import { type Route } from 'next';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useOrganization, useUser } from '@clerk/nextjs';
 import { NewButton } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
+import { EventsIcon } from '@inngest/components/icons/sections/Events';
+import { RunsIcon } from '@inngest/components/icons/sections/Runs';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiArrowGoForwardLine } from '@remixicon/react';
+import { RiArrowGoForwardLine, RiDiscordFill, RiQuestionAnswerLine } from '@remixicon/react';
 import { Command } from 'cmdk';
 import { useQuery } from 'urql';
 
+import { EnvironmentProvider, useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import { getEnvironmentSlug } from '@/utils/environments';
 
@@ -66,6 +69,7 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [isDebouncing, setIsDebouncing] = useState(false);
   const router = useRouter();
+  const params = useParams<{ environmentSlug: string }>();
   const { user } = useUser();
   const { organization } = useOrganization();
   let searchResult = {
@@ -140,7 +144,7 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
   const isFetching = globalSearchFetching || getFunctionSlugFetching;
 
   /*
-   * Returns the environment slug
+   * Returns the environment slug of the search results
    */
   const environmentSlug = getEnvironmentSlug({
     environmentID: globalResults?.env.id ?? '',
@@ -173,55 +177,125 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
   }
 
   const isLoading = isFetching || isDebouncing;
+  const currentEnvironmentSlug = params.environmentSlug || 'production';
 
   return (
-    <Modal alignTop isOpen={isOpen} onClose={onOpenChange} className="max-w-2xl align-baseline">
-      <Command label="Search by ID menu" shouldFilter={false} className="p-2">
+    <Modal alignTop isOpen={isOpen} onClose={onOpenChange} className="max-w-xl align-baseline">
+      <Command label="Command menu" shouldFilter={true} className="p-2">
         <Command.Input
-          placeholder="Search by ID..."
+          placeholder="Type a command or an ID"
           value={search}
           onValueChange={setSearch}
-          className={cn(
-            search && 'border-b border-slate-200 focus:border-slate-200',
-            'w-[656px] border-0 px-3 py-3 placeholder-slate-500 outline-none focus:ring-0'
-          )}
+          className="border-subtle focus:border-muted placeholder-subtle w-full min-w-[558px] border-0 border-b px-3 py-3 focus:outline-none focus:ring-0"
         />
-        {search && (
-          <Command.List className="px-3 py-3 text-slate-600">
-            {isLoading && <Command.Loading>Searching...</Command.Loading>}
-            {!isLoading && globalResults && (
-              <Command.Group
-                heading={<div className="pb-2 text-xs text-slate-500">Navigate To</div>}
-              >
-                <Command.Item
-                  onSelect={() => {
-                    router.push(searchResult.href as Route);
-                    onOpenChange(!isOpen);
-                  }}
-                  key={globalResults.env.id}
-                  value={globalResults.env.name}
-                  className="group flex cursor-pointer items-center rounded-md px-3 py-3 data-[selected]:bg-slate-100"
+        <Command.List className="text-basis h-[min(330px, var(--cmdk-list-height))] pt-3">
+          <Group heading="Go to">
+            <Item
+              onSelect={() => {
+                console.log('ok');
+              }}
+            >
+              <RunsIcon /> Go to run by ID
+            </Item>
+            <Item
+              onSelect={() => {
+                console.log('ok');
+              }}
+            >
+              <EventsIcon /> Go to event by ID
+            </Item>
+          </Group>
+          <Group heading="Navigate">
+            <Item
+              onSelect={() => {
+                router.push(`/env/${currentEnvironmentSlug}/functions`);
+                onOpenChange(!isOpen);
+              }}
+            >
+              <RunsIcon /> Functions
+            </Item>
+            <Item
+              onSelect={() => {
+                router.push(`/env/${currentEnvironmentSlug}/events`);
+                onOpenChange(!isOpen);
+              }}
+            >
+              <EventsIcon /> Events
+            </Item>
+          </Group>
+          <Group heading="Help">
+            <Command.Item className="hover:bg-surfaceSubtle/30 data-[selected=true]:bg-surfaceSubtle/30 text-subtle flex h-12 cursor-pointer flex-row items-center gap-3 rounded-md px-4">
+              <RiQuestionAnswerLine /> Contact support
+            </Command.Item>
+            <Command.Item className="hover:bg-surfaceSubtle/30 data-[selected=true]:bg-surfaceSubtle/30 text-subtle flex h-12 cursor-pointer flex-row items-center gap-3 rounded-md px-4">
+              <RiDiscordFill /> Discord
+            </Command.Item>
+          </Group>
+          {search && (
+            <>
+              {isLoading && <Command.Loading>Searching...</Command.Loading>}
+              {!isLoading && globalResults && (
+                <Command.Group
+                  heading={<div className="pb-2 text-xs text-slate-500">Navigate To</div>}
                 >
-                  <div className="flex items-center gap-2 truncate">
-                    {searchResult.icon}
-                    <p className="flex-1 truncate">{searchResult.name}</p>
-                  </div>
-                  <kbd
-                    aria-label="press enter to jump to page"
-                    className="ml-auto hidden rounded bg-slate-200 p-1.5 text-white group-data-[selected]:block"
+                  <Command.Item
+                    onSelect={() => {
+                      router.push(searchResult.href as Route);
+                      onOpenChange(!isOpen);
+                    }}
+                    key={globalResults.env.id}
+                    value={globalResults.env.name}
+                    className="group flex cursor-pointer items-center rounded-md px-3 py-3 data-[selected]:bg-slate-100"
                   >
-                    <RiArrowGoForwardLine className="h-3 w-3 rotate-180 text-slate-600" />
-                  </kbd>
-                </Command.Item>
-              </Command.Group>
-            )}
-            <Command.Empty className={cn(isLoading && 'hidden')}>
-              No results found. Make sure you are typing the full ID.
-            </Command.Empty>
-          </Command.List>
-        )}
+                    <div className="flex items-center gap-2 truncate">
+                      {searchResult.icon}
+                      <p className="flex-1 truncate">{searchResult.name}</p>
+                    </div>
+                    <kbd
+                      aria-label="press enter to jump to page"
+                      className="ml-auto hidden rounded bg-slate-200 p-1.5 text-white group-data-[selected]:block"
+                    >
+                      <RiArrowGoForwardLine className="h-3 w-3 rotate-180 text-slate-600" />
+                    </kbd>
+                  </Command.Item>
+                </Command.Group>
+              )}
+              <Command.Empty className={cn(isLoading && 'hidden')}>
+                No results found. Make sure you are typing the full ID.
+              </Command.Empty>
+            </>
+          )}
+        </Command.List>
       </Command>
     </Modal>
+  );
+}
+
+function Group({ children, heading }: { children: React.ReactNode; heading: React.ReactNode }) {
+  return (
+    <Command.Group
+      className="mb-2 flex flex-col gap-1 last:mb-0"
+      heading={<div className="text-light px-3 text-xs">{heading}</div>}
+    >
+      {children}
+    </Command.Group>
+  );
+}
+
+function Item({
+  children,
+  onSelect = () => {},
+}: {
+  children: React.ReactNode;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <Command.Item
+      className="hover:bg-surfaceSubtle/30 data-[selected=true]:bg-surfaceSubtle/30 text-subtle flex h-12 cursor-pointer flex-row items-center gap-3 rounded-md px-4"
+      onSelect={onSelect}
+    >
+      {children}
+    </Command.Item>
   );
 }
 
@@ -273,7 +347,6 @@ export default function Search({ collapsed }: { collapsed: boolean }) {
           </TooltipContent>
         </Tooltip>
       )}
-
       <SearchModal isOpen={isSearchModalVisible} onOpenChange={setIsSearchModalVisible} />
     </>
   );

@@ -54,7 +54,7 @@
     "@urql/exchange-retry": "1.2.0",
     "change-case": "4.1.2",
     "clsx": "1.2.1",
-    "cmdk": "0.2.1",
+    "cmdk": "1.0.0",
     "dayjs": "1.11.7",
     "framer-motion": "10.16.4",
     "graphql": "16.8.1",
