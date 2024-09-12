@@ -1,13 +1,20 @@
 import { Alert } from '@inngest/components/Alert/Alert';
 import { Chart, type ChartProps } from '@inngest/components/Chart/Chart';
+import { resolveColor } from '@inngest/components/utils/colors';
+import { isDark } from '@inngest/components/utils/theme';
+import resolveConfig from 'tailwindcss/resolveConfig';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import type { FunctionStatusMetricsQuery, ScopedMetricsResponse } from '@/gql/graphql';
-import { cssToRGB } from '@/utils/colors';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import tailwindConfig from '../../../tailwind.config';
 import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
 import { FunctionInfo } from './FunctionInfo';
+
+const {
+  theme: { backgroundColor, textColor, borderColor, colors },
+} = resolveConfig(tailwindConfig);
 
 export type MetricsFilters = {
   from: Date;
@@ -31,16 +38,16 @@ export type PieChartData = Array<{
   itemStyle: { color: string };
 }>;
 
-const placeHolderData = () => [
-  { value: 0, name: 'Completed', itemStyle: { color: cssToRGB('--color-primary-moderate') } },
-  { value: 0, name: 'Running', itemStyle: { color: cssToRGB('--color-secondary-subtle') } },
-  { value: 0, name: 'Queued', itemStyle: { color: cssToRGB('--color-quaternary-cool-moderate') } },
+const placeHolder = [
   {
     value: 0,
-    name: 'Cancelled',
-    itemStyle: { color: cssToRGB('--color-background-canvas-muted') },
+    name: 'Completed',
+    itemStyle: { color: resolveColor(colors.primary.moderate, true, '#2c9b63') },
   },
-  { value: 0, name: 'Failed', itemStyle: { color: cssToRGB('--color-tertiary-subtle') } },
+  { value: 0, name: 'Running', itemStyle: { color: '#52b2fd' } },
+  { value: 0, name: 'Queued', itemStyle: { color: '#8b74f9' } },
+  { value: 0, name: 'Cancelled', itemStyle: { color: '#e2e2e2' } },
+  { value: 0, name: 'Failed', itemStyle: { color: '#fa8d86' } },
 ];
 
 const GetFunctionStatusMetrics = graphql(`
@@ -129,6 +136,7 @@ const mapCompleted = ({
     data: Array<{ value: number }>;
   }>;
 }): PieChartData => {
+  const dark = isDark();
   const counts: { [k: string]: number } = {
     Cancelled: 0,
     Failed: 0,
@@ -150,17 +158,17 @@ const mapCompleted = ({
     {
       value: totals['Completed'] || 0,
       name: 'Completed',
-      itemStyle: { color: cssToRGB('--color-primary-moderate') },
+      itemStyle: { color: resolveColor(colors.primary.moderate, dark, '#2c9b63') },
     },
     {
       value: totals['Cancelled'] || 0,
       name: 'Cancelled',
-      itemStyle: { color: cssToRGB('--color-background-canvas-muted') },
+      itemStyle: { color: resolveColor(backgroundColor.canvasMuted, dark, '#e2e2e2') },
     },
     {
       value: totals['Failed'] || 0,
       name: 'Failed',
-      itemStyle: { color: cssToRGB('--color-tertiary-subtle') },
+      itemStyle: { color: resolveColor(colors.tertiary.subtle, dark, '#fa8d86') },
     },
   ];
 };
@@ -191,19 +199,20 @@ function rgbToHex(r: number, g: number, b: number): string {
 const mapMetrics = ({
   workspace: { completed, started, scheduled },
 }: FunctionStatusMetricsQuery) => {
+  const dark = isDark();
   return [
     ...mapCompleted(completed),
     {
       value: mapMetric(started),
       name: 'Running',
       itemStyle: {
-        color: cssToRGB('--color-secondary-subtle'),
+        color: resolveColor(colors.secondary.subtle, dark, '#52b2fd'),
       },
     },
     {
       value: mapMetric(scheduled),
       name: 'Queued',
-      itemStyle: { color: cssToRGB('--color-quaternary-cool-moderate') },
+      itemStyle: { color: resolveColor(colors.quaternary.coolModerate, dark, '#8b74f9') },
     },
   ];
 };
@@ -229,12 +238,12 @@ const percent = (sum: number, part: number) => (sum ? `${((part / sum) * 100).to
 
 const getChartOptions = (data: PieChartData, loading: boolean = false): ChartProps['option'] => {
   const sum = totalRuns(data);
-  console.log('shit sum', sum);
+  const dark = isDark();
 
   return {
     legend: {
       orient: 'vertical',
-      right: '10%',
+      right: '20%',
       top: 'center',
       icon: 'circle',
       formatter: (name: string) =>
@@ -254,7 +263,7 @@ const getChartOptions = (data: PieChartData, loading: boolean = false): ChartPro
         radius: ['35%', '60%'],
         center: ['25%', '50%'],
         itemStyle: {
-          borderColor: cssToRGB('--color-background-canvas-base'),
+          borderColor: resolveColor(backgroundColor.canvasBase, dark, '#fff'),
           borderWidth: 2,
         },
         avoidLabelOverlap: true,
@@ -274,7 +283,7 @@ const getChartOptions = (data: PieChartData, loading: boolean = false): ChartPro
             formatter: ({ data }: any): string => {
               return [`{name| ${data?.name}}`, `{value| ${data?.value}}`].join('\n');
             },
-            backgroundColor: cssToRGB('--color-background-canvas-base'),
+            backgroundColor: resolveColor(backgroundColor.canvasBase, dark, '#fff'),
             width: 80,
             ...holeLabel,
           },
