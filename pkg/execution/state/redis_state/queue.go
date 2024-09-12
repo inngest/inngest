@@ -873,6 +873,7 @@ func (q QueueItem) IsLeased(time time.Time) bool {
 
 // ItemPartitions returns up 3 item partitions for a given queue item.
 // Note: Currently, we only ever return 2 partitions (2x custom concurrency keys or function + custom concurrency key)
+// Note: For backwards compatibility, we may return a third partition for the function itself, in case two custom concurrency keys are used.
 // This will change with the implementation of throttling key queues.
 func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartition {
 	var (
@@ -941,11 +942,7 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 		fnPartition.ConcurrencyLimit = limits.AccountLimit
 	}
 
-	// If there are no concurrency keys, we're putting this queue item into a partition
-	// for the function itself.
-	if len(ckeys) == 0 {
-		partitions = append(partitions, fnPartition)
-	} else {
+	if len(ckeys) > 0 {
 		// Up to 2 concurrency keys.
 		for _, key := range ckeys {
 			scope, id, checksum, _ := key.ParseKey()
@@ -984,29 +981,14 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 
 			partitions = append(partitions, partition)
 		}
-
-		// NOTE (INN-3565): For backwards compatibility, we always enqueue to the default function partition,
-		// even if users supply two custom concurrency keys
-		// This can be removed once we trust the system sufficiently to exclusively use key queues  if possible
-		if len(ckeys) == 2 {
-			partitions = append(partitions, fnPartition)
-		}
-
-		// BACKWARDS COMPATABILITY FOR PRE-MULTIPLE-PARTITION-PER-ITEM QUEUES.
-		//
-		// As of 2024-07-26, we've refactored this system to have many queues per
-		// function.  If a fn had two concurrency settings: [{ limit: 5 }, { limit: 5, key: "foo"}]
-		// only the items with a key are treated as custom concurrency keys.
-		//
-		// We still need to create a QueuePartition for the function's limit (the first setting in
-		// the above example) for older queue items.
-		//
-		// NOTE: New queue items now always create two concurrency keys in this case.
-		if len(ckeys) == 1 && limits.FunctionLimit > 0 {
-			partitions = append(partitions, fnPartition)
-		}
-
 	}
+
+	// NOTE (INN-3565): For backwards compatibility, we always enqueue to the default function partition,
+	// even if users supply two custom concurrency keys
+	// Once the rollout is complete, we can revert this and only enqueue to the default partition in two cases
+	// 1. If there are no concurrency keys
+	// 2. If only one custom concurrency key was supplied _and_ the user configured a function concurrency limit
+	partitions = append(partitions, fnPartition)
 
 	// TODO: check for throttle keys
 
