@@ -1,4 +1,5 @@
 import type { UrlObject } from 'url';
+import type { HTMLAttributeAnchorTarget } from 'react';
 import type { Route } from 'next';
 import NextLink, { type LinkProps } from 'next/link';
 import { cn } from '@inngest/components/utils/classNames';
@@ -13,6 +14,7 @@ type CustomLinkProps = {
   iconBefore?: React.ReactNode;
   iconAfter?: React.ReactNode;
   arrowOnHover?: boolean;
+  target?: HTMLAttributeAnchorTarget | undefined;
 };
 
 export type NewLinkProps = CustomLinkProps & LinkProps;
