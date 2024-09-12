@@ -96,7 +96,13 @@ export function RunsPage({
       if (!isColumnID(column.id)) {
         continue;
       }
-
+      if (
+        scope === 'env' &&
+        (column.id === 'startedAt' || column.id === 'app' || column.id === 'durationMS')
+      ) {
+        out[column.id] = false;
+        continue;
+      }
       if (defaultVisibleColumns && !defaultVisibleColumns.includes(column.id)) {
         out[column.id] = false;
       } else {
@@ -104,7 +110,7 @@ export function RunsPage({
       }
     }
     return out;
-  }, [defaultVisibleColumns, columns]);
+  }, [defaultVisibleColumns, columns, scope]);
 
   const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
     `VisibleRunsColumns-${scope}`,
