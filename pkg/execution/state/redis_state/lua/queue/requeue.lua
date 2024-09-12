@@ -26,6 +26,8 @@ local concurrencyPointer      = KEYS[13]
 local keyItemIndexA           = KEYS[14]          -- custom item index 1
 local keyItemIndexB           = KEYS[15]          -- custom item index 2
 
+local keyPartitionLegacy			= KEYS[16] -- legacy partition
+
 local queueItem           = ARGV[1]
 local queueID             = ARGV[2]           -- id
 local queueScore          = tonumber(ARGV[3]) -- vesting time, in ms
@@ -38,6 +40,9 @@ local partitionIdB        = ARGV[9]
 local partitionIdC        = ARGV[10]
 local accountId           = ARGV[11]
 local legacyPartitionName = ARGV[12]
+
+local partitionItemLegacy	= ARGV[13]
+local partitionIdLegacy		= ARGV[14]
 
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
@@ -103,6 +108,9 @@ redis.call("ZREM", keyAcctConcurrency, item.id)
 requeue_to_partition(keyPartitionA, partitionIdA, partitionItemA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
 requeue_to_partition(keyPartitionB, partitionIdB, partitionItemB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
 requeue_to_partition(keyPartitionC, partitionIdC, partitionItemC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
+
+-- Backwards compatibility: Re-Enqueue to default partition if not included above
+requeue_to_partition(keyPartitionLegacy, partitionIdLegacy, partitionItemLegacy, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
 
 -- Add optional indexes.
 if keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then

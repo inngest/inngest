@@ -570,14 +570,18 @@ func TestQueueEnqueueItem(t *testing.T) {
 			}
 			assert.Equal(t, keyQueueB, actualItemPartitions[1])
 
-			// We enqueue to the function-specific queue for backwards-compatibility reasons
+			// We enqueue to the function-specific queue for backwards-compatibility reasons, but
+			// we don't return it from ItemPartitions as it's a special case with extra rules for leasing, etc.
+			assert.Equal(t, QueuePartition{}, actualItemPartitions[2])
+
 			expectedDefaultPartition := QueuePartition{
 				ID:               fnID.String(),
 				FunctionID:       &fnID,
 				AccountID:        accountId,
 				ConcurrencyLimit: consts.DefaultConcurrencyLimit,
 			}
-			assert.Equal(t, expectedDefaultPartition, actualItemPartitions[2])
+			legacyPartition := q.functionPartition(ctx, actualItemPartitions, qi)
+			assert.Equal(t, expectedDefaultPartition, legacyPartition)
 
 			i, err := q.EnqueueItem(ctx, qi, now.Add(10*time.Second))
 			require.NoError(t, err)

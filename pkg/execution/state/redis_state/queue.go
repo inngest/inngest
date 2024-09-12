@@ -893,6 +893,23 @@ func (q *queue) defaultFunctionPartition(ctx context.Context, i QueueItem) (Queu
 	return fnPartition, limits
 }
 
+// functionPartition returns the default function partition for backwards compatibility, in case ItemPartitions did not return a function partition.
+// This is required for enqueueing items to the function partition to allow the old system to continue to work on a potential rollback.
+//
+// The returned partition is a zero value if ItemPartitions returned a default partition.
+func (q *queue) functionPartition(ctx context.Context, parts []QueuePartition, i QueueItem) QueuePartition {
+	// If ItemPartitions already returned function partition, we do not need to enqueue again for backwards compatibility
+	for _, p := range parts {
+		// This also catches system partitions, which is intended. We don't want to enqueue twice.
+		if p.PartitionType == int(enums.PartitionTypeDefault) {
+			return QueuePartition{}
+		}
+	}
+
+	functionPartition, _ := q.defaultFunctionPartition(ctx, i)
+	return functionPartition
+}
+
 // ItemPartitions returns up 3 item partitions for a given queue item.
 // Note: Currently, we only ever return 2 partitions (2x custom concurrency keys or function + custom concurrency key)
 // This will change with the implementation of throttling key queues.
@@ -1246,6 +1263,9 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		}
 	}
 
+	// Backwards compatibility: Always enqueue to function partition
+	legacyPartition := q.functionPartition(ctx, parts, i)
+
 	keys := []string{
 		q.u.kg.QueueItem(),            // Queue item
 		q.u.kg.PartitionItem(),        // Partition item, map
@@ -1260,6 +1280,9 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		parts[0].zsetKey(q.u.kg),
 		parts[1].zsetKey(q.u.kg),
 		parts[2].zsetKey(q.u.kg),
+
+		// Backwards compatibility: Enqueue to function partition
+		legacyPartition.zsetKey(q.u.kg),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, q.u.kg) {
@@ -1291,6 +1314,10 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 
 		guaranteedCapacity,
 		guaranteedCapacityKey,
+
+		// Backwards compatibility: Enqueue to function partition
+		legacyPartition,
+		legacyPartition.ID,
 	})
 	if err != nil {
 		return i, err
@@ -1444,6 +1471,8 @@ func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) 
 	// This is because a single queue item may be present in more than one queue.
 	parts := q.ItemPartitions(ctx, i)
 
+	legacyPartition := q.functionPartition(ctx, parts, i)
+
 	keys := []string{
 		q.u.kg.QueueItem(),
 		q.u.kg.PartitionItem(), // Partition item, map
@@ -1454,6 +1483,9 @@ func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) 
 		parts[0].zsetKey(q.u.kg),
 		parts[1].zsetKey(q.u.kg),
 		parts[2].zsetKey(q.u.kg),
+
+		// Backwards compatibility: Re-enqueue to function partition
+		legacyPartition.zsetKey(q.u.kg),
 	}
 	args, err := StrSlice([]any{
 		jobID,
@@ -1466,6 +1498,10 @@ func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) 
 		parts[1].ID,
 		parts[2].ID,
 		i.Data.Identifier.AccountID.String(),
+
+		// Backwards compatibility: Re-enqueue to function partition
+		legacyPartition,
+		legacyPartition.ID,
 	})
 	if err != nil {
 		return err
@@ -1554,6 +1590,8 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		}
 	}
 
+	legacyPartition := q.functionPartition(ctx, parts, item)
+
 	keys := []string{
 		q.u.kg.QueueItem(),
 		// Pass in the actual key queue
@@ -1571,6 +1609,10 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		q.u.kg.ThrottleKey(item.Data.Throttle),
 		// Finally, there are ALWAYS account-level concurrency keys.
 		accountConcurrencyKey,
+
+		// Backwards compatibility: Remove enqueued item in function partition
+		legacyPartition.zsetKey(q.u.kg),
+		legacyPartition.concurrencyKey(q.u.kg),
 	}
 	args, err := StrSlice([]any{
 		item.ID,
@@ -1584,6 +1626,9 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		parts[2].ConcurrencyLimit,
 		acctLimit,
 		item.Data.Identifier.AccountID,
+
+		// Backwards compatibility: Remove enqueued item in function partition
+		legacyPartition.ID,
 	})
 	if err != nil {
 		return nil, err
@@ -1810,6 +1855,8 @@ func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
 	}
 
+	legacyPartition := q.functionPartition(ctx, parts, i)
+
 	keys := []string{
 		q.u.kg.QueueItem(),
 		q.u.kg.PartitionItem(), // Partition item, map
@@ -1825,6 +1872,9 @@ func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 		parts[2].concurrencyKey(q.u.kg),
 		accountConcurrencyKey,
 		q.u.kg.ConcurrencyIndex(),
+
+		// Backwards compatibility: Re-enqueue item to function partition (don't need to remove from concurrency queue, see Lease)
+		legacyPartition.zsetKey(q.u.kg),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, q.u.kg) {
@@ -1858,6 +1908,10 @@ func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 
 		// Backwards compatibility
 		legacyPartitionName,
+
+		// Backwards compatibility: Re-enqueue item to function partition (don't need to remove from concurrency queue, see Lease)
+		legacyPartition,
+		legacyPartition.ID,
 	})
 	if err != nil {
 		return err

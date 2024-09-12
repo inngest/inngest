@@ -18,6 +18,7 @@ local keyPartitionB           	= KEYS[10]           -- e.g. sorted:c|t:$workflow
 local keyPartitionC           	= KEYS[11]          -- e.g. sorted:c|t:$workflowID - zset
 local keyItemIndexA           	= KEYS[12]          -- custom item index 1
 local keyItemIndexB           	= KEYS[13]          -- custom item index 2
+local keyPartitionLegacy				= KEYS[14]          -- legacy partition
 
 local queueItem           		= ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID             		= ARGV[2]           -- id
@@ -34,6 +35,9 @@ local partitionIdC        		= ARGV[12]
 local accountId           		= ARGV[13]
 local guaranteedCapacity      = ARGV[14]
 local guaranteedCapacityKey   = ARGV[15]
+
+local partitionItemLegacy		= ARGV[16]
+local partitionIdLegacy			= ARGV[17]
 
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
@@ -56,6 +60,9 @@ end
 enqueue_to_partition(keyPartitionA, partitionIdA, partitionItemA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
 enqueue_to_partition(keyPartitionB, partitionIdB, partitionItemB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
 enqueue_to_partition(keyPartitionC, partitionIdC, partitionItemC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
+
+-- For backwards compatibility, enqueue to default partition if not included above
+enqueue_to_partition(keyPartitionLegacy, partitionIdLegacy, partitionItemLegacy, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
 
 if exists_without_ending(keyFnMetadata, ":fnMeta:-") == true then
 	-- note to future devs: if updating metadata, be sure you do not change the "off"

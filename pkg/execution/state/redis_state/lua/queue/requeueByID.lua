@@ -24,6 +24,8 @@ local keyPartitionA    = KEYS[6] -- queue:sorted:$workflowID - zset
 local keyPartitionB    = KEYS[7] -- e.g. sorted:c|t:$workflowID - zset
 local keyPartitionC    = KEYS[8] -- e.g. sorted:c|t:$workflowID - zset
 
+local keyPartitionLegacy = KEYS[9] -- legacy partition
+
 local jobID            = ARGV[1]           -- queue item ID
 local jobScore         = tonumber(ARGV[2]) -- enqueue at, in milliseconds
 local nowMS            = tonumber(ARGV[3]) -- in ms
@@ -34,6 +36,9 @@ local partitionIdA        = ARGV[7]
 local partitionIdB        = ARGV[8]
 local partitionIdC        = ARGV[9]
 local accountId           = ARGV[10]
+
+local partitionItemLegacy = ARGV[11]
+local partitionIdLegacy   = ARGV[12]
 
 -- $include(get_queue_item.lua)
 -- $include(update_pointer_score.lua)
@@ -63,5 +68,8 @@ redis.call("HSET", keyQueueHash, jobID, cjson.encode(item))
 requeue_to_partition(keyPartitionA, partitionIdA, partitionItemA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
 requeue_to_partition(keyPartitionB, partitionIdB, partitionItemB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
 requeue_to_partition(keyPartitionC, partitionIdC, partitionItemC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
+
+-- Backwards compatibility: Re-Enqueue to default partition if not included above
+requeue_to_partition(keyPartitionLegacy, partitionIdLegacy, partitionItemLegacy, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
 
 return 0

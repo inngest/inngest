@@ -32,6 +32,9 @@ local keyAccountPartitions    = KEYS[11] -- accounts:$accountId:partition:sorted
 local throttleKey             = KEYS[12] -- key used for throttling function run starts.
 local keyAcctConcurrency      = KEYS[13]
 
+local keyPartitionLegacy      = KEYS[14] -- legacy partition
+local keyConcurrencyLegacy     = KEYS[15] -- legacy concurrency
+
 local queueID      = ARGV[1]
 local newLeaseKey  = ARGV[2]
 local currentTime  = tonumber(ARGV[3]) -- in ms
@@ -45,6 +48,8 @@ local concurrencyC    = tonumber(ARGV[9])
 -- And we always check against account concurrency limits
 local concurrencyAcct = tonumber(ARGV[10])
 local accountId       = ARGV[11]
+
+local partitionIdLegacy = ARGV[12]
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -170,6 +175,13 @@ if exists_without_ending(keyConcurrencyB, ":-") == true and concurrencyB > 0 the
 end
 if exists_without_ending(keyConcurrencyC, ":-") == true and concurrencyC > 0 then
 	handleLease(keyPartitionC, keyConcurrencyC, partitionIdC)
+end
+
+if exists_without_ending(keyConcurrencyLegacy, ":-") == true then
+	-- Backwards compatibility: Remove the item from our sorted index, as this is no longer on the queue;
+	-- it's in-progress and stored in the respective concurrency queues. We do not add it to the function
+	-- partition queue unless function concurrency limits are specified - in which case it is added above.
+	redis.call("ZREM", keyPartitionLegacy, item.id)
 end
 
 return 0
