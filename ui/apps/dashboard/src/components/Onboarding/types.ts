@@ -2,7 +2,6 @@ import { type MenuStepContent } from '@inngest/components/Steps/StepsMenu';
 
 export const steps = [1, 2, 3, 4] as const;
 export type OnboardingSteps = 1 | 2 | 3 | 4;
-export type OnboardingStepsArray = OnboardingSteps[];
 // For localStorage
 export type OnboardingStepsString = `${OnboardingSteps}`;
 

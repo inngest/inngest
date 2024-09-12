@@ -9,6 +9,7 @@ import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { EnvironmentType } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import { onboardingWidgetContent } from '../Onboarding/content';
+import { steps } from '../Onboarding/types';
 import useOnboardingStep from '../Onboarding/useOnboardingStep';
 
 export default function OnboardingWidget({
@@ -77,7 +78,7 @@ export default function OnboardingWidget({
               <p className="text-subtle text-sm">{stepContent.description}</p>
             </div>
             {!isFinalStep && (
-              <SegmentedProgressBar segmentsCompleted={lastCompletedStep} segments={4} />
+              <SegmentedProgressBar segmentsCompleted={lastCompletedStep} segments={steps.length} />
             )}
             {stepContent.eta && (
               <p className="text-light text-[10px] font-medium uppercase">{stepContent.eta}</p>
