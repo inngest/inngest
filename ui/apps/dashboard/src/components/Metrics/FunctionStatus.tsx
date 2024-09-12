@@ -18,7 +18,7 @@ const {
 
 export type MetricsFilters = {
   from: Date;
-  until?: Date | '';
+  until?: Date;
   selectedApps?: string[];
   selectedFns?: string[];
   autoRefresh?: boolean;
@@ -275,7 +275,7 @@ const getChartOptions = (data: PieChartData, loading: boolean = false): ChartPro
 
 export const FunctionStatus = ({
   from,
-  until = '',
+  until,
   selectedApps = [],
   selectedFns = [],
   autoRefresh = false,
