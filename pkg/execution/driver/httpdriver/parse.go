@@ -171,5 +171,5 @@ func parseResponse(byt []byte) any {
 		}
 	}
 
-	return byt
+	return string(byt)
 }
