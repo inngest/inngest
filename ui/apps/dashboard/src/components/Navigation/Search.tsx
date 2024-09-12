@@ -9,6 +9,7 @@ import { Modal } from '@inngest/components/Modal';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
+import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { RunsIcon } from '@inngest/components/icons/sections/Runs';
 import { cn } from '@inngest/components/utils/classNames';
@@ -179,9 +180,20 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
   const isLoading = isFetching || isDebouncing;
   const currentEnvironmentSlug = params.environmentSlug || 'production';
 
+  const breadcrumbs = [currentEnvironmentSlug];
   return (
     <Modal alignTop isOpen={isOpen} onClose={onOpenChange} className="max-w-xl align-baseline">
       <Command label="Command menu" shouldFilter={true} className="p-2">
+        <div className="flex flex-row gap-2">
+          {breadcrumbs.map((breadcrumb) => (
+            <span
+              key={breadcrumb}
+              className="bg-surfaceSubtle/30 text-subtle rounded-md px-2 py-1 text-xs"
+            >
+              {breadcrumb}
+            </span>
+          ))}
+        </div>
         <Command.Input
           placeholder="Type a command or an ID"
           value={search}
@@ -206,6 +218,14 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
             </Item>
           </Group>
           <Group heading="Navigate">
+            <Item
+              onSelect={() => {
+                router.push(`/env/${currentEnvironmentSlug}/apps`);
+                onOpenChange(!isOpen);
+              }}
+            >
+              <AppsIcon /> Apps
+            </Item>
             <Item
               onSelect={() => {
                 router.push(`/env/${currentEnvironmentSlug}/functions`);
