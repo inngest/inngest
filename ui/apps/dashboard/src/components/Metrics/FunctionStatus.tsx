@@ -38,18 +38,6 @@ export type PieChartData = Array<{
   itemStyle: { color: string };
 }>;
 
-const placeHolder = [
-  {
-    value: 0,
-    name: 'Completed',
-    itemStyle: { color: resolveColor(colors.primary.moderate, true, '#2c9b63') },
-  },
-  { value: 0, name: 'Running', itemStyle: { color: '#52b2fd' } },
-  { value: 0, name: 'Queued', itemStyle: { color: '#8b74f9' } },
-  { value: 0, name: 'Cancelled', itemStyle: { color: '#e2e2e2' } },
-  { value: 0, name: 'Failed', itemStyle: { color: '#fa8d86' } },
-];
-
 const GetFunctionStatusMetrics = graphql(`
   query FunctionStatusMetrics(
     $workspaceId: ID!
@@ -183,18 +171,6 @@ const mapMetric = ({
     data: Array<{ value: number }>;
   }>;
 }): number => metrics.flatMap(({ data }) => data).reduce((acc, { value }) => acc + value, 0);
-
-function rgbToHex(r: number, g: number, b: number): string {
-  return (
-    '#' +
-    [r, g, b]
-      .map((x) => {
-        const hex = x.toString(16);
-        return hex.length === 1 ? '0' + hex : hex;
-      })
-      .join('')
-  );
-}
 
 const mapMetrics = ({
   workspace: { completed, started, scheduled },
