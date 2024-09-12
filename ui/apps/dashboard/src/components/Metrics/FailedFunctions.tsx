@@ -1,5 +1,4 @@
-import { Chart, type ChartProps } from '@inngest/components/Chart/Chart';
-import type { LineSeriesOption } from 'echarts';
+import { Chart, type ChartProps, type LineSeriesOption } from '@inngest/components/Chart/Chart';
 
 import { FunctionInfo } from './FunctionInfo';
 

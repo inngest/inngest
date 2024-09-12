@@ -5,9 +5,11 @@ import {
   getInstanceByDom,
   init,
   type EChartsOption,
-  type PieSeriesOption,
+  type LineSeriesOption,
   type SetOptionOpts,
 } from 'echarts';
+
+export type { LineSeriesOption };
 
 export interface ChartProps {
   option: EChartsOption;
