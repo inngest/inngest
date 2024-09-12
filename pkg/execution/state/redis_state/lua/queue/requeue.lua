@@ -59,10 +59,14 @@ redis.call("HSET", queueKey, queueID, queueItem)
 -- index/scavenger queue is updated to the next earliest item.
 -- This is the first half of requeueing: Removing the in-progress item, which must be followed up
 -- by enqueueing back to the partition queues
-local function handleRequeueConcurrency(keyConcurrency)
+local function handleRequeueConcurrency(keyConcurrency, partitionID)
 	redis.call("ZREM", keyConcurrency, item.id) -- Remove from in-progress queue
 
-	redis.call("ZREM", concurrencyPointer, legacyPartitionName) -- always clean up previous item
+	-- Backwards compatibility: For default partitions, use the partition ID (function ID) as the pointer
+	local pointerMember = keyConcurrency
+	if exists_without_ending(keyConcurrency, ":concurrency:p:" .. partitionID) == false then
+		pointerMember = partitionID
+	end
 
 	-- Get the earliest item in the partition concurrency set.  We may be dequeueing
 	-- the only in-progress job and should remove this from the partition concurrency
@@ -72,14 +76,14 @@ local function handleRequeueConcurrency(keyConcurrency)
 	-- leased job, if exists.
 	local concurrencyScores = redis.call("ZRANGE", keyConcurrency, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
 	if concurrencyScores == false then
-		redis.call("ZREM", concurrencyPointer, keyConcurrency)
+		redis.call("ZREM", concurrencyPointer, pointerMember)
 	else
 		local earliestLease = tonumber(concurrencyScores[2])
 		if earliestLease == nil then
-			redis.call("ZREM", concurrencyPointer, keyConcurrency)
+			redis.call("ZREM", concurrencyPointer, pointerMember)
 		else
 			-- Ensure that we update the score with the earliest lease
-			redis.call("ZADD", concurrencyPointer, earliestLease, keyConcurrency)
+			redis.call("ZADD", concurrencyPointer, earliestLease, pointerMember)
 		end
 	end
 end
@@ -88,9 +92,9 @@ end
 -- Concurrency
 --
 
-handleRequeueConcurrency(keyConcurrencyA)
-handleRequeueConcurrency(keyConcurrencyB)
-handleRequeueConcurrency(keyConcurrencyC)
+handleRequeueConcurrency(keyConcurrencyA, partitionIdA)
+handleRequeueConcurrency(keyConcurrencyB, partitionIdB)
+handleRequeueConcurrency(keyConcurrencyC, partitionIdC)
 
 -- Remove item from the account concurrency queue
 -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
