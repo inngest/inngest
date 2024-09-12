@@ -469,6 +469,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	if req.Function.Concurrency != nil {
 		// Ensure we evaluate concurrency keys when scheduling the function.
 		for _, limit := range req.Function.Concurrency.Limits {
+			// Only include custom limits (key must be set or scope must be different than function)
 			if !limit.IsCustomLimit() {
 				continue
 			}
