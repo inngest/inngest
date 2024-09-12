@@ -153,14 +153,11 @@ func TestFunctionSteps(t *testing.T) {
 	})
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
-		run := c.WaitForRunTraces(ctx, t, &runID, models.FunctionStatusCompleted)
+		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusCompleted, ChildSpanCount: 5})
 
 		require.False(t, run.IsBatch)
 		require.Nil(t, run.BatchCreatedAt)
 
-		require.NotNil(t, run.Trace)
-		require.True(t, run.Trace.IsRoot)
-		require.Equal(t, 5, len(run.Trace.ChildSpans))
 		require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
 
 		// output test

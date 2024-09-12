@@ -14,6 +14,7 @@ import (
 
 const (
 	defaultBatchMaxSize = 10_000
+	defaultConcurrency  = 100
 	defaultBatchTimeout = 200 * time.Millisecond
 )
 
@@ -35,33 +36,48 @@ func WithBatchProcessorInterval(timeout time.Duration) BatchSpanProcessorOpt {
 	}
 }
 
+func WithBatchProcessorConcurrency(c int) BatchSpanProcessorOpt {
+	return func(b *batchSpanProcessor) {
+		if c > 0 {
+			b.concurrency = c
+		}
+	}
+}
+
 type batchSpanProcessor struct {
-	mt       sync.RWMutex
-	exporter trace.SpanExporter
-	maxSize  int
-	timeout  time.Duration
-	in       chan *trace.ReadOnlySpan
-	buffer   map[string][]trace.ReadOnlySpan
-	pointer  uuid.UUID
+	mt          sync.RWMutex
+	exporter    trace.SpanExporter
+	maxSize     int
+	concurrency int
+	timeout     time.Duration
+	buffer      map[string][]trace.ReadOnlySpan
+	pointer     uuid.UUID
+	in          chan *trace.ReadOnlySpan
+	out         chan string
 }
 
 func NewBatchSpanProcessor(ctx context.Context, exporter trace.SpanExporter, opts ...BatchSpanProcessorOpt) trace.SpanProcessor {
 	p := &batchSpanProcessor{
-		mt:       sync.RWMutex{},
-		exporter: exporter,
-		maxSize:  defaultBatchMaxSize,
-		timeout:  defaultBatchTimeout,
-		buffer:   map[string][]trace.ReadOnlySpan{},
-		pointer:  uuid.New(),
+		mt:          sync.RWMutex{},
+		exporter:    exporter,
+		maxSize:     defaultBatchMaxSize,
+		timeout:     defaultBatchTimeout,
+		concurrency: defaultConcurrency,
+		buffer:      map[string][]trace.ReadOnlySpan{},
+		pointer:     uuid.New(),
 	}
 
 	for _, apply := range opts {
 		apply(p)
 	}
 	p.in = make(chan *trace.ReadOnlySpan, p.maxSize)
+	p.out = make(chan string, p.maxSize)
 
 	// start process loop
-	go p.run(ctx)
+	for i := 0; i < p.concurrency; i++ {
+		go p.run(ctx)
+	}
+	go p.instrument(ctx)
 
 	return p
 }
@@ -72,7 +88,7 @@ func (b *batchSpanProcessor) OnStart(ctx context.Context, s trace.ReadWriteSpan)
 func (b *batchSpanProcessor) OnEnd(s trace.ReadOnlySpan) {
 	// pass span into the channel
 	b.in <- &s
-	metrics.IncrBatchProcessorEnqueuedCounter(context.TODO(), metrics.CounterOpt{PkgName: pkgName})
+	metrics.IncrSpanBatchProcessorEnqueuedCounter(context.TODO(), metrics.CounterOpt{PkgName: pkgName})
 }
 
 func (b *batchSpanProcessor) Shutdown(ctx context.Context) error {
@@ -89,6 +105,11 @@ func (b *batchSpanProcessor) ForceFlush(ctx context.Context) error {
 func (b *batchSpanProcessor) run(ctx context.Context) {
 	for {
 		select {
+		case id := <-b.out:
+			if err := b.send(ctx, id); err != nil {
+				logger.StdlibLogger(ctx).Error("error sending out batched spans", "error", err, "batch_id", id)
+			}
+
 		case span := <-b.in:
 			b.append(ctx, span)
 
@@ -125,12 +146,8 @@ func (b *batchSpanProcessor) append(ctx context.Context, span *trace.ReadOnlySpa
 		newPointer := uuid.New()
 		b.pointer = newPointer
 
-		// start execution right away
-		go func() {
-			if err := b.send(ctx, p.String()); err != nil {
-				logger.StdlibLogger(ctx).Error("error sending spans on full batch", "error", err)
-			}
-		}()
+		// start execution
+		b.out <- p.String()
 	}
 }
 
@@ -140,20 +157,30 @@ func (b *batchSpanProcessor) sendLater(ctx context.Context, id string) {
 
 	// update the pointer to something else so it doesn't attempt to update the same buffer
 	b.mt.Lock()
+	defer b.mt.Unlock()
+
 	// only update if the pointer value is still the same
 	if b.pointer.String() == id {
 		b.pointer = uuid.New()
 	}
-	b.mt.Unlock()
 
-	if err := b.send(ctx, id); err != nil {
-		logger.StdlibLogger(ctx).Error("error sending spans after delay", "error", err)
+	_, ok := b.buffer[id]
+	if !ok {
+		// already processed, not need to deal with it
+		return
 	}
+
+	b.out <- id
 }
 
 // send attempts to process the buffer of spans identified by id
 func (b *batchSpanProcessor) send(ctx context.Context, id string) error {
 	b.mt.Lock()
+	// if the pointer and the id is still the same, change it so nothing can append to the same buffer
+	if b.pointer.String() == id {
+		b.pointer = uuid.New()
+	}
+
 	spans, ok := b.buffer[id]
 	b.mt.Unlock()
 
@@ -163,7 +190,7 @@ func (b *batchSpanProcessor) send(ctx context.Context, id string) error {
 	}
 
 	count := len(spans)
-	metrics.IncrBatchProcessorAttemptCounter(ctx, int64(count), metrics.CounterOpt{PkgName: pkgName})
+	metrics.IncrSpanBatchProcessorAttemptCounter(ctx, int64(count), metrics.CounterOpt{PkgName: pkgName})
 
 	err := b.exporter.ExportSpans(ctx, spans)
 	if err != nil {
@@ -189,4 +216,31 @@ func (b *batchSpanProcessor) flush(ctx context.Context) error {
 	}
 
 	return errs
+}
+
+// instrument checks on the size of the buffer and keys used
+// neither should be increasing over time
+func (b *batchSpanProcessor) instrument(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		default:
+			<-time.After(20 * time.Second)
+
+			var keys, total int64
+
+			// count things very quickly
+			b.mt.Lock()
+			for _, spans := range b.buffer {
+				keys += 1
+				total += int64(len(spans))
+			}
+			b.mt.Unlock()
+
+			metrics.GaugeSpanBatchProcessorBufferKeys(ctx, keys, metrics.GaugeOpt{PkgName: pkgName})
+			metrics.GaugeSpanBatchProcessorBufferSize(ctx, total, metrics.GaugeOpt{PkgName: pkgName})
+		}
+	}
 }

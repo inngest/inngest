@@ -63,10 +63,11 @@ func TestWait(t *testing.T) {
 	r.NoError(err)
 
 	t.Run("in progress wait", func(t *testing.T) {
-		run := c.WaitForRunTraces(ctx, t, &runID, models.FunctionStatusRunning)
+		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
+			Status:         models.FunctionStatusRunning,
+			ChildSpanCount: 1,
+		})
 
-		require.NotNil(t, run.Trace)
-		require.Equal(t, 1, len(run.Trace.ChildSpans))
 		require.Equal(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
 		require.Nil(t, run.Trace.OutputID)
 
@@ -101,11 +102,11 @@ func TestWait(t *testing.T) {
 	r.NoError(err)
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
-		run := c.WaitForRunTraces(ctx, t, &runID, models.FunctionStatusCompleted)
+		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
+			Status:         models.FunctionStatusCompleted,
+			ChildSpanCount: 1,
+		})
 
-		require.Equal(t, models.FunctionStatusCompleted.String(), run.Status)
-		require.NotNil(t, run.Trace)
-		require.Equal(t, 1, len(run.Trace.ChildSpans))
 		require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
 
 		// output test
@@ -194,10 +195,11 @@ func TestWaitGroup(t *testing.T) {
 	r.NoError(err)
 
 	t.Run("in progress wait", func(t *testing.T) {
-		run := c.WaitForRunTraces(ctx, t, &runID, models.FunctionStatusRunning)
+		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
+			Status:         models.FunctionStatusRunning,
+			ChildSpanCount: 1,
+		})
 
-		require.NotNil(t, run.Trace)
-		require.Equal(t, 1, len(run.Trace.ChildSpans))
 		require.Equal(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
 		require.Nil(t, run.Trace.OutputID)
 
@@ -232,11 +234,11 @@ func TestWaitGroup(t *testing.T) {
 	r.NoError(err)
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
-		run := c.WaitForRunTraces(ctx, t, &runID, models.FunctionStatusCompleted)
+		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
+			Status:         models.FunctionStatusCompleted,
+			ChildSpanCount: 1,
+		})
 
-		require.Equal(t, models.FunctionStatusCompleted.String(), run.Status)
-		require.NotNil(t, run.Trace)
-		require.Equal(t, 1, len(run.Trace.ChildSpans))
 		require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
 
 		// output test
