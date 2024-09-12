@@ -260,7 +260,7 @@ export function RunsPage({
       onScroll={onScroll}
       ref={containerRef}
     >
-      <div className="bg-canvasBase z-5 sticky top-0 flex flex-col px-3">
+      <div className="bg-canvasBase z-5 border-subtle sticky top-0 flex flex-col border-b px-3">
         <div className="flex h-[58px] items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <SelectGroup>

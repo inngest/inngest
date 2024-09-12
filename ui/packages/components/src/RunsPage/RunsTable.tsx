@@ -88,7 +88,7 @@ export default function RunsTable({
     },
   });
 
-  const tableStyles = 'w-full border-y border-subtle';
+  const tableStyles = 'w-full border-b border-subtle';
   const tableHeadStyles = 'border-b border-subtle';
   const tableBodyStyles = 'divide-y divide-subtle';
   const tableColumnStyles = 'px-4';
