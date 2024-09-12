@@ -1,5 +1,13 @@
+'use client';
+
 import { useEffect, useRef } from 'react';
-import { getInstanceByDom, init, type EChartsOption, type SetOptionOpts } from 'echarts';
+import {
+  getInstanceByDom,
+  init,
+  type EChartsOption,
+  type PieSeriesOption,
+  type SetOptionOpts,
+} from 'echarts';
 
 export interface ChartProps {
   option: EChartsOption;

@@ -5,7 +5,7 @@ import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
 
 import { MetricsActionMenu } from '@/components/Metrics/ActionMenu';
 import { Dashboard } from '@/components/Metrics/Dashboard';
-import { getMetricsLookups, preloadMetricsLookups } from '@/components/Metrics/lookups';
+import { getMetricsLookups, preloadMetricsLookups } from '@/components/Metrics/data';
 
 type MetricsProps = {
   params: {

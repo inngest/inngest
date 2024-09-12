@@ -113,6 +113,9 @@ importers:
       cmdk:
         specifier: 0.2.1
         version: 0.2.1(@types/react@18.2.11)(react-dom@18.2.0)(react@18.2.0)
+      date-fns:
+        specifier: 3.6.0
+        version: 3.6.0
       dayjs:
         specifier: 1.11.7
         version: 1.11.7

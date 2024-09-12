@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+import { Alert } from '../Alert';
 import { StatusCell } from '../Table';
 import { Trace } from '../TimelineV2';
 import { Timeline } from '../TimelineV2/Timeline';
@@ -96,10 +97,25 @@ export function RunDetails(props: Props) {
         <div className="grow">
           <div className="ml-8">
             {runRes.error || resultRes.error ? (
-              <ErrorCard
-                error={runRes.error || resultRes.error}
-                reset={runRes.error ? () => runRes.refetch() : () => resultRes.refetch()}
-              />
+              <Alert
+                severity="error"
+                button={
+                  reset && (
+                    <NewButton
+                      onClick={() => reset()}
+                      kind="secondary"
+                      appearance="outlined"
+                      label="Reload"
+                    />
+                  )
+                }
+              >
+                <p className="mb-4 font-semibold">{error.message}</p>
+                <p>
+                  An error occurred loading. Click reload to try again. If the problem persists,
+                  contact support.
+                </p>
+              </Alert>
             ) : (
               <RunInfo
                 cancelRun={cancelRun}

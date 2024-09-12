@@ -7,6 +7,7 @@ import EntityFilter from '@inngest/components/Filter/EntityFilter';
 import { Pill } from '@inngest/components/Pill';
 import {
   useBatchedSearchParams,
+  useBooleanSearchParam,
   useSearchParam,
   useStringArraySearchParam,
 } from '@inngest/components/hooks/useSearchParam';
@@ -15,6 +16,7 @@ import {
   parseDuration,
   subtractDuration,
   toDate,
+  type DurationType,
 } from '@inngest/components/utils/date';
 import { RiArrowDownSFill, RiArrowRightSFill } from '@remixicon/react';
 import { useQuery } from 'urql';
@@ -30,6 +32,21 @@ type EntityType = {
 
 export const DEFAULT_DURATION = { hours: 24 };
 
+const getFrom = (start?: Date, duration?: DurationType | '') =>
+  start || subtractDuration(new Date(), duration ? duration : DEFAULT_DURATION);
+
+const getDefaultRange = (start?: Date, end?: Date, duration?: DurationType | '') =>
+  start && end
+    ? {
+        type: 'absolute' as const,
+        start: start,
+        end: end,
+      }
+    : {
+        type: 'relative' as const,
+        duration: duration ? duration : DEFAULT_DURATION,
+      };
+
 export const Dashboard = ({
   apps = [],
   functions = [],
@@ -42,24 +59,12 @@ export const Dashboard = ({
   const [start] = useSearchParam('start');
   const [end] = useSearchParam('end');
   const [duration] = useSearchParam('duration');
-  const parsedDuration = duration && parseDuration(duration);
-
-  const parsedStart = toDate(start);
-  const parsedEnd = toDate(end);
-
+  const [autoRefresh] = useBooleanSearchParam('autoRefresh');
   const batchUpdate = useBatchedSearchParams();
 
-  const defaultRange =
-    parsedStart && parsedEnd
-      ? {
-          type: 'absolute' as const,
-          start: parsedStart,
-          end: parsedEnd,
-        }
-      : {
-          type: 'relative' as const,
-          duration: parsedDuration ? parsedDuration : DEFAULT_DURATION,
-        };
+  const parsedDuration = duration && parseDuration(duration);
+  const parsedStart = toDate(start);
+  const parsedEnd = toDate(end);
 
   const [overviewOpen, setOverviewOpen] = useState(true);
 
@@ -96,7 +101,7 @@ export const Dashboard = ({
           <RangePicker
             className="w-full"
             upgradeCutoff={upgradeCutoff}
-            defaultValue={defaultRange}
+            defaultValue={getDefaultRange(parsedStart, parsedEnd, parsedDuration)}
             onChange={(range: RangeChangeProps) => {
               batchUpdate({
                 duration: range.type === 'relative' ? durationToString(range.duration) : null,
@@ -121,7 +126,13 @@ export const Dashboard = ({
           </div>
           {overviewOpen && (
             <div className="relative flex w-full flex-row items-center justify-start gap-2 overflow-hidden">
-              <FunctionStatus />
+              <FunctionStatus
+                from={getFrom(parsedStart, parsedDuration)}
+                until={parsedEnd}
+                selectedApps={selectedApps}
+                selectedFns={selectedFns}
+                autoRefresh={autoRefresh}
+              />
               <FailedFunctions />
             </div>
           )}

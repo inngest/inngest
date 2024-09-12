@@ -6,12 +6,10 @@ import { Switch } from '@inngest/components/Switch';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import { RiSettingsLine } from '@remixicon/react';
 
-const AUTO_REFRESH_INTERVAL = 5;
+export const AUTO_REFRESH_INTERVAL = 5;
 
-export type RunsActionMenuProps = {};
-
-export const MetricsActionMenu = ({}: RunsActionMenuProps) => {
-  const [autoRefresh, setAutoRefresh, removeAutoRefresh] = useSearchParam('auto-refresh');
+export const MetricsActionMenu = () => {
+  const [autoRefresh, setAutoRefresh, removeAutoRefresh] = useSearchParam('autoRefresh');
 
   return (
     <Listbox>

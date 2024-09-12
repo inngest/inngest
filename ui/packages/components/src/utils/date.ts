@@ -7,6 +7,8 @@ import {
   type DurationUnit,
 } from 'date-fns';
 
+export type { Duration as DurationType };
+
 export const DURATION_STRING_REGEX = /^[1-9]\d*[smMhdwy]$/;
 
 export const DURATION_UNITS: { [k: string]: string } = {
@@ -160,10 +162,10 @@ export function durationToString(duration: Duration): string {
   return `${value}${shortUnit}`;
 }
 
-export const toDate = (dateString?: string): Date | null => {
+export const toDate = (dateString?: string): Date | undefined => {
   if (!dateString) {
-    return null;
+    return undefined;
   }
   const d = new Date(dateString);
-  return isNaN(d.getTime()) ? null : d;
+  return isNaN(d.getTime()) ? undefined : d;
 };
