@@ -141,13 +141,11 @@ func parseResponse(byt []byte) any {
 		return nil
 	}
 
-	if byt[0] == '{' {
-		// Is the response valid JSON?  If so, ensure that we don't re-marshal the
-		// JSON string.
-		respjson := map[string]interface{}{}
-		if err := json.Unmarshal(byt, &respjson); err == nil {
-			return respjson
-		}
+	// Is the response valid JSON?  If so, ensure that we don't re-marshal the
+	// JSON string.
+	var respjson json.RawMessage
+	if err := json.Unmarshal(byt, &respjson); err == nil {
+		return respjson
 	}
 
 	// This may have been a string-encoded object, because encoding generally
