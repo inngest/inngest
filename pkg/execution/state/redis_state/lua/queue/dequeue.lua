@@ -64,7 +64,11 @@ end
 local function handleDequeueConcurrency(keyConcurrency, keyPartitionSet, partitionID)
 	redis.call("ZREM", keyConcurrency, item.id) -- remove from concurrency/in-progress queue
 
-	redis.call("ZREM", concurrencyPointer, legacyPartitionName) -- always clean up previous item
+	-- Backwards compatibility: For default partitions, use the partition ID (function ID) as the pointer
+	local pointerMember = keyConcurrency
+	if exists_without_ending(keyConcurrency, ":concurrency:p:" .. partitionID) == false then
+		pointerMember = partitionID
+	end
 
 	-- Get the earliest item in the partition concurrency set.  We may be dequeueing
 	-- the only in-progress job and should remove this from the partition concurrency
@@ -74,14 +78,14 @@ local function handleDequeueConcurrency(keyConcurrency, keyPartitionSet, partiti
 	-- leased job, if exists.
 	local concurrencyScores = redis.call("ZRANGE", keyConcurrency, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
 	if concurrencyScores == false then
-		redis.call("ZREM", concurrencyPointer, keyConcurrency)
+		redis.call("ZREM", concurrencyPointer, pointerMember)
 	else
 		local earliestLease = tonumber(concurrencyScores[2])
 		if earliestLease == nil then
-			redis.call("ZREM", concurrencyPointer, keyConcurrency)
+			redis.call("ZREM", concurrencyPointer, pointerMember)
 		else
 			-- Ensure that we update the score with the earliest lease
-			redis.call("ZADD", concurrencyPointer, earliestLease, keyConcurrency)
+			redis.call("ZADD", concurrencyPointer, earliestLease, pointerMember)
 		end
 	end
 
