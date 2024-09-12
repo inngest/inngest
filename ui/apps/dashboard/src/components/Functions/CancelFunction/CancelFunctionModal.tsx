@@ -95,7 +95,7 @@ export function CancelFunctionModal(props: Props) {
             <label className="text-basis text-sm font-medium" htmlFor="time-range">
               Date range
             </label>
-            <p className="text-subtle text-sm">
+            <p className="text-muted text-sm">
               Choose the time range when the function runs were queued
             </p>
 

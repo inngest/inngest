@@ -29,7 +29,7 @@ export default function AppCardStep({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <Disclosure.Panel className="text-muted pb-4 pl-14 pr-6">
+          <Disclosure.Panel className="text-subtle pb-4 pl-14 pr-6">
             {expandedContent}
           </Disclosure.Panel>
         </Transition>
