@@ -647,12 +647,6 @@ export type MetricsResponse = {
   to: Scalars['Time'];
 };
 
-export enum MetricsScope {
-  App = 'APP',
-  Env = 'ENV',
-  Fn = 'FN'
-}
-
 export type Mutation = {
   __typename?: 'Mutation';
   archiveApp: App;
@@ -1289,33 +1283,6 @@ export enum SdkMode {
   Dev = 'DEV'
 }
 
-export type ScopedMetric = {
-  __typename?: 'ScopedMetric';
-  data: Array<MetricsData>;
-  id: Scalars['UUID'];
-  tagName: Maybe<Scalars['String']>;
-  tagValue: Maybe<Scalars['String']>;
-};
-
-export type ScopedMetricsFilter = {
-  appIDs?: InputMaybe<Array<Scalars['UUID']>>;
-  from: Scalars['Time'];
-  functionIDs?: InputMaybe<Array<Scalars['UUID']>>;
-  groupBy?: InputMaybe<Scalars['String']>;
-  name: Scalars['String'];
-  scope: MetricsScope;
-  until?: InputMaybe<Scalars['Time']>;
-};
-
-export type ScopedMetricsResponse = {
-  __typename?: 'ScopedMetricsResponse';
-  from: Scalars['Time'];
-  granularity: Scalars['String'];
-  metrics: Array<ScopedMetric>;
-  scope: MetricsScope;
-  to: Scalars['Time'];
-};
-
 export type SearchInput = {
   term: Scalars['String'];
 };
@@ -1692,7 +1659,7 @@ export type Workspace = {
   runTraceSpanOutputByID: RunTraceSpanOutput;
   runTrigger: RunTraceTrigger;
   runs: RunsConnection;
-  scopedMetrics: ScopedMetricsResponse;
+  runsMetrics: MetricsResponse;
   signingKeys: Array<SigningKey>;
   slug: Scalars['String'];
   test: Scalars['Boolean'];
@@ -1776,8 +1743,8 @@ export type WorkspaceRunsArgs = {
 };
 
 
-export type WorkspaceScopedMetricsArgs = {
-  filter: ScopedMetricsFilter;
+export type WorkspaceRunsMetricsArgs = {
+  filter: RunsFilterV2;
 };
 
 
