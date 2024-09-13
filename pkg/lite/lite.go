@@ -54,6 +54,7 @@ var redisSingleton *miniredis.Miniredis
 type StartOpts struct {
 	Config  config.Config `json:"-"`
 	RootDir string        `json:"dir"`
+	URLs    []string      `json:"urls"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -288,6 +289,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	ds := devserver.NewService(devserver.StartOpts{
 		Config:  opts.Config,
 		RootDir: opts.RootDir,
+		URLs:    opts.URLs,
 		Tick:    tick,
 	}, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hd, &persistenceInterval)
 	// embed the tracker
