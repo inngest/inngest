@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import ConnectPage from '@inngest/components/PostgresIntegrations/ConnectPage';
-import { neonConnectContent } from '@inngest/components/PostgresIntegrations/neonContent';
+import { neonConnectContent } from '@inngest/components/PostgresIntegrations/Neon/neonContent';
 import { STEPS_ORDER } from '@inngest/components/PostgresIntegrations/types';
 
 import { pathCreator } from '@/utils/urls';

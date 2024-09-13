@@ -1,10 +1,10 @@
 import { RiCodeBlock, RiLinksFill, RiLockUnlockLine } from '@remixicon/react';
 
-import { IconNeon } from '../icons/platforms/Neon';
+import { IconNeon } from '../../icons/platforms/Neon';
 import {
   type ConnectPostgresIntegrationContent,
   type PostgresIntegrationMenuContent,
-} from './types';
+} from '../types';
 
 export const neonConnectContent: ConnectPostgresIntegrationContent = {
   title: 'Neon',

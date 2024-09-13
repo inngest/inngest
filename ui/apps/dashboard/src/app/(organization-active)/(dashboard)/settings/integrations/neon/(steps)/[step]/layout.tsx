@@ -1,7 +1,7 @@
 'use client';
 
+import { neonMenuStepContent } from '@inngest/components/PostgresIntegrations/Neon/neonContent';
 import Menu from '@inngest/components/PostgresIntegrations/StepsMenu';
-import { neonMenuStepContent } from '@inngest/components/PostgresIntegrations/neonContent';
 import { STEPS_ORDER, isValidStep } from '@inngest/components/PostgresIntegrations/types';
 import StepsMenu from '@inngest/components/Steps/StepsMenu';
 import StepsPageHeader from '@inngest/components/Steps/StepsPageHeader';
