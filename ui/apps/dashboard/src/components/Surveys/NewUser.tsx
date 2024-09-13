@@ -19,7 +19,7 @@ export default function NewUser() {
       isAfter(
         user.createdAt,
         sub(new Date(), {
-          years: 2,
+          months: 2,
         })
       ) &&
       window.localStorage.getItem(HIDE_NEW_USER_SURVEY) !== 'true'
