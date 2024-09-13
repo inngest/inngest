@@ -9,6 +9,8 @@ import {
 export const neonConnectContent: ConnectPostgresIntegrationContent = {
   title: 'Neon',
   logo: <IconNeon className="text-onContrast" size={20} />,
+  // TO DO: Update once we have Neon docs in deploy section
+  url: 'https://www.inngest.com/docs/',
   description:
     'This integration enables you to host your Inngest functions on the Vercel platform and automatically sync them every time you deploy code.',
   step: {
