@@ -88,7 +88,7 @@ export default function RunsTable({
     },
   });
 
-  const tableStyles = 'w-full border-y border-subtle';
+  const tableStyles = 'w-full border-b border-subtle';
   const tableHeadStyles = 'border-b border-subtle';
   const tableBodyStyles = 'divide-y divide-subtle';
   const tableColumnStyles = 'px-4';
@@ -96,14 +96,14 @@ export default function RunsTable({
   const isEmpty = data.length < 1 && !isLoading;
 
   return (
-    <table className={cn(isEmpty && 'h-[calc(100%-58px)]', tableStyles)}>
+    <table className={cn(tableStyles, isEmpty && 'border-b-0')}>
       <thead className={tableHeadStyles}>
         {table.getHeaderGroups().map((headerGroup) => (
           <tr key={headerGroup.id} className="h-12">
             {headerGroup.headers.map((header) => (
               <th
                 key={header.id}
-                className={cn(tableColumnStyles, 'text-subtle text-left text-sm font-semibold')}
+                className={cn(tableColumnStyles, 'text-muted text-left text-sm font-semibold')}
               >
                 {header.isPlaceholder ? null : (
                   <div
@@ -129,7 +129,7 @@ export default function RunsTable({
         {isEmpty && (
           <tr>
             <td
-              className="text-subtle pt-28 text-center align-top font-medium"
+              className="text-muted pt-28 text-center align-top font-medium"
               colSpan={numberOfVisibleColumns || table.getVisibleFlatColumns().length}
             >
               No results were found.

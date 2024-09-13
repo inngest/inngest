@@ -63,7 +63,7 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
         {latestSyncURL && (
           <dl>
             <dt className="hidden">URL</dt>
-            <dd className="text-subtle truncate" title={app.latestSync?.url || ''}>
+            <dd className="text-muted truncate" title={app.latestSync?.url || ''}>
               {latestSyncURL}
             </dd>
           </dl>
@@ -120,7 +120,7 @@ function Description({
 }) {
   return (
     <div className={className}>
-      <dt className="text-subtle pb-2 text-sm">{term}</dt>
+      <dt className="text-muted pb-2 text-sm">{term}</dt>
       <dd className="text-basis leading-8">{detail ?? ''}</dd>
     </div>
   );

@@ -171,5 +171,5 @@ func parseResponse(byt []byte) any {
 		}
 	}
 
-	return json.RawMessage(byt)
+	return string(byt)
 }

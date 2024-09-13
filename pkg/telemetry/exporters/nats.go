@@ -92,12 +92,10 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 	}
 	// publish to all subjects defined
 	for _, subj := range e.subjects {
-		sub := subj
-
 		for _, sp := range spans {
 			wg.Add(1)
 
-			go func(ctx context.Context, sp trace.ReadOnlySpan) {
+			go func(ctx context.Context, sub string, sp trace.ReadOnlySpan) {
 				defer wg.Done()
 
 				ts := sp.StartTime()
@@ -112,7 +110,7 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 
 				id, status, kind, attr, err := e.parseSpanAttributes(sp.Attributes())
 				if err != nil {
-					logger.StdlibLogger(ctx).Error("error parsing span attribures",
+					logger.StdlibLogger(ctx).Error("error parsing span attributes",
 						"error", err,
 						"spanAttr", sp.Attributes(),
 					)
@@ -140,6 +138,10 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 					logger.StdlibLogger(ctx).Error("error parsing span events",
 						"error", err,
 						"spanEvents", sp.Events(),
+						"acctID", id.AccountId,
+						"wsID", id.EnvId,
+						"wfID", id.FunctionId,
+						"runID", id.RunId,
 					)
 				}
 
@@ -187,6 +189,7 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 						"wfID", id.FunctionId,
 						"runID", id.RunId,
 					)
+					return
 				}
 
 				pstatus := "unknown"
@@ -205,14 +208,14 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 					)
 				}
 
-				metrics.IncrExportedSpansCounter(ctx, metrics.CounterOpt{
+				metrics.IncrSpanExportedCounter(ctx, metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
 						"subject": sub,
 						"status":  pstatus,
 					},
 				})
-			}(ctx, sp)
+			}(ctx, subj, sp)
 		}
 	}
 

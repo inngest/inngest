@@ -91,53 +91,49 @@ func TestSleep(t *testing.T) {
 	})
 
 	t.Run("complete", func(t *testing.T) {
-		<-time.After(4 * time.Second)
+		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
+			Status:         models.FunctionStatusCompleted,
+			ChildSpanCount: 3,
+			Timeout:        9 * time.Second,
+			Interval:       3 * time.Second,
+		})
+		require.EqualValues(t, 1, atomic.LoadInt32(&completed))
 
-		require.Eventually(t, func() bool {
-			require.EqualValues(t, 1, atomic.LoadInt32(&completed))
-			run := c.RunTraces(ctx, runID)
-			require.NotNil(t, run)
-			require.NotNil(t, run.Trace)
-			require.True(t, run.Trace.IsRoot)
-			require.Equal(t, 3, len(run.Trace.ChildSpans))
-			require.NotEqual(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
+		require.NotEqual(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
 
-			// output test
-			require.NotNil(t, run.Trace.OutputID)
-			output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
-			require.NotNil(t, output)
-			c.ExpectSpanOutput(t, "true", output)
+		// output test
+		require.NotNil(t, run.Trace.OutputID)
+		output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
+		require.NotNil(t, output)
+		c.ExpectSpanOutput(t, "true", output)
 
-			t.Run("sleep", func(t *testing.T) {
-				sleep := run.Trace.ChildSpans[0]
-				assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), sleep.Status)
-				assert.Equal(t, 2, len(sleep.ChildSpans))
-				assert.Equal(t, "nap", sleep.Name)
-				assert.Equal(t, models.StepOpSleep.String(), sleep.StepOp)
-				assert.Nil(t, sleep.OutputID)
+		t.Run("sleep", func(t *testing.T) {
+			sleep := run.Trace.ChildSpans[0]
+			assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), sleep.Status)
+			assert.Equal(t, 2, len(sleep.ChildSpans))
+			assert.Equal(t, "nap", sleep.Name)
+			assert.Equal(t, models.StepOpSleep.String(), sleep.StepOp)
+			assert.Nil(t, sleep.OutputID)
 
-				// verify step info
-				info := &models.SleepStepInfo{}
-				byt, err := json.Marshal(sleep.StepInfo)
-				assert.NoError(t, err)
-				assert.NoError(t, json.Unmarshal(byt, info))
+			// verify step info
+			info := &models.SleepStepInfo{}
+			byt, err := json.Marshal(sleep.StepInfo)
+			assert.NoError(t, err)
+			assert.NoError(t, json.Unmarshal(byt, info))
 
-				assert.True(t, time.Now().After(info.SleepUntil))
+			assert.True(t, time.Now().After(info.SleepUntil))
 
-				// first is the failed attempt
-				t.Run("failed execution", func(t *testing.T) {
-					exec := sleep.ChildSpans[0]
-					assert.Equal(t, models.RunTraceSpanStatusFailed.String(), exec.Status)
-					assert.Equal(t, "Attempt 0", exec.Name)
-					assert.NotNil(t, exec.OutputID)
+			// first is the failed attempt
+			t.Run("failed execution", func(t *testing.T) {
+				exec := sleep.ChildSpans[0]
+				assert.Equal(t, models.RunTraceSpanStatusFailed.String(), exec.Status)
+				assert.Equal(t, "Attempt 0", exec.Name)
+				assert.NotNil(t, exec.OutputID)
 
-					execOutput := c.RunSpanOutput(ctx, *exec.OutputID)
-					assert.NotNil(t, execOutput)
-					c.ExpectSpanErrorOutput(t, "", "throwing an initial error", execOutput)
-				})
+				execOutput := c.RunSpanOutput(ctx, *exec.OutputID)
+				assert.NotNil(t, execOutput)
+				c.ExpectSpanErrorOutput(t, "", "throwing an initial error", execOutput)
 			})
-
-			return true
-		}, 9*time.Second, 3*time.Second)
+		})
 	})
 }

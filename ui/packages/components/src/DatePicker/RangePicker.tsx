@@ -244,10 +244,10 @@ export const RangePicker = ({
                 }}
               >
                 Absolute range
-                <RiArrowRightSLine className="text-muted h-6 w-6" />
+                <RiArrowRightSLine className="text-subtle h-6 w-6" />
               </div>
               {showAbsolute && (
-                <div className="text-subtle px-4 py-2 text-sm">{formatAbsolute(absoluteRange)}</div>
+                <div className="text-muted px-4 py-2 text-sm">{formatAbsolute(absoluteRange)}</div>
               )}
             </div>
           </div>
@@ -256,7 +256,7 @@ export const RangePicker = ({
               <Tabs.Root className="flex flex-col" value={tab} onValueChange={setTab}>
                 <Tabs.List className="flex shrink-0 px-4 pt-4" aria-label={`Select ${tab} date`}>
                   <Tabs.Trigger
-                    className="text-subtle data-[state=active]:text-basis data-[state=active]:border-contrast flex flex-1 
+                    className="text-muted data-[state=active]:text-basis data-[state=active]:border-contrast flex flex-1 
                       cursor-pointer select-none items-center justify-center border-b-2 border-transparent px-5 pb-1
                       text-sm outline-none"
                     value="start"
@@ -264,7 +264,7 @@ export const RangePicker = ({
                     Start
                   </Tabs.Trigger>
                   <Tabs.Trigger
-                    className="text-subtle data-[state=active]:text-basis data-[state=active]:border-contrast flex flex-1 
+                    className="text-muted data-[state=active]:text-basis data-[state=active]:border-contrast flex flex-1 
                       cursor-pointer select-none items-center justify-center border-b-2 border-transparent px-5 pb-1
                       text-sm outline-none"
                     value="end"

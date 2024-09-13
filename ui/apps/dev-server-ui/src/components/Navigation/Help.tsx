@@ -25,44 +25,44 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
         <Listbox.Options className="bg-canvasBase border-subtle absolute -right-48 bottom-0 z-50 ml-8 w-[199px] gap-y-0.5 rounded border shadow ring-0 focus:outline-none">
           <Link href="https://www.inngest.com/docs/local-development" target="_blank">
             <Listbox.Option
-              className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="docs"
             >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                <RiExternalLinkLine className="text-subtle mr-2 h-4 w-4 " />
+                <RiExternalLinkLine className="text-muted mr-2 h-4 w-4 " />
                 <div>Inngest Documentation</div>
               </div>
             </Listbox.Option>
           </Link>
           <Link href="https://app.inngest.com/support" target="_blank">
             <Listbox.Option
-              className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="support"
             >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                <RiMailLine className="text-subtle mr-2 h-4 w-4" />
+                <RiMailLine className="text-muted mr-2 h-4 w-4" />
                 <div>Support</div>
               </div>
             </Listbox.Option>
           </Link>
           <Link href="https://www.inngest.com/discord" target="_blank">
             <Listbox.Option
-              className="text-subtle hover:bg-canvasSubtle mx-2 my-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              className="text-muted hover:bg-canvasSubtle mx-2 my-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="discord"
             >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                <RiDiscordLine className="text-subtle mr-2 h-4 w-4" />
+                <RiDiscordLine className="text-muted mr-2 h-4 w-4" />
                 <div>Join Discord</div>
               </div>
             </Listbox.Option>
           </Link>
           <Link href="https://roadmap.inngest.com/roadmap" target="_blank">
             <Listbox.Option
-              className="text-subtle hover:bg-canvasSubtle mx-2 my-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              className="text-muted hover:bg-canvasSubtle mx-2 my-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="roadmap"
             >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                <RiRoadMapLine className="text-subtle mr-2 h-4 w-4" />
+                <RiRoadMapLine className="text-muted mr-2 h-4 w-4" />
                 <div>Inngest Roadmap</div>
               </div>
             </Listbox.Option>

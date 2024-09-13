@@ -96,10 +96,11 @@ const columns = [
           disabled={false}
           doesFunctionAcceptPayload={doesFunctionAcceptPayload}
           btnAppearance="outlined"
-          btnAction={(data) => {
+          btnAction={({ data, user }) => {
             invokeFunction({
               data,
               functionSlug: props.row.original.slug,
+              user,
             });
           }}
         />
@@ -130,7 +131,7 @@ export default function FunctionList() {
       remove();
     }
     setGlobalFilter(searchInput);
-  });
+  }, 200);
 
   const { data, isFetching } = useGetFunctionsQuery(undefined, {
     refetchOnMountOrArgChange: true,
