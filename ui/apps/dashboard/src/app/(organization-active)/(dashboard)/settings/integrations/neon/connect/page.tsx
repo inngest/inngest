@@ -1,8 +1,21 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import ConnectPage from '@inngest/components/PostgresIntegrations/ConnectPage';
 import { neonConnectContent } from '@inngest/components/PostgresIntegrations/neonContent';
+import { STEPS_ORDER } from '@inngest/components/PostgresIntegrations/types';
+
+import { pathCreator } from '@/utils/urls';
 
 export default function NeonConnect() {
-  return <ConnectPage content={neonConnectContent} onStartInstallation={() => {}} />;
+  const router = useRouter();
+  const firstStep = STEPS_ORDER[0]!;
+  return (
+    <ConnectPage
+      content={neonConnectContent}
+      onStartInstallation={() => {
+        router.push(pathCreator.neonIntegrationStep({ step: firstStep }));
+      }}
+    />
+  );
 }
