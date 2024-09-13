@@ -50,7 +50,6 @@ export default function SideBar({
         <Navigation collapsed={collapsed} activeEnv={activeEnv} />
 
         <div className="mx-4">
-          {!collapsed && <Alert />}
           {isWidgetOpen && <OnboardingWidget collapsed={collapsed} closeWidget={closeWidget} />}
           <Integrations collapsed={collapsed} />
           <Help collapsed={collapsed} showWidget={showWidget} />
