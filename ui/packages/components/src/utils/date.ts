@@ -1,6 +1,7 @@
 import {
   format,
   formatDistanceToNow,
+  isAfter,
   sub,
   subDays,
   type Duration,
@@ -8,6 +9,7 @@ import {
 } from 'date-fns';
 
 export type { Duration as DurationType };
+export { isAfter, sub };
 
 export const DURATION_STRING_REGEX = /^[1-9]\d*[smMhdwy]$/;
 

@@ -1,3 +1,4 @@
+import dynamic from 'next/dynamic';
 import { NewButton } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
 import { Link } from '@inngest/components/Link/Link';
@@ -5,8 +6,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Too
 import { RiAddLine, RiQuestionLine } from '@remixicon/react';
 
 import { StatusMenu } from '@/components/Apps/StatusMenu';
+import { ServerFeatureFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import { pathCreator } from '@/utils/urls';
 import { Apps } from './Apps';
+
+const NewUser = dynamic(() => import('@/components/Surveys/NewUser'), {
+  ssr: false,
+});
 
 const AppInfo = () => (
   <Tooltip>
@@ -60,6 +66,10 @@ export default async function AppsPage({
           <StatusMenu archived={isArchived} envSlug={envSlug} />
         </div>
         <Apps isArchived={isArchived} />
+
+        <ServerFeatureFlag flag="new-user-survey">
+          <NewUser />
+        </ServerFeatureFlag>
       </div>
     </>
   );
