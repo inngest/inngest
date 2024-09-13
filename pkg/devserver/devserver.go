@@ -202,7 +202,7 @@ func start(ctx context.Context, opts StartOpts) error {
 					limits.FunctionLimit = f.Concurrency.PartitionConcurrency()
 				}
 			}
-			if p.ConcurrencyKey != "" {
+			if p.EvaluatedConcurrencyKey != "" {
 				limits.CustomKeyLimit = p.ConcurrencyLimit
 			}
 

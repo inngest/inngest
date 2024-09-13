@@ -595,7 +595,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 		if p.FunctionID != nil {
 			q.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
 		}
-		q.lifecycles.OnCustomKeyConcurrencyLimitReached(context.WithoutCancel(ctx), p.ConcurrencyKey)
+		q.lifecycles.OnCustomKeyConcurrencyLimitReached(context.WithoutCancel(ctx), p.EvaluatedConcurrencyKey)
 		metrics.IncrQueuePartitionConcurrencyLimitCounter(ctx,
 			metrics.CounterOpt{
 				PkgName: pkgName,
@@ -1328,7 +1328,7 @@ func (p *processor) process(ctx context.Context, item *QueueItem) error {
 			p.queue.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.partition.FunctionID)
 		}
 
-		p.queue.lifecycles.OnCustomKeyConcurrencyLimitReached(context.WithoutCancel(ctx), p.partition.ConcurrencyKey)
+		p.queue.lifecycles.OnCustomKeyConcurrencyLimitReached(context.WithoutCancel(ctx), p.partition.EvaluatedConcurrencyKey)
 
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,

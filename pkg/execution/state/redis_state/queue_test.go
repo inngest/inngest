@@ -474,14 +474,14 @@ func TestQueueEnqueueItem(t *testing.T) {
 			assert.Equal(t, 3, len(actualItemPartions))
 
 			customkeyQueuePartition := QueuePartition{
-				ID:               q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hash),
-				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
-				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
-				FunctionID:       &fnID,
-				AccountID:        accountId,
-				ConcurrencyLimit: 1,
-				ConcurrencyKey:   ck.Key,
-				ConcurrencyHash:  ck.Hash,
+				ID:                         q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hash),
+				PartitionType:              int(enums.PartitionTypeConcurrencyKey),
+				ConcurrencyScope:           int(enums.ConcurrencyScopeFn),
+				FunctionID:                 &fnID,
+				AccountID:                  accountId,
+				ConcurrencyLimit:           1,
+				EvaluatedConcurrencyKey:    ck.Key,
+				UnevaluatedConcurrencyHash: ck.Hash,
 			}
 
 			assert.Equal(t, customkeyQueuePartition, actualItemPartions[0])
@@ -547,26 +547,26 @@ func TestQueueEnqueueItem(t *testing.T) {
 			actualItemPartitions := q.ItemPartitions(ctx, qi)
 			assert.Equal(t, 3, len(actualItemPartitions))
 			keyQueueA := QueuePartition{
-				ID:               q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hashA),
-				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
-				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
-				FunctionID:       &fnID,
-				AccountID:        accountId,
-				ConcurrencyLimit: 1,
-				ConcurrencyKey:   ckA.Key,
-				ConcurrencyHash:  ckA.Hash,
+				ID:                         q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hashA),
+				PartitionType:              int(enums.PartitionTypeConcurrencyKey),
+				ConcurrencyScope:           int(enums.ConcurrencyScopeFn),
+				FunctionID:                 &fnID,
+				AccountID:                  accountId,
+				ConcurrencyLimit:           1,
+				EvaluatedConcurrencyKey:    ckA.Key,
+				UnevaluatedConcurrencyHash: ckA.Hash,
 			}
 			assert.Equal(t, keyQueueA, actualItemPartitions[0])
 
 			keyQueueB := QueuePartition{
-				ID:               q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hashB),
-				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
-				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
-				FunctionID:       &fnID,
-				AccountID:        accountId,
-				ConcurrencyLimit: 2,
-				ConcurrencyKey:   ckB.Key,
-				ConcurrencyHash:  ckB.Hash,
+				ID:                         q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hashB),
+				PartitionType:              int(enums.PartitionTypeConcurrencyKey),
+				ConcurrencyScope:           int(enums.ConcurrencyScopeFn),
+				FunctionID:                 &fnID,
+				AccountID:                  accountId,
+				ConcurrencyLimit:           2,
+				EvaluatedConcurrencyKey:    ckB.Key,
+				UnevaluatedConcurrencyHash: ckB.Hash,
 			}
 			assert.Equal(t, keyQueueB, actualItemPartitions[1])
 
@@ -1514,7 +1514,7 @@ func TestQueueLease(t *testing.T) {
 			t.Run("Leases with capacity", func(t *testing.T) {
 				// Use the new item's workflow ID
 				zsetKeyA := q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnId.String(), keyExprChecksum)
-				pA := QueuePartition{ID: zsetKeyA, AccountID: accountId, FunctionID: &itemA.FunctionID, PartitionType: int(enums.PartitionTypeConcurrencyKey), ConcurrencyKey: ck.Key, ConcurrencyLimit: 1}
+				pA := QueuePartition{ID: zsetKeyA, AccountID: accountId, FunctionID: &itemA.FunctionID, PartitionType: int(enums.PartitionTypeConcurrencyKey), EvaluatedConcurrencyKey: ck.Key, ConcurrencyLimit: 1}
 				require.Equal(t, pA.zsetKey(q.u.kg), zsetKeyA)
 				require.Equal(t, pA, getPartition(t, r, enums.PartitionTypeConcurrencyKey, fnId, keyExprChecksum))
 
@@ -1588,12 +1588,12 @@ func TestQueueLease(t *testing.T) {
 
 			// Use the new item's workflow ID
 			zsetKeyA := q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnIDA.String(), evaluatedKeyChecksumA)
-			pA := QueuePartition{ID: zsetKeyA, FunctionID: &itemA1.FunctionID, PartitionType: int(enums.PartitionTypeConcurrencyKey), ConcurrencyKey: ckA.Key, ConcurrencyLimit: 1, ConcurrencyHash: ckA.Hash}
+			pA := QueuePartition{ID: zsetKeyA, FunctionID: &itemA1.FunctionID, PartitionType: int(enums.PartitionTypeConcurrencyKey), EvaluatedConcurrencyKey: ckA.Key, ConcurrencyLimit: 1, UnevaluatedConcurrencyHash: ckA.Hash}
 
 			require.Equal(t, pA, getPartition(t, r, enums.PartitionTypeConcurrencyKey, fnIDA, evaluatedKeyChecksumA))
 
 			zsetKeyB := q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnIDB.String(), evaluatedKeyChecksumB)
-			pB := QueuePartition{ID: zsetKeyB, FunctionID: &itemB1.FunctionID, PartitionType: int(enums.PartitionTypeConcurrencyKey), ConcurrencyKey: ckB.Key, ConcurrencyLimit: 1, ConcurrencyHash: ckB.Hash}
+			pB := QueuePartition{ID: zsetKeyB, FunctionID: &itemB1.FunctionID, PartitionType: int(enums.PartitionTypeConcurrencyKey), EvaluatedConcurrencyKey: ckB.Key, ConcurrencyLimit: 1, UnevaluatedConcurrencyHash: ckB.Hash}
 			require.Equal(t, pB, getPartition(t, r, enums.PartitionTypeConcurrencyKey, fnIDB, evaluatedKeyChecksumB))
 
 			// Both key queues exist

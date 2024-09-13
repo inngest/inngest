@@ -414,7 +414,7 @@ func NewQueue(u *QueueClient, opts ...QueueOpt) *queue {
 				FunctionLimit:  def,
 				CustomKeyLimit: -1,
 			}
-			if p.ConcurrencyKey == "" {
+			if p.EvaluatedConcurrencyKey == "" {
 				limits.CustomKeyLimit = NoConcurrencyLimit
 			}
 			return limits
@@ -648,14 +648,15 @@ type QueuePartition struct {
 	//
 	// This ALWAYS exists, even for function level partitions.
 	ConcurrencyLimit int `json:"l,omitempty"`
-	// ConcurrencyKey represents the hashed custom key for the queue partition, if this is
+	// EvaluatedConcurrencyKey represents the evaluated and hashed custom key for the queue partition, if this is
+	// for a custom key.
+	EvaluatedConcurrencyKey string `json:"ck,omitempty"`
+	// UnevaluatedConcurrencyHash is the hashed but unevaluated custom key for the queue partition, if this is
 	// for a custom key.
 	//
 	// This must be set so that we can fetch the latest concurrency limits dynamically when
 	// leasing a partition, if desired, via the ConcurrencyLimitGetter.
-	ConcurrencyKey string `json:"ck,omitempty"`
-	// TESTING: We might need the hashed but _unevaluated_ custom key for loading current limits in PartitionLease
-	ConcurrencyHash string `json:"ch,omitempty"`
+	UnevaluatedConcurrencyHash string `json:"ch,omitempty"`
 	// LimitOwner represents the function ID that set the max concurrency limit for
 	// this function.  This allows us to lower the max if the owner/enqueueing function
 	// ID matches - otherwise, once set, the max can never lower.
@@ -742,10 +743,10 @@ func (q QueuePartition) customConcurrencyKey(kg QueueKeyGenerator) string {
 		return kg.Concurrency("custom", q.Queue())
 	}
 
-	if q.ConcurrencyKey == "" {
+	if q.EvaluatedConcurrencyKey == "" {
 		return kg.Concurrency("custom", "-")
 	}
-	return kg.Concurrency("custom", q.ConcurrencyKey)
+	return kg.Concurrency("custom", q.EvaluatedConcurrencyKey)
 }
 
 func (q QueuePartition) Queue() string {
@@ -961,8 +962,8 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 				AccountID:        i.Data.Identifier.AccountID,
 				ConcurrencyScope: int(scope),
 
-				ConcurrencyKey:  key.Key,
-				ConcurrencyHash: key.Hash,
+				EvaluatedConcurrencyKey:    key.Key,
+				UnevaluatedConcurrencyHash: key.Hash,
 
 				// Note: This uses the latest limit for the key queue,
 				// retrieved from customConcurrencyLimitRefresher
@@ -1498,7 +1499,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	for _, partition := range parts {
 		// Check to see if this key has already been denied in the lease iteration.
 		// If so, fail early.
-		if denies != nil && partition.ConcurrencyKey != "" && denies.denyConcurrency(partition.ConcurrencyKey) {
+		if denies != nil && partition.EvaluatedConcurrencyKey != "" && denies.denyConcurrency(partition.EvaluatedConcurrencyKey) {
 			return nil, ErrConcurrencyLimitCustomKey
 		}
 	}
@@ -1595,11 +1596,11 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 			return nil, newKeyError(ErrPartitionConcurrencyLimit, item.FunctionID.String())
 		}
 
-		return nil, newKeyError(ErrConcurrencyLimitCustomKey, parts[0].ConcurrencyKey)
+		return nil, newKeyError(ErrConcurrencyLimitCustomKey, parts[0].EvaluatedConcurrencyKey)
 	case 4:
-		return nil, newKeyError(ErrConcurrencyLimitCustomKey, parts[1].ConcurrencyKey)
+		return nil, newKeyError(ErrConcurrencyLimitCustomKey, parts[1].EvaluatedConcurrencyKey)
 	case 5:
-		return nil, newKeyError(ErrConcurrencyLimitCustomKey, parts[2].ConcurrencyKey)
+		return nil, newKeyError(ErrConcurrencyLimitCustomKey, parts[2].EvaluatedConcurrencyKey)
 	case 6:
 		return nil, newKeyError(ErrAccountConcurrencyLimit, item.Data.Identifier.AccountID.String())
 	case 7:
