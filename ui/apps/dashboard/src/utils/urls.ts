@@ -78,6 +78,13 @@ export const pathCreator = {
   keys({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/manage/keys` as Route;
   },
+  // TODO: Support environments
+  onboarding(): Route {
+    return `/env/production/onboarding/` as Route;
+  },
+  onboardingSteps({ envSlug, step }: { envSlug: string; step: number }): Route {
+    return `/env/${envSlug}/onboarding/${step}` as Route;
+  },
   runPopout({ envSlug, runID }: { envSlug: string; runID: string }): Route {
     return `/env/${envSlug}/runs/${runID}` as Route;
   },

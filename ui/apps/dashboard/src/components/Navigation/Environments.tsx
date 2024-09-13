@@ -172,7 +172,7 @@ export default function EnvironmentSelectMenu({
               >
                 <SelectedDisplay selected={selected} collapsed={collapsed} />
                 {!collapsed && (
-                  <RiExpandUpDownLine className="text-subtle h-4 w-4" aria-hidden="true" />
+                  <RiExpandUpDownLine className="text-muted h-4 w-4" aria-hidden="true" />
                 )}
               </div>
             </Listbox.Button>
@@ -201,7 +201,7 @@ export default function EnvironmentSelectMenu({
               ) : (
                 <Link
                   href="/env"
-                  className="bg-canvasBase hover:bg-canvasSubtle text-muted flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal"
+                  className="bg-canvasBase hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal"
                 >
                   <RiLoopLeftLine className="h-3 w-3" />
                   Sync a branch
@@ -213,7 +213,7 @@ export default function EnvironmentSelectMenu({
               <Link
                 prefetch={true}
                 href="/env"
-                className="hover:bg-canvasSubtle text-muted flex h-10 cursor-pointer items-center gap-2 whitespace-nowrap px-3 text-[13px] font-normal"
+                className="hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-2 whitespace-nowrap px-3 text-[13px] font-normal"
               >
                 <RiCloudFill className="h-3 w-3" />
                 View All Environments
@@ -247,7 +247,7 @@ function EnvironmentItem({
       key={environment.id}
       value={environment}
       className={cn(
-        'bg-canvasBase hover:bg-canvasSubtle text-muted flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal',
+        'bg-canvasBase hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal',
         variant === 'compact' && 'py-2'
       )}
     >

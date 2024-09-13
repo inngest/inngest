@@ -101,6 +101,7 @@ func mapLiteFlags(cmd *cobra.Command) error {
 	err = errors.Join(err, viper.BindPFlag("host", cmd.Flags().Lookup("host")))
 	err = errors.Join(err, viper.BindPFlag("port", cmd.Flags().Lookup("port")))
 	err = errors.Join(err, viper.BindPFlag("poll-interval", cmd.Flags().Lookup("poll-interval")))
+	err = errors.Join(err, viper.BindPFlag("urls", cmd.Flags().Lookup("sdk-url")))
 
 	return err
 }

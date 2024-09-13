@@ -215,13 +215,53 @@ func (c *Client) WaitForRunStatus(
 	return run
 }
 
-// retrieve run with traces
-// TODO: add the traces once implemented
-func (c *Client) RunTraces(ctx context.Context, runID string) *RunV2 {
+// WaitForRunTraces waits for run traces with a matching status for a predefined timeout and interval.
+// Once run traces are available, they are returned and tests continue. If run traces are missing or invalid, the test will fail.
+func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *string, opts WaitForRunTracesOptions) *RunV2 {
+	if opts.Interval == 0 {
+		opts.Interval = 2 * time.Second
+	}
+	if opts.Timeout == 0 {
+		opts.Timeout = 10 * time.Second
+	}
+
+	var traces *RunV2
+	require.NotNil(t, runID)
+	require.Eventually(t, func() bool {
+		if *runID == "" {
+			return false
+		}
+
+		run, err := c.RunTraces(ctx, *runID)
+		traces = run
+
+		// NOTE: we force the function to return early to prevent panics in the next assertion.
+		// We cannot use require.NotNil as this will cause an uncaught panic (see https://github.com/stretchr/testify/issues/1457)
+		ready := err == nil && run != nil && run.Status == opts.Status.String()
+
+		if opts.ChildSpanCount > 0 {
+			ready = ready && run.Trace != nil && run.Trace.IsRoot && len(run.Trace.ChildSpans) == opts.ChildSpanCount
+		}
+
+		return ready
+	}, opts.Timeout, opts.Interval)
+
+	return traces
+}
+
+type WaitForRunTracesOptions struct {
+	Status   models.FunctionStatus
+	Timeout  time.Duration
+	Interval time.Duration
+
+	ChildSpanCount int
+}
+
+func (c *Client) RunTraces(ctx context.Context, runID string) (*RunV2, error) {
 	c.Helper()
 
 	if runID == "" {
-		return nil
+		return nil, nil
 	}
 
 	query := `
@@ -282,14 +322,14 @@ func (c *Client) RunTraces(ctx context.Context, runID string) *RunV2 {
 		}
 	`
 
-	resp := c.MustDoGQL(ctx, graphql.RawParams{
+	resp, err := c.DoGQL(ctx, graphql.RawParams{
 		Query: query,
 		Variables: map[string]any{
 			"runID": runID,
 		},
 	})
-	if len(resp.Errors) > 0 {
-		c.Fatalf("err with fnrun trace query: %#v", resp.Errors)
+	if err != nil {
+		return nil, fmt.Errorf("err with fnrun trace query: %w", err)
 	}
 
 	type response struct {
@@ -297,10 +337,10 @@ func (c *Client) RunTraces(ctx context.Context, runID string) *RunV2 {
 	}
 	data := &response{}
 	if err := json.Unmarshal(resp.Data, data); err != nil {
-		c.Fatalf(err.Error())
+		return nil, fmt.Errorf("could not unmarshal response data: %w", err)
 	}
 
-	return &data.Run
+	return &data.Run, nil
 }
 
 type RunV2 struct {
@@ -433,4 +473,44 @@ func (c *Client) RunTrigger(ctx context.Context, runID string) *models.RunTraceT
 	}
 
 	return data.RunTrigger
+}
+
+type runByEventID struct {
+	ID string `json:"id"`
+}
+
+func (c *Client) RunsByEventID(ctx context.Context, eventID string) ([]runByEventID, error) {
+	c.Helper()
+
+	query := `
+		query Q($eventID: ID!) {
+			event(query: { eventId: $eventID }) {
+				functionRuns {
+					id
+				}
+			}
+		}`
+
+	resp := c.doGQL(ctx, graphql.RawParams{
+		Query: query,
+		Variables: map[string]any{
+			"eventID": eventID,
+		},
+	})
+	if len(resp.Errors) > 0 {
+		return nil, fmt.Errorf("err with gql: %#v", resp.Errors)
+	}
+
+	type response struct {
+		Event struct {
+			FunctionRuns []runByEventID `json:"functionRuns"`
+		} `json:"event"`
+	}
+
+	data := &response{}
+	if err := json.Unmarshal(resp.Data, data); err != nil {
+		c.Fatalf(err.Error())
+	}
+
+	return data.Event.FunctionRuns, nil
 }

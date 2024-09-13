@@ -291,7 +291,7 @@ func newOTLPHTTPTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, err
 		return nil, fmt.Errorf("error create otlp http trace client: %w", err)
 	}
 
-	sp := trace.NewBatchSpanProcessor(exp)
+	sp := trace.NewBatchSpanProcessor(exp, trace.WithBatchTimeout(100*time.Millisecond))
 	tp := trace.NewTracerProvider(
 		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(
@@ -391,9 +391,9 @@ func newNatsTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) 
 	{
 		val := os.Getenv("SPAN_BATCH_PROCESSOR_BUFFER_SIZE")
 		if val != "" {
-			bufferSize, err := strconv.ParseUint(val, 10, 32)
+			bufferSize, err := strconv.Atoi(val)
 			if err == nil && bufferSize > 0 {
-				bopts = append(bopts, exporters.WithBatchProcessorBufferSize(uint32(bufferSize)))
+				bopts = append(bopts, exporters.WithBatchProcessorBufferSize(bufferSize))
 			}
 		}
 	}
@@ -407,11 +407,17 @@ func newNatsTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) 
 		}
 	}
 
-	sp, err := exporters.NewBatchSpanProcessor(ctx, exp, bopts...)
-	if err != nil {
-		return nil, err
+	{
+		val := os.Getenv("SPAN_BATCH_PROCESSOR_CONCURRENCY")
+		if val != "" {
+			c, err := strconv.Atoi(val)
+			if err == nil && c > 0 {
+				bopts = append(bopts, exporters.WithBatchProcessorConcurrency(c))
+			}
+		}
 	}
 
+	sp := exporters.NewBatchSpanProcessor(ctx, exp, bopts...)
 	tp := trace.NewTracerProvider(
 		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(

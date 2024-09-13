@@ -121,7 +121,7 @@ export function RunDetails(props: Props) {
 
           <hr className="border-muted mt-8" />
           <div className="px-5 pt-4">
-            <h3 className="text-subtle py-4 text-sm">Timeline</h3>
+            <h3 className="text-muted py-4 text-sm">Timeline</h3>
             <Timeline
               getOutput={getHistoryItemOutput}
               history={history}

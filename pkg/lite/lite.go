@@ -55,6 +55,7 @@ type StartOpts struct {
 	Config       config.Config `json:"-"`
 	RootDir      string        `json:"dir"`
 	PollInterval int           `json:"poll-interval"`
+	URLs         []string      `json:"urls"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -287,6 +288,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	dsOpts := devserver.StartOpts{
 		Config:  opts.Config,
 		RootDir: opts.RootDir,
+		URLs:    opts.URLs,
 		Tick:    tick,
 	}
 
