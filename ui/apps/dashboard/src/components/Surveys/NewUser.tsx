@@ -48,8 +48,8 @@ export default function NewUser() {
           />
         </div>
         <div className="text-muted px-3 pb-3 text-sm">
-          Inngest’s Product Design would like to hear about your experience onboarding and using
-          Inngest. Please fill out this brief 7-question survey on your experience. After
+          Inngest&apos;s Product Design would like to hear about your experience onboarding and
+          using Inngest. Please fill out this brief 7-question survey on your experience. After
           completion, you will be entered into a drawing for an Amazon gift card.
         </div>
         <div className="border-subtle border-t px-3 py-2">
