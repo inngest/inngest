@@ -2,11 +2,7 @@
 
 import Menu from '@inngest/components/PostgresIntegrations/StepsMenu';
 import { neonMenuStepContent } from '@inngest/components/PostgresIntegrations/neonContent';
-import {
-  STEPS_ORDER,
-  isValidStep,
-  type IntegrationSteps,
-} from '@inngest/components/PostgresIntegrations/types';
+import { STEPS_ORDER, isValidStep } from '@inngest/components/PostgresIntegrations/types';
 import StepsMenu from '@inngest/components/Steps/StepsMenu';
 import StepsPageHeader from '@inngest/components/Steps/StepsPageHeader';
 import { RiExternalLinkLine } from '@remixicon/react';
@@ -22,8 +18,8 @@ export default function Layout({
     return <div>Invalid step.</div>;
   }
 
-  const currentStep = STEPS_ORDER.indexOf(step as IntegrationSteps);
-  const stepContent = neonMenuStepContent.step[step as IntegrationSteps];
+  const currentStep = STEPS_ORDER.indexOf(step);
+  const stepContent = neonMenuStepContent.step[step];
 
   return (
     <div className="my-12 grid grid-cols-3">
