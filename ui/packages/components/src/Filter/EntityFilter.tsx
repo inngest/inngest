@@ -45,7 +45,7 @@ export default function EntityFilter({
       isLabelVisible
     >
       <SelectWithSearch.Button isLabelVisible className={className}>
-        <div className="w-24 truncate text-nowrap text-left">
+        <div className="min-w-7 max-w-24 truncate text-nowrap text-left">
           {selectedEntities.length === 1 && !areAllEntitiesSelected && (
             <span>{selectedValues[0]?.name}</span>
           )}

@@ -88,7 +88,7 @@ export default function RunsTable({
     },
   });
 
-  const tableStyles = 'w-full border-y border-subtle';
+  const tableStyles = 'w-full border-b border-subtle';
   const tableHeadStyles = 'border-b border-subtle';
   const tableBodyStyles = 'divide-y divide-subtle';
   const tableColumnStyles = 'px-4';
@@ -96,7 +96,7 @@ export default function RunsTable({
   const isEmpty = data.length < 1 && !isLoading;
 
   return (
-    <table className={cn(isEmpty && 'h-[calc(100%-58px)]', tableStyles)}>
+    <table className={cn(tableStyles, isEmpty && 'border-b-0')}>
       <thead className={tableHeadStyles}>
         {table.getHeaderGroups().map((headerGroup) => (
           <tr key={headerGroup.id} className="h-12">
