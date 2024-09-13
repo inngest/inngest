@@ -577,6 +577,10 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 		return q.PartitionRequeue(ctx, p, q.clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
 	if errors.Is(err, ErrAccountConcurrencyLimit) {
+		// For backwards compatibility, we report on the function level as well
+		if p.FunctionID != nil {
+			q.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
+		}
 		q.lifecycles.OnAccountConcurrencyLimitReached(context.WithoutCancel(ctx), p.AccountID)
 		metrics.IncrQueuePartitionConcurrencyLimitCounter(ctx,
 			metrics.CounterOpt{
@@ -587,6 +591,10 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 		return q.PartitionRequeue(ctx, p, q.clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
 	if errors.Is(err, ErrConcurrencyLimitCustomKey) {
+		// For backwards compatibility, we report on the function level as well
+		if p.FunctionID != nil {
+			q.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
+		}
 		q.lifecycles.OnCustomKeyConcurrencyLimitReached(context.WithoutCancel(ctx), p.ConcurrencyKey)
 		metrics.IncrQueuePartitionConcurrencyLimitCounter(ctx,
 			metrics.CounterOpt{
@@ -1290,6 +1298,11 @@ func (p *processor) process(ctx context.Context, item *QueueItem) error {
 			}
 		case ErrAccountConcurrencyLimit:
 			status = "account_concurrency_limit"
+			// For backwards compatibility, we report on the function level as well
+			if p.partition.FunctionID != nil {
+				p.queue.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.partition.FunctionID)
+			}
+
 			p.queue.lifecycles.OnAccountConcurrencyLimitReached(context.WithoutCancel(ctx), p.partition.AccountID)
 		}
 
@@ -1309,6 +1322,11 @@ func (p *processor) process(ctx context.Context, item *QueueItem) error {
 		// Here we denylist each concurrency key that's been limited here, then ignore
 		// any other jobs from being leased as we continue to iterate through the loop.
 		p.denies.addConcurrency(err)
+
+		// For backwards compatibility, we report on the function level as well
+		if p.partition.FunctionID != nil {
+			p.queue.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.partition.FunctionID)
+		}
 
 		p.queue.lifecycles.OnCustomKeyConcurrencyLimitReached(context.WithoutCancel(ctx), p.partition.ConcurrencyKey)
 
