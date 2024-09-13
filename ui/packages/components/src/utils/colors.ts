@@ -10,7 +10,7 @@ export const rgbToHex = (r: number, g: number, b: number): string =>
 export const resolveColor = (
   colorValue: string,
   isDark: boolean,
-  defaultColor: string = '#f6f6f6'
+  defaultColor: string = '#f6f6f6' // carbon 50
 ): string => {
   if (typeof window === 'undefined') {
     return defaultColor;
