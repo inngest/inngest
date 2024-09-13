@@ -52,8 +52,10 @@ var redisSingleton *miniredis.Miniredis
 
 // StartOpts configures the dev server
 type StartOpts struct {
-	Config  config.Config `json:"-"`
-	RootDir string        `json:"dir"`
+	Config       config.Config `json:"-"`
+	RootDir      string        `json:"dir"`
+	PollInterval int           `json:"poll-interval"`
+	URLs         []string      `json:"urls"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -287,13 +289,21 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithPublisher(pb),
 	)
 
-	// The devserver embeds the event API.
-	persistenceInterval := consts.LiteDefaultPersistenceInterval
-	ds := devserver.NewService(devserver.StartOpts{
+	dsOpts := devserver.StartOpts{
 		Config:  opts.Config,
 		RootDir: opts.RootDir,
+		URLs:    opts.URLs,
 		Tick:    tick,
-	}, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hd, &persistenceInterval)
+	}
+
+	if opts.PollInterval > 0 {
+		dsOpts.Poll = true
+		dsOpts.PollInterval = opts.PollInterval
+	}
+
+	// The devserver embeds the event API.
+	persistenceInterval := consts.LiteDefaultPersistenceInterval
+	ds := devserver.NewService(dsOpts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hd, &persistenceInterval)
 	// embed the tracker
 	ds.Tracker = t
 	ds.State = sm
