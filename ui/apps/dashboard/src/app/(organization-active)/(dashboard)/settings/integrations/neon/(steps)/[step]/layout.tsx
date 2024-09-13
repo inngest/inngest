@@ -18,7 +18,7 @@ export default function Layout({
   params: { step },
 }: React.PropsWithChildren<{ params: { step: string } }>) {
   if (!isValidStep(step)) {
-    // To Do: Handle invalid step, e.g., redirect to first step or show an error
+    // To DO: Handle invalid step, e.g., redirect to first step or show an error
     return <div>Invalid step.</div>;
   }
 
@@ -36,6 +36,7 @@ export default function Layout({
         {children}
       </main>
       <Menu
+        // TO DO: local storage for completed steps
         lastCompletedStep={'authorize'}
         activeStep={step}
         content={neonMenuStepContent}
