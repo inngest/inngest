@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/dateutil"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/valyala/fastjson"
 )
 
 // ParseGenerator parses generator responses from a JSON response.
@@ -169,6 +170,11 @@ func parseResponse(byt []byte) any {
 		if err := json.Unmarshal([]byte(respstr), &respjson); err == nil {
 			return respjson
 		}
+	}
+
+	err := fastjson.ValidateBytes(byt)
+	if err == nil {
+		return json.RawMessage(byt)
 	}
 
 	return string(byt)

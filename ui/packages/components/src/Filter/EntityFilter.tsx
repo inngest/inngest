@@ -7,6 +7,7 @@ type EntityFilterProps = {
   selectedEntities: string[];
   entities: Option[];
   onFilterChange: (value: string[]) => void;
+  className?: string;
 };
 
 export default function EntityFilter({
@@ -14,6 +15,7 @@ export default function EntityFilter({
   entities,
   onFilterChange,
   type,
+  className,
 }: EntityFilterProps) {
   const [query, setQuery] = useState('');
   const selectedValues = entities.filter((entity) =>
@@ -42,7 +44,7 @@ export default function EntityFilter({
       label={type}
       isLabelVisible
     >
-      <SelectWithSearch.Button isLabelVisible>
+      <SelectWithSearch.Button isLabelVisible className={className}>
         <div className="min-w-7 max-w-24 truncate text-nowrap text-left">
           {selectedEntities.length === 1 && !areAllEntitiesSelected && (
             <span>{selectedValues[0]?.name}</span>

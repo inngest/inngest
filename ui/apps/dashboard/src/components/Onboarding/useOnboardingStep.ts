@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useLocalStorage } from 'react-use';
 
 import {
+  steps,
   type OnboardingSteps,
   type OnboardingStepsCompleted,
   type OnboardingStepsString,
@@ -15,7 +16,7 @@ export default function useOnboardingStep() {
     onboardingLastStepCompleted ? (Number(onboardingLastStepCompleted) as OnboardingSteps) : 0
   );
 
-  const isFinalStep = lastCompletedStep === 4;
+  const isFinalStep = lastCompletedStep === steps.length;
   const nextStep = isFinalStep ? lastCompletedStep : lastCompletedStep + 1;
 
   const updateLastCompletedStep = (step: OnboardingSteps) => {
