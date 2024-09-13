@@ -1,4 +1,5 @@
-export type IntegrationSteps = 1 | 2 | 3;
+export type IntegrationSteps = 'authorize' | 'format-wal' | 'connect-db';
+export const STEPS_ORDER: IntegrationSteps[] = ['authorize', 'format-wal', 'connect-db'];
 
 type ConnectStepContent = {
   title: string;

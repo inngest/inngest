@@ -1,6 +1,6 @@
 import { NewButton } from '../Button';
 import { NewLink } from '../Link';
-import { type ConnectPostgresIntegrationContent } from './types';
+import { STEPS_ORDER, type ConnectPostgresIntegrationContent } from './types';
 
 export default function ConnectPage({
   content,
@@ -30,20 +30,21 @@ export default function ConnectPage({
       </div>
       <p className="font-lg">Installation overview</p>
       <div>
-        {Object.entries(step).map(([stepNumber, stepContent]) => (
-          <div
-            key={stepNumber}
-            className={`border-subtle ml-3 ${stepNumber !== '3' ? 'border-l' : ''} `}
-          >
-            <div
-              className="before:border-subtle before:text-light before:bg-canvasBase relative ml-[32px] pb-7 before:absolute before:left-[-46px] before:flex before:h-[28px] before:w-[28px] before:items-center before:justify-center before:rounded-full before:border before:text-[13px] before:content-[attr(data-step-number)]"
-              data-step-number={stepNumber}
-            >
-              <div className="text-basis text-base">{stepContent.title}</div>
-              <div className="text-subtle text-sm">{stepContent.description}</div>
+        {STEPS_ORDER.map((stepKey, index) => {
+          const stepContent = step[stepKey];
+          const isLastStep = index === STEPS_ORDER.length - 1;
+          return (
+            <div key={stepKey} className={`border-subtle ml-3 ${!isLastStep ? 'border-l' : ''} `}>
+              <div
+                className="before:border-subtle before:text-light before:bg-canvasBase relative ml-[32px] pb-7 before:absolute before:left-[-46px] before:flex before:h-[28px] before:w-[28px] before:items-center before:justify-center before:rounded-full before:border before:text-[13px] before:content-[attr(data-step-number)]"
+                data-step-number={index + 1}
+              >
+                <div className="text-basis text-base">{stepContent.title}</div>
+                <div className="text-subtle text-sm">{stepContent.description}</div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <div>
         <NewButton label="Start installation" onClick={onStartInstallation} />
