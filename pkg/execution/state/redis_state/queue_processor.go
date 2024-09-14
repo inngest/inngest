@@ -115,6 +115,11 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		WallTimeMS: at.UnixMilli(),
 	}
 
+	if queueName == nil && qi.FunctionID == uuid.Nil {
+		q.logger.Error().Interface("qi", qi).Msg("attempted to enqueue QueueItem without function ID or queueName override")
+		return fmt.Errorf("queue name or function ID must be set")
+	}
+
 	// Use the queue item's score, ensuring we process older function runs first
 	// (eg. before at)
 	next := time.UnixMilli(qi.Score(q.clock.Now()))
