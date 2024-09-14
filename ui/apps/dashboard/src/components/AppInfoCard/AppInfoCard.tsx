@@ -3,6 +3,7 @@
 import { type Route } from 'next';
 import { Link } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton';
+import { TextClickToCopy } from '@inngest/components/Text';
 import { Time } from '@inngest/components/Time';
 import { cn } from '@inngest/components/utils/classNames';
 
@@ -126,7 +127,7 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
           />
           <Description
             className="col-span-2"
-            detail={<div className="truncate">{sync?.url ?? '-'}</div>}
+            detail={<TextClickToCopy truncate>{sync?.url ?? '-'}</TextClickToCopy>}
             term="URL"
             loading={loading}
           />
