@@ -4,8 +4,8 @@ import { useRouter } from 'next/navigation';
 import NeonAuth from '@inngest/components/PostgresIntegrations/Neon/Auth';
 import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/types';
 
+import { useSteps } from '@/components/PostgresIntegration/Context';
 import { pathCreator } from '@/utils/urls';
-import { useSteps } from '../Context';
 
 export default function NeonStep({ params: { step } }: { params: { step: string } }) {
   const router = useRouter();
