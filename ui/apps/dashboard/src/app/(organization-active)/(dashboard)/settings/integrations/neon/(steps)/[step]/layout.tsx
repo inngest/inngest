@@ -1,23 +1,30 @@
 'use client';
 
+import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import { neonMenuStepContent } from '@inngest/components/PostgresIntegrations/Neon/neonContent';
-import Menu from '@inngest/components/PostgresIntegrations/StepsMenu';
 import { STEPS_ORDER, isValidStep } from '@inngest/components/PostgresIntegrations/types';
 import StepsMenu from '@inngest/components/Steps/StepsMenu';
 import StepsPageHeader from '@inngest/components/Steps/StepsPageHeader';
 import { RiExternalLinkLine } from '@remixicon/react';
 
 import { pathCreator } from '@/utils/urls';
+import { useSteps } from '../Context';
+
+const Menu = dynamic(() => import('@inngest/components/PostgresIntegrations/StepsMenu'), {
+  ssr: false,
+});
 
 export default function Layout({
   children,
   params: { step },
 }: React.PropsWithChildren<{ params: { step: string } }>) {
+  const router = useRouter();
+  const { stepsCompleted } = useSteps();
   if (!isValidStep(step)) {
-    // To DO: Handle invalid step, e.g., redirect to first step or show an error
-    return <div>Invalid step.</div>;
+    router.push(pathCreator.neonIntegrationStep({}));
+    return;
   }
-
   const currentStep = STEPS_ORDER.indexOf(step);
   const stepContent = neonMenuStepContent.step[step];
 
@@ -32,8 +39,7 @@ export default function Layout({
         {children}
       </main>
       <Menu
-        // TO DO: local storage for completed steps
-        lastCompletedStep={'authorize'}
+        stepsCompleted={stepsCompleted}
         activeStep={step}
         content={neonMenuStepContent}
         links={links}

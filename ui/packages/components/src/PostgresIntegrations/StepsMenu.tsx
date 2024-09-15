@@ -5,14 +5,14 @@ import StepsMenu from '@inngest/components/Steps/StepsMenu';
 import { isValidStep, type PostgresIntegrationMenuContent } from './types';
 
 export default function Menu({
-  lastCompletedStep,
+  stepsCompleted,
   activeStep,
   content,
   links,
   steps,
   pathname,
 }: {
-  lastCompletedStep: string;
+  stepsCompleted: string[];
   activeStep: string;
   content: PostgresIntegrationMenuContent;
   links: React.ReactNode;
@@ -27,7 +27,7 @@ export default function Menu({
           return 'error';
         }
         const stepContent = step[stepKey];
-        const isCompleted = lastCompletedStep === stepKey;
+        const isCompleted = stepsCompleted.includes(stepKey);
         const isActive = activeStep === stepKey;
         const url = `${pathname}/${stepKey}`;
         return (
