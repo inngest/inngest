@@ -1,3 +1,5 @@
+'use client';
+
 import { createContext, useContext, useState } from 'react';
 import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/types';
 

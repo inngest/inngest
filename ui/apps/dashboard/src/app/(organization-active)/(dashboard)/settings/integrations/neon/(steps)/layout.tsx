@@ -1,5 +1,3 @@
-'use client';
-
 import { StepsProvider } from './Context';
 
 export default function Layout({ children }: React.PropsWithChildren) {
