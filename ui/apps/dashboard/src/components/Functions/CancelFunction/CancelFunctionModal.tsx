@@ -79,8 +79,13 @@ export function CancelFunctionModal(props: Props) {
       <Modal.Body>
         <div className="flex flex-col gap-4">
           <div>
+            <label className="text-basis mb-1 text-sm font-medium" htmlFor="cancellation-name">
+              Name (optional)
+            </label>
+            <p className="text-muted mb-1 text-sm">Provide a name for this cancellation group</p>
+
             <Input
-              label="Name"
+              // label="Name"
               name="cancellation-name"
               onChange={(e) => {
                 setName(e.target.value);
@@ -92,10 +97,10 @@ export function CancelFunctionModal(props: Props) {
           </div>
 
           <div>
-            <label className="text-basis text-sm font-medium" htmlFor="time-range">
+            <label className="text-basis mb-1 text-sm font-medium" htmlFor="time-range">
               Date range
             </label>
-            <p className="text-muted text-sm">
+            <p className="text-muted mb-1 text-sm">
               Choose the time range when the function runs were queued
             </p>
 
@@ -139,7 +144,7 @@ export function CancelFunctionModal(props: Props) {
           onClick={onClose}
         />
         <NewButton
-          disabled={isCreating || !timeRange || countRes.data === 0}
+          disabled={isCreating || !timeRange || (countRes.data ?? 0) === 0}
           kind="danger"
           label="Submit"
           onClick={onSubmit}
