@@ -6,7 +6,7 @@ export default function Layout({
   params: { step },
 }: React.PropsWithChildren<{ params: { step: string } }>) {
   return (
-    <div className="my-12 grid grid-cols-3">
+    <div className="text-subtle my-12 grid grid-cols-3">
       <main className="col-span-2 mx-20">
         <PageHeader step={step} />
         {children}

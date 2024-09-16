@@ -28,7 +28,7 @@ export default function ConnectPage({
           )}
         </p>
       </div>
-      <p className="font-lg">Installation overview</p>
+      <p className="font-lg text-basis">Installation overview</p>
       <div>
         {STEPS_ORDER.map((stepKey, index) => {
           const stepContent = step[stepKey];
