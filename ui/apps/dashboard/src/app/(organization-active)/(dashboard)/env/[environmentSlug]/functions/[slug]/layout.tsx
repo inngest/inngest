@@ -42,7 +42,7 @@ export default function FunctionLayout({
   const [replayOpen, setReplayOpen] = useState(false);
 
   const functionSlug = decodeURIComponent(slug);
-  const [{ data, fetching }] = useFunction({ functionSlug });
+  const [{ data, error, fetching }] = useFunction({ functionSlug });
   const [, invokeFunction] = useMutation(InvokeFunctionDocument);
   const env = useEnvironment();
 
@@ -71,6 +71,10 @@ export default function FunctionLayout({
   );
 
   const externalAppID = data?.workspace.workflow?.appName;
+
+  if (error) {
+    throw error;
+  }
 
   return (
     <>
