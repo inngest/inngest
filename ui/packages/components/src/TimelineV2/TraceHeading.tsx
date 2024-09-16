@@ -64,7 +64,7 @@ export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, tr
   }
 
   return (
-    <div className="flex w-72 gap-2">
+    <div className="text-basis flex w-72 gap-2">
       {isExpandable && (
         <Button
           btnAction={onClickExpandToggle}
