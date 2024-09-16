@@ -13,7 +13,7 @@ export default function Connect({ next }: { next: () => void }) {
 
       <div className="my-6">
         <p className="mb-3">Inngest will:</p>
-        <AccordionList type="single" defaultValue={'1'} collapsible>
+        <AccordionList type="multiple" defaultValue={['1']}>
           <AccordionList.Item value="1">
             <AccordionList.Trigger>Create a Postgres role for replication</AccordionList.Trigger>
 
