@@ -375,11 +375,19 @@ type PartitionConcurrencyLimits struct {
 	CustomKeyLimit int
 }
 
+type SystemPartitionConcurrencyLimits struct {
+	// GlobalLimit returns the account-level equivalent concurrency limit for system partitions, which is always applied. Defaults to maximum concurrency.
+	GlobalLimit int
+
+	// PartitionLimit returns the partition-scoped concurrency limit, if configured. Defaults to maximum concurrency.
+	PartitionLimit int
+}
+
 // ConcurrencyLimitGetter returns the fn, account, and custom limits for a given partition.
 type ConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits
 
 // SystemConcurrencyLimitGetter returns the concurrency limits for a given system partition.
-type SystemConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) int
+type SystemConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits
 
 func NewQueue(u *QueueClient, opts ...QueueOpt) *queue {
 	q := &queue{
@@ -419,12 +427,15 @@ func NewQueue(u *QueueClient, opts ...QueueOpt) *queue {
 			}
 			return limits
 		},
-		systemConcurrencyLimitGetter: func(ctx context.Context, p QueuePartition) int {
+		systemConcurrencyLimitGetter: func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
 			def := defaultConcurrency
 			if p.ConcurrencyLimit > 0 {
 				def = p.ConcurrencyLimit
 			}
-			return def
+			return SystemPartitionConcurrencyLimits{
+				GlobalLimit:    def,
+				PartitionLimit: def,
+			}
 		},
 		customConcurrencyLimitRefresher: func(ctx context.Context, item QueueItem) []state.CustomConcurrency {
 			// No-op: Use whatever's in the queue item by default
@@ -891,15 +902,15 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) ([]QueuePartiti
 			QueueName: i.Data.QueueName,
 		}
 		// Fetch most recent system concurrency limit
-		systemLimit := q.systemConcurrencyLimitGetter(ctx, systemPartition)
-		systemPartition.ConcurrencyLimit = systemLimit
+		systemLimits := q.systemConcurrencyLimitGetter(ctx, systemPartition)
+		systemPartition.ConcurrencyLimit = systemLimits.PartitionLimit
 
 		return []QueuePartition{
 			systemPartition,
 			// pad with empty partitions
 			{},
 			{},
-		}, systemLimit
+		}, systemLimits.GlobalLimit
 	}
 
 	// Check if we have custom concurrency keys for the given function.  If so,

@@ -789,8 +789,11 @@ func TestQueueSystemPartitions(t *testing.T) {
 		NewQueueClient(rc, QueueDefaultKey),
 		WithAllowQueueNames(customQueueName),
 		WithSystemConcurrencyLimitGetter(
-			func(ctx context.Context, p QueuePartition) int {
-				return customTestLimit
+			func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
+				return SystemPartitionConcurrencyLimits{
+					GlobalLimit:    consts.DefaultConcurrencyLimit,
+					PartitionLimit: customTestLimit,
+				}
 			}),
 		WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
 			return PartitionConcurrencyLimits{5000, 5000, 5000}
