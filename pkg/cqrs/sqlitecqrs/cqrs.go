@@ -967,7 +967,6 @@ func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*
 		return nil, fmt.Errorf("error retrieving spans for output: %w", err)
 	}
 
-	var output *cqrs.SpanOutput
 	for _, s := range spans {
 		var evts []cqrs.SpanEvent
 		err := json.Unmarshal(s.Events, &evts)
@@ -985,21 +984,19 @@ func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*
 					isError = true
 				}
 
-				output = &cqrs.SpanOutput{
+				return &cqrs.SpanOutput{
 					Data:             []byte(evt.Name),
 					Timestamp:        evt.Timestamp,
 					Attributes:       evt.Attributes,
 					IsError:          isError,
 					IsFunctionOutput: isFnOutput,
 					IsStepOutput:     isStepOutput,
-				}
-
-				break
+				}, nil
 			}
 		}
 	}
 
-	return output, nil
+	return nil, fmt.Errorf("no output found")
 }
 
 type runsQueryBuilder struct {

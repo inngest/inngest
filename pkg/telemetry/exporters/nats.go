@@ -85,115 +85,138 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 	ctx = context.WithoutCancel(ctx)
 	wg := sync.WaitGroup{}
 
-	for _, sp := range spans {
-		wg.Add(1)
+	// Expect jetstream to be enabled
+	js, err := e.conn.JSConn()
+	if err != nil {
+		return err
+	}
+	// publish to all subjects defined
+	for _, subj := range e.subjects {
+		for _, sp := range spans {
+			wg.Add(1)
 
-		go func(ctx context.Context, sp trace.ReadOnlySpan) {
-			defer wg.Done()
+			go func(ctx context.Context, sub string, sp trace.ReadOnlySpan) {
+				defer wg.Done()
 
-			ts := sp.StartTime()
-			dur := sp.EndTime().Sub(ts)
-			scope := sp.InstrumentationScope().Name
+				ts := sp.StartTime()
+				dur := sp.EndTime().Sub(ts)
+				scope := sp.InstrumentationScope().Name
 
-			var psid *string
-			if sp.Parent().HasSpanID() {
-				sid := sp.Parent().SpanID().String()
-				psid = &sid
-			}
-
-			id, status, kind, attr, err := e.parseSpanAttributes(sp.Attributes())
-			if err != nil {
-				logger.StdlibLogger(ctx).Error("error parsing span attribures",
-					"error", err,
-					"spanAttr", sp.Attributes(),
-				)
-			}
-
-			links := make([]*runv2.SpanLink, len(sp.Links()))
-			for i, spl := range sp.Links() {
-				attrs := map[string]string{}
-				for _, kv := range spl.Attributes {
-					key := string(kv.Key)
-					val := e.attributeValueAsString(kv.Value)
-					attr[key] = val
+				var psid *string
+				if sp.Parent().HasSpanID() {
+					sid := sp.Parent().SpanID().String()
+					psid = &sid
 				}
 
-				links[i] = &runv2.SpanLink{
-					TraceId:    spl.SpanContext.TraceID().String(),
-					SpanId:     spl.SpanContext.SpanID().String(),
-					TraceState: spl.SpanContext.TraceFlags().String(),
-					Attributes: attrs,
+				id, status, kind, attr, err := e.parseSpanAttributes(sp.Attributes())
+				if err != nil {
+					logger.StdlibLogger(ctx).Error("error parsing span attributes",
+						"error", err,
+						"spanAttr", sp.Attributes(),
+					)
 				}
-			}
 
-			events, triggers, output, err := e.parseSpanEvents(sp.Events())
-			if err != nil {
-				logger.StdlibLogger(ctx).Error("error parsing span events",
-					"error", err,
-					"spanEvents", sp.Events(),
-				)
-			}
+				links := make([]*runv2.SpanLink, len(sp.Links()))
+				for i, spl := range sp.Links() {
+					attrs := map[string]string{}
+					for _, kv := range spl.Attributes {
+						key := string(kv.Key)
+						val := e.attributeValueAsString(kv.Value)
+						attr[key] = val
+					}
 
-			span := &runv2.Span{
-				Id: id,
-				Ctx: &runv2.SpanContext{
-					TraceId:      sp.SpanContext().TraceID().String(),
-					ParentSpanId: psid,
-					SpanId:       sp.SpanContext().SpanID().String(),
-				},
-				Name:       sp.Name(),
-				Kind:       kind,
-				Status:     status,
-				StatusCode: sp.Status().Code.String(),
-				Scope:      scope,
-				Timestamp:  timestamppb.New(ts),
-				DurationMs: dur.Milliseconds(),
-				Attributes: attr,
-				Triggers:   triggers,
-				Output:     output,
-				Events:     events,
-				Links:      links,
-			}
+					links[i] = &runv2.SpanLink{
+						TraceId:    spl.SpanContext.TraceID().String(),
+						SpanId:     spl.SpanContext.SpanID().String(),
+						TraceState: spl.SpanContext.TraceFlags().String(),
+						Attributes: attrs,
+					}
+				}
 
-			// serialize it into bytes
-			byt, err := proto.Marshal(span)
-			if err != nil {
-				logger.StdlibLogger(ctx).Error("error serializing span to protobuf",
-					"error", err,
-					"acctID", id.AccountId,
-					"wsID", id.EnvId,
-					"wfID", id.FunctionId,
-					"runID", id.RunId,
-				)
-				return
-			}
+				events, triggers, output, err := e.parseSpanEvents(sp.Events())
+				if err != nil {
+					logger.StdlibLogger(ctx).Error("error parsing span events",
+						"error", err,
+						"spanEvents", sp.Events(),
+						"acctID", id.AccountId,
+						"wsID", id.EnvId,
+						"wfID", id.FunctionId,
+						"runID", id.RunId,
+					)
+				}
 
-			// publish to all subjects defined
-			for _, subj := range e.subjects {
-				status := "success"
+				span := &runv2.Span{
+					Id: id,
+					Ctx: &runv2.SpanContext{
+						TraceId:      sp.SpanContext().TraceID().String(),
+						ParentSpanId: psid,
+						SpanId:       sp.SpanContext().SpanID().String(),
+					},
+					Name:       sp.Name(),
+					Kind:       kind,
+					Status:     status,
+					StatusCode: sp.Status().Code.String(),
+					Scope:      scope,
+					Timestamp:  timestamppb.New(ts),
+					DurationMs: dur.Milliseconds(),
+					Attributes: attr,
+					Triggers:   triggers,
+					Output:     output,
+					Events:     events,
+					Links:      links,
+				}
 
-				// publish to NATS
-				if err := e.conn.Publish(ctx, subj, byt); err != nil {
-					logger.StdlibLogger(ctx).Error("error publishing span to NATS",
+				// serialize it into bytes
+				byt, err := proto.Marshal(span)
+				if err != nil {
+					logger.StdlibLogger(ctx).Error("error serializing span to protobuf",
 						"error", err,
 						"acctID", id.AccountId,
 						"wsID", id.EnvId,
 						"wfID", id.FunctionId,
 						"runID", id.RunId,
 					)
-
-					status = "error"
+					return
 				}
 
-				metrics.IncrExportedSpansCounter(ctx, metrics.CounterOpt{
+				// Use async publish to increase throughput
+				fack, err := js.PublishAsync(sub, byt)
+				if err != nil {
+					logger.StdlibLogger(ctx).Error("error on async publish to nats stream",
+						"error", err,
+						"acctID", id.AccountId,
+						"wsID", id.EnvId,
+						"wfID", id.FunctionId,
+						"runID", id.RunId,
+					)
+					return
+				}
+
+				pstatus := "unknown"
+				select {
+				case <-fack.Ok():
+					pstatus = "success"
+				case err := <-fack.Err():
+					pstatus = "error"
+
+					logger.StdlibLogger(ctx).Error("error with async publish to nats stream",
+						"error", err,
+						"acctID", id.AccountId,
+						"wsID", id.EnvId,
+						"wfID", id.FunctionId,
+						"runID", id.RunId,
+					)
+				}
+
+				metrics.IncrSpanExportedCounter(ctx, metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"subject": subj,
-						"status":  status,
+						"subject": sub,
+						"status":  pstatus,
 					},
 				})
-			}
-		}(ctx, sp)
+			}(ctx, subj, sp)
+		}
 	}
 
 	wg.Wait()

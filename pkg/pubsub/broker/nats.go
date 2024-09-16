@@ -130,6 +130,13 @@ func (c *NatsConnector) Publish(ctx context.Context, sub string, data []byte) er
 	return c.conn.Publish(sub, data)
 }
 
+func (c *NatsConnector) JSConn() (jetstream.JetStream, error) {
+	if c.js == nil {
+		return nil, fmt.Errorf("jetstream connection not available")
+	}
+	return c.js, nil
+}
+
 // Consumer returns the specified consumer based on stream name and consumer name, if it's initialized
 func (c *NatsConnector) Consumer(ctx context.Context, stream, consumer string) (jetstream.Consumer, error) {
 	if c.consumers == nil {

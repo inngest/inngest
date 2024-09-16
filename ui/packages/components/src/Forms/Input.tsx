@@ -20,7 +20,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     ref
   ) => {
     let passwordManagerProps: Record<string, unknown> = {
-      autocomplete: 'off',
+      autoComplete: 'off',
       'data-1p-ignore': true,
       'data-bwignore': true,
       'data-lpignore': true,
@@ -34,7 +34,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         {props.label && (
           <label htmlFor={props.name} className="text-basis text-sm font-medium">
             {props.label}{' '}
-            {props.optional && <span className="text-muted font-normal">(optional)</span>}
+            {props.optional && <span className="text-subtle font-normal">(optional)</span>}
           </label>
         )}
         <input

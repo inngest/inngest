@@ -19,6 +19,8 @@ const defined = <T,>(value: T | undefined): value is T => value !== undefined;
 const getBreadCrumbs = (pathname: string): BreadCrumbType[] =>
   pathname.includes('integrations/vercel')
     ? [{ text: 'Integrations', href: `/settings/integrations` }, { text: 'Vercel' }]
+    : pathname.includes('integrations/neon')
+    ? [{ text: 'Integrations', href: `/settings/integrations` }, { text: 'Neon' }]
     : paths.map(([path, text]) => (pathname.endsWith(path) ? { text } : undefined)).filter(defined);
 
 export const SettingsHeader = () => {

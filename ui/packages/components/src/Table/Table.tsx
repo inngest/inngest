@@ -3,7 +3,7 @@ import { RiArrowDownSLine } from '@remixicon/react';
 import { flexRender, useReactTable, type Row, type TableOptions } from '@tanstack/react-table';
 import { useVirtual } from 'react-virtual';
 
-const cellStyles = 'pl-6 pr-2 py-3 whitespace-nowrap';
+const cellStyles = 'pl-4 pr-2 py-3 whitespace-nowrap';
 
 type TableProps<T> = {
   options: TableOptions<T>;
@@ -53,7 +53,7 @@ export function Table<T>({
               <th
                 className={classNames(
                   cellStyles,
-                  'bg-canvasBase text-subtle text-sm font-semibold',
+                  'bg-canvasBase text-muted text-sm font-semibold',
                   header.column.getIsPinned() && 'sticky left-0 z-[4]',
                   header.column.getCanSort() && 'cursor-pointer'
                 )}

@@ -1,3 +1,4 @@
+import dynamic from 'next/dynamic';
 import { NewButton } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
 import { Link } from '@inngest/components/Link/Link';
@@ -5,18 +6,23 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Too
 import { RiAddLine, RiQuestionLine } from '@remixicon/react';
 
 import { StatusMenu } from '@/components/Apps/StatusMenu';
+import { ServerFeatureFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import { pathCreator } from '@/utils/urls';
 import { Apps } from './Apps';
+
+const NewUser = dynamic(() => import('@/components/Surveys/NewUser'), {
+  ssr: false,
+});
 
 const AppInfo = () => (
   <Tooltip>
     <TooltipTrigger>
-      <RiQuestionLine className="text-muted h-[18px] w-[18px]" />
+      <RiQuestionLine className="text-subtle h-[18px] w-[18px]" />
     </TooltipTrigger>
     <TooltipContent
       side="right"
       sideOffset={2}
-      className="border-muted text-subtle text-md mt-6 flex flex-col rounded-lg border p-0"
+      className="border-muted text-muted text-md mt-6 flex flex-col rounded-lg border p-0"
     >
       <div className="border-b px-4 py-2 ">Apps map directly to your products or services.</div>
 
@@ -60,6 +66,10 @@ export default async function AppsPage({
           <StatusMenu archived={isArchived} envSlug={envSlug} />
         </div>
         <Apps isArchived={isArchived} />
+
+        <ServerFeatureFlag flag="new-user-survey">
+          <NewUser />
+        </ServerFeatureFlag>
       </div>
     </>
   );

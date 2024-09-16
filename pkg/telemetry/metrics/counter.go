@@ -128,11 +128,29 @@ func IncrInstrumentationLeaseClaimsCounter(ctx context.Context, opts CounterOpt)
 	})
 }
 
-func IncrExportedSpansCounter(ctx context.Context, opts CounterOpt) {
+func IncrSpanExportedCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "exported_spans_total",
+		MetricName:  "span_exported_total",
 		Description: "Total number of run spans exported",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrSpanBatchProcessorEnqueuedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_batch_processor_enqueued_total",
+		Description: "Total number of spans enqueued for batch processing",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrSpanBatchProcessorAttemptCounter(ctx context.Context, incr int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, incr, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_batch_processor_attempt_total",
+		Description: "Total number of spans attempted to export",
 		Tags:        opts.Tags,
 	})
 }

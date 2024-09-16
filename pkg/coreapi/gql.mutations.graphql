@@ -9,6 +9,7 @@ type Mutation {
   invokeFunction(
     data: Map
     functionSlug: String!
+    user: Map
   ): Boolean
 
   cancelRun(runID: ULID!): FunctionRun!

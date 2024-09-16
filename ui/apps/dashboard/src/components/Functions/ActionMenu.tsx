@@ -52,7 +52,7 @@ export const ActionsMenu = ({
           <div className="relative">
             <Listbox.Options className="bg-canvasBase absolute right-1 top-5 z-50 w-[170px] gap-y-0.5 rounded border shadow">
               <Listbox.Option
-                className="text-subtle mx-2 mt-2 flex h-8 cursor-pointer items-center justify-start text-[13px]"
+                className="text-muted mx-2 mt-2 flex h-8 cursor-pointer items-center justify-start text-[13px]"
                 value="invoke"
               >
                 <OptionalTooltip
@@ -70,7 +70,7 @@ export const ActionsMenu = ({
                     icon={<RiFlashlightFill className="h-4 w-4" />}
                     iconSide="left"
                     label="Invoke"
-                    className={`text-subtle m-0 w-full justify-start text-sm ${
+                    className={`text-muted m-0 w-full justify-start text-sm ${
                       (archived || paused) && 'cursor-not-allowed'
                     }`}
                   />
@@ -97,7 +97,7 @@ export const ActionsMenu = ({
                     }
                     iconSide="left"
                     label={paused ? 'Resume' : 'Pause'}
-                    className={`text-subtle m-0 w-full justify-start text-sm ${
+                    className={`text-muted m-0 w-full justify-start text-sm ${
                       archived && 'cursor-not-allowed'
                     }`}
                   />
@@ -122,7 +122,7 @@ export const ActionsMenu = ({
                     icon={<IconReplay className="h-4 w-4" />}
                     iconSide="left"
                     label="Replay"
-                    className={`text-subtle m-0 w-full justify-start text-sm ${
+                    className={`text-muted m-0 w-full justify-start text-sm ${
                       (archived || paused) && 'cursor-not-allowed'
                     }`}
                   />
