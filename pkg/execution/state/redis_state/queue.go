@@ -872,11 +872,11 @@ func (q QueueItem) IsLeased(time time.Time) bool {
 	return q.LeaseID != nil && ulid.Time(q.LeaseID.Time()).After(time)
 }
 
-// ItemPartitions returns up 3 item partitions for a given queue item.
+// ItemPartitions returns up 3 item partitions for a given queue item, as well as the account concurrency limit.
 // Note: Currently, we only ever return 2 partitions (2x custom concurrency keys or function + custom concurrency key)
 // Note: For backwards compatibility, we may return a third partition for the function itself, in case two custom concurrency keys are used.
 // This will change with the implementation of throttling key queues.
-func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartition {
+func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) ([]QueuePartition, int) {
 	var (
 		partitions []QueuePartition
 		ckeys      = i.Data.GetConcurrencyKeys()
@@ -899,7 +899,7 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 			// pad with empty partitions
 			{},
 			{},
-		}
+		}, systemLimit
 	}
 
 	// Check if we have custom concurrency keys for the given function.  If so,
@@ -999,7 +999,7 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 		partitions = append(partitions, QueuePartition{})
 	}
 
-	return partitions
+	return partitions, limits.AccountLimit
 }
 
 // RunJobs returns a list of jobs that are due to run for a given run ID.
@@ -1196,7 +1196,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		partitionTime = q.clock.Now()
 	}
 
-	parts := q.ItemPartitions(ctx, i)
+	parts, _ := q.ItemPartitions(ctx, i)
 	isSystemPartition := parts[0].IsSystem()
 
 	if i.Data.Identifier.AccountID == uuid.Nil && !isSystemPartition {
@@ -1420,7 +1420,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) 
 	// the queue item instead of just the partition passed via args.
 	//
 	// This is because a single queue item may be present in more than one queue.
-	parts := q.ItemPartitions(ctx, i)
+	parts, _ := q.ItemPartitions(ctx, i)
 
 	keys := []string{
 		q.u.kg.QueueItem(),
@@ -1495,7 +1495,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	}
 
 	// Grab all partitions for the queue item
-	parts := q.ItemPartitions(ctx, item)
+	parts, acctLimit := q.ItemPartitions(ctx, item)
 	for _, partition := range parts {
 		// Check to see if this key has already been denied in the lease iteration.
 		// If so, fail early.
@@ -1513,18 +1513,14 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	// For system partitions, this doesn't make a lot of sense, but it matches the previous
 	// implementation. In the future, we should streamline the abstraction layers so that the
 	// queue does not need to handle account-related details outside the account scope.
-	var acctLimit int
 	accountConcurrencyKey := q.u.kg.Concurrency("account", item.Data.Identifier.AccountID.String())
 	if len(parts) > 0 && parts[0].IsSystem() {
 		// Always apply system partition-specific concurrency limits
 		// "account" prefix is used for backwards-compatibility
 		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
-		acctLimit = parts[0].ConcurrencyLimit
-	} else {
-		// NOTE: This has been called in ItemPartitions.  We always need to fetch the latest
+	} else if acctLimit <= 0 {
+		// NOTE: This should have been called in ItemPartitions.  We always need to fetch the latest
 		// account concurrency limit.
-		//
-		// TODO: Refactor this to be nicer/remove dupe calls
 		limits := q.concurrencyLimitGetter(ctx, parts[0])
 		acctLimit = limits.AccountLimit
 		if acctLimit <= 0 {
@@ -1630,7 +1626,7 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 		return nil, fmt.Errorf("error generating id: %w", err)
 	}
 
-	parts := q.ItemPartitions(ctx, i)
+	parts, _ := q.ItemPartitions(ctx, i)
 	accountConcurrencyKey := q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String())
 	if len(parts) > 0 && parts[0].IsSystem() {
 		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
@@ -1690,7 +1686,7 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 	// the queue item instead of just the partition passed via args.
 	//
 	// This is because a single queue item may be present in more than one queue.
-	parts := q.ItemPartitions(ctx, i)
+	parts, _ := q.ItemPartitions(ctx, i)
 	accountConcurrencyKey := q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String())
 	if len(parts) > 0 && parts[0].IsSystem() {
 		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
@@ -1782,7 +1778,7 @@ func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 	// the queue item instead of just the partition passed via args.
 	//
 	// This is because a single queue item may be present in more than one queue.
-	parts := q.ItemPartitions(ctx, i)
+	parts, _ := q.ItemPartitions(ctx, i)
 	accountConcurrencyKey := q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String())
 	if len(parts) > 0 && parts[0].IsSystem() {
 		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
