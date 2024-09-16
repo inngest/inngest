@@ -47,7 +47,7 @@ type FunctionDashboardProps = {
 
 export default function FunctionDashboardPage({ params }: FunctionDashboardProps) {
   const functionSlug = decodeURIComponent(params.slug);
-  const [{ data, fetching: isFetchingFunction }] = useFunction({
+  const [{ data, error, fetching: isFetchingFunction }] = useFunction({
     functionSlug,
   });
   const function_ = data?.workspace.workflow;
@@ -60,6 +60,11 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
     functionSlug,
     timeRange: selectedTimeRange,
   });
+
+  if (error) {
+    <Alert severity="warning">Error fetching function</Alert>;
+    console.error('error fetching function', error);
+  }
 
   if (isFetchingFunction) {
     return (
