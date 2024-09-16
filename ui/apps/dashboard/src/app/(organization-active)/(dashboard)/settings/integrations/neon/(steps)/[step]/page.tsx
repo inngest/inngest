@@ -36,7 +36,7 @@ export default function NeonStep({ params: { step } }: { params: { step: string 
       <NeonConnect
         next={() => {
           setStepsCompleted(IntegrationSteps.ConnectDb);
-          router.push(pathCreator.neonIntegrationStep({ step: IntegrationSteps.ConnectDb }));
+          router.push(pathCreator.neonIntegrationStep({}));
         }}
       />
     );

@@ -59,14 +59,14 @@ export default function Connect({ next }: { next: () => void }) {
           <AccordionList.Item value="4">
             <AccordionList.Trigger>Create a publication</AccordionList.Trigger>
             <AccordionList.Content>
-              <ol>
+              <ol className="list-decimal pl-10">
                 <li>
-                  1. Add the replication identity (the method of distinguishing between rows) for
-                  each table you want to replicate:
+                  Add the replication identity (the method of distinguishing between rows) for each
+                  table you want to replicate:
                 </li>
                 <li>
-                  2. Create the Postgres publication. Include all tables you want to replicate as
-                  part of the publication:
+                  Create the Postgres publication. Include all tables you want to replicate as part
+                  of the publication:
                 </li>
               </ol>
               <p>
