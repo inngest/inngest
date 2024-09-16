@@ -1340,7 +1340,7 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 		return nil, err
 	}
 
-	res, err := scripts["queue/peek"].Exec(
+	peekRet, err := scripts["queue/peek"].Exec(
 		redis_telemetry.WithScriptName(ctx, "peek"),
 		q.u.unshardedRc,
 		[]string{
@@ -1352,12 +1352,52 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 	if err != nil {
 		return nil, fmt.Errorf("error peeking queue items: %w", err)
 	}
-	items, ok := res.([]any)
+
+	returnedSet, ok := peekRet.([]any)
 	if !ok {
-		return nil, nil
+		return nil, fmt.Errorf("unknown return type from peek: %T", peekRet)
 	}
-	if len(items) == 0 {
-		return nil, nil
+
+	var items, missingQueueItems []any
+	if len(returnedSet) == 2 {
+		items, ok = returnedSet[0].([]any)
+		if !ok {
+			return nil, fmt.Errorf("unexpected first item in set returned from peek: %T", peekRet)
+		}
+
+		missingQueueItems, ok = returnedSet[1].([]any)
+		if !ok {
+			return nil, fmt.Errorf("unexpected first item in set returned from peek: %T", peekRet)
+		}
+	} else if len(returnedSet) != 0 {
+		return nil, fmt.Errorf("expected zero or two items in set returned by peek: %v", returnedSet)
+	}
+
+	if len(missingQueueItems) > 0 {
+		// TODO This can happen, be careful
+		if partition.AccountID == uuid.Nil {
+			return nil, fmt.Errorf("encountered missing queue items in partition queue %q", partition.zsetKey(q.u.kg))
+		}
+
+		eg := errgroup.Group{}
+		for _, missingItemId := range missingQueueItems {
+			if missingItemId == nil {
+				return nil, fmt.Errorf("encountered nil queue item key in partition queue %q", partition.zsetKey(q.u.kg))
+			}
+
+			str, ok := missingItemId.(string)
+			if !ok {
+				return nil, fmt.Errorf("encountered non-string queue item key in partition queue %q", partition.zsetKey(q.u.kg))
+			}
+
+			eg.Go(func() error {
+				return q.cleanupNilQueueItemInPartition(ctx, *partition, str)
+			})
+		}
+
+		if err := eg.Wait(); err != nil {
+			return nil, fmt.Errorf("error cleaning up nil partitions in account pointer queue: %w", err)
+		}
 	}
 
 	if isPeekNext {
@@ -1988,13 +2028,27 @@ func (q *queue) partitionSize(ctx context.Context, partitionKey string, until ti
 func (q *queue) cleanupNilPartitionInAccount(ctx context.Context, accountId uuid.UUID, partitionKey string) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "cleanupNilPartitionInAccount"), redis_telemetry.ScopeQueue)
 
+	// TODO LOG!
+
 	cmd := q.u.Client().B().Zrem().Key(q.u.kg.AccountPartitionIndex(accountId)).Member(partitionKey).Build()
 	if err := q.u.Client().Do(ctx, cmd).Error(); err != nil {
 		return fmt.Errorf("failed to remove nil partition from account partitions pointer queue: %w", err)
 	}
 
 	return nil
+}
 
+func (q *queue) cleanupNilQueueItemInPartition(ctx context.Context, p QueuePartition, queueItemId string) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "cleanupNilQueueItemInPartition"), redis_telemetry.ScopeQueue)
+
+	// TODO LOG!
+
+	cmd := q.u.Client().B().Zrem().Key(p.zsetKey(q.u.kg)).Member(queueItemId).Build()
+	if err := q.u.Client().Do(ctx, cmd).Error(); err != nil {
+		return fmt.Errorf("failed to remove nil queue item from partition queue: %w", err)
+	}
+
+	return nil
 }
 
 func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequential bool, until time.Time, limit int64, accountId *uuid.UUID) ([]*QueuePartition, error) {

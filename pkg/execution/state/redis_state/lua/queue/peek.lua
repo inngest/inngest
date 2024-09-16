@@ -15,4 +15,15 @@ if #items == 0 then
 	return {}
 end
 
-return redis.call("HMGET", queueKey, unpack(items))
+local queueItems = redis.call("HMGET", queueKey, unpack(items))
+
+-- if there's a nil value in the queue item at position i, we need to remove it and add it to a separate set of missing queue items
+local missingQueueItems = {}
+for i, qi in ipairs(queueItems) do
+	if qi == false then
+		table.insert(missingQueueItems, items[i])
+		table.remove(queueItems, i)
+	end
+end
+
+return {queueItems, missingQueueItems}
