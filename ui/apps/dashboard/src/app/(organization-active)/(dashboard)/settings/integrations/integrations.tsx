@@ -4,10 +4,12 @@ import type { ReactNode } from 'react';
 import { NewButton } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card';
 import { IconDatadog } from '@inngest/components/icons/platforms/Datadog';
+import { IconNeon } from '@inngest/components/icons/platforms/Neon';
 import { IconNetlify } from '@inngest/components/icons/platforms/Netlify';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { RiExternalLinkLine } from '@remixicon/react';
 
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import type VercelIntegration from './vercel/VercelIntegration';
 
 type Integration = {
@@ -35,6 +37,22 @@ const INTEGRATIONS: Integration[] = [
     ),
     description:
       'Host your Inngest functions on Vercel and automatically sync them every time you deploy code.',
+  },
+  {
+    title: 'Neon',
+    Icon: <IconNeon className="text-onContrast h-6 w-6" />,
+    actionButton: (enabled, loading) => (
+      <NewButton
+        kind="primary"
+        appearance="solid"
+        size="medium"
+        loading={loading}
+        href={enabled ? '/settings/integrations/neon' : '/settings/integrations/neon/connect'}
+        label={enabled ? 'Manage' : 'Connect'}
+        prefetch={true}
+      />
+    ),
+    description: 'Connect to send events directly from changes in your Neon Database.',
   },
   {
     title: 'Netlify',
@@ -73,28 +91,32 @@ const INTEGRATIONS: Integration[] = [
 ];
 
 export default function IntegrationsList({ integration }: { integration: VercelIntegration }) {
+  const { value: postgressIntegration } = useBooleanFlag('postgres-integration');
   return (
     <div className="mx-auto mt-16 flex w-[800px] flex-col">
       <div className="mb-7 w-full text-2xl font-medium">All integrations</div>
       <div className="grid w-[800px] grid-cols-2 gap-6">
-        {INTEGRATIONS.map((i: Integration, n) => (
-          <Card key={`integration-card-${n}`}>
-            <div className="flex h-[189px] w-[388px] flex-col p-6">
-              <div className="align-center flex flex-row items-center justify-between">
-                <div className="bg-contrast flex h-12 w-12 items-center justify-center rounded">
-                  {i.Icon}
+        {INTEGRATIONS.map((i: Integration, n) => {
+          if (i.title === 'Neon' && !postgressIntegration) return;
+          return (
+            <Card key={`integration-card-${n}`}>
+              <div className="flex h-[189px] w-[388px] flex-col p-6">
+                <div className="align-center flex flex-row items-center justify-between">
+                  <div className="bg-contrast flex h-12 w-12 items-center justify-center rounded">
+                    {i.Icon}
+                  </div>
+                  {i.actionButton(
+                    i.title === 'Vercel'
+                      ? integration.enabled && integration.projects.length > 0
+                      : false
+                  )}
                 </div>
-                {i.actionButton(
-                  i.title === 'Vercel'
-                    ? integration.enabled && integration.projects.length > 0
-                    : false
-                )}
+                <div className="text-basis mt-[18px] text-lg font-medium">{i.title}</div>
+                <div className="text-muted mt-2 text-sm leading-tight">{i.description}</div>
               </div>
-              <div className="text-basis mt-[18px] text-lg font-medium">{i.title}</div>
-              <div className="text-muted mt-2 text-sm leading-tight">{i.description}</div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
         <Card>
           <div className="bg-canvasSubtle flex h-[189px] w-[388px] flex-col p-6">
             <div className="text-basis text-lg font-medium">Can&apos;t find what you need?</div>

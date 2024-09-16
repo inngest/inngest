@@ -15,7 +15,10 @@ export const FunctionInfo = () => (
       <div className="border-b px-4 py-2 ">Function status information.</div>
 
       <div className="px-4 py-2">
-        <Link href={'https://www.inngest.com/docs/features/inngest-functions?ref=app-metrics'} className="text-md">
+        <Link
+          href={'https://www.inngest.com/docs/features/inngest-functions?ref=app-metrics'}
+          className="text-md"
+        >
           Learn more about Inngest functions.
         </Link>
       </div>

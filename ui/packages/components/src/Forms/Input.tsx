@@ -20,7 +20,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     ref
   ) => {
     let passwordManagerProps: Record<string, unknown> = {
-      autocomplete: 'off',
+      autoComplete: 'off',
       'data-1p-ignore': true,
       'data-bwignore': true,
       'data-lpignore': true,
