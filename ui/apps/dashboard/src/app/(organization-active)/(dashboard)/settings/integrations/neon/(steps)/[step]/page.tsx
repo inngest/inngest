@@ -17,7 +17,7 @@ export default function NeonStep({ params: { step } }: { params: { step: string 
     return (
       <NeonAuth
         next={() => {
-          setStepsCompleted([IntegrationSteps.Authorize]);
+          setStepsCompleted(IntegrationSteps.Authorize);
           router.push(pathCreator.neonIntegrationStep({ step: IntegrationSteps.FormatWal }));
         }}
       />
@@ -26,7 +26,7 @@ export default function NeonStep({ params: { step } }: { params: { step: string 
     return (
       <NeonFormat
         next={() => {
-          setStepsCompleted([IntegrationSteps.FormatWal]);
+          setStepsCompleted(IntegrationSteps.FormatWal);
           router.push(pathCreator.neonIntegrationStep({ step: IntegrationSteps.ConnectDb }));
         }}
       />
@@ -35,7 +35,7 @@ export default function NeonStep({ params: { step } }: { params: { step: string 
     return (
       <NeonConnect
         next={() => {
-          setStepsCompleted([IntegrationSteps.ConnectDb]);
+          setStepsCompleted(IntegrationSteps.ConnectDb);
           router.push(pathCreator.neonIntegrationStep({ step: IntegrationSteps.ConnectDb }));
         }}
       />
