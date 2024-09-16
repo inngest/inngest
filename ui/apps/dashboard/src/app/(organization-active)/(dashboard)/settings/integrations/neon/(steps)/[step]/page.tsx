@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import NeonAuth from '@inngest/components/PostgresIntegrations/Neon/Auth';
+import NeonConnect from '@inngest/components/PostgresIntegrations/Neon/Connect';
 import NeonFormat from '@inngest/components/PostgresIntegrations/Neon/Format';
 import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/types';
 
@@ -31,7 +32,14 @@ export default function NeonStep({ params: { step } }: { params: { step: string 
       />
     );
   } else if (step === IntegrationSteps.ConnectDb) {
-    return <div>Page For Connect</div>;
+    return (
+      <NeonConnect
+        next={() => {
+          setStepsCompleted([IntegrationSteps.ConnectDb]);
+          router.push(pathCreator.neonIntegrationStep({ step: IntegrationSteps.ConnectDb }));
+        }}
+      />
+    );
   }
 
   return <div>Page Content</div>;
