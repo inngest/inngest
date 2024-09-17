@@ -2025,10 +2025,15 @@ func (q *queue) partitionSize(ctx context.Context, partitionKey string, until ti
 	return q.u.Client().Do(ctx, cmd).AsInt64()
 }
 
+// cleanupNilPartitionInAccount is invoked when we peek a missing partition in the account partitions pointer zset.
+// This happens when old executors process default function partitions that were enqueued on a new new-runs instance,
+// which, in addition to the global partition pointer, enqueued the partition in the account partitions queue of queues.
+// This ensures we gracefully handle inconsistencies created by the backwards compatible (keep using global partitions pointer _and_ account partitions) key queues implementation.
 func (q *queue) cleanupNilPartitionInAccount(ctx context.Context, accountId uuid.UUID, partitionKey string) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "cleanupNilPartitionInAccount"), redis_telemetry.ScopeQueue)
 
-	// TODO LOG!
+	// Log because this should only happen as long as we run old code
+	q.logger.Warn().Interface("partition", partitionKey).Str("account_id", accountId.String()).Msg("removing account partitions pointer to missing partition")
 
 	cmd := q.u.Client().B().Zrem().Key(q.u.kg.AccountPartitionIndex(accountId)).Member(partitionKey).Build()
 	if err := q.u.Client().Do(ctx, cmd).Error(); err != nil {
@@ -2038,10 +2043,13 @@ func (q *queue) cleanupNilPartitionInAccount(ctx context.Context, accountId uuid
 	return nil
 }
 
+// cleanupNilQueueItemInPartition is invoked for missing queue items, specifically in key queues, when an old executor processed and dequeued an item in the default partition.
+// This ensures we gracefully handle inconsistencies created by the backwards compatible (always enqueue to default partition) key queues implementation.
 func (q *queue) cleanupNilQueueItemInPartition(ctx context.Context, p QueuePartition, queueItemId string) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "cleanupNilQueueItemInPartition"), redis_telemetry.ScopeQueue)
 
-	// TODO LOG!
+	// Log because this should only happen as long as we run old code
+	q.logger.Warn().Interface("partition", p).Str("item_id", queueItemId).Msg("removing pointer to missing queue item")
 
 	cmd := q.u.Client().B().Zrem().Key(p.zsetKey(q.u.kg)).Member(queueItemId).Build()
 	if err := q.u.Client().Do(ctx, cmd).Error(); err != nil {
