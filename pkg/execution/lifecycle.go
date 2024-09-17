@@ -18,9 +18,10 @@ import (
 type SkipState struct {
 	// Reason represents the reason the function was skipped.
 	Reason enums.SkipReason
-
 	// CronSchedule, if present, is the cron schedule string that triggered the skipped function.
 	CronSchedule *string
+	// Events are the list of events being used when attempted to trigger a run
+	Events []json.RawMessage
 }
 
 var _ LifecycleListener = (*NoopLifecyceListener)(nil)
