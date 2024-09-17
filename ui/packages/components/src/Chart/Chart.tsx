@@ -17,7 +17,7 @@ export interface ChartProps {
   theme?: 'light' | 'dark';
 }
 
-export const Chart = ({ option, settings, theme = 'light' }: ChartProps) => {
+export const Chart = ({ option, settings = { notMerge: true }, theme = 'light' }: ChartProps) => {
   const chartRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

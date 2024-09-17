@@ -1,28 +1,15 @@
-import { Alert } from '@inngest/components/Alert/Alert';
 import { Chart, type ChartProps } from '@inngest/components/Chart/Chart';
 import { resolveColor } from '@inngest/components/utils/colors';
 import { isDark } from '@inngest/components/utils/theme';
 import resolveConfig from 'tailwindcss/resolveConfig';
 
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { graphql } from '@/gql';
 import type { FunctionStatusMetricsQuery, ScopedMetricsResponse } from '@/gql/graphql';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 import tailwindConfig from '../../../tailwind.config';
-import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
 import { FunctionInfo } from './FunctionInfo';
 
 const {
   theme: { backgroundColor, colors },
 } = resolveConfig(tailwindConfig);
-
-export type MetricsFilters = {
-  from: Date;
-  until?: Date;
-  selectedApps?: string[];
-  selectedFns?: string[];
-  autoRefresh?: boolean;
-};
 
 export type MetricsData = {
   workspace: {
@@ -37,80 +24,6 @@ export type PieChartData = Array<{
   name: string;
   itemStyle: { color: string };
 }>;
-
-const GetFunctionStatusMetrics = graphql(`
-  query FunctionStatusMetrics(
-    $workspaceId: ID!
-    $from: Time!
-    $functionIDs: [UUID!]
-    $appIDs: [UUID!]
-    $until: Time
-  ) {
-    workspace(id: $workspaceId) {
-      scheduled: scopedMetrics(
-        filter: {
-          name: "function_run_scheduled_total"
-          scope: APP
-          from: $from
-          functionIDs: $functionIDs
-          appIDs: $appIDs
-          until: $until
-        }
-      ) {
-        metrics {
-          id
-          data {
-            value
-            bucket
-          }
-        }
-      }
-    }
-    workspace(id: $workspaceId) {
-      started: scopedMetrics(
-        filter: {
-          name: "function_run_started_total"
-          scope: FN
-          from: $from
-          functionIDs: $functionIDs
-          appIDs: $appIDs
-          until: $until
-        }
-      ) {
-        metrics {
-          id
-          data {
-            value
-            bucket
-          }
-        }
-      }
-    }
-    workspace(id: $workspaceId) {
-      completed: scopedMetrics(
-        filter: {
-          name: "function_run_ended_total"
-          scope: FN
-          groupBy: "status"
-          from: $from
-          functionIDs: $functionIDs
-          appIDs: $appIDs
-          until: $until
-        }
-      ) {
-        metrics {
-          id
-          tagName
-          tagValue
-          data {
-            value
-            bucket
-          }
-        }
-      }
-    }
-  }
-`);
 
 //
 // completed metrics data includes cancels and failures distinguished by a tag.
@@ -172,9 +85,7 @@ const mapMetric = ({
   }>;
 }): number => metrics.flatMap(({ data }) => data).reduce((acc, { value }) => acc + value, 0);
 
-const mapMetrics = ({
-  workspace: { completed, started, scheduled },
-}: FunctionStatusMetricsQuery) => {
+const mapMetrics = ({ completed, started, scheduled }: FunctionStatusMetricsQuery['workspace']) => {
   const dark = isDark();
   return [
     ...mapCompleted(completed),
@@ -273,45 +184,16 @@ const getChartOptions = (data: PieChartData, loading: boolean = false): ChartPro
   };
 };
 
-export const FunctionStatus = ({
-  from,
-  until,
-  selectedApps = [],
-  selectedFns = [],
-  autoRefresh = false,
-}: MetricsFilters) => {
-  const env = useEnvironment();
-
-  const variables = {
-    workspaceId: env.id,
-    from: from.toISOString(),
-    appIDs: selectedApps,
-    functionIDs: selectedFns,
-    until: until ? until.toISOString() : null,
-  };
-
-  const { data, error } = useGraphQLQuery({
-    query: GetFunctionStatusMetrics,
-    pollIntervalInMilliseconds: autoRefresh ? AUTO_REFRESH_INTERVAL * 1000 : 0,
-    variables,
-  });
-
-  error && console.error('Error fetcthing metrics data for', variables, error);
-  const metrics = data && mapMetrics(data);
+export const FunctionStatus = ({ workspace }: Partial<FunctionStatusMetricsQuery>) => {
+  const metrics = workspace && mapMetrics(workspace);
 
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[300px] w-[448px] shrink-0 flex-col rounded-lg p-5">
       <div className="text-subtle flex flex-row items-center gap-x-2 text-lg">
         Functions Status <FunctionInfo />
       </div>
-      {error ? (
-        <Alert severity="error" className="h-full">
-          <p className="mb-4 font-semibold">Error loading data.</p>
-          <p>Reload to try again. If the problem persists, contact support.</p>
-        </Alert>
-      ) : (
-        <Chart option={metrics ? getChartOptions(metrics) : {}} />
-      )}
+
+      <Chart option={metrics ? getChartOptions(metrics) : {}} />
     </div>
   );
 };
