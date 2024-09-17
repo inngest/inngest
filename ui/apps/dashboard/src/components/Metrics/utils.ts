@@ -1,11 +1,16 @@
-import { lightFormat } from '@inngest/components/utils/date';
+import { lightFormat, toDate } from '@inngest/components/utils/date';
 
 export const dateFormat = (dateString: string, diff: number) => {
+  const date = toDate(dateString);
+  if (!date) {
+    return dateString;
+  }
+
   const d = Math.abs(diff);
 
   return d < 6000 // a minute
-    ? lightFormat(dateString, 'HH:mm:ss:SSS')
+    ? lightFormat(date, 'HH:mm:ss:SSS')
     : d <= 8.64e7 // a day
-    ? lightFormat(dateString, 'HH:mm')
-    : lightFormat(dateString, 'MM/dd:HH');
+    ? lightFormat(date, 'HH:mm')
+    : lightFormat(date, 'MM/dd:HH');
 };

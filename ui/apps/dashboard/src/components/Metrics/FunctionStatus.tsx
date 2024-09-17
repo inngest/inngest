@@ -130,7 +130,7 @@ const getChartOptions = (data: PieChartData, loading: boolean = false): ChartPro
   return {
     legend: {
       orient: 'vertical',
-      right: '20%',
+      right: '10%',
       top: 'center',
       icon: 'circle',
       formatter: (name: string) =>
@@ -147,7 +147,7 @@ const getChartOptions = (data: PieChartData, loading: boolean = false): ChartPro
       {
         name: 'Function Runs',
         type: 'pie',
-        radius: ['35%', '60%'],
+        radius: ['50%', '85%'],
         center: ['25%', '50%'],
         itemStyle: {
           borderColor: resolveColor(backgroundColor.canvasBase, dark, '#fff'),
@@ -189,11 +189,11 @@ export const FunctionStatus = ({ workspace }: Partial<FunctionStatusMetricsQuery
 
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[300px] w-[448px] shrink-0 flex-col rounded-lg p-5">
-      <div className="text-subtle flex flex-row items-center gap-x-2 text-lg">
+      <div className="text-subtle mb-2 flex flex-row items-center gap-x-2 text-lg">
         Functions Status <FunctionInfo />
       </div>
 
-      <Chart option={metrics ? getChartOptions(metrics) : {}} />
+      <Chart option={metrics ? getChartOptions(metrics) : {}} className="h-[300px]" />
     </div>
   );
 };

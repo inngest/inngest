@@ -15,9 +15,15 @@ export interface ChartProps {
   option: EChartsOption;
   settings?: SetOptionOpts;
   theme?: 'light' | 'dark';
+  className?: string;
 }
 
-export const Chart = ({ option, settings = { notMerge: true }, theme = 'light' }: ChartProps) => {
+export const Chart = ({
+  option,
+  settings = { notMerge: true },
+  theme = 'light',
+  className,
+}: ChartProps) => {
   const chartRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -43,5 +49,5 @@ export const Chart = ({ option, settings = { notMerge: true }, theme = 'light' }
     }
   }, [option, settings]);
 
-  return <div ref={chartRef} className="absolute h-[100%] w-full overflow-hidden" />;
+  return <div ref={chartRef} className={` ${className}`} />;
 };
