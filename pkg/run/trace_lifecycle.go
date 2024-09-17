@@ -398,6 +398,74 @@ func (l traceLifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata
 	}
 }
 
+func (l traceLifecycle) OnFunctionSkipped(
+	ctx context.Context,
+	md sv2.Metadata,
+	s execution.SkipState,
+) {
+	ctx = l.extractTraceCtx(ctx, md, true)
+
+	start := time.Now()
+	if !md.Config.StartedAt.IsZero() {
+		start = md.Config.StartedAt
+	}
+
+	// spanID should always exists
+	spanID, err := md.Config.GetSpanID()
+	if err != nil {
+		// generate a new one here to be used for subsequent runs.
+		// this could happen for runs that started before this feature was introduced.
+		sid := NewSpanID(ctx)
+		spanID = &sid
+	}
+
+	slug := md.Config.FunctionSlug()
+
+	evtIDs := make([]string, len(md.Config.EventIDs))
+	for i, e := range md.Config.EventIDs {
+		evtIDs[i] = e.String()
+	}
+
+	_, span := NewSpan(ctx,
+		WithScope(consts.OtelScopeFunction),
+		WithName(slug),
+		WithTimestamp(start),
+		WithSpanID(*spanID),
+		WithSpanAttributes(
+			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
+			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, md.ID.FunctionID.String()),
+			attribute.String(consts.OtelSysFunctionSlug, slug),
+			attribute.Int(consts.OtelSysFunctionVersion, md.Config.FunctionVersion),
+			attribute.String(consts.OtelAttrSDKRunID, md.ID.RunID.String()),
+			attribute.String(consts.OtelSysEventIDs, strings.Join(evtIDs, ",")),
+			attribute.String(consts.OtelSysIdempotencyKey, md.IdempotencyKey()),
+			attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusSkipped.ToCode()),
+		),
+	)
+	defer span.End()
+
+	if md.Config.CronSchedule() != nil {
+		span.SetAttributes(attribute.String(consts.OtelSysCronExpr, *md.Config.CronSchedule()))
+	}
+	if md.Config.BatchID != nil {
+		span.SetAttributes(
+			attribute.String(consts.OtelSysBatchID, md.Config.BatchID.String()),
+			attribute.Int64(consts.OtelSysBatchTS, int64(md.Config.BatchID.Time())),
+		)
+	}
+
+	if err := span.SetEvents(ctx, s.Events, md.Config.EventIDMapping()); err != nil {
+		l.log.Warn("error setting events",
+			"lifecycle", "OnFunctionSkipped",
+			"errors", err,
+			"meta", md,
+			"evts", s.Events,
+		)
+	}
+}
+
 func (l traceLifecycle) OnStepStarted(
 	ctx context.Context,
 	md statev2.Metadata,
