@@ -5,6 +5,18 @@ import StoreProvider from '@/app/StoreProvider';
 
 export const metadata: Metadata = {
   title: 'Inngest Development Server',
+  icons: {
+    icon: [
+      {
+        url: '/favicon-june-2024-light.png',
+        media: '(prefers-color-scheme: light)',
+      },
+      {
+        url: '/favicon-june-2024-dark.png',
+        media: '(prefers-color-scheme: dark)',
+      },
+    ],
+  },
 };
 
 type RootLayoutProps = {

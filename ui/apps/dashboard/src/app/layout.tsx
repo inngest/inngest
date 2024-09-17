@@ -12,7 +12,18 @@ import SentryUserIdentification from './SentryUserIdentification';
 export const metadata: Metadata = {
   title: 'Inngest Cloud',
   description: 'The Inngest Cloud dashboard',
-  icons: process.env.NEXT_PUBLIC_FAVICON,
+  icons: {
+    icon: [
+      {
+        url: process.env.NEXT_PUBLIC_FAVICON ?? '/favicon-june-2024-light.png',
+        media: '(prefers-color-scheme: light)',
+      },
+      {
+        url: process.env.NEXT_PUBLIC_FAVICON ?? '/favicon-june-2024-dark.png',
+        media: '(prefers-color-scheme: dark)',
+      },
+    ],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
