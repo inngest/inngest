@@ -19,7 +19,6 @@ import (
 	"github.com/inngest/inngest/pkg/publicerr"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/rs/zerolog"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
@@ -198,9 +197,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 					trace.WithTimestamp(ts),
 					trace.WithNewRoot(),
 					trace.WithLinks(trace.LinkFromContext(ctx)),
-					trace.WithAttributes(
-						attribute.Bool(consts.OtelUserTraceFilterKey, true),
-					))
+				)
 			defer span.End()
 
 			id, err := a.handler(ctx, &evt)

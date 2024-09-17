@@ -2455,7 +2455,6 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		run.WithName(consts.OtelSpanBatch),
 		run.WithNewRoot(),
 		run.WithSpanAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, payload.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, payload.WorkspaceID.String()),
 			attribute.String(consts.OtelSysAppID, payload.AppID.String()),

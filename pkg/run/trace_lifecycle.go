@@ -56,7 +56,6 @@ func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Meta
 		WithName(consts.OtelSpanTrigger),
 		WithTimestamp(ulid.Time(runID.Time())),
 		WithSpanAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -133,7 +132,6 @@ func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Meta
 							WithTimestamp(meta.InvokeTraceCarrier.Timestamp),
 							WithSpanID(sid),
 							WithSpanAttributes(
-								attribute.Bool(consts.OtelUserTraceFilterKey, true),
 								attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 								attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 								attribute.String(consts.OtelSysAppID, meta.SourceAppID),
@@ -199,7 +197,6 @@ func (l traceLifecycle) OnFunctionStarted(
 		WithTimestamp(start),
 		WithSpanID(*spanID),
 		WithSpanAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -281,7 +278,6 @@ func (l traceLifecycle) OnFunctionFinished(
 		WithTimestamp(start),
 		WithSpanID(*spanID),
 		WithSpanAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -362,7 +358,6 @@ func (l traceLifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata
 		WithTimestamp(start),
 		WithSpanID(*fnSpanID),
 		WithSpanAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -494,7 +489,6 @@ func (l traceLifecycle) OnStepStarted(
 		WithTimestamp(start),
 		WithSpanID(*spanID),
 		WithSpanAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -561,7 +555,6 @@ func (l traceLifecycle) OnStepFinished(
 		WithTimestamp(start),
 		WithSpanID(*spanID),
 		WithSpanAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -686,7 +679,6 @@ func (l traceLifecycle) OnSleep(
 		WithName(consts.OtelSpanSleep),
 		WithTimestamp(startedAt),
 		WithSpanAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -742,7 +734,6 @@ func (l traceLifecycle) OnInvokeFunction(
 		WithTimestamp(carrier.Timestamp),
 		WithSpanID(spanID),
 		WithSpanAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -811,7 +802,6 @@ func (l traceLifecycle) OnInvokeFunctionResumed(
 				WithTimestamp(carrier.Timestamp),
 				WithSpanID(carrier.SpanID()),
 				WithSpanAttributes(
-					attribute.Bool(consts.OtelUserTraceFilterKey, true),
 					attribute.String(consts.OtelSysAccountID, pause.Identifier.AccountID.String()),
 					attribute.String(consts.OtelSysWorkspaceID, pause.Identifier.WorkspaceID.String()),
 					attribute.String(consts.OtelSysAppID, pause.Identifier.AppID.String()),
@@ -887,7 +877,6 @@ func (l traceLifecycle) OnWaitForEvent(
 		WithTimestamp(carrier.Timestamp),
 		WithSpanID(carrier.SpanID()),
 		WithSpanAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeWaitForEvent.String()),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
@@ -942,7 +931,6 @@ func (l traceLifecycle) OnWaitForEventResumed(
 				WithTimestamp(carrier.Timestamp),
 				WithSpanID(carrier.SpanID()),
 				WithSpanAttributes(
-					attribute.Bool(consts.OtelUserTraceFilterKey, true),
 					attribute.String(consts.OtelSysAccountID, pause.Identifier.AccountID.String()),
 					attribute.String(consts.OtelSysWorkspaceID, pause.Identifier.WorkspaceID.String()),
 					attribute.String(consts.OtelSysAppID, pause.Identifier.AppID.String()),
