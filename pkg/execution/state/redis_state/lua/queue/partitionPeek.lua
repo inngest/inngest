@@ -38,4 +38,4 @@ for i, partition in ipairs(partitions) do
 	end
 end
 
-return {partitions, missingPartitions}
+return {count, partitions, missingPartitions}

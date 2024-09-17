@@ -2040,6 +2040,12 @@ func (q *queue) cleanupNilPartitionInAccount(ctx context.Context, accountId uuid
 		return fmt.Errorf("failed to remove nil partition from account partitions pointer queue: %w", err)
 	}
 
+	// Atomically check whether account partitions is empty and remove from global accounts ZSET
+	err := q.cleanupEmptyAccount(ctx, accountId)
+	if err != nil {
+		return fmt.Errorf("failed to check for and clean up empty account: %w", err)
+	}
+
 	return nil
 }
 
@@ -2059,6 +2065,41 @@ func (q *queue) cleanupNilQueueItemInPartition(ctx context.Context, p QueueParti
 	return nil
 }
 
+// cleanupEmptyAccount is invoked when we peek an account without any partitions in the account pointer zset.
+// This happens when old executors process default function partitions and .
+// This ensures we gracefully handle inconsistencies created by the backwards compatible (keep using global partitions pointer _and_ account partitions) key queues implementation.
+func (q *queue) cleanupEmptyAccount(ctx context.Context, accountId uuid.UUID) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "cleanupEmptyAccount"), redis_telemetry.ScopeQueue)
+
+	if accountId == uuid.Nil {
+		q.logger.Warn().Msg("attempted to clean up empty account pointer with nil account ID")
+		return nil
+	}
+
+	status, err := scripts["queue/cleanupEmptyAccount"].Exec(
+		redis_telemetry.WithScriptName(ctx, "cleanupEmptyAccount"),
+		q.u.Client(),
+		[]string{
+			q.u.kg.GlobalAccountIndex(),
+			q.u.kg.AccountPartitionIndex(accountId),
+		},
+		[]string{
+			accountId.String(),
+		},
+	).ToInt64()
+	if err != nil {
+		return fmt.Errorf("failed to check for empty account: %w", err)
+	}
+
+	if status == 1 {
+		// Log because this should only happen as long as we run old code
+		q.logger.Warn().Str("account_id", accountId.String()).Msg("removed empty account pointer")
+	}
+
+	return nil
+}
+
+// partitionPeek returns pending queue partitions within the global partition pointer _or_ account partition pointer ZSET.
 func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequential bool, until time.Time, limit int64, accountId *uuid.UUID) ([]*QueuePartition, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "partitionPeek"), redis_telemetry.ScopeQueue)
 
@@ -2109,46 +2150,38 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	}
 
 	var encoded, missingPartitions []any
-	if len(returnedSet) == 2 {
-		encoded, ok = returnedSet[0].([]any)
+	var totalItemCount int64 // number of items stored in partition ZSET
+	if len(returnedSet) == 3 {
+		totalItemCount, ok = returnedSet[0].(int64)
 		if !ok {
 			return nil, fmt.Errorf("unexpected first item in set returned from partitionPeek: %T", peekRet)
 		}
 
-		missingPartitions, ok = returnedSet[1].([]any)
+		encoded, ok = returnedSet[1].([]any)
 		if !ok {
-			return nil, fmt.Errorf("unexpected first item in set returned from partitionPeek: %T", peekRet)
+			return nil, fmt.Errorf("unexpected second item in set returned from partitionPeek: %T", peekRet)
+		}
+
+		missingPartitions, ok = returnedSet[2].([]any)
+		if !ok {
+			return nil, fmt.Errorf("unexpected third item in set returned from partitionPeek: %T", peekRet)
 		}
 	} else if len(returnedSet) != 0 {
-		return nil, fmt.Errorf("expected zero or two items in set returned by partitionPeek: %v", returnedSet)
+		return nil, fmt.Errorf("expected zero or three items in set returned by partitionPeek: %v", returnedSet)
 	}
-
-	// begin temporary debugging code
-	for _, item := range encoded {
-		if item == nil {
-			continue
-		}
-
-		str, ok := item.(string)
-		if !ok {
-			return nil, fmt.Errorf(
-				"non-string type returned from partition peek: %T, partitionKey: %s, partitionItem: %s, args: %+v",
-				item, partitionKey, q.u.kg.PartitionItem(), args,
-			)
-		}
-		if str == "" {
-			return nil, fmt.Errorf(
-				"empty string returned from partition peek; partitionKey: %s, partitionItem: %s, args: %+v",
-				partitionKey, q.u.kg.PartitionItem(), args,
-			)
-		}
-	}
-	// end temporary debugging code
 
 	weights := []float64{}
 	items := make([]*QueuePartition, len(encoded))
 	fnIDs := make(map[uuid.UUID]bool)
 	fnIDsMu := sync.Mutex{}
+
+	// if partition is empty, run an atomic check-and-delete operation to remove account from global account index
+	if accountId != nil && totalItemCount == 0 {
+		err := q.cleanupEmptyAccount(ctx, *accountId)
+		if err != nil {
+			return nil, fmt.Errorf("error cleaning up empty account after peeking account partitions: %w", err)
+		}
+	}
 
 	// Use parallel decoding as per Peek
 	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueuePartition, error) {
