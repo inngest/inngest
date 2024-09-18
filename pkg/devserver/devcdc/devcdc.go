@@ -58,10 +58,6 @@ func (d devcdc) AddAPIRoutes(r chi.Router) {
 	r.Post("/add", d.apiAddConnection)
 	r.Post("/setup/pg", d.apiSetupPostgres)
 	r.Get("/", d.apiGetConnections)
-
-	r.Get("/lol", func(w http.ResponseWriter, req *http.Request) {
-		w.Write([]byte("lol"))
-	})
 }
 
 func (devcdc) Commit(changeset.Watermark) {
