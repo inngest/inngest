@@ -16,7 +16,12 @@ import (
 	"github.com/spf13/viper"
 )
 
-func NewCmdStart() *cobra.Command {
+type FlagGroup struct {
+	name string
+	fs   *pflag.FlagSet
+}
+
+func NewCmdStart(rootCmd *cobra.Command) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "start",
 		Short:   "[Beta] Run Inngest as a single-node service.",
@@ -24,7 +29,7 @@ func NewCmdStart() *cobra.Command {
 		Run:     doStart,
 	}
 
-	groups := map[*pflag.FlagSet]string{}
+	groups := []FlagGroup{}
 
 	baseFlags := pflag.NewFlagSet("base", pflag.ExitOnError)
 	baseFlags.String("config", "", "Path to an Inngest configuration file")
@@ -36,14 +41,17 @@ func NewCmdStart() *cobra.Command {
 	baseFlags.StringSliceP("sdk-url", "u", []string{}, "SDK URLs to load functions from")
 	baseFlags.Int("tick", devserver.DefaultTick, "Interval, in milliseconds, of which to check for new work.")
 	cmd.Flags().AddFlagSet(baseFlags)
-	groups[baseFlags] = ""
+	groups = append(groups, FlagGroup{name: "Flags:", fs: baseFlags})
 
 	persistenceFlags := pflag.NewFlagSet("persistence", pflag.ExitOnError)
 	// persistenceFlags.String("sqlite-dir", "", "Directory for where to write SQLite database.")
 	persistenceFlags.String("redis-uri", "", "Redis server URI for external queue and run state. Defaults to self-contained, in-memory Redis server with periodic snapshot backups.")
 	// persistenceFlags.String("postgres-uri", "", "[Experimental] PostgreSQL database URI for configuration and history persistence. Defaults to SQLite database.")
 	cmd.Flags().AddFlagSet(persistenceFlags)
-	groups[persistenceFlags] = "Persistence options"
+	groups = append(groups, FlagGroup{name: "Persistence Flags:", fs: persistenceFlags})
+
+	// Also add global flags
+	groups = append(groups, FlagGroup{name: "Group Flags:", fs: rootCmd.PersistentFlags()})
 
 	cmd.SetUsageFunc(func(c *cobra.Command) error {
 		fmt.Printf("%s\n  %s\n\n%s\n%s\n\n",
@@ -53,12 +61,12 @@ func NewCmdStart() *cobra.Command {
 			"inngest start",
 		)
 
-		for fs, name := range groups {
-			usage := fs.FlagUsages()
+		for _, group := range groups {
+			usage := group.fs.FlagUsages()
 
 			help := ""
-			if name != "" {
-				help = help + name + "\n"
+			if group.name != "" {
+				help = help + group.name + "\n"
 			}
 			help = help + usage
 			fmt.Println(help)
