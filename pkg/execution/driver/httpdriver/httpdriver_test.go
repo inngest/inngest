@@ -34,7 +34,7 @@ func TestRedirect(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch count {
 		case 8:
-			require.Equal(t, http.MethodPost, r.Method)
+			require.Equal(t, http.MethodGet, r.Method)
 			byt, err := io.ReadAll(r.Body)
 			require.NoError(t, err)
 			require.Equal(t, input, byt)
