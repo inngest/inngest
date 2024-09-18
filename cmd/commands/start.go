@@ -27,7 +27,7 @@ func NewCmdStart() *cobra.Command {
 	groups := map[*pflag.FlagSet]string{}
 
 	baseFlags := pflag.NewFlagSet("base", pflag.ExitOnError)
-	baseFlags.String("config", "", "Path to the configuration file")
+	baseFlags.String("config", "", "Path to an Inngest configuration file")
 	baseFlags.BoolP("help", "h", false, "Output this help information")
 	baseFlags.String("host", "", "Server hostname")
 	baseFlags.StringP("port", "p", "8288", "Server port")
@@ -39,7 +39,7 @@ func NewCmdStart() *cobra.Command {
 	groups[baseFlags] = ""
 
 	persistenceFlags := pflag.NewFlagSet("persistence", pflag.ExitOnError)
-	persistenceFlags.String("sqlite-dir", "", "Directory for where to write SQLite database.")
+	// persistenceFlags.String("sqlite-dir", "", "Directory for where to write SQLite database.")
 	persistenceFlags.String("redis-uri", "", "Redis server URI for external queue and run state. Defaults to self-contained, in-memory Redis server with periodic snapshot backups.")
 	// persistenceFlags.String("postgres-uri", "", "[Experimental] PostgreSQL database URI for configuration and history persistence. Defaults to SQLite database.")
 	cmd.Flags().AddFlagSet(persistenceFlags)
@@ -98,9 +98,9 @@ func doStart(cmd *cobra.Command, args []string) {
 
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
 		ServiceName:   "tracing",
-		Type:          itrace.TracerTypeOTLPHTTP,
 		TraceEndpoint: "localhost:8288",
 		TraceURLPath:  "/dev/traces",
+		Type:          itrace.TracerTypeOTLPHTTP,
 	}); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -115,11 +115,12 @@ func doStart(cmd *cobra.Command, args []string) {
 	}
 
 	opts := lite.StartOpts{
-		Config:       *conf,
-		PollInterval: viper.GetInt("poll-interval"),
-		URLs:         viper.GetStringSlice("urls"),
-		RedisURI:     viper.GetString("redis-uri"),
-		Tick:         time.Duration(tick) * time.Millisecond,
+		Config:        *conf,
+		PollInterval:  viper.GetInt("poll-interval"),
+		RedisURI:      viper.GetString("redis-uri"),
+		RetryInterval: viper.GetInt("retry-interval"),
+		Tick:          time.Duration(tick) * time.Millisecond,
+		URLs:          viper.GetStringSlice("urls"),
 	}
 
 	err = lite.New(ctx, opts)

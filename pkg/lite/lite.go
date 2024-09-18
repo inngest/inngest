@@ -52,12 +52,13 @@ var redisSingleton *miniredis.Miniredis
 
 // StartOpts configures the dev server
 type StartOpts struct {
-	Config       config.Config `json:"-"`
-	RootDir      string        `json:"dir"`
-	RedisURI     string        `json:"redis-uri"`
-	PollInterval int           `json:"poll-interval"`
-	URLs         []string      `json:"urls"`
-	Tick         time.Duration `json:"tick"`
+	Config        config.Config `json:"-"`
+	RootDir       string        `json:"dir"`
+	RedisURI      string        `json:"redis-uri"`
+	PollInterval  int           `json:"poll-interval"`
+	URLs          []string      `json:"urls"`
+	Tick          time.Duration `json:"tick"`
+	RetryInterval int           `json:"retry_interval"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
