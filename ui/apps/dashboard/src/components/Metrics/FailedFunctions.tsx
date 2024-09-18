@@ -1,6 +1,7 @@
 import React from 'react';
 import { NewButton } from '@inngest/components/Button';
 import { Chart, type ChartProps, type LineSeriesOption } from '@inngest/components/Chart/Chart';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { resolveColor } from '@inngest/components/utils/colors';
 import { differenceInMilliseconds, formatDistanceToNow } from '@inngest/components/utils/date';
 import { isDark } from '@inngest/components/utils/theme';
@@ -217,7 +218,7 @@ export const FailedList = ({ rateList }: { rateList: Rate[] | undefined }) => {
       {rateList?.map((r, i) => (
         <React.Fragment key={`function-failed-list-${i}`}>
           <div className="leanding-none mt-3 flex w-full flex-row items-center justify-between gap-x-3 text-xs font-light leading-none">
-            <div>{resolveColor.name}</div>
+            <div>{r.name}</div>
             <div className="flex flex-row justify-end gap-x-4">
               <div className="justify-self-end">{r.totalFailures}</div>
               <div className="text-tertiary-moderate">
@@ -228,9 +229,16 @@ export const FailedList = ({ rateList }: { rateList: Rate[] | undefined }) => {
               </div>
             </div>
           </div>
-          <div className="text-disabled leading none text-xs">
-            {r.lastOccurence && formatDistanceToNow(r.lastOccurence, { addSuffix: true })}
-          </div>
+
+          <OptionalTooltip tooltip={r.lastOccurence}>
+            <div
+              className={`text-disabled leading none text-xs ${
+                r.lastOccurence && 'cursor-pointer'
+              }`}
+            >
+              {r.lastOccurence && formatDistanceToNow(r.lastOccurence, { addSuffix: true })}
+            </div>
+          </OptionalTooltip>
         </React.Fragment>
       ))}
     </div>
