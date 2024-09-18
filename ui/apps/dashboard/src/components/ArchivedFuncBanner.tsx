@@ -45,7 +45,8 @@ export function ArchivedFuncBanner({ funcID }: Props) {
 
   return (
     <Banner kind="warning">
-      <span className="font-semibold">Function is archived.</span>
+      <span className="font-semibold">Function is archived.</span> Unarchive it by enabling it in
+      your app and resyncing.
     </Banner>
   );
 }
