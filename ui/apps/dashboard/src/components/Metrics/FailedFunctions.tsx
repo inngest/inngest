@@ -1,7 +1,8 @@
+import React from 'react';
 import { NewButton } from '@inngest/components/Button';
 import { Chart, type ChartProps, type LineSeriesOption } from '@inngest/components/Chart/Chart';
 import { resolveColor } from '@inngest/components/utils/colors';
-import { differenceInMilliseconds } from '@inngest/components/utils/date';
+import { differenceInMilliseconds, formatDistanceToNow } from '@inngest/components/utils/date';
 import { isDark } from '@inngest/components/utils/theme';
 import { RiArrowRightUpLine } from '@remixicon/react';
 import resolveConfig from 'tailwindcss/resolveConfig';
@@ -17,6 +18,10 @@ import { dateFormat } from './utils';
 const {
   theme: { colors },
 } = resolveConfig(tailwindConfig);
+
+export type FunctionLookup = { [id: string]: string };
+export type CompletedType = FunctionStatusMetricsQuery['workspace']['completed'];
+export type CompletedMetricsType = FunctionStatusMetricsQuery['workspace']['completed']['metrics'];
 
 const seriesOptions: LineSeriesOption = {
   type: 'line',
@@ -38,6 +43,19 @@ export type LineChartData = {
   }>;
 };
 
+export type Rate = {
+  name: string;
+  lastOccurence?: string;
+  totalFailures: number;
+  failureRate: number;
+};
+
+export type RateListData = {
+  rateList: Rate[];
+};
+
+export type MappedData = RateListData & LineChartData;
+
 const lineColors = [
   [colors.accent.subtle, '#ec9923'],
   [colors.primary.moderate, '#2c9b63'],
@@ -56,22 +74,52 @@ const convert = (functions: EntityType[]) =>
 
 const sum = (data?: MetricsData[]) => (data ? data.reduce((acc, { value }) => acc + value, 0) : 0);
 
-const filter = ({ metrics }: FunctionStatusMetricsQuery['workspace']['completed']) =>
+const filter = ({ metrics }: CompletedType) =>
   metrics.filter(({ tagValue }) => tagValue === 'Failed');
 
-const sort = (metrics: FunctionStatusMetricsQuery['workspace']['completed']['metrics']) =>
+const sort = (metrics: CompletedMetricsType) =>
   metrics.sort(({ data: data1 }, { data: data2 }) => sum(data2) - sum(data1));
+
+//
+// Completion metrics for this function are spread across this:
+// [{id: x, data: {value}}, {id: x, data: {value}}]
+// flatten & sum all the values
+const getRate = (id: string, totalFailures: number, completed: CompletedType) => {
+  const totalCompleted = sum(
+    completed.metrics.filter((m) => m.id === id).flatMap(({ data }) => data)
+  );
+
+  return totalFailures && totalCompleted ? totalFailures / totalCompleted : 0;
+};
+
+const mapRateList = (
+  failed: CompletedMetricsType,
+  completed: CompletedType,
+  functions: FunctionLookup
+): Rate[] => {
+  return failed.map((f) => {
+    const failures = f.data.filter((d) => d.value > 0);
+    const totalFailures = sum(failures);
+    const lastOccurence = failures.at(-1)?.bucket;
+    return {
+      name: functions[f.id] || f.id,
+      lastOccurence,
+      totalFailures,
+      failureRate: getRate(f.id, totalFailures, completed),
+    };
+  });
+};
 
 const mapFailed = (
   { completed }: FunctionStatusMetricsQuery['workspace'],
-  functions: { [id: string]: string }
+  functions: FunctionLookup
 ) => {
   const dark = isDark();
   const failed = sort(filter(completed));
-
   const diff = timeDiff(failed[0]?.data[0]?.bucket, failed[0]?.data.at(-1)?.bucket);
 
   return {
+    rateList: mapRateList(failed, completed, functions),
     xAxis: {
       type: 'category',
       boundaryGap: true,
@@ -104,7 +152,7 @@ const getChartOptions = (data: LineChartData): ChartProps['option'] => {
     legend: {
       type: 'scroll',
       bottom: '0%',
-      left: '0%',
+      left: '-0%',
       icon: 'circle',
       itemWidth: 10,
       itemHeight: 10,
@@ -112,7 +160,7 @@ const getChartOptions = (data: LineChartData): ChartProps['option'] => {
     },
     grid: {
       top: '10%',
-      left: '0%',
+      left: '1%',
       right: '0%',
       bottom: '15%',
       containLabel: true,
@@ -130,7 +178,6 @@ export const FailedFunctions = ({
   functions,
 }: Partial<FunctionStatusMetricsQuery> & { functions: EntityType[] }) => {
   const env = useEnvironment();
-
   const metrics = workspace && mapFailed(workspace, convert(functions));
 
   return (
@@ -149,7 +196,43 @@ export const FailedFunctions = ({
           href={pathCreator.functions({ envSlug: env.slug })}
         />
       </div>
-      <Chart option={metrics ? getChartOptions(metrics) : {}} className="h-[300px]" />
+      <div className="flex h-full flex-row items-center">
+        <Chart option={metrics ? getChartOptions(metrics) : {}} className="h-[100%] w-[75%]" />
+        <FailedList rateList={metrics?.rateList} />
+      </div>
+    </div>
+  );
+};
+
+export const FailedList = ({ rateList }: { rateList: Rate[] | undefined }) => {
+  return (
+    <div className="border-subtle my-5 mb-5 ml-4 mt-8 flex h-full w-[25%] flex-col items-start justify-start border-l pl-4">
+      <div className="pt flex w-full flex-row items-center justify-between gap-x-3 text-xs font-medium leading-none">
+        <div>Recently failed</div>
+        <div className="flex flex-row gap-x-3 justify-self-end">
+          <div className="justify-self-end">Failed Runs</div>
+          <div>Rate</div>
+        </div>
+      </div>
+      {rateList?.map((r, i) => (
+        <React.Fragment key={`function-failed-list-${i}`}>
+          <div className="leanding-none mt-3 flex w-full flex-row items-center justify-between gap-x-3 text-xs font-light leading-none">
+            <div>{resolveColor.name}</div>
+            <div className="flex flex-row justify-end gap-x-4">
+              <div className="justify-self-end">{r.totalFailures}</div>
+              <div className="text-tertiary-moderate">
+                {r.failureRate.toLocaleString(undefined, {
+                  style: 'percent',
+                  minimumFractionDigits: 0,
+                })}
+              </div>
+            </div>
+          </div>
+          <div className="text-disabled leading none text-xs">
+            {r.lastOccurence && formatDistanceToNow(r.lastOccurence, { addSuffix: true })}
+          </div>
+        </React.Fragment>
+      ))}
     </div>
   );
 };
