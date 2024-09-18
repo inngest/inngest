@@ -2494,6 +2494,15 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		return err
 	}
 
+	metrics.IncrBatchProcessStartCounter(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			// whether batch was full or started by timeout
+			"batch_timeout": opts == nil,
+			"account_id":    payload.AccountID.String(),
+		},
+	})
+
 	if md != nil {
 		span.SetAttributes(attribute.String(consts.OtelAttrSDKRunID, md.ID.RunID.String()))
 	} else {
