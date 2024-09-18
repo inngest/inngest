@@ -34,7 +34,7 @@ export function ArchivedFuncBanner({ funcID }: Props) {
     return null;
   }
 
-  if (!data?.environment.function.archivedAt) {
+  if (!data?.environment.function?.archivedAt) {
     return null;
   }
 
