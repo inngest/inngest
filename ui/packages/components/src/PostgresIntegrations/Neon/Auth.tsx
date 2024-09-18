@@ -11,7 +11,7 @@ export default function NeonAuth({ next }: { next: () => void }) {
         publications, and a new user that subscribes to updates. Note that your admin credentials
         will not be stored and are only used for setup.
       </p>
-      <NewLink size="small" href="">
+      <NewLink size="small" href="https://neon.tech/docs/connect/connect-securely">
         Learn more about postgres credentials
       </NewLink>
       <form className="py-6">
