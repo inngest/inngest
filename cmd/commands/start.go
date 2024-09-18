@@ -97,7 +97,7 @@ func doStart(cmd *cobra.Command, args []string) {
 	}
 
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
-		ServiceName:   "lite",
+		ServiceName:   "tracing",
 		Type:          itrace.TracerTypeOTLPHTTP,
 		TraceEndpoint: "localhost:8288",
 		TraceURLPath:  "/dev/traces",

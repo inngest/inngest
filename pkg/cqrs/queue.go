@@ -14,7 +14,7 @@ type SnapshotValue struct {
 type QueueSnapshot = map[string]SnapshotValue
 type SnapshotID = ulid.ULID
 
-// QueueSnapshotManager is a lite-only manager for queue snapshots.
+// QueueSnapshotManager is a manager for queue snapshots.
 type QueueSnapshotManager interface {
 	QueueSnapshotReader
 	QueueSnapshotWriter

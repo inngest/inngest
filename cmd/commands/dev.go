@@ -88,7 +88,7 @@ func doDev(cmd *cobra.Command, args []string) {
 	tick := viper.GetInt("tick")
 
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
-		ServiceName:   "devserver",
+		ServiceName:   "tracing",
 		Type:          itrace.TracerTypeOTLPHTTP,
 		TraceEndpoint: "localhost:8288",
 		TraceURLPath:  "/dev/traces",

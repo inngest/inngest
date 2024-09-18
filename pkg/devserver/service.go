@@ -95,7 +95,7 @@ type devserver struct {
 
 func (d *devserver) Name() string {
 	if d.persistenceInterval != nil {
-		return "lite"
+		return "persistence"
 	}
 
 	return "devserver"
