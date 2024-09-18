@@ -118,6 +118,7 @@ const mapFailed = (
   const dark = isDark();
   const failed = sort(filter(completed));
   const diff = timeDiff(failed[0]?.data[0]?.bucket, failed[0]?.data.at(-1)?.bucket);
+  const dataLength = failed[0]?.data?.length || 30;
 
   return {
     rateList: mapRateList(failed, completed, functions),
@@ -126,6 +127,7 @@ const mapFailed = (
       boundaryGap: true,
       data: failed[0]?.data.map(({ bucket }) => bucket) || ['None Found'],
       axisLabel: {
+        interval: dataLength <= 40 ? 2 : dataLength / (dataLength / 12),
         formatter: (value: string) => dateFormat(value, diff),
       },
     },
@@ -207,7 +209,7 @@ export const FailedFunctions = ({
 
 export const FailedList = ({ rateList }: { rateList: Rate[] | undefined }) => {
   return (
-    <div className="border-subtle my-5 mb-5 ml-4 mt-8 flex h-full w-[25%] flex-col items-start justify-start border-l pl-4">
+    <div className="border-subtle my-5 mb-5 ml-4 mt-8 flex h-full w-[25%] min-w-[220px] flex-col items-start justify-start border-l pl-4">
       <div className="pt flex w-full flex-row items-center justify-between gap-x-3 text-xs font-medium leading-none">
         <div>Recently failed</div>
         <div className="flex flex-row gap-x-3 justify-self-end">
