@@ -357,7 +357,7 @@ func (h *handler) inBandSync(
 		}
 	}
 
-	valid, skey, err := ValidateSignature(
+	valid, skey, err := ValidateRequestSignature(
 		ctx,
 		sig,
 		h.GetSigningKey(),
@@ -440,7 +440,7 @@ func (h *handler) inBandSync(
 		return fmt.Errorf("error marshalling response: %w", err)
 	}
 
-	resSig, err := Sign(ctx, time.Now(), []byte(skey), respByt)
+	resSig, err := signWithoutJCS(time.Now(), []byte(skey), respByt)
 	if err != nil {
 		return fmt.Errorf("error signing response: %w", err)
 	}
@@ -701,7 +701,7 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-	if valid, _, err := ValidateSignature(
+	if valid, _, err := ValidateRequestSignature(
 		r.Context(),
 		sig,
 		h.GetSigningKey(),
@@ -913,7 +913,7 @@ func (h *handler) introspect(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	sig := r.Header.Get(HeaderKeySignature)
-	valid, _, _ := ValidateSignature(
+	valid, _, _ := ValidateRequestSignature(
 		r.Context(),
 		sig,
 		h.GetSigningKey(),
@@ -974,7 +974,7 @@ func (h *handler) trust(
 		return
 	}
 
-	valid, key, err := ValidateSignature(
+	valid, key, err := ValidateRequestSignature(
 		ctx,
 		r.Header.Get("X-Inngest-Signature"),
 		h.GetSigningKey(),
@@ -1001,7 +1001,7 @@ func (h *handler) trust(
 		return
 	}
 
-	resSig, err := Sign(ctx, time.Now(), []byte(key), byt)
+	resSig, err := signWithoutJCS(time.Now(), []byte(key), byt)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, err)
 		return

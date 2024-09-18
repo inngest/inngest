@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gowebpki/jcs"
@@ -50,10 +51,29 @@ func Sign(ctx context.Context, at time.Time, key, body []byte) (string, error) {
 	return fmt.Sprintf("t=%d&s=%s", ts, sig), nil
 }
 
-// validateSignature ensures that the signature for the given body is signed with
+// signWithoutJCS signs a request body with the given key at the given
+// timestamp. It's the same as Sign but does not perform canonicalization.
+func signWithoutJCS(at time.Time, key, body []byte) (string, error) {
+	key = normalizeKey(key)
+
+	ts := at.Unix()
+	if at.IsZero() {
+		ts = time.Now().Unix()
+	}
+
+	mac := hmac.New(sha256.New, key)
+	_, _ = mac.Write(body)
+	// Write the timestamp as a unix timestamp to the hmac to prevent
+	// timing attacks.
+	_, _ = mac.Write([]byte(fmt.Sprintf("%d", ts)))
+	sig := hex.EncodeToString(mac.Sum(nil))
+	return fmt.Sprintf("t=%d&s=%s", ts, sig), nil
+}
+
+// validateRequestSignature ensures that the signature for the given body is signed with
 // the given key within a given time period to prevent invalid requests or
 // replay attacks.
-func validateSignature(ctx context.Context, sig string, key, body []byte) (bool, error) {
+func validateRequestSignature(ctx context.Context, sig string, key, body []byte) (bool, error) {
 	key = normalizeKey(key)
 
 	val, err := url.ParseQuery(sig)
@@ -80,11 +100,11 @@ func validateSignature(ctx context.Context, sig string, key, body []byte) (bool,
 	return true, nil
 }
 
-// ValidateSignature ensures that the signature for the given body is signed with
+// ValidateRequestSignature ensures that the signature for the given body is signed with
 // the given key within a given time period to prevent invalid requests or
 // replay attacks. A signing key fallback is used if provided. Returns the
 // correct signing key, which is useful when signing responses
-func ValidateSignature(
+func ValidateRequestSignature(
 	ctx context.Context,
 	sig string,
 	signingKey string,
@@ -98,11 +118,11 @@ func ValidateSignature(
 		return true, correctKey, nil
 	}
 
-	valid, err := validateSignature(ctx, sig, []byte(signingKey), body)
+	valid, err := validateRequestSignature(ctx, sig, []byte(signingKey), body)
 	if !valid {
 		if signingKeyFallback != "" {
 			// Validation failed with the primary key, so try the fallback key
-			valid, err := validateSignature(ctx, sig, []byte(signingKeyFallback), body)
+			valid, err := validateRequestSignature(ctx, sig, []byte(signingKeyFallback), body)
 			if valid {
 				correctKey = signingKeyFallback
 			}
@@ -113,6 +133,39 @@ func ValidateSignature(
 	}
 
 	return valid, correctKey, err
+}
+
+// ValidateResponseSignature validates the response signature. It's the same as
+// request signature validation except doesn't perform canonicalization.
+func ValidateResponseSignature(ctx context.Context, sig string, key, body []byte) (bool, error) {
+	// Trim the trailing newline if it exists. This is necessary because Go's
+	// JSON encoder adds a trailing newline
+	body = []byte(strings.TrimSuffix(string(body), "\n"))
+
+	key = normalizeKey(key)
+
+	val, err := url.ParseQuery(sig)
+	if err != nil || (val.Get("t") == "" || val.Get("s") == "") {
+		return false, ErrInvalidSignature
+	}
+	str, err := strconv.Atoi(val.Get("t"))
+	if err != nil {
+		return false, ErrInvalidTimestamp
+	}
+	ts := time.Unix(int64(str), 0)
+	if time.Since(ts) > signatureTimeDeltaMax {
+		return false, ErrExpiredSignature
+	}
+
+	actual, err := signWithoutJCS(ts, key, body)
+	if err != nil {
+		return false, err
+	}
+	if actual != sig {
+		return false, ErrInvalidSignature
+	}
+
+	return true, nil
 }
 
 func normalizeKey(key []byte) []byte {
