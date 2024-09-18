@@ -414,6 +414,7 @@ func (l traceLifecycle) OnFunctionSkipped(
 		spanID = &sid
 	}
 
+	runID := md.ID.RunID
 	slug := md.Config.FunctionSlug()
 
 	evtIDs := make([]string, len(md.Config.EventIDs))
@@ -421,6 +422,60 @@ func (l traceLifecycle) OnFunctionSkipped(
 		evtIDs[i] = e.String()
 	}
 
+	// NOTE: generate the trigger span since it's skipped
+	{
+		_, trigger := NewSpan(ctx,
+			WithScope(consts.OtelScopeTrigger),
+			WithName(consts.OtelSpanTrigger),
+			WithTimestamp(ulid.Time(runID.Time())),
+			WithSpanAttributes(
+				attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
+				attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
+				attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
+				attribute.String(consts.OtelSysFunctionID, md.ID.FunctionID.String()),
+				attribute.String(consts.OtelSysFunctionSlug, md.Config.FunctionSlug()),
+				attribute.Int(consts.OtelSysFunctionVersion, md.Config.FunctionVersion),
+				attribute.String(consts.OtelAttrSDKRunID, runID.String()),
+				attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusScheduled.ToCode()),
+				attribute.String(consts.OtelSysEventIDs, strings.Join(evtIDs, ",")),
+			),
+		)
+		defer trigger.End()
+
+		schedule := md.Config.CronSchedule()
+		if schedule != nil {
+			trigger.SetAttributes(attribute.String(consts.OtelSysCronExpr, *schedule))
+		}
+
+		batchID := md.Config.BatchID
+		if batchID != nil {
+			trigger.SetAttributes(
+				attribute.String(consts.OtelSysBatchID, batchID.String()),
+				attribute.Int64(consts.OtelSysBatchTS, int64(batchID.Time())),
+			)
+		}
+		if md.Config.DebounceFlag() {
+			trigger.SetAttributes(attribute.Bool(consts.OtelSysDebounceTimeout, true))
+		}
+		if md.Config.Context != nil {
+			if val, ok := md.Config.Context[consts.OtelPropagationLinkKey]; ok {
+				if link, ok := val.(string); ok {
+					trigger.SetAttributes(attribute.String(consts.OtelPropagationLinkKey, link))
+				}
+			}
+		}
+
+		if err := trigger.SetEvents(ctx, s.Events, md.Config.EventIDMapping()); err != nil {
+			l.log.Warn("error settings events for trigger",
+				"lifecycle", "OnFunctionSkipped",
+				"errors", err,
+				"meta", md,
+				"evts", s.Events,
+			)
+		}
+	}
+
+	// Generate the function span
 	_, span := NewSpan(ctx,
 		WithScope(consts.OtelScopeFunction),
 		WithName(slug),
@@ -433,7 +488,7 @@ func (l traceLifecycle) OnFunctionSkipped(
 			attribute.String(consts.OtelSysFunctionID, md.ID.FunctionID.String()),
 			attribute.String(consts.OtelSysFunctionSlug, slug),
 			attribute.Int(consts.OtelSysFunctionVersion, md.Config.FunctionVersion),
-			attribute.String(consts.OtelAttrSDKRunID, md.ID.RunID.String()),
+			attribute.String(consts.OtelAttrSDKRunID, runID.String()),
 			attribute.String(consts.OtelSysEventIDs, strings.Join(evtIDs, ",")),
 			attribute.String(consts.OtelSysIdempotencyKey, md.IdempotencyKey()),
 			attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusSkipped.ToCode()),
