@@ -28,7 +28,7 @@ var (
 	longDescription = fmt.Sprintf(
 		"%s\n%s\n%s%s\n",
 		cli.TextStyle.Render(letters),
-		cli.TextStyle.Render("Build event-driven queues with zero infra. "),
+		cli.TextStyle.Render("The durable execution engine with built-in flow control."),
 		cli.TextStyle.Render("Request features, get help, and chat with us: "),
 		cli.BoldStyle.Render("https://www.inngest.com/discord"),
 	)
@@ -37,7 +37,7 @@ var (
 func Execute() {
 	rootCmd := &cobra.Command{
 		Use:   "inngest",
-		Short: "A serverless event-driven infrastructure platform",
+		Short: "The durable execution engine with built-in flow control.",
 		Long:  longDescription,
 		CompletionOptions: cobra.CompletionOptions{
 			DisableDefaultCmd: true,
