@@ -19,7 +19,7 @@ import (
 func NewCmdStart() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "start",
-		Short:   "[Experimental] Run Inngest as a single-node service.",
+		Short:   "[Beta] Run Inngest as a single-node service.",
 		Example: "inngest start",
 		Run:     doStart,
 	}
@@ -41,7 +41,7 @@ func NewCmdStart() *cobra.Command {
 	persistenceFlags := pflag.NewFlagSet("persistence", pflag.ExitOnError)
 	persistenceFlags.String("sqlite-dir", "", "Directory for where to write SQLite database.")
 	persistenceFlags.String("redis-uri", "", "Redis server URI for external queue and run state. Defaults to self-contained, in-memory Redis server with periodic snapshot backups.")
-	// persistenceFlags.String("postgres-uri", "", "PostgreSQL database URI for configuration and history persistence. Defaults to SQLite database.")
+	// persistenceFlags.String("postgres-uri", "", "[Experimental] PostgreSQL database URI for configuration and history persistence. Defaults to SQLite database.")
 	cmd.Flags().AddFlagSet(persistenceFlags)
 	groups[persistenceFlags] = "Persistence options"
 
