@@ -108,7 +108,6 @@ func (r *mutationResolver) InvokeFunction(
 		run.WithScope(consts.OtelScopeInvoke),
 		run.WithNewRoot(),
 		run.WithSpanAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysFunctionSlug, functionSlug),
 		),
 	)
