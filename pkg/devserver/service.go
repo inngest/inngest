@@ -102,13 +102,11 @@ func (d *devserver) Name() string {
 }
 
 func (d *devserver) PrettyName() string {
-	name := strings.Title(d.Name())
-
-	if name == "Devserver" {
-		return "Dev Server"
+	if d.Name() != "devserver" {
+		return ""
 	}
 
-	return name
+	return "Dev Server"
 }
 
 func (d *devserver) Pre(ctx context.Context) error {
@@ -137,9 +135,14 @@ func (d *devserver) Run(ctx context.Context) error {
 		go func() {
 			<-time.After(25 * time.Millisecond)
 			addr := fmt.Sprintf("%s:%d", d.Opts.Config.EventAPI.Addr, d.Opts.Config.EventAPI.Port)
+			prettyName := d.PrettyName()
+			if prettyName != "" {
+				prettyName = " " + prettyName
+			}
+
 			fmt.Println("")
 			fmt.Println("")
-			fmt.Print(cli.BoldStyle.Render(fmt.Sprintf("\tInngest %s online ", d.PrettyName())))
+			fmt.Print(cli.BoldStyle.Render(fmt.Sprintf("\tInngest%s online ", prettyName)))
 			fmt.Printf(cli.TextStyle.Render(fmt.Sprintf("at %s, visible at the following URLs:", addr)) + "\n\n")
 			for n, ip := range localIPs() {
 				style := cli.BoldStyle
