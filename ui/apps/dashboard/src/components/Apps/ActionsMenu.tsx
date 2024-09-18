@@ -50,25 +50,27 @@ export const ActionsMenu = ({
             </OptionalTooltip>
           </Listbox.Option>
 
-          <Listbox.Option
-            className="m-2 flex h-8 cursor-pointer items-center text-[13px]"
-            value="signingKeys"
-          >
-            <OptionalTooltip
-              tooltip={disableArchive && 'Parent app is archived. Archive action not available.'}
+          {!isArchived && (
+            <Listbox.Option
+              className="m-2 flex h-8 cursor-pointer items-center text-[13px]"
+              value="signingKeys"
             >
-              <NewButton
-                appearance="ghost"
-                kind="danger"
-                size="medium"
-                icon={<RiArchive2Line className="h-4 w-4" />}
-                iconSide="left"
-                label={isArchived ? 'Unarchive app' : 'Archive app'}
-                className="m-0 w-full justify-start"
-                onClick={showArchive}
-              />
-            </OptionalTooltip>
-          </Listbox.Option>
+              <OptionalTooltip
+                tooltip={disableArchive && 'Parent app is archived. Archive action not available.'}
+              >
+                <NewButton
+                  appearance="ghost"
+                  kind="danger"
+                  size="medium"
+                  icon={<RiArchive2Line className="h-4 w-4" />}
+                  iconSide="left"
+                  label={'Archive app'}
+                  className="m-0 w-full justify-start"
+                  onClick={showArchive}
+                />
+              </OptionalTooltip>
+            </Listbox.Option>
+          )}
         </Listbox.Options>
       </div>
     </Listbox>
