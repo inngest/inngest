@@ -7,13 +7,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"io/fs"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 
 	"github.com/google/uuid"
 	"github.com/inngest/expr"
@@ -241,11 +242,12 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 	//
 	// In future/other metadata stores this is (or will be) transactional.
 	res := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
-		return c.B().Setnx().Key(
+		return c.B().Set().Key(
 			fnRunState.kg.Idempotency(ctx, isSharded, input.Identifier),
-		).Value("").Build()
+		).Value("").Nx().Ex(consts.FunctionIdempotencyPeriod).Build()
 	})
-	if set, err := res.AsInt64(); err == nil && set == 0 {
+	set, err := res.AsBool()
+	if (err == nil || rueidis.IsRedisNil(err)) && !set {
 		return nil, state.ErrIdentifierExists
 	}
 
