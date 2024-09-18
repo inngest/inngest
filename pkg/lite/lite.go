@@ -57,6 +57,7 @@ type StartOpts struct {
 	RedisURI     string        `json:"redis-uri"`
 	PollInterval int           `json:"poll-interval"`
 	URLs         []string      `json:"urls"`
+	Tick         time.Duration `json:"tick"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -86,7 +87,10 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
-	tick := devserver.DefaultTick
+	tick := opts.Tick
+	if tick < 1 {
+		tick = devserver.DefaultTickDuration
+	}
 
 	// Initialize the devserver
 	dbcqrs := sqlitecqrs.NewCQRS(db)
