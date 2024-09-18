@@ -15,7 +15,10 @@ export default function NeonFormat({ next }: { next: () => void }) {
         reverted. Enabling logical replication also restarts all computes in your Neon project,
         meaning active connections will be dropped and have to reconnect.
       </p>
-      <NewLink size="small" href="">
+      <NewLink
+        size="small"
+        href="https://neon.tech/docs/guides/logical-replication-concepts#write-ahead-log-wal"
+      >
         Learn more about WAL level
       </NewLink>
 
