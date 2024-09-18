@@ -213,6 +213,8 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan,
 			fnstatus = rpbv2.SpanStatus_CANCELLED
 		case enums.RunStatusFailed, enums.RunStatusOverflowed:
 			fnstatus = rpbv2.SpanStatus_FAILED
+		case enums.RunStatusSkipped:
+			fnstatus = rpbv2.SpanStatus_SKIPPED
 		}
 		res.Status = fnstatus
 
@@ -1223,7 +1225,7 @@ func hasFinished(rs *rpbv2.RunSpan) bool {
 		return false
 	}
 	switch rs.Status {
-	case rpbv2.SpanStatus_CANCELLED, rpbv2.SpanStatus_COMPLETED, rpbv2.SpanStatus_FAILED:
+	case rpbv2.SpanStatus_CANCELLED, rpbv2.SpanStatus_COMPLETED, rpbv2.SpanStatus_FAILED, rpbv2.SpanStatus_SKIPPED:
 		return true
 	default:
 		return false
