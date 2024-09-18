@@ -46,6 +46,7 @@ enum SpanStatus {
   COMPLETED = 300;
   FAILED = 400;
   CANCELLED = 500;
+  SKIPPED = 600;
 }
 
 enum SpanStepOp {
