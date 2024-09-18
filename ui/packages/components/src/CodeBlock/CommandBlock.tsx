@@ -65,50 +65,48 @@ const CommandBlock = ({ currentTabContent }: { currentTabContent?: TabsProps }) 
   return (
     <>
       {monaco && (
-        <>
-          <div ref={wrapperRef}>
-            <Editor
-              defaultLanguage={activeTabContent.language}
-              value={activeTabContent.content}
-              theme="inngest-theme"
-              onMount={handleEditorDidMount}
-              onChange={updateEditorHeight}
-              options={{
-                readOnly: activeTabContent.readOnly || true,
-                minimap: {
-                  enabled: false,
-                },
-                lineNumbers: 'off',
-                contextmenu: false,
-                scrollBeyondLastLine: false,
-                fontFamily: FONT.font,
-                fontSize: FONT.size,
-                fontWeight: 'light',
-                lineHeight: LINE_HEIGHT,
-                renderLineHighlight: 'none',
-                renderWhitespace: 'none',
-                guides: {
-                  indentation: false,
-                  highlightActiveBracketPair: false,
-                  highlightActiveIndentation: false,
-                },
-                scrollbar: {
-                  verticalScrollbarSize: 10,
-                  alwaysConsumeMouseWheel: false,
-                  vertical: 'hidden',
-                  horizontal: 'hidden',
-                },
-                padding: {
-                  top: 10,
-                  bottom: 10,
-                },
-                wordWrap: 'off',
-                wrappingStrategy: 'advanced',
-                overviewRulerLanes: 0,
-              }}
-            />
-          </div>
-        </>
+        <div ref={wrapperRef}>
+          <Editor
+            defaultLanguage={activeTabContent.language}
+            value={activeTabContent.content}
+            theme="inngest-theme"
+            onMount={handleEditorDidMount}
+            onChange={updateEditorHeight}
+            options={{
+              readOnly: activeTabContent.readOnly || true,
+              minimap: {
+                enabled: false,
+              },
+              lineNumbers: 'off',
+              contextmenu: false,
+              scrollBeyondLastLine: false,
+              fontFamily: FONT.font,
+              fontSize: FONT.size,
+              fontWeight: 'light',
+              lineHeight: LINE_HEIGHT,
+              renderLineHighlight: 'none',
+              renderWhitespace: 'none',
+              guides: {
+                indentation: false,
+                highlightActiveBracketPair: false,
+                highlightActiveIndentation: false,
+              },
+              scrollbar: {
+                verticalScrollbarSize: 10,
+                alwaysConsumeMouseWheel: false,
+                vertical: 'hidden',
+                horizontal: 'hidden',
+              },
+              padding: {
+                top: 10,
+                bottom: 10,
+              },
+              wordWrap: 'off',
+              wrappingStrategy: 'advanced',
+              overviewRulerLanes: 0,
+            }}
+          />
+        </div>
       )}
     </>
   );
