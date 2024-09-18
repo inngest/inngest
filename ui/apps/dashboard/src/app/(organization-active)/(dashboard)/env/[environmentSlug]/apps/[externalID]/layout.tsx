@@ -12,6 +12,7 @@ import { ArchivedAppBanner } from '@/components/ArchivedAppBanner';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { ArchiveModal } from './ArchiveModal';
 import { ResyncButton } from './ResyncButton';
+import { UnarchiveButton } from './UnarchiveButton';
 import { ValidateModal } from './ValidateButton/ValidateModal';
 import { useNavData } from './useNavData';
 
@@ -53,7 +54,6 @@ export default function Layout({ children, params: { externalID } }: Props) {
   return (
     <>
       <ArchivedAppBanner externalAppID={externalAppID} />
-
       {res.data?.latestSync?.url && (
         <ValidateModal
           isOpen={showValidate}
@@ -89,7 +89,10 @@ export default function Layout({ children, params: { externalID } }: Props) {
                 disableValidate={res.data.isParentArchived}
               />
             )}
-            {res.data?.latestSync?.url && (
+            {res.data && res.data.isArchived && (
+              <UnarchiveButton showArchive={() => setShowArchive(true)} />
+            )}
+            {res.data?.latestSync?.url && !res.data.isArchived && (
               <ResyncButton
                 appExternalID={externalAppID}
                 disabled={res.data.isArchived}
