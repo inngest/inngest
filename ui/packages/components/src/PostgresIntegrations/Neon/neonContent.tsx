@@ -3,6 +3,7 @@ import { RiCodeBlock, RiLinksFill, RiLockUnlockLine } from '@remixicon/react';
 import { IconNeon } from '../../icons/platforms/Neon';
 import {
   type ConnectPostgresIntegrationContent,
+  type IntegrationPageContent,
   type PostgresIntegrationMenuContent,
 } from '../types';
 
@@ -48,4 +49,11 @@ export const neonMenuStepContent: PostgresIntegrationMenuContent = {
       icon: RiLinksFill,
     },
   },
+};
+
+export const neonIntegrationPageContent: IntegrationPageContent = {
+  title: 'Neon',
+  logo: <IconNeon className="text-onContrast" size={24} />,
+  // TO DO: Update once we have Neon docs in deploy section
+  url: 'https://www.inngest.com/docs/',
 };
