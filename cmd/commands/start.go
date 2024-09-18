@@ -72,14 +72,14 @@ func NewCmdStart() *cobra.Command {
 
 func doStart(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
-	// TODO Likely need a `Lite()`
+	// TODO Likely need a `Start()`
 	conf, err := config.Dev(ctx)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 
-	if err = localconfig.InitLiteConfig(ctx, cmd); err != nil {
+	if err = localconfig.InitStartConfig(ctx, cmd); err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}

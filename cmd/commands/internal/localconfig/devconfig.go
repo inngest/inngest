@@ -23,8 +23,8 @@ func InitDevConfig(ctx context.Context, cmd *cobra.Command) error {
 	return nil
 }
 
-func InitLiteConfig(ctx context.Context, cmd *cobra.Command) error {
-	if err := mapLiteFlags(cmd); err != nil {
+func InitStartConfig(ctx context.Context, cmd *cobra.Command) error {
+	if err := mapStartFlags(cmd); err != nil {
 		return err
 	}
 
@@ -95,8 +95,8 @@ func mapDevFlags(cmd *cobra.Command) error {
 	return err
 }
 
-// mapLiteFlags binds the command line flags to the viper configuration
-func mapLiteFlags(cmd *cobra.Command) error {
+// mapStartFlags binds the command line flags to the viper configuration
+func mapStartFlags(cmd *cobra.Command) error {
 	var err error
 	err = errors.Join(err, viper.BindPFlag("host", cmd.Flags().Lookup("host")))
 	err = errors.Join(err, viper.BindPFlag("port", cmd.Flags().Lookup("port")))

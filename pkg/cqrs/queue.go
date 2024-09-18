@@ -14,18 +14,18 @@ type SnapshotValue struct {
 type QueueSnapshot = map[string]SnapshotValue
 type SnapshotID = ulid.ULID
 
-// LiteQueueSnapshotManager is a lite-only manager for queue snapshots.
-type LiteQueueSnapshotManager interface {
-	LiteQueueSnapshotReader
-	LiteQueueSnapshotWriter
+// QueueSnapshotManager is a lite-only manager for queue snapshots.
+type QueueSnapshotManager interface {
+	QueueSnapshotReader
+	QueueSnapshotWriter
 }
 
-type LiteQueueSnapshotReader interface {
+type QueueSnapshotReader interface {
 	GetQueueSnapshot(ctx context.Context, snapshotID SnapshotID) (*QueueSnapshot, error)
 	GetLatestQueueSnapshot(ctx context.Context) (*QueueSnapshot, error)
 }
 
-type LiteQueueSnapshotWriter interface {
+type QueueSnapshotWriter interface {
 	InsertQueueSnapshot(ctx context.Context, params InsertQueueSnapshotParams) (SnapshotID, error)
 	InsertQueueSnapshotChunk(ctx context.Context, params InsertQueueSnapshotChunkParams) error
 }

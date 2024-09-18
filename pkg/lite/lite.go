@@ -291,7 +291,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	)
 
 	// The devserver embeds the event API.
-	pi := consts.LiteDefaultPersistenceInterval
+	pi := consts.StartDefaultPersistenceInterval
 	persistenceInterval := &pi
 	if opts.RedisURI != "" {
 		// If we're using an external Redis, we rely on that to persist and
