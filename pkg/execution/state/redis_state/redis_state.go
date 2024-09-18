@@ -246,7 +246,7 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 			fnRunState.kg.Idempotency(ctx, isSharded, input.Identifier),
 		).Value("").Nx().Ex(consts.FunctionIdempotencyPeriod).Build()
 	})
-	if set, err := res.AsInt64(); err == nil && set == 0 {
+	if set, err := res.AsBool(); err == nil && !set {
 		return nil, state.ErrIdentifierExists
 	}
 
