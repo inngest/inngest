@@ -55,9 +55,9 @@ func NewCmdStart(rootCmd *cobra.Command) *cobra.Command {
 
 	cmd.SetUsageFunc(func(c *cobra.Command) error {
 		fmt.Printf("%s\n  %s\n\n%s\n%s\n\n",
-			"Usage",
+			"Usage:",
 			"inngest start [flags]",
-			"Examples",
+			"Examples:",
 			"inngest start",
 		)
 
