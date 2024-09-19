@@ -7,8 +7,6 @@ import (
 )
 
 const (
-	devServerURL = "http://127.0.0.1:8288"
-
 	envKeyAllowInBandSync = "INNGEST_ALLOW_IN_BAND_SYNC"
 )
 
@@ -33,7 +31,7 @@ func DevServerURL() string {
 			return dev
 		}
 	}
-	return devServerURL
+	return devServerOrigin
 }
 
 func isTrue(val string) bool {
