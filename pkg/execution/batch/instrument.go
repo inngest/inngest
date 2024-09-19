@@ -7,55 +7,65 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
+	"github.com/rs/zerolog"
 	"sync"
 	"time"
 )
 
 const pkgName = "execution.batch"
 
-func InstrumentBatching(ctx context.Context, q queue.Queue, b *redis_state.BatchClient) error {
-	log := logger.From(context.Background())
-	configLeaser, ok := q.(redis_state.ConfigLeaser)
+type batchInstrumenter struct {
+	queue        queue.Queue
+	batchClient  *redis_state.BatchClient
+	configLeaser redis_state.ConfigLeaser
+	logger       *zerolog.Logger
+	batchManager BatchManager
+
+	leaseLock       *sync.RWMutex
+	existingLeaseId *ulid.ULID
+}
+
+func (b *batchInstrumenter) Name() string {
+	return "batch-instrumenter"
+}
+
+func (b *batchInstrumenter) Pre(ctx context.Context) error {
+	configLeaser, ok := b.queue.(redis_state.ConfigLeaser)
 	if !ok {
 		return fmt.Errorf("expected config leaser to be passed in")
 	}
+	b.configLeaser = configLeaser
+	return nil
+}
 
-	batchManager := NewRedisBatchManager(b, q)
-
-	var currentLease func() *ulid.ULID
-	var setLease func(leaseId *ulid.ULID)
-
-	{
-		leaseLock := sync.RWMutex{}
-		var existingLeaseId *ulid.ULID
-
-		currentLease = func() *ulid.ULID {
-			leaseLock.RLock()
-			defer leaseLock.RUnlock()
-			if existingLeaseId == nil {
-				return nil
-			}
-			copied := *existingLeaseId
-			return &copied
-		}
-
-		setLease = func(leaseId *ulid.ULID) {
-			leaseLock.Lock()
-			defer leaseLock.Unlock()
-			copied := *leaseId
-			existingLeaseId = &copied
-		}
+func (b *batchInstrumenter) currentLease() *ulid.ULID {
+	b.leaseLock.RLock()
+	defer b.leaseLock.RUnlock()
+	if b.existingLeaseId == nil {
+		return nil
 	}
+	copied := *b.existingLeaseId
+	return &copied
+}
 
+func (b *batchInstrumenter) setLease(leaseId *ulid.ULID) {
+	b.leaseLock.Lock()
+	defer b.leaseLock.Unlock()
+	copied := *leaseId
+	b.existingLeaseId = &copied
+}
+
+func (b *batchInstrumenter) Run(ctx context.Context) error {
 	{
-		leaseID, err := configLeaser.ConfigLease(ctx, b.KeyGenerator().BatchInstrument(), redis_state.ConfigLeaseDuration, currentLease())
+		leaseID, err := b.configLeaser.ConfigLease(ctx, b.batchClient.KeyGenerator().BatchInstrument(), redis_state.ConfigLeaseDuration, b.currentLease())
 		if err != redis_state.ErrConfigAlreadyLeased && err != nil {
 			return fmt.Errorf("could not lease instrument: %w", err)
 		}
 
-		setLease(leaseID)
+		b.setLease(leaseID)
 	}
 
 	batchInstrumentTicker := time.NewTicker(10 * time.Second)
@@ -65,33 +75,35 @@ func InstrumentBatching(ctx context.Context, q queue.Queue, b *redis_state.Batch
 		for {
 			select {
 			case <-ctx.Done():
+				batchInstrumentTicker.Stop()
+				leaseTick.Stop()
 				return
 			case <-leaseTick.C:
-				leaseID, err := configLeaser.ConfigLease(ctx, b.KeyGenerator().BatchInstrument(), redis_state.ConfigLeaseDuration, currentLease())
+				leaseID, err := b.configLeaser.ConfigLease(ctx, b.batchClient.KeyGenerator().BatchInstrument(), redis_state.ConfigLeaseDuration, b.currentLease())
 				if errors.Is(err, redis_state.ErrConfigAlreadyLeased) {
-					setLease(nil)
+					b.setLease(nil)
 					continue
 				}
 
 				if err != nil {
-					log.Error().Err(err).Msg("error claiming instrumentation lease")
-					setLease(nil)
+					b.logger.Error().Err(err).Msg("error claiming instrumentation lease")
+					b.setLease(nil)
 					continue
 				}
 
-				setLease(leaseID)
+				b.setLease(leaseID)
 				continue
 			case <-batchInstrumentTicker.C:
 			}
 
-			pendingBatchCount, err := batchManager.PendingBatchCount(ctx)
+			pendingBatchCount, err := b.batchManager.PendingBatchCount(ctx)
 			if err != nil {
-				log.Error().Err(err).Msg("error retrieving pending batches")
+				b.logger.Error().Err(err).Msg("error retrieving pending batches")
 				continue
 			}
 
 			for accountId, count := range pendingBatchCount {
-				log.Trace().Str("account_id", accountId.String()).Int64("count", count).Msg("pending batch count")
+				b.logger.Trace().Str("account_id", accountId.String()).Int64("count", count).Msg("pending batch count")
 				metrics.HistogramPendingEventBatches(ctx, count, metrics.HistogramOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
@@ -103,4 +115,18 @@ func InstrumentBatching(ctx context.Context, q queue.Queue, b *redis_state.Batch
 	}()
 
 	return nil
+}
+
+func (b batchInstrumenter) Stop(ctx context.Context) error {
+	return nil
+}
+
+func NewBatchInstrumenter(ctx context.Context, b *redis_state.BatchClient, q queue.Queue) service.Service {
+	return &batchInstrumenter{
+		batchClient:     b,
+		logger:          logger.From(ctx),
+		batchManager:    NewRedisBatchManager(b, q),
+		leaseLock:       &sync.RWMutex{},
+		existingLeaseId: nil,
+	}
 }
