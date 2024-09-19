@@ -24,7 +24,7 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-func NewRedisBatchManager(b *redis_state.BatchClient, q redis_state.QueueManager) BatchManager {
+func NewRedisBatchManager(b *redis_state.BatchClient, q queue.Producer) BatchManager {
 	return redisBatchManager{
 		b: b,
 		q: q,
@@ -33,7 +33,7 @@ func NewRedisBatchManager(b *redis_state.BatchClient, q redis_state.QueueManager
 
 type redisBatchManager struct {
 	b *redis_state.BatchClient
-	q redis_state.QueueManager
+	q queue.Producer
 }
 
 func (b redisBatchManager) batchKey(ctx context.Context, evt event.Event, fn inngest.Function) (string, error) {

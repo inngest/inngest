@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -14,7 +15,7 @@ import (
 
 const pkgName = "execution.batch"
 
-func InstrumentBatching(ctx context.Context, q redis_state.QueueManager, b *redis_state.BatchClient) error {
+func InstrumentBatching(ctx context.Context, q queue.Queue, b *redis_state.BatchClient) error {
 	log := logger.From(context.Background())
 	configLeaser, ok := q.(redis_state.ConfigLeaser)
 	if !ok {
