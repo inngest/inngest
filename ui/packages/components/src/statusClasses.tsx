@@ -15,6 +15,7 @@ const backgroundClasses: { [key in FunctionRunStatus | ReplayRunStatus | 'UNKNOW
   UNKNOWN: 'bg-status-cancelled',
   SKIPPED_PAUSED: 'bg-accent-moderate',
   PAUSED: 'bg-status-paused',
+  SKIPPED: 'bg-status-paused',
 };
 
 export function getStatusBackgroundClass(status: string): string {
@@ -34,6 +35,7 @@ const borderClasses: { [key in FunctionRunStatus | ReplayRunStatus | 'UNKNOWN']:
   UNKNOWN: 'border-status-cancelled',
   SKIPPED_PAUSED: 'border-accent-moderate',
   PAUSED: 'border-accent-paused',
+  SKIPPED: 'border-accent-paused',
 };
 
 export function getStatusBorderClass(status: string): string {
@@ -53,6 +55,7 @@ const textClasses: { [key in FunctionRunStatus | ReplayRunStatus | 'UNKNOWN']: s
   UNKNOWN: 'text-status-cancelledText',
   SKIPPED_PAUSED: 'text-accent-moderate',
   PAUSED: 'text-status-pausedText',
+  SKIPPED: 'text-status-pausedText',
 };
 
 export function getStatusTextClass(status: string): string {
