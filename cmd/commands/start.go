@@ -44,7 +44,7 @@ func NewCmdStart(rootCmd *cobra.Command) *cobra.Command {
 	groups = append(groups, FlagGroup{name: "Flags:", fs: baseFlags})
 
 	persistenceFlags := pflag.NewFlagSet("persistence", pflag.ExitOnError)
-	// persistenceFlags.String("sqlite-dir", "", "Directory for where to write SQLite database.")
+	persistenceFlags.String("sqlite-dir", "", "Directory for where to write SQLite database.")
 	persistenceFlags.String("redis-uri", "", "Redis server URI for external queue and run state. Defaults to self-contained, in-memory Redis server with periodic snapshot backups.")
 	// persistenceFlags.String("postgres-uri", "", "[Experimental] PostgreSQL database URI for configuration and history persistence. Defaults to SQLite database.")
 	cmd.Flags().AddFlagSet(persistenceFlags)
@@ -129,6 +129,7 @@ func doStart(cmd *cobra.Command, args []string) {
 		RetryInterval: viper.GetInt("retry-interval"),
 		Tick:          time.Duration(tick) * time.Millisecond,
 		URLs:          viper.GetStringSlice("urls"),
+		SQLiteDir:     viper.GetString("sqlite-dir"),
 	}
 
 	err = lite.New(ctx, opts)
