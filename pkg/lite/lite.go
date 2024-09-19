@@ -59,6 +59,7 @@ type StartOpts struct {
 	URLs          []string      `json:"urls"`
 	Tick          time.Duration `json:"tick"`
 	RetryInterval int           `json:"retry_interval"`
+	SQLiteDir     string        `json:"sqlite-dir"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -83,7 +84,10 @@ func New(ctx context.Context, opts StartOpts) error {
 }
 
 func start(ctx context.Context, opts StartOpts) error {
-	db, err := sqlitecqrs.New(sqlitecqrs.SqliteCQRSOptions{InMemory: false})
+	db, err := sqlitecqrs.New(sqlitecqrs.SqliteCQRSOptions{
+		InMemory:  false,
+		Directory: opts.SQLiteDir,
+	})
 	if err != nil {
 		return err
 	}
