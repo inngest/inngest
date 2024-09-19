@@ -43,7 +43,6 @@ func New(opts SqliteCQRSOptions) (*sql.DB, error) {
 				if !filepath.IsAbs(opts.Directory) {
 					wd, err := os.Getwd()
 					if err != nil {
-						err = fmt.Errorf("error getting working directory to decide on SQLite storage path: %w", err)
 						return
 					}
 
