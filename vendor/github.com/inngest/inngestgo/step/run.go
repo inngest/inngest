@@ -32,8 +32,10 @@ func Run[T any](
 	id string,
 	f func(ctx context.Context) (T, error),
 ) (T, error) {
+	targetID := getTargetStepID(ctx)
 	mgr := preflight(ctx)
 	op := mgr.NewOp(enums.OpcodeStep, id, nil)
+	hashedID := op.MustHash()
 
 	if val, ok := mgr.Step(op); ok {
 		// Create a new empty type T in v
@@ -78,6 +80,21 @@ func Run[T any](
 		return val, nil
 	}
 
+	if targetID != nil && *targetID != hashedID {
+		panic(ControlHijack{})
+	}
+
+	planParallel := targetID == nil && isParallel(ctx)
+	planBeforeRun := targetID == nil && mgr.Request().CallCtx.DisableImmediateExecution
+	if planParallel || planBeforeRun {
+		mgr.AppendOp(state.GeneratorOpcode{
+			ID:   hashedID,
+			Op:   enums.OpcodeStepPlanned,
+			Name: id,
+		})
+		panic(ControlHijack{})
+	}
+
 	// We're calling a function, so always cancel the context afterwards so that no
 	// other tools run.
 	defer mgr.Cancel()
@@ -94,7 +111,7 @@ func Run[T any](
 
 		// Implement per-step errors.
 		mgr.AppendOp(state.GeneratorOpcode{
-			ID:   op.MustHash(),
+			ID:   hashedID,
 			Op:   enums.OpcodeStepError,
 			Name: id,
 			Error: &state.UserError{
@@ -112,7 +129,7 @@ func Run[T any](
 		mgr.SetErr(fmt.Errorf("unable to marshal run respone for '%s': %w", id, err))
 	}
 	mgr.AppendOp(state.GeneratorOpcode{
-		ID:   op.MustHash(),
+		ID:   hashedID,
 		Op:   enums.OpcodeStepRun,
 		Name: id,
 		Data: byt,
