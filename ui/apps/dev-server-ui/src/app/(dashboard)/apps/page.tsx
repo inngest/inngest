@@ -9,6 +9,7 @@ import { IconSpinner } from '@inngest/components/icons/Spinner';
 
 import AddAppButton from '@/components/App/AddAppButton';
 import AppCard from '@/components/App/AppCard';
+import { useInfoQuery } from '@/store/devApi';
 import { useGetAppsQuery } from '@/store/generated';
 
 export default function AppList() {
@@ -23,6 +24,8 @@ export default function AppList() {
       return <AppCard key={app?.id} app={app} />;
     });
   }, [apps]);
+
+  const { data: info } = useInfoQuery();
 
   return (
     <div className="flex h-full flex-col overflow-y-scroll">
@@ -40,10 +43,12 @@ export default function AppList() {
         }
         action={
           <div className="flex items-center gap-5">
-            <p className="text-btnPrimary flex items-center gap-2 text-sm leading-tight">
-              <IconSpinner className="fill-btnPrimary" />
-              Auto-detecting Apps
-            </p>
+            {info?.isDiscoveryEnabled ? (
+              <p className="text-btnPrimary flex items-center gap-2 text-sm leading-tight">
+                <IconSpinner className="fill-btnPrimary" />
+                Auto-detecting Apps
+              </p>
+            ) : null}
             <AddAppButton />
           </div>
         }
