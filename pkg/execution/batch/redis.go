@@ -261,7 +261,7 @@ func (b redisBatchManager) ExpireKeys(ctx context.Context, functionId uuid.UUID,
 }
 
 func (b redisBatchManager) TrackBatchCreate(ctx context.Context, accountId uuid.UUID) error {
-	err := retriableScripts["trackNewBatch"].Exec(
+	_, err := retriableScripts["trackNewBatch"].Exec(
 		ctx,
 		b.b.Client(),
 		[]string{
@@ -270,7 +270,7 @@ func (b redisBatchManager) TrackBatchCreate(ctx context.Context, accountId uuid.
 		[]string{
 			accountId.String(),
 		},
-	).Error()
+	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("failed to track batch creation: %w", err)
 	}
@@ -279,7 +279,7 @@ func (b redisBatchManager) TrackBatchCreate(ctx context.Context, accountId uuid.
 }
 
 func (b redisBatchManager) TrackBatchStart(ctx context.Context, accountId uuid.UUID) error {
-	err := retriableScripts["trackStartedBatch"].Exec(
+	_, err := retriableScripts["trackStartedBatch"].Exec(
 		ctx,
 		b.b.Client(),
 		[]string{
@@ -288,7 +288,7 @@ func (b redisBatchManager) TrackBatchStart(ctx context.Context, accountId uuid.U
 		[]string{
 			accountId.String(),
 		},
-	).Error()
+	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("failed to track batch creation: %w", err)
 	}
