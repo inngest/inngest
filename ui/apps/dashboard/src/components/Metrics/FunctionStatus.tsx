@@ -19,85 +19,41 @@ export type MetricsData = {
   };
 };
 
+export type FunctionTotals = FunctionStatusMetricsQuery['workspace']['totals'];
+
 export type PieChartData = Array<{
   value: number;
   name: string;
   itemStyle: { color: string };
 }>;
 
-//
-// completed metrics data includes cancels and failures distinguished by a tag.
-// so we need to flatten the metrics and count them separately by tag value
-const mapCompleted = ({
-  metrics,
-}: {
-  metrics: Array<{
-    tagName: string | null;
-    tagValue: string | null;
-    data: Array<{ value: number }>;
-  }>;
-}): PieChartData => {
+const mapMetrics = (totals: FunctionTotals) => {
   const dark = isDark();
-  const counts: { [k: string]: number } = {
-    Cancelled: 0,
-    Failed: 0,
-    Completed: 0,
-  };
-
-  const totals = metrics
-    .flatMap(({ data, tagValue }) => data.map((d) => ({ ...d, tagValue })))
-    .reduce((acc, { tagValue, value }) => {
-      //
-      // if there is an untagged count here we'll consider it completed
-      // as this is the completed metrics query
-      const k = tagValue || 'Completed';
-      acc[k] = acc[k] || 0 + value;
-      return acc;
-    }, counts);
-
   return [
     {
-      value: totals['Completed'] || 0,
+      value: totals.completed || 0,
       name: 'Completed',
       itemStyle: { color: resolveColor(colors.primary.moderate, dark, '#2c9b63') },
     },
     {
-      value: totals['Cancelled'] || 0,
+      value: totals.cancelled || 0,
       name: 'Cancelled',
       itemStyle: { color: resolveColor(backgroundColor.canvasMuted, dark, '#e2e2e2') },
     },
     {
-      value: totals['Failed'] || 0,
+      value: totals.failed || 0,
       name: 'Failed',
       itemStyle: { color: resolveColor(colors.tertiary.subtle, dark, '#fa8d86') },
     },
-  ];
-};
-
-//
-// metrics data is nested in [{data: {value}}]
-// flatten and then sum `value`
-const mapMetric = ({
-  metrics,
-}: {
-  metrics: Array<{
-    data: Array<{ value: number }>;
-  }>;
-}): number => metrics.flatMap(({ data }) => data).reduce((acc, { value }) => acc + value, 0);
-
-const mapMetrics = ({ completed, started, scheduled }: FunctionStatusMetricsQuery['workspace']) => {
-  const dark = isDark();
-  return [
-    ...mapCompleted(completed),
     {
-      value: mapMetric(started),
+      value: totals.running,
       name: 'Running',
       itemStyle: {
         color: resolveColor(colors.secondary.subtle, dark, '#52b2fd'),
       },
     },
     {
-      value: mapMetric(scheduled),
+      value: totals.queued,
       name: 'Queued',
       itemStyle: { color: resolveColor(colors.quaternary.coolModerate, dark, '#8b74f9') },
     },
@@ -184,8 +140,8 @@ const getChartOptions = (data: PieChartData, loading: boolean = false): ChartPro
   };
 };
 
-export const FunctionStatus = ({ workspace }: Partial<FunctionStatusMetricsQuery>) => {
-  const metrics = workspace && mapMetrics(workspace);
+export const FunctionStatus = ({ totals }: { totals?: FunctionTotals }) => {
+  const metrics = totals && mapMetrics(totals);
 
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[300px] w-[448px] shrink-0 flex-col rounded-lg p-5">
