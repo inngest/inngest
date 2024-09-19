@@ -103,6 +103,7 @@ func mapStartFlags(cmd *cobra.Command) error {
 	err = errors.Join(err, viper.BindPFlag("redis-uri", cmd.Flags().Lookup("redis-uri")))
 	err = errors.Join(err, viper.BindPFlag("poll-interval", cmd.Flags().Lookup("poll-interval")))
 	err = errors.Join(err, viper.BindPFlag("urls", cmd.Flags().Lookup("sdk-url")))
+	err = errors.Join(err, viper.BindPFlag("sqlite-dir", cmd.Flags().Lookup("sqlite-dir")))
 
 	return err
 }
