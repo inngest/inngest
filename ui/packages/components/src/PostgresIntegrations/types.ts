@@ -37,3 +37,9 @@ export type PostgresIntegrationMenuContent = {
     [K in IntegrationSteps]: MenuStepContent;
   };
 };
+
+export type IntegrationPageContent = {
+  title: string;
+  logo: React.ReactNode;
+  url: string;
+};

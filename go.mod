@@ -31,7 +31,7 @@ require (
 	github.com/graph-gophers/dataloader v5.0.0+incompatible
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/inngest/expr v0.0.0-20240717151033-03e4378c436c
-	github.com/inngest/inngestgo v0.7.3-0.20240718000349-c9247956e061
+	github.com/inngest/inngestgo v0.7.4-0.20240918175052-546b1d21b36d
 	github.com/jedib0t/go-pretty/v6 v6.3.0
 	github.com/jinzhu/copier v0.3.5
 	github.com/jonboulle/clockwork v0.4.0
