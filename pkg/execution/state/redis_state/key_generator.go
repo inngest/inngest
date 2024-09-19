@@ -293,6 +293,14 @@ func (u queueKeyGenerator) ConcurrencyFnEWMA(fnID uuid.UUID) string {
 }
 
 type BatchKeyGenerator interface {
+	// PendingBatchCount returns the hash used for tracking pending batches
+	// for each account.
+	// Note: This is a global, non-sharded key and thus cannot be
+	// used on regular batch Lua scripts.
+	PendingBatchCount(ctx context.Context) string
+	// BatchInstrument returns the key which allows a worker to claim instrumentation for
+	// event batching.
+	BatchInstrument() string
 	// QueuePrefix returns the hash prefix used in the queue.
 	// This is likely going to be a redis specific requirement.
 	QueuePrefix(ctx context.Context, functionId uuid.UUID) string
@@ -316,6 +324,14 @@ type BatchKeyGenerator interface {
 type batchKeyGenerator struct {
 	queueDefaultKey string
 	queueItemKeyGenerator
+}
+
+func (u batchKeyGenerator) BatchInstrument() string {
+	return fmt.Sprintf("{%s}:batching:instrument-lease", u.queueDefaultKey)
+}
+
+func (u batchKeyGenerator) PendingBatchCount(ctx context.Context) string {
+	return fmt.Sprintf("{%s}:batching:pending-batch-count", u.queueDefaultKey)
 }
 
 func (u batchKeyGenerator) PrefixByFunctionId(ctx context.Context, defaultPrefix string, isSharded bool, functionId uuid.UUID) string {

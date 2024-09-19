@@ -85,3 +85,13 @@ func HistogramRedisCommandDuration(ctx context.Context, value int64, opts Histog
 		Boundaries:  DefaultBoundaries,
 	})
 }
+
+func HistogramPendingEventBatches(ctx context.Context, value int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, value, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "pending_event_batches",
+		Description: "Number of pending event batches for a given account",
+		Tags:        opts.Tags,
+		Boundaries:  DefaultBoundaries,
+	})
+}

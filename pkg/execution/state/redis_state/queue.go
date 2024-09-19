@@ -2060,6 +2060,10 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 	return counter, resultErr
 }
 
+type ConfigLeaser interface {
+	ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error)
+}
+
 // ConfigLease allows a worker to lease config keys for sequential or scavenger processing.
 // Leasing this key works similar to leasing partitions or queue items:
 //

@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/redis/rueidis"
 	"time"
 
 	"github.com/inngest/inngest/pkg/event"
@@ -257,4 +258,61 @@ func (b redisBatchManager) ExpireKeys(ctx context.Context, functionId uuid.UUID,
 	}
 
 	return nil
+}
+
+func (b redisBatchManager) TrackBatchCreate(ctx context.Context, accountId uuid.UUID) error {
+	err := retriableScripts["trackNewBatch"].Exec(
+		ctx,
+		b.b.Client(),
+		[]string{
+			b.b.KeyGenerator().PendingBatchCount(ctx),
+		},
+		[]string{
+			accountId.String(),
+		},
+	).Error()
+	if err != nil {
+		return fmt.Errorf("failed to track batch creation: %w", err)
+	}
+
+	return nil
+}
+
+func (b redisBatchManager) TrackBatchStart(ctx context.Context, accountId uuid.UUID) error {
+	err := retriableScripts["trackStartedBatch"].Exec(
+		ctx,
+		b.b.Client(),
+		[]string{
+			b.b.KeyGenerator().PendingBatchCount(ctx),
+		},
+		[]string{
+			accountId.String(),
+		},
+	).Error()
+	if err != nil {
+		return fmt.Errorf("failed to track batch creation: %w", err)
+	}
+
+	return nil
+}
+
+func (b redisBatchManager) PendingBatchCount(ctx context.Context) (map[uuid.UUID]int64, error) {
+	res, err := b.b.Client().Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Hgetall().Key(b.b.KeyGenerator().PendingBatchCount(ctx)).Build()
+	}).AsIntMap()
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve pending batch count: %w", err)
+	}
+
+	pendingBatchCount := make(map[uuid.UUID]int64, len(res))
+	for rawAccountId, count := range res {
+		accountId, err := uuid.Parse(rawAccountId)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse accountId %q in pending batch count hash: %w", accountId, err)
+		}
+
+		pendingBatchCount[accountId] = count
+	}
+
+	return nil, nil
 }

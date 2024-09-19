@@ -2407,6 +2407,10 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 				"account_id": bi.AccountID.String(),
 			},
 		})
+
+		if err := e.batcher.TrackBatchCreate(ctx, bi.AccountID); err != nil {
+			return fmt.Errorf("could not track batch create: %w", err)
+		}
 	case enums.BatchFull:
 		// start execution immediately
 		batchID := ulid.MustParse(result.BatchID)
@@ -2512,6 +2516,10 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 	// TODO: check if all errors can be blindly returned
 	if err := e.batcher.ExpireKeys(ctx, payload.FunctionID, payload.BatchID); err != nil {
 		return err
+	}
+
+	if err := e.batcher.TrackBatchStart(ctx, payload.AccountID); err != nil {
+		return fmt.Errorf("could not track batch start: %w", err)
 	}
 
 	return nil
