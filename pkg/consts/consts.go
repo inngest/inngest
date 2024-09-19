@@ -109,8 +109,8 @@ const (
 	// StartMaxQueueSnapshots is the maximum number of snapshots we keep.
 	StartMaxQueueSnapshots = 5
 
-	DevServerTempDir     = ".inngest"
-	DevServerDbFile      = "dev_db.db"
+	DevServerTempDir = ".inngest"
+	DevServerDbFile  = "main.db"
 	DevServerHistoryFile = "dev_history.json"
 
 	PauseExpiredDeletionGracePeriod = time.Second * 10
