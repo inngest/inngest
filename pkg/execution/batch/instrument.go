@@ -51,7 +51,7 @@ func InstrumentBatching(ctx context.Context, q redis_state.QueueManager, b *redi
 	{
 		leaseID, err := configLeaser.ConfigLease(ctx, b.KeyGenerator().BatchInstrument(), redis_state.ConfigLeaseDuration, currentLease())
 		if err != redis_state.ErrConfigAlreadyLeased && err != nil {
-			return fmt.Errorf("could not lease instrument")
+			return fmt.Errorf("could not lease instrument: %w", err)
 		}
 
 		setLease(leaseID)
@@ -60,41 +60,46 @@ func InstrumentBatching(ctx context.Context, q redis_state.QueueManager, b *redi
 	batchInstrumentTicker := time.NewTicker(10 * time.Second)
 	leaseTick := time.NewTicker(redis_state.ConfigLeaseMax / 3)
 
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-leaseTick.C:
-			leaseID, err := configLeaser.ConfigLease(ctx, b.KeyGenerator().BatchInstrument(), redis_state.ConfigLeaseDuration, currentLease())
-			if errors.Is(err, redis_state.ErrConfigAlreadyLeased) {
-				setLease(nil)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-leaseTick.C:
+				leaseID, err := configLeaser.ConfigLease(ctx, b.KeyGenerator().BatchInstrument(), redis_state.ConfigLeaseDuration, currentLease())
+				if errors.Is(err, redis_state.ErrConfigAlreadyLeased) {
+					setLease(nil)
+					continue
+				}
+
+				if err != nil {
+					log.Error().Err(err).Msg("error claiming instrumentation lease")
+					setLease(nil)
+					continue
+				}
+
+				setLease(leaseID)
 				continue
+			case <-batchInstrumentTicker.C:
 			}
 
+			pendingBatchCount, err := batchManager.PendingBatchCount(ctx)
 			if err != nil {
-				log.Error().Err(err).Msg("error claiming instrumentation lease")
-				setLease(nil)
+				log.Error().Err(err).Msg("error retrieving pending batches")
 				continue
 			}
 
-			setLease(leaseID)
-			continue
-		case <-batchInstrumentTicker.C:
+			for accountId, count := range pendingBatchCount {
+				log.Trace().Str("account_id", accountId.String()).Int64("count", count).Msg("pending batch count")
+				metrics.HistogramPendingEventBatches(ctx, count, metrics.HistogramOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"account_id": accountId.String(),
+					},
+				})
+			}
 		}
+	}()
 
-		pendingBatchCount, err := batchManager.PendingBatchCount(ctx)
-		if err != nil {
-			log.Error().Err(err).Msg("error retrieving pending batches")
-			continue
-		}
-
-		for accountId, count := range pendingBatchCount {
-			metrics.HistogramPendingEventBatches(ctx, count, metrics.HistogramOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"account_id": accountId.String(),
-				},
-			})
-		}
-	}
+	return nil
 }
