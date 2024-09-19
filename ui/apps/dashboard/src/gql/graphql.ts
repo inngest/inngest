@@ -315,6 +315,7 @@ export type Deploy = {
   sdkLanguage: Scalars['String'];
   sdkVersion: Scalars['String'];
   status: Scalars['String'];
+  syncKind: Maybe<Scalars['String']>;
   url: Maybe<Scalars['String']>;
   vercelDeploymentID: Maybe<Scalars['String']>;
   vercelDeploymentURL: Maybe<Scalars['String']>;
@@ -537,7 +538,9 @@ export enum FunctionRunStatus {
   /** The function run has been scheduled. */
   Queued = 'QUEUED',
   /** The function run is currently running. */
-  Running = 'RUNNING'
+  Running = 'RUNNING',
+  /** The function run was skipped */
+  Skipped = 'SKIPPED'
 }
 
 export enum FunctionRunTimeField {
@@ -1289,6 +1292,18 @@ export enum SdkMode {
   Dev = 'DEV'
 }
 
+export type ScopedFunctionStatusResponse = {
+  __typename?: 'ScopedFunctionStatusResponse';
+  cancelled: Scalars['Int'];
+  completed: Scalars['Int'];
+  failed: Scalars['Int'];
+  from: Scalars['Time'];
+  queued: Scalars['Int'];
+  running: Scalars['Int'];
+  skipped: Scalars['Int'];
+  to: Scalars['Time'];
+};
+
 export type ScopedMetric = {
   __typename?: 'ScopedMetric';
   data: Array<MetricsData>;
@@ -1692,6 +1707,7 @@ export type Workspace = {
   runTraceSpanOutputByID: RunTraceSpanOutput;
   runTrigger: RunTraceTrigger;
   runs: RunsConnection;
+  scopedFunctionStatus: ScopedFunctionStatusResponse;
   scopedMetrics: ScopedMetricsResponse;
   signingKeys: Array<SigningKey>;
   slug: Scalars['String'];
@@ -1773,6 +1789,11 @@ export type WorkspaceRunsArgs = {
   filter: RunsFilterV2;
   first?: Scalars['Int'];
   orderBy: Array<RunsOrderBy>;
+};
+
+
+export type WorkspaceScopedFunctionStatusArgs = {
+  filter: ScopedMetricsFilter;
 };
 
 
