@@ -181,6 +181,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 
   const fetchMoreOnScroll: React.ComponentProps<typeof RunsPage>['onScroll'] = useCallback(
     (event) => {
+      console.log('scroll event');
       if (runs.length > 0) {
         const { scrollHeight, scrollTop, clientHeight } = event.target as HTMLDivElement;
         const lastCursor = nextPageInfo?.endCursor || firstPageInfo?.endCursor;

@@ -256,7 +256,7 @@ export function RunsPage({
 
   return (
     <main
-      className="bg-canvasBase text-basis flex-1 overflow-auto"
+      className="bg-canvasBase text-basis h-full min-h-0 flex-1 overflow-y-auto"
       onScroll={onScroll}
       ref={containerRef}
     >
