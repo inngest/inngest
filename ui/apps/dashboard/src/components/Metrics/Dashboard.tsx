@@ -21,6 +21,7 @@ import { useQuery } from 'urql';
 
 import { GetBillingPlanDocument } from '@/gql/graphql';
 import { MetricsOverview } from './Overview';
+import { MetricsVolume } from './Volume';
 
 export type EntityType = {
   id: string;
@@ -109,6 +110,16 @@ export const Dashboard = ({
       </div>
       <div className="px-6">
         <MetricsOverview
+          from={getFrom(parsedStart, parsedDuration)}
+          until={parsedEnd}
+          selectedApps={selectedApps}
+          selectedFns={selectedFns}
+          autoRefresh={autoRefresh}
+          functions={functions}
+        />
+      </div>
+      <div className="px-6">
+        <MetricsVolume
           from={getFrom(parsedStart, parsedDuration)}
           until={parsedEnd}
           selectedApps={selectedApps}

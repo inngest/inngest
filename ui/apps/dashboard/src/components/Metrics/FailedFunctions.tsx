@@ -1,6 +1,8 @@
 import React from 'react';
 import { NewButton } from '@inngest/components/Button';
 import { Chart, type ChartProps, type LineSeriesOption } from '@inngest/components/Chart/Chart';
+import { Info } from '@inngest/components/Info/Info';
+import { NewLink } from '@inngest/components/Link/Link';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { resolveColor } from '@inngest/components/utils/colors';
 import { differenceInMilliseconds, formatDistanceToNow } from '@inngest/components/utils/date';
@@ -13,7 +15,6 @@ import type { FunctionStatusMetricsQuery, MetricsData } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import tailwindConfig from '../../../tailwind.config';
 import type { EntityType } from './Dashboard';
-import { FunctionInfo } from './FunctionInfo';
 import { dateFormat } from './utils';
 
 const {
@@ -155,7 +156,7 @@ const getChartOptions = (data: LineChartData): ChartProps['option'] => {
     legend: {
       type: 'scroll',
       bottom: '0%',
-      left: '-0%',
+      left: '0%',
       icon: 'circle',
       itemWidth: 10,
       itemHeight: 10,
@@ -187,7 +188,19 @@ export const FailedFunctions = ({
     <div className="bg-canvasBase border-subtle overflowx-hidden relative flex h-[300px] w-full flex-col rounded-lg p-5">
       <div className="mb-2 flex flex-row items-center justify-between">
         <div className="text-subtle flex w-full flex-row items-center gap-x-2 text-lg">
-          Failed Functions <FunctionInfo />
+          Failed Functions{' '}
+          <Info
+            text="Total number of failed runs in your environment, app or function."
+            action={
+              <NewLink
+                arrowOnHover
+                className="text-sm"
+                href="https://www.inngest.com/docs/features/inngest-functions?ref=app-metrics"
+              >
+                Learn more about Inngest functions.
+              </NewLink>
+            }
+          />
         </div>
         <NewButton
           size="small"

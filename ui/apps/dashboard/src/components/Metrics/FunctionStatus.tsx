@@ -1,11 +1,12 @@
 import { Chart, type ChartProps } from '@inngest/components/Chart/Chart';
+import { Info } from '@inngest/components/Info/Info';
+import { NewLink } from '@inngest/components/Link/Link';
 import { resolveColor } from '@inngest/components/utils/colors';
 import { isDark } from '@inngest/components/utils/theme';
 import resolveConfig from 'tailwindcss/resolveConfig';
 
 import type { FunctionStatusMetricsQuery, ScopedMetricsResponse } from '@/gql/graphql';
 import tailwindConfig from '../../../tailwind.config';
-import { FunctionInfo } from './FunctionInfo';
 
 const {
   theme: { backgroundColor, colors },
@@ -146,7 +147,19 @@ export const FunctionStatus = ({ totals }: { totals?: FunctionTotals }) => {
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[300px] w-[448px] shrink-0 flex-col rounded-lg p-5">
       <div className="text-subtle mb-2 flex flex-row items-center gap-x-2 text-lg">
-        Functions Status <FunctionInfo />
+        Functions Status{' '}
+        <Info
+          text="Interact with the chart to see the status and total number of your function runs over a period of time."
+          action={
+            <NewLink
+              arrowOnHover
+              className="text-sm"
+              href="https://www.inngest.com/docs/features/inngest-functions?ref=app-metrics"
+            >
+              Learn more about Inngest functions.
+            </NewLink>
+          }
+        />
       </div>
 
       <Chart option={metrics ? getChartOptions(metrics) : {}} className="h-[300px]" />
