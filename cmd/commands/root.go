@@ -54,7 +54,6 @@ func Execute() {
 	)
 	rootCmd.SetHelpTemplate(tmpl)
 
-	rootCmd.PersistentFlags().Bool("prod", false, "Use the production environment for the current command.")
 	rootCmd.PersistentFlags().Bool("json", false, "Output logs as JSON.  Set to true if stdout is not a TTY.")
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose logging.")
 	rootCmd.PersistentFlags().StringP("log-level", "l", "info", "Set the log level.  One of: trace, debug, info, warn, error.")
