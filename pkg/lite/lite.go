@@ -315,7 +315,9 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	// The devserver embeds the event API.
-	ds := devserver.NewService(dsOpts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hd, persistenceInterval)
+	ds := devserver.NewService(dsOpts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hd, &devserver.SingleNodeServiceOpts{
+		PersistenceInterval: persistenceInterval,
+	})
 	// embed the tracker
 	ds.Tracker = t
 	ds.State = sm
