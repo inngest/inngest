@@ -119,14 +119,7 @@ export const Dashboard = ({
         />
       </div>
       <div className="px-6">
-        <MetricsVolume
-          from={getFrom(parsedStart, parsedDuration)}
-          until={parsedEnd}
-          selectedApps={selectedApps}
-          selectedFns={selectedFns}
-          autoRefresh={autoRefresh}
-          functions={functions}
-        />
+        <MetricsVolume />
       </div>
     </div>
   );
