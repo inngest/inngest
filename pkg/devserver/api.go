@@ -128,10 +128,11 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ir := InfoResponse{
-		Version:   version.Print(),
-		StartOpts: a.devserver.Opts,
-		Functions: funcs,
-		Handlers:  a.devserver.handlers,
+		Version:             version.Print(),
+		StartOpts:           a.devserver.Opts,
+		Functions:           funcs,
+		Handlers:            a.devserver.handlers,
+		IsSingleNodeService: a.devserver.IsSingleNodeService(),
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	byt, _ := json.MarshalIndent(ir, "", "  ")
@@ -549,9 +550,10 @@ func (a devapi) err(ctx context.Context, w http.ResponseWriter, status int, err 
 
 type InfoResponse struct {
 	// Version lists the version of the development server
-	Version       string             `json:"version"`
-	Authenticated bool               `json:"authed"`
-	StartOpts     StartOpts          `json:"startOpts"`
-	Functions     []inngest.Function `json:"functions"`
-	Handlers      []SDKHandler       `json:"handlers"`
+	Version             string             `json:"version"`
+	Authenticated       bool               `json:"authed"`
+	StartOpts           StartOpts          `json:"startOpts"`
+	Functions           []inngest.Function `json:"functions"`
+	Handlers            []SDKHandler       `json:"handlers"`
+	IsSingleNodeService bool               `json:"isSingleNodeService"`
 }
