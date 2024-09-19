@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/spf13/cobra"
@@ -35,6 +36,11 @@ func InitStartConfig(ctx context.Context, cmd *cobra.Command) error {
 
 func loadConfigFile(ctx context.Context, cmd *cobra.Command) {
 	l := logger.From(ctx).With().Logger()
+
+	// Automatially bind environment variables
+	viper.SetEnvPrefix("INNGEST")
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	viper.AutomaticEnv()
 
 	configPath, _ := cmd.Flags().GetString("config")
 	if configPath != "" {
