@@ -186,6 +186,11 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
         const lastCursor = nextPageInfo?.endCursor || firstPageInfo?.endCursor;
         // Check if scrolled to the bottom
         const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
+        console.log(
+          reachedBottom,
+          { scrollHeight: scrollHeight, scrollTop: scrollTop, clientHeight: clientHeight },
+          scrollHeight - scrollTop - clientHeight
+        );
         if (reachedBottom && !isLoading && lastCursor && hasNextPage) {
           setIsScrollRequest(true);
           setCursor(lastCursor);
