@@ -54,6 +54,7 @@ var redisSingleton *miniredis.Miniredis
 type StartOpts struct {
 	Config       config.Config `json:"-"`
 	RootDir      string        `json:"dir"`
+	RedisURI     string        `json:"redis-uri"`
 	PollInterval int           `json:"poll-interval"`
 	URLs         []string      `json:"urls"`
 }
@@ -96,12 +97,12 @@ func start(ctx context.Context, opts StartOpts) error {
 	stepLimitOverrides := make(map[string]int)
 	stateSizeLimitOverrides := make(map[string]int)
 
-	shardedRc, err := createInmemoryRedisConnection(ctx)
+	shardedRc, err := connectToOrCreateRedis(ctx, opts.RedisURI)
 	if err != nil {
 		return err
 	}
 
-	unshardedRc, err := createInmemoryRedisConnection(ctx)
+	unshardedRc, err := connectToOrCreateRedis(ctx, opts.RedisURI)
 	if err != nil {
 		return err
 	}
@@ -289,6 +290,17 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithPublisher(pb),
 	)
 
+	// The devserver embeds the event API.
+	pi := consts.LiteDefaultPersistenceInterval
+	persistenceInterval := &pi
+	if opts.RedisURI != "" {
+		// If we're using an external Redis, we rely on that to persist and
+		// manage snapshotting
+		persistenceInterval = nil
+
+		logger.From(ctx).Info().Msgf("using external Redis %s; disabling in-memory persistence and snapshotting", opts.RedisURI)
+	}
+
 	dsOpts := devserver.StartOpts{
 		Config:  opts.Config,
 		RootDir: opts.RootDir,
@@ -302,8 +314,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	// The devserver embeds the event API.
-	persistenceInterval := consts.LiteDefaultPersistenceInterval
-	ds := devserver.NewService(dsOpts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hd, &persistenceInterval)
+	ds := devserver.NewService(dsOpts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hd, persistenceInterval)
 	// embed the tracker
 	ds.Tracker = t
 	ds.State = sm
@@ -358,6 +369,30 @@ func start(ctx context.Context, opts StartOpts) error {
 	)
 
 	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice)
+}
+
+func connectToOrCreateRedis(ctx context.Context, redisURI string) (rueidis.Client, error) {
+	if redisURI == "" {
+		return createInmemoryRedisConnection(ctx)
+	}
+
+	url := redisURI
+	// strip the redis:// prefix if we have one; connection fails with it
+	if len(url) > 8 && url[:8] == "redis://" {
+		url = url[8:]
+	}
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:       []string{url},
+		DisableCache:      true,
+		BlockingPoolSize:  1,
+		ForceSingleClient: true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error creating redis client: %w", err)
+	}
+
+	return rc, nil
 }
 
 // createInMemoryRedisConnection creates a new connection to the in-memory Redis

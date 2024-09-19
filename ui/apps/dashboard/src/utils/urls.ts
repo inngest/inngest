@@ -78,6 +78,9 @@ export const pathCreator = {
   keys({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/manage/keys` as Route;
   },
+  neonIntegrationStep({ step }: { step?: string }): Route {
+    return `/settings/integrations/neon${step ? `/${step}` : ''}` as Route;
+  },
   // TODO: Support environments
   onboarding(): Route {
     return `/env/production/onboarding/` as Route;

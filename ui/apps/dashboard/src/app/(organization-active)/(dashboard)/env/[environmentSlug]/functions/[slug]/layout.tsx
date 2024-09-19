@@ -9,6 +9,7 @@ import { RiPauseCircleLine } from '@remixicon/react';
 import { useMutation } from 'urql';
 
 import { ArchivedAppBanner } from '@/components/ArchivedAppBanner';
+import { ArchivedFuncBanner } from '@/components/ArchivedFuncBanner';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { ActionsMenu } from '@/components/Functions/ActionMenu';
@@ -42,7 +43,7 @@ export default function FunctionLayout({
   const [replayOpen, setReplayOpen] = useState(false);
 
   const functionSlug = decodeURIComponent(slug);
-  const [{ data, fetching }] = useFunction({ functionSlug });
+  const [{ data, error, fetching }] = useFunction({ functionSlug });
   const [, invokeFunction] = useMutation(InvokeFunctionDocument);
   const env = useEnvironment();
 
@@ -72,9 +73,14 @@ export default function FunctionLayout({
 
   const externalAppID = data?.workspace.workflow?.appName;
 
+  if (error) {
+    throw error;
+  }
+
   return (
     <>
       {externalAppID && <ArchivedAppBanner externalAppID={externalAppID} />}
+      {fn && <ArchivedFuncBanner funcID={fn.id} />}
       {invokOpen && (
         <InvokeModal
           doesFunctionAcceptPayload={doesFunctionAcceptPayload}

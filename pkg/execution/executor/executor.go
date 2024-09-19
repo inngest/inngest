@@ -456,6 +456,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			go e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, execution.SkipState{
 				CronSchedule: req.Events[0].GetEvent().CronSchedule(),
 				Reason:       enums.SkipReasonFunctionPaused,
+				Events:       evts,
 			})
 		}
 		return nil, ErrFunctionSkipped
@@ -2459,7 +2460,6 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		run.WithName(consts.OtelSpanBatch),
 		run.WithNewRoot(),
 		run.WithSpanAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, payload.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, payload.WorkspaceID.String()),
 			attribute.String(consts.OtelSysAppID, payload.AppID.String()),
@@ -2498,6 +2498,15 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		span.SetStatus(codes.Error, err.Error())
 		return err
 	}
+
+	metrics.IncrBatchProcessStartCounter(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			// whether batch was full or started by timeout
+			"batch_timeout": opts == nil,
+			"account_id":    payload.AccountID.String(),
+		},
+	})
 
 	if md != nil {
 		span.SetAttributes(attribute.String(consts.OtelAttrSDKRunID, md.ID.RunID.String()))

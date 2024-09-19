@@ -128,6 +128,15 @@ func IncrBatchScheduledCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrBatchProcessStartCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "batch_processing_started_total",
+		Description: "Total number of completed batches for event batching, either through timeout or full batch.",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrInstrumentationLeaseClaimsCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,

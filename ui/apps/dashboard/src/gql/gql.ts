@@ -81,6 +81,7 @@ const documents = {
     "\n  mutation CompleteAWSMarketplaceSetup($input: AWSMarketplaceSetupInput!) {\n    completeAWSMarketplaceSetup(input: $input) {\n      message\n    }\n  }\n": types.CompleteAwsMarketplaceSetupDocument,
     "\n  query GetAccountSupportInfo {\n    account {\n      id\n      plan {\n        id\n        name\n        amount\n        features\n      }\n    }\n  }\n": types.GetAccountSupportInfoDocument,
     "\n  query GetArchivedAppBannerData($envID: ID!, $externalAppID: String!) {\n    environment: workspace(id: $envID) {\n      app: appByExternalID(externalID: $externalAppID) {\n        isArchived\n      }\n    }\n  }\n": types.GetArchivedAppBannerDataDocument,
+    "\n  query GetArchivedFuncBannerData($envID: ID!, $funcID: ID!) {\n    environment: workspace(id: $envID) {\n      function: workflow(id: $funcID) {\n        id\n        archivedAt\n      }\n    }\n  }\n": types.GetArchivedFuncBannerDataDocument,
     "\n  mutation ArchiveEnvironment($id: ID!) {\n    archiveEnvironment(id: $id) {\n      id\n    }\n  }\n": types.ArchiveEnvironmentDocument,
     "\n  mutation UnarchiveEnvironment($id: ID!) {\n    unarchiveEnvironment(id: $id) {\n      id\n    }\n  }\n": types.UnarchiveEnvironmentDocument,
     "\n  mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {\n    disableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n": types.DisableEnvironmentAutoArchiveDocumentDocument,
@@ -406,6 +407,10 @@ export function graphql(source: "\n  query GetAccountSupportInfo {\n    account 
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query GetArchivedAppBannerData($envID: ID!, $externalAppID: String!) {\n    environment: workspace(id: $envID) {\n      app: appByExternalID(externalID: $externalAppID) {\n        isArchived\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetArchivedAppBannerData($envID: ID!, $externalAppID: String!) {\n    environment: workspace(id: $envID) {\n      app: appByExternalID(externalID: $externalAppID) {\n        isArchived\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query GetArchivedFuncBannerData($envID: ID!, $funcID: ID!) {\n    environment: workspace(id: $envID) {\n      function: workflow(id: $funcID) {\n        id\n        archivedAt\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetArchivedFuncBannerData($envID: ID!, $funcID: ID!) {\n    environment: workspace(id: $envID) {\n      function: workflow(id: $funcID) {\n        id\n        archivedAt\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

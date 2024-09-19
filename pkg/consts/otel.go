@@ -98,9 +98,7 @@ const (
 	OtelScopeStep      = "step.function.app.env.inngest"
 	OtelScopeExecution = "execution.function.app.env.inngest"
 
-	// otel collector filter keys
-	OtelUserTraceFilterKey = "inngest.user"
-
+	// Propagation keys
 	OtelPropagationKey     = "sys.trace"
 	OtelPropagationLinkKey = "sys.trace.link"
 

@@ -508,11 +508,12 @@ github.com/inconshreveable/mousetrap
 # github.com/inngest/expr v0.0.0-20240717151033-03e4378c436c
 ## explicit; go 1.21.0
 github.com/inngest/expr
-# github.com/inngest/inngestgo v0.7.3-0.20240718000349-c9247956e061
+# github.com/inngest/inngestgo v0.7.5-0.20240919173141-dccf7b2deffe
 ## explicit; go 1.21.0
 github.com/inngest/inngestgo
 github.com/inngest/inngestgo/errors
 github.com/inngest/inngestgo/internal/sdkrequest
+github.com/inngest/inngestgo/internal/types
 github.com/inngest/inngestgo/step
 # github.com/jedib0t/go-pretty/v6 v6.3.0
 ## explicit; go 1.16

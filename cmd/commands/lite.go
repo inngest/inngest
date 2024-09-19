@@ -24,6 +24,7 @@ func NewCmdLite() *cobra.Command {
 	cmd.Flags().String("config", "", "Path to the configuration file")
 	cmd.Flags().String("host", "", "host to run the API on")
 	cmd.Flags().StringP("port", "p", "8288", "port to run the API on")
+	cmd.Flags().String("redis-uri", "", "URI for an external Redis instance to use")
 	cmd.Flags().Int("poll-interval", 0, "Interval in seconds between polling for updates to apps")
 	cmd.Flags().StringSliceP("sdk-url", "u", []string{}, "SDK URLs to load functions from")
 
@@ -73,6 +74,7 @@ func doLite(cmd *cobra.Command, args []string) {
 		Config:       *conf,
 		PollInterval: viper.GetInt("poll-interval"),
 		URLs:         viper.GetStringSlice("urls"),
+		RedisURI:     viper.GetString("redis-uri"),
 	}
 
 	err = lite.New(ctx, opts)
