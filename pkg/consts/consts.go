@@ -109,8 +109,12 @@ const (
 	// StartMaxQueueSnapshots is the maximum number of snapshots we keep.
 	StartMaxQueueSnapshots = 5
 
-	DevServerTempDir = ".inngest"
-	DevServerDbFile  = "main.db"
+	DefaultInngestConfigDir = ".inngest"
+	SQLiteDbFileName        = "main.db"
+	// DevServerHistoryFile is the file where the history is stored.
+	//
+	// @deprecated Used in the in-memory writer when persiting, though this
+	// should not be actively used any more.
 	DevServerHistoryFile = "dev_history.json"
 
 	PauseExpiredDeletionGracePeriod = time.Second * 10

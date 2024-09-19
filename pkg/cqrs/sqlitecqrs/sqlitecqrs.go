@@ -37,7 +37,7 @@ func New(opts SqliteCQRSOptions) (*sql.DB, error) {
 	} else {
 		o.Do(func() {
 			// make the dir if it doesn't exist
-			dir := consts.DevServerTempDir
+			dir := consts.DefaultInngestConfigDir
 			if opts.Directory != "" {
 				dir = opts.Directory
 				if !filepath.IsAbs(opts.Directory) {
@@ -58,7 +58,7 @@ func New(opts SqliteCQRSOptions) (*sql.DB, error) {
 				}
 			}
 
-			file := filepath.Join(dir, consts.DevServerDbFile)
+			file := filepath.Join(dir, consts.SQLiteDbFileName)
 
 			db, err = sql.Open("sqlite", fmt.Sprintf("file:%s?cache=shared", file))
 		})
@@ -103,7 +103,7 @@ func up(db *sql.DB, opts SqliteCQRSOptions) error {
 
 	dbName := "file:inngest?mode=memory&cache=shared"
 	if !opts.InMemory {
-		dbName = fmt.Sprintf("file:%s?cache=shared", fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerDbFile))
+		dbName = fmt.Sprintf("file:%s?cache=shared", fmt.Sprintf("%s/%s", consts.DefaultInngestConfigDir, consts.SQLiteDbFileName))
 	}
 
 	m, err := migrate.NewWithInstance("iofs", source, dbName, driver)
