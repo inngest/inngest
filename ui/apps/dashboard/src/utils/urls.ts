@@ -72,7 +72,7 @@ export const pathCreator = {
   }): Route {
     return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}/cancellations` as Route;
   },
-  functionRuns({ envSlug, functionSlug }: { envSlug: string; functionSlug: string }): Route {
+  oldRuns({ envSlug, functionSlug }: { envSlug: string; functionSlug: string }): Route {
     return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}/logs` as Route;
   },
   keys({ envSlug }: { envSlug: string }): Route {
