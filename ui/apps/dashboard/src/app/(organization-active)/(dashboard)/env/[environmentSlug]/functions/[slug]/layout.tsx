@@ -146,7 +146,7 @@ export default function FunctionLayout({
           {
             children: (
               <div className="m-0 flex flex-row items-center justify-start space-x-1 p-0">
-                <div>Runs</div>
+                <div>Old runs</div>
                 <Pill kind="info">Legacy</Pill>
               </div>
             ),
