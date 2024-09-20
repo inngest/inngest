@@ -85,7 +85,7 @@ export default function LatestFailedFunctionRuns({
           className="ml-auto"
           appearance="outlined"
           href={
-            `/env/${environmentSlug}/functions/${encodeURIComponent(functionSlug)}/logs` as Route
+            `/env/${environmentSlug}/functions/${encodeURIComponent(functionSlug)}/runs` as Route
           }
           label="View All Runs"
         />
@@ -136,7 +136,7 @@ export default function LatestFailedFunctionRuns({
                         router.push(
                           `/env/${environmentSlug}/functions/${encodeURIComponent(
                             functionSlug
-                          )}/logs/${functionRun.id}` as Route
+                          )}/runs/${functionRun.id}` as Route
                         )
                       }
                     >
