@@ -3122,6 +3122,93 @@ func TestQueuePartitionPeek(t *testing.T) {
 		assert.Contains(t, apIds, idB.String())
 		assert.Contains(t, apIds, idC.String())
 	})
+
+	t.Run("script should skip all null items", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		kg := queueKeyGenerator{
+			queueDefaultKey: QueueDefaultKey,
+			queueItemKeyGenerator: queueItemKeyGenerator{
+				queueDefaultKey: QueueDefaultKey,
+			},
+		}
+		accountId := uuid.New()
+
+		fnId := uuid.New()
+		validPartitionItem, err := json.Marshal(QueuePartition{
+			ID:         fnId.String(),
+			FunctionID: &fnId,
+			AccountID:  accountId,
+		})
+		require.NoError(t, err)
+
+		err = rc.Do(ctx, rc.B().Hset().Key(kg.PartitionItem()).FieldValue().FieldValue(fnId.String(), string(validPartitionItem)).Build()).Error()
+		require.NoError(t, err)
+
+		rc.Do(ctx, rc.B().
+			Zadd().
+			Key(kg.AccountPartitionIndex(accountId)).
+			ScoreMember().
+			ScoreMember(0, "missing").
+			ScoreMember(0, "missing1").
+			ScoreMember(0, "missing2").
+			ScoreMember(0, "missing3").
+			ScoreMember(0, "missing4").
+			ScoreMember(1, fnId.String()).
+			ScoreMember(2, "missing5").
+			ScoreMember(2, "missing6").
+			ScoreMember(2, "missing7").
+			ScoreMember(2, "missing8").
+			ScoreMember(2, "missing9").
+			Build())
+		require.NoError(t, err)
+
+		mem, err := r.ZMembers(kg.AccountPartitionIndex(accountId))
+		require.NoError(t, err)
+		require.Len(t, mem, 11)
+
+		args, err := StrSlice([]any{
+			time.Now().UnixMilli(),
+			15,
+			true,
+		})
+		require.NoError(t, err)
+
+		resp, err := scripts["queue/partitionPeek"].Exec(
+			ctx,
+			rc,
+			[]string{
+				kg.AccountPartitionIndex(accountId),
+				q.u.kg.PartitionItem(),
+			},
+			args,
+		).ToAny()
+		require.NoError(t, err)
+
+		returned, ok := resp.([]any)
+		require.True(t, ok)
+		require.Len(t, returned, 3, r.Dump())
+		require.Equal(t, int64(11), returned[0])
+		require.Equal(t, []any{string(validPartitionItem)}, returned[1])
+		require.Equal(t, []any{
+			"missing",
+			"missing1",
+			"missing2",
+			"missing3",
+			"missing4",
+			"missing5",
+			"missing6",
+			"missing7",
+			"missing8",
+			"missing9",
+		}, returned[2])
+	})
 }
 
 func TestQueuePartitionRequeue(t *testing.T) {

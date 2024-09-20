@@ -2186,6 +2186,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	// Use parallel decoding as per Peek
 	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueuePartition, error) {
 		if val == nil {
+			q.logger.Error().Interface("encoded", encoded).Interface("missing", missingPartitions).Str("key", partitionKey).Msg("encountered nil partition item in pointer queue")
 			return nil, fmt.Errorf("encountered nil partition item in pointer queue %q", partitionKey)
 		}
 
