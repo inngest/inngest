@@ -141,9 +141,9 @@ func (w wrapper) InsertQueueSnapshot(ctx context.Context, params cqrs.InsertQueu
 
 	var chunks [][]byte
 	for len(byt) > 0 {
-		if len(byt) > consts.LiteMaxQueueChunkSize {
-			chunks = append(chunks, byt[:consts.LiteMaxQueueChunkSize])
-			byt = byt[consts.LiteMaxQueueChunkSize:]
+		if len(byt) > consts.StartMaxQueueChunkSize {
+			chunks = append(chunks, byt[:consts.StartMaxQueueChunkSize])
+			byt = byt[consts.StartMaxQueueChunkSize:]
 		} else {
 			chunks = append(chunks, byt)
 			break
@@ -176,7 +176,7 @@ func (w wrapper) InsertQueueSnapshot(ctx context.Context, params cqrs.InsertQueu
 
 	// Asynchronously remove old snapshots.
 	go func() {
-		_, _ = w.q.DeleteOldQueueSnapshots(ctx, consts.LiteMaxQueueSnapshots)
+		_, _ = w.q.DeleteOldQueueSnapshots(ctx, consts.StartMaxQueueSnapshots)
 	}()
 
 	return snapshotID, nil
