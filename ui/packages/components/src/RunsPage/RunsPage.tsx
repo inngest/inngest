@@ -323,7 +323,7 @@ export function RunsPage({
           </div>
         </div>
       </div>
-      <div className="overflow-y-auto">
+      <>
         <RunsTable
           data={data}
           isLoading={isLoadingInitial}
@@ -357,7 +357,7 @@ export function RunsPage({
             />
           </div>
         )}
-      </div>
+      </>
     </main>
   );
 }
