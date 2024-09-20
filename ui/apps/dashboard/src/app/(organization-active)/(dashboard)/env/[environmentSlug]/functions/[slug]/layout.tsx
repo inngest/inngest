@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useCallback, useState } from 'react';
-import { Badge } from '@inngest/components/Badge';
 import { Header } from '@inngest/components/Header/Header';
 import { InvokeModal } from '@inngest/components/InvokeButton';
+import { Pill } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { RiPauseCircleLine } from '@remixicon/react';
 import { useMutation } from 'urql';
@@ -47,7 +47,6 @@ export default function FunctionLayout({
   const [, invokeFunction] = useMutation(InvokeFunctionDocument);
   const env = useEnvironment();
 
-  const isNewRunsEnabled = useBooleanFlag('new-runs');
   const isBulkCancellationEnabled = useBooleanFlag('bulk-cancellation-ui');
 
   const fn = data?.workspace.workflow;
@@ -120,9 +119,9 @@ export default function FunctionLayout({
         ]}
         infoIcon={
           isPaused && (
-            <Badge kind="solid" className="text-warning h-6 bg-amber-100 text-xs">
+            <Pill kind="warning">
               <RiPauseCircleLine className="h-4 w-4" /> Paused
-            </Badge>
+            </Pill>
           )
         }
         action={
@@ -143,25 +142,16 @@ export default function FunctionLayout({
             href: `/env/${environmentSlug}/functions/${slug}`,
             exactRouteMatch: true,
           },
-          { children: 'Runs', href: `/env/${environmentSlug}/functions/${slug}/logs` },
-          ...(isNewRunsEnabled.isReady && isNewRunsEnabled.value
-            ? [
-                {
-                  children: (
-                    <div className="m-0 flex flex-row items-center justify-start space-x-1 p-0">
-                      <div>New runs</div>
-                      <Badge
-                        kind="solid"
-                        className="text-onContrast bg-btnPrimary h-5 px-1.5 py-1 text-xs"
-                      >
-                        Beta
-                      </Badge>
-                    </div>
-                  ),
-                  href: `/env/${environmentSlug}/functions/${slug}/runs`,
-                },
-              ]
-            : []),
+          { children: 'Runs', href: `/env/${environmentSlug}/functions/${slug}/runs` },
+          {
+            children: (
+              <div className="m-0 flex flex-row items-center justify-start space-x-1 p-0">
+                <div>Runs</div>
+                <Pill kind="info">Legacy</Pill>
+              </div>
+            ),
+            href: `/env/${environmentSlug}/functions/${slug}/logs`,
+          },
           { children: 'Replay history', href: `/env/${environmentSlug}/functions/${slug}/replay` },
           ...(isBulkCancellationEnabled.isReady && isBulkCancellationEnabled.value
             ? [
