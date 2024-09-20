@@ -323,7 +323,7 @@ export function RunsPage({
           </div>
         </div>
       </div>
-      <div className=" h-[calc(100%-58px)] overflow-y-auto">
+      <div className="overflow-y-auto">
         <RunsTable
           data={data}
           isLoading={isLoadingInitial}

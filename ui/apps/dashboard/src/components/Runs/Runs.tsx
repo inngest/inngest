@@ -181,17 +181,11 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 
   const fetchMoreOnScroll: React.ComponentProps<typeof RunsPage>['onScroll'] = useCallback(
     (event) => {
-      console.log('scroll event');
       if (runs.length > 0) {
         const { scrollHeight, scrollTop, clientHeight } = event.target as HTMLDivElement;
         const lastCursor = nextPageInfo?.endCursor || firstPageInfo?.endCursor;
         // Check if scrolled to the bottom
         const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
-        console.log(
-          reachedBottom,
-          { scrollHeight: scrollHeight, scrollTop: scrollTop, clientHeight: clientHeight },
-          scrollHeight - scrollTop - clientHeight
-        );
         if (reachedBottom && !isLoading && lastCursor && hasNextPage) {
           setIsScrollRequest(true);
           setCursor(lastCursor);
