@@ -192,7 +192,6 @@ func (h *ExpressionHandler) MatchOutputExpressions(ctx context.Context, output [
 			if err != nil {
 				return fmt.Errorf("error evaluating output expression: %w", err)
 			}
-			fmt.Printf("Found: %v\n", ok)
 
 			res[idx] = ok
 			return nil

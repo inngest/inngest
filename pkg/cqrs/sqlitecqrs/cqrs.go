@@ -19,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jinzhu/copier"
@@ -516,7 +517,6 @@ func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*c
 		return nil, err
 	}
 
-	fmt.Println("Event filter SQL:", sql)
 	rows, err := w.db.QueryContext(ctx, sql, args...)
 	if err != nil {
 		return nil, err
@@ -1313,12 +1313,18 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			continue
 		}
 
-		// fmt.Printf("Output Expr: %#v\n", expHandler.OutputExprList)
 		if expHandler.HasOutputFilters() {
 			ok, err := expHandler.MatchOutputExpressions(ctx, data.Output)
 			if err != nil {
-				fmt.Printf("Output match error: %#v\n", err)
-				// TODO: log error
+				logger.StdlibLogger(ctx).Error("error inspecting run for output match",
+					"error", err,
+					"output", data.Output,
+					"acctID", data.AccountID,
+					"wsID": data.WorkspaceID,
+					"appID": data.AppID,
+					"wfID", data.FunctionID,
+					"runID": data.RunID,
+				)
 				continue
 			}
 			if !ok {
