@@ -1320,10 +1320,10 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 					"error", err,
 					"output", data.Output,
 					"acctID", data.AccountID,
-					"wsID": data.WorkspaceID,
-					"appID": data.AppID,
+					"wsID", data.WorkspaceID,
+					"appID", data.AppID,
 					"wfID", data.FunctionID,
-					"runID": data.RunID,
+					"runID", data.RunID,
 				)
 				continue
 			}
