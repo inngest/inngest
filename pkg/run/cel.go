@@ -2,6 +2,7 @@ package run
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -161,8 +162,22 @@ func (h *ExpressionHandler) MatchOutputExpressions(ctx context.Context, output [
 
 	eg := errgroup.Group{}
 	res := make([]bool, len(h.OutputExprList))
-	// data := string(output)
-	fmt.Printf("Output Data: %s\n", output)
+
+	var result any
+	if err := json.Unmarshal(output, &result); err != nil {
+		return false, fmt.Errorf("error deserializing output: %w", err)
+	}
+
+	var data map[string]any
+	switch v := result.(type) {
+	case map[string]any:
+		data = map[string]any{"output": v}
+	case []any:
+		data = map[string]any{"output": v}
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, bool, string:
+		data = map[string]any{"output": v}
+	}
+
 	for i, e := range h.OutputExprList {
 		idx := i
 		exp := e
@@ -173,7 +188,7 @@ func (h *ExpressionHandler) MatchOutputExpressions(ctx context.Context, output [
 				return fmt.Errorf("error initializing expression evaluator for output: %w", err)
 			}
 
-			ok, _, err := eval.Evaluate(ctx, expressions.NewData(map[string]any{"output": output}))
+			ok, _, err := eval.Evaluate(ctx, expressions.NewData(data))
 			if err != nil {
 				return fmt.Errorf("error evaluating output expression: %w", err)
 			}
