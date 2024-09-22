@@ -49,5 +49,5 @@ export const Chart = ({
     }
   }, [option, settings]);
 
-  return <div ref={chartRef} className={` ${className}`} />;
+  return <div ref={chartRef} className={className} />;
 };
