@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { RangePicker } from '@inngest/components/DatePicker';
 import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicker.jsx';
 import EntityFilter from '@inngest/components/Filter/EntityFilter';
@@ -18,14 +17,13 @@ import {
   toDate,
   type DurationType,
 } from '@inngest/components/utils/date';
-import { RiArrowDownSFill, RiArrowRightSFill } from '@remixicon/react';
 import { useQuery } from 'urql';
 
 import { GetBillingPlanDocument } from '@/gql/graphql';
-import { FailedFunctions } from './FailedFunctions';
-import { FunctionStatus } from './FunctionStatus';
+import { MetricsOverview } from './Overview';
+import { MetricsVolume } from './Volume';
 
-type EntityType = {
+export type EntityType = {
   id: string;
   name: string;
 };
@@ -51,8 +49,8 @@ export const Dashboard = ({
   apps = [],
   functions = [],
 }: {
-  apps?: EntityType[];
-  functions?: EntityType[];
+  apps: EntityType[];
+  functions: EntityType[];
 }) => {
   const [selectedApps, setApps, removeApps] = useStringArraySearchParam('apps');
   const [selectedFns, setFns, removeFns] = useStringArraySearchParam('fns');
@@ -65,8 +63,6 @@ export const Dashboard = ({
   const parsedDuration = duration && parseDuration(duration);
   const parsedStart = toDate(start);
   const parsedEnd = toDate(end);
-
-  const [overviewOpen, setOverviewOpen] = useState(true);
 
   const [{ data: planData }] = useQuery({
     query: GetBillingPlanDocument,
@@ -113,30 +109,17 @@ export const Dashboard = ({
         </div>
       </div>
       <div className="px-6">
-        <div className="bg-canvasSubtle item-start flex h-full w-full flex-col items-start">
-          <div className="leading-non text-subtle my-4 flex w-full flex-row items-center justify-start gap-x-2 text-xs uppercase">
-            {overviewOpen ? (
-              <RiArrowDownSFill className="cursor-pointer" onClick={() => setOverviewOpen(false)} />
-            ) : (
-              <RiArrowRightSFill className="cursor-pointer" onClick={() => setOverviewOpen(true)} />
-            )}
-            <div>Overview</div>
-
-            <hr className="border-subtle w-full" />
-          </div>
-          {overviewOpen && (
-            <div className="relative flex w-full flex-row items-center justify-start gap-2 overflow-hidden">
-              <FunctionStatus
-                from={getFrom(parsedStart, parsedDuration)}
-                until={parsedEnd}
-                selectedApps={selectedApps}
-                selectedFns={selectedFns}
-                autoRefresh={autoRefresh}
-              />
-              <FailedFunctions />
-            </div>
-          )}
-        </div>
+        <MetricsOverview
+          from={getFrom(parsedStart, parsedDuration)}
+          until={parsedEnd}
+          selectedApps={selectedApps}
+          selectedFns={selectedFns}
+          autoRefresh={autoRefresh}
+          functions={functions}
+        />
+      </div>
+      <div className="px-6">
+        <MetricsVolume />
       </div>
     </div>
   );
