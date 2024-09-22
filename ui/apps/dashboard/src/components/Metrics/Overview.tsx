@@ -141,7 +141,7 @@ export const MetricsOverview = ({
 
   return (
     <div className="bg-canvasSubtle item-start flex h-full w-full flex-col items-start">
-      <div className="leading-non text-subtle my-4 flex w-full flex-row items-center justify-start gap-x-2 text-xs uppercase">
+      <div className="text-subtle my-4 flex w-full flex-row items-center justify-start gap-x-2 text-xs uppercase">
         {overviewOpen ? (
           <RiArrowDownSFill className="cursor-pointer" onClick={() => setOverviewOpen(false)} />
         ) : (
