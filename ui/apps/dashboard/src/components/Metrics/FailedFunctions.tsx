@@ -232,7 +232,7 @@ export const FailedList = ({ rateList }: { rateList: Rate[] | undefined }) => {
       </div>
       {rateList?.map((r, i) => (
         <React.Fragment key={`function-failed-list-${i}`}>
-          <div className="leanding-none mt-3 flex w-full flex-row items-center justify-between gap-x-3 text-xs font-light leading-none">
+          <div className="mt-3 flex w-full flex-row items-center justify-between gap-x-3 text-xs font-light leading-none">
             <div>{r.name}</div>
             <div className="flex flex-row justify-end gap-x-4">
               <div className="justify-self-end">{r.totalFailures}</div>
