@@ -352,7 +352,7 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*response, error) {
 	// Only SDK versions that include the status in the body are expected to
 	// send a 201 status code and namespace in this way, so failing to parse
 	// here is an error.
-	if resp.StatusCode == 201 {
+	if resp.StatusCode == 201 && sysErr == nil {
 		stream, err := ParseStream(byt)
 		if err != nil {
 			return nil, err
