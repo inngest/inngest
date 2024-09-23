@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/inngest/log"
@@ -290,7 +291,7 @@ func newOTLPHTTPTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, err
 		return nil, fmt.Errorf("error create otlp http trace client: %w", err)
 	}
 
-	sp := trace.NewBatchSpanProcessor(exp)
+	sp := trace.NewBatchSpanProcessor(exp, trace.WithBatchTimeout(100*time.Millisecond))
 	tp := trace.NewTracerProvider(
 		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(
@@ -385,7 +386,38 @@ func newNatsTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) 
 		return nil, fmt.Errorf("error creating NATS trace client: %w", err)
 	}
 
-	sp := trace.NewBatchSpanProcessor(exp)
+	// configure options
+	bopts := []exporters.BatchSpanProcessorOpt{}
+	{
+		val := os.Getenv("SPAN_BATCH_PROCESSOR_BUFFER_SIZE")
+		if val != "" {
+			bufferSize, err := strconv.Atoi(val)
+			if err == nil && bufferSize > 0 {
+				bopts = append(bopts, exporters.WithBatchProcessorBufferSize(bufferSize))
+			}
+		}
+	}
+
+	{
+		val := os.Getenv("SPAN_BATCH_PROCESSOR_INTERVAL")
+		if val != "" {
+			if dur, err := time.ParseDuration(val); err == nil {
+				bopts = append(bopts, exporters.WithBatchProcessorInterval(dur))
+			}
+		}
+	}
+
+	{
+		val := os.Getenv("SPAN_BATCH_PROCESSOR_CONCURRENCY")
+		if val != "" {
+			c, err := strconv.Atoi(val)
+			if err == nil && c > 0 {
+				bopts = append(bopts, exporters.WithBatchProcessorConcurrency(c))
+			}
+		}
+	}
+
+	sp := exporters.NewBatchSpanProcessor(ctx, exp, bopts...)
 	tp := trace.NewTracerProvider(
 		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(

@@ -33,7 +33,7 @@ export function FuncCard({ title, id, status, active = false, onClick }: FuncCar
         <h2 className="text-basis">{title}</h2>
       </div>
       <hr className="border-muted" />
-      <div className="text-muted px-5 py-3.5 text-xs leading-none">
+      <div className="text-subtle px-5 py-3.5 text-xs leading-none">
         Run ID: <span className="font-mono">{id}</span>
       </div>
     </a>

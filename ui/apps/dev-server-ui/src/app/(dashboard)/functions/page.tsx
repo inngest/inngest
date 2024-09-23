@@ -5,7 +5,7 @@ import { BlankSlate } from '@inngest/components/BlankSlate';
 import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
 import { InvokeButton } from '@inngest/components/InvokeButton';
-import { Link } from '@inngest/components/Link/Link';
+import { NewLink } from '@inngest/components/Link/Link';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { Table } from '@inngest/components/Table';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
@@ -96,10 +96,11 @@ const columns = [
           disabled={false}
           doesFunctionAcceptPayload={doesFunctionAcceptPayload}
           btnAppearance="outlined"
-          btnAction={(data) => {
+          btnAction={({ data, user }) => {
             invokeFunction({
               data,
               functionSlug: props.row.original.slug,
+              user,
             });
           }}
         />
@@ -130,7 +131,7 @@ export default function FunctionList() {
       remove();
     }
     setGlobalFilter(searchInput);
-  });
+  }, 200);
 
   const { data, isFetching } = useGetFunctionsQuery(undefined, {
     refetchOnMountOrArgChange: true,
@@ -161,9 +162,13 @@ export default function FunctionList() {
           <Info
             text="List of all function in the development environment."
             action={
-              <Link href={'https://www.inngest.com/docs/functions'} className="text-md">
+              <NewLink
+                arrowOnHover
+                className="text-sm"
+                href={'https://www.inngest.com/docs/functions'}
+              >
                 Learn how to create a function
-              </Link>
+              </NewLink>
             }
           />
         }

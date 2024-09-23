@@ -17,7 +17,7 @@ export const HeaderTab = ({ href, children, exactRouteMatch = false }: HeaderTab
   return (
     <nav
       className={`${
-        active ? 'text-basis border-contrast ' : 'text-subtle border-transparent'
+        active ? 'text-basis border-contrast ' : 'text-muted border-transparent'
       }  flex h-[30px] items-center self-center border-b-2 pb-1 text-sm leading-tight outline-none`}
     >
       <Link href={href} prefetch={true} className="hover:bg-canvasSubtle rounded p-1">

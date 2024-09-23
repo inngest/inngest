@@ -14,12 +14,13 @@ type Request struct {
 // CallCtx represents context for individual function calls.  This logs the function ID, the
 // specific run ID, and sep information.
 type CallCtx struct {
-	Env        string    `json:"env"`
-	FunctionID string    `json:"fn_id"`
-	RunID      string    `json:"run_id"`
-	StepID     string    `json:"step_id"`
-	Stack      CallStack `json:"stack"`
-	Attempt    int       `json:"attempt"`
+	DisableImmediateExecution bool      `json:"disable_immediate_execution"`
+	Env                       string    `json:"env"`
+	FunctionID                string    `json:"fn_id"`
+	RunID                     string    `json:"run_id"`
+	StepID                    string    `json:"step_id"`
+	Stack                     CallStack `json:"stack"`
+	Attempt                   int       `json:"attempt"`
 }
 
 type CallStack struct {

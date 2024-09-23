@@ -84,10 +84,12 @@ type RegisterRequest struct {
 }
 
 const (
+	InBandSyncV1 string = "v1"
 	TrustProbeV1 string = "v1"
 )
 
 type Capabilities struct {
+	InBandSync string `json:"in_band_sync"`
 	TrustProbe string `json:"trust_probe"`
 }
 

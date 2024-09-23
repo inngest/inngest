@@ -35,7 +35,7 @@ export const EventList = () => {
                 scope="col"
                 className={cn(
                   'whitespace-nowrap px-2 py-3 text-left text-xs font-semibold text-slate-600',
-                  index === 0 && 'pl-6'
+                  index === 0 && 'pl-4'
                 )}
               >
                 {heading}
@@ -114,7 +114,7 @@ function EventTypesListPaginationPage({
         return (
           <tr className="hover:bg-slate-50" key={event.name}>
             <td className="w-96 whitespace-nowrap">
-              <div className="flex items-center gap-2.5 pl-4">
+              <div className="flex items-center gap-2.5 pl-2">
                 <Link
                   href={pathCreator.eventType({ envSlug: env.slug, eventName: event.name })}
                   internalNavigation

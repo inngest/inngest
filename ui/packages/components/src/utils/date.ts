@@ -1,11 +1,18 @@
 import {
+  differenceInMilliseconds,
   format,
   formatDistanceToNow,
+  isAfter,
+  isValid,
+  lightFormat,
   sub,
   subDays,
   type Duration,
   type DurationUnit,
 } from 'date-fns';
+
+export type { Duration as DurationType };
+export { differenceInMilliseconds, formatDistanceToNow, isAfter, isValid, lightFormat, sub };
 
 export const DURATION_STRING_REGEX = /^[1-9]\d*[smMhdwy]$/;
 
@@ -159,3 +166,11 @@ export function durationToString(duration: Duration): string {
 
   return `${value}${shortUnit}`;
 }
+
+export const toDate = (dateString?: string): Date | undefined => {
+  if (!dateString) {
+    return undefined;
+  }
+  const d = new Date(dateString);
+  return isNaN(d.getTime()) ? undefined : d;
+};

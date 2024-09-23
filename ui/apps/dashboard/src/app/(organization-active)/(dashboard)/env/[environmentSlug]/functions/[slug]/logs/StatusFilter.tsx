@@ -18,6 +18,7 @@ const orderedStatuses = getOrderedEnumValues(FunctionRunStatus, [
   FunctionRunStatus.Cancelled,
   FunctionRunStatus.Completed,
   FunctionRunStatus.Failed,
+  FunctionRunStatus.Skipped,
 ]);
 
 type StatusFilterProps = {

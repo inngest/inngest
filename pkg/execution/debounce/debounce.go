@@ -20,6 +20,7 @@ import (
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/xhit/go-str2duration/v2"
@@ -201,6 +202,7 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 	err = d.updateDebounce(ctx, di, fn, ttl, *debounceID)
 	if err == context.DeadlineExceeded || err == ErrDebounceInProgress || err == ErrDebounceNotFound {
 		if n == 5 {
+			logger.StdlibLogger(ctx).Error("unable to update debounce", "error", err)
 			// Only recurse 5 times.
 			return fmt.Errorf("unable to update debounce: %w", err)
 		}
@@ -332,7 +334,6 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 	}
 	switch out {
 	case -1:
-		log.From(ctx).Warn().Msg(ErrDebounceInProgress.Error())
 		// The debounce is in progress or has just finished.  Requeue.
 		return ErrDebounceInProgress
 	case -2:
@@ -340,8 +341,6 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 		// Do nothing.
 		return nil
 	case -3:
-		log.From(ctx).Warn().Msg(ErrDebounceNotFound.Error())
-		// The debounce is in progress or has just finished.  Requeue.
 		return ErrDebounceNotFound
 	default:
 		// Debounces should have a maximum timeout;  updating the debounce returns

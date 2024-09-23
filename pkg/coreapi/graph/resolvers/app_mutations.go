@@ -93,10 +93,12 @@ func (r *mutationResolver) InvokeFunction(
 	ctx context.Context,
 	data map[string]any,
 	functionSlug string,
+	user map[string]any,
 ) (*bool, error) {
 	evt := event.NewInvocationEvent(event.NewInvocationEventOpts{
 		Event: event.Event{
 			Data: data,
+			User: user,
 		},
 		FnID: functionSlug,
 	})
@@ -106,7 +108,6 @@ func (r *mutationResolver) InvokeFunction(
 		run.WithScope(consts.OtelScopeInvoke),
 		run.WithNewRoot(),
 		run.WithSpanAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysFunctionSlug, functionSlug),
 		),
 	)

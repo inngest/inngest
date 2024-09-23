@@ -16,6 +16,7 @@ export default {
           940: '#080D19',
         },
         primary: {
+          '3xSubtle': 'rgb(var(--color-primary-3xSubtle) / <alpha-value>)',
           '2xSubtle': 'rgb(var(--color-primary-2xSubtle) / <alpha-value>)',
           xSubtle: 'rgb(var(--color-primary-xSubtle) / <alpha-value>)',
           subtle: 'rgb(var(--color-primary-subtle) / <alpha-value>)',
@@ -148,6 +149,7 @@ export default {
       },
       textDecorationColor: {
         link: 'rgb(var(--color-foreground-link) / <alpha-value>)',
+        subtle: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
       },
       placeholderColor: {
         disabled: 'rgb(var(--color-foreground-disabled) / <alpha-value>)',
@@ -167,6 +169,7 @@ export default {
       boxShadowColor: {
         // temporary tooltip token
         tooltip: 'rgb(var(--color-background-canvas-muted) / <alpha-value>)',
+        subtle: 'rgb(var(--color-border-subtle) / <alpha-value>)',
       },
       boxShadow: {
         primary: '0 4px 4px 0 rgba(0,0,0,0.25)',

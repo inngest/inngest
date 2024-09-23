@@ -100,17 +100,21 @@ const (
 	// in which priority factors are taken into account.
 	FutureAtLimit = 2 * time.Second
 
-	// LiteDefaultPersistenceInterval is the default interval at which the
+	// StartDefaultPersistenceInterval is the default interval at which the
 	// queue will be snapshotted and persisted to disk.
-	LiteDefaultPersistenceInterval = time.Second * 60
-	// LiteMaxQueueChunkSize is the default maximum size of a queue chunk.
+	StartDefaultPersistenceInterval = time.Second * 60
+	// StartMaxQueueChunkSize is the default maximum size of a queue chunk.
 	// This is set to be comfortably within the 1GB limit of SQLite.
-	LiteMaxQueueChunkSize = 1024 * 1024 * 800 // 800MB
-	// LiteMaxQueueSnapshots is the maximum number of snapshots we keep.
-	LiteMaxQueueSnapshots = 5
+	StartMaxQueueChunkSize = 1024 * 1024 * 800 // 800MB
+	// StartMaxQueueSnapshots is the maximum number of snapshots we keep.
+	StartMaxQueueSnapshots = 5
 
-	DevServerTempDir     = ".inngest"
-	DevServerDbFile      = "dev_db.db"
+	DefaultInngestConfigDir = ".inngest"
+	SQLiteDbFileName        = "main.db"
+	// DevServerHistoryFile is the file where the history is stored.
+	//
+	// @deprecated Used in the in-memory writer when persiting, though this
+	// should not be actively used any more.
 	DevServerHistoryFile = "dev_history.json"
 
 	PauseExpiredDeletionGracePeriod = time.Second * 10

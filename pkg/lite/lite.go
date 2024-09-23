@@ -53,9 +53,15 @@ var redisSingleton *miniredis.Miniredis
 
 // StartOpts configures the dev server
 type StartOpts struct {
-	Config     config.Config `json:"-"`
-	RootDir    string        `json:"dir"`
-	SigningKey *string       `json:"signing_key"`
+	Config        config.Config `json:"-"`
+	RootDir       string        `json:"dir"`
+	SigningKey    *string       `json:"signing_key"`
+	RedisURI      string        `json:"redis-uri"`
+	PollInterval  int           `json:"poll-interval"`
+	URLs          []string      `json:"urls"`
+	Tick          time.Duration `json:"tick"`
+	RetryInterval int           `json:"retry_interval"`
+	SQLiteDir     string        `json:"sqlite-dir"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -80,12 +86,18 @@ func New(ctx context.Context, opts StartOpts) error {
 }
 
 func start(ctx context.Context, opts StartOpts) error {
-	db, err := sqlitecqrs.New(sqlitecqrs.SqliteCQRSOptions{InMemory: false})
+	db, err := sqlitecqrs.New(sqlitecqrs.SqliteCQRSOptions{
+		InMemory:  false,
+		Directory: opts.SQLiteDir,
+	})
 	if err != nil {
 		return err
 	}
 
-	tick := devserver.DefaultTick
+	tick := opts.Tick
+	if tick < 1 {
+		tick = devserver.DefaultTickDuration
+	}
 
 	// Initialize the devserver
 	dbcqrs := sqlitecqrs.NewCQRS(db)
@@ -96,12 +108,12 @@ func start(ctx context.Context, opts StartOpts) error {
 	stepLimitOverrides := make(map[string]int)
 	stateSizeLimitOverrides := make(map[string]int)
 
-	shardedRc, err := createInmemoryRedisConnection(ctx)
+	shardedRc, err := connectToOrCreateRedis(ctx, opts.RedisURI)
 	if err != nil {
 		return err
 	}
 
-	unshardedRc, err := createInmemoryRedisConnection(ctx)
+	unshardedRc, err := connectToOrCreateRedis(ctx, opts.RedisURI)
 	if err != nil {
 		return err
 	}
@@ -288,12 +300,32 @@ func start(ctx context.Context, opts StartOpts) error {
 	)
 
 	// The devserver embeds the event API.
-	persistenceInterval := consts.LiteDefaultPersistenceInterval
-	ds := devserver.NewService(devserver.StartOpts{
+	pi := consts.StartDefaultPersistenceInterval
+	persistenceInterval := &pi
+	if opts.RedisURI != "" {
+		// If we're using an external Redis, we rely on that to persist and
+		// manage snapshotting
+		persistenceInterval = nil
+
+		logger.From(ctx).Info().Msgf("using external Redis %s; disabling in-memory persistence and snapshotting", opts.RedisURI)
+	}
+
+	dsOpts := devserver.StartOpts{
 		Config:  opts.Config,
 		RootDir: opts.RootDir,
+		URLs:    opts.URLs,
 		Tick:    tick,
-	}, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hd, &persistenceInterval)
+	}
+
+	if opts.PollInterval > 0 {
+		dsOpts.Poll = true
+		dsOpts.PollInterval = opts.PollInterval
+	}
+
+	// The devserver embeds the event API.
+	ds := devserver.NewService(dsOpts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hd, &devserver.SingleNodeServiceOpts{
+		PersistenceInterval: persistenceInterval,
+	})
 	// embed the tracker
 	ds.Tracker = t
 	ds.State = sm
@@ -348,6 +380,30 @@ func start(ctx context.Context, opts StartOpts) error {
 	)
 
 	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice)
+}
+
+func connectToOrCreateRedis(ctx context.Context, redisURI string) (rueidis.Client, error) {
+	if redisURI == "" {
+		return createInmemoryRedisConnection(ctx)
+	}
+
+	url := redisURI
+	// strip the redis:// prefix if we have one; connection fails with it
+	if len(url) > 8 && url[:8] == "redis://" {
+		url = url[8:]
+	}
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:       []string{url},
+		DisableCache:      true,
+		BlockingPoolSize:  1,
+		ForceSingleClient: true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error creating redis client: %w", err)
+	}
+
+	return rc, nil
 }
 
 // createInMemoryRedisConnection creates a new connection to the in-memory Redis

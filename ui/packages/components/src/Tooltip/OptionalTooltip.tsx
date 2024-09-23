@@ -15,7 +15,7 @@ export const OptionalTooltip = ({
       <TooltipTrigger asChild>{children}</TooltipTrigger>
       <TooltipContent
         side={side}
-        className="text-subtle flex h-8 items-center px-4 text-xs leading-[18px]"
+        className="text-muted flex h-8 items-center px-4 text-xs leading-[18px]"
       >
         {tooltip}
       </TooltipContent>

@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -21,6 +22,9 @@ var (
 
 type SqliteCQRSOptions struct {
 	InMemory bool
+
+	// The path at which the SQLite database should be stored.
+	Directory string
 }
 
 func New(opts SqliteCQRSOptions) (*sql.DB, error) {
@@ -33,15 +37,34 @@ func New(opts SqliteCQRSOptions) (*sql.DB, error) {
 	} else {
 		o.Do(func() {
 			// make the dir if it doesn't exist
-			if _, err := os.Stat(consts.DevServerTempDir); os.IsNotExist(err) {
-				err = os.Mkdir(consts.DevServerTempDir, 0750)
+			dir := consts.DefaultInngestConfigDir
+			if opts.Directory != "" {
+				dir = opts.Directory
+				if !filepath.IsAbs(opts.Directory) {
+					wd, err := os.Getwd()
+					if err != nil {
+						return
+					}
+
+					dir = filepath.Join(wd, opts.Directory)
+				}
+			}
+
+			if _, err := os.Stat(dir); os.IsNotExist(err) {
+				err = os.MkdirAll(dir, 0750)
 				if err != nil {
 					return
 				}
 			}
 
-			db, err = sql.Open("sqlite", fmt.Sprintf("file:%s?cache=shared", fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerDbFile)))
+			file := filepath.Join(dir, consts.SQLiteDbFileName)
+
+			db, err = sql.Open("sqlite", fmt.Sprintf("file:%s?cache=shared", file))
 		})
+	}
+
+	if err != nil {
+		return nil, err
 	}
 
 	if err := db.Ping(); err != nil {
@@ -79,7 +102,7 @@ func up(db *sql.DB, opts SqliteCQRSOptions) error {
 
 	dbName := "file:inngest?mode=memory&cache=shared"
 	if !opts.InMemory {
-		dbName = fmt.Sprintf("file:%s?cache=shared", fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerDbFile))
+		dbName = fmt.Sprintf("file:%s?cache=shared", fmt.Sprintf("%s/%s", consts.DefaultInngestConfigDir, consts.SQLiteDbFileName))
 	}
 
 	m, err := migrate.NewWithInstance("iofs", source, dbName, driver)

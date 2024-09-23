@@ -29,6 +29,16 @@ const nextConfig = {
         permanent: false,
       },
       {
+        source: '/env/:slug/onboarding',
+        destination: '/env/production/onboarding/1',
+        permanent: false,
+      },
+      {
+        source: '/env/:slug((?!production)[^/]+)/onboarding/:step',
+        destination: '/env/production/onboarding/:step',
+        permanent: false,
+      },
+      {
         source: '/integrations/vercel',
         destination: '/integrations/vercel/callback',
         permanent: false,

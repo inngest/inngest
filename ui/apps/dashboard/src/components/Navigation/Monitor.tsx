@@ -13,7 +13,9 @@ export default function Monitor({
   activeEnv: EnvType;
   collapsed: boolean;
 }) {
-  const { isReady, value: isRunsEnabled } = useBooleanFlag('env-level-runs-page');
+  const { isReady: runsIsReady, value: runsEnabled } = useBooleanFlag('env-level-runs-page');
+  const { isReady: metricsIsReady, value: metricsEnabled } = useBooleanFlag('metrics-dashboard');
+
   return (
     <div className={`flex w-full flex-col  ${collapsed ? 'mt-2' : 'mt-5'}`}>
       {collapsed ? (
@@ -26,14 +28,14 @@ export default function Monitor({
         collapsed={collapsed}
         text="Metrics"
         icon={<MetricsIcon className="h-18px w-[18px]" />}
-        comingSoon={true}
+        comingSoon={!metricsIsReady || !metricsEnabled}
       />
       <MenuItem
         href={getNavRoute(activeEnv, 'runs')}
         collapsed={collapsed}
         text="Runs"
         icon={<RunsIcon className="h-18px w-[18px]" />}
-        comingSoon={isReady && !isRunsEnabled}
+        comingSoon={!runsIsReady || !runsEnabled}
       />
       {/* <MenuItem
         href={getNavRoute(activeEnv, 'events/monitor')}

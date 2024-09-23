@@ -206,7 +206,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
           <div className="flex flex-col items-start justify-between gap-2 px-6 py-4">
             <label htmlFor="replayName">
               <span className="text-basis text-sm font-semibold">Replay Name</span>
-              <p className="text-subtle text-sm">
+              <p className="text-muted text-sm">
                 Provide a unique name for this replay group to easily identify the runs being
                 replayed.
               </p>
@@ -227,7 +227,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
           <div className="flex flex-col justify-between gap-2 px-6 py-4">
             <div>
               <span className="text-basis text-sm font-semibold">Date Range</span>
-              <p className="text-subtle text-sm">
+              <p className="text-muted text-sm">
                 Choose the time range for when the runs were queued.
               </p>
             </div>
@@ -249,7 +249,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
         <div className="space-y-5 px-6 py-4">
           <div>
             <span className="text-basis text-sm font-semibold">Statuses</span>
-            <p className="text-subtle text-sm">Select the statuses you wish to replay.</p>
+            <p className="text-muted text-sm">Select the statuses you wish to replay.</p>
           </div>
           <ToggleGroup.Root
             type="multiple"
@@ -268,9 +268,9 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
                 >
                   <RunStatusIcon status={value} className="mx-auto h-8" />
                   {label}
-                  {!timeRange && <p className="text-subtle text-sm">-- runs</p>}
+                  {!timeRange && <p className="text-muted text-sm">-- runs</p>}
                   {timeRange && (
-                    <p aria-label={`Number of ${label} runs`} className="text-subtle text-sm">
+                    <p aria-label={`Number of ${label} runs`} className="text-muted text-sm">
                       {isLoading ? (
                         <Placeholder className="top-px inline-flex h-3 w-3 bg-slate-200" />
                       ) : (
@@ -288,7 +288,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
           </ToggleGroup.Root>
         </div>
         <div className="px-6 py-4">
-          <div className="text-subtle bg-canvasSubtle rounded-md px-6 py-4 text-sm">
+          <div className="text-muted bg-canvasSubtle rounded-md px-6 py-4 text-sm">
             <p>
               Note: Replayed functions are re-run from the beginning. Previously run steps and
               function states will not be reused during the replay. The <code>event.user</code>{' '}
@@ -301,7 +301,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
           {!timeRange && <p></p>}
           {timeRange && (
             <div className="flex items-center gap-2">
-              <p className="text-subtle inline-flex items-center gap-1.5 text-sm">
+              <p className="text-muted inline-flex items-center gap-1.5 text-sm">
                 <RiInformationLine className="h-5 w-5" />A total of{' '}
                 <span className="font-bold">
                   {isLoading ? (

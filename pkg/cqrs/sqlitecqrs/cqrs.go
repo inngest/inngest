@@ -141,9 +141,9 @@ func (w wrapper) InsertQueueSnapshot(ctx context.Context, params cqrs.InsertQueu
 
 	var chunks [][]byte
 	for len(byt) > 0 {
-		if len(byt) > consts.LiteMaxQueueChunkSize {
-			chunks = append(chunks, byt[:consts.LiteMaxQueueChunkSize])
-			byt = byt[consts.LiteMaxQueueChunkSize:]
+		if len(byt) > consts.StartMaxQueueChunkSize {
+			chunks = append(chunks, byt[:consts.StartMaxQueueChunkSize])
+			byt = byt[consts.StartMaxQueueChunkSize:]
 		} else {
 			chunks = append(chunks, byt)
 			break
@@ -176,7 +176,7 @@ func (w wrapper) InsertQueueSnapshot(ctx context.Context, params cqrs.InsertQueu
 
 	// Asynchronously remove old snapshots.
 	go func() {
-		_, _ = w.q.DeleteOldQueueSnapshots(ctx, consts.LiteMaxQueueSnapshots)
+		_, _ = w.q.DeleteOldQueueSnapshots(ctx, consts.StartMaxQueueSnapshots)
 	}()
 
 	return snapshotID, nil
@@ -967,7 +967,6 @@ func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*
 		return nil, fmt.Errorf("error retrieving spans for output: %w", err)
 	}
 
-	var output *cqrs.SpanOutput
 	for _, s := range spans {
 		var evts []cqrs.SpanEvent
 		err := json.Unmarshal(s.Events, &evts)
@@ -985,21 +984,19 @@ func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*
 					isError = true
 				}
 
-				output = &cqrs.SpanOutput{
+				return &cqrs.SpanOutput{
 					Data:             []byte(evt.Name),
 					Timestamp:        evt.Timestamp,
 					Attributes:       evt.Attributes,
 					IsError:          isError,
 					IsFunctionOutput: isFnOutput,
 					IsStepOutput:     isStepOutput,
-				}
-
-				break
+				}, nil
 			}
 		}
 	}
 
-	return output, nil
+	return nil, fmt.Errorf("no output found")
 }
 
 type runsQueryBuilder struct {

@@ -35,7 +35,7 @@ export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, tr
         <Tooltip>
           <TooltipTrigger>
             <Badge
-              className="border-muted text-muted border px-1.5"
+              className="border-muted text-subtle border px-1.5"
               flatSide={isRetried ? 'right' : undefined}
               kind="solid"
             >
@@ -49,7 +49,7 @@ export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, tr
           <Tooltip>
             <TooltipTrigger>
               <Badge
-                className="border-r-1 border-muted text-muted border-l-0 px-1.5"
+                className="border-r-1 border-muted text-subtle border-l-0 px-1.5"
                 flatSide="left"
                 kind="solid"
               >
@@ -64,7 +64,7 @@ export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, tr
   }
 
   return (
-    <div className="flex w-72 gap-2">
+    <div className="text-basis flex w-72 gap-2">
       {isExpandable && (
         <Button
           btnAction={onClickExpandToggle}

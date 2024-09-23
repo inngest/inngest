@@ -7,38 +7,22 @@ import (
 	"github.com/inngest/inngest/pkg/api/tel"
 	"github.com/inngest/inngest/pkg/cli"
 	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/inngest/version"
 	"github.com/inngest/inngest/pkg/logger"
 	isatty "github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-const (
-	letters = `
-    ____                            __
-   /  _/___  ____  ____ ____  _____/ /_
-   / // __ \/ __ \/ __ '/ _ \/ ___/ __/
- _/ // / / / / / / /_/ /  __(__  ) /_
-/___/_/ /_/_/ /_/\__, /\___/____/\__/
-                /____/
-`
-)
-
-var (
-	longDescription = fmt.Sprintf(
-		"%s\n%s\n%s%s\n",
-		cli.TextStyle.Render(letters),
-		cli.TextStyle.Render("Build event-driven queues with zero infra. "),
-		cli.TextStyle.Render("Request features, get help, and chat with us: "),
-		cli.BoldStyle.Render("https://www.inngest.com/discord"),
-	)
-)
-
 func Execute() {
 	rootCmd := &cobra.Command{
-		Use:   "inngest",
-		Short: "A serverless event-driven infrastructure platform",
-		Long:  longDescription,
+		Use: "inngest",
+		Short: cli.TextStyle.Render(fmt.Sprintf(
+			"%s %s\n\n%s",
+			"Inngest CLI",
+			fmt.Sprintf("v%s", version.Print()),
+			"The durable execution engine with built-in flow control.",
+		)),
 		CompletionOptions: cobra.CompletionOptions{
 			DisableDefaultCmd: true,
 		},
@@ -62,7 +46,14 @@ func Execute() {
 		},
 	}
 
-	rootCmd.PersistentFlags().Bool("prod", false, "Use the production environment for the current command.")
+	// Add a note to the bottom of the help message
+	tmpl := rootCmd.HelpTemplate() + fmt.Sprintf(
+		"\n%s\n%s\n",
+		"Request features, get help, and chat with us: ",
+		"https://www.inngest.com/discord",
+	)
+	rootCmd.SetHelpTemplate(tmpl)
+
 	rootCmd.PersistentFlags().Bool("json", false, "Output logs as JSON.  Set to true if stdout is not a TTY.")
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose logging.")
 	rootCmd.PersistentFlags().StringP("log-level", "l", "info", "Set the log level.  One of: trace, debug, info, warn, error.")
@@ -77,11 +68,9 @@ func Execute() {
 	}
 
 	// Register Top Level Commands
-	rootCmd.AddCommand(NewCmdLogin())
 	rootCmd.AddCommand(NewCmdDev())
 	rootCmd.AddCommand(NewCmdVersion())
-	rootCmd.AddCommand(NewCmdServe())
-	rootCmd.AddCommand(NewCmdLite())
+	rootCmd.AddCommand(NewCmdStart(rootCmd))
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

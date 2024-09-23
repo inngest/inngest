@@ -38,7 +38,7 @@ export default function VercelProjects({ integration }: { integration: VercelInt
   return (
     <div className="mt-8 flex flex-col">
       <div className="flex flex-row items-center justify-between">
-        <div className="text-subtle">
+        <div className="text-muted">
           Projects (<span className="mx-[2px]">{projects.length}</span>)
         </div>
         <div className="text-btnPrimary flex cursor-pointer flex-row items-center justify-between text-xs">
@@ -53,7 +53,7 @@ export default function VercelProjects({ integration }: { integration: VercelInt
             value={{ id: 'all', name: 'All' }}
             onChange={(o) => setFilter(o.name)}
             label="Show"
-            className="text-subtle bg-canvasBase ml-4 h-6 rounded-sm text-xs leading-tight"
+            className="text-muted bg-canvasBase ml-4 h-6 rounded-sm text-xs leading-tight"
           >
             <Select.Button className="rounded-0 h-4">
               <span className="text-slate- text-basis pr-2 text-xs leading-tight first-letter:capitalize">
@@ -94,7 +94,7 @@ export default function VercelProjects({ integration }: { integration: VercelInt
                       className={`h-6 ${
                         p.isEnabled
                           ? 'bg-primary-intense text-onContrast'
-                          : 'bg-disabled text-subtle'
+                          : 'bg-disabled text-muted'
                       }`}
                     >
                       {p.isEnabled ? 'enabled' : 'disabled'}
@@ -112,7 +112,7 @@ export default function VercelProjects({ integration }: { integration: VercelInt
                             <div className="text-basis px-4 pt-2 text-sm font-medium">
                               Deployment protection is enabled
                             </div>
-                            <div className="text-subtle my-2 px-4 text-sm font-normal">
+                            <div className="text-muted my-2 px-4 text-sm font-normal">
                               Inngest may not be able to communicate with your application by
                               default.
                             </div>
@@ -126,7 +126,7 @@ export default function VercelProjects({ integration }: { integration: VercelInt
                       </Tooltip>
                     )}
                   </div>
-                  <div className="text-subtle mt-2 text-base font-normal leading-snug">
+                  <div className="text-muted mt-2 text-base font-normal leading-snug">
                     {p.servePath}
                   </div>
                 </div>

@@ -85,7 +85,7 @@ export function SyncList({
                 >
                   {sync.syncedFunctions.length > 0 && (
                     <>
-                      <IconFunction className="text-subtle" />
+                      <IconFunction className="text-muted" />
                       {sync.syncedFunctions.length}
                     </>
                   )}
