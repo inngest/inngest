@@ -1,6 +1,9 @@
+import { useState } from 'react';
 import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
 import { NewButton } from '@inngest/components/Button';
 import { NewLink } from '@inngest/components/Link';
+import { IconSpinner } from '@inngest/components/icons/Spinner';
+import { RiCheckboxCircleFill, RiCloseCircleFill } from '@remixicon/react';
 
 import {
   AccessCommand,
@@ -10,8 +13,57 @@ import {
   RoleCommand,
 } from './ConnectCommands';
 
-export default function Connect({ next }: { next: () => void }) {
-  // TO DO: Add interactions and pass actions as props
+const verifyConnect = async (): Promise<boolean> => {
+  // TO DO: Replace with actual API call in production.
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(true);
+    }, 1000);
+  });
+};
+
+const StatusIndicator = ({
+  loading,
+  success,
+  error,
+}: {
+  loading?: boolean;
+  success?: boolean;
+  error?: boolean;
+}) => {
+  if (loading)
+    return (
+      <div className="text-link flex items-center gap-1 text-sm">
+        <IconSpinner className="fill-link h-4 w-4" />
+        In progress
+      </div>
+    );
+  if (success) return <RiCheckboxCircleFill className="text-success h-4 w-4" />;
+  if (error) return <RiCloseCircleFill className="text-error h-5 w-5" />;
+};
+
+export default function Connect({ onSuccess }: { onSuccess: () => void }) {
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
+  const [error, setError] = useState<string>();
+
+  const handleVerify = async () => {
+    setIsVerifying(true);
+    try {
+      const success = await verifyConnect();
+      if (success) {
+        setIsVerified(true);
+        onSuccess();
+      } else {
+        setError('Connection error.');
+      }
+    } catch (err) {
+      setError('An error occurred while connecting. Please try again.');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   return (
     <>
       <p className="text-sm">
@@ -23,7 +75,12 @@ export default function Connect({ next }: { next: () => void }) {
         <p className="mb-3 font-medium">Inngest will automatically perform the following setup:</p>
         <AccordionList type="multiple" defaultValue={[]}>
           <AccordionList.Item value="1">
-            <AccordionList.Trigger>Create a Postgres role for replication</AccordionList.Trigger>
+            <AccordionList.Trigger>
+              <div className="flex w-full items-center justify-between">
+                <p>Create a Postgres role for replication</p>
+                <StatusIndicator loading={isVerifying} success={isVerified} error={!!error} />
+              </div>
+            </AccordionList.Trigger>
 
             <AccordionList.Content>
               <p className="mb-3">
@@ -39,7 +96,12 @@ export default function Connect({ next }: { next: () => void }) {
             </AccordionList.Content>
           </AccordionList.Item>
           <AccordionList.Item value="2">
-            <AccordionList.Trigger>Grant schema access to your Postgres role</AccordionList.Trigger>
+            <AccordionList.Trigger>
+              <div className="flex w-full items-center justify-between">
+                <p>Grant schema access to your Postgres role</p>
+                <StatusIndicator loading={isVerifying} success={isVerified} error={!!error} />
+              </div>
+            </AccordionList.Trigger>
             <AccordionList.Content>
               <p className="mb-3">
                 Granting{' '}
@@ -51,7 +113,12 @@ export default function Connect({ next }: { next: () => void }) {
             </AccordionList.Content>
           </AccordionList.Item>
           <AccordionList.Item value="3">
-            <AccordionList.Trigger>Create a replication slot</AccordionList.Trigger>
+            <AccordionList.Trigger>
+              <div className="flex w-full items-center justify-between">
+                <p>Create a replication slot</p>
+                <StatusIndicator loading={isVerifying} success={isVerified} error={!!error} />
+              </div>
+            </AccordionList.Trigger>
             <AccordionList.Content>
               <p className="mb-3">
                 Inngest uses the <code className="text-accent-xIntense text-xs">pgoutput</code>{' '}
@@ -70,7 +137,12 @@ export default function Connect({ next }: { next: () => void }) {
             </AccordionList.Content>
           </AccordionList.Item>
           <AccordionList.Item value="4">
-            <AccordionList.Trigger>Create a publication</AccordionList.Trigger>
+            <AccordionList.Trigger>
+              <div className="flex w-full items-center justify-between">
+                <p>Create a publication</p>
+                <StatusIndicator loading={isVerifying} success={isVerified} error={!!error} />
+              </div>
+            </AccordionList.Trigger>
             <AccordionList.Content>
               <ol className="list-decimal pl-10">
                 <li className="mb-3">
@@ -100,7 +172,16 @@ export default function Connect({ next }: { next: () => void }) {
         </AccordionList>
       </div>
 
-      <NewButton label="Complete setup automatically" onClick={next} />
+      {isVerified ? (
+        <NewButton label="See integration" href={`/settings/integrations/neon`} />
+      ) : (
+        <NewButton
+          label="Complete setup automatically"
+          onClick={handleVerify}
+          loading={isVerifying}
+        />
+      )}
+      {error && <p className="text-error mt-4 text-sm">{error}</p>}
     </>
   );
 }
