@@ -18,7 +18,7 @@ export default function NeonFormat({
     engine: string;
     name: string;
     replicaConn?: string;
-  }) => Promise<boolean>;
+  }) => Promise<{ success: boolean; error: string }>;
 }) {
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState<string>();
@@ -41,13 +41,14 @@ export default function NeonFormat({
     }
 
     try {
-      const success = await verifyLogicalReplication(parsedInput);
+      const { success, error } = await verifyLogicalReplication(parsedInput);
       if (success) {
         setIsVerified(true);
         onSuccess();
       } else {
         setError(
-          'Could not verify credentials. Please check if everything is entered correctly and try again.'
+          error ||
+            'Could not verify credentials. Please check if everything is entered correctly and try again.'
         );
       }
     } catch (err) {

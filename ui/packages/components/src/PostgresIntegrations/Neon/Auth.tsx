@@ -20,7 +20,7 @@ export default function NeonAuth({
     engine: string;
     name: string;
     replicaConn?: string;
-  }) => Promise<boolean>;
+  }) => Promise<{ success: boolean; error: string }>;
 }) {
   const [inputValue, setInputValue] = useState(savedCredentials || '');
   const [isVerifying, setIsVerifying] = useState(false);
@@ -47,13 +47,14 @@ export default function NeonAuth({
     }
 
     try {
-      const success = await verifyCredentials(parsedInput);
+      const { success, error } = await verifyCredentials(parsedInput);
       if (success) {
         setIsVerified(true);
         onSuccess(inputValue);
       } else {
         setError(
-          'Could not verify credentials. Please check if everything is entered correctly and try again.'
+          error ||
+            'Could not verify credentials. Please check if everything is entered correctly and try again.'
         );
       }
     } catch (err) {

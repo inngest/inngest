@@ -46,7 +46,7 @@ export default function Connect({
     engine: string;
     name: string;
     replicaConn?: string;
-  }) => Promise<boolean>;
+  }) => Promise<{ success: boolean; error: string }>;
 }) {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
@@ -71,12 +71,12 @@ export default function Connect({
     }
 
     try {
-      const success = await verifyAutoSetup(parsedInput);
+      const { success, error } = await verifyAutoSetup(parsedInput);
       if (success) {
         setIsVerified(true);
         onSuccess();
       } else {
-        setError('Connection error.');
+        setError(error || 'Connection error.');
       }
     } catch (err) {
       setError('An error occurred while connecting. Please try again.');
