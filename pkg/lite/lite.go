@@ -69,7 +69,7 @@ type StartOpts struct {
 
 	// EventKey is used to authorize incoming events, ensuring they match the
 	// given key.
-	EventKey string `json:"event_key"`
+	EventKey []string `json:"event_key"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -403,7 +403,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			{At: "/v0", Router: core.Router},
 			{At: "/debug", Handler: middleware.Profiler()},
 		},
-		LocalEventKey: opts.EventKey,
+		LocalEventKeys: opts.EventKey,
 	})
 
 	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice)

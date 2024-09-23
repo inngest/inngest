@@ -32,21 +32,21 @@ type Options struct {
 	EventHandler EventHandler
 	Logger       *zerolog.Logger
 
-	// LocalEventKey is the key used to send events to the local event API from
-	// an app. If this is set, only keys that match this value will be
-	// accepted.
-	LocalEventKey string
+	// LocalEventKeys are the keys used to send events to the local event API
+	// from an app. If this is set, only keys that match one of these values
+	// will be accepted.
+	LocalEventKeys []string
 }
 
 func NewAPI(o Options) (chi.Router, error) {
 	logger := o.Logger.With().Str("caller", "api").Logger()
 
 	api := &API{
-		Router:        chi.NewMux(),
-		config:        o.Config,
-		handler:       o.EventHandler,
-		log:           &logger,
-		localEventKey: o.LocalEventKey,
+		Router:         chi.NewMux(),
+		config:         o.Config,
+		handler:        o.EventHandler,
+		log:            &logger,
+		localEventKeys: o.LocalEventKeys,
 	}
 
 	cors := cors.New(cors.Options{
@@ -77,10 +77,10 @@ type API struct {
 
 	server *http.Server
 
-	// LocalEventKey is the key used to send events to the local event API from
-	// an app. If this is set, only keys that match this value will be
-	// accepted.
-	localEventKey string
+	// localEventKeys are the keys used to send events to the local event API
+	// from an app. If this is set, only keys that match one of these values
+	// will be accepted.
+	localEventKeys []string
 }
 
 func (a *API) AddRoutes() {
@@ -137,12 +137,22 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if a.localEventKey != "" && key != a.localEventKey {
-		a.writeResponse(w, apiResponse{
-			StatusCode: http.StatusUnauthorized,
-			Error:      "Event key not found",
-		})
-		return
+	if len(a.localEventKeys) > 0 {
+		var found bool
+		for _, k := range a.localEventKeys {
+			if k == key {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			a.writeResponse(w, apiResponse{
+				StatusCode: http.StatusUnauthorized,
+				Error:      "Event key not found",
+			})
+			return
+		}
 	}
 
 	ctx, cancel := context.WithCancel(ctx)

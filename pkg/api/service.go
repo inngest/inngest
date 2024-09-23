@@ -35,17 +35,17 @@ type APIServiceOptions struct {
 	Config config.Config
 	Mounts []Mount
 
-	// LocalEventKey is the key used to send events to the local event API from
-	// an app. If this is set, only keys that match this value will be
-	// accepted.
-	LocalEventKey string
+	// LocalEventKeys are the keys used to send events to the local event API
+	// from an app. If this is set, only keys that match one of these values
+	// will be accepted.
+	LocalEventKeys []string
 }
 
 func NewService(opts APIServiceOptions) service.Service {
 	return &apiServer{
-		config:        opts.Config,
-		mounts:        opts.Mounts,
-		localEventKey: opts.LocalEventKey,
+		config:         opts.Config,
+		mounts:         opts.Mounts,
+		localEventKeys: opts.LocalEventKeys,
 	}
 }
 
@@ -56,10 +56,10 @@ type apiServer struct {
 
 	mounts []Mount
 
-	// localEventKey is the key used to send events to the local event API from
-	// an app. If this is set, only keys that match this value will be
-	// accepted.
-	localEventKey string
+	// localEventKeys are the keys used to send events to the local event API
+	// from an app. If this is set, only keys that match one of these values
+	// will be accepted.
+	localEventKeys []string
 }
 
 func (a *apiServer) Name() string {
@@ -70,10 +70,10 @@ func (a *apiServer) Pre(ctx context.Context) error {
 	var err error
 
 	api, err := NewAPI(Options{
-		Config:        a.config,
-		Logger:        logger.From(ctx),
-		EventHandler:  a.handleEvent,
-		LocalEventKey: a.localEventKey,
+		Config:         a.config,
+		Logger:         logger.From(ctx),
+		EventHandler:   a.handleEvent,
+		LocalEventKeys: a.localEventKeys,
 	})
 	if err != nil {
 		return err
