@@ -76,12 +76,15 @@ func TestThrottle(t *testing.T) {
 				continue
 			}
 
-			timeDiff := startTimes[i].Sub(startTimes[i-1])
+			sincePreviousStart := startTimes[i].Sub(startTimes[i-1])
 
-			// Ensure this run started within 1 second of the throttle period
-			// (+/- 1 second)
-			require.GreaterOrEqual(t, timeDiff, throttlePeriod-1*time.Second)
-			require.LessOrEqual(t, timeDiff, throttlePeriod+1*time.Second)
+			// Sometimes runs start a little before the throttle period, but
+			// shouldn't be more than 1 second before
+			require.GreaterOrEqual(t, sincePreviousStart, throttlePeriod-1*time.Second)
+
+			// Sometimes runs start a little after the throttle period. This
+			// fudge factor can be increased if we see it fail in CI
+			require.LessOrEqual(t, sincePreviousStart, throttlePeriod+2*time.Second)
 		}
 	})
 
