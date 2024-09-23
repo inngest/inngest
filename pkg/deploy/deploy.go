@@ -24,6 +24,7 @@ var (
 	DeployErrNoBranchName        = fmt.Errorf("missing_branch_env_name")
 	DeployErrInvalidSigningKey   = fmt.Errorf("invalid_signing_key")
 	DeployErrNoSigningKey        = fmt.Errorf("missing_signing_key")
+	DeployErrNoServerSigningKey  = fmt.Errorf("missing_server_signing_key")
 	DeployErrInvalidFunction     = fmt.Errorf("invalid_function")
 	DeployErrNoFunctions         = fmt.Errorf("no_functions")
 	DeployErrUnreachable         = fmt.Errorf("unreachable")
@@ -42,7 +43,13 @@ type pingResult struct {
 	IsSDK bool
 }
 
-func Ping(ctx context.Context, url string, serverKind string, signingKey string) pingResult {
+func Ping(ctx context.Context, url string, serverKind string, signingKey string, requireKeys bool) pingResult {
+	if requireKeys && signingKey == "" {
+		return pingResult{
+			Err: DeployErrNoServerSigningKey,
+		}
+	}
+
 	isSDK := false
 
 	reqByt, err := json.Marshal(map[string]string{"url": url})

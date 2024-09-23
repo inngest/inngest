@@ -36,6 +36,12 @@ type Options struct {
 	// from an app. If this is set, only keys that match one of these values
 	// will be accepted.
 	LocalEventKeys []string
+
+	// RequireKeys defines whether event and signing keys are required for the
+	// server to function. If this is true and signing keys are not defined,
+	// the server will still boot but core actions such as syncing, runs, and
+	// ingesting events will not work.
+	RequireKeys bool
 }
 
 func NewAPI(o Options) (chi.Router, error) {
@@ -47,6 +53,7 @@ func NewAPI(o Options) (chi.Router, error) {
 		handler:        o.EventHandler,
 		log:            &logger,
 		localEventKeys: o.LocalEventKeys,
+		requireKeys:    o.RequireKeys,
 	}
 
 	cors := cors.New(cors.Options{
@@ -81,6 +88,12 @@ type API struct {
 	// from an app. If this is set, only keys that match one of these values
 	// will be accepted.
 	localEventKeys []string
+
+	// requireKeys defines whether event and signing keys are required for the
+	// server to function. If this is true and signing keys are not defined,
+	// the server will still boot but core actions such as syncing, runs, and
+	// ingesting events will not work.
+	requireKeys bool
 }
 
 func (a *API) AddRoutes() {
@@ -126,6 +139,15 @@ func (a API) HealthCheck(w http.ResponseWriter, r *http.Request) {
 func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	defer r.Body.Close()
+
+	// If self hosting and keys are not defined, error.
+	if a.requireKeys && len(a.localEventKeys) == 0 {
+		a.writeResponse(w, apiResponse{
+			StatusCode: http.StatusServiceUnavailable,
+			Error:      "Event keys are required to ingest events securely",
+		})
+		return
+	}
 
 	key := chi.URLParam(r, "key")
 	if key == "" {

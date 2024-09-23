@@ -232,12 +232,11 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	var drivers = []driver.Driver{}
-	driverOpts := registration.NewDriverOpts{}
-	if sk != nil {
-		driverOpts.SigningKey = sk
-	}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
-		d, err := driverConfig.NewDriver(driverOpts)
+		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
+			RequireLocalSigningKey: true,
+			LocalSigningKey:        sk,
+		})
 		if err != nil {
 			return err
 		}
@@ -332,11 +331,12 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	dsOpts := devserver.StartOpts{
-		Config:     opts.Config,
-		RootDir:    opts.RootDir,
-		URLs:       opts.URLs,
-		Tick:       tick,
-		SigningKey: sk,
+		Config:      opts.Config,
+		RootDir:     opts.RootDir,
+		URLs:        opts.URLs,
+		Tick:        tick,
+		SigningKey:  sk,
+		RequireKeys: true,
 	}
 
 	if opts.PollInterval > 0 {
@@ -385,6 +385,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		Executor:        ds.Executor,
 		HistoryReader:   hr,
 		LocalSigningKey: opts.SigningKey,
+		RequireKeys:     true,
 	})
 	if err != nil {
 		return err

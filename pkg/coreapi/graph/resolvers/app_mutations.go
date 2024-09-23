@@ -36,7 +36,7 @@ func (r *mutationResolver) CreateApp(ctx context.Context, input models.CreateApp
 	}
 	app, _ := r.Data.UpsertApp(ctx, params)
 
-	if res := deploy.Ping(ctx, input.URL, r.ServerKind, r.LocalSigningKey); res.Err != nil {
+	if res := deploy.Ping(ctx, input.URL, r.ServerKind, r.LocalSigningKey, r.RequireKeys); res.Err != nil {
 		return app, res.Err
 	}
 

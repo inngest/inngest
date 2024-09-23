@@ -56,7 +56,8 @@ func RegisterState(f func() any) {
 }
 
 type NewDriverOpts struct {
-	SigningKey *string
+	LocalSigningKey        *string
+	RequireLocalSigningKey bool
 }
 
 // DriverConfig is an interface used to determine driver config structs.

@@ -23,6 +23,12 @@ type Resolver struct {
 
 	// LocalSigningKey is the key used to sign events for self-hosted services.
 	LocalSigningKey string
+
+	// RequireKeys defines whether event and signing keys are required for the
+	// server to function. If this is true and signing keys are not defined,
+	// the server will still boot but core actions such as syncing, runs, and
+	// ingesting events will not work.
+	RequireKeys bool
 }
 
 // Query returns generated.QueryResolver implementation.

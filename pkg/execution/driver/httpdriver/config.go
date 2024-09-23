@@ -24,14 +24,20 @@ func (Config) DriverName() string { return "http" }
 
 func (c Config) NewDriver(opts ...registration.NewDriverOpts) (driver.Driver, error) {
 	var skey []byte
+	requireLocalSigningKey := false
 	if len(opts) > 0 {
-		if opts[0].SigningKey != nil {
-			skey = []byte(*opts[0].SigningKey)
+		if opts[0].LocalSigningKey != nil {
+			skey = []byte(*opts[0].LocalSigningKey)
+		}
+
+		if opts[0].RequireLocalSigningKey {
+			requireLocalSigningKey = true
 		}
 	}
 
 	return &executor{
-		Client:     DefaultClient,
-		signingKey: skey,
+		Client:                 DefaultClient,
+		localSigningKey:        skey,
+		requireLocalSigningKey: requireLocalSigningKey,
 	}, nil
 }
