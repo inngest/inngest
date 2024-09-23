@@ -9,9 +9,9 @@ import { type CdcConnectionInput } from '@/gql/graphql';
 
 export async function verifyCredentials(input: CdcConnectionInput) {
   try {
-    const response = await testAuth(input);
+    const response = await testAuth(input.input);
 
-    const isSuccessful = response.error === null;
+    const isSuccessful = response.cdcTestCredentials.error === null;
 
     return isSuccessful;
   } catch (error) {
@@ -22,9 +22,9 @@ export async function verifyCredentials(input: CdcConnectionInput) {
 
 export async function verifyLogicalReplication(input: CdcConnectionInput) {
   try {
-    const response = await testLogicalReplication(input);
+    const response = await testLogicalReplication(input.input);
 
-    const isSuccessful = response.error === null;
+    const isSuccessful = response.cdcTestLogicalReplication.error === null;
 
     return isSuccessful;
   } catch (error) {
@@ -35,9 +35,9 @@ export async function verifyLogicalReplication(input: CdcConnectionInput) {
 
 export async function verifyAutoSetup(input: CdcConnectionInput) {
   try {
-    const response = await testAutoSetup(input);
+    const response = await testAutoSetup(input.input);
 
-    const isSuccessful = response.error === null;
+    const isSuccessful = response.cdcAutoSetup.error === null;
 
     return isSuccessful;
   } catch (error) {

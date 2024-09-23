@@ -45,7 +45,7 @@ export type IntegrationPageContent = {
 };
 
 export function parseConnectionString(connectionString: string) {
-  const regex = /postgresql:\/\/(\w+):([^@]+)@([^/]+)/;
+  const regex = /postgresq?l?:\/\/(\w+):([^@]+)@([^/]+)/;
   const match = connectionString.match(regex);
 
   if (match) {
