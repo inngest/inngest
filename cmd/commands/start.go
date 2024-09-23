@@ -129,7 +129,7 @@ func doStart(cmd *cobra.Command, args []string) {
 		RedisURI:      viper.GetString("redis-uri"),
 		RetryInterval: viper.GetInt("retry-interval"),
 		Tick:          time.Duration(tick) * time.Millisecond,
-		URLs:          viper.GetStringSlice("urls"),
+		URLs:          viper.GetStringSlice("sdk-url"),
 		SQLiteDir:     viper.GetString("sqlite-dir"),
 		SigningKey:    viper.GetString("signing-key"),
 	}

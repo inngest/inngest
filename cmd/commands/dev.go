@@ -78,7 +78,7 @@ func doDev(cmd *cobra.Command, args []string) {
 		conf.EventAPI.Addr = host
 	}
 
-	urls := viper.GetStringSlice("urls")
+	urls := viper.GetStringSlice("sdk-url")
 
 	// Run auto-discovery unless we've explicitly disabled it.
 	noDiscovery := viper.GetBool("no-discovery")
