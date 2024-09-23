@@ -41,7 +41,7 @@ func NewCmdStart(rootCmd *cobra.Command) *cobra.Command {
 	baseFlags.StringSliceP("sdk-url", "u", []string{}, "SDK URLs to load functions from")
 	baseFlags.Int("tick", devserver.DefaultTick, "Interval, in milliseconds, of which to check for new work.")
 	baseFlags.String("signing-key", "", "Signing key used to sign and validate data between the server and apps.")
-	baseFlags.String("event-key", "", "Event key(s) that will be used by apps to send events to the server.")
+	baseFlags.StringSlice("event-key", []string{}, "Event key(s) that will be used by apps to send events to the server.")
 	cmd.Flags().AddFlagSet(baseFlags)
 	groups = append(groups, FlagGroup{name: "Flags:", fs: baseFlags})
 
