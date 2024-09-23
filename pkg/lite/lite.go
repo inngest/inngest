@@ -336,6 +336,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		URLs:        opts.URLs,
 		Tick:        tick,
 		SigningKey:  sk,
+		EventKeys:   opts.EventKey,
 		RequireKeys: true,
 	}
 
