@@ -1162,6 +1162,90 @@ func TestQueuePeek(t *testing.T) {
 			require.Equal(t, int64(0), q.randomScavengeOffset(5, 4, 1))
 		})
 	})
+
+	t.Run("script should skip all null items", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		kg := queueKeyGenerator{
+			queueDefaultKey: QueueDefaultKey,
+			queueItemKeyGenerator: queueItemKeyGenerator{
+				queueDefaultKey: QueueDefaultKey,
+			},
+		}
+
+		fnId := uuid.New()
+		itemId := ulid.MustNew(ulid.Now(), rand.Reader).String()
+		validQueueItem, err := json.Marshal(QueueItem{
+			FunctionID: fnId,
+			ID:         itemId,
+		})
+		require.NoError(t, err)
+
+		err = rc.Do(ctx, rc.B().Hset().Key(kg.QueueItem()).FieldValue().FieldValue(itemId, string(validQueueItem)).Build()).Error()
+		require.NoError(t, err)
+
+		rc.Do(ctx, rc.B().
+			Zadd().
+			Key(kg.PartitionQueueSet(enums.PartitionTypeDefault, fnId.String(), "")).
+			ScoreMember().
+			ScoreMember(0, "missing").
+			ScoreMember(0, "missing1").
+			ScoreMember(0, "missing2").
+			ScoreMember(0, "missing3").
+			ScoreMember(0, "missing4").
+			ScoreMember(1, itemId).
+			ScoreMember(2, "missing5").
+			ScoreMember(2, "missing6").
+			ScoreMember(2, "missing7").
+			ScoreMember(2, "missing8").
+			ScoreMember(2, "missing9").
+			Build())
+		require.NoError(t, err)
+
+		mem, err := r.ZMembers(kg.PartitionQueueSet(enums.PartitionTypeDefault, fnId.String(), ""))
+		require.NoError(t, err)
+		require.Len(t, mem, 11)
+
+		args, err := StrSlice([]any{
+			time.Now().UnixMilli(),
+			15,
+		})
+		require.NoError(t, err)
+
+		resp, err := scripts["queue/peek"].Exec(
+			ctx,
+			rc,
+			[]string{
+				kg.PartitionQueueSet(enums.PartitionTypeDefault, fnId.String(), ""),
+				q.u.kg.QueueItem(),
+			},
+			args,
+		).ToAny()
+		require.NoError(t, err)
+
+		returned, ok := resp.([]any)
+		require.True(t, ok)
+		require.Len(t, returned, 2, r.Dump())
+		require.Equal(t, []any{string(validQueueItem)}, returned[0])
+		require.Equal(t, []any{
+			"missing",
+			"missing1",
+			"missing2",
+			"missing3",
+			"missing4",
+			"missing5",
+			"missing6",
+			"missing7",
+			"missing8",
+			"missing9",
+		}, returned[1])
+	})
 }
 
 func TestQueueLease(t *testing.T) {
