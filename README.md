@@ -77,7 +77,7 @@ npx inngest-cli@latest dev
 
 Open the Inngest Dev Server dashboard at [http://localhost:8288]:
 
-https://www.inngest.com/assets/homepage/video/2024-09-dev-server-4k.mp4
+![Screenshot of the Inngest dashboard served by the Inngest Dev Server](.github/assets/dashboard-screenshot-2024-09-23.png)
 
 Follow our [Next.js](https://www.inngest.com/docs/getting-started/nextjs-quick-start) or [Python](https://www.inngest.com/docs/getting-started/python-quick-start) quick start guides.
 
