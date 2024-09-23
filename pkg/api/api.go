@@ -137,7 +137,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if a.config.GetServerKind() == headers.ServerKindCloud && a.localEventKey != "" && key != a.localEventKey {
+	if a.localEventKey != "" && key != a.localEventKey {
 		a.writeResponse(w, apiResponse{
 			StatusCode: http.StatusUnauthorized,
 			Error:      "Event key not found",
