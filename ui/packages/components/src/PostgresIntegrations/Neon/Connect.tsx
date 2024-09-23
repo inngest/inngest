@@ -46,11 +46,44 @@ export default function Connect({
     engine: string;
     name: string;
     replicaConn?: string;
-  }) => Promise<{ success: boolean; error: string }>;
+  }) => Promise<{
+    success: boolean;
+    error: string;
+    steps: {
+      logical_replication_enabled: {
+        complete: boolean;
+      };
+      publication_created: {
+        complete: boolean;
+      };
+      replication_slot_created: {
+        complete: boolean;
+      };
+      roles_granted: {
+        complete: boolean;
+      };
+      user_created: {
+        complete: boolean;
+      };
+    };
+  }>;
 }) {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
   const [error, setError] = useState<string>();
+  const [completionStatus, setCompletionStatus] = useState<{
+    logical_replication_enabled: boolean | null;
+    publication_created: boolean | null;
+    replication_slot_created: boolean | null;
+    roles_granted: boolean | null;
+    user_created: boolean | null;
+  }>({
+    logical_replication_enabled: null,
+    publication_created: null,
+    replication_slot_created: null,
+    roles_granted: null,
+    user_created: null,
+  });
 
   const handleVerify = async () => {
     setIsVerifying(true);
@@ -71,7 +104,14 @@ export default function Connect({
     }
 
     try {
-      const { success, error } = await verifyAutoSetup(parsedInput);
+      const { success, error, steps } = await verifyAutoSetup(parsedInput);
+      setCompletionStatus({
+        logical_replication_enabled: steps.logical_replication_enabled.complete,
+        publication_created: steps.publication_created.complete,
+        replication_slot_created: steps.replication_slot_created.complete,
+        roles_granted: steps.roles_granted.complete,
+        user_created: steps.user_created.complete,
+      });
       if (success) {
         setIsVerified(true);
         onSuccess();
@@ -95,11 +135,15 @@ export default function Connect({
       <div className="my-6">
         <p className="mb-3 font-medium">Inngest will automatically perform the following setup:</p>
         <AccordionList type="multiple" defaultValue={[]}>
-          <AccordionList.Item value="1">
+          <AccordionList.Item value="user_created">
             <AccordionList.Trigger>
               <div className="flex w-full items-center justify-between">
                 <p>Create a Postgres role for replication</p>
-                <StatusIndicator loading={isVerifying} success={isVerified} error={!!error} />
+                <StatusIndicator
+                  loading={isVerifying}
+                  success={completionStatus.user_created === true}
+                  error={completionStatus.user_created === false}
+                />
               </div>
             </AccordionList.Trigger>
 
@@ -116,11 +160,15 @@ export default function Connect({
               <RoleCommand />
             </AccordionList.Content>
           </AccordionList.Item>
-          <AccordionList.Item value="2">
+          <AccordionList.Item value="roles_granted">
             <AccordionList.Trigger>
               <div className="flex w-full items-center justify-between">
                 <p>Grant schema access to your Postgres role</p>
-                <StatusIndicator loading={isVerifying} success={isVerified} error={!!error} />
+                <StatusIndicator
+                  loading={isVerifying}
+                  success={completionStatus.roles_granted === true}
+                  error={completionStatus.roles_granted === false}
+                />
               </div>
             </AccordionList.Trigger>
             <AccordionList.Content>
@@ -133,11 +181,15 @@ export default function Connect({
               <AccessCommand />
             </AccordionList.Content>
           </AccordionList.Item>
-          <AccordionList.Item value="3">
+          <AccordionList.Item value="replication_slot_created">
             <AccordionList.Trigger>
               <div className="flex w-full items-center justify-between">
                 <p>Create a replication slot</p>
-                <StatusIndicator loading={isVerifying} success={isVerified} error={!!error} />
+                <StatusIndicator
+                  loading={isVerifying}
+                  success={completionStatus.replication_slot_created === true}
+                  error={completionStatus.replication_slot_created === false}
+                />
               </div>
             </AccordionList.Trigger>
             <AccordionList.Content>
@@ -157,11 +209,15 @@ export default function Connect({
               </p>
             </AccordionList.Content>
           </AccordionList.Item>
-          <AccordionList.Item value="4">
+          <AccordionList.Item value="publication_created">
             <AccordionList.Trigger>
               <div className="flex w-full items-center justify-between">
                 <p>Create a publication</p>
-                <StatusIndicator loading={isVerifying} success={isVerified} error={!!error} />
+                <StatusIndicator
+                  loading={isVerifying}
+                  success={completionStatus.publication_created === true}
+                  error={completionStatus.publication_created === false}
+                />
               </div>
             </AccordionList.Trigger>
             <AccordionList.Content>

@@ -40,9 +40,9 @@ export async function verifyAutoSetup(input: CdcConnectionInput) {
     const response = await testAutoSetup(input);
     const error = response.cdcAutoSetup.error;
     if (error) {
-      return { success: false, error: error };
+      return { success: false, error: error, steps: response.cdcAutoSetup.steps };
     }
-    return { success: true, error: null };
+    return { success: true, error: null, steps: response.cdcAutoSetup.steps };
   } catch (error) {
     console.error('Error connecting:', error);
     return { success: false, error: null };
