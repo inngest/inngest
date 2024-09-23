@@ -51,11 +51,9 @@ export function parseConnectionString(connectionString: string) {
   if (match) {
     const [, username, password, host] = match;
     return {
-      input: {
-        name: `Neon-${host}`,
-        engine: 'postgresql',
-        adminConn: connectionString,
-      },
+      name: `Neon-${host}`,
+      engine: 'postgresql',
+      adminConn: connectionString,
     };
   }
 

@@ -18,7 +18,7 @@ export const testAuth = async (input: CdcConnectionInput) => {
 
   return await graphqlAPI.request<CdcSetupResponse>(testAuthDocument, {
     envID: environment.id,
-    input,
+    input: input,
   });
 };
 
@@ -36,7 +36,7 @@ export const testLogicalReplication = async (input: CdcConnectionInput) => {
 
   return await graphqlAPI.request<CdcSetupResponse>(testLogicalReplicationDocument, {
     envID: environment.id,
-    input,
+    input: input,
   });
 };
 
@@ -54,6 +54,6 @@ export const testAutoSetup = async (input: CdcConnectionInput) => {
 
   return await graphqlAPI.request<CdcSetupResponse>(testAutoSetupDocument, {
     envID: environment.id,
-    input,
+    input: input,
   });
 };

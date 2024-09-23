@@ -14,7 +14,10 @@ export default function NeonFormat({
   onSuccess: () => void;
   savedCredentials?: string;
   verifyLogicalReplication: (variables: {
-    input: { adminConn: string; engine: string; name: string; replicaConn?: string };
+    adminConn: string;
+    engine: string;
+    name: string;
+    replicaConn?: string;
   }) => Promise<boolean>;
 }) {
   const [isVerifying, setIsVerifying] = useState(false);

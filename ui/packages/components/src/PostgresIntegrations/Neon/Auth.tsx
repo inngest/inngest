@@ -16,7 +16,10 @@ export default function NeonAuth({
   onSuccess: (value: string) => void;
   savedCredentials?: string;
   verifyCredentials: (variables: {
-    input: { adminConn: string; engine: string; name: string; replicaConn?: string };
+    adminConn: string;
+    engine: string;
+    name: string;
+    replicaConn?: string;
   }) => Promise<boolean>;
 }) {
   const [inputValue, setInputValue] = useState(savedCredentials || '');

@@ -42,7 +42,10 @@ export default function Connect({
   onSuccess: () => void;
   savedCredentials?: string;
   verifyAutoSetup: (variables: {
-    input: { adminConn: string; engine: string; name: string; replicaConn?: string };
+    adminConn: string;
+    engine: string;
+    name: string;
+    replicaConn?: string;
   }) => Promise<boolean>;
 }) {
   const [isVerifying, setIsVerifying] = useState(false);
