@@ -18,7 +18,6 @@ import (
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
 	_ "github.com/inngest/inngest/pkg/config/defaults"
-	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs"
@@ -67,7 +66,10 @@ type StartOpts struct {
 	PollInterval  int           `json:"poll_interval"`
 	Tick          time.Duration `json:"tick"`
 	RetryInterval int           `json:"retry_interval"`
-	SigningKey    *string       `json:"signing_key"`
+
+	// SigningKey is used to decide that the server should sign requests and
+	// validate responses where applicable, modelling cloud behaviour.
+	SigningKey *string `json:"signing_key"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -219,9 +221,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	var drivers = []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
-		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
-			SigningKey: opts.SigningKey,
-		})
+		d, err := driverConfig.NewDriver()
 		if err != nil {
 			return err
 		}
