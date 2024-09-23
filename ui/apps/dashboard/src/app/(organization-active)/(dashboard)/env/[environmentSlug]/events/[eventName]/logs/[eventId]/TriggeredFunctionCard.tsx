@@ -11,6 +11,7 @@ import { RiArrowRightSLine } from '@remixicon/react';
 import { noCase } from 'change-case';
 import { titleCase } from 'title-case';
 
+import { getBaseRunUrl } from '@/components/Runs/utils';
 import { graphql } from '@/gql';
 import { FunctionRunStatus } from '@/gql/graphql';
 import graphqlAPI from '@/queries/graphqlAPI';
@@ -72,9 +73,11 @@ export default async function TriggeredFunctionCard({
     );
   }
 
+  const baseUrl = getBaseRunUrl(function_.run.startedAt);
+
   return (
     <Link
-      href={`/env/${environmentSlug}/functions/${encodeURIComponent(function_.slug)}/runs/${
+      href={`/env/${environmentSlug}/functions/${encodeURIComponent(function_.slug)}/${baseUrl}/${
         function_.run.id
       }`}
       className="flex items-center rounded-lg border bg-white p-5 shadow"

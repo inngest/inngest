@@ -14,6 +14,7 @@ import { RiArrowGoForwardLine } from '@remixicon/react';
 import { Command } from 'cmdk';
 import { useQuery } from 'urql';
 
+import { getBaseRunUrl } from '@/components/Runs/utils';
 import { graphql } from '@/gql';
 import { getEnvironmentSlug } from '@/utils/environments';
 
@@ -37,6 +38,7 @@ const GetGlobalSearchDocument = graphql(`
             ... on FunctionRun {
               id
               functionID: workflowID
+              startedAt
             }
           }
         }
@@ -153,11 +155,13 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
    * Generates the result to be displayed to the user
    */
   if (globalResults?.value.__typename === 'FunctionRun' && functionResults) {
+    // runs from before clickhouse migration go to the old runs page
+    const baseUrl = getBaseRunUrl(globalResults.value.startedAt);
     searchResult = {
       type: 'function',
-      href: `/env/${environmentSlug}/functions/${encodeURIComponent(functionResults.slug)}/logs/${
-        globalResults.value.id
-      }`,
+      href: `/env/${environmentSlug}/functions/${encodeURIComponent(
+        functionResults.slug
+      )}/${baseUrl}/${globalResults.value.id}`,
       name: functionResults.name || '',
       icon: <IconFunction className="w-4" />,
     };
