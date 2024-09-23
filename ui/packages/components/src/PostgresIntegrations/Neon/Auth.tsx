@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import { NewButton } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
 import { NewLink } from '@inngest/components/Link';
-import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/types';
+import {
+  IntegrationSteps,
+  parseConnectionString,
+} from '@inngest/components/PostgresIntegrations/types';
 import { cn } from '@inngest/components/utils/classNames';
 
 export default function NeonAuth({
@@ -27,24 +30,6 @@ export default function NeonAuth({
       setIsVerified(true);
     }
   }, [savedCredentials]);
-
-  const parseConnectionString = (connectionString: string) => {
-    const regex = /postgresql:\/\/(\w+):([^@]+)@([^/]+)/;
-    const match = connectionString.match(regex);
-
-    if (match) {
-      const [, username, password, host] = match;
-      return {
-        input: {
-          name: `Neon-${host}`,
-          engine: 'postgresql',
-          adminConn: connectionString,
-        },
-      };
-    }
-
-    return null;
-  };
 
   const handleVerify = async () => {
     setIsVerifying(true);

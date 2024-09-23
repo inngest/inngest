@@ -6,7 +6,7 @@ import NeonFormat from '@inngest/components/PostgresIntegrations/Neon/Format';
 import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/types';
 
 import { useSteps } from '@/components/PostgresIntegration/Context';
-import { verifyCredentials } from './actions';
+import { verifyCredentials, verifyLogicalReplication } from './actions';
 
 export default function NeonStep({ params: { step } }: { params: { step: string } }) {
   const { setStepsCompleted, credentials, setCredentials } = useSteps();
@@ -19,6 +19,7 @@ export default function NeonStep({ params: { step } }: { params: { step: string 
           setCredentials(value);
           setStepsCompleted(IntegrationSteps.Authorize);
         }}
+        // @ts-ignore for now
         verifyCredentials={verifyCredentials}
       />
     );
@@ -28,6 +29,9 @@ export default function NeonStep({ params: { step } }: { params: { step: string 
         onSuccess={() => {
           setStepsCompleted(IntegrationSteps.FormatWal);
         }}
+        // @ts-ignore for now
+        verifyLogicalReplication={verifyLogicalReplication}
+        savedCredentials={credentials}
       />
     );
   } else if (step === IntegrationSteps.ConnectDb) {

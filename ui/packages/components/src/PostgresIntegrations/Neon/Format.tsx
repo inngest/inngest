@@ -1,18 +1,22 @@
 import { useState } from 'react';
 import { NewButton } from '@inngest/components/Button';
 import { NewLink } from '@inngest/components/Link';
-import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/types';
+import {
+  IntegrationSteps,
+  parseConnectionString,
+} from '@inngest/components/PostgresIntegrations/types';
 
-const verifyReplication = async (): Promise<boolean> => {
-  // TO DO: Replace with actual API call in production.
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(true);
-    }, 1000);
-  });
-};
-
-export default function NeonFormat({ onSuccess }: { onSuccess: () => void }) {
+export default function NeonFormat({
+  onSuccess,
+  savedCredentials,
+  verifyLogicalReplication,
+}: {
+  onSuccess: () => void;
+  savedCredentials?: string;
+  verifyLogicalReplication: (variables: {
+    input: { adminConn: string; engine: string; name: string; replicaConn?: string };
+  }) => Promise<boolean>;
+}) {
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState<string>();
   const [isVerified, setIsVerified] = useState(false);
@@ -20,8 +24,21 @@ export default function NeonFormat({ onSuccess }: { onSuccess: () => void }) {
   const handleVerify = async () => {
     setIsVerifying(true);
     setError(undefined);
+    if (!savedCredentials) {
+      setError('Lost credentials. Go back to the first step.');
+      setIsVerifying(false);
+      return;
+    }
+    const parsedInput = parseConnectionString(savedCredentials);
+
+    if (!parsedInput) {
+      setError('Invalid connection string format. Please check your input.');
+      setIsVerifying(false);
+      return;
+    }
+
     try {
-      const success = await verifyReplication();
+      const success = await verifyLogicalReplication(parsedInput);
       if (success) {
         setIsVerified(true);
         onSuccess();
