@@ -232,12 +232,11 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	var drivers = []driver.Driver{}
-	driverOpts := registration.NewDriverOpts{}
-	if sk != nil {
-		driverOpts.SigningKey = sk
-	}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
-		d, err := driverConfig.NewDriver(driverOpts)
+		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
+			RequireLocalSigningKey: true,
+			LocalSigningKey:        sk,
+		})
 		if err != nil {
 			return err
 		}
