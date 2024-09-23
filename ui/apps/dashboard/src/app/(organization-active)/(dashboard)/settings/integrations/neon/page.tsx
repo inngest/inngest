@@ -29,7 +29,7 @@ export default async function Page() {
   );
 
   const integrations = response.environment.cdcConnections;
-  const neonConnection = integrations.find((connection) => connection.id === 'Neon');
+  const neonConnection = integrations.find((connection) => connection.name.startsWith('Neon'));
 
   if (!neonConnection) {
     redirect('/settings/integrations/neon/connect');
