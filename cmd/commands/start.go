@@ -40,6 +40,7 @@ func NewCmdStart(rootCmd *cobra.Command) *cobra.Command {
 	baseFlags.Int("retry-interval", 0, "Retry interval in seconds for linear backoff. Minimum: 1.")
 	baseFlags.StringSliceP("sdk-url", "u", []string{}, "SDK URLs to load functions from")
 	baseFlags.Int("tick", devserver.DefaultTick, "Interval, in milliseconds, of which to check for new work.")
+	baseFlags.String("signing-key", "", "Signing key")
 	cmd.Flags().AddFlagSet(baseFlags)
 	groups = append(groups, FlagGroup{name: "Flags:", fs: baseFlags})
 
@@ -130,6 +131,7 @@ func doStart(cmd *cobra.Command, args []string) {
 		Tick:          time.Duration(tick) * time.Millisecond,
 		URLs:          viper.GetStringSlice("urls"),
 		SQLiteDir:     viper.GetString("sqlite-dir"),
+		SigningKey:    viper.GetString("signing-key"),
 	}
 
 	err = lite.New(ctx, opts)

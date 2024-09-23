@@ -55,7 +55,7 @@ var redisSingleton *miniredis.Miniredis
 type StartOpts struct {
 	Config        config.Config `json:"-"`
 	RootDir       string        `json:"dir"`
-	SigningKey    *string       `json:"signing_key"`
+	SigningKey    string        `json:"signing_key"`
 	RedisURI      string        `json:"redis-uri"`
 	PollInterval  int           `json:"poll-interval"`
 	URLs          []string      `json:"urls"`
@@ -213,10 +213,12 @@ func start(ctx context.Context, opts StartOpts) error {
 	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
 
 	var drivers = []driver.Driver{}
+	driverOpts := registration.NewDriverOpts{}
+	if opts.SigningKey != "" {
+		driverOpts.SigningKey = &opts.SigningKey
+	}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
-		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
-			SigningKey: opts.SigningKey,
-		})
+		d, err := driverConfig.NewDriver(driverOpts)
 		if err != nil {
 			return err
 		}
