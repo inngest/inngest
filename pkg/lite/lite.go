@@ -108,12 +108,12 @@ func start(ctx context.Context, opts StartOpts) error {
 	stepLimitOverrides := make(map[string]int)
 	stateSizeLimitOverrides := make(map[string]int)
 
-	shardedRc, err := connectToOrCreateRedis(ctx, opts.RedisURI)
+	shardedRc, err := connectToOrCreateRedis(opts.RedisURI)
 	if err != nil {
 		return err
 	}
 
-	unshardedRc, err := connectToOrCreateRedis(ctx, opts.RedisURI)
+	unshardedRc, err := connectToOrCreateRedis(opts.RedisURI)
 	if err != nil {
 		return err
 	}
@@ -268,7 +268,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			return consts.DefaultMaxStateSizeLimit
 		}),
 		executor.WithInvokeFailHandler(getInvokeFailHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
-		executor.WithSendingEventHandler(getSendingEventHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
+		executor.WithSendingEventHandler(getSendingEventHandler(pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithDebouncer(debouncer),
 		executor.WithBatcher(batcher),
 	)
@@ -384,9 +384,9 @@ func start(ctx context.Context, opts StartOpts) error {
 	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice)
 }
 
-func connectToOrCreateRedis(ctx context.Context, redisURI string) (rueidis.Client, error) {
+func connectToOrCreateRedis(redisURI string) (rueidis.Client, error) {
 	if redisURI == "" {
-		return createInmemoryRedisConnection(ctx)
+		return createInmemoryRedisConnection()
 	}
 
 	url := redisURI
@@ -410,7 +410,7 @@ func connectToOrCreateRedis(ctx context.Context, redisURI string) (rueidis.Clien
 
 // createInMemoryRedisConnection creates a new connection to the in-memory Redis
 // server. If the server is not yet running, it will start one.
-func createInmemoryRedisConnection(ctx context.Context) (rueidis.Client, error) {
+func createInmemoryRedisConnection() (rueidis.Client, error) {
 	if redisSingleton == nil {
 		redisSingleton = miniredis.NewMiniRedis()
 		err := redisSingleton.Start()
@@ -439,7 +439,7 @@ func createInmemoryRedisConnection(ctx context.Context) (rueidis.Client, error) 
 	return rc, nil
 }
 
-func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
+func getSendingEventHandler(pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
 	return func(ctx context.Context, evt event.Event, item queue.Item) error {
 		trackedEvent := event.NewOSSTrackedEvent(evt)
 		byt, err := json.Marshal(trackedEvent)
