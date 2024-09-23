@@ -39,3 +39,21 @@ export const testLogicalReplication = async (input: CdcConnectionInput) => {
     input,
   });
 };
+
+const testAutoSetupDocument = graphql(`
+  mutation testAutoSetup($input: CDCConnectionInput!, $envID: UUID!) {
+    cdcAutoSetup(input: $input, envID: $envID) {
+      steps
+      error
+    }
+  }
+`);
+
+export const testAutoSetup = async (input: CdcConnectionInput) => {
+  const environment = await getProductionEnvironment();
+
+  return await graphqlAPI.request<CdcSetupResponse>(testAutoSetupDocument, {
+    envID: environment.id,
+    input,
+  });
+};

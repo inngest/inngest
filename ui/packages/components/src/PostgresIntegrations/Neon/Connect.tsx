@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
 import { NewButton } from '@inngest/components/Button';
 import { NewLink } from '@inngest/components/Link';
+import { parseConnectionString } from '@inngest/components/PostgresIntegrations/types';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { RiCheckboxCircleFill, RiCloseCircleFill } from '@remixicon/react';
 
@@ -12,15 +13,6 @@ import {
   ReplicationSlotCommand,
   RoleCommand,
 } from './ConnectCommands';
-
-const verifyConnect = async (): Promise<boolean> => {
-  // TO DO: Replace with actual API call in production.
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(true);
-    }, 1000);
-  });
-};
 
 const StatusIndicator = ({
   loading,
@@ -42,15 +34,41 @@ const StatusIndicator = ({
   if (error) return <RiCloseCircleFill className="text-error h-5 w-5" />;
 };
 
-export default function Connect({ onSuccess }: { onSuccess: () => void }) {
+export default function Connect({
+  onSuccess,
+  savedCredentials,
+  verifyAutoSetup,
+}: {
+  onSuccess: () => void;
+  savedCredentials?: string;
+  verifyAutoSetup: (variables: {
+    input: { adminConn: string; engine: string; name: string; replicaConn?: string };
+  }) => Promise<boolean>;
+}) {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
   const [error, setError] = useState<string>();
 
   const handleVerify = async () => {
     setIsVerifying(true);
+    setError(undefined);
+
+    if (!savedCredentials) {
+      setError('Lost credentials. Go back to the first step.');
+      setIsVerifying(false);
+      return;
+    }
+
+    const parsedInput = parseConnectionString(savedCredentials);
+
+    if (!parsedInput) {
+      setError('Invalid connection string format. Please check your input.');
+      setIsVerifying(false);
+      return;
+    }
+
     try {
-      const success = await verifyConnect();
+      const success = await verifyAutoSetup(parsedInput);
       if (success) {
         setIsVerified(true);
         onSuccess();

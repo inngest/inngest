@@ -1,6 +1,10 @@
 'use server';
 
-import { testAuth, testLogicalReplication } from '@/components/PostgresIntegration/neonData';
+import {
+  testAuth,
+  testAutoSetup,
+  testLogicalReplication,
+} from '@/components/PostgresIntegration/neonData';
 import { type CdcConnectionInput } from '@/gql/graphql';
 
 export async function verifyCredentials(input: CdcConnectionInput) {
@@ -25,6 +29,19 @@ export async function verifyLogicalReplication(input: CdcConnectionInput) {
     return isSuccessful;
   } catch (error) {
     console.error('Error verifying logical replication:', error);
+    return false;
+  }
+}
+
+export async function verifyAutoSetup(input: CdcConnectionInput) {
+  try {
+    const response = await testAutoSetup(input);
+
+    const isSuccessful = response.error === null;
+
+    return isSuccessful;
+  } catch (error) {
+    console.error('Error connecting:', error);
     return false;
   }
 }
