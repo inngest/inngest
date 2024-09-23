@@ -58,7 +58,7 @@ func (a *devapi) addRoutes() {
 		}
 		return http.HandlerFunc(fn)
 	})
-	a.Use(headers.StaticHeadersMiddleware(headers.ServerKindDev))
+	a.Use(headers.StaticHeadersMiddleware(a.devserver.Opts.Config.GetServerKind()))
 
 	a.Get("/dev", a.Info)
 	a.Post("/dev/traces", a.OTLPTrace)
@@ -133,6 +133,8 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 		Functions:           funcs,
 		Handlers:            a.devserver.handlers,
 		IsSingleNodeService: a.devserver.IsSingleNodeService(),
+		IsMissingSigningKey: a.devserver.Opts.RequireKeys && !a.devserver.HasSigningKey(),
+		IsMissingEventKeys:  a.devserver.Opts.RequireKeys && !a.devserver.HasEventKeys(),
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	byt, _ := json.MarshalIndent(ir, "", "  ")
@@ -145,8 +147,8 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	expectedServerKind := r.Header.Get(headers.HeaderKeyExpectedServerKind)
-	if expectedServerKind != "" && expectedServerKind != headers.ServerKindDev {
-		a.err(ctx, w, 400, fmt.Errorf("Expected server kind %s, got %s", headers.ServerKindDev, expectedServerKind))
+	if expectedServerKind != "" && expectedServerKind != a.devserver.Opts.Config.GetServerKind() {
+		a.err(ctx, w, 400, fmt.Errorf("Expected server kind %s, got %s", a.devserver.Opts.Config.GetServerKind(), expectedServerKind))
 		return
 	}
 
@@ -556,4 +558,12 @@ type InfoResponse struct {
 	Functions           []inngest.Function `json:"functions"`
 	Handlers            []SDKHandler       `json:"handlers"`
 	IsSingleNodeService bool               `json:"isSingleNodeService"`
+
+	// If true, the server is running in a mode where it requires a signing key
+	// to function and it is not set.
+	IsMissingSigningKey bool `json:"isMissingSigningKey"`
+
+	// If true, the server is running in a mode where it requires one or more
+	// event keys to function and they are not set.
+	IsMissingEventKeys bool `json:"isMissingEventKeys"`
 }
