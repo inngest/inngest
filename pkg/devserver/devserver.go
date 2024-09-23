@@ -70,6 +70,10 @@ type StartOpts struct {
 	// SigningKey is used to decide that the server should sign requests and
 	// validate responses where applicable, modelling cloud behaviour.
 	SigningKey *string `json:"signing_key"`
+
+	// EventKey is used to authorize incoming events, ensuring they match the
+	// given key.
+	EventKey *string `json:"event_key"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -351,18 +355,27 @@ func start(ctx context.Context, opts StartOpts) error {
 	if err != nil {
 		return err
 	}
+
+	ek := ""
+	if opts.EventKey != nil {
+		ek = *opts.EventKey
+	}
+
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
 	// server UI, events, and API for loading data.
 	//
 	// Merge the dev server API (for handling files & registration) with the data
 	// API into the event API router.
-	ds.Apiservice = api.NewService(
-		ds.Opts.Config,
-		api.Mount{At: "/", Router: devAPI},
-		api.Mount{At: "/v0", Router: core.Router},
-		api.Mount{At: "/debug", Handler: middleware.Profiler()},
-	)
+	ds.Apiservice = api.NewService(api.APIServiceOptions{
+		Config: ds.Opts.Config,
+		Mounts: []api.Mount{
+			{At: "/", Router: devAPI},
+			{At: "/v0", Router: core.Router},
+			{At: "/debug", Handler: middleware.Profiler()},
+		},
+		LocalEventKey: ek,
+	})
 
 	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice)
 }

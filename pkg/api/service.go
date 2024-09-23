@@ -31,10 +31,21 @@ type Mount struct {
 	Handler http.Handler
 }
 
-func NewService(c config.Config, mounts ...Mount) service.Service {
+type APIServiceOptions struct {
+	Config config.Config
+	Mounts []Mount
+
+	// LocalEventKey is the key used to send events to the local event API from
+	// an app. If this is set, only keys that match this value will be
+	// accepted.
+	LocalEventKey string
+}
+
+func NewService(opts APIServiceOptions) service.Service {
 	return &apiServer{
-		config: c,
-		mounts: mounts,
+		config:        opts.Config,
+		mounts:        opts.Mounts,
+		localEventKey: opts.LocalEventKey,
 	}
 }
 
@@ -44,6 +55,11 @@ type apiServer struct {
 	publisher pubsub.Publisher
 
 	mounts []Mount
+
+	// localEventKey is the key used to send events to the local event API from
+	// an app. If this is set, only keys that match this value will be
+	// accepted.
+	localEventKey string
 }
 
 func (a *apiServer) Name() string {
@@ -54,9 +70,10 @@ func (a *apiServer) Pre(ctx context.Context) error {
 	var err error
 
 	api, err := NewAPI(Options{
-		Config:       a.config,
-		Logger:       logger.From(ctx),
-		EventHandler: a.handleEvent,
+		Config:        a.config,
+		Logger:        logger.From(ctx),
+		EventHandler:  a.handleEvent,
+		LocalEventKey: a.localEventKey,
 	})
 	if err != nil {
 		return err
