@@ -32,6 +32,7 @@ export default function Menu({
         const url = `${pathname}/${stepKey}`;
         return (
           <StepsMenu.MenuItem
+            isDisabled={!isCompleted && !isActive}
             key={stepKey}
             stepContent={stepContent}
             isCompleted={isCompleted}

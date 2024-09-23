@@ -1,8 +1,42 @@
+import { useState } from 'react';
 import { NewButton } from '@inngest/components/Button';
 import { NewLink } from '@inngest/components/Link';
+import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/types';
 
-export default function NeonFormat({ next }: { next: () => void }) {
-  // TO DO: Add interactions and pass actions as props
+const verifyReplication = async (): Promise<boolean> => {
+  // TO DO: Replace with actual API call in production.
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(true);
+    }, 1000);
+  });
+};
+
+export default function NeonFormat({ onSuccess }: { onSuccess: () => void }) {
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [error, setError] = useState<string>();
+  const [isVerified, setIsVerified] = useState(false);
+
+  const handleVerify = async () => {
+    setIsVerifying(true);
+    setError(undefined);
+    try {
+      const success = await verifyReplication();
+      if (success) {
+        setIsVerified(true);
+        onSuccess();
+      } else {
+        setError(
+          'Could not verify credentials. Please check if everything is entered correctly and try again.'
+        );
+      }
+    } catch (err) {
+      setError('An error occurred while verifying. Please try again.');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   return (
     <>
       <p className="text-sm">
@@ -39,7 +73,19 @@ export default function NeonFormat({ next }: { next: () => void }) {
         </ol>
       </div>
 
-      <NewButton label="Next" onClick={next} />
+      {isVerified ? (
+        <NewButton
+          label="Next"
+          href={`/settings/integrations/neon/${IntegrationSteps.ConnectDb}`}
+        />
+      ) : (
+        <NewButton
+          label="Verify logical replication is enabled"
+          onClick={handleVerify}
+          loading={isVerifying}
+        />
+      )}
+      {error && <p className="text-error mt-4 text-sm">{error}</p>}
     </>
   );
 }
