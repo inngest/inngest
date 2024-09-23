@@ -52,11 +52,14 @@ var redisSingleton *miniredis.Miniredis
 
 // StartOpts configures the dev server
 type StartOpts struct {
-	Config       config.Config `json:"-"`
-	RootDir      string        `json:"dir"`
-	RedisURI     string        `json:"redis-uri"`
-	PollInterval int           `json:"poll-interval"`
-	URLs         []string      `json:"urls"`
+	Config        config.Config `json:"-"`
+	RootDir       string        `json:"dir"`
+	RedisURI      string        `json:"redis-uri"`
+	PollInterval  int           `json:"poll-interval"`
+	URLs          []string      `json:"urls"`
+	Tick          time.Duration `json:"tick"`
+	RetryInterval int           `json:"retry_interval"`
+	SQLiteDir     string        `json:"sqlite-dir"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -81,12 +84,18 @@ func New(ctx context.Context, opts StartOpts) error {
 }
 
 func start(ctx context.Context, opts StartOpts) error {
-	db, err := sqlitecqrs.New(sqlitecqrs.SqliteCQRSOptions{InMemory: false})
+	db, err := sqlitecqrs.New(sqlitecqrs.SqliteCQRSOptions{
+		InMemory:  false,
+		Directory: opts.SQLiteDir,
+	})
 	if err != nil {
 		return err
 	}
 
-	tick := devserver.DefaultTick
+	tick := opts.Tick
+	if tick < 1 {
+		tick = devserver.DefaultTickDuration
+	}
 
 	// Initialize the devserver
 	dbcqrs := sqlitecqrs.NewCQRS(db)
@@ -291,7 +300,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	)
 
 	// The devserver embeds the event API.
-	pi := consts.LiteDefaultPersistenceInterval
+	pi := consts.StartDefaultPersistenceInterval
 	persistenceInterval := &pi
 	if opts.RedisURI != "" {
 		// If we're using an external Redis, we rely on that to persist and
@@ -314,7 +323,9 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	// The devserver embeds the event API.
-	ds := devserver.NewService(dsOpts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hd, persistenceInterval)
+	ds := devserver.NewService(dsOpts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hd, &devserver.SingleNodeServiceOpts{
+		PersistenceInterval: persistenceInterval,
+	})
 	// embed the tracker
 	ds.Tracker = t
 	ds.State = sm

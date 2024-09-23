@@ -35,11 +35,18 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 )
 
-func NewService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubsub.Publisher, stepLimitOverrides map[string]int, stateSizeLimitOverrides map[string]int, rc rueidis.Client, hw history.Driver, persistenceInterval *time.Duration) *devserver {
+func NewService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubsub.Publisher, stepLimitOverrides map[string]int, stateSizeLimitOverrides map[string]int, rc rueidis.Client, hw history.Driver, snso *SingleNodeServiceOpts) *devserver {
 	// If the polling interval is 0, reset it to a sensible value to avoid
 	// hammering the SDKs and burning CPU.
 	if opts.PollInterval == 0 {
 		opts.PollInterval = DefaultPollInterval
+	}
+
+	// Fill in some defaults in they're not set
+	if snso != nil {
+		if snso.snapshotLock == nil {
+			snso.snapshotLock = &sync.Mutex{}
+		}
 	}
 
 	return &devserver{
@@ -47,13 +54,12 @@ func NewService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubs
 		Runner:                  runner,
 		Opts:                    opts,
 		handlerLock:             &sync.Mutex{},
-		snapshotLock:            &sync.Mutex{},
 		publisher:               pb,
 		stepLimitOverrides:      stepLimitOverrides,
 		stateSizeLimitOverrides: stateSizeLimitOverrides,
 		redisClient:             rc,
 		historyWriter:           hw,
-		persistenceInterval:     persistenceInterval,
+		singleNodeServiceOpts:   snso,
 	}
 }
 
@@ -88,32 +94,44 @@ type devserver struct {
 	handlers    []SDKHandler
 	handlerLock *sync.Mutex
 
+	// These options are used to configure the server's behaviour as a
+	// single-node service instead of a dev environment.
+	singleNodeServiceOpts *SingleNodeServiceOpts
+}
+
+type SingleNodeServiceOpts struct {
+	// PersistenceInterval is the interval at which the dev server will
+	// snapshot the Redis queue to disk if it is using an in-memory Redis
+	// instance.
+	PersistenceInterval *time.Duration
+
 	// Used to lock the snapshotting process.
-	snapshotLock        *sync.Mutex
-	persistenceInterval *time.Duration
+	snapshotLock *sync.Mutex
 }
 
 func (d *devserver) Name() string {
-	if d.persistenceInterval != nil {
-		return "lite"
+	if d.IsSingleNodeService() {
+		return "persistence"
 	}
 
 	return "devserver"
 }
 
 func (d *devserver) PrettyName() string {
-	name := strings.Title(d.Name())
-
-	if name == "Devserver" {
-		return "Dev Server"
+	if d.Name() != "devserver" {
+		return ""
 	}
 
-	return name
+	return "Dev Server"
+}
+
+func (d *devserver) IsSingleNodeService() bool {
+	return d.singleNodeServiceOpts != nil
 }
 
 func (d *devserver) Pre(ctx context.Context) error {
 	// Import Redis if we can and have persistence enabled
-	if d.persistenceInterval != nil {
+	if d.IsSingleNodeService() {
 		_, _ = d.importRedisSnapshot(ctx)
 	}
 
@@ -137,9 +155,14 @@ func (d *devserver) Run(ctx context.Context) error {
 		go func() {
 			<-time.After(25 * time.Millisecond)
 			addr := fmt.Sprintf("%s:%d", d.Opts.Config.EventAPI.Addr, d.Opts.Config.EventAPI.Port)
+			prettyName := d.PrettyName()
+			if prettyName != "" {
+				prettyName = " " + prettyName
+			}
+
 			fmt.Println("")
 			fmt.Println("")
-			fmt.Print(cli.BoldStyle.Render(fmt.Sprintf("\tInngest %s online ", d.PrettyName())))
+			fmt.Print(cli.BoldStyle.Render(fmt.Sprintf("\tInngest%s online ", prettyName)))
 			fmt.Printf(cli.TextStyle.Render(fmt.Sprintf("at %s, visible at the following URLs:", addr)) + "\n\n")
 			for n, ip := range localIPs() {
 				style := cli.BoldStyle
@@ -168,7 +191,7 @@ func (d *devserver) Run(ctx context.Context) error {
 }
 
 func (d *devserver) Stop(ctx context.Context) error {
-	if d.persistenceInterval != nil {
+	if d.IsSingleNodeService() {
 		return d.exportRedisSnapshot(ctx)
 	}
 
@@ -176,11 +199,11 @@ func (d *devserver) Stop(ctx context.Context) error {
 }
 
 func (d *devserver) startPersistenceRoutine(ctx context.Context) {
-	if d.persistenceInterval == nil {
+	if !d.IsSingleNodeService() {
 		return
 	}
 
-	ticker := time.NewTicker(*d.persistenceInterval)
+	ticker := time.NewTicker(*d.singleNodeServiceOpts.PersistenceInterval)
 	defer ticker.Stop()
 	for {
 		select {
@@ -336,8 +359,8 @@ func (d *devserver) HandleEvent(ctx context.Context, e *event.Event) (string, er
 }
 
 func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
-	d.snapshotLock.Lock()
-	defer d.snapshotLock.Unlock()
+	d.singleNodeServiceOpts.snapshotLock.Lock()
+	defer d.singleNodeServiceOpts.snapshotLock.Unlock()
 
 	var (
 		snapshotID cqrs.SnapshotID
@@ -473,8 +496,8 @@ func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
 }
 
 func (d *devserver) importRedisSnapshot(ctx context.Context) (imported bool, err error) {
-	d.snapshotLock.Lock()
-	defer d.snapshotLock.Unlock()
+	d.singleNodeServiceOpts.snapshotLock.Lock()
+	defer d.singleNodeServiceOpts.snapshotLock.Unlock()
 
 	l := logger.From(ctx).With().Str("caller", d.Name()).Logger()
 	l.Info().Msg("importing Redis snapshot")

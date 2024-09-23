@@ -22,7 +22,7 @@ type Manager interface {
 
 	// Embed the development function manager for now.
 	DevFunctionManager
-	LiteQueueSnapshotManager
+	QueueSnapshotManager
 
 	AppManager
 	FunctionRunManager

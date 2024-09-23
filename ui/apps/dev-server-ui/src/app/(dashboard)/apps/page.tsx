@@ -3,12 +3,13 @@
 import { useMemo } from 'react';
 import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
-import { Link } from '@inngest/components/Link';
+import { NewLink } from '@inngest/components/Link';
 import { IconApp } from '@inngest/components/icons/App';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 
 import AddAppButton from '@/components/App/AddAppButton';
 import AppCard from '@/components/App/AppCard';
+import { useInfoQuery } from '@/store/devApi';
 import { useGetAppsQuery } from '@/store/generated';
 
 export default function AppList() {
@@ -24,6 +25,8 @@ export default function AppList() {
     });
   }, [apps]);
 
+  const { data: info } = useInfoQuery();
+
   return (
     <div className="flex h-full flex-col overflow-y-scroll">
       <Header
@@ -32,18 +35,24 @@ export default function AppList() {
           <Info
             text="This is a list of all apps. We auto-detect apps that you have defined in specific ports."
             action={
-              <Link href="https://www.inngest.com/docs/local-development#connecting-apps-to-the-dev-server">
+              <NewLink
+                arrowOnHover
+                className="text-sm"
+                href="https://www.inngest.com/docs/local-development#connecting-apps-to-the-dev-server"
+              >
                 Go to specific ports.
-              </Link>
+              </NewLink>
             }
           />
         }
         action={
           <div className="flex items-center gap-5">
-            <p className="text-btnPrimary flex items-center gap-2 text-sm leading-tight">
-              <IconSpinner className="fill-btnPrimary" />
-              Auto-detecting Apps
-            </p>
+            {info?.isDiscoveryEnabled ? (
+              <p className="text-btnPrimary flex items-center gap-2 text-sm leading-tight">
+                <IconSpinner className="fill-btnPrimary" />
+                Auto-detecting Apps
+              </p>
+            ) : null}
             <AddAppButton />
           </div>
         }

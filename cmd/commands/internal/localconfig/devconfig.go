@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/spf13/cobra"
@@ -23,8 +24,8 @@ func InitDevConfig(ctx context.Context, cmd *cobra.Command) error {
 	return nil
 }
 
-func InitLiteConfig(ctx context.Context, cmd *cobra.Command) error {
-	if err := mapLiteFlags(cmd); err != nil {
+func InitStartConfig(ctx context.Context, cmd *cobra.Command) error {
+	if err := mapStartFlags(cmd); err != nil {
 		return err
 	}
 
@@ -35,6 +36,11 @@ func InitLiteConfig(ctx context.Context, cmd *cobra.Command) error {
 
 func loadConfigFile(ctx context.Context, cmd *cobra.Command) {
 	l := logger.From(ctx).With().Logger()
+
+	// Automatially bind environment variables
+	viper.SetEnvPrefix("INNGEST")
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	viper.AutomaticEnv()
 
 	configPath, _ := cmd.Flags().GetString("config")
 	if configPath != "" {
@@ -90,19 +96,22 @@ func mapDevFlags(cmd *cobra.Command) error {
 	err = errors.Join(err, viper.BindPFlag("port", cmd.Flags().Lookup("port")))
 	err = errors.Join(err, viper.BindPFlag("retry-interval", cmd.Flags().Lookup("retry-interval")))
 	err = errors.Join(err, viper.BindPFlag("tick", cmd.Flags().Lookup("tick")))
-	err = errors.Join(err, viper.BindPFlag("urls", cmd.Flags().Lookup("sdk-url")))
+	err = errors.Join(err, viper.BindPFlag("sdk-url", cmd.Flags().Lookup("sdk-url")))
 
 	return err
 }
 
-// mapLiteFlags binds the command line flags to the viper configuration
-func mapLiteFlags(cmd *cobra.Command) error {
+// mapStartFlags binds the command line flags to the viper configuration
+func mapStartFlags(cmd *cobra.Command) error {
 	var err error
 	err = errors.Join(err, viper.BindPFlag("host", cmd.Flags().Lookup("host")))
 	err = errors.Join(err, viper.BindPFlag("port", cmd.Flags().Lookup("port")))
 	err = errors.Join(err, viper.BindPFlag("redis-uri", cmd.Flags().Lookup("redis-uri")))
 	err = errors.Join(err, viper.BindPFlag("poll-interval", cmd.Flags().Lookup("poll-interval")))
-	err = errors.Join(err, viper.BindPFlag("urls", cmd.Flags().Lookup("sdk-url")))
+	err = errors.Join(err, viper.BindPFlag("retry-interval", cmd.Flags().Lookup("retry-interval")))
+	err = errors.Join(err, viper.BindPFlag("sdk-url", cmd.Flags().Lookup("sdk-url")))
+	err = errors.Join(err, viper.BindPFlag("sqlite-dir", cmd.Flags().Lookup("sqlite-dir")))
+	err = errors.Join(err, viper.BindPFlag("tick", cmd.Flags().Lookup("tick")))
 
 	return err
 }

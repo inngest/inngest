@@ -51,7 +51,8 @@ import (
 )
 
 const (
-	DefaultTick         = time.Millisecond * 150
+	DefaultTick         = 150
+	DefaultTickDuration = time.Millisecond * DefaultTick
 	DefaultPollInterval = 5
 )
 
@@ -95,7 +96,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	if opts.Tick == 0 {
-		opts.Tick = DefaultTick
+		opts.Tick = DefaultTickDuration
 	}
 
 	// Initialize the devserver
@@ -386,7 +387,7 @@ func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Clien
 	// If tick is lower than the default, tick every 50ms.  This lets us save
 	// CPU for standard dev-server testing.
 	poll := time.Second
-	if tick < DefaultTick {
+	if tick < DefaultTickDuration {
 		poll = time.Millisecond * 50
 	}
 

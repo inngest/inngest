@@ -217,7 +217,7 @@ select * from traces where trace_id = @trace_id AND span_id = @span_id ORDER BY 
 
 
 --
--- Lite queue snapshots
+-- Queue snapshots
 --
 
 -- name: GetQueueSnapshotChunks :many

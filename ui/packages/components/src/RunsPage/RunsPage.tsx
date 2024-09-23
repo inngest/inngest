@@ -256,11 +256,11 @@ export function RunsPage({
 
   return (
     <main
-      className="bg-canvasBase text-basis flex-1 overflow-auto"
+      className="bg-canvasBase text-basis h-full min-h-0 flex-1 overflow-y-auto"
       onScroll={onScroll}
       ref={containerRef}
     >
-      <div className="bg-canvasBase z-5 border-subtle sticky top-0 flex flex-col border-b px-3">
+      <div className="bg-canvasBase border-subtle sticky top-0 z-10 flex flex-col border-b px-3">
         <div className="flex h-[58px] items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <SelectGroup>
@@ -323,7 +323,7 @@ export function RunsPage({
           </div>
         </div>
       </div>
-      <div className=" h-[calc(100%-58px)] overflow-y-auto">
+      <>
         <RunsTable
           data={data}
           isLoading={isLoadingInitial}
@@ -357,7 +357,7 @@ export function RunsPage({
             />
           </div>
         )}
-      </div>
+      </>
     </main>
   );
 }
