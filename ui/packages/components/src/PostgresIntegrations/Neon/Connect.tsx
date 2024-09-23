@@ -38,8 +38,10 @@ export default function Connect({
   onSuccess,
   savedCredentials,
   verifyAutoSetup,
+  handleLostCredentials,
 }: {
   onSuccess: () => void;
+  handleLostCredentials: () => void;
   savedCredentials?: string;
   verifyAutoSetup: (variables: {
     adminConn: string;
@@ -90,8 +92,7 @@ export default function Connect({
     setError(undefined);
 
     if (!savedCredentials) {
-      setError('Lost credentials. Go back to the first step.');
-      setIsVerifying(false);
+      handleLostCredentials();
       return;
     }
 

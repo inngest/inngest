@@ -10,8 +10,10 @@ export default function NeonFormat({
   onSuccess,
   savedCredentials,
   verifyLogicalReplication,
+  handleLostCredentials,
 }: {
   onSuccess: () => void;
+  handleLostCredentials: () => void;
   savedCredentials?: string;
   verifyLogicalReplication: (variables: {
     adminConn: string;
@@ -28,8 +30,7 @@ export default function NeonFormat({
     setIsVerifying(true);
     setError(undefined);
     if (!savedCredentials) {
-      setError('Lost credentials. Go back to the first step.');
-      setIsVerifying(false);
+      handleLostCredentials();
       return;
     }
     const parsedInput = parseConnectionString(savedCredentials);
