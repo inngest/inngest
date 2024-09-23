@@ -1,9 +1,22 @@
+import { Chart } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
 import { NewLink } from '@inngest/components/Link/Link';
 
-export const RunsThrougput = () => {
+import type { VolumeMetricsQuery } from '@/gql/graphql';
+import type { FunctionLookup } from './Dashboard';
+import { getLineChartOptions, mapFunctionLines } from './utils';
+
+export type RunsThroughputMetricsType =
+  VolumeMetricsQuery['workspace']['runsThroughput']['metrics'];
+
+export const RunsThrougput = ({
+  workspace,
+  functions,
+}: Partial<VolumeMetricsQuery> & { functions: FunctionLookup }) => {
+  const metrics = workspace && mapFunctionLines(workspace.runsThroughput.metrics, functions);
+
   return (
-    <div className="bg-canvasBase border-subtle overflow-x-hidden relative flex h-[300px] w-full flex-col rounded-lg p-5">
+    <div className="bg-canvasBase border-subtle relative flex h-[300px] w-full flex-col overflow-x-hidden rounded-lg p-5">
       <div className="mb-2 flex flex-row items-center justify-between">
         <div className="text-subtle flex w-full flex-row items-center gap-x-2 text-lg">
           Total runs throughput{' '}
@@ -22,8 +35,7 @@ export const RunsThrougput = () => {
         </div>
       </div>
       <div className="flex h-full flex-row items-center">
-        {/* <Chart option={{}} className="h-full w-full" /> */}
-        coming soon...
+        <Chart option={metrics ? getLineChartOptions(metrics) : {}} className="h-full w-full" />
       </div>
     </div>
   );

@@ -22,6 +22,18 @@ import { useQuery } from 'urql';
 import { GetBillingPlanDocument } from '@/gql/graphql';
 import { MetricsOverview } from './Overview';
 import { MetricsVolume } from './Volume';
+import { convert } from './utils';
+
+export type FunctionLookup = { [id: string]: string };
+
+export type MetricsFilters = {
+  from: Date;
+  until?: Date;
+  selectedApps?: string[];
+  selectedFns?: string[];
+  autoRefresh?: boolean;
+  functions: FunctionLookup;
+};
 
 export type EntityType = {
   id: string;
@@ -71,6 +83,8 @@ export const Dashboard = ({
   const logRetention = Number(planData?.account.plan?.features.log_retention);
   const upgradeCutoff = subtractDuration(new Date(), { days: logRetention || 7 });
 
+  const mappedFunctions = convert(functions);
+
   return (
     <div className="flex h-full w-full flex-col">
       <div className="bg-canvasBase flex h-16 w-full flex-row items-center justify-between px-3 py-5">
@@ -115,11 +129,18 @@ export const Dashboard = ({
           selectedApps={selectedApps}
           selectedFns={selectedFns}
           autoRefresh={autoRefresh}
-          functions={functions}
+          functions={mappedFunctions}
         />
       </div>
       <div className="px-6">
-        <MetricsVolume />
+        <MetricsVolume
+          from={getFrom(parsedStart, parsedDuration)}
+          until={parsedEnd}
+          selectedApps={selectedApps}
+          selectedFns={selectedFns}
+          autoRefresh={autoRefresh}
+          functions={mappedFunctions}
+        />
       </div>
     </div>
   );

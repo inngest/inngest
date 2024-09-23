@@ -5,18 +5,9 @@ import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
-import type { EntityType } from './Dashboard';
+import type { MetricsFilters } from './Dashboard';
 import { FailedFunctions } from './FailedFunctions';
 import { FunctionStatus } from './FunctionStatus';
-
-export type MetricsFilters = {
-  from: Date;
-  until?: Date;
-  selectedApps?: string[];
-  selectedFns?: string[];
-  autoRefresh?: boolean;
-  functions: EntityType[];
-};
 
 const GetFunctionStatusMetrics = graphql(`
   query FunctionStatusMetrics(
@@ -30,7 +21,7 @@ const GetFunctionStatusMetrics = graphql(`
       scheduled: scopedMetrics(
         filter: {
           name: "function_run_scheduled_total"
-          scope: APP
+          scope: FN
           from: $from
           functionIDs: $functionIDs
           appIDs: $appIDs
@@ -50,7 +41,7 @@ const GetFunctionStatusMetrics = graphql(`
       started: scopedMetrics(
         filter: {
           name: "function_run_started_total"
-          scope: APP
+          scope: FN
           from: $from
           functionIDs: $functionIDs
           appIDs: $appIDs
@@ -70,7 +61,7 @@ const GetFunctionStatusMetrics = graphql(`
       completed: scopedMetrics(
         filter: {
           name: "function_run_ended_total"
-          scope: APP
+          scope: FN
           groupBy: "status"
           from: $from
           functionIDs: $functionIDs
@@ -93,7 +84,7 @@ const GetFunctionStatusMetrics = graphql(`
       totals: scopedFunctionStatus(
         filter: {
           name: "function_run_scheduled_total"
-          scope: APP
+          scope: FN
           from: $from
           functionIDs: $functionIDs
           appIDs: $appIDs
