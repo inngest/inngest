@@ -16,7 +16,7 @@ const testAuthDocument = graphql(`
 export const testAuth = async (input: CdcConnectionInput) => {
   const environment = await getProductionEnvironment();
 
-  return await graphqlAPI.request<CdcSetupResponse>(testAuthDocument, {
+  return await graphqlAPI.request<{ cdcTestCredentials: CdcSetupResponse }>(testAuthDocument, {
     envID: environment.id,
     input: input,
   });
@@ -34,10 +34,13 @@ const testLogicalReplicationDocument = graphql(`
 export const testLogicalReplication = async (input: CdcConnectionInput) => {
   const environment = await getProductionEnvironment();
 
-  return await graphqlAPI.request<CdcSetupResponse>(testLogicalReplicationDocument, {
-    envID: environment.id,
-    input: input,
-  });
+  return await graphqlAPI.request<{ cdcTestLogicalReplication: CdcSetupResponse }>(
+    testLogicalReplicationDocument,
+    {
+      envID: environment.id,
+      input: input,
+    }
+  );
 };
 
 const testAutoSetupDocument = graphql(`
@@ -52,7 +55,7 @@ const testAutoSetupDocument = graphql(`
 export const testAutoSetup = async (input: CdcConnectionInput) => {
   const environment = await getProductionEnvironment();
 
-  return await graphqlAPI.request<CdcSetupResponse>(testAutoSetupDocument, {
+  return await graphqlAPI.request<{ cdcAutoSetup: CdcSetupResponse }>(testAutoSetupDocument, {
     envID: environment.id,
     input: input,
   });
