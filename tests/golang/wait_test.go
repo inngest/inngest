@@ -155,7 +155,6 @@ func TestWaitGroup(t *testing.T) {
 
 	var started int32
 
-	// This function will invoke the other function
 	runID := ""
 	evtName := "wait-group"
 	waitEvtName := "resume-group"
@@ -226,9 +225,24 @@ func TestWaitGroup(t *testing.T) {
 			c.ExpectSpanErrorOutput(t, "", "initial error", execOutput)
 		})
 
+		// Wait for the WaitForEvent to appear in history
+		r.EventuallyWithT(func(ct *assert.CollectT) {
+			a := assert.New(ct)
+			run, err := c.RunTraces(ctx, runID)
+			a.NoError(err)
+			a.Len(run.Trace.ChildSpans, 1)
+
+			isWaiting := false
+			for _, s := range run.Trace.ChildSpans[0].ChildSpans {
+				if s.StepOp == models.StepOpWaitForEvent.String() {
+					isWaiting = true
+					break
+				}
+			}
+			a.True(isWaiting)
+		}, 5*time.Second, 500*time.Millisecond)
 	})
 
-	<-time.After(3 * time.Second)
 	// Trigger the main function
 	_, err = inngestgo.Send(ctx, &event.Event{Name: waitEvtName})
 	r.NoError(err)
