@@ -97,7 +97,11 @@ export const getLineChartOptions = (data: LineChartData): ChartProps['option'] =
   };
 };
 
-export const mapFunctionLines = (metrics: ScopedMetric[], functions: FunctionLookup) => {
+export const mapFunctionLines = (
+  metrics: ScopedMetric[],
+  functions: FunctionLookup,
+  areaStyle?: { opacity: number }
+) => {
   const dark = isDark();
 
   const diff = timeDiff(metrics[0]?.data[0]?.bucket, metrics[0]?.data.at(-1)?.bucket);
@@ -121,6 +125,7 @@ export const mapFunctionLines = (metrics: ScopedMetric[], functions: FunctionLoo
         itemStyle: {
           color: resolveColor(lineColors[i % lineColors.length]![0]!, dark, lineColors[0]?.[1]),
         },
+        areaStyle,
       };
     }),
   };

@@ -122,7 +122,7 @@ export const Dashboard = ({
           />
         </div>
       </div>
-      <div className="px-6">
+      <div className="bg-canvasSubtle px-6">
         <MetricsOverview
           from={getFrom(parsedStart, parsedDuration)}
           until={parsedEnd}
@@ -132,7 +132,7 @@ export const Dashboard = ({
           functions={mappedFunctions}
         />
       </div>
-      <div className="px-6">
+      <div className="bg-canvasSubtle px-6 pb-6">
         <MetricsVolume
           from={getFrom(parsedStart, parsedDuration)}
           until={parsedEnd}

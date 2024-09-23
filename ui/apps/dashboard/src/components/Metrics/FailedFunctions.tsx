@@ -88,7 +88,7 @@ export const FailedFunctions = ({
 
   return (
     <div className="bg-canvasBase border-subtle overflowx-hidden relative flex h-[300px] w-full flex-col rounded-lg p-5">
-      <div className="mb-2 flex flex-row items-center justify-between">
+      <div className="mb-2 flex flex-row items-center justify-between gap-x-2">
         <div className="text-subtle flex w-full flex-row items-center gap-x-2 text-lg">
           Failed Functions{' '}
           <Info
@@ -111,11 +111,14 @@ export const FailedFunctions = ({
           icon={<RiArrowRightUpLine />}
           iconSide="left"
           label="View all"
-          href={pathCreator.functions({ envSlug: env.slug })}
+          href={`${pathCreator.runs({ envSlug: env.slug })}?filterStatus=%5B"FAILED"%5D`}
         />
       </div>
       <div className="flex h-full flex-row items-center">
-        <Chart option={metrics ? getLineChartOptions(metrics) : {}} className="h-[100%] w-[75%]" />
+        <Chart
+          option={metrics ? getLineChartOptions(metrics) : {}}
+          className="h-[100%] w-full md:w-[75%]"
+        />
         <FailedList rateList={metrics?.rateList} />
       </div>
     </div>
@@ -124,7 +127,7 @@ export const FailedFunctions = ({
 
 export const FailedList = ({ rateList }: { rateList: Rate[] | undefined }) => {
   return (
-    <div className="border-subtle my-5 mb-5 ml-4 mt-8 flex h-full w-[25%] min-w-[220px] flex-col items-start justify-start border-l pl-4">
+    <div className="border-subtle my-5 mb-5 ml-4 mt-8 hidden h-full w-[25%] min-w-[220px] flex-col items-start justify-start border-l pl-4 md:flex">
       <div className="pt flex w-full flex-row items-center justify-between gap-x-3 text-xs font-medium leading-none">
         <div>Recently failed</div>
         <div className="flex flex-row gap-x-3 justify-self-end">

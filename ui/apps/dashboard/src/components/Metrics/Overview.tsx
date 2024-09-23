@@ -131,7 +131,7 @@ export const MetricsOverview = ({
   error && console.error('Error fetcthing metrics data for', variables, error);
 
   return (
-    <div className="bg-canvasSubtle item-start flex h-full w-full flex-col items-start">
+    <div className="item-start flex h-full w-full flex-col items-start">
       <div className="text-subtle my-4 flex w-full flex-row items-center justify-start gap-x-2 text-xs uppercase">
         {overviewOpen ? (
           <RiArrowDownSFill className="cursor-pointer" onClick={() => setOverviewOpen(false)} />
@@ -143,7 +143,7 @@ export const MetricsOverview = ({
         <hr className="border-subtle w-full" />
       </div>
       {overviewOpen && (
-        <div className="relative flex w-full flex-row items-center justify-start gap-2 overflow-hidden">
+        <div className="relative flex w-full flex-row flex-wrap items-center justify-start gap-2 overflow-hidden md:flex-nowrap">
           <FunctionStatus totals={data?.workspace.totals} />
           <FailedFunctions workspace={data?.workspace} functions={functions} />
         </div>
