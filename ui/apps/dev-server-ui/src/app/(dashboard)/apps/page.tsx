@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
-import { Link } from '@inngest/components/Link';
+import { NewLink } from '@inngest/components/Link';
 import { IconApp } from '@inngest/components/icons/App';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 
@@ -35,9 +35,13 @@ export default function AppList() {
           <Info
             text="This is a list of all apps. We auto-detect apps that you have defined in specific ports."
             action={
-              <Link href="https://www.inngest.com/docs/local-development#connecting-apps-to-the-dev-server">
+              <NewLink
+                arrowOnHover
+                className="text-sm"
+                href="https://www.inngest.com/docs/local-development#connecting-apps-to-the-dev-server"
+              >
                 Go to specific ports.
-              </Link>
+              </NewLink>
             }
           />
         }

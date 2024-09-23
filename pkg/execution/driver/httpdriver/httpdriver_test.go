@@ -2,6 +2,7 @@ package httpdriver
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/stretchr/testify/require"
 )
 
@@ -183,4 +185,27 @@ func TestParseStream(t *testing.T) {
 		require.NotNil(t, actual)
 		require.Equal(t, r, *actual)
 	})
+}
+
+func TestStreamResponseTooLarge(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		data := make([]byte, consts.MaxBodySize)
+		_, err := rand.Read(data)
+		require.NoError(t, err)
+
+		// Indicate a streaming response.
+		w.WriteHeader(201)
+		err = json.NewEncoder(w).Encode(data)
+		require.NoError(t, err)
+	}))
+
+	defer ts.Close()
+	u, _ := url.Parse(ts.URL)
+	r, err := do(context.Background(), nil, Request{
+		URL: *u,
+	})
+	require.NotNil(t, r)
+	require.NotNil(t, r.sysErr)
+	require.Equal(t, r.sysErr.Code, syscode.CodeOutputTooLarge)
+	require.Nil(t, err)
 }
