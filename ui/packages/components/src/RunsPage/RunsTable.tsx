@@ -89,7 +89,7 @@ export default function RunsTable({
   });
 
   const tableStyles = 'w-full border-b border-subtle';
-  const tableHeadStyles = 'shadow-subtle shadow-[0_1px_0] sticky top-[59px] bg-canvasBase z-10';
+  const tableHeadStyles = 'shadow-subtle shadow-[0_1px_0] sticky top-[59px] bg-canvasBase z-0';
   const tableBodyStyles = 'divide-y divide-subtle';
   const tableColumnStyles = 'px-4';
 
