@@ -85,7 +85,6 @@ export function CancelFunctionModal(props: Props) {
             <p className="text-muted mb-1 text-sm">Provide a name for this cancellation group</p>
 
             <Input
-              // label="Name"
               name="cancellation-name"
               onChange={(e) => {
                 setName(e.target.value);
