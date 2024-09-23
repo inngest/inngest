@@ -69,11 +69,17 @@ type StartOpts struct {
 
 	// SigningKey is used to decide that the server should sign requests and
 	// validate responses where applicable, modelling cloud behaviour.
-	SigningKey *string `json:"signing_key"`
+	SigningKey *string `json:"-"`
 
 	// EventKey is used to authorize incoming events, ensuring they match the
 	// given key.
-	EventKeys []string `json:"event_key"`
+	EventKeys []string `json:"-"`
+
+	// RequireKeys defines whether event and signing keys are required for the
+	// server to function. If this is true and signing keys are not defined,
+	// the server will still boot but core actions such as syncing, runs, and
+	// ingesting events will not work.
+	RequireKeys bool `json:"require_keys"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)

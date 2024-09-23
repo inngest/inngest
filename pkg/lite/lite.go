@@ -332,11 +332,12 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	dsOpts := devserver.StartOpts{
-		Config:     opts.Config,
-		RootDir:    opts.RootDir,
-		URLs:       opts.URLs,
-		Tick:       tick,
-		SigningKey: sk,
+		Config:      opts.Config,
+		RootDir:     opts.RootDir,
+		URLs:        opts.URLs,
+		Tick:        tick,
+		SigningKey:  sk,
+		RequireKeys: true,
 	}
 
 	if opts.PollInterval > 0 {
@@ -385,6 +386,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		Executor:        ds.Executor,
 		HistoryReader:   hr,
 		LocalSigningKey: opts.SigningKey,
+		RequireKeys:     true,
 	})
 	if err != nil {
 		return err
