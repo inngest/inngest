@@ -44,7 +44,7 @@ export default function IntegrationPage({
               <div className="flex flex-col">
                 <div>
                   <Pill appearance="solid" kind={p.isActive ? 'primary' : 'default'}>
-                    {p.isActive ? 'Active' : 'disabled'}
+                    {p.isActive ? 'Active' : 'Disabled'}
                   </Pill>
                 </div>
                 <div className="mt-4 flex flex-row items-center justify-start">
