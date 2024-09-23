@@ -281,7 +281,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 
 				// Make a new PUT request to each app, indicating that the
 				// SDK should push functions to the dev server.
-				res := deploy.Ping(ctx, app.Url)
+				res := deploy.Ping(ctx, app.Url, d.Opts.Config.ServerKind, *d.Opts.SigningKey)
 				if res.Err != nil {
 					_, _ = d.Data.UpdateAppError(ctx, cqrs.UpdateAppErrorParams{
 						ID: app.ID,
@@ -302,7 +302,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 					continue
 				}
 
-				res := deploy.Ping(ctx, u)
+				res := deploy.Ping(ctx, u, d.Opts.Config.ServerKind, *d.Opts.SigningKey)
 
 				// If there was an SDK error then we should still ensure the app
 				// exists. Otherwise, users will have a harder time figuring out

@@ -52,7 +52,7 @@ func NewAPI(o Options) (chi.Router, error) {
 		MaxAge:           60 * 60, // 1 hour
 	})
 	api.Use(cors.Handler)
-	api.Use(headers.StaticHeadersMiddleware(headers.ServerKindDev))
+	api.Use(headers.StaticHeadersMiddleware(o.Config.GetServerKind()))
 
 	api.Get("/health", api.HealthCheck)
 	api.Post("/e/{key}", api.ReceiveEvent)

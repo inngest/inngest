@@ -38,6 +38,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/run"
@@ -73,6 +74,12 @@ func New(ctx context.Context, opts StartOpts) error {
 	// The dev server _always_ logs output for development.
 	if !opts.Config.Execution.LogOutput {
 		opts.Config.Execution.LogOutput = true
+	}
+
+	// Ensure that if we've been given a signing key, that cloud mode is
+	// enabled appropriately in config.
+	if opts.SigningKey != "" {
+		opts.Config.ServerKind = headers.ServerKindCloud
 	}
 
 	// NOTE: looks deprecated?
@@ -212,10 +219,15 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
 
+	var sk *string
+	if opts.SigningKey != "" {
+		sk = &opts.SigningKey
+	}
+
 	var drivers = []driver.Driver{}
 	driverOpts := registration.NewDriverOpts{}
-	if opts.SigningKey != "" {
-		driverOpts.SigningKey = &opts.SigningKey
+	if sk != nil {
+		driverOpts.SigningKey = sk
 	}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
 		d, err := driverConfig.NewDriver(driverOpts)
@@ -313,10 +325,11 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	dsOpts := devserver.StartOpts{
-		Config:  opts.Config,
-		RootDir: opts.RootDir,
-		URLs:    opts.URLs,
-		Tick:    tick,
+		Config:     opts.Config,
+		RootDir:    opts.RootDir,
+		URLs:       opts.URLs,
+		Tick:       tick,
+		SigningKey: sk,
 	}
 
 	if opts.PollInterval > 0 {
@@ -354,16 +367,17 @@ func start(ctx context.Context, opts StartOpts) error {
 	})
 
 	core, err := coreapi.NewCoreApi(coreapi.Options{
-		Data:          ds.Data,
-		Config:        ds.Opts.Config,
-		Logger:        logger.From(ctx),
-		Runner:        ds.Runner,
-		Tracker:       ds.Tracker,
-		State:         ds.State,
-		Queue:         ds.Queue,
-		EventHandler:  ds.HandleEvent,
-		Executor:      ds.Executor,
-		HistoryReader: hr,
+		Data:            ds.Data,
+		Config:          ds.Opts.Config,
+		Logger:          logger.From(ctx),
+		Runner:          ds.Runner,
+		Tracker:         ds.Tracker,
+		State:           ds.State,
+		Queue:           ds.Queue,
+		EventHandler:    ds.HandleEvent,
+		Executor:        ds.Executor,
+		HistoryReader:   hr,
+		LocalSigningKey: opts.SigningKey,
 	})
 	if err != nil {
 		return err

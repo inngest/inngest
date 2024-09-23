@@ -43,6 +43,9 @@ type Options struct {
 	EventHandler  api.EventHandler
 	Executor      execution.Executor
 	HistoryReader history_reader.Reader
+
+	// LocalSigningKey is the key used to sign events for self-hosted services.
+	LocalSigningKey string
 }
 
 func NewCoreApi(o Options) (*CoreAPI, error) {
@@ -70,19 +73,21 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	})
 	a.Use(
 		cors.Handler,
-		headers.StaticHeadersMiddleware(headers.ServerKindDev),
+		headers.StaticHeadersMiddleware(o.Config.GetServerKind()),
 		loader.Middleware(loader.LoaderParams{
 			DB: o.Data,
 		}),
 	)
 
 	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &resolvers.Resolver{
-		Data:          o.Data,
-		HistoryReader: o.HistoryReader,
-		Runner:        o.Runner,
-		Queue:         o.Queue,
-		EventHandler:  o.EventHandler,
-		Executor:      o.Executor,
+		Data:            o.Data,
+		HistoryReader:   o.HistoryReader,
+		Runner:          o.Runner,
+		Queue:           o.Queue,
+		EventHandler:    o.EventHandler,
+		Executor:        o.Executor,
+		ServerKind:      o.Config.GetServerKind(),
+		LocalSigningKey: o.LocalSigningKey,
 	}}))
 
 	// TODO - Add option for enabling GraphQL Playground

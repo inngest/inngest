@@ -19,6 +19,10 @@ type Resolver struct {
 	Queue         queue.JobQueueReader
 	EventHandler  api.EventHandler
 	Executor      execution.Executor
+	ServerKind    string
+
+	// LocalSigningKey is the key used to sign events for self-hosted services.
+	LocalSigningKey string
 }
 
 // Query returns generated.QueryResolver implementation.
