@@ -75,7 +75,7 @@ Run the Inngest Dev Server using our CLI:
 npx inngest-cli@latest dev
 ```
 
-Open the Inngest Dev Server dashboard at [http://localhost:8288]:
+Open the Inngest Dev Server dashboard at http://localhost:8288:
 
 ![Screenshot of the Inngest dashboard served by the Inngest Dev Server](.github/assets/dashboard-screenshot-2024-09-23.png)
 
