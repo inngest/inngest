@@ -79,12 +79,12 @@ Open the Inngest Dev Server dashboard at http://localhost:8288:
 
 ![Screenshot of the Inngest dashboard served by the Inngest Dev Server](.github/assets/dashboard-screenshot-2024-09-23.png)
 
-Follow our [Next.js](https://www.inngest.com/docs/getting-started/nextjs-quick-start) or [Python](https://www.inngest.com/docs/getting-started/python-quick-start) quick start guides.
+Follow our [Next.js](https://www.inngest.com/docs/getting-started/nextjs-quick-start?ref=github-inngest-readme) or [Python](https://www.inngest.com/docs/getting-started/python-quick-start?ref=github-inngest-readme) quick start guides.
 
 ## SDKs
 
-- **TypeScript / JavaScript** ([inngest-js](https://github.com/inngest/inngest-js)) - [Reference](https://www.inngest.com/docs/reference/typescript)
-- **Python** ([inngest-py](https://github.com/inngest/inngest-py)) - [Reference](https://www.inngest.com/docs/reference/python)
+- **TypeScript / JavaScript** ([inngest-js](https://github.com/inngest/inngest-js)) - [Reference](https://www.inngest.com/docs/reference/typescript?ref=github-inngest-readme)
+- **Python** ([inngest-py](https://github.com/inngest/inngest-py)) - [Reference](https://www.inngest.com/docs/reference/python?ref=github-inngest-readme)
 - **Go** ([inngestgo](https://github.com/inngest/inngestgo)) - [Reference](https://pkg.go.dev/github.com/inngest/inngestgo)
 - **Kotlin / Java** ([inngest-kt](https://github.com/inngest/inngest-kt))
 
