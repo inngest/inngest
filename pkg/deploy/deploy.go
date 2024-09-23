@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/publicerr"
+	"github.com/inngest/inngestgo"
 )
 
 var (
@@ -41,10 +42,17 @@ type pingResult struct {
 	IsSDK bool
 }
 
-func Ping(ctx context.Context, url string) pingResult {
+func Ping(ctx context.Context, url string, serverKind string, signingKey string) pingResult {
 	isSDK := false
 
-	req, err := http.NewRequest(http.MethodPut, url, nil)
+	reqByt, err := json.Marshal(map[string]string{"url": url})
+	if err != nil {
+		return pingResult{
+			Err: fmt.Errorf("failed to marshal request body: %w", err),
+		}
+	}
+
+	req, err := http.NewRequest(http.MethodPut, url, io.NopCloser(strings.NewReader(string(reqByt))))
 	if err != nil {
 		return pingResult{
 			Err: publicerr.WrapWithData(
@@ -58,7 +66,18 @@ func Ping(ctx context.Context, url string) pingResult {
 			IsSDK: isSDK,
 		}
 	}
-	req.Header.Set(headers.HeaderKeyServerKind, headers.ServerKindDev)
+	req.Header.Set(headers.HeaderKeyServerKind, serverKind)
+
+	if signingKey != "" {
+		reqSig, err := inngestgo.Sign(ctx, time.Now(), []byte(signingKey), reqByt)
+		if err != nil {
+			return pingResult{
+				Err: fmt.Errorf("failed to sign request: %w", err),
+			}
+		}
+		req.Header.Set(headers.HeaderKeySignature, reqSig)
+	}
+
 	resp, err := Client.Do(req)
 	if err != nil {
 		err = handlePingError(err)
