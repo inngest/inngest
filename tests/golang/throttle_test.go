@@ -20,23 +20,27 @@ func TestThrottle(t *testing.T) {
 
 		trigger := "test/timeouts-start"
 
-		var (
-			total int32
-			funcs = 5
-		)
+		funcs := 5
+		throttlePeriod := 5 * time.Second
+
+		runs := map[string]struct{}{}
+		startTimes := []time.Time{}
 
 		a := inngestgo.CreateFunction(
 			inngestgo.FunctionOpts{
 				Name: "throttle test",
 				Throttle: &inngestgo.Throttle{
 					Limit:  1,
-					Period: 5 * time.Second,
+					Period: throttlePeriod,
 				},
 			},
 			inngestgo.EventTrigger(trigger, nil),
 			func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[any, any]]) (any, error) {
-				fmt.Println("Throttled function hit")
-				atomic.AddInt32(&total, 1)
+				fmt.Println(time.Now().Format(time.RFC3339))
+				if _, ok := runs[input.InputCtx.RunID]; !ok {
+					startTimes = append(startTimes, time.Now())
+					runs[input.InputCtx.RunID] = struct{}{}
+				}
 				return true, nil
 			},
 		)
@@ -44,29 +48,43 @@ func TestThrottle(t *testing.T) {
 		h.Register(a)
 		registerFuncs()
 
-		// Run 5 functions
+		var events []any
 		for i := 0; i < funcs; i++ {
-			go func() {
-				_, err := inngestgo.Send(context.Background(), inngestgo.Event{
-					Name: trigger,
-					Data: map[string]any{"test": true},
-				})
-				require.NoError(t, err)
-			}()
+			events = append(events, inngestgo.Event{
+				Name: trigger,
+				Data: map[string]any{"test": true},
+			})
 		}
+		_, err := inngestgo.SendMany(context.Background(), events)
+		require.NoError(t, err)
 
-		// Wait for the first function to finish, but not long enough for the second function
-		// to start.
-		<-time.After(time.Second)
+		// Wait for all functions to run
+		require.Eventually(t,
+			func() bool {
+				return len(startTimes) == funcs
+			},
 
-		// Ensure that each function finishes after 3 seconds.
-		for i := 1; i <= funcs; i++ {
-			require.Eventually(t, func() bool {
-				require.EqualValues(t, i, total)
+			// Add a little extra time to ensure all functions have run
+			time.Duration(funcs+1)*5*time.Second,
 
-				return true
-			}, 2*time.Second, 500*time.Millisecond)
-			<-time.After(5 * time.Second)
+			time.Second,
+		)
+
+		for i := 0; i < funcs; i++ {
+			fmt.Println(startTimes[i].Format(time.RFC3339))
+			if i == 0 {
+				continue
+			}
+
+			sincePreviousStart := startTimes[i].Sub(startTimes[i-1])
+
+			// Sometimes runs start a little before the throttle period, but
+			// shouldn't be more than 1 second before
+			require.GreaterOrEqual(t, sincePreviousStart, throttlePeriod-1*time.Second)
+
+			// Sometimes runs start a little after the throttle period. This
+			// fudge factor can be increased if we see it fail in CI
+			require.LessOrEqual(t, sincePreviousStart, throttlePeriod+2*time.Second)
 		}
 	})
 
