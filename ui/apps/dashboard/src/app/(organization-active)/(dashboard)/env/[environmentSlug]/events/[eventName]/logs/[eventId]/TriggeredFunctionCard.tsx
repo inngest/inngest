@@ -15,6 +15,7 @@ import { getBaseRunUrl } from '@/components/Runs/utils';
 import { graphql } from '@/gql';
 import { FunctionRunStatus } from '@/gql/graphql';
 import graphqlAPI from '@/queries/graphqlAPI';
+import { pathCreator } from '@/utils/urls';
 
 const functionRunStatusIcons: Record<string, (args: { className?: string }) => React.ReactNode> = {
   [FunctionRunStatus.Cancelled]: IconStatusCancelled,
@@ -74,14 +75,18 @@ export default async function TriggeredFunctionCard({
   }
 
   const baseUrl = getBaseRunUrl(function_.run.startedAt);
+  // runs from before clickhouse migration go to the old runs page
+  const url =
+    baseUrl === 'logs'
+      ? pathCreator.oldRun({
+          envSlug: environmentSlug,
+          functionSlug: function_.slug,
+          runID: function_.run.id,
+        })
+      : pathCreator.runPopout({ envSlug: environmentSlug, runID: function_.run.id });
 
   return (
-    <Link
-      href={`/env/${environmentSlug}/functions/${encodeURIComponent(function_.slug)}/${baseUrl}/${
-        function_.run.id
-      }`}
-      className="flex items-center rounded-lg border bg-white p-5 shadow"
-    >
+    <Link href={url} className="flex items-center rounded-lg border bg-white p-5 shadow">
       <div className="flex-1">
         <div className="flex items-center gap-1.5">
           <IconFunction className="h-4 w-4 text-slate-500" />

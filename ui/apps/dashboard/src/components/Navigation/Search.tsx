@@ -17,6 +17,7 @@ import { useQuery } from 'urql';
 import { getBaseRunUrl } from '@/components/Runs/utils';
 import { graphql } from '@/gql';
 import { getEnvironmentSlug } from '@/utils/environments';
+import { pathCreator } from '@/utils/urls';
 
 const GetGlobalSearchDocument = graphql(`
   query GetGlobalSearch($opts: SearchInput!) {
@@ -157,11 +158,17 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
   if (globalResults?.value.__typename === 'FunctionRun' && functionResults) {
     // runs from before clickhouse migration go to the old runs page
     const baseUrl = getBaseRunUrl(globalResults.value.startedAt);
+    const url =
+      baseUrl === 'logs'
+        ? pathCreator.oldRun({
+            envSlug: environmentSlug,
+            functionSlug: functionResults.slug,
+            runID: globalResults.value.id,
+          })
+        : pathCreator.runPopout({ envSlug: environmentSlug, runID: globalResults.value.id });
     searchResult = {
       type: 'function',
-      href: `/env/${environmentSlug}/functions/${encodeURIComponent(
-        functionResults.slug
-      )}/${baseUrl}/${globalResults.value.id}`,
+      href: url,
       name: functionResults.name || '',
       icon: <IconFunction className="w-4" />,
     };
