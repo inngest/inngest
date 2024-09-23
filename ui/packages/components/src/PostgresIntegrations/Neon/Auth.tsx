@@ -5,21 +5,16 @@ import { NewLink } from '@inngest/components/Link';
 import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/types';
 import { cn } from '@inngest/components/utils/classNames';
 
-const verifyCredentials = async (credentials: string): Promise<boolean> => {
-  // TO DO: Replace with actual API call in production.
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(credentials.startsWith('postgresql://'));
-    }, 1000);
-  });
-};
-
 export default function NeonAuth({
   onSuccess,
   savedCredentials,
+  verifyCredentials,
 }: {
   onSuccess: (value: string) => void;
   savedCredentials?: string;
+  verifyCredentials: (variables: {
+    input: { adminConn: string; engine: string; name: string; replicaConn?: string };
+  }) => Promise<boolean>;
 }) {
   const [inputValue, setInputValue] = useState(savedCredentials || '');
   const [isVerifying, setIsVerifying] = useState(false);
@@ -33,11 +28,38 @@ export default function NeonAuth({
     }
   }, [savedCredentials]);
 
+  const parseConnectionString = (connectionString: string) => {
+    const regex = /postgresql:\/\/(\w+):([^@]+)@([^/]+)/;
+    const match = connectionString.match(regex);
+
+    if (match) {
+      const [, username, password, host] = match;
+      return {
+        input: {
+          name: `Neon-${host}`,
+          engine: 'postgresql',
+          adminConn: connectionString,
+        },
+      };
+    }
+
+    return null;
+  };
+
   const handleVerify = async () => {
     setIsVerifying(true);
     setError(undefined);
+
+    const parsedInput = parseConnectionString(inputValue);
+
+    if (!parsedInput) {
+      setError('Invalid connection string format. Please check your input.');
+      setIsVerifying(false);
+      return;
+    }
+
     try {
-      const success = await verifyCredentials(inputValue);
+      const success = await verifyCredentials(parsedInput);
       if (success) {
         setIsVerified(true);
         onSuccess(inputValue);
