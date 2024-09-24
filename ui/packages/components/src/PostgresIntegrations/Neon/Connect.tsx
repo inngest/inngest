@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
 import { NewButton } from '@inngest/components/Button';
 import { NewLink } from '@inngest/components/Link';
-import { parseConnectionString } from '@inngest/components/PostgresIntegrations/types';
+import { parseConnectionString } from '@inngest/components/PostgresIntegrations/utils';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { RiCheckboxCircleFill, RiCloseCircleFill } from '@remixicon/react';
 
