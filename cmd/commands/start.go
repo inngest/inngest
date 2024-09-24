@@ -42,6 +42,7 @@ func NewCmdStart(rootCmd *cobra.Command) *cobra.Command {
 	baseFlags.Int("tick", devserver.DefaultTick, "Interval, in milliseconds, of which to check for new work.")
 	baseFlags.String("signing-key", "", "Signing key used to sign and validate data between the server and apps.")
 	baseFlags.StringSlice("event-key", []string{}, "Event key(s) that will be used by apps to send events to the server.")
+	baseFlags.BoolP("enable-persistence", "", true, "Controls whether state is persisted. (default true)")
 	cmd.Flags().AddFlagSet(baseFlags)
 	groups = append(groups, FlagGroup{name: "Flags:", fs: baseFlags})
 
@@ -125,15 +126,16 @@ func doStart(cmd *cobra.Command, args []string) {
 	}
 
 	opts := lite.StartOpts{
-		Config:        *conf,
-		PollInterval:  viper.GetInt("poll-interval"),
-		RedisURI:      viper.GetString("redis-uri"),
-		RetryInterval: viper.GetInt("retry-interval"),
-		Tick:          time.Duration(tick) * time.Millisecond,
-		URLs:          viper.GetStringSlice("sdk-url"),
-		SQLiteDir:     viper.GetString("sqlite-dir"),
-		SigningKey:    viper.GetString("signing-key"),
-		EventKey:      viper.GetStringSlice("event-key"),
+		Config:            *conf,
+		PollInterval:      viper.GetInt("poll-interval"),
+		RedisURI:          viper.GetString("redis-uri"),
+		RetryInterval:     viper.GetInt("retry-interval"),
+		Tick:              time.Duration(tick) * time.Millisecond,
+		URLs:              viper.GetStringSlice("sdk-url"),
+		SQLiteDir:         viper.GetString("sqlite-dir"),
+		SigningKey:        viper.GetString("signing-key"),
+		EventKey:          viper.GetStringSlice("event-key"),
+		EnablePersistence: viper.GetBool("enable-persistence"),
 	}
 
 	err = lite.New(ctx, opts)

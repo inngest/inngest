@@ -70,6 +70,8 @@ type StartOpts struct {
 	// EventKey is used to authorize incoming events, ensuring they match the
 	// given key.
 	EventKey []string `json:"event_key"`
+
+	EnablePersistence bool `json:"enable_persistence"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -319,15 +321,24 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithPublisher(pb),
 	)
 
-	// The devserver embeds the event API.
-	pi := consts.StartDefaultPersistenceInterval
-	persistenceInterval := &pi
-	if opts.RedisURI != "" {
-		// If we're using an external Redis, we rely on that to persist and
-		// manage snapshotting
-		persistenceInterval = nil
+	var snso *devserver.SingleNodeServiceOpts
+	if opts.EnablePersistence {
+		// The devserver embeds the event API.
+		pi := consts.StartDefaultPersistenceInterval
+		persistenceInterval := &pi
+		if opts.RedisURI != "" {
+			// If we're using an external Redis, we rely on that to persist and
+			// manage snapshotting
+			persistenceInterval = nil
 
-		logger.From(ctx).Info().Msgf("using external Redis %s; disabling in-memory persistence and snapshotting", opts.RedisURI)
+			logger.From(ctx).Info().Msgf("using external Redis %s; disabling in-memory persistence and snapshotting", opts.RedisURI)
+		}
+
+		snso = &devserver.SingleNodeServiceOpts{
+			PersistenceInterval: persistenceInterval,
+		}
+	} else {
+		logger.From(ctx).Info().Msg("persistence disabled")
 	}
 
 	dsOpts := devserver.StartOpts{
@@ -346,9 +357,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	// The devserver embeds the event API.
-	ds := devserver.NewService(dsOpts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hd, &devserver.SingleNodeServiceOpts{
-		PersistenceInterval: persistenceInterval,
-	})
+	ds := devserver.NewService(dsOpts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hd, snso)
 	// embed the tracker
 	ds.Tracker = t
 	ds.State = sm
