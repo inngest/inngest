@@ -1942,6 +1942,13 @@ func TestQueueLease(t *testing.T) {
 
 		require.True(t, r.Exists(p.concurrencyKey(q.u.kg)), r.Dump())
 	})
+
+	t.Run("leasing key queue should clear backward-compat default partition", func(t *testing.T) {
+		// TODO Implement this test
+		// This is required as not dropping items from all partitions during lease will cause a leftover item to be in the default partition
+		// When the item has been processed and we run Dequeue, this only happens on the key queue, and the default partition retains its pointer even though the queue item is deleted
+		// This leads to Peek errors in default partitions, including system partitions (encountered missing queue items in partition queue)
+	})
 }
 
 func TestQueueExtendLease(t *testing.T) {
