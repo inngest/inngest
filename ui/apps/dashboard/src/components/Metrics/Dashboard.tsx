@@ -24,13 +24,13 @@ import { MetricsOverview } from './Overview';
 import { MetricsVolume } from './Volume';
 import { convertLookup } from './utils';
 
-export type EntityLookup = { [id: string]: string };
-
 export type EntityType = {
   id: string;
   name: string;
   slug?: string;
 };
+
+export type EntityLookup = { [id: string]: EntityType };
 
 export type MetricsFilters = {
   from: Date;

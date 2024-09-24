@@ -1,8 +1,11 @@
 import React from 'react';
+import { NewLink } from '@inngest/components/Link/Link';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { formatDistanceToNow } from '@inngest/components/utils/date';
 
 import type { FunctionStatusMetricsQuery } from '@/gql/graphql';
+import { pathCreator } from '@/utils/urls';
+import { useEnvironment } from '../Environments/environment-context';
 import type { EntityLookup } from './Dashboard';
 import { sum } from './utils';
 
@@ -12,6 +15,7 @@ export type CompletedByFunctionMetricsType =
   FunctionStatusMetricsQuery['workspace']['completedByFunction']['metrics'];
 
 export type Rate = {
+  slug: string;
   name: string;
   lastOccurence?: string;
   totalFailures: number;
@@ -50,7 +54,8 @@ const mapRateList = (
     const totalFailures = sum(failures);
     const lastOccurence = failures.at(-1)?.bucket;
     return {
-      name: functions[f.id] || f.id,
+      slug: functions[f.id]?.slug || '',
+      name: functions[f.id]?.name || f.id,
       lastOccurence,
       totalFailures,
       failureRate: getRate(f.id, totalFailures, completed),
@@ -62,6 +67,7 @@ export const FailedRate = ({
   workspace,
   functions,
 }: Partial<FunctionStatusMetricsQuery> & { functions: EntityLookup }) => {
+  const env = useEnvironment();
   const failed = workspace && sort(filter(workspace.completedByFunction));
   const rateList = failed && mapRateList(failed, workspace.completedByFunction, functions);
 
@@ -77,7 +83,12 @@ export const FailedRate = ({
       {rateList?.map((r, i) => (
         <React.Fragment key={`function-failed-list-${i}`}>
           <div className="mt-3 flex w-full flex-row items-center justify-between gap-x-3 text-xs font-light leading-none">
-            <div>{r.name}</div>
+            <NewLink
+              className="text-basis text-xs font-light leading-none hover:no-underline"
+              href={pathCreator.function({ envSlug: env.slug, functionSlug: r.slug })}
+            >
+              <div>{r.name}</div>
+            </NewLink>
             <div className="flex flex-row justify-end gap-x-4">
               <div className="justify-self-end">{r.totalFailures}</div>
               <div className="text-tertiary-moderate">

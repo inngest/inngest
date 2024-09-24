@@ -61,7 +61,7 @@ export const timeDiff = (start?: string, end?: string) =>
 //
 // convert our [id, name] function/app lookup to {[id]: name} to avoid n+1 lookups
 export const convertLookup = (entities: EntityType[]): EntityLookup =>
-  entities.reduce((acc, v) => ({ ...acc, [v.id]: v.name }), {});
+  entities.reduce((acc, v) => ({ ...acc, [v.id]: { id: v.id, name: v.name, slug: v.slug } }), {});
 
 export const sum = (data?: MetricsData[]) =>
   data ? data.reduce((acc, { value }) => acc + value, 0) : 0;
@@ -120,7 +120,7 @@ export const mapEntityLines = (
     series: metrics.map((f, i) => {
       return {
         ...seriesOptions,
-        name: entities[f.id],
+        name: entities[f.id]?.name,
         data: f.data.map(({ value }) => value),
         itemStyle: {
           color: resolveColor(lineColors[i % lineColors.length]![0]!, dark, lineColors[0]?.[1]),
