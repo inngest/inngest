@@ -1913,6 +1913,35 @@ func TestQueueLease(t *testing.T) {
 			require.False(t, r.Exists(p.concurrencyKey(q.u.kg)))
 		})
 	})
+
+	t.Run("system partitions should be leased properly", func(t *testing.T) {
+		r.FlushAll()
+
+		systemQueueName := "system-queue"
+		item, err := q.EnqueueItem(ctx, QueueItem{
+			QueueName: &systemQueueName,
+			Data: osqueue.Item{
+				QueueName: &systemQueueName,
+			},
+		}, start)
+		require.NoError(t, err)
+
+		item = getQueueItem(t, r, item.ID)
+		require.Nil(t, item.LeaseID)
+
+		p := getSystemPartition(t, r, systemQueueName)
+
+		now := time.Now()
+		id, err := q.Lease(ctx, p, item, time.Second, time.Now(), nil)
+		require.NoError(t, err)
+
+		item = getQueueItem(t, r, item.ID)
+		require.NotNil(t, item.LeaseID)
+		require.EqualValues(t, id, item.LeaseID)
+		require.WithinDuration(t, now.Add(time.Second), ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
+
+		require.True(t, r.Exists(p.concurrencyKey(q.u.kg)), r.Dump())
+	})
 }
 
 func TestQueueExtendLease(t *testing.T) {

@@ -122,6 +122,8 @@ local function handleLease(keyPartition, keyConcurrency, partitionID)
 	-- and stored in functionConcurrencyKey.
 	redis.call("ZREM", keyPartition, item.id)
 
+	-- TODO(INN-3573): If we just leased the last queue item of the partition, drop partition pointers
+
 	-- Update the fn's score in the global pointer queue to the next job, if available.
 	local earliestScore = get_fn_partition_score(keyPartition)
 
@@ -142,7 +144,7 @@ local function handleLease(keyPartition, keyConcurrency, partitionID)
 
 	-- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
 	-- so that expired leases can be re-processed.  We want to take the earliest time from the
-	-- concurrenqy queue such that we get a previously lost job if possible.
+	-- concurrency queue such that we get a previously lost job if possible.
 
 	local inProgressScores = redis.call("ZRANGE", keyConcurrency, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
 	if inProgressScores ~= false then
