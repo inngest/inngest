@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Error } from '@inngest/components/Error/Error';
 import { RiArrowDownSFill, RiArrowRightSFill } from '@remixicon/react';
 
 import { graphql } from '@/gql';
@@ -185,11 +186,13 @@ export const MetricsVolume = ({
     until: until ? until.toISOString() : null,
   };
 
-  const { data } = useGraphQLQuery({
+  const { error, data } = useGraphQLQuery({
     query: GetVolumeMetrics,
     pollIntervalInMilliseconds: autoRefresh ? AUTO_REFRESH_INTERVAL * 1000 : 0,
     variables,
   });
+
+  error && console.error('Error fetcthing metrics data for', variables, error);
 
   return (
     <div className="item-start flex h-full w-full flex-col items-start">
@@ -204,18 +207,22 @@ export const MetricsVolume = ({
         <hr className="border-subtle w-full" />
       </div>
       {volumeOpen && (
-        <div className="relative grid w-full auto-cols-max grid-cols-1 gap-2 overflow-hidden md:grid-cols-2">
-          <RunsThrougput workspace={data?.workspace} functions={functions} />
-          <StepsThroughput workspace={data?.workspace} functions={functions} />
-          <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
-            <SdkThroughput workspace={data?.workspace} functions={functions} />
-            <Backlog workspace={data?.workspace} functions={functions} />
+        <>
+          {error && <Error message="There was an error fetching volume metrics data." />}
+
+          <div className="relative grid w-full auto-cols-max grid-cols-1 gap-2 overflow-hidden md:grid-cols-2">
+            <RunsThrougput workspace={data?.workspace} functions={functions} />
+            <StepsThroughput workspace={data?.workspace} functions={functions} />
+            <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
+              <SdkThroughput workspace={data?.workspace} functions={functions} />
+              <Backlog workspace={data?.workspace} functions={functions} />
+            </div>
+            <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
+              <AccountConcurrency workspace={data?.workspace} functions={functions} />
+              <Feedback />
+            </div>
           </div>
-          <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
-            <AccountConcurrency workspace={data?.workspace} functions={functions} />
-            <Feedback />
-          </div>
-        </div>
+        </>
       )}
     </div>
   );

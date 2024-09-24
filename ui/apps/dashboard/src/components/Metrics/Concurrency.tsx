@@ -21,7 +21,7 @@ export const AccountConcurrency = ({
         <div className="text-subtle flex w-full flex-row items-center gap-x-2 text-lg">
           Account Concurrency{' '}
           <Info
-            text="Total number of compared to the account-level concurrency limits."
+            text="Total number of steps running compared to the account-level concurrency limits."
             action={
               <NewLink
                 arrowOnHover
