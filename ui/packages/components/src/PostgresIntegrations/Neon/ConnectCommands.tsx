@@ -20,8 +20,8 @@ export const RoleCommand = () => (
     tabs={[
       {
         title: 'Create role',
-        content: 'neon roles create --name replication_user',
-        language: 'bash',
+        content: 'CREATE USER inngest WITH REPLICATION',
+        language: 'sql',
       },
     ]}
   />
@@ -32,9 +32,7 @@ export const AccessCommand = () => (
     tabs={[
       {
         title: 'Access command',
-        content: `GRANT USAGE ON SCHEMA public TO replication_user;
-  GRANT SELECT ON ALL TABLES IN SCHEMA public TO replication_user;
-  ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO replication_user;`,
+        content: `GRANT USAGE ON SCHEMA public TO replication_user;\n\GRANT SELECT ON ALL TABLES IN SCHEMA public TO replication_user;\n\ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO replication_user;`,
         language: 'sql',
       },
     ]}

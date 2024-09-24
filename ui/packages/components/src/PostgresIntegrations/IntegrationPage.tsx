@@ -41,7 +41,7 @@ export default function IntegrationPage({
           key={`${content.title}-publications-${i}`}
           className="my-9"
           accentPosition="left"
-          accentColor={p.enabled ? 'bg-primary-intense' : 'bg-disabled'}
+          accentColor={p.enabled ? 'bg-primary-intense' : 'bg-surfaceMuted'}
         >
           <Card.Content className="p-6">
             <div className="flex flex-row items-center justify-between">
@@ -61,12 +61,20 @@ export default function IntegrationPage({
       ))}
 
       <div className="border-muted border-t py-7">
-        <p>Remove {content.title} integration</p>
+        <div className="flex items-center gap-2">
+          <p>Remove {content.title} integration</p>
+          <Pill>Coming soon</Pill>
+        </div>
         <p className="text-subtle mb-6 mt-3 text-sm">
           Permanently remove the {content.title} integration from Inngest
         </p>
-        {/* TO DO: Wire button */}
-        <NewButton appearance="solid" kind="danger" label={`Remove ${content.title}`} />
+        <NewButton
+          disabled
+          appearance="solid"
+          kind="danger"
+          label={`Remove ${content.title}`}
+          title="coming soon"
+        />
       </div>
     </div>
   );
