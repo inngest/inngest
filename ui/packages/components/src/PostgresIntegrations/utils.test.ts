@@ -32,8 +32,6 @@ describe('parseConnectionString', (t) => {
     const connectionString = 'postgres://user-name_underscore:password@host.with.domain/db';
     const parsed = parseConnectionString(connectionString);
 
-    console.log(parsed);
-
     assert.notEqual(parsed, null);
     assert.deepStrictEqual(parsed, {
       name: 'Neon-host.with.domain',
