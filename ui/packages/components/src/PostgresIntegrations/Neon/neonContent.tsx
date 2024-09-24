@@ -13,7 +13,7 @@ export const neonConnectContent: ConnectPostgresIntegrationContent = {
   // TO DO: Update once we have Neon docs in deploy section
   url: 'https://www.inngest.com/docs/',
   description:
-    'This integration enables you to host your Inngest functions on the Vercel platform and automatically sync them every time you deploy code.',
+    'This integration enables you to trigger Inngest functions from your Neon Postgres database updates.',
   step: {
     authorize: {
       title: 'Authorize',
