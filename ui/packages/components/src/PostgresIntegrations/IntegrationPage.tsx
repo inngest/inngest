@@ -15,7 +15,7 @@ export default function IntegrationPage({
     id: string;
     name: string;
     slug: string;
-    projects: [];
+    projects: never[];
     enabled: boolean;
   }[];
 }) {
