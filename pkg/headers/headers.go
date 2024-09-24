@@ -25,6 +25,10 @@ const (
 )
 
 func StaticHeadersMiddleware(serverKind string) func(next http.Handler) http.Handler {
+	if serverKind == "" {
+		panic("server kind must be set")
+	}
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set(HeaderKeyServerKind, serverKind)
