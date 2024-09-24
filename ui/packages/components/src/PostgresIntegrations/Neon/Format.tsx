@@ -1,10 +1,8 @@
 import { useState } from 'react';
 import { NewButton } from '@inngest/components/Button';
 import { NewLink } from '@inngest/components/Link';
-import {
-  IntegrationSteps,
-  parseConnectionString,
-} from '@inngest/components/PostgresIntegrations/types';
+import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/types';
+import { parseConnectionString } from '@inngest/components/PostgresIntegrations/utils';
 
 export default function NeonFormat({
   onSuccess,
