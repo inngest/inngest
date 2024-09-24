@@ -108,8 +108,10 @@ export default function IntegrationsList({ integrations }: { integrations: Verce
           if (i.title === 'Neon' && !postgressIntegration) return;
 
           const integrationData = getIntegrationData(i.slug);
-          const isEnabled = integrationData?.enabled ?? false;
-          const projectsLength = integrationData?.projects?.length ?? 0;
+          const isEnabled =
+            i.slug === 'vercel'
+              ? Boolean(integrationData?.enabled && integrationData.projects.length > 0)
+              : integrationData?.enabled ?? false;
 
           return (
             <Card key={`integration-card-${n}`}>
@@ -118,9 +120,7 @@ export default function IntegrationsList({ integrations }: { integrations: Verce
                   <div className="bg-contrast flex h-12 w-12 items-center justify-center rounded">
                     {i.Icon}
                   </div>
-                  {i.actionButton(
-                    i.title === 'vercel' ? isEnabled && projectsLength > 0 : isEnabled
-                  )}
+                  {i.actionButton(isEnabled)}
                 </div>
                 <div className="text-basis mt-[18px] text-lg font-medium">{i.title}</div>
                 <div className="text-muted mt-2 text-sm leading-tight">{i.description}</div>
