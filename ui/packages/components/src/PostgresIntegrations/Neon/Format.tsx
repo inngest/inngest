@@ -1,18 +1,27 @@
 import { useState } from 'react';
 import { NewButton } from '@inngest/components/Button';
 import { NewLink } from '@inngest/components/Link';
-import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/types';
+import {
+  IntegrationSteps,
+  parseConnectionString,
+} from '@inngest/components/PostgresIntegrations/types';
 
-const verifyReplication = async (): Promise<boolean> => {
-  // TO DO: Replace with actual API call in production.
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(true);
-    }, 1000);
-  });
-};
-
-export default function NeonFormat({ onSuccess }: { onSuccess: () => void }) {
+export default function NeonFormat({
+  onSuccess,
+  savedCredentials,
+  verifyLogicalReplication,
+  handleLostCredentials,
+}: {
+  onSuccess: () => void;
+  handleLostCredentials: () => void;
+  savedCredentials?: string;
+  verifyLogicalReplication: (variables: {
+    adminConn: string;
+    engine: string;
+    name: string;
+    replicaConn?: string;
+  }) => Promise<{ success: boolean; error: string }>;
+}) {
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState<string>();
   const [isVerified, setIsVerified] = useState(false);
@@ -20,14 +29,27 @@ export default function NeonFormat({ onSuccess }: { onSuccess: () => void }) {
   const handleVerify = async () => {
     setIsVerifying(true);
     setError(undefined);
+    if (!savedCredentials) {
+      handleLostCredentials();
+      return;
+    }
+    const parsedInput = parseConnectionString(savedCredentials);
+
+    if (!parsedInput) {
+      setError('Invalid connection string format. Please check your input.');
+      setIsVerifying(false);
+      return;
+    }
+
     try {
-      const success = await verifyReplication();
+      const { success, error } = await verifyLogicalReplication(parsedInput);
       if (success) {
         setIsVerified(true);
         onSuccess();
       } else {
         setError(
-          'Could not verify credentials. Please check if everything is entered correctly and try again.'
+          error ||
+            'Could not verify credentials. Please check if everything is entered correctly and try again.'
         );
       }
     } catch (err) {

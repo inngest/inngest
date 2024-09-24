@@ -59,7 +59,7 @@ function StepMenuItem({
             : isActive
             ? isCompleted
               ? 'border-primary-moderate bg-primary-3xSubtle group-hover:bg-primary-moderate'
-              : 'border-contrast'
+              : 'border-contrast group-hover:bg-contrast'
             : isCompleted
             ? 'bg-primary-3xSubtle group-hover:bg-primary-moderate border-none'
             : 'border-muted group-hover:bg-contrast group-hover:border-none'

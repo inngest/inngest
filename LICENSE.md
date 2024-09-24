@@ -1,12 +1,14 @@
-                     Server Side Public License
-                     VERSION 1, OCTOBER 16, 2018
+# Server Side Public License, Version 1.0, Oct 16, 2018
+# Apache 2.0 Future License
 
-                    Copyright © 2022 Inngest, Inc.
+## Notice
+
+Copyright © 2022 Inngest, Inc.
 
 Everyone is permitted to copy and distribute verbatim copies of this
 license document, but changing it is not allowed.
 
-                       TERMS AND CONDITIONS
+## Terms and Conditions
 
 0. Definitions.
 
@@ -555,3 +557,23 @@ warranty or assumption of liability accompanies a copy of the Program in
 return for a fee.
 
                         END OF TERMS AND CONDITIONS
+
+## Grant of Future License
+
+We hereby irrevocably grant you an additional license to use the Software,
+under the Apache License, Version 2.0, that is effective on the third
+anniversary of the date we make the Software available. On or after that date,
+you may use the Software under the Apache License, Version 2.0, in which case
+the following will apply:
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License.
+
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.

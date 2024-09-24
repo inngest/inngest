@@ -1,166 +1,122 @@
-# [![Inngest](https://github.com/inngest/.github/raw/main/profile/github-readme-banner-2024-01-26.png)](https://www.inngest.com)
+# [![Inngest](https://github.com/inngest/.github/raw/main/profile/github-readme-banner-2024-09-23.png)](https://www.inngest.com)
 
 [![Latest release](https://img.shields.io/github/v/release/inngest/inngest?include_prereleases&sort=semver)](https://github.com/inngest/inngest/releases)
 [![Test Status](https://img.shields.io/github/actions/workflow/status/inngest/inngest/go.yaml?branch=main&label=tests)](https://github.com/inngest/inngest/actions?query=branch%3Amain)
 [![Discord](https://img.shields.io/discord/842170679536517141?label=discord)](https://www.inngest.com/discord)
 [![Twitter Follow](https://img.shields.io/twitter/follow/inngest?style=social)](https://twitter.com/inngest)
 
-[Inngest](https://www.inngest.com) is a developer platform that combines event streams, queues, and durable execution into a single reliability layer.
+[Inngest](https://www.inngest.com/?ref=github-inngest-readme)'s durable functions replace queues, state management, and scheduling to enable any developer to write reliable step functions faster without touching infrastructure.
 
-<div align="center">
-  <a href="https://www.inngest.com/uses/durable-workflows?ref=org-readme">
-    Durable workflows
-  </a>&nbsp;&nbsp;|&nbsp;&nbsp;
+1. Write durable functions using any of [**our language SDKs**](#sdks)
+2. Run the [**Inngest Dev Server**](#getting-started) for a complete local development experience, with production parity.
+3. Deploy your functions to your own infrastructure
+4. Sync your application's functions with the [**Inngest Platform**](https://www.inngest.com/?ref=github-inngest-readme) or a [self-hosted Inngest server](#self-hosting).
+5. Inngest invokes your functions securely via HTTPS whenever triggering events are received.
 
-  <a href="https://www.inngest.com/ai?ref=org-readme">
-    AI & LLM Chaining
-  </a>&nbsp;&nbsp;|&nbsp;&nbsp;
+### An example durable function
 
-  <a href="https://www.inngest.com/uses/serverless-queues?ref=org-readme">
-    Serverless Queues
-  </a>&nbsp;&nbsp;|&nbsp;&nbsp;
+Inngest Functions enable developers to run reliable background logic, from background jobs to complex workflows. An Inngest Function is composed of three key parts that provide robust support for retrying, scheduling, and coordinating complex sequences of operations:
 
-  <a href="https://www.inngest.com/uses/workflow-engine?ref=org-readme">
-    Workflow Engines
-  </a>
-</div>
-<br/>
+- [**Triggers**](https://www.inngest.com/docs/features/events-triggers?ref=github-inngest-readme) - Events, Cron schedules or webhook events that trigger the function.
+- [**Flow Control**](https://www.inngest.com/docs/guides/flow-control?ref=github-inngest-readme) - Configure how the function runs are enqueued and executed including concurrency, throttling, debouncing, rate limiting, and prioritization.
+- [**Steps**](/docs/features/inngest-functions/steps-workflows?ref=github-inngest-readme) - Steps are fundamental building blocks of Inngest, turning your Inngest Functions into reliable workflows that can runs for months and recover from failures.
 
-Build and ship durable functions and workflows **in your current codebase** without any additional infrastructure. Using Inngest, your entire team can ship reliable products.
+Here is an example function that limits concurrency for each unique user id and performs two steps that will be retried on error:
 
-- Write durable functions in your existing codebase using an [**Inngest SDK**](#sdks)
-- Run the open source [**Inngest Dev Server**](#the-inngest-dev-server) for a complete local development experience, with production parity.
-- The **Inngest Platform** invokes your code wherever you host it, via HTTPS. Deploy to your existing setup, and deliver products faster without managing infrastructure.
+```typescript
+export default inngest.createFunction(
+  {
+    id: "import-product-images",
+    concurrency: {
+      key: "event.data.userId",
+      limit: 10
+    }
+  },
+  { event: "shop/product.imported" },
+  async ({ event, step }) => {
+    // Here goes the business logic
+    // By wrapping code in steps, each will be retried automatically on failure
+    const s3Urls = await step.run("copy-images-to-s3", async () => {
+      return copyAllImagesToS3(event.data.imageURLs);
+    });
+    // You can include numerous steps in your function
+    await step.run("resize-images", async () => {
+      await resizer.bulk({ urls: s3Urls, quality: 0.9, maxWidth: 1024 });
+    })
+  };
+);
 
-**SDKs**: [TypeScript/JavaScript](https://github.com/inngest/inngest-js) &mdash; [Python](https://github.com/inngest/inngest-py) &mdash; [Go](https://github.com/inngest/inngestgo)
+// Elsewhere in your code (e.g. in your API endpoint):
+await inngest.send({
+  name: "shop/product.imported",
+  data: {
+    userId: "01J8G44701QYGE0DH65PZM8DPM",
+    imageURLs: [
+      "https://useruploads.acme.com/q2345678/1094.jpg",
+      "https://useruploads.acme.com/q2345678/1095.jpg"
+    ],
+  },
+});
+```
 
----
+## Learn more
 
-- [Overview](#overview)
-- [SDKs](#sdks)
 - [Getting started](#getting-started)
+- [SDKs](#sdks)
 - [Project Architecture](#project-architecture)
+- [Self-hosting](#self-hosting)
 - [Community](#community)
 
-<br />
+## Getting started
 
-#### The Inngest Dev Server
+Run the Inngest Dev Server using our CLI:
 
 ```
 npx inngest-cli@latest dev
 ```
 
-![Inngest Dev Server screenshot](https://www.inngest.com/assets/homepage/dev-server-screenshot.jpg)
+Open the Inngest Dev Server dashboard at http://localhost:8288:
 
-<br />
+![Screenshot of the Inngest dashboard served by the Inngest Dev Server](.github/assets/dashboard-screenshot-2024-09-23.png)
 
-## Overview
-
-Inngest makes it easy to develop durable functions and workflows in your existing codebase, without any new infrastructure. Inngest Functions are triggered via events &mdash; decoupling your code within your application.
-
-1. You define your Inngest functions using the [Inngest SDK](#sdks) and serve them through a [simple API endpoint](https://www.inngest.com/docs/sdk/serve?ref=github-inngest-readme).
-2. Inngest automatically invokes your functions via HTTPS whenever you send events from your application.
-
-Inngest abstracts the complex parts of building a robust, reliable, and scalable architecture away from you, so you can focus on building applications for your users.
-
-- **Run your code anywhere** - We call you via HTTPS so you can deploy your code to serverless, servers or the edge.
-- **Zero-infrastructure required** - No queues or workers to configure or manage &mdash; just write code and Inngest does the rest.
-- **Build complex workflows with simple primitives** - Our [SDKs](#sdks) provides easy to learn `step` tools like [`run`](https://www.inngest.com/docs/reference/functions/step-run?ref=github-inngest-readme), [`sleep`](https://www.inngest.com/docs/reference/functions/step-sleep?ref=github-inngest-readme), [`sleepUntil`](https://www.inngest.com/docs/reference/functions/step-sleep-until?ref=github-inngest-readme), and [`waitForEvent`](https://www.inngest.com/docs/reference/functions/step-wait-for-event?ref=github-inngest-readme) that you can combine using code and patterns that you're used to create complex and robust workflows.
-
-[Read more about our vision and why Inngest exists](https://www.inngest.com/blog/inngest-add-super-powers-to-serverless-functions)
-
----
+Follow our [Next.js](https://www.inngest.com/docs/getting-started/nextjs-quick-start?ref=github-inngest-readme) or [Python](https://www.inngest.com/docs/getting-started/python-quick-start?ref=github-inngest-readme) quick start guides.
 
 ## SDKs
 
-- **TypeScript / JavaScript** ([inngest-js](<(https://github.com/inngest/inngest-js)>)) - [Reference](https://www.inngest.com/docs/reference/typescript)
-- **Python** ([inngest-py](https://github.com/inngest/inngest-py)) - [Reference](https://www.inngest.com/docs/reference/python)
+- **TypeScript / JavaScript** ([inngest-js](https://github.com/inngest/inngest-js)) - [Reference](https://www.inngest.com/docs/reference/typescript?ref=github-inngest-readme)
+- **Python** ([inngest-py](https://github.com/inngest/inngest-py)) - [Reference](https://www.inngest.com/docs/reference/python?ref=github-inngest-readme)
 - **Go** ([inngestgo](https://github.com/inngest/inngestgo)) - [Reference](https://pkg.go.dev/github.com/inngest/inngestgo)
-
-## Getting started
-
-👉 [**Follow the full quick start guide here**](https://www.inngest.com/docs/quick-start?ref=github-inngest-readme)
-
-### A brief example
-
-Here is an example of an Inngest function that sends a welcome email when a user signs up to an application. The function sleeps for 4 days and sends a second product tips email:
-
-```ts
-import { Inngest } from 'inngest';
-
-const inngest = new Inngest({ id: 'my-app' });
-
-// This function will be invoked by Inngest via HTTP any time
-// the "app/user.signup" event is sent to to Inngest
-export default inngest.createFunction(
-  { id: 'user-onboarding-emails' },
-  { event: 'app/user.signup' },
-  async ({ event, step }) => {
-    await step.run('send-welcome-email', async () => {
-      await sendEmail({ email: event.data.email, template: 'welcome' });
-    });
-
-    await step.sleep('delay-follow-up-email', '7 days');
-
-    await step.run('send-tips-email', async () => {
-      await sendEmail({ email: event.data.email, template: 'product-tips' });
-    });
-  }
-);
-
-// Elsewhere in your code (e.g. in your sign up handler):
-await inngest.send({
-  name: 'app/user.signup',
-  data: {
-    email: 'test@example.com',
-  },
-});
-```
-
-Some things to highlight about the above code:
-
-- Code within each `step.run` is automatically retried on error.
-- Each `step.run` is individually executed via HTTPS ensuring errors do not result in lost work from previous steps.
-- State from previous steps is memoized so code within steps is not re-executed on retries.
-- Functions can `sleep` for hours, days, or months. Inngest stops execution and continues at the exactly the right time.
-- Events can trigger one or more functions via [fan-out](https://www.inngest.com/docs/guides/fan-out-jobs)
-
-Learn more about writing Inngest functions in [our documentation](https://www.inngest.com/docs).
-
-<br />
+- **Kotlin / Java** ([inngest-kt](https://github.com/inngest/inngest-kt))
 
 ## Project Architecture
 
-Fundamentally, there are two core pieces to Inngest: _events_ and _functions_. Functions have several subcomponents for managing complex functionality (eg. steps, edges, triggers), but high level an event triggers a function, much like you schedule a job via an RPC call to a queue. Except, in Inngest, **functions are declarative**. They specify which events they react to, their schedules and delays, and the steps in their sequence.
+To understand how self-hosting works, it's valuable to understand the architecture and system components at a high level. We'll take a look at a simplified architecture diagram and walk through the system.
 
 <br />
 
 <p align="center">
-  <img src=".github/assets/architecture-0.5.0.png" alt="Open Source Architecture" width="660" />
+  <img src=".github/assets/architecture-2024-09-23.png" alt="System Architecture" width="660" />
 </p>
 
-Inngest’s architecture is made up of 6 core components:
-
-- **Event API** receives events from clients through a simple POST request, pushing them to the **message queue**.
-- **Event Stream** acts as a buffer between the **API** and the **Runner**, buffering incoming messages to ensure QoS before passing messages to be executed.<br />
-- A **Runner** coordinates the execution of functions and a specific run’s **State**. When a new function execution is required, this schedules running the function’s steps from the trigger via the **executor.** Upon each step’s completion, this schedules execution of subsequent steps via iterating through the function’s **Edges.**
-- **Executor** manages executing the individual steps of a function, via _drivers_ for each step’s runtime. It loads the specific code to execute via the **DataStore.** It also interfaces over the **State** store to save action data as each finishes or fails.
-  - **Drivers** run the specific action code for a step, e.g. within Docker or WASM. This allows us to support a variety of runtimes.
-- **State** stores data about events and given function runs, including the outputs and errors of individual actions, and what’s enqueued for the future.
-- **DataStore** stores persisted system data including Functions and Actions version metadata.
-- **Core API** is the main interface for writing to the DataStore. The CLI uses this to deploy new functions and manage other key resources.
-
-And, in this CLI:
-
-- The **DevServer** combines all the components and basic drivers for each into a single system which reads all functions from your application running on your machine, handles incoming events via the API and executes functions, all returning a readable output to the developer.
-
-For specific information on how the DevServer works and how it compares to production [read this doc](/docs/DEVSERVER_ARCHITECTURE.md).
+- **Event API** - Receives events from SDKs via HTTP requests. Authenticates client requests via [Event Keys](https://www.inngest.com/docs/events/creating-an-event-key?ref=github-inngest-readme). The Event API publishes event payloads to an internal event stream.
+- **Event stream** - Acts as buffer between the _Event API_ and the _Runner_.
+- **Runner** - Consumes incoming events and performs several actions:
+  - Scheduling of new “function runs” (aka jobs) given the event type, creating initial run state in the _State store_ database. Runs are added to queues given the function's flow control configuration.
+  - Resume functions paused via [`waitForEvent`](https://www.inngest.com/docs/features/inngest-functions/steps-workflows/wait-for-event?ref=github-inngest-readme) with matching expressions.
+  - Cancels running functions with matching [`cancelOn`](https://www.inngest.com/docs/features/inngest-functions/cancellation/cancel-on-events?ref=github-inngest-readme) expressions
+  - Writes ingested events to a database for historical record and future replay.
+- **Queue** - A multi-tenant aware, multi-tier queue designed for fairness and various [flow control](https://www.inngest.com/docs/guides/flow-control?ref=github-inngest-readme) methods (concurrency, throttling, prioritization, debouncing, rate limiting) and [batching](https://www.inngest.com/docs/guides/batching?ref=github-inngest-readme).
+- **Executor** - Responsible for executing functions, from initial execution, step execution, writing incremental function run state to the _State store_, and retries after failures.
+- **State store (database)** - Persists data for pending and ongoing function runs. Data includes initial triggering event(s), step output and step errors.
+- **Database** - Persists system data and history including Apps, Functions, Events, Function run results.
+- **API** - GraphQL and REST APIs for programmatic access and management of system resources.
+- **Dashboard UI** - The UI to manage apps, functions and view function run history.
 
 <br />
 
 ## Community
 
-- [**Join our online community for support, to give us feedback, or chat with us**](https://www.inngest.com/discord).
+- [**Join our Discord community for support, to give us feedback, or chat with us**](https://www.inngest.com/discord).
 - [Post a question or idea to our GitHub discussion board](https://github.com/orgs/inngest/discussions)
 - [Read the documentation](https://www.inngest.com/docs?ref=github-inngest-readme)
 - [Explore our public roadmap](http://roadmap.inngest.com/)
@@ -169,9 +125,16 @@ For specific information on how the DevServer works and how it compares to produ
 
 ## Contributing
 
-We’re excited to embrace the community! We’re happy for any and all contributions, whether they’re
-feature requests, ideas, bug reports, or PRs. While we’re open source, we don’t have expectations
-that people do our work for us — so any contributions are indeed very much appreciated. Feel free to
-hack on anything and submit a PR.
+We embrace contributions in many forms, including documentation, typos, bug reports or fixes. Check out our [contributing guide](/docs/CONTRIBUTING.md) to get started. Each of our open source [SDKs](#sdks) are open to contributions as well.
 
-Check out our [contributing guide](/docs/CONTRIBUTING.md) to get started.
+Additionally, Inngest's website documentation is available for contribution in [the `inngest/website` repo](https://github.com/inngest/website).
+
+## Self-hosting
+
+Self-hosting the Inngest server is possible and easy to get started with. Learn more about self-hosting Inngest in [our docs guide](https://www.inngest.com/docs/self-hosting?ref=github-inngest-readme).
+
+## License
+
+The Inngest server and CLI are available under the Server Side Public License and delayed open source publication (DOSP) under Apache 2.0. [View the license here](/LICENSE.md).
+
+All Inngest [SDKs](#sdks) are all available under the Apache 2.0 license.

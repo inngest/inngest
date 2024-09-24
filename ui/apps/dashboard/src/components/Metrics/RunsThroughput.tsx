@@ -3,7 +3,7 @@ import { NewLink } from '@inngest/components/Link/Link';
 
 export const RunsThrougput = () => {
   return (
-    <div className="bg-canvasBase border-subtle overflow-x-hidden relative flex h-[300px] w-full flex-col rounded-lg p-5">
+    <div className="bg-canvasBase border-subtle relative flex h-[300px] w-full flex-col overflow-x-hidden rounded-lg p-5">
       <div className="mb-2 flex flex-row items-center justify-between">
         <div className="text-subtle flex w-full flex-row items-center gap-x-2 text-lg">
           Total runs throughput{' '}
