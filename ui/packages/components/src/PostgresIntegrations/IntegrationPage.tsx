@@ -10,9 +10,13 @@ export default function IntegrationPage({
   publications,
 }: {
   content: IntegrationPageContent;
+  // TO DO: change this format
   publications: {
-    isActive: boolean;
+    id: string;
     name: string;
+    slug: string;
+    projects: [];
+    enabled: boolean;
   }[];
 }) {
   return (
@@ -37,14 +41,14 @@ export default function IntegrationPage({
           key={`${content.title}-publications-${i}`}
           className="my-9"
           accentPosition="left"
-          accentColor={p.isActive ? 'bg-primary-intense' : 'bg-disabled'}
+          accentColor={p.enabled ? 'bg-primary-intense' : 'bg-disabled'}
         >
           <Card.Content className="p-6">
             <div className="flex flex-row items-center justify-between">
               <div className="flex flex-col">
                 <div>
-                  <Pill appearance="solid" kind={p.isActive ? 'primary' : 'default'}>
-                    {p.isActive ? 'Active' : 'Disabled'}
+                  <Pill appearance="solid" kind={p.enabled ? 'primary' : 'default'}>
+                    {p.enabled ? 'Active' : 'Disabled'}
                   </Pill>
                 </div>
                 <div className="mt-4 flex flex-row items-center justify-start">
