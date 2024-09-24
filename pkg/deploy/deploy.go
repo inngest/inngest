@@ -73,6 +73,7 @@ func Ping(ctx context.Context, url string, serverKind string, signingKey string,
 			IsSDK: isSDK,
 		}
 	}
+	req.Header.Set("content-type", "application/json")
 	req.Header.Set(headers.HeaderKeyServerKind, serverKind)
 
 	if signingKey != "" {
