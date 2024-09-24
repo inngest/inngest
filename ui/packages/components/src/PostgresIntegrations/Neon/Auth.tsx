@@ -2,24 +2,25 @@ import { useEffect, useState } from 'react';
 import { NewButton } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
 import { NewLink } from '@inngest/components/Link';
-import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/types';
+import {
+  IntegrationSteps,
+  parseConnectionString,
+} from '@inngest/components/PostgresIntegrations/types';
 import { cn } from '@inngest/components/utils/classNames';
-
-const verifyCredentials = async (credentials: string): Promise<boolean> => {
-  // TO DO: Replace with actual API call in production.
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(credentials.startsWith('postgresql://'));
-    }, 1000);
-  });
-};
 
 export default function NeonAuth({
   onSuccess,
   savedCredentials,
+  verifyCredentials,
 }: {
   onSuccess: (value: string) => void;
   savedCredentials?: string;
+  verifyCredentials: (variables: {
+    adminConn: string;
+    engine: string;
+    name: string;
+    replicaConn?: string;
+  }) => Promise<{ success: boolean; error: string }>;
 }) {
   const [inputValue, setInputValue] = useState(savedCredentials || '');
   const [isVerifying, setIsVerifying] = useState(false);
@@ -36,14 +37,24 @@ export default function NeonAuth({
   const handleVerify = async () => {
     setIsVerifying(true);
     setError(undefined);
+
+    const parsedInput = parseConnectionString(inputValue);
+
+    if (!parsedInput) {
+      setError('Invalid connection string format. Please check your input.');
+      setIsVerifying(false);
+      return;
+    }
+
     try {
-      const success = await verifyCredentials(inputValue);
+      const { success, error } = await verifyCredentials(parsedInput);
       if (success) {
         setIsVerified(true);
         onSuccess(inputValue);
       } else {
         setError(
-          'Could not verify credentials. Please check if everything is entered correctly and try again.'
+          error ||
+            'Could not verify credentials. Please check if everything is entered correctly and try again.'
         );
       }
     } catch (err) {
