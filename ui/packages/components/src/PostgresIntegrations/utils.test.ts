@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 import { parseConnectionString } from './utils';
 
@@ -14,6 +14,13 @@ describe('parseConnectionString', (t) => {
       engine: 'postgresql',
       adminConn: connectionString,
     });
+  });
+
+  it('test invalid connection string', () => {
+    const connectionString = 'https://user:password@host.com/db';
+    const parsed = parseConnectionString(connectionString);
+
+    assert.equal(parsed, null);
   });
 
   it('test alternate protocol and domains', () => {
