@@ -100,6 +100,7 @@ const documents = {
     "\n  query MetricsLookups($envSlug: String!) {\n    envBySlug(slug: $envSlug) {\n      apps {\n        externalID\n        id\n        name\n      }\n      workflows {\n        data {\n          name\n          id\n        }\n      }\n    }\n  }\n": types.MetricsLookupsDocument,
     "\n  query GetGlobalSearch($opts: SearchInput!) {\n    account {\n      search(opts: $opts) {\n        results {\n          env {\n            name\n            id\n            type\n            slug\n          }\n          kind\n          value {\n            ... on ArchivedEvent {\n              id\n              name\n            }\n            ... on FunctionRun {\n              id\n              functionID: workflowID\n            }\n          }\n        }\n      }\n    }\n  }\n": types.GetGlobalSearchDocument,
     "\n  query GetFunctionSlug($environmentID: ID!, $functionID: ID!) {\n    environment: workspace(id: $environmentID) {\n      function: workflow(id: $functionID) {\n        slug\n        name\n      }\n    }\n  }\n": types.GetFunctionSlugDocument,
+    "\n  query getPostgresIntegrations($envID: ID!) {\n    environment: workspace(id: $envID) {\n      cdcConnections {\n        id\n        name\n        status\n        statusDetail\n        description\n      }\n    }\n  }\n": types.GetPostgresIntegrationsDocument,
     "\n  mutation testCredentials($input: CDCConnectionInput!, $envID: UUID!) {\n    cdcTestCredentials(input: $input, envID: $envID) {\n      steps\n      error\n    }\n  }\n": types.TestCredentialsDocument,
     "\n  mutation testReplication($input: CDCConnectionInput!, $envID: UUID!) {\n    cdcTestLogicalReplication(input: $input, envID: $envID) {\n      steps\n      error\n    }\n  }\n": types.TestReplicationDocument,
     "\n  mutation testAutoSetup($input: CDCConnectionInput!, $envID: UUID!) {\n    cdcAutoSetup(input: $input, envID: $envID) {\n      steps\n      error\n    }\n  }\n": types.TestAutoSetupDocument,
@@ -487,6 +488,10 @@ export function graphql(source: "\n  query GetGlobalSearch($opts: SearchInput!) 
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query GetFunctionSlug($environmentID: ID!, $functionID: ID!) {\n    environment: workspace(id: $environmentID) {\n      function: workflow(id: $functionID) {\n        slug\n        name\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetFunctionSlug($environmentID: ID!, $functionID: ID!) {\n    environment: workspace(id: $environmentID) {\n      function: workflow(id: $functionID) {\n        slug\n        name\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query getPostgresIntegrations($envID: ID!) {\n    environment: workspace(id: $envID) {\n      cdcConnections {\n        id\n        name\n        status\n        statusDetail\n        description\n      }\n    }\n  }\n"): (typeof documents)["\n  query getPostgresIntegrations($envID: ID!) {\n    environment: workspace(id: $envID) {\n      cdcConnections {\n        id\n        name\n        status\n        statusDetail\n        description\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
