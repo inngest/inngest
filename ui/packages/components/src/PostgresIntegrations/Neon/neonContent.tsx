@@ -10,7 +10,7 @@ import {
 export const neonConnectContent: ConnectPostgresIntegrationContent = {
   title: 'Neon',
   logo: <IconNeon className="text-onContrast" size={20} />,
-  url: 'https://www.inngest.com/docs/features/events-triggers/neon?ref=app-connect',
+  url: 'https://www.inngest.com/docs/features/events-triggers/neon?ref=app-neon-connect',
   description:
     'This integration enables you to trigger Inngest functions from your Neon Postgres database updates.',
   step: {
@@ -53,5 +53,5 @@ export const neonMenuStepContent: PostgresIntegrationMenuContent = {
 export const neonIntegrationPageContent: IntegrationPageContent = {
   title: 'Neon',
   logo: <IconNeon className="text-onContrast" size={24} />,
-  url: 'https://www.inngest.com/docs/features/events-triggers/neon?ref=app-integration-page',
+  url: 'https://www.inngest.com/docs/features/events-triggers/neon?ref=app-neon-integration-page',
 };
