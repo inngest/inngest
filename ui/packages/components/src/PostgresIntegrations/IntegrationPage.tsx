@@ -41,7 +41,7 @@ export default function IntegrationPage({
           key={`${content.title}-publications-${i}`}
           className="my-9"
           accentPosition="left"
-          accentColor={p.enabled ? 'bg-primary-intense' : 'bg-disabled'}
+          accentColor={p.enabled ? 'bg-primary-intense' : 'bg-surfaceMuted'}
         >
           <Card.Content className="p-6">
             <div className="flex flex-row items-center justify-between">

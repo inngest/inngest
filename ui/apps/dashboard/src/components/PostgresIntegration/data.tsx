@@ -32,7 +32,7 @@ export const PostgresIntegrations = async () => {
       name: integration.name,
       slug: 'neon',
       projects: [],
-      enabled: integration.status === 'RUNNING',
+      enabled: integration.status === 'RUNNING' || integration.status === 'SETUP_COMPLETE',
     }));
   } catch (error) {
     return [];
