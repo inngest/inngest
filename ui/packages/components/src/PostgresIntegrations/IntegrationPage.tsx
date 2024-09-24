@@ -60,14 +60,13 @@ export default function IntegrationPage({
         </Card>
       ))}
 
-      <div className="border-muted border-t py-7">
+      {/* <div className="border-muted border-t py-7">
         <p>Remove {content.title} integration</p>
         <p className="text-subtle mb-6 mt-3 text-sm">
           Permanently remove the {content.title} integration from Inngest
         </p>
-        {/* TO DO: Wire button */}
         <NewButton appearance="solid" kind="danger" label={`Remove ${content.title}`} />
-      </div>
+      </div> */}
     </div>
   );
 }
