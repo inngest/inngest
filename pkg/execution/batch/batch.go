@@ -35,7 +35,7 @@ type BatchManager interface {
 	RetrieveItems(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID) ([]BatchItem, error)
 	StartExecution(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID, batchPointer string) (string, error)
 	ScheduleExecution(ctx context.Context, opts ScheduleBatchOpts) error
-	ExpireKeys(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID) error
+	DeleteKeys(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID) error
 }
 
 // BatchItem represents the item that are being batched.

@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/api/apiv1"
 	"github.com/inngest/inngest/pkg/config"
 	_ "github.com/inngest/inngest/pkg/config/defaults"
+	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs"
@@ -37,6 +38,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/run"
@@ -59,7 +61,15 @@ type StartOpts struct {
 	URLs          []string      `json:"urls"`
 	Tick          time.Duration `json:"tick"`
 	RetryInterval int           `json:"retry_interval"`
-	SQLiteDir     string        `json:"sqlite-dir"`
+
+	// SigningKey is used to decide that the server should sign requests and
+	// validate responses where applicable, modelling cloud behaviour.
+	SigningKey string `json:"signing_key"`
+	SQLiteDir  string `json:"sqlite-dir"`
+
+	// EventKey is used to authorize incoming events, ensuring they match the
+	// given key.
+	EventKey []string `json:"event_key"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -71,6 +81,12 @@ func New(ctx context.Context, opts StartOpts) error {
 	// The dev server _always_ logs output for development.
 	if !opts.Config.Execution.LogOutput {
 		opts.Config.Execution.LogOutput = true
+	}
+
+	// Ensure that if we've been given a signing key, that cloud mode is
+	// enabled appropriately in config.
+	if opts.SigningKey != "" {
+		opts.Config.ServerKind = headers.ServerKindCloud
 	}
 
 	// NOTE: looks deprecated?
@@ -106,12 +122,12 @@ func start(ctx context.Context, opts StartOpts) error {
 	stepLimitOverrides := make(map[string]int)
 	stateSizeLimitOverrides := make(map[string]int)
 
-	shardedRc, err := connectToOrCreateRedis(ctx, opts.RedisURI)
+	shardedRc, err := connectToOrCreateRedis(opts.RedisURI)
 	if err != nil {
 		return err
 	}
 
-	unshardedRc, err := connectToOrCreateRedis(ctx, opts.RedisURI)
+	unshardedRc, err := connectToOrCreateRedis(opts.RedisURI)
 	if err != nil {
 		return err
 	}
@@ -210,9 +226,17 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
 
+	var sk *string
+	if opts.SigningKey != "" {
+		sk = &opts.SigningKey
+	}
+
 	var drivers = []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
-		d, err := driverConfig.NewDriver()
+		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
+			RequireLocalSigningKey: true,
+			LocalSigningKey:        sk,
+		})
 		if err != nil {
 			return err
 		}
@@ -262,7 +286,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			return consts.DefaultMaxStateSizeLimit
 		}),
 		executor.WithInvokeFailHandler(getInvokeFailHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
-		executor.WithSendingEventHandler(getSendingEventHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
+		executor.WithSendingEventHandler(getSendingEventHandler(pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithDebouncer(debouncer),
 		executor.WithBatcher(batcher),
 	)
@@ -307,10 +331,13 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	dsOpts := devserver.StartOpts{
-		Config:  opts.Config,
-		RootDir: opts.RootDir,
-		URLs:    opts.URLs,
-		Tick:    tick,
+		Config:      opts.Config,
+		RootDir:     opts.RootDir,
+		URLs:        opts.URLs,
+		Tick:        tick,
+		SigningKey:  sk,
+		EventKeys:   opts.EventKey,
+		RequireKeys: true,
 	}
 
 	if opts.PollInterval > 0 {
@@ -348,39 +375,45 @@ func start(ctx context.Context, opts StartOpts) error {
 	})
 
 	core, err := coreapi.NewCoreApi(coreapi.Options{
-		Data:          ds.Data,
-		Config:        ds.Opts.Config,
-		Logger:        logger.From(ctx),
-		Runner:        ds.Runner,
-		Tracker:       ds.Tracker,
-		State:         ds.State,
-		Queue:         ds.Queue,
-		EventHandler:  ds.HandleEvent,
-		Executor:      ds.Executor,
-		HistoryReader: hr,
+		Data:            ds.Data,
+		Config:          ds.Opts.Config,
+		Logger:          logger.From(ctx),
+		Runner:          ds.Runner,
+		Tracker:         ds.Tracker,
+		State:           ds.State,
+		Queue:           ds.Queue,
+		EventHandler:    ds.HandleEvent,
+		Executor:        ds.Executor,
+		HistoryReader:   hr,
+		LocalSigningKey: opts.SigningKey,
+		RequireKeys:     true,
 	})
 	if err != nil {
 		return err
 	}
+
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
 	// server UI, events, and API for loading data.
 	//
 	// Merge the dev server API (for handling files & registration) with the data
 	// API into the event API router.
-	ds.Apiservice = api.NewService(
-		ds.Opts.Config,
-		api.Mount{At: "/", Router: devAPI},
-		api.Mount{At: "/v0", Router: core.Router},
-		api.Mount{At: "/debug", Handler: middleware.Profiler()},
-	)
+	ds.Apiservice = api.NewService(api.APIServiceOptions{
+		Config: ds.Opts.Config,
+		Mounts: []api.Mount{
+			{At: "/", Router: devAPI},
+			{At: "/v0", Router: core.Router},
+			{At: "/debug", Handler: middleware.Profiler()},
+		},
+		LocalEventKeys: opts.EventKey,
+	})
 
 	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice)
 }
 
-func connectToOrCreateRedis(ctx context.Context, redisURI string) (rueidis.Client, error) {
+func connectToOrCreateRedis(redisURI string) (rueidis.Client, error) {
 	if redisURI == "" {
-		return createInmemoryRedisConnection(ctx)
+		return createInmemoryRedisConnection()
 	}
 
 	url := redisURI
@@ -404,7 +437,7 @@ func connectToOrCreateRedis(ctx context.Context, redisURI string) (rueidis.Clien
 
 // createInMemoryRedisConnection creates a new connection to the in-memory Redis
 // server. If the server is not yet running, it will start one.
-func createInmemoryRedisConnection(ctx context.Context) (rueidis.Client, error) {
+func createInmemoryRedisConnection() (rueidis.Client, error) {
 	if redisSingleton == nil {
 		redisSingleton = miniredis.NewMiniRedis()
 		err := redisSingleton.Start()
@@ -433,7 +466,7 @@ func createInmemoryRedisConnection(ctx context.Context) (rueidis.Client, error) 
 	return rc, nil
 }
 
-func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
+func getSendingEventHandler(pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
 	return func(ctx context.Context, evt event.Event, item queue.Item) error {
 		trackedEvent := event.NewOSSTrackedEvent(evt)
 		byt, err := json.Marshal(trackedEvent)

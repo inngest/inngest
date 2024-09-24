@@ -14,6 +14,7 @@ import type VercelIntegration from './vercel/VercelIntegration';
 
 type Integration = {
   title: string;
+  slug: string;
   Icon: ReactNode;
   actionButton: (enabled: boolean, loading?: boolean) => ReactNode;
   description: string;
@@ -23,6 +24,7 @@ type Integration = {
 const INTEGRATIONS: Integration[] = [
   {
     title: 'Vercel',
+    slug: 'vercel',
     Icon: <IconVercel className="text-onContrast h-6 w-6" />,
     actionButton: (enabled, loading) => (
       <NewButton
@@ -40,6 +42,7 @@ const INTEGRATIONS: Integration[] = [
   },
   {
     title: 'Neon',
+    slug: 'neon',
     Icon: <IconNeon className="text-onContrast h-6 w-6" />,
     actionButton: (enabled, loading) => (
       <NewButton
@@ -56,6 +59,7 @@ const INTEGRATIONS: Integration[] = [
   },
   {
     title: 'Netlify',
+    slug: 'netlify',
     Icon: <IconNetlify className="text-onContrast h-6 w-6" />,
     actionButton: () => (
       <NewButton
@@ -73,6 +77,7 @@ const INTEGRATIONS: Integration[] = [
   },
   {
     title: 'Datadog',
+    slug: 'datadog',
     Icon: <IconDatadog className="text-onContrast h-6 w-6" />,
     actionButton: () => (
       <NewButton
@@ -90,14 +95,24 @@ const INTEGRATIONS: Integration[] = [
   },
 ];
 
-export default function IntegrationsList({ integration }: { integration: VercelIntegration }) {
+export default function IntegrationsList({ integrations }: { integrations: VercelIntegration[] }) {
   const { value: postgressIntegration } = useBooleanFlag('postgres-integration');
+  const getIntegrationData = (slug: string) =>
+    integrations.find((integration) => integration.slug === slug);
+
   return (
     <div className="mx-auto mt-16 flex w-[800px] flex-col">
       <div className="mb-7 w-full text-2xl font-medium">All integrations</div>
       <div className="grid w-[800px] grid-cols-2 gap-6">
         {INTEGRATIONS.map((i: Integration, n) => {
           if (i.title === 'Neon' && !postgressIntegration) return;
+
+          const integrationData = getIntegrationData(i.slug);
+          const isEnabled =
+            i.slug === 'vercel'
+              ? Boolean(integrationData?.enabled && integrationData.projects.length > 0)
+              : integrationData?.enabled ?? false;
+
           return (
             <Card key={`integration-card-${n}`}>
               <div className="flex h-[189px] w-[388px] flex-col p-6">
@@ -105,11 +120,7 @@ export default function IntegrationsList({ integration }: { integration: VercelI
                   <div className="bg-contrast flex h-12 w-12 items-center justify-center rounded">
                     {i.Icon}
                   </div>
-                  {i.actionButton(
-                    i.title === 'Vercel'
-                      ? integration.enabled && integration.projects.length > 0
-                      : false
-                  )}
+                  {i.actionButton(isEnabled)}
                 </div>
                 <div className="text-basis mt-[18px] text-lg font-medium">{i.title}</div>
                 <div className="text-muted mt-2 text-sm leading-tight">{i.description}</div>

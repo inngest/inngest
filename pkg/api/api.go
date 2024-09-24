@@ -31,16 +31,29 @@ type Options struct {
 
 	EventHandler EventHandler
 	Logger       *zerolog.Logger
+
+	// LocalEventKeys are the keys used to send events to the local event API
+	// from an app. If this is set, only keys that match one of these values
+	// will be accepted.
+	LocalEventKeys []string
+
+	// RequireKeys defines whether event and signing keys are required for the
+	// server to function. If this is true and signing keys are not defined,
+	// the server will still boot but core actions such as syncing, runs, and
+	// ingesting events will not work.
+	RequireKeys bool
 }
 
 func NewAPI(o Options) (chi.Router, error) {
 	logger := o.Logger.With().Str("caller", "api").Logger()
 
 	api := &API{
-		Router:  chi.NewMux(),
-		config:  o.Config,
-		handler: o.EventHandler,
-		log:     &logger,
+		Router:         chi.NewMux(),
+		config:         o.Config,
+		handler:        o.EventHandler,
+		log:            &logger,
+		localEventKeys: o.LocalEventKeys,
+		requireKeys:    o.RequireKeys,
 	}
 
 	cors := cors.New(cors.Options{
@@ -52,7 +65,7 @@ func NewAPI(o Options) (chi.Router, error) {
 		MaxAge:           60 * 60, // 1 hour
 	})
 	api.Use(cors.Handler)
-	api.Use(headers.StaticHeadersMiddleware(headers.ServerKindDev))
+	api.Use(headers.StaticHeadersMiddleware(o.Config.GetServerKind()))
 
 	api.Get("/health", api.HealthCheck)
 	api.Post("/e/{key}", api.ReceiveEvent)
@@ -70,6 +83,17 @@ type API struct {
 	log     *zerolog.Logger
 
 	server *http.Server
+
+	// localEventKeys are the keys used to send events to the local event API
+	// from an app. If this is set, only keys that match one of these values
+	// will be accepted.
+	localEventKeys []string
+
+	// requireKeys defines whether event and signing keys are required for the
+	// server to function. If this is true and signing keys are not defined,
+	// the server will still boot but core actions such as syncing, runs, and
+	// ingesting events will not work.
+	requireKeys bool
 }
 
 func (a *API) AddRoutes() {
@@ -116,6 +140,15 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	defer r.Body.Close()
 
+	// If self hosting and keys are not defined, error.
+	if a.requireKeys && len(a.localEventKeys) == 0 {
+		a.writeResponse(w, apiResponse{
+			StatusCode: http.StatusServiceUnavailable,
+			Error:      "Event keys are required to ingest events securely",
+		})
+		return
+	}
+
 	key := chi.URLParam(r, "key")
 	if key == "" {
 		a.writeResponse(w, apiResponse{
@@ -124,6 +157,24 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		})
 
 		return
+	}
+
+	if len(a.localEventKeys) > 0 {
+		var found bool
+		for _, k := range a.localEventKeys {
+			if k == key {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			a.writeResponse(w, apiResponse{
+				StatusCode: http.StatusUnauthorized,
+				Error:      "Event key not found",
+			})
+			return
+		}
 	}
 
 	ctx, cancel := context.WithCancel(ctx)

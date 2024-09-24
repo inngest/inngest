@@ -62,8 +62,9 @@ type HTTPDoer interface {
 }
 
 type executor struct {
-	Client     *http.Client
-	signingKey []byte
+	Client                 *http.Client
+	localSigningKey        []byte
+	requireLocalSigningKey bool
 }
 
 // RuntimeType fulfiils the inngest.Runtime interface.
@@ -72,6 +73,10 @@ func (e executor) RuntimeType() string {
 }
 
 func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadata, item queue.Item, edge inngest.Edge, step inngest.Step, idx, attempt int) (*state.DriverResponse, error) {
+	if e.requireLocalSigningKey && len(e.localSigningKey) == 0 {
+		return nil, fmt.Errorf("server requires that a signing key is set to run functions")
+	}
+
 	uri, err := url.Parse(step.URI)
 	if err != nil {
 		return nil, err
@@ -83,7 +88,7 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 	}
 
 	return DoRequest(ctx, e.Client, Request{
-		SigningKey: e.signingKey,
+		SigningKey: e.localSigningKey,
 		URL:        *uri,
 		Input:      input,
 		Edge:       edge,
