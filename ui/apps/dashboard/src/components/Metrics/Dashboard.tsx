@@ -22,10 +22,24 @@ import { useQuery } from 'urql';
 import { GetBillingPlanDocument } from '@/gql/graphql';
 import { MetricsOverview } from './Overview';
 import { MetricsVolume } from './Volume';
+import { convertLookup } from './utils';
 
 export type EntityType = {
   id: string;
   name: string;
+  slug?: string;
+};
+
+export type EntityLookup = { [id: string]: EntityType };
+
+export type MetricsFilters = {
+  from: Date;
+  until?: Date;
+  selectedApps?: string[];
+  selectedFns?: string[];
+  autoRefresh?: boolean;
+  entities: EntityLookup;
+  functions: EntityLookup;
 };
 
 export const DEFAULT_DURATION = { hours: 24 };
@@ -71,6 +85,11 @@ export const Dashboard = ({
   const logRetention = Number(planData?.account.plan?.features.log_retention);
   const upgradeCutoff = subtractDuration(new Date(), { days: logRetention || 7 });
 
+  const envLookup = !selectedApps?.length && !selectedFns?.length;
+  const mappedFunctions = convertLookup(functions);
+  const mappedApps = convertLookup(apps);
+  const mappedEntities = envLookup ? mappedApps : mappedFunctions;
+
   return (
     <div className="flex h-full w-full flex-col">
       <div className="bg-canvasBase flex h-16 w-full flex-row items-center justify-between px-3 py-5">
@@ -108,18 +127,26 @@ export const Dashboard = ({
           />
         </div>
       </div>
-      <div className="px-6">
+      <div className="bg-canvasSubtle px-6">
         <MetricsOverview
           from={getFrom(parsedStart, parsedDuration)}
           until={parsedEnd}
           selectedApps={selectedApps}
           selectedFns={selectedFns}
           autoRefresh={autoRefresh}
-          functions={functions}
+          entities={mappedEntities}
+          functions={mappedFunctions}
         />
       </div>
-      <div className="px-6">
-        <MetricsVolume />
+      <div className="bg-canvasSubtle px-6 pb-6">
+        <MetricsVolume
+          from={getFrom(parsedStart, parsedDuration)}
+          until={parsedEnd}
+          selectedApps={selectedApps}
+          selectedFns={selectedFns}
+          autoRefresh={autoRefresh}
+          entities={mappedEntities}
+        />
       </div>
     </div>
   );

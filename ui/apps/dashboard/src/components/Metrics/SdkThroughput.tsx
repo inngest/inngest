@@ -6,26 +6,29 @@ import type { VolumeMetricsQuery } from '@/gql/graphql';
 import type { EntityLookup } from './Dashboard';
 import { getLineChartOptions, mapEntityLines } from './utils';
 
-export const StepsThroughput = ({
+export type SdkThroughputMetricsType = VolumeMetricsQuery['workspace']['sdkThroughput']['metrics'];
+
+export const SdkThroughput = ({
   workspace,
   entities,
 }: Partial<VolumeMetricsQuery> & { entities: EntityLookup }) => {
-  const metrics = workspace && mapEntityLines(workspace.stepThroughput.metrics, entities);
+  const metrics =
+    workspace && mapEntityLines(workspace.sdkThroughput.metrics, entities, { opacity: 0.1 });
 
   return (
-    <div className="bg-canvasBase border-subtle relative flex h-[300px] w-full flex-col overflow-x-hidden rounded-lg p-5">
-      <div className="mb-2 flex flex-row items-center justify-between">
+    <div className="bg-canvasBase border-subtle relative flex h-[300px] w-full flex-col overflow-x-hidden rounded-lg p-5 md:w-[75%]">
+      <div className="mb-2 flex w-full flex-row items-center justify-between p-0">
         <div className="text-subtle flex w-full flex-row items-center gap-x-2 text-lg">
-          Total steps throughput{' '}
+          SDK request throughput{' '}
           <Info
-            text="Total number of steps processed your env, app or function."
+            text="Total number of requests to Inngest SDKs from functions in your apps."
             action={
               <NewLink
                 arrowOnHover
                 className="text-sm"
-                href="https://www.inngest.com/docs/features/inngest-functions/steps-workflows"
+                href="https://www.inngest.com/docs/sdk/overview"
               >
-                Learn more about step throughput.
+                Learn more about SDK throughput.
               </NewLink>
             }
           />

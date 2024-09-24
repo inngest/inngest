@@ -1,8 +1,18 @@
 import { useState } from 'react';
+import { Error } from '@inngest/components/Error/Error';
 import { RiArrowDownSFill, RiArrowRightSFill } from '@remixicon/react';
 
-import type { EntityType } from './Dashboard';
+import { graphql } from '@/gql';
+import { MetricsScope } from '@/gql/graphql';
+import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useEnvironment } from '../Environments/environment-context';
+import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
+import { Backlog } from './Backlog';
+import { AccountConcurrency } from './Concurrency';
+import type { EntityLookup } from './Dashboard';
+import { Feedback } from './Feedback';
 import { RunsThrougput } from './RunsThroughput';
+import { SdkThroughput } from './SdkThroughput';
 import { StepsThroughput } from './StepsThroughput';
 
 export type MetricsFilters = {
@@ -11,14 +21,184 @@ export type MetricsFilters = {
   selectedApps?: string[];
   selectedFns?: string[];
   autoRefresh?: boolean;
-  functions: EntityType[];
+  entities: EntityLookup;
 };
 
-export const MetricsVolume = () => {
+const GetVolumeMetrics = graphql(`
+  query VolumeMetrics(
+    $workspaceId: ID!
+    $from: Time!
+    $functionIDs: [UUID!]
+    $appIDs: [UUID!]
+    $until: Time
+    $scope: MetricsScope!
+  ) {
+    workspace(id: $workspaceId) {
+      runsThroughput: scopedMetrics(
+        filter: {
+          name: "function_run_ended_total"
+          scope: $scope
+          from: $from
+          functionIDs: $functionIDs
+          appIDs: $appIDs
+          until: $until
+        }
+      ) {
+        metrics {
+          id
+          tagName
+          tagValue
+          data {
+            value
+            bucket
+          }
+        }
+      }
+    }
+    workspace(id: $workspaceId) {
+      sdkThroughput: scopedMetrics(
+        filter: {
+          name: "sdk_req_ended_total"
+          scope: $scope
+          from: $from
+          functionIDs: $functionIDs
+          appIDs: $appIDs
+          until: $until
+        }
+      ) {
+        metrics {
+          id
+          tagName
+          tagValue
+          data {
+            value
+            bucket
+          }
+        }
+      }
+    }
+    workspace(id: $workspaceId) {
+      stepThroughput: scopedMetrics(
+        filter: {
+          name: "step_output_bytes_total"
+          scope: $scope
+          from: $from
+          functionIDs: $functionIDs
+          appIDs: $appIDs
+          until: $until
+        }
+      ) {
+        metrics {
+          id
+          tagName
+          tagValue
+          data {
+            value
+            bucket
+          }
+        }
+      }
+    }
+    workspace(id: $workspaceId) {
+      stepThroughput: scopedMetrics(
+        filter: {
+          name: "step_output_bytes_total"
+          scope: $scope
+          from: $from
+          functionIDs: $functionIDs
+          appIDs: $appIDs
+          until: $until
+        }
+      ) {
+        metrics {
+          id
+          tagName
+          tagValue
+          data {
+            value
+            bucket
+          }
+        }
+      }
+    }
+    workspace(id: $workspaceId) {
+      backlog: scopedMetrics(
+        filter: {
+          name: "steps_scheduled"
+          scope: $scope
+          from: $from
+          functionIDs: $functionIDs
+          appIDs: $appIDs
+          until: $until
+        }
+      ) {
+        metrics {
+          id
+          tagName
+          tagValue
+          data {
+            value
+            bucket
+          }
+        }
+      }
+    }
+    workspace(id: $workspaceId) {
+      concurrency: scopedMetrics(
+        filter: {
+          name: "concurrency_limit_reached_total"
+          scope: $scope
+          from: $from
+          functionIDs: $functionIDs
+          appIDs: $appIDs
+          until: $until
+        }
+      ) {
+        metrics {
+          id
+          tagName
+          tagValue
+          data {
+            value
+            bucket
+          }
+        }
+      }
+    }
+  }
+`);
+
+export const MetricsVolume = ({
+  from,
+  until,
+  selectedApps = [],
+  selectedFns = [],
+  autoRefresh = false,
+  entities,
+}: MetricsFilters) => {
   const [volumeOpen, setVolumeOpen] = useState(true);
 
+  const env = useEnvironment();
+
+  const variables = {
+    workspaceId: env.id,
+    from: from.toISOString(),
+    appIDs: selectedApps,
+    functionIDs: selectedFns,
+    until: until ? until.toISOString() : null,
+    scope: !selectedApps.length && !selectedFns.length ? MetricsScope.App : MetricsScope.Fn,
+  };
+
+  const { error, data } = useGraphQLQuery({
+    query: GetVolumeMetrics,
+    pollIntervalInMilliseconds: autoRefresh ? AUTO_REFRESH_INTERVAL * 1000 : 0,
+    variables,
+  });
+
+  error && console.error('Error fetcthing metrics data for', variables, error);
+
   return (
-    <div className="bg-canvasSubtle item-start flex h-full w-full flex-col items-start">
+    <div className="item-start flex h-full w-full flex-col items-start">
       <div className="text-subtle my-4 flex w-full flex-row items-center justify-start gap-x-2 text-xs uppercase">
         {volumeOpen ? (
           <RiArrowDownSFill className="cursor-pointer" onClick={() => setVolumeOpen(false)} />
@@ -30,10 +210,22 @@ export const MetricsVolume = () => {
         <hr className="border-subtle w-full" />
       </div>
       {volumeOpen && (
-        <div className="relative flex w-full flex-row items-center justify-start gap-2 overflow-hidden">
-          <RunsThrougput />
-          <StepsThroughput />
-        </div>
+        <>
+          {error && <Error message="There was an error fetching volume metrics data." />}
+
+          <div className="relative grid w-full auto-cols-max grid-cols-1 gap-2 overflow-hidden md:grid-cols-2">
+            <RunsThrougput workspace={data?.workspace} entities={entities} />
+            <StepsThroughput workspace={data?.workspace} entities={entities} />
+            <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
+              <SdkThroughput workspace={data?.workspace} entities={entities} />
+              <Backlog workspace={data?.workspace} entities={entities} />
+            </div>
+            <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
+              <AccountConcurrency workspace={data?.workspace} entities={entities} />
+              <Feedback />
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
