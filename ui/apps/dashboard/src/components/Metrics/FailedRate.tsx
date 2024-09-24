@@ -91,7 +91,7 @@ export const FailedRate = ({
 
           <OptionalTooltip tooltip={r.lastOccurence}>
             <div
-              className={`text-disabled leading none text-xs ${
+              className={`text-disabled text-xs leading-none ${
                 r.lastOccurence && 'cursor-pointer'
               }`}
             >
