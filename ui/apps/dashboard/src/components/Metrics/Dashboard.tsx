@@ -22,9 +22,15 @@ import { useQuery } from 'urql';
 import { GetBillingPlanDocument } from '@/gql/graphql';
 import { MetricsOverview } from './Overview';
 import { MetricsVolume } from './Volume';
-import { convert } from './utils';
+import { convertLookup } from './utils';
 
-export type FunctionLookup = { [id: string]: string };
+export type EntityLookup = { [id: string]: string };
+
+export type EntityType = {
+  id: string;
+  name: string;
+  slug?: string;
+};
 
 export type MetricsFilters = {
   from: Date;
@@ -32,12 +38,8 @@ export type MetricsFilters = {
   selectedApps?: string[];
   selectedFns?: string[];
   autoRefresh?: boolean;
-  functions: FunctionLookup;
-};
-
-export type EntityType = {
-  id: string;
-  name: string;
+  entities: EntityLookup;
+  functions: EntityLookup;
 };
 
 export const DEFAULT_DURATION = { hours: 24 };
@@ -83,7 +85,10 @@ export const Dashboard = ({
   const logRetention = Number(planData?.account.plan?.features.log_retention);
   const upgradeCutoff = subtractDuration(new Date(), { days: logRetention || 7 });
 
-  const mappedFunctions = convert(functions);
+  const envLookup = !selectedApps?.length && !selectedFns?.length;
+  const mappedFunctions = convertLookup(functions);
+  const mappedApps = convertLookup(apps);
+  const mappedEntities = envLookup ? mappedApps : mappedFunctions;
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -129,6 +134,7 @@ export const Dashboard = ({
           selectedApps={selectedApps}
           selectedFns={selectedFns}
           autoRefresh={autoRefresh}
+          entities={mappedEntities}
           functions={mappedFunctions}
         />
       </div>
@@ -139,7 +145,7 @@ export const Dashboard = ({
           selectedApps={selectedApps}
           selectedFns={selectedFns}
           autoRefresh={autoRefresh}
-          functions={mappedFunctions}
+          entities={mappedEntities}
         />
       </div>
     </div>

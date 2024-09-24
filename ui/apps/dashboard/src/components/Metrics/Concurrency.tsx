@@ -3,17 +3,17 @@ import { Info } from '@inngest/components/Info/Info';
 import { NewLink } from '@inngest/components/Link/Link';
 
 import type { VolumeMetricsQuery } from '@/gql/graphql';
-import type { FunctionLookup } from './Dashboard';
-import { getLineChartOptions, mapFunctionLines } from './utils';
+import type { EntityLookup } from './Dashboard';
+import { getLineChartOptions, mapEntityLines } from './utils';
 
 export type SdkThroughputMetricsType = VolumeMetricsQuery['workspace']['concurrency']['metrics'];
 
 export const AccountConcurrency = ({
   workspace,
-  functions,
-}: Partial<VolumeMetricsQuery> & { functions: FunctionLookup }) => {
+  entities,
+}: Partial<VolumeMetricsQuery> & { entities: EntityLookup }) => {
   const metrics =
-    workspace && mapFunctionLines(workspace.concurrency.metrics, functions, { opacity: 1 });
+    workspace && mapEntityLines(workspace.concurrency.metrics, entities, { opacity: 1 });
 
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[300px] w-full flex-col overflow-x-hidden rounded-lg p-5">

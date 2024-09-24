@@ -6,7 +6,7 @@ import resolveConfig from 'tailwindcss/resolveConfig';
 
 import type { MetricsData, ScopedMetric } from '@/gql/graphql';
 import tailwindConfig from '../../../tailwind.config';
-import type { EntityType, FunctionLookup } from './Dashboard';
+import type { EntityLookup, EntityType } from './Dashboard';
 
 const {
   theme: { colors },
@@ -59,9 +59,9 @@ export const timeDiff = (start?: string, end?: string) =>
   start && end ? differenceInMilliseconds(start, end) : 0;
 
 //
-// convert our [id, name] function lookup to {[id]: name} to avoid n+1 lookups
-export const convert = (functions: EntityType[]): FunctionLookup =>
-  functions.reduce((acc, v) => ({ ...acc, [v.id]: v.name }), {});
+// convert our [id, name] function/app lookup to {[id]: name} to avoid n+1 lookups
+export const convertLookup = (entities: EntityType[]): EntityLookup =>
+  entities.reduce((acc, v) => ({ ...acc, [v.id]: v.name }), {});
 
 export const sum = (data?: MetricsData[]) =>
   data ? data.reduce((acc, { value }) => acc + value, 0) : 0;
@@ -97,9 +97,9 @@ export const getLineChartOptions = (data: LineChartData): ChartProps['option'] =
   };
 };
 
-export const mapFunctionLines = (
+export const mapEntityLines = (
   metrics: ScopedMetric[],
-  functions: FunctionLookup,
+  entities: EntityLookup,
   areaStyle?: { opacity: number }
 ) => {
   const dark = isDark();
@@ -120,7 +120,7 @@ export const mapFunctionLines = (
     series: metrics.map((f, i) => {
       return {
         ...seriesOptions,
-        name: functions[f.id],
+        name: entities[f.id],
         data: f.data.map(({ value }) => value),
         itemStyle: {
           color: resolveColor(lineColors[i % lineColors.length]![0]!, dark, lineColors[0]?.[1]),

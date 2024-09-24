@@ -3,12 +3,13 @@ import { Error } from '@inngest/components/Error/Error';
 import { RiArrowDownSFill, RiArrowRightSFill } from '@remixicon/react';
 
 import { graphql } from '@/gql';
+import { MetricsScope } from '@/gql/graphql';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { useEnvironment } from '../Environments/environment-context';
 import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
 import { Backlog } from './Backlog';
 import { AccountConcurrency } from './Concurrency';
-import type { FunctionLookup } from './Dashboard';
+import type { EntityLookup } from './Dashboard';
 import { Feedback } from './Feedback';
 import { RunsThrougput } from './RunsThroughput';
 import { SdkThroughput } from './SdkThroughput';
@@ -20,7 +21,7 @@ export type MetricsFilters = {
   selectedApps?: string[];
   selectedFns?: string[];
   autoRefresh?: boolean;
-  functions: FunctionLookup;
+  entities: EntityLookup;
 };
 
 const GetVolumeMetrics = graphql(`
@@ -30,12 +31,13 @@ const GetVolumeMetrics = graphql(`
     $functionIDs: [UUID!]
     $appIDs: [UUID!]
     $until: Time
+    $scope: MetricsScope!
   ) {
     workspace(id: $workspaceId) {
       runsThroughput: scopedMetrics(
         filter: {
           name: "function_run_ended_total"
-          scope: FN
+          scope: $scope
           from: $from
           functionIDs: $functionIDs
           appIDs: $appIDs
@@ -57,7 +59,7 @@ const GetVolumeMetrics = graphql(`
       sdkThroughput: scopedMetrics(
         filter: {
           name: "sdk_req_ended_total"
-          scope: FN
+          scope: $scope
           from: $from
           functionIDs: $functionIDs
           appIDs: $appIDs
@@ -79,7 +81,7 @@ const GetVolumeMetrics = graphql(`
       stepThroughput: scopedMetrics(
         filter: {
           name: "step_output_bytes_total"
-          scope: FN
+          scope: $scope
           from: $from
           functionIDs: $functionIDs
           appIDs: $appIDs
@@ -101,7 +103,7 @@ const GetVolumeMetrics = graphql(`
       stepThroughput: scopedMetrics(
         filter: {
           name: "step_output_bytes_total"
-          scope: FN
+          scope: $scope
           from: $from
           functionIDs: $functionIDs
           appIDs: $appIDs
@@ -123,7 +125,7 @@ const GetVolumeMetrics = graphql(`
       backlog: scopedMetrics(
         filter: {
           name: "steps_scheduled"
-          scope: FN
+          scope: $scope
           from: $from
           functionIDs: $functionIDs
           appIDs: $appIDs
@@ -145,7 +147,7 @@ const GetVolumeMetrics = graphql(`
       concurrency: scopedMetrics(
         filter: {
           name: "concurrency_limit_reached_total"
-          scope: FN
+          scope: $scope
           from: $from
           functionIDs: $functionIDs
           appIDs: $appIDs
@@ -172,7 +174,7 @@ export const MetricsVolume = ({
   selectedApps = [],
   selectedFns = [],
   autoRefresh = false,
-  functions,
+  entities,
 }: MetricsFilters) => {
   const [volumeOpen, setVolumeOpen] = useState(true);
 
@@ -184,6 +186,7 @@ export const MetricsVolume = ({
     appIDs: selectedApps,
     functionIDs: selectedFns,
     until: until ? until.toISOString() : null,
+    scope: !selectedApps.length && !selectedFns.length ? MetricsScope.App : MetricsScope.Fn,
   };
 
   const { error, data } = useGraphQLQuery({
@@ -211,14 +214,14 @@ export const MetricsVolume = ({
           {error && <Error message="There was an error fetching volume metrics data." />}
 
           <div className="relative grid w-full auto-cols-max grid-cols-1 gap-2 overflow-hidden md:grid-cols-2">
-            <RunsThrougput workspace={data?.workspace} functions={functions} />
-            <StepsThroughput workspace={data?.workspace} functions={functions} />
+            <RunsThrougput workspace={data?.workspace} entities={entities} />
+            <StepsThroughput workspace={data?.workspace} entities={entities} />
             <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
-              <SdkThroughput workspace={data?.workspace} functions={functions} />
-              <Backlog workspace={data?.workspace} functions={functions} />
+              <SdkThroughput workspace={data?.workspace} entities={entities} />
+              <Backlog workspace={data?.workspace} entities={entities} />
             </div>
             <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
-              <AccountConcurrency workspace={data?.workspace} functions={functions} />
+              <AccountConcurrency workspace={data?.workspace} entities={entities} />
               <Feedback />
             </div>
           </div>

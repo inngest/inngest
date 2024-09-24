@@ -16,6 +16,7 @@ const MetricsLookupDocument = graphql(`
         data {
           name
           id
+          slug
         }
       }
     }

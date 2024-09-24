@@ -14,7 +14,7 @@ export const ChartIcon = ({
     xmlns="http://www.w3.org/2000/svg"
     className={className}
   >
-    <g clip-path="url(#clip0_6858_42709)">
+    <g clipPath="url(#clip0_6858_42709)">
       <rect x="6" y="6" width={width - 12} height={height - 12} rx="8" fill="#DFF5E6" />
       <path
         d="M31.892 30V51.3333H53.8851V54H29.1428V30H31.892ZM52.9132 34.3905L54.8571 36.2761L47.0123 43.8856L42.8886 39.8867L36.9877 45.6095L35.0437 43.7239L42.8886 36.1144L47.0123 40.1133L52.9132 34.3905Z"
@@ -34,9 +34,9 @@ export const ChartIcon = ({
         y2="149.48"
         gradientUnits="userSpaceOnUse"
       >
-        <stop stop-color="#FEFEFE" />
-        <stop offset="0.535" stop-color="#9ADAB3" />
-        <stop offset="1" stop-color="#FEFEFE" />
+        <stop stopColor="#FEFEFE" />
+        <stop offset="0.535" stopColor="#9ADAB3" />
+        <stop offset="1" stopColor="#FEFEFE" />
       </linearGradient>
       <linearGradient
         id="paint1_linear_6858_42709"
@@ -46,9 +46,9 @@ export const ChartIcon = ({
         y2="108.817"
         gradientUnits="userSpaceOnUse"
       >
-        <stop stop-color="#FEFEFE" />
-        <stop offset="0.535" stop-color="#9ADAB3" />
-        <stop offset="1" stop-color="#FEFEFE" />
+        <stop stopColor="#FEFEFE" />
+        <stop offset="0.535" stopColor="#9ADAB3" />
+        <stop offset="1" stopColor="#FEFEFE" />
       </linearGradient>
       <linearGradient
         id="paint2_linear_6858_42709"
@@ -58,9 +58,9 @@ export const ChartIcon = ({
         y2="6.27734"
         gradientUnits="userSpaceOnUse"
       >
-        <stop stop-color="#FEFEFE" />
-        <stop offset="0.535" stop-color="#9ADAB3" />
-        <stop offset="1" stop-color="#FEFEFE" />
+        <stop stopColor="#FEFEFE" />
+        <stop offset="0.535" stopColor="#9ADAB3" />
+        <stop offset="1" stopColor="#FEFEFE" />
       </linearGradient>
       <linearGradient
         id="paint3_linear_6858_42709"
@@ -70,9 +70,9 @@ export const ChartIcon = ({
         y2="77.9844"
         gradientUnits="userSpaceOnUse"
       >
-        <stop stop-color="#FEFEFE" />
-        <stop offset="0.535" stop-color="#9ADAB3" />
-        <stop offset="1" stop-color="#FEFEFE" />
+        <stop stopColor="#FEFEFE" />
+        <stop offset="0.535" stopColor="#9ADAB3" />
+        <stop offset="1" stopColor="#FEFEFE" />
       </linearGradient>
       <clipPath id="clip0_6858_42709">
         <rect width="84" height="84" fill="white" />

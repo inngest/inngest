@@ -3,14 +3,14 @@ import { Info } from '@inngest/components/Info/Info';
 import { NewLink } from '@inngest/components/Link/Link';
 
 import type { VolumeMetricsQuery } from '@/gql/graphql';
-import type { FunctionLookup } from './Dashboard';
-import { getLineChartOptions, mapFunctionLines } from './utils';
+import type { EntityLookup } from './Dashboard';
+import { getLineChartOptions, mapEntityLines } from './utils';
 
 export const StepsThroughput = ({
   workspace,
-  functions,
-}: Partial<VolumeMetricsQuery> & { functions: FunctionLookup }) => {
-  const metrics = workspace && mapFunctionLines(workspace.stepThroughput.metrics, functions);
+  entities,
+}: Partial<VolumeMetricsQuery> & { entities: EntityLookup }) => {
+  const metrics = workspace && mapEntityLines(workspace.stepThroughput.metrics, entities);
 
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[300px] w-full flex-col overflow-x-hidden rounded-lg p-5">

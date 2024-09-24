@@ -4,6 +4,7 @@ import { RiArrowDownSFill, RiArrowRightSFill } from '@remixicon/react';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
+import { MetricsScope } from '@/gql/graphql';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
 import type { MetricsFilters } from './Dashboard';
@@ -17,12 +18,13 @@ const GetFunctionStatusMetrics = graphql(`
     $functionIDs: [UUID!]
     $appIDs: [UUID!]
     $until: Time
+    $scope: MetricsScope!
   ) {
     workspace(id: $workspaceId) {
       scheduled: scopedMetrics(
         filter: {
           name: "function_run_scheduled_total"
-          scope: FN
+          scope: $scope
           from: $from
           functionIDs: $functionIDs
           appIDs: $appIDs
@@ -42,7 +44,7 @@ const GetFunctionStatusMetrics = graphql(`
       started: scopedMetrics(
         filter: {
           name: "function_run_started_total"
-          scope: FN
+          scope: $scope
           from: $from
           functionIDs: $functionIDs
           appIDs: $appIDs
@@ -60,6 +62,29 @@ const GetFunctionStatusMetrics = graphql(`
     }
     workspace(id: $workspaceId) {
       completed: scopedMetrics(
+        filter: {
+          name: "function_run_ended_total"
+          scope: $scope
+          groupBy: "status"
+          from: $from
+          functionIDs: $functionIDs
+          appIDs: $appIDs
+          until: $until
+        }
+      ) {
+        metrics {
+          id
+          tagName
+          tagValue
+          data {
+            value
+            bucket
+          }
+        }
+      }
+    }
+    workspace(id: $workspaceId) {
+      completedByFunction: scopedMetrics(
         filter: {
           name: "function_run_ended_total"
           scope: FN
@@ -110,6 +135,7 @@ export const MetricsOverview = ({
   selectedApps = [],
   selectedFns = [],
   autoRefresh = false,
+  entities, // dynamic based on scope
   functions,
 }: MetricsFilters) => {
   const [overviewOpen, setOverviewOpen] = useState(true);
@@ -121,6 +147,7 @@ export const MetricsOverview = ({
     appIDs: selectedApps,
     functionIDs: selectedFns,
     until: until ? until.toISOString() : null,
+    scope: !selectedApps.length && !selectedFns.length ? MetricsScope.App : MetricsScope.Fn,
   };
 
   const { data, error } = useGraphQLQuery({
@@ -148,7 +175,11 @@ export const MetricsOverview = ({
           {error && <Error message="There was an error fetching overview metrics data." />}
           <div className="relative flex w-full flex-row flex-wrap items-center justify-start gap-2 overflow-hidden md:flex-nowrap">
             <FunctionStatus totals={data?.workspace.totals} />
-            <FailedFunctions workspace={data?.workspace} functions={functions} />
+            <FailedFunctions
+              workspace={data?.workspace}
+              entities={entities}
+              functions={functions}
+            />
           </div>
         </>
       )}
