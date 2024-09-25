@@ -78,7 +78,8 @@ const holeLabel = {
 const totalRuns = (totals: Array<{ value: number }>) =>
   totals.reduce((acc, { value }) => acc + value, 0);
 
-const percent = (sum: number, part: number) => (sum ? `${((part / sum) * 100).toFixed(0)}%` : `0%`);
+const percent = (sum: number, part: number) =>
+  `${sum ? parseFloat(((part / sum) * 100).toFixed(2)) : 0}%`;
 
 const getChartOptions = (data: PieChartData, loading: boolean = false): ChartProps['option'] => {
   const sum = totalRuns(data);
