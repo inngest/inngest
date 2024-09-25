@@ -255,11 +255,7 @@ export function RunsPage({
     pollInterval && pollInterval < 1000 ? isLoadingInitial : isLoadingMore || isLoadingInitial;
 
   return (
-    <main
-      className="bg-canvasBase text-basis h-full min-h-0 flex-1 overflow-y-auto"
-      onScroll={onScroll}
-      ref={containerRef}
-    >
+    <main className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-auto">
       <div className="bg-canvasBase border-subtle sticky top-0 z-10 flex flex-col border-b px-3">
         <div className="flex h-[58px] items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -323,7 +319,7 @@ export function RunsPage({
           </div>
         </div>
       </div>
-      <>
+      <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
         <RunsTable
           data={data}
           isLoading={isLoadingInitial}
@@ -357,7 +353,7 @@ export function RunsPage({
             />
           </div>
         )}
-      </>
+      </div>
     </main>
   );
 }
