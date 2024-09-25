@@ -157,7 +157,12 @@ function Footer({
   disabledApply?: boolean;
 }) {
   return (
-    <div className="border-muted mt-1 flex items-center justify-between border-t px-2 pb-1.5 pt-2.5">
+    <div
+      className={cn(
+        'border-muted mt-1 flex items-center border-t px-2 pb-1 pt-2',
+        onReset ? 'justify-between' : 'justify-end'
+      )}
+    >
       {onReset && (
         <InngestButton
           label="Reset"
