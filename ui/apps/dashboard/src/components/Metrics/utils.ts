@@ -83,10 +83,7 @@ export const getLineChartOptions = (data: LineChartData): ChartProps['option'] =
       appendTo: () => document.getElementById('chart-tooltip'),
       extraCssText: 'max-height: 250px; overflow-y: scroll;',
       className: 'no-scrollbar',
-      position: function (point) {
-        // fixed at top
-        return [point[0] + 5, '55%'];
-      },
+      position: (point) => [point[0] + 5, '55%'],
     },
     legend: {
       type: 'scroll',
