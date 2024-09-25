@@ -1298,6 +1298,8 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		return i, err
 	}
 
+	q.logger.Trace().Interface("item", i).Interface("parts", parts).Interface("keys", keys).Interface("args", args).Msg("enqueueing item")
+
 	status, err := scripts["queue/enqueue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "enqueue"),
 		q.u.Client(),
@@ -1389,6 +1391,8 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 	if len(missingQueueItems) > 0 {
 		// TODO This can happen, be careful
 		if partition.AccountID == uuid.Nil {
+			q.logger.Error().Interface("items", missingQueueItems).Str("partition", partition.zsetKey(q.u.kg)).Msg("encountered missing queue items")
+
 			return nil, fmt.Errorf("encountered missing queue items in partition queue %q", partition.zsetKey(q.u.kg))
 		}
 
@@ -1630,6 +1634,9 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	if err != nil {
 		return nil, err
 	}
+
+	q.logger.Trace().Interface("item", item).Interface("part", p).Interface("parts", parts).Interface("keys", keys).Interface("args", args).Str("accountConcurrencyKey", accountConcurrencyKey).Int("acctLimit", acctLimit).Str("leaseID", leaseID.String()).Msg("leasing item")
+
 	status, err := scripts["queue/lease"].Exec(
 		redis_telemetry.WithScriptName(ctx, "lease"),
 		q.u.unshardedRc,
@@ -1805,6 +1812,9 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 	if err != nil {
 		return err
 	}
+
+	q.logger.Trace().Interface("parts", parts).Interface("item", i).Interface("part", p).Msg("dequeueing queue item")
+
 	status, err := scripts["queue/dequeue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "dequeue"),
 		q.u.unshardedRc,
@@ -1904,6 +1914,9 @@ func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 	if err != nil {
 		return err
 	}
+
+	q.logger.Trace().Interface("parts", parts).Interface("item", i).Msg("requeueing queue item")
+
 	status, err := scripts["queue/requeue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "requeue"),
 		q.u.unshardedRc,
