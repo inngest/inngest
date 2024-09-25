@@ -85,11 +85,13 @@ export default function EntityFilter({
           placeholder={`Search for ${type}`}
           onChange={(event) => setQuery(event.target.value)}
         />
-        {filteredOptions.map((option) => (
-          <SelectWithSearch.CheckboxOption key={option.id} option={option}>
-            {option.name}
-          </SelectWithSearch.CheckboxOption>
-        ))}
+        <div className="max-h-64 overflow-scroll">
+          {filteredOptions.map((option) => (
+            <SelectWithSearch.CheckboxOption key={option.id} option={option}>
+              {option.name}
+            </SelectWithSearch.CheckboxOption>
+          ))}
+        </div>
         <SelectWithSearch.Footer
           onReset={handleReset}
           onApply={handleApply}
