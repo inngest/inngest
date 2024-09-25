@@ -1967,6 +1967,7 @@ func TestQueueLease(t *testing.T) {
 			},
 		}
 
+		// Sanity check: Ensure partitions are created properly and keys match old system
 		parts, _ := q.ItemPartitions(ctx, qi)
 		require.Equal(t, 3, len(parts))
 		require.Equal(t, QueuePartition{
