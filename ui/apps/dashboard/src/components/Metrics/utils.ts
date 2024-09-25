@@ -60,8 +60,13 @@ export const timeDiff = (start?: string, end?: string) =>
 
 //
 // convert our [id, name] function/app lookup to {[id]: name} to avoid n+1 lookups
-export const convertLookup = (entities: EntityType[]): EntityLookup =>
-  entities.reduce((acc, v) => ({ ...acc, [v.id]: { id: v.id, name: v.name, slug: v.slug } }), {});
+export const convertLookup = (entities?: EntityType[]): EntityLookup | {} =>
+  entities
+    ? entities.reduce(
+        (acc, v) => ({ ...acc, [v.id]: { id: v.id, name: v.name, slug: v.slug } }),
+        {}
+      )
+    : {};
 
 export const sum = (data?: MetricsData[]) =>
   data ? data.reduce((acc, { value }) => acc + value, 0) : 0;
@@ -70,7 +75,14 @@ export const getLineChartOptions = (data: LineChartData): ChartProps['option'] =
   return {
     tooltip: {
       trigger: 'axis',
+      renderMode: 'html',
       enterable: true,
+      //
+      // Attach tooltips to a dedicated dom node above interim parents
+      // with low z-indexes
+      appendTo: () => document.getElementById('chart-tooltip'),
+      extraCssText: 'max-height: 250px; overflow-y: scroll;',
+      className: 'no-scrollbar',
     },
     legend: {
       type: 'scroll',
@@ -110,10 +122,11 @@ export const mapEntityLines = (
     xAxis: {
       type: 'category',
       boundaryGap: true,
-      data: metrics[0]?.data.map(({ bucket }) => bucket) || ['None Found'],
+      data: metrics[0]?.data.map(({ bucket }) => bucket) || ['No Data Found'],
       axisLabel: {
         interval: dataLength <= 40 ? 2 : dataLength / (dataLength / 12),
         formatter: (value: string) => dateFormat(value, diff),
+        margin: 10,
       },
     },
     series: metrics.map((f, i) => {

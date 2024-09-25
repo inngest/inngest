@@ -91,7 +91,7 @@ const getChartOptions = (data: PieChartData, loading: boolean = false): ChartPro
       right: '5%',
       top: 'center',
       icon: 'circle',
-      selectedMode: false,
+      selectedMode: true,
       formatter: (name: string) =>
         [
           name,
