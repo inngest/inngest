@@ -70,7 +70,14 @@ export const getLineChartOptions = (data: LineChartData): ChartProps['option'] =
   return {
     tooltip: {
       trigger: 'axis',
+      renderMode: 'html',
       enterable: true,
+      //
+      // Attach tooltips to a dedicated dom node above interim parents
+      // with low z-indexes
+      appendTo: () => document?.getElementById('chart-tooltip'),
+      extraCssText: 'max-height: 250px; overflow-y: scroll;',
+      className: 'no-scrollbar',
     },
     legend: {
       type: 'scroll',
