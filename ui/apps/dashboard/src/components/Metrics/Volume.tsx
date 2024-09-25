@@ -199,12 +199,11 @@ export const MetricsVolume = ({
 
   return (
     <div className="item-start flex h-full w-full flex-col items-start">
-      <div className="text-subtle my-4 flex w-full flex-row items-center justify-start gap-x-2 text-xs uppercase">
-        {volumeOpen ? (
-          <RiArrowDownSFill className="cursor-pointer" onClick={() => setVolumeOpen(false)} />
-        ) : (
-          <RiArrowRightSFill className="cursor-pointer" onClick={() => setVolumeOpen(true)} />
-        )}
+      <div
+        className="text-subtle my-4 flex w-full cursor-pointer flex-row items-center justify-start gap-x-2 text-xs uppercase"
+        onClick={() => setVolumeOpen(!volumeOpen)}
+      >
+        {volumeOpen ? <RiArrowDownSFill /> : <RiArrowRightSFill />}
         <div>Volume</div>
 
         <hr className="border-subtle w-full" />
@@ -217,12 +216,12 @@ export const MetricsVolume = ({
             <RunsThrougput workspace={data?.workspace} entities={entities} />
             <StepsThroughput workspace={data?.workspace} entities={entities} />
             <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
-              <SdkThroughput workspace={data?.workspace} entities={entities} />
+              {/* <SdkThroughput workspace={data?.workspace} entities={entities} /> */}
               <Backlog workspace={data?.workspace} entities={entities} />
+              <Feedback />
             </div>
             <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
-              <AccountConcurrency workspace={data?.workspace} entities={entities} />
-              <Feedback />
+              {/* <AccountConcurrency workspace={data?.workspace} entities={entities} /> */}
             </div>
           </div>
         </>

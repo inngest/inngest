@@ -11,6 +11,7 @@ const MetricsLookupDocument = graphql(`
         externalID
         id
         name
+        isArchived
       }
       workflows @paginated(perPage: $pageSize, page: $page) {
         data {

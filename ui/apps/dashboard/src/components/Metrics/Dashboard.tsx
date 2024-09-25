@@ -110,9 +110,6 @@ export const Dashboard = ({
           />
         </div>
         <div className="flex flex-row items-center justify-end gap-x-2">
-          <Pill appearance="outlined" kind="warning">
-            <div className="text-nowrap">15m delay</div>
-          </Pill>
           <RangePicker
             className="w-full"
             upgradeCutoff={upgradeCutoff}
