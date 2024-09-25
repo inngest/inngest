@@ -122,7 +122,7 @@ export const mapEntityLines = (
     xAxis: {
       type: 'category',
       boundaryGap: true,
-      data: metrics[0]?.data.map(({ bucket }) => bucket) || ['None Found'],
+      data: metrics[0]?.data.map(({ bucket }) => bucket) || ['No Data Found'],
       axisLabel: {
         interval: dataLength <= 40 ? 2 : dataLength / (dataLength / 12),
         formatter: (value: string) => dateFormat(value, diff),
