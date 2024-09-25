@@ -145,10 +145,31 @@ function CheckboxOption({
   );
 }
 
-function Footer({ onReset }: { onReset: () => void }) {
+function Footer({
+  onReset,
+  onApply,
+  disabledReset,
+  disabledApply,
+}: {
+  onReset?: () => void;
+  onApply?: () => void;
+  disabledReset?: boolean;
+  disabledApply?: boolean;
+}) {
   return (
     <div className="border-muted mt-1 flex items-center justify-between border-t px-2 pb-1.5 pt-2.5">
-      {onReset && <InngestButton label="Reset" appearance="ghost" size="small" onClick={onReset} />}
+      {onReset && (
+        <InngestButton
+          label="Reset"
+          appearance="ghost"
+          size="small"
+          onClick={onReset}
+          disabled={disabledReset}
+        />
+      )}
+      {onApply && (
+        <InngestButton label="Apply" size="small" onClick={onApply} disabled={disabledApply} />
+      )}
     </div>
   );
 }

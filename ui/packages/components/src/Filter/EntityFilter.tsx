@@ -18,10 +18,12 @@ export default function EntityFilter({
   className,
 }: EntityFilterProps) {
   const [query, setQuery] = useState('');
+  const [temporarySelectedValues, setTemporarySelectedValues] = useState(selectedEntities);
+
   const selectedValues = entities.filter((entity) =>
-    selectedEntities.some((id) => id === entity.id)
+    temporarySelectedValues.some((id) => id === entity.id)
   );
-  const areAllEntitiesSelected = selectedEntities.length === entities.length;
+  const areAllEntitiesSelected = temporarySelectedValues.length === entities.length;
 
   const filteredOptions =
     query === ''
@@ -29,6 +31,26 @@ export default function EntityFilter({
       : entities.filter((entity) => {
           return entity.name.toLowerCase().includes(query.toLowerCase());
         });
+
+  const isSelectionChanged = () => {
+    if (temporarySelectedValues.length !== selectedEntities.length) {
+      return true;
+    }
+    const tempSet = new Set(temporarySelectedValues);
+    return selectedEntities.some((id) => !tempSet.has(id));
+  };
+
+  const isDisabledApply = !isSelectionChanged();
+  const isDisabledReset = temporarySelectedValues.length === 0 && selectedEntities.length === 0; // Disable if no items are selected
+
+  const handleApply = () => {
+    onFilterChange(temporarySelectedValues);
+  };
+
+  const handleReset = () => {
+    setTemporarySelectedValues([]);
+    onFilterChange([]);
+  };
 
   return (
     <SelectWithSearch
@@ -39,22 +61,22 @@ export default function EntityFilter({
         value.forEach((option) => {
           newValue.push(option.id);
         });
-        onFilterChange(newValue);
+        setTemporarySelectedValues(newValue);
       }}
       label={type}
       isLabelVisible
     >
       <SelectWithSearch.Button isLabelVisible className={className}>
         <div className="min-w-7 max-w-24 truncate text-nowrap text-left">
-          {selectedEntities.length === 1 && !areAllEntitiesSelected && (
+          {temporarySelectedValues.length === 1 && !areAllEntitiesSelected && (
             <span>{selectedValues[0]?.name}</span>
           )}
-          {selectedEntities.length > 1 && !areAllEntitiesSelected && (
+          {temporarySelectedValues.length > 1 && !areAllEntitiesSelected && (
             <span>
-              {selectedEntities.length} {type}s
+              {temporarySelectedValues.length} {type}s
             </span>
           )}
-          {(selectedEntities.length === 0 || areAllEntitiesSelected) && <span>All</span>}
+          {(temporarySelectedValues.length === 0 || areAllEntitiesSelected) && <span>All</span>}
         </div>
       </SelectWithSearch.Button>
       <SelectWithSearch.Options>
@@ -68,7 +90,12 @@ export default function EntityFilter({
             {option.name}
           </SelectWithSearch.CheckboxOption>
         ))}
-        <SelectWithSearch.Footer onReset={() => onFilterChange([])} />
+        <SelectWithSearch.Footer
+          onReset={handleReset}
+          onApply={handleApply}
+          disabledReset={isDisabledReset}
+          disabledApply={isDisabledApply}
+        />
       </SelectWithSearch.Options>
     </SelectWithSearch>
   );
