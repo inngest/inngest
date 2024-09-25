@@ -16,7 +16,7 @@ export const RunsThrougput = ({
   const metrics = workspace && mapEntityLines(workspace.runsThroughput.metrics, entities);
 
   return (
-    <div className="bg-canvasBase border-subtle relative flex h-[300px] w-full flex-col overflow-x-hidden rounded-lg p-5">
+    <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-visible rounded-lg border p-5">
       <div className="mb-2 flex flex-row items-center justify-between">
         <div className="text-subtle flex w-full flex-row items-center gap-x-2 text-lg">
           Total runs throughput{' '}
@@ -34,8 +34,11 @@ export const RunsThrougput = ({
           />
         </div>
       </div>
-      <div className="flex h-full flex-row items-center">
-        <Chart option={metrics ? getLineChartOptions(metrics) : {}} className="h-full w-full" />
+      <div className="flex h-full flex-row items-center overflow-visible">
+        <Chart
+          option={metrics ? getLineChartOptions(metrics) : {}}
+          className="relative h-full w-full overflow-visible"
+        />
       </div>
     </div>
   );

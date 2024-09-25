@@ -7,9 +7,9 @@ export type SdkThroughputMetricsType = VolumeMetricsQuery['workspace']['sdkThrou
 
 export const Feedback = ({}) => {
   return (
-    <div className="bg-canvasBase border-subtle relative flex h-[300px] w-full flex-col items-center justify-center gap-3 overflow-x-hidden rounded-lg p-2 text-center md:w-[65%] md:px-12 ">
+    <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col items-center justify-center gap-3 overflow-x-hidden rounded-lg border p-2 text-center md:w-[65%] md:px-12 ">
       <ChartIcon />
-      <div className="text-lg font-medium">Can&apos; find the data you need?</div>
+      <div className="text-lg font-medium">Can&apos;t find the data you need?</div>
       <div className="text-subtle text-sm leading-tight">
         Let our team know which charts are most useful to you and request any additional charts that
         you might need but are currently missing.

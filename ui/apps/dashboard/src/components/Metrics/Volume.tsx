@@ -8,11 +8,9 @@ import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { useEnvironment } from '../Environments/environment-context';
 import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
 import { Backlog } from './Backlog';
-import { AccountConcurrency } from './Concurrency';
 import type { EntityLookup } from './Dashboard';
 import { Feedback } from './Feedback';
 import { RunsThrougput } from './RunsThroughput';
-import { SdkThroughput } from './SdkThroughput';
 import { StepsThroughput } from './StepsThroughput';
 
 export type MetricsFilters = {
@@ -22,6 +20,7 @@ export type MetricsFilters = {
   selectedFns?: string[];
   autoRefresh?: boolean;
   entities: EntityLookup;
+  scope: MetricsScope;
 };
 
 const GetVolumeMetrics = graphql(`
@@ -175,6 +174,7 @@ export const MetricsVolume = ({
   selectedFns = [],
   autoRefresh = false,
   entities,
+  scope,
 }: MetricsFilters) => {
   const [volumeOpen, setVolumeOpen] = useState(true);
 
@@ -186,7 +186,7 @@ export const MetricsVolume = ({
     appIDs: selectedApps,
     functionIDs: selectedFns,
     until: until ? until.toISOString() : null,
-    scope: !selectedApps.length && !selectedFns.length ? MetricsScope.App : MetricsScope.Fn,
+    scope,
   };
 
   const { error, data } = useGraphQLQuery({
@@ -199,12 +199,11 @@ export const MetricsVolume = ({
 
   return (
     <div className="item-start flex h-full w-full flex-col items-start">
-      <div className="text-subtle my-4 flex w-full flex-row items-center justify-start gap-x-2 text-xs uppercase">
-        {volumeOpen ? (
-          <RiArrowDownSFill className="cursor-pointer" onClick={() => setVolumeOpen(false)} />
-        ) : (
-          <RiArrowRightSFill className="cursor-pointer" onClick={() => setVolumeOpen(true)} />
-        )}
+      <div
+        className="text-subtle my-4 flex w-full cursor-pointer flex-row items-center justify-start gap-x-2 text-xs uppercase"
+        onClick={() => setVolumeOpen(!volumeOpen)}
+      >
+        {volumeOpen ? <RiArrowDownSFill /> : <RiArrowRightSFill />}
         <div>Volume</div>
 
         <hr className="border-subtle w-full" />
@@ -217,13 +216,10 @@ export const MetricsVolume = ({
             <RunsThrougput workspace={data?.workspace} entities={entities} />
             <StepsThroughput workspace={data?.workspace} entities={entities} />
             <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
-              <SdkThroughput workspace={data?.workspace} entities={entities} />
               <Backlog workspace={data?.workspace} entities={entities} />
-            </div>
-            <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
-              <AccountConcurrency workspace={data?.workspace} entities={entities} />
               <Feedback />
             </div>
+            <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap"></div>
           </div>
         </>
       )}
