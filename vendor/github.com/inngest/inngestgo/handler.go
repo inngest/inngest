@@ -47,10 +47,6 @@ var (
 	}
 )
 
-const (
-	defaultRegisterURL = "https://api.inngest.com/fn/register"
-)
-
 // Register adds the given functions to the default handler for serving.  You must register all
 // functions with a handler prior to serving the handler for them to be enabled.
 func Register(funcs ...ServableFunction) {
@@ -253,7 +249,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		if err := h.introspect(w, r); err != nil {
+		if err := h.inspect(w, r); err != nil {
 			_ = publicerr.WriteHTTP(w, err)
 		}
 		return
@@ -495,7 +491,7 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 	}
 	config.Functions = fns
 
-	registerURL := defaultRegisterURL
+	registerURL := fmt.Sprintf("%s/fn/register", defaultAPIOrigin)
 	if IsDev() {
 		// TODO: Check if dev server is up.  If not, error.  We can't deploy to production.
 		registerURL = fmt.Sprintf("%s/fn/register", DevServerURL())
@@ -771,8 +767,13 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 		}()
 	}
 
+	var stepID *string
+	if rawStepID := r.URL.Query().Get("stepId"); rawStepID != "" && rawStepID != "step" {
+		stepID = &rawStepID
+	}
+
 	// Invoke the function, then immediately stop the streaming buffer.
-	resp, ops, err := invoke(r.Context(), fn, request)
+	resp, ops, err := invoke(r.Context(), fn, request, stepID)
 	streamCancel()
 
 	// NOTE: When triggering step errors, we should have an OpcodeStepError
@@ -851,24 +852,66 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	return json.NewEncoder(w).Encode(resp)
 }
 
-type insecureIntrospection struct {
-	FunctionCount int    `json:"function_count"`
-	HasEventKey   bool   `json:"has_event_key"`
-	HasSigningKey bool   `json:"has_signing_key"`
-	Mode          string `json:"mode"`
+type insecureInspection struct {
+	SchemaVersion string `json:"schema_version"`
+
+	AuthenticationSucceeded *bool  `json:"authentication_succeeded"`
+	FunctionCount           int    `json:"function_count"`
+	HasEventKey             bool   `json:"has_event_key"`
+	HasSigningKey           bool   `json:"has_signing_key"`
+	HasSigningKeyFallback   bool   `json:"has_signing_key_fallback"`
+	Mode                    string `json:"mode"`
 }
 
-type secureIntrospection struct {
-	insecureIntrospection
+type secureInspection struct {
+	insecureInspection
+
+	APIOrigin              string           `json:"api_origin"`
+	AppID                  string           `json:"app_id"`
 	Capabilities           sdk.Capabilities `json:"capabilities"`
+	Env                    *string          `json:"env"`
+	EventAPIOrigin         string           `json:"event_api_origin"`
+	EventKeyHash           *string          `json:"event_key_hash"`
+	Framework              string           `json:"framework"`
+	SDKLanguage            string           `json:"sdk_language"`
+	SDKVersion             string           `json:"sdk_version"`
+	ServeOrigin            *string          `json:"serve_origin"`
+	ServePath              *string          `json:"serve_path"`
 	SigningKeyFallbackHash *string          `json:"signing_key_fallback_hash"`
 	SigningKeyHash         *string          `json:"signing_key_hash"`
 }
 
-func (h *handler) createSecureInspection() (*secureIntrospection, error) {
+func (h *handler) createInsecureInspection(
+	authenticationSucceeded *bool,
+) (*insecureInspection, error) {
 	mode := "cloud"
 	if IsDev() {
 		mode = "dev"
+	}
+
+	return &insecureInspection{
+		AuthenticationSucceeded: authenticationSucceeded,
+		FunctionCount:           len(h.funcs),
+		HasEventKey:             os.Getenv("INNGEST_EVENT_KEY") != "",
+		HasSigningKey:           h.GetSigningKey() != "",
+		HasSigningKeyFallback:   h.GetSigningKeyFallback() != "",
+		Mode:                    mode,
+		SchemaVersion:           "2024-05-24",
+	}, nil
+}
+
+func (h *handler) createSecureInspection() (*secureInspection, error) {
+	apiOrigin := defaultAPIOrigin
+	eventAPIOrigin := defaultEventAPIOrigin
+	if IsDev() {
+		apiOrigin = DevServerURL()
+		eventAPIOrigin = DevServerURL()
+	}
+
+	var eventKeyHash *string
+	if os.Getenv("INNGEST_EVENT_KEY") != "" {
+		hash := hashEventKey(os.Getenv("INNGEST_EVENT_KEY"))
+		eventKeyHash = &hash
 	}
 
 	var signingKeyHash *string
@@ -891,54 +934,81 @@ func (h *handler) createSecureInspection() (*secureIntrospection, error) {
 		signingKeyFallbackHash = &hash
 	}
 
-	return &secureIntrospection{
-		insecureIntrospection: insecureIntrospection{
-			FunctionCount: len(h.funcs),
-			HasEventKey:   os.Getenv("INNGEST_EVENT_KEY") != "",
-			HasSigningKey: h.GetSigningKey() != "",
-			Mode:          mode,
-		},
+	authenticationSucceeded := true
+
+	var env *string
+	if h.GetEnv() != "" {
+		val := h.GetEnv()
+		env = &val
+	}
+
+	var serveOrigin, servePath *string
+	if h.URL != nil {
+		serveOriginStr := h.URL.Scheme + "://" + h.URL.Host
+		serveOrigin = &serveOriginStr
+
+		servePath = &h.URL.Path
+	}
+
+	authenticationSucceeded = true
+	insecureInspection, err := h.createInsecureInspection(&authenticationSucceeded)
+	if err != nil {
+		return nil, fmt.Errorf("error creating inspection: %w", err)
+	}
+
+	return &secureInspection{
+		insecureInspection:     *insecureInspection,
+		APIOrigin:              apiOrigin,
+		AppID:                  h.appName,
 		Capabilities:           capabilities,
+		Env:                    env,
+		EventAPIOrigin:         eventAPIOrigin,
+		EventKeyHash:           eventKeyHash,
+		SDKLanguage:            SDKLanguage,
+		SDKVersion:             SDKVersion,
 		SigningKeyFallbackHash: signingKeyFallbackHash,
 		SigningKeyHash:         signingKeyHash,
+		ServeOrigin:            serveOrigin,
+		ServePath:              servePath,
 	}, nil
 }
 
-func (h *handler) introspect(w http.ResponseWriter, r *http.Request) error {
+func (h *handler) inspect(w http.ResponseWriter, r *http.Request) error {
 	defer r.Body.Close()
 
-	mode := "cloud"
-	if IsDev() {
-		mode = "dev"
-	}
-
 	sig := r.Header.Get(HeaderKeySignature)
-	valid, _, _ := ValidateRequestSignature(
-		r.Context(),
-		sig,
-		h.GetSigningKey(),
-		h.GetSigningKeyFallback(),
-		[]byte{},
-	)
-	if valid {
-		introspection, err := h.createSecureInspection()
-		if err != nil {
-			return err
-		}
+	if sig != "" {
+		valid, _, _ := ValidateRequestSignature(
+			r.Context(),
+			sig,
+			h.GetSigningKey(),
+			h.GetSigningKeyFallback(),
+			[]byte{},
+		)
+		if valid {
+			inspection, err := h.createSecureInspection()
+			if err != nil {
+				return err
+			}
 
-		w.Header().Set(HeaderKeyContentType, "application/json")
-		return json.NewEncoder(w).Encode(introspection)
+			w.Header().Set(HeaderKeyContentType, "application/json")
+			return json.NewEncoder(w).Encode(inspection)
+		}
 	}
 
-	introspection := insecureIntrospection{
-		FunctionCount: len(h.funcs),
-		HasEventKey:   os.Getenv("INNGEST_EVENT_KEY") != "",
-		HasSigningKey: h.GetSigningKey() != "",
-		Mode:          mode,
+	var authenticationSucceeded *bool
+	if sig != "" {
+		val := false
+		authenticationSucceeded = &val
+	}
+
+	inspection, err := h.createInsecureInspection(authenticationSucceeded)
+	if err != nil {
+		return fmt.Errorf("error creating inspection: %w", err)
 	}
 
 	w.Header().Set(HeaderKeyContentType, "application/json")
-	return json.NewEncoder(w).Encode(introspection)
+	return json.NewEncoder(w).Encode(inspection)
 
 }
 
@@ -1025,7 +1095,12 @@ type StreamResponse struct {
 
 // invoke calls a given servable function with the specified input event.  The input event must
 // be fully typed.
-func invoke(ctx context.Context, sf ServableFunction, input *sdkrequest.Request) (any, []state.GeneratorOpcode, error) {
+func invoke(
+	ctx context.Context,
+	sf ServableFunction,
+	input *sdkrequest.Request,
+	stepID *string,
+) (any, []state.GeneratorOpcode, error) {
 	if sf.Func() == nil {
 		// This should never happen, but as sf.Func returns a nillable type we
 		// must check that the function exists.
@@ -1036,6 +1111,10 @@ func invoke(ctx context.Context, sf ServableFunction, input *sdkrequest.Request)
 	// within a step.  This allows us to prevent any execution of future tools after a
 	// tool has run.
 	fCtx, cancel := context.WithCancel(context.Background())
+	if stepID != nil {
+		fCtx = step.SetTargetStepID(fCtx, *stepID)
+	}
+
 	// This must be a pointer so that it can be mutated from within function tools.
 	mgr := sdkrequest.NewManager(cancel, input)
 	fCtx = sdkrequest.SetManager(fCtx, mgr)

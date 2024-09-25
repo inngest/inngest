@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/cmd/commands/internal/localconfig"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/devserver"
+	"github.com/inngest/inngest/pkg/headers"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -20,12 +21,13 @@ import (
 func NewCmdDev() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "dev",
-		Short:   "Run the Inngest dev server",
+		Short:   "Run the Inngest Dev Server for local development.",
 		Example: "inngest dev -u http://localhost:3000/api/inngest",
 		Run:     doDev,
 	}
 
-	cmd.Flags().String("config", "", "Path to the Dev Server configuration file")
+	cmd.Flags().String("config", "", "Path to an Inngest configuration file")
+	cmd.Flags().BoolP("help", "h", false, "Output this help information")
 	cmd.Flags().String("host", "", "host to run the API on")
 	cmd.Flags().StringP("port", "p", "8288", "port to run the API on")
 	cmd.Flags().StringSliceP("sdk-url", "u", []string{}, "SDK URLs to load functions from")
@@ -33,7 +35,6 @@ func NewCmdDev() *cobra.Command {
 	cmd.Flags().Bool("no-poll", false, "Disable polling of apps for updates")
 	cmd.Flags().Int("poll-interval", devserver.DefaultPollInterval, "Interval in seconds between polling for updates to apps")
 	cmd.Flags().Int("retry-interval", 0, "Retry interval in seconds for linear backoff when retrying functions - must be 1 or above")
-
 	cmd.Flags().Int("tick", 150, "The interval (in milliseconds) at which the executor checks for new work, during local development")
 
 	return cmd
@@ -78,7 +79,7 @@ func doDev(cmd *cobra.Command, args []string) {
 		conf.EventAPI.Addr = host
 	}
 
-	urls := viper.GetStringSlice("urls")
+	urls := viper.GetStringSlice("sdk-url")
 
 	// Run auto-discovery unless we've explicitly disabled it.
 	noDiscovery := viper.GetBool("no-discovery")
@@ -88,10 +89,10 @@ func doDev(cmd *cobra.Command, args []string) {
 	tick := viper.GetInt("tick")
 
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
-		ServiceName:   "devserver",
-		Type:          itrace.TracerTypeOTLPHTTP,
+		ServiceName:   "tracing",
 		TraceEndpoint: "localhost:8288",
 		TraceURLPath:  "/dev/traces",
+		Type:          itrace.TracerTypeOTLPHTTP,
 	}); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -100,14 +101,16 @@ func doDev(cmd *cobra.Command, args []string) {
 		_ = itrace.CloseUserTracer(ctx)
 	}()
 
+	conf.ServerKind = headers.ServerKindDev
+
 	opts := devserver.StartOpts{
-		Config:        *conf,
-		URLs:          urls,
 		Autodiscover:  !noDiscovery,
+		Config:        *conf,
 		Poll:          !noPoll,
 		PollInterval:  pollInterval,
 		RetryInterval: retryInterval,
 		Tick:          time.Duration(tick) * time.Millisecond,
+		URLs:          urls,
 	}
 
 	err = devserver.New(ctx, opts)

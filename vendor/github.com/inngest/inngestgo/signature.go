@@ -172,6 +172,11 @@ func normalizeKey(key []byte) []byte {
 	return keyRegexp.ReplaceAll(key, []byte{})
 }
 
+func hashEventKey(key string) string {
+	hash := sha256.Sum256([]byte(key))
+	return hex.EncodeToString(hash[:])
+}
+
 func hashedSigningKey(key []byte) ([]byte, error) {
 	prefix := keyRegexp.Find(key)
 	key = normalizeKey(key)

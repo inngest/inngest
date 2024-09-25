@@ -1,6 +1,10 @@
+import { useState } from 'react';
 import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
 import { NewButton } from '@inngest/components/Button';
 import { NewLink } from '@inngest/components/Link';
+import { parseConnectionString } from '@inngest/components/PostgresIntegrations/utils';
+import { IconSpinner } from '@inngest/components/icons/Spinner';
+import { RiCheckboxCircleFill, RiCloseCircleFill } from '@remixicon/react';
 
 import {
   AccessCommand,
@@ -10,8 +14,118 @@ import {
   RoleCommand,
 } from './ConnectCommands';
 
-export default function Connect({ next }: { next: () => void }) {
-  // TO DO: Add interactions and pass actions as props
+const StatusIndicator = ({
+  loading,
+  success,
+  error,
+}: {
+  loading?: boolean;
+  success?: boolean;
+  error?: boolean;
+}) => {
+  if (loading)
+    return (
+      <div className="text-link flex items-center gap-1 text-sm">
+        <IconSpinner className="fill-link h-4 w-4" />
+        In progress
+      </div>
+    );
+  if (success) return <RiCheckboxCircleFill className="text-success h-4 w-4" />;
+  if (error) return <RiCloseCircleFill className="text-error h-5 w-5" />;
+};
+
+export default function Connect({
+  onSuccess,
+  savedCredentials,
+  verifyAutoSetup,
+  handleLostCredentials,
+}: {
+  onSuccess: () => void;
+  handleLostCredentials: () => void;
+  savedCredentials?: string;
+  verifyAutoSetup: (variables: {
+    adminConn: string;
+    engine: string;
+    name: string;
+    replicaConn?: string;
+  }) => Promise<{
+    success: boolean;
+    error: string;
+    steps: {
+      logical_replication_enabled: {
+        complete: boolean;
+      };
+      publication_created: {
+        complete: boolean;
+      };
+      replication_slot_created: {
+        complete: boolean;
+      };
+      roles_granted: {
+        complete: boolean;
+      };
+      user_created: {
+        complete: boolean;
+      };
+    };
+  }>;
+}) {
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
+  const [error, setError] = useState<string>();
+  const [completionStatus, setCompletionStatus] = useState<{
+    logical_replication_enabled: boolean | null;
+    publication_created: boolean | null;
+    replication_slot_created: boolean | null;
+    roles_granted: boolean | null;
+    user_created: boolean | null;
+  }>({
+    logical_replication_enabled: null,
+    publication_created: null,
+    replication_slot_created: null,
+    roles_granted: null,
+    user_created: null,
+  });
+
+  const handleVerify = async () => {
+    setIsVerifying(true);
+    setError(undefined);
+
+    if (!savedCredentials) {
+      handleLostCredentials();
+      return;
+    }
+
+    const parsedInput = parseConnectionString(savedCredentials);
+
+    if (!parsedInput) {
+      setError('Invalid connection string format. Please check your input.');
+      setIsVerifying(false);
+      return;
+    }
+
+    try {
+      const { success, error, steps } = await verifyAutoSetup(parsedInput);
+      setCompletionStatus({
+        logical_replication_enabled: steps.logical_replication_enabled.complete,
+        publication_created: steps.publication_created.complete,
+        replication_slot_created: steps.replication_slot_created.complete,
+        roles_granted: steps.roles_granted.complete,
+        user_created: steps.user_created.complete,
+      });
+      if (success) {
+        setIsVerified(true);
+        onSuccess();
+      } else {
+        setError(error || 'Connection error.');
+      }
+    } catch (err) {
+      setError('An error occurred while connecting. Please try again.');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   return (
     <>
       <p className="text-sm">
@@ -22,8 +136,17 @@ export default function Connect({ next }: { next: () => void }) {
       <div className="my-6">
         <p className="mb-3 font-medium">Inngest will automatically perform the following setup:</p>
         <AccordionList type="multiple" defaultValue={[]}>
-          <AccordionList.Item value="1">
-            <AccordionList.Trigger>Create a Postgres role for replication</AccordionList.Trigger>
+          <AccordionList.Item value="user_created">
+            <AccordionList.Trigger>
+              <div className="flex w-full items-center justify-between">
+                <p>Create a Postgres role for replication</p>
+                <StatusIndicator
+                  loading={isVerifying}
+                  success={completionStatus.user_created === true}
+                  error={completionStatus.user_created === false}
+                />
+              </div>
+            </AccordionList.Trigger>
 
             <AccordionList.Content>
               <p className="mb-3">
@@ -38,8 +161,17 @@ export default function Connect({ next }: { next: () => void }) {
               <RoleCommand />
             </AccordionList.Content>
           </AccordionList.Item>
-          <AccordionList.Item value="2">
-            <AccordionList.Trigger>Grant schema access to your Postgres role</AccordionList.Trigger>
+          <AccordionList.Item value="roles_granted">
+            <AccordionList.Trigger>
+              <div className="flex w-full items-center justify-between">
+                <p>Grant schema access to your Postgres role</p>
+                <StatusIndicator
+                  loading={isVerifying}
+                  success={completionStatus.roles_granted === true}
+                  error={completionStatus.roles_granted === false}
+                />
+              </div>
+            </AccordionList.Trigger>
             <AccordionList.Content>
               <p className="mb-3">
                 Granting{' '}
@@ -50,8 +182,17 @@ export default function Connect({ next }: { next: () => void }) {
               <AccessCommand />
             </AccordionList.Content>
           </AccordionList.Item>
-          <AccordionList.Item value="3">
-            <AccordionList.Trigger>Create a replication slot</AccordionList.Trigger>
+          <AccordionList.Item value="replication_slot_created">
+            <AccordionList.Trigger>
+              <div className="flex w-full items-center justify-between">
+                <p>Create a replication slot</p>
+                <StatusIndicator
+                  loading={isVerifying}
+                  success={completionStatus.replication_slot_created === true}
+                  error={completionStatus.replication_slot_created === false}
+                />
+              </div>
+            </AccordionList.Trigger>
             <AccordionList.Content>
               <p className="mb-3">
                 Inngest uses the <code className="text-accent-xIntense text-xs">pgoutput</code>{' '}
@@ -69,8 +210,17 @@ export default function Connect({ next }: { next: () => void }) {
               </p>
             </AccordionList.Content>
           </AccordionList.Item>
-          <AccordionList.Item value="4">
-            <AccordionList.Trigger>Create a publication</AccordionList.Trigger>
+          <AccordionList.Item value="publication_created">
+            <AccordionList.Trigger>
+              <div className="flex w-full items-center justify-between">
+                <p>Create a publication</p>
+                <StatusIndicator
+                  loading={isVerifying}
+                  success={completionStatus.publication_created === true}
+                  error={completionStatus.publication_created === false}
+                />
+              </div>
+            </AccordionList.Trigger>
             <AccordionList.Content>
               <ol className="list-decimal pl-10">
                 <li className="mb-3">
@@ -100,7 +250,16 @@ export default function Connect({ next }: { next: () => void }) {
         </AccordionList>
       </div>
 
-      <NewButton label="Complete setup automatically" onClick={next} />
+      {isVerified ? (
+        <NewButton label="See integration" href={`/settings/integrations/neon`} />
+      ) : (
+        <NewButton
+          label="Complete setup automatically"
+          onClick={handleVerify}
+          loading={isVerifying}
+        />
+      )}
+      {error && <p className="text-error mt-4 text-sm">{error}</p>}
     </>
   );
 }

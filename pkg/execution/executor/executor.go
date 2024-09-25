@@ -2514,7 +2514,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 	}
 
 	// TODO: check if all errors can be blindly returned
-	if err := e.batcher.ExpireKeys(ctx, payload.FunctionID, payload.BatchID); err != nil {
+	if err := e.batcher.DeleteKeys(ctx, payload.FunctionID, payload.BatchID); err != nil {
 		return err
 	}
 

@@ -40,14 +40,15 @@
     "graphql-request": "6.1.0",
     "lodash.debounce": "4.0.8",
     "monaco-editor": "0.34.1",
-    "next": "14.2.3",
+    "next": "14.2.10",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-redux": "8.0.5",
     "react-refractor": "2.1.7",
     "refractor": "4.8.0",
     "sonner": "1.2.0",
-    "ulid": "2.3.0"
+    "ulid": "2.3.0",
+    "zod": "3.22.4"
   },
   "devDependencies": {
     "@graphql-codegen/cli": "3.2.2",

@@ -1,90 +1,77 @@
-import { Chart, type ChartProps, type LineSeriesOption } from '@inngest/components/Chart/Chart';
+import { NewButton } from '@inngest/components/Button';
+import { Chart } from '@inngest/components/Chart/Chart';
+import { Info } from '@inngest/components/Info/Info';
+import { NewLink } from '@inngest/components/Link/Link';
+import { RiArrowRightUpLine } from '@remixicon/react';
 
-import { FunctionInfo } from './FunctionInfo';
+import { useEnvironment } from '@/components/Environments/environment-context';
+import type { FunctionStatusMetricsQuery } from '@/gql/graphql';
+import { pathCreator } from '@/utils/urls';
+import type { EntityLookup } from './Dashboard';
+import { FailedRate } from './FailedRate';
+import { getLineChartOptions, mapEntityLines, sum } from './utils';
 
-const seriesOptions: LineSeriesOption = {
-  type: 'line',
-  showSymbol: false,
-  stack: 'Total',
-  lineStyle: { width: 1 },
-  emphasis: {
-    focus: 'series',
-  },
+export type CompletedType = FunctionStatusMetricsQuery['workspace']['completed'];
+export type CompletedMetricsType = FunctionStatusMetricsQuery['workspace']['completed']['metrics'];
+
+const filter = ({ metrics }: CompletedType) =>
+  metrics.filter(({ tagValue }) => tagValue === 'Failed');
+
+const sort = (metrics: CompletedMetricsType) =>
+  metrics.sort(({ data: data1 }, { data: data2 }) => sum(data2) - sum(data1));
+
+const mapFailed = (
+  { completed }: FunctionStatusMetricsQuery['workspace'],
+  entities: EntityLookup
+) => {
+  const failed = sort(filter(completed));
+  return mapEntityLines(failed, entities);
 };
 
-export const FailedFunctions = () => {
-  const option: ChartProps['option'] = {
-    tooltip: {
-      trigger: 'axis',
-    },
-    legend: {
-      bottom: '10%',
-      icon: 'circle',
-      itemWidth: 10,
-      itemHeight: 10,
-      data: [
-        'Web analytics',
-        'Deploy notifications',
-        'New lead',
-        'Stripe invoice',
-        'Onboarding campaign',
-      ],
-      textStyle: { fontSize: '12px' },
-    },
-    grid: {
-      top: '20%',
-      left: '0%',
-      right: '10%',
-      bottom: '20%',
-      containLabel: true,
-    },
-    xAxis: {
-      type: 'category',
-      boundaryGap: false,
-      data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-    },
-    yAxis: {
-      type: 'value',
-    },
-    series: [
-      {
-        ...seriesOptions,
-        name: 'Web analytics',
-        data: [120, 132, 101, 134, 90, 230, 210],
-        itemStyle: { color: '#ec9923' },
-      },
-      {
-        ...seriesOptions,
-        name: 'Deploy notifications',
-        data: [220, 182, 191, 234, 290, 330, 310],
-        itemStyle: { color: '#2c9b63' },
-      },
-      {
-        ...seriesOptions,
-        name: 'New lead',
-        data: [150, 232, 201, 154, 190, 330, 410],
-        itemStyle: { color: '#2389f1' },
-      },
-      {
-        ...seriesOptions,
-        name: 'Stripe invoice',
-        data: [320, 332, 301, 334, 390, 330, 320],
-        itemStyle: { color: '#f54a3f' },
-      },
-      {
-        ...seriesOptions,
-        name: 'Onboarding campaign',
-        data: [820, 932, 901, 934, 1290, 1330, 1320],
-        itemStyle: { color: '#6222df' },
-      },
-    ],
-  };
+export const FailedFunctions = ({
+  workspace,
+  entities,
+  functions,
+}: Partial<FunctionStatusMetricsQuery> & { entities: EntityLookup; functions: EntityLookup }) => {
+  const env = useEnvironment();
+
+  const metrics = workspace && mapFailed(workspace, entities);
+
   return (
     <div className="bg-canvasBase border-subtle overflowx-hidden relative flex h-[300px] w-full flex-col rounded-lg p-5">
-      <div className="text-subtle flex w-full flex-row items-center gap-x-2 text-lg">
-        Failed Functions <FunctionInfo />
+      <div className="mb-2 flex flex-row items-center justify-between gap-x-2">
+        <div className="text-subtle flex w-full flex-row items-center gap-x-2 text-lg">
+          Failed Functions{' '}
+          <Info
+            text="Total number of failed runs in your environment, app or function."
+            action={
+              <NewLink
+                arrowOnHover
+                className="text-sm"
+                href="https://www.inngest.com/docs/features/inngest-functions?ref=app-metrics"
+              >
+                Learn more about Inngest functions.
+              </NewLink>
+            }
+          />
+        </div>
+        <NewButton
+          size="small"
+          kind="secondary"
+          appearance="outlined"
+          icon={<RiArrowRightUpLine />}
+          iconSide="left"
+          label="View all"
+          href={`${pathCreator.runs({ envSlug: env.slug })}?filterStatus=%5B"FAILED"%5D`}
+        />
       </div>
-      <Chart option={option} />
+      <div className="flex h-full flex-row items-center">
+        <Chart
+          option={metrics ? getLineChartOptions(metrics) : {}}
+          className="h-[100%] w-full md:w-[75%]"
+        />
+        <FailedRate workspace={workspace} functions={functions} />
+      </div>
     </div>
   );
 };

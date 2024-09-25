@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+// This is a TypeScript implementation of the syscode package in Inngest OSS
+
 const codes = [
   'account_mismatch',
   'app_mismatch',
@@ -57,3 +59,41 @@ export const httpDataSchema = z.object({
   headers: z.record(z.array(z.string())),
   statusCode: z.number(),
 });
+
+export const dataMultiErr = z.object({
+  errors: z.array(codedErrorSchema),
+});
+
+export function parseErrorData(
+  data: unknown
+): z.infer<typeof httpDataSchema> | z.infer<typeof dataMultiErr> | null {
+  if (data === null || data === undefined) {
+    return null;
+  }
+
+  if (typeof data !== 'string') {
+    console.error('error data is not a string:', data);
+    return null;
+  }
+
+  let obj: unknown;
+  try {
+    obj = JSON.parse(data);
+  } catch {
+    console.error('failed to parse error data:', data);
+    return null;
+  }
+
+  const httpData = httpDataSchema.safeParse(obj);
+  if (httpData.success) {
+    return httpData.data;
+  }
+
+  const multiErr = dataMultiErr.safeParse(obj);
+  if (multiErr.success) {
+    return multiErr.data;
+  }
+
+  console.error('unknown error data format:', data);
+  return null;
+}

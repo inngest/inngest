@@ -10,9 +10,13 @@ export default function IntegrationPage({
   publications,
 }: {
   content: IntegrationPageContent;
+  // TO DO: change this format
   publications: {
-    isActive: boolean;
+    id: string;
     name: string;
+    slug: string;
+    projects: never[];
+    enabled: boolean;
   }[];
 }) {
   return (
@@ -37,14 +41,14 @@ export default function IntegrationPage({
           key={`${content.title}-publications-${i}`}
           className="my-9"
           accentPosition="left"
-          accentColor={p.isActive ? 'bg-primary-intense' : 'bg-disabled'}
+          accentColor={p.enabled ? 'bg-primary-intense' : 'bg-surfaceMuted'}
         >
           <Card.Content className="p-6">
             <div className="flex flex-row items-center justify-between">
               <div className="flex flex-col">
                 <div>
-                  <Pill appearance="solid" kind={p.isActive ? 'primary' : 'default'}>
-                    {p.isActive ? 'Active' : 'disabled'}
+                  <Pill appearance="solid" kind={p.enabled ? 'primary' : 'default'}>
+                    {p.enabled ? 'Active' : 'Disabled'}
                   </Pill>
                 </div>
                 <div className="mt-4 flex flex-row items-center justify-start">
@@ -57,12 +61,20 @@ export default function IntegrationPage({
       ))}
 
       <div className="border-muted border-t py-7">
-        <p>Remove {content.title} integration</p>
+        <div className="flex items-center gap-2">
+          <p>Remove {content.title} integration</p>
+          <Pill>Coming soon</Pill>
+        </div>
         <p className="text-subtle mb-6 mt-3 text-sm">
           Permanently remove the {content.title} integration from Inngest
         </p>
-        {/* TO DO: Wire button */}
-        <NewButton appearance="solid" kind="danger" label={`Remove ${content.title}`} />
+        <NewButton
+          disabled
+          appearance="solid"
+          kind="danger"
+          label={`Remove ${content.title}`}
+          title="coming soon"
+        />
       </div>
     </div>
   );

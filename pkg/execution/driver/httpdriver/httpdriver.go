@@ -62,8 +62,9 @@ type HTTPDoer interface {
 }
 
 type executor struct {
-	Client     *http.Client
-	signingKey []byte
+	Client                 *http.Client
+	localSigningKey        []byte
+	requireLocalSigningKey bool
 }
 
 // RuntimeType fulfiils the inngest.Runtime interface.
@@ -72,6 +73,10 @@ func (e executor) RuntimeType() string {
 }
 
 func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadata, item queue.Item, edge inngest.Edge, step inngest.Step, idx, attempt int) (*state.DriverResponse, error) {
+	if e.requireLocalSigningKey && len(e.localSigningKey) == 0 {
+		return nil, fmt.Errorf("server requires that a signing key is set to run functions")
+	}
+
 	uri, err := url.Parse(step.URI)
 	if err != nil {
 		return nil, err
@@ -83,7 +88,7 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 	}
 
 	return DoRequest(ctx, e.Client, Request{
-		SigningKey: e.signingKey,
+		SigningKey: e.localSigningKey,
 		URL:        *uri,
 		Input:      input,
 		Edge:       edge,
@@ -352,10 +357,10 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*response, error) {
 	// Only SDK versions that include the status in the body are expected to
 	// send a 201 status code and namespace in this way, so failing to parse
 	// here is an error.
-	if resp.StatusCode == 201 {
+	if resp.StatusCode == 201 && sysErr == nil {
 		stream, err := ParseStream(byt)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error parsing stream: %w", err)
 		}
 		// These are all contained within a single wrapper.
 		body = stream.Body

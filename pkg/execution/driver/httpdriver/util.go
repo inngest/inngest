@@ -47,9 +47,6 @@ func CheckRedirect(req *http.Request, via []*http.Request) (err error) {
 		return fmt.Errorf("stopped after 10 redirects")
 	}
 
-	// If we're redirected we want to ensure that we retain the HTTP method.
-	req.Method = via[0].Method
-
 	if via[0].Body != nil {
 		req.Body, err = via[0].GetBody()
 		if err != nil {
@@ -58,7 +55,13 @@ func CheckRedirect(req *http.Request, via []*http.Request) (err error) {
 	}
 
 	req.ContentLength = via[0].ContentLength
-	req.Header = via[0].Header
+
+	// Combine headers from the original request and the redirect request
+	for k, v := range via[0].Header {
+		if len(v) > 0 {
+			req.Header.Set(k, v[0])
+		}
+	}
 
 	// Retain the original query params
 	qp := req.URL.Query()
