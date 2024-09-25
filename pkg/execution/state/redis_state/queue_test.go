@@ -1926,6 +1926,8 @@ func TestQueueLease(t *testing.T) {
 		}, start)
 		require.NoError(t, err)
 
+		require.True(t, r.Exists("{queue}:queue:sorted:system-queue"))
+
 		item = getQueueItem(t, r, item.ID)
 		require.Nil(t, item.LeaseID)
 
@@ -1934,6 +1936,50 @@ func TestQueueLease(t *testing.T) {
 		now := time.Now()
 		id, err := q.Lease(ctx, p, item, time.Second, time.Now(), nil)
 		require.NoError(t, err)
+
+		require.False(t, r.Exists("{queue}:queue:sorted:system-queue"))
+		require.True(t, r.Exists("{queue}:concurrency:account:system-queue"), r.Dump())
+		require.True(t, r.Exists("{queue}:concurrency:p:system-queue"))
+
+		item = getQueueItem(t, r, item.ID)
+		require.NotNil(t, item.LeaseID)
+		require.EqualValues(t, id, item.LeaseID)
+		require.WithinDuration(t, now.Add(time.Second), ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
+
+		require.True(t, r.Exists(p.concurrencyKey(q.u.kg)), r.Dump())
+	})
+
+	t.Run("batch system partitions should be leased properly", func(t *testing.T) {
+		r.FlushAll()
+
+		systemQueueName := osqueue.KindScheduleBatch
+		item, err := q.EnqueueItem(ctx, QueueItem{
+			QueueName: &systemQueueName,
+			Data: osqueue.Item{
+				QueueName: &systemQueueName,
+			},
+		}, start)
+		require.NoError(t, err)
+
+		require.True(t, r.Exists("{queue}:queue:sorted:schedule-batch"))
+
+		item = getQueueItem(t, r, item.ID)
+		require.Nil(t, item.LeaseID)
+
+		p := getSystemPartition(t, r, systemQueueName)
+
+		now := time.Now()
+		id, err := q.Lease(ctx, p, item, time.Second, time.Now(), nil)
+		require.NoError(t, err)
+
+		require.False(t, r.Exists("{queue}:queue:sorted:schedule-batch"))
+
+		// batching uses different rules for concurrency keys
+		require.False(t, r.Exists("{queue}:concurrency:account:schedule-batch"), r.Dump())
+		require.False(t, r.Exists("{queue}:concurrency:p:schedule-batch"))
+
+		require.True(t, r.Exists("{queue}:concurrency:account:00000000-0000-0000-0000-000000000000"), r.Dump())
+		require.True(t, r.Exists("{queue}:concurrency:p:00000000-0000-0000-0000-000000000000"))
 
 		item = getQueueItem(t, r, item.ID)
 		require.NotNil(t, item.LeaseID)
@@ -1944,10 +1990,76 @@ func TestQueueLease(t *testing.T) {
 	})
 
 	t.Run("leasing key queue should clear backward-compat default partition", func(t *testing.T) {
-		// TODO Implement this test
+		r.FlushAll()
+
 		// This is required as not dropping items from all partitions during lease will cause a leftover item to be in the default partition
-		// When the item has been processed and we run Dequeue, this only happens on the key queue, and the default partition retains its pointer even though the queue item is deleted
+		// When the item has been processed, and we run Dequeue, this only happens on the key queue, and the default partition retains its pointer even though the queue item is deleted
 		// This leads to Peek errors in default partitions, including system partitions (encountered missing queue items in partition queue)
+
+		accountId := uuid.New()
+
+		evaluatedKey := util.ConcurrencyKey(enums.ConcurrencyScopeAccount, accountId, "customer-1")
+
+		fnId := uuid.New()
+		item, err := q.EnqueueItem(ctx, QueueItem{
+			FunctionID: fnId,
+			Data: osqueue.Item{
+				Identifier: state.Identifier{
+					AccountID:  accountId,
+					WorkflowID: fnId,
+				},
+				CustomConcurrencyKeys: []state.CustomConcurrency{
+					{
+						Key:   evaluatedKey,
+						Hash:  util.XXHash("event.data.customerId"),
+						Limit: 10,
+					},
+				},
+			},
+		}, start)
+		require.NoError(t, err)
+
+		kg := queueKeyGenerator{
+			queueDefaultKey: QueueDefaultKey,
+			queueItemKeyGenerator: queueItemKeyGenerator{
+				queueDefaultKey: QueueDefaultKey,
+			},
+		}
+
+		p := getPartition(t, r, enums.PartitionTypeConcurrencyKey, accountId, util.XXHash("customer-1"))
+		defaultPart := getDefaultPartition(t, r, fnId)
+
+		require.True(t, r.Exists(defaultPart.zsetKey(kg)))
+
+		// account-scoped custom concurrency queue should exist
+		require.True(t, r.Exists(p.zsetKey(kg)), evaluatedKey, p.zsetKey(kg), r.Dump())
+
+		now := time.Now()
+		id, err := q.Lease(ctx, p, item, time.Second, time.Now(), nil)
+		require.NoError(t, err)
+
+		item = getQueueItem(t, r, item.ID)
+		require.NotNil(t, item.LeaseID)
+		require.EqualValues(t, id, item.LeaseID)
+		require.WithinDuration(t, now.Add(time.Second), ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
+
+		require.False(t, r.Exists(defaultPart.zsetKey(kg)))
+		require.False(t, r.Exists(p.zsetKey(kg)), evaluatedKey, p.zsetKey(kg), r.Dump())
+
+		require.True(t, r.Exists(p.concurrencyKey(kg)), r.Dump())
+		require.True(t, r.Exists(defaultPart.concurrencyKey(kg)), evaluatedKey, p.concurrencyKey(kg), r.Dump())
+		require.True(t, r.Exists(kg.Concurrency("account", accountId.String())))
+
+		err = q.Dequeue(ctx, p, item)
+		require.NoError(t, err)
+
+		require.False(t, r.Exists(defaultPart.zsetKey(kg)))
+		require.False(t, r.Exists(p.zsetKey(kg)), evaluatedKey, p.zsetKey(kg), r.Dump())
+
+		require.False(t, r.Exists(p.concurrencyKey(kg)), r.Dump())
+		require.False(t, r.Exists(defaultPart.concurrencyKey(kg)), evaluatedKey, p.concurrencyKey(kg), r.Dump())
+		require.False(t, r.Exists(kg.Concurrency("account", accountId.String())))
+
 	})
 }
 

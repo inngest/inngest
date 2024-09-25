@@ -724,6 +724,12 @@ func (q QueuePartition) concurrencyKey(kg QueueKeyGenerator) string {
 func (q QueuePartition) fnConcurrencyKey(kg QueueKeyGenerator) string {
 	// Enable system partitions to use the queueName override instead of the fnId
 	if q.IsSystem() {
+		if *q.QueueName == osqueue.KindScheduleBatch {
+			// this is consistent with the concrete WithPartitionConcurrencyKeyGenerator in cloud previously
+			return kg.Concurrency("p", uuid.Nil.String())
+		}
+
+		// for other queues like pauses, this is consistent with the concrete WithPartitionConcurrencyKeyGenerator in cloud previously
 		return kg.Concurrency("p", q.Queue())
 	}
 
@@ -738,6 +744,12 @@ func (q QueuePartition) fnConcurrencyKey(kg QueueKeyGenerator) string {
 func (q QueuePartition) acctConcurrencyKey(kg QueueKeyGenerator) string {
 	// Enable system partitions to use the queueName override instead of the accountId
 	if q.IsSystem() {
+		if *q.QueueName == osqueue.KindScheduleBatch {
+			// this is consistent with the concrete WithAccountConcurrencyKeyGenerator in cloud previously
+			return kg.Concurrency("account", uuid.Nil.String())
+		}
+
+		// for other queues like pauses, this is consistent with the concrete WithAccountConcurrencyKeyGenerator in cloud previously
 		return kg.Concurrency("account", q.Queue())
 	}
 	if q.AccountID == uuid.Nil {
@@ -751,6 +763,7 @@ func (q QueuePartition) acctConcurrencyKey(kg QueueKeyGenerator) string {
 func (q QueuePartition) customConcurrencyKey(kg QueueKeyGenerator) string {
 	// This should never happen, but we attempt to handle it gracefully
 	if q.IsSystem() {
+		// this is consistent with the concrete WithCustomConcurrencyKeyGenerator in cloud previously
 		return kg.Concurrency("custom", q.Queue())
 	}
 
@@ -1569,6 +1582,10 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		// Always apply system partition-specific concurrency limits
 		// "account" prefix is used for backwards-compatibility
 		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
+		if *parts[0].QueueName == osqueue.KindScheduleBatch {
+			// we previously used an empty uuid for account + partition, see concrete WithAccountConcurrencyKeyGenerator in cloud
+			accountConcurrencyKey = q.u.kg.Concurrency("account", uuid.Nil.String())
+		}
 	} else if acctLimit <= 0 {
 		// NOTE: This should have been called in ItemPartitions.  We always need to fetch the latest
 		// account concurrency limit.
