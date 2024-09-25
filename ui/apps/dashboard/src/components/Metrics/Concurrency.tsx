@@ -6,26 +6,29 @@ import type { VolumeMetricsQuery } from '@/gql/graphql';
 import type { EntityLookup } from './Dashboard';
 import { getLineChartOptions, mapEntityLines } from './utils';
 
-export const StepsThroughput = ({
+export type SdkThroughputMetricsType = VolumeMetricsQuery['workspace']['concurrency']['metrics'];
+
+export const AccountConcurrency = ({
   workspace,
   entities,
 }: Partial<VolumeMetricsQuery> & { entities: EntityLookup }) => {
-  const metrics = workspace && mapEntityLines(workspace.stepThroughput.metrics, entities);
+  const metrics =
+    workspace && mapEntityLines(workspace.concurrency.metrics, entities, { opacity: 1 });
 
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[300px] w-full flex-col overflow-x-hidden rounded-lg p-5">
       <div className="mb-2 flex flex-row items-center justify-between">
         <div className="text-subtle flex w-full flex-row items-center gap-x-2 text-lg">
-          Total steps throughput{' '}
+          Account Concurrency{' '}
           <Info
-            text="Total number of steps processed your env, app or function."
+            text="Total number of steps running compared to the account-level concurrency limits."
             action={
               <NewLink
                 arrowOnHover
                 className="text-sm"
-                href="https://www.inngest.com/docs/features/inngest-functions/steps-workflows"
+                href="https://www.inngest.com/docs/guides/concurrency#concurrency-use-cases"
               >
-                Learn more about step throughput.
+                Learn more about concurrency.
               </NewLink>
             }
           />

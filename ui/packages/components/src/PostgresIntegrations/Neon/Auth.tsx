@@ -2,10 +2,8 @@ import { useEffect, useState } from 'react';
 import { NewButton } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
 import { NewLink } from '@inngest/components/Link';
-import {
-  IntegrationSteps,
-  parseConnectionString,
-} from '@inngest/components/PostgresIntegrations/types';
+import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/types';
+import { parseConnectionString } from '@inngest/components/PostgresIntegrations/utils';
 import { cn } from '@inngest/components/utils/classNames';
 
 export default function NeonAuth({

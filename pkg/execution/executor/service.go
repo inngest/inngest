@@ -299,7 +299,7 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 	}
 	if status == enums.BatchStatusAbsent.String() {
 		// just attempt clean up, don't care about the result
-		_ = s.batcher.ExpireKeys(ctx, opts.FunctionID, batchID)
+		_ = s.batcher.DeleteKeys(ctx, opts.FunctionID, batchID)
 		return nil
 	}
 

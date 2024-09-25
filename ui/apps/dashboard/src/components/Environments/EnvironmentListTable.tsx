@@ -173,8 +173,10 @@ function TableRow(props: { env: Environment }) {
 
   return (
     <tr className="hover:bg-slate-100/60">
-      <td className="px-4 py-4">
-        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">{name}</h3>
+      <td className="max-w-80 px-4 py-4">
+        <h3 className="flex items-center gap-2 break-all text-sm font-semibold text-slate-800">
+          {name}
+        </h3>
       </td>
       <td>
         <div className="flex items-center gap-2 px-4" title={`Last synced at ${lastDeployedAt}`}>
