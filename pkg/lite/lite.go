@@ -84,11 +84,8 @@ func New(ctx context.Context, opts StartOpts) error {
 		opts.Config.Execution.LogOutput = true
 	}
 
-	// Ensure that if we've been given a signing key, that cloud mode is
-	// enabled appropriately in config.
-	if opts.SigningKey != nil && opts.SigningKey.Valid() {
-		opts.Config.ServerKind = headers.ServerKindCloud
-	}
+	// Always set Cloud.
+	opts.Config.ServerKind = headers.ServerKindCloud
 
 	// NOTE: looks deprecated?
 	// Before running the development service, ensure that we change the http
