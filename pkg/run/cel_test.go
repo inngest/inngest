@@ -9,10 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func mustExpHandler() *ExpressionHandler {
-	return nil
-}
-
 func TestToSQLEventFilters(t *testing.T) {
 	ctx := context.Background()
 

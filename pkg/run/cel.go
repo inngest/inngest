@@ -129,11 +129,11 @@ func (h *ExpressionHandler) add(ctx context.Context, cel []string) error {
 		}
 	}
 
-	for evt, _ := range evtExprs {
+	for evt := range evtExprs {
 		h.EventExprList = append(h.EventExprList, evt)
 	}
 
-	for out, _ := range outputExprs {
+	for out := range outputExprs {
 		h.OutputExprList = append(h.OutputExprList, out)
 	}
 
