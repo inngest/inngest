@@ -20,6 +20,7 @@ export type MetricsFilters = {
   selectedFns?: string[];
   autoRefresh?: boolean;
   entities: EntityLookup;
+  scope: MetricsScope;
 };
 
 const GetVolumeMetrics = graphql(`
@@ -173,6 +174,7 @@ export const MetricsVolume = ({
   selectedFns = [],
   autoRefresh = false,
   entities,
+  scope,
 }: MetricsFilters) => {
   const [volumeOpen, setVolumeOpen] = useState(true);
 
@@ -184,7 +186,7 @@ export const MetricsVolume = ({
     appIDs: selectedApps,
     functionIDs: selectedFns,
     until: until ? until.toISOString() : null,
-    scope: !selectedApps.length && !selectedFns.length ? MetricsScope.App : MetricsScope.Fn,
+    scope,
   };
 
   const { error, data } = useGraphQLQuery({

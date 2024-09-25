@@ -18,7 +18,7 @@ import {
 } from '@inngest/components/utils/date';
 import { useQuery } from 'urql';
 
-import { GetBillingPlanDocument } from '@/gql/graphql';
+import { GetBillingPlanDocument, MetricsScope } from '@/gql/graphql';
 import { MetricsOverview } from './Overview';
 import { MetricsVolume } from './Volume';
 import { convertLookup } from './utils';
@@ -39,6 +39,7 @@ export type MetricsFilters = {
   autoRefresh?: boolean;
   entities: EntityLookup;
   functions: EntityLookup;
+  scope: MetricsScope;
 };
 
 export const DEFAULT_DURATION = { hours: 24 };
@@ -84,7 +85,7 @@ export const Dashboard = ({
   const logRetention = Number(planData?.account.plan?.features.log_retention);
   const upgradeCutoff = subtractDuration(new Date(), { days: logRetention || 7 });
 
-  const envLookup = !selectedApps?.length && !selectedFns?.length;
+  const envLookup = apps.length !== 1 && !selectedApps?.length && !selectedFns?.length;
   const mappedFunctions = convertLookup(functions);
   const mappedApps = convertLookup(apps);
   const mappedEntities = envLookup ? mappedApps : mappedFunctions;
@@ -132,6 +133,7 @@ export const Dashboard = ({
           autoRefresh={autoRefresh}
           entities={mappedEntities}
           functions={mappedFunctions}
+          scope={envLookup ? MetricsScope.App : MetricsScope.Fn}
         />
       </div>
       <div className="bg-canvasSubtle px-6 pb-6">
@@ -142,6 +144,7 @@ export const Dashboard = ({
           selectedFns={selectedFns}
           autoRefresh={autoRefresh}
           entities={mappedEntities}
+          scope={envLookup ? MetricsScope.App : MetricsScope.Fn}
         />
       </div>
     </div>
