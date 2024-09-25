@@ -906,13 +906,26 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) ([]QueuePartiti
 		ckeys      = i.Data.GetConcurrencyKeys()
 	)
 
+	queueName := i.Data.QueueName
+
+	// sanity check: both QueueNames should be set, but sometimes aren't
+	if queueName == nil && i.QueueName != nil {
+		queueName = i.QueueName
+		q.logger.Warn().Interface("item", i).Msg("encountered queue item with inconsistent custom queue name, should have both i.QueueName and i.Data.QueueName set")
+	}
+
+	// sanity check: queueName values must match
+	if i.Data.QueueName != nil && i.QueueName != nil && i.Data.QueueName != i.QueueName {
+		q.logger.Error().Interface("item", i).Msg("encountered queue item with inconsistent custom queue names, should have matching values for i.QueueName and i.Data.QueueName")
+	}
+
 	// The only case when we manually set a queueName is for system partitions
-	if i.Data.QueueName != nil {
+	if queueName != nil {
 		systemPartition := QueuePartition{
 			// NOTE: Never remove this. The ID is required to enqueue items to the
 			// partition, as it is used for conditional checks in Lua
-			ID:        *i.Data.QueueName,
-			QueueName: i.Data.QueueName,
+			ID:        *queueName,
+			QueueName: queueName,
 		}
 		// Fetch most recent system concurrency limit
 		systemLimits := q.systemConcurrencyLimitGetter(ctx, systemPartition)
@@ -924,6 +937,10 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) ([]QueuePartiti
 			{},
 			{},
 		}, systemLimits.GlobalLimit
+	}
+
+	if i.FunctionID == uuid.Nil {
+		q.logger.Error().Interface("item", i).Msg("unexpected missing functionID in ItemPartitions()")
 	}
 
 	// Check if we have custom concurrency keys for the given function.  If so,
