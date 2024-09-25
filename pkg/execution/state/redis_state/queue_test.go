@@ -1953,12 +1953,35 @@ func TestQueueLease(t *testing.T) {
 		r.FlushAll()
 
 		systemQueueName := osqueue.KindScheduleBatch
-		item, err := q.EnqueueItem(ctx, QueueItem{
+		qi := QueueItem{
 			QueueName: &systemQueueName,
 			Data: osqueue.Item{
 				QueueName: &systemQueueName,
 			},
-		}, start)
+		}
+
+		kg := queueKeyGenerator{
+			queueDefaultKey: QueueDefaultKey,
+			queueItemKeyGenerator: queueItemKeyGenerator{
+				queueDefaultKey: QueueDefaultKey,
+			},
+		}
+
+		parts, _ := q.ItemPartitions(ctx, qi)
+		require.Equal(t, 3, len(parts))
+		require.Equal(t, QueuePartition{
+			ID:               systemQueueName,
+			QueueName:        &systemQueueName,
+			ConcurrencyLimit: consts.DefaultConcurrencyLimit,
+		}, parts[0])
+		require.True(t, parts[0].IsSystem())
+		require.Equal(t, QueuePartition{}, parts[1])
+		require.Equal(t, QueuePartition{}, parts[2])
+
+		require.Equal(t, "{queue}:queue:sorted:schedule-batch", parts[0].zsetKey(kg))
+		require.Equal(t, "{queue}:concurrency:p:00000000-0000-0000-0000-000000000000", parts[0].concurrencyKey(kg))
+
+		item, err := q.EnqueueItem(ctx, qi, start)
 		require.NoError(t, err)
 
 		require.True(t, r.Exists("{queue}:queue:sorted:schedule-batch"))
