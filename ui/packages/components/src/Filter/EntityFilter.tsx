@@ -49,7 +49,6 @@ export default function EntityFilter({
 
   const handleReset = () => {
     setTemporarySelectedValues([]);
-    onFilterChange([]);
   };
 
   return (
