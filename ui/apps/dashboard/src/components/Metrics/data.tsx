@@ -48,7 +48,7 @@ const fetchLookups = async ({
 
 export const getMetricsLookups = cache(async (envSlug: string) => {
   const page = 1;
-  const pageSize = 100;
+  const pageSize = 1000;
   const results = await fetchLookups({ envSlug, page, pageSize });
 
   const totalPages = results.envBySlug.workflows.page.totalPages || 1;
