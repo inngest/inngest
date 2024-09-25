@@ -3,7 +3,6 @@
 import { RangePicker } from '@inngest/components/DatePicker';
 import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicker.jsx';
 import EntityFilter from '@inngest/components/Filter/EntityFilter';
-import { Pill } from '@inngest/components/Pill';
 import {
   useBatchedSearchParams,
   useBooleanSearchParam,

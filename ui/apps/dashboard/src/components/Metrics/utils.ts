@@ -70,7 +70,6 @@ export const getLineChartOptions = (data: LineChartData): ChartProps['option'] =
   return {
     tooltip: {
       trigger: 'axis',
-      confine: true,
       enterable: true,
     },
     legend: {

@@ -8,11 +8,9 @@ import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { useEnvironment } from '../Environments/environment-context';
 import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
 import { Backlog } from './Backlog';
-import { AccountConcurrency } from './Concurrency';
 import type { EntityLookup } from './Dashboard';
 import { Feedback } from './Feedback';
 import { RunsThrougput } from './RunsThroughput';
-import { SdkThroughput } from './SdkThroughput';
 import { StepsThroughput } from './StepsThroughput';
 
 export type MetricsFilters = {

@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { RiRefreshLine } from '@remixicon/react';
+import { toast } from 'sonner';
 
 import { NewButton } from '../Button';
 
@@ -15,7 +16,10 @@ export const RefreshButton = () => {
       label="Refresh page"
       icon={<RiRefreshLine />}
       iconSide="left"
-      onClick={() => router.refresh()}
+      onClick={() => {
+        router.refresh();
+        setTimeout(() => toast.success('Refreshed!'), 500);
+      }}
     />
   );
 };
