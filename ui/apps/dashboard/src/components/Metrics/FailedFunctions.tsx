@@ -9,6 +9,7 @@ import type { FunctionStatusMetricsQuery } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import type { EntityLookup } from './Dashboard';
 import { FailedRate } from './FailedRate';
+import { NotFound } from './NotFound';
 import { getLineChartOptions, mapEntityLines, sum } from './utils';
 
 export type CompletedType = FunctionStatusMetricsQuery['workspace']['completed'];
@@ -36,6 +37,10 @@ export const FailedFunctions = ({
   const env = useEnvironment();
 
   const metrics = workspace && mapFailed(workspace, entities);
+  const notFound = metrics && metrics.series.length === 0;
+  if (notFound) {
+    return <NotFound />;
+  }
 
   return (
     <div className="bg-canvasBase border-subtle overflowx-hidden relative flex h-[384px] w-full flex-col rounded-lg border p-5">

@@ -4,6 +4,7 @@ import { NewLink } from '@inngest/components/Link/Link';
 
 import type { VolumeMetricsQuery } from '@/gql/graphql';
 import type { EntityLookup } from './Dashboard';
+import { NotFound } from './NotFound';
 import { getLineChartOptions, mapEntityLines } from './utils';
 
 export type RunsThroughputMetricsType =
@@ -14,6 +15,11 @@ export const RunsThrougput = ({
   entities,
 }: Partial<VolumeMetricsQuery> & { entities: EntityLookup }) => {
   const metrics = workspace && mapEntityLines(workspace.runsThroughput.metrics, entities);
+
+  const notFound = metrics && metrics.series.length === 0;
+  if (notFound) {
+    return <NotFound />;
+  }
 
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-visible rounded-lg border p-5">
