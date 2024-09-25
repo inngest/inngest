@@ -12,6 +12,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/headers"
+	"github.com/inngest/inngest/pkg/keys"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngestgo"
 )
@@ -43,8 +44,8 @@ type pingResult struct {
 	IsSDK bool
 }
 
-func Ping(ctx context.Context, url string, serverKind string, signingKey string, requireKeys bool) pingResult {
-	if requireKeys && signingKey == "" {
+func Ping(ctx context.Context, url string, serverKind string, signingKey *keys.SigningKey, requireKeys bool) pingResult {
+	if requireKeys && (signingKey == nil || !signingKey.Valid()) {
 		return pingResult{
 			Err: DeployErrNoServerSigningKey,
 		}
@@ -76,8 +77,8 @@ func Ping(ctx context.Context, url string, serverKind string, signingKey string,
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set(headers.HeaderKeyServerKind, serverKind)
 
-	if signingKey != "" {
-		reqSig, err := inngestgo.Sign(ctx, time.Now(), []byte(signingKey), reqByt)
+	if signingKey.Valid() {
+		reqSig, err := inngestgo.Sign(ctx, time.Now(), []byte(signingKey.Raw()), reqByt)
 		if err != nil {
 			return pingResult{
 				Err: fmt.Errorf("failed to sign request: %w", err),

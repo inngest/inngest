@@ -2,10 +2,8 @@ package devserver
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
 	_ "embed"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -135,7 +133,7 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 		Functions:           funcs,
 		Handlers:            a.devserver.handlers,
 		IsSingleNodeService: a.devserver.IsSingleNodeService(),
-		IsMissingSigningKey: a.devserver.Opts.RequireKeys && !a.devserver.HasSigningKey(),
+		IsMissingSigningKey: a.devserver.Opts.RequireKeys && !a.devserver.HasValidSigningKey(),
 		IsMissingEventKeys:  a.devserver.Opts.RequireKeys && !a.devserver.HasEventKeys(),
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -147,6 +145,14 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	ctx := r.Context()
+
+	if a.devserver.Opts.RequireKeys && !a.devserver.HasValidSigningKey() {
+		errMsg := "no signing key provided in server; add a signing key to allow syncing and runs"
+
+		logger.From(ctx).Warn().Msg(errMsg)
+		a.err(ctx, w, 401, fmt.Errorf(errMsg))
+		return
+	}
 
 	expectedServerKind := r.Header.Get(headers.HeaderKeyExpectedServerKind)
 	if expectedServerKind != "" && expectedServerKind != a.devserver.Opts.Config.GetServerKind() {
@@ -176,7 +182,7 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if authHeader != hashSigningKey(a.devserver.Opts.SigningKey) {
+		if !a.devserver.Opts.SigningKey.Equal(authHeader) {
 			errMsg := "invalid authorization header provided"
 
 			logger.From(ctx).Warn().Msg(errMsg)
@@ -209,30 +215,6 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, _ = w.Write([]byte(`{"ok":true}`))
-}
-
-// hashSigningKey hashes the signing key for comparison with authorization
-// headers in requests from an SDK.
-//
-// It accounts for keys that are not strictly hex strings as users could specify
-// a key of any length.
-func hashSigningKey(signingKey *string) string {
-	if signingKey == nil || *signingKey == "" {
-		return ""
-	}
-
-	// Because we expect the signing key to be a hex string due to being this
-	// format in Cloud, it needs to have an even number of characters. We pad
-	// here with a leading 0 if it doesn't, as the client SDKs should be when
-	// sending the key.
-	encodedKey := *signingKey
-	if len(encodedKey)%2 != 0 {
-		encodedKey = "0" + encodedKey
-	}
-
-	decodedKey, _ := hex.DecodeString(encodedKey)
-	sum := sha256.Sum256(decodedKey)
-	return hex.EncodeToString(sum[:])
 }
 
 func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error) {

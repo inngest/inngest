@@ -39,6 +39,7 @@ import (
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/headers"
+	"github.com/inngest/inngest/pkg/keys"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/run"
@@ -64,8 +65,8 @@ type StartOpts struct {
 
 	// SigningKey is used to decide that the server should sign requests and
 	// validate responses where applicable, modelling cloud behaviour.
-	SigningKey string `json:"signing_key"`
-	SQLiteDir  string `json:"sqlite-dir"`
+	SigningKey *keys.SigningKey `json:"signing_key"`
+	SQLiteDir  string           `json:"sqlite-dir"`
 
 	// EventKey is used to authorize incoming events, ensuring they match the
 	// given key.
@@ -85,7 +86,7 @@ func New(ctx context.Context, opts StartOpts) error {
 
 	// Ensure that if we've been given a signing key, that cloud mode is
 	// enabled appropriately in config.
-	if opts.SigningKey != "" {
+	if opts.SigningKey != nil && opts.SigningKey.Valid() {
 		opts.Config.ServerKind = headers.ServerKindCloud
 	}
 
@@ -226,16 +227,11 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
 
-	var sk *string
-	if opts.SigningKey != "" {
-		sk = &opts.SigningKey
-	}
-
 	var drivers = []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
 		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
 			RequireLocalSigningKey: true,
-			LocalSigningKey:        sk,
+			LocalSigningKey:        opts.SigningKey,
 		})
 		if err != nil {
 			return err
@@ -335,7 +331,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		RootDir:     opts.RootDir,
 		URLs:        opts.URLs,
 		Tick:        tick,
-		SigningKey:  sk,
+		SigningKey:  opts.SigningKey,
 		EventKeys:   opts.EventKey,
 		RequireKeys: true,
 	}
