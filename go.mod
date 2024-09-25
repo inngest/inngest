@@ -14,7 +14,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0
 	github.com/charmbracelet/lipgloss v0.5.0
 	github.com/coocood/freecache v1.2.3
-	github.com/davecgh/go-spew v1.1.1
 	github.com/dmarkham/enumer v1.5.8
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/dustinkirkland/golang-petname v0.0.0-20191129215211-8e5a1ed0cff0
@@ -111,6 +110,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cockroachdb/apd/v2 v2.0.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/emicklei/proto v1.6.15 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
