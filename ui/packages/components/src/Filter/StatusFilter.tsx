@@ -27,6 +27,9 @@ export default function StatusFilter({
       return !!functionIsPaused;
     } else if (status === 'RUNNING') {
       return !functionIsPaused;
+      // Hide skipped runs from filter
+    } else if (status === 'SKIPPED') {
+      return false;
     }
     return true;
   });
