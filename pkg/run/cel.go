@@ -59,8 +59,15 @@ func NewExpressionHandler(ctx context.Context, opts ...ExprHandlerOpt) (*Express
 	return h, nil
 }
 
+// add adds the list of CEL strings passed in and store them in the list of expressions.
+//
+// currently not expecting to use nesting within a string, but if needed, this function
+// should change to use recursion for importing the list of expressions instead.
 func (h *ExpressionHandler) add(ctx context.Context, cel []string) error {
 	parser := expressions.ParserSingleton()
+
+	evtExprs := map[string]bool{}
+	outputExprs := map[string]bool{}
 
 	for _, e := range cel {
 		tree, err := parser.Parse(ctx, expr.StringExpression(e))
@@ -71,11 +78,63 @@ func (h *ExpressionHandler) add(ctx context.Context, cel []string) error {
 		if tree.Root.HasPredicate() {
 			switch {
 			case eventRegex.MatchString(tree.Root.Predicate.Ident):
-				h.EventExprList = append(h.EventExprList, e)
+				if _, ok := evtExprs[e]; !ok {
+					evtExprs[e] = true
+				}
 			case outputRegex.MatchString(tree.Root.Predicate.Ident):
-				h.OutputExprList = append(h.OutputExprList, e)
+				if _, ok := outputExprs[e]; !ok {
+					outputExprs[e] = true
+				}
 			}
 		}
+
+		// NOTE: separate expressions are treated as AND, so putting an and within
+		// a cel doesn't really make sense but it is what it is
+		if len(tree.Root.Ands) > 0 {
+			for _, n := range tree.Root.Ands {
+				if n.HasPredicate() {
+					switch {
+					case eventRegex.MatchString(n.Predicate.Ident):
+						if _, ok := evtExprs[e]; !ok {
+							evtExprs[e] = true
+						}
+						continue
+					case outputRegex.MatchString(n.Predicate.Ident):
+						if _, ok := outputExprs[e]; !ok {
+							outputExprs[e] = true
+						}
+						continue
+					}
+				}
+			}
+		}
+
+		if len(tree.Root.Ors) > 0 {
+			for _, n := range tree.Root.Ors {
+				if n.HasPredicate() {
+					switch {
+					case eventRegex.MatchString(n.Predicate.Ident):
+						if _, ok := evtExprs[e]; !ok {
+							evtExprs[e] = true
+						}
+						continue
+					case outputRegex.MatchString(n.Predicate.Ident):
+						if _, ok := outputExprs[e]; !ok {
+							outputExprs[e] = true
+						}
+						continue
+					}
+				}
+			}
+		}
+	}
+
+	for evt, _ := range evtExprs {
+		h.EventExprList = append(h.EventExprList, evt)
+	}
+
+	for out, _ := range outputExprs {
+		h.OutputExprList = append(h.OutputExprList, out)
 	}
 
 	return nil
