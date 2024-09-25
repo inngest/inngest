@@ -59,10 +59,10 @@ export const getMetricsLookups = cache(async (envSlug: string) => {
 
   for (let p = 1; p <= totalPages; p++) {
     const pageResult = await fetchLookups({ envSlug, page: p, pageSize });
-    results.envBySlug.workflows.data = {
+    results.envBySlug.workflows.data = [
       ...results.envBySlug.workflows.data,
       ...pageResult.envBySlug.workflows.data,
-    };
+    ];
   }
 
   return results;
