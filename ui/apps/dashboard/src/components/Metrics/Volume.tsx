@@ -214,13 +214,10 @@ export const MetricsVolume = ({
             <RunsThrougput workspace={data?.workspace} entities={entities} />
             <StepsThroughput workspace={data?.workspace} entities={entities} />
             <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
-              {/* <SdkThroughput workspace={data?.workspace} entities={entities} /> */}
               <Backlog workspace={data?.workspace} entities={entities} />
               <Feedback />
             </div>
-            <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
-              {/* <AccountConcurrency workspace={data?.workspace} entities={entities} /> */}
-            </div>
+            <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap"></div>
           </div>
         </>
       )}
