@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -12,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	runv2 "github.com/inngest/inngest/proto/gen/run/v2"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"google.golang.org/protobuf/proto"
@@ -180,7 +182,10 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 				}
 
 				// Use async publish to increase throughput
-				fack, err := js.PublishAsync(sub, byt)
+				fack, err := js.PublishAsync(sub, byt,
+					jetstream.WithStallWait(500*time.Millisecond),
+					jetstream.WithRetryAttempts(10),
+				)
 				if err != nil {
 					logger.StdlibLogger(ctx).Error("error on async publish to nats stream",
 						"error", err,
