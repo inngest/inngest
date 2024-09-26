@@ -147,6 +147,11 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   const nextPageInfo = nextPageRes.data?.environment.runs.pageInfo;
   const hasNextPage = nextPageInfo?.hasNextPage || firstPageInfo?.hasNextPage;
   const isLoading = firstPageRes.fetching || nextPageRes.fetching;
+  console.log(
+    'hasNextPage' + hasNextPage,
+    'firstPageInfo' + firstPageInfo,
+    'nextPageInfo' + nextPageInfo
+  );
 
   let totalCount = undefined;
   if (!countRes.fetching) {
@@ -160,21 +165,31 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   }
 
   const firstPageRuns = useMemo(() => {
+    console.log('first page runs:', firstPageRunsData);
     return parseRunsData(firstPageRunsData);
   }, [firstPageRunsData]);
 
   const nextPageRuns = useMemo(() => {
+    console.log('next page runs', nextPageRuns);
     return parseRunsData(nextPageRunsData);
   }, [nextPageRunsData]);
 
   useEffect(() => {
+    console.log('data', firstPageRuns, isScrollRequest);
     if (!isScrollRequest) {
+      console.log(
+        'first data got in',
+        'first page runs:' + firstPageRuns,
+        'isScroll' + isScrollRequest
+      );
       setRuns(firstPageRuns);
     }
   }, [firstPageRuns, isScrollRequest]);
 
   useEffect(() => {
+    console.log('data', 'next page runs:' + nextPageRuns, 'isScroll' + isScrollRequest);
     if (isScrollRequest && nextPageRuns.length > 0) {
+      console.log('got in', 'next page runs:' + nextPageRuns, 'isScroll' + isScrollRequest);
       setRuns((prevRuns) => [...prevRuns, ...nextPageRuns]);
     }
   }, [nextPageRuns, isScrollRequest]);
@@ -187,6 +202,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
         // Check if scrolled to the bottom
         const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
         if (reachedBottom && !isLoading && lastCursor && hasNextPage) {
+          console.log('set scroll request to true');
           setIsScrollRequest(true);
           setCursor(lastCursor);
         }
@@ -197,6 +213,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 
   const onScrollToTop = useCallback(() => {
     setIsScrollRequest(false);
+    console.log('set scroll request to false');
   }, []);
 
   const onRefresh = useCallback(() => {
