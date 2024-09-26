@@ -2422,7 +2422,8 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 		metrics.IncrBatchScheduledCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"account_id": bi.AccountID.String(),
+				"account_id":  bi.AccountID.String(),
+				"function_id": bi.FunctionID.String(),
 			},
 		})
 	case enums.BatchFull:
