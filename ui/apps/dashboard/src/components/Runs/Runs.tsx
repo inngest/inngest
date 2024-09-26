@@ -145,7 +145,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   const nextPageRunsData = nextPageRes.data?.environment.runs.edges;
   const firstPageInfo = firstPageRes.data?.environment.runs.pageInfo;
   const nextPageInfo = nextPageRes.data?.environment.runs.pageInfo;
-  const hasNextPage = nextPageInfo?.hasNextPage || firstPageInfo?.hasNextPage;
+  const hasNextPage = isScrollRequest ? nextPageInfo?.hasNextPage : firstPageInfo?.hasNextPage;
   const isLoading = firstPageRes.fetching || nextPageRes.fetching;
   console.log(
     '1',
