@@ -148,9 +148,13 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   const hasNextPage = nextPageInfo?.hasNextPage || firstPageInfo?.hasNextPage;
   const isLoading = firstPageRes.fetching || nextPageRes.fetching;
   console.log(
-    'hasNextPage' + hasNextPage,
-    'firstPageInfo' + firstPageInfo,
-    'nextPageInfo' + nextPageInfo
+    '1',
+    'hasNextPage: ',
+    hasNextPage,
+    'firstPageInfo: ',
+    firstPageInfo,
+    'nextPageInfo: ',
+    nextPageInfo
   );
 
   let totalCount = undefined;
@@ -172,24 +176,26 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     return parseRunsData(nextPageRunsData);
   }, [nextPageRunsData]);
 
-  console.log('firstPageRunsData' + firstPageRunsData, 'nextPageRunsData' + nextPageRunsData);
+  console.log(
+    '2',
+    'firstPageRunsData: ',
+    firstPageRunsData,
+    'nextPageRunsData: ',
+    nextPageRunsData
+  );
 
   useEffect(() => {
-    console.log('data', firstPageRuns, isScrollRequest);
+    console.log('3', firstPageRuns, isScrollRequest);
     if (!isScrollRequest) {
-      console.log(
-        'first data got in',
-        'first page runs:' + firstPageRuns,
-        'isScroll' + isScrollRequest
-      );
+      console.log('4', 'first page runs: ', firstPageRuns, 'isScroll: ', isScrollRequest);
       setRuns(firstPageRuns);
     }
   }, [firstPageRuns, isScrollRequest]);
 
   useEffect(() => {
-    console.log('data', 'next page runs:' + nextPageRuns, 'isScroll' + isScrollRequest);
+    console.log('5', 'next page runs: ', nextPageRuns, 'isScroll: ', isScrollRequest);
     if (isScrollRequest && nextPageRuns.length > 0) {
-      console.log('got in', 'next page runs:' + nextPageRuns, 'isScroll' + isScrollRequest);
+      console.log('6', 'next page runs: ', nextPageRuns, 'isScroll: ', isScrollRequest);
       setRuns((prevRuns) => [...prevRuns, ...nextPageRuns]);
     }
   }, [nextPageRuns, isScrollRequest]);

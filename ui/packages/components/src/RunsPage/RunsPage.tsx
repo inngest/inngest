@@ -87,7 +87,7 @@ export function RunsPage({
   totalCount,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  console.log('runs page', 'data:' + data, 'has more' + hasMore);
+  console.log('runs page', 'data: ', data, 'has more: ', hasMore);
   const columns = useScopedColumns(scope);
 
   const displayAllColumns = useMemo(() => {
