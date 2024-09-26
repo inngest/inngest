@@ -87,7 +87,6 @@ export function RunsPage({
   totalCount,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-
   const columns = useScopedColumns(scope);
 
   const displayAllColumns = useMemo(() => {
