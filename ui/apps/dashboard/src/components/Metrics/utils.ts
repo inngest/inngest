@@ -83,7 +83,7 @@ export const getLineChartOptions = (data: LineChartData): ChartProps['option'] =
       appendTo: () => document.getElementById('chart-tooltip'),
       extraCssText: 'max-height: 250px; overflow-y: scroll;',
       className: 'no-scrollbar',
-      position: (point) => [point[0] + 5, '55%'],
+      transitionDuration: 1.5,
     },
     legend: {
       type: 'scroll',
@@ -119,6 +119,23 @@ export const mapEntityLines = (
   const diff = timeDiff(metrics[0]?.data[0]?.bucket, metrics[0]?.data.at(-1)?.bucket);
   const dataLength = metrics[0]?.data?.length || 30;
 
+  const series = Array(30)
+    .fill(0)
+    .map((_, o) =>
+      metrics.map((f, i) => {
+        return {
+          ...seriesOptions,
+          name: `${entities[f.id]?.name}-${o}`,
+          data: f.data.map(({ value }) => Math.floor(Math.random() * 20) + 1),
+          itemStyle: {
+            color: lineColors[1]![1],
+          },
+          areaStyle,
+        };
+      })
+    )
+    .flat();
+
   return {
     xAxis: {
       type: 'category',
@@ -130,16 +147,6 @@ export const mapEntityLines = (
         margin: 10,
       },
     },
-    series: metrics.map((f, i) => {
-      return {
-        ...seriesOptions,
-        name: entities[f.id]?.name,
-        data: f.data.map(({ value }) => value),
-        itemStyle: {
-          color: resolveColor(lineColors[i % lineColors.length]![0]!, dark, lineColors[0]?.[1]),
-        },
-        areaStyle,
-      };
-    }),
+    series,
   };
 };
