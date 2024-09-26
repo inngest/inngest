@@ -2505,7 +2505,10 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 	})
 
 	// Ensure to delete batch when Schedule worked, we already processed it, or the function was paused
-	shouldDeleteBatch := err == nil || err == redis_state.ErrQueueItemExists || errors.Is(err, ErrFunctionSkipped)
+	shouldDeleteBatch := err == nil ||
+		err == redis_state.ErrQueueItemExists ||
+		errors.Is(err, ErrFunctionSkipped) ||
+		errors.Is(err, state.ErrIdentifierExists)
 	if shouldDeleteBatch {
 		// TODO: check if all errors can be blindly returned
 		if err := e.batcher.DeleteKeys(ctx, payload.FunctionID, payload.BatchID); err != nil {
