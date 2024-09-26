@@ -3,8 +3,8 @@
 import type { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { OptionalLink } from '@inngest/components/Link/OptionalLink';
+import { RiErrorWarningLine } from '@remixicon/react';
 
-import { Badge } from '../Badge';
 import { Pill } from '../Pill';
 import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 import { cn } from '../utils/classNames';
@@ -56,10 +56,9 @@ export const MenuItem = ({
             </Pill>
           )}
           {!collapsed && error && (
-            <Badge
-              kind={'error'}
-              className="text-alwaysWhite bg-error ml-2.5 h-5 px-1.5 py-1 text-xs"
-            />
+            <Pill kind="error" className="ml-2.5">
+              <RiErrorWarningLine className="h-3 w-3" />
+            </Pill>
           )}
         </div>
       </OptionalTooltip>

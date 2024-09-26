@@ -3,6 +3,7 @@ import {
   format,
   formatDistanceToNow,
   isAfter,
+  isBefore,
   isValid,
   lightFormat,
   sub,
@@ -12,7 +13,7 @@ import {
 } from 'date-fns';
 
 export type { Duration as DurationType };
-export { differenceInMilliseconds, formatDistanceToNow, isAfter, isValid, lightFormat, sub };
+export { differenceInMilliseconds, formatDistanceToNow, isBefore, isAfter, isValid, lightFormat, sub };
 
 export const DURATION_STRING_REGEX = /^[1-9]\d*[smMhdwy]$/;
 

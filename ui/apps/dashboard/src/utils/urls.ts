@@ -72,8 +72,19 @@ export const pathCreator = {
   }): Route {
     return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}/cancellations` as Route;
   },
-  functionRuns({ envSlug, functionSlug }: { envSlug: string; functionSlug: string }): Route {
+  oldRuns({ envSlug, functionSlug }: { envSlug: string; functionSlug: string }): Route {
     return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}/logs` as Route;
+  },
+  oldRun({
+    envSlug,
+    functionSlug,
+    runID,
+  }: {
+    envSlug: string;
+    functionSlug: string;
+    runID: string;
+  }): Route {
+    return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}/logs/${runID}` as Route;
   },
   keys({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/manage/keys` as Route;

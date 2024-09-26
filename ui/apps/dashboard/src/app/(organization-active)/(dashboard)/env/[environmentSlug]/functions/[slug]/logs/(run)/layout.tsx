@@ -55,7 +55,7 @@ export default function RunLayout({ children, params }: RunLayoutProps) {
       size={hasCron ? 'small' : 'large'}
       onClose={() =>
         router.push(
-          pathCreator.functionRuns({
+          pathCreator.oldRuns({
             envSlug: environment.slug,
             functionSlug,
           })

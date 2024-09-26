@@ -7,7 +7,7 @@ import { IconFunction } from '@inngest/components/icons/Function';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiTimeLine } from '@remixicon/react';
 
-export type PillKind = 'default' | 'info' | 'warning' | 'primary';
+export type PillKind = 'default' | 'info' | 'warning' | 'primary' | 'error';
 export type PillAppearance = 'solid' | 'outlined';
 
 export function Pill({
@@ -71,6 +71,7 @@ export const getPillColors = ({
     default: `bg-canvasMuted text-basis ${clickable && 'hover:bg-surfaceMuted'}`,
     primary: `bg-primary-intense text-alwaysWhite ${clickable && 'hover:bg-primary-xIntense'}`,
     warning: `bg-accent-moderate text-alwaysWhite ${clickable && 'hover:bg-accent-intense'}`,
+    error: `bg-tertiary-moderate text-alwaysWhite ${clickable && 'hover:bg-tertiary-intense'}`,
     info: `bg-secondary-moderate text-alwaysWhite ${clickable && 'hover:bg-secondary-intense'}`,
   };
 
@@ -82,6 +83,7 @@ export const getPillColors = ({
     warning: `border border-warning bg-warning text-warning ${
       clickable && 'hover:bg-accent-xSubtle'
     }`,
+    error: `border border-error bg-error text-error ${clickable && 'hover:bg-tertiary-xSubtle'}`,
     info: `border border-info bg-info text-info ${clickable && 'hover:bg-secondary-xSubtle'}`,
   };
 
