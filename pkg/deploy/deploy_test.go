@@ -13,7 +13,7 @@ import (
 )
 
 func TestPing(t *testing.T) {
-	newFakeSDK := func(handler func(w http.ResponseWriter, r *http.Request)) (string, func() error, error) {
+	newFakeSDK := func(handler func(w http.ResponseWriter, r *http.Request)) (string, func(), error) {
 		mux := http.NewServeMux()
 
 		mux.HandleFunc("/", handler)
@@ -34,7 +34,11 @@ func TestPing(t *testing.T) {
 			_ = server.Serve(listener)
 		}()
 
-		return url, server.Close, nil
+		close := func() {
+			_ = server.Close()
+		}
+
+		return url, close, nil
 	}
 
 	t.Run("headers and body are correct", func(t *testing.T) {
