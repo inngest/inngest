@@ -147,15 +147,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   const nextPageInfo = nextPageRes.data?.environment.runs.pageInfo;
   const hasNextPage = isScrollRequest ? nextPageInfo?.hasNextPage : firstPageInfo?.hasNextPage;
   const isLoading = firstPageRes.fetching || nextPageRes.fetching;
-  console.log(
-    '1',
-    'hasNextPage: ',
-    hasNextPage,
-    'firstPageInfo: ',
-    firstPageInfo,
-    'nextPageInfo: ',
-    nextPageInfo
-  );
 
   let totalCount = undefined;
   if (!countRes.fetching) {
@@ -176,26 +167,14 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     return parseRunsData(nextPageRunsData);
   }, [nextPageRunsData]);
 
-  console.log(
-    '2',
-    'firstPageRunsData: ',
-    firstPageRunsData,
-    'nextPageRunsData: ',
-    nextPageRunsData
-  );
-
   useEffect(() => {
-    console.log('3', firstPageRuns, isScrollRequest);
     if (!isScrollRequest) {
-      console.log('4', 'first page runs: ', firstPageRuns, 'isScroll: ', isScrollRequest);
       setRuns(firstPageRuns);
     }
   }, [firstPageRuns, isScrollRequest]);
 
   useEffect(() => {
-    console.log('5', 'next page runs: ', nextPageRuns, 'isScroll: ', isScrollRequest);
     if (isScrollRequest && nextPageRuns.length > 0) {
-      console.log('6', 'next page runs: ', nextPageRuns, 'isScroll: ', isScrollRequest);
       setRuns((prevRuns) => [...prevRuns, ...nextPageRuns]);
     }
   }, [nextPageRuns, isScrollRequest]);
@@ -208,7 +187,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
         // Check if scrolled to the bottom
         const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
         if (reachedBottom && !isLoading && lastCursor && hasNextPage) {
-          console.log('set scroll request to true');
           setIsScrollRequest(true);
           setCursor(lastCursor);
         }
@@ -219,7 +197,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 
   const onScrollToTop = useCallback(() => {
     setIsScrollRequest(false);
-    console.log('set scroll request to false');
   }, []);
 
   const onRefresh = useCallback(() => {
