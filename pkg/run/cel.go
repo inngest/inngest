@@ -21,6 +21,7 @@ var (
 )
 
 type ExprHandlerOpt func(ctx context.Context, h *ExpressionHandler) error
+type ExprSQLConverter func(ctx context.Context, n *expr.Node) ([]sq.Expression, error)
 
 func WithExpressionHandlerExpressions(cel []string) ExprHandlerOpt {
 	return func(ctx context.Context, h *ExpressionHandler) error {
@@ -39,15 +40,24 @@ func WithExpressionHandlerBlob(exp string, delimiter string) ExprHandlerOpt {
 	}
 }
 
+func WithExpressionSQLConverter(c ExprSQLConverter) ExprHandlerOpt {
+	return func(ctx context.Context, h *ExpressionHandler) error {
+		h.SQLConverter = c
+		return nil
+	}
+}
+
 type ExpressionHandler struct {
 	EventExprList  []string
 	OutputExprList []string
+	SQLConverter   ExprSQLConverter
 }
 
 func NewExpressionHandler(ctx context.Context, opts ...ExprHandlerOpt) (*ExpressionHandler, error) {
 	h := &ExpressionHandler{
 		EventExprList:  []string{},
 		OutputExprList: []string{},
+		SQLConverter:   SQLiteConverter,
 	}
 
 	for _, apply := range opts {
@@ -152,13 +162,7 @@ func (h *ExpressionHandler) HasOutputFilters() bool {
 	return len(h.OutputExprList) > 0
 }
 
-// create pre-filters for database queries
-// - ULID
-// - event id (idempotency key)
-// - event name
-// - version
-// - timestamp
-func (h *ExpressionHandler) ToSQLEventFilters(ctx context.Context) ([]sq.Expression, error) {
+func (h *ExpressionHandler) ToSQLFilters(ctx context.Context) ([]sq.Expression, error) {
 	filters := []sq.Expression{}
 	parser := expressions.ParserSingleton()
 
@@ -168,7 +172,7 @@ func (h *ExpressionHandler) ToSQLEventFilters(ctx context.Context) ([]sq.Express
 			return nil, fmt.Errorf("error evaluating event expression '%s': %w", exp, err)
 		}
 
-		expFilter, err := toSQLEventFilters(ctx, []*expr.Node{&tree.Root})
+		expFilter, err := h.toSQLFilters(ctx, []*expr.Node{&tree.Root})
 		if err != nil {
 			return nil, err
 		}
@@ -274,78 +278,19 @@ func allMatches(res []bool) bool {
 }
 
 // toSQLEventFilter parses the passed in nodes and converts them into SQL filter expressions
-func toSQLEventFilters(ctx context.Context, nodes []*expr.Node) ([]sq.Expression, error) {
+func (h *ExpressionHandler) toSQLFilters(ctx context.Context, nodes []*expr.Node) ([]sq.Expression, error) {
 	filters := []sq.Expression{}
 
 	for _, n := range nodes {
-		if n.HasPredicate() {
-			literal := n.Predicate.Literal
-
-			switch n.Predicate.Ident {
-			case "event.id":
-				id, ok := literal.(string)
-				if !ok {
-					return nil, fmt.Errorf("expects 'event.id' to be a string: %v", literal)
-				}
-				switch n.Predicate.Operator {
-				case operators.Equals:
-					filters = append(filters, sq.C("event_id").Eq(id))
-				case operators.NotEquals:
-					filters = append(filters, sq.C("event_id").Neq(id))
-				}
-			case "event.name":
-				name, ok := literal.(string)
-				if !ok {
-					return nil, fmt.Errorf("expects 'event.name' to be a string: %v", literal)
-				}
-				switch n.Predicate.Operator {
-				case operators.Equals:
-					filters = append(filters, sq.C("event_name").Eq(name))
-				case operators.NotEquals:
-					filters = append(filters, sq.C("event_name").Neq(name))
-				}
-			case "event.ts":
-				ts, ok := literal.(int64)
-				if !ok {
-					return nil, fmt.Errorf("expects 'event.ts' to be an integer: %v", literal)
-				}
-				var f sq.Expression
-				field := "event_ts"
-
-				switch n.Predicate.Operator {
-				case operators.Greater:
-					f = sq.C(field).Gt(ts)
-				case operators.GreaterEquals:
-					f = sq.C(field).Gte(ts)
-				case operators.Equals:
-					f = sq.C(field).Eq(ts)
-				case operators.Less:
-					f = sq.C(field).Lt(ts)
-				case operators.LessEquals:
-					f = sq.C(field).Lte(ts)
-				case operators.NotEquals:
-					f = sq.C(field).Neq(ts)
-				}
-				if f != nil {
-					filters = append(filters, f)
-				}
-			case "event.v":
-				v, ok := literal.(string)
-				if !ok {
-					return nil, fmt.Errorf("expects 'event.v' to be a string: %v", literal)
-				}
-				switch n.Predicate.Operator {
-				case operators.Equals:
-					filters = append(filters, sq.C("event_v").Eq(v))
-				case operators.NotEquals:
-					filters = append(filters, sq.C("event_v").Neq(v))
-				}
-			}
+		res, err := h.SQLConverter(ctx, n)
+		if err != nil {
+			return nil, err
 		}
+		filters = append(filters, res...)
 
 		// check for further nesting
 		if n.Ands != nil {
-			nested, err := toSQLEventFilters(ctx, n.Ands)
+			nested, err := h.toSQLFilters(ctx, n.Ands)
 			if err != nil {
 				return nil, err
 			}
@@ -353,11 +298,89 @@ func toSQLEventFilters(ctx context.Context, nodes []*expr.Node) ([]sq.Expression
 		}
 
 		if n.Ors != nil {
-			nested, err := toSQLEventFilters(ctx, n.Ors)
+			nested, err := h.toSQLFilters(ctx, n.Ors)
 			if err != nil {
 				return nil, err
 			}
 			filters = append(filters, sq.Or(nested...))
+		}
+	}
+
+	return filters, nil
+}
+
+// create filters for database queries in sqlite
+// - ULID
+// - event id (idempotency key)
+// - event name
+// - version
+// - timestamp
+//
+// This only applies to events
+func SQLiteConverter(ctx context.Context, n *expr.Node) ([]sq.Expression, error) {
+	filters := []sq.Expression{}
+	if n.HasPredicate() {
+		literal := n.Predicate.Literal
+
+		switch n.Predicate.Ident {
+		case "event.id":
+			id, ok := literal.(string)
+			if !ok {
+				return nil, fmt.Errorf("expects 'event.id' to be a string: %v", literal)
+			}
+			switch n.Predicate.Operator {
+			case operators.Equals:
+				filters = append(filters, sq.C("event_id").Eq(id))
+			case operators.NotEquals:
+				filters = append(filters, sq.C("event_id").Neq(id))
+			}
+		case "event.name":
+			name, ok := literal.(string)
+			if !ok {
+				return nil, fmt.Errorf("expects 'event.name' to be a string: %v", literal)
+			}
+			switch n.Predicate.Operator {
+			case operators.Equals:
+				filters = append(filters, sq.C("event_name").Eq(name))
+			case operators.NotEquals:
+				filters = append(filters, sq.C("event_name").Neq(name))
+			}
+		case "event.ts":
+			ts, ok := literal.(int64)
+			if !ok {
+				return nil, fmt.Errorf("expects 'event.ts' to be an integer: %v", literal)
+			}
+			var f sq.Expression
+			field := "event_ts"
+
+			switch n.Predicate.Operator {
+			case operators.Greater:
+				f = sq.C(field).Gt(ts)
+			case operators.GreaterEquals:
+				f = sq.C(field).Gte(ts)
+			case operators.Equals:
+				f = sq.C(field).Eq(ts)
+			case operators.Less:
+				f = sq.C(field).Lt(ts)
+			case operators.LessEquals:
+				f = sq.C(field).Lte(ts)
+			case operators.NotEquals:
+				f = sq.C(field).Neq(ts)
+			}
+			if f != nil {
+				filters = append(filters, f)
+			}
+		case "event.v":
+			v, ok := literal.(string)
+			if !ok {
+				return nil, fmt.Errorf("expects 'event.v' to be a string: %v", literal)
+			}
+			switch n.Predicate.Operator {
+			case operators.Equals:
+				filters = append(filters, sq.C("event_v").Eq(v))
+			case operators.NotEquals:
+				filters = append(filters, sq.C("event_v").Neq(v))
+			}
 		}
 	}
 

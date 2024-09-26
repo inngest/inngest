@@ -59,7 +59,7 @@ func TestToSQLEventFilters(t *testing.T) {
 			handler, err := NewExpressionHandler(ctx, WithExpressionHandlerExpressions(test.cel))
 			require.NoError(t, err)
 
-			filters, err := handler.ToSQLEventFilters(ctx)
+			filters, err := handler.ToSQLFilters(ctx)
 			require.NoError(t, err)
 
 			assert.ElementsMatch(t, test.expected, filters)

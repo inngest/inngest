@@ -489,7 +489,7 @@ func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*c
 	if err != nil {
 		return nil, err
 	}
-	prefilters, err := expHandler.ToSQLEventFilters(ctx)
+	prefilters, err := expHandler.ToSQLFilters(ctx)
 	if err != nil {
 		return nil, err
 	}
