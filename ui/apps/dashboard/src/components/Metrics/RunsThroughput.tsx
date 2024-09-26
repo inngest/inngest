@@ -26,7 +26,8 @@ export const RunsThrougput = ({
               <NewLink
                 arrowOnHover
                 className="text-sm"
-                href="https://www.inngest.com/docs/features/inngest-functions/steps-workflows"
+                href="https://www.inngest.com/docs/platform/monitor/observability-metrics#total-runs-throughput"
+                target="_new"
               >
                 Learn more about runs throughput.
               </NewLink>

@@ -156,7 +156,8 @@ export const FunctionStatus = ({ totals }: { totals?: FunctionTotals }) => {
             <NewLink
               arrowOnHover
               className="text-sm"
-              href="https://www.inngest.com/docs/features/inngest-functions?ref=app-metrics"
+              href="https://www.inngest.com/docs/platform/monitor/observability-metrics#function-status"
+              target="_new"
             >
               Learn more about Inngest functions.
             </NewLink>
