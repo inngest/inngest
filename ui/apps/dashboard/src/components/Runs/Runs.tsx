@@ -165,14 +165,14 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   }
 
   const firstPageRuns = useMemo(() => {
-    console.log('first page runs:', firstPageRunsData);
     return parseRunsData(firstPageRunsData);
   }, [firstPageRunsData]);
 
   const nextPageRuns = useMemo(() => {
-    console.log('next page runs', nextPageRuns);
     return parseRunsData(nextPageRunsData);
   }, [nextPageRunsData]);
+
+  console.log('firstPageRunsData' + firstPageRunsData, 'nextPageRunsData' + nextPageRunsData);
 
   useEffect(() => {
     console.log('data', firstPageRuns, isScrollRequest);
