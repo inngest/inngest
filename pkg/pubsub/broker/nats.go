@@ -6,7 +6,6 @@ import (
 	"os"
 	"strconv"
 	"sync"
-	"time"
 
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/nats-io/nats.go"
