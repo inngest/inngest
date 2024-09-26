@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Tab } from '@headlessui/react';
@@ -19,7 +19,7 @@ import { graphql } from '@/gql';
 import { EnvironmentType } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 
-const payloadSchema = z.object({
+const eventSchema = z.object({
   name: z.string(),
   data: z.record(z.unknown()),
 });
@@ -42,7 +42,7 @@ type SendEventModalProps = {
 };
 
 type TabType = {
-  payload: { name: string; data: {} };
+  payload: { name: string; data: {} } | { name: string; data: {} }[];
   eventKey?: string;
   isBranchChild: boolean;
   envName: string;
@@ -106,7 +106,12 @@ export function SendEventModal({
   isOpen,
   onClose,
 }: SendEventModalProps) {
-  const [payload, setPayload] = useState({ name: eventName, data: {} });
+  const [payload, setPayload] = useState<
+    z.infer<typeof eventSchema> | z.infer<typeof eventSchema>[]
+  >({
+    name: eventName,
+    data: {},
+  });
   const router = useRouter();
   const environment = useEnvironment();
   const eventKey = usePreferDefaultEventKey();
@@ -118,6 +123,84 @@ export function SendEventModal({
 
   const isBranchChild = environment.type === EnvironmentType.BranchChild;
   const envName = environment.name;
+
+  // serialize data to state on change so we can persist it between editor tab changes
+  const serializeData = (code: string) => {
+    let payload;
+    const parsedObject = eventSchema.safeParse(JSON.parse(code));
+    if (parsedObject.success) {
+      payload = parsedObject.data;
+    } else {
+      const parsedArray = z.array(eventSchema).safeParse(JSON.parse(code));
+      if (parsedArray.success) {
+        payload = parsedArray.data;
+      } else {
+        console.log("can't parse code editor payload, skipping serialization");
+        return;
+      }
+    }
+
+    setPayload(payload);
+  };
+
+  const sendEventAction = useCallback(
+    async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const formData = new FormData(form);
+      const jsonString = formData.get('code') as string;
+
+      let jsonEvent: JsonValue;
+      try {
+        jsonEvent = JSON.parse(jsonString);
+      } catch (error) {
+        toast.error('Could not parse JSON. Please check your syntax.');
+        return;
+      }
+
+      const headers: { ['x-inngest-env']?: string } = {};
+      if (isBranchChild) {
+        headers['x-inngest-env'] = envName;
+      }
+
+      const sendEvent = ky.post(sendEventURL, {
+        json: jsonEvent,
+        headers,
+      });
+
+      toast.promise(sendEvent, {
+        loading: 'Loading...',
+        success: () => {
+          router.refresh();
+          onClose();
+          window.location.reload(); // We need to reload page to display new events, because we can't update the URQL cache without using mutations
+          return 'Event sent!';
+        },
+        error: 'Could not send event. Please try again later.',
+      });
+    },
+    [envName, isBranchChild, onClose, router, sendEventURL]
+  );
+
+  const copyToClipboardAction = useCallback(
+    (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const formData = new FormData(form);
+      const code = formData.get('code') as string;
+
+      toast.promise(navigator.clipboard.writeText(code), {
+        loading: 'Loading...',
+        success: () => {
+          router.refresh();
+          onClose();
+          return 'Copied to clipboard!';
+        },
+        error: 'Could not copy to clipboard.',
+      });
+    },
+    [onClose, router]
+  );
 
   let tabs = useMemo(() => {
     return buildTabs({
@@ -138,69 +221,6 @@ export function SendEventModal({
     sendEventAction,
     sendEventURL,
   ]);
-
-  //
-  // serialize data to state on change so we can persist it between editor tab changes
-  const serializeData = (code: string) => {
-    try {
-      setPayload(payloadSchema.parse(JSON.parse(code)));
-    } catch (error) {
-      console.log("can't parse code editor payload, skipping serialization");
-    }
-  };
-
-  async function sendEventAction(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const jsonString = formData.get('code') as string;
-
-    let jsonEvent: JsonValue;
-    try {
-      jsonEvent = JSON.parse(jsonString);
-    } catch (error) {
-      toast.error('Could not parse JSON. Please check your syntax.');
-      return;
-    }
-
-    const headers: { ['x-inngest-env']?: string } = {};
-    if (isBranchChild) {
-      headers['x-inngest-env'] = envName;
-    }
-
-    const sendEvent = ky.post(sendEventURL, {
-      json: jsonEvent,
-      headers,
-    });
-
-    toast.promise(sendEvent, {
-      loading: 'Loading...',
-      success: () => {
-        router.refresh();
-        onClose();
-        window.location.reload(); // We need to reload page to display new events, because we can't update the URQL cache without using mutations
-        return 'Event sent!';
-      },
-      error: 'Could not send event. Please try again later.',
-    });
-  }
-
-  function copyToClipboardAction(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const code = formData.get('code') as string;
-
-    toast.promise(navigator.clipboard.writeText(code), {
-      loading: 'Loading...',
-      success: () => {
-        router.refresh();
-        onClose();
-        return 'Copied to clipboard!';
-      },
-      error: 'Could not copy to clipboard.',
-    });
-  }
 
   return (
     <Modal className="max-w-6xl space-y-3 p-6" isOpen={isOpen} onClose={onClose}>

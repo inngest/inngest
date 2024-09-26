@@ -1,22 +1,14 @@
 import { useState } from 'react';
+import { Error } from '@inngest/components/Error/Error';
 import { RiArrowDownSFill, RiArrowRightSFill } from '@remixicon/react';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
-import type { EntityType } from './Dashboard';
+import type { MetricsFilters } from './Dashboard';
 import { FailedFunctions } from './FailedFunctions';
 import { FunctionStatus } from './FunctionStatus';
-
-export type MetricsFilters = {
-  from: Date;
-  until?: Date;
-  selectedApps?: string[];
-  selectedFns?: string[];
-  autoRefresh?: boolean;
-  functions: EntityType[];
-};
 
 const GetFunctionStatusMetrics = graphql(`
   query FunctionStatusMetrics(
@@ -25,12 +17,13 @@ const GetFunctionStatusMetrics = graphql(`
     $functionIDs: [UUID!]
     $appIDs: [UUID!]
     $until: Time
+    $scope: MetricsScope!
   ) {
     workspace(id: $workspaceId) {
       scheduled: scopedMetrics(
         filter: {
           name: "function_run_scheduled_total"
-          scope: APP
+          scope: $scope
           from: $from
           functionIDs: $functionIDs
           appIDs: $appIDs
@@ -50,7 +43,7 @@ const GetFunctionStatusMetrics = graphql(`
       started: scopedMetrics(
         filter: {
           name: "function_run_started_total"
-          scope: APP
+          scope: $scope
           from: $from
           functionIDs: $functionIDs
           appIDs: $appIDs
@@ -70,7 +63,30 @@ const GetFunctionStatusMetrics = graphql(`
       completed: scopedMetrics(
         filter: {
           name: "function_run_ended_total"
-          scope: APP
+          scope: $scope
+          groupBy: "status"
+          from: $from
+          functionIDs: $functionIDs
+          appIDs: $appIDs
+          until: $until
+        }
+      ) {
+        metrics {
+          id
+          tagName
+          tagValue
+          data {
+            value
+            bucket
+          }
+        }
+      }
+    }
+    workspace(id: $workspaceId) {
+      completedByFunction: scopedMetrics(
+        filter: {
+          name: "function_run_ended_total"
+          scope: FN
           groupBy: "status"
           from: $from
           functionIDs: $functionIDs
@@ -93,7 +109,7 @@ const GetFunctionStatusMetrics = graphql(`
       totals: scopedFunctionStatus(
         filter: {
           name: "function_run_scheduled_total"
-          scope: APP
+          scope: FN
           from: $from
           functionIDs: $functionIDs
           appIDs: $appIDs
@@ -118,7 +134,9 @@ export const MetricsOverview = ({
   selectedApps = [],
   selectedFns = [],
   autoRefresh = false,
+  entities, // dynamic based on scope
   functions,
+  scope,
 }: MetricsFilters) => {
   const [overviewOpen, setOverviewOpen] = useState(true);
   const env = useEnvironment();
@@ -129,6 +147,7 @@ export const MetricsOverview = ({
     appIDs: selectedApps,
     functionIDs: selectedFns,
     until: until ? until.toISOString() : null,
+    scope,
   };
 
   const { data, error } = useGraphQLQuery({
@@ -140,22 +159,28 @@ export const MetricsOverview = ({
   error && console.error('Error fetcthing metrics data for', variables, error);
 
   return (
-    <div className="bg-canvasSubtle item-start flex h-full w-full flex-col items-start">
-      <div className="text-subtle my-4 flex w-full flex-row items-center justify-start gap-x-2 text-xs uppercase">
-        {overviewOpen ? (
-          <RiArrowDownSFill className="cursor-pointer" onClick={() => setOverviewOpen(false)} />
-        ) : (
-          <RiArrowRightSFill className="cursor-pointer" onClick={() => setOverviewOpen(true)} />
-        )}
+    <div className="item-start flex h-full w-full flex-col items-start">
+      <div
+        className="text-subtle my-4 flex w-full cursor-pointer flex-row items-center justify-start gap-x-2 text-xs uppercase"
+        onClick={() => setOverviewOpen(!overviewOpen)}
+      >
+        {overviewOpen ? <RiArrowDownSFill /> : <RiArrowRightSFill />}
         <div>Overview</div>
 
         <hr className="border-subtle w-full" />
       </div>
       {overviewOpen && (
-        <div className="relative flex w-full flex-row items-center justify-start gap-2 overflow-hidden">
-          <FunctionStatus totals={data?.workspace.totals} />
-          <FailedFunctions workspace={data?.workspace} functions={functions} />
-        </div>
+        <>
+          {error && <Error message="There was an error fetching overview metrics data." />}
+          <div className="relative flex w-full flex-row flex-wrap items-center justify-start gap-2 overflow-hidden md:flex-nowrap">
+            <FunctionStatus totals={data?.workspace.totals} />
+            <FailedFunctions
+              workspace={data?.workspace}
+              entities={entities}
+              functions={functions}
+            />
+          </div>
+        </>
       )}
     </div>
   );

@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/cmd/commands/internal/localconfig"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/devserver"
+	"github.com/inngest/inngest/pkg/headers"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -78,7 +79,7 @@ func doDev(cmd *cobra.Command, args []string) {
 		conf.EventAPI.Addr = host
 	}
 
-	urls := viper.GetStringSlice("urls")
+	urls := viper.GetStringSlice("sdk-url")
 
 	// Run auto-discovery unless we've explicitly disabled it.
 	noDiscovery := viper.GetBool("no-discovery")
@@ -99,6 +100,8 @@ func doDev(cmd *cobra.Command, args []string) {
 	defer func() {
 		_ = itrace.CloseUserTracer(ctx)
 	}()
+
+	conf.ServerKind = headers.ServerKindDev
 
 	opts := devserver.StartOpts{
 		Autodiscover:  !noDiscovery,

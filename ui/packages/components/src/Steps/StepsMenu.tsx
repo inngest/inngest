@@ -31,42 +31,56 @@ function StepMenuItem({
   stepContent,
   isCompleted,
   isActive,
+  isDisabled,
   url,
 }: {
   stepContent: MenuStepContent;
   isCompleted: boolean;
   isActive: boolean;
+  isDisabled?: boolean;
   url: Route;
 }) {
   const { title, description, icon: Icon } = stepContent;
-  return (
-    <Link href={url}>
-      <li className="bg-canvasBase hover:bg-canvasSubtle group flex items-center gap-4 rounded-md p-1.5">
-        <div
-          className={cn(
-            'group-hover:bg-contrast box-border flex h-[38px] w-[38px] items-center justify-center rounded-md border group-hover:border-none',
-            isActive
-              ? isCompleted
-                ? 'border-primary-moderate bg-primary-3xSubtle group-hover:bg-primary-moderate'
-                : 'border-contrast'
-              : isCompleted
-              ? 'bg-primary-3xSubtle group-hover:bg-primary-moderate border-none'
-              : 'border-muted'
-          )}
-        >
-          {isCompleted ? (
-            <RiCheckboxCircleFill className="text-primary-moderate group-hover:text-alwaysWhite" />
-          ) : (
-            <Icon className="group-hover:text-onContrast h-5 w-5" />
-          )}
-        </div>
-        <div>
-          <h4 className="text-sm font-medium">{title}</h4>
-          <p className="text-subtle text-sm">{description}</p>
-        </div>
-      </li>
-    </Link>
+
+  const content = (
+    <li
+      className={cn(
+        'flex items-center gap-4 rounded-md p-1.5',
+        isDisabled
+          ? 'bg-canvasBase cursor-not-allowed opacity-50'
+          : 'bg-canvasBase hover:bg-canvasSubtle group cursor-pointer'
+      )}
+    >
+      <div
+        className={cn(
+          'box-border flex h-[38px] w-[38px] items-center justify-center rounded-md border',
+          isDisabled
+            ? 'border-muted'
+            : isActive
+            ? isCompleted
+              ? 'border-primary-moderate bg-primary-3xSubtle group-hover:bg-primary-moderate'
+              : 'border-contrast group-hover:bg-contrast'
+            : isCompleted
+            ? 'bg-primary-3xSubtle group-hover:bg-primary-moderate border-none'
+            : 'border-muted group-hover:bg-contrast group-hover:border-none'
+        )}
+      >
+        {isCompleted ? (
+          <RiCheckboxCircleFill
+            className={cn('text-primary-moderate', !isDisabled && 'group-hover:text-alwaysWhite')}
+          />
+        ) : (
+          <Icon className={cn('h-5 w-5', !isDisabled && 'group-hover:text-onContrast')} />
+        )}
+      </div>
+      <div>
+        <h4 className="text-sm font-medium">{title}</h4>
+        <p className="text-subtle text-sm">{description}</p>
+      </div>
+    </li>
   );
+
+  return isDisabled ? content : <Link href={url}>{content}</Link>;
 }
 
 function StepLink({ children, href, ...props }: React.PropsWithChildren<NewLinkProps>) {

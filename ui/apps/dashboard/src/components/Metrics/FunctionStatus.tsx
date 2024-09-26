@@ -78,7 +78,8 @@ const holeLabel = {
 const totalRuns = (totals: Array<{ value: number }>) =>
   totals.reduce((acc, { value }) => acc + value, 0);
 
-const percent = (sum: number, part: number) => (sum ? `${((part / sum) * 100).toFixed(0)}%` : `0%`);
+const percent = (sum: number, part: number) =>
+  `${sum ? parseFloat(((part / sum) * 100).toFixed(2)) : 0}%`;
 
 const getChartOptions = (data: PieChartData, loading: boolean = false): ChartProps['option'] => {
   const sum = totalRuns(data);
@@ -87,9 +88,10 @@ const getChartOptions = (data: PieChartData, loading: boolean = false): ChartPro
   return {
     legend: {
       orient: 'vertical',
-      right: '10%',
+      right: '5%',
       top: 'center',
       icon: 'circle',
+      selectedMode: true,
       formatter: (name: string) =>
         [
           name,
@@ -104,8 +106,8 @@ const getChartOptions = (data: PieChartData, loading: boolean = false): ChartPro
       {
         name: 'Function Runs',
         type: 'pie',
-        radius: ['50%', '85%'],
-        center: ['25%', '50%'],
+        radius: ['40%', '75%'],
+        center: ['30%', '50%'],
         itemStyle: {
           borderColor: resolveColor(backgroundColor.canvasBase, dark, '#fff'),
           borderWidth: 2,
@@ -145,7 +147,7 @@ export const FunctionStatus = ({ totals }: { totals?: FunctionTotals }) => {
   const metrics = totals && mapMetrics(totals);
 
   return (
-    <div className="bg-canvasBase border-subtle relative flex h-[300px] w-[448px] shrink-0 flex-col rounded-lg p-5">
+    <div className="bg-canvasBase border-subtle relative flex h-[384px] w-[448px] shrink-0 flex-col rounded-lg border p-5">
       <div className="text-subtle mb-2 flex flex-row items-center gap-x-2 text-lg">
         Functions Status{' '}
         <Info
@@ -162,7 +164,7 @@ export const FunctionStatus = ({ totals }: { totals?: FunctionTotals }) => {
         />
       </div>
 
-      <Chart option={metrics ? getChartOptions(metrics) : {}} className="h-[300px]" />
+      <Chart option={metrics ? getChartOptions(metrics) : {}} className="h-[384px]" />
     </div>
   );
 };
