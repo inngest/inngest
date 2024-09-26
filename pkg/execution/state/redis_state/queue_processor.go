@@ -100,6 +100,11 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		queueName = item.QueueName
 	}
 
+	// ensure both QueueName attributes are always set (ItemPartitions depends on this)
+	if queueName != nil && item.QueueName == nil {
+		item.QueueName = queueName
+	}
+
 	metrics.IncrQueueItemStatusCounter(ctx, metrics.CounterOpt{
 		PkgName: pkgName,
 		Tags: map[string]any{
