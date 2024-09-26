@@ -22,13 +22,6 @@ export const Feedback = ({}) => {
           href="https://roadmap.inngest.com/roadmap"
           target="_new"
         />
-        <NewButton
-          kind="secondary"
-          appearance="outlined"
-          label="Give us feedback"
-          href="https://roadmap.inngest.com/roadmap"
-          target="_new"
-        />
       </div>
     </div>
   );
