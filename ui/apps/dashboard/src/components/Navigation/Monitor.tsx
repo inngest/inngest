@@ -29,6 +29,7 @@ export default function Monitor({
         text="Metrics"
         icon={<MetricsIcon className="h-18px w-[18px]" />}
         comingSoon={!metricsIsReady || !metricsEnabled}
+        beta={metricsIsReady && metricsEnabled}
       />
       <MenuItem
         href={getNavRoute(activeEnv, 'runs')}

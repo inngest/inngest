@@ -25,7 +25,8 @@ export const Backlog = ({
               <NewLink
                 arrowOnHover
                 className="text-sm"
-                href="https://www.inngest.com/docs/sdk/overview"
+                href="https://www.inngest.com/docs/platform/monitor/observability-metrics#backlog"
+                target="_new"
               >
                 Learn more about backlog.
               </NewLink>

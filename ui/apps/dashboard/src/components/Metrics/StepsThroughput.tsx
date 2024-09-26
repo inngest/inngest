@@ -23,7 +23,8 @@ export const StepsThroughput = ({
               <NewLink
                 arrowOnHover
                 className="text-sm"
-                href="https://www.inngest.com/docs/features/inngest-functions/steps-workflows"
+                href="https://www.inngest.com/docs/platform/monitor/observability-metrics#total-steps-throughput"
+                target="_new"
               >
                 Learn more about step throughput.
               </NewLink>

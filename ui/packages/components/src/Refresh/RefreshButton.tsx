@@ -18,7 +18,7 @@ export const RefreshButton = () => {
       iconSide="left"
       onClick={() => {
         router.refresh();
-        setTimeout(() => toast.success('Refreshed!'), 500);
+        setTimeout(() => toast.success('Page successfully refreshed!'), 500);
       }}
     />
   );
