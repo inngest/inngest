@@ -27,6 +27,10 @@ type ExprSQLConverter func(ctx context.Context, n *expr.Node) ([]sq.Expression, 
 
 func WithExpressionHandlerExpressions(cel []string) ExprHandlerOpt {
 	return func(ctx context.Context, h *ExpressionHandler) error {
+		if len(cel) == 0 {
+			return nil
+		}
+
 		return h.add(ctx, cel)
 	}
 }
@@ -38,6 +42,10 @@ func WithExpressionHandlerBlob(exp string, delimiter string) ExprHandlerOpt {
 	cel := strings.Split(exp, delimiter)
 
 	return func(ctx context.Context, h *ExpressionHandler) error {
+		if exp == "" || len(cel) == 0 {
+			return nil
+		}
+
 		return h.add(ctx, cel)
 	}
 }
