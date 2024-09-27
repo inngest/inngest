@@ -9,6 +9,7 @@ import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
+import { pathCreator } from '@/utils/urls';
 
 const GetFailedFunctionRunsDocument = graphql(`
   query GetFailedFunctionRuns(
@@ -134,9 +135,7 @@ export default function LatestFailedFunctionRuns({
                       className="cursor-pointer truncate transition-all hover:bg-slate-100"
                       onClick={() =>
                         router.push(
-                          `/env/${environmentSlug}/functions/${encodeURIComponent(
-                            functionSlug
-                          )}/runs/${functionRun.id}` as Route
+                          pathCreator.runPopout({ envSlug: environmentSlug, runID: functionRun.id })
                         )
                       }
                     >
