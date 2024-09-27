@@ -285,7 +285,14 @@ func (h *ExpressionHandler) toSQLFilters(ctx context.Context, nodes []*expr.Node
 			if err != nil {
 				return nil, err
 			}
-			filters = append(filters, sq.And(nested...))
+
+			switch len(nested) {
+			case 0: // no op
+			case 1:
+				filters = append(filters, nested[0])
+			default:
+				filters = append(filters, sq.And(nested...))
+			}
 		}
 
 		if n.Ors != nil {
@@ -293,7 +300,14 @@ func (h *ExpressionHandler) toSQLFilters(ctx context.Context, nodes []*expr.Node
 			if err != nil {
 				return nil, err
 			}
-			filters = append(filters, sq.Or(nested...))
+
+			switch len(nested) {
+			case 0: // no op
+			case 1:
+				filters = append(filters, nested[0])
+			default:
+				filters = append(filters, sq.Or(nested...))
+			}
 		}
 	}
 

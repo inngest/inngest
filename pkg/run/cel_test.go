@@ -80,13 +80,24 @@ func TestToSQLEventFilters(t *testing.T) {
 		},
 		{
 			name: "AND queries",
-			cel:  []string{`event.name == 'test/hello' && event.name == 'test/yolo'`, `event.ts > 1727291508963`},
+			cel:  []string{`event.name == 'test/hello' && event.name == 'test/yolo'`, `event.ts <= 1727291508963`},
 			expected: []sq.Expression{
 				sq.And(
 					sq.C("event_name").Eq("test/hello"),
 					sq.C("event_name").Eq("test/yolo"),
 				),
-				sq.C("event_ts").Gt(int64(1727291508963)),
+				sq.C("event_ts").Lte(int64(1727291508963)),
+			},
+		},
+		{
+			name: "AND with nested OR",
+			cel:  []string{`event.name != 'test/hello' && (event.name != 'test/yolo' || event.ts >= 1727291508963)`},
+			expected: []sq.Expression{
+				sq.C("event_name").Neq("test/hello"),
+				sq.Or(
+					sq.C("event_name").Neq("test/yolo"),
+					sq.C("event_ts").Gte(int64(1727291508963)),
+				),
 			},
 		},
 	}
