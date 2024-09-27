@@ -96,7 +96,7 @@ export function Alert({ children, className, severity, showIcon = true, button }
 function AlertLink({ href, severity, ...props }: LinkProps & { severity: Severity }) {
   const styles = severityStyles[severity].linkClassName;
   return (
-    <Link href={href} {...props} className={cn(props.className, styles)} showIcon={false}></Link>
+    <Link href={href} {...props} className={cn(styles, props.className)} showIcon={false}></Link>
   );
 }
 

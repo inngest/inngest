@@ -61,6 +61,7 @@ type Props = {
   functionIsPaused?: boolean;
   scope: ViewScope;
   totalCount: number | undefined;
+  temporaryAlert?: React.ReactElement;
 };
 
 export function RunsPage({
@@ -85,6 +86,7 @@ export function RunsPage({
   functionIsPaused,
   scope,
   totalCount,
+  temporaryAlert,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useScopedColumns(scope);
@@ -352,6 +354,7 @@ export function RunsPage({
             />
           </div>
         )}
+        {temporaryAlert}
       </div>
     </main>
   );

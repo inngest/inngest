@@ -103,14 +103,18 @@ export function parseRunsData(runsData: PickedFunctionRunV2EdgeWithNode[] | unde
   );
 }
 
-/**
- * Util to help send runs from before clickhouse migration to the old runs page
- */
-export function getBaseRunUrl(time: string) {
+export function isBeforeRunsMigration(time: string) {
   const CUTOFF_DATE = new Date('2023-09-08T01:00:00Z'); // 1h after migration
   const parsedDate = toDate(time);
   if (!parsedDate) {
     throw new Error('Invalid date format');
   }
-  return isBefore(parsedDate, CUTOFF_DATE) ? 'logs' : 'runs';
+  return isBefore(parsedDate, CUTOFF_DATE);
+}
+
+/**
+ * Util to help send runs from before clickhouse migration to the old runs page
+ */
+export function getBaseRunUrl(time: string) {
+  return isBeforeRunsMigration(time) ? 'logs' : 'runs';
 }
