@@ -96,6 +96,14 @@ func (h *ExpressionHandler) add(ctx context.Context, cel []string) error {
 			msg := exprErrorRegex.ReplaceAllString(errs[0], "")
 			return fmt.Errorf("%s\n | %s", msg, e)
 		}
+		if tree.HasMacros {
+			return fmt.Errorf("macros are currently not supported")
+		}
+		// NOTE: if there are no predicates or AND or OR
+		// it means an invalid syntax was used and it couldn't parse anything
+		if !tree.Root.HasPredicate() && tree.Root.Ands == nil && tree.Root.Ors == nil {
+			return fmt.Errorf("invalid syntax detected")
+		}
 
 		h.addToExprList(ctx, []*expr.Node{&tree.Root}, e, evtExprs, outputExprs)
 	}

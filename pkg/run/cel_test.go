@@ -31,6 +31,21 @@ func TestValidateExpressionHandler(t *testing.T) {
 			cel:    []string{`event.name === "test/hello"`},
 			errStr: "token recognition error at: '= '",
 		},
+		{
+			name:   "macros",
+			cel:    []string{`event.data.num.filter(x, x > 5)`},
+			errStr: "macros are currently not supported",
+		},
+		{
+			name:   "macros (select)",
+			cel:    []string{`has(event.name)`},
+			errStr: "macros are currently not supported",
+		},
+		{
+			name:   "invalid syntax",
+			cel:    []string{`event.name.startWith("hello")`},
+			errStr: "invalid syntax detected",
+		},
 	}
 
 	for _, test := range tests {
