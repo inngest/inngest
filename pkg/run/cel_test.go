@@ -9,6 +9,43 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestValidateExpressionHandler(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name   string
+		cel    []string
+		errStr string
+	}{
+		{
+			name: "valid CEL expr have no errors",
+			cel:  []string{`event.name == "test/hello"`, `output.success == true`},
+		},
+		{
+			name:   "invalid AND",
+			cel:    []string{`event.name == "test/hello" and event.ts > 1727291508963`},
+			errStr: "mismatched input 'and'",
+		},
+		{
+			name:   "invalid Equal",
+			cel:    []string{`event.name === "test/hello"`},
+			errStr: "token recognition error at: '= '",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := NewExpressionHandler(ctx, WithExpressionHandlerExpressions(test.cel))
+
+			if test.errStr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorContains(t, err, test.errStr)
+			}
+		})
+	}
+}
+
 func TestToSQLEventFilters(t *testing.T) {
 	ctx := context.Background()
 

@@ -18,6 +18,8 @@ import (
 var (
 	eventRegex  = regexp.MustCompile(`^event\..+`)
 	outputRegex = regexp.MustCompile(`^output`)
+
+	exprErrorRegex = regexp.MustCompile(`^ERROR: <input>:\d+:\d+:\s+`)
 )
 
 type ExprHandlerOpt func(ctx context.Context, h *ExpressionHandler) error
@@ -80,74 +82,63 @@ func (h *ExpressionHandler) add(ctx context.Context, cel []string) error {
 	outputExprs := map[string]bool{}
 
 	for _, e := range cel {
+		// parse and validate
 		tree, err := parser.Parse(ctx, expr.StringExpression(e))
 		if err != nil {
-			return fmt.Errorf("error parsing expression '%s': %w", e, err)
+			// reformat the error message to be more comprehensive when propagated back to the user
+			errs := strings.Split(err.Error(), "\n")
+			if len(errs) == 1 {
+				return err
+			}
+
+			// Only take the first one, the rest is not needed.
+			// then remove the prefix `ERROR : <input>:1:\d:` and use the rest of the error body
+			msg := exprErrorRegex.ReplaceAllString(errs[0], "")
+			return fmt.Errorf("%s\n | %s", msg, e)
 		}
 
-		if tree.Root.HasPredicate() {
-			switch {
-			case eventRegex.MatchString(tree.Root.Predicate.Ident):
-				if _, ok := evtExprs[e]; !ok {
-					evtExprs[e] = true
-				}
-			case outputRegex.MatchString(tree.Root.Predicate.Ident):
-				if _, ok := outputExprs[e]; !ok {
-					outputExprs[e] = true
-				}
-			}
-		}
-
-		// NOTE: separate expressions are treated as AND, so putting an and within
-		// a cel doesn't really make sense but it is what it is
-		if len(tree.Root.Ands) > 0 {
-			for _, n := range tree.Root.Ands {
-				if n.HasPredicate() {
-					switch {
-					case eventRegex.MatchString(n.Predicate.Ident):
-						if _, ok := evtExprs[e]; !ok {
-							evtExprs[e] = true
-						}
-						continue
-					case outputRegex.MatchString(n.Predicate.Ident):
-						if _, ok := outputExprs[e]; !ok {
-							outputExprs[e] = true
-						}
-						continue
-					}
-				}
-			}
-		}
-
-		if len(tree.Root.Ors) > 0 {
-			for _, n := range tree.Root.Ors {
-				if n.HasPredicate() {
-					switch {
-					case eventRegex.MatchString(n.Predicate.Ident):
-						if _, ok := evtExprs[e]; !ok {
-							evtExprs[e] = true
-						}
-						continue
-					case outputRegex.MatchString(n.Predicate.Ident):
-						if _, ok := outputExprs[e]; !ok {
-							outputExprs[e] = true
-						}
-						continue
-					}
-				}
-			}
-		}
+		h.addToExprList(ctx, []*expr.Node{&tree.Root}, e, evtExprs, outputExprs)
 	}
 
 	for evt := range evtExprs {
 		h.EventExprList = append(h.EventExprList, evt)
 	}
 
-	for out := range outputExprs {
-		h.OutputExprList = append(h.OutputExprList, out)
+	for output := range outputExprs {
+		h.OutputExprList = append(h.OutputExprList, output)
 	}
 
 	return nil
+}
+
+func (h *ExpressionHandler) addToExprList(
+	ctx context.Context,
+	nodes []*expr.Node,
+	cel string,
+	evtDedup map[string]bool,
+	outputDedup map[string]bool,
+) {
+	for _, n := range nodes {
+		if n.HasPredicate() {
+			switch {
+			case eventRegex.MatchString(n.Predicate.Ident):
+				if _, ok := evtDedup[cel]; !ok {
+					evtDedup[cel] = true
+				}
+			case outputRegex.MatchString(n.Predicate.Ident):
+				if _, ok := outputDedup[cel]; !ok {
+					outputDedup[cel] = true
+				}
+			}
+		}
+
+		if n.Ands != nil {
+			h.addToExprList(ctx, n.Ands, cel, evtDedup, outputDedup)
+		}
+		if n.Ors != nil {
+			h.addToExprList(ctx, n.Ors, cel, evtDedup, outputDedup)
+		}
+	}
 }
 
 func (h *ExpressionHandler) HasFilters() bool {
