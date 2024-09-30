@@ -9,7 +9,7 @@ import { Help } from '../Navigation/Help';
 import { Integrations } from '../Navigation/Integrations';
 import Logo from '../Navigation/Logo';
 import Navigation from '../Navigation/Navigation';
-import { Profile, type ProfileType } from '../Navigation/Profile';
+import { Profile } from '../Navigation/Profile';
 import useOnboardingWidget from '../Onboarding/useOnboardingWidget';
 
 // Disable SSR in Onboarding Widget, to prevent hydration errors. It requires windows info
