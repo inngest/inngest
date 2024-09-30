@@ -34,7 +34,8 @@ export default async function makeVM(timeout: number = -1) {
   const disposables = new DisposableComposer();
 
   const QuickJS = await getQuickJS();
-  const vm = QuickJS.createVm();
+  const vm = QuickJS.newContext();
+
   let alive = true;
   disposables.add({
     get alive() {
@@ -47,7 +48,7 @@ export default async function makeVM(timeout: number = -1) {
   });
 
   if (timeout !== -1) {
-    vm.setInterruptHandler(shouldInterruptAfterDeadline(Date.now() + timeout));
+    vm.runtime.setInterruptHandler(shouldInterruptAfterDeadline(Date.now() + timeout));
   }
 
   const trueHandle = vm.unwrapResult(vm.evalCode('true'));
@@ -113,7 +114,7 @@ export default async function makeVM(timeout: number = -1) {
           target.then((result: any) => {
             const marshaled = marshal(result);
             deferred.resolve(marshaled);
-            vm.executePendingJobs(-1);
+            vm.runtime.executePendingJobs(-1);
           });
           return deferred.handle;
         }
@@ -381,7 +382,7 @@ export default async function makeVM(timeout: number = -1) {
      */
     dump: typedBind(vm.dump, vm),
 
-    executePendingJobs: typedBind(vm.executePendingJobs, vm),
+    executePendingJobs: typedBind(vm.runtime.executePendingJobs, vm),
 
     /**
      * Unwrap a VmCallResult, returning it's value on success, and throwing the dumped
@@ -396,13 +397,13 @@ export default async function makeVM(timeout: number = -1) {
      *
      * The interrupt handler can be removed with [[removeInterruptHandler]].
      */
-    setInterruptHandler: typedBind(vm.setInterruptHandler, vm),
+    setInterruptHandler: typedBind(vm.runtime.setInterruptHandler, vm),
 
     /**
      * Remove the interrupt handler, if any.
      * See [[setInterruptHandler]].
      */
-    removeInterruptHandler: typedBind(vm.removeInterruptHandler, vm),
+    removeInterruptHandler: typedBind(vm.runtime.removeInterruptHandler, vm),
 
     /**
      * Dispose of this VM's underlying resources.
