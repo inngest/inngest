@@ -103,6 +103,9 @@ export function parseRunsData(runsData: PickedFunctionRunV2EdgeWithNode[] | unde
   );
 }
 
+/**
+ * Delete after December 7
+ */
 export function isBeforeRunsMigration(time: string) {
   const CUTOFF_DATE = new Date('2023-09-08T01:00:00Z'); // 1h after migration
   const parsedDate = toDate(time);

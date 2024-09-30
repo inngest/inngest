@@ -213,6 +213,9 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     },
   }));
 
+  /**
+   * Delete after December 7
+   */
   const temporaryAlert = useMemo(() => {
     const showBanner = isBeforeRunsMigration(calculatedStartTime.toISOString());
     if (!showBanner) return;
@@ -221,8 +224,8 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       <Alert
         showIcon
         severity="info"
-        className="mx-auto my-4 flex max-w-xl"
-        button={
+        className="mx-auto my-4 flex max-w-xl items-center justify-between"
+        link={
           scope === 'fn' ? (
             <Alert.Link
               severity="info"
