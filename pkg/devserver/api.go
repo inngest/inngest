@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -127,6 +128,12 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 		funcs[n] = f
 	}
 
+	features := map[string]bool{}
+	for _, flag := range featureFlags {
+		enabled, _ := strconv.ParseBool(os.Getenv(flag))
+		features[flag] = enabled
+	}
+
 	ir := InfoResponse{
 		Version:             version.Print(),
 		StartOpts:           a.devserver.Opts,
@@ -135,6 +142,7 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 		IsSingleNodeService: a.devserver.IsSingleNodeService(),
 		IsMissingSigningKey: a.devserver.Opts.RequireKeys && !a.devserver.HasSigningKey(),
 		IsMissingEventKeys:  a.devserver.Opts.RequireKeys && !a.devserver.HasEventKeys(),
+		Features:            features,
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	byt, _ := json.MarshalIndent(ir, "", "  ")
@@ -566,4 +574,6 @@ type InfoResponse struct {
 	// If true, the server is running in a mode where it requires one or more
 	// event keys to function and they are not set.
 	IsMissingEventKeys bool `json:"isMissingEventKeys"`
+
+	Features map[string]bool `json:"features"`
 }
