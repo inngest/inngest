@@ -2422,7 +2422,8 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 		metrics.IncrBatchScheduledCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"account_id": bi.AccountID.String(),
+				"account_id":  bi.AccountID.String(),
+				"function_id": bi.FunctionID.String(),
 			},
 		})
 	case enums.BatchFull:
@@ -2502,6 +2503,19 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		IdempotencyKey:   &key,
 		FunctionPausedAt: opts.FunctionPausedAt,
 	})
+
+	// Ensure to delete batch when Schedule worked, we already processed it, or the function was paused
+	shouldDeleteBatch := err == nil ||
+		err == redis_state.ErrQueueItemExists ||
+		errors.Is(err, ErrFunctionSkipped) ||
+		errors.Is(err, state.ErrIdentifierExists)
+	if shouldDeleteBatch {
+		// TODO: check if all errors can be blindly returned
+		if err := e.batcher.DeleteKeys(ctx, payload.FunctionID, payload.BatchID); err != nil {
+			return err
+		}
+	}
+
 	// Don't bother if it's already there
 	if err == redis_state.ErrQueueItemExists {
 		return nil
@@ -2525,11 +2539,6 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		span.SetAttributes(attribute.String(consts.OtelAttrSDKRunID, md.ID.RunID.String()))
 	} else {
 		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
-	}
-
-	// TODO: check if all errors can be blindly returned
-	if err := e.batcher.DeleteKeys(ctx, payload.FunctionID, payload.BatchID); err != nil {
-		return err
 	}
 
 	return nil
