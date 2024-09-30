@@ -56,14 +56,15 @@ export default function CodeSearch({ onSearch }: { onSearch: (content: string) =
 
   const handleClear = () => {
     if (editorRef.current) {
-      editorRef.current.setValue('');
-      setContent('');
+      editorRef.current.setValue('\n');
+      setContent('\n');
     }
   };
 
   const handleSearch = () => {
-    if (content) {
-      onSearch(content);
+    const trimmedContent = content.trim();
+    if (trimmedContent && trimmedContent !== '\n') {
+      onSearch(trimmedContent);
     }
   };
 
