@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 
+import type { ProfileDisplayType } from '@/queries/server-only/profile';
 import type { Environment } from '@/utils/environments';
 import { Help } from '../Navigation/Help';
 import { Integrations } from '../Navigation/Integrations';
@@ -23,7 +24,7 @@ export default function SideBar({
 }: {
   collapsed: boolean | undefined;
   activeEnv?: Environment;
-  profile: ProfileType;
+  profile: ProfileDisplayType;
 }) {
   const [collapsed, setCollapsed] = useState<boolean>(serverCollapsed ?? false);
   const { isWidgetOpen, showWidget, closeWidget } = useOnboardingWidget();
