@@ -21,6 +21,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 
 import SendEventButton from '@/components/Event/SendEventButton';
 import { useCancelRun } from '@/hooks/useCancelRun';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import { useGetRun } from '@/hooks/useGetRun';
 import { useGetTraceResult } from '@/hooks/useGetTraceResult';
 import { useGetTrigger } from '@/hooks/useGetTrigger';
@@ -38,6 +39,7 @@ import { pathCreator } from '@/utils/pathCreator';
 const pollInterval = 400;
 
 export default function Page() {
+  const { featureFlags } = useFeatureFlags();
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [filterApp] = useStringArraySearchParam('filterApp');
   const [totalCount, setTotalCount] = useState<number>();
@@ -152,6 +154,8 @@ export default function Page() {
     // TODO: What should this do?
   }, []);
 
+  const isSearchEnabled = featureFlags.FEATURE_CEL_SEARCH;
+
   return (
     <>
       <Header
@@ -196,6 +200,8 @@ export default function Page() {
         pollInterval={pollInterval}
         scope="env"
         totalCount={totalCount}
+        showSearch={isSearchEnabled}
+        onSearch={() => {}}
       />
     </>
   );

@@ -19,6 +19,7 @@ import { useCancelRun } from '@/queries/useCancelRun';
 import { useRerun } from '@/queries/useRerun';
 import { pathCreator } from '@/utils/urls';
 import { usePlanFeatures } from '@/utils/usePlanFeatures';
+import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { AppFilterDocument, CountRunsDocument, GetRunsDocument } from './queries';
 import { parseRunsData, toRunStatuses, toTimeField } from './utils';
 
@@ -43,6 +44,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   ref
 ) {
   const env = useEnvironment();
+  const { isReady: searchIsReady, value: searchEnabled } = useBooleanFlag('run-cel-query');
 
   const [{ data: pauseData }] = useQuery({
     pause: scope !== 'fn',
@@ -237,6 +239,8 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       functionIsPaused={pauseData?.environment.function?.isPaused ?? false}
       scope={scope}
       totalCount={totalCount}
+      showSearch={searchIsReady && searchEnabled}
+      onSearch={() => {}}
     />
   );
 });
