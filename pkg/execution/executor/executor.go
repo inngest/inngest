@@ -838,10 +838,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 }
 
 func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *state.DriverResponse) error {
-	l := logger.From(ctx).With().
-		Str("run_id", i.md.ID.RunID.String()).
-		Str("workflow_id", i.md.ID.FunctionID.String()).
-		Logger()
+	l := logger.StdlibLogger(ctx).With(
+		"run_id", i.md.ID.RunID.String(),
+		"workflow_id", i.md.ID.FunctionID.String(),
+	)
 
 	for _, e := range e.lifecycles {
 		// OnStepFinished handles step success and step errors/failures.  It is
@@ -889,13 +889,13 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 		if !resp.Retryable() {
 			// TODO: Refactor state input
 			if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
-				l.Error().Err(err).Msg("error running finish handler")
+				l.Error("error running finish handler", "error", err)
 			} else if performedFinalization {
 				for _, e := range e.lifecycles {
 					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
 				}
 			} else {
-				l.Info().Msg("run finished but did not finalize")
+				l.Info("run finished but did not finalize")
 			}
 
 			return resp
@@ -918,13 +918,13 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 				}
 
 				if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
-					l.Error().Err(err).Msg("error running finish handler")
+					l.Error("error running finish handler", "error", err)
 				} else if performedFinalization {
 					for _, e := range e.lifecycles {
 						go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
 					}
 				} else {
-					l.Info().Msg("run finished but did not finalize")
+					l.Info("run finished but did not finalize")
 				}
 
 				return nil
@@ -936,13 +936,13 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 
 	// This is the function result.
 	if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
-		l.Error().Err(err).Msg("error running finish handler")
+		l.Error("error running finish handler", "error", err)
 	} else if performedFinalization {
 		for _, e := range e.lifecycles {
 			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
 		}
 	} else {
-		l.Info().Msg("run finished but did not finalize")
+		l.Info("run finished but did not finalize")
 	}
 
 	return nil
@@ -1615,10 +1615,10 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 
 // Cancel cancels an in-progress function.
 func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequest) error {
-	l := logger.From(ctx).With().
-		Str("run_id", id.RunID.String()).
-		Str("workflow_id", id.FunctionID.String()).
-		Logger()
+	l := logger.StdlibLogger(ctx).With(
+		"run_id", id.RunID.String(),
+		"workflow_id", id.FunctionID.String(),
+	)
 
 	md, err := e.smv2.LoadMetadata(ctx, id)
 	if err == sv2.ErrMetadataNotFound || err == state.ErrRunNotFound {
@@ -1644,13 +1644,13 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	if performedFinalization, err := e.finalize(ctx, md, evts, f.GetSlug(), state.DriverResponse{
 		Err: &fnCancelledErr,
 	}); err != nil {
-		l.Error().Err(err).Msg("error running finish handler")
+		l.Error("error running finish handler", "error", err)
 	} else if performedFinalization || r.ForceLifecycleHook {
 		for _, e := range e.lifecycles {
 			go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, evts)
 		}
 	} else {
-		l.Info().Msg("run cancelled but did not finalize")
+		l.Info("run cancelled but did not finalize")
 	}
 
 	return nil

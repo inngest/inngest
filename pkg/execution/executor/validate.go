@@ -67,10 +67,10 @@ func (r *runValidator) validate(ctx context.Context) error {
 }
 
 func (r *runValidator) checkStepLimit(ctx context.Context) error {
-	l := logger.From(ctx).With().
-		Str("run_id", r.md.ID.RunID.String()).
-		Str("workflow_id", r.md.ID.FunctionID.String()).
-		Logger()
+	l := logger.StdlibLogger(ctx).With(
+		"run_id", r.md.ID.RunID.String(),
+		"workflow_id", r.md.ID.FunctionID.String(),
+	)
 
 	var limit int
 
@@ -99,13 +99,13 @@ func (r *runValidator) checkStepLimit(ctx context.Context) error {
 		resp.SetFinal()
 
 		if performedFinalization, err := r.e.finalize(ctx, r.md, r.evts, r.f.GetSlug(), resp); err != nil {
-			l.Error().Err(err).Msg("error running finish handler")
+			l.Error("error running finish handler", "error", err)
 		} else if performedFinalization {
 			for _, e := range r.e.lifecycles {
 				go e.OnFunctionFinished(context.WithoutCancel(ctx), r.md, r.item, r.evts, resp)
 			}
 		} else {
-			l.Info().Msg("run cancelled but did not finalize")
+			l.Info("run cancelled but did not finalize")
 		}
 
 		// Stop the function from running, but don't return an error as we don't
