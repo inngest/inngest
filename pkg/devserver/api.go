@@ -575,5 +575,6 @@ type InfoResponse struct {
 	// event keys to function and they are not set.
 	IsMissingEventKeys bool `json:"isMissingEventKeys"`
 
+	// Features acts as an in-memory feature flag for the UI
 	Features map[string]bool `json:"features"`
 }
