@@ -43,6 +43,7 @@ export default function Page() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [filterApp] = useStringArraySearchParam('filterApp');
   const [totalCount, setTotalCount] = useState<number>();
+  const [celQuery, setCelQuery] = useState<string>();
   const [filteredStatus] = useValidatedArraySearchParam('filterStatus', isFunctionRunStatus);
   const [timeField = FunctionRunTimeField.QueuedAt] = useValidatedSearchParam(
     'timeField',
@@ -63,6 +64,7 @@ export default function Page() {
         endTime: endTime,
         status: filteredStatus,
         timeField,
+        celQuery,
       });
 
       const edges = data.runs.edges.map((edge) => {
@@ -83,7 +85,7 @@ export default function Page() {
         edges,
       };
     },
-    [filterApp, filteredStatus, calculatedStartTime, timeField]
+    [filterApp, filteredStatus, calculatedStartTime, timeField, celQuery]
   );
 
   const { data, fetchNextPage, isFetching, hasNextPage } = useInfiniteQuery({
@@ -109,10 +111,11 @@ export default function Page() {
         endTime,
         status: filteredStatus,
         timeField,
+        celQuery,
       });
       setTotalCount(data.runs.totalCount);
     })();
-  }, [calculatedStartTime, endTime, filteredStatus, timeField]);
+  }, [calculatedStartTime, endTime, filteredStatus, timeField, celQuery]);
 
   const runs = useMemo(() => {
     if (!data?.pages) {
@@ -201,7 +204,9 @@ export default function Page() {
         scope="env"
         totalCount={totalCount}
         showSearch={isSearchEnabled}
-        onSearch={() => {}}
+        onSearch={(cel) => {
+          setCelQuery(cel);
+        }}
       />
     </>
   );
