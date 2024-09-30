@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Header } from '@inngest/components/Header/Header';
-import { Pill } from '@inngest/components/Pill';
 import { RunsActionMenu } from '@inngest/components/RunsPage/ActionMenu';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
@@ -85,7 +84,7 @@ export default function Page() {
     [filterApp, filteredStatus, calculatedStartTime, timeField]
   );
 
-  const { data, fetchNextPage, isFetching } = useInfiniteQuery({
+  const { data, fetchNextPage, isFetching, hasNextPage } = useInfiniteQuery({
     queryKey: ['runs'],
     queryFn,
     refetchInterval: autoRefresh ? pollInterval : false,
@@ -157,11 +156,6 @@ export default function Page() {
     <>
       <Header
         breadcrumb={[{ text: 'Runs' }]}
-        infoIcon={
-          <Pill kind="primary" appearance="solid">
-            Beta
-          </Pill>
-        }
         action={
           <div className="flex flex-row items-center gap-x-1">
             <SendEventButton
@@ -188,7 +182,7 @@ export default function Page() {
         features={{
           history: Number.MAX_SAFE_INTEGER,
         }}
-        hasMore={false}
+        hasMore={hasNextPage ?? false}
         isLoadingInitial={isFetching && runs === undefined}
         isLoadingMore={isFetching && runs !== undefined}
         getRun={getRun}

@@ -13,7 +13,7 @@ export const StepsThroughput = ({
   const metrics = workspace && mapEntityLines(workspace.stepThroughput.metrics, entities);
 
   return (
-    <div className="bg-canvasBase border-subtle relative flex h-[300px] w-full flex-col overflow-x-hidden rounded-lg p-5">
+    <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-x-hidden rounded-lg border p-5">
       <div className="mb-2 flex flex-row items-center justify-between">
         <div className="text-subtle flex w-full flex-row items-center gap-x-2 text-lg">
           Total steps throughput{' '}
@@ -23,7 +23,8 @@ export const StepsThroughput = ({
               <NewLink
                 arrowOnHover
                 className="text-sm"
-                href="https://www.inngest.com/docs/features/inngest-functions/steps-workflows"
+                href="https://www.inngest.com/docs/platform/monitor/observability-metrics#total-steps-throughput"
+                target="_new"
               >
                 Learn more about step throughput.
               </NewLink>

@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/expressions"
 	"time"
+
+	"github.com/inngest/inngest/pkg/expressions"
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/event"
@@ -66,6 +67,11 @@ func (r *runValidator) validate(ctx context.Context) error {
 }
 
 func (r *runValidator) checkStepLimit(ctx context.Context) error {
+	l := logger.From(ctx).With().
+		Str("run_id", r.md.ID.RunID.String()).
+		Str("workflow_id", r.md.ID.FunctionID.String()).
+		Logger()
+
 	var limit int
 
 	if r.e.steplimit != nil {
@@ -93,11 +99,13 @@ func (r *runValidator) checkStepLimit(ctx context.Context) error {
 		resp.SetFinal()
 
 		if performedFinalization, err := r.e.finalize(ctx, r.md, r.evts, r.f.GetSlug(), resp); err != nil {
-			logger.From(ctx).Error().Err(err).Msg("error running finish handler")
+			l.Error().Err(err).Msg("error running finish handler")
 		} else if performedFinalization {
 			for _, e := range r.e.lifecycles {
 				go e.OnFunctionFinished(context.WithoutCancel(ctx), r.md, r.item, r.evts, resp)
 			}
+		} else {
+			l.Info().Msg("run cancelled but did not finalize")
 		}
 
 		// Stop the function from running, but don't return an error as we don't

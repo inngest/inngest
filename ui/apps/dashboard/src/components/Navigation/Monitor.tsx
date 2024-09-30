@@ -13,7 +13,6 @@ export default function Monitor({
   activeEnv: EnvType;
   collapsed: boolean;
 }) {
-  const { isReady: runsIsReady, value: runsEnabled } = useBooleanFlag('env-level-runs-page');
   const { isReady: metricsIsReady, value: metricsEnabled } = useBooleanFlag('metrics-dashboard');
 
   return (
@@ -29,13 +28,13 @@ export default function Monitor({
         text="Metrics"
         icon={<MetricsIcon className="h-18px w-[18px]" />}
         comingSoon={!metricsIsReady || !metricsEnabled}
+        beta={metricsIsReady && metricsEnabled}
       />
       <MenuItem
         href={getNavRoute(activeEnv, 'runs')}
         collapsed={collapsed}
         text="Runs"
         icon={<RunsIcon className="h-18px w-[18px]" />}
-        comingSoon={!runsIsReady || !runsEnabled}
       />
       {/* <MenuItem
         href={getNavRoute(activeEnv, 'events/monitor')}

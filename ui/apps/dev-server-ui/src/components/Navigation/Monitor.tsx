@@ -15,7 +15,6 @@ export default function Monitor({ collapsed }: { collapsed: boolean }) {
         href="/runs"
         collapsed={collapsed}
         text="Runs"
-        beta={true}
         icon={<RiMistLine className="h-18px w-[18px]" />}
       />
       <MenuItem

@@ -4,7 +4,6 @@ import { RiArrowDownSFill, RiArrowRightSFill } from '@remixicon/react';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
-import { MetricsScope } from '@/gql/graphql';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
 import type { MetricsFilters } from './Dashboard';
@@ -137,6 +136,7 @@ export const MetricsOverview = ({
   autoRefresh = false,
   entities, // dynamic based on scope
   functions,
+  scope,
 }: MetricsFilters) => {
   const [overviewOpen, setOverviewOpen] = useState(true);
   const env = useEnvironment();
@@ -147,7 +147,7 @@ export const MetricsOverview = ({
     appIDs: selectedApps,
     functionIDs: selectedFns,
     until: until ? until.toISOString() : null,
-    scope: !selectedApps.length && !selectedFns.length ? MetricsScope.App : MetricsScope.Fn,
+    scope,
   };
 
   const { data, error } = useGraphQLQuery({
@@ -160,12 +160,11 @@ export const MetricsOverview = ({
 
   return (
     <div className="item-start flex h-full w-full flex-col items-start">
-      <div className="text-subtle my-4 flex w-full flex-row items-center justify-start gap-x-2 text-xs uppercase">
-        {overviewOpen ? (
-          <RiArrowDownSFill className="cursor-pointer" onClick={() => setOverviewOpen(false)} />
-        ) : (
-          <RiArrowRightSFill className="cursor-pointer" onClick={() => setOverviewOpen(true)} />
-        )}
+      <div
+        className="text-subtle my-4 flex w-full cursor-pointer flex-row items-center justify-start gap-x-2 text-xs uppercase"
+        onClick={() => setOverviewOpen(!overviewOpen)}
+      >
+        {overviewOpen ? <RiArrowDownSFill /> : <RiArrowRightSFill />}
         <div>Overview</div>
 
         <hr className="border-subtle w-full" />

@@ -3,7 +3,6 @@
 import { RangePicker } from '@inngest/components/DatePicker';
 import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicker.jsx';
 import EntityFilter from '@inngest/components/Filter/EntityFilter';
-import { Pill } from '@inngest/components/Pill';
 import {
   useBatchedSearchParams,
   useBooleanSearchParam,
@@ -19,7 +18,7 @@ import {
 } from '@inngest/components/utils/date';
 import { useQuery } from 'urql';
 
-import { GetBillingPlanDocument } from '@/gql/graphql';
+import { GetBillingPlanDocument, MetricsScope } from '@/gql/graphql';
 import { MetricsOverview } from './Overview';
 import { MetricsVolume } from './Volume';
 import { convertLookup } from './utils';
@@ -40,6 +39,7 @@ export type MetricsFilters = {
   autoRefresh?: boolean;
   entities: EntityLookup;
   functions: EntityLookup;
+  scope: MetricsScope;
 };
 
 export const DEFAULT_DURATION = { hours: 24 };
@@ -85,7 +85,7 @@ export const Dashboard = ({
   const logRetention = Number(planData?.account.plan?.features.log_retention);
   const upgradeCutoff = subtractDuration(new Date(), { days: logRetention || 7 });
 
-  const envLookup = !selectedApps?.length && !selectedFns?.length;
+  const envLookup = apps.length !== 1 && !selectedApps?.length && !selectedFns?.length;
   const mappedFunctions = convertLookup(functions);
   const mappedApps = convertLookup(apps);
   const mappedEntities = envLookup ? mappedApps : mappedFunctions;
@@ -110,9 +110,6 @@ export const Dashboard = ({
           />
         </div>
         <div className="flex flex-row items-center justify-end gap-x-2">
-          <Pill appearance="outlined" kind="warning">
-            <div className="text-nowrap">15m delay</div>
-          </Pill>
           <RangePicker
             className="w-full"
             upgradeCutoff={upgradeCutoff}
@@ -136,6 +133,7 @@ export const Dashboard = ({
           autoRefresh={autoRefresh}
           entities={mappedEntities}
           functions={mappedFunctions}
+          scope={envLookup ? MetricsScope.App : MetricsScope.Fn}
         />
       </div>
       <div className="bg-canvasSubtle px-6 pb-6">
@@ -146,6 +144,7 @@ export const Dashboard = ({
           selectedFns={selectedFns}
           autoRefresh={autoRefresh}
           entities={mappedEntities}
+          scope={envLookup ? MetricsScope.App : MetricsScope.Fn}
         />
       </div>
     </div>

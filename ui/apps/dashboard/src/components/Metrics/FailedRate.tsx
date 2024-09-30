@@ -49,7 +49,7 @@ const mapRateList = (
   completed: CompletedByFunctionType,
   functions: EntityLookup
 ): Rate[] => {
-  return failed.map((f) => {
+  return failed.slice(0, 6).map((f) => {
     const failures = f.data.filter((d) => d.value > 0);
     const totalFailures = sum(failures);
     const lastOccurence = failures.at(-1)?.bucket;
@@ -85,9 +85,9 @@ export const FailedRate = ({
           <div className="mt-3 flex w-full flex-row items-center justify-between gap-x-3 text-xs font-light leading-none">
             <NewLink
               className="text-basis text-xs font-light leading-none hover:no-underline"
-              href={pathCreator.function({ envSlug: env.slug, functionSlug: r.slug })}
+              href={`${pathCreator.function({ envSlug: env.slug, functionSlug: r.slug })}/runs`}
             >
-              <div>{r.name}</div>
+              <div className="w-[136px] overflow-hidden text-ellipsis text-nowrap">{r.name}</div>
             </NewLink>
             <div className="flex flex-row justify-end gap-x-4">
               <div className="justify-self-end">{r.totalFailures}</div>

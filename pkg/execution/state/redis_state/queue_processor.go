@@ -96,6 +96,10 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		item.QueueName = queueName
 	}
 
+	if queueName != nil && *queueName == "" {
+		return fmt.Errorf("encountered empty string for queue name")
+	}
+
 	metrics.IncrQueueItemStatusCounter(ctx, metrics.CounterOpt{
 		PkgName: pkgName,
 		Tags: map[string]any{

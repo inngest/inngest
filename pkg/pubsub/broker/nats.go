@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"sync"
 
 	"github.com/inngest/inngest/pkg/logger"
@@ -92,8 +93,15 @@ func NewNATSConnector(ctx context.Context, opts NatsConnOpt) (*NatsConnector, er
 	}
 
 	if opts.JetStream {
+		pending := 10_000
+		if p, err := strconv.Atoi(os.Getenv("NATS_JS_MAX_PENDING")); err == nil && p > 0 {
+			pending = p
+		}
+
 		// NOTE: should there be some default jetstream options?
-		js, err := jetstream.New(conn)
+		js, err := jetstream.New(conn,
+			jetstream.WithPublishAsyncMaxPending(pending),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("error initializing jetstream API: %w", err)
 		}

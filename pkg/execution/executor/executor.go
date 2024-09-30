@@ -841,6 +841,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 }
 
 func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *state.DriverResponse) error {
+	l := logger.From(ctx).With().
+		Str("run_id", i.md.ID.RunID.String()).
+		Str("workflow_id", i.md.ID.FunctionID.String()).
+		Logger()
+
 	for _, e := range e.lifecycles {
 		// OnStepFinished handles step success and step errors/failures.  It is
 		// currently the responsibility of the lifecycle manager to handle the differing
@@ -887,11 +892,13 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 		if !resp.Retryable() {
 			// TODO: Refactor state input
 			if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
-				logger.From(ctx).Error().Err(err).Msg("error running finish handler")
+				l.Error().Err(err).Msg("error running finish handler")
 			} else if performedFinalization {
 				for _, e := range e.lifecycles {
 					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
 				}
+			} else {
+				l.Info().Msg("run finished but did not finalize")
 			}
 
 			return resp
@@ -914,11 +921,13 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 				}
 
 				if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
-					logger.From(ctx).Error().Err(err).Msg("error running finish handler")
+					l.Error().Err(err).Msg("error running finish handler")
 				} else if performedFinalization {
 					for _, e := range e.lifecycles {
 						go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
 					}
+				} else {
+					l.Info().Msg("run finished but did not finalize")
 				}
 
 				return nil
@@ -930,11 +939,13 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 
 	// This is the function result.
 	if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
-		logger.From(ctx).Error().Err(err).Msg("error running finish handler")
+		l.Error().Err(err).Msg("error running finish handler")
 	} else if performedFinalization {
 		for _, e := range e.lifecycles {
 			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
 		}
+	} else {
+		l.Info().Msg("run finished but did not finalize")
 	}
 
 	return nil
@@ -1608,6 +1619,11 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 
 // Cancel cancels an in-progress function.
 func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequest) error {
+	l := logger.From(ctx).With().
+		Str("run_id", id.RunID.String()).
+		Str("workflow_id", id.FunctionID.String()).
+		Logger()
+
 	md, err := e.smv2.LoadMetadata(ctx, id)
 	if err == sv2.ErrMetadataNotFound || err == state.ErrRunNotFound {
 		return nil
@@ -1632,11 +1648,13 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	if performedFinalization, err := e.finalize(ctx, md, evts, f.Function.GetSlug(), state.DriverResponse{
 		Err: &fnCancelledErr,
 	}); err != nil {
-		logger.From(ctx).Error().Err(err).Msg("error running finish handler")
+		l.Error().Err(err).Msg("error running finish handler")
 	} else if performedFinalization || r.ForceLifecycleHook {
 		for _, e := range e.lifecycles {
 			go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, evts)
 		}
+	} else {
+		l.Info().Msg("run cancelled but did not finalize")
 	}
 
 	return nil
@@ -2409,7 +2427,8 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 		metrics.IncrBatchScheduledCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"account_id": bi.AccountID.String(),
+				"account_id":  bi.AccountID.String(),
+				"function_id": bi.FunctionID.String(),
 			},
 		})
 	case enums.BatchFull:
@@ -2489,6 +2508,19 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		IdempotencyKey:   &key,
 		FunctionPausedAt: opts.FunctionPausedAt,
 	})
+
+	// Ensure to delete batch when Schedule worked, we already processed it, or the function was paused
+	shouldDeleteBatch := err == nil ||
+		err == redis_state.ErrQueueItemExists ||
+		errors.Is(err, ErrFunctionSkipped) ||
+		errors.Is(err, state.ErrIdentifierExists)
+	if shouldDeleteBatch {
+		// TODO: check if all errors can be blindly returned
+		if err := e.batcher.DeleteKeys(ctx, payload.FunctionID, payload.BatchID); err != nil {
+			return err
+		}
+	}
+
 	// Don't bother if it's already there
 	if err == redis_state.ErrQueueItemExists {
 		return nil
@@ -2512,11 +2544,6 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		span.SetAttributes(attribute.String(consts.OtelAttrSDKRunID, md.ID.RunID.String()))
 	} else {
 		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
-	}
-
-	// TODO: check if all errors can be blindly returned
-	if err := e.batcher.DeleteKeys(ctx, payload.FunctionID, payload.BatchID); err != nil {
-		return err
 	}
 
 	return nil
