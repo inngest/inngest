@@ -90,6 +90,11 @@ func (h *ExpressionHandler) add(ctx context.Context, cel []string) error {
 	outputExprs := map[string]bool{}
 
 	for _, e := range cel {
+		// empty string, skip
+		for len(e) == 0 {
+			continue
+		}
+
 		// parse and validate
 		tree, err := parser.Parse(ctx, expr.StringExpression(e))
 		if err != nil {
@@ -210,7 +215,7 @@ func (h *ExpressionHandler) MatchEventExpressions(ctx context.Context, evt event
 		return false, nil
 	}
 
-	eg := errgroup.Group{}
+	eg, ctx := errgroup.WithContext(ctx)
 	res := make([]bool, len(h.EventExprList))
 	data := evt.Map()
 
@@ -226,7 +231,10 @@ func (h *ExpressionHandler) MatchEventExpressions(ctx context.Context, evt event
 
 			ok, _, err := eval.Evaluate(ctx, expressions.NewData(map[string]any{"event": data}))
 			if err != nil {
-				return fmt.Errorf("error evaluating event expression: %w", err)
+				// if there's an error, it likely means the data being matched is not of the same structure
+				// map[string]any vs int64
+				res[idx] = false
+				return nil
 			}
 
 			res[idx] = ok
