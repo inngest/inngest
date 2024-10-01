@@ -1318,7 +1318,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			if err != nil {
 				logger.StdlibLogger(ctx).Error("error inspecting run for output match",
 					"error", err,
-					"output", data.Output,
+					"output", string(data.Output),
 					"acctID", data.AccountID,
 					"wsID", data.WorkspaceID,
 					"appID", data.AppID,
