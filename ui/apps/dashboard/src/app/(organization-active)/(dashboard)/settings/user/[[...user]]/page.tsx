@@ -2,7 +2,6 @@
 
 import { usePathname } from 'next/navigation';
 import { UserProfile } from '@clerk/nextjs';
-import { NewButton } from '@inngest/components/Button';
 
 export default function UserSettingsPage() {
   const pathname = usePathname();
