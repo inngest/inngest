@@ -60,7 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             formFieldInput:
               'border border-muted placeholder-slate-500 shadow transition-all text-sm px-3.5 py-3 rounded-lg',
             formButtonPrimary:
-              'bg-btnPrimary focus:bg-btnPrimaryPressed hover:bg-btnPrimaryHover active:bg-btnPrimaryPressed disabled:bg-btnPrimaryDisabled text-alwaysWhite h-8 text-xs leading-[18px] px-3 py-1.5 flex items-center justify-center whitespace-nowrap rounded-md disabled:cursor-not-allowed"',
+              'inline-flex flex-shrink-0 items-center gap-1 justify-center overflow-hidden text-sm font-regular rounded-[6px] transition-all bg-gradient-to-b from-[#6d7bfe] to-[#6366f1] hover:from-[#7986fd] hover:to-[#7679f9] text-shadow text-white font-medium px-6 py-2.5 capitalize',
             buttonArrowIcon: 'hidden',
             tagInputContainer:
               'border border-muted placeholder-slate-500 shadow transition-all rounded-lg focus-within:*:ring-0 *:px-3 *:p-1.5 *:text-sm',
