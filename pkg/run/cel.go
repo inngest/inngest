@@ -173,7 +173,11 @@ func (h *ExpressionHandler) ToSQLFilters(ctx context.Context) ([]sq.Expression, 
 	filters := []sq.Expression{}
 	parser := expressions.ParserSingleton()
 
-	for _, exp := range h.EventExprList {
+	exprs := []string{}
+	exprs = append(exprs, h.EventExprList...)
+	exprs = append(exprs, h.OutputExprList...)
+
+	for _, exp := range exprs {
 		tree, err := parser.Parse(ctx, expr.StringExpression(exp))
 		if err != nil {
 			return nil, fmt.Errorf("error evaluating event expression '%s': %w", exp, err)

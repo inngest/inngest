@@ -61,7 +61,7 @@ func TestValidateExpressionHandler(t *testing.T) {
 	}
 }
 
-func TestToSQLEventFilters(t *testing.T) {
+func TestToSQLFilters(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
