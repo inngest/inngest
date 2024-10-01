@@ -34,10 +34,12 @@ export const Chart = ({
         chart?.resize();
       };
       window.addEventListener('resize', resizeChart);
+      window.addEventListener('navToggle', resizeChart);
 
       return () => {
         chart?.dispose();
         window.removeEventListener('resize', resizeChart);
+        window.removeEventListener('navToggle', resizeChart);
       };
     }
   }, [theme]);

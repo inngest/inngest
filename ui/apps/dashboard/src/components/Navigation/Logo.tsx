@@ -23,7 +23,7 @@ const NavToggle = ({ collapsed, setCollapsed }: LogoProps) => {
       window.cookieStore.set('navCollapsed', toggled ? 'true' : 'false');
       //
       // some downstream things, like charts, may need to redraw themselves
-      setTimeout(() => window.dispatchEvent(new Event('resize')), 200);
+      setTimeout(() => window.dispatchEvent(new Event('navToggle')), 200);
     }
   };
 
