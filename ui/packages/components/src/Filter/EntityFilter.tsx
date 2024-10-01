@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { SelectWithSearch, type Option } from '../Select/Select';
 
@@ -19,6 +19,7 @@ export default function EntityFilter({
 }: EntityFilterProps) {
   const [query, setQuery] = useState('');
   const [temporarySelectedValues, setTemporarySelectedValues] = useState(selectedEntities);
+  const comboboxRef = useRef<HTMLButtonElement>(null);
 
   const selectedValues = entities.filter((entity) =>
     temporarySelectedValues.some((id) => id === entity.id)
@@ -45,6 +46,10 @@ export default function EntityFilter({
 
   const handleApply = () => {
     onFilterChange(temporarySelectedValues);
+    // Close the Select dropdown
+    if (comboboxRef.current) {
+      comboboxRef.current.click();
+    }
   };
 
   const handleReset = () => {
@@ -65,7 +70,7 @@ export default function EntityFilter({
       label={type}
       isLabelVisible
     >
-      <SelectWithSearch.Button isLabelVisible className={className}>
+      <SelectWithSearch.Button isLabelVisible className={className} ref={comboboxRef}>
         <div className="min-w-7 max-w-24 truncate text-nowrap text-left">
           {temporarySelectedValues.length === 1 && !areAllEntitiesSelected && (
             <span>{selectedValues[0]?.name}</span>

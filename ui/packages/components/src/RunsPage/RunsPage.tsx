@@ -39,6 +39,10 @@ const RunsTable = dynamic(() => import('@inngest/components/RunsPage/RunsTable')
   ssr: false,
 });
 
+const CodeSearch = dynamic(() => import('@inngest/components/CodeSearch/CodeSearch'), {
+  ssr: false,
+});
+
 type Props = {
   cancelRun: React.ComponentProps<typeof RunDetails>['cancelRun'];
   data: Run[];
@@ -62,6 +66,8 @@ type Props = {
   scope: ViewScope;
   totalCount: number | undefined;
   temporaryAlert?: React.ReactElement;
+  onSearch?: (content: string) => void;
+  showSearch?: boolean;
 };
 
 export function RunsPage({
@@ -87,6 +93,8 @@ export function RunsPage({
   scope,
   totalCount,
   temporaryAlert,
+  onSearch,
+  showSearch = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useScopedColumns(scope);
@@ -320,6 +328,7 @@ export function RunsPage({
           </div>
         </div>
       </div>
+      <>{onSearch && showSearch && <CodeSearch onSearch={onSearch} />}</>
       <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
         <RunsTable
           data={data}
