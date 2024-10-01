@@ -65,6 +65,7 @@ type Props = {
   functionIsPaused?: boolean;
   scope: ViewScope;
   totalCount: number | undefined;
+  temporaryAlert?: React.ReactElement;
   onSearch?: (content: string) => void;
   showSearch?: boolean;
 };
@@ -91,6 +92,7 @@ export function RunsPage({
   functionIsPaused,
   scope,
   totalCount,
+  temporaryAlert,
   onSearch,
   showSearch = false,
 }: Props) {
@@ -361,6 +363,7 @@ export function RunsPage({
             />
           </div>
         )}
+        {temporaryAlert}
       </div>
     </main>
   );
