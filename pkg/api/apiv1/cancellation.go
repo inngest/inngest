@@ -104,7 +104,7 @@ func (c CreateCancellationBody) Validate() error {
 	if c.StartedBefore.IsZero() {
 		err = errors.Join(err, errors.New("started_before is required"))
 	}
-	if c.StartedBefore.After(time.Now()) {
+	if c.StartedBefore.After(time.Now().Add(5 * time.Second)) {
 		err = errors.Join(err, errors.New("started_before must be in the past"))
 	}
 	if c.StartedAfter != nil && c.StartedAfter.After(c.StartedBefore) {
