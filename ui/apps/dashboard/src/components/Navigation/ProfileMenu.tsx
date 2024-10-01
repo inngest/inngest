@@ -76,18 +76,18 @@ export const ProfileMenu = ({ children }: { children: ReactNode }) => {
                 <div>Your Profile</div>
               </div>
             </Listbox.Option>
-            <Listbox.Option
-              className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
-              value="signOut"
-            >
-              <SignOutButton>
-                <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                  <RiLogoutCircleLine className="text-muted mr-2 h-4 w-4" />
-                  <div>Sign Out</div>
-                </div>
-              </SignOutButton>
-            </Listbox.Option>
           </Link>
+          <Listbox.Option
+            className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+            value="signOut"
+          >
+            <SignOutButton>
+              <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
+                <RiLogoutCircleLine className="text-muted mr-2 h-4 w-4" />
+                <div>Sign Out</div>
+              </div>
+            </SignOutButton>
+          </Listbox.Option>
         </Listbox.Options>
       </div>
     </Listbox>
