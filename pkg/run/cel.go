@@ -245,8 +245,12 @@ func (h *ExpressionHandler) MatchOutputExpressions(ctx context.Context, output [
 	if !h.HasOutputFilters() {
 		return false, nil
 	}
+	// no output to match against, don't waste effort
+	if string(output) == "" {
+		return false, nil
+	}
 
-	eg := errgroup.Group{}
+	eg, ctx := errgroup.WithContext(ctx)
 	res := make([]bool, len(h.OutputExprList))
 
 	var result any
@@ -260,7 +264,7 @@ func (h *ExpressionHandler) MatchOutputExpressions(ctx context.Context, output [
 		data = map[string]any{"output": v}
 	case []any:
 		data = map[string]any{"output": v}
-	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, bool, string:
+	case int64, float64, bool, string:
 		data = map[string]any{"output": v}
 	}
 
@@ -276,7 +280,10 @@ func (h *ExpressionHandler) MatchOutputExpressions(ctx context.Context, output [
 
 			ok, _, err := eval.Evaluate(ctx, expressions.NewData(data))
 			if err != nil {
-				return fmt.Errorf("error evaluating output expression: %w", err)
+				// if there's an error, it likely means the data being matched is not of the same structure
+				// map[string]any vs int64
+				res[idx] = false
+				return nil
 			}
 
 			res[idx] = ok
