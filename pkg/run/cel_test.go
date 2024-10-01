@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	sq "github.com/doug-martin/goqu/v9"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -57,6 +58,68 @@ func TestValidateExpressionHandler(t *testing.T) {
 			} else {
 				assert.ErrorContains(t, err, test.errStr)
 			}
+		})
+	}
+}
+
+func TestMatchEventExpressions(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name     string
+		expr     string
+		input    event.Event
+		expected bool
+	}{
+		{
+			name: "should match",
+			expr: `event.name == 'test/hello' && event.data.foo == "bar"`,
+			input: event.Event{
+				Name: "test/hello",
+				Data: map[string]any{"foo": "bar"},
+			},
+			expected: true,
+		},
+		{
+			name: "should not match",
+			expr: `event.data.hello == "world"`,
+			input: event.Event{
+				Name: "test/hello",
+				Data: map[string]any{"foo": "bar"},
+			},
+			expected: false,
+		},
+		{
+			name: "should match with output as OR",
+			expr: `event.data.hello == "world" || output.hello == "world"`,
+			input: event.Event{
+				Name: "test/hello",
+				Data: map[string]any{"hello": "world"},
+			},
+			expected: true,
+		},
+		{
+			name: "should not match with output as AND",
+			expr: `event.data.hello == "world" && output.hello == "world"`,
+			input: event.Event{
+				Name: "test/hello",
+				Data: map[string]any{"hello": "world"},
+			},
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			handler, err := NewExpressionHandler(ctx,
+				WithExpressionHandlerExpressions([]string{test.expr}),
+			)
+			require.NoError(t, err)
+
+			ok, err := handler.MatchEventExpressions(ctx, test.input)
+			require.NoError(t, err)
+
+			assert.Equal(t, test.expected, ok)
 		})
 	}
 }
