@@ -173,9 +173,21 @@ func (h *ExpressionHandler) ToSQLFilters(ctx context.Context) ([]sq.Expression, 
 	filters := []sq.Expression{}
 	parser := expressions.ParserSingleton()
 
+	// used to dedup in case there's an expression that is included in both list
+	dedup := map[string]bool{}
 	exprs := []string{}
-	exprs = append(exprs, h.EventExprList...)
-	exprs = append(exprs, h.OutputExprList...)
+	for _, e := range h.EventExprList {
+		if _, ok := dedup[e]; !ok {
+			dedup[e] = true
+			exprs = append(exprs, e)
+		}
+	}
+	for _, e := range h.OutputExprList {
+		if _, ok := dedup[e]; !ok {
+			dedup[e] = true
+			exprs = append(exprs, e)
+		}
+	}
 
 	for _, exp := range exprs {
 		tree, err := parser.Parse(ctx, expr.StringExpression(exp))
