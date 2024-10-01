@@ -23,14 +23,26 @@ export default function UserSettingsPage() {
             pageScrollBox: 'pt-6 px-2',
           },
         }}
-      />
-      <NewButton
-        kind="secondary"
-        appearance="outlined"
-        href={security ? '/settings/user' : '/settings/user/security'}
-        label={security ? 'User Profile' : 'Account Security'}
-        className="mb-2 mt-1"
-      />
+      >
+        <UserProfile.Page label="security" />
+      </UserProfile>
+      <UserProfile
+        routing="path"
+        path="/settings/user"
+        appearance={{
+          layout: {
+            logoPlacement: 'none',
+          },
+          elements: {
+            navbar: 'hidden',
+            scrollBox: 'bg-white shadow-none',
+            pageScrollBox: 'pt-6 px-2',
+            profileSectionItemList__activeDevices: 'h-24 overflow-y-scroll',
+          },
+        }}
+      >
+        <UserProfile.Page label="account" />
+      </UserProfile>
     </div>
   );
 }
