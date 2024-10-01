@@ -205,6 +205,7 @@ export default function Page() {
         totalCount={totalCount}
         showSearch={isSearchEnabled}
         onSearch={(cel) => {
+          console.log(cel);
           setCelQuery(cel);
         }}
       />

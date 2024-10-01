@@ -718,6 +718,7 @@ export type GetRunsQueryVariables = Exact<{
   status: InputMaybe<Array<FunctionRunStatus> | FunctionRunStatus>;
   timeField: RunsV2OrderByField;
   functionRunCursor?: InputMaybe<Scalars['String']>;
+  celQuery?: InputMaybe<Scalars['String']>;
 }>;
 
 
@@ -1020,9 +1021,9 @@ export const RerunDocument = `
 }
     `;
 export const GetRunsDocument = `
-    query GetRuns($appIDs: [UUID!], $startTime: Time!, $status: [FunctionRunStatus!], $timeField: RunsV2OrderByField!, $functionRunCursor: String = null) {
+    query GetRuns($appIDs: [UUID!], $startTime: Time!, $status: [FunctionRunStatus!], $timeField: RunsV2OrderByField!, $functionRunCursor: String = null, $celQuery: String = null) {
   runs(
-    filter: {appIDs: $appIDs, from: $startTime, status: $status, timeField: $timeField}
+    filter: {appIDs: $appIDs, from: $startTime, status: $status, timeField: $timeField, query: $celQuery}
     orderBy: [{field: $timeField, direction: DESC}]
     after: $functionRunCursor
   ) {
