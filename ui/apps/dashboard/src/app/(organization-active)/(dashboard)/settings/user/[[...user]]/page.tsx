@@ -1,12 +1,8 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
 import { UserProfile } from '@clerk/nextjs';
 
 export default function UserSettingsPage() {
-  const pathname = usePathname();
-  const security = pathname.includes('security');
-
   return (
     <div className="flex flex-col justify-start">
       <UserProfile
