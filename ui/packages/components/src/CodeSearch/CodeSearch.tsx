@@ -12,8 +12,14 @@ type MonacoEditorType = editor.IStandaloneCodeEditor | null;
 
 const MAX_HEIGHT = 10 * LINE_HEIGHT;
 
-export default function CodeSearch({ onSearch }: { onSearch: (content: string) => void }) {
-  const [content, setContent] = useState<string>('\n');
+export default function CodeSearch({
+  onSearch,
+  placeholder,
+}: {
+  onSearch: (content: string) => void;
+  placeholder?: string;
+}) {
+  const [content, setContent] = useState<string>('');
   const [dark, setDark] = useState(isDark());
   const editorRef = useRef<MonacoEditorType>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -56,14 +62,14 @@ export default function CodeSearch({ onSearch }: { onSearch: (content: string) =
 
   const handleClear = () => {
     if (editorRef.current) {
-      editorRef.current.setValue('\n');
-      setContent('\n');
+      editorRef.current.setValue('');
+      setContent('');
     }
   };
 
   const handleSearch = () => {
     const trimmedContent = content.trim();
-    if (trimmedContent && trimmedContent !== '\n') {
+    if (trimmedContent && trimmedContent !== '') {
       onSearch(trimmedContent);
     }
   };
@@ -71,7 +77,19 @@ export default function CodeSearch({ onSearch }: { onSearch: (content: string) =
   return (
     <>
       {monaco && (
-        <div ref={wrapperRef}>
+        <div ref={wrapperRef} className="relative">
+          {!content && (
+            <div
+              className="text-disabled pointer-events-none absolute left-11 top-0 z-[1] flex h-full w-full items-center pl-3"
+              style={{
+                fontFamily: FONT.font,
+                fontSize: FONT.size,
+                lineHeight: `${LINE_HEIGHT}px`,
+              }}
+            >
+              {placeholder}
+            </div>
+          )}
           <Editor
             defaultLanguage="javascript"
             value={content}
@@ -82,6 +100,7 @@ export default function CodeSearch({ onSearch }: { onSearch: (content: string) =
               updateEditorHeight();
             }}
             options={{
+              lineNumbersMinChars: 4,
               readOnly: false,
               minimap: {
                 enabled: false,
@@ -117,7 +136,7 @@ export default function CodeSearch({ onSearch }: { onSearch: (content: string) =
           />
         </div>
       )}
-      <div className="bg-codeEditor flex items-center pb-4 pl-7">
+      <div className="bg-codeEditor flex items-center gap-4 py-4 pl-4">
         <Button onClick={handleSearch} label="Search" size="small" />
         <Button
           onClick={handleClear}
