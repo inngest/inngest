@@ -270,7 +270,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       scope={scope}
       totalCount={totalCount}
       temporaryAlert={temporaryAlert}
-      showSearch={searchIsReady && searchEnabled}
+      hasSearchFlag={searchIsReady && searchEnabled}
       onSearch={() => {}}
     />
   );
