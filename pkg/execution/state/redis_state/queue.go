@@ -915,7 +915,7 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) ([]QueuePartiti
 	}
 
 	// sanity check: queueName values must match
-	if i.Data.QueueName != nil && i.QueueName != nil && i.Data.QueueName != i.QueueName {
+	if i.Data.QueueName != nil && i.QueueName != nil && *i.Data.QueueName != *i.QueueName {
 		q.logger.Error().Interface("item", i).Msg("encountered queue item with inconsistent custom queue names, should have matching values for i.QueueName and i.Data.QueueName")
 	}
 
