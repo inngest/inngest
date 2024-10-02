@@ -29,7 +29,7 @@ const afterAuth = async (
   const isOrganizationSetup = isSignedIn && !!auth.sessionClaims.accountID;
 
   if (!isSignedIn) {
-    return authMiddleware().redirectToSignIn({ returnBackUrl: request.url });
+    return auth.redirectToSignIn({ returnBackUrl: request.url });
   }
 
   if (!isUserSetup && request.nextUrl.pathname !== '/sign-up/set-up') {
@@ -61,6 +61,14 @@ const afterAuth = async (
 };
 
 export default clerkMiddleware((auth, request) => {
+  //
+  // Some clerk-nextjs shenanigans. We must check auth user id before calling
+  // auth.protect() below becuase that will always return a 404 by design.
+  // https://discord.com/channels/856971667393609759/1021521740800733244/threads/1253004875273338922
+  if (!auth().userId && !isPublicRoute(request)) {
+    return auth().redirectToSignIn();
+  }
+
   if (!isPublicRoute(request)) {
     auth().protect();
     return afterAuth(auth, request);
