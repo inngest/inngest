@@ -4,6 +4,7 @@ import {
   testAuth,
   testAutoSetup,
   testLogicalReplication,
+  testManualSetup,
 } from '@/components/PostgresIntegration/neonData';
 import { type CdcConnectionInput } from '@/gql/graphql';
 
@@ -43,6 +44,20 @@ export async function verifyAutoSetup(input: CdcConnectionInput) {
       return { success: false, error: error, steps: response.cdcAutoSetup.steps };
     }
     return { success: true, error: null, steps: response.cdcAutoSetup.steps };
+  } catch (error) {
+    console.error('Error connecting:', error);
+    return { success: false, error: null };
+  }
+}
+
+export async function verifyManualSetup(input: CdcConnectionInput) {
+  try {
+    const response = await testManualSetup(input);
+    const error = response.cdcManualSetup.error;
+    if (error) {
+      return { success: false, error: error, steps: response.cdcManualSetup.steps };
+    }
+    return { success: true, error: null, steps: response.cdcManualSetup.steps };
   } catch (error) {
     console.error('Error connecting:', error);
     return { success: false, error: null };
