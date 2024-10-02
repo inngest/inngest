@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 
 import type { Environment } from '@/utils/environments';
@@ -25,16 +25,28 @@ export default function SideBar({
   activeEnv?: Environment;
   profile: ProfileType;
 }) {
+  const navRef = useRef<HTMLDivElement>(null);
+
   const [collapsed, setCollapsed] = useState<boolean>(serverCollapsed ?? false);
   const { isWidgetOpen, showWidget, closeWidget } = useOnboardingWidget();
+
+  const autoCollapse = () =>
+    typeof window !== 'undefined' &&
+    window.matchMedia('(max-width: 800px)').matches &&
+    setCollapsed(true);
 
   useEffect(() => {
     //
     // if the user has not set a pref and they are on mobile, collapse by default
-    serverCollapsed === undefined &&
-      setCollapsed(
-        typeof window !== 'undefined' && window.matchMedia('(max-width: 800px)').matches
-      );
+    serverCollapsed === undefined && autoCollapse();
+
+    if (navRef.current !== null) {
+      window.addEventListener('resize', autoCollapse);
+
+      return () => {
+        window.removeEventListener('resize', autoCollapse);
+      };
+    }
   }, []);
 
   return (
@@ -43,6 +55,7 @@ export default function SideBar({
          top-0 flex h-screen flex-col justify-start ${
            collapsed ? 'w-[64px]' : 'w-[224px]'
          }  sticky z-[51] shrink-0 overflow-visible border-r`}
+      ref={navRef}
     >
       <Logo collapsed={collapsed} setCollapsed={setCollapsed} />
       <div className="flex grow flex-col justify-between">
