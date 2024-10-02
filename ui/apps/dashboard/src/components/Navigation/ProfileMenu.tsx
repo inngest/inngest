@@ -19,7 +19,7 @@ export const ProfileMenu = ({ children }: { children: ReactNode }) => {
       <Listbox.Button className="w-full cursor-pointer ring-0">{children}</Listbox.Button>
       <div className="relative">
         <Listbox.Options className="bg-canvasBase absolute -right-48 bottom-4 z-50 ml-8 w-[199px] rounded border shadow ring-0 focus:outline-none">
-          <Link href="/settings/organization/organization-settings" scroll={false}>
+          <Link href="/settings/organization" scroll={false}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="org"
@@ -30,7 +30,7 @@ export const ProfileMenu = ({ children }: { children: ReactNode }) => {
               </div>
             </Listbox.Option>
           </Link>
-          <Link href="/settings/organization" scroll={false}>
+          <Link href="/settings/organization/organization-members" scroll={false}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="members"
@@ -76,18 +76,18 @@ export const ProfileMenu = ({ children }: { children: ReactNode }) => {
                 <div>Your Profile</div>
               </div>
             </Listbox.Option>
-            <Listbox.Option
-              className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
-              value="signOut"
-            >
-              <SignOutButton>
-                <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                  <RiLogoutCircleLine className="text-muted mr-2 h-4 w-4" />
-                  <div>Sign Out</div>
-                </div>
-              </SignOutButton>
-            </Listbox.Option>
           </Link>
+          <Listbox.Option
+            className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+            value="signOut"
+          >
+            <SignOutButton>
+              <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
+                <RiLogoutCircleLine className="text-muted mr-2 h-4 w-4" />
+                <div>Sign Out</div>
+              </div>
+            </SignOutButton>
+          </Listbox.Option>
         </Listbox.Options>
       </div>
     </Listbox>

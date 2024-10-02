@@ -1,14 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 
+import type { ProfileDisplayType } from '@/queries/server-only/profile';
 import type { Environment } from '@/utils/environments';
 import { Help } from '../Navigation/Help';
 import { Integrations } from '../Navigation/Integrations';
 import Logo from '../Navigation/Logo';
 import Navigation from '../Navigation/Navigation';
-import { Profile, type ProfileType } from '../Navigation/Profile';
+import { Profile } from '../Navigation/Profile';
 import useOnboardingWidget from '../Onboarding/useOnboardingWidget';
 
 // Disable SSR in Onboarding Widget, to prevent hydration errors. It requires windows info
@@ -23,18 +24,30 @@ export default function SideBar({
 }: {
   collapsed: boolean | undefined;
   activeEnv?: Environment;
-  profile: ProfileType;
+  profile: ProfileDisplayType;
 }) {
+  const navRef = useRef<HTMLDivElement>(null);
+
   const [collapsed, setCollapsed] = useState<boolean>(serverCollapsed ?? false);
   const { isWidgetOpen, showWidget, closeWidget } = useOnboardingWidget();
+
+  const autoCollapse = () =>
+    typeof window !== 'undefined' &&
+    window.matchMedia('(max-width: 800px)').matches &&
+    setCollapsed(true);
 
   useEffect(() => {
     //
     // if the user has not set a pref and they are on mobile, collapse by default
-    serverCollapsed === undefined &&
-      setCollapsed(
-        typeof window !== 'undefined' && window.matchMedia('(max-width: 800px)').matches
-      );
+    serverCollapsed === undefined && autoCollapse();
+
+    if (navRef.current !== null) {
+      window.addEventListener('resize', autoCollapse);
+
+      return () => {
+        window.removeEventListener('resize', autoCollapse);
+      };
+    }
   }, []);
 
   return (
@@ -43,6 +56,7 @@ export default function SideBar({
          top-0 flex h-screen flex-col justify-start ${
            collapsed ? 'w-[64px]' : 'w-[224px]'
          }  sticky z-[51] shrink-0 overflow-visible border-r`}
+      ref={navRef}
     >
       <Logo collapsed={collapsed} setCollapsed={setCollapsed} />
       <div className="flex grow flex-col justify-between">

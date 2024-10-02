@@ -72,9 +72,14 @@ type Props = {
    * Additional button CTA.
    */
   button?: React.ReactNode;
+
+  /**
+   * Additional link CTA.
+   */
+  link?: React.ReactNode;
 };
 
-export function Alert({ children, className, severity, showIcon = true, button }: Props) {
+export function Alert({ children, className, severity, showIcon = true, button, link }: Props) {
   const Icon = severityStyles[severity].icon;
 
   return (
@@ -89,6 +94,7 @@ export function Alert({ children, className, severity, showIcon = true, button }
         <div className="leading-5">{children}</div>
       </div>
       {button && <div className={cn('mt-4', showIcon && 'ml-7')}>{button}</div>}
+      {link}
     </div>
   );
 }
@@ -96,7 +102,7 @@ export function Alert({ children, className, severity, showIcon = true, button }
 function AlertLink({ href, severity, ...props }: LinkProps & { severity: Severity }) {
   const styles = severityStyles[severity].linkClassName;
   return (
-    <Link href={href} {...props} className={cn(props.className, styles)} showIcon={false}></Link>
+    <Link href={href} {...props} className={cn(styles, props.className)} showIcon={false}></Link>
   );
 }
 

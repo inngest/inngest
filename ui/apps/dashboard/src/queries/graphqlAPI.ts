@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { auth } from '@clerk/nextjs';
+import { auth } from '@clerk/nextjs/server';
 import { GraphQLClient, type RequestMiddleware, type ResponseMiddleware } from 'graphql-request';
 
 import 'server-only';
