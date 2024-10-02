@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, type UIEventHandler } from 'react';
+import { useCallback, useMemo, useRef, useState, type UIEventHandler } from 'react';
 import dynamic from 'next/dynamic';
 import { NewButton } from '@inngest/components/Button';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
@@ -15,7 +15,7 @@ import {
   type FunctionRunStatus,
 } from '@inngest/components/types/functionRun';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
-import { RiRefreshLine } from '@remixicon/react';
+import { RiArrowRightUpLine, RiRefreshLine } from '@remixicon/react';
 import { type VisibilityState } from '@tanstack/react-table';
 import { useLocalStorage } from 'react-use';
 
@@ -67,7 +67,7 @@ type Props = {
   totalCount: number | undefined;
   temporaryAlert?: React.ReactElement;
   onSearch?: (content: string) => void;
-  showSearch?: boolean;
+  hasSearchFlag?: boolean;
 };
 
 export function RunsPage({
@@ -94,10 +94,11 @@ export function RunsPage({
   totalCount,
   temporaryAlert,
   onSearch,
-  showSearch = false,
+  hasSearchFlag = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useScopedColumns(scope);
+  const [showSearch, setShowSearch] = useState(false);
 
   const displayAllColumns = useMemo(() => {
     const out: Record<string, boolean> = {};
@@ -320,6 +321,11 @@ export function RunsPage({
             <TotalCount totalCount={totalCount} />
           </div>
           <div className="flex items-center gap-2">
+            <NewButton
+              appearance="ghost"
+              label={showSearch ? 'Hide search' : 'Show search'}
+              onClick={() => setShowSearch((prev) => !prev)}
+            />
             <TableFilter
               columnVisibility={columnVisibility}
               setColumnVisibility={setColumnVisibility}
@@ -328,7 +334,31 @@ export function RunsPage({
           </div>
         </div>
       </div>
-      <>{onSearch && showSearch && <CodeSearch onSearch={onSearch} />}</>
+      <>
+        {onSearch && hasSearchFlag && showSearch && (
+          <>
+            <div className="bg-codeEditor flex items-center justify-between px-4 pt-4">
+              <p className="text-subtle text-sm">Search your runs by using a CEL query</p>
+              <NewButton
+                appearance="outlined"
+                label="Read the docs"
+                icon={<RiArrowRightUpLine />}
+                iconSide="right"
+                size="small"
+                // TODO: enable when docs are up
+                disabled
+              />
+            </div>
+            <CodeSearch
+              onSearch={(content) => {
+                scrollToTop();
+                onSearch(content);
+              }}
+              placeholder="event.data.userId = “1234” or output.count > 10"
+            />
+          </>
+        )}
+      </>
       <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
         <RunsTable
           data={data}
