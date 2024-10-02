@@ -26,6 +26,11 @@ export default async function SignUpPage() {
           unsafeMetadata={{
             ...(anonymousIDCookie?.value && { anonymousID: anonymousIDCookie.value }),
           }}
+          appearance={{
+            elements: {
+              footer: 'bg-none',
+            },
+          }}
         />
       </div>
       <p className="mt-auto text-center text-xs text-slate-400">

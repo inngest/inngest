@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs';
+import { auth } from '@clerk/nextjs/server';
 import { z } from 'zod';
 
 import { GetSavedVercelProjectsDocument } from '@/gql/graphql';
