@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { NewButton as Button } from '@inngest/components/Button';
 import { FONT, LINE_HEIGHT, createColors, createRules } from '@inngest/components/utils/monaco';
-import Editor, { useMonaco } from '@monaco-editor/react';
+import Editor, { useMonaco, type Monaco } from '@monaco-editor/react';
 import { languages, type editor } from 'monaco-editor';
 
 import { isDark } from '../utils/theme';
@@ -11,6 +11,7 @@ import { isDark } from '../utils/theme';
 type MonacoEditorType = editor.IStandaloneCodeEditor | null;
 
 const MAX_HEIGHT = 10 * LINE_HEIGHT;
+const VALIDATION_DELAY = 500;
 
 const EVENT_PATHS = [
   'event.data.',
@@ -77,6 +78,82 @@ function isOperator(str: string): boolean {
   return [...NUMERIC_OPERATORS, ...STRING_OPERATORS].includes(str);
 }
 
+interface ValidationError {
+  message: string;
+  startColumn: number;
+  endColumn: number;
+}
+
+function validateExpression(content: string): ValidationError | null {
+  if (!content.trim()) return null;
+
+  const parts = content
+    .trim()
+    .split(' ')
+    .filter((p) => p !== '');
+
+  // Check if the first word is a valid path
+  const firstWord = parts[0];
+  if (!firstWord) return null;
+
+  if (
+    !EVENT_PATHS.includes(firstWord as EventPath) &&
+    !EVENT_PATHS.some((path) => path.endsWith('.') && firstWord.startsWith(path))
+  ) {
+    return {
+      message: `Invalid field: ${firstWord}. Search by event or output.`,
+      startColumn: content.indexOf(firstWord) + 1,
+      endColumn: content.indexOf(firstWord) + firstWord.length + 1,
+    };
+  }
+  // Not enough parts to validate operator and value
+  if (parts.length < 3) return null;
+
+  const operator = parts[1];
+  if (!operator) return null;
+  const value = parts[2];
+  if (!value) return null;
+
+  const valueStartIndex = content.indexOf(value);
+
+  // Validate operator
+  const validOperators = getOperatorsForPath(firstWord);
+  if (!validOperators.includes(operator)) {
+    return {
+      message: `Invalid operator for ${firstWord}: ${operator}. Valid operators are: ${validOperators.join(
+        ', '
+      )}`,
+      startColumn: content.indexOf(operator) + 1,
+      endColumn: content.indexOf(operator) + operator.length + 1,
+    };
+  }
+
+  // Validate value type
+  if (firstWord === 'event.id' || firstWord === 'event.name' || firstWord === 'event.v') {
+    // Strings need to be wrapped in quotes
+    if (
+      (!value.startsWith('"') && !value.startsWith("'")) ||
+      (!value.endsWith('"') && !value.endsWith("'"))
+    ) {
+      return {
+        message: `${firstWord} must be a string`,
+        startColumn: valueStartIndex + 1,
+        endColumn: valueStartIndex + value.length + 1,
+      };
+    }
+  } else if (firstWord === 'event.ts') {
+    // Check if value is a valid integer for event.ts
+    if (!/^\d+$/.test(value)) {
+      return {
+        message: `${firstWord} must be an integer`,
+        startColumn: valueStartIndex + 1,
+        endColumn: valueStartIndex + value.length + 1,
+      };
+    }
+  }
+  return null;
+}
+
 export default function CodeSearch({
   onSearch,
   placeholder,
@@ -88,6 +165,9 @@ export default function CodeSearch({
   const [dark, setDark] = useState(isDark());
   const editorRef = useRef<MonacoEditorType>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const monacoRef = useRef<Monaco>();
+  const [hasValidationError, setHasValidationError] = useState(false);
+  const validationTimerRef = useRef<NodeJS.Timeout>();
 
   const monaco = useMonaco();
 
@@ -102,6 +182,7 @@ export default function CodeSearch({
     if (!monaco) {
       return;
     }
+    monacoRef.current = monaco;
 
     monaco.languages.register({ id: 'cel' });
 
@@ -217,7 +298,6 @@ export default function CodeSearch({
           }
         }
 
-        // No suggestions in other cases
         return { suggestions: [] };
       },
     });
@@ -237,18 +317,59 @@ export default function CodeSearch({
     }
   };
 
+  const updateMarkers = (error: ValidationError | null) => {
+    if (!editorRef.current || !monacoRef.current) return;
+
+    const model = editorRef.current.getModel();
+    if (!model) return;
+
+    if (error) {
+      const marker: editor.IMarkerData = {
+        severity: monacoRef.current.MarkerSeverity.Error,
+        message: error.message,
+        startLineNumber: 1,
+        startColumn: error.startColumn,
+        endLineNumber: 1,
+        endColumn: error.endColumn,
+      };
+      monacoRef.current.editor.setModelMarkers(model, 'owner', [marker]);
+      setHasValidationError(true);
+    } else {
+      monacoRef.current.editor.setModelMarkers(model, 'owner', []);
+      setHasValidationError(false);
+    }
+  };
+
   const handleClear = () => {
     if (editorRef.current) {
       editorRef.current.setValue('');
       setContent('');
+      updateMarkers(null);
     }
   };
 
   const handleSearch = () => {
     const trimmedContent = content.trim();
-    if (trimmedContent && trimmedContent !== '') {
+    if (trimmedContent && trimmedContent !== '' && !hasValidationError) {
       onSearch(trimmedContent);
     }
+  };
+
+  const handleContentChange = (value: string | undefined) => {
+    const newContent = value || '';
+    setContent(newContent);
+    updateEditorHeight();
+
+    // Clear existing timer
+    if (validationTimerRef.current) {
+      clearTimeout(validationTimerRef.current);
+    }
+
+    // Set new timer for validation
+    validationTimerRef.current = setTimeout(() => {
+      const error = validateExpression(newContent);
+      updateMarkers(error);
+    }, VALIDATION_DELAY);
   };
 
   return (
@@ -272,10 +393,7 @@ export default function CodeSearch({
             value={content}
             theme="inngest-theme"
             onMount={handleEditorDidMount}
-            onChange={(value) => {
-              setContent(value || '');
-              updateEditorHeight();
-            }}
+            onChange={handleContentChange}
             options={{
               lineNumbersMinChars: 4,
               readOnly: false,
