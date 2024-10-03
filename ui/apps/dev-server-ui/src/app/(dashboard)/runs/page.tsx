@@ -203,10 +203,8 @@ export default function Page() {
         pollInterval={pollInterval}
         scope="env"
         totalCount={totalCount}
-        showSearch={isSearchEnabled}
-        onSearch={(cel) => {
-          setCelQuery(cel);
-        }}
+        hasSearchFlag={isSearchEnabled}
+        onSearch={setCelQuery}
       />
     </>
   );

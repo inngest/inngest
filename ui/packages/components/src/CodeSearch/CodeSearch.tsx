@@ -12,8 +12,14 @@ type MonacoEditorType = editor.IStandaloneCodeEditor | null;
 
 const MAX_HEIGHT = 10 * LINE_HEIGHT;
 
-export default function CodeSearch({ onSearch }: { onSearch: (content: string) => void }) {
-  const [content, setContent] = useState<string>('\n');
+export default function CodeSearch({
+  onSearch,
+  placeholder,
+}: {
+  onSearch: (content: string) => void;
+  placeholder?: string;
+}) {
+  const [content, setContent] = useState<string>('');
   const [dark, setDark] = useState(isDark());
   const editorRef = useRef<MonacoEditorType>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -31,6 +37,45 @@ export default function CodeSearch({ onSearch }: { onSearch: (content: string) =
     if (!monaco) {
       return;
     }
+
+    monaco.languages.register({ id: 'cel' });
+
+    monaco.languages.setMonarchTokensProvider('cel', {
+      tokenizer: {
+        root: [
+          // Identifying keywords
+          [/\b(true|false|null)\b/, 'keyword.constant'],
+          [/\b(in|map|list|as|and|or|not)\b/, 'keyword.operator'],
+          [/\b(int|bool|string|double|bytes)\b/, 'keyword.type'],
+
+          // Identifying function calls (e.g. size, exists, all, etc.)
+          [/\b(size|exists|all|has)\b/, 'function'],
+
+          // Identifying identifiers (variables or field names)
+          [/[a-zA-Z_]\w*/, 'identifier'],
+
+          // Identifying string literals (single and double-quoted)
+          [/"([^"\\]|\\.)*"/, 'string'], // Double-quoted string with escaped characters
+          [/'([^'\\]|\\.)*'/, 'string'], // Single-quoted string with escaped characters
+
+          // Identifying numbers (only if not within a string)
+          [/\b\d+(\.\d+)?\b/, 'number'],
+
+          // Identifying comments (single-line and multi-line)
+          [/\/\/.*$/, 'comment'],
+          [/\/\*.*\*\//, 'comment'],
+
+          // Identifying operators
+          [/[=!<>]=|[-+*/%]/, 'operator'],
+
+          // Identifying parentheses, brackets, and curly braces
+          [/[\[\](){}]/, '@brackets'],
+
+          // Identifying whitespace
+          [/\s+/, 'white'],
+        ],
+      },
+    });
 
     monaco.editor.defineTheme('inngest-theme', {
       base: dark ? 'vs-dark' : 'vs',
@@ -56,14 +101,14 @@ export default function CodeSearch({ onSearch }: { onSearch: (content: string) =
 
   const handleClear = () => {
     if (editorRef.current) {
-      editorRef.current.setValue('\n');
-      setContent('\n');
+      editorRef.current.setValue('');
+      setContent('');
     }
   };
 
   const handleSearch = () => {
     const trimmedContent = content.trim();
-    if (trimmedContent && trimmedContent !== '\n') {
+    if (trimmedContent && trimmedContent !== '') {
       onSearch(trimmedContent);
     }
   };
@@ -71,9 +116,21 @@ export default function CodeSearch({ onSearch }: { onSearch: (content: string) =
   return (
     <>
       {monaco && (
-        <div ref={wrapperRef}>
+        <div ref={wrapperRef} className="relative">
+          {!content && (
+            <div
+              className="text-disabled pointer-events-none absolute left-11 top-0 z-[1] flex h-full w-full items-center pl-3"
+              style={{
+                fontFamily: FONT.font,
+                fontSize: FONT.size,
+                lineHeight: `${LINE_HEIGHT}px`,
+              }}
+            >
+              {placeholder}
+            </div>
+          )}
           <Editor
-            defaultLanguage="javascript"
+            defaultLanguage="cel"
             value={content}
             theme="inngest-theme"
             onMount={handleEditorDidMount}
@@ -82,6 +139,7 @@ export default function CodeSearch({ onSearch }: { onSearch: (content: string) =
               updateEditorHeight();
             }}
             options={{
+              lineNumbersMinChars: 4,
               readOnly: false,
               minimap: {
                 enabled: false,
@@ -117,7 +175,7 @@ export default function CodeSearch({ onSearch }: { onSearch: (content: string) =
           />
         </div>
       )}
-      <div className="bg-codeEditor flex items-center pb-4 pl-7">
+      <div className="bg-codeEditor flex items-center gap-4 py-4 pl-4">
         <Button onClick={handleSearch} label="Search" size="small" />
         <Button
           onClick={handleClear}
