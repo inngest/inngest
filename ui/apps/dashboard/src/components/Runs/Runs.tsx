@@ -75,6 +75,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
   const [cursor, setCursor] = useState('');
   const [runs, setRuns] = useState<Run[]>([]);
+  const [celQuery, setCelQuery] = useState<string>();
   const [isScrollRequest, setIsScrollRequest] = useState(false);
 
   const cancelRun = useCancelRun({ envID: env.id });
@@ -111,6 +112,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     endTime: endTime ?? null,
     status: filteredStatus.length > 0 ? filteredStatus : null,
     timeField,
+    celQuery,
   };
 
   const [firstPageRes, fetchFirstPage] = useQuery({
@@ -271,7 +273,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       totalCount={totalCount}
       temporaryAlert={temporaryAlert}
       hasSearchFlag={searchIsReady && searchEnabled}
-      onSearch={() => {}}
+      onSearch={setCelQuery}
     />
   );
 });

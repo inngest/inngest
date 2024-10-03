@@ -10,6 +10,7 @@ export const GetRunsDocument = graphql(`
     $timeField: RunsOrderByField!
     $functionSlug: String
     $functionRunCursor: String = null
+    $celQuery: String = null
   ) {
     environment: workspace(id: $environmentID) {
       runs(
@@ -20,6 +21,7 @@ export const GetRunsDocument = graphql(`
           status: $status
           timeField: $timeField
           fnSlug: $functionSlug
+          query: $celQuery
         }
         orderBy: [{ field: $timeField, direction: DESC }]
         after: $functionRunCursor
@@ -64,6 +66,7 @@ export const CountRunsDocument = graphql(`
     $status: [FunctionRunStatus!]
     $timeField: RunsOrderByField!
     $functionSlug: String
+    $celQuery: String = null
   ) {
     environment: workspace(id: $environmentID) {
       runs(
@@ -74,6 +77,7 @@ export const CountRunsDocument = graphql(`
           status: $status
           timeField: $timeField
           fnSlug: $functionSlug
+          query: $celQuery
         }
         orderBy: [{ field: $timeField, direction: DESC }]
       ) {
