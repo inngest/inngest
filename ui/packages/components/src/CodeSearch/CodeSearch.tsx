@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { NewButton as Button } from '@inngest/components/Button';
 import { FONT, LINE_HEIGHT, createColors, createRules } from '@inngest/components/utils/monaco';
 import Editor, { useMonaco } from '@monaco-editor/react';
-import { type editor } from 'monaco-editor';
+import { languages, type editor } from 'monaco-editor';
 
 import { isDark } from '../utils/theme';
 
@@ -20,7 +20,43 @@ const EVENT_PATHS = [
   'event.v',
   'output',
   'output.',
-];
+] as const;
+
+type EventPath = (typeof EVENT_PATHS)[number];
+
+const EVENT_PATH_DETAILS: Record<
+  EventPath,
+  { kind: languages.CompletionItemKind; detail: string }
+> = {
+  'event.data.': {
+    kind: languages.CompletionItemKind.Struct,
+    detail: 'Event Data Fields',
+  },
+  'event.id': {
+    kind: languages.CompletionItemKind.Field,
+    detail: 'Event Identifier (string)',
+  },
+  'event.name': {
+    kind: languages.CompletionItemKind.Field,
+    detail: 'Event Name (string)',
+  },
+  'event.ts': {
+    kind: languages.CompletionItemKind.Field,
+    detail: 'Event Timestamp (int64)',
+  },
+  'event.v': {
+    kind: languages.CompletionItemKind.Field,
+    detail: 'Event Version (string)',
+  },
+  output: {
+    kind: languages.CompletionItemKind.Variable,
+    detail: 'Output Variable',
+  },
+  'output.': {
+    kind: languages.CompletionItemKind.Struct,
+    detail: 'Output Fields',
+  },
+};
 
 const NUMERIC_OPERATORS = ['==', '!=', '>', '>=', '<', '<='];
 const STRING_OPERATORS = ['==', '!='];
@@ -143,7 +179,8 @@ export default function CodeSearch({
             suggestions: EVENT_PATHS.filter((path) => path.startsWith(wordAtPosition.word)).map(
               (path) => ({
                 label: path,
-                kind: monaco.languages.CompletionItemKind.Field,
+                kind: EVENT_PATH_DETAILS[path]?.kind || monaco.languages.CompletionItemKind.Field,
+                detail: EVENT_PATH_DETAILS[path]?.detail || 'Field',
                 insertText: path,
                 range: {
                   startLineNumber: position.lineNumber,
@@ -160,7 +197,7 @@ export default function CodeSearch({
         if (justTypedSpace && parts.length > 0) {
           const leftSide = parts[0] || '';
           if (
-            EVENT_PATHS.includes(leftSide) ||
+            EVENT_PATHS.includes(leftSide as EventPath) ||
             EVENT_PATHS.some((path) => path.endsWith('.') && leftSide.startsWith(path))
           ) {
             const operators = getOperatorsForPath(leftSide);
