@@ -30,7 +30,7 @@ require (
 	github.com/gowebpki/jcs v1.0.0
 	github.com/graph-gophers/dataloader v5.0.0+incompatible
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/inngest/expr v0.0.0-20240717151033-03e4378c436c
+	github.com/inngest/expr v0.0.0-20240927213444-e4d5a1dfefa2
 	github.com/inngest/inngestgo v0.7.5-0.20240919173141-dccf7b2deffe
 	github.com/jedib0t/go-pretty/v6 v6.3.0
 	github.com/jinzhu/copier v0.3.5
