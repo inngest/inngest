@@ -489,8 +489,8 @@ github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
-github.com/inngest/expr v0.0.0-20240717151033-03e4378c436c h1:9XaJS0BV+5wYqv3pVh9OxowUPArRdGMRa8xFdV7eTAI=
-github.com/inngest/expr v0.0.0-20240717151033-03e4378c436c/go.mod h1:Dq8dNC1Q/cZBjl6ltxCoAeNn8fstrBJWWjeSisqTL94=
+github.com/inngest/expr v0.0.0-20240927213444-e4d5a1dfefa2 h1:uZcAt+KAg0r+9YEX+OWFGrzpN3g32CW9Vfe+D1cU4E0=
+github.com/inngest/expr v0.0.0-20240927213444-e4d5a1dfefa2/go.mod h1:Dq8dNC1Q/cZBjl6ltxCoAeNn8fstrBJWWjeSisqTL94=
 github.com/inngest/inngestgo v0.7.5-0.20240919173141-dccf7b2deffe h1:vwGvSB+AoHOtzK2UvyQn1Z4ba00hVYKH/1TKeP3NVys=
 github.com/inngest/inngestgo v0.7.5-0.20240919173141-dccf7b2deffe/go.mod h1:G0XZalzZnS90LbqBrjuUJDcZPvyz6mp2BaeYx8xN11E=
 github.com/jackc/chunkreader v1.0.0/go.mod h1:RT6O25fNZIuasFJRyZ4R/Y2BbhasbmZXF9QQ7T3kePo=
