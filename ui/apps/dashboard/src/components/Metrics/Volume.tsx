@@ -240,8 +240,6 @@ export const MetricsVolume = ({
     variables,
   });
 
-  console.log('shit volume data', data);
-
   error && console.error('Error fetcthing metrics data for', variables, error);
 
   return (
