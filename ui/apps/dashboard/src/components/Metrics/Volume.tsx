@@ -11,6 +11,7 @@ import { Backlog } from './Backlog';
 import type { EntityLookup } from './Dashboard';
 import { Feedback } from './Feedback';
 import { RunsThrougput } from './RunsThroughput';
+import { SdkThroughput } from './SdkThroughput';
 import { StepsThroughput } from './StepsThroughput';
 
 export type MetricsFilters = {
@@ -77,9 +78,53 @@ const GetVolumeMetrics = graphql(`
       }
     }
     workspace(id: $workspaceId) {
-      stepThroughput: scopedMetrics(
+      sdkThroughputEnded: scopedMetrics(
         filter: {
-          name: "step_output_bytes_total"
+          name: "sdk_req_ended_total"
+          scope: $scope
+          from: $from
+          functionIDs: $functionIDs
+          appIDs: $appIDs
+          until: $until
+        }
+      ) {
+        metrics {
+          id
+          tagName
+          tagValue
+          data {
+            value
+            bucket
+          }
+        }
+      }
+    }
+    workspace(id: $workspaceId) {
+      sdkThroughputStarted: scopedMetrics(
+        filter: {
+          name: "sdk_req_started_total"
+          scope: $scope
+          from: $from
+          functionIDs: $functionIDs
+          appIDs: $appIDs
+          until: $until
+        }
+      ) {
+        metrics {
+          id
+          tagName
+          tagValue
+          data {
+            value
+            bucket
+          }
+        }
+      }
+    }
+    workspace(id: $workspaceId) {
+      sdkThroughputScheduled: scopedMetrics(
+        filter: {
+          name: "sdk_req_scheduled_total"
           scope: $scope
           from: $from
           functionIDs: $functionIDs
@@ -195,6 +240,8 @@ export const MetricsVolume = ({
     variables,
   });
 
+  console.log('shit volume data', data);
+
   error && console.error('Error fetcthing metrics data for', variables, error);
 
   return (
@@ -216,7 +263,10 @@ export const MetricsVolume = ({
             <RunsThrougput workspace={data?.workspace} entities={entities} />
             <StepsThroughput workspace={data?.workspace} entities={entities} />
             <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
+              <SdkThroughput workspace={data?.workspace} />
               <Backlog workspace={data?.workspace} entities={entities} />
+            </div>
+            <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
               <Feedback />
             </div>
             <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap"></div>
