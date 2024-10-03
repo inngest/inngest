@@ -348,7 +348,6 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 		actualTTL := time.Second * time.Duration(out)
 		err = d.q.RequeueByJobID(
 			ctx,
-			fn.ID.String(),
 			debounceID.String(),
 			now.Add(actualTTL).Add(buffer).Add(time.Second),
 		)

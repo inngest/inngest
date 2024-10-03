@@ -27,4 +27,16 @@ if #items == 0 then
 	return {}
 end
 
-return redis.call("HMGET", partitionKey, unpack(items))
+local potentiallyMissingPartitions = redis.call("HMGET", partitionKey, unpack(items))
+local missingPartitionIds = {}
+local validPartitions = {}
+
+for i, partition in ipairs(potentiallyMissingPartitions) do
+	if partition ~= false and partition ~= nil then
+		table.insert(validPartitions, partition)
+	else
+		table.insert(missingPartitionIds, items[i])
+	end
+end
+
+return {count, validPartitions, missingPartitionIds}

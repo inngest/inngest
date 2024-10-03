@@ -15,4 +15,16 @@ if #items == 0 then
 	return {}
 end
 
-return redis.call("HMGET", queueKey, unpack(items))
+local potentiallyMissingQueueItems = redis.call("HMGET", queueKey, unpack(items))
+local missingQueueItems = {}
+local validQueueItems = {}
+
+for i, queueItem in ipairs(potentiallyMissingQueueItems) do
+	if queueItem ~= false and queueItem ~= nil then
+		table.insert(validQueueItems, queueItem)
+	else
+		table.insert(missingQueueItems, items[i])
+	end
+end
+
+return {validQueueItems, missingQueueItems}
