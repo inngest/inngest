@@ -1084,6 +1084,12 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 		},
 	).AsInt64()
 	if err != nil {
+		q.logger.
+			Error().
+			Err(err).
+			Interface("item", qi).
+			Interface("zset", q.u.kg.QueueIndex(partitionName)).
+			Msg("error requeueing queue item by JobID")
 		return fmt.Errorf("error requeueing item: %w", err)
 	}
 	switch status {
@@ -1474,7 +1480,14 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		args,
 	).AsInt64()
 	if err != nil {
-		return fmt.Errorf("error requeueing item: %w", err)
+		q.logger.
+			Error().
+			Err(err).
+			Interface("item", i).
+			Interface("partition", p).
+			Interface("zset", q.u.kg.QueueIndex(i.Queue())).
+			Msg("error requeueing queue item")
+		return fmt.Errorf("error requeueing item %q: %w", i.Queue(), err)
 	}
 	switch status {
 	case 0:
