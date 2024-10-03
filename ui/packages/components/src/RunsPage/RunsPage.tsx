@@ -321,11 +321,13 @@ export function RunsPage({
             <TotalCount totalCount={totalCount} />
           </div>
           <div className="flex items-center gap-2">
-            <NewButton
-              appearance="ghost"
-              label={showSearch ? 'Hide search' : 'Show search'}
-              onClick={() => setShowSearch((prev) => !prev)}
-            />
+            {hasSearchFlag && (
+              <NewButton
+                appearance="ghost"
+                label={showSearch ? 'Hide search' : 'Show search'}
+                onClick={() => setShowSearch((prev) => !prev)}
+              />
+            )}
             <TableFilter
               columnVisibility={columnVisibility}
               setColumnVisibility={setColumnVisibility}
