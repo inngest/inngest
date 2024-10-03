@@ -1543,8 +1543,8 @@ func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) 
 		q.logger.
 			Error().
 			Err(err).
-			Interface("item", qi).
-			Interface("zset", q.u.kg.QueueIndex(partitionName)).
+			Interface("item", i).
+			Interface("parts", parts).
 			Msg("error requeueing queue item by JobID")
 		return fmt.Errorf("error requeueing item: %w", err)
 	}
@@ -1951,10 +1951,9 @@ func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 			Error().
 			Err(err).
 			Interface("item", i).
-			Interface("partition", p).
-			Interface("zset", q.u.kg.QueueIndex(i.Queue())).
+			Interface("parts", parts).
 			Msg("error requeueing queue item")
-		return fmt.Errorf("error requeueing item %q: %w", i.Queue(), err)
+		return fmt.Errorf("error requeueing item: %w", err)
 	}
 	switch status {
 	case 0:
