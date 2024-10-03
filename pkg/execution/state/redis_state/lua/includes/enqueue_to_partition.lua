@@ -117,7 +117,7 @@ local function requeue_to_partition(keyPartitionSet, partitionID, partitionItem,
 		--       we've forced a partition to have a delay.
 		--
 		--       Here, we do those checks.
-		if nowMS > existing.forceAtMS then
+		if existing ~= nil and nowMS > existing.forceAtMS then
 			-- If the current time is before the force stuff, don't bother.  Here, we
 			-- are guaranteed that we've already passed the force delay.
 			--
