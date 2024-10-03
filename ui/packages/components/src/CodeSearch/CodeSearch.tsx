@@ -12,6 +12,35 @@ type MonacoEditorType = editor.IStandaloneCodeEditor | null;
 
 const MAX_HEIGHT = 10 * LINE_HEIGHT;
 
+const EVENT_PATHS = [
+  'event.data.',
+  'event.id',
+  'event.name',
+  'event.ts',
+  'event.v',
+  'output',
+  'output.',
+];
+
+const NUMERIC_OPERATORS = ['==', '!=', '>', '>=', '<', '<='];
+const STRING_OPERATORS = ['==', '!='];
+
+function getOperatorsForPath(path: string): string[] {
+  if (
+    path === 'event.ts' ||
+    path.startsWith('event.data.') ||
+    path === 'output' ||
+    path.startsWith('output.')
+  ) {
+    return NUMERIC_OPERATORS;
+  }
+  return STRING_OPERATORS;
+}
+
+function isOperator(str: string): boolean {
+  return [...NUMERIC_OPERATORS, ...STRING_OPERATORS].includes(str);
+}
+
 export default function CodeSearch({
   onSearch,
   placeholder,
@@ -82,6 +111,78 @@ export default function CodeSearch({
       inherit: true,
       rules: dark ? createRules(true) : createRules(false),
       colors: dark ? createColors(true) : createColors(false),
+    });
+
+    monaco.languages.registerCompletionItemProvider('cel', {
+      triggerCharacters: ['.', ' '],
+      provideCompletionItems: (model, position) => {
+        const lineContent = model.getLineContent(position.lineNumber);
+        const wordAtPosition = model.getWordUntilPosition(position);
+
+        // Check if we just typed a space
+        const justTypedSpace = lineContent[position.column - 2] === ' ';
+
+        // Get the text before the current position
+        const textUntilPosition = lineContent.substring(0, position.column - 1);
+
+        // Split by space but keep empty parts to accurately track word count
+        const parts = textUntilPosition.split(' ').filter((p) => p !== '');
+
+        // Check if we already have an operator
+        const hasOperator = parts.some((part) => isOperator(part));
+
+        // If we already have an operator, no more suggestions
+        if (hasOperator) {
+          return { suggestions: [] };
+        }
+
+        // If we're at the start or just starting a new word
+        if (parts.length === 0 || (parts.length === 1 && !justTypedSpace)) {
+          // Provide path suggestions
+          return {
+            suggestions: EVENT_PATHS.filter((path) => path.startsWith(wordAtPosition.word)).map(
+              (path) => ({
+                label: path,
+                kind: monaco.languages.CompletionItemKind.Field,
+                insertText: path,
+                range: {
+                  startLineNumber: position.lineNumber,
+                  startColumn: position.column - wordAtPosition.word.length,
+                  endLineNumber: position.lineNumber,
+                  endColumn: position.column,
+                },
+              })
+            ),
+          };
+        }
+
+        // If we just typed a space after a valid path, suggest operators
+        if (justTypedSpace && parts.length > 0) {
+          const leftSide = parts[0] || '';
+          if (
+            EVENT_PATHS.includes(leftSide) ||
+            EVENT_PATHS.some((path) => path.endsWith('.') && leftSide.startsWith(path))
+          ) {
+            const operators = getOperatorsForPath(leftSide);
+            return {
+              suggestions: operators.map((op) => ({
+                label: op,
+                kind: monaco.languages.CompletionItemKind.Operator,
+                insertText: op,
+                range: {
+                  startLineNumber: position.lineNumber,
+                  startColumn: position.column,
+                  endLineNumber: position.lineNumber,
+                  endColumn: position.column,
+                },
+              })),
+            };
+          }
+        }
+
+        // No suggestions in other cases
+        return { suggestions: [] };
+      },
     });
   }, [monaco, dark]);
 
@@ -171,6 +272,9 @@ export default function CodeSearch({
               wordWrap: 'off',
               wrappingStrategy: 'advanced',
               overviewRulerLanes: 0,
+              suggest: {
+                showWords: false,
+              },
             }}
           />
         </div>
