@@ -715,6 +715,14 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, fmt.Errorf("cannot load metadata to execute run: %w", err)
 	}
 
+	ef, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
+	if err != nil {
+		return nil, fmt.Errorf("error loading function for run: %w", err)
+	}
+	if ef.Paused {
+		return nil, state.ErrFunctionPaused
+	}
+
 	// Find the stack index for the incoming step.
 	//
 	// stackIndex represents the stack pointer at the time this step was scheduled.
@@ -738,13 +746,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		md.Config.StartedAt = time.Now()
 	}
 
-	f, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
-	if err != nil {
-		return nil, fmt.Errorf("error loading function for run: %w", err)
-	}
-
 	// Validate that the run can execute.
-	v := newRunValidator(e, f, md, events, item) // TODO: Load events for this.
+	v := newRunValidator(e, ef.Function, md, events, item) // TODO: Load events for this.
 	if err := v.validate(ctx); err != nil {
 		return nil, err
 	}
@@ -779,19 +782,19 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	if edge.Incoming == inngest.TriggerName {
 		// We only support functions with a single step, as we've removed the DAG based approach.
 		// This means that we always execute the first step.
-		if len(f.Steps) > 1 {
+		if len(ef.Function.Steps) > 1 {
 			return nil, fmt.Errorf("DAG-based steps are no longer supported")
 		}
 
 		edge.Outgoing = inngest.TriggerName
-		edge.Incoming = f.Steps[0].ID
+		edge.Incoming = ef.Function.Steps[0].ID
 		// Update the payload
 		payload := item.Payload.(queue.PayloadEdge)
 		payload.Edge = edge
 		item.Payload = payload
 		// Add retries from the step to our queue item.  Increase as retries is
 		// always one less than attempts.
-		retries := f.Steps[0].RetryCount() + 1
+		retries := ef.Function.Steps[0].RetryCount() + 1
 		item.MaxAttempts = &retries
 
 		// Only just starting:  run lifecycles on first attempt.
@@ -815,7 +818,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	instance := runInstance{
 		md:         md,
-		f:          *f,
+		f:          *ef.Function,
 		events:     events,
 		item:       item,
 		edge:       edge,
@@ -1038,8 +1041,9 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 			}
 
 			err := q.Dequeue(ctx, redis_state.QueuePartition{
-				WorkflowID:  md.ID.FunctionID,
-				WorkspaceID: md.ID.Tenant.EnvID,
+				// TODO Check whether this works
+				FunctionID: &md.ID.FunctionID,
+				EnvID:      &md.ID.Tenant.EnvID,
 			}, *qi)
 			if err != nil {
 				logger.StdlibLogger(ctx).Error("error dequeueing run job", "error", err)
@@ -1205,7 +1209,7 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 
 	res, err := e.handlePausesAllNaively(ctx, iter, evt)
 	if err != nil {
-		log.From(ctx).Error().Err(err).Msg("error handling aggregate pauses")
+		log.From(ctx).Error().Err(err).Msg("error handling naive pauses")
 	}
 	return res, nil
 }
@@ -1641,7 +1645,7 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	}
 
 	fnCancelledErr := state.ErrFunctionCancelled.Error()
-	if performedFinalization, err := e.finalize(ctx, md, evts, f.GetSlug(), state.DriverResponse{
+	if performedFinalization, err := e.finalize(ctx, md, evts, f.Function.GetSlug(), state.DriverResponse{
 		Err: &fnCancelledErr,
 	}); err != nil {
 		l.Error().Err(err).Msg("error running finish handler")
@@ -1696,7 +1700,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		if err == nil || err == state.ErrPauseNotFound {
 			return nil
 		}
-		return err
+		return fmt.Errorf("error consuming pause via timeout: %w", err)
 	}
 
 	if err = e.pm.ConsumePause(ctx, pause.ID, r.With); err != nil {
@@ -1745,10 +1749,11 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		jobID := fmt.Sprintf("%s-%s", md.IdempotencyKey(), pause.DataKey)
 		err := q.Dequeue(
 			ctx,
-			redis_state.QueuePartition{WorkflowID: md.ID.FunctionID},
+			// TODO (key queues) Double check if these need updates
+			redis_state.QueuePartition{FunctionID: &md.ID.FunctionID},
 			redis_state.QueueItem{
 				ID:         redis_state.HashID(ctx, jobID),
-				WorkflowID: md.ID.FunctionID,
+				FunctionID: md.ID.FunctionID,
 				Data: queue.Item{
 					Kind: queue.KindPause,
 				},

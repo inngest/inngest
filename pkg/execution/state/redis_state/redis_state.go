@@ -88,6 +88,7 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 				val = strings.ReplaceAll(val, include[0], string(byt))
 			}
 		}
+
 		scripts[name] = rueidis.NewLuaScript(val)
 		retriableScripts[name] = NewClusterLuaScript(val)
 	}

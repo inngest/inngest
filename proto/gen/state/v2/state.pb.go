@@ -345,7 +345,7 @@ func (x *ConcurrencyKey) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ConcurrencyKey.ProtoReflect.Descriptor instead.
+// Deprecated: Use EvaluatedConcurrencyKey.ProtoReflect.Descriptor instead.
 func (*ConcurrencyKey) Descriptor() ([]byte, []int) {
 	return file_state_v2_state_proto_rawDescGZIP(), []int{3}
 }
@@ -1611,7 +1611,7 @@ var file_state_v2_state_proto_goTypes = []interface{}{
 	(*Metadata)(nil),               // 0: state.v2.Metadata
 	(*ID)(nil),                     // 1: state.v2.ID
 	(*Config)(nil),                 // 2: state.v2.Config
-	(*ConcurrencyKey)(nil),         // 3: state.v2.ConcurrencyKey
+	(*ConcurrencyKey)(nil),         // 3: state.v2.EvaluatedConcurrencyKey
 	(*RunMetrics)(nil),             // 4: state.v2.RunMetrics
 	(*Tenant)(nil),                 // 5: state.v2.Tenant
 	(*CreateStateRequest)(nil),     // 6: state.v2.CreateStateRequest
@@ -1643,7 +1643,7 @@ var file_state_v2_state_proto_depIdxs = []int32{
 	4,  // 2: state.v2.Metadata.metrics:type_name -> state.v2.RunMetrics
 	5,  // 3: state.v2.ID.tenant:type_name -> state.v2.Tenant
 	26, // 4: state.v2.Config.started_at:type_name -> google.protobuf.Timestamp
-	3,  // 5: state.v2.Config.concurrency_keys:type_name -> state.v2.ConcurrencyKey
+	3,  // 5: state.v2.Config.concurrency_keys:type_name -> state.v2.EvaluatedConcurrencyKey
 	27, // 6: state.v2.Config.context:type_name -> google.protobuf.Struct
 	0,  // 7: state.v2.CreateStateRequest.metadata:type_name -> state.v2.Metadata
 	1,  // 8: state.v2.DeleteStateRequest.id:type_name -> state.v2.ID
