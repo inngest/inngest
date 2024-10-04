@@ -18,10 +18,12 @@ import {
 } from '@inngest/components/utils/date';
 import { useQuery } from 'urql';
 
-import { GetBillingPlanDocument, MetricsScope } from '@/gql/graphql';
+import { GetBillingPlanDocument, MetricsScope, type GetBillingPlanQuery } from '@/gql/graphql';
 import { MetricsOverview } from './Overview';
 import { MetricsVolume } from './Volume';
 import { convertLookup } from './utils';
+
+export const CONCURRENCY_LIMIT_DEFAULT = 25;
 
 export type EntityType = {
   id: string;
@@ -59,6 +61,11 @@ const getDefaultRange = (start?: Date, end?: Date, duration?: DurationType | '')
         duration: duration ? duration : DEFAULT_DURATION,
       };
 
+const getConcurrencyLimit = (planData?: GetBillingPlanQuery) =>
+  Number(planData?.account.plan?.features.concurrency) ||
+  Number(planData?.plans.find((p) => p?.name === 'Free Tier')?.features.concurrency) ||
+  CONCURRENCY_LIMIT_DEFAULT;
+
 export const Dashboard = ({
   apps = [],
   functions = [],
@@ -84,7 +91,7 @@ export const Dashboard = ({
 
   const logRetention = Number(planData?.account.plan?.features.log_retention);
   const upgradeCutoff = subtractDuration(new Date(), { days: logRetention || 7 });
-  const concurrenyLimit = Number(planData?.account.plan?.features.concurrency) || 25;
+  const concurrenyLimit = getConcurrencyLimit(planData);
 
   const envLookup = apps.length !== 1 && !selectedApps?.length && !selectedFns?.length;
   const mappedFunctions = convertLookup(functions);
