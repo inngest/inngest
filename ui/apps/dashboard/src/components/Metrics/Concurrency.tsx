@@ -10,6 +10,8 @@ import tailwindConfig from '../../../tailwind.config';
 import type { EntityLookup } from './Dashboard';
 import { dateFormat, getLineChartOptions, seriesOptions, timeDiff } from './utils';
 
+const zeroID = '00000000-0000-0000-0000-000000000000';
+
 const {
   theme: { colors },
 } = resolveConfig(tailwindConfig);
@@ -31,6 +33,8 @@ export const mapConcurrency = (
   entities: EntityLookup,
   concurrencyLimit: number
 ) => {
+  console.log('shit limitMetrics', limitMetrics);
+  console.log('shit runningMetrics', runningMetrics);
   const dark = isDark();
 
   const diff = timeDiff(limitMetrics[0]?.data[0]?.bucket, limitMetrics[0]?.data.at(-1)?.bucket);
@@ -60,37 +64,41 @@ export const mapConcurrency = (
     ],
 
     series: [
-      ...limitMetrics.map((f) => ({
-        xAxisIndex: 1,
-        z: 100,
-        ...seriesOptions,
-        markLine: {
-          symbol: 'none',
-          animation: false,
-          lineStyle: {
-            type: 'solid',
+      ...limitMetrics
+        .filter(({ id }) => id !== zeroID)
+        .map((f) => ({
+          xAxisIndex: 1,
+          z: 100,
+          ...seriesOptions,
+          markLine: {
+            symbol: 'none',
+            animation: false,
+            lineStyle: {
+              type: 'solid',
+              color: resolveColor(limitColor[0]!, dark, limitColor[1]),
+            } as any,
+            data: [{ yAxis: concurrencyLimit, name: 'Concurrency Limit', symbol: 'none' }],
+          },
+          name: `${entities[f.id]?.name} - limit reached`,
+          data: f.data.map(({ value }) => value),
+          itemStyle: {
             color: resolveColor(limitColor[0]!, dark, limitColor[1]),
-          } as any,
-          data: [{ yAxis: concurrencyLimit, name: 'Concurrency Limit', symbol: 'none' }],
-        },
-        name: `${entities[f.id]?.name} - limit reached`,
-        data: f.data.map(({ value }) => value),
-        itemStyle: {
-          color: resolveColor(limitColor[0]!, dark, limitColor[1]),
-        },
-        lineStyle: { opacity: 0 },
-        areaStyle: { opacity: 0.3 },
-      })),
-      ...runningMetrics.map((f, i) => ({
-        xAxisIndex: 0,
-        ...seriesOptions,
-        name: entities[f.id]?.name,
-        data: f.data.map(({ value }) => value),
-        itemStyle: {
-          color: resolveColor(lineColors[i % lineColors.length]![0]!, dark, lineColors[0]?.[1]),
-        },
-        areaStyle: { opacity: 1 },
-      })),
+          },
+          lineStyle: { opacity: 0 },
+          areaStyle: { opacity: 0.3 },
+        })),
+      ...runningMetrics
+        .filter(({ id }) => id !== zeroID)
+        .map((f, i) => ({
+          xAxisIndex: 0,
+          ...seriesOptions,
+          name: entities[f.id]?.name,
+          data: f.data.map(({ value }) => value),
+          itemStyle: {
+            color: resolveColor(lineColors[i % lineColors.length]![0]!, dark, lineColors[0]?.[1]),
+          },
+          areaStyle: { opacity: 1 },
+        })),
     ],
   };
 
