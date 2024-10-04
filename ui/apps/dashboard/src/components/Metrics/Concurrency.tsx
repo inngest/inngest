@@ -47,6 +47,7 @@ export const mapConcurrency = (
         type: 'category' as const,
         boundaryGap: true,
         data: runningMetrics[0]?.data.map(({ bucket }) => bucket) || ['No Data Found'],
+        axisPointer: { show: true, type: 'line' },
         axisLabel: {
           interval: dataLength <= 40 ? 2 : dataLength / (dataLength / 12),
           formatter: (value: string) => dateFormat(value, diff),
@@ -57,6 +58,7 @@ export const mapConcurrency = (
         type: 'category' as const,
         show: false,
         axisLabel: { show: false },
+        axisPointer: { show: true, type: 'none' },
         data: limitMetrics[0]?.data.map(({ bucket }) => bucket) || ['No Data Found'],
       },
     ],

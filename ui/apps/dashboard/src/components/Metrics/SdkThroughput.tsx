@@ -41,9 +41,9 @@ export const mapSdkThroughput = ({
   //
   // a bit daft, fake an entity lookup so we can reuse the entity chart builder code
   const entityLookup: EntityLookup = {
-    queued: { id: queued, name: queued },
-    started: { id: started, name: started },
-    ended: { id: ended, name: ended },
+    [queued]: { id: queued, name: queued },
+    [started]: { id: started, name: started },
+    [ended]: { id: ended, name: ended },
   };
 
   const metrics = [
