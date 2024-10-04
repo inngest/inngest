@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { NewButton } from '@inngest/components/Button';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
+import { Pill } from '@inngest/components/Pill';
 import { SelectGroup, type Option } from '@inngest/components/Select/Select';
 import { TableFilter } from '@inngest/components/Table';
 import { DEFAULT_TIME } from '@inngest/components/hooks/useCalculatedStartTime';
@@ -340,7 +341,10 @@ export function RunsPage({
         {onSearch && hasSearchFlag && showSearch && (
           <>
             <div className="bg-codeEditor flex items-center justify-between px-4 pt-4">
-              <p className="text-subtle text-sm">Search your runs by using a CEL query</p>
+              <div className="flex items-center gap-2">
+                <p className="text-subtle text-sm">Search your runs by using a CEL query</p>
+                <Pill kind="primary">Beta</Pill>
+              </div>
               <NewButton
                 appearance="outlined"
                 label="Read the docs"
