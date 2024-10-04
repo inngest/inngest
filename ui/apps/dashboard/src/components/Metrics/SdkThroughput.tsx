@@ -1,13 +1,12 @@
 import { Chart } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
 import { NewLink } from '@inngest/components/Link/Link';
-import { resolveColor } from '@inngest/components/utils/colors';
-import { isDark } from '@inngest/components/utils/theme';
 
-import type { ScopedMetric, VolumeMetricsQuery } from '@/gql/graphql';
-import { dateFormat, getLineChartOptions, lineColors, seriesOptions, timeDiff } from './utils';
+import type { MetricsData, ScopedMetric, VolumeMetricsQuery } from '@/gql/graphql';
+import type { EntityLookup } from './Dashboard';
+import { getLineChartOptions, mapEntityLines } from './utils';
 
-const accumulator: { value: number }[] = [];
+const accumulator: { value: number; bucket: string }[] = [];
 
 //
 // Throughput metrics are aggregated by function or app like so
@@ -18,60 +17,46 @@ const sum = (metrics: ScopedMetric[]) =>
     (acc, metric: ScopedMetric) =>
       metric.data.map((item, index) => ({
         value: (acc[index]?.value || 0) + item.value,
+        bucket: item.bucket,
       })),
     accumulator
   );
 
-export const mapSdkThroughput = (
-  {
-    sdkThroughputScheduled,
-    sdkThroughputStarted,
-    sdkThroughputEnded,
-  }: VolumeMetricsQuery['workspace'],
-  areaStyle?: { opacity: number }
-) => {
-  const dark = isDark();
+const scopedMetric = (id: string, data: Array<MetricsData>) => ({
+  id,
+  tagName: '',
+  tagValue: '',
+  data,
+});
 
-  const intervals = sdkThroughputScheduled.metrics[0]?.data || [];
-  const diff = timeDiff(intervals[0]?.bucket, intervals.at(-1)?.bucket);
-  const dataLength = intervals.length || 30;
+export const mapSdkThroughput = ({
+  sdkThroughputScheduled,
+  sdkThroughputStarted,
+  sdkThroughputEnded,
+}: VolumeMetricsQuery['workspace']) => {
+  const queued = 'Queued';
+  const started = 'Started';
+  const ended = 'Ended';
+
+  //
+  // a bit daft, fake an entity lookup so we can reuse the entity chart builder code
+  const entityLookup: EntityLookup = {
+    queued: { id: queued, name: queued },
+    started: { id: started, name: started },
+    ended: { id: ended, name: ended },
+  };
 
   const metrics = [
-    {
-      name: 'Queued',
-      data: sum(sdkThroughputScheduled.metrics),
-    },
-    { name: 'Started', data: sum(sdkThroughputStarted.metrics) },
-    { name: 'Ended', data: sum(sdkThroughputEnded.metrics) },
+    scopedMetric(queued, sum(sdkThroughputScheduled.metrics)),
+    scopedMetric(started, sum(sdkThroughputStarted.metrics)),
+    scopedMetric(ended, sum(sdkThroughputEnded.metrics)),
   ];
 
-  return {
-    xAxis: {
-      type: 'category' as const,
-      boundaryGap: true,
-      data: intervals.length ? intervals.map(({ bucket }) => bucket) : ['No Data Found'],
-      axisLabel: {
-        interval: dataLength <= 40 ? 2 : dataLength / (dataLength / 12),
-        formatter: (value: string) => dateFormat(value, diff),
-        margin: 10,
-      },
-    },
-    series: metrics.map((m, i) => {
-      return {
-        ...seriesOptions,
-        name: m.name,
-        data: m.data.map(({ value }) => value),
-        itemStyle: {
-          color: resolveColor(lineColors[i % lineColors.length]![0]!, dark, lineColors[0]?.[1]),
-        },
-        areaStyle,
-      };
-    }),
-  };
+  return mapEntityLines(metrics, entityLookup, { opacity: 0.1 });
 };
 
 export const SdkThroughput = ({ workspace }: { workspace?: VolumeMetricsQuery['workspace'] }) => {
-  const metrics = workspace && mapSdkThroughput(workspace, { opacity: 0.1 });
+  const metrics = workspace && mapSdkThroughput(workspace);
 
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-x-hidden rounded-lg border p-5 md:w-[75%]">
