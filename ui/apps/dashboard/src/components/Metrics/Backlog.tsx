@@ -11,7 +11,10 @@ export type BacklogMetricsType = VolumeMetricsQuery['workspace']['backlog']['met
 export const Backlog = ({
   workspace,
   entities,
-}: Partial<VolumeMetricsQuery> & { entities: EntityLookup }) => {
+}: {
+  workspace?: VolumeMetricsQuery['workspace'];
+  entities: EntityLookup;
+}) => {
   const metrics = workspace && mapEntityLines(workspace.backlog.metrics, entities);
 
   return (

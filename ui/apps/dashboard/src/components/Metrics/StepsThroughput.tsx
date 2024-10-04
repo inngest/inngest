@@ -9,7 +9,10 @@ import { getLineChartOptions, mapEntityLines } from './utils';
 export const StepsThroughput = ({
   workspace,
   entities,
-}: Partial<VolumeMetricsQuery> & { entities: EntityLookup }) => {
+}: {
+  workspace?: VolumeMetricsQuery['workspace'];
+  entities: EntityLookup;
+}) => {
   const metrics = workspace && mapEntityLines(workspace.stepThroughput.metrics, entities);
 
   return (

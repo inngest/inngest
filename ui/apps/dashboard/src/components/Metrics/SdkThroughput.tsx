@@ -7,7 +7,6 @@ import { isDark } from '@inngest/components/utils/theme';
 import type { ScopedMetric, VolumeMetricsQuery } from '@/gql/graphql';
 import { dateFormat, getLineChartOptions, lineColors, seriesOptions, timeDiff } from './utils';
 
-export type SdkThroughputMetricsType = VolumeMetricsQuery['workspace']['sdkThroughput']['metrics'];
 const accumulator: { value: number }[] = [];
 
 //
@@ -48,7 +47,7 @@ export const mapSdkThroughput = (
 
   return {
     xAxis: {
-      type: 'category',
+      type: 'category' as const,
       boundaryGap: true,
       data: intervals.length ? intervals.map(({ bucket }) => bucket) : ['No Data Found'],
       axisLabel: {
@@ -71,7 +70,7 @@ export const mapSdkThroughput = (
   };
 };
 
-export const SdkThroughput = ({ workspace }: Partial<VolumeMetricsQuery>) => {
+export const SdkThroughput = ({ workspace }: { workspace?: VolumeMetricsQuery['workspace'] }) => {
   const metrics = workspace && mapSdkThroughput(workspace, { opacity: 0.1 });
 
   return (

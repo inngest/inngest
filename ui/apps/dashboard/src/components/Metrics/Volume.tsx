@@ -8,6 +8,7 @@ import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { useEnvironment } from '../Environments/environment-context';
 import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
 import { Backlog } from './Backlog';
+import { AccountConcurrency } from './Concurrency';
 import type { EntityLookup } from './Dashboard';
 import { Feedback } from './Feedback';
 import { RunsThrougput } from './RunsThroughput';
@@ -22,6 +23,7 @@ export type MetricsFilters = {
   autoRefresh?: boolean;
   entities: EntityLookup;
   scope: MetricsScope;
+  concurrencyLimit?: number;
 };
 
 const GetVolumeMetrics = graphql(`
@@ -37,28 +39,6 @@ const GetVolumeMetrics = graphql(`
       runsThroughput: scopedMetrics(
         filter: {
           name: "function_run_ended_total"
-          scope: $scope
-          from: $from
-          functionIDs: $functionIDs
-          appIDs: $appIDs
-          until: $until
-        }
-      ) {
-        metrics {
-          id
-          tagName
-          tagValue
-          data {
-            value
-            bucket
-          }
-        }
-      }
-    }
-    workspace(id: $workspaceId) {
-      sdkThroughput: scopedMetrics(
-        filter: {
-          name: "sdk_req_ended_total"
           scope: $scope
           from: $from
           functionIDs: $functionIDs
@@ -188,6 +168,28 @@ const GetVolumeMetrics = graphql(`
       }
     }
     workspace(id: $workspaceId) {
+      stepRunning: scopedMetrics(
+        filter: {
+          name: "steps_running"
+          scope: $scope
+          from: $from
+          functionIDs: $functionIDs
+          appIDs: $appIDs
+          until: $until
+        }
+      ) {
+        metrics {
+          id
+          tagName
+          tagValue
+          data {
+            value
+            bucket
+          }
+        }
+      }
+    }
+    workspace(id: $workspaceId) {
       concurrency: scopedMetrics(
         filter: {
           name: "concurrency_limit_reached_total"
@@ -220,6 +222,7 @@ export const MetricsVolume = ({
   autoRefresh = false,
   entities,
   scope,
+  concurrencyLimit = 25,
 }: MetricsFilters) => {
   const [volumeOpen, setVolumeOpen] = useState(true);
 
@@ -265,6 +268,11 @@ export const MetricsVolume = ({
               <Backlog workspace={data?.workspace} entities={entities} />
             </div>
             <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
+              <AccountConcurrency
+                workspace={data?.workspace}
+                entities={entities}
+                concurrencyLimit={concurrencyLimit}
+              />
               <Feedback />
             </div>
             <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap"></div>

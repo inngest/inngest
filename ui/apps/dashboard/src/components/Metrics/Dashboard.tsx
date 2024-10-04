@@ -84,6 +84,7 @@ export const Dashboard = ({
 
   const logRetention = Number(planData?.account.plan?.features.log_retention);
   const upgradeCutoff = subtractDuration(new Date(), { days: logRetention || 7 });
+  const concurrenyLimit = Number(planData?.account.plan?.features.concurrency) || 25;
 
   const envLookup = apps.length !== 1 && !selectedApps?.length && !selectedFns?.length;
   const mappedFunctions = convertLookup(functions);
@@ -145,6 +146,7 @@ export const Dashboard = ({
           autoRefresh={autoRefresh}
           entities={mappedEntities}
           scope={envLookup ? MetricsScope.App : MetricsScope.Fn}
+          concurrencyLimit={concurrenyLimit}
         />
       </div>
     </div>

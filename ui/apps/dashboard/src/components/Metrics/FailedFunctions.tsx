@@ -32,7 +32,11 @@ export const FailedFunctions = ({
   workspace,
   entities,
   functions,
-}: Partial<FunctionStatusMetricsQuery> & { entities: EntityLookup; functions: EntityLookup }) => {
+}: {
+  workspace?: FunctionStatusMetricsQuery['workspace'];
+  entities: EntityLookup;
+  functions: EntityLookup;
+}) => {
   const env = useEnvironment();
 
   const metrics = workspace && mapFailed(workspace, entities);

@@ -1,13 +1,10 @@
 import { NewButton } from '@inngest/components/Button';
 
-import type { VolumeMetricsQuery } from '@/gql/graphql';
 import { ChartIcon } from '@/icons/ChartIcon';
-
-export type SdkThroughputMetricsType = VolumeMetricsQuery['workspace']['sdkThroughput']['metrics'];
 
 export const Feedback = ({}) => {
   return (
-    <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col items-center justify-center gap-3 overflow-x-hidden rounded-lg border p-2 text-center  md:px-12 ">
+    <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col items-center justify-center gap-3 overflow-x-hidden rounded-lg border p-2 text-center md:w-[65%] md:px-12 ">
       <ChartIcon />
       <div className="text-lg font-medium">Can&apos;t find the data you need?</div>
       <div className="text-subtle text-sm leading-tight">
