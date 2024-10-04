@@ -62,21 +62,35 @@ export const mapConcurrency = (
     ],
 
     series: [
+      {
+        ...seriesOptions,
+        markLine: {
+          symbol: 'none',
+          animation: false,
+          lineStyle: {
+            type: 'solid' as any,
+            color: resolveColor(limitColor[0]!, dark, limitColor[1]),
+          },
+          data: [{ yAxis: concurrencyLimit, name: 'Concurrency Limit', symbol: 'none' }],
+
+          emphasis: {
+            label: {
+              show: true,
+              color: 'inherit',
+              position: 'insideStartTop' as const,
+              formatter: ({ value }: any) => {
+                return ` Plan Limit: ${value}\n\n`;
+              },
+            },
+          },
+        },
+      },
       ...limitMetrics
         .filter(({ id }) => id !== zeroID)
         .map((f) => ({
           xAxisIndex: 1,
           z: 100,
           ...seriesOptions,
-          markLine: {
-            symbol: 'none',
-            animation: false,
-            lineStyle: {
-              type: 'solid',
-              color: resolveColor(limitColor[0]!, dark, limitColor[1]),
-            } as any,
-            data: [{ yAxis: concurrencyLimit, name: 'Concurrency Limit', symbol: 'none' }],
-          },
           name: `${entities[f.id]?.name} - limit reached`,
           data: f.data.map(({ value }) => value),
           itemStyle: {
