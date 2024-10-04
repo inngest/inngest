@@ -33,8 +33,6 @@ export const mapConcurrency = (
   entities: EntityLookup,
   concurrencyLimit: number
 ) => {
-  console.log('shit limitMetrics', limitMetrics);
-  console.log('shit runningMetrics', runningMetrics);
   const dark = isDark();
 
   const diff = timeDiff(limitMetrics[0]?.data[0]?.bucket, limitMetrics[0]?.data.at(-1)?.bucket);
