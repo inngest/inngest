@@ -151,7 +151,7 @@ type QueueManager interface {
 	osqueue.JobQueueReader
 	osqueue.Queue
 
-	Dequeue(ctx context.Context, p QueuePartition, i QueueItem) error
+	Dequeue(ctx context.Context, i QueueItem) error
 	Requeue(ctx context.Context, i QueueItem, at time.Time) error
 	RequeueByJobID(ctx context.Context, jobID string, at time.Time) error
 }
@@ -1601,7 +1601,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) 
 //
 // Obtaining a lease updates the vesting time for the queue item until now() +
 // lease duration. This returns the newly acquired lease ID on success.
-func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, duration time.Duration, now time.Time, denies *leaseDenies) (*ulid.ULID, error) {
+func (q *queue) Lease(ctx context.Context, item QueueItem, duration time.Duration, now time.Time, denies *leaseDenies) (*ulid.ULID, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Lease"), redis_telemetry.ScopeQueue)
 
 	if item.Data.Throttle != nil && denies != nil && denies.denyThrottle(item.Data.Throttle.Key) {
@@ -1693,7 +1693,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		return nil, err
 	}
 
-	q.logger.Trace().Interface("item", item).Interface("part", p).Interface("parts", parts).Interface("keys", keys).Interface("args", args).Str("accountConcurrencyKey", accountConcurrencyKey).Int("acctLimit", acctLimit).Str("leaseID", leaseID.String()).Msg("leasing item")
+	q.logger.Trace().Interface("item", item).Interface("parts", parts).Interface("keys", keys).Interface("args", args).Str("accountConcurrencyKey", accountConcurrencyKey).Int("acctLimit", acctLimit).Str("leaseID", leaseID.String()).Msg("leasing item")
 
 	status, err := scripts["queue/lease"].Exec(
 		redis_telemetry.WithScriptName(ctx, "lease"),
@@ -1717,11 +1717,11 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		// and potentially concurrency key partitions. Errors should be returned based on
 		// the partition type
 
-		if p.IsSystem() {
+		if parts[0].IsSystem() {
 			return nil, newKeyError(ErrSystemConcurrencyLimit, parts[0].ID)
 		}
 
-		if p.PartitionType == int(enums.PartitionTypeDefault) {
+		if parts[0].PartitionType == int(enums.PartitionTypeDefault) {
 			return nil, newKeyError(ErrPartitionConcurrencyLimit, item.FunctionID.String())
 		}
 
@@ -1812,7 +1812,7 @@ func (q *queue) ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID,
 }
 
 // Dequeue removes an item from the queue entirely.
-func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) error {
+func (q *queue) Dequeue(ctx context.Context, i QueueItem) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Dequeue"), redis_telemetry.ScopeQueue)
 
 	// Remove all items from all partitions.  For this, we need all partitions for
@@ -1857,11 +1857,6 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 		i.ID,
 		int(idempotency.Seconds()),
 
-		// NOTE: For backwards compatibility, we need to also remove the previously-used
-		// concurrency index item. While we use fully-qualified keys in concurrencyKey,
-		// previously we used function IDs or queueNames for system partitions.
-		p.Queue(),
-
 		parts[0].ID,
 		parts[1].ID,
 		parts[2].ID,
@@ -1875,7 +1870,7 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 		return err
 	}
 
-	q.logger.Trace().Interface("parts", parts).Interface("item", i).Interface("part", p).Msg("dequeueing queue item")
+	q.logger.Trace().Interface("parts", parts).Interface("item", i).Msg("dequeueing queue item")
 
 	status, err := scripts["queue/dequeue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "dequeue"),

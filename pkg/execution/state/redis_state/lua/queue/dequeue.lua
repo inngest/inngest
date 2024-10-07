@@ -28,14 +28,13 @@ local keyItemIndexB      = KEYS[16]  -- custom item index 2
 
 local queueID        = ARGV[1]
 local idempotencyTTL = tonumber(ARGV[2])
-local legacyPartitionName  = ARGV[3]
-local partitionIdA   = ARGV[4]
-local partitionIdB   = ARGV[5]
-local partitionIdC   = ARGV[6]
-local accountId      = ARGV[7]
-local partitionTypeA = tonumber(ARGV[8])
-local partitionTypeB = tonumber(ARGV[9])
-local partitionTypeC = tonumber(ARGV[10])
+local partitionIdA   = ARGV[3]
+local partitionIdB   = ARGV[4]
+local partitionIdC   = ARGV[5]
+local accountId      = ARGV[6]
+local partitionTypeA = tonumber(ARGV[7])
+local partitionTypeB = tonumber(ARGV[8])
+local partitionTypeC = tonumber(ARGV[9])
 
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)

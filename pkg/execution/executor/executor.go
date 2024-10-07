@@ -1040,11 +1040,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 				continue
 			}
 
-			err := q.Dequeue(ctx, redis_state.QueuePartition{
-				// TODO Check whether this works
-				FunctionID: &md.ID.FunctionID,
-				EnvID:      &md.ID.Tenant.EnvID,
-			}, *qi)
+			err := q.Dequeue(ctx, *qi)
 			if err != nil {
 				logger.StdlibLogger(ctx).Error("error dequeueing run job", "error", err)
 			}
@@ -1747,18 +1743,13 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 	// And dequeue the timeout job to remove unneeded work from the queue, etc.
 	if q, ok := e.queue.(redis_state.QueueManager); ok {
 		jobID := fmt.Sprintf("%s-%s", md.IdempotencyKey(), pause.DataKey)
-		err := q.Dequeue(
-			ctx,
-			// TODO (key queues) Double check if these need updates
-			redis_state.QueuePartition{FunctionID: &md.ID.FunctionID},
-			redis_state.QueueItem{
-				ID:         redis_state.HashID(ctx, jobID),
-				FunctionID: md.ID.FunctionID,
-				Data: queue.Item{
-					Kind: queue.KindPause,
-				},
+		err := q.Dequeue(ctx, redis_state.QueueItem{
+			ID:         redis_state.HashID(ctx, jobID),
+			FunctionID: md.ID.FunctionID,
+			Data: queue.Item{
+				Kind: queue.KindPause,
 			},
-		)
+		})
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error dequeueing consumed pause job when resuming", "error", err)
 		}

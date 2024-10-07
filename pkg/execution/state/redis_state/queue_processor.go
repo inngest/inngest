@@ -921,7 +921,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 
 		// Dequeue this entirely, as this permanently failed.
 		// XXX: Increase permanently failed counter here.
-		if err := q.Dequeue(context.WithoutCancel(ctx), p, qi); err != nil {
+		if err := q.Dequeue(context.WithoutCancel(ctx), qi); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil
@@ -936,7 +936,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 		}
 
 	case <-doneCh:
-		if err := q.Dequeue(context.WithoutCancel(ctx), p, qi); err != nil {
+		if err := q.Dequeue(context.WithoutCancel(ctx), qi); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil
@@ -1265,7 +1265,7 @@ func (p *processor) process(ctx context.Context, item *QueueItem) error {
 	// This is safe:  only one process runs scan(), and we guard the total number of
 	// available workers with the above semaphore.
 	leaseID, err := duration(ctx, "lease", p.queue.clock.Now(), func(ctx context.Context) (*ulid.ULID, error) {
-		return p.queue.Lease(ctx, *p.partition, *item, QueueLeaseDuration, p.staticTime, p.denies)
+		return p.queue.Lease(ctx, *item, QueueLeaseDuration, p.staticTime, p.denies)
 	})
 
 	// NOTE: If this loop ends in an error, we must _always_ release an item from the
