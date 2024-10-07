@@ -340,11 +340,12 @@ export default function CodeSearch({
     }
   };
 
-  const handleClear = () => {
+  const handleReset = () => {
     if (editorRef.current) {
       editorRef.current.setValue('');
       setContent('');
       updateMarkers(null);
+      onSearch('');
     }
   };
 
@@ -437,11 +438,11 @@ export default function CodeSearch({
       <div className="bg-codeEditor flex items-center gap-4 py-4 pl-4">
         <Button onClick={handleSearch} label="Search" size="small" />
         <Button
-          onClick={handleClear}
+          onClick={handleReset}
           appearance="ghost"
           size="small"
           kind="secondary"
-          label="Clear"
+          label="Reset"
         />
       </div>
     </>
