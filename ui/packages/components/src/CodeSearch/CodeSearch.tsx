@@ -82,73 +82,84 @@ interface ValidationError {
   message: string;
   startColumn: number;
   endColumn: number;
+  lineNumber: number;
 }
 
 function validateExpression(content: string): ValidationError | null {
-  if (!content.trim()) return null;
+  const lines = content.split('\n');
 
-  const parts = content
-    .trim()
-    .split(' ')
-    .filter((p) => p !== '');
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    const currentLine = lines[lineIndex] ?? '';
+    const line = currentLine.trim();
 
-  // Check if the first word is a valid path
-  const firstWord = parts[0];
-  if (!firstWord) return null;
+    if (!line) continue;
 
-  if (
-    !EVENT_PATHS.includes(firstWord as EventPath) &&
-    !EVENT_PATHS.some((path) => path.endsWith('.') && firstWord.startsWith(path))
-  ) {
-    return {
-      message: `Invalid field: ${firstWord}. Search by event or output.`,
-      startColumn: content.indexOf(firstWord) + 1,
-      endColumn: content.indexOf(firstWord) + firstWord.length + 1,
-    };
-  }
-  // Not enough parts to validate operator and value
-  if (parts.length < 3) return null;
+    const parts = line.split(' ').filter((p) => p !== '');
 
-  const operator = parts[1];
-  if (!operator) return null;
-  const value = parts[2];
-  if (!value) return null;
+    // Check if the first word is a valid path
+    const firstWord = parts[0];
+    if (!firstWord) continue;
 
-  const valueStartIndex = content.indexOf(value);
+    const startColumn = currentLine.indexOf(firstWord) + 1;
 
-  // Validate operator
-  const validOperators = getOperatorsForPath(firstWord);
-  if (!validOperators.includes(operator)) {
-    return {
-      message: `Invalid operator for ${firstWord}: ${operator}. Valid operators are: ${validOperators.join(
-        ', '
-      )}`,
-      startColumn: content.indexOf(operator) + 1,
-      endColumn: content.indexOf(operator) + operator.length + 1,
-    };
-  }
-
-  // Validate value type
-  if (firstWord === 'event.id' || firstWord === 'event.name' || firstWord === 'event.v') {
-    // Strings need to be wrapped in quotes
     if (
-      (!value.startsWith('"') && !value.startsWith("'")) ||
-      (!value.endsWith('"') && !value.endsWith("'"))
+      !EVENT_PATHS.includes(firstWord as EventPath) &&
+      !EVENT_PATHS.some((path) => path.endsWith('.') && firstWord.startsWith(path))
     ) {
       return {
-        message: `${firstWord} must be a string`,
-        startColumn: valueStartIndex + 1,
-        endColumn: valueStartIndex + value.length + 1,
+        message: `Invalid field: ${firstWord}. Search by event or output.`,
+        startColumn,
+        endColumn: startColumn + firstWord.length,
+        lineNumber: lineIndex + 1,
       };
     }
-  } else if (firstWord === 'event.ts') {
-    // Check if value is a valid integer for event.ts
-    if (!/^\d+$/.test(value)) {
+
+    // Not enough parts to validate operator and value
+    if (parts.length < 3) continue;
+
+    const operator = parts[1];
+    if (!operator) continue;
+
+    const value = parts.slice(2).join(' ');
+    const valueStartInLine = currentLine.indexOf(value);
+    const valueStartColumn = valueStartInLine + 1;
+
+    // Validate operator
+    const validOperators = getOperatorsForPath(firstWord);
+    if (!validOperators.includes(operator)) {
       return {
-        message: `${firstWord} must be an integer`,
-        startColumn: valueStartIndex + 1,
-        endColumn: valueStartIndex + value.length + 1,
+        message: `Invalid operator for ${firstWord}: ${operator}. Valid operators are: ${validOperators.join(
+          ', '
+        )}`,
+        startColumn: currentLine.indexOf(operator) + 1,
+        endColumn: currentLine.indexOf(operator) + operator.length + 1,
+        lineNumber: lineIndex + 1,
       };
+    }
+
+    // Validate value type
+    if (firstWord === 'event.id' || firstWord === 'event.name' || firstWord === 'event.v') {
+      const isValidString =
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"));
+
+      if (!isValidString) {
+        return {
+          message: `${firstWord} must be a string`,
+          startColumn: valueStartColumn,
+          endColumn: valueStartColumn + value.length,
+          lineNumber: lineIndex + 1,
+        };
+      }
+    } else if (firstWord === 'event.ts') {
+      if (!/^\d+$/.test(value)) {
+        return {
+          message: `${firstWord} must be an integer`,
+          startColumn: valueStartColumn,
+          endColumn: valueStartColumn + value.length,
+          lineNumber: lineIndex + 1,
+        };
+      }
     }
   }
   return null;
@@ -333,9 +344,9 @@ export default function CodeSearch({
       const marker: editor.IMarkerData = {
         severity: monacoRef.current.MarkerSeverity.Error,
         message: error.message,
-        startLineNumber: 1,
+        startLineNumber: error.lineNumber,
         startColumn: error.startColumn,
-        endLineNumber: 1,
+        endLineNumber: error.lineNumber,
         endColumn: error.endColumn,
       };
       monacoRef.current.editor.setModelMarkers(model, 'owner', [marker]);
