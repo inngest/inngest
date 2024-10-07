@@ -39,9 +39,16 @@ export const mapConcurrency = (
   const dataLength = limitMetrics[0]?.data?.length || 30;
 
   const metrics = {
-    yAxis: {
-      max: ({ max }: { max: number }) => (max > concurrencyLimit ? max : concurrencyLimit),
-    },
+    yAxis: [
+      {
+        max: ({ max }: { max: number }) => (max > concurrencyLimit ? max : concurrencyLimit),
+      },
+      {
+        max: 1,
+        min: 0,
+        show: false,
+      },
+    ],
     xAxis: [
       {
         type: 'category' as const,
@@ -68,6 +75,8 @@ export const mapConcurrency = (
         ...seriesOptions,
         markLine: {
           symbol: 'none',
+          barMinHeight: '100%',
+          large: true,
           animation: false,
           lineStyle: {
             type: 'solid' as any,
@@ -91,21 +100,27 @@ export const mapConcurrency = (
         .filter(({ id }) => id !== zeroID)
         .map((f) => ({
           xAxisIndex: 1,
+          yAxisIndex: 1,
           z: 100,
-          ...seriesOptions,
+          type: 'bar' as const,
+          silent: true,
           name: `${entities[f.id]?.name} - limit reached`,
-          data: f.data.map(({ value }) => value),
+          data: f.data.map(({ value }) => ({ value: value > 0 ? 1 : 0 })),
           itemStyle: {
             color: resolveColor(limitColor[0]!, dark, limitColor[1]),
+            opacity: 0.6,
           },
-          lineStyle: { opacity: 0 },
-          areaStyle: { opacity: 0.3 },
+          tooltip: {
+            valueFormatter: (value: any) => (value ? 'yes' : 'no'),
+          },
         })),
       ...runningMetrics
         .filter(({ id }) => id !== zeroID)
         .map((f, i) => ({
           xAxisIndex: 0,
-          ...seriesOptions,
+          yAxisIndes: 0,
+          ...{ ...seriesOptions, stack: 'Total' },
+          silent: true,
           name: entities[f.id]?.name,
           data: f.data.map(({ value }) => value),
           itemStyle: {
