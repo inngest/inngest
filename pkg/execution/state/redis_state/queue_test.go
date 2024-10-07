@@ -476,14 +476,18 @@ func TestQueueEnqueueItem(t *testing.T) {
 			assert.Equal(t, consts.DefaultConcurrencyLimit, acctLimit)
 
 			// Enqueue always enqueues to the default partitions - enqueueing to key queues has been disabled for now
-			expectedDefaultPartition := QueuePartition{
-				ID:               fnID.String(),
-				FunctionID:       &fnID,
-				AccountID:        accountId,
-				ConcurrencyLimit: consts.DefaultConcurrencyLimit,
+			customkeyQueuePartition := QueuePartition{
+				ID:                         q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hash),
+				PartitionType:              int(enums.PartitionTypeConcurrencyKey),
+				ConcurrencyScope:           int(enums.ConcurrencyScopeFn),
+				FunctionID:                 &fnID,
+				AccountID:                  accountId,
+				ConcurrencyLimit:           1,
+				EvaluatedConcurrencyKey:    ck.Key,
+				UnevaluatedConcurrencyHash: ck.Hash,
 			}
 
-			assert.Equal(t, expectedDefaultPartition, actualItemPartitions[0])
+			assert.Equal(t, customkeyQueuePartition, actualItemPartitions[0])
 
 			i, err := q.EnqueueItem(ctx, qi, now.Add(10*time.Second))
 			require.NoError(t, err)
@@ -508,7 +512,12 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 			// We enqueue to the function-specific queue for backwards-compatibility reasons
 			defaultPartition := getDefaultPartition(t, r, fnID)
-			assert.Equal(t, expectedDefaultPartition, defaultPartition)
+			assert.Equal(t, QueuePartition{
+				ID:               fnID.String(),
+				FunctionID:       &fnID,
+				AccountID:        accountId,
+				ConcurrencyLimit: consts.DefaultConcurrencyLimit,
+			}, defaultPartition)
 
 			mem, err := r.ZMembers(defaultPartition.zsetKey(q.u.kg))
 			require.NoError(t, err)
@@ -2229,23 +2238,30 @@ func TestQueueDequeue(t *testing.T) {
 
 		// First 2 partitions will be custom.
 		parts, acctLimit := q.ItemPartitions(ctx, itemA)
-		require.Equal(t, int(enums.PartitionTypeDefault), parts[0].PartitionType)
+		require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[0].PartitionType)
+		require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[1].PartitionType)
+		require.Equal(t, int(enums.PartitionTypeDefault), parts[2].PartitionType)
+
 		require.Equal(t, consts.DefaultConcurrencyLimit, acctLimit)
 
 		// Lease the first item, pretending it's in progress.
 		_, err = q.Lease(ctx, QueuePartition{}, itemA, 10*time.Second, q.clock.Now(), nil)
 		require.NoError(t, err)
 
+		// Note: Originally, this test used the concurrency key queue for testing Dequeue(),
+		// but this was changed to the default partition, as we do not enqueue to key queues anymore.
+		partitionToDequeue := parts[2]
+
 		// Force requeue the next partition such that it's pushed forward, pretending there's
 		// no capacity.
-		err = q.PartitionRequeue(ctx, &parts[0], start.Add(30*time.Minute), true)
+		err = q.PartitionRequeue(ctx, &partitionToDequeue, start.Add(30*time.Minute), true)
 		require.NoError(t, err)
 
 		t.Run("Requeueing partitions updates the score", func(t *testing.T) {
-			partScoreA, _ := r.ZMScore(q.u.kg.GlobalPartitionIndex(), parts[0].ID)
+			partScoreA, _ := r.ZMScore(q.u.kg.GlobalPartitionIndex(), partitionToDequeue.ID)
 			require.EqualValues(t, start.Add(30*time.Minute).Unix(), partScoreA[0])
 
-			partScoreA, _ = r.ZMScore(q.u.kg.AccountPartitionIndex(acctID), parts[0].ID)
+			partScoreA, _ = r.ZMScore(q.u.kg.AccountPartitionIndex(acctID), partitionToDequeue.ID)
 			require.NotNil(t, partScoreA, "expected partition requeue to update account partition index", r.Dump())
 			require.EqualValues(t, start.Add(30*time.Minute).Unix(), partScoreA[0])
 		})
@@ -2254,8 +2270,8 @@ func TestQueueDequeue(t *testing.T) {
 		require.Nil(t, err)
 
 		t.Run("The outstanding partition scores should reset", func(t *testing.T) {
-			partScoreA, _ := r.ZMScore(q.u.kg.GlobalPartitionIndex(), parts[0].ID)
-			require.EqualValues(t, start, time.Unix(int64(partScoreA[0]), 0), r.Dump())
+			partScoreA, _ := r.ZMScore(q.u.kg.GlobalPartitionIndex(), partitionToDequeue.ID)
+			require.EqualValues(t, start, time.Unix(int64(partScoreA[0]), 0), r.Dump(), partitionToDequeue)
 		})
 	})
 
