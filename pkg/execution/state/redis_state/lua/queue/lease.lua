@@ -15,36 +15,40 @@ Output:
 
 ]]
 
-local keyQueueMap            = KEYS[1]
-local keyPartitionA          = KEYS[2]           -- queue:sorted:$workflowID - zset
-local keyPartitionB          = KEYS[3]           -- e.g. sorted:c|t:$workflowID - zset
-local keyPartitionC          = KEYS[4]          -- e.g. sorted:c|t:$workflowID - zset
+local keyQueueMap            	= KEYS[1]
+local keyPartitionMap					= KEYS[2]           -- partition:item
+local keyPartitionA          	= KEYS[3]           -- queue:sorted:$workflowID - zset
+local keyPartitionB          	= KEYS[4]           -- e.g. sorted:c|t:$workflowID - zset
+local keyPartitionC          	= KEYS[5]          -- e.g. sorted:c|t:$workflowID - zset
 
 -- We push our queue item ID into each concurrency queue
-local keyConcurrencyA  = KEYS[5] -- Account concurrency level
-local keyConcurrencyB  = KEYS[6] -- When leasing an item we need to place the lease into this key.
-local keyConcurrencyC  = KEYS[7] -- Optional for eg. for concurrency amongst steps
+local keyConcurrencyA  				= KEYS[6] -- Account concurrency level
+local keyConcurrencyB  				= KEYS[7] -- When leasing an item we need to place the lease into this key.
+local keyConcurrencyC  				= KEYS[8] -- Optional for eg. for concurrency amongst steps
 -- We push pointers to partition concurrency items to the partition concurrency item
-local concurrencyPointer      = KEYS[8]
-local keyGlobalPointer        = KEYS[9]
-local keyGlobalAccountPointer = KEYS[10] -- accounts:sorted - zset
-local keyAccountPartitions    = KEYS[11] -- accounts:$accountId:partition:sorted - zset
-local throttleKey             = KEYS[12] -- key used for throttling function run starts.
-local keyAcctConcurrency      = KEYS[13]
+local concurrencyPointer      = KEYS[9]
+local keyGlobalPointer        = KEYS[10]
+local keyGlobalAccountPointer = KEYS[11] -- accounts:sorted - zset
+local keyAccountPartitions    = KEYS[12] -- accounts:$accountId:partition:sorted - zset
+local throttleKey             = KEYS[13] -- key used for throttling function run starts.
+local keyAcctConcurrency      = KEYS[14]
 
-local queueID      = ARGV[1]
-local newLeaseKey  = ARGV[2]
-local currentTime  = tonumber(ARGV[3]) -- in ms
-local partitionIdA = ARGV[4]
-local partitionIdB = ARGV[5]
-local partitionIdC = ARGV[6]
+local queueID      						= ARGV[1]
+local newLeaseKey  						= ARGV[2]
+local currentTime  						= tonumber(ARGV[3]) -- in ms
+local partitionItemA      		= ARGV[4]
+local partitionItemB      		= ARGV[5]
+local partitionItemC      		= ARGV[6]
+local partitionIdA 						= ARGV[7]
+local partitionIdB 						= ARGV[8]
+local partitionIdC 						= ARGV[9]
 -- We check concurrency limits when leasing queue items.
-local concurrencyA    = tonumber(ARGV[7])
-local concurrencyB    = tonumber(ARGV[8])
-local concurrencyC    = tonumber(ARGV[9])
+local concurrencyA    				= tonumber(ARGV[10])
+local concurrencyB    				= tonumber(ARGV[11])
+local concurrencyC    				= tonumber(ARGV[12])
 -- And we always check against account concurrency limits
-local concurrencyAcct = tonumber(ARGV[10])
-local accountId       = ARGV[11]
+local concurrencyAcct 				= tonumber(ARGV[13])
+local accountId       				= ARGV[14]
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -115,6 +119,11 @@ item.leaseID = newLeaseKey
 redis.call("HSET", keyQueueMap, queueID, cjson.encode(item))
 
 local function handleLease(keyPartition, keyConcurrency, partitionID)
+	-- Store the partition if it does not exist
+	-- Note: This specifically applies to concurrency key queues, as we do not
+	-- create the respective partitions during enqueue
+	redis.call("HSETNX", keyPartitionMap, partitionID, partitionItem)
+
 	-- Add item to in-progress/concurrency queue and set score to lease expiry time to be picked up by scavenger
 	redis.call("ZADD", keyConcurrency, nextTime, item.id)
 
@@ -151,13 +160,13 @@ redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
 -- and custom concurrency items may not be set, but the keys need to be set for clustered
 -- mode.
 if exists_without_ending(keyConcurrencyA, ":-") == true and concurrencyA > 0 then
-	handleLease(keyPartitionA, keyConcurrencyA, partitionIdA)
+	handleLease(keyPartitionA, keyConcurrencyA, partitionIdA, partitionItemA)
 end
 if exists_without_ending(keyConcurrencyB, ":-") == true and concurrencyB > 0 then
-	handleLease(keyPartitionB, keyConcurrencyB, partitionIdB)
+	handleLease(keyPartitionB, keyConcurrencyB, partitionIdB, partitionItemB)
 end
 if exists_without_ending(keyConcurrencyC, ":-") == true and concurrencyC > 0 then
-	handleLease(keyPartitionC, keyConcurrencyC, partitionIdC)
+	handleLease(keyPartitionC, keyConcurrencyC, partitionIdC, partitionItemC)
 end
 
 return 0
