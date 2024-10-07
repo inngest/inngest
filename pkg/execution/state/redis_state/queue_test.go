@@ -5,13 +5,14 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"github.com/inngest/inngest/pkg/consts"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/inngest/inngest/pkg/consts"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/davecgh/go-spew/spew"
@@ -25,6 +26,10 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	EnableKeyQueues = false // see also: pkg/execution/state/redis_state/lua/includes/update_pointer_score.lua lines 5-8 and callers of ItemPartitions
 )
 
 func init() {
@@ -3429,7 +3434,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 				requirePartitionScoreEquals(t, r, &idA, next)
 				requirePartitionScoreEquals(t, r, &idA, time.UnixMilli(loaded.ForceAtMS))
 
-				// Now remove this item, as we dont need it for any future tests.
+				// Now remove this item, as we don't need it for any future tests.
 				err = q.Dequeue(ctx, p, qi)
 				require.NoError(t, err)
 			})
@@ -4591,7 +4596,7 @@ func requirePartitionScoreEquals(t *testing.T, r *miniredis.Miniredis, wid *uuid
 	requireGlobalPartitionScore(t, r, wid.String(), expected)
 }
 
-func concurrencyQueueScores(t *testing.T, r *miniredis.Miniredis, key string, from time.Time) map[string]time.Time {
+func concurrencyQueueScores(t *testing.T, r *miniredis.Miniredis, key string, _ time.Time) map[string]time.Time {
 	t.Helper()
 	members, err := r.ZMembers(key)
 	require.NoError(t, err)

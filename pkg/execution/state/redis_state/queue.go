@@ -17,7 +17,6 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/VividCortex/ewma"
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
@@ -2954,48 +2953,6 @@ func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Durat
 	default:
 		return nil, fmt.Errorf("unknown response claiming config lease: %d", status)
 	}
-}
-
-// peekEWMA returns the calculated EWMA value from the list
-func (q *queue) peekEWMA(ctx context.Context, fnID uuid.UUID) (int64, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "peekEWMA"), redis_telemetry.ScopeQueue)
-
-	// retrieves the list from redis
-	cmd := q.u.Client().B().Lrange().Key(q.u.KeyGenerator().ConcurrencyFnEWMA(fnID)).Start(0).Stop(-1).Build()
-	strlist, err := q.u.Client().Do(ctx, cmd).AsStrSlice()
-	if err != nil {
-		return 0, fmt.Errorf("error reading function concurrency EWMA values: %w", err)
-	}
-
-	// return early
-	if len(strlist) == 0 {
-		return 0, nil
-	}
-
-	hasNonZero := false
-	vals := make([]float64, len(strlist))
-	for i, s := range strlist {
-		v, _ := strconv.ParseFloat(s, 64)
-		vals[i] = v
-		if v > 0 {
-			hasNonZero = true
-		}
-	}
-
-	if !hasNonZero {
-		// short-circuit.
-		return 0, nil
-	}
-
-	// create a simple EWMA, add all the numbers in it and get the final value
-	// NOTE: we don't need variable since we don't want to maintain this in memory
-	mavg := ewma.NewMovingAverage()
-	for _, v := range vals {
-		mavg.Add(v)
-	}
-
-	// round up to the nearest integer
-	return int64(math.Round(mavg.Value())), nil
 }
 
 // setPeekEWMA add the new value to the existing list.
