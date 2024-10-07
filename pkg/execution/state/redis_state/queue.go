@@ -2408,9 +2408,6 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		// If we have an allowlist, only accept this partition if its in the allowlist.
 		if len(q.allowQueues) > 0 && !checkList(item.Queue(), q.allowQueueMap, q.allowQueuePrefixes) {
 			// This is not in the allowlist specified, so do not allow this partition to be used.
-			if q.name == "pause-queue" {
-				q.logger.Debug().Interface("queue", item.Queue()).Msg("skipping queue via allowlist")
-			}
 			ignored++
 			continue
 		}
