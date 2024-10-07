@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
@@ -30,13 +31,26 @@ const (
 
 // NATS span exporter
 type natsSpanExporter struct {
-	subjects []string
+	subjects map[string]StreamConf
 	conn     *broker.NatsConnector
+}
+
+type StreamConf struct {
+	// Name of the NATS Stream
+	Name string
+	// If non zero, this means the stream is split into multiple to allow higher throughput.
+	// And the number is used in a modulur to extract the number to be used for the stream.
+	// The remain will be added to the stream name
+	//
+	// e.g.
+	// - inngest.hello.1
+	// - inngest.hello.2
+	DivideBy uint64
 }
 
 type NatsExporterOpts struct {
 	// The subjects this exporter will be publishing the spans to
-	Subjects []string
+	Subjects map[string]StreamConf
 	// Comma delimited URLs of the NATS server to use
 	URLs string
 	// The path of the nkey file to be used for authentication
@@ -93,7 +107,9 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 		return err
 	}
 	// publish to all subjects defined
-	for _, subj := range e.subjects {
+	for subj, conf := range e.subjects {
+		var i uint64
+
 		for _, sp := range spans {
 			wg.Add(1)
 
@@ -181,8 +197,19 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 					return
 				}
 
+				idx := atomic.LoadUint64(&i)
+				if idx > 0 {
+					idx = idx % conf.DivideBy
+				}
+
+				subj := sub
+				if conf.DivideBy > 0 {
+					// set index in the subject
+					subj = fmt.Sprintf("%s.%d", sub, idx)
+				}
+
 				// Use async publish to increase throughput
-				fack, err := js.PublishAsync(sub, byt,
+				fack, err := js.PublishAsync(subj, byt,
 					jetstream.WithStallWait(500*time.Millisecond),
 					jetstream.WithRetryAttempts(10),
 				)
@@ -196,6 +223,9 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 					)
 					return
 				}
+
+				// Increment the counter
+				atomic.AddUint64(&i, 1)
 
 				pstatus := "unknown"
 				select {
@@ -216,7 +246,7 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 				metrics.IncrSpanExportedCounter(ctx, metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"subject": sub,
+						"subject": subj,
 						"status":  pstatus,
 					},
 				})
