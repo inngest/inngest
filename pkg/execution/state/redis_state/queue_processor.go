@@ -993,6 +993,16 @@ func (q *queue) capacity() int64 {
 // 2. configured min, max of peek size range
 // 3. worker capacity
 func (q *queue) peekSize(ctx context.Context, p *QueuePartition) int64 {
+	// set ranges
+	pmin := q.peekMin
+	if pmin == 0 {
+		pmin = QueuePeekMin
+	}
+	pmax := q.peekMax
+	if pmax == 0 {
+		pmax = QueuePeekMax
+	}
+	
 	// Take a random amount between our range.
 	size := int64(rand.Intn(int(q.peekMax-q.peekMin))) + q.peekMin
 	// Limit to capacity
