@@ -1013,6 +1013,58 @@ func (q *queue) peekSize(_ context.Context, _ *QueuePartition) int64 {
 	return size
 }
 
+func (q *queue) ewmaPeekSize(ctx context.Context, p *QueuePartition) int64 {
+	if p.FunctionID == nil {
+		return q.peekMin
+	}
+
+	// retrieve the EWMA value
+	ewma, err := q.peekEWMA(ctx, *p.FunctionID)
+	if err != nil {
+		// return the minimum if there's an error
+		return q.peekMin
+	}
+
+	// set multiplier
+	multiplier := q.peekCurrMultiplier
+	if multiplier == 0 {
+		multiplier = QueuePeekCurrMultiplier
+	}
+
+	// set ranges
+	pmin := q.peekMin
+	if pmin == 0 {
+		pmin = QueuePeekMin
+	}
+	pmax := q.peekMax
+	if pmax == 0 {
+		pmax = QueuePeekMax
+	}
+
+	// calculate size with EWMA and multiplier
+	size := ewma * multiplier
+	switch {
+	case size < pmin:
+		size = pmin
+	case size > pmax:
+		size = pmax
+	}
+
+	dur := time.Hour * 24
+	qsize, _ := q.partitionSize(ctx, p.zsetKey(q.u.kg), q.clock.Now().Add(dur))
+	if qsize > size {
+		size = qsize
+	}
+
+	// add 10% expecting for some workflow that will finish in the mean time
+	cap := int64(float64(q.capacity()) * 1.1)
+	if size > cap {
+		size = cap
+	}
+
+	return size
+}
+
 func (q *queue) isSequential() bool {
 	l := q.sequentialLease()
 	if l == nil {
