@@ -61,11 +61,6 @@ local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem,
 		--
 		--       Here, we do those checks.
 
-		-- DEBUG: This should never happen, but for some reason it does. log it.
-			if existing == false or existing == nil or existing.forceAtMS == nil then
-					redis.call("HSET", "enqueue-debug-missing-partitions", partitionID, cjson.encode(existing))
-			end
-
 		if nowMS == nil or nowMS == false or existing == false or existing == nil or existing.forceAtMS == nil or nowMS > tonumber(existing.forceAtMS) then
 			-- If the current time is before the force stuff, don't bother.  Here, we
 			-- are guaranteed that we've already passed the force delay.
@@ -123,11 +118,6 @@ local function requeue_to_partition(keyPartitionSet, partitionID, partitionItem,
 		--       we've forced a partition to have a delay.
 		--
 		--       Here, we do those checks.
-
-		-- DEBUG: This should never happen, but for some reason it does. log it.
-		if existing == false or existing == nil or existing.forceAtMS == nil then
-				redis.call("HSET", "requeue-debug-missing-partitions", partitionID, cjson.encode(existing))
-		end
 
 		if nowMS == nil or nowMS == false or existing == false or existing == nil or existing.forceAtMS == nil or nowMS > tonumber(existing.forceAtMS) then
 			-- If the current time is before the force stuff, don't bother.  Here, we

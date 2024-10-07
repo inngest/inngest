@@ -1002,7 +1002,7 @@ func (q *queue) peekSize(ctx context.Context, p *QueuePartition) int64 {
 	if pmax == 0 {
 		pmax = QueuePeekMax
 	}
-	
+
 	// Take a random amount between our range.
 	size := int64(rand.Intn(int(q.peekMax-q.peekMin))) + q.peekMin
 	// Limit to capacity
