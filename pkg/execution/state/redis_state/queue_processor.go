@@ -992,7 +992,7 @@ func (q *queue) capacity() int64 {
 // 1. EWMA of concurrency limit hits
 // 2. configured min, max of peek size range
 // 3. worker capacity
-func (q *queue) peekSize(ctx context.Context, p *QueuePartition) int64 {
+func (q *queue) peekSize(_ context.Context, _ *QueuePartition) int64 {
 	// set ranges
 	pmin := q.peekMin
 	if pmin == 0 {
