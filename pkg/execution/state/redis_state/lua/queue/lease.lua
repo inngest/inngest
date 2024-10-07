@@ -122,30 +122,9 @@ local function handleLease(keyPartition, keyConcurrency, partitionID)
 	-- and stored in functionConcurrencyKey.
 	redis.call("ZREM", keyPartition, item.id)
 
-	-- TODO(INN-3573): If we just leased the last queue item of the partition, drop partition pointers
-
-	-- Update the fn's score in the global pointer queue to the next job, if available.
-	local earliestScore = get_fn_partition_score(keyPartition)
-
-	-- TODO If score is 0 (there is no further item in the partition queue), remove the partition pointer
-	-- to prevent executors from spinning on guaranteed-empty partitions until the last in-progress item is done
-	-- and the partition is gc'd.
-
-	-- NOTE: The global partition ID isn't the actual partition zset key for backwards compatibility.
-	-- Instead, they are the partition IDs, which is either the partition ZSET (for new concurrency
-	-- key partitions) OR the function ID (for default partitions).
-	-- 
-	-- The first version of the queue used function UUIDs as queue names, and the global pointer
-	-- expected just the function UUIDs instead of a fully defined redis key.
-	update_pointer_score_to(partitionID, keyGlobalPointer, earliestScore)
-
-	-- Update account partitions and account pointers with new score of next item
-	update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, earliestScore)
-
 	-- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
 	-- so that expired leases can be re-processed.  We want to take the earliest time from the
 	-- concurrency queue such that we get a previously lost job if possible.
-
 	local inProgressScores = redis.call("ZRANGE", keyConcurrency, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
 	if inProgressScores ~= false then
 		local earliestLease = tonumber(inProgressScores[2])

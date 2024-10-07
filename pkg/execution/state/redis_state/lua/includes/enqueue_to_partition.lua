@@ -8,7 +8,7 @@ local function enqueue_get_partition_item(partitionKey, id)
 end
 
 local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
-	if partitionID == "" then
+	if partitionID == "" or partitionID == nil or partitionID == false then
 		-- This is a blank partition, so don't even bother.  This allows us to pre-allocate
 		-- 3 partitions per item, even if an item only needs a single partition.
 		return
@@ -43,7 +43,7 @@ local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem,
 	redis.call("HSETNX", keyPartitionMap, partitionID, partitionItem) -- store the partition
 
 	-- Potentially update the global queue of queues (global partitions).
-	local currentScore = redis.call("ZSCORE", keyGlobalPointer, partitionID) 
+	local currentScore = redis.call("ZSCORE", keyGlobalPointer, partitionID)
 	if currentScore == false or tonumber(currentScore) > partitionTime then
 		-- In this case, we're enqueueing something earlier than we previously had in
 		-- the current queue/partition.  To this effect, we need to:
@@ -60,7 +60,13 @@ local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem,
 		--       we've forced a partition to have a delay.
 		--
 		--       Here, we do those checks.
-		if nowMS > existing.forceAtMS then
+
+		-- DEBUG: This should never happen, but for some reason it does. log it.
+			if existing == false or existing == nil or existing.forceAtMS == nil then
+					redis.call("HSET", "enqueue-debug-missing-partitions", partitionID, cjson.encode(existing))
+			end
+
+		if nowMS == nil or nowMS == false or existing == false or existing == nil or existing.forceAtMS == nil or nowMS > tonumber(existing.forceAtMS) then
 			-- If the current time is before the force stuff, don't bother.  Here, we
 			-- are guaranteed that we've already passed the force delay.
 			--
@@ -76,7 +82,7 @@ end
 -- update global pointers instead of using the current queue item's score.
 -- Requires: update_account_queues.lua which requires update_pointer_score.lua, ends_with.lua
 local function requeue_to_partition(keyPartitionSet, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountID)
-	if partitionID == "" then
+	if partitionID == "" or partitionID == nil or partitionID == false then
 		-- This is a blank partition, so don't even bother.  This allows us to pre-allocate
 		-- 3 partitions per item, even if an item only needs a single partition.
 		return
@@ -90,7 +96,7 @@ local function requeue_to_partition(keyPartitionSet, partitionID, partitionItem,
 	--       set of functions is *just* the workflow ID.
 	--
 	--       For new key-based queues, we actually store the entire redis key here.  Much better.
-	--       
+	--
 	--       Because of this discrepancy, we have to pass in a "partitionID" to this function so
 	--       that we can properly do backcompat in the global queue of queues.
 	redis.call("HSETNX", keyPartitionMap, partitionID, partitionItem) -- store the partition
@@ -99,8 +105,8 @@ local function requeue_to_partition(keyPartitionSet, partitionID, partitionItem,
 	local minScores = redis.call("ZRANGE", keyPartitionSet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
 	local earliestScore = tonumber(minScores[2])
 
-	-- Potentially update the queue of queues.  
-	local currentScore = redis.call("ZSCORE", keyGlobalPointer, partitionID) 
+	-- Potentially update the queue of queues.
+	local currentScore = redis.call("ZSCORE", keyGlobalPointer, partitionID)
 	if currentScore == false or tonumber(currentScore) ~= earliestScore then
 		-- In this case, we're enqueueing something earlier than we previously had in
 		-- the current queue/partition.  To this effect, we need to:
@@ -117,7 +123,13 @@ local function requeue_to_partition(keyPartitionSet, partitionID, partitionItem,
 		--       we've forced a partition to have a delay.
 		--
 		--       Here, we do those checks.
-		if existing ~= nil and nowMS > existing.forceAtMS then
+
+		-- DEBUG: This should never happen, but for some reason it does. log it.
+		if existing == false or existing == nil or existing.forceAtMS == nil then
+				redis.call("HSET", "requeue-debug-missing-partitions", partitionID, cjson.encode(existing))
+		end
+
+		if nowMS == nil or nowMS == false or existing == false or existing == nil or existing.forceAtMS == nil or nowMS > tonumber(existing.forceAtMS) then
 			-- If the current time is before the force stuff, don't bother.  Here, we
 			-- are guaranteed that we've already passed the force delay.
 			--

@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/enums"
-	"golang.org/x/sync/errgroup"
 	"math"
 	mrand "math/rand"
 	"strconv"
@@ -15,6 +13,9 @@ import (
 	"sync/atomic"
 	"time"
 	"unsafe"
+
+	"github.com/inngest/inngest/pkg/enums"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/VividCortex/ewma"
 	"github.com/cespare/xxhash/v2"
@@ -41,7 +42,7 @@ import (
 const (
 	PartitionSelectionMax = int64(100)
 	PartitionPeekMax      = PartitionSelectionMax * 3
-	AccountPeekMax        = int64(25)
+	AccountPeekMax        = int64(30)
 )
 
 const (
@@ -77,7 +78,7 @@ const (
 
 	// default values
 	QueuePeekMin            int64 = 300
-	QueuePeekMax            int64 = 5000
+	QueuePeekMax            int64 = 750
 	QueuePeekCurrMultiplier int64 = 4 // threshold 25%
 	QueuePeekEWMALen        int   = 10
 	QueueLeaseDuration            = 20 * time.Second
@@ -301,6 +302,14 @@ func WithKindToQueueMapping(mapping map[string]string) func(q *queue) {
 	}
 }
 
+func WithDisableFifoForFunctions(mapping map[string]struct{}) func(q *queue) {
+	// XXX: Refactor osqueue.Item and this package to resolve these interfaces
+	// and clean up this function.
+	return func(q *queue) {
+		q.disableFifoForFunctions = mapping
+	}
+}
+
 func WithLogger(l *zerolog.Logger) func(q *queue) {
 	return func(q *queue) {
 		q.logger = l
@@ -395,12 +404,15 @@ func NewQueue(u *QueueClient, opts ...QueueOpt) *queue {
 		pf: func(_ context.Context, _ QueuePartition) uint {
 			return PriorityDefault
 		},
+		peekMin: QueuePeekMin,
+		peekMax: QueuePeekMax,
 		runMode: QueueRunMode{
 			Sequential:         true,
 			Scavenger:          true,
 			Partition:          true,
 			Account:            true,
 			GuaranteedCapacity: true,
+			AccountWeight:      85,
 		},
 		numWorkers:               defaultNumWorkers,
 		wg:                       &sync.WaitGroup{},
@@ -507,8 +519,9 @@ type queue struct {
 	// prior to leasing items.
 	sem *trackingSemaphore
 	// queueKindMapping stores a map of job kind => queue names
-	queueKindMapping map[string]string
-	logger           *zerolog.Logger
+	queueKindMapping        map[string]string
+	disableFifoForFunctions map[string]struct{}
+	logger                  *zerolog.Logger
 
 	// itemIndexer returns indexes for a given queue item.
 	itemIndexer QueueItemIndexer
@@ -575,6 +588,9 @@ type QueueRunMode struct {
 
 	// Account determines whether accounts are processed
 	Account bool
+
+	// AccountWeight is the weight of processing accounts over partitions between 0 - 100 where 100 means only process accounts
+	AccountWeight int
 
 	// GuaranteedAccount determines whether accounts with guaranteed capacity are fetched, and one lease is acquired per instance to process the account
 	GuaranteedCapacity bool
@@ -900,13 +916,13 @@ func (q QueueItem) IsLeased(time time.Time) bool {
 // Note: Currently, we only ever return 2 partitions (2x custom concurrency keys or function + custom concurrency key)
 // Note: For backwards compatibility, we may return a third partition for the function itself, in case two custom concurrency keys are used.
 // This will change with the implementation of throttling key queues.
-func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) ([]QueuePartition, int) {
+func (q *queue) ItemPartitions(ctx context.Context, i QueueItem, enableKeyQueues bool) ([]QueuePartition, int) {
 	var (
 		partitions []QueuePartition
 		ckeys      = i.Data.GetConcurrencyKeys()
 	)
 
-	queueName := i.Data.QueueName
+	queueName := i.QueueName
 
 	// sanity check: both QueueNames should be set, but sometimes aren't
 	if queueName == nil && i.QueueName != nil {
@@ -984,7 +1000,7 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) ([]QueuePartiti
 		fnPartition.ConcurrencyLimit = limits.AccountLimit
 	}
 
-	if len(ckeys) > 0 {
+	if enableKeyQueues && len(ckeys) > 0 {
 		// Up to 2 concurrency keys.
 		for _, key := range ckeys {
 			scope, id, checksum, _ := key.ParseKey()
@@ -1237,7 +1253,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		partitionTime = q.clock.Now()
 	}
 
-	parts, _ := q.ItemPartitions(ctx, i)
+	parts, _ := q.ItemPartitions(ctx, i, false)
 	isSystemPartition := parts[0].IsSystem()
 
 	if i.Data.Identifier.AccountID == uuid.Nil && !isSystemPartition {
@@ -1382,7 +1398,7 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 		args,
 	).ToAny()
 	if err != nil {
-		return nil, fmt.Errorf("error peeking queue items: %w", err)
+		return nil, fmt.Errorf("error peeking queue items (limit: %d): %w", limit, err)
 	}
 
 	returnedSet, ok := peekRet.([]any)
@@ -1390,19 +1406,38 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 		return nil, fmt.Errorf("unknown return type from peek: %T", peekRet)
 	}
 
-	var items, missingQueueItems []any
+	var potentiallyMissingItems, allQueueItemIds []any
 	if len(returnedSet) == 2 {
-		items, ok = returnedSet[0].([]any)
+		potentiallyMissingItems, ok = returnedSet[0].([]any)
 		if !ok {
 			return nil, fmt.Errorf("unexpected first item in set returned from peek: %T", peekRet)
 		}
 
-		missingQueueItems, ok = returnedSet[1].([]any)
+		allQueueItemIds, ok = returnedSet[1].([]any)
 		if !ok {
 			return nil, fmt.Errorf("unexpected first item in set returned from peek: %T", peekRet)
 		}
 	} else if len(returnedSet) != 0 {
 		return nil, fmt.Errorf("expected zero or two items in set returned by peek: %v", returnedSet)
+	}
+
+	items := make([]any, 0, len(allQueueItemIds))
+	missingQueueItems := make([]string, 0, len(allQueueItemIds))
+	for idx, itemId := range allQueueItemIds {
+		if potentiallyMissingItems[idx] == nil {
+			if itemId == nil {
+				return nil, fmt.Errorf("encountered nil queue item key in partition queue %q", partition.zsetKey(q.u.kg))
+			}
+
+			str, ok := itemId.(string)
+			if !ok {
+				return nil, fmt.Errorf("encountered non-string queue item key in partition queue %q", partition.zsetKey(q.u.kg))
+			}
+
+			missingQueueItems = append(missingQueueItems, str)
+		} else {
+			items = append(items, potentiallyMissingItems[idx])
+		}
 	}
 
 	if len(missingQueueItems) > 0 {
@@ -1415,17 +1450,9 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 
 		eg := errgroup.Group{}
 		for _, missingItemId := range missingQueueItems {
-			if missingItemId == nil {
-				return nil, fmt.Errorf("encountered nil queue item key in partition queue %q", partition.zsetKey(q.u.kg))
-			}
-
-			str, ok := missingItemId.(string)
-			if !ok {
-				return nil, fmt.Errorf("encountered non-string queue item key in partition queue %q", partition.zsetKey(q.u.kg))
-			}
-
+			id := missingItemId
 			eg.Go(func() error {
-				return q.cleanupNilQueueItemInPartition(ctx, *partition, str)
+				return q.cleanupNilQueueItemInPartition(ctx, *partition, id)
 			})
 		}
 
@@ -1505,7 +1532,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) 
 	// the queue item instead of just the partition passed via args.
 	//
 	// This is because a single queue item may be present in more than one queue.
-	parts, _ := q.ItemPartitions(ctx, i)
+	parts, _ := q.ItemPartitions(ctx, i, true)
 
 	keys := []string{
 		q.u.kg.QueueItem(),
@@ -1586,7 +1613,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	}
 
 	// Grab all partitions for the queue item
-	parts, acctLimit := q.ItemPartitions(ctx, item)
+	parts, acctLimit := q.ItemPartitions(ctx, item, true)
 	for _, partition := range parts {
 		// Check to see if this key has already been denied in the lease iteration.
 		// If so, fail early.
@@ -1724,7 +1751,7 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 		return nil, fmt.Errorf("error generating id: %w", err)
 	}
 
-	parts, _ := q.ItemPartitions(ctx, i)
+	parts, _ := q.ItemPartitions(ctx, i, false)
 	accountConcurrencyKey := q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String())
 	if len(parts) > 0 && parts[0].IsSystem() {
 		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
@@ -1784,7 +1811,7 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 	// the queue item instead of just the partition passed via args.
 	//
 	// This is because a single queue item may be present in more than one queue.
-	parts, _ := q.ItemPartitions(ctx, i)
+	parts, _ := q.ItemPartitions(ctx, i, true)
 	accountConcurrencyKey := q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String())
 	if len(parts) > 0 && parts[0].IsSystem() {
 		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
@@ -1879,7 +1906,7 @@ func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 	// the queue item instead of just the partition passed via args.
 	//
 	// This is because a single queue item may be present in more than one queue.
-	parts, _ := q.ItemPartitions(ctx, i)
+	parts, _ := q.ItemPartitions(ctx, i, false)
 	accountConcurrencyKey := q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String())
 	if len(parts) > 0 && parts[0].IsSystem() {
 		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
@@ -2208,7 +2235,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		return nil, fmt.Errorf("unknown return type from partitionPeek: %T", peekRet)
 	}
 
-	var encoded, missingPartitions []any
+	var potentiallyMissingPartitions, allPartitionIds []any
 	var totalItemCount int64 // number of items stored in partition ZSET
 	if len(returnedSet) == 3 {
 		totalItemCount, ok = returnedSet[0].(int64)
@@ -2216,17 +2243,38 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 			return nil, fmt.Errorf("unexpected first item in set returned from partitionPeek: %T", peekRet)
 		}
 
-		encoded, ok = returnedSet[1].([]any)
+		potentiallyMissingPartitions, ok = returnedSet[1].([]any)
 		if !ok {
 			return nil, fmt.Errorf("unexpected second item in set returned from partitionPeek: %T", peekRet)
 		}
 
-		missingPartitions, ok = returnedSet[2].([]any)
+		allPartitionIds, ok = returnedSet[2].([]any)
 		if !ok {
 			return nil, fmt.Errorf("unexpected third item in set returned from partitionPeek: %T", peekRet)
 		}
 	} else if len(returnedSet) != 0 {
 		return nil, fmt.Errorf("expected zero or three items in set returned by partitionPeek: %v", returnedSet)
+	}
+
+	encoded := make([]any, 0)
+	missingPartitions := make([]string, 0)
+	if len(potentiallyMissingPartitions) > 0 {
+		for idx, partitionId := range allPartitionIds {
+			if potentiallyMissingPartitions[idx] == nil {
+				if partitionId == nil {
+					return nil, fmt.Errorf("encountered nil partition key in pointer queue %q", partitionKey)
+				}
+
+				str, ok := partitionId.(string)
+				if !ok {
+					return nil, fmt.Errorf("encountered non-string partition key in pointer queue %q", partitionKey)
+				}
+
+				missingPartitions = append(missingPartitions, str)
+			} else {
+				encoded = append(encoded, potentiallyMissingPartitions[idx])
+			}
+		}
 	}
 
 	weights := []float64{}
@@ -2279,18 +2327,10 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		}
 
 		eg := errgroup.Group{}
-		for _, partition := range missingPartitions {
-			if partition == nil {
-				return nil, fmt.Errorf("encountered nil partition key in pointer queue %q", partitionKey)
-			}
-
-			str, ok := partition.(string)
-			if !ok {
-				return nil, fmt.Errorf("encountered non-string partition key in pointer queue %q", partitionKey)
-			}
-
+		for _, partitionId := range missingPartitions {
+			id := partitionId
 			eg.Go(func() error {
-				return q.cleanupNilPartitionInAccount(ctx, *accountId, str)
+				return q.cleanupNilPartitionInAccount(ctx, *accountId, id)
 			})
 		}
 
@@ -2368,6 +2408,9 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		// If we have an allowlist, only accept this partition if its in the allowlist.
 		if len(q.allowQueues) > 0 && !checkList(item.Queue(), q.allowQueueMap, q.allowQueuePrefixes) {
 			// This is not in the allowlist specified, so do not allow this partition to be used.
+			if q.name == "pause-queue" {
+				q.logger.Debug().Interface("queue", item.Queue()).Msg("skipping queue via allowlist")
+			}
 			ignored++
 			continue
 		}

@@ -71,11 +71,15 @@ local items = redis.call("ZRANGE", keyPartitionZset, "-inf", "+inf", "BYSCORE", 
 if #items > 0 and forceAt ~= 1 then
     local encoded = redis.call("HMGET", queueKey, unpack(items))
     for k, v in pairs(encoded) do
-        local item = cjson.decode(v)
-        if (item.leaseID == nil or item.leaseID == cjson.null) and math.floor(item.at / 1000) < atS then
-            atS = math.floor(item.at / 1000)
-            break
-        end
+				-- when an old executor processes a default partition, it does not
+				-- remove pointers from key queues. we need to skip nil items in here
+				if v ~= nil and v ~= false then
+					local item = cjson.decode(v)
+					if (item.leaseID == nil or item.leaseID == cjson.null) and math.floor(item.at / 1000) < atS then
+							atS = math.floor(item.at / 1000)
+							break
+					end
+				end
     end
 end
 
