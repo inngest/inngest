@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"runtime/debug"
 	"sync"
@@ -520,8 +521,7 @@ func (q *queue) scan(ctx context.Context) error {
 		// Note: This is not optimal as some accounts may have fewer partitions than others and
 		// we're leaving capacity on the table. We'll need to find a better way to determine the
 		// optimal peek size in this case.
-		// accountPartitionPeekMax := int64(math.Round(float64(PartitionPeekMax / int64(len(peekedAccounts)))))
-		accountPartitionPeekMax := int64(10)
+		accountPartitionPeekMax := int64(math.Round(float64(PartitionPeekMax / int64(len(peekedAccounts)))))
 
 		// Scan and process account partitions in parallel
 		wg := sync.WaitGroup{}
