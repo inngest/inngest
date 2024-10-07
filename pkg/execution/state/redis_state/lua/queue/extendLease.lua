@@ -57,7 +57,7 @@ local function handleExtendLease(keyConcurrency)
 
 	-- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
 	-- so that expired leases can be re-processed.  We want to take the earliest time from the
-	-- concurrenqy queue such that we get a previously lost job if possible.
+	-- concurrency queue such that we get a previously lost job if possible.
 
 	local inProgressScores = redis.call("ZRANGE", keyConcurrency, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
 	if inProgressScores ~= false then

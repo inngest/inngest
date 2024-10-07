@@ -2,12 +2,6 @@
 -- score.  This score should almost always be the value from `get_fn_partition_score`.
 -- It's a separate function as > 1 pointer queue may be updated at a time.
 local function update_pointer_score_to(fnID, pointerQueueKey, updateTo)
-    -- if fnID contains 
-    if fnID:sub(1,1) == "{" then
-        return
-    end
-
-
     -- Only update if set.
     if updateTo > 0 then
         redis.call("ZADD", pointerQueueKey, updateTo, fnID)

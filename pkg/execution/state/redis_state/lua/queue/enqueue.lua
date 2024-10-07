@@ -31,9 +31,12 @@ local partitionItemC      		= ARGV[9]
 local partitionIdA        		= ARGV[10]
 local partitionIdB        		= ARGV[11]
 local partitionIdC        		= ARGV[12]
-local accountId           		= ARGV[13]
-local guaranteedCapacity      = ARGV[14]
-local guaranteedCapacityKey   = ARGV[15]
+local partitionTypeA        	= tonumber(ARGV[13])
+local partitionTypeB        	= tonumber(ARGV[14])
+local partitionTypeC        	= tonumber(ARGV[15])
+local accountId           		= ARGV[16]
+local guaranteedCapacity      = ARGV[17]
+local guaranteedCapacityKey   = ARGV[18]
 
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
@@ -53,9 +56,9 @@ if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 then
     return 1
 end
 
-enqueue_to_partition(keyPartitionA, partitionIdA, partitionItemA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
-enqueue_to_partition(keyPartitionB, partitionIdB, partitionItemB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
-enqueue_to_partition(keyPartitionC, partitionIdC, partitionItemC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
+enqueue_to_partition(keyPartitionA, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
+enqueue_to_partition(keyPartitionB, partitionIdB, partitionItemB, partitionTypeB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
+enqueue_to_partition(keyPartitionC, partitionIdC, partitionItemC, partitionTypeC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
 
 if exists_without_ending(keyFnMetadata, ":fnMeta:-") == true then
 	-- note to future devs: if updating metadata, be sure you do not change the "off"

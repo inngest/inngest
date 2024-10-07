@@ -33,6 +33,9 @@ local partitionIdA   = ARGV[4]
 local partitionIdB   = ARGV[5]
 local partitionIdC   = ARGV[6]
 local accountId      = ARGV[7]
+local partitionTypeA = tonumber(ARGV[8])
+local partitionTypeB = tonumber(ARGV[9])
+local partitionTypeC = tonumber(ARGV[10])
 
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
@@ -61,12 +64,12 @@ end
 -- This removes the current queue item from the concurrency/in-progress queue,
 -- ensures the concurrency index/scavenger queue is updated to the next earliest in-progress item,
 -- and updates the global and account partition pointers to the next earliest item score
-local function handleDequeueConcurrency(keyConcurrency, keyPartitionSet, partitionID)
+local function handleDequeueConcurrency(keyConcurrency, keyPartitionSet, partitionID, partitionType)
 	redis.call("ZREM", keyConcurrency, item.id) -- remove from concurrency/in-progress queue
 
 	-- Backwards compatibility: For default partitions, use the partition ID (function ID) as the pointer
 	local pointerMember = keyConcurrency
-	if exists_without_ending(keyConcurrency, ":concurrency:p:" .. partitionID) == false then
+	if partitionType == 0 then
 		pointerMember = partitionID
 	end
 
@@ -87,6 +90,11 @@ local function handleDequeueConcurrency(keyConcurrency, keyPartitionSet, partiti
 			-- Ensure that we update the score with the earliest lease
 			redis.call("ZADD", concurrencyPointer, earliestLease, pointerMember)
 		end
+	end
+
+	if partitionType ~= 0 then
+		-- If this is not a default partition, we don't need to update the global or account pointer.
+		return
 	end
 
 	-- For each partition, we now have an extra available capacity.  Check the partition's
@@ -118,9 +126,9 @@ local function handleDequeueConcurrency(keyConcurrency, keyPartitionSet, partiti
 	end
 end
 
-handleDequeueConcurrency(keyConcurrencyA, keyPartitionA, partitionIdA)
-handleDequeueConcurrency(keyConcurrencyB, keyPartitionB, partitionIdB)
-handleDequeueConcurrency(keyConcurrencyC, keyPartitionC, partitionIdC)
+handleDequeueConcurrency(keyConcurrencyA, keyPartitionA, partitionIdA, partitionTypeA)
+handleDequeueConcurrency(keyConcurrencyB, keyPartitionB, partitionIdB, partitionTypeB)
+handleDequeueConcurrency(keyConcurrencyC, keyPartitionC, partitionIdC, partitionTypeC)
 
 -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
 -- and Lease for respective ZADD calls.

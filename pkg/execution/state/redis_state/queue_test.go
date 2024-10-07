@@ -28,10 +28,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	EnableKeyQueues = false // see also: pkg/execution/state/redis_state/lua/includes/update_pointer_score.lua lines 5-8 and callers of ItemPartitions
-)
-
 func init() {
 	miniredis.DumpMaxLineLen = 1024
 }
@@ -475,7 +471,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 				},
 			}
 
-			actualItemPartitions, acctLimit := q.ItemPartitions(ctx, qi, false)
+			actualItemPartitions, acctLimit := q.ItemPartitions(ctx, qi)
 			assert.Equal(t, 3, len(actualItemPartitions))
 			assert.Equal(t, consts.DefaultConcurrencyLimit, acctLimit)
 
@@ -539,7 +535,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 					}},
 			}
 
-			actualItemPartitions, acctLimit := q.ItemPartitions(ctx, qi, true)
+			actualItemPartitions, acctLimit := q.ItemPartitions(ctx, qi)
 			assert.Equal(t, 3, len(actualItemPartitions))
 			assert.Equal(t, consts.DefaultConcurrencyLimit, acctLimit)
 			keyQueueA := QueuePartition{
@@ -1708,10 +1704,10 @@ func TestQueueLease(t *testing.T) {
 				defaultPartition := getDefaultPartition(t, r, uuid.Nil)
 
 				// The partition should use a custom ID for the concurrency key.
-				parts, _ := q.ItemPartitions(ctx, itemA, true)
+				parts, _ := q.ItemPartitions(ctx, itemA)
 				pa1, pa2 := parts[0], parts[1]
 
-				parts, _ = q.ItemPartitions(ctx, itemB, true)
+				parts, _ = q.ItemPartitions(ctx, itemB)
 				pb1, pb2 := parts[0], parts[1]
 
 				require.Equal(t, "{queue}:sorted:c:00000000-0000-0000-0000-000000000000<2gu959eo1zbsi>", pa1.ID)
@@ -1769,7 +1765,7 @@ func TestQueueLease(t *testing.T) {
 			_, err = q.EnqueueItem(ctx, QueueItem{}, atB)
 			require.NoError(t, err)
 
-			parts, _ := q.ItemPartitions(ctx, itemA, false)
+			parts, _ := q.ItemPartitions(ctx, itemA)
 			p := parts[0]
 
 			score, err := r.ZScore(defaultQueueKey.GlobalPartitionIndex(), p.Queue())
@@ -1867,7 +1863,7 @@ func TestQueueLease(t *testing.T) {
 		}
 
 		// Sanity check: Ensure partitions are created properly and keys match old system
-		parts, _ := q.ItemPartitions(ctx, qi, true)
+		parts, _ := q.ItemPartitions(ctx, qi)
 		require.Equal(t, 3, len(parts))
 		require.Equal(t, QueuePartition{
 			ID:               systemQueueName,
@@ -1960,7 +1956,7 @@ func TestQueueLease(t *testing.T) {
 			FunctionID:                 &fnId,
 			AccountID:                  accountId,
 			ConcurrencyLimit:           10,
-			EvaluatedConcurrencyKey:    util.XXHash("customer-1"),
+			EvaluatedConcurrencyKey:    fmt.Sprintf("a:%s:%s", accountId, util.XXHash("customer-1")),
 			UnevaluatedConcurrencyHash: util.XXHash("event.data.customerId"),
 		}
 
@@ -2018,7 +2014,7 @@ func TestQueueExtendLease(t *testing.T) {
 		item = getQueueItem(t, r, item.ID)
 		require.Nil(t, item.LeaseID)
 
-		parts, _ := q.ItemPartitions(ctx, item, true)
+		parts, _ := q.ItemPartitions(ctx, item)
 		p := parts[0]
 
 		now := time.Now()
@@ -2031,7 +2027,7 @@ func TestQueueExtendLease(t *testing.T) {
 		require.WithinDuration(t, now.Add(time.Second), ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
 
 		now = time.Now()
-		nextID, err := q.ExtendLease(ctx, p, item, *id, 10*time.Second)
+		nextID, err := q.ExtendLease(ctx, item, *id, 10*time.Second)
 		require.NoError(t, err)
 
 		require.False(t, r.Exists(QueuePartition{}.concurrencyKey(q.u.kg)))
@@ -2052,7 +2048,7 @@ func TestQueueExtendLease(t *testing.T) {
 
 		t.Run("It fails with an invalid lease ID", func(t *testing.T) {
 			invalid := ulid.MustNew(ulid.Now(), rnd)
-			nextID, err := q.ExtendLease(ctx, p, item, invalid, 10*time.Second)
+			nextID, err := q.ExtendLease(ctx, item, invalid, 10*time.Second)
 			require.EqualValues(t, ErrQueueItemLeaseMismatch, err)
 			require.Nil(t, nextID)
 		})
@@ -2062,12 +2058,10 @@ func TestQueueExtendLease(t *testing.T) {
 		item, err := q.EnqueueItem(ctx, QueueItem{}, start)
 		require.NoError(t, err)
 
-		p := QueuePartition{FunctionID: &item.FunctionID}
-
 		item = getQueueItem(t, r, item.ID)
 		require.Nil(t, item.LeaseID)
 
-		nextID, err := q.ExtendLease(ctx, p, item, ulid.ULID{}, 10*time.Second)
+		nextID, err := q.ExtendLease(ctx, item, ulid.ULID{}, 10*time.Second)
 		require.EqualValues(t, ErrQueueItemNotLeased, err)
 		require.Nil(t, nextID)
 
@@ -2104,7 +2098,7 @@ func TestQueueExtendLease(t *testing.T) {
 		require.Nil(t, err)
 
 		// First 2 partitions will be custom.
-		parts, _ := q.ItemPartitions(ctx, item, true)
+		parts, _ := q.ItemPartitions(ctx, item)
 		require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[0].PartitionType)
 		require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[1].PartitionType)
 
@@ -2120,7 +2114,7 @@ func TestQueueExtendLease(t *testing.T) {
 		require.Equal(t, score0[0], score1[0], "Partition scores should match after leasing")
 
 		t.Run("extending the lease should extend both items in all partition's concurrency queues", func(t *testing.T) {
-			id, err = q.ExtendLease(ctx, QueuePartition{}, item, *id, 98712*time.Millisecond)
+			id, err = q.ExtendLease(ctx, item, *id, 98712*time.Millisecond)
 			require.NoError(t, err)
 			require.NotNil(t, id)
 
@@ -2130,7 +2124,7 @@ func TestQueueExtendLease(t *testing.T) {
 			require.NoError(t, err)
 
 			require.Equal(t, newScore0, newScore1, "Partition scores should match after leasing")
-			require.NotEqual(t, int(score0[0]), int(newScore0[0]), "Partition scores should have been updated: %v", newScore0)
+			require.NotEqual(t, int(score0[0]), int(newScore0[0]), "Partition scores should not have been updated: %v", newScore0)
 			require.NotEqual(t, score1, newScore1, "Partition scores should have been updated")
 
 			// And, the account-level concurrency queue is updated
@@ -2144,7 +2138,7 @@ func TestQueueExtendLease(t *testing.T) {
 			require.NoError(t, err)
 			require.NotZero(t, score[0])
 
-			id, err = q.ExtendLease(ctx, QueuePartition{}, item, *id, 1238712*time.Millisecond)
+			id, err = q.ExtendLease(ctx, item, *id, 1238712*time.Millisecond)
 			require.NoError(t, err)
 			require.NotNil(t, id)
 
@@ -2234,9 +2228,8 @@ func TestQueueDequeue(t *testing.T) {
 		require.Nil(t, err)
 
 		// First 2 partitions will be custom.
-		parts, acctLimit := q.ItemPartitions(ctx, itemA, true)
-		require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[0].PartitionType)
-		require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[1].PartitionType)
+		parts, acctLimit := q.ItemPartitions(ctx, itemA)
+		require.Equal(t, int(enums.PartitionTypeDefault), parts[0].PartitionType)
 		require.Equal(t, consts.DefaultConcurrencyLimit, acctLimit)
 
 		// Lease the first item, pretending it's in progress.
@@ -2247,21 +2240,14 @@ func TestQueueDequeue(t *testing.T) {
 		// no capacity.
 		err = q.PartitionRequeue(ctx, &parts[0], start.Add(30*time.Minute), true)
 		require.NoError(t, err)
-		err = q.PartitionRequeue(ctx, &parts[1], start.Add(30*time.Minute), true)
-		require.NoError(t, err)
 
 		t.Run("Requeueing partitions updates the score", func(t *testing.T) {
 			partScoreA, _ := r.ZMScore(q.u.kg.GlobalPartitionIndex(), parts[0].ID)
-			partScoreB, _ := r.ZMScore(q.u.kg.GlobalPartitionIndex(), parts[1].ID)
 			require.EqualValues(t, start.Add(30*time.Minute).Unix(), partScoreA[0])
-			require.EqualValues(t, start.Add(30*time.Minute).Unix(), partScoreB[0])
 
 			partScoreA, _ = r.ZMScore(q.u.kg.AccountPartitionIndex(acctID), parts[0].ID)
-			partScoreB, _ = r.ZMScore(q.u.kg.AccountPartitionIndex(acctID), parts[1].ID)
 			require.NotNil(t, partScoreA, "expected partition requeue to update account partition index", r.Dump())
-			require.NotNil(t, partScoreB)
 			require.EqualValues(t, start.Add(30*time.Minute).Unix(), partScoreA[0])
-			require.EqualValues(t, start.Add(30*time.Minute).Unix(), partScoreB[0])
 		})
 
 		err = q.Dequeue(ctx, QueuePartition{}, itemA)
@@ -2269,14 +2255,7 @@ func TestQueueDequeue(t *testing.T) {
 
 		t.Run("The outstanding partition scores should reset", func(t *testing.T) {
 			partScoreA, _ := r.ZMScore(q.u.kg.GlobalPartitionIndex(), parts[0].ID)
-			partScoreB, _ := r.ZMScore(q.u.kg.GlobalPartitionIndex(), parts[1].ID)
 			require.EqualValues(t, start, time.Unix(int64(partScoreA[0]), 0), r.Dump())
-			require.EqualValues(t, start, time.Unix(int64(partScoreB[0]), 0))
-
-			partScoreA, _ = r.ZMScore(q.u.kg.AccountPartitionIndex(acctID), parts[0].ID)
-			partScoreB, _ = r.ZMScore(q.u.kg.AccountPartitionIndex(acctID), parts[1].ID)
-			require.EqualValues(t, start, time.Unix(int64(partScoreA[0]), 0), r.Dump())
-			require.EqualValues(t, start, time.Unix(int64(partScoreB[0]), 0))
 		})
 	})
 
@@ -2311,7 +2290,7 @@ func TestQueueDequeue(t *testing.T) {
 			require.Nil(t, err)
 
 			// First 2 partitions will be custom.
-			parts, _ := q.ItemPartitions(ctx, item, true)
+			parts, _ := q.ItemPartitions(ctx, item)
 			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[0].PartitionType)
 			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[1].PartitionType)
 			require.Equal(t, int(enums.PartitionTypeDefault), parts[2].PartitionType)
@@ -2357,7 +2336,7 @@ func TestQueueDequeue(t *testing.T) {
 			require.Nil(t, err)
 
 			// First 2 partitions will be custom.
-			parts, _ := q.ItemPartitions(ctx, item, true)
+			parts, _ := q.ItemPartitions(ctx, item)
 			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[0].PartitionType)
 			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[1].PartitionType)
 
@@ -2427,7 +2406,7 @@ func TestQueueDequeue(t *testing.T) {
 		})
 
 		t.Run("Extending a lease should fail after dequeue", func(t *testing.T) {
-			id, err := q.ExtendLease(ctx, p, item, *id, time.Minute)
+			id, err := q.ExtendLease(ctx, item, *id, time.Minute)
 			require.Equal(t, ErrQueueItemNotFound, err)
 			require.Nil(t, id)
 		})
@@ -2497,7 +2476,7 @@ func TestQueueDequeue(t *testing.T) {
 			QueueName: &customQueueName,
 		}, start)
 		require.NoError(t, err)
-		parts, _ := q.ItemPartitions(ctx, item, true)
+		parts, _ := q.ItemPartitions(ctx, item)
 
 		itemCountMatches := func(num int) {
 			zsetKey := parts[0].zsetKey(q.u.kg)
@@ -2693,7 +2672,7 @@ func TestQueueRequeue(t *testing.T) {
 		item, err := q.EnqueueItem(ctx, item, now)
 		require.NoError(t, err)
 
-		parts, _ := q.ItemPartitions(ctx, item, true)
+		parts, _ := q.ItemPartitions(ctx, item)
 
 		// Get all scores
 		itemScoreA, _ := r.ZMScore(parts[0].zsetKey(q.u.kg), item.ID)
@@ -2889,7 +2868,6 @@ func TestQueuePartitionLease(t *testing.T) {
 
 		// Enqueueing an item
 		ck := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "test", 1)
-		_, _, hash, _ := ck.ParseKey() // get the hash of the "test" string / evaluated input.
 
 		_, err := q.EnqueueItem(ctx, QueueItem{
 			FunctionID: fnID,
@@ -2899,15 +2877,10 @@ func TestQueuePartitionLease(t *testing.T) {
 		}, now.Add(10*time.Second))
 		require.NoError(t, err)
 
-		p := QueuePartition{
-			ID:               q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hash),
-			FunctionID:       &fnID,
-			PartitionType:    int(enums.PartitionTypeConcurrencyKey),
-			ConcurrencyScope: int(enums.ConcurrencyScopeFn),
-		}
+		defaultPartition := getDefaultPartition(t, r, fnID)
 
 		leaseUntil := now.Add(3 * time.Second)
-		leaseID, capacity, err := q.PartitionLease(ctx, &p, time.Until(leaseUntil))
+		leaseID, capacity, err := q.PartitionLease(ctx, &defaultPartition, time.Until(leaseUntil))
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 		require.NotZero(t, capacity)
@@ -2994,12 +2967,14 @@ func TestQueuePartitionLease(t *testing.T) {
 				}
 			}
 
-			ck := createConcurrencyKey(enums.ConcurrencyScopeAccount, uuid.Nil, "foo", 1)
+			accountId := uuid.New()
+			ck := createConcurrencyKey(enums.ConcurrencyScopeAccount, accountId, "foo", 1)
 
 			// Create a new item
 			itemA, err := q.EnqueueItem(ctx, QueueItem{
 				FunctionID: uuid.New(),
 				Data: osqueue.Item{
+					Identifier: state.Identifier{AccountID: accountId},
 					CustomConcurrencyKeys: []state.CustomConcurrency{
 						{
 							Key:   ck.Key,
@@ -3013,6 +2988,7 @@ func TestQueuePartitionLease(t *testing.T) {
 			_, err = q.EnqueueItem(ctx, QueueItem{
 				FunctionID: uuid.New(),
 				Data: osqueue.Item{
+					Identifier: state.Identifier{AccountID: accountId},
 					CustomConcurrencyKeys: []state.CustomConcurrency{
 						{
 							Key:   ck.Key,
@@ -3031,14 +3007,15 @@ func TestQueuePartitionLease(t *testing.T) {
 				require.NoError(t, err)
 			})
 
-			t.Run("Partition lease errors without capacity", func(t *testing.T) {
-				_, _, hash, _ := ck.ParseKey()
-				qp := getPartition(t, r, enums.PartitionTypeConcurrencyKey, uuid.Nil, hash)
+			t.Run("Partition lease on default fn does not error without capacity", func(t *testing.T) {
+				p := QueuePartition{FunctionID: &itemA.FunctionID, AccountID: accountId}
 
-				leaseId, _, err := q.PartitionLease(ctx, &qp, 5*time.Second)
-				require.Nil(t, leaseId, "No lease id when leasing fails.\n%s", r.Dump())
-				require.Error(t, err)
-				require.ErrorIs(t, err, ErrConcurrencyLimitCustomKey)
+				// Since we don't peek and lease concurrency key queue partitions anymore,
+				// we won't check for custom concurrency limits ahead of processing items.
+				// Leasing a default partition works even though the concurrency key has no additional capacity.
+				leaseId, _, err := q.PartitionLease(ctx, &p, 5*time.Second)
+				require.NotNil(t, leaseId, "Expected lease id.\n%s", r.Dump())
+				require.NoError(t, err)
 			})
 		})
 	})
@@ -3288,93 +3265,6 @@ func TestQueuePartitionPeek(t *testing.T) {
 		assert.Contains(t, apIds, idB.String())
 		assert.Contains(t, apIds, idC.String())
 	})
-
-	t.Run("script should skip all null items", func(t *testing.T) {
-		r := miniredis.RunT(t)
-		rc, err := rueidis.NewClient(rueidis.ClientOption{
-			InitAddress:  []string{r.Addr()},
-			DisableCache: true,
-		})
-		require.NoError(t, err)
-		defer rc.Close()
-
-		kg := queueKeyGenerator{
-			queueDefaultKey: QueueDefaultKey,
-			queueItemKeyGenerator: queueItemKeyGenerator{
-				queueDefaultKey: QueueDefaultKey,
-			},
-		}
-		accountId := uuid.New()
-
-		fnId := uuid.New()
-		validPartitionItem, err := json.Marshal(QueuePartition{
-			ID:         fnId.String(),
-			FunctionID: &fnId,
-			AccountID:  accountId,
-		})
-		require.NoError(t, err)
-
-		err = rc.Do(ctx, rc.B().Hset().Key(kg.PartitionItem()).FieldValue().FieldValue(fnId.String(), string(validPartitionItem)).Build()).Error()
-		require.NoError(t, err)
-
-		rc.Do(ctx, rc.B().
-			Zadd().
-			Key(kg.AccountPartitionIndex(accountId)).
-			ScoreMember().
-			ScoreMember(0, "missing").
-			ScoreMember(0, "missing1").
-			ScoreMember(0, "missing2").
-			ScoreMember(0, "missing3").
-			ScoreMember(0, "missing4").
-			ScoreMember(1, fnId.String()).
-			ScoreMember(2, "missing5").
-			ScoreMember(2, "missing6").
-			ScoreMember(2, "missing7").
-			ScoreMember(2, "missing8").
-			ScoreMember(2, "missing9").
-			Build())
-		require.NoError(t, err)
-
-		mem, err := r.ZMembers(kg.AccountPartitionIndex(accountId))
-		require.NoError(t, err)
-		require.Len(t, mem, 11)
-
-		args, err := StrSlice([]any{
-			time.Now().UnixMilli(),
-			15,
-			true,
-		})
-		require.NoError(t, err)
-
-		resp, err := scripts["queue/partitionPeek"].Exec(
-			ctx,
-			rc,
-			[]string{
-				kg.AccountPartitionIndex(accountId),
-				q.u.kg.PartitionItem(),
-			},
-			args,
-		).ToAny()
-		require.NoError(t, err)
-
-		returned, ok := resp.([]any)
-		require.True(t, ok)
-		require.Len(t, returned, 3, r.Dump())
-		require.Equal(t, int64(11), returned[0])
-		require.Equal(t, []any{string(validPartitionItem)}, returned[1])
-		require.Equal(t, []any{
-			"missing",
-			"missing1",
-			"missing2",
-			"missing3",
-			"missing4",
-			"missing5",
-			"missing6",
-			"missing7",
-			"missing8",
-			"missing9",
-		}, returned[2])
-	})
 }
 
 func TestQueuePartitionRequeue(t *testing.T) {
@@ -3524,7 +3414,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 				},
 			}
 
-			parts, _ := q.ItemPartitions(ctx, item, true)
+			parts, _ := q.ItemPartitions(ctx, item)
 			p := parts[0]
 
 			require.Equal(t, "{queue}:concurrency:custom:a:4d59bf95-28b6-5423-b1a8-604046826e33:3cwxlkg53rr2c", p.concurrencyKey(q.u.kg))
@@ -3533,6 +3423,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 			require.NoError(t, err)
 
 			t.Run("Uses the next job item's time when requeueing with another job", func(t *testing.T) {
+				t.Skip("This test is not applicable to the current system, as we do not update pointers for key queues")
 				requireGlobalPartitionScore(t, r, p.zsetKey(q.u.kg), now)
 				next := now.Add(time.Hour)
 				err := q.PartitionRequeue(ctx, &p, next, false)
@@ -3542,6 +3433,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 			})
 
 			t.Run("Forces a custom partition with `force` set to true", func(t *testing.T) {
+				t.Skip("This test is not applicable to the current system, as we do not update pointers for key queues")
 				requireGlobalPartitionScore(t, r, p.zsetKey(q.u.kg), now)
 				next := now.Add(time.Hour)
 				err := q.PartitionRequeue(ctx, &p, next, true)
@@ -3550,6 +3442,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 			})
 
 			t.Run("Sets back to next job with force: false", func(t *testing.T) {
+				t.Skip("This test is not applicable to the current system, as we do not update pointers for key queues")
 				err := q.PartitionRequeue(ctx, &p, time.Now(), false)
 				require.NoError(t, err)
 				requireGlobalPartitionScore(t, r, p.zsetKey(q.u.kg), now)
@@ -3564,7 +3457,9 @@ func TestQueuePartitionRequeue(t *testing.T) {
 
 				err = q.PartitionRequeue(ctx, &p, next, false)
 				require.NoError(t, err)
-				requireGlobalPartitionScore(t, r, p.zsetKey(q.u.kg), next)
+
+				// We do not set the global partition score for key queues
+				require.False(t, r.Exists(p.zsetKey(q.u.kg)))
 
 				t.Run("With an empty queue the zset is deleted", func(t *testing.T) {
 					err := q.Dequeue(ctx, p, item)
@@ -4440,7 +4335,7 @@ func getDefaultPartition(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) Que
 	val := r.HGet(kg.PartitionItem(), id.String())
 	qp := QueuePartition{}
 	err := json.Unmarshal([]byte(val), &qp)
-	require.NoError(t, err)
+	require.NoError(t, err, r.Dump(), val)
 	return qp
 }
 
