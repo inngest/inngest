@@ -1004,7 +1004,7 @@ func (q *queue) peekSize(_ context.Context, _ *QueuePartition) int64 {
 	}
 
 	// Take a random amount between our range.
-	size := int64(rand.Intn(int(q.peekMax-q.peekMin))) + q.peekMin
+	size := int64(rand.Intn(int(pmax-pmin))) + q.peekMin
 	// Limit to capacity
 	cap := q.capacity()
 	if size > cap {
