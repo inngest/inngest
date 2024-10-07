@@ -179,7 +179,7 @@ export default function CodeSearch({
   });
 
   useEffect(() => {
-    if (!monaco) {
+    if (!monaco || monacoRef.current) {
       return;
     }
     monacoRef.current = monaco;
@@ -230,7 +230,7 @@ export default function CodeSearch({
       colors: dark ? createColors(true) : createColors(false),
     });
 
-    monaco.languages.registerCompletionItemProvider('cel', {
+    const disposable = monaco.languages.registerCompletionItemProvider('cel', {
       triggerCharacters: ['.', ' '],
       provideCompletionItems: (model, position) => {
         const lineContent = model.getLineContent(position.lineNumber);
@@ -301,6 +301,12 @@ export default function CodeSearch({
         return { suggestions: [] };
       },
     });
+
+    // Clean up function
+    return () => {
+      disposable.dispose();
+      monacoRef.current = undefined;
+    };
   }, [monaco, dark]);
 
   const handleEditorDidMount = (editor: MonacoEditorType) => {
