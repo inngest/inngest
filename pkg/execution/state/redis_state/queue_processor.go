@@ -1013,6 +1013,7 @@ func (q *queue) peekSize(_ context.Context, _ *QueuePartition) int64 {
 	return size
 }
 
+//nolint:golint,unused // this code remains to be enabled on demand
 func (q *queue) ewmaPeekSize(ctx context.Context, p *QueuePartition) int64 {
 	if p.FunctionID == nil {
 		return q.peekMin
