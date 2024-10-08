@@ -5,27 +5,27 @@ import { type OnboardingMenuContent, type OnboardingWidgetContent } from './type
 
 export const onboardingWidgetContent: OnboardingWidgetContent = {
   step: {
-    0: {
+    'create-app': {
       title: 'Getting started',
       description: "Let's get your system up and running on Inngest.",
       eta: 'Est. 10 mins remaining',
     },
-    1: {
+    'deploy-app': {
       title: 'Getting started',
       description: "Let's get your system up and running on Inngest.",
       eta: 'Est. 10 mins remaining',
     },
-    2: {
+    'sync-app': {
       title: 'Getting started',
       description: "Let's get your system up and running on Inngest.",
       eta: 'Est. 7 mins remaining',
     },
-    3: {
+    'invoke-fn': {
       title: 'Almost there!',
       description: "Let's get your system up and running on Inngest.",
       eta: 'Est. 3 mins remaining',
     },
-    4: {
+    success: {
       title: 'Well done!',
       description: 'You can now explore the full capabilities of Inngest.',
       cta: 'View our starter plans',
@@ -39,22 +39,22 @@ export const onboardingWidgetContent: OnboardingWidgetContent = {
 export const onboardingMenuStepContent: OnboardingMenuContent = {
   title: 'Explore onboarding guide',
   step: {
-    1: {
+    'create-app': {
       title: 'Create Inngest app',
       description: 'Start building in local development',
       icon: AppsIcon,
     },
-    2: {
+    'deploy-app': {
       title: 'Deploy Inngest app',
       description: 'Host your app on any platform or infra',
       icon: RiSendPlaneLine,
     },
-    3: {
+    'sync-app': {
       title: 'Sync app to Inngest',
       description: 'Tell Inngest where your app is running',
       icon: RiLoopRightLine,
     },
-    4: {
+    'invoke-fn': {
       title: 'Invoke your function',
       description: 'Trigger and monitor your first function',
       icon: RiMagicLine,
