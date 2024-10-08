@@ -1327,7 +1327,7 @@ func (p *processor) process(ctx context.Context, item *QueueItem) error {
 			Tags:    map[string]any{"status": "throttled"},
 		})
 		return nil
-	case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit:
+	case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit, ErrSystemConcurrencyLimit:
 		p.ctrConcurrency++
 		// Since the queue is at capacity on a fn or account level, no
 		// more jobs in this loop should be worked on - so break.
@@ -1338,6 +1338,8 @@ func (p *processor) process(ctx context.Context, item *QueueItem) error {
 		// concurrency key.
 		var status string
 		switch cause {
+		case ErrSystemConcurrencyLimit:
+			status = "system_concurrency_limit"
 		case ErrPartitionConcurrencyLimit:
 			status = "partition_concurrency_limit"
 			if p.partition.FunctionID != nil {

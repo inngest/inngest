@@ -73,7 +73,7 @@ const (
 	// NOTE: This must be greater than PartitionLookahead
 	// NOTE: This is the maximum latency introduced into concurrnecy limited partitions in the
 	//       worst case.
-	PartitionConcurrencyLimitRequeueExtension = 10 * time.Second
+	PartitionConcurrencyLimitRequeueExtension = 5 * time.Second
 	PartitionThrottleLimitRequeueExtension    = 2 * time.Second
 	PartitionLookahead                        = time.Second
 
@@ -2012,7 +2012,18 @@ func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration) (*ulid.ULID, int, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PartitionLease"), redis_telemetry.ScopeQueue)
 
-	limits := q.concurrencyLimitGetter(ctx, *p)
+	var accountLimit, functionLimit, customKeyLimit int
+	if p.IsSystem() {
+		limits := q.systemConcurrencyLimitGetter(ctx, *p)
+		accountLimit = limits.GlobalLimit
+		functionLimit = limits.PartitionLimit
+	} else {
+		limits := q.concurrencyLimitGetter(ctx, *p)
+		accountLimit = limits.AccountLimit
+		functionLimit = limits.FunctionLimit
+		customKeyLimit = limits.CustomKeyLimit
+
+	}
 
 	// XXX: Check for function throttling prior to leasing;  if it's throttled we can requeue
 	// the pointer and back off.  A question here is enqueuing new items onto the partition
@@ -2051,9 +2062,9 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		leaseID.String(),
 		now.UnixMilli(),
 		leaseExpires.Unix(),
-		limits.AccountLimit,
-		limits.FunctionLimit,
-		limits.CustomKeyLimit,
+		accountLimit,
+		functionLimit,
+		customKeyLimit,
 		now.Add(PartitionConcurrencyLimitRequeueExtension).Unix(),
 		p.AccountID.String(),
 	})
@@ -2088,7 +2099,7 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	case -6:
 		return nil, 0, ErrPartitionPaused
 	default:
-		limit := limits.FunctionLimit
+		limit := functionLimit
 		if len(result) == 2 {
 			limit = int(result[1])
 		}
