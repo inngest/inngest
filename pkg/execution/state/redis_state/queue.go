@@ -2411,6 +2411,13 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		// check pause
 		if item.FunctionID != nil {
 			if paused := fnIDs[*item.FunctionID]; paused {
+				err := q.PartitionRequeue(ctx, item, q.clock.Now().Truncate(time.Minute).Add(1), true)
+				if err != nil {
+					q.logger.Error().Interface("partition", item).Msg("failed to push back paused partition")
+				} else {
+					q.logger.Debug().Interface("partition", item.Queue()).Msg("pushed back paused partition")
+				}
+				
 				ignored++
 				continue
 			}
