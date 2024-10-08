@@ -852,7 +852,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 		leaseId, availableCapacity, err := q.PartitionLease(ctx, &qp, time.Second)
 		require.NoError(t, err)
 		require.NotNil(t, leaseId)
-		require.Equal(t, 5000, availableCapacity)
+		require.Equal(t, 1, availableCapacity)
 	})
 
 	t.Run("peeks partition successfully", func(t *testing.T) {
