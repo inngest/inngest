@@ -891,14 +891,13 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 		// Check if this step permanently failed.  If so, the function is a failure.
 		if !resp.Retryable() {
 			// TODO: Refactor state input
-			if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+			if _, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
 				l.Error().Err(err).Msg("error running finish handler")
-			} else if performedFinalization {
-				for _, e := range e.lifecycles {
-					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
-				}
-			} else {
-				l.Info().Msg("run finished but did not finalize")
+			}
+
+			// Can be reached multiple times for parallel discovery steps
+			for _, e := range e.lifecycles {
+				go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
 			}
 
 			return resp
@@ -920,14 +919,13 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 					resp.Err = &serialized
 				}
 
-				if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+				if _, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
 					l.Error().Err(err).Msg("error running finish handler")
-				} else if performedFinalization {
-					for _, e := range e.lifecycles {
-						go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
-					}
-				} else {
-					l.Info().Msg("run finished but did not finalize")
+				}
+
+				// Can be reached multiple times for parallel discovery steps
+				for _, e := range e.lifecycles {
+					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
 				}
 
 				return nil
@@ -938,14 +936,13 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 	}
 
 	// This is the function result.
-	if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+	if _, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
 		l.Error().Err(err).Msg("error running finish handler")
-	} else if performedFinalization {
-		for _, e := range e.lifecycles {
-			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
-		}
-	} else {
-		l.Info().Msg("run finished but did not finalize")
+	}
+
+	// Can be reached multiple times for parallel discovery steps
+	for _, e := range e.lifecycles {
+		go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
 	}
 
 	return nil
@@ -1645,16 +1642,13 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	}
 
 	fnCancelledErr := state.ErrFunctionCancelled.Error()
-	if performedFinalization, err := e.finalize(ctx, md, evts, f.Function.GetSlug(), state.DriverResponse{
+	if _, err := e.finalize(ctx, md, evts, f.Function.GetSlug(), state.DriverResponse{
 		Err: &fnCancelledErr,
 	}); err != nil {
 		l.Error().Err(err).Msg("error running finish handler")
-	} else if performedFinalization || r.ForceLifecycleHook {
-		for _, e := range e.lifecycles {
-			go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, evts)
-		}
-	} else {
-		l.Info().Msg("run cancelled but did not finalize")
+	}
+	for _, e := range e.lifecycles {
+		go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, evts)
 	}
 
 	return nil
