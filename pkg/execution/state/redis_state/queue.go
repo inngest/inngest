@@ -1284,7 +1284,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		q.u.kg.PartitionItem(),        // Partition item, map
 		q.u.kg.GlobalPartitionIndex(), // Global partition queue
 		q.u.kg.GlobalAccountIndex(),
-		q.u.kg.AccountPartitionIndex(i.Data.Identifier.AccountID), // new queue items always
+		q.u.kg.AccountPartitionIndex(i.Data.Identifier.AccountID), // new queue items always contain the account ID
 		q.u.kg.Idempotency(i.ID),
 		q.u.kg.FnMetadata(i.FunctionID),
 		q.u.kg.GuaranteedCapacityMap(),

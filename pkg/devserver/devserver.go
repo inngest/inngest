@@ -154,6 +154,11 @@ func start(ctx context.Context, opts StartOpts) error {
 	smv2 := redis_state.MustRunServiceV2(sm)
 
 	queueOpts := []redis_state.QueueOpt{
+		redis_state.WithRunMode(redis_state.QueueRunMode{
+			Sequential: true,
+			Scavenger:  true,
+			Partition:  true,
+		}),
 		redis_state.WithIdempotencyTTL(time.Hour),
 		redis_state.WithNumWorkers(100),
 		redis_state.WithPollTick(opts.Tick),
