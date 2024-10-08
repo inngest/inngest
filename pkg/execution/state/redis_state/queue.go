@@ -303,8 +303,6 @@ func WithKindToQueueMapping(mapping map[string]string) func(q *queue) {
 }
 
 func WithDisableFifoForFunctions(mapping map[string]struct{}) func(q *queue) {
-	// XXX: Refactor osqueue.Item and this package to resolve these interfaces
-	// and clean up this function.
 	return func(q *queue) {
 		q.disableFifoForFunctions = mapping
 	}
@@ -1403,7 +1401,7 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 		args,
 	).ToAny()
 	if err != nil {
-		return nil, fmt.Errorf("error peeking queue items (limit: %d): %w", limit, err)
+		return nil, fmt.Errorf("error peeking queue items: %w", err)
 	}
 
 	returnedSet, ok := peekRet.([]any)
