@@ -53,10 +53,10 @@ export const Chart = ({
       const chart = getInstanceByDom(chartRef.current);
       chart?.setOption(option, settings);
 
-      if (chart && group) {
-        chart.group = group;
-        connect(group);
-      }
+      // if (chart && group) {
+      //   chart.group = group;
+      //   connect(group);
+      // }
     }
   }, [option, settings]);
 
