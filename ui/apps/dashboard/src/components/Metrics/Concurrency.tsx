@@ -25,7 +25,7 @@ export const mapConcurrency = (
 
   const metrics = {
     yAxis: {
-      max: ({ max }: { max: number }) => (max > concurrencyLimit ? max : concurrencyLimit),
+      max: ({ max }: { max: number }) => (max > concurrencyLimit ? max : concurrencyLimit + 5),
     },
 
     xAxis: {
