@@ -66,7 +66,10 @@ const mapRateList = (
 export const FailedRate = ({
   workspace,
   functions,
-}: Partial<FunctionStatusMetricsQuery> & { functions: EntityLookup }) => {
+}: {
+  workspace?: FunctionStatusMetricsQuery['workspace'];
+  functions: EntityLookup;
+}) => {
   const env = useEnvironment();
   const failed = workspace && sort(filter(workspace.completedByFunction));
   const rateList = failed && mapRateList(failed, workspace.completedByFunction, functions);

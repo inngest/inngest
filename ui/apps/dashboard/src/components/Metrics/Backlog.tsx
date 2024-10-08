@@ -11,7 +11,10 @@ export type BacklogMetricsType = VolumeMetricsQuery['workspace']['backlog']['met
 export const Backlog = ({
   workspace,
   entities,
-}: Partial<VolumeMetricsQuery> & { entities: EntityLookup }) => {
+}: {
+  workspace?: VolumeMetricsQuery['workspace'];
+  entities: EntityLookup;
+}) => {
   const metrics = workspace && mapEntityLines(workspace.backlog.metrics, entities);
 
   return (
@@ -35,7 +38,11 @@ export const Backlog = ({
         </div>
       </div>
       <div className="flex h-full flex-row items-center">
-        <Chart option={metrics ? getLineChartOptions(metrics) : {}} className="h-full w-full" />
+        <Chart
+          option={metrics ? getLineChartOptions(metrics) : {}}
+          className="h-full w-full"
+          group="metricsDashboard"
+        />
       </div>
     </div>
   );

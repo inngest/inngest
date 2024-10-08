@@ -9,7 +9,10 @@ import { getLineChartOptions, mapEntityLines } from './utils';
 export const StepsThroughput = ({
   workspace,
   entities,
-}: Partial<VolumeMetricsQuery> & { entities: EntityLookup }) => {
+}: {
+  workspace?: VolumeMetricsQuery['workspace'];
+  entities: EntityLookup;
+}) => {
   const metrics = workspace && mapEntityLines(workspace.stepThroughput.metrics, entities);
 
   return (
@@ -33,7 +36,11 @@ export const StepsThroughput = ({
         </div>
       </div>
       <div className="flex h-full flex-row items-center">
-        <Chart option={metrics ? getLineChartOptions(metrics) : {}} className="h-full w-full" />
+        <Chart
+          option={metrics ? getLineChartOptions(metrics) : {}}
+          className="h-full w-full"
+          group="metricsDashboard"
+        />
       </div>
     </div>
   );

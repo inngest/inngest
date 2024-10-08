@@ -1,9 +1,6 @@
 import { NewButton } from '@inngest/components/Button';
 
-import type { VolumeMetricsQuery } from '@/gql/graphql';
 import { ChartIcon } from '@/icons/ChartIcon';
-
-export type SdkThroughputMetricsType = VolumeMetricsQuery['workspace']['sdkThroughput']['metrics'];
 
 export const Feedback = ({}) => {
   return (
