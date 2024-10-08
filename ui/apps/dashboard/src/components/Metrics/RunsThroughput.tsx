@@ -42,6 +42,7 @@ export const RunsThrougput = ({
         <Chart
           option={metrics ? getLineChartOptions(metrics) : {}}
           className="relative h-full w-full overflow-visible"
+          group="metricsDashboard"
         />
       </div>
     </div>

@@ -74,6 +74,7 @@ export const FailedFunctions = ({
         <Chart
           option={metrics ? getLineChartOptions(metrics) : {}}
           className="h-[100%] w-full md:w-[75%]"
+          group="metricsDashboard"
         />
         <FailedRate workspace={workspace} functions={functions} />
       </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import {
+  connect,
   getInstanceByDom,
   init,
   type EChartsOption,
@@ -17,6 +18,7 @@ export interface ChartProps {
   settings?: SetOptionOpts;
   theme?: 'light' | 'dark';
   className?: string;
+  group?: string;
 }
 
 export const Chart = ({
@@ -24,6 +26,7 @@ export const Chart = ({
   settings = { notMerge: true },
   theme = 'light',
   className,
+  group,
 }: ChartProps) => {
   const chartRef = useRef<HTMLDivElement>(null);
 
@@ -49,6 +52,11 @@ export const Chart = ({
     if (chartRef.current !== null) {
       const chart = getInstanceByDom(chartRef.current);
       chart?.setOption(option, settings);
+
+      if (chart && group) {
+        chart.group = group;
+        connect(group);
+      }
     }
   }, [option, settings]);
 
