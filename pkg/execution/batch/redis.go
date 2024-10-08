@@ -201,6 +201,7 @@ func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleB
 	jobID := opts.JobID()
 	maxAttempts := 20
 
+	queueName := queue.KindScheduleBatch
 	err := b.q.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		GroupID:     uuid.New().String(),
@@ -217,6 +218,7 @@ func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleB
 		Attempt:     0,
 		MaxAttempts: &maxAttempts,
 		Payload:     opts.ScheduleBatchPayload,
+		QueueName:   &queueName,
 	}, opts.At)
 	if err == redis_state.ErrQueueItemExists {
 		log.From(ctx).

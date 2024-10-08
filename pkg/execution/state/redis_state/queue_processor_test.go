@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"github.com/inngest/inngest/pkg/enums"
 	mrand "math/rand"
 	"sync/atomic"
 	"testing"
@@ -117,7 +118,7 @@ func TestQueueRunBasic(t *testing.T) {
 	idA, idB := uuid.New(), uuid.New()
 	items := []QueueItem{
 		{
-			WorkflowID: idA,
+			FunctionID: idA,
 			Data: osqueue.Item{
 				Kind:        osqueue.KindEdge,
 				MaxAttempts: max(3),
@@ -128,7 +129,7 @@ func TestQueueRunBasic(t *testing.T) {
 			},
 		},
 		{
-			WorkflowID: idB,
+			FunctionID: idB,
 			Data: osqueue.Item{
 				Kind:        osqueue.KindEdge,
 				MaxAttempts: max(1),
@@ -139,7 +140,7 @@ func TestQueueRunBasic(t *testing.T) {
 			},
 		},
 		{
-			WorkflowID: idB,
+			FunctionID: idB,
 			QueueName:  &customQueueName,
 			Data: osqueue.Item{
 				Kind:        "test-kind",
@@ -173,7 +174,7 @@ func TestQueueRunBasic(t *testing.T) {
 	}
 
 	<-time.After(12 * time.Second)
-	require.EqualValues(t, int32(len(items)), atomic.LoadInt32(&handled))
+	require.EqualValues(t, int32(len(items)), atomic.LoadInt32(&handled), "number of enqueued and received items does  not match", r.Dump())
 	cancel()
 
 	<-time.After(time.Second)
@@ -206,7 +207,7 @@ func TestQueueRunRetry(t *testing.T) {
 	idA := uuid.New()
 	items := []QueueItem{
 		{
-			WorkflowID: idA,
+			FunctionID: idA,
 			Data: osqueue.Item{
 				Kind:        osqueue.KindEdge,
 				MaxAttempts: max(3),
@@ -273,14 +274,14 @@ func TestQueueRunExtended(t *testing.T) {
 
 	// In this test, shards must be leased rapidly, as we randomly close and terminate workers
 	// after a minimum of 10 seconds.
-	ShardTickTime = 5 * time.Second
-	ShardLeaseTime = 5 * time.Second
+	GuaranteedCapacityTickTime = 5 * time.Second
+	AccountLeaseTime = 5 * time.Second
 
-	sf := func(ctx context.Context, queueName string, wsID uuid.UUID) *QueueShard {
+	sf := func(ctx context.Context, accountId uuid.UUID) *GuaranteedCapacity {
 		// For nil UUIDs, return a shard.
-		if wsID == uuid.Nil {
-			return &QueueShard{
-				Name:               "test-shard",
+		if accountId == uuid.Nil {
+			return &GuaranteedCapacity{
+				AccountID:          uuid.Nil,
 				GuaranteedCapacity: 1,
 			}
 		}
@@ -293,7 +294,7 @@ func TestQueueRunExtended(t *testing.T) {
 		// so lower the number of workers.
 		WithNumWorkers(200),
 		WithLogger(&l),
-		WithShardFinder(sf),
+		WithGuaranteedCapacityFinder(sf),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -321,7 +322,7 @@ func TestQueueRunExtended(t *testing.T) {
 					// so lower the number of workers.
 					WithNumWorkers(200),
 					WithLogger(&l),
-					WithShardFinder(sf),
+					WithGuaranteedCapacityFinder(sf),
 				)
 
 				go func() {
@@ -387,7 +388,7 @@ func TestQueueRunExtended(t *testing.T) {
 					}
 
 					item := QueueItem{
-						WorkflowID:  id,
+						FunctionID:  id,
 						WorkspaceID: id,
 					}
 
@@ -525,6 +526,470 @@ func TestRunPriorityFactor(t *testing.T) {
 	require.EqualValues(t, 2, atomic.LoadInt32(&handled))
 
 	cancel()
+	r.Close()
+	rc.Close()
+
+	// Assert queue items have been processed
+	// Assert queue items have been dequeued, and peek is nil for workflows.
+	// Assert metrics are correct.
+}
+
+func TestQueueAllowList(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	allowedQueueName := "allowed"
+	otherQueueName := "other"
+
+	q := NewQueue(
+		NewQueueClient(rc, QueueDefaultKey),
+		// We can't add more than 8128 goroutines when detecting race conditions.
+		WithNumWorkers(10),
+		WithAllowQueueNames(allowedQueueName),
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	var handledAllow, handledOther int32
+	go func() {
+		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) error {
+			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
+			if item.QueueName != nil && *item.QueueName == allowedQueueName {
+				atomic.AddInt32(&handledAllow, 1)
+			} else {
+				atomic.AddInt32(&handledOther, 1)
+			}
+			id := osqueue.JobIDFromContext(ctx)
+			require.NotEmpty(t, id, "No job ID was passed via context")
+			return nil
+		})
+	}()
+
+	items := []QueueItem{
+		{
+			QueueName: &allowedQueueName,
+			ID:        "i1",
+			Data: osqueue.Item{
+				QueueName:   &allowedQueueName,
+				Kind:        osqueue.KindPause,
+				MaxAttempts: max(3),
+			},
+		},
+		{
+			QueueName: &otherQueueName,
+			ID:        "i2",
+			Data: osqueue.Item{
+				QueueName:   &otherQueueName,
+				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(1),
+				Identifier: state.Identifier{
+					RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+				},
+			},
+		},
+		{
+			ID: "i3",
+			Data: osqueue.Item{
+				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(1),
+				Identifier: state.Identifier{
+					RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+				},
+			},
+		},
+	}
+
+	for _, item := range items {
+		at := time.Now()
+		_, err := q.EnqueueItem(ctx, item, at)
+		require.NoError(t, err)
+	}
+
+	<-time.After(5 * time.Second)
+
+	// Assert queue items have been processed
+	require.EqualValues(t, 1, atomic.LoadInt32(&handledAllow), "number of enqueued and received allowed items does not match", r.Dump())
+	require.EqualValues(t, 0, atomic.LoadInt32(&handledOther), "number of enqueued and received other items does not match", r.Dump())
+
+	cancel()
+
+	<-time.After(time.Second)
+
+	// Assert queue items have been dequeued, and peek is nil for workflows.
+	val := r.HGet(q.u.kg.QueueItem(), HashID(context.Background(), "i1"))
+	require.Equal(t, "", val)
+
+	// No more items in system partition
+	peekedItems, err := q.Peek(context.Background(), &QueuePartition{QueueName: &allowedQueueName}, time.Now(), 1)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(peekedItems))
+
+	// Still items in other and random partition
+	peekedItems, err = q.Peek(context.Background(), &QueuePartition{QueueName: &otherQueueName}, time.Now(), 1)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(peekedItems))
+
+	peekedItems, err = q.Peek(context.Background(), &QueuePartition{PartitionType: int(enums.PartitionTypeDefault), FunctionID: &uuid.Nil}, time.Now(), 1)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(peekedItems), r.Dump())
+
+	r.Close()
+	rc.Close()
+
+	// Assert metrics are correct.
+}
+
+func TestQueueDenyList(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	deniedQueueName := "denied"
+	otherQueueName := "other"
+
+	q := NewQueue(
+		NewQueueClient(rc, QueueDefaultKey),
+		// We can't add more than 8128 goroutines when detecting race conditions.
+		WithNumWorkers(10),
+		WithDenyQueueNames(deniedQueueName),
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	var handledDeny, handledOther int32
+	go func() {
+		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) error {
+			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
+			if item.QueueName != nil && *item.QueueName == deniedQueueName {
+				atomic.AddInt32(&handledDeny, 1)
+			} else {
+				atomic.AddInt32(&handledOther, 1)
+			}
+			id := osqueue.JobIDFromContext(ctx)
+			require.NotEmpty(t, id, "No job ID was passed via context")
+			return nil
+		})
+	}()
+
+	items := []QueueItem{
+		{
+			QueueName: &deniedQueueName,
+			ID:        "i1",
+			Data: osqueue.Item{
+				QueueName:   &deniedQueueName,
+				Kind:        osqueue.KindPause,
+				MaxAttempts: max(3),
+			},
+		},
+		{
+			QueueName: &otherQueueName,
+			ID:        "i2",
+			Data: osqueue.Item{
+				QueueName:   &otherQueueName,
+				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(1),
+				Identifier: state.Identifier{
+					RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+				},
+			},
+		},
+		{
+			ID: "i3",
+			Data: osqueue.Item{
+				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(1),
+				Identifier: state.Identifier{
+					RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+				},
+			},
+		},
+	}
+
+	for _, item := range items {
+		at := time.Now()
+		_, err := q.EnqueueItem(ctx, item, at)
+		require.NoError(t, err)
+	}
+
+	<-time.After(5 * time.Second)
+	require.EqualValues(t, 0, atomic.LoadInt32(&handledDeny), "number of enqueued and received denied items does not match", r.Dump())
+	require.EqualValues(t, 2, atomic.LoadInt32(&handledOther), "number of enqueued and received other items does not match", r.Dump())
+
+	cancel()
+
+	<-time.After(time.Second)
+
+	// Assert queue items have been processed
+	// Assert queue items have been dequeued, and peek is nil for workflows.
+
+	// Assert queue items have been dequeued, and peek is nil for workflows.
+	qi := getQueueItem(t, r, HashID(context.Background(), "i1"))
+	require.Equal(t, *qi.QueueName, "denied")
+
+	// No more items in system partition
+	peekedItems, err := q.Peek(context.Background(), &QueuePartition{QueueName: &deniedQueueName}, time.Now(), 1)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(peekedItems))
+
+	// Still items in other and random partition
+	peekedItems, err = q.Peek(context.Background(), &QueuePartition{QueueName: &otherQueueName}, time.Now(), 1)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(peekedItems))
+
+	peekedItems, err = q.Peek(context.Background(), &QueuePartition{PartitionType: int(enums.PartitionTypeDefault), FunctionID: &uuid.Nil}, time.Now(), 1)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(peekedItems), r.Dump())
+
+	r.Close()
+	rc.Close()
+
+	// Assert metrics are correct.
+}
+
+func TestQueueRunAccount(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	q := NewQueue(
+		NewQueueClient(rc, QueueDefaultKey),
+		// We can't add more than 8128 goroutines when detecting race conditions.
+		WithNumWorkers(10),
+		// Test custom queue names
+		WithRunMode(QueueRunMode{
+			Account: true,
+		}),
+	)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	idA, idB := uuid.New(), uuid.New()
+	accountIdA, accountIdB := uuid.New(), uuid.New()
+
+	items := []QueueItem{
+		{
+			FunctionID: idA,
+			Data: osqueue.Item{
+				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(3),
+				Identifier: state.Identifier{
+					WorkflowID: idA,
+					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+					AccountID:  accountIdA,
+				},
+			},
+		},
+		{
+			FunctionID: idB,
+			Data: osqueue.Item{
+				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(1),
+				Identifier: state.Identifier{
+					WorkflowID: idB,
+					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+					AccountID:  accountIdB,
+				},
+			},
+		},
+		{
+			FunctionID: idB,
+			Data: osqueue.Item{
+				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(1),
+				Identifier: state.Identifier{
+					WorkflowID: idB,
+					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+					AccountID:  accountIdB,
+				},
+			},
+		},
+	}
+
+	var handled int32
+	go func() {
+		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) error {
+			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
+			atomic.AddInt32(&handled, 1)
+			id := osqueue.JobIDFromContext(ctx)
+			require.NotEmpty(t, id, "No job ID was passed via context")
+			return nil
+		})
+	}()
+
+	for n, item := range items {
+		at := time.Now()
+		if n == len(items)-1 {
+			at = time.Now().Add(10 * time.Second)
+		}
+		_, err := q.EnqueueItem(ctx, item, at)
+		require.NoError(t, err)
+	}
+
+	<-time.After(12 * time.Second)
+	require.EqualValues(t, int32(len(items)), atomic.LoadInt32(&handled), "number of enqueued and received items does  not match", r.Dump())
+	cancel()
+
+	<-time.After(time.Second)
+
+	r.Close()
+	rc.Close()
+
+	// Assert queue items have been processed
+	// Assert queue items have been dequeued, and peek is nil for workflows.
+	// Assert metrics are correct.
+}
+
+func TestQueueRunGuaranteedCapacity(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	priorityAccountId, regularAccountId := uuid.New(), uuid.New()
+	priorityFn, regularFn := uuid.New(), uuid.New()
+
+	sf := func(ctx context.Context, accountId uuid.UUID) *GuaranteedCapacity {
+		if accountId == priorityAccountId {
+			return &GuaranteedCapacity{
+				Scope:              enums.GuaranteedCapacityScopeAccount,
+				AccountID:          priorityAccountId,
+				GuaranteedCapacity: 1,
+			}
+		}
+		return nil
+	}
+
+	q := NewQueue(
+		NewQueueClient(rc, QueueDefaultKey),
+		// We can't add more than 8128 goroutines when detecting race conditions.
+		WithNumWorkers(10),
+		// Test custom queue names
+		WithRunMode(QueueRunMode{
+			Account:            true,
+			GuaranteedCapacity: true,
+		}),
+		WithGuaranteedCapacityFinder(sf),
+	)
+	q.guaranteedCapacityScanTickTime = time.Second
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	var handledPrio, handledRegular int32
+	go func() {
+		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) error {
+			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
+			if item.Identifier.AccountID == priorityAccountId {
+				atomic.AddInt32(&handledPrio, 1)
+			} else if item.Identifier.AccountID == regularAccountId {
+				atomic.AddInt32(&handledRegular, 1)
+			}
+			id := osqueue.JobIDFromContext(ctx)
+			require.NotEmpty(t, id, "No job ID was passed via context")
+			return nil
+		})
+	}()
+
+	// ensure guaranteed capacity exists
+	_, err = q.EnqueueItem(ctx, QueueItem{
+		FunctionID: priorityFn,
+		Data: osqueue.Item{
+			Kind:        osqueue.KindEdge,
+			MaxAttempts: max(3),
+			Identifier: state.Identifier{
+				WorkflowID: priorityFn,
+				RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+				AccountID:  priorityAccountId,
+			},
+		},
+	}, time.Now())
+	require.NoError(t, err)
+
+	// Wait for account to be locked
+	<-time.After(5 * time.Second)
+
+	currentLeases := q.getAccountLeases()
+	require.Equal(t, 1, len(currentLeases), "number of leased accounts does not match")
+	require.Equal(t, priorityAccountId, currentLeases[0].GuaranteedCapacity.AccountID)
+
+	items := []QueueItem{
+		{
+			FunctionID: priorityFn,
+			Data: osqueue.Item{
+				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(3),
+				Identifier: state.Identifier{
+					WorkflowID: priorityFn,
+					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+					AccountID:  priorityAccountId,
+				},
+			},
+		},
+		{
+			FunctionID: regularFn,
+			Data: osqueue.Item{
+				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(1),
+				Identifier: state.Identifier{
+					WorkflowID: regularFn,
+					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+					AccountID:  regularAccountId,
+				},
+			},
+		},
+		{
+			FunctionID: priorityFn,
+			Data: osqueue.Item{
+				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(1),
+				Identifier: state.Identifier{
+					WorkflowID: priorityFn,
+					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+					AccountID:  priorityAccountId,
+				},
+			},
+		},
+	}
+
+	for n, item := range items {
+		at := time.Now()
+		if n == len(items)-1 {
+			at = time.Now().Add(10 * time.Second)
+		}
+		_, err := q.EnqueueItem(ctx, item, at)
+		require.NoError(t, err)
+	}
+
+	<-time.After(12 * time.Second)
+	require.EqualValues(t, 3, atomic.LoadInt32(&handledPrio), "number of enqueued and received priority items does not match", r.Dump())
+	require.EqualValues(t, 0, atomic.LoadInt32(&handledRegular), "number of enqueued and received regular items does not match", r.Dump())
+
+	currentLeases = q.getAccountLeases()
+	require.Equal(t, 1, len(currentLeases), "number of leased accounts does not match")
+	require.Equal(t, priorityAccountId, currentLeases[0].GuaranteedCapacity.AccountID)
+
+	cancel()
+
+	<-time.After(time.Second)
+
 	r.Close()
 	rc.Close()
 

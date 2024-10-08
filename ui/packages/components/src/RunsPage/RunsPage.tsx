@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useMemo, useRef, type UIEventHandler } from 'react';
+import { useCallback, useMemo, useRef, useState, type UIEventHandler } from 'react';
 import dynamic from 'next/dynamic';
 import { NewButton } from '@inngest/components/Button';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
+import { Pill } from '@inngest/components/Pill';
 import { SelectGroup, type Option } from '@inngest/components/Select/Select';
 import { TableFilter } from '@inngest/components/Table';
 import { DEFAULT_TIME } from '@inngest/components/hooks/useCalculatedStartTime';
@@ -15,7 +16,7 @@ import {
   type FunctionRunStatus,
 } from '@inngest/components/types/functionRun';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
-import { RiRefreshLine } from '@remixicon/react';
+import { RiArrowRightUpLine, RiRefreshLine } from '@remixicon/react';
 import { type VisibilityState } from '@tanstack/react-table';
 import { useLocalStorage } from 'react-use';
 
@@ -36,6 +37,10 @@ import type { Run, ViewScope } from './types';
 
 // Disable SSR in Runs Table, to prevent hydration errors. It requires windows info on visibility columns
 const RunsTable = dynamic(() => import('@inngest/components/RunsPage/RunsTable'), {
+  ssr: false,
+});
+
+const CodeSearch = dynamic(() => import('@inngest/components/CodeSearch/CodeSearch'), {
   ssr: false,
 });
 
@@ -61,6 +66,9 @@ type Props = {
   functionIsPaused?: boolean;
   scope: ViewScope;
   totalCount: number | undefined;
+  temporaryAlert?: React.ReactElement;
+  onSearch?: (content: string) => void;
+  hasSearchFlag?: boolean;
 };
 
 export function RunsPage({
@@ -85,9 +93,13 @@ export function RunsPage({
   functionIsPaused,
   scope,
   totalCount,
+  temporaryAlert,
+  onSearch,
+  hasSearchFlag = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useScopedColumns(scope);
+  const [showSearch, setShowSearch] = useState(false);
 
   const displayAllColumns = useMemo(() => {
     const out: Record<string, boolean> = {};
@@ -310,6 +322,13 @@ export function RunsPage({
             <TotalCount totalCount={totalCount} />
           </div>
           <div className="flex items-center gap-2">
+            {hasSearchFlag && (
+              <NewButton
+                appearance="ghost"
+                label={showSearch ? 'Hide search' : 'Show search'}
+                onClick={() => setShowSearch((prev) => !prev)}
+              />
+            )}
             <TableFilter
               columnVisibility={columnVisibility}
               setColumnVisibility={setColumnVisibility}
@@ -318,6 +337,34 @@ export function RunsPage({
           </div>
         </div>
       </div>
+      <>
+        {onSearch && hasSearchFlag && showSearch && (
+          <>
+            <div className="bg-codeEditor flex items-center justify-between px-4 pt-4">
+              <div className="flex items-center gap-2">
+                <p className="text-subtle text-sm">Search your runs by using a CEL query</p>
+                <Pill kind="primary">Beta</Pill>
+              </div>
+              <NewButton
+                appearance="outlined"
+                label="Read the docs"
+                icon={<RiArrowRightUpLine />}
+                iconSide="right"
+                size="small"
+                // TODO: enable when docs are up
+                disabled
+              />
+            </div>
+            <CodeSearch
+              onSearch={(content) => {
+                scrollToTop();
+                onSearch(content);
+              }}
+              placeholder="event.data.userId = “1234” or output.count > 10"
+            />
+          </>
+        )}
+      </>
       <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
         <RunsTable
           data={data}
@@ -352,6 +399,7 @@ export function RunsPage({
             />
           </div>
         )}
+        {temporaryAlert}
       </div>
     </main>
   );

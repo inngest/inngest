@@ -302,7 +302,7 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 	// NOTE: This function has a deadline to complete.  If this fn doesn't complete within the deadline,
 	// eg, network issues, we must check if the debounce expired and re-attempt the entire thing, allowing
 	// us to either update or create a new debounce depending on the current time.
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	keyPtr := d.d.KeyGenerator().DebouncePointer(ctx, fn.ID, key)
@@ -348,7 +348,6 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 		actualTTL := time.Second * time.Duration(out)
 		err = d.q.RequeueByJobID(
 			ctx,
-			fn.ID.String(),
 			debounceID.String(),
 			now.Add(actualTTL).Add(buffer).Add(time.Second),
 		)

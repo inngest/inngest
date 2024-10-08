@@ -8,9 +8,11 @@ import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { useEnvironment } from '../Environments/environment-context';
 import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
 import { Backlog } from './Backlog';
-import type { EntityLookup } from './Dashboard';
+import { AccountConcurrency } from './Concurrency';
+import { CONCURRENCY_LIMIT_DEFAULT, type EntityLookup } from './Dashboard';
 import { Feedback } from './Feedback';
 import { RunsThrougput } from './RunsThroughput';
+import { SdkThroughput } from './SdkThroughput';
 import { StepsThroughput } from './StepsThroughput';
 
 export type MetricsFilters = {
@@ -21,6 +23,7 @@ export type MetricsFilters = {
   autoRefresh?: boolean;
   entities: EntityLookup;
   scope: MetricsScope;
+  concurrencyLimit?: number;
 };
 
 const GetVolumeMetrics = graphql(`
@@ -55,7 +58,7 @@ const GetVolumeMetrics = graphql(`
       }
     }
     workspace(id: $workspaceId) {
-      sdkThroughput: scopedMetrics(
+      sdkThroughputEnded: scopedMetrics(
         filter: {
           name: "sdk_req_ended_total"
           scope: $scope
@@ -77,9 +80,31 @@ const GetVolumeMetrics = graphql(`
       }
     }
     workspace(id: $workspaceId) {
-      stepThroughput: scopedMetrics(
+      sdkThroughputStarted: scopedMetrics(
         filter: {
-          name: "step_output_bytes_total"
+          name: "sdk_req_started_total"
+          scope: $scope
+          from: $from
+          functionIDs: $functionIDs
+          appIDs: $appIDs
+          until: $until
+        }
+      ) {
+        metrics {
+          id
+          tagName
+          tagValue
+          data {
+            value
+            bucket
+          }
+        }
+      }
+    }
+    workspace(id: $workspaceId) {
+      sdkThroughputScheduled: scopedMetrics(
+        filter: {
+          name: "sdk_req_scheduled_total"
           scope: $scope
           from: $from
           functionIDs: $functionIDs
@@ -143,6 +168,28 @@ const GetVolumeMetrics = graphql(`
       }
     }
     workspace(id: $workspaceId) {
+      stepRunning: scopedMetrics(
+        filter: {
+          name: "steps_running"
+          scope: $scope
+          from: $from
+          functionIDs: $functionIDs
+          appIDs: $appIDs
+          until: $until
+        }
+      ) {
+        metrics {
+          id
+          tagName
+          tagValue
+          data {
+            value
+            bucket
+          }
+        }
+      }
+    }
+    workspace(id: $workspaceId) {
       concurrency: scopedMetrics(
         filter: {
           name: "concurrency_limit_reached_total"
@@ -175,6 +222,7 @@ export const MetricsVolume = ({
   autoRefresh = false,
   entities,
   scope,
+  concurrencyLimit = CONCURRENCY_LIMIT_DEFAULT,
 }: MetricsFilters) => {
   const [volumeOpen, setVolumeOpen] = useState(true);
 
@@ -216,7 +264,15 @@ export const MetricsVolume = ({
             <RunsThrougput workspace={data?.workspace} entities={entities} />
             <StepsThroughput workspace={data?.workspace} entities={entities} />
             <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
+              <SdkThroughput workspace={data?.workspace} />
               <Backlog workspace={data?.workspace} entities={entities} />
+            </div>
+            <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
+              <AccountConcurrency
+                workspace={data?.workspace}
+                entities={entities}
+                concurrencyLimit={concurrencyLimit}
+              />
               <Feedback />
             </div>
             <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap"></div>

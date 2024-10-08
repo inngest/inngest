@@ -21,6 +21,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 
 import SendEventButton from '@/components/Event/SendEventButton';
 import { useCancelRun } from '@/hooks/useCancelRun';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import { useGetRun } from '@/hooks/useGetRun';
 import { useGetTraceResult } from '@/hooks/useGetTraceResult';
 import { useGetTrigger } from '@/hooks/useGetTrigger';
@@ -38,9 +39,11 @@ import { pathCreator } from '@/utils/pathCreator';
 const pollInterval = 400;
 
 export default function Page() {
+  const { featureFlags } = useFeatureFlags();
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [filterApp] = useStringArraySearchParam('filterApp');
   const [totalCount, setTotalCount] = useState<number>();
+  const [celQuery, setCelQuery] = useState<string>();
   const [filteredStatus] = useValidatedArraySearchParam('filterStatus', isFunctionRunStatus);
   const [timeField = FunctionRunTimeField.QueuedAt] = useValidatedSearchParam(
     'timeField',
@@ -61,6 +64,7 @@ export default function Page() {
         endTime: endTime,
         status: filteredStatus,
         timeField,
+        celQuery,
       });
 
       const edges = data.runs.edges.map((edge) => {
@@ -81,7 +85,7 @@ export default function Page() {
         edges,
       };
     },
-    [filterApp, filteredStatus, calculatedStartTime, timeField]
+    [filterApp, filteredStatus, calculatedStartTime, timeField, celQuery]
   );
 
   const { data, fetchNextPage, isFetching, hasNextPage } = useInfiniteQuery({
@@ -107,10 +111,11 @@ export default function Page() {
         endTime,
         status: filteredStatus,
         timeField,
+        celQuery,
       });
       setTotalCount(data.runs.totalCount);
     })();
-  }, [calculatedStartTime, endTime, filteredStatus, timeField]);
+  }, [calculatedStartTime, endTime, filteredStatus, timeField, celQuery]);
 
   const runs = useMemo(() => {
     if (!data?.pages) {
@@ -151,6 +156,8 @@ export default function Page() {
   const onScrollToTop = useCallback(() => {
     // TODO: What should this do?
   }, []);
+
+  const isSearchEnabled = featureFlags.FEATURE_CEL_SEARCH;
 
   return (
     <>
@@ -196,6 +203,8 @@ export default function Page() {
         pollInterval={pollInterval}
         scope="env"
         totalCount={totalCount}
+        hasSearchFlag={isSearchEnabled}
+        onSearch={setCelQuery}
       />
     </>
   );

@@ -83,7 +83,7 @@ export const getButtonSizeStyles = ({ size, icon, label }: ButtonSizeStyleParams
   };
 
   const sizeStyles = {
-    small: 'h-6 text-xs leading-[18px] px-3 py-1.5',
+    small: 'h-6 text-xs leading-[18px] px-2 py-1.5',
     medium: 'h-8 text-xs leading-[18px] px-3 py-1.5',
     large: 'h-10 text-xs leading-[18px] px-3 py-1.5',
   };

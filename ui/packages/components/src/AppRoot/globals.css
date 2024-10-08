@@ -15,6 +15,12 @@
   }
 }
 
+/* Override clerk's internal style for social style buttons */
+.cl-socialButtonsBlockButton {
+  border-width: 1px !important;
+  box-shadow: none !important;
+}
+
 .dark #modals {
   @apply text-sm text-slate-400;
 }

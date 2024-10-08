@@ -2,16 +2,18 @@ import { OrganizationProfile } from '@clerk/nextjs';
 
 export default async function OrganizationSettingsPage() {
   return (
-    <div className="min-h-0 flex-1">
+    <div className="flex w-full flex-col justify-start">
       <OrganizationProfile
         routing="path"
         path="/settings/organization"
         appearance={{
+          layout: {
+            logoPlacement: 'none',
+          },
           elements: {
-            rootBox: 'h-full',
             navbar: 'hidden',
-            scrollBox: 'bg-white',
-            pageScrollBox: '[scrollbar-width:none]', // hides the Clerk's scrollbar
+            scrollBox: 'bg-white shadow-none',
+            pageScrollBox: 'pt-6 px-2 w-full',
           },
         }}
       />

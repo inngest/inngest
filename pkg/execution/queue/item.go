@@ -211,6 +211,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 	i.RunInfo = temp.RunInfo
 	i.CustomConcurrencyKeys = temp.CustomConcurrencyKeys
 	i.PriorityFactor = temp.PriorityFactor
+	i.QueueName = temp.QueueName
 
 	// Save this for custom unmarshalling of other jobs.  This is overwritten
 	// for known queue kinds.

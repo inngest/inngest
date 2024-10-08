@@ -65,6 +65,15 @@ func IncrQueueScanNoCapacityCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrQueueScanCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_scan_total",
+		Description: "The total number of times we scanned the queue",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrQueuePartitionProcessedCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,

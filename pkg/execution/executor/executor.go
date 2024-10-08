@@ -715,6 +715,14 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, fmt.Errorf("cannot load metadata to execute run: %w", err)
 	}
 
+	ef, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
+	if err != nil {
+		return nil, fmt.Errorf("error loading function for run: %w", err)
+	}
+	if ef.Paused {
+		return nil, state.ErrFunctionPaused
+	}
+
 	// Find the stack index for the incoming step.
 	//
 	// stackIndex represents the stack pointer at the time this step was scheduled.
@@ -738,13 +746,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		md.Config.StartedAt = time.Now()
 	}
 
-	f, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
-	if err != nil {
-		return nil, fmt.Errorf("error loading function for run: %w", err)
-	}
-
 	// Validate that the run can execute.
-	v := newRunValidator(e, f, md, events, item) // TODO: Load events for this.
+	v := newRunValidator(e, ef.Function, md, events, item) // TODO: Load events for this.
 	if err := v.validate(ctx); err != nil {
 		return nil, err
 	}
@@ -779,19 +782,19 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	if edge.Incoming == inngest.TriggerName {
 		// We only support functions with a single step, as we've removed the DAG based approach.
 		// This means that we always execute the first step.
-		if len(f.Steps) > 1 {
+		if len(ef.Function.Steps) > 1 {
 			return nil, fmt.Errorf("DAG-based steps are no longer supported")
 		}
 
 		edge.Outgoing = inngest.TriggerName
-		edge.Incoming = f.Steps[0].ID
+		edge.Incoming = ef.Function.Steps[0].ID
 		// Update the payload
 		payload := item.Payload.(queue.PayloadEdge)
 		payload.Edge = edge
 		item.Payload = payload
 		// Add retries from the step to our queue item.  Increase as retries is
 		// always one less than attempts.
-		retries := f.Steps[0].RetryCount() + 1
+		retries := ef.Function.Steps[0].RetryCount() + 1
 		item.MaxAttempts = &retries
 
 		// Only just starting:  run lifecycles on first attempt.
@@ -815,7 +818,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	instance := runInstance{
 		md:         md,
-		f:          *f,
+		f:          *ef.Function,
 		events:     events,
 		item:       item,
 		edge:       edge,
@@ -888,14 +891,13 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 		// Check if this step permanently failed.  If so, the function is a failure.
 		if !resp.Retryable() {
 			// TODO: Refactor state input
-			if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+			if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
 				l.Error("error running finish handler", "error", err)
-			} else if performedFinalization {
-				for _, e := range e.lifecycles {
-					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
-				}
-			} else {
-				l.Info("run finished but did not finalize")
+			}
+
+			// Can be reached multiple times for parallel discovery steps
+			for _, e := range e.lifecycles {
+				go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
 			}
 
 			return resp
@@ -917,14 +919,13 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 					resp.Err = &serialized
 				}
 
-				if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
 					l.Error("error running finish handler", "error", err)
-				} else if performedFinalization {
-					for _, e := range e.lifecycles {
-						go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
-					}
-				} else {
-					l.Info("run finished but did not finalize")
+				}
+
+				// Can be reached multiple times for parallel discovery steps
+				for _, e := range e.lifecycles {
+					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
 				}
 
 				return nil
@@ -935,14 +936,13 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 	}
 
 	// This is the function result.
-	if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+	if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
 		l.Error("error running finish handler", "error", err)
-	} else if performedFinalization {
-		for _, e := range e.lifecycles {
-			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
-		}
-	} else {
-		l.Info("run finished but did not finalize")
+	}
+
+	// Can be reached multiple times for parallel discovery steps
+	for _, e := range e.lifecycles {
+		go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
 	}
 
 	return nil
@@ -982,13 +982,13 @@ func (f functionFinishedData) Map() map[string]any {
 // Returns a boolean indicating whether it performed finalization. If the run
 // had parallel steps then it may be false, since parallel steps cause the
 // function end to be reached multiple times in a single run
-func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, resp state.DriverResponse) (bool, error) {
+func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, resp state.DriverResponse) error {
 	// Parse events for the fail handler before deleting state.
 	inputEvents := make([]event.Event, len(evts))
 	for n, e := range evts {
 		evt, err := event.NewEvent(e)
 		if err != nil {
-			return false, err
+			return err
 		}
 		inputEvents[n] = *evt
 	}
@@ -998,12 +998,9 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 	}
 
 	// Delete the function state in every case.
-	performedFinalization, err := e.smv2.Delete(ctx, md.ID)
+	_, err := e.smv2.Delete(ctx, md.ID)
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("error deleting state in finalize", "error", err)
-	}
-	if err == nil && !performedFinalization {
-		return performedFinalization, nil
 	}
 
 	// We may be cancelling an in-progress run.  If that's the case, we want to delete any
@@ -1037,10 +1034,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 				continue
 			}
 
-			err := q.Dequeue(ctx, redis_state.QueuePartition{
-				WorkflowID:  md.ID.FunctionID,
-				WorkspaceID: md.ID.Tenant.EnvID,
-			}, *qi)
+			err := q.Dequeue(ctx, *qi)
 			if err != nil {
 				logger.StdlibLogger(ctx).Error("error dequeueing run job", "error", err)
 			}
@@ -1050,7 +1044,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 	// TODO: Load all pauses for the function and remove, also.
 
 	if e.finishHandler == nil {
-		return performedFinalization, nil
+		return nil
 	}
 
 	// Prepare events that we must send
@@ -1103,7 +1097,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 		}
 	}
 
-	return performedFinalization, e.finishHandler(ctx, md.ID, freshEvents)
+	return e.finishHandler(ctx, md.ID, freshEvents)
 }
 
 func correlationID(event event.Event) *string {
@@ -1205,7 +1199,7 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 
 	res, err := e.handlePausesAllNaively(ctx, iter, evt)
 	if err != nil {
-		log.From(ctx).Error().Err(err).Msg("error handling aggregate pauses")
+		log.From(ctx).Error().Err(err).Msg("error handling naive pauses")
 	}
 	return res, nil
 }
@@ -1641,16 +1635,13 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	}
 
 	fnCancelledErr := state.ErrFunctionCancelled.Error()
-	if performedFinalization, err := e.finalize(ctx, md, evts, f.GetSlug(), state.DriverResponse{
+	if err := e.finalize(ctx, md, evts, f.Function.GetSlug(), state.DriverResponse{
 		Err: &fnCancelledErr,
 	}); err != nil {
 		l.Error("error running finish handler", "error", err)
-	} else if performedFinalization || r.ForceLifecycleHook {
-		for _, e := range e.lifecycles {
-			go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, evts)
-		}
-	} else {
-		l.Info("run cancelled but did not finalize")
+	}
+	for _, e := range e.lifecycles {
+		go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, evts)
 	}
 
 	return nil
@@ -1696,7 +1687,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		if err == nil || err == state.ErrPauseNotFound {
 			return nil
 		}
-		return err
+		return fmt.Errorf("error consuming pause via timeout: %w", err)
 	}
 
 	if err = e.pm.ConsumePause(ctx, pause.ID, r.With); err != nil {
@@ -1743,17 +1734,13 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 	// And dequeue the timeout job to remove unneeded work from the queue, etc.
 	if q, ok := e.queue.(redis_state.QueueManager); ok {
 		jobID := fmt.Sprintf("%s-%s", md.IdempotencyKey(), pause.DataKey)
-		err := q.Dequeue(
-			ctx,
-			redis_state.QueuePartition{WorkflowID: md.ID.FunctionID},
-			redis_state.QueueItem{
-				ID:         redis_state.HashID(ctx, jobID),
-				WorkflowID: md.ID.FunctionID,
-				Data: queue.Item{
-					Kind: queue.KindPause,
-				},
+		err := q.Dequeue(ctx, redis_state.QueueItem{
+			ID:         redis_state.HashID(ctx, jobID),
+			FunctionID: md.ID.FunctionID,
+			Data: queue.Item{
+				Kind: queue.KindPause,
 			},
-		)
+		})
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error dequeueing consumed pause job when resuming", "error", err)
 		}

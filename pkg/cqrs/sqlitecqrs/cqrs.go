@@ -17,8 +17,10 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs/sqlc"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/history"
-	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jinzhu/copier"
 	"github.com/oklog/ulid/v2"
@@ -53,13 +55,20 @@ type wrapper struct {
 }
 
 // LoadFunction implements the state.FunctionLoader interface.
-func (w wrapper) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*inngest.Function, error) {
+func (w wrapper) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*state.ExecutorFunction, error) {
 	// XXX: This doesn't store versions, as the dev server is currently ignorant to version.s
 	fn, err := w.GetFunctionByInternalUUID(ctx, envID, fnID)
 	if err != nil {
 		return nil, err
 	}
-	return fn.InngestFunction()
+	def, err := fn.InngestFunction()
+	if err != nil {
+		return nil, err
+	}
+	return &state.ExecutorFunction{
+		Function: def,
+		Paused:   false, // dev server does not support pausing
+	}, nil
 }
 
 func (w wrapper) WithTx(ctx context.Context) (cqrs.TxManager, error) {
@@ -478,6 +487,83 @@ func (w wrapper) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([
 	}
 
 	return evts, nil
+}
+
+func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*cqrs.Event, error) {
+	expHandler, err := run.NewExpressionHandler(ctx,
+		run.WithExpressionHandlerExpressions(cel),
+	)
+	if err != nil {
+		return nil, err
+	}
+	prefilters, err := expHandler.ToSQLFilters(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	sql, args, err := sq.Dialect("sqlite3").
+		From("events").
+		Select(
+			"internal_id",
+			"account_id",
+			"workspace_id",
+			"source",
+			"source_id",
+			"received_at",
+			"event_id",
+			"event_name",
+			"event_data",
+			"event_user",
+			"event_v",
+			"event_ts",
+		).
+		Where(prefilters...).
+		Order(sq.C("received_at").Desc()).
+		ToSQL()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := w.db.QueryContext(ctx, sql, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	res := []*cqrs.Event{}
+	for rows.Next() {
+		data := sqlc.Event{}
+		if err := rows.Scan(
+			&data.InternalID,
+			&data.AccountID,
+			&data.WorkspaceID,
+			&data.Source,
+			&data.SourceID,
+			&data.ReceivedAt,
+			&data.EventID,
+			&data.EventName,
+			&data.EventData,
+			&data.EventUser,
+			&data.EventV,
+			&data.EventTs,
+		); err != nil {
+			return nil, err
+		}
+
+		evt, err := data.ToCQRS()
+		if err != nil {
+			return nil, fmt.Errorf("error deserializing event: %w", err)
+		}
+
+		ok, err := expHandler.MatchEventExpressions(ctx, evt.GetEvent())
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			res = append(res, evt)
+		}
+	}
+
+	return res, nil
 }
 
 func (w wrapper) FindEvent(ctx context.Context, workspaceID uuid.UUID, internalID ulid.ULID) (*cqrs.Event, error) {
@@ -1131,36 +1217,35 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 }
 
 func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
-	builder := newRunsQueryBuilder(ctx, opt)
-	filter := builder.filter
-	order := builder.order
-
-	sql, args, err := sq.Dialect("sqlite3").
-		From("trace_runs").
-		Select(sq.COUNT("run_id").As("total")).
-		Where(filter...).
-		Order(order...).
-		ToSQL()
+	// explicitly set it to zero so it would not attempt to paginate
+	opt.Items = 0
+	res, err := w.GetTraceRuns(ctx, opt)
 	if err != nil {
 		return 0, err
 	}
 
-	rows, err := w.db.QueryContext(ctx, sql, args...)
-	if err != nil {
-		return 0, err
-	}
-
-	var count int
-	for rows.Next() {
-		if err := rows.Scan(&count); err != nil {
-			return 0, err
-		}
-	}
-
-	return count, nil
+	return len(res), nil
 }
 
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
+	// use evtIDs as post query filter
+	evtIDs := []string{}
+	expHandler, err := run.NewExpressionHandler(ctx,
+		run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if expHandler.HasEventFilters() {
+		evts, err := w.GetEventsByExpressions(ctx, expHandler.EventExprList)
+		if err != nil {
+			return nil, err
+		}
+		for _, e := range evts {
+			evtIDs = append(evtIDs, e.ID.String())
+		}
+	}
+
 	builder := newRunsQueryBuilder(ctx, opt)
 	filter := builder.filter
 	order := builder.order
@@ -1168,6 +1253,9 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	resCursorLayout := builder.cursorLayout
 
 	// read from database
+	// TODO:
+	// change this to a continuous loop with limits instead of just attempting to grab everything.
+	// might not matter though since this is primarily meant for local development
 	sql, args, err := sq.Dialect("sqlite3").
 		From("trace_runs").
 		Select(
@@ -1187,7 +1275,6 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			"cron_schedule",
 		).
 		Where(filter...).
-		Limit(opt.Items).
 		Order(order...).
 		ToSQL()
 	if err != nil {
@@ -1200,6 +1287,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	}
 
 	res := []*cqrs.TraceRun{}
+	var count uint
 	for rows.Next() {
 		data := sqlc.TraceRun{}
 		err := rows.Scan(
@@ -1222,9 +1310,33 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			return nil, err
 		}
 
+		// filter out runs that doesn't have the event IDs
+		if len(evtIDs) > 0 && !data.HasEventIDs(evtIDs) {
+			continue
+		}
+
 		// the cursor target should be skipped
 		if reqcursor.ID == data.RunID.String() {
 			continue
+		}
+
+		if expHandler.HasOutputFilters() {
+			ok, err := expHandler.MatchOutputExpressions(ctx, data.Output)
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("error inspecting run for output match",
+					"error", err,
+					"output", string(data.Output),
+					"acctID", data.AccountID,
+					"wsID", data.WorkspaceID,
+					"appID", data.AppID,
+					"wfID", data.FunctionID,
+					"runID", data.RunID,
+				)
+				continue
+			}
+			if !ok {
+				continue
+			}
 		}
 
 		// copy layout
@@ -1278,6 +1390,11 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			CronSchedule: cron,
 			Cursor:       cursor,
 		})
+		count++
+		// enough items, don't need to proceed anymore
+		if opt.Items > 0 && count >= opt.Items {
+			break
+		}
 	}
 
 	return res, nil

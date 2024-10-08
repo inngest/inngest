@@ -1,4 +1,8 @@
-import type { ChartProps, LineSeriesOption } from '@inngest/components/Chart/Chart';
+import type {
+  ChartProps,
+  LegendComponentOption,
+  LineSeriesOption,
+} from '@inngest/components/Chart/Chart';
 import { resolveColor } from '@inngest/components/utils/colors';
 import { differenceInMilliseconds, lightFormat, toDate } from '@inngest/components/utils/date';
 import { isDark } from '@inngest/components/utils/theme';
@@ -71,7 +75,10 @@ export const convertLookup = (entities?: EntityType[]): EntityLookup | {} =>
 export const sum = (data?: MetricsData[]) =>
   data ? data.reduce((acc, { value }) => acc + value, 0) : 0;
 
-export const getLineChartOptions = (data: LineChartData): ChartProps['option'] => {
+export const getLineChartOptions = (
+  data: Partial<ChartProps['option']>,
+  legendData?: LegendComponentOption['data']
+): ChartProps['option'] => {
   return {
     tooltip: {
       trigger: 'axis',
@@ -81,7 +88,7 @@ export const getLineChartOptions = (data: LineChartData): ChartProps['option'] =
       // Attach tooltips to a dedicated dom node above interim parents
       // with low z-indexes
       appendTo: () => document.getElementById('chart-tooltip'),
-      extraCssText: 'max-height: 250px; overflow-y: scroll;',
+      extraCssText: 'max-height: 350px; overflow-y: scroll;',
       className: 'no-scrollbar',
       transitionDuration: 1.5,
     },
@@ -93,6 +100,7 @@ export const getLineChartOptions = (data: LineChartData): ChartProps['option'] =
       itemWidth: 10,
       itemHeight: 10,
       textStyle: { fontSize: '12px' },
+      data: legendData,
     },
     grid: {
       top: '10%',
@@ -121,7 +129,7 @@ export const mapEntityLines = (
 
   return {
     xAxis: {
-      type: 'category',
+      type: 'category' as const,
       boundaryGap: true,
       data: metrics[0]?.data.map(({ bucket }) => bucket) || ['No Data Found'],
       axisLabel: {
