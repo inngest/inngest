@@ -9,7 +9,7 @@ import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { EnvironmentType } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import { onboardingWidgetContent } from '../Onboarding/content';
-import { steps } from '../Onboarding/types';
+import { STEPS_ORDER } from '../Onboarding/types';
 import useOnboardingStep from '../Onboarding/useOnboardingStep';
 
 export default function OnboardingWidget({
@@ -21,8 +21,13 @@ export default function OnboardingWidget({
 }) {
   const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
   const { lastCompletedStep, isFinalStep, nextStep } = useOnboardingStep();
+  const segmentsCompleted = lastCompletedStep ? STEPS_ORDER.indexOf(lastCompletedStep) + 1 : 0;
 
-  const stepContent = onboardingWidgetContent.step[lastCompletedStep];
+  const stepContent = isFinalStep
+    ? onboardingWidgetContent.step['success']
+    : lastCompletedStep
+    ? onboardingWidgetContent.step[lastCompletedStep]
+    : onboardingWidgetContent.step[STEPS_ORDER[0]!];
 
   if (!onboardingFlow) return;
   return (
@@ -78,7 +83,10 @@ export default function OnboardingWidget({
               <p className="text-subtle text-sm">{stepContent.description}</p>
             </div>
             {!isFinalStep && (
-              <SegmentedProgressBar segmentsCompleted={lastCompletedStep} segments={steps.length} />
+              <SegmentedProgressBar
+                segmentsCompleted={segmentsCompleted}
+                segments={STEPS_ORDER.length}
+              />
             )}
             {stepContent.eta && (
               <p className="text-light text-[10px] font-medium uppercase">{stepContent.eta}</p>
