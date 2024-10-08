@@ -1,10 +1,11 @@
 'use client';
 
+import CreateApp from '@/components/Onboarding/CreateApp';
 import { OnboardingSteps } from '@/components/Onboarding/types';
 
 export default function OnboardingStep({ params: { step } }: { params: { step: string } }) {
   if (step === OnboardingSteps.CreateApp) {
-    return <p>Create component</p>;
+    return <CreateApp />;
   } else if (step === OnboardingSteps.DeployApp) {
     return <p>Deploy component</p>;
   } else if (step === OnboardingSteps.SyncApp) {
