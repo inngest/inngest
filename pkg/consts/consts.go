@@ -1,6 +1,9 @@
 package consts
 
-import "time"
+import (
+	"github.com/google/uuid"
+	"time"
+)
 
 const (
 	// DefaultRetryCount is used when no retry count for a step is specified.
@@ -118,4 +121,9 @@ const (
 	DevServerHistoryFile = "dev_history.json"
 
 	PauseExpiredDeletionGracePeriod = time.Second * 10
+)
+
+var (
+	// DevServerAccountId is the fixed account ID used internally in the dev server.
+	DevServerAccountId = uuid.MustParse("72d87f98-871b-5b9f-a9f1-e9e2ef0a8f55")
 )

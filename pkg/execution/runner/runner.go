@@ -634,6 +634,7 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 			FunctionVersion: fn.FunctionVersion,
 			EventID:         evt.GetInternalID(),
 			Event:           evt.GetEvent(),
+			AccountID:       consts.DevServerAccountId,
 		}
 
 		if err := s.executor.AppendAndScheduleBatch(ctx, fn, bi, nil); err != nil {
@@ -732,6 +733,7 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 		Function:       fn,
 		Events:         []event.TrackedEvent{tracked},
 		IdempotencyKey: &idempotencyKey,
+		AccountID:      consts.DevServerAccountId,
 	})
 
 	switch err {

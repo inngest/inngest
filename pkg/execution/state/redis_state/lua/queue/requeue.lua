@@ -38,6 +38,9 @@ local partitionIdB        = ARGV[9]
 local partitionIdC        = ARGV[10]
 local accountId           = ARGV[11]
 local legacyPartitionName = ARGV[12]
+local partitionTypeA = tonumber(ARGV[13])
+local partitionTypeB = tonumber(ARGV[14])
+local partitionTypeC = tonumber(ARGV[15])
 
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
@@ -59,12 +62,12 @@ redis.call("HSET", queueKey, queueID, queueItem)
 -- index/scavenger queue is updated to the next earliest item.
 -- This is the first half of requeueing: Removing the in-progress item, which must be followed up
 -- by enqueueing back to the partition queues
-local function handleRequeueConcurrency(keyConcurrency, partitionID)
+local function handleRequeueConcurrency(keyConcurrency, partitionID, partitionType)
 	redis.call("ZREM", keyConcurrency, item.id) -- Remove from in-progress queue
 
 	-- Backwards compatibility: For default partitions, use the partition ID (function ID) as the pointer
 	local pointerMember = keyConcurrency
-	if exists_without_ending(keyConcurrency, ":concurrency:p:" .. partitionID) == false then
+	if partitionType == 0 then
 		pointerMember = partitionID
 	end
 
@@ -92,9 +95,9 @@ end
 -- Concurrency
 --
 
-handleRequeueConcurrency(keyConcurrencyA, partitionIdA)
-handleRequeueConcurrency(keyConcurrencyB, partitionIdB)
-handleRequeueConcurrency(keyConcurrencyC, partitionIdC)
+handleRequeueConcurrency(keyConcurrencyA, partitionIdA, partitionTypeA)
+handleRequeueConcurrency(keyConcurrencyB, partitionIdB, partitionTypeB)
+handleRequeueConcurrency(keyConcurrencyC, partitionIdC, partitionTypeC)
 
 -- Remove item from the account concurrency queue
 -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
@@ -104,9 +107,9 @@ redis.call("ZREM", keyAcctConcurrency, item.id)
 --
 -- Enqueue item to partition queues again
 -- 
-requeue_to_partition(keyPartitionA, partitionIdA, partitionItemA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
-requeue_to_partition(keyPartitionB, partitionIdB, partitionItemB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
-requeue_to_partition(keyPartitionC, partitionIdC, partitionItemC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
+requeue_to_partition(keyPartitionA, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
+requeue_to_partition(keyPartitionB, partitionIdB, partitionItemB, partitionTypeB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
+requeue_to_partition(keyPartitionC, partitionIdC, partitionItemC, partitionTypeC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
 
 -- Add optional indexes.
 if keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then

@@ -90,6 +90,8 @@ if fnConcurrency > 0 and #keyFnConcurrency > 0 then
     end
 end
 
+-- NOTE: This check will not be hit until we re-enable key queues.
+-- This is only used for concurrency key queues, which are not enqueued right now.
 if customConcurrency > 0 and #keyCustomConcurrency > 0 then
     -- Check that there's capacity for this partition, based off of custom
     -- concurrency keys.

@@ -34,6 +34,9 @@ local partitionIdA        = ARGV[7]
 local partitionIdB        = ARGV[8]
 local partitionIdC        = ARGV[9]
 local accountId           = ARGV[10]
+local partitionTypeA = tonumber(ARGV[11])
+local partitionTypeB = tonumber(ARGV[12])
+local partitionTypeC = tonumber(ARGV[13])
 
 -- $include(get_queue_item.lua)
 -- $include(update_pointer_score.lua)
@@ -60,8 +63,8 @@ item.wt = jobScore
 redis.call("HSET", keyQueueHash, jobID, cjson.encode(item))
 
 -- Update and requeue all partitions
-requeue_to_partition(keyPartitionA, partitionIdA, partitionItemA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
-requeue_to_partition(keyPartitionB, partitionIdB, partitionItemB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
-requeue_to_partition(keyPartitionC, partitionIdC, partitionItemC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
+requeue_to_partition(keyPartitionA, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
+requeue_to_partition(keyPartitionB, partitionIdB, partitionItemB, partitionTypeB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
+requeue_to_partition(keyPartitionC, partitionIdC, partitionItemC, partitionTypeC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
 
 return 0

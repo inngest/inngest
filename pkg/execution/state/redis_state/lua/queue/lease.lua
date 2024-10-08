@@ -5,9 +5,9 @@ Output:
   1: Queue item not found
   2: Queue item already leased
 
-  3: First partition concurrnecy limit hit
-  4: Second partition concurrnecy limit hit
-  5: Third partition concurrnecy limit hit
+  3: First partition concurrency limit hit
+  4: Second partition concurrency limit hit
+  5: Third partition concurrency limit hit
 
   6: Account concurrency limit hit
 
@@ -15,15 +15,15 @@ Output:
 
 ]]
 
-local keyQueueMap            = KEYS[1]
-local keyPartitionA          = KEYS[2]           -- queue:sorted:$workflowID - zset
-local keyPartitionB          = KEYS[3]           -- e.g. sorted:c|t:$workflowID - zset
-local keyPartitionC          = KEYS[4]          -- e.g. sorted:c|t:$workflowID - zset
+local keyQueueMap            	= KEYS[1]
+local keyPartitionA          	= KEYS[2]           -- queue:sorted:$workflowID - zset
+local keyPartitionB          	= KEYS[3]           -- e.g. sorted:c|t:$workflowID - zset
+local keyPartitionC          	= KEYS[4]          -- e.g. sorted:c|t:$workflowID - zset
 
 -- We push our queue item ID into each concurrency queue
-local keyConcurrencyA  = KEYS[5] -- Account concurrency level
-local keyConcurrencyB  = KEYS[6] -- When leasing an item we need to place the lease into this key.
-local keyConcurrencyC  = KEYS[7] -- Optional for eg. for concurrency amongst steps
+local keyConcurrencyA  				= KEYS[5] -- Account concurrency level
+local keyConcurrencyB  				= KEYS[6] -- When leasing an item we need to place the lease into this key.
+local keyConcurrencyC  				= KEYS[7] -- Optional for eg. for concurrency amongst steps
 -- We push pointers to partition concurrency items to the partition concurrency item
 local concurrencyPointer      = KEYS[8]
 local keyGlobalPointer        = KEYS[9]
@@ -32,19 +32,19 @@ local keyAccountPartitions    = KEYS[11] -- accounts:$accountId:partition:sorted
 local throttleKey             = KEYS[12] -- key used for throttling function run starts.
 local keyAcctConcurrency      = KEYS[13]
 
-local queueID      = ARGV[1]
-local newLeaseKey  = ARGV[2]
-local currentTime  = tonumber(ARGV[3]) -- in ms
-local partitionIdA = ARGV[4]
-local partitionIdB = ARGV[5]
-local partitionIdC = ARGV[6]
+local queueID      						= ARGV[1]
+local newLeaseKey  						= ARGV[2]
+local currentTime  						= tonumber(ARGV[3]) -- in ms
+local partitionIdA 						= ARGV[4]
+local partitionIdB 						= ARGV[5]
+local partitionIdC 						= ARGV[6]
 -- We check concurrency limits when leasing queue items.
-local concurrencyA    = tonumber(ARGV[7])
-local concurrencyB    = tonumber(ARGV[8])
-local concurrencyC    = tonumber(ARGV[9])
+local concurrencyA    				= tonumber(ARGV[7])
+local concurrencyB    				= tonumber(ARGV[8])
+local concurrencyC    				= tonumber(ARGV[9])
 -- And we always check against account concurrency limits
-local concurrencyAcct = tonumber(ARGV[10])
-local accountId       = ARGV[11]
+local concurrencyAcct 				= tonumber(ARGV[10])
+local accountId       				= ARGV[11]
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -122,30 +122,9 @@ local function handleLease(keyPartition, keyConcurrency, partitionID)
 	-- and stored in functionConcurrencyKey.
 	redis.call("ZREM", keyPartition, item.id)
 
-	-- TODO(INN-3573): If we just leased the last queue item of the partition, drop partition pointers
-
-	-- Update the fn's score in the global pointer queue to the next job, if available.
-	local earliestScore = get_fn_partition_score(keyPartition)
-
-	-- TODO If score is 0 (there is no further item in the partition queue), remove the partition pointer
-	-- to prevent executors from spinning on guaranteed-empty partitions until the last in-progress item is done
-	-- and the partition is gc'd.
-
-	-- NOTE: The global partition ID isn't the actual partition zset key for backwards compatibility.
-	-- Instead, they are the partition IDs, which is either the partition ZSET (for new concurrency
-	-- key partitions) OR the function ID (for default partitions).
-	-- 
-	-- The first version of the queue used function UUIDs as queue names, and the global pointer
-	-- expected just the function UUIDs instead of a fully defined redis key.
-	update_pointer_score_to(partitionID, keyGlobalPointer, earliestScore)
-
-	-- Update account partitions and account pointers with new score of next item
-	update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, earliestScore)
-
 	-- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
 	-- so that expired leases can be re-processed.  We want to take the earliest time from the
 	-- concurrency queue such that we get a previously lost job if possible.
-
 	local inProgressScores = redis.call("ZRANGE", keyConcurrency, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
 	if inProgressScores ~= false then
 		local earliestLease = tonumber(inProgressScores[2])

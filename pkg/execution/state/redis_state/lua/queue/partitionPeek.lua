@@ -22,21 +22,12 @@ if count > limit and sequential == 0 then
 	offset = math.random((count-limit)+1) - 1
 end
 
-local items = redis.call("ZRANGE", partitionIndex, "-inf", peekUntil, "BYSCORE", "LIMIT", offset, limit)
-if #items == 0 then
+local partitionIds = redis.call("ZRANGE", partitionIndex, "-inf", peekUntil, "BYSCORE", "LIMIT", offset, limit)
+if #partitionIds == 0 then
 	return {}
 end
 
-local potentiallyMissingPartitions = redis.call("HMGET", partitionKey, unpack(items))
-local missingPartitionIds = {}
-local validPartitions = {}
+local potentiallyMissingPartitions = redis.call("HMGET", partitionKey, unpack(partitionIds))
 
-for i, partition in ipairs(potentiallyMissingPartitions) do
-	if partition ~= false and partition ~= nil then
-		table.insert(validPartitions, partition)
-	else
-		table.insert(missingPartitionIds, items[i])
-	end
-end
 
-return {count, validPartitions, missingPartitionIds}
+return {count, potentiallyMissingPartitions, partitionIds}

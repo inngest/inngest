@@ -322,6 +322,7 @@ func (r *mutationResolver) Rerun(
 			event.NewOSSTrackedEventWithID(evt.Event(), evt.InternalID()),
 		},
 		OriginalRunID: &fnrun.RunID,
+		AccountID:     consts.DevServerAccountId,
 	})
 	if err != nil {
 		return zero, err

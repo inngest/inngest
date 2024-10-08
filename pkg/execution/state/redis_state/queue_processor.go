@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"math"
 	"math/rand"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/VividCortex/ewma"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -82,22 +83,11 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		id = *item.JobID
 	}
 
-	var queueName *string
-	if name, ok := q.queueKindMapping[item.Kind]; ok {
-		queueName = &name
-	}
-	// item.QueueName takes precedence if not nil
-	if item.QueueName != nil {
-		queueName = item.QueueName
-	}
-
-	// ensure both QueueName attributes are always set (ItemPartitions depends on this)
-	if queueName != nil && item.QueueName == nil {
-		item.QueueName = queueName
-	}
-
-	if queueName != nil && *queueName == "" {
-		return fmt.Errorf("encountered empty string for queue name")
+	if item.QueueName == nil {
+		// Check if we have a kind mapping.
+		if name, ok := q.queueKindMapping[item.Kind]; ok {
+			item.QueueName = &name
+		}
 	}
 
 	metrics.IncrQueueItemStatusCounter(ctx, metrics.CounterOpt{
@@ -114,12 +104,11 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		WorkspaceID: item.WorkspaceID,
 		FunctionID:  item.Identifier.WorkflowID,
 		Data:        item,
-		// Only use the queue name if provided by queueKindMapping or set explicitly
-		QueueName:  queueName,
-		WallTimeMS: at.UnixMilli(),
+		QueueName:   item.QueueName,
+		WallTimeMS:  at.UnixMilli(),
 	}
 
-	if queueName == nil && qi.FunctionID == uuid.Nil {
+	if item.QueueName == nil && qi.FunctionID == uuid.Nil {
 		q.logger.Error().Interface("qi", qi).Msg("attempted to enqueue QueueItem without function ID or queueName override")
 		return fmt.Errorf("queue name or function ID must be set")
 	}
@@ -417,8 +406,11 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 
 func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimit int64, peekUntil time.Time, guaranteedCapacity *GuaranteedCapacity, metricShardName string, accountId *uuid.UUID) error {
 	// Peek 1s into the future to pull jobs off ahead of time, minimizing 0 latency
-	partitions, err := duration(ctx, "partition_peek", q.clock.Now(), func(ctx context.Context) ([]*QueuePartition, error) {
+
+	partitions, err := durationWithTags(ctx, "partition_peek", q.clock.Now(), func(ctx context.Context) ([]*QueuePartition, error) {
 		return q.partitionPeek(ctx, partitionKey, q.isSequential(), peekUntil, peekLimit, accountId)
+	}, map[string]any{
+		"is_global_partition_peek": fmt.Sprintf("%t", accountId == nil),
 	})
 	if err != nil {
 		return err
@@ -500,7 +492,7 @@ func (q *queue) scan(ctx context.Context) error {
 	}
 
 	processAccount := false
-	if q.runMode.Account && (!q.runMode.Partition || rand.Intn(2) == 1) {
+	if q.runMode.Account && (!q.runMode.Partition || rand.Intn(100) <= q.runMode.AccountWeight) {
 		processAccount = true
 	}
 
@@ -514,7 +506,9 @@ func (q *queue) scan(ctx context.Context) error {
 			},
 		)
 
-		peekedAccounts, err := q.accountPeek(ctx, q.isSequential(), peekUntil, AccountPeekMax)
+		peekedAccounts, err := duration(ctx, "account_peek", q.clock.Now(), func(ctx context.Context) ([]uuid.UUID, error) {
+			return q.accountPeek(ctx, q.isSequential(), peekUntil, AccountPeekMax)
+		})
 		if err != nil {
 			return fmt.Errorf("could not peek accounts: %w", err)
 		}
@@ -523,25 +517,31 @@ func (q *queue) scan(ctx context.Context) error {
 			return nil
 		}
 
-		eg := errgroup.Group{}
-
 		// Reduce number of peeked partitions as we're processing multiple accounts in parallel
 		// Note: This is not optimal as some accounts may have fewer partitions than others and
 		// we're leaving capacity on the table. We'll need to find a better way to determine the
 		// optimal peek size in this case.
-		peekSize := int64(math.Round(float64(PartitionPeekMax / int64(len(peekedAccounts)))))
+		accountPartitionPeekMax := int64(math.Round(float64(PartitionPeekMax / int64(len(peekedAccounts)))))
 
 		// Scan and process account partitions in parallel
+		wg := sync.WaitGroup{}
 		for _, account := range peekedAccounts {
 			account := account
-			eg.Go(func() error {
+
+			wg.Add(1)
+			go func(account uuid.UUID) {
+				defer wg.Done()
 				partitionKey := q.u.kg.AccountPartitionIndex(account)
 
-				return q.scanPartition(ctx, partitionKey, peekSize, peekUntil, nil, metricShardName, &account)
-			})
+				if err := q.scanPartition(ctx, partitionKey, accountPartitionPeekMax, peekUntil, nil, metricShardName, &account); err != nil {
+					q.logger.Error().Err(err).Msg("error processing account partitions")
+				}
+			}(account)
 		}
 
-		return eg.Wait()
+		wg.Wait()
+
+		return nil
 	}
 
 	metrics.IncrQueueScanCounter(ctx,
@@ -671,7 +671,8 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 
 	// parallel all queue names with internal mappings for now.
 	// XXX: Allow parallel partitions for all functions except for fns opting into FIFO
-	_, parallel := q.queueKindMapping[p.Queue()]
+	_, isSystemFn := q.queueKindMapping[p.Queue()]
+	_, parallel := q.disableFifoForFunctions[p.Queue()]
 
 	iter := processor{
 		partition:          p,
@@ -680,7 +681,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 		queue:              q,
 		denies:             newLeaseDenyList(),
 		staticTime:         q.clock.Now(),
-		parallel:           parallel,
+		parallel:           parallel || isSystemFn,
 	}
 
 	if processErr := iter.iterate(ctx); processErr != nil {
@@ -763,7 +764,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 					// Don't extend lease since one doesn't exist
 					return
 				}
-				leaseID, err = q.ExtendLease(ctx, p, qi, *leaseID, QueueLeaseDuration)
+				leaseID, err = q.ExtendLease(ctx, qi, *leaseID, QueueLeaseDuration)
 				if err != nil && err != ErrQueueItemNotFound && errors.Unwrap(err) != context.Canceled {
 					// XXX: Increase counter here.
 					q.logger.Error().Err(err).Msg("error extending lease")
@@ -920,7 +921,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 
 		// Dequeue this entirely, as this permanently failed.
 		// XXX: Increase permanently failed counter here.
-		if err := q.Dequeue(context.WithoutCancel(ctx), p, qi); err != nil {
+		if err := q.Dequeue(context.WithoutCancel(ctx), qi); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil
@@ -935,7 +936,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 		}
 
 	case <-doneCh:
-		if err := q.Dequeue(context.WithoutCancel(ctx), p, qi); err != nil {
+		if err := q.Dequeue(context.WithoutCancel(ctx), qi); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil
@@ -991,7 +992,29 @@ func (q *queue) capacity() int64 {
 // 1. EWMA of concurrency limit hits
 // 2. configured min, max of peek size range
 // 3. worker capacity
-func (q *queue) peekSize(ctx context.Context, p *QueuePartition) int64 {
+func (q *queue) peekSize(_ context.Context, _ *QueuePartition) int64 {
+	// set ranges
+	pmin := q.peekMin
+	if pmin == 0 {
+		pmin = QueuePeekMin
+	}
+	pmax := q.peekMax
+	if pmax == 0 {
+		pmax = QueuePeekMax
+	}
+
+	// Take a random amount between our range.
+	size := int64(rand.Intn(int(pmax-pmin))) + q.peekMin
+	// Limit to capacity
+	cap := q.capacity()
+	if size > cap {
+		size = cap
+	}
+	return size
+}
+
+//nolint:golint,unused // this code remains to be enabled on demand
+func (q *queue) ewmaPeekSize(ctx context.Context, p *QueuePartition) int64 {
 	if p.FunctionID == nil {
 		return q.peekMin
 	}
@@ -1069,8 +1092,20 @@ func (q *queue) isInstrumentator() bool {
 
 // duration is a helper function to record durations of queue operations.
 func duration[T any](ctx context.Context, op string, start time.Time, f func(ctx context.Context) (T, error)) (T, error) {
+	return durationWithTags(ctx, op, start, f, nil)
+}
+
+// durationWithTags is a helper function to record durations of queue operations.
+func durationWithTags[T any](ctx context.Context, op string, start time.Time, f func(ctx context.Context) (T, error), tags map[string]any) (T, error) {
 	if start.IsZero() {
 		start = time.Now()
+	}
+
+	finalTags := map[string]any{
+		"operation": op,
+	}
+	for k, v := range tags {
+		finalTags[k] = v
 	}
 
 	res, err := f(ctx)
@@ -1079,9 +1114,7 @@ func duration[T any](ctx context.Context, op string, start time.Time, f func(ctx
 		time.Since(start).Milliseconds(),
 		metrics.HistogramOpt{
 			PkgName: pkgName,
-			Tags: map[string]any{
-				"operation": op,
-			},
+			Tags:    finalTags,
 		},
 	)
 	return res, err
@@ -1233,7 +1266,7 @@ func (p *processor) process(ctx context.Context, item *QueueItem) error {
 	// This is safe:  only one process runs scan(), and we guard the total number of
 	// available workers with the above semaphore.
 	leaseID, err := duration(ctx, "lease", p.queue.clock.Now(), func(ctx context.Context) (*ulid.ULID, error) {
-		return p.queue.Lease(ctx, *p.partition, *item, QueueLeaseDuration, p.staticTime, p.denies)
+		return p.queue.Lease(ctx, *item, QueueLeaseDuration, p.staticTime, p.denies)
 	})
 
 	// NOTE: If this loop ends in an error, we must _always_ release an item from the
