@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/VividCortex/ewma"
 	"math"
 	mrand "math/rand"
 	"strconv"
@@ -14,6 +13,8 @@ import (
 	"sync/atomic"
 	"time"
 	"unsafe"
+
+	"github.com/VividCortex/ewma"
 
 	"github.com/inngest/inngest/pkg/enums"
 	"golang.org/x/sync/errgroup"
@@ -72,7 +73,7 @@ const (
 	// NOTE: This must be greater than PartitionLookahead
 	// NOTE: This is the maximum latency introduced into concurrnecy limited partitions in the
 	//       worst case.
-	PartitionConcurrencyLimitRequeueExtension = 30 * time.Second
+	PartitionConcurrencyLimitRequeueExtension = 10 * time.Second
 	PartitionThrottleLimitRequeueExtension    = 2 * time.Second
 	PartitionLookahead                        = time.Second
 
