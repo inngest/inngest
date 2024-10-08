@@ -891,7 +891,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 		// Check if this step permanently failed.  If so, the function is a failure.
 		if !resp.Retryable() {
 			// TODO: Refactor state input
-			if _, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+			if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
 				l.Error().Err(err).Msg("error running finish handler")
 			}
 
@@ -919,7 +919,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 					resp.Err = &serialized
 				}
 
-				if _, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
 					l.Error().Err(err).Msg("error running finish handler")
 				}
 
@@ -936,7 +936,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 	}
 
 	// This is the function result.
-	if _, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+	if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
 		l.Error().Err(err).Msg("error running finish handler")
 	}
 
@@ -982,13 +982,13 @@ func (f functionFinishedData) Map() map[string]any {
 // Returns a boolean indicating whether it performed finalization. If the run
 // had parallel steps then it may be false, since parallel steps cause the
 // function end to be reached multiple times in a single run
-func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, resp state.DriverResponse) (bool, error) {
+func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, resp state.DriverResponse) error {
 	// Parse events for the fail handler before deleting state.
 	inputEvents := make([]event.Event, len(evts))
 	for n, e := range evts {
 		evt, err := event.NewEvent(e)
 		if err != nil {
-			return false, err
+			return err
 		}
 		inputEvents[n] = *evt
 	}
@@ -998,12 +998,9 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 	}
 
 	// Delete the function state in every case.
-	performedFinalization, err := e.smv2.Delete(ctx, md.ID)
+	_, err := e.smv2.Delete(ctx, md.ID)
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("error deleting state in finalize", "error", err)
-	}
-	if err == nil && !performedFinalization {
-		return performedFinalization, nil
 	}
 
 	// We may be cancelling an in-progress run.  If that's the case, we want to delete any
@@ -1051,7 +1048,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 	// TODO: Load all pauses for the function and remove, also.
 
 	if e.finishHandler == nil {
-		return performedFinalization, nil
+		return nil
 	}
 
 	// Prepare events that we must send
@@ -1104,7 +1101,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 		}
 	}
 
-	return performedFinalization, e.finishHandler(ctx, md.ID, freshEvents)
+	return e.finishHandler(ctx, md.ID, freshEvents)
 }
 
 func correlationID(event event.Event) *string {
@@ -1642,7 +1639,7 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	}
 
 	fnCancelledErr := state.ErrFunctionCancelled.Error()
-	if _, err := e.finalize(ctx, md, evts, f.Function.GetSlug(), state.DriverResponse{
+	if err := e.finalize(ctx, md, evts, f.Function.GetSlug(), state.DriverResponse{
 		Err: &fnCancelledErr,
 	}); err != nil {
 		l.Error().Err(err).Msg("error running finish handler")
