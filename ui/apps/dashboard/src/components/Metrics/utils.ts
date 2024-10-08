@@ -85,6 +85,11 @@ export const getLineChartOptions = (
       renderMode: 'html',
       enterable: true,
       //
+      // Off by default because we don't like the tooltip
+      // behavior for chart groups. We toggle this programmatically
+      // per chart at the dom level
+      show: false,
+      //
       // Attach tooltips to a dedicated dom node above interim parents
       // with low z-indexes
       appendTo: () => document.getElementById('chart-tooltip'),
@@ -132,6 +137,7 @@ export const mapEntityLines = (
       type: 'category' as const,
       boundaryGap: true,
       data: metrics[0]?.data.map(({ bucket }) => bucket) || ['No Data Found'],
+      axisPointer: { show: true, type: 'line' as const, label: { show: false } },
       axisLabel: {
         interval: dataLength <= 40 ? 2 : dataLength / (dataLength / 12),
         formatter: (value: string) => dateFormat(value, diff),

@@ -30,6 +30,13 @@ export const Chart = ({
 }: ChartProps) => {
   const chartRef = useRef<HTMLDivElement>(null);
 
+  const toggleTooltip = (show: boolean) => {
+    if (chartRef.current !== null) {
+      const chart = getInstanceByDom(chartRef.current);
+      chart?.setOption({ tooltip: { show } });
+    }
+  };
+
   useEffect(() => {
     if (chartRef.current !== null) {
       const chart = init(chartRef.current, theme);
@@ -53,12 +60,19 @@ export const Chart = ({
       const chart = getInstanceByDom(chartRef.current);
       chart?.setOption(option, settings);
 
-      // if (chart && group) {
-      //   chart.group = group;
-      //   connect(group);
-      // }
+      if (chart && group) {
+        chart.group = group;
+        connect(group);
+      }
     }
   }, [option, settings]);
 
-  return <div ref={chartRef} className={className} />;
+  return (
+    <div
+      ref={chartRef}
+      className={className}
+      {...(group && { onMouseEnter: () => toggleTooltip(true) })}
+      {...(group && { onMouseLeave: () => toggleTooltip(false) })}
+    />
+  );
 };
