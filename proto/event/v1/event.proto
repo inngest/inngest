@@ -1,0 +1,12 @@
+syntax = "proto3";
+package event.v1;
+
+option go_package = "github.com/inngest/inngest/proto/gen/event/v1;event";
+
+message Event {
+  string id = 1;
+  string name = 2;
+  repeated bytes data = 3;
+  int64 timestamp = 4;
+  string version = 5;
+}
