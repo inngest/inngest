@@ -3045,7 +3045,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 
 	q := NewQueue(
 		NewQueueClient(rc, QueueDefaultKey),
-		WithPriorityFinder(func(ctx context.Context, p QueuePartition) uint {
+		WithPartitionPriorityFinder(func(ctx context.Context, p QueuePartition) uint {
 			if p.FunctionID == nil {
 				return PriorityMin
 			}
@@ -3142,7 +3142,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 
 		q := NewQueue(
 			NewQueueClient(rc, QueueDefaultKey),
-			WithPriorityFinder(func(ctx context.Context, p QueuePartition) uint {
+			WithPartitionPriorityFinder(func(ctx context.Context, p QueuePartition) uint {
 				if p.FunctionID == nil {
 					return PriorityMin
 				}
@@ -3185,7 +3185,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 
 		q := NewQueue(
 			NewQueueClient(rc, QueueDefaultKey),
-			WithPriorityFinder(func(_ context.Context, _ QueuePartition) uint {
+			WithPartitionPriorityFinder(func(_ context.Context, _ QueuePartition) uint {
 				return PriorityDefault
 			}),
 		)
@@ -3228,7 +3228,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 
 		q := NewQueue(
 			NewQueueClient(rc, QueueDefaultKey),
-			WithPriorityFinder(func(_ context.Context, _ QueuePartition) uint {
+			WithPartitionPriorityFinder(func(_ context.Context, _ QueuePartition) uint {
 				return PriorityDefault
 			}),
 		)
@@ -3478,7 +3478,7 @@ func TestQueueFunctionPause(t *testing.T) {
 
 	q := NewQueue(
 		NewQueueClient(rc, QueueDefaultKey),
-		WithPriorityFinder(func(_ context.Context, _ QueuePartition) uint {
+		WithPartitionPriorityFinder(func(_ context.Context, _ QueuePartition) uint {
 			return PriorityDefault
 		}),
 	)
@@ -3521,7 +3521,7 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 	defer rc.Close()
 	q := NewQueue(
 		NewQueueClient(rc, QueueDefaultKey),
-		WithPriorityFinder(func(_ context.Context, _ QueuePartition) uint {
+		WithPartitionPriorityFinder(func(_ context.Context, _ QueuePartition) uint {
 			return priority
 		}),
 	)
@@ -3571,7 +3571,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 	defer rc.Close()
 
 	q := NewQueue(NewQueueClient(rc, QueueDefaultKey))
-	q.pf = func(ctx context.Context, p QueuePartition) uint {
+	q.ppf = func(ctx context.Context, p QueuePartition) uint {
 		return PriorityMin
 	}
 	q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
@@ -3793,7 +3793,7 @@ func TestQueueLeaseSequential(t *testing.T) {
 
 	q := queue{
 		u: NewQueueClient(rc, QueueDefaultKey),
-		pf: func(ctx context.Context, p QueuePartition) uint {
+		ppf: func(ctx context.Context, p QueuePartition) uint {
 			return PriorityMin
 		},
 		clock: clockwork.NewRealClock(),

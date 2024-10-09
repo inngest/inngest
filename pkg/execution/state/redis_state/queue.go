@@ -157,8 +157,11 @@ type QueueManager interface {
 	RequeueByJobID(ctx context.Context, jobID string, at time.Time) error
 }
 
-// PriorityFinder returns the priority for a given queue partition.
-type PriorityFinder func(ctx context.Context, part QueuePartition) uint
+// PartitionPriorityFinder returns the priority for a given queue partition.
+type PartitionPriorityFinder func(ctx context.Context, part QueuePartition) uint
+
+// AccountPriorityFinder returns the priority for a given account.
+type AccountPriorityFinder func(ctx context.Context, accountId uuid.UUID) uint
 
 // GuaranteedCapacityFinder returns the given guaranteed capacity for an account ID, or nil if the
 // account does not have guaranteed capacity. We use an account ID because each individual
@@ -182,9 +185,15 @@ func WithQueueLifecycles(l ...QueueLifecycleListener) QueueOpt {
 	}
 }
 
-func WithPriorityFinder(pf PriorityFinder) QueueOpt {
+func WithPartitionPriorityFinder(ppf PartitionPriorityFinder) QueueOpt {
 	return func(q *queue) {
-		q.pf = pf
+		q.ppf = ppf
+	}
+}
+
+func WithAccountPriorityFinder(apf AccountPriorityFinder) QueueOpt {
+	return func(q *queue) {
+		q.apf = apf
 	}
 }
 
@@ -400,7 +409,10 @@ type SystemConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) Sy
 func NewQueue(u *QueueClient, opts ...QueueOpt) *queue {
 	q := &queue{
 		u: u,
-		pf: func(_ context.Context, _ QueuePartition) uint {
+		ppf: func(_ context.Context, _ QueuePartition) uint {
+			return PriorityDefault
+		},
+		apf: func(_ context.Context, _ uuid.UUID) uint {
 			return PriorityDefault
 		},
 		peekMin: QueuePeekMin,
@@ -477,7 +489,9 @@ type queue struct {
 
 	// redis stores the redis connection to use.
 	u   *QueueClient
-	pf  PriorityFinder
+	ppf PartitionPriorityFinder
+	apf AccountPriorityFinder
+
 	gcf GuaranteedCapacityFinder
 
 	lifecycles QueueLifecycleListeners
@@ -2444,7 +2458,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		}
 
 		items[n-ignored] = item
-		partPriority := q.pf(ctx, *item)
+		partPriority := q.ppf(ctx, *item)
 		weights = append(weights, float64(10-partPriority))
 	}
 
@@ -2526,9 +2540,7 @@ func (q *queue) accountPeek(ctx context.Context, sequential bool, until time.Tim
 
 	weights := make([]float64, len(items))
 	for i := range items {
-		// TODO Do we need account-specific weights? Then we need to store
-		// a data structure like QueuePartition for accounts (QueueAccount?)
-		accountPriority := PriorityDefault
+		accountPriority := q.apf(ctx, items[i])
 		weights[i] = float64(10 - accountPriority)
 	}
 

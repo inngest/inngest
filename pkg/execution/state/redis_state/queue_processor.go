@@ -853,7 +853,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 		runInfo := osqueue.RunInfo{
 			Latency:      latency,
 			SojournDelay: sojourn,
-			Priority:     q.pf(ctx, p),
+			Priority:     q.ppf(ctx, p),
 		}
 		if s != nil {
 			runInfo.GuaranteedCapacityKey = s.Key()
