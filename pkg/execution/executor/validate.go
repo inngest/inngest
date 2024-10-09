@@ -67,10 +67,10 @@ func (r *runValidator) validate(ctx context.Context) error {
 }
 
 func (r *runValidator) checkStepLimit(ctx context.Context) error {
-	l := logger.From(ctx).With().
-		Str("run_id", r.md.ID.RunID.String()).
-		Str("workflow_id", r.md.ID.FunctionID.String()).
-		Logger()
+	l := logger.StdlibLogger(ctx).With(
+		"run_id", r.md.ID.RunID.String(),
+		"workflow_id", r.md.ID.FunctionID.String(),
+	)
 
 	var limit int
 
@@ -99,7 +99,7 @@ func (r *runValidator) checkStepLimit(ctx context.Context) error {
 		resp.SetFinal()
 
 		if err := r.e.finalize(ctx, r.md, r.evts, r.f.GetSlug(), resp); err != nil {
-			l.Error().Err(err).Msg("error running finish handler")
+			l.Error("error running finish handler", "error", err)
 		}
 
 		// Can be reached multiple times for parallel discovery steps
