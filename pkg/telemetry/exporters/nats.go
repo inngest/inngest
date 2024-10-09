@@ -31,8 +31,19 @@ const (
 
 // NATS span exporter
 type natsSpanExporter struct {
-	subjects map[string]StreamConf
-	conn     *broker.NatsConnector
+	streams    []*StreamConf
+	conn       *broker.NatsConnector
+	deadletter *StreamConf
+}
+
+type natsSpanExporterOpts struct {
+	streams []StreamConf
+	// Comma delimited URLs of the NATS server to use
+	urls string
+	// The path of the nkey file to be used for authentication
+	nkeyFile string
+	// The credentials file to be used for authentication
+	credsFile string
 }
 
 type StreamConf struct {
@@ -48,27 +59,23 @@ type StreamConf struct {
 	DivideBy uint64
 }
 
-type NatsExporterOpts struct {
-	// The subjects this exporter will be publishing the spans to
-	Subjects map[string]StreamConf
-	// Comma delimited URLs of the NATS server to use
-	URLs string
-	// The path of the nkey file to be used for authentication
-	NkeyFile string
-	// The credentials file to be used for authentication
-	CredsFile string
-}
+type NatsExporterOpts func(n *natsSpanExporterOpts)
 
 // NewNATSSpanExporter creates an otel compatible exporter that ships the spans to NATS
-func NewNATSSpanExporter(ctx context.Context, opts *NatsExporterOpts) (trace.SpanExporter, error) {
-	if opts == nil {
-		return nil, fmt.Errorf("nats exporter setup options unavailable")
+func NewNATSSpanExporter(ctx context.Context, opts ...NatsExporterOpts) (trace.SpanExporter, error) {
+	if len(opts) == 0 {
+		return nil, fmt.Errorf("no nats exporter options provided")
+	}
+
+	expOpts := &natsSpanExporterOpts{}
+	for _, apply := range opts {
+		apply(expOpts)
 	}
 
 	connOpts := []nats.Option{}
 	// attempt to parse nkey file is the option was passed in
-	if opts.NkeyFile != "" {
-		auth, err := nats.NkeyOptionFromSeed(opts.NkeyFile)
+	if expOpts.nkeyFile != "" {
+		auth, err := nats.NkeyOptionFromSeed(expOpts.nkeyFile)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing nkey file for NATS: %w", err)
 		}
@@ -76,14 +83,14 @@ func NewNATSSpanExporter(ctx context.Context, opts *NatsExporterOpts) (trace.Spa
 	}
 
 	// Use chain credentials file for auth
-	if opts.CredsFile != "" {
-		auth := nats.UserCredentials(opts.CredsFile)
+	if expOpts.credsFile != "" {
+		auth := nats.UserCredentials(expOpts.credsFile)
 		connOpts = append(connOpts, auth)
 	}
 
 	conn, err := broker.NewNATSConnector(ctx, broker.NatsConnOpt{
 		Name:      "run-span-exporter",
-		URLS:      opts.URLs,
+		URLS:      expOpts.urls,
 		JetStream: true,
 		Opts:      connOpts,
 	})
@@ -91,9 +98,16 @@ func NewNATSSpanExporter(ctx context.Context, opts *NatsExporterOpts) (trace.Spa
 		return nil, fmt.Errorf("error setting up nats: %w", err)
 	}
 
+	dedup := map[string]*StreamConf{}
+
+	streams := []*StreamConf{}
+	for _, conf := range dedup {
+		streams = append(streams, conf)
+	}
+
 	return &natsSpanExporter{
-		subjects: opts.Subjects,
-		conn:     conn,
+		streams: streams,
+		conn:    conn,
 	}, nil
 }
 
@@ -107,13 +121,13 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 		return err
 	}
 	// publish to all subjects defined
-	for subj, conf := range e.subjects {
+	for _, stream := range e.streams {
 		var i uint64
 
 		for _, sp := range spans {
 			wg.Add(1)
 
-			go func(ctx context.Context, sub string, sp trace.ReadOnlySpan) {
+			go func(ctx context.Context, conf StreamConf, sp trace.ReadOnlySpan) {
 				defer wg.Done()
 
 				ts := sp.StartTime()
@@ -202,10 +216,10 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 					idx = idx % conf.DivideBy
 				}
 
-				subj := sub
+				subj := conf.Name
 				if conf.DivideBy > 0 {
 					// set index in the subject
-					subj = fmt.Sprintf("%s.%d", sub, idx)
+					subj = fmt.Sprintf("%s.%d", conf.Name, idx)
 				}
 
 				// Use async publish to increase throughput
@@ -250,7 +264,7 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 						"status":  pstatus,
 					},
 				})
-			}(ctx, subj, sp)
+			}(ctx, *stream, sp)
 		}
 	}
 
