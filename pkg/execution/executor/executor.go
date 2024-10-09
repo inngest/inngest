@@ -2504,7 +2504,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 	}
 
 	// Don't bother if it's already there
-	if err == redis_state.ErrQueueItemExists {
+	if err == redis_state.ErrQueueItemExists || errors.Is(err, ErrFunctionSkipped) {
 		return nil
 	}
 	// TODO: check for known errors
