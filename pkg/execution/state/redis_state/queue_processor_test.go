@@ -115,7 +115,7 @@ func TestQueueRunBasic(t *testing.T) {
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 
-	idA, idB := uuid.New(), uuid.New()
+	idA, idB, accountId := uuid.New(), uuid.New(), uuid.New()
 	items := []QueueItem{
 		{
 			FunctionID: idA,
@@ -123,6 +123,7 @@ func TestQueueRunBasic(t *testing.T) {
 				Kind:        osqueue.KindEdge,
 				MaxAttempts: max(3),
 				Identifier: state.Identifier{
+					AccountID:  accountId,
 					WorkflowID: idA,
 					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
 				},
@@ -134,6 +135,7 @@ func TestQueueRunBasic(t *testing.T) {
 				Kind:        osqueue.KindEdge,
 				MaxAttempts: max(1),
 				Identifier: state.Identifier{
+					AccountID:  accountId,
 					WorkflowID: idB,
 					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
 				},
@@ -146,6 +148,7 @@ func TestQueueRunBasic(t *testing.T) {
 				Kind:        "test-kind",
 				MaxAttempts: max(1),
 				Identifier: state.Identifier{
+					AccountID:  accountId,
 					WorkflowID: idB,
 					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
 				},
@@ -204,7 +207,7 @@ func TestQueueRunRetry(t *testing.T) {
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 
-	idA := uuid.New()
+	idA, accountId := uuid.New(), uuid.New()
 	items := []QueueItem{
 		{
 			FunctionID: idA,
@@ -212,6 +215,7 @@ func TestQueueRunRetry(t *testing.T) {
 				Kind:        osqueue.KindEdge,
 				MaxAttempts: max(3),
 				Identifier: state.Identifier{
+					AccountID:  accountId,
 					WorkflowID: idA,
 					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
 				},
@@ -473,7 +477,7 @@ func TestRunPriorityFactor(t *testing.T) {
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 
-	idA, idB := uuid.New(), uuid.New()
+	idA, idB, accountId := uuid.New(), uuid.New(), uuid.New()
 	factor2 := int64(2)
 	items := []osqueue.Item{
 		{
@@ -481,6 +485,7 @@ func TestRunPriorityFactor(t *testing.T) {
 			Kind:        osqueue.KindEdge,
 			MaxAttempts: max(1),
 			Identifier: state.Identifier{
+				AccountID:  accountId,
 				WorkflowID: idA,
 				RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
 			},
@@ -490,6 +495,7 @@ func TestRunPriorityFactor(t *testing.T) {
 			Kind:        osqueue.KindEdge,
 			MaxAttempts: max(1),
 			Identifier: state.Identifier{
+				AccountID:  accountId,
 				WorkflowID: idB,
 				RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
 				// Enqueue 2 seconds prior to the actual At time
@@ -571,6 +577,7 @@ func TestQueueAllowList(t *testing.T) {
 		})
 	}()
 
+	accountId := uuid.New()
 	items := []QueueItem{
 		{
 			QueueName: &allowedQueueName,
@@ -589,7 +596,8 @@ func TestQueueAllowList(t *testing.T) {
 				Kind:        osqueue.KindEdge,
 				MaxAttempts: max(1),
 				Identifier: state.Identifier{
-					RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+					AccountID: accountId,
+					RunID:     ulid.MustNew(ulid.Now(), rand.Reader),
 				},
 			},
 		},
@@ -599,7 +607,8 @@ func TestQueueAllowList(t *testing.T) {
 				Kind:        osqueue.KindEdge,
 				MaxAttempts: max(1),
 				Identifier: state.Identifier{
-					RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+					AccountID: accountId,
+					RunID:     ulid.MustNew(ulid.Now(), rand.Reader),
 				},
 			},
 		},
@@ -682,6 +691,7 @@ func TestQueueDenyList(t *testing.T) {
 		})
 	}()
 
+	accountId := uuid.New()
 	items := []QueueItem{
 		{
 			QueueName: &deniedQueueName,
@@ -700,7 +710,8 @@ func TestQueueDenyList(t *testing.T) {
 				Kind:        osqueue.KindEdge,
 				MaxAttempts: max(1),
 				Identifier: state.Identifier{
-					RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+					AccountID: accountId,
+					RunID:     ulid.MustNew(ulid.Now(), rand.Reader),
 				},
 			},
 		},
@@ -710,7 +721,8 @@ func TestQueueDenyList(t *testing.T) {
 				Kind:        osqueue.KindEdge,
 				MaxAttempts: max(1),
 				Identifier: state.Identifier{
-					RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+					AccountID: accountId,
+					RunID:     ulid.MustNew(ulid.Now(), rand.Reader),
 				},
 			},
 		},
