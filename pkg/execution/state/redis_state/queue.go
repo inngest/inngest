@@ -75,6 +75,7 @@ const (
 	//       worst case.
 	PartitionConcurrencyLimitRequeueExtension = 5 * time.Second
 	PartitionThrottleLimitRequeueExtension    = 2 * time.Second
+	PartitionPausedRequeueExtension           = 24 * time.Hour
 	PartitionLookahead                        = time.Second
 
 	// default values
@@ -2428,7 +2429,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		if item.FunctionID != nil {
 			if paused := fnIDs[*item.FunctionID]; paused {
 				// Function is pulled up when it is unpaused, so we can push it back for a long time (see SetFunctionPaused)
-				err := q.PartitionRequeue(ctx, item, q.clock.Now().Truncate(time.Second).Add(time.Hour*24), true)
+				err := q.PartitionRequeue(ctx, item, q.clock.Now().Truncate(time.Second).Add(PartitionPausedRequeueExtension), true)
 				if err != nil {
 					q.logger.Error().Interface("partition", item).Msg("failed to push back paused partition")
 				} else {
