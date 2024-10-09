@@ -3,6 +3,7 @@ package redis_state
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
@@ -29,6 +30,15 @@ var (
 	GuaranteedCapacityLeaseLimit = 1
 )
 
+func guaranteedCapacityKeyForAccount(accountId uuid.UUID) string {
+	gc := GuaranteedCapacity{
+		Scope:     enums.GuaranteedCapacityScopeAccount,
+		AccountID: accountId,
+	}
+
+	return gc.Key()
+}
+
 // GuaranteedCapacity represents an account with guaranteed capacity.
 type GuaranteedCapacity struct {
 	// Scope identifies the level of guaranteed capacity, currently we only support account
@@ -51,7 +61,49 @@ type GuaranteedCapacity struct {
 	Leases []ulid.ULID `json:"leases"`
 }
 
-func (g GuaranteedCapacity) Key() string {
+func (g *GuaranteedCapacity) UnmarshalJSON(data []byte) error {
+	// Start decoding the base type
+	type baseType struct {
+		Scope              enums.GuaranteedCapacityScope `json:"s"`
+		AccountID          uuid.UUID                     `json:"a"`
+		Priority           uint                          `json:"p"`
+		GuaranteedCapacity uint                          `json:"gc"`
+	}
+
+	// If we encounter an error, always report it
+	base := baseType{}
+	if err := json.Unmarshal(data, &base); err != nil {
+		return err
+	}
+
+	g.Scope = base.Scope
+	g.AccountID = base.AccountID
+	g.Priority = base.Priority
+	g.GuaranteedCapacity = base.GuaranteedCapacity
+
+	// Lua's cjson library fails to encode empty arrays, so we need to handle empty objects
+	type leasesMap struct {
+		Leases map[string]interface{} `json:"leases"`
+	}
+	if err := json.Unmarshal(data, &leasesMap{}); err == nil {
+		return nil
+	}
+
+	// If we have an array of leases, decode them
+	type leasesArr struct {
+		Leases []ulid.ULID `json:"leases"`
+	}
+	l := leasesArr{}
+	if err := json.Unmarshal(data, &l); err != nil {
+		return err
+	}
+
+	g.Leases = l.Leases
+
+	return nil
+}
+
+func (g *GuaranteedCapacity) Key() string {
 	switch g.Scope {
 	case enums.GuaranteedCapacityScopeAccount:
 		return fmt.Sprintf("a:%s", g.AccountID)
