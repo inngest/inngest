@@ -6,46 +6,28 @@ import { isDark } from '@inngest/components/utils/theme';
 
 import type { VolumeMetricsQuery } from '@/gql/graphql';
 import type { EntityLookup } from './Dashboard';
-import { dateFormat, getLineChartOptions, lineColors, seriesOptions, timeDiff } from './utils';
+import { getLineChartOptions, getXAxis, lineColors, seriesOptions } from './utils';
 
 const zeroID = '00000000-0000-0000-0000-000000000000';
 
 export const mapConcurrency = (
-  {
-    concurrency: { metrics: limitMetrics },
-    stepRunning: { metrics: runningMetrics },
-  }: VolumeMetricsQuery['workspace'],
+  { stepRunning: { metrics: runningMetrics } }: VolumeMetricsQuery['workspace'],
   entities: EntityLookup,
   concurrencyLimit: number
 ) => {
   const dark = isDark();
 
-  const diff = timeDiff(limitMetrics[0]?.data[0]?.bucket, limitMetrics[0]?.data.at(-1)?.bucket);
-  const dataLength = limitMetrics[0]?.data?.length || 30;
-
   const metrics = {
     yAxis: {
-      max: ({ max }: { max: number }) => (max > concurrencyLimit ? max : concurrencyLimit + 5),
+      max: ({ max }: { max: number }) =>
+        max > concurrencyLimit ? max : concurrencyLimit + concurrencyLimit * 0.1,
     },
-
-    xAxis: {
-      type: 'category' as const,
-      boundaryGap: true,
-      data: runningMetrics[0]?.data.map(({ bucket }) => bucket) || ['No Data Found'],
-      axisPointer: { show: true, type: 'line' as const, label: { show: false } },
-      axisLabel: {
-        interval: dataLength <= 40 ? 2 : dataLength / (dataLength / 12),
-        formatter: (value: string) => dateFormat(value, diff),
-        margin: 10,
-      },
-    },
-
+    xAxis: getXAxis(runningMetrics),
     series: [
       ...runningMetrics
         .filter(({ id }) => id !== zeroID)
         .map((f, i) => ({
           ...{ ...seriesOptions, stack: 'Total' },
-          silent: true,
           name: entities[f.id]?.name,
           data: f.data.map(({ value }) => value),
           itemStyle: {
@@ -65,7 +47,9 @@ export const mapConcurrency = (
             color: resolveColor(lineColors[3]![0]!, dark, lineColors[3]![1]),
           },
           data: [{ yAxis: concurrencyLimit, name: 'Concurrency Limit', symbol: 'none' }],
-
+          tooltip: {
+            show: false,
+          },
           emphasis: {
             label: {
               show: true,

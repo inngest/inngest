@@ -6,14 +6,16 @@ import type {
 import { resolveColor } from '@inngest/components/utils/colors';
 import { differenceInMilliseconds, lightFormat, toDate } from '@inngest/components/utils/date';
 import { isDark } from '@inngest/components/utils/theme';
+import ReactDOMServer from 'react-dom/server';
 import resolveConfig from 'tailwindcss/resolveConfig';
 
 import type { MetricsData, ScopedMetric } from '@/gql/graphql';
 import tailwindConfig from '../../../tailwind.config';
+import { ChartTooltip } from './ChartTooltip';
 import type { EntityLookup, EntityType } from './Dashboard';
 
 const {
-  theme: { colors },
+  theme: { colors, backgroundColor, textColor, borderColor },
 } = resolveConfig(tailwindConfig);
 
 export type LineChartData = {
@@ -40,7 +42,7 @@ export const seriesOptions: LineSeriesOption = {
   showSymbol: false,
   lineStyle: { width: 1 },
   emphasis: {
-    focus: 'series',
+    focus: 'none',
   },
 };
 
@@ -75,15 +77,19 @@ export const convertLookup = (entities?: EntityType[]): EntityLookup | {} =>
 export const sum = (data?: MetricsData[]) =>
   data ? data.reduce((acc, { value }) => acc + value, 0) : 0;
 
+export const formatNumber = (number?: number | bigint) => (number || 0).toLocaleString(undefined);
+
 export const getLineChartOptions = (
   data: Partial<ChartProps['option']>,
   legendData?: LegendComponentOption['data']
 ): ChartProps['option'] => {
   return {
     tooltip: {
-      trigger: 'axis',
+      trigger: 'item',
       renderMode: 'html',
       enterable: true,
+      position: 'top',
+
       //
       // Off by default because we don't like the tooltip
       // behavior for chart groups. We toggle this programmatically
@@ -93,9 +99,16 @@ export const getLineChartOptions = (
       // Attach tooltips to a dedicated dom node above interim parents
       // with low z-indexes
       appendTo: () => document.getElementById('chart-tooltip'),
-      extraCssText: 'max-height: 350px; overflow-y: scroll;',
-      className: 'no-scrollbar',
-      transitionDuration: 1.5,
+      transitionDuration: 1,
+      //
+      // rendering our tooltip componen to a string doesn't support click events
+      // so wrap the whole thing in a vanilla js clipboard cliip handler
+      formatter: (params: any) =>
+        `<div onclick="navigator.clipboard.writeText('${
+          params.name
+        }')">${ReactDOMServer.renderToString(ChartTooltip(params))}</div>`,
+      padding: 0,
+      extraCssText: `border: 0px;`,
     },
     legend: {
       type: 'scroll',
@@ -122,6 +135,40 @@ export const getLineChartOptions = (
   };
 };
 
+export const getXAxis = (metrics: ScopedMetric[]) => {
+  const dark = isDark();
+
+  const diff = timeDiff(metrics[0]?.data[0]?.bucket, metrics[0]?.data.at(-1)?.bucket);
+  const dataLength = metrics[0]?.data?.length || 30;
+
+  return {
+    type: 'category' as const,
+    boundaryGap: true,
+    data: metrics[0]?.data.map(({ bucket }) => bucket) || ['No Data Found'],
+    axisPointer: {
+      show: true,
+      type: 'line' as const,
+      label: {
+        show: false,
+        borderWidth: 1,
+        padding: 8,
+        borderColor: resolveColor(borderColor.subtle, dark),
+        color: resolveColor(textColor.basis, dark),
+        backgroundColor: resolveColor(backgroundColor.canvasBase, dark),
+        shadowColor: resolveColor(borderColor.subtle, dark),
+        shadowBlur: 4,
+        formatter: ({ value }: any) => dateFormat(value, diff),
+      },
+      triggerTooltip: false,
+    },
+    axisLabel: {
+      interval: dataLength <= 40 ? 2 : dataLength / (dataLength / 12),
+      formatter: (value: string) => dateFormat(value, diff),
+      margin: 10,
+    },
+  };
+};
+
 export const mapEntityLines = (
   metrics: ScopedMetric[],
   entities: EntityLookup,
@@ -129,21 +176,8 @@ export const mapEntityLines = (
 ) => {
   const dark = isDark();
 
-  const diff = timeDiff(metrics[0]?.data[0]?.bucket, metrics[0]?.data.at(-1)?.bucket);
-  const dataLength = metrics[0]?.data?.length || 30;
-
   return {
-    xAxis: {
-      type: 'category' as const,
-      boundaryGap: true,
-      data: metrics[0]?.data.map(({ bucket }) => bucket) || ['No Data Found'],
-      axisPointer: { show: true, type: 'line' as const, label: { show: false } },
-      axisLabel: {
-        interval: dataLength <= 40 ? 2 : dataLength / (dataLength / 12),
-        formatter: (value: string) => dateFormat(value, diff),
-        margin: 10,
-      },
-    },
+    xAxis: getXAxis(metrics),
     series: metrics.map((f, i) => {
       return {
         ...seriesOptions,
