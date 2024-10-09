@@ -57,8 +57,8 @@ type natsSpanExporterOpts struct {
 }
 
 type StreamConf struct {
-	// Name of the NATS Stream
-	Name string
+	// Subject of the NATS Stream
+	Subject string
 	// If non zero, this means the stream is split into multiple to allow higher throughput.
 	// And the number is used in a modulur to extract the number to be used for the stream.
 	// The remain will be added to the stream name
@@ -198,7 +198,7 @@ func (e *natsSpanExporter) handleFailedExports(ctx context.Context) {
 				continue
 			}
 
-			fack, err := js.PublishAsync(e.deadletter.Name, byt,
+			fack, err := js.PublishAsync(e.deadletter.Subject, byt,
 				jetstream.WithStallWait(1*time.Second),
 				jetstream.WithRetryAttempts(20),
 			)
@@ -233,7 +233,7 @@ func (e *natsSpanExporter) handleFailedExports(ctx context.Context) {
 				PkgName: pkgName,
 				Tags: map[string]any{
 					"status": status,
-					"stream": e.deadletter.Name,
+					"stream": e.deadletter.Subject,
 				},
 			})
 		}
@@ -345,10 +345,10 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 					idx = idx % conf.DivideBy
 				}
 
-				subj := conf.Name
+				subj := conf.Subject
 				if conf.DivideBy > 0 {
 					// set index in the subject
-					subj = fmt.Sprintf("%s.%d", conf.Name, idx)
+					subj = fmt.Sprintf("%s.%d", conf.Subject, idx)
 				}
 
 				// Use async publish to increase throughput
