@@ -3209,8 +3209,8 @@ func TestQueuePartitionPeek(t *testing.T) {
 				return PriorityDefault
 			}),
 		)
-		now := time.Now()
 		enqueue(q, now)
+		requirePartitionScoreEquals(t, r, &idA, now)
 
 		// Pause A, excluding it from peek:
 		err = q.SetFunctionPaused(ctx, uuid.Nil, idA, true)
@@ -3237,6 +3237,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 			{ID: idB.String(), FunctionID: &idB, AccountID: accountId, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
 			{ID: idC.String(), FunctionID: &idC, AccountID: accountId, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
 		}, items, r.Dump())
+		requirePartitionScoreEquals(t, r, &idA, now)
 	})
 
 	t.Run("Cleans up missing partitions in account queue", func(t *testing.T) {
