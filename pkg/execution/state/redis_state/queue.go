@@ -1229,7 +1229,8 @@ func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID
 			}
 
 			// When it does get unpaused, we should immediately start processing it again
-			if err := q.PartitionRequeue(ctx, &fnPart, time.Now(), false); err != nil {
+			err := q.PartitionRequeue(ctx, &fnPart, time.Now(), false)
+			if err != nil && !errors.Is(err, ErrPartitionNotFound) && !errors.Is(err, ErrPartitionGarbageCollected) {
 				return fmt.Errorf("could not requeue partition after modifying paused state to %t: %w", paused, err)
 			}
 		}
