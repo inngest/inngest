@@ -34,6 +34,8 @@ type natsSpanExporter struct {
 	streams    []*StreamConf
 	conn       *broker.NatsConnector
 	deadletter *StreamConf
+	// The channel to be used for sending spans to the deadletter queue
+	dlc chan *runv2.Span
 }
 
 type natsSpanExporterOpts struct {
@@ -43,8 +45,15 @@ type natsSpanExporterOpts struct {
 	// The path of the nkey file to be used for authentication
 	nkeyFile string
 	// The credentials file to be used for authentication
-	credsFile  string
+	credsFile string
+	// The deadletter stream to send the failed attempts to
 	deadletter *StreamConf
+	// The number of goroutines to handle deadletter delivery
+	// defaults to 100
+	dlConcurrency int
+	// The buffer to be used for the deadletter channel
+	// defaults to 10,000
+	dlcBuffer int
 }
 
 type StreamConf struct {
@@ -99,7 +108,9 @@ func NewNATSSpanExporter(ctx context.Context, opts ...NatsExporterOpts) (trace.S
 	}
 
 	expOpts := &natsSpanExporterOpts{
-		streams: []*StreamConf{},
+		streams:       []*StreamConf{},
+		dlConcurrency: 100,
+		dlcBuffer:     10_000,
 	}
 	for _, apply := range opts {
 		apply(expOpts)
@@ -138,10 +149,95 @@ func NewNATSSpanExporter(ctx context.Context, opts ...NatsExporterOpts) (trace.S
 		streams = append(streams, conf)
 	}
 
-	return &natsSpanExporter{
+	exporter := &natsSpanExporter{
 		streams: streams,
 		conn:    conn,
-	}, nil
+		dlc:     make(chan *runv2.Span, expOpts.dlcBuffer),
+	}
+
+	for i := 0; i < expOpts.dlConcurrency; i++ {
+		go exporter.handleFailedExports(ctx)
+	}
+
+	return exporter, nil
+}
+
+func (e *natsSpanExporter) handleFailedExports(ctx context.Context) {
+	js, err := e.conn.JSConn()
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error access Jetstream connection")
+
+		return
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case span := <-e.dlc:
+			metrics.IncrSpanBatchProcessorDeadLetterCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
+
+			if e.deadletter == nil {
+				continue
+			}
+
+			id := span.Id
+
+			byt, err := proto.Marshal(span)
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("error serializing span to protobuf",
+					"error", err,
+					"deadletter", true,
+					"acctID", id.AccountId,
+					"wsID", id.EnvId,
+					"wfID", id.FunctionId,
+					"runID", id.RunId,
+				)
+
+				continue
+			}
+
+			fack, err := js.PublishAsync(e.deadletter.Name, byt,
+				jetstream.WithStallWait(1*time.Second),
+				jetstream.WithRetryAttempts(20),
+			)
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("error on async publish to nats stream",
+					"error", err,
+					"acctID", id.AccountId,
+					"wsID", id.EnvId,
+					"wfID", id.FunctionId,
+					"runID", id.RunId,
+				)
+				continue
+			}
+
+			status := "unknown"
+			select {
+			case <-fack.Ok():
+				status = "success"
+			case err := <-fack.Err():
+				status = "error"
+
+				logger.StdlibLogger(ctx).Error("error with async publish to deadletter stream",
+					"error", err,
+					"acctID", id.AccountId,
+					"wsID", id.EnvId,
+					"wfID", id.FunctionId,
+					"runID", id.RunId,
+				)
+			}
+
+			metrics.IncrSpanBatchProcessorDeadLetterPublishStatusCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"status": status,
+					"stream": e.deadletter.Name,
+				},
+			})
+		}
+	}
 }
 
 func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOnlySpan) error {
@@ -268,6 +364,9 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 						"wfID", id.FunctionId,
 						"runID", id.RunId,
 					)
+
+					e.dlc <- span
+
 					return
 				}
 
@@ -288,6 +387,8 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 						"wfID", id.FunctionId,
 						"runID", id.RunId,
 					)
+
+					e.dlc <- span
 				}
 
 				metrics.IncrSpanExportedCounter(ctx, metrics.CounterOpt{
