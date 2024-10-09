@@ -3209,6 +3209,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 				return PriorityDefault
 			}),
 		)
+		now := time.Now()
 		enqueue(q, now)
 		requirePartitionScoreEquals(t, r, &idA, now)
 
