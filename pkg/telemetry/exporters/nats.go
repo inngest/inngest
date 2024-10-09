@@ -37,13 +37,14 @@ type natsSpanExporter struct {
 }
 
 type natsSpanExporterOpts struct {
-	streams []StreamConf
+	streams []*StreamConf
 	// Comma delimited URLs of the NATS server to use
 	urls string
 	// The path of the nkey file to be used for authentication
 	nkeyFile string
 	// The credentials file to be used for authentication
-	credsFile string
+	credsFile  string
+	deadletter *StreamConf
 }
 
 type StreamConf struct {
@@ -61,13 +62,45 @@ type StreamConf struct {
 
 type NatsExporterOpts func(n *natsSpanExporterOpts)
 
+func WithNatsExporterStream(stream StreamConf) NatsExporterOpts {
+	return func(n *natsSpanExporterOpts) {
+		n.streams = append(n.streams, &stream)
+	}
+}
+
+func WithNatsExporterUrls(urls string) NatsExporterOpts {
+	return func(n *natsSpanExporterOpts) {
+		n.urls = urls
+	}
+}
+
+func WithNatsExporterNKeyFile(nkeyFilePath string) NatsExporterOpts {
+	return func(n *natsSpanExporterOpts) {
+		n.nkeyFile = nkeyFilePath
+	}
+}
+
+func WithNatsExporterCredsFile(credsFilePath string) NatsExporterOpts {
+	return func(n *natsSpanExporterOpts) {
+		n.credsFile = credsFilePath
+	}
+}
+
+func WithNatsExporterDeadLetter(s StreamConf) NatsExporterOpts {
+	return func(n *natsSpanExporterOpts) {
+		n.deadletter = &s
+	}
+}
+
 // NewNATSSpanExporter creates an otel compatible exporter that ships the spans to NATS
 func NewNATSSpanExporter(ctx context.Context, opts ...NatsExporterOpts) (trace.SpanExporter, error) {
 	if len(opts) == 0 {
 		return nil, fmt.Errorf("no nats exporter options provided")
 	}
 
-	expOpts := &natsSpanExporterOpts{}
+	expOpts := &natsSpanExporterOpts{
+		streams: []*StreamConf{},
+	}
 	for _, apply := range opts {
 		apply(expOpts)
 	}

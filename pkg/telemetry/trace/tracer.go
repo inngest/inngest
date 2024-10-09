@@ -67,7 +67,7 @@ type TracerOpts struct {
 	TraceURLPath             string
 	TraceMaxPayloadSizeBytes int
 
-	NATS *exporters.NatsExporterOpts
+	NATS []exporters.NatsExporterOpts
 }
 
 func (o TracerOpts) Endpoint() string {
@@ -377,11 +377,11 @@ func newTextMapPropagator() propagation.TextMapPropagator {
 }
 
 func newNatsTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
-	if opts.NATS == nil {
-		return nil, fmt.Errorf("nats options not available")
+	if len(opts.NATS) == 0 {
+		return nil, fmt.Errorf("nats options not provided")
 	}
 
-	exp, err := exporters.NewNATSSpanExporter(ctx, opts.NATS)
+	exp, err := exporters.NewNATSSpanExporter(ctx, opts.NATS...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating NATS trace client: %w", err)
 	}
