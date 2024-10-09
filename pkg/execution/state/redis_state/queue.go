@@ -75,6 +75,7 @@ const (
 	//       worst case.
 	PartitionConcurrencyLimitRequeueExtension = 5 * time.Second
 	PartitionThrottleLimitRequeueExtension    = 2 * time.Second
+	PartitionPausedRequeueExtension           = 24 * time.Hour
 	PartitionLookahead                        = time.Second
 
 	// default values
@@ -1183,7 +1184,8 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 
 // SetFunctionPaused sets the "Paused" flag (represented in JSON as "off") for the given
 // function ID's queue partition.
-func (q *queue) SetFunctionPaused(ctx context.Context, fnID uuid.UUID, paused bool) error {
+// If a function is unpaused, we requeue the partition with a score of "now" to ensure that it is processed.
+func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, paused bool) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionPaused"), redis_telemetry.ScopeQueue)
 
 	pausedArg := "0"
@@ -1217,6 +1219,21 @@ func (q *queue) SetFunctionPaused(ctx context.Context, fnID uuid.UUID, paused bo
 	}
 	switch status {
 	case 0:
+		// If a function was paused, there's no need to process it. We can push back paused partitions for a long time.
+		// Instead of doing this here, we push back paused partitions in partitionPeek to prevent racing a currently processing partition.
+		if !paused {
+			fnPart := QueuePartition{
+				ID:         fnID.String(),
+				FunctionID: &fnID,
+				AccountID:  accountId,
+			}
+
+			// When it does get unpaused, we should immediately start processing it again
+			if err := q.PartitionRequeue(ctx, &fnPart, time.Now(), false); err != nil {
+				return fmt.Errorf("could not requeue partition after modifying paused state to %t: %w", paused, err)
+			}
+		}
+
 		return nil
 	default:
 		return fmt.Errorf("unknown response updating paused state: %d", status)
@@ -2422,6 +2439,14 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		// check pause
 		if item.FunctionID != nil {
 			if paused := fnIDs[*item.FunctionID]; paused {
+				// Function is pulled up when it is unpaused, so we can push it back for a long time (see SetFunctionPaused)
+				err := q.PartitionRequeue(ctx, item, q.clock.Now().Truncate(time.Second).Add(PartitionPausedRequeueExtension), true)
+				if err != nil {
+					q.logger.Error().Interface("partition", item).Msg("failed to push back paused partition")
+				} else {
+					q.logger.Trace().Interface("partition", item.Queue()).Msg("pushed back paused partition")
+				}
+
 				ignored++
 				continue
 			}

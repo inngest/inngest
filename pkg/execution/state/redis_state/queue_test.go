@@ -424,17 +424,30 @@ func TestQueueEnqueueItem(t *testing.T) {
 	t.Run("Enqueueing to a paused partition does not affect the partition's pause state", func(t *testing.T) {
 		now := time.Now()
 		workflowId := uuid.New()
+		accountId := uuid.New()
 
 		item, err := q.EnqueueItem(ctx, QueueItem{
 			FunctionID: workflowId,
+			Data: osqueue.Item{
+				Identifier: state.Identifier{
+					WorkflowID: workflowId,
+					AccountID:  accountId,
+				},
+			},
 		}, now.Add(10*time.Second))
 		require.NoError(t, err)
 
-		err = q.SetFunctionPaused(ctx, item.FunctionID, true)
+		err = q.SetFunctionPaused(ctx, accountId, item.FunctionID, true)
 		require.NoError(t, err)
 
 		item, err = q.EnqueueItem(ctx, QueueItem{
 			FunctionID: workflowId,
+			Data: osqueue.Item{
+				Identifier: state.Identifier{
+					WorkflowID: workflowId,
+					AccountID:  accountId,
+				},
+			},
 		}, now)
 		require.NoError(t, err)
 
@@ -443,6 +456,12 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 		item, err = q.EnqueueItem(ctx, QueueItem{
 			FunctionID: workflowId,
+			Data: osqueue.Item{
+				Identifier: state.Identifier{
+					WorkflowID: workflowId,
+					AccountID:  accountId,
+				},
+			},
 		}, now.Add(-10*time.Second))
 		require.NoError(t, err)
 
@@ -2833,7 +2852,7 @@ func TestQueuePartitionLease(t *testing.T) {
 
 		t.Run("Fails to lease a paused partition", func(t *testing.T) {
 			// pause fn A's partition:
-			err = q.SetFunctionPaused(ctx, idA, true)
+			err = q.SetFunctionPaused(ctx, uuid.Nil, idA, true)
 			require.NoError(t, err)
 
 			// attempt to lease the paused partition:
@@ -2846,7 +2865,7 @@ func TestQueuePartitionLease(t *testing.T) {
 
 		t.Run("Succeeds to lease a previously paused partition", func(t *testing.T) {
 			// unpause fn A's partition:
-			err = q.SetFunctionPaused(ctx, idA, false)
+			err = q.SetFunctionPaused(ctx, uuid.Nil, idA, false)
 			require.NoError(t, err)
 
 			// attempt to lease the unpaused partition:
@@ -3032,7 +3051,6 @@ func TestQueuePartitionPeek(t *testing.T) {
 	}
 
 	now := time.Now().Truncate(time.Second).UTC()
-	atA, atB, atC := now, now.Add(2*time.Second), now.Add(4*time.Second)
 
 	r := miniredis.RunT(t)
 
@@ -3059,7 +3077,9 @@ func TestQueuePartitionPeek(t *testing.T) {
 	)
 	ctx := context.Background()
 
-	enqueue := func(q *queue) {
+	enqueue := func(q *queue, now time.Time) {
+		atA, atB, atC := now, now.Add(2*time.Second), now.Add(4*time.Second)
+
 		_, err := q.EnqueueItem(ctx, newQueueItem(idA), atA)
 		require.NoError(t, err)
 		_, err = q.EnqueueItem(ctx, newQueueItem(idB), atB)
@@ -3067,7 +3087,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 		_, err = q.EnqueueItem(ctx, newQueueItem(idC), atC)
 		require.NoError(t, err)
 	}
-	enqueue(q)
+	enqueue(q, now)
 
 	t.Run("Sequentially returns partitions in order", func(t *testing.T) {
 		items, err := q.PartitionPeek(ctx, true, time.Now().Add(time.Hour), PartitionPeekMax)
@@ -3157,10 +3177,10 @@ func TestQueuePartitionPeek(t *testing.T) {
 			WithDenyQueueNames(idA.String()),
 		)
 
-		enqueue(q)
+		enqueue(q, now)
 
 		// This should only select B and C, as id A is ignored.
-		items, err := q.PartitionPeek(ctx, true, time.Now().Add(time.Hour), PartitionPeekMax)
+		items, err := q.PartitionPeek(ctx, true, now.Add(time.Hour), PartitionPeekMax)
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		require.EqualValues(t, []*QueuePartition{
@@ -3169,7 +3189,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 		}, items)
 
 		// Try without sequential scans
-		items, err = q.PartitionPeek(ctx, false, time.Now().Add(time.Hour), PartitionPeekMax)
+		items, err = q.PartitionPeek(ctx, false, now.Add(time.Hour), PartitionPeekMax)
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 	})
@@ -3189,23 +3209,26 @@ func TestQueuePartitionPeek(t *testing.T) {
 				return PriorityDefault
 			}),
 		)
-		enqueue(q)
+		now := time.Now()
+		enqueue(q, now)
+		requirePartitionScoreEquals(t, r, &idA, now)
 
 		// Pause A, excluding it from peek:
-		err = q.SetFunctionPaused(ctx, idA, true)
+		err = q.SetFunctionPaused(ctx, uuid.Nil, idA, true)
 		require.NoError(t, err)
 
 		// This should only select B and C, as id A is ignored:
-		items, err := q.PartitionPeek(ctx, true, time.Now().Add(time.Hour), PartitionPeekMax)
+		items, err := q.PartitionPeek(ctx, true, now.Add(time.Hour), PartitionPeekMax)
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		require.EqualValues(t, []*QueuePartition{
 			{ID: idB.String(), FunctionID: &idB, AccountID: accountId, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
 			{ID: idC.String(), FunctionID: &idC, AccountID: accountId, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
 		}, items)
+		requirePartitionScoreEquals(t, r, &idA, now.Add(24*time.Hour))
 
 		// After unpausing A, it should be included in the peek:
-		err = q.SetFunctionPaused(ctx, idA, false)
+		err = q.SetFunctionPaused(ctx, uuid.Nil, idA, false)
 		require.NoError(t, err)
 		items, err = q.PartitionPeek(ctx, true, time.Now().Add(time.Hour), PartitionPeekMax)
 		require.NoError(t, err)
@@ -3215,6 +3238,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 			{ID: idB.String(), FunctionID: &idB, AccountID: accountId, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
 			{ID: idC.String(), FunctionID: &idC, AccountID: accountId, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
 		}, items, r.Dump())
+		requirePartitionScoreEquals(t, r, &idA, now)
 	})
 
 	t.Run("Cleans up missing partitions in account queue", func(t *testing.T) {
@@ -3232,7 +3256,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 				return PriorityDefault
 			}),
 		)
-		enqueue(q)
+		enqueue(q, now)
 
 		// Create inconsistency: Delete partition item from partition hash and global partition index but _not_ account partitions
 		err = rc.Do(ctx, rc.B().Hdel().Key(q.u.kg.PartitionItem()).Field(idA.String()).Build()).Error()
@@ -3342,7 +3366,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 			_, _, err = q.PartitionLease(ctx, &QueuePartition{FunctionID: &idA}, time.Minute)
 			require.NoError(t, err)
 
-			err = q.SetFunctionPaused(ctx, idA, true)
+			err = q.SetFunctionPaused(ctx, uuid.Nil, idA, true)
 			require.NoError(t, err)
 
 			err = q.PartitionRequeue(ctx, &p, next, true)
@@ -3489,13 +3513,13 @@ func TestQueueFunctionPause(t *testing.T) {
 	_, err = q.EnqueueItem(ctx, QueueItem{FunctionID: idA}, now)
 	require.NoError(t, err)
 
-	err = q.SetFunctionPaused(ctx, idA, true)
+	err = q.SetFunctionPaused(ctx, uuid.Nil, idA, true)
 	require.NoError(t, err)
 
 	fnMeta := getFnMetadata(t, r, idA)
 	require.True(t, fnMeta.Paused)
 
-	err = q.SetFunctionPaused(ctx, idA, false)
+	err = q.SetFunctionPaused(ctx, uuid.Nil, idA, false)
 	require.NoError(t, err)
 
 	fnMeta = getFnMetadata(t, r, idA)
