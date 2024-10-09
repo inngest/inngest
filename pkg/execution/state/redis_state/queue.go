@@ -1277,10 +1277,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		guaranteedCapacity *GuaranteedCapacity
 
 		// initialize guaranteed capacity key for automatic cleanup
-		guaranteedCapacityKey = GuaranteedCapacity{
-			Scope:     enums.GuaranteedCapacityScopeAccount,
-			AccountID: i.Data.Identifier.AccountID,
-		}.Key()
+		guaranteedCapacityKey = guaranteedCapacityKeyForAccount(i.Data.Identifier.AccountID)
 	)
 	if q.gcf != nil && !isSystemPartition {
 		// Fetch guaranteed capacity for the given account. If there is no guaranteed

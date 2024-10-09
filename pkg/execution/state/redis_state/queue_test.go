@@ -4021,13 +4021,13 @@ func TestAccountLease(t *testing.T) {
 
 	_, err = q.EnqueueItem(ctx, QueueItem{Data: osqueue.Item{Identifier: state.Identifier{AccountID: idA}}}, time.Now())
 	require.NoError(t, err)
-	exists, err := rc.Do(ctx, rc.B().Hexists().Key(q.u.kg.GuaranteedCapacityMap()).Field(GuaranteedCapacity{AccountID: idA}.Key()).Build()).AsBool()
+	exists, err := rc.Do(ctx, rc.B().Hexists().Key(q.u.kg.GuaranteedCapacityMap()).Field(guaranteedCapacityKeyForAccount(idA)).Build()).AsBool()
 	require.NoError(t, err)
 	require.True(t, exists, r.Dump())
 
 	_, err = q.EnqueueItem(ctx, QueueItem{Data: osqueue.Item{Identifier: state.Identifier{AccountID: idB}}}, time.Now())
 	require.NoError(t, err)
-	exists, err = rc.Do(ctx, rc.B().Hexists().Key(q.u.kg.GuaranteedCapacityMap()).Field(GuaranteedCapacity{AccountID: idB}.Key()).Build()).AsBool()
+	exists, err = rc.Do(ctx, rc.B().Hexists().Key(q.u.kg.GuaranteedCapacityMap()).Field(guaranteedCapacityKeyForAccount(idB)).Build()).AsBool()
 	require.NoError(t, err)
 	require.True(t, exists, r.Dump())
 
