@@ -5,13 +5,14 @@ import {
   connect,
   getInstanceByDom,
   init,
+  type DefaultLabelFormatterCallbackParams,
   type EChartsOption,
   type LegendComponentOption,
   type LineSeriesOption,
   type SetOptionOpts,
 } from 'echarts';
 
-export type { LineSeriesOption, LegendComponentOption };
+export type { LineSeriesOption, LegendComponentOption, DefaultLabelFormatterCallbackParams };
 
 export interface ChartProps {
   option: EChartsOption;
@@ -30,10 +31,10 @@ export const Chart = ({
 }: ChartProps) => {
   const chartRef = useRef<HTMLDivElement>(null);
 
-  const toggleTooltip = (show: boolean) => {
+  const toggleTooltips = (show: boolean) => {
     if (chartRef.current !== null) {
       const chart = getInstanceByDom(chartRef.current);
-      chart?.setOption({ tooltip: { show } });
+      chart?.setOption({ tooltip: { show }, xAxis: { axisPointer: { label: { show } } } });
     }
   };
 
@@ -71,8 +72,8 @@ export const Chart = ({
     <div
       ref={chartRef}
       className={className}
-      {...(group && { onMouseEnter: () => toggleTooltip(true) })}
-      {...(group && { onMouseLeave: () => toggleTooltip(false) })}
+      {...(group && { onMouseEnter: () => toggleTooltips(true) })}
+      {...(group && { onMouseLeave: () => toggleTooltips(false) })}
     />
   );
 };
