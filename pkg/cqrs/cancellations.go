@@ -8,6 +8,7 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+// CancellationReadWriter reads/writes cancellation records in a backing store.
 type CancellationReadWriter interface {
 	CancellationReader
 	CancellationWriter
