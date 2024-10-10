@@ -4,6 +4,8 @@ import { NewButton } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
 import CommandBlock from '@inngest/components/CodeBlock/CommandBlock';
 import { NewLink } from '@inngest/components/Link';
+import { IconSpinner } from '@inngest/components/icons/Spinner';
+import { RiCheckboxCircleFill, RiExternalLinkLine } from '@remixicon/react';
 
 import { pathCreator } from '@/utils/urls';
 import { OnboardingSteps } from '../Onboarding/types';
@@ -13,7 +15,7 @@ const tabs = [
   {
     title: 'npm',
     content: 'npm install inngest',
-    language: 'shell',
+    language: 'shell', // TODO: add shell language to monaco
   },
   {
     title: 'yarn',
@@ -37,6 +39,11 @@ export default function CreateApp() {
   const [activeTab, setActiveTab] = useState(tabs[0]?.title || '');
   const currentTabContent = tabs.find((tab) => tab.title === activeTab) || tabs[0];
   const router = useRouter();
+
+  {
+    /* TODO: add request to check dev server with polling */
+  }
+  const devServerIsRunning = false;
 
   return (
     <div className="text-subtle">
@@ -67,15 +74,41 @@ export default function CreateApp() {
         <CommandBlock currentTabContent={currentTabContent} />
       </CommandBlock.Wrapper>
       <Card className="my-6">
-        <div className="p-4">
-          <p className=" text-basis text-base font-medium">Dev Server UI</p>
-          <p className="text-sm">
-            Open the Dev Server at{' '}
-            <code className="text-basis bg-canvasMuted rounded-sm px-1.5 py-0.5 text-xs">
-              http://localhost:8288
-            </code>{' '}
-            and follow the guide to create your app.
-          </p>
+        <div className="flex items-center justify-between gap-2 p-4">
+          <div>
+            <div className="mb-1 flex items-center gap-1">
+              <p className=" text-basis text-base font-medium">Dev Server UI</p>
+              {devServerIsRunning && (
+                <div className="text-success flex items-center gap-0.5 text-sm">
+                  <RiCheckboxCircleFill className="h-4 w-4" />
+                  Running
+                </div>
+              )}
+            </div>
+            <p className="text-sm">
+              Open the Dev Server at{' '}
+              <code className="text-basis bg-canvasMuted rounded-sm px-1.5 py-0.5 text-xs">
+                http://localhost:8288
+              </code>{' '}
+              and follow the guide to create your app.
+            </p>
+          </div>
+          {devServerIsRunning ? (
+            <NewButton
+              icon={<RiExternalLinkLine />}
+              iconSide="left"
+              appearance="outlined"
+              label="Open"
+              href="http://localhost:8288"
+              target="_blank"
+              rel="noopener noreferrer"
+            />
+          ) : (
+            <div className="text-link flex items-center gap-1.5 text-sm">
+              <IconSpinner className="fill-link h-4 w-4" />
+              Searching
+            </div>
+          )}
         </div>
       </Card>
       <div className="flex items-center gap-2">
@@ -86,7 +119,15 @@ export default function CreateApp() {
             router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.DeployApp }));
           }}
         />
-        <NewButton appearance="outlined" label="I already have an Inngest app" />
+        {/* TODO: add tracking */}
+        <NewButton
+          appearance="outlined"
+          label="I already have an Inngest app"
+          onClick={() => {
+            updateLastCompletedStep(OnboardingSteps.CreateApp);
+            router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.DeployApp }));
+          }}
+        />
       </div>
     </div>
   );
