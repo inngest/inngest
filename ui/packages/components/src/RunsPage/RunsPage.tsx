@@ -360,7 +360,7 @@ export function RunsPage({
                 scrollToTop();
                 onSearch(content);
               }}
-              placeholder="event.data.userId = “1234” or output.count > 10"
+              placeholder="event.data.userId == “1234” or output.count > 10"
             />
           </>
         )}
