@@ -1,4 +1,4 @@
-import type { DefaultLabelFormatterCallbackParams } from '@inngest/components/Chart/Chart.jsx';
+import type { DefaultLabelFormatterCallbackParams } from '@inngest/components/Chart/Chart';
 import { RiFileCopyLine } from '@remixicon/react';
 
 export const ChartTooltip = ({

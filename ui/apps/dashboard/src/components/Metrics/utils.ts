@@ -101,7 +101,7 @@ export const getLineChartOptions = (
       appendTo: () => document.getElementById('chart-tooltip'),
       transitionDuration: 1,
       //
-      // rendering our tooltip componen to a string doesn't support click events
+      // rendering our tooltip component to a string removes click events,
       // so wrap the whole thing in a vanilla js clipboard cliip handler
       formatter: (params: any) =>
         `<div onclick="navigator.clipboard.writeText('${
