@@ -104,6 +104,7 @@ const documents = {
     "\n  mutation testCredentials($input: CDCConnectionInput!, $envID: UUID!) {\n    cdcTestCredentials(input: $input, envID: $envID) {\n      steps\n      error\n    }\n  }\n": types.TestCredentialsDocument,
     "\n  mutation testReplication($input: CDCConnectionInput!, $envID: UUID!) {\n    cdcTestLogicalReplication(input: $input, envID: $envID) {\n      steps\n      error\n    }\n  }\n": types.TestReplicationDocument,
     "\n  mutation testAutoSetup($input: CDCConnectionInput!, $envID: UUID!) {\n    cdcAutoSetup(input: $input, envID: $envID) {\n      steps\n      error\n    }\n  }\n": types.TestAutoSetupDocument,
+    "\n  mutation testManualSetup($input: CDCConnectionInput!, $envID: UUID!) {\n    cdcManualSetup(input: $input, envID: $envID) {\n      steps\n      error\n    }\n  }\n": types.TestManualSetupDocument,
     "\n  fragment TraceDetails on RunTraceSpan {\n    name\n    status\n    attempts\n    queuedAt\n    startedAt\n    endedAt\n    isRoot\n    outputID\n    spanID\n    stepOp\n    stepInfo {\n      __typename\n      ... on InvokeStepInfo {\n        triggeringEventID\n        functionID\n        timeout\n        returnEventID\n        runID\n        timedOut\n      }\n      ... on SleepStepInfo {\n        sleepUntil\n      }\n      ... on WaitForEventStepInfo {\n        eventName\n        expression\n        timeout\n        foundEventID\n        timedOut\n      }\n    }\n  }\n": types.TraceDetailsFragmentDoc,
     "\n  query GetRunTrace($envID: ID!, $runID: String!) {\n    workspace(id: $envID) {\n      run(runID: $runID) {\n        function {\n          app {\n            name\n            externalID\n          }\n          id\n          name\n          slug\n        }\n        trace {\n          ...TraceDetails\n          childrenSpans {\n            ...TraceDetails\n            childrenSpans {\n              ...TraceDetails\n            }\n          }\n        }\n      }\n    }\n  }\n": types.GetRunTraceDocument,
     "\n  query TraceResult($envID: ID!, $traceID: String!) {\n    workspace(id: $envID) {\n      runTraceSpanOutputByID(outputID: $traceID) {\n        data\n        error {\n          message\n          name\n          stack\n        }\n      }\n    }\n  }\n": types.TraceResultDocument,
@@ -504,6 +505,10 @@ export function graphql(source: "\n  mutation testReplication($input: CDCConnect
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation testAutoSetup($input: CDCConnectionInput!, $envID: UUID!) {\n    cdcAutoSetup(input: $input, envID: $envID) {\n      steps\n      error\n    }\n  }\n"): (typeof documents)["\n  mutation testAutoSetup($input: CDCConnectionInput!, $envID: UUID!) {\n    cdcAutoSetup(input: $input, envID: $envID) {\n      steps\n      error\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation testManualSetup($input: CDCConnectionInput!, $envID: UUID!) {\n    cdcManualSetup(input: $input, envID: $envID) {\n      steps\n      error\n    }\n  }\n"): (typeof documents)["\n  mutation testManualSetup($input: CDCConnectionInput!, $envID: UUID!) {\n    cdcManualSetup(input: $input, envID: $envID) {\n      steps\n      error\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
