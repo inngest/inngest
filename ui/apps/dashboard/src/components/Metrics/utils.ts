@@ -150,6 +150,7 @@ export const getXAxis = (metrics: ScopedMetric[]) => {
       type: 'line' as const,
       label: {
         show: false,
+        snap: true,
         borderWidth: 1,
         padding: 8,
         borderColor: resolveColor(borderColor.subtle, dark),
