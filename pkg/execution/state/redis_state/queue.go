@@ -1196,7 +1196,7 @@ func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID
 	// This is written to the store if fn metadata doesn't exist.
 	defaultFnMetadata := FnMetadata{
 		FnID:   fnID,
-		Paused: true,
+		Paused: paused,
 	}
 
 	keys := []string{q.u.kg.FnMetadata(fnID)}
@@ -1231,6 +1231,7 @@ func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID
 			// When it does get unpaused, we should immediately start processing it again
 			err := q.PartitionRequeue(ctx, &fnPart, time.Now(), false)
 			if err != nil && !errors.Is(err, ErrPartitionNotFound) && !errors.Is(err, ErrPartitionGarbageCollected) {
+
 				return fmt.Errorf("could not requeue partition after modifying paused state to %t: %w", paused, err)
 			}
 		}
@@ -2442,8 +2443,8 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 			if paused := fnIDs[*item.FunctionID]; paused {
 				// Function is pulled up when it is unpaused, so we can push it back for a long time (see SetFunctionPaused)
 				err := q.PartitionRequeue(ctx, item, q.clock.Now().Truncate(time.Second).Add(PartitionPausedRequeueExtension), true)
-				if err != nil {
-					q.logger.Error().Interface("partition", item).Msg("failed to push back paused partition")
+				if err != nil && !errors.Is(err, ErrPartitionGarbageCollected) {
+					q.logger.Error().Interface("partition", item).Err(err).Msg("failed to push back paused partition")
 				} else {
 					q.logger.Trace().Interface("partition", item.Queue()).Msg("pushed back paused partition")
 				}
