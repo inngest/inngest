@@ -142,16 +142,9 @@ func NewNATSSpanExporter(ctx context.Context, opts ...NatsExporterOpts) (trace.S
 		return nil, fmt.Errorf("error setting up nats: %w", err)
 	}
 
-	dedup := map[string]*StreamConf{}
-
-	streams := []*StreamConf{}
-	for _, conf := range dedup {
-		streams = append(streams, conf)
-	}
-
 	exporter := &natsSpanExporter{
-		streams: streams,
 		conn:    conn,
+		streams: expOpts.streams,
 		dlc:     make(chan *runv2.Span, expOpts.dlcBuffer),
 	}
 
@@ -341,12 +334,12 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 				}
 
 				idx := atomic.LoadUint64(&i)
-				if idx > 0 {
-					idx = idx % conf.DivideBy
-				}
-
 				subj := conf.Subject
 				if conf.DivideBy > 0 {
+					if idx > 0 {
+						idx = idx % conf.DivideBy
+					}
+
 					// set index in the subject
 					subj = fmt.Sprintf("%s.%d", conf.Subject, idx)
 				}
