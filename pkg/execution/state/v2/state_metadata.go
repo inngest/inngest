@@ -3,6 +3,7 @@ package state
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -117,9 +118,14 @@ type Config struct {
 	ForceStepPlan bool
 	// Context allows storing arbitrary context for a run.
 	Context map[string]any
+
+	mu sync.Mutex
 }
 
 func (c *Config) EventID() ulid.ULID {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if len(c.EventIDs) > 0 {
 		return c.EventIDs[0]
 	}
@@ -149,12 +155,18 @@ func (c *Config) initContext() {
 }
 
 func (c *Config) SetCronSchedule(schedule string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.initContext()
 	c.Context[cronScheduleKey] = schedule
 }
 
 // CronSchedule retrieves the stored cron schedule information if available
 func (c *Config) CronSchedule() *string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if c.Context == nil {
 		return nil
 	}
@@ -169,12 +181,18 @@ func (c *Config) CronSchedule() *string {
 }
 
 func (c *Config) SetFunctionSlug(slug string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.initContext()
 	c.Context[fnslugKey] = slug
 }
 
 // FunctionSlug retrieves the stored function slug if available
 func (c *Config) FunctionSlug() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if c.Context == nil {
 		return ""
 	}
@@ -189,11 +207,17 @@ func (c *Config) FunctionSlug() string {
 }
 
 func (c *Config) SetTraceLink(link string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.initContext()
 	c.Context[traceLinkKey] = link
 }
 
 func (c *Config) TraceLink() *string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if c.Context == nil {
 		return nil
 	}
@@ -208,11 +232,17 @@ func (c *Config) TraceLink() *string {
 }
 
 func (c *Config) SetDebounceFlag(flag bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.initContext()
 	c.Context[debounceKey] = flag
 }
 
 func (c *Config) DebounceFlag() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if c.Context == nil {
 		return false
 	}
@@ -227,11 +257,17 @@ func (c *Config) DebounceFlag() bool {
 }
 
 func (c *Config) SetFunctionTrace(carrier *itrace.TraceCarrier) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.initContext()
 	c.Context[consts.OtelPropagationKey] = carrier
 }
 
 func (c *Config) FunctionTrace() *itrace.TraceCarrier {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if c.Context == nil {
 		return nil
 	}
@@ -259,6 +295,9 @@ func (c *Config) FunctionTrace() *itrace.TraceCarrier {
 //
 // - evtID => ULID
 func (c *Config) SetEventIDMapping(evts []event.TrackedEvent) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.initContext()
 
 	m := map[string]ulid.ULID{}
@@ -274,6 +313,9 @@ func (c *Config) SetEventIDMapping(evts []event.TrackedEvent) {
 }
 
 func (c *Config) EventIDMapping() map[string]ulid.ULID {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if c.Context == nil {
 		return nil
 	}
