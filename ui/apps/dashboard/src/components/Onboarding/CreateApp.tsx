@@ -43,7 +43,9 @@ export default function CreateApp() {
   {
     /* TODO: add request to check dev server with polling */
   }
-  const devServerIsRunning = false;
+  const devServerIsRunning = (): boolean => {
+    return Math.random() < 0.5;
+  };
 
   return (
     <div className="text-subtle">
@@ -78,7 +80,7 @@ export default function CreateApp() {
           <div>
             <div className="mb-1 flex items-center gap-1">
               <p className=" text-basis text-base font-medium">Dev Server UI</p>
-              {devServerIsRunning && (
+              {devServerIsRunning() && (
                 <div className="text-success flex items-center gap-0.5 text-sm">
                   <RiCheckboxCircleFill className="h-4 w-4" />
                   Running
@@ -93,7 +95,7 @@ export default function CreateApp() {
               and follow the guide to create your app.
             </p>
           </div>
-          {devServerIsRunning ? (
+          {devServerIsRunning() ? (
             <NewButton
               icon={<RiExternalLinkLine />}
               iconSide="left"
