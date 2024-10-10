@@ -69,6 +69,13 @@ type Tenant struct {
 	AccountID uuid.UUID
 }
 
+func InitConfig(c *Config) *Config {
+	if c.mu == nil {
+		c.mu = &sync.RWMutex{}
+	}
+	return c
+}
+
 // Config represents run config, stored within metadata.
 type Config struct {
 	// FunctionVersion stores the version of the function used when the run is
@@ -119,12 +126,12 @@ type Config struct {
 	// Context allows storing arbitrary context for a run.
 	Context map[string]any
 
-	mu sync.Mutex
+	mu *sync.RWMutex
 }
 
 func (c *Config) EventID() ulid.ULID {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	if len(c.EventIDs) > 0 {
 		return c.EventIDs[0]
@@ -155,8 +162,8 @@ func (c *Config) initContext() {
 }
 
 func (c *Config) SetCronSchedule(schedule string) {
-	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.mu.Lock()
 
 	c.initContext()
 	c.Context[cronScheduleKey] = schedule
@@ -164,8 +171,8 @@ func (c *Config) SetCronSchedule(schedule string) {
 
 // CronSchedule retrieves the stored cron schedule information if available
 func (c *Config) CronSchedule() *string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	if c.Context == nil {
 		return nil
@@ -190,8 +197,8 @@ func (c *Config) SetFunctionSlug(slug string) {
 
 // FunctionSlug retrieves the stored function slug if available
 func (c *Config) FunctionSlug() string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	if c.Context == nil {
 		return ""
@@ -215,8 +222,8 @@ func (c *Config) SetTraceLink(link string) {
 }
 
 func (c *Config) TraceLink() *string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	if c.Context == nil {
 		return nil
@@ -240,8 +247,8 @@ func (c *Config) SetDebounceFlag(flag bool) {
 }
 
 func (c *Config) DebounceFlag() bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	if c.Context == nil {
 		return false
@@ -313,8 +320,8 @@ func (c *Config) SetEventIDMapping(evts []event.TrackedEvent) {
 }
 
 func (c *Config) EventIDMapping() map[string]ulid.ULID {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	if c.Context == nil {
 		return nil

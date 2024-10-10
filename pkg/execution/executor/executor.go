@@ -407,7 +407,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// function run spanID
 	spanID := run.NewSpanID(ctx)
 
-	config := sv2.Config{
+	config := *sv2.InitConfig(&sv2.Config{
 		FunctionVersion: req.Function.FunctionVersion,
 		SpanID:          spanID.String(),
 		EventIDs:        eventIDs,
@@ -417,7 +417,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		PriorityFactor:  &factor,
 		BatchID:         req.BatchID,
 		Context:         req.Context,
-	}
+	})
 
 	// Grab the cron schedule for function config.  This is necessary for fast
 	// lookups, trace info, etc.
