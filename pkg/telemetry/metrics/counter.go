@@ -172,3 +172,21 @@ func IncrSpanBatchProcessorAttemptCounter(ctx context.Context, incr int64, opts 
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrSpanBatchProcessorDeadLetterCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_batch_processor_deadletter_total",
+		Description: "Total number of spans that got passed into the deadletter stream",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrSpanBatchProcessorDeadLetterPublishStatusCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_batch_processor_deadletter_publish_status_total",
+		Description: "Total number of spans that got published to the deadletter stream and their status",
+		Tags:        opts.Tags,
+	})
+}

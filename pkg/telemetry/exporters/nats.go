@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
@@ -30,31 +31,95 @@ const (
 
 // NATS span exporter
 type natsSpanExporter struct {
-	subjects []string
-	conn     *broker.NatsConnector
+	streams    []*StreamConf
+	conn       *broker.NatsConnector
+	deadletter *StreamConf
+	// The channel to be used for sending spans to the deadletter queue
+	dlc chan *runv2.Span
 }
 
-type NatsExporterOpts struct {
-	// The subjects this exporter will be publishing the spans to
-	Subjects []string
+type natsSpanExporterOpts struct {
+	streams []*StreamConf
 	// Comma delimited URLs of the NATS server to use
-	URLs string
+	urls string
 	// The path of the nkey file to be used for authentication
-	NkeyFile string
+	nkeyFile string
 	// The credentials file to be used for authentication
-	CredsFile string
+	credsFile string
+	// The deadletter stream to send the failed attempts to
+	deadletter *StreamConf
+	// The number of goroutines to handle deadletter delivery
+	// defaults to 100
+	dlConcurrency int
+	// The buffer to be used for the deadletter channel
+	// defaults to 10,000
+	dlcBuffer int
+}
+
+type StreamConf struct {
+	// Subject of the NATS Stream
+	Subject string
+	// If non zero, this means the stream is split into multiple to allow higher throughput.
+	// And the number is used in a modulur to extract the number to be used for the stream.
+	// The remain will be added to the stream name
+	//
+	// e.g.
+	// - inngest.hello.1
+	// - inngest.hello.2
+	DivideBy uint64
+}
+
+type NatsExporterOpts func(n *natsSpanExporterOpts)
+
+func WithNatsExporterStream(stream StreamConf) NatsExporterOpts {
+	return func(n *natsSpanExporterOpts) {
+		n.streams = append(n.streams, &stream)
+	}
+}
+
+func WithNatsExporterUrls(urls string) NatsExporterOpts {
+	return func(n *natsSpanExporterOpts) {
+		n.urls = urls
+	}
+}
+
+func WithNatsExporterNKeyFile(nkeyFilePath string) NatsExporterOpts {
+	return func(n *natsSpanExporterOpts) {
+		n.nkeyFile = nkeyFilePath
+	}
+}
+
+func WithNatsExporterCredsFile(credsFilePath string) NatsExporterOpts {
+	return func(n *natsSpanExporterOpts) {
+		n.credsFile = credsFilePath
+	}
+}
+
+func WithNatsExporterDeadLetter(s StreamConf) NatsExporterOpts {
+	return func(n *natsSpanExporterOpts) {
+		n.deadletter = &s
+	}
 }
 
 // NewNATSSpanExporter creates an otel compatible exporter that ships the spans to NATS
-func NewNATSSpanExporter(ctx context.Context, opts *NatsExporterOpts) (trace.SpanExporter, error) {
-	if opts == nil {
-		return nil, fmt.Errorf("nats exporter setup options unavailable")
+func NewNATSSpanExporter(ctx context.Context, opts ...NatsExporterOpts) (trace.SpanExporter, error) {
+	if len(opts) == 0 {
+		return nil, fmt.Errorf("no nats exporter options provided")
+	}
+
+	expOpts := &natsSpanExporterOpts{
+		streams:       []*StreamConf{},
+		dlConcurrency: 100,
+		dlcBuffer:     10_000,
+	}
+	for _, apply := range opts {
+		apply(expOpts)
 	}
 
 	connOpts := []nats.Option{}
 	// attempt to parse nkey file is the option was passed in
-	if opts.NkeyFile != "" {
-		auth, err := nats.NkeyOptionFromSeed(opts.NkeyFile)
+	if expOpts.nkeyFile != "" {
+		auth, err := nats.NkeyOptionFromSeed(expOpts.nkeyFile)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing nkey file for NATS: %w", err)
 		}
@@ -62,14 +127,14 @@ func NewNATSSpanExporter(ctx context.Context, opts *NatsExporterOpts) (trace.Spa
 	}
 
 	// Use chain credentials file for auth
-	if opts.CredsFile != "" {
-		auth := nats.UserCredentials(opts.CredsFile)
+	if expOpts.credsFile != "" {
+		auth := nats.UserCredentials(expOpts.credsFile)
 		connOpts = append(connOpts, auth)
 	}
 
 	conn, err := broker.NewNATSConnector(ctx, broker.NatsConnOpt{
 		Name:      "run-span-exporter",
-		URLS:      opts.URLs,
+		URLS:      expOpts.urls,
 		JetStream: true,
 		Opts:      connOpts,
 	})
@@ -77,10 +142,95 @@ func NewNATSSpanExporter(ctx context.Context, opts *NatsExporterOpts) (trace.Spa
 		return nil, fmt.Errorf("error setting up nats: %w", err)
 	}
 
-	return &natsSpanExporter{
-		subjects: opts.Subjects,
-		conn:     conn,
-	}, nil
+	exporter := &natsSpanExporter{
+		conn:    conn,
+		streams: expOpts.streams,
+		dlc:     make(chan *runv2.Span, expOpts.dlcBuffer),
+	}
+
+	for i := 0; i < expOpts.dlConcurrency; i++ {
+		go exporter.handleFailedExports(ctx)
+	}
+
+	return exporter, nil
+}
+
+func (e *natsSpanExporter) handleFailedExports(ctx context.Context) {
+	js, err := e.conn.JSConn()
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error access Jetstream connection")
+
+		return
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case span := <-e.dlc:
+			metrics.IncrSpanBatchProcessorDeadLetterCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
+
+			if e.deadletter == nil {
+				continue
+			}
+
+			id := span.Id
+
+			byt, err := proto.Marshal(span)
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("error serializing span to protobuf",
+					"error", err,
+					"deadletter", true,
+					"acctID", id.AccountId,
+					"wsID", id.EnvId,
+					"wfID", id.FunctionId,
+					"runID", id.RunId,
+				)
+
+				continue
+			}
+
+			fack, err := js.PublishAsync(e.deadletter.Subject, byt,
+				jetstream.WithStallWait(1*time.Second),
+				jetstream.WithRetryAttempts(20),
+			)
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("error on async publish to nats stream",
+					"error", err,
+					"acctID", id.AccountId,
+					"wsID", id.EnvId,
+					"wfID", id.FunctionId,
+					"runID", id.RunId,
+				)
+				continue
+			}
+
+			status := "unknown"
+			select {
+			case <-fack.Ok():
+				status = "success"
+			case err := <-fack.Err():
+				status = "error"
+
+				logger.StdlibLogger(ctx).Error("error with async publish to deadletter stream",
+					"error", err,
+					"acctID", id.AccountId,
+					"wsID", id.EnvId,
+					"wfID", id.FunctionId,
+					"runID", id.RunId,
+				)
+			}
+
+			metrics.IncrSpanBatchProcessorDeadLetterPublishStatusCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"status": status,
+					"stream": e.deadletter.Subject,
+				},
+			})
+		}
+	}
 }
 
 func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOnlySpan) error {
@@ -93,11 +243,13 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 		return err
 	}
 	// publish to all subjects defined
-	for _, subj := range e.subjects {
+	for _, stream := range e.streams {
+		var i uint64
+
 		for _, sp := range spans {
 			wg.Add(1)
 
-			go func(ctx context.Context, sub string, sp trace.ReadOnlySpan) {
+			go func(ctx context.Context, conf StreamConf, sp trace.ReadOnlySpan) {
 				defer wg.Done()
 
 				ts := sp.StartTime()
@@ -181,8 +333,19 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 					return
 				}
 
+				idx := atomic.LoadUint64(&i)
+				subj := conf.Subject
+				if conf.DivideBy > 0 {
+					if idx > 0 {
+						idx = idx % conf.DivideBy
+					}
+
+					// set index in the subject
+					subj = fmt.Sprintf("%s.%d", conf.Subject, idx)
+				}
+
 				// Use async publish to increase throughput
-				fack, err := js.PublishAsync(sub, byt,
+				fack, err := js.PublishAsync(subj, byt,
 					jetstream.WithStallWait(500*time.Millisecond),
 					jetstream.WithRetryAttempts(10),
 				)
@@ -194,8 +357,14 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 						"wfID", id.FunctionId,
 						"runID", id.RunId,
 					)
+
+					e.dlc <- span
+
 					return
 				}
+
+				// Increment the counter
+				atomic.AddUint64(&i, 1)
 
 				pstatus := "unknown"
 				select {
@@ -211,16 +380,18 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 						"wfID", id.FunctionId,
 						"runID", id.RunId,
 					)
+
+					e.dlc <- span
 				}
 
 				metrics.IncrSpanExportedCounter(ctx, metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"subject": sub,
+						"subject": subj,
 						"status":  pstatus,
 					},
 				})
-			}(ctx, subj, sp)
+			}(ctx, *stream, sp)
 		}
 	}
 
