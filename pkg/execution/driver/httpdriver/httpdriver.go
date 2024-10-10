@@ -115,8 +115,6 @@ type Request struct {
 
 // DoRequest executes the HTTP request with the given input.
 func DoRequest(ctx context.Context, c HTTPDoer, r Request) (*state.DriverResponse, error) {
-	fmt.Println("\nDoRequest")
-
 	if c == nil {
 		c = DefaultClient
 	}
@@ -139,7 +137,6 @@ func DoRequest(ctx context.Context, c HTTPDoer, r Request) (*state.DriverRespons
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("status code", resp.statusCode)
 
 	if resp.statusCode == 206 {
 		// This is a generator-based function returning opcodes.
