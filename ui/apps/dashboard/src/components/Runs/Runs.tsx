@@ -68,6 +68,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   const [lastDays] = useSearchParam('last');
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
+  const [search] = useSearchParam('search');
 
   const timeField = toTimeField(rawTimeField) ?? RunsOrderByField.QueuedAt;
 
@@ -75,7 +76,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
   const [cursor, setCursor] = useState('');
   const [runs, setRuns] = useState<Run[]>([]);
-  const [celQuery, setCelQuery] = useState<string>();
   const [isScrollRequest, setIsScrollRequest] = useState(false);
 
   const cancelRun = useCancelRun({ envID: env.id });
@@ -112,7 +112,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     endTime: endTime ?? null,
     status: filteredStatus.length > 0 ? filteredStatus : null,
     timeField,
-    celQuery,
+    celQuery: search ? decodeURIComponent(search) : '',
   };
 
   const [firstPageRes, fetchFirstPage] = useQuery({
@@ -273,7 +273,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       totalCount={totalCount}
       temporaryAlert={temporaryAlert}
       hasSearchFlag={searchIsReady && searchEnabled}
-      onSearch={setCelQuery}
     />
   );
 });

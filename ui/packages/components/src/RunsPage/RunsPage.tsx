@@ -67,7 +67,6 @@ type Props = {
   scope: ViewScope;
   totalCount: number | undefined;
   temporaryAlert?: React.ReactElement;
-  onSearch?: (content: string) => void;
   hasSearchFlag?: boolean;
 };
 
@@ -94,7 +93,6 @@ export function RunsPage({
   scope,
   totalCount,
   temporaryAlert,
-  onSearch,
   hasSearchFlag = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -141,6 +139,8 @@ export function RunsPage({
     'timeField',
     isFunctionTimeField
   );
+
+  const [search, setSearch, removeSearch] = useSearchParam('search');
 
   const [lastDays] = useSearchParam('last');
   const [startTime] = useSearchParam('start');
@@ -222,6 +222,19 @@ export function RunsPage({
       }
     },
     [batchUpdate, scrollToTop]
+  );
+
+  const onSearchChange = useCallback(
+    (value: string) => {
+      scrollToTop();
+      if (value.length > 0) {
+        const encodedValue = encodeURIComponent(value);
+        setSearch(encodedValue);
+      } else {
+        removeSearch();
+      }
+    },
+    [scrollToTop, setTimeField]
   );
 
   const renderSubComponent = useCallback(
@@ -338,7 +351,7 @@ export function RunsPage({
         </div>
       </div>
       <>
-        {onSearch && hasSearchFlag && showSearch && (
+        {hasSearchFlag && showSearch && (
           <>
             <div className="bg-codeEditor flex items-center justify-between px-4 pt-4">
               <div className="flex items-center gap-2">
@@ -356,11 +369,9 @@ export function RunsPage({
               />
             </div>
             <CodeSearch
-              onSearch={(content) => {
-                scrollToTop();
-                onSearch(content);
-              }}
+              onSearch={onSearchChange}
               placeholder="event.data.userId == “1234” or output.count > 10"
+              value={search ? decodeURIComponent(search) : ''}
             />
           </>
         )}
