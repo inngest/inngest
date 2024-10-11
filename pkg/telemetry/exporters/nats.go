@@ -33,8 +33,8 @@ type natsSpanExporter struct {
 	streams    []*StreamConf
 	conn       *broker.NatsConnector
 	deadletter *StreamConf
-	// The channel to be used for sending spans to the deadletter queue
-	dlc chan *runv2.Span
+	// buffer to be used to store spans temporarily if nats client is overwhelmed
+	buf *natsBuffer
 }
 
 type natsSpanExporterOpts struct {
@@ -58,14 +58,6 @@ type natsSpanExporterOpts struct {
 type StreamConf struct {
 	// Subject of the NATS Stream
 	Subject string
-	// If non zero, this means the stream is split into multiple to allow higher throughput.
-	// And the number is used in a modulur to extract the number to be used for the stream.
-	// The remain will be added to the stream name
-	//
-	// e.g.
-	// - inngest.hello.1
-	// - inngest.hello.2
-	DivideBy uint64
 }
 
 type NatsExporterOpts func(n *natsSpanExporterOpts)
@@ -144,105 +136,157 @@ func NewNATSSpanExporter(ctx context.Context, opts ...NatsExporterOpts) (trace.S
 	exporter := &natsSpanExporter{
 		conn:    conn,
 		streams: expOpts.streams,
-		dlc:     make(chan *runv2.Span, expOpts.dlcBuffer),
+		buf:     newNatsBuffer(),
 	}
 
-	for i := 0; i < expOpts.dlConcurrency; i++ {
-		go exporter.handleFailedExports(ctx)
-	}
+	go exporter.handleBuffered(ctx)
 
 	return exporter, nil
 }
 
-func (e *natsSpanExporter) handleFailedExports(ctx context.Context) {
-	js, err := e.conn.JSConn()
-	if err != nil {
-		logger.StdlibLogger(ctx).Error("error access Jetstream connection")
-		return
-	}
+func (e *natsSpanExporter) handleBuffered(ctx context.Context) {
+	ticker := time.NewTicker(500 * time.Millisecond)
 
 	for {
 		select {
 		case <-ctx.Done():
+			if err := e.flush(ctx, e.streams, false); err != nil {
+				logger.StdlibLogger(ctx).Error("error flushing to NATS streams",
+					"error", err,
+					"streams", e.streams,
+				)
+			}
+
+			dls := []*StreamConf{e.deadletter}
+			if err := e.flush(ctx, dls, true); err != nil {
+				logger.StdlibLogger(ctx).Error("error flushing to NATS deadletter stream",
+					"error", err,
+					"streams", dls,
+				)
+			}
+
+			ticker.Stop()
 			return
 
-		case span := <-e.dlc:
-			metrics.IncrSpanBatchProcessorDeadLetterCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
-
+		case <-ticker.C:
 			if e.deadletter == nil {
 				continue
 			}
 
-			subj := e.deadletter.Subject
-
-			id := span.Id
-			byt, err := proto.Marshal(span)
-			if err != nil {
-				logger.StdlibLogger(ctx).Error("error serializing span to protobuf",
+			dls := []*StreamConf{e.deadletter}
+			if err := e.flush(ctx, dls, true); err != nil {
+				logger.StdlibLogger(ctx).Error("error flushing to NATS deadletter stream",
 					"error", err,
-					"stream", subj,
-					"acctID", id.AccountId,
-					"wsID", id.EnvId,
-					"wfID", id.FunctionId,
-					"runID", id.RunId,
-				)
-
-				continue
-			}
-
-			fack, err := js.PublishAsync(e.deadletter.Subject, byt,
-				jetstream.WithStallWait(1*time.Second),
-				jetstream.WithRetryAttempts(20),
-			)
-			if err != nil {
-				logger.StdlibLogger(ctx).Error("error on async publish to nats stream",
-					"error", err,
-					"stream", subj,
-					"acctID", id.AccountId,
-					"wsID", id.EnvId,
-					"wfID", id.FunctionId,
-					"runID", id.RunId,
-				)
-
-				// wait a little before retrying again
-				<-time.After(100 * time.Millisecond)
-				e.dlc <- span
-				continue
-			}
-
-			status := "unknown"
-			select {
-			case <-fack.Ok():
-				status = "success"
-			case err := <-fack.Err():
-				status = "error"
-
-				logger.StdlibLogger(ctx).Error("error with async publish to deadletter stream",
-					"error", err,
-					"stream", subj,
-					"acctID", id.AccountId,
-					"wsID", id.EnvId,
-					"wfID", id.FunctionId,
-					"runID", id.RunId,
+					"streams", dls,
 				)
 			}
-
-			metrics.IncrSpanBatchProcessorDeadLetterPublishStatusCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"status": status,
-					"stream": subj,
-				},
-			})
-			metrics.IncrSpanExportedCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"subject": subj,
-					"status":  status,
-				},
-			})
 		}
 	}
+}
+
+func (e *natsSpanExporter) flush(ctx context.Context, streams []*StreamConf, deadletter bool) error {
+	if len(streams) == 0 {
+		// no op
+		return nil
+	}
+
+	js, err := e.conn.JSConn()
+	if err != nil {
+		return err
+	}
+	wg := sync.WaitGroup{}
+	spans := e.buf.Retrieve()
+	if len(spans) == 0 {
+		// no op
+		return nil
+	}
+
+	for _, stream := range streams {
+		for _, s := range spans {
+			wg.Add(1)
+			go func(ctx context.Context, conf StreamConf, span *runv2.Span) {
+				defer wg.Done()
+
+				if deadletter {
+					metrics.IncrSpanBatchProcessorDeadLetterCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
+				}
+
+				id := span.Id
+				byt, err := proto.Marshal(span)
+				if err != nil {
+					logger.StdlibLogger(ctx).Error("error serializing span to protobuf",
+						"error", err,
+						"stream", conf.Subject,
+						"acctID", id.AccountId,
+						"wsID", id.EnvId,
+						"wfID", id.FunctionId,
+						"runID", id.RunId,
+					)
+
+					return
+				}
+
+				fack, err := js.PublishAsync(conf.Subject, byt,
+					jetstream.WithStallWait(1*time.Second),
+					jetstream.WithRetryAttempts(20),
+				)
+				if err != nil {
+					logger.StdlibLogger(ctx).Error("error on async publish to nats stream",
+						"error", err,
+						"stream", conf.Subject,
+						"acctID", id.AccountId,
+						"wsID", id.EnvId,
+						"wfID", id.FunctionId,
+						"runID", id.RunId,
+					)
+
+					// publish it back again for retries
+					e.buf.Add(span)
+					return
+				}
+
+				status := "unknown"
+				select {
+				case <-fack.Ok():
+					status = "success"
+				case err := <-fack.Err():
+					status = "error"
+
+					logger.StdlibLogger(ctx).Error("error with async publish to nats stream",
+						"error", err,
+						"stream", conf.Subject,
+						"acctID", id.AccountId,
+						"wsID", id.EnvId,
+						"wfID", id.FunctionId,
+						"runID", id.RunId,
+					)
+
+					// publish it back again for retries
+					e.buf.Add(span)
+				}
+
+				metrics.IncrSpanExportedCounter(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"subject": conf.Subject,
+						"status":  status,
+					},
+				})
+				if deadletter {
+					metrics.IncrSpanBatchProcessorDeadLetterPublishStatusCounter(ctx, metrics.CounterOpt{
+						PkgName: pkgName,
+						Tags: map[string]any{
+							"status": status,
+							"stream": conf.Subject,
+						},
+					})
+				}
+			}(ctx, *stream, s)
+		}
+	}
+
+	wg.Wait()
+	return nil
 }
 
 func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOnlySpan) error {
@@ -331,6 +375,19 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 					Links:      links,
 				}
 
+				pending := js.PublishAsyncPending()
+				metrics.GaugeSpanBatchProcessorNatsAsyncPending(ctx, int64(pending), metrics.GaugeOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"subject": conf.Subject,
+					},
+				})
+				if pending >= e.conn.BufferSize {
+					// don't try to send because it'll likely stall
+					e.buf.Add(span)
+					return
+				}
+
 				// serialize it into bytes
 				byt, err := proto.Marshal(span)
 				if err != nil {
@@ -360,7 +417,7 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 						"runID", id.RunId,
 					)
 
-					e.dlc <- span
+					e.buf.Add(span)
 					return
 				}
 
@@ -380,7 +437,7 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 						"runID", id.RunId,
 					)
 
-					e.dlc <- span
+					e.buf.Add(span)
 				}
 
 				metrics.IncrSpanExportedCounter(ctx, metrics.CounterOpt{
@@ -560,4 +617,38 @@ func (e *natsSpanExporter) attributeValueAsString(v attribute.Value) string {
 		)
 		return v.AsString()
 	}
+}
+
+type spanRetry struct {
+	span    *runv2.Span
+	attempt int
+}
+
+func newNatsBuffer() *natsBuffer {
+	return &natsBuffer{
+		buf: []*runv2.Span{},
+	}
+}
+
+type natsBuffer struct {
+	sync.Mutex
+
+	buf []*runv2.Span
+}
+
+func (b *natsBuffer) Add(s *runv2.Span) {
+	b.Lock()
+	defer b.Unlock()
+
+	b.buf = append(b.buf, s)
+}
+
+func (b *natsBuffer) Retrieve() []*runv2.Span {
+	b.Lock()
+	defer b.Unlock()
+
+	res := b.buf
+	b.buf = []*runv2.Span{}
+
+	return res
 }
