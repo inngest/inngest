@@ -148,7 +148,7 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 				AccountID: md.Identifier.AccountID,
 			},
 		},
-		Config: state.Config{
+		Config: *state.InitConfig(&state.Config{
 			FunctionVersion:       md.Identifier.WorkflowVersion,
 			SpanID:                md.SpanID,
 			StartedAt:             startedAt,
@@ -162,7 +162,7 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 			CustomConcurrencyKeys: md.Identifier.CustomConcurrencyKeys,
 			Context:               md.Context,
 			ForceStepPlan:         md.DisableImmediateExecution,
-		},
+		}),
 		Stack: stack,
 		Metrics: state.RunMetrics{
 			EventSize: md.EventSize,
