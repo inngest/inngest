@@ -230,6 +230,13 @@ func (e *natsSpanExporter) handleFailedExports(ctx context.Context) {
 					"stream": subj,
 				},
 			})
+			metrics.IncrSpanExportedCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"subject": subj,
+					"status":  status,
+				},
+			})
 		}
 	}
 }
