@@ -33,6 +33,8 @@ type natsSpanExporter struct {
 	streams    []*StreamConf
 	conn       *broker.NatsConnector
 	deadletter *StreamConf
+	// The channel to be used for sending spans to the specified queue
+	pub chan *runv2.Span
 	// The channel to be used for sending spans to the deadletter queue
 	dlc chan *runv2.Span
 }
@@ -173,12 +175,14 @@ func (e *natsSpanExporter) handleFailedExports(ctx context.Context) {
 				continue
 			}
 
+			subj := e.deadletter.Subject
+
 			id := span.Id
 			byt, err := proto.Marshal(span)
 			if err != nil {
 				logger.StdlibLogger(ctx).Error("error serializing span to protobuf",
 					"error", err,
-					"deadletter", true,
+					"stream", subj,
 					"acctID", id.AccountId,
 					"wsID", id.EnvId,
 					"wfID", id.FunctionId,
@@ -195,7 +199,7 @@ func (e *natsSpanExporter) handleFailedExports(ctx context.Context) {
 			if err != nil {
 				logger.StdlibLogger(ctx).Error("error on async publish to nats stream",
 					"error", err,
-					"deadletter", true,
+					"stream", subj,
 					"acctID", id.AccountId,
 					"wsID", id.EnvId,
 					"wfID", id.FunctionId,
@@ -213,7 +217,7 @@ func (e *natsSpanExporter) handleFailedExports(ctx context.Context) {
 
 				logger.StdlibLogger(ctx).Error("error with async publish to deadletter stream",
 					"error", err,
-					"deadletter", true,
+					"stream", subj,
 					"acctID", id.AccountId,
 					"wsID", id.EnvId,
 					"wfID", id.FunctionId,
@@ -225,7 +229,7 @@ func (e *natsSpanExporter) handleFailedExports(ctx context.Context) {
 				PkgName: pkgName,
 				Tags: map[string]any{
 					"status": status,
-					"stream": e.deadletter.Subject,
+					"stream": subj,
 				},
 			})
 		}
@@ -289,6 +293,7 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 					logger.StdlibLogger(ctx).Error("error parsing span events",
 						"error", err,
 						"spanEvents", sp.Events(),
+						"stream", conf.Subject,
 						"acctID", id.AccountId,
 						"wsID", id.EnvId,
 						"wfID", id.FunctionId,
@@ -322,6 +327,7 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 				if err != nil {
 					logger.StdlibLogger(ctx).Error("error serializing span to protobuf",
 						"error", err,
+						"stream", conf.Subject,
 						"acctID", id.AccountId,
 						"wsID", id.EnvId,
 						"wfID", id.FunctionId,
@@ -338,6 +344,7 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 				if err != nil {
 					logger.StdlibLogger(ctx).Error("error on async publish to nats stream",
 						"error", err,
+						"stream", conf.Subject,
 						"acctID", id.AccountId,
 						"wsID", id.EnvId,
 						"wfID", id.FunctionId,
@@ -357,6 +364,7 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 
 					logger.StdlibLogger(ctx).Error("error with async publish to nats stream",
 						"error", err,
+						"stream", conf.Subject,
 						"acctID", id.AccountId,
 						"wsID", id.EnvId,
 						"wfID", id.FunctionId,
