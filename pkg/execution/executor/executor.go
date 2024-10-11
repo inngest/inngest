@@ -1035,7 +1035,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 			}
 
 			err := q.Dequeue(ctx, *qi)
-			if err != nil {
+			if err != nil && !errors.Is(err, redis_state.ErrQueueItemNotFound) {
 				logger.StdlibLogger(ctx).Error("error dequeueing run job", "error", err)
 			}
 		}
