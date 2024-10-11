@@ -319,6 +319,12 @@ func WithDisableFifoForFunctions(mapping map[string]struct{}) func(q *queue) {
 	}
 }
 
+func WithDisableFifoForAccounts(mapping map[string]struct{}) func(q *queue) {
+	return func(q *queue) {
+		q.disableFifoForAccounts = mapping
+	}
+}
+
 func WithLogger(l *zerolog.Logger) func(q *queue) {
 	return func(q *queue) {
 		q.logger = l
@@ -535,6 +541,7 @@ type queue struct {
 	// queueKindMapping stores a map of job kind => queue names
 	queueKindMapping        map[string]string
 	disableFifoForFunctions map[string]struct{}
+	disableFifoForAccounts  map[string]struct{}
 	logger                  *zerolog.Logger
 
 	// itemIndexer returns indexes for a given queue item.
