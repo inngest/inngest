@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
@@ -159,7 +158,6 @@ func (e *natsSpanExporter) handleFailedExports(ctx context.Context) {
 	js, err := e.conn.JSConn()
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("error access Jetstream connection")
-
 		return
 	}
 
@@ -176,7 +174,6 @@ func (e *natsSpanExporter) handleFailedExports(ctx context.Context) {
 			}
 
 			id := span.Id
-
 			byt, err := proto.Marshal(span)
 			if err != nil {
 				logger.StdlibLogger(ctx).Error("error serializing span to protobuf",
@@ -198,6 +195,7 @@ func (e *natsSpanExporter) handleFailedExports(ctx context.Context) {
 			if err != nil {
 				logger.StdlibLogger(ctx).Error("error on async publish to nats stream",
 					"error", err,
+					"deadletter", true,
 					"acctID", id.AccountId,
 					"wsID", id.EnvId,
 					"wfID", id.FunctionId,
@@ -215,6 +213,7 @@ func (e *natsSpanExporter) handleFailedExports(ctx context.Context) {
 
 				logger.StdlibLogger(ctx).Error("error with async publish to deadletter stream",
 					"error", err,
+					"deadletter", true,
 					"acctID", id.AccountId,
 					"wsID", id.EnvId,
 					"wfID", id.FunctionId,
@@ -244,8 +243,6 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 	}
 	// publish to all subjects defined
 	for _, stream := range e.streams {
-		var i uint64
-
 		for _, sp := range spans {
 			wg.Add(1)
 
@@ -333,19 +330,8 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 					return
 				}
 
-				idx := atomic.LoadUint64(&i)
-				subj := conf.Subject
-				if conf.DivideBy > 0 {
-					if idx > 0 {
-						idx = idx % conf.DivideBy
-					}
-
-					// set index in the subject
-					subj = fmt.Sprintf("%s.%d", conf.Subject, idx)
-				}
-
 				// Use async publish to increase throughput
-				fack, err := js.PublishAsync(subj, byt,
+				fack, err := js.PublishAsync(conf.Subject, byt,
 					jetstream.WithStallWait(500*time.Millisecond),
 					jetstream.WithRetryAttempts(10),
 				)
@@ -359,12 +345,8 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 					)
 
 					e.dlc <- span
-
 					return
 				}
-
-				// Increment the counter
-				atomic.AddUint64(&i, 1)
 
 				pstatus := "unknown"
 				select {
@@ -387,7 +369,7 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 				metrics.IncrSpanExportedCounter(ctx, metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"subject": subj,
+						"subject": conf.Subject,
 						"status":  pstatus,
 					},
 				})
@@ -400,6 +382,7 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 }
 
 func (e *natsSpanExporter) Shutdown(ctx context.Context) error {
+	logger.StdlibLogger(ctx).Info("shutting down nats span exporter")
 	return e.conn.Shutdown(ctx)
 }
 
