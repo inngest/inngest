@@ -234,7 +234,7 @@ export function RunsPage({
         removeSearch();
       }
     },
-    [scrollToTop, setTimeField]
+    [scrollToTop, setSearch]
   );
 
   const renderSubComponent = useCallback(
@@ -340,6 +340,11 @@ export function RunsPage({
                 appearance="ghost"
                 label={showSearch ? 'Hide search' : 'Show search'}
                 onClick={() => setShowSearch((prev) => !prev)}
+                className={
+                  search
+                    ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
+                    : ''
+                }
               />
             )}
             <TableFilter

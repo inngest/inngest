@@ -369,8 +369,7 @@ export default function CodeSearch({
   };
 
   const handleSearch = () => {
-    const trimmedContent = content.trim();
-    if (trimmedContent && trimmedContent !== '' && !hasValidationError) {
+    if (!hasValidationError) {
       onSearch(content);
     }
   };
