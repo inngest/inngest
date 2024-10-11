@@ -92,3 +92,21 @@ func GaugeSpanBatchProcessorBufferKeys(ctx context.Context, val int64, opts Gaug
 		Tags:        opts.Tags,
 	})
 }
+
+func GaugeSpanBatchProcessorNatsAsyncPending(ctx context.Context, val int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, val, GaugeOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_batch_processor_async_pending",
+		Description: "The number of messages pending to publish to NATS stream",
+		Tags:        opts.Tags,
+	})
+}
+
+func GaugeSpanExporterBuffer(ctx context.Context, val int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, val, GaugeOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_exporter_buffer_size",
+		Description: "The number of messages in the NATS exporter buffer",
+		Tags:        opts.Tags,
+	})
+}

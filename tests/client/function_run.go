@@ -26,7 +26,7 @@ type FunctionRunOpt struct {
 }
 
 func (o FunctionRunOpt) OrderBy() string {
-	if o.Order == nil || len(o.Order) == 0 {
+	if len(o.Order) == 0 {
 		return fmt.Sprintf("[ { field: %s, direction: %s } ]", models.RunsV2OrderByFieldQueuedAt, models.RunsOrderByDirectionDesc)
 	}
 
