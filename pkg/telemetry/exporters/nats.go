@@ -195,8 +195,11 @@ func (e *natsSpanExporter) flush(ctx context.Context, streams []*StreamConf, dea
 		return err
 	}
 	wg := sync.WaitGroup{}
+
 	spans := e.buf.Retrieve()
-	if len(spans) == 0 {
+	size := len(spans)
+	metrics.GaugeSpanExporterBuffer(ctx, int64(size), metrics.GaugeOpt{PkgName: pkgName})
+	if size == 0 {
 		// no op
 		return nil
 	}
