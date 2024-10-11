@@ -196,8 +196,8 @@ func (e *natsSpanExporter) flush(ctx context.Context, streams []*StreamConf, dea
 	}
 	wg := sync.WaitGroup{}
 
-	spans := e.buf.Retrieve()
-	size := len(spans)
+	retries := e.buf.Retrieve()
+	size := len(retries)
 	metrics.GaugeSpanExporterBuffer(ctx, int64(size), metrics.GaugeOpt{PkgName: pkgName})
 	if size == 0 {
 		// no op
@@ -205,17 +205,17 @@ func (e *natsSpanExporter) flush(ctx context.Context, streams []*StreamConf, dea
 	}
 
 	for _, stream := range streams {
-		for _, s := range spans {
+		for _, sr := range retries {
 			wg.Add(1)
-			go func(ctx context.Context, conf StreamConf, span *runv2.Span) {
+			go func(ctx context.Context, conf StreamConf, sr *spanRetry) {
 				defer wg.Done()
 
 				if deadletter {
 					metrics.IncrSpanBatchProcessorDeadLetterCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
 				}
 
-				id := span.Id
-				byt, err := proto.Marshal(span)
+				id := sr.span.Id
+				byt, err := proto.Marshal(sr.span)
 				if err != nil {
 					logger.StdlibLogger(ctx).Error("error serializing span to protobuf",
 						"error", err,
@@ -224,6 +224,7 @@ func (e *natsSpanExporter) flush(ctx context.Context, streams []*StreamConf, dea
 						"wsID", id.EnvId,
 						"wfID", id.FunctionId,
 						"runID", id.RunId,
+						"retry", sr,
 					)
 
 					return
@@ -241,10 +242,12 @@ func (e *natsSpanExporter) flush(ctx context.Context, streams []*StreamConf, dea
 						"wsID", id.EnvId,
 						"wfID", id.FunctionId,
 						"runID", id.RunId,
+						"retry", sr,
 					)
 
 					// publish it back again for retries
-					e.buf.Add(span)
+					sr.attempt++
+					e.buf.Add(sr)
 					return
 				}
 
@@ -262,10 +265,12 @@ func (e *natsSpanExporter) flush(ctx context.Context, streams []*StreamConf, dea
 						"wsID", id.EnvId,
 						"wfID", id.FunctionId,
 						"runID", id.RunId,
+						"retry", sr,
 					)
 
 					// publish it back again for retries
-					e.buf.Add(span)
+					sr.attempt++
+					e.buf.Add(sr)
 				}
 
 				metrics.IncrSpanExportedCounter(ctx, metrics.CounterOpt{
@@ -284,7 +289,7 @@ func (e *natsSpanExporter) flush(ctx context.Context, streams []*StreamConf, dea
 						},
 					})
 				}
-			}(ctx, *stream, s)
+			}(ctx, *stream, sr)
 		}
 	}
 
@@ -387,7 +392,7 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 				})
 				if pending >= e.conn.BufferSize {
 					// don't try to send because it'll likely stall
-					e.buf.Add(span)
+					e.buf.Add(&spanRetry{span: span})
 					return
 				}
 
@@ -420,7 +425,7 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 						"runID", id.RunId,
 					)
 
-					e.buf.Add(span)
+					e.buf.Add(&spanRetry{span: span})
 					return
 				}
 
@@ -440,7 +445,7 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 						"runID", id.RunId,
 					)
 
-					e.buf.Add(span)
+					e.buf.Add(&spanRetry{span: span})
 				}
 
 				metrics.IncrSpanExportedCounter(ctx, metrics.CounterOpt{
@@ -629,29 +634,29 @@ type spanRetry struct {
 
 func newNatsBuffer() *natsBuffer {
 	return &natsBuffer{
-		buf: []*runv2.Span{},
+		buf: []*spanRetry{},
 	}
 }
 
 type natsBuffer struct {
 	sync.Mutex
 
-	buf []*runv2.Span
+	buf []*spanRetry
 }
 
-func (b *natsBuffer) Add(s *runv2.Span) {
+func (b *natsBuffer) Add(s *spanRetry) {
 	b.Lock()
 	defer b.Unlock()
 
 	b.buf = append(b.buf, s)
 }
 
-func (b *natsBuffer) Retrieve() []*runv2.Span {
+func (b *natsBuffer) Retrieve() []*spanRetry {
 	b.Lock()
 	defer b.Unlock()
 
 	res := b.buf
-	b.buf = []*runv2.Span{}
+	b.buf = []*spanRetry{}
 
 	return res
 }
