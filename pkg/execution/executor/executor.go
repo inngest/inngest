@@ -1669,7 +1669,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		return fmt.Errorf("error loading metadata to resume from pause: %w", err)
 	}
 
-	util.Crit(ctx, "consume pause", func(ctx context.Context) error {
+	err = util.Crit(ctx, "consume pause", func(ctx context.Context) error {
 		// Lease this pause so that only this thread can schedule the execution.
 		//
 		// If we don't do this, there's a chance that two concurrent runners
@@ -1748,6 +1748,10 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		}
 		return nil
 	}, 20*time.Second)
+
+	if err != nil {
+		return err
+	}
 
 	if pause.IsInvoke() {
 		for _, e := range e.lifecycles {
