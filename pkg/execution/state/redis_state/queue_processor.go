@@ -673,6 +673,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 	// XXX: Allow parallel partitions for all functions except for fns opting into FIFO
 	_, isSystemFn := q.queueKindMapping[p.Queue()]
 	_, parallel := q.disableFifoForFunctions[p.Queue()]
+	_, parallelAccount := q.disableFifoForAccounts[p.AccountID.String()]
 
 	iter := processor{
 		partition:          p,
@@ -681,7 +682,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 		queue:              q,
 		denies:             newLeaseDenyList(),
 		staticTime:         q.clock.Now(),
-		parallel:           parallel || isSystemFn,
+		parallel:           parallel || parallelAccount || isSystemFn,
 	}
 
 	if processErr := iter.iterate(ctx); processErr != nil {
