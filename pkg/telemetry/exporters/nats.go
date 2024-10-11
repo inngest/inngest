@@ -203,6 +203,10 @@ func (e *natsSpanExporter) handleFailedExports(ctx context.Context) {
 					"wfID", id.FunctionId,
 					"runID", id.RunId,
 				)
+
+				// wait a little before retrying again
+				<-time.After(100 * time.Millisecond)
+				e.dlc <- span
 				continue
 			}
 
