@@ -33,8 +33,6 @@ type natsSpanExporter struct {
 	streams    []*StreamConf
 	conn       *broker.NatsConnector
 	deadletter *StreamConf
-	// The channel to be used for sending spans to the specified queue
-	pub chan *runv2.Span
 	// The channel to be used for sending spans to the deadletter queue
 	dlc chan *runv2.Span
 }
