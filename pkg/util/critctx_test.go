@@ -101,7 +101,7 @@ func TestCrit(t *testing.T) {
 		require.True(t, called)
 		require.Nil(t, err)
 
-		require.Contains(t, string(buf.Bytes()), "critical section took longer than boundaries")
+		require.Contains(t, buf.String(), "critical section took longer than boundaries")
 	})
 
 	t.Run("With a cancelled context, the fn fails", func(t *testing.T) {
