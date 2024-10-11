@@ -1669,81 +1669,88 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		return fmt.Errorf("error loading metadata to resume from pause: %w", err)
 	}
 
-	// Lease this pause so that only this thread can schedule the execution.
-	//
-	// If we don't do this, there's a chance that two concurrent runners
-	// attempt to enqueue the next step of the workflow.
-	err = e.pm.LeasePause(ctx, pause.ID)
-	if err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
-		// Ignore;  this is being handled by another runner.
-		return nil
-	}
-
-	if pause.OnTimeout && r.EventID != nil {
-		// Delete this pause, as an event has occured which matches
-		// the timeout.  We can do this prior to leasing a pause as it's the
-		// only work that needs to happen
-		err := e.pm.ConsumePause(ctx, pause.ID, nil)
-		if err == nil || err == state.ErrPauseNotFound {
+	err = util.Crit(ctx, "consume pause", func(ctx context.Context) error {
+		// Lease this pause so that only this thread can schedule the execution.
+		//
+		// If we don't do this, there's a chance that two concurrent runners
+		// attempt to enqueue the next step of the workflow.
+		err = e.pm.LeasePause(ctx, pause.ID)
+		if err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
+			// Ignore;  this is being handled by another runner.
 			return nil
 		}
-		return fmt.Errorf("error consuming pause via timeout: %w", err)
-	}
 
-	if err = e.pm.ConsumePause(ctx, pause.ID, r.With); err != nil {
-		return fmt.Errorf("error consuming pause via event: %w", err)
-	}
-
-	if e.log != nil {
-		e.log.Debug().
-			Str("pause_id", pause.ID.String()).
-			Str("run_id", pause.Identifier.RunID.String()).
-			Str("workflow_id", pause.Identifier.WorkflowID.String()).
-			Bool("timeout", pause.OnTimeout).
-			Bool("cancel", pause.Cancel).
-			Msg("resuming from pause")
-	}
-
-	// Schedule an execution from the pause's entrypoint.  We do this after
-	// consuming the pause to guarantee the event data is stored via the pause
-	// for the next run.  If the ConsumePause call comes after enqueue, the TCP
-	// conn may drop etc. and running the job may occur prior to saving state data.
-	jobID := fmt.Sprintf("%s-%s", pause.Identifier.IdempotencyKey(), pause.DataKey)
-	err = e.queue.Enqueue(
-		ctx,
-		queue.Item{
-			JobID: &jobID,
-			// Add a new group ID for the child;  this will be a new step.
-			GroupID:               uuid.New().String(),
-			WorkspaceID:           pause.WorkspaceID,
-			Kind:                  queue.KindEdge,
-			Identifier:            pause.Identifier,
-			PriorityFactor:        md.Config.PriorityFactor,
-			CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
-			MaxAttempts:           pause.MaxAttempts,
-			Payload: queue.PayloadEdge{
-				Edge: pause.Edge(),
-			},
-		},
-		time.Now(),
-	)
-	if err != nil && err != redis_state.ErrQueueItemExists {
-		return fmt.Errorf("error enqueueing after pause: %w", err)
-	}
-
-	// And dequeue the timeout job to remove unneeded work from the queue, etc.
-	if q, ok := e.queue.(redis_state.QueueManager); ok {
-		jobID := fmt.Sprintf("%s-%s", md.IdempotencyKey(), pause.DataKey)
-		err := q.Dequeue(ctx, redis_state.QueueItem{
-			ID:         redis_state.HashID(ctx, jobID),
-			FunctionID: md.ID.FunctionID,
-			Data: queue.Item{
-				Kind: queue.KindPause,
-			},
-		})
-		if err != nil {
-			logger.StdlibLogger(ctx).Error("error dequeueing consumed pause job when resuming", "error", err)
+		if pause.OnTimeout && r.EventID != nil {
+			// Delete this pause, as an event has occured which matches
+			// the timeout.  We can do this prior to leasing a pause as it's the
+			// only work that needs to happen
+			err := e.pm.ConsumePause(ctx, pause.ID, nil)
+			if err == nil || err == state.ErrPauseNotFound {
+				return nil
+			}
+			return fmt.Errorf("error consuming pause via timeout: %w", err)
 		}
+
+		if err = e.pm.ConsumePause(ctx, pause.ID, r.With); err != nil {
+			return fmt.Errorf("error consuming pause via event: %w", err)
+		}
+
+		if e.log != nil {
+			e.log.Debug().
+				Str("pause_id", pause.ID.String()).
+				Str("run_id", pause.Identifier.RunID.String()).
+				Str("workflow_id", pause.Identifier.WorkflowID.String()).
+				Bool("timeout", pause.OnTimeout).
+				Bool("cancel", pause.Cancel).
+				Msg("resuming from pause")
+		}
+
+		// Schedule an execution from the pause's entrypoint.  We do this after
+		// consuming the pause to guarantee the event data is stored via the pause
+		// for the next run.  If the ConsumePause call comes after enqueue, the TCP
+		// conn may drop etc. and running the job may occur prior to saving state data.
+		jobID := fmt.Sprintf("%s-%s", pause.Identifier.IdempotencyKey(), pause.DataKey)
+		err = e.queue.Enqueue(
+			ctx,
+			queue.Item{
+				JobID: &jobID,
+				// Add a new group ID for the child;  this will be a new step.
+				GroupID:               uuid.New().String(),
+				WorkspaceID:           pause.WorkspaceID,
+				Kind:                  queue.KindEdge,
+				Identifier:            pause.Identifier,
+				PriorityFactor:        md.Config.PriorityFactor,
+				CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
+				MaxAttempts:           pause.MaxAttempts,
+				Payload: queue.PayloadEdge{
+					Edge: pause.Edge(),
+				},
+			},
+			time.Now(),
+		)
+		if err != nil && err != redis_state.ErrQueueItemExists {
+			return fmt.Errorf("error enqueueing after pause: %w", err)
+		}
+
+		// And dequeue the timeout job to remove unneeded work from the queue, etc.
+		if q, ok := e.queue.(redis_state.QueueManager); ok {
+			jobID := fmt.Sprintf("%s-%s", md.IdempotencyKey(), pause.DataKey)
+			err := q.Dequeue(ctx, redis_state.QueueItem{
+				ID:         redis_state.HashID(ctx, jobID),
+				FunctionID: md.ID.FunctionID,
+				Data: queue.Item{
+					Kind: queue.KindPause,
+				},
+			})
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("error dequeueing consumed pause job when resuming", "error", err)
+			}
+		}
+		return nil
+	}, 20*time.Second)
+
+	if err != nil {
+		return err
 	}
 
 	if pause.IsInvoke() {
@@ -1824,11 +1831,10 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 			continue
 		}
 		copied := *op
-		newItem := i.item
 		if group.ShouldStartHistoryGroup {
 			// Give each opcode its own group ID, since we want to track each
 			// parellel step individually.
-			newItem.GroupID = uuid.New().String()
+			i.item.GroupID = uuid.New().String()
 		}
 		eg.Go(func() error { return e.handleGenerator(ctx, i, copied) })
 	}
