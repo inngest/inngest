@@ -1,4 +1,4 @@
-import { IconCloudflarePages } from '@inngest/components/icons/platforms/CloudflarePages';
+import { IconCloudflare } from '@inngest/components/icons/platforms/Cloudflare';
 import { IconRailway } from '@inngest/components/icons/platforms/Railway';
 import { IconRender } from '@inngest/components/icons/platforms/Render';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
@@ -11,7 +11,7 @@ function isPlatform(platform: string): platform is Platform {
 
 const platformInfo = {
   'cloudflare-pages': {
-    Icon: IconCloudflarePages,
+    Icon: IconCloudflare,
     text: 'Cloudflare Pages',
   },
   railway: {
