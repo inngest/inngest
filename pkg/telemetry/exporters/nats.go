@@ -150,6 +150,9 @@ func (e *natsSpanExporter) handleBuffered(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			// create a new context so the current one doesn't get cancelled
+			ctx = context.Background()
+
 			if err := e.flush(ctx, e.streams, false); err != nil {
 				logger.StdlibLogger(ctx).Error("error flushing to NATS streams",
 					"error", err,
@@ -465,6 +468,25 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 
 func (e *natsSpanExporter) Shutdown(ctx context.Context) error {
 	logger.StdlibLogger(ctx).Info("shutting down nats span exporter")
+
+	// create a new context so the current one doesn't get cancelled
+	ctx = context.Background()
+
+	if err := e.flush(ctx, e.streams, false); err != nil {
+		logger.StdlibLogger(ctx).Error("error flushing to NATS streams",
+			"error", err,
+			"streams", e.streams,
+		)
+	}
+
+	dls := []*StreamConf{e.deadletter}
+	if err := e.flush(ctx, dls, true); err != nil {
+		logger.StdlibLogger(ctx).Error("error flushing to NATS deadletter stream",
+			"error", err,
+			"streams", dls,
+		)
+	}
+
 	return e.conn.Shutdown(ctx)
 }
 
