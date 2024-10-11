@@ -404,7 +404,7 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 	}
 }
 
-func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimit int64, peekUntil time.Time, guaranteedCapacity *GuaranteedCapacity, metricShardName string, accountId *uuid.UUID) error {
+func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimit int64, peekUntil time.Time, guaranteedCapacity *GuaranteedCapacity, metricShardName string, accountId *uuid.UUID, reportPeekedPartitions *int64) error {
 	// Peek 1s into the future to pull jobs off ahead of time, minimizing 0 latency
 
 	partitions, err := durationWithTags(ctx, "partition_peek", q.clock.Now(), func(ctx context.Context) ([]*QueuePartition, error) {
@@ -414,6 +414,10 @@ func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimi
 	})
 	if err != nil {
 		return err
+	}
+
+	if reportPeekedPartitions != nil {
+		atomic.AddInt64(reportPeekedPartitions, int64(len(partitions)))
 	}
 
 	eg := errgroup.Group{}
@@ -488,7 +492,25 @@ func (q *queue) scan(ctx context.Context) error {
 
 		// When account is leased, process it
 		partitionKey := q.u.kg.AccountPartitionIndex(guaranteedCapacity.AccountID)
-		return q.scanPartition(ctx, partitionKey, PartitionPeekMax, peekUntil, guaranteedCapacity, metricShardName, &guaranteedCapacity.AccountID)
+		var actualScannedPartitions int64
+
+		err := q.scanPartition(ctx, partitionKey, PartitionPeekMax, peekUntil, guaranteedCapacity, metricShardName, &guaranteedCapacity.AccountID, &actualScannedPartitions)
+		if err != nil {
+			return err
+		}
+
+		metrics.IncrQueuePartitionScannedCounter(ctx,
+			actualScannedPartitions,
+			metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"kind": "guaranteed_capacity",
+				},
+			},
+		)
+
+		return nil
+
 	}
 
 	processAccount := false
@@ -523,6 +545,8 @@ func (q *queue) scan(ctx context.Context) error {
 		// optimal peek size in this case.
 		accountPartitionPeekMax := int64(math.Round(float64(PartitionPeekMax / int64(len(peekedAccounts)))))
 
+		var actualScannedPartitions int64
+
 		// Scan and process account partitions in parallel
 		wg := sync.WaitGroup{}
 		for _, account := range peekedAccounts {
@@ -533,13 +557,23 @@ func (q *queue) scan(ctx context.Context) error {
 				defer wg.Done()
 				partitionKey := q.u.kg.AccountPartitionIndex(account)
 
-				if err := q.scanPartition(ctx, partitionKey, accountPartitionPeekMax, peekUntil, nil, metricShardName, &account); err != nil {
+				if err := q.scanPartition(ctx, partitionKey, accountPartitionPeekMax, peekUntil, nil, metricShardName, &account, &actualScannedPartitions); err != nil {
 					q.logger.Error().Err(err).Msg("error processing account partitions")
 				}
 			}(account)
 		}
 
 		wg.Wait()
+
+		metrics.IncrQueuePartitionScannedCounter(ctx,
+			actualScannedPartitions,
+			metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"kind": "accounts",
+				},
+			},
+		)
 
 		return nil
 	}
@@ -556,7 +590,23 @@ func (q *queue) scan(ctx context.Context) error {
 	// By default, use the global partition
 	partitionKey := q.u.kg.GlobalPartitionIndex()
 
-	return q.scanPartition(ctx, partitionKey, PartitionPeekMax, peekUntil, nil, metricShardName, nil)
+	var actualScannedPartitions int64
+	err := q.scanPartition(ctx, partitionKey, PartitionPeekMax, peekUntil, nil, metricShardName, nil, &actualScannedPartitions)
+	if err != nil {
+		return err
+	}
+
+	metrics.IncrQueuePartitionScannedCounter(ctx,
+		actualScannedPartitions,
+		metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"kind": "partitions",
+			},
+		},
+	)
+
+	return nil
 }
 
 // NOTE: Shard is only passed as a reference if the partition was peeked from
@@ -761,14 +811,25 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 					return
 				}
 				if leaseID == nil {
-					log.From(ctx).Error().Msg("cannot extend lease since lease ID is nil")
+					log.From(ctx).Error().
+						Str("account_id", p.AccountID.String()).
+						Str("qi", qi.ID).
+						Str("fn_id", qi.FunctionID.String()).
+						Str("partition_id", p.ID).
+						Msg("cannot extend lease since lease ID is nil")
 					// Don't extend lease since one doesn't exist
 					return
 				}
 				leaseID, err = q.ExtendLease(ctx, qi, *leaseID, QueueLeaseDuration)
 				if err != nil && err != ErrQueueItemNotFound && errors.Unwrap(err) != context.Canceled {
 					// XXX: Increase counter here.
-					q.logger.Error().Err(err).Msg("error extending lease")
+					q.logger.Error().
+						Err(err).
+						Str("account_id", p.AccountID.String()).
+						Str("qi", qi.ID).
+						Str("fn_id", qi.FunctionID.String()).
+						Str("partition_id", p.ID).
+						Msg("error extending lease")
 					errCh <- fmt.Errorf("error extending lease while processing: %w", err)
 					return
 				}
