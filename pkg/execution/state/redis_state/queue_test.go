@@ -4125,8 +4125,6 @@ func TestGuaranteedCapacity(t *testing.T) {
 		res := setup(1)
 		defer res.teardown()
 
-		ctx := context.Background()
-
 		require.Len(t, res.q1.getAccountLeases(), 0)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -4336,7 +4334,10 @@ func TestGuaranteedCapacity(t *testing.T) {
 		defer cancelAll()
 
 		ctxQ1, cancelQ1 := context.WithCancel(ctx)
+		defer cancelQ1()
+		
 		ctxQ2, cancelQ2 := context.WithCancel(ctx)
+		defer cancelQ2()
 
 		// run two workers
 		go res.q1.claimUnleasedGuaranteedCapacity(ctxQ1, 500*time.Millisecond, 500*time.Millisecond)
