@@ -22,13 +22,6 @@ if guaranteedCapacity == nil then
     return -1
 end
 
--- TODO:
--- Filter expired leases based off of currentTimeMS
--- If index != remaining, fail.
--- Append lease to guaranteed capacity
--- Update map
--- Return OK
-
 local currentLeases = {}
 local found = false
 

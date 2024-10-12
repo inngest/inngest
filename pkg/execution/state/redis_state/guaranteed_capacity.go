@@ -139,12 +139,12 @@ func (q *queue) getGuaranteedCapacityMap(ctx context.Context) (map[string]Guaran
 	return guaranteedCapacityMap, nil
 }
 
-// leaseAccount leases an account with guaranteed capacity for the given duration. GuaranteedCapacity can have more than one lease at a time;
+// acquireAccountLease leases an account with guaranteed capacity for the given duration. GuaranteedCapacity can have more than one lease at a time;
 // you must provide an index to claim a lease. THe index This prevents multiple workers
 // from claiming the same lease index;  if workers A and B see an account with 0 leases and both attempt
 // to claim lease "0", only one will succeed.
-func (q *queue) leaseAccount(ctx context.Context, guaranteedCapacity GuaranteedCapacity, duration time.Duration, leaseIndex int) (*ulid.ULID, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "leaseAccount"), redis_telemetry.ScopeQueue)
+func (q *queue) acquireAccountLease(ctx context.Context, guaranteedCapacity GuaranteedCapacity, duration time.Duration, leaseIndex int) (*ulid.ULID, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "acquireAccountLease"), redis_telemetry.ScopeQueue)
 
 	if guaranteedCapacity.Scope != enums.GuaranteedCapacityScopeAccount {
 		return nil, fmt.Errorf("expected account scope, got %s", guaranteedCapacity.Scope)
@@ -183,6 +183,8 @@ func (q *queue) leaseAccount(ctx context.Context, guaranteedCapacity GuaranteedC
 		return nil, errGuaranteedCapacityIndexLeased
 	case int64(-3):
 		return nil, errGuaranteedCapacityIndexInvalid
+	case int64(-4):
+		return nil, errGuaranteedCapacityIndexExceeded
 	case int64(0):
 		return &leaseID, nil
 	default:
@@ -389,7 +391,7 @@ func (q *queue) scanAndLeaseUnleasedAccounts(ctx context.Context) (retry bool, e
 	q.logger.Trace().Msgf("leasing %d accounts", leaseNum)
 
 	for _, guaranteedCapacity := range filteredUnleasedAccounts[0:leaseNum] {
-		leaseID, err := q.leaseAccount(ctx, guaranteedCapacity, AccountLeaseTime, len(guaranteedCapacity.Leases))
+		leaseID, err := q.acquireAccountLease(ctx, guaranteedCapacity, AccountLeaseTime, len(guaranteedCapacity.Leases))
 		if err == nil {
 			guaranteedCapacity.Leases = append(guaranteedCapacity.Leases, *leaseID)
 			// go q.counter(ctx, "queue_account_lease_success_total", 1, map[string]any{
@@ -411,8 +413,12 @@ func (q *queue) scanAndLeaseUnleasedAccounts(ctx context.Context) (retry bool, e
 		case errGuaranteedCapacityIndexInvalid:
 			// A lease expired while trying to lease — try again.
 			retry = true
+		case errGuaranteedCapacityIndexExceeded:
+			// This should not have happened; we should have filtered this out.
+			q.logger.Error().Interface("guaranteed_capacity", guaranteedCapacity).Err(err).Msg("attempted to lease more than the maximum number of leases")
+			continue
 		default:
-			q.logger.Debug().Interface("guaranteed_capacity", guaranteedCapacity).Err(err).Msg("failed to lease account with guaranteed capacity")
+			q.logger.Error().Interface("guaranteed_capacity", guaranteedCapacity).Err(err).Msg("failed to lease account with guaranteed capacity")
 			return true, err
 		}
 
@@ -492,6 +498,7 @@ func (q *queue) filterUnleasedAccounts(guaranteedCapacityMap map[string]Guarante
 	for _, v := range guaranteedCapacityMap {
 		// XXX: Here we can add latency targets, etc.
 
+		// Filter out expired leases; we may be able to take over from another worker.
 		validLeases := []ulid.ULID{}
 		for _, l := range v.Leases {
 			if time.UnixMilli(int64(l.Time())).After(q.clock.Now()) {
