@@ -137,6 +137,7 @@ var (
 	// internal guaranteed capacity errors
 	errGuaranteedCapacityNotFound      = fmt.Errorf("guaranteed capacity not found")
 	errGuaranteedCapacityIndexLeased   = fmt.Errorf("guaranteed capacity index is already leased")
+	errGuaranteedCapacityLeaseNotFound = fmt.Errorf("guaranteed capacity lease not found")
 	errGuaranteedCapacityIndexInvalid  = fmt.Errorf("guaranteed capacity lease index is too high (a lease just expired)")
 	errGuaranteedCapacityIndexExceeded = fmt.Errorf("guaranteed capacity index exceeded the maximum limit")
 )

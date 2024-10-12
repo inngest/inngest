@@ -235,7 +235,7 @@ func (q *queue) renewAccountLease(ctx context.Context, guaranteedCapacity Guaran
 	case int64(-1):
 		return nil, errGuaranteedCapacityNotFound
 	case int64(-2):
-		return nil, fmt.Errorf("lease not found")
+		return nil, errGuaranteedCapacityLeaseNotFound
 	case int64(0):
 		return &newLeaseID, nil
 	default:
@@ -269,6 +269,9 @@ func (q *queue) claimUnleasedGuaranteedCapacity(ctx context.Context, scanTickTim
 
 	// records whether we're leasing
 	var leasing int32
+
+	// records whether we're renewing
+	var renewing int32
 
 	for {
 		if q.isSequential() {
@@ -333,29 +336,49 @@ func (q *queue) claimUnleasedGuaranteedCapacity(ctx context.Context, scanTickTim
 				}
 			}()
 		case <-leaseTick.Chan():
-			// Copy the slice to prevent locking/concurrent access.
-			existingLeases := q.getAccountLeases()
+			go func() {
+				if !atomic.CompareAndSwapInt32(&renewing, 0, 1) {
+					// Only one lease can occur at once.
+					q.logger.Debug().Msg("already renewing accounts")
+					return
+				}
 
-			for _, s := range existingLeases {
-				// Attempt to lease all ASAP, even if the backing store is single threaded.
-				go func(ls leasedAccount) {
-					nextLeaseID, err := q.renewAccountLease(ctx, ls.GuaranteedCapacity, AccountLeaseTime, ls.Lease)
-					if err != nil {
-						// If guaranteed capacity was removed, we can remove the internal lease state
-						if errors.Is(err, errGuaranteedCapacityNotFound) {
-							q.removeLeasedAccount(ls.GuaranteedCapacity)
+				// Always reset the renewing op to zero, allowing us to lease again.
+				defer func() { atomic.StoreInt32(&renewing, 0) }()
+
+				// Copy the slice to prevent locking/concurrent access.
+				existingLeases := q.getAccountLeases()
+
+				for _, s := range existingLeases {
+					// Attempt to lease all ASAP, even if the backing store is single threaded.
+					go func(ls leasedAccount) {
+						nextLeaseID, err := q.renewAccountLease(ctx, ls.GuaranteedCapacity, AccountLeaseTime, ls.Lease)
+						if err != nil {
+							// If guaranteed capacity was removed, we can remove the internal lease state
+							if errors.Is(err, errGuaranteedCapacityNotFound) {
+								q.removeLeasedAccount(ls.GuaranteedCapacity)
+								return
+							}
+
+							// If our lease was stolen, play nice and remove the leased account
+							if errors.Is(err, errGuaranteedCapacityLeaseNotFound) {
+								q.logger.Warn().Interface("lease", ls).Msg("giving up lease since it was removed in the backing store")
+
+								q.removeLeasedAccount(ls.GuaranteedCapacity)
+								return
+							}
+
+							q.logger.Error().Err(err).Msg("error renewing account lease")
 							return
 						}
+						q.logger.Debug().Interface("account", ls).Msg("renewed account lease")
+						// Update the lease ID so that we have this stored appropriately for
+						// the next renewal.
+						q.addLeasedAccount(ls.GuaranteedCapacity, *nextLeaseID)
+					}(s)
+				}
+			}()
 
-						q.logger.Error().Err(err).Msg("error renewing account lease")
-						return
-					}
-					q.logger.Debug().Interface("account", ls).Msg("renewed account lease")
-					// Update the lease ID so that we have this stored appropriately for
-					// the next renewal.
-					q.addLeasedAccount(ls.GuaranteedCapacity, *nextLeaseID)
-				}(s)
-			}
 		}
 	}
 }
@@ -490,6 +513,7 @@ func (q *queue) filterUnleasedAccounts(guaranteedCapacityMap map[string]Guarante
 
 	// Copy the slice to prevent locking/concurrent access.
 	for _, v := range q.getAccountLeases() {
+		// Remove any accounts that have already been leased by this worker.
 		delete(guaranteedCapacityMap, v.GuaranteedCapacity.Key())
 	}
 

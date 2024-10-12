@@ -26,18 +26,27 @@ local currentLeases = {}
 local found = false
 
 if guaranteedCapacity.leases ~= nil and #guaranteedCapacity.leases > 0 then
+    local validLeases = {}
     for _, lease in ipairs(guaranteedCapacity.leases) do
         if decode_ulid_time(lease) >= currentTimeMS then
             -- This is a valid lease.  If the lease matches what we're replacing,
             -- update the lease.
             if lease == existingLeaseID then
-								found = true
-							  if expire == 0 then
-                	table.insert(currentLeases, newLeaseID)
-								end
-            else
-                table.insert(currentLeases, lease)
+                found = true
+                if expire == 0 then
+                  table.insert(validLeases, newLeaseID)
+                end
+			      else
+                table.insert(validLeases, lease)
             end
+        end
+    end
+
+    -- Filter out leases exceeding capacity
+    for i, lease in ipairs(validLeases) do
+        local lease_within_bounds = guaranteedCapacity.gc == nil or i <= tonumber(guaranteedCapacity.gc)
+        if lease_within_bounds then
+            table.insert(currentLeases, lease)
         end
     end
 end
