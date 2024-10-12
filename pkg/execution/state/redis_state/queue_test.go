@@ -4109,6 +4109,15 @@ func TestGuaranteedCapacity(t *testing.T) {
 		require.NoError(t, err, "expected lease to be expired", res.r.Dump(), leaseId, leaseGc)
 
 		res.q1.removeLeasedAccount(res.gc)
+
+		localLeases = res.q1.getAccountLeases()
+		require.Len(t, localLeases, 0)
+
+		gc, err = res.q1.getGuaranteedCapacityMap(ctx)
+		require.NoError(t, err)
+		require.Len(t, gc, 1)
+		require.NotNil(t, gc[res.gc.Key()], "expected guaranteed capacity for account to be set", gc)
+		require.Len(t, gc[res.gc.Key()].Leases, 0)
 	})
 
 	// Test claimUnleasedGuaranteedCapacity
