@@ -4034,7 +4034,7 @@ func TestAccountLease(t *testing.T) {
 
 	t.Run("Leasing an account without guaranteed capacity fails", func(t *testing.T) {
 		shard := sf(ctx, uuid.UUID{})
-		leaseID, err := q.leaseAccount(ctx, shard, 2*time.Second, 1)
+		leaseID, err := q.leaseAccount(ctx, *shard, 2*time.Second, 1)
 		require.Nil(t, leaseID, "Got lease ID: %v", leaseID)
 		require.NotNil(t, err)
 		require.ErrorContains(t, err, "guaranteed capacity not found")
@@ -4061,7 +4061,7 @@ func TestAccountLease(t *testing.T) {
 		// At the beginning, no shards have been leased.  Leasing a shard
 		// with an index of >= 1 should fail.
 		guaranteedCapacity := sf(ctx, idA)
-		leaseID, err := q.leaseAccount(ctx, guaranteedCapacity, 2*time.Second, 1)
+		leaseID, err := q.leaseAccount(ctx, *guaranteedCapacity, 2*time.Second, 1)
 		require.Nil(t, leaseID, "Got lease ID: %v", leaseID)
 		require.NotNil(t, err)
 		require.ErrorContains(t, err, "lease index is too high", r.Dump())
@@ -4071,13 +4071,13 @@ func TestAccountLease(t *testing.T) {
 		shard := sf(ctx, idA)
 
 		t.Run("Basic lease", func(t *testing.T) {
-			leaseID, err := q.leaseAccount(ctx, shard, 1*time.Second, 0)
+			leaseID, err := q.leaseAccount(ctx, *shard, 1*time.Second, 0)
 			require.NotNil(t, leaseID, "Didn't get a lease ID for a basic lease")
 			require.Nil(t, err)
 		})
 
 		t.Run("Leasing a subsequent index works", func(t *testing.T) {
-			leaseID, err := q.leaseAccount(ctx, shard, 8*time.Second, 1) // Same length as the lease below, after wait
+			leaseID, err := q.leaseAccount(ctx, *shard, 8*time.Second, 1) // Same length as the lease below, after wait
 			require.NotNil(t, leaseID, "Didn't get a lease ID for a secondary lease")
 			require.Nil(t, err)
 		})
@@ -4087,7 +4087,7 @@ func TestAccountLease(t *testing.T) {
 			// is no longer valid, so leasing with an index of (1) should succeed.
 			<-time.After(2 * time.Second) // Wait a few seconds so that time.Now() in the call works.
 			r.FastForward(2 * time.Second)
-			leaseID, err := q.leaseAccount(ctx, shard, 10*time.Second, 1)
+			leaseID, err := q.leaseAccount(ctx, *shard, 10*time.Second, 1)
 			require.NotNil(t, leaseID)
 			require.Nil(t, err)
 
@@ -4095,7 +4095,7 @@ func TestAccountLease(t *testing.T) {
 		})
 
 		t.Run("Leasing an already leased index fails", func(t *testing.T) {
-			leaseID, err := q.leaseAccount(ctx, shard, 2*time.Second, 1)
+			leaseID, err := q.leaseAccount(ctx, *shard, 2*time.Second, 1)
 			require.Nil(t, leaseID, "got a lease ID for an existing lease")
 			require.NotNil(t, err)
 			require.ErrorContains(t, err, "index is already leased")
@@ -4103,7 +4103,7 @@ func TestAccountLease(t *testing.T) {
 
 		t.Run("Leasing a second account works", func(t *testing.T) {
 			// Try another shard name with an index of 0.
-			leaseID, err := q.leaseAccount(ctx, sf(ctx, idB), 2*time.Second, 0)
+			leaseID, err := q.leaseAccount(ctx, *sf(ctx, idB), 2*time.Second, 0)
 			require.NotNil(t, leaseID)
 			require.Nil(t, err)
 		})
@@ -4117,12 +4117,12 @@ func TestAccountLease(t *testing.T) {
 		require.Nil(t, err)
 
 		guaranteedCapacity := sf(ctx, idA)
-		leaseID, err := q.leaseAccount(ctx, guaranteedCapacity, 1*time.Second, 0)
+		leaseID, err := q.leaseAccount(ctx, *guaranteedCapacity, 1*time.Second, 0)
 		require.NotNil(t, leaseID, "could not lease account", r.Dump())
 		require.Nil(t, err)
 
 		t.Run("Current leases succeed", func(t *testing.T) {
-			leaseID, err = q.renewAccountLease(ctx, guaranteedCapacity, 2*time.Second, *leaseID)
+			leaseID, err = q.renewAccountLease(ctx, *guaranteedCapacity, 2*time.Second, *leaseID)
 			require.NotNil(t, leaseID, "did not get a new lease when renewing", r.Dump())
 			require.Nil(t, err)
 		})
@@ -4131,13 +4131,13 @@ func TestAccountLease(t *testing.T) {
 			<-time.After(3 * time.Second)
 			r.FastForward(3 * time.Second)
 
-			leaseID, err := q.renewAccountLease(ctx, guaranteedCapacity, 2*time.Second, *leaseID)
+			leaseID, err := q.renewAccountLease(ctx, *guaranteedCapacity, 2*time.Second, *leaseID)
 			require.ErrorContains(t, err, "lease not found")
 			require.Nil(t, leaseID)
 		})
 
 		t.Run("Invalid lease IDs fail", func(t *testing.T) {
-			leaseID, err := q.renewAccountLease(ctx, guaranteedCapacity, 2*time.Second, ulid.MustNew(ulid.Now(), rand.Reader))
+			leaseID, err := q.renewAccountLease(ctx, *guaranteedCapacity, 2*time.Second, ulid.MustNew(ulid.Now(), rand.Reader))
 			require.ErrorContains(t, err, "lease not found")
 			require.Nil(t, leaseID)
 		})

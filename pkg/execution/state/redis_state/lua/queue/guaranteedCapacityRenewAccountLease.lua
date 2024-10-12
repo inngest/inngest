@@ -8,10 +8,11 @@ Output:
 
 local keyGuaranteedCapacityMap  = KEYS[1]
 
-local currentTimeMS             = tonumber(ARGV[1])
-local guaranteedCapacityName    = ARGV[2]
-local existingLeaseID           = ARGV[3]
-local newLeaseID                = ARGV[4]
+local expire 										= tonumber(ARGV[1])
+local currentTimeMS             = tonumber(ARGV[2])
+local guaranteedCapacityName    = ARGV[3]
+local existingLeaseID           = ARGV[4]
+local newLeaseID                = ARGV[5]
 
 -- $include(get_guaranteed_capacity_item.lua)
 -- $include(decode_ulid_time.lua)
@@ -37,8 +38,10 @@ if guaranteedCapacity.leases ~= nil and #guaranteedCapacity.leases > 0 then
             -- This is a valid lease.  If the lease matches what we're replacing,
             -- update the lease.
             if lease == existingLeaseID then
-                table.insert(currentLeases, newLeaseID)
-                found = true
+								found = true
+							  if expire == 0 then
+                	table.insert(currentLeases, newLeaseID)
+								end
             else
                 table.insert(currentLeases, lease)
             end

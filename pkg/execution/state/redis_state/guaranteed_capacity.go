@@ -118,7 +118,7 @@ type leasedAccount struct {
 	Lease              ulid.ULID
 }
 
-func (q *queue) getGuaranteedCapacityMap(ctx context.Context) (map[string]*GuaranteedCapacity, error) {
+func (q *queue) getGuaranteedCapacityMap(ctx context.Context) (map[string]GuaranteedCapacity, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "getGuaranteedCapacityMap"), redis_telemetry.ScopeQueue)
 
 	m, err := q.u.unshardedRc.Do(ctx, q.u.unshardedRc.B().Hgetall().Key(q.u.kg.GuaranteedCapacityMap()).Build()).AsMap()
@@ -128,10 +128,10 @@ func (q *queue) getGuaranteedCapacityMap(ctx context.Context) (map[string]*Guara
 	if err != nil {
 		return nil, fmt.Errorf("error fetching guaranteed capacity map: %w", err)
 	}
-	guaranteedCapacityMap := map[string]*GuaranteedCapacity{}
+	guaranteedCapacityMap := map[string]GuaranteedCapacity{}
 	for k, v := range m {
-		guaranteedCapacity := &GuaranteedCapacity{}
-		if err := v.DecodeJSON(guaranteedCapacity); err != nil {
+		guaranteedCapacity := GuaranteedCapacity{}
+		if err := v.DecodeJSON(&guaranteedCapacity); err != nil {
 			return nil, fmt.Errorf("error decoding guaranteed capacity: %w", err)
 		}
 		guaranteedCapacityMap[k] = guaranteedCapacity
@@ -143,7 +143,7 @@ func (q *queue) getGuaranteedCapacityMap(ctx context.Context) (map[string]*Guara
 // you must provide an index to claim a lease. THe index This prevents multiple workers
 // from claiming the same lease index;  if workers A and B see an account with 0 leases and both attempt
 // to claim lease "0", only one will succeed.
-func (q *queue) leaseAccount(ctx context.Context, guaranteedCapacity *GuaranteedCapacity, duration time.Duration, n int) (*ulid.ULID, error) {
+func (q *queue) leaseAccount(ctx context.Context, guaranteedCapacity GuaranteedCapacity, duration time.Duration, leaseIndex int) (*ulid.ULID, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "leaseAccount"), redis_telemetry.ScopeQueue)
 
 	if guaranteedCapacity.Scope != enums.GuaranteedCapacityScopeAccount {
@@ -161,7 +161,7 @@ func (q *queue) leaseAccount(ctx context.Context, guaranteedCapacity *Guaranteed
 		now.UnixMilli(),
 		guaranteedCapacity.Key(),
 		leaseID,
-		n,
+		leaseIndex,
 	})
 	if err != nil {
 		return nil, err
@@ -190,7 +190,7 @@ func (q *queue) leaseAccount(ctx context.Context, guaranteedCapacity *Guaranteed
 	}
 }
 
-func (q *queue) renewAccountLease(ctx context.Context, guaranteedCapacity *GuaranteedCapacity, duration time.Duration, leaseID ulid.ULID) (*ulid.ULID, error) {
+func (q *queue) renewAccountLease(ctx context.Context, guaranteedCapacity GuaranteedCapacity, duration time.Duration, leaseID ulid.ULID) (*ulid.ULID, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "renewAccountLease"), redis_telemetry.ScopeQueue)
 
 	if guaranteedCapacity.Scope != enums.GuaranteedCapacityScopeAccount {
@@ -203,8 +203,14 @@ func (q *queue) renewAccountLease(ctx context.Context, guaranteedCapacity *Guara
 		return nil, err
 	}
 
+	expireArg := "0"
+	if duration == 0 {
+		expireArg = "1"
+	}
+
 	keys := []string{q.u.kg.GuaranteedCapacityMap()}
 	args, err := StrSlice([]any{
+		expireArg,
 		now.UnixMilli(),
 		guaranteedCapacity.Key(),
 		leaseID,
@@ -235,8 +241,13 @@ func (q *queue) renewAccountLease(ctx context.Context, guaranteedCapacity *Guara
 	}
 }
 
-func (q *queue) expireAccountLease(ctx context.Context, guaranteedCapacity *GuaranteedCapacity, leaseID ulid.ULID) (*ulid.ULID, error) {
-	return q.renewAccountLease(ctx, guaranteedCapacity, 0, leaseID)
+func (q *queue) expireAccountLease(ctx context.Context, guaranteedCapacity GuaranteedCapacity, leaseID ulid.ULID) error {
+	_, err := q.renewAccountLease(ctx, guaranteedCapacity, 0, leaseID)
+	if err != nil {
+		return fmt.Errorf("could not renew account lease: %w", err)
+	}
+
+	return nil
 }
 
 //nolint:all
@@ -280,10 +291,12 @@ func (q *queue) claimUnleasedGuaranteedCapacity(ctx context.Context, scanTickTim
 				// Expire leases immediately from backing store.
 				ls := ls
 				go func(ls leasedAccount) {
-					_, err := q.expireAccountLease(context.Background(), &ls.GuaranteedCapacity, ls.Lease)
+					q.logger.Debug().Str("account", ls.GuaranteedCapacity.AccountID.String()).Msg("expiring account lease before shutdown")
+					err := q.expireAccountLease(context.Background(), ls.GuaranteedCapacity, ls.Lease)
 					if err != nil && !errors.Is(err, errGuaranteedCapacityNotFound) {
 						q.logger.Error().Err(err).Msg("error expiring account lease")
 					}
+					q.removeLeasedAccount(ls.GuaranteedCapacity)
 				}(ls)
 			}
 
@@ -313,7 +326,7 @@ func (q *queue) claimUnleasedGuaranteedCapacity(ctx context.Context, scanTickTim
 						return
 					}
 					if retry {
-						<-q.clock.After(time.Duration(mathRand.Intn(50)) * time.Millisecond)
+						<-q.clock.After(time.Duration(mathRand.Intn(1000)) * time.Millisecond)
 					}
 				}
 			}()
@@ -324,11 +337,11 @@ func (q *queue) claimUnleasedGuaranteedCapacity(ctx context.Context, scanTickTim
 			for _, s := range existingLeases {
 				// Attempt to lease all ASAP, even if the backing store is single threaded.
 				go func(ls leasedAccount) {
-					nextLeaseID, err := q.renewAccountLease(ctx, &ls.GuaranteedCapacity, AccountLeaseTime, ls.Lease)
+					nextLeaseID, err := q.renewAccountLease(ctx, ls.GuaranteedCapacity, AccountLeaseTime, ls.Lease)
 					if err != nil {
 						// If guaranteed capacity was removed, we can remove the internal lease state
 						if errors.Is(err, errGuaranteedCapacityNotFound) {
-							q.removeLeasedAccount(ctx, ls.GuaranteedCapacity)
+							q.removeLeasedAccount(ls.GuaranteedCapacity)
 							return
 						}
 
@@ -338,7 +351,7 @@ func (q *queue) claimUnleasedGuaranteedCapacity(ctx context.Context, scanTickTim
 					q.logger.Debug().Interface("account", ls).Msg("renewed account lease")
 					// Update the lease ID so that we have this stored appropriately for
 					// the next renewal.
-					q.addLeasedAccount(ctx, &ls.GuaranteedCapacity, *nextLeaseID)
+					q.addLeasedAccount(ls.GuaranteedCapacity, *nextLeaseID)
 				}(s)
 			}
 		}
@@ -357,7 +370,7 @@ func (q *queue) scanAndLeaseUnleasedAccounts(ctx context.Context) (retry bool, e
 		return
 	}
 
-	filteredUnleasedAccounts, err := q.filterUnleasedAccounts(ctx, guaranteedCapacityMap)
+	filteredUnleasedAccounts, err := q.filterUnleasedAccounts(guaranteedCapacityMap)
 	if err != nil {
 		q.logger.Error().Err(err).Msg("error filtering unleased accounts")
 		return
@@ -378,18 +391,14 @@ func (q *queue) scanAndLeaseUnleasedAccounts(ctx context.Context) (retry bool, e
 	for _, guaranteedCapacity := range filteredUnleasedAccounts[0:leaseNum] {
 		leaseID, err := q.leaseAccount(ctx, guaranteedCapacity, AccountLeaseTime, len(guaranteedCapacity.Leases))
 		if err == nil {
+			guaranteedCapacity.Leases = append(guaranteedCapacity.Leases, *leaseID)
 			// go q.counter(ctx, "queue_account_lease_success_total", 1, map[string]any{
 			// 	"shard_name": guaranteedCapacity.Name,
 			// })
-			q.addLeasedAccount(ctx, guaranteedCapacity, *leaseID)
+			q.addLeasedAccount(guaranteedCapacity, *leaseID)
 			q.logger.Debug().Interface("guaranteed_capacity", guaranteedCapacity).Str("lease_id", leaseID.String()).Msg("leased account with guaranteed capacity")
-		} else {
-			q.logger.Debug().Interface("guaranteed_capacity", guaranteedCapacity).Err(err).Msg("failed to lease account with guaranteed capacity")
+			continue
 		}
-
-		// go q.counter(ctx, "queue_shard_lease_conflict_total", 1, map[string]any{
-		// 	"shard_name": guaranteedCapacity.Name,
-		// })
 
 		switch err {
 		case errGuaranteedCapacityNotFound:
@@ -403,21 +412,26 @@ func (q *queue) scanAndLeaseUnleasedAccounts(ctx context.Context) (retry bool, e
 			// A lease expired while trying to lease — try again.
 			retry = true
 		default:
+			q.logger.Debug().Interface("guaranteed_capacity", guaranteedCapacity).Err(err).Msg("failed to lease account with guaranteed capacity")
 			return true, err
 		}
+
+		// go q.counter(ctx, "queue_shard_lease_conflict_total", 1, map[string]any{
+		// 	"shard_name": guaranteedCapacity.Name,
+		// })
 	}
 
 	return retry, nil
 }
 
-func (q *queue) addLeasedAccount(ctx context.Context, guaranteedCapacity *GuaranteedCapacity, lease ulid.ULID) {
+func (q *queue) addLeasedAccount(guaranteedCapacity GuaranteedCapacity, lease ulid.ULID) {
 	for i, n := range q.accountLeases {
 		if n.GuaranteedCapacity.Key() == guaranteedCapacity.Key() {
 			// Updated in place.
 			q.accountLeaseLock.Lock()
 			q.accountLeases[i] = leasedAccount{
 				Lease:              lease,
-				GuaranteedCapacity: *guaranteedCapacity,
+				GuaranteedCapacity: guaranteedCapacity,
 			}
 			q.accountLeaseLock.Unlock()
 			return
@@ -427,12 +441,12 @@ func (q *queue) addLeasedAccount(ctx context.Context, guaranteedCapacity *Guaran
 	q.accountLeaseLock.Lock()
 	q.accountLeases = append(q.accountLeases, leasedAccount{
 		Lease:              lease,
-		GuaranteedCapacity: *guaranteedCapacity,
+		GuaranteedCapacity: guaranteedCapacity,
 	})
 	q.accountLeaseLock.Unlock()
 }
 
-func (q *queue) removeLeasedAccount(ctx context.Context, guaranteedCapacity GuaranteedCapacity) {
+func (q *queue) removeLeasedAccount(guaranteedCapacity GuaranteedCapacity) {
 	q.accountLeaseLock.Lock()
 
 	filtered := make([]leasedAccount, len(q.accountLeases)-1)
@@ -446,6 +460,8 @@ func (q *queue) removeLeasedAccount(ctx context.Context, guaranteedCapacity Guar
 		filtered[i+skipped] = accountLease
 	}
 
+	q.accountLeases = filtered
+
 	q.accountLeaseLock.Unlock()
 }
 
@@ -454,7 +470,7 @@ func (q *queue) removeLeasedAccount(ctx context.Context, guaranteedCapacity Guar
 // and priority shuffles guaranteed capacity to lease in a non-deterministic (but prioritized) order.
 //
 // The returned guaranteed capacities are safe to be leased, and should be attempted in-order.
-func (q *queue) filterUnleasedAccounts(ctx context.Context, guaranteedCapacityMap map[string]*GuaranteedCapacity) ([]*GuaranteedCapacity, error) {
+func (q *queue) filterUnleasedAccounts(guaranteedCapacityMap map[string]GuaranteedCapacity) ([]GuaranteedCapacity, error) {
 	if len(guaranteedCapacityMap) == 0 {
 		return nil, nil
 	}
@@ -472,7 +488,7 @@ func (q *queue) filterUnleasedAccounts(ctx context.Context, guaranteedCapacityMa
 	}
 
 	weights := []float64{}
-	shuffleIdx := []*GuaranteedCapacity{}
+	shuffleIdx := []GuaranteedCapacity{}
 	for _, v := range guaranteedCapacityMap {
 		// XXX: Here we can add latency targets, etc.
 
@@ -501,7 +517,7 @@ func (q *queue) filterUnleasedAccounts(ctx context.Context, guaranteedCapacityMa
 	// randomly shuffling.  Note that high priority accounts will still be
 	// likely to come first with some contention.
 	w := sampleuv.NewWeighted(weights, rnd)
-	result := make([]*GuaranteedCapacity, len(weights))
+	result := make([]GuaranteedCapacity, len(weights))
 	for n := range result {
 		idx, ok := w.Take()
 		if !ok && len(result) < len(weights)-1 {
