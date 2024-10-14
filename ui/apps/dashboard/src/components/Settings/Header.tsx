@@ -9,9 +9,10 @@ import { Header, type BreadCrumbType } from '@inngest/components/Header/Header';
 const paths: [string, string][] = [
   ['/integrations', 'Integrations'],
   ['/billing', 'Billing'],
-  ['/organization-settings', 'Organization'],
-  ['/organization', 'Members'],
+  ['/organization', 'Organization'],
+  ['/organization/organization-members', 'Members'],
   ['/user', 'Your profile'],
+  ['/user/security', 'Account Security'],
 ];
 
 const defined = <T,>(value: T | undefined): value is T => value !== undefined;

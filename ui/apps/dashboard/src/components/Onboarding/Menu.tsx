@@ -1,29 +1,31 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
 import StepsMenu from '@inngest/components/Steps/StepsMenu';
 import { RiDiscordLine, RiExternalLinkLine, RiMailLine } from '@remixicon/react';
 
 import { pathCreator } from '@/utils/urls';
-import { steps } from '../Onboarding/types';
+import { STEPS_ORDER, isValidStep } from '../Onboarding/types';
 import { onboardingMenuStepContent } from './content';
 import useOnboardingStep from './useOnboardingStep';
 
-export default function Menu({ envSlug }: { envSlug: string }) {
+export default function Menu({ envSlug, step }: { envSlug: string; step: string }) {
   const { lastCompletedStep } = useOnboardingStep();
-  const pathname = usePathname();
 
-  const activeStep = pathname.split('/').pop() || '1';
   return (
     <StepsMenu title={onboardingMenuStepContent.title} links={links}>
-      {steps.map((stepNumber) => {
-        const isCompleted = stepNumber <= lastCompletedStep;
-        const isActive = activeStep === stepNumber.toString();
-        const stepContent = onboardingMenuStepContent.step[stepNumber];
-        const url = pathCreator.onboardingSteps({ envSlug: envSlug, step: stepNumber });
+      {STEPS_ORDER.map((stepKey) => {
+        if (!isValidStep(stepKey)) {
+          return 'error';
+        }
+        const isCompleted = lastCompletedStep
+          ? STEPS_ORDER.indexOf(stepKey) <= STEPS_ORDER.indexOf(lastCompletedStep)
+          : false;
+        const isActive = step === stepKey;
+        const stepContent = onboardingMenuStepContent.step[stepKey];
+        const url = pathCreator.onboardingSteps({ envSlug: envSlug, step: stepKey });
         return (
           <StepsMenu.MenuItem
-            key={stepNumber}
+            key={stepKey}
             stepContent={stepContent}
             isCompleted={isCompleted}
             isActive={isActive}

@@ -372,6 +372,14 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*response, error) {
 		}
 	}
 
+	if resp.StatusCode == 0 {
+		// Unreachable
+		log.From(ctx).Error().Err(err).
+			Str("body", string(byt)).
+			Str("run_id", r.RunID.String()).
+			Msg("status code is 0")
+	}
+
 	// Check the retry status from the headers and versions.
 	noRetry = !shouldRetry(statusCode, headers[headerNoRetry], headers[headerSDK])
 

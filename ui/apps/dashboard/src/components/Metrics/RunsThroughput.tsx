@@ -12,7 +12,10 @@ export type RunsThroughputMetricsType =
 export const RunsThrougput = ({
   workspace,
   entities,
-}: Partial<VolumeMetricsQuery> & { entities: EntityLookup }) => {
+}: {
+  workspace?: VolumeMetricsQuery['workspace'];
+  entities: EntityLookup;
+}) => {
   const metrics = workspace && mapEntityLines(workspace.runsThroughput.metrics, entities);
 
   return (
@@ -26,7 +29,8 @@ export const RunsThrougput = ({
               <NewLink
                 arrowOnHover
                 className="text-sm"
-                href="https://www.inngest.com/docs/features/inngest-functions/steps-workflows"
+                href="https://www.inngest.com/docs/platform/monitor/observability-metrics#total-runs-throughput"
+                target="_new"
               >
                 Learn more about runs throughput.
               </NewLink>
@@ -38,6 +42,7 @@ export const RunsThrougput = ({
         <Chart
           option={metrics ? getLineChartOptions(metrics) : {}}
           className="relative h-full w-full overflow-visible"
+          group="metricsDashboard"
         />
       </div>
     </div>

@@ -32,18 +32,18 @@ func QueueItemIndexerFunc(ctx context.Context, i QueueItem, kg QueueKeyGenerator
 	case osqueue.KindStart:
 		return QueueItemIndex{
 			kg.RunIndex(i.Data.Identifier.RunID),
-			kg.Status("start", i.WorkflowID),
+			kg.Status("start", i.FunctionID),
 		}
 	case osqueue.KindEdge, osqueue.KindEdgeError:
 		// For edges and sleeps, store an index for the given run ID.
 		return QueueItemIndex{
 			kg.RunIndex(i.Data.Identifier.RunID),
-			kg.Status("in-progress", i.WorkflowID),
+			kg.Status("in-progress", i.FunctionID),
 		}
 	case osqueue.KindSleep:
 		return QueueItemIndex{
 			kg.RunIndex(i.Data.Identifier.RunID),
-			kg.Status("sleep", i.WorkflowID),
+			kg.Status("sleep", i.FunctionID),
 		}
 	case osqueue.KindPause:
 		// Still keep this in the run index so that we know jobs are present

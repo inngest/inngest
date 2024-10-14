@@ -138,7 +138,7 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 		startedAt = time.UnixMilli(md.StartedAt)
 	}
 
-	return state.Metadata{
+	result := state.Metadata{
 		ID: state.ID{
 			RunID:      md.Identifier.RunID,
 			FunctionID: md.Identifier.WorkflowID,
@@ -148,7 +148,7 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 				AccountID: md.Identifier.AccountID,
 			},
 		},
-		Config: state.Config{
+		Config: *state.InitConfig(&state.Config{
 			FunctionVersion:       md.Identifier.WorkflowVersion,
 			SpanID:                md.SpanID,
 			StartedAt:             startedAt,
@@ -162,14 +162,19 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 			CustomConcurrencyKeys: md.Identifier.CustomConcurrencyKeys,
 			Context:               md.Context,
 			ForceStepPlan:         md.DisableImmediateExecution,
-		},
+		}),
 		Stack: stack,
 		Metrics: state.RunMetrics{
 			EventSize: md.EventSize,
 			StateSize: md.StateSize,
 			StepCount: md.StepCount,
 		},
-	}, nil
+	}
+
+	// initialize function trace eagerly; this needs to unmarshal the trace carrier
+	_ = result.Config.FunctionTrace()
+
+	return result, nil
 }
 
 // Update updates configuration on the state, eg. setting the execution

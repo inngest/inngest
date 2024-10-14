@@ -18,8 +18,13 @@ const NavToggle = ({ collapsed, setCollapsed }: LogoProps) => {
   const toggle = async () => {
     const toggled = !collapsed;
     setCollapsed(toggled);
-    typeof window !== 'undefined' &&
+
+    if (typeof window !== 'undefined') {
       window.cookieStore.set('navCollapsed', toggled ? 'true' : 'false');
+      //
+      // some downstream things, like charts, may need to redraw themselves
+      setTimeout(() => window.dispatchEvent(new Event('navToggle')), 200);
+    }
   };
 
   return (

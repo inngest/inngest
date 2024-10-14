@@ -255,9 +255,16 @@ export const GET_RUNS = gql`
     $status: [FunctionRunStatus!]
     $timeField: RunsV2OrderByField!
     $functionRunCursor: String = null
+    $celQuery: String = null
   ) {
     runs(
-      filter: { appIDs: $appIDs, from: $startTime, status: $status, timeField: $timeField }
+      filter: {
+        appIDs: $appIDs
+        from: $startTime
+        status: $status
+        timeField: $timeField
+        query: $celQuery
+      }
       orderBy: [{ field: $timeField, direction: DESC }]
       after: $functionRunCursor
     ) {

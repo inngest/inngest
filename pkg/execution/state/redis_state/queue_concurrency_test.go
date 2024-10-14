@@ -36,28 +36,38 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 	workflowIDs := []uuid.UUID{limit_1, limit_10}
 
 	// Limit function concurrency by workflow ID.
-	pkf := func(ctx context.Context, p QueuePartition) (string, int) {
-		switch p.WorkflowID {
+	pkf := func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+		switch *p.FunctionID {
 		case limit_1:
-			return p.WorkflowID.String(), 1
+			return PartitionConcurrencyLimits{
+				AccountLimit:   NoConcurrencyLimit,
+				FunctionLimit:  1,
+				CustomKeyLimit: 1,
+			}
 		case limit_10:
-			return p.WorkflowID.String(), 10
+			return PartitionConcurrencyLimits{
+				AccountLimit:   NoConcurrencyLimit,
+				FunctionLimit:  10,
+				CustomKeyLimit: 10,
+			}
 		default:
 			// No concurrency, which means use the default concurrency limits.
-			return "", 0
+			return PartitionConcurrencyLimits{NoConcurrencyLimit, NoConcurrencyLimit, NoConcurrencyLimit}
 		}
 	}
 
 	// Create a new lifecycle listener.  This should be invoked each time we hit limits.
 	ll := testLifecycleListener{
-		l:           &sync.Mutex{},
-		concurrency: map[uuid.UUID]int{},
+		lock:            &sync.Mutex{},
+		fnConcurrency:   map[uuid.UUID]int{},
+		acctConcurrency: map[uuid.UUID]int{},
+		ckConcurrency:   map[string]int{},
 	}
 
 	q := NewQueue(
 		NewQueueClient(rc, QueueDefaultKey),
 		WithNumWorkers(100),
-		WithPartitionConcurrencyKeyGenerator(pkf),
+		WithConcurrencyLimitGetter(pkf),
 		WithQueueLifecycles(ll),
 	)
 
@@ -70,16 +80,24 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 	// Run the queue.
 	go func() {
 		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) error {
+			if item.Identifier.WorkflowID == limit_1 {
+				fmt.Println("Single concurrency item hit", time.Now().Truncate(time.Millisecond))
+			}
+
 			<-time.After(jobDuration / 2)
 			// each job takes 2 seconds to complete.
 			switch item.Identifier.WorkflowID {
 			case limit_1:
-				fmt.Println("Single concurrency item hit", time.Now().Truncate(time.Millisecond))
 				atomic.AddInt32(&counter_1, 1)
 			case limit_10:
+				fmt.Println("10 concurrency item hit", time.Now().Truncate(time.Millisecond))
 				atomic.AddInt32(&counter_10, 1)
 			}
+
 			<-time.After(jobDuration / 2)
+			if item.Identifier.WorkflowID == limit_1 {
+				fmt.Println("Single concurrency item done", time.Now().Truncate(time.Millisecond))
+			}
 			return nil
 		})
 	}()
@@ -115,7 +133,11 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 		}
 	}
 
-	require.NotZero(t, ll.concurrency[limit_1])
+	require.Eventually(t, func() bool {
+		ll.lock.Lock()
+		defer ll.lock.Unlock()
+		return ll.fnConcurrency[limit_1] > 0
+	}, 5*time.Second, 50*time.Millisecond)
 
 	diff := time.Since(start).Seconds()
 	require.Greater(t, int(diff), 10, "10 jobs should have taken at least 10 seconds")
@@ -123,13 +145,32 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 }
 
 type testLifecycleListener struct {
-	l           *sync.Mutex
-	concurrency map[uuid.UUID]int
+	lock            *sync.Mutex
+	fnConcurrency   map[uuid.UUID]int
+	acctConcurrency map[uuid.UUID]int
+	ckConcurrency   map[string]int
 }
 
-func (t testLifecycleListener) OnConcurrencyLimitReached(ctx context.Context, fnID uuid.UUID) {
-	t.l.Lock()
-	i := t.concurrency[fnID]
-	t.concurrency[fnID] = i + 1
-	t.l.Unlock()
+func (t testLifecycleListener) OnFnConcurrencyLimitReached(_ context.Context, fnID uuid.UUID) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	i := t.fnConcurrency[fnID]
+	t.fnConcurrency[fnID] = i + 1
+}
+
+func (t testLifecycleListener) OnAccountConcurrencyLimitReached(_ context.Context, acctID uuid.UUID) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	i := t.acctConcurrency[acctID]
+	t.acctConcurrency[acctID] = i + 1
+}
+
+func (t testLifecycleListener) OnCustomKeyConcurrencyLimitReached(_ context.Context, key string) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	i := t.ckConcurrency[key]
+	t.ckConcurrency[key] = i + 1
 }

@@ -298,7 +298,7 @@ type TracePageCursor struct {
 }
 
 func (c *TracePageCursor) IsEmpty() bool {
-	return c.Cursors == nil || len(c.Cursors) == 0
+	return len(c.Cursors) == 0
 }
 
 // Find finds a cusor with the provided name

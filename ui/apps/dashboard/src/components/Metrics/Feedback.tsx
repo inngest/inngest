@@ -1,9 +1,6 @@
 import { NewButton } from '@inngest/components/Button';
 
-import type { VolumeMetricsQuery } from '@/gql/graphql';
 import { ChartIcon } from '@/icons/ChartIcon';
-
-export type SdkThroughputMetricsType = VolumeMetricsQuery['workspace']['sdkThroughput']['metrics'];
 
 export const Feedback = ({}) => {
   return (
@@ -19,13 +16,6 @@ export const Feedback = ({}) => {
           kind="secondary"
           appearance="outlined"
           label="Request charts"
-          href="https://roadmap.inngest.com/roadmap"
-          target="_new"
-        />
-        <NewButton
-          kind="secondary"
-          appearance="outlined"
-          label="Give us feedback"
           href="https://roadmap.inngest.com/roadmap"
           target="_new"
         />

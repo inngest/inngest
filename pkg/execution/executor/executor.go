@@ -407,7 +407,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// function run spanID
 	spanID := run.NewSpanID(ctx)
 
-	config := sv2.Config{
+	config := *sv2.InitConfig(&sv2.Config{
 		FunctionVersion: req.Function.FunctionVersion,
 		SpanID:          spanID.String(),
 		EventIDs:        eventIDs,
@@ -417,7 +417,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		PriorityFactor:  &factor,
 		BatchID:         req.BatchID,
 		Context:         req.Context,
-	}
+	})
 
 	// Grab the cron schedule for function config.  This is necessary for fast
 	// lookups, trace info, etc.
@@ -715,6 +715,14 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, fmt.Errorf("cannot load metadata to execute run: %w", err)
 	}
 
+	ef, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
+	if err != nil {
+		return nil, fmt.Errorf("error loading function for run: %w", err)
+	}
+	if ef.Paused {
+		return nil, state.ErrFunctionPaused
+	}
+
 	// Find the stack index for the incoming step.
 	//
 	// stackIndex represents the stack pointer at the time this step was scheduled.
@@ -738,13 +746,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		md.Config.StartedAt = time.Now()
 	}
 
-	f, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
-	if err != nil {
-		return nil, fmt.Errorf("error loading function for run: %w", err)
-	}
-
 	// Validate that the run can execute.
-	v := newRunValidator(e, f, md, events, item) // TODO: Load events for this.
+	v := newRunValidator(e, ef.Function, md, events, item) // TODO: Load events for this.
 	if err := v.validate(ctx); err != nil {
 		return nil, err
 	}
@@ -779,19 +782,19 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	if edge.Incoming == inngest.TriggerName {
 		// We only support functions with a single step, as we've removed the DAG based approach.
 		// This means that we always execute the first step.
-		if len(f.Steps) > 1 {
+		if len(ef.Function.Steps) > 1 {
 			return nil, fmt.Errorf("DAG-based steps are no longer supported")
 		}
 
 		edge.Outgoing = inngest.TriggerName
-		edge.Incoming = f.Steps[0].ID
+		edge.Incoming = ef.Function.Steps[0].ID
 		// Update the payload
 		payload := item.Payload.(queue.PayloadEdge)
 		payload.Edge = edge
 		item.Payload = payload
 		// Add retries from the step to our queue item.  Increase as retries is
 		// always one less than attempts.
-		retries := f.Steps[0].RetryCount() + 1
+		retries := ef.Function.Steps[0].RetryCount() + 1
 		item.MaxAttempts = &retries
 
 		// Only just starting:  run lifecycles on first attempt.
@@ -815,7 +818,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	instance := runInstance{
 		md:         md,
-		f:          *f,
+		f:          *ef.Function,
 		events:     events,
 		item:       item,
 		edge:       edge,
@@ -838,6 +841,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 }
 
 func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *state.DriverResponse) error {
+	l := logger.StdlibLogger(ctx).With(
+		"run_id", i.md.ID.RunID.String(),
+		"workflow_id", i.md.ID.FunctionID.String(),
+	)
+
 	for _, e := range e.lifecycles {
 		// OnStepFinished handles step success and step errors/failures.  It is
 		// currently the responsibility of the lifecycle manager to handle the differing
@@ -883,12 +891,13 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 		// Check if this step permanently failed.  If so, the function is a failure.
 		if !resp.Retryable() {
 			// TODO: Refactor state input
-			if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
-				logger.From(ctx).Error().Err(err).Msg("error running finish handler")
-			} else if performedFinalization {
-				for _, e := range e.lifecycles {
-					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
-				}
+			if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+				l.Error("error running finish handler", "error", err)
+			}
+
+			// Can be reached multiple times for parallel discovery steps
+			for _, e := range e.lifecycles {
+				go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
 			}
 
 			return resp
@@ -910,12 +919,13 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 					resp.Err = &serialized
 				}
 
-				if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
-					logger.From(ctx).Error().Err(err).Msg("error running finish handler")
-				} else if performedFinalization {
-					for _, e := range e.lifecycles {
-						go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
-					}
+				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+					l.Error("error running finish handler", "error", err)
+				}
+
+				// Can be reached multiple times for parallel discovery steps
+				for _, e := range e.lifecycles {
+					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
 				}
 
 				return nil
@@ -926,12 +936,13 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 	}
 
 	// This is the function result.
-	if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
-		logger.From(ctx).Error().Err(err).Msg("error running finish handler")
-	} else if performedFinalization {
-		for _, e := range e.lifecycles {
-			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
-		}
+	if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+		l.Error("error running finish handler", "error", err)
+	}
+
+	// Can be reached multiple times for parallel discovery steps
+	for _, e := range e.lifecycles {
+		go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
 	}
 
 	return nil
@@ -971,13 +982,13 @@ func (f functionFinishedData) Map() map[string]any {
 // Returns a boolean indicating whether it performed finalization. If the run
 // had parallel steps then it may be false, since parallel steps cause the
 // function end to be reached multiple times in a single run
-func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, resp state.DriverResponse) (bool, error) {
+func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, resp state.DriverResponse) error {
 	// Parse events for the fail handler before deleting state.
 	inputEvents := make([]event.Event, len(evts))
 	for n, e := range evts {
 		evt, err := event.NewEvent(e)
 		if err != nil {
-			return false, err
+			return err
 		}
 		inputEvents[n] = *evt
 	}
@@ -987,12 +998,9 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 	}
 
 	// Delete the function state in every case.
-	performedFinalization, err := e.smv2.Delete(ctx, md.ID)
+	_, err := e.smv2.Delete(ctx, md.ID)
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("error deleting state in finalize", "error", err)
-	}
-	if err == nil && !performedFinalization {
-		return performedFinalization, nil
 	}
 
 	// We may be cancelling an in-progress run.  If that's the case, we want to delete any
@@ -1026,11 +1034,8 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 				continue
 			}
 
-			err := q.Dequeue(ctx, redis_state.QueuePartition{
-				WorkflowID:  md.ID.FunctionID,
-				WorkspaceID: md.ID.Tenant.EnvID,
-			}, *qi)
-			if err != nil {
+			err := q.Dequeue(ctx, *qi)
+			if err != nil && !errors.Is(err, redis_state.ErrQueueItemNotFound) {
 				logger.StdlibLogger(ctx).Error("error dequeueing run job", "error", err)
 			}
 		}
@@ -1039,7 +1044,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 	// TODO: Load all pauses for the function and remove, also.
 
 	if e.finishHandler == nil {
-		return performedFinalization, nil
+		return nil
 	}
 
 	// Prepare events that we must send
@@ -1092,7 +1097,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 		}
 	}
 
-	return performedFinalization, e.finishHandler(ctx, md.ID, freshEvents)
+	return e.finishHandler(ctx, md.ID, freshEvents)
 }
 
 func correlationID(event event.Event) *string {
@@ -1194,7 +1199,7 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 
 	res, err := e.handlePausesAllNaively(ctx, iter, evt)
 	if err != nil {
-		log.From(ctx).Error().Err(err).Msg("error handling aggregate pauses")
+		log.From(ctx).Error().Err(err).Msg("error handling naive pauses")
 	}
 	return res, nil
 }
@@ -1604,6 +1609,11 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 
 // Cancel cancels an in-progress function.
 func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequest) error {
+	l := logger.StdlibLogger(ctx).With(
+		"run_id", id.RunID.String(),
+		"workflow_id", id.FunctionID.String(),
+	)
+
 	md, err := e.smv2.LoadMetadata(ctx, id)
 	if err == sv2.ErrMetadataNotFound || err == state.ErrRunNotFound {
 		return nil
@@ -1625,14 +1635,13 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	}
 
 	fnCancelledErr := state.ErrFunctionCancelled.Error()
-	if performedFinalization, err := e.finalize(ctx, md, evts, f.GetSlug(), state.DriverResponse{
+	if err := e.finalize(ctx, md, evts, f.Function.GetSlug(), state.DriverResponse{
 		Err: &fnCancelledErr,
 	}); err != nil {
-		logger.From(ctx).Error().Err(err).Msg("error running finish handler")
-	} else if performedFinalization || r.ForceLifecycleHook {
-		for _, e := range e.lifecycles {
-			go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, evts)
-		}
+		l.Error("error running finish handler", "error", err)
+	}
+	for _, e := range e.lifecycles {
+		go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, evts)
 	}
 
 	return nil
@@ -1660,85 +1669,88 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		return fmt.Errorf("error loading metadata to resume from pause: %w", err)
 	}
 
-	// Lease this pause so that only this thread can schedule the execution.
-	//
-	// If we don't do this, there's a chance that two concurrent runners
-	// attempt to enqueue the next step of the workflow.
-	err = e.pm.LeasePause(ctx, pause.ID)
-	if err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
-		// Ignore;  this is being handled by another runner.
-		return nil
-	}
-
-	if pause.OnTimeout && r.EventID != nil {
-		// Delete this pause, as an event has occured which matches
-		// the timeout.  We can do this prior to leasing a pause as it's the
-		// only work that needs to happen
-		err := e.pm.ConsumePause(ctx, pause.ID, nil)
-		if err == nil || err == state.ErrPauseNotFound {
+	err = util.Crit(ctx, "consume pause", func(ctx context.Context) error {
+		// Lease this pause so that only this thread can schedule the execution.
+		//
+		// If we don't do this, there's a chance that two concurrent runners
+		// attempt to enqueue the next step of the workflow.
+		err = e.pm.LeasePause(ctx, pause.ID)
+		if err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
+			// Ignore;  this is being handled by another runner.
 			return nil
 		}
-		return err
-	}
 
-	if err = e.pm.ConsumePause(ctx, pause.ID, r.With); err != nil {
-		return fmt.Errorf("error consuming pause via event: %w", err)
-	}
+		if pause.OnTimeout && r.EventID != nil {
+			// Delete this pause, as an event has occured which matches
+			// the timeout.  We can do this prior to leasing a pause as it's the
+			// only work that needs to happen
+			err := e.pm.ConsumePause(ctx, pause.ID, nil)
+			if err == nil || err == state.ErrPauseNotFound {
+				return nil
+			}
+			return fmt.Errorf("error consuming pause via timeout: %w", err)
+		}
 
-	if e.log != nil {
-		e.log.Debug().
-			Str("pause_id", pause.ID.String()).
-			Str("run_id", pause.Identifier.RunID.String()).
-			Str("workflow_id", pause.Identifier.WorkflowID.String()).
-			Bool("timeout", pause.OnTimeout).
-			Bool("cancel", pause.Cancel).
-			Msg("resuming from pause")
-	}
+		if err = e.pm.ConsumePause(ctx, pause.ID, r.With); err != nil {
+			return fmt.Errorf("error consuming pause via event: %w", err)
+		}
 
-	// Schedule an execution from the pause's entrypoint.  We do this after
-	// consuming the pause to guarantee the event data is stored via the pause
-	// for the next run.  If the ConsumePause call comes after enqueue, the TCP
-	// conn may drop etc. and running the job may occur prior to saving state data.
-	jobID := fmt.Sprintf("%s-%s", pause.Identifier.IdempotencyKey(), pause.DataKey)
-	err = e.queue.Enqueue(
-		ctx,
-		queue.Item{
-			JobID: &jobID,
-			// Add a new group ID for the child;  this will be a new step.
-			GroupID:               uuid.New().String(),
-			WorkspaceID:           pause.WorkspaceID,
-			Kind:                  queue.KindEdge,
-			Identifier:            pause.Identifier,
-			PriorityFactor:        md.Config.PriorityFactor,
-			CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
-			MaxAttempts:           pause.MaxAttempts,
-			Payload: queue.PayloadEdge{
-				Edge: pause.Edge(),
-			},
-		},
-		time.Now(),
-	)
-	if err != nil && err != redis_state.ErrQueueItemExists {
-		return fmt.Errorf("error enqueueing after pause: %w", err)
-	}
+		if e.log != nil {
+			e.log.Debug().
+				Str("pause_id", pause.ID.String()).
+				Str("run_id", pause.Identifier.RunID.String()).
+				Str("workflow_id", pause.Identifier.WorkflowID.String()).
+				Bool("timeout", pause.OnTimeout).
+				Bool("cancel", pause.Cancel).
+				Msg("resuming from pause")
+		}
 
-	// And dequeue the timeout job to remove unneeded work from the queue, etc.
-	if q, ok := e.queue.(redis_state.QueueManager); ok {
-		jobID := fmt.Sprintf("%s-%s", md.IdempotencyKey(), pause.DataKey)
-		err := q.Dequeue(
+		// Schedule an execution from the pause's entrypoint.  We do this after
+		// consuming the pause to guarantee the event data is stored via the pause
+		// for the next run.  If the ConsumePause call comes after enqueue, the TCP
+		// conn may drop etc. and running the job may occur prior to saving state data.
+		jobID := fmt.Sprintf("%s-%s", pause.Identifier.IdempotencyKey(), pause.DataKey)
+		err = e.queue.Enqueue(
 			ctx,
-			redis_state.QueuePartition{WorkflowID: md.ID.FunctionID},
-			redis_state.QueueItem{
+			queue.Item{
+				JobID: &jobID,
+				// Add a new group ID for the child;  this will be a new step.
+				GroupID:               uuid.New().String(),
+				WorkspaceID:           pause.WorkspaceID,
+				Kind:                  queue.KindEdge,
+				Identifier:            pause.Identifier,
+				PriorityFactor:        md.Config.PriorityFactor,
+				CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
+				MaxAttempts:           pause.MaxAttempts,
+				Payload: queue.PayloadEdge{
+					Edge: pause.Edge(),
+				},
+			},
+			time.Now(),
+		)
+		if err != nil && err != redis_state.ErrQueueItemExists {
+			return fmt.Errorf("error enqueueing after pause: %w", err)
+		}
+
+		// And dequeue the timeout job to remove unneeded work from the queue, etc.
+		if q, ok := e.queue.(redis_state.QueueManager); ok {
+			jobID := fmt.Sprintf("%s-%s", md.IdempotencyKey(), pause.DataKey)
+			err := q.Dequeue(ctx, redis_state.QueueItem{
 				ID:         redis_state.HashID(ctx, jobID),
-				WorkflowID: md.ID.FunctionID,
+				FunctionID: md.ID.FunctionID,
 				Data: queue.Item{
 					Kind: queue.KindPause,
 				},
-			},
-		)
-		if err != nil {
-			logger.StdlibLogger(ctx).Error("error dequeueing consumed pause job when resuming", "error", err)
+			})
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("error dequeueing consumed pause job when resuming", "error", err)
+			}
 		}
+		return nil
+	}, 20*time.Second)
+
+	if err != nil {
+		return err
 	}
 
 	if pause.IsInvoke() {
@@ -1819,11 +1831,10 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 			continue
 		}
 		copied := *op
-		newItem := i.item
 		if group.ShouldStartHistoryGroup {
 			// Give each opcode its own group ID, since we want to track each
 			// parellel step individually.
-			newItem.GroupID = uuid.New().String()
+			i.item.GroupID = uuid.New().String()
 		}
 		eg.Go(func() error { return e.handleGenerator(ctx, i, copied) })
 	}
@@ -2404,7 +2415,8 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 		metrics.IncrBatchScheduledCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"account_id": bi.AccountID.String(),
+				"account_id":  bi.AccountID.String(),
+				"function_id": bi.FunctionID.String(),
 			},
 		})
 	case enums.BatchFull:
@@ -2484,11 +2496,29 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		IdempotencyKey:   &key,
 		FunctionPausedAt: opts.FunctionPausedAt,
 	})
+
+	// Ensure to delete batch when Schedule worked, we already processed it, or the function was paused
+	shouldDeleteBatch := err == nil ||
+		err == redis_state.ErrQueueItemExists ||
+		errors.Is(err, ErrFunctionSkipped) ||
+		errors.Is(err, state.ErrIdentifierExists)
+	if shouldDeleteBatch {
+		// TODO: check if all errors can be blindly returned
+		if err := e.batcher.DeleteKeys(ctx, payload.FunctionID, payload.BatchID); err != nil {
+			return err
+		}
+	}
+
 	// Don't bother if it's already there
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
-	// TODO: check for known errors
+
+	// If function is paused, we do not schedule runs
+	if errors.Is(err, ErrFunctionSkipped) {
+		return nil
+	}
+
 	if err != nil {
 		span.SetStatus(codes.Error, err.Error())
 		return err
@@ -2507,11 +2537,6 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		span.SetAttributes(attribute.String(consts.OtelAttrSDKRunID, md.ID.RunID.String()))
 	} else {
 		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
-	}
-
-	// TODO: check if all errors can be blindly returned
-	if err := e.batcher.DeleteKeys(ctx, payload.FunctionID, payload.BatchID); err != nil {
-		return err
 	}
 
 	return nil

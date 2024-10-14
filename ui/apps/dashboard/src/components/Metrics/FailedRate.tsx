@@ -49,7 +49,7 @@ const mapRateList = (
   completed: CompletedByFunctionType,
   functions: EntityLookup
 ): Rate[] => {
-  return failed.map((f) => {
+  return failed.slice(0, 6).map((f) => {
     const failures = f.data.filter((d) => d.value > 0);
     const totalFailures = sum(failures);
     const lastOccurence = failures.at(-1)?.bucket;
@@ -66,7 +66,10 @@ const mapRateList = (
 export const FailedRate = ({
   workspace,
   functions,
-}: Partial<FunctionStatusMetricsQuery> & { functions: EntityLookup }) => {
+}: {
+  workspace?: FunctionStatusMetricsQuery['workspace'];
+  functions: EntityLookup;
+}) => {
   const env = useEnvironment();
   const failed = workspace && sort(filter(workspace.completedByFunction));
   const rateList = failed && mapRateList(failed, workspace.completedByFunction, functions);

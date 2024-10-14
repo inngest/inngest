@@ -1,19 +1,88 @@
 import { Chart } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
 import { NewLink } from '@inngest/components/Link/Link';
+import { resolveColor } from '@inngest/components/utils/colors';
+import { isDark } from '@inngest/components/utils/theme';
 
 import type { VolumeMetricsQuery } from '@/gql/graphql';
 import type { EntityLookup } from './Dashboard';
-import { getLineChartOptions, mapEntityLines } from './utils';
+import { getLineChartOptions, getXAxis, lineColors, seriesOptions } from './utils';
 
-export type SdkThroughputMetricsType = VolumeMetricsQuery['workspace']['concurrency']['metrics'];
+const zeroID = '00000000-0000-0000-0000-000000000000';
+
+export const mapConcurrency = (
+  { stepRunning: { metrics: runningMetrics } }: VolumeMetricsQuery['workspace'],
+  entities: EntityLookup,
+  concurrencyLimit: number
+) => {
+  const dark = isDark();
+
+  const metrics = {
+    yAxis: {
+      max: ({ max }: { max: number }) =>
+        max > concurrencyLimit ? max : concurrencyLimit + concurrencyLimit * 0.1,
+    },
+    xAxis: getXAxis(runningMetrics),
+    series: [
+      ...runningMetrics
+        .filter(({ id }) => id !== zeroID)
+        .map((f, i) => ({
+          ...{ ...seriesOptions, stack: 'Total' },
+          name: entities[f.id]?.name,
+          data: f.data.map(({ value }) => value),
+          itemStyle: {
+            color: resolveColor(lineColors[i % lineColors.length]![0]!, dark, lineColors[0]?.[1]),
+          },
+          areaStyle: { opacity: 1 },
+        })),
+      {
+        ...seriesOptions,
+        markLine: {
+          symbol: 'none',
+          barMinHeight: '100%',
+          large: true,
+          animation: false,
+          lineStyle: {
+            type: 'solid' as any,
+            color: resolveColor(lineColors[3]![0]!, dark, lineColors[3]![1]),
+          },
+          data: [{ yAxis: concurrencyLimit, name: 'Concurrency Limit', symbol: 'none' }],
+          tooltip: {
+            show: false,
+          },
+          emphasis: {
+            label: {
+              show: true,
+              color: 'inherit',
+              position: 'insideStartTop' as const,
+              formatter: ({ value }: any) => {
+                return ` Plan Limit: ${value}\n\n`;
+              },
+            },
+          },
+        },
+      },
+    ],
+  };
+
+  return getLineChartOptions(
+    metrics,
+    runningMetrics.length
+      ? runningMetrics.map(({ id }) => ({ name: entities[id]?.name }))
+      : ['No Data Found']
+  );
+};
 
 export const AccountConcurrency = ({
   workspace,
   entities,
-}: Partial<VolumeMetricsQuery> & { entities: EntityLookup }) => {
-  const metrics =
-    workspace && mapEntityLines(workspace.concurrency.metrics, entities, { opacity: 1 });
+  concurrencyLimit,
+}: {
+  workspace?: VolumeMetricsQuery['workspace'];
+  entities: EntityLookup;
+  concurrencyLimit: number;
+}) => {
+  const chartOptions = workspace && mapConcurrency(workspace, entities, concurrencyLimit);
 
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-x-hidden rounded-lg border p-5">
@@ -35,7 +104,11 @@ export const AccountConcurrency = ({
         </div>
       </div>
       <div className="flex h-full flex-row items-center">
-        <Chart option={metrics ? getLineChartOptions(metrics) : {}} className="h-full w-full" />
+        <Chart
+          option={chartOptions ? chartOptions : {}}
+          className="h-full w-full"
+          group="metricsDashboard"
+        />
       </div>
     </div>
   );

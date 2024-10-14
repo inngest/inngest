@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { RunStatusDot } from '../FunctionRunStatusIcons';
 import { Select, type Option } from '../Select/Select';
@@ -22,6 +22,7 @@ export default function StatusFilter({
   functionIsPaused,
 }: StatusFilterProps) {
   const [temporarySelectedStatuses, setTemporarySelectedStatuses] = useState(selectedStatuses);
+  const comboboxRef = useRef<HTMLButtonElement>(null);
   const availableStatuses: FunctionRunStatus[] = functionRunStatuses.filter((status) => {
     if (status === 'PAUSED') {
       return !!functionIsPaused;
@@ -59,6 +60,10 @@ export default function StatusFilter({
 
   const handleApply = () => {
     onStatusesChange(temporarySelectedStatuses);
+    // Close the Select dropdown
+    if (comboboxRef.current) {
+      comboboxRef.current.click();
+    }
   };
 
   const isSelectionChanged = () => {
@@ -87,7 +92,7 @@ export default function StatusFilter({
       label="Status"
       isLabelVisible
     >
-      <Select.Button isLabelVisible>
+      <Select.Button isLabelVisible ref={comboboxRef}>
         <div className="w-7 text-left">
           {temporarySelectedStatuses.length > 0 && !areAllStatusesSelected && (
             <span>{statusDots}</span>

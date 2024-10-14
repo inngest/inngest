@@ -61,10 +61,15 @@ func FunctionLoader() state.FunctionLoader {
 
 type loader struct{}
 
-func (loader) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*inngest.Function, error) {
-	if fnID == w.ID {
-		return &w, nil
+func (loader) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*state.ExecutorFunction, error) {
+	fn := &state.ExecutorFunction{
+		Paused: false,
 	}
+	if fnID == w.ID {
+		fn.Function = &w
+		return fn, nil
+	}
+ 
 	return nil, fmt.Errorf("workflow not found: %s", fnID)
 }
 

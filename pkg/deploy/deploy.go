@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -60,7 +61,7 @@ func Ping(ctx context.Context, url string, serverKind string, signingKey *keys.S
 		}
 	}
 
-	req, err := http.NewRequest(http.MethodPut, url, io.NopCloser(strings.NewReader(string(reqByt))))
+	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(reqByt))
 	if err != nil {
 		return pingResult{
 			Err: publicerr.WrapWithData(

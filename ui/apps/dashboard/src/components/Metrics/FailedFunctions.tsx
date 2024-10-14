@@ -32,7 +32,11 @@ export const FailedFunctions = ({
   workspace,
   entities,
   functions,
-}: Partial<FunctionStatusMetricsQuery> & { entities: EntityLookup; functions: EntityLookup }) => {
+}: {
+  workspace?: FunctionStatusMetricsQuery['workspace'];
+  entities: EntityLookup;
+  functions: EntityLookup;
+}) => {
   const env = useEnvironment();
 
   const metrics = workspace && mapFailed(workspace, entities);
@@ -48,7 +52,8 @@ export const FailedFunctions = ({
               <NewLink
                 arrowOnHover
                 className="text-sm"
-                href="https://www.inngest.com/docs/features/inngest-functions?ref=app-metrics"
+                href="https://www.inngest.com/docs/platform/monitor/observability-metrics#failed-functions"
+                target="_new"
               >
                 Learn more about Inngest functions.
               </NewLink>
@@ -69,6 +74,7 @@ export const FailedFunctions = ({
         <Chart
           option={metrics ? getLineChartOptions(metrics) : {}}
           className="h-[100%] w-full md:w-[75%]"
+          group="metricsDashboard"
         />
         <FailedRate workspace={workspace} functions={functions} />
       </div>
