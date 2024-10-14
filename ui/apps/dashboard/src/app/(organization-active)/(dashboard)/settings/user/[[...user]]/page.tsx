@@ -1,19 +1,43 @@
+'use client';
+
 import { UserProfile } from '@clerk/nextjs';
 
-export default async function UserSettingsPage() {
+export default function UserSettingsPage() {
   return (
-    <UserProfile
-      routing="path"
-      path="/settings/user"
-      appearance={{
-        elements: {
-          rootBox: 'h-full',
-          card: '',
-          navbar: 'hidden',
-          scrollBox: 'bg-white',
-          pageScrollBox: '[scrollbar-width:none]', // hides the Clerk's scrollbar
-        },
-      }}
-    />
+    <div className="flex flex-col justify-start">
+      <UserProfile
+        routing="path"
+        path="/settings/user"
+        appearance={{
+          layout: {
+            logoPlacement: 'none',
+          },
+          elements: {
+            navbar: 'hidden',
+            scrollBox: 'bg-white shadow-none',
+            pageScrollBox: 'pt-6 px-2',
+          },
+        }}
+      >
+        <UserProfile.Page label="security" />
+      </UserProfile>
+      <UserProfile
+        routing="path"
+        path="/settings/user"
+        appearance={{
+          layout: {
+            logoPlacement: 'none',
+          },
+          elements: {
+            navbar: 'hidden',
+            scrollBox: 'bg-white shadow-none',
+            pageScrollBox: 'pt-6 px-2',
+            profileSectionItemList__activeDevices: 'h-24 overflow-y-scroll',
+          },
+        }}
+      >
+        <UserProfile.Page label="account" />
+      </UserProfile>
+    </div>
   );
 }

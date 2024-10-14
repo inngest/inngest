@@ -1,4 +1,5 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { z } from 'zod';
 
 import { api } from './generated';
 
@@ -10,10 +11,37 @@ export interface EventPayload {
   name: string;
 }
 
+const serverInfoSchema = z.object({
+  version: z.string().optional(),
+  isSingleNodeService: z.boolean().optional(),
+  startOpts: z.record(z.unknown()).optional(),
+});
+
+export interface ServerInfo extends z.output<typeof serverInfoSchema> {
+  isDiscoveryEnabled?: boolean;
+}
+
 export const devApi = createApi({
   reducerPath: 'devApi',
   baseQuery: fetchBaseQuery({ baseUrl: baseURL.toString() }),
   endpoints: (builder) => ({
+    info: builder.query<ServerInfo, void>({
+      query() {
+        return {
+          url: '/dev',
+          method: 'GET',
+        };
+      },
+      transformResponse(baseQueryReturnValue) {
+        const info: ServerInfo = serverInfoSchema.parse(baseQueryReturnValue);
+
+        if (info.startOpts) {
+          info.isDiscoveryEnabled = Boolean(info.startOpts.autodiscover);
+        }
+
+        return info;
+      },
+    }),
     sendEvent: builder.mutation<
       void,
       { id: string; name: string; ts: number; data?: object; user?: object; functionId?: string }
@@ -56,5 +84,5 @@ export const devApi = createApi({
   }),
 });
 
-export const { useSendEventMutation } = devApi;
+export const { useSendEventMutation, useInfoQuery } = devApi;
 export default devApi;

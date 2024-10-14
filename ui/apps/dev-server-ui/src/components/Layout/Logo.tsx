@@ -6,6 +6,8 @@ import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
 import { InngestLogoSmallBW } from '@inngest/components/icons/logos/InngestLogoSmall';
 import { RiContractLeftLine, RiContractRightLine } from '@remixicon/react';
 
+import { useInfoQuery } from '@/store/devApi';
+
 type LogoProps = {
   collapsed: boolean;
   setCollapsed: (arg: boolean) => void;
@@ -37,6 +39,9 @@ const NavToggle = ({ collapsed, setCollapsed }: LogoProps) => {
 };
 
 export default function Logo({ collapsed, setCollapsed }: LogoProps) {
+  const { data: info, isLoading } = useInfoQuery();
+  const isDevServer = isLoading ? false : !info?.isSingleNodeService;
+
   return (
     <div
       className={`my-5 flex h-10 w-full flex-row items-center ${
@@ -53,7 +58,9 @@ export default function Logo({ collapsed, setCollapsed }: LogoProps) {
             <Link href="/">
               <InngestLogo className="text-basis mr-1.5" width={92} />
             </Link>
-            <span className="text-primary-intense text-[11px] leading-none">DEV SERVER</span>
+            {isDevServer ? (
+              <span className="text-primary-intense text-[11px] leading-none">DEV SERVER</span>
+            ) : null}
           </div>
         )}
       </div>

@@ -1,11 +1,24 @@
 import { type MenuStepContent } from '@inngest/components/Steps/StepsMenu';
 
-export const steps = [1, 2, 3, 4] as const;
-export type OnboardingSteps = 1 | 2 | 3 | 4;
-// For localStorage
-export type OnboardingStepsString = `${OnboardingSteps}`;
+export enum OnboardingSteps {
+  CreateApp = 'create-app',
+  DeployApp = 'deploy-app',
+  SyncApp = 'sync-app',
+  InvokeFn = 'invoke-fn',
+}
 
-export type OnboardingStepsCompleted = 0 | OnboardingSteps;
+export const STEPS_ORDER: OnboardingSteps[] = [
+  OnboardingSteps.CreateApp,
+  OnboardingSteps.DeployApp,
+  OnboardingSteps.SyncApp,
+  OnboardingSteps.InvokeFn,
+];
+
+export function isValidStep(step: string): step is OnboardingSteps {
+  return STEPS_ORDER.includes(step as OnboardingSteps);
+}
+
+export type OnboardingStepsCompleted = OnboardingSteps[] | [];
 
 type OnboardingWidgetStepContent = {
   title: string;
@@ -16,7 +29,7 @@ type OnboardingWidgetStepContent = {
 
 export type OnboardingWidgetContent = {
   step: {
-    [K in OnboardingStepsCompleted]: OnboardingWidgetStepContent;
+    [K in OnboardingSteps | 'success']: OnboardingWidgetStepContent;
   };
   tooltip: {
     close: string;

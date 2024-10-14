@@ -304,7 +304,6 @@ func (r *mutationResolver) Rerun(
 		run.WithScope(consts.OtelScopeRerun),
 		run.WithNewRoot(),
 		run.WithSpanAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAppID, fnCQRS.AppID.String()),
 			attribute.String(consts.OtelSysFunctionID, fn.ID.String()),
 			attribute.String(consts.OtelSysFunctionSlug, fnCQRS.Slug),
@@ -323,6 +322,7 @@ func (r *mutationResolver) Rerun(
 			event.NewOSSTrackedEventWithID(evt.Event(), evt.InternalID()),
 		},
 		OriginalRunID: &fnrun.RunID,
+		AccountID:     consts.DevServerAccountId,
 	})
 	if err != nil {
 		return zero, err

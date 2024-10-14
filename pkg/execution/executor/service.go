@@ -215,8 +215,12 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	resp, err := s.exec.Execute(ctx, item.Identifier, item, edge)
 	// Check if the execution is cancelled, and if so finalize and terminate early.
 	// This prevents steps from scheduling children.
-	if err == state.ErrFunctionCancelled {
+	if errors.Is(err, state.ErrFunctionCancelled) {
 		return nil
+	}
+
+	if errors.Is(err, state.ErrFunctionPaused) {
+		return queue.AlwaysRetryError(err)
 	}
 
 	if errors.Is(err, ErrHandledStepError) {
@@ -295,7 +299,7 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 	}
 	if status == enums.BatchStatusAbsent.String() {
 		// just attempt clean up, don't care about the result
-		_ = s.batcher.ExpireKeys(ctx, opts.FunctionID, batchID)
+		_ = s.batcher.DeleteKeys(ctx, opts.FunctionID, batchID)
 		return nil
 	}
 

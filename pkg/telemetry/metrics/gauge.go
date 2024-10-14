@@ -39,38 +39,38 @@ func GaugePartitionSize(ctx context.Context, val int64, opts GaugeOpt) {
 	})
 }
 
-func GaugeQueueShardCount(ctx context.Context, val int64, opts GaugeOpt) {
-	RecordGaugeMetric(ctx, val, GaugeOpt{
+func GaugeQueueGuaranteedCapacityCount(ctx context.Context, value int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, value, GaugeOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "queue_shards_count",
-		Description: "Number of shards in the queue",
+		MetricName:  "queue_guaranteed_capacity_count",
+		Description: "Number of accounts with guaranteed capacity in the queue",
 		Tags:        opts.Tags,
 	})
 }
 
-func GaugeQueueShardGuaranteedCapacityCount(ctx context.Context, val int64, opts GaugeOpt) {
+func GaugeQueueAccountGuaranteedCapacityCount(ctx context.Context, val int64, opts GaugeOpt) {
 	RecordGaugeMetric(ctx, val, GaugeOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "queue_shards_guaranteed_capacity_count",
-		Description: "Shard guaranteed capacity",
+		MetricName:  "queue_account_guaranteed_capacity_count",
+		Description: "Account guaranteed capacity",
 		Tags:        opts.Tags,
 	})
 }
 
-func GaugeQueueShardLeaseCount(ctx context.Context, val int64, opts GaugeOpt) {
+func GaugeQueueGuaranteedCapacityLeaseCount(ctx context.Context, val int64, opts GaugeOpt) {
 	RecordGaugeMetric(ctx, val, GaugeOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "queue_shards_lease_count",
-		Description: "Shard current lease count",
+		MetricName:  "queue_guaranteed_capacity_lease_count",
+		Description: "Guaranteed capacity current lease count",
 		Tags:        opts.Tags,
 	})
 }
 
-func GaugeQueueShardPartitionAvailableCount(ctx context.Context, val int64, opts GaugeOpt) {
+func GaugeQueueGuaranteedCapacityAccountPartitionAvailableCount(ctx context.Context, val int64, opts GaugeOpt) {
 	RecordGaugeMetric(ctx, val, GaugeOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "queue_shard_partition_available_count",
-		Description: "The number of shard partitions available",
+		MetricName:  "queue_guaranteed_capacity_account_partition_available_count",
+		Description: "The number of partitions available for account with guaranteed capacity",
 		Tags:        opts.Tags,
 	})
 }
@@ -89,6 +89,24 @@ func GaugeSpanBatchProcessorBufferKeys(ctx context.Context, val int64, opts Gaug
 		PkgName:     opts.PkgName,
 		MetricName:  "span_batch_processor_buffer_keys",
 		Description: "The number of keys used in buffer point in time",
+		Tags:        opts.Tags,
+	})
+}
+
+func GaugeSpanBatchProcessorNatsAsyncPending(ctx context.Context, val int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, val, GaugeOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_batch_processor_async_pending",
+		Description: "The number of messages pending to publish to NATS stream",
+		Tags:        opts.Tags,
+	})
+}
+
+func GaugeSpanExporterBuffer(ctx context.Context, val int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, val, GaugeOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_exporter_buffer_size",
+		Description: "The number of messages in the NATS exporter buffer",
 		Tags:        opts.Tags,
 	})
 }

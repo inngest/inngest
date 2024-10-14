@@ -1,27 +1,27 @@
 import { useState } from 'react';
 import { useLocalStorage } from 'react-use';
 
-import {
-  steps,
-  type OnboardingSteps,
-  type OnboardingStepsCompleted,
-  type OnboardingStepsString,
-} from './types';
+import { STEPS_ORDER, type OnboardingSteps } from './types';
 
 export default function useOnboardingStep() {
   const [onboardingLastStepCompleted, setOnboardingLastStepCompleted] =
-    useLocalStorage<OnboardingStepsString>('onboardingLastStepCompleted', undefined);
+    useLocalStorage<OnboardingSteps>('onboardingLastStepCompleted', undefined);
 
-  const [lastCompletedStep, setLastCompletedStep] = useState<OnboardingStepsCompleted>(
-    onboardingLastStepCompleted ? (Number(onboardingLastStepCompleted) as OnboardingSteps) : 0
+  const [lastCompletedStep, setLastCompletedStep] = useState<OnboardingSteps | undefined>(
+    onboardingLastStepCompleted
   );
 
-  const isFinalStep = lastCompletedStep === steps.length;
-  const nextStep = isFinalStep ? lastCompletedStep : lastCompletedStep + 1;
+  const isFinalStep = lastCompletedStep === STEPS_ORDER[STEPS_ORDER.length - 1];
+  const nextStep = (
+    !lastCompletedStep
+      ? STEPS_ORDER[0]
+      : isFinalStep
+      ? lastCompletedStep
+      : STEPS_ORDER[STEPS_ORDER.indexOf(lastCompletedStep) + 1]
+  ) as OnboardingSteps;
 
   const updateLastCompletedStep = (step: OnboardingSteps) => {
-    const stepString: OnboardingStepsString = step.toString() as OnboardingStepsString;
-    setOnboardingLastStepCompleted(stepString);
+    setOnboardingLastStepCompleted(step);
     setLastCompletedStep(step);
   };
 

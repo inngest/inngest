@@ -1,10 +1,8 @@
 'use client';
 
-import { useState } from 'react';
 import { RangePicker } from '@inngest/components/DatePicker';
 import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicker.jsx';
 import EntityFilter from '@inngest/components/Filter/EntityFilter';
-import { Pill } from '@inngest/components/Pill';
 import {
   useBatchedSearchParams,
   useBooleanSearchParam,
@@ -18,16 +16,32 @@ import {
   toDate,
   type DurationType,
 } from '@inngest/components/utils/date';
-import { RiArrowDownSFill, RiArrowRightSFill } from '@remixicon/react';
 import { useQuery } from 'urql';
 
-import { GetBillingPlanDocument } from '@/gql/graphql';
-import { FailedFunctions } from './FailedFunctions';
-import { FunctionStatus } from './FunctionStatus';
+import { GetBillingPlanDocument, MetricsScope, type GetBillingPlanQuery } from '@/gql/graphql';
+import { MetricsOverview } from './Overview';
+import { MetricsVolume } from './Volume';
+import { convertLookup } from './utils';
 
-type EntityType = {
+export const CONCURRENCY_LIMIT_DEFAULT = 25;
+
+export type EntityType = {
   id: string;
   name: string;
+  slug?: string;
+};
+
+export type EntityLookup = { [id: string]: EntityType };
+
+export type MetricsFilters = {
+  from: Date;
+  until?: Date;
+  selectedApps?: string[];
+  selectedFns?: string[];
+  autoRefresh?: boolean;
+  entities: EntityLookup;
+  functions: EntityLookup;
+  scope: MetricsScope;
 };
 
 export const DEFAULT_DURATION = { hours: 24 };
@@ -47,12 +61,17 @@ const getDefaultRange = (start?: Date, end?: Date, duration?: DurationType | '')
         duration: duration ? duration : DEFAULT_DURATION,
       };
 
+const getConcurrencyLimit = (planData?: GetBillingPlanQuery) =>
+  Number(planData?.account.plan?.features.concurrency) ||
+  Number(planData?.plans.find((p) => p?.name === 'Free Tier')?.features.concurrency) ||
+  CONCURRENCY_LIMIT_DEFAULT;
+
 export const Dashboard = ({
   apps = [],
   functions = [],
 }: {
-  apps?: EntityType[];
-  functions?: EntityType[];
+  apps: EntityType[];
+  functions: EntityType[];
 }) => {
   const [selectedApps, setApps, removeApps] = useStringArraySearchParam('apps');
   const [selectedFns, setFns, removeFns] = useStringArraySearchParam('fns');
@@ -66,14 +85,18 @@ export const Dashboard = ({
   const parsedStart = toDate(start);
   const parsedEnd = toDate(end);
 
-  const [overviewOpen, setOverviewOpen] = useState(true);
-
   const [{ data: planData }] = useQuery({
     query: GetBillingPlanDocument,
   });
 
   const logRetention = Number(planData?.account.plan?.features.log_retention);
   const upgradeCutoff = subtractDuration(new Date(), { days: logRetention || 7 });
+  const concurrenyLimit = getConcurrencyLimit(planData);
+
+  const envLookup = apps.length !== 1 && !selectedApps?.length && !selectedFns?.length;
+  const mappedFunctions = convertLookup(functions);
+  const mappedApps = convertLookup(apps);
+  const mappedEntities = envLookup ? mappedApps : mappedFunctions;
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -95,9 +118,6 @@ export const Dashboard = ({
           />
         </div>
         <div className="flex flex-row items-center justify-end gap-x-2">
-          <Pill appearance="outlined" kind="warning">
-            <div className="text-nowrap">15m delay</div>
-          </Pill>
           <RangePicker
             className="w-full"
             upgradeCutoff={upgradeCutoff}
@@ -112,31 +132,29 @@ export const Dashboard = ({
           />
         </div>
       </div>
-      <div className="px-6">
-        <div className="bg-canvasSubtle item-start flex h-full w-full flex-col items-start">
-          <div className="leading-non text-subtle my-4 flex w-full flex-row items-center justify-start gap-x-2 text-xs uppercase">
-            {overviewOpen ? (
-              <RiArrowDownSFill className="cursor-pointer" onClick={() => setOverviewOpen(false)} />
-            ) : (
-              <RiArrowRightSFill className="cursor-pointer" onClick={() => setOverviewOpen(true)} />
-            )}
-            <div>Overview</div>
-
-            <hr className="border-subtle w-full" />
-          </div>
-          {overviewOpen && (
-            <div className="relative flex w-full flex-row items-center justify-start gap-2 overflow-hidden">
-              <FunctionStatus
-                from={getFrom(parsedStart, parsedDuration)}
-                until={parsedEnd}
-                selectedApps={selectedApps}
-                selectedFns={selectedFns}
-                autoRefresh={autoRefresh}
-              />
-              <FailedFunctions />
-            </div>
-          )}
-        </div>
+      <div className="bg-canvasSubtle px-6">
+        <MetricsOverview
+          from={getFrom(parsedStart, parsedDuration)}
+          until={parsedEnd}
+          selectedApps={selectedApps}
+          selectedFns={selectedFns}
+          autoRefresh={autoRefresh}
+          entities={mappedEntities}
+          functions={mappedFunctions}
+          scope={envLookup ? MetricsScope.App : MetricsScope.Fn}
+        />
+      </div>
+      <div className="bg-canvasSubtle px-6 pb-6">
+        <MetricsVolume
+          from={getFrom(parsedStart, parsedDuration)}
+          until={parsedEnd}
+          selectedApps={selectedApps}
+          selectedFns={selectedFns}
+          autoRefresh={autoRefresh}
+          entities={mappedEntities}
+          scope={envLookup ? MetricsScope.App : MetricsScope.Fn}
+          concurrencyLimit={concurrenyLimit}
+        />
       </div>
     </div>
   );

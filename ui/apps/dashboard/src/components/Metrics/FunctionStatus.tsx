@@ -1,28 +1,16 @@
-import { Alert } from '@inngest/components/Alert/Alert';
 import { Chart, type ChartProps } from '@inngest/components/Chart/Chart';
+import { Info } from '@inngest/components/Info/Info';
+import { NewLink } from '@inngest/components/Link/Link';
 import { resolveColor } from '@inngest/components/utils/colors';
 import { isDark } from '@inngest/components/utils/theme';
 import resolveConfig from 'tailwindcss/resolveConfig';
 
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { graphql } from '@/gql';
 import type { FunctionStatusMetricsQuery, ScopedMetricsResponse } from '@/gql/graphql';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 import tailwindConfig from '../../../tailwind.config';
-import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
-import { FunctionInfo } from './FunctionInfo';
 
 const {
   theme: { backgroundColor, colors },
 } = resolveConfig(tailwindConfig);
-
-export type MetricsFilters = {
-  from: Date;
-  until?: Date;
-  selectedApps?: string[];
-  selectedFns?: string[];
-  autoRefresh?: boolean;
-};
 
 export type MetricsData = {
   workspace: {
@@ -32,161 +20,41 @@ export type MetricsData = {
   };
 };
 
+export type FunctionTotals = FunctionStatusMetricsQuery['workspace']['totals'];
+
 export type PieChartData = Array<{
   value: number;
   name: string;
   itemStyle: { color: string };
 }>;
 
-const GetFunctionStatusMetrics = graphql(`
-  query FunctionStatusMetrics(
-    $workspaceId: ID!
-    $from: Time!
-    $functionIDs: [UUID!]
-    $appIDs: [UUID!]
-    $until: Time
-  ) {
-    workspace(id: $workspaceId) {
-      scheduled: scopedMetrics(
-        filter: {
-          name: "function_run_scheduled_total"
-          scope: APP
-          from: $from
-          functionIDs: $functionIDs
-          appIDs: $appIDs
-          until: $until
-        }
-      ) {
-        metrics {
-          id
-          data {
-            value
-            bucket
-          }
-        }
-      }
-    }
-    workspace(id: $workspaceId) {
-      started: scopedMetrics(
-        filter: {
-          name: "function_run_started_total"
-          scope: FN
-          from: $from
-          functionIDs: $functionIDs
-          appIDs: $appIDs
-          until: $until
-        }
-      ) {
-        metrics {
-          id
-          data {
-            value
-            bucket
-          }
-        }
-      }
-    }
-    workspace(id: $workspaceId) {
-      completed: scopedMetrics(
-        filter: {
-          name: "function_run_ended_total"
-          scope: FN
-          groupBy: "status"
-          from: $from
-          functionIDs: $functionIDs
-          appIDs: $appIDs
-          until: $until
-        }
-      ) {
-        metrics {
-          id
-          tagName
-          tagValue
-          data {
-            value
-            bucket
-          }
-        }
-      }
-    }
-  }
-`);
-
-//
-// completed metrics data includes cancels and failures distinguished by a tag.
-// so we need to flatten the metrics and count them separately by tag value
-const mapCompleted = ({
-  metrics,
-}: {
-  metrics: Array<{
-    tagName: string | null;
-    tagValue: string | null;
-    data: Array<{ value: number }>;
-  }>;
-}): PieChartData => {
+const mapMetrics = (totals: FunctionTotals) => {
   const dark = isDark();
-  const counts: { [k: string]: number } = {
-    Cancelled: 0,
-    Failed: 0,
-    Completed: 0,
-  };
-
-  const totals = metrics
-    .flatMap(({ data, tagValue }) => data.map((d) => ({ ...d, tagValue })))
-    .reduce((acc, { tagValue, value }) => {
-      //
-      // if there is an untagged count here we'll consider it completed
-      // as this is the completed metrics query
-      const k = tagValue || 'Completed';
-      acc[k] = acc[k] || 0 + value;
-      return acc;
-    }, counts);
-
   return [
     {
-      value: totals['Completed'] || 0,
+      value: totals.completed || 0,
       name: 'Completed',
       itemStyle: { color: resolveColor(colors.primary.moderate, dark, '#2c9b63') },
     },
     {
-      value: totals['Cancelled'] || 0,
+      value: totals.cancelled || 0,
       name: 'Cancelled',
       itemStyle: { color: resolveColor(backgroundColor.canvasMuted, dark, '#e2e2e2') },
     },
     {
-      value: totals['Failed'] || 0,
+      value: totals.failed || 0,
       name: 'Failed',
       itemStyle: { color: resolveColor(colors.tertiary.subtle, dark, '#fa8d86') },
     },
-  ];
-};
-
-//
-// metrics data is nested in [{data: {value}}]
-// flatten and then sum `value`
-const mapMetric = ({
-  metrics,
-}: {
-  metrics: Array<{
-    data: Array<{ value: number }>;
-  }>;
-}): number => metrics.flatMap(({ data }) => data).reduce((acc, { value }) => acc + value, 0);
-
-const mapMetrics = ({
-  workspace: { completed, started, scheduled },
-}: FunctionStatusMetricsQuery) => {
-  const dark = isDark();
-  return [
-    ...mapCompleted(completed),
     {
-      value: mapMetric(started),
+      value: totals.running,
       name: 'Running',
       itemStyle: {
         color: resolveColor(colors.secondary.subtle, dark, '#52b2fd'),
       },
     },
     {
-      value: mapMetric(scheduled),
+      value: totals.queued,
       name: 'Queued',
       itemStyle: { color: resolveColor(colors.quaternary.coolModerate, dark, '#8b74f9') },
     },
@@ -210,7 +78,8 @@ const holeLabel = {
 const totalRuns = (totals: Array<{ value: number }>) =>
   totals.reduce((acc, { value }) => acc + value, 0);
 
-const percent = (sum: number, part: number) => (sum ? `${((part / sum) * 100).toFixed(0)}%` : `0%`);
+const percent = (sum: number, part: number) =>
+  `${sum ? parseFloat(((part / sum) * 100).toFixed(2)) : 0}%`;
 
 const getChartOptions = (data: PieChartData, loading: boolean = false): ChartProps['option'] => {
   const sum = totalRuns(data);
@@ -219,9 +88,10 @@ const getChartOptions = (data: PieChartData, loading: boolean = false): ChartPro
   return {
     legend: {
       orient: 'vertical',
-      right: '20%',
+      right: '5%',
       top: 'center',
       icon: 'circle',
+      selectedMode: true,
       formatter: (name: string) =>
         [
           name,
@@ -236,8 +106,8 @@ const getChartOptions = (data: PieChartData, loading: boolean = false): ChartPro
       {
         name: 'Function Runs',
         type: 'pie',
-        radius: ['35%', '60%'],
-        center: ['25%', '50%'],
+        radius: ['40%', '75%'],
+        center: ['30%', '50%'],
         itemStyle: {
           borderColor: resolveColor(backgroundColor.canvasBase, dark, '#fff'),
           borderWidth: 2,
@@ -273,45 +143,29 @@ const getChartOptions = (data: PieChartData, loading: boolean = false): ChartPro
   };
 };
 
-export const FunctionStatus = ({
-  from,
-  until,
-  selectedApps = [],
-  selectedFns = [],
-  autoRefresh = false,
-}: MetricsFilters) => {
-  const env = useEnvironment();
-
-  const variables = {
-    workspaceId: env.id,
-    from: from.toISOString(),
-    appIDs: selectedApps,
-    functionIDs: selectedFns,
-    until: until ? until.toISOString() : null,
-  };
-
-  const { data, error } = useGraphQLQuery({
-    query: GetFunctionStatusMetrics,
-    pollIntervalInMilliseconds: autoRefresh ? AUTO_REFRESH_INTERVAL * 1000 : 0,
-    variables,
-  });
-
-  error && console.error('Error fetcthing metrics data for', variables, error);
-  const metrics = data && mapMetrics(data);
+export const FunctionStatus = ({ totals }: { totals?: FunctionTotals }) => {
+  const metrics = totals && mapMetrics(totals);
 
   return (
-    <div className="bg-canvasBase border-subtle relative flex h-[300px] w-[448px] shrink-0 flex-col rounded-lg p-5">
-      <div className="text-subtle flex flex-row items-center gap-x-2 text-lg">
-        Functions Status <FunctionInfo />
+    <div className="bg-canvasBase border-subtle relative flex h-[384px] w-[448px] shrink-0 flex-col rounded-lg border p-5">
+      <div className="text-subtle mb-2 flex flex-row items-center gap-x-2 text-lg">
+        Functions Status{' '}
+        <Info
+          text="Interact with the chart to see the status and total number of your function runs over a period of time."
+          action={
+            <NewLink
+              arrowOnHover
+              className="text-sm"
+              href="https://www.inngest.com/docs/platform/monitor/observability-metrics#function-status"
+              target="_new"
+            >
+              Learn more about Inngest functions.
+            </NewLink>
+          }
+        />
       </div>
-      {error ? (
-        <Alert severity="error" className="h-full">
-          <p className="mb-4 font-semibold">Error loading data.</p>
-          <p>Reload to try again. If the problem persists, contact support.</p>
-        </Alert>
-      ) : (
-        <Chart option={metrics ? getChartOptions(metrics) : {}} />
-      )}
+
+      <Chart option={metrics ? getChartOptions(metrics) : {}} className="h-[384px]" />
     </div>
   );
 };

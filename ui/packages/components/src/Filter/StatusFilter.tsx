@@ -1,3 +1,5 @@
+import { useRef, useState } from 'react';
+
 import { RunStatusDot } from '../FunctionRunStatusIcons';
 import { Select, type Option } from '../Select/Select';
 import { getStatusBackgroundClass, getStatusBorderClass } from '../statusClasses';
@@ -19,11 +21,16 @@ export default function StatusFilter({
   onStatusesChange,
   functionIsPaused,
 }: StatusFilterProps) {
+  const [temporarySelectedStatuses, setTemporarySelectedStatuses] = useState(selectedStatuses);
+  const comboboxRef = useRef<HTMLButtonElement>(null);
   const availableStatuses: FunctionRunStatus[] = functionRunStatuses.filter((status) => {
     if (status === 'PAUSED') {
       return !!functionIsPaused;
     } else if (status === 'RUNNING') {
       return !functionIsPaused;
+      // Hide skipped runs from filter
+    } else if (status === 'SKIPPED') {
+      return false;
     }
     return true;
   });
@@ -32,13 +39,13 @@ export default function StatusFilter({
     name: status,
   }));
   const selectedValues = options.filter((option) =>
-    selectedStatuses.some((status) => isFunctionRunStatus(status) && status === option.id)
+    temporarySelectedStatuses.some((status) => isFunctionRunStatus(status) && status === option.id)
   );
   const areAllStatusesSelected = availableStatuses.every((status) =>
-    selectedStatuses.includes(status)
+    temporarySelectedStatuses.includes(status)
   );
-  const statusDots = selectedStatuses.map((status) => {
-    const isSelected = selectedStatuses.includes(status);
+  const statusDots = temporarySelectedStatuses.map((status) => {
+    const isSelected = temporarySelectedStatuses.includes(status);
     return (
       <span
         key={status}
@@ -50,6 +57,22 @@ export default function StatusFilter({
       />
     );
   });
+
+  const handleApply = () => {
+    onStatusesChange(temporarySelectedStatuses);
+    // Close the Select dropdown
+    if (comboboxRef.current) {
+      comboboxRef.current.click();
+    }
+  };
+
+  const isSelectionChanged = () => {
+    if (temporarySelectedStatuses.length !== selectedStatuses.length) return true;
+    const tempSet = new Set(temporarySelectedStatuses);
+    return selectedStatuses.some((status) => !tempSet.has(status));
+  };
+
+  const isDisabledApply = !isSelectionChanged();
 
   return (
     <Select
@@ -64,15 +87,17 @@ export default function StatusFilter({
             console.error(`invalid status: ${status.id}`);
           }
         });
-        onStatusesChange(newValue);
+        setTemporarySelectedStatuses(newValue);
       }}
       label="Status"
       isLabelVisible
     >
-      <Select.Button isLabelVisible>
+      <Select.Button isLabelVisible ref={comboboxRef}>
         <div className="w-7 text-left">
-          {selectedStatuses.length > 0 && !areAllStatusesSelected && <span>{statusDots}</span>}
-          {(selectedStatuses.length === 0 || areAllStatusesSelected) && <span>All</span>}
+          {temporarySelectedStatuses.length > 0 && !areAllStatusesSelected && (
+            <span>{statusDots}</span>
+          )}
+          {(temporarySelectedStatuses.length === 0 || areAllStatusesSelected) && <span>All</span>}
         </div>
       </Select.Button>
       <Select.Options>
@@ -87,6 +112,7 @@ export default function StatusFilter({
             </Select.CheckboxOption>
           );
         })}
+        <Select.Footer onApply={handleApply} disabledApply={isDisabledApply} />
       </Select.Options>
     </Select>
   );

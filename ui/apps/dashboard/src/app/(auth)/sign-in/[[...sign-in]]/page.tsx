@@ -33,7 +33,13 @@ export default function SignInPage({ searchParams }: SignInPageProps) {
   return (
     <SplitView>
       <div className="mx-auto my-auto text-center">
-        <SignIn />
+        <SignIn
+          appearance={{
+            elements: {
+              footer: 'bg-none',
+            },
+          }}
+        />
         {typeof searchParams.error === 'string' && (
           <Alert severity="error" className="mx-auto max-w-xs">
             <p className="text-balance">

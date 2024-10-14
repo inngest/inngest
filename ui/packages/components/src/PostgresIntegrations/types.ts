@@ -37,3 +37,25 @@ export type PostgresIntegrationMenuContent = {
     [K in IntegrationSteps]: MenuStepContent;
   };
 };
+
+export type IntegrationPageContent = {
+  title: string;
+  logo: React.ReactNode;
+  url: string;
+};
+
+export function parseConnectionString(connectionString: string) {
+  const regex = /postgresq?l?:\/\/(\w+):([^@]+)@([^/]+)/;
+  const match = connectionString.match(regex);
+
+  if (match) {
+    const [, username, password, host] = match;
+    return {
+      name: `Neon-${host}`,
+      engine: 'postgresql',
+      adminConn: connectionString,
+    };
+  }
+
+  return null;
+}

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Header } from '@inngest/components/Header/Header';
-import { Pill } from '@inngest/components/Pill';
 import { RunsActionMenu } from '@inngest/components/RunsPage/ActionMenu';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
@@ -22,6 +21,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 
 import SendEventButton from '@/components/Event/SendEventButton';
 import { useCancelRun } from '@/hooks/useCancelRun';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import { useGetRun } from '@/hooks/useGetRun';
 import { useGetTraceResult } from '@/hooks/useGetTraceResult';
 import { useGetTrigger } from '@/hooks/useGetTrigger';
@@ -39,9 +39,11 @@ import { pathCreator } from '@/utils/pathCreator';
 const pollInterval = 400;
 
 export default function Page() {
+  const { featureFlags } = useFeatureFlags();
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [filterApp] = useStringArraySearchParam('filterApp');
   const [totalCount, setTotalCount] = useState<number>();
+  const [celQuery, setCelQuery] = useState<string>();
   const [filteredStatus] = useValidatedArraySearchParam('filterStatus', isFunctionRunStatus);
   const [timeField = FunctionRunTimeField.QueuedAt] = useValidatedSearchParam(
     'timeField',
@@ -62,6 +64,7 @@ export default function Page() {
         endTime: endTime,
         status: filteredStatus,
         timeField,
+        celQuery,
       });
 
       const edges = data.runs.edges.map((edge) => {
@@ -82,10 +85,10 @@ export default function Page() {
         edges,
       };
     },
-    [filterApp, filteredStatus, calculatedStartTime, timeField]
+    [filterApp, filteredStatus, calculatedStartTime, timeField, celQuery]
   );
 
-  const { data, fetchNextPage, isFetching } = useInfiniteQuery({
+  const { data, fetchNextPage, isFetching, hasNextPage } = useInfiniteQuery({
     queryKey: ['runs'],
     queryFn,
     refetchInterval: autoRefresh ? pollInterval : false,
@@ -108,10 +111,11 @@ export default function Page() {
         endTime,
         status: filteredStatus,
         timeField,
+        celQuery,
       });
       setTotalCount(data.runs.totalCount);
     })();
-  }, [calculatedStartTime, endTime, filteredStatus, timeField]);
+  }, [calculatedStartTime, endTime, filteredStatus, timeField, celQuery]);
 
   const runs = useMemo(() => {
     if (!data?.pages) {
@@ -153,15 +157,12 @@ export default function Page() {
     // TODO: What should this do?
   }, []);
 
+  const isSearchEnabled = featureFlags.FEATURE_CEL_SEARCH;
+
   return (
     <>
       <Header
         breadcrumb={[{ text: 'Runs' }]}
-        infoIcon={
-          <Pill kind="primary" appearance="solid">
-            Beta
-          </Pill>
-        }
         action={
           <div className="flex flex-row items-center gap-x-1">
             <SendEventButton
@@ -188,7 +189,7 @@ export default function Page() {
         features={{
           history: Number.MAX_SAFE_INTEGER,
         }}
-        hasMore={false}
+        hasMore={hasNextPage ?? false}
         isLoadingInitial={isFetching && runs === undefined}
         isLoadingMore={isFetching && runs !== undefined}
         getRun={getRun}
@@ -202,6 +203,8 @@ export default function Page() {
         pollInterval={pollInterval}
         scope="env"
         totalCount={totalCount}
+        hasSearchFlag={isSearchEnabled}
+        onSearch={setCelQuery}
       />
     </>
   );

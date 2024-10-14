@@ -18,6 +18,7 @@ const orderedStatuses = getOrderedEnumValues(FunctionRunStatus, [
   FunctionRunStatus.Cancelled,
   FunctionRunStatus.Completed,
   FunctionRunStatus.Failed,
+  FunctionRunStatus.Skipped,
 ]);
 
 type StatusFilterProps = {
@@ -44,6 +45,9 @@ export default function StatusFilter({
       return !!functionIsPaused;
     } else if (status === FunctionRunStatus.Running) {
       return !functionIsPaused;
+      // Hide skipped runs from filter
+    } else if (status === FunctionRunStatus.Skipped) {
+      return false;
     }
     return true;
   });

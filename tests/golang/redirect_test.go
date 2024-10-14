@@ -31,7 +31,7 @@ func TestRedirect(t *testing.T) {
 	redirectServer := NewHTTPServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			redirectCounter++
-			http.Redirect(w, r, server.URL(), http.StatusSeeOther)
+			http.Redirect(w, r, server.URL(), http.StatusTemporaryRedirect)
 		}),
 	)
 	defer redirectServer.Close()

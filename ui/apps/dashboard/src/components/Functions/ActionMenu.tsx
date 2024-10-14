@@ -133,22 +133,16 @@ export const ActionsMenu = ({
                   className="m-2 flex h-8 cursor-pointer items-center text-[13px]"
                   value="cancel"
                 >
-                  <OptionalTooltip
-                    tooltip={archived && `Cancel not available, function is archived'}.`}
-                  >
-                    <NewButton
-                      onClick={showCancel}
-                      appearance="ghost"
-                      kind="danger"
-                      size="medium"
-                      icon={<RiCloseCircleLine className="h-4 w-4" />}
-                      iconSide="left"
-                      label="Bulk Cancel"
-                      className={`m-0 w-full justify-start text-sm ${
-                        archived && 'cursor-not-allowed'
-                      }`}
-                    />
-                  </OptionalTooltip>
+                  <NewButton
+                    onClick={showCancel}
+                    appearance="ghost"
+                    kind="danger"
+                    size="medium"
+                    icon={<RiCloseCircleLine className="h-4 w-4" />}
+                    iconSide="left"
+                    label="Bulk Cancel"
+                    className="m-0 w-full justify-start text-sm"
+                  />
                 </Listbox.Option>
               )}
             </Listbox.Options>

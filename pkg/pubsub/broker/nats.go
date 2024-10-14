@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"sync"
 
 	"github.com/inngest/inngest/pkg/logger"
@@ -50,6 +51,8 @@ type NatsConnector struct {
 	//
 	// the key is a combination of stream name + consumer name (e.g. trace + trace-consumer = "trace-trace-consumer")
 	consumers map[string]jetstream.Consumer
+	// The size of the buffer allowed for pending messages on async publish
+	BufferSize int
 }
 
 func NewNATSConnector(ctx context.Context, opts NatsConnOpt) (*NatsConnector, error) {
@@ -92,8 +95,16 @@ func NewNATSConnector(ctx context.Context, opts NatsConnOpt) (*NatsConnector, er
 	}
 
 	if opts.JetStream {
+		pending := 10_000
+		if p, err := strconv.Atoi(os.Getenv("NATS_JS_MAX_PENDING")); err == nil && p > 0 {
+			pending = p
+		}
+		c.BufferSize = pending
+
 		// NOTE: should there be some default jetstream options?
-		js, err := jetstream.New(conn)
+		js, err := jetstream.New(conn,
+			jetstream.WithPublishAsyncMaxPending(pending),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("error initializing jetstream API: %w", err)
 		}

@@ -36,7 +36,7 @@ func (r *mutationResolver) CreateApp(ctx context.Context, input models.CreateApp
 	}
 	app, _ := r.Data.UpsertApp(ctx, params)
 
-	if res := deploy.Ping(ctx, input.URL); res.Err != nil {
+	if res := deploy.Ping(ctx, input.URL, r.ServerKind, r.LocalSigningKey, r.RequireKeys); res.Err != nil {
 		return app, res.Err
 	}
 
@@ -108,7 +108,6 @@ func (r *mutationResolver) InvokeFunction(
 		run.WithScope(consts.OtelScopeInvoke),
 		run.WithNewRoot(),
 		run.WithSpanAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysFunctionSlug, functionSlug),
 		),
 	)

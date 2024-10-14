@@ -33,12 +33,15 @@ export default async function MetricsPage({ params: { environmentSlug: envSlug }
           </div>
         }
       />
+      <div id="chart-tooltip" className="z-[1000]" />
       <div className="bg-canvasSubtle mx-auto flex h-full w-full flex-col">
         <Dashboard
-          apps={apps.map((app: { id: string; externalID: string }) => ({
-            id: app.id,
-            name: app.externalID,
-          }))}
+          apps={apps
+            .filter(({ isArchived }) => isArchived === false)
+            .map((app: { id: string; externalID: string }) => ({
+              id: app.id,
+              name: app.externalID,
+            }))}
           functions={functions}
         />
       </div>

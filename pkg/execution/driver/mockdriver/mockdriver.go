@@ -91,7 +91,7 @@ func (c *Config) RuntimeName() string { return c.Driver }
 // DriverName returns the name of this driver
 func (*Config) DriverName() string { return RuntimeName }
 
-func (c *Config) NewDriver() (driver.Driver, error) {
+func (c *Config) NewDriver(opts ...registration.NewDriverOpts) (driver.Driver, error) {
 	c.l.Lock()
 	defer c.l.Unlock()
 

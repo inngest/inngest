@@ -1,6 +1,6 @@
 import type { Run } from '@inngest/components/RunsPage/types';
 import { isFunctionRunStatus, type FunctionRunStatus } from '@inngest/components/types/functionRun';
-import { toMaybeDate } from '@inngest/components/utils/date';
+import { isBefore, toDate, toMaybeDate } from '@inngest/components/utils/date';
 
 import {
   FunctionRunStatus as FunctionRunStatusEnum,
@@ -26,6 +26,8 @@ export function toRunStatus(status: FunctionRunStatus): FunctionRunStatusEnum {
       return FunctionRunStatusEnum.Running;
     case 'PAUSED':
       return FunctionRunStatusEnum.Paused;
+    case 'SKIPPED':
+      return FunctionRunStatusEnum.Skipped;
   }
 }
 
@@ -99,4 +101,23 @@ export function parseRunsData(runsData: PickedFunctionRunV2EdgeWithNode[] | unde
       };
     }) ?? []
   );
+}
+
+/**
+ * Delete after December 7
+ */
+export function isBeforeRunsMigration(time: string) {
+  const CUTOFF_DATE = new Date('2023-09-08T01:00:00Z'); // 1h after migration
+  const parsedDate = toDate(time);
+  if (!parsedDate) {
+    throw new Error('Invalid date format');
+  }
+  return isBefore(parsedDate, CUTOFF_DATE);
+}
+
+/**
+ * Util to help send runs from before clickhouse migration to the old runs page
+ */
+export function getBaseRunUrl(time: string) {
+  return isBeforeRunsMigration(time) ? 'logs' : 'runs';
 }

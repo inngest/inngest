@@ -13,7 +13,6 @@ import (
 	"github.com/inngest/inngest/pkg/expressions"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -202,6 +201,7 @@ func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleB
 	jobID := opts.JobID()
 	maxAttempts := 20
 
+	queueName := queue.KindScheduleBatch
 	err := b.q.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		GroupID:     uuid.New().String(),
@@ -218,6 +218,7 @@ func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleB
 		Attempt:     0,
 		MaxAttempts: &maxAttempts,
 		Payload:     opts.ScheduleBatchPayload,
+		QueueName:   &queueName,
 	}, opts.At)
 	if err == redis_state.ErrQueueItemExists {
 		log.From(ctx).
@@ -233,27 +234,25 @@ func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleB
 	return nil
 }
 
-// ExpireKeys sets the TTL for the keys related to the provided batchID.
-func (b redisBatchManager) ExpireKeys(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID) error {
+// DeleteKeys drops keys related to the provided batchID.
+func (b redisBatchManager) DeleteKeys(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID) error {
 	keys := []string{
 		b.b.KeyGenerator().Batch(ctx, functionId, batchID),
 		b.b.KeyGenerator().BatchMetadata(ctx, functionId, batchID),
 	}
 
-	timeout := consts.MaxBatchTTL.Seconds()
-
-	args, err := redis_state.StrSlice([]any{timeout})
+	args, err := redis_state.StrSlice([]any{})
 	if err != nil {
-		return fmt.Errorf("error constructing batch expiration: %w", err)
+		return fmt.Errorf("error constructing batch deletion: %w", err)
 	}
 
-	if _, err = retriableScripts["expire"].Exec(
+	if _, err = retriableScripts["drop_keys"].Exec(
 		ctx,
 		b.b.Client(),
 		keys,
 		args,
 	).AsInt64(); err != nil {
-		return fmt.Errorf("failed to expire batch '%s' related keys: %v", batchID, err)
+		return fmt.Errorf("failed to delete batch '%s' related keys: %v", batchID, err)
 	}
 
 	return nil

@@ -105,7 +105,7 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 							)
 						}
 
-						if span.ChildrenSpans != nil && len(span.ChildrenSpans) > 0 {
+						if len(span.ChildrenSpans) > 0 {
 							primeTree(ctx, span.ChildrenSpans)
 						}
 					}
@@ -252,7 +252,7 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 	}
 
 	// iterate over children recursively
-	if pb.Children != nil && len(pb.Children) > 0 {
+	if len(pb.Children) > 0 {
 		span.ChildrenSpans = []*models.RunTraceSpan{}
 
 		for _, cp := range pb.Children {

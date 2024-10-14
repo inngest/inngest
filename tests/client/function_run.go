@@ -10,6 +10,7 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,12 +20,13 @@ type FunctionRunOpt struct {
 	Status    []string
 	TimeField models.RunsV2OrderByField
 	Order     []models.RunsV2OrderBy
+	Query     *string
 	Start     time.Time
 	End       time.Time
 }
 
 func (o FunctionRunOpt) OrderBy() string {
-	if o.Order == nil || len(o.Order) == 0 {
+	if len(o.Order) == 0 {
 		return fmt.Sprintf("[ { field: %s, direction: %s } ]", models.RunsV2OrderByFieldQueuedAt, models.RunsOrderByDirectionDesc)
 	}
 
@@ -82,12 +84,13 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 		$endTime: Time!,
 		$timeField: RunsV2OrderByField = QUEUED_AT,
 		$status: [FunctionRunStatus!],
-		$first: Int = 40
+		$first: Int = 40,
+		$query: String
 	) {
 		runs(
 			first: $first,
 			after: %s,
-			filter: { from: $startTime, until: $endTime, status: $status, timeField: $timeField },
+			filter: { from: $startTime, until: $endTime, status: $status, timeField: $timeField, query: $query },
 			orderBy: %s
 		) {
 			edges {
@@ -121,6 +124,7 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 			"timeField": timeField,
 			"status":    opts.Status,
 			"first":     items,
+			"query":     opts.Query,
 		},
 	})
 	if len(resp.Errors) > 0 {
@@ -227,23 +231,22 @@ func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *stri
 
 	var traces *RunV2
 	require.NotNil(t, runID)
-	require.Eventually(t, func() bool {
-		if *runID == "" {
-			return false
-		}
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		a := assert.New(t)
+		a.NotEmpty(runID)
 
 		run, err := c.RunTraces(ctx, *runID)
-		traces = run
-
-		// NOTE: we force the function to return early to prevent panics in the next assertion.
-		// We cannot use require.NotNil as this will cause an uncaught panic (see https://github.com/stretchr/testify/issues/1457)
-		ready := err == nil && run != nil && run.Status == opts.Status.String()
+		a.NoError(err)
+		a.NotNil(run)
+		a.Equal(run.Status, opts.Status.String())
 
 		if opts.ChildSpanCount > 0 {
-			ready = ready && run.Trace != nil && run.Trace.IsRoot && len(run.Trace.ChildSpans) == opts.ChildSpanCount
+			a.NotNil(run.Trace)
+			a.True(run.Trace.IsRoot)
+			a.Len(run.Trace.ChildSpans, opts.ChildSpanCount)
 		}
 
-		return ready
+		traces = run
 	}, opts.Timeout, opts.Interval)
 
 	return traces

@@ -65,6 +65,24 @@ func IncrQueueScanNoCapacityCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrQueueScanCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_scan_total",
+		Description: "The total number of times we scanned the queue",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueuePartitionScannedCounter(ctx context.Context, parts int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, parts, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_partitions_scanned_total",
+		Description: "The total number of partitions we peeked in a single scan loop",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrQueuePartitionProcessedCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -119,6 +137,15 @@ func IncrBatchScheduledCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrBatchProcessStartCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "batch_processing_started_total",
+		Description: "Total number of completed batches for event batching, either through timeout or full batch.",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrInstrumentationLeaseClaimsCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -151,6 +178,24 @@ func IncrSpanBatchProcessorAttemptCounter(ctx context.Context, incr int64, opts 
 		PkgName:     opts.PkgName,
 		MetricName:  "span_batch_processor_attempt_total",
 		Description: "Total number of spans attempted to export",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrSpanBatchProcessorDeadLetterCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_batch_processor_deadletter_total",
+		Description: "Total number of spans that got passed into the deadletter stream",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrSpanBatchProcessorDeadLetterPublishStatusCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_batch_processor_deadletter_publish_status_total",
+		Description: "Total number of spans that got published to the deadletter stream and their status",
 		Tags:        opts.Tags,
 	})
 }

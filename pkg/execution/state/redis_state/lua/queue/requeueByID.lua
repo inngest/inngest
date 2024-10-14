@@ -14,26 +14,36 @@ Return values:
 ]]
 --
 
-local keyQueueIndex    = KEYS[1]
-local keyQueueHash     = KEYS[2]
-local keyGlobalIndex   = KEYS[3]           -- partition:sorted - zset
-local keyShardIndex    = KEYS[4]           -- shard zset
-local keyPartitionHash = KEYS[5]           -- partition hash
+local keyQueueHash            = KEYS[1] -- queue:item - hash
+local keyPartitionMap         = KEYS[2] -- partition:item - hash: { $workflowID: $partition }
+local keyGlobalPointer        = KEYS[3] -- partition:sorted - zset
+local keyGlobalAccountPointer = KEYS[4] -- accounts:sorted - zset
+local keyAccountPartitions    = KEYS[5] -- accounts:$accountId:partition:sorted
+
+local keyPartitionA    = KEYS[6] -- queue:sorted:$workflowID - zset
+local keyPartitionB    = KEYS[7] -- e.g. sorted:c|t:$workflowID - zset
+local keyPartitionC    = KEYS[8] -- e.g. sorted:c|t:$workflowID - zset
 
 local jobID            = ARGV[1]           -- queue item ID
 local jobScore         = tonumber(ARGV[2]) -- enqueue at, in milliseconds
-local partitionID      = ARGV[3]           -- function ID
-local currentTime      = tonumber(ARGV[4]) -- in ms
-
-if redis.call("ZSCORE", keyQueueIndex, jobID) == false then
-    -- This doesn't exist.
-    return -1
-end
+local nowMS            = tonumber(ARGV[3]) -- in ms
+local partitionItemA      = ARGV[4]
+local partitionItemB      = ARGV[5]
+local partitionItemC      = ARGV[6]
+local partitionIdA        = ARGV[7]
+local partitionIdB        = ARGV[8]
+local partitionIdC        = ARGV[9]
+local accountId           = ARGV[10]
+local partitionTypeA = tonumber(ARGV[11])
+local partitionTypeB = tonumber(ARGV[12])
+local partitionTypeC = tonumber(ARGV[13])
 
 -- $include(get_queue_item.lua)
 -- $include(update_pointer_score.lua)
 -- $include(get_partition_item.lua)
--- $include(has_shard_key.lua)
+-- $include(ends_with.lua)
+-- $include(update_account_queues.lua)
+-- $include(enqueue_to_partition.lua)
 
 local item = get_queue_item(keyQueueHash, jobID)
 if item == nil then
@@ -41,43 +51,20 @@ if item == nil then
 end
 
 -- Ensure that we're not requeueing a leased job.
-if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > currentTime then
+if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > nowMS then
     -- This is already leased, so don't requeue by ID.  Use the standard requeue operation.
     return -2
 end
 
-local existing = get_partition_item(keyPartitionHash, partitionID)
-if existing == nil then
-    return -1
-end
-
-redis.call("ZADD", keyQueueIndex, jobScore, jobID)
 
 -- Update the "at" time of the job
 item.at = jobScore
 item.wt = jobScore
 redis.call("HSET", keyQueueHash, jobID, cjson.encode(item))
 
--- Get the current score of the partition;  if queueScore < currentScore update the
--- partition's score so that we can work on this workflow when the earliest member
--- is available.
---
--- We might have just pushed back the earliest job, so the partitions pointer
--- could have an earlier score than necessary.  In order to fix this, we want to scan
--- and take the minimum time from the keyQueueIndex and use this as the score
-local minScore = redis.call("ZRANGEBYSCORE", keyQueueIndex, "-inf", "+inf", "WITHSCORES", "LIMIT", "0", "1")
-local partitionScore = math.floor(minScore[2] / 1000)
-
-local currentScore = redis.call("ZSCORE", keyGlobalIndex, partitionID)
-if currentScore == false or tonumber(currentScore) ~= partitionScore then
-    redis.call("ZADD", keyGlobalIndex, partitionScore, partitionID)
-    if has_shard_key(keyShardIndex) then
-        update_pointer_score_to(partitionID, keyShardIndex, partitionScore)
-    end
-end
-
--- Update the partition pointer's actual AtS timestamp in the struct.
-existing.at = partitionScore
-redis.call("HSET", keyPartitionHash, partitionID, cjson.encode(existing))
+-- Update and requeue all partitions
+requeue_to_partition(keyPartitionA, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
+requeue_to_partition(keyPartitionB, partitionIdB, partitionItemB, partitionTypeB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
+requeue_to_partition(keyPartitionC, partitionIdC, partitionItemC, partitionTypeC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
 
 return 0

@@ -1,4 +1,4 @@
-import { isErrorCode, type CodedError, type ErrorCode } from '@/codedError';
+import { isErrorCode, parseErrorData, type CodedError, type ErrorCode } from '@/codedError';
 
 const messages = {
   account_mismatch: "The app's signing key is for the wrong account.",
@@ -46,6 +46,25 @@ export function getMessage(error: CodedError) {
 
   if (error.message) {
     return error.message;
+  }
+
+  const data = parseErrorData(error.data);
+  if (data) {
+    if ('errors' in data) {
+      // We're dealing with a "multi-error" (probably a config error). We'll
+      // return the unique messages for all the errors
+
+      const set = new Set();
+      for (const err of data.errors) {
+        if (err.message) {
+          set.add(err.message);
+        }
+      }
+
+      if (set.size > 0) {
+        return Array.from(set).join('\n');
+      }
+    }
   }
 
   return 'Something went wrong.';

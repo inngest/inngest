@@ -100,6 +100,10 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
     }
   }
 
+  function handleEditorDidMount(editor: MonacoEditorType) {
+    editorRef.current = editor;
+  }
+
   function updateEditorLayout(editor: MonacoEditorType) {
     const container = editor?.getDomNode();
     if (!editor || !container) return;
@@ -355,6 +359,7 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
                   wordWrap: isWordWrap ? 'on' : 'off',
                 }}
                 onMount={(editor) => {
+                  handleEditorDidMount(editor);
                   updateEditorLayout(editor);
                 }}
                 onChange={(value) => {

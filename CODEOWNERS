@@ -1,6 +1,7 @@
 # UI
-/ui @anafilipadealmeida @goodoldneon @djfarrelly
+/ui @anafilipadealmeida @amh4r @djfarrelly @jacobheric
 
-# Backend
-/cmd @tonyhb @djfarrelly @darwin67 @goodoldneon @jpwilliams @BrunoScheufler
-/pkg @tonyhb @djfarrelly @darwin67 @goodoldneon @jpwilliams @BrunoScheufler
+# Execution
+/pkg/execution @tonyhb @darwin67 @BrunoScheufler
+/pkg/telemetry @tonyhb @darwin67 @BrunoScheufler
+/pkg/run @tonyhb @darwin67 @BrunoScheufler

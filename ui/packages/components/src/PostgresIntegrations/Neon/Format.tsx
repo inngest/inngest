@@ -1,8 +1,62 @@
+import { useState } from 'react';
 import { NewButton } from '@inngest/components/Button';
 import { NewLink } from '@inngest/components/Link';
+import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/types';
+import { parseConnectionString } from '@inngest/components/PostgresIntegrations/utils';
 
-export default function NeonFormat({ next }: { next: () => void }) {
-  // TO DO: Add interactions and pass actions as props
+export default function NeonFormat({
+  onSuccess,
+  savedCredentials,
+  verifyLogicalReplication,
+  handleLostCredentials,
+}: {
+  onSuccess: () => void;
+  handleLostCredentials: () => void;
+  savedCredentials?: string;
+  verifyLogicalReplication: (variables: {
+    adminConn: string;
+    engine: string;
+    name: string;
+    replicaConn?: string;
+  }) => Promise<{ success: boolean; error: string }>;
+}) {
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [error, setError] = useState<string>();
+  const [isVerified, setIsVerified] = useState(false);
+
+  const handleVerify = async () => {
+    setIsVerifying(true);
+    setError(undefined);
+    if (!savedCredentials) {
+      handleLostCredentials();
+      return;
+    }
+    const parsedInput = parseConnectionString(savedCredentials);
+
+    if (!parsedInput) {
+      setError('Invalid connection string format. Please check your input.');
+      setIsVerifying(false);
+      return;
+    }
+
+    try {
+      const { success, error } = await verifyLogicalReplication(parsedInput);
+      if (success) {
+        setIsVerified(true);
+        onSuccess();
+      } else {
+        setError(
+          error ||
+            'Could not verify credentials. Please check if everything is entered correctly and try again.'
+        );
+      }
+    } catch (err) {
+      setError('An error occurred while verifying. Please try again.');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   return (
     <>
       <p className="text-sm">
@@ -15,7 +69,10 @@ export default function NeonFormat({ next }: { next: () => void }) {
         reverted. Enabling logical replication also restarts all computes in your Neon project,
         meaning active connections will be dropped and have to reconnect.
       </p>
-      <NewLink size="small" href="">
+      <NewLink
+        size="small"
+        href="https://neon.tech/docs/guides/logical-replication-concepts#write-ahead-log-wal"
+      >
         Learn more about WAL level
       </NewLink>
 
@@ -36,7 +93,19 @@ export default function NeonFormat({ next }: { next: () => void }) {
         </ol>
       </div>
 
-      <NewButton label="Next" onClick={next} />
+      {isVerified ? (
+        <NewButton
+          label="Next"
+          href={`/settings/integrations/neon/${IntegrationSteps.ConnectDb}`}
+        />
+      ) : (
+        <NewButton
+          label="Verify logical replication is enabled"
+          onClick={handleVerify}
+          loading={isVerifying}
+        />
+      )}
+      {error && <p className="text-error mt-4 text-sm">{error}</p>}
     </>
   );
 }

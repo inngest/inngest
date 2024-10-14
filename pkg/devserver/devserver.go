@@ -51,7 +51,8 @@ import (
 )
 
 const (
-	DefaultTick         = time.Millisecond * 150
+	DefaultTick         = 150
+	DefaultTickDuration = time.Millisecond * DefaultTick
 	DefaultPollInterval = 5
 )
 
@@ -65,6 +66,20 @@ type StartOpts struct {
 	PollInterval  int           `json:"poll_interval"`
 	Tick          time.Duration `json:"tick"`
 	RetryInterval int           `json:"retry_interval"`
+
+	// SigningKey is used to decide that the server should sign requests and
+	// validate responses where applicable, modelling cloud behaviour.
+	SigningKey *string `json:"-"`
+
+	// EventKey is used to authorize incoming events, ensuring they match the
+	// given key.
+	EventKeys []string `json:"-"`
+
+	// RequireKeys defines whether event and signing keys are required for the
+	// server to function. If this is true and signing keys are not defined,
+	// the server will still boot but core actions such as syncing, runs, and
+	// ingesting events will not work.
+	RequireKeys bool `json:"require_keys"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -95,7 +110,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	if opts.Tick == 0 {
-		opts.Tick = DefaultTick
+		opts.Tick = DefaultTickDuration
 	}
 
 	// Initialize the devserver
@@ -139,10 +154,15 @@ func start(ctx context.Context, opts StartOpts) error {
 	smv2 := redis_state.MustRunServiceV2(sm)
 
 	queueOpts := []redis_state.QueueOpt{
+		redis_state.WithRunMode(redis_state.QueueRunMode{
+			Sequential: true,
+			Scavenger:  true,
+			Partition:  true,
+		}),
 		redis_state.WithIdempotencyTTL(time.Hour),
 		redis_state.WithNumWorkers(100),
 		redis_state.WithPollTick(opts.Tick),
-		redis_state.WithCustomConcurrencyKeyGenerator(func(ctx context.Context, i redis_state.QueueItem) []state.CustomConcurrency {
+		redis_state.WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i redis_state.QueueItem) []state.CustomConcurrency {
 			keys := i.Data.GetConcurrencyKeys()
 
 			fn, err := dbcqrs.GetFunctionByInternalUUID(ctx, i.Data.Identifier.WorkspaceID, i.Data.Identifier.WorkflowID)
@@ -176,27 +196,37 @@ func start(ctx context.Context, opts StartOpts) error {
 
 			return keys
 		}),
-		redis_state.WithAccountConcurrencyKeyGenerator(func(ctx context.Context, i redis_state.QueueItem) (string, int) {
-			// NOTE: In the dev server there are no account concurrency limits.
-			return i.Queue(), consts.DefaultConcurrencyLimit
-		}),
-		redis_state.WithPartitionConcurrencyKeyGenerator(func(ctx context.Context, p redis_state.QueuePartition) (string, int) {
+		redis_state.WithConcurrencyLimitGetter(func(ctx context.Context, p redis_state.QueuePartition) redis_state.PartitionConcurrencyLimits {
+			// In the dev server, there are never account limits.
+			limits := redis_state.PartitionConcurrencyLimits{
+				AccountLimit: redis_state.NoConcurrencyLimit,
+			}
+
 			// Ensure that we return the correct concurrency values per
 			// partition.
 			funcs, err := dbcqrs.GetFunctions(ctx)
 			if err != nil {
-				return p.Queue(), consts.DefaultConcurrencyLimit
+				return redis_state.PartitionConcurrencyLimits{
+					AccountLimit:   redis_state.NoConcurrencyLimit,
+					FunctionLimit:  consts.DefaultConcurrencyLimit,
+					CustomKeyLimit: consts.DefaultConcurrencyLimit,
+				}
 			}
-			for _, fn := range funcs {
-				f, _ := fn.InngestFunction()
+			for _, fun := range funcs {
+				f, _ := fun.InngestFunction()
 				if f.ID == uuid.Nil {
 					f.ID = f.DeterministicUUID()
 				}
-				if f.ID == p.WorkflowID && f.Concurrency != nil && f.Concurrency.PartitionConcurrency() > 0 {
-					return p.Queue(), f.Concurrency.PartitionConcurrency()
+				// Update the function's concurrency here with latest defaults
+				if p.FunctionID != nil && f.ID == *p.FunctionID && f.Concurrency != nil && f.Concurrency.PartitionConcurrency() > 0 {
+					limits.FunctionLimit = f.Concurrency.PartitionConcurrency()
 				}
 			}
-			return p.Queue(), consts.DefaultConcurrencyLimit
+			if p.EvaluatedConcurrencyKey != "" {
+				limits.CustomKeyLimit = p.ConcurrencyLimit
+			}
+
+			return limits
 		}),
 	}
 	if opts.RetryInterval > 0 {
@@ -346,18 +376,22 @@ func start(ctx context.Context, opts StartOpts) error {
 	if err != nil {
 		return err
 	}
+
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
 	// server UI, events, and API for loading data.
 	//
 	// Merge the dev server API (for handling files & registration) with the data
 	// API into the event API router.
-	ds.Apiservice = api.NewService(
-		ds.Opts.Config,
-		api.Mount{At: "/", Router: devAPI},
-		api.Mount{At: "/v0", Router: core.Router},
-		api.Mount{At: "/debug", Handler: middleware.Profiler()},
-	)
+	ds.Apiservice = api.NewService(api.APIServiceOptions{
+		Config: ds.Opts.Config,
+		Mounts: []api.Mount{
+			{At: "/", Router: devAPI},
+			{At: "/v0", Router: core.Router},
+			{At: "/debug", Handler: middleware.Profiler()},
+		},
+		LocalEventKeys: opts.EventKeys,
+	})
 
 	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice)
 }
@@ -376,7 +410,7 @@ func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Clien
 	// If tick is lower than the default, tick every 50ms.  This lets us save
 	// CPU for standard dev-server testing.
 	poll := time.Second
-	if tick < DefaultTick {
+	if tick < DefaultTickDuration {
 		poll = time.Millisecond * 50
 	}
 

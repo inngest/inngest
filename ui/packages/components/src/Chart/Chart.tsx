@@ -2,23 +2,41 @@
 
 import { useEffect, useRef } from 'react';
 import {
+  connect,
   getInstanceByDom,
   init,
+  type DefaultLabelFormatterCallbackParams,
   type EChartsOption,
+  type LegendComponentOption,
   type LineSeriesOption,
   type SetOptionOpts,
 } from 'echarts';
 
-export type { LineSeriesOption };
+export type { LineSeriesOption, LegendComponentOption, DefaultLabelFormatterCallbackParams };
 
 export interface ChartProps {
   option: EChartsOption;
   settings?: SetOptionOpts;
   theme?: 'light' | 'dark';
+  className?: string;
+  group?: string;
 }
 
-export const Chart = ({ option, settings, theme = 'light' }: ChartProps) => {
+export const Chart = ({
+  option,
+  settings = { notMerge: true },
+  theme = 'light',
+  className,
+  group,
+}: ChartProps) => {
   const chartRef = useRef<HTMLDivElement>(null);
+
+  const toggleTooltips = (show: boolean) => {
+    if (chartRef.current !== null) {
+      const chart = getInstanceByDom(chartRef.current);
+      chart?.setOption({ tooltip: { show }, xAxis: { axisPointer: { label: { show } } } });
+    }
+  };
 
   useEffect(() => {
     if (chartRef.current !== null) {
@@ -28,10 +46,12 @@ export const Chart = ({ option, settings, theme = 'light' }: ChartProps) => {
         chart?.resize();
       };
       window.addEventListener('resize', resizeChart);
+      window.addEventListener('navToggle', resizeChart);
 
       return () => {
         chart?.dispose();
         window.removeEventListener('resize', resizeChart);
+        window.removeEventListener('navToggle', resizeChart);
       };
     }
   }, [theme]);
@@ -40,8 +60,20 @@ export const Chart = ({ option, settings, theme = 'light' }: ChartProps) => {
     if (chartRef.current !== null) {
       const chart = getInstanceByDom(chartRef.current);
       chart?.setOption(option, settings);
+
+      if (chart && group) {
+        chart.group = group;
+        connect(group);
+      }
     }
   }, [option, settings]);
 
-  return <div ref={chartRef} className="absolute h-[100%] w-full overflow-hidden" />;
+  return (
+    <div
+      ref={chartRef}
+      className={className}
+      {...(group && { onMouseEnter: () => toggleTooltips(true) })}
+      {...(group && { onMouseLeave: () => toggleTooltips(false) })}
+    />
+  );
 };

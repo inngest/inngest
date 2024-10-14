@@ -162,6 +162,7 @@ export default {
         alwaysWhite: 'rgb(var(--color-foreground-alwaysWhite) / <alpha-value>)',
         btnPrimary: 'rgb(var(--color-foreground-btn-primary) / <alpha-value>)',
         btnDanger: 'rgb(var(--color-foreground-btn-danger) / <alpha-value>)',
+        link: 'rgb(var(--color-foreground-link) / <alpha-value>)',
       },
       gridTemplateColumns: {
         dashboard: '1fr 1fr 1fr 432px',
@@ -169,6 +170,7 @@ export default {
       boxShadowColor: {
         // temporary tooltip token
         tooltip: 'rgb(var(--color-background-canvas-muted) / <alpha-value>)',
+        subtle: 'rgb(var(--color-border-subtle) / <alpha-value>)',
       },
       boxShadow: {
         primary: '0 4px 4px 0 rgba(0,0,0,0.25)',
