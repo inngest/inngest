@@ -168,11 +168,13 @@ function validateExpression(content: string): ValidationError | null {
 export default function CodeSearch({
   onSearch,
   placeholder,
+  value,
 }: {
   onSearch: (content: string) => void;
   placeholder?: string;
+  value?: string;
 }) {
-  const [content, setContent] = useState<string>('');
+  const [content, setContent] = useState<string>(value || '');
   const [dark, setDark] = useState(isDark());
   const editorRef = useRef<MonacoEditorType>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -367,8 +369,7 @@ export default function CodeSearch({
   };
 
   const handleSearch = () => {
-    const trimmedContent = content.trim();
-    if (trimmedContent && trimmedContent !== '' && !hasValidationError) {
+    if (!hasValidationError) {
       onSearch(content);
     }
   };
