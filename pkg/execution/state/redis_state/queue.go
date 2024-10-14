@@ -133,10 +133,12 @@ var (
 	// jobs in a queue, via custom concurrency keys which are evaluated to a specific string.
 	ErrConcurrencyLimitCustomKey = fmt.Errorf("at concurrency limit")
 
-	// internal shard errors
-	errGuaranteedCapacityNotFound     = fmt.Errorf("guaranteed capacity not found")
-	errGuaranteedCapacityIndexLeased  = fmt.Errorf("guaranteed capacity index is already leased")
-	errGuaranteedCapacityIndexInvalid = fmt.Errorf("guaranteed capacity lease index is too high (a lease just expired)")
+	// internal guaranteed capacity errors
+	errGuaranteedCapacityNotFound      = fmt.Errorf("guaranteed capacity not found")
+	errGuaranteedCapacityIndexLeased   = fmt.Errorf("guaranteed capacity index is already leased")
+	errGuaranteedCapacityLeaseNotFound = fmt.Errorf("guaranteed capacity lease not found")
+	errGuaranteedCapacityIndexInvalid  = fmt.Errorf("guaranteed capacity lease index is too high (a lease just expired)")
+	errGuaranteedCapacityIndexExceeded = fmt.Errorf("guaranteed capacity index exceeded the maximum limit")
 )
 
 var (

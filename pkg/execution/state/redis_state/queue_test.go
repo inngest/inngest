@@ -3815,13 +3815,15 @@ func TestQueueLeaseSequential(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
+	qc := NewQueueClient(rc, QueueDefaultKey)
 	q := queue{
-		primaryQueueClient: NewQueueClient(rc, QueueDefaultKey),
+		primaryQueueClient: qc,
 		ppf: func(ctx context.Context, p QueuePartition) uint {
 			return PriorityMin
 		},
 		clock: clockwork.NewRealClock(),
 	}
+	q.enqueuer = NewRedisEnqueuer(&q, qc)
 
 	var (
 		leaseID *ulid.ULID
@@ -3875,141 +3877,519 @@ func TestQueueLeaseSequential(t *testing.T) {
 // TestGuaranteedCapacity covers the basics of guaranteed capacity;  we assert that function enqueues
 // upsert guaranteed capacity appropriately, and that leasing accounts works
 func TestGuaranteedCapacity(t *testing.T) {
-	r := miniredis.RunT(t)
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
-	})
-	require.NoError(t, err)
-	defer rc.Close()
-	ctx := context.Background()
-
-	accountId := uuid.New()
-	enableGuaranteedCapacity := true // indicate whether to enable guaranteed capacity in tests
-	guaranteedCapacity := &GuaranteedCapacity{
-		Scope:              enums.GuaranteedCapacityScopeAccount,
-		AccountID:          accountId,
-		GuaranteedCapacity: 1,
+	type setupReturns struct {
+		gc       GuaranteedCapacity
+		q1       *queue
+		q2       *queue
+		r        *miniredis.Miniredis
+		rc       rueidis.Client
+		teardown func()
 	}
-
-	sf := func(ctx context.Context, accountId uuid.UUID) *GuaranteedCapacity {
-		if !enableGuaranteedCapacity {
-			return nil
+	setup := func(capacity uint) setupReturns {
+		accountId := uuid.New()
+		enableGuaranteedCapacity := true // indicate whether to enable guaranteed capacity in tests
+		guaranteedCapacity := GuaranteedCapacity{
+			Scope:              enums.GuaranteedCapacityScopeAccount,
+			AccountID:          accountId,
+			GuaranteedCapacity: capacity,
 		}
-		return guaranteedCapacity
+
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		ctx := context.Background()
+
+		sf := func(ctx context.Context, accountId uuid.UUID) *GuaranteedCapacity {
+			if !enableGuaranteedCapacity {
+				return nil
+			}
+			return &guaranteedCapacity
+		}
+		q1 := NewQueue(
+			NewQueueClient(rc, QueueDefaultKey),
+			WithRunMode(QueueRunMode{
+				Sequential:         false,
+				Scavenger:          false,
+				Partition:          false,
+				Account:            false,
+				AccountWeight:      0,
+				GuaranteedCapacity: false,
+			}),
+			WithGuaranteedCapacityFinder(sf),
+		)
+		require.NotNil(t, sf(ctx, accountId))
+
+		empty := q1.getAccountLeases()
+		require.Len(t, empty, 0, "expected leases to be empty")
+
+		gc, err := q1.getGuaranteedCapacityMap(ctx)
+		require.NoError(t, err)
+		require.Len(t, gc, 0)
+
+		fnId := uuid.New()
+		//	randomUlid := ulid.MustNew(ulid.Now(), rand.Reader)
+		_, err = q1.enqueuer.EnqueueItem(ctx, osqueue.QueueItem{
+			FunctionID: fnId,
+			Data: osqueue.Item{
+				Identifier: state.Identifier{
+					AccountID: accountId,
+				},
+			},
+		}, time.Now())
+		require.NoError(t, err)
+
+		gc, err = q1.getGuaranteedCapacityMap(ctx)
+		require.NoError(t, err)
+		require.Len(t, gc, 1)
+		require.Equal(t, guaranteedCapacity, gc[guaranteedCapacity.Key()])
+
+		require.True(t, r.Exists(q1.primaryQueueClient.kg.GuaranteedCapacityMap()))
+		keys, err := r.HKeys(q1.primaryQueueClient.kg.GuaranteedCapacityMap())
+		require.NoError(t, err)
+		require.Len(t, keys, 1)
+		require.Equal(t, guaranteedCapacity.Key(), keys[0])
+
+		q2 := NewQueue(
+			NewQueueClient(rc, QueueDefaultKey),
+			WithRunMode(QueueRunMode{
+				Sequential:         false,
+				Scavenger:          false,
+				Partition:          false,
+				Account:            false,
+				AccountWeight:      0,
+				GuaranteedCapacity: false,
+			}),
+			WithGuaranteedCapacityFinder(sf),
+		)
+
+		return setupReturns{
+			gc: guaranteedCapacity,
+			q1: q1,
+			q2: q2,
+			r:  r,
+			rc: rc,
+			teardown: func() {
+				rc.Close()
+				r.Close()
+			},
+		}
+
 	}
-	q := NewQueue(
-		NewQueueClient(rc, QueueDefaultKey),
-		WithRunMode(QueueRunMode{
-			Account:            true,
-			GuaranteedCapacity: true,
-		}),
-		WithGuaranteedCapacityFinder(sf),
-	)
-	require.NotNil(t, sf(ctx, accountId))
 
-	t.Run("QueueItem with guaranteed capacity", func(t *testing.T) {
+	// happy path: queue should lease unleased guaranteed capacity
+	t.Run("guaranteed capacity lifecycle", func(t *testing.T) {
+		res := setup(1)
+		defer res.teardown()
+		ctx := context.Background()
 
-		// NOTE: Times for guaranteed capacity or global pointers cannot be <= now.
-		// Because of this, tests start with the earliest item 1 hour ahead of now so that
-		// we can appropriately test enqueueing earlier items adjust pointer times.
+		// Empty state: guaranteed capacity exists as unleased item
+		var gcToLease GuaranteedCapacity
+		t.Run("empty state", func(t *testing.T) {
+			gc, err := res.q1.getGuaranteedCapacityMap(ctx)
+			require.NoError(t, err)
+			require.Len(t, gc, 1)
+			require.NotNil(t, gc[res.gc.Key()], "expected guaranteed capacity for account to be set", gc)
+			require.Equal(t, res.gc, gc[res.gc.Key()])
 
-		t.Run("Basic enqueue", func(t *testing.T) {
-			at := time.Now().Truncate(time.Second).Add(time.Hour)
-			_, err := q.enqueuer.EnqueueItem(ctx, osqueue.QueueItem{
-				ID: "foo",
-				Data: osqueue.Item{
-					Identifier: state.Identifier{
-						AccountID: accountId,
-					},
-				},
-			}, at)
-			require.NoError(t, err, "guaranteed capacity enqueue should succeed")
+			filtered, err := res.q1.filterUnleasedAccounts(gc)
+			require.NoError(t, err)
+			require.Len(t, filtered, 1)
+			require.Equal(t, res.gc, filtered[0])
+			require.Len(t, filtered[0].Leases, 0)
 
-			t.Run("Enqueueing creates an item in the guaranteed capacity map", func(t *testing.T) {
-				keys, err := r.HKeys(q.primaryQueueClient.kg.GuaranteedCapacityMap())
-				require.NoError(t, err)
-				require.Equal(t, 1, len(keys))
+			localLeases := res.q1.getAccountLeases()
+			require.Len(t, localLeases, 0, "expected leases to be empty")
 
-				serialized := r.HGet(q.primaryQueueClient.kg.GuaranteedCapacityMap(), guaranteedCapacity.Key())
-				actual := &GuaranteedCapacity{}
-				err = json.Unmarshal([]byte(serialized), actual)
-				require.NoError(t, err)
-				require.EqualValues(t, *guaranteedCapacity, *actual)
-			})
-
-			t.Run("enqueueing another item in the same account doesn't duplicate guaranteed capacity item", func(t *testing.T) {
-				_, err := q.enqueuer.EnqueueItem(ctx, osqueue.QueueItem{
-					Data: osqueue.Item{
-						Identifier: state.Identifier{
-							AccountID: accountId,
-						},
-					},
-				}, at.Add(time.Minute))
-				require.NoError(t, err)
-
-				keys, err := r.HKeys(q.primaryQueueClient.kg.GuaranteedCapacityMap())
-				require.NoError(t, err)
-				require.Equal(t, 1, len(keys))
-
-				serialized := r.HGet(q.primaryQueueClient.kg.GuaranteedCapacityMap(), guaranteedCapacity.Key())
-				actual := &GuaranteedCapacity{}
-				err = json.Unmarshal([]byte(serialized), actual)
-				require.NoError(t, err)
-				require.EqualValues(t, *guaranteedCapacity, *actual)
-			})
+			// Set guaranteed capacity to lease for remaining test
+			gcToLease = filtered[0]
 		})
 
-		t.Run("guaranteed capacity is updated when enqueueing, if already exists", func(t *testing.T) {
-			serialized := r.HGet(q.primaryQueueClient.kg.GuaranteedCapacityMap(), guaranteedCapacity.Key())
-			first := &GuaranteedCapacity{}
-			err = json.Unmarshal([]byte(serialized), first)
+		// Lease guaranteed capacity
+		var currentLeaseId *ulid.ULID
+		t.Run("lease guaranteed capacity", func(t *testing.T) {
+			// lease index = 0
+			leaseId, err := res.q1.acquireAccountLease(ctx, gcToLease, time.Second, 0)
 			require.NoError(t, err)
-			require.EqualValues(t, *guaranteedCapacity, *first)
+			require.NotNil(t, leaseId)
 
-			// Enqueue again with a capacity of 1
-			guaranteedCapacity.GuaranteedCapacity = guaranteedCapacity.GuaranteedCapacity + 1
-			_, err = q.enqueuer.EnqueueItem(ctx, osqueue.QueueItem{
-				Data: osqueue.Item{
-					Identifier: state.Identifier{
-						AccountID: accountId,
-					},
-				},
-			}, time.Now())
-
-			serialized = r.HGet(q.primaryQueueClient.kg.GuaranteedCapacityMap(), guaranteedCapacity.Key())
-			updated := &GuaranteedCapacity{}
-			err = json.Unmarshal([]byte(serialized), updated)
+			gc, err := res.q1.getGuaranteedCapacityMap(ctx)
 			require.NoError(t, err)
-			require.NotEqualValues(t, *first, *updated)
-			require.EqualValues(t, *guaranteedCapacity, *updated)
+			require.Len(t, gc, 1)
+			require.NotNil(t, gc[res.gc.Key()], "expected guaranteed capacity for account to be set", gc)
+			require.Equal(t, []ulid.ULID{*leaseId}, gc[res.gc.Key()].Leases)
+
+			filtered, err := res.q1.filterUnleasedAccounts(gc)
+			require.NoError(t, err)
+			require.Len(t, filtered, 0)
+
+			res.q1.addLeasedAccount(res.gc, *leaseId)
+
+			localLeases := res.q1.getAccountLeases()
+			require.Len(t, localLeases, 1)
+			require.Equal(t, *leaseId, localLeases[0].Lease)
+
+			currentLeaseId = leaseId
 		})
 
-		t.Run("disabled guaranteed capacity is removed when enqueueing, if already exists", func(t *testing.T) {
-			serialized := r.HGet(q.primaryQueueClient.kg.GuaranteedCapacityMap(), guaranteedCapacity.Key())
-			first := &GuaranteedCapacity{}
-			err = json.Unmarshal([]byte(serialized), first)
+		t.Run("renew account lease", func(t *testing.T) {
+			newLeaseId, err := res.q1.renewAccountLease(ctx, gcToLease, time.Second, *currentLeaseId)
 			require.NoError(t, err)
-			require.EqualValues(t, *guaranteedCapacity, *first)
+			require.NotNil(t, newLeaseId)
 
-			exists, err := rc.Do(ctx, rc.B().Hexists().Key(q.primaryQueueClient.kg.GuaranteedCapacityMap()).Field(guaranteedCapacity.Key()).Build()).AsBool()
+			gc, err := res.q1.getGuaranteedCapacityMap(ctx)
 			require.NoError(t, err)
-			require.True(t, exists)
+			require.Len(t, gc, 1)
+			require.NotNil(t, gc[res.gc.Key()], "expected guaranteed capacity for account to be set", gc)
+			require.Equal(t, []ulid.ULID{*newLeaseId}, gc[res.gc.Key()].Leases)
 
-			enableGuaranteedCapacity = false
-			_, err = q.enqueuer.EnqueueItem(ctx, osqueue.QueueItem{
-				Data: osqueue.Item{
-					Identifier: state.Identifier{
-						AccountID: accountId,
-					},
-				},
-			}, time.Now())
+			filtered, err := res.q1.filterUnleasedAccounts(gc)
 			require.NoError(t, err)
+			require.Len(t, filtered, 0)
 
-			exists, err = rc.Do(ctx, rc.B().Hexists().Key(q.primaryQueueClient.kg.GuaranteedCapacityMap()).Field(guaranteedCapacity.Key()).Build()).AsBool()
-			require.NoError(t, err)
-			require.False(t, exists, r.Dump())
+			res.q1.addLeasedAccount(res.gc, *newLeaseId)
+
+			localLeases := res.q1.getAccountLeases()
+			require.Len(t, localLeases, 1)
+			require.Equal(t, *newLeaseId, localLeases[0].Lease)
+
+			// Lease has been renewed, so the leaseId should be updated
+			currentLeaseId = newLeaseId
 		})
+
+		// Expire again
+		t.Run("expire account lease forcefully", func(t *testing.T) {
+			err := res.q1.expireAccountLease(ctx, gcToLease, *currentLeaseId)
+			require.NoError(t, err)
+
+			res.q1.removeLeasedAccount(res.gc)
+
+			gc, err := res.q1.getGuaranteedCapacityMap(ctx)
+			require.NoError(t, err)
+			require.Len(t, gc, 1)
+			require.NotNil(t, gc[res.gc.Key()], "expected guaranteed capacity for account to be set", gc)
+			require.NotEqual(t, []ulid.ULID{*currentLeaseId}, gc[res.gc.Key()].Leases)
+			require.Len(t, gc[res.gc.Key()].Leases, 0)
+
+			filtered, err := res.q1.filterUnleasedAccounts(gc)
+			require.NoError(t, err)
+			require.Len(t, filtered, 1)
+			require.Len(t, filtered[0].Leases, 0)
+		})
+	})
+
+	// Test scanAndLeaseUnleasedAccounts
+	t.Run("scan and lease unleased accounts", func(t *testing.T) {
+		res := setup(1)
+		defer res.teardown()
+		ctx := context.Background()
+
+		retry, err := res.q1.scanAndLeaseUnleasedAccounts(ctx)
+		require.NoError(t, err)
+		require.False(t, retry)
+
+		localLeases := res.q1.getAccountLeases()
+		require.Len(t, localLeases, 1)
+		leaseId := localLeases[0].Lease
+		leaseGc := localLeases[0].GuaranteedCapacity
+
+		gc, err := res.q1.getGuaranteedCapacityMap(ctx)
+		require.Equal(t, leaseGc, gc[res.gc.Key()])
+		require.NoError(t, err)
+		require.Len(t, gc, 1)
+		require.NotNil(t, gc[res.gc.Key()], "expected guaranteed capacity for account to be set", gc)
+		require.Equal(t, []ulid.ULID{leaseId}, gc[res.gc.Key()].Leases)
+		require.Len(t, gc[res.gc.Key()].Leases, 1)
+
+		filtered, err := res.q1.filterUnleasedAccounts(gc)
+		require.NoError(t, err)
+		require.Len(t, filtered, 0)
+
+		err = res.q1.expireAccountLease(ctx, leaseGc, leaseId)
+		require.NoError(t, err, "expected lease to be expired", res.r.Dump(), leaseId, leaseGc)
+
+		res.q1.removeLeasedAccount(res.gc)
+
+		localLeases = res.q1.getAccountLeases()
+		require.Len(t, localLeases, 0)
+
+		gc, err = res.q1.getGuaranteedCapacityMap(ctx)
+		require.NoError(t, err)
+		require.Len(t, gc, 1)
+		require.NotNil(t, gc[res.gc.Key()], "expected guaranteed capacity for account to be set", gc)
+		require.Len(t, gc[res.gc.Key()].Leases, 0)
+	})
+
+	// Test claimUnleasedGuaranteedCapacity
+	t.Run("claim unleased guaranteed capacity", func(t *testing.T) {
+		res := setup(1)
+		defer res.teardown()
+
+		require.Len(t, res.q1.getAccountLeases(), 0)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		go res.q1.claimUnleasedGuaranteedCapacity(ctx, time.Second, 2*time.Second)
+
+		require.Eventually(t, func() bool {
+			return len(res.q1.getAccountLeases()) == 1
+		}, 2*time.Second, 250*time.Millisecond)
+
+		cancel()
+
+		// eventually, account should be returned
+		require.Eventually(t, func() bool {
+			return len(res.q1.getAccountLeases()) == 0
+		}, 2*time.Second, 250*time.Millisecond)
+
+		gc, err := res.q1.getGuaranteedCapacityMap(context.Background())
+		require.NoError(t, err)
+		require.Len(t, gc, 1)
+		require.Len(t, gc[res.gc.Key()].Leases, 0)
+	})
+
+	t.Run("multiple leases", func(t *testing.T) {
+		res := setup(4)
+		defer res.teardown()
+		ctx := context.Background()
+
+		leaseIds := make([]ulid.ULID, 4)
+
+		// Lease first account
+		leaseId, err := res.q1.acquireAccountLease(ctx, res.gc, time.Second, 0)
+		require.NoError(t, err)
+		require.NotNil(t, leaseId)
+		leaseIds[0] = *leaseId
+
+		res.gc.Leases = append(res.gc.Leases, *leaseId)
+		res.q1.addLeasedAccount(res.gc, *leaseId)
+
+		gc, err := res.q1.getGuaranteedCapacityMap(ctx)
+		require.NoError(t, err)
+		require.Len(t, gc, 1)
+		require.Equal(t, gc[res.gc.Key()].Leases, []ulid.ULID{*leaseId})
+
+		// expect filter to filter out guaranteed capacity because we've already leased it
+		filtered, err := res.q1.filterUnleasedAccounts(gc)
+		require.NoError(t, err)
+		require.Len(t, filtered, 0)
+
+		// Fully lease account (this wouldn't be possible normally as filter removes
+		// guaranteed capacity when the same account is leased by the same executor)
+		for i := 1; i < 4; i++ {
+			leaseId, err := res.q1.acquireAccountLease(ctx, res.gc, time.Second, i)
+			require.NoError(t, err)
+			require.NotNil(t, leaseId)
+
+			leaseIds[i] = *leaseId
+		}
+
+		// Acquiring yet another lease should not work
+		_, err = res.q1.acquireAccountLease(ctx, res.gc, time.Second, 4)
+		require.ErrorIs(t, err, errGuaranteedCapacityIndexExceeded)
+
+		gc, err = res.q1.getGuaranteedCapacityMap(ctx)
+		require.NoError(t, err)
+		require.Len(t, gc, 1)
+		require.Equal(t, gc[res.gc.Key()].Leases, leaseIds)
+	})
+
+	t.Run("taking over expired lease", func(t *testing.T) {
+		res := setup(1)
+		defer res.teardown()
+		ctx := context.Background()
+
+		leaseIdA, err := res.q1.acquireAccountLease(ctx, res.gc, 50*time.Millisecond, 0)
+		require.NoError(t, err)
+		require.NotNil(t, leaseIdA)
+
+		<-time.After(250 * time.Millisecond)
+
+		leaseIdB, err := res.q1.acquireAccountLease(ctx, res.gc, time.Second, 0)
+		require.NoError(t, err, "acquiring expired lease must work", res.r.Dump())
+		require.NotNil(t, leaseIdA)
+
+		require.NotEqual(t, *leaseIdA, *leaseIdB)
+
+		gc, err := res.q1.getGuaranteedCapacityMap(ctx)
+		require.NoError(t, err)
+		require.Len(t, gc, 1)
+		require.Equal(t, gc[res.gc.Key()].Leases, []ulid.ULID{*leaseIdB})
+
+		// renewing older lease should fail
+		leaseIdA2, err := res.q1.renewAccountLease(ctx, res.gc, time.Second, *leaseIdA)
+		require.ErrorIs(t, err, errGuaranteedCapacityLeaseNotFound)
+		require.Nil(t, leaseIdA2)
+
+		// renewing newer lease should work
+		leaseIdB2, err := res.q1.renewAccountLease(ctx, res.gc, time.Second, *leaseIdB)
+		require.NoError(t, err)
+		require.NotNil(t, leaseIdB2)
+		require.NotEqual(t, *leaseIdB, *leaseIdB2)
+
+		// sanity check: final lease should be leaseIdB2
+		gc, err = res.q1.getGuaranteedCapacityMap(ctx)
+		require.NoError(t, err)
+		require.Len(t, gc, 1)
+		require.Equal(t, gc[res.gc.Key()].Leases, []ulid.ULID{*leaseIdB2})
+	})
+
+	t.Run("taking over non-expired lease should fail", func(t *testing.T) {
+		res := setup(1)
+		defer res.teardown()
+		ctx := context.Background()
+
+		leaseIdA, err := res.q1.acquireAccountLease(ctx, res.gc, 50*time.Millisecond, 0)
+		require.NoError(t, err)
+		require.NotNil(t, leaseIdA)
+
+		leaseIdB, err := res.q1.acquireAccountLease(ctx, res.gc, 50*time.Millisecond, 0)
+		require.ErrorIs(t, err, errGuaranteedCapacityIndexLeased)
+		require.Nil(t, leaseIdB)
+	})
+
+	// what if another executor goes rogue and takes over a lease?
+	// we expect current leaseholder to simply start over and scan for more guaranteed capacity -> renewing should fail
+	t.Run("own lease gets removed even though valid, should be handled gracefully", func(t *testing.T) {
+		res := setup(1)
+		defer res.teardown()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		go res.q1.claimUnleasedGuaranteedCapacity(ctx, 500*time.Millisecond, 500*time.Millisecond)
+
+		// wait until account is leased
+		require.Eventually(t, func() bool {
+			return len(res.q1.getAccountLeases()) == 1
+		}, 1*time.Second, 100*time.Millisecond)
+		require.Equal(t, res.gc.Key(), res.q1.getAccountLeases()[0].GuaranteedCapacity.Key())
+
+		// simulate takeover by other account
+		evilLeaseId := ulid.MustNew(ulid.Timestamp(time.Now().Add(1*time.Hour)), rnd)
+		res.gc.Leases = []ulid.ULID{evilLeaseId}
+		marshaled, err := json.Marshal(res.gc)
+		require.NoError(t, err)
+		res.r.HSet(res.q1.primaryQueueClient.kg.GuaranteedCapacityMap(), res.gc.Key(), string(marshaled))
+
+		require.Eventually(t, func() bool {
+			return len(res.q1.getAccountLeases()) == 0
+		}, 1*time.Second, 100*time.Millisecond, "expected executor to give up account", res.q1.getAccountLeases(), res.r.Dump())
+
+		// remove evil lease
+		res.gc.Leases = nil
+		marshaled, err = json.Marshal(res.gc)
+		require.NoError(t, err)
+		res.r.HSet(res.q1.primaryQueueClient.kg.GuaranteedCapacityMap(), res.gc.Key(), string(marshaled))
+
+		// expect us to re-acquire lease
+		require.Eventually(t, func() bool {
+			return len(res.q1.getAccountLeases()) == 1
+		}, 1*time.Second, 100*time.Millisecond)
+
+		require.Equal(t, res.gc.Key(), res.q1.getAccountLeases()[0].GuaranteedCapacity.Key())
+	})
+
+	// we can remove guaranteed capacity from accounts mid-flight
+	t.Run("guaranteed capacity gets removed when lease is still held", func(t *testing.T) {
+		res := setup(1)
+		defer res.teardown()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		go res.q1.claimUnleasedGuaranteedCapacity(ctx, 500*time.Millisecond, 500*time.Millisecond)
+
+		// wait until account is leased
+		require.Eventually(t, func() bool {
+			return len(res.q1.getAccountLeases()) == 1
+		}, 1*time.Second, 100*time.Millisecond)
+
+		require.Len(t, res.q1.getAccountLeases(), 1)
+		require.Equal(t, res.gc.Key(), res.q1.getAccountLeases()[0].GuaranteedCapacity.Key())
+
+		// simulate gc removal
+		res.r.HDel(res.q1.primaryQueueClient.kg.GuaranteedCapacityMap(), res.gc.Key())
+
+		require.Eventually(t, func() bool {
+			return len(res.q1.getAccountLeases()) == 0
+		}, 1*time.Second, 100*time.Millisecond, "expected executor to give up account", res.q1.getAccountLeases(), res.r.Dump())
+
+		// re-add gc
+		marshaled, err := json.Marshal(res.gc)
+		require.NoError(t, err)
+		res.r.HSet(res.q1.primaryQueueClient.kg.GuaranteedCapacityMap(), res.gc.Key(), string(marshaled))
+
+		// expect us to re-acquire lease
+		require.Eventually(t, func() bool {
+			return len(res.q1.getAccountLeases()) == 1
+		}, 1*time.Second, 100*time.Millisecond)
+
+		require.Equal(t, res.gc.Key(), res.q1.getAccountLeases()[0].GuaranteedCapacity.Key())
+	})
+
+	t.Run("increasing/decreasing guaranteed capacity in-flight should work", func(t *testing.T) {
+		res := setup(1)
+		defer res.teardown()
+
+		ctx, cancelAll := context.WithCancel(context.Background())
+		defer cancelAll()
+
+		ctxQ1, cancelQ1 := context.WithCancel(ctx)
+		defer cancelQ1()
+
+		ctxQ2, cancelQ2 := context.WithCancel(ctx)
+		defer cancelQ2()
+
+		// run two workers
+		go res.q1.claimUnleasedGuaranteedCapacity(ctxQ1, 500*time.Millisecond, 500*time.Millisecond)
+		go res.q2.claimUnleasedGuaranteedCapacity(ctxQ2, 500*time.Millisecond, 500*time.Millisecond)
+
+		// acquire first lease
+		require.Eventually(t, func() bool {
+			leasedAccount := (len(res.q1.getAccountLeases()) + len(res.q2.getAccountLeases())) == 1
+			if !leasedAccount {
+				return false
+			}
+
+			if len(res.q1.getAccountLeases()) == 1 {
+				return res.gc.Key() == res.q1.getAccountLeases()[0].GuaranteedCapacity.Key()
+			}
+
+			return res.gc.Key() == res.q2.getAccountLeases()[0].GuaranteedCapacity.Key()
+
+		}, 1*time.Second, 100*time.Millisecond)
+
+		// bump to 2 and watch second lease get acquired
+		res.gc.GuaranteedCapacity = 2
+		marshaled, err := json.Marshal(res.gc)
+		require.NoError(t, err)
+		res.r.HSet(res.q1.primaryQueueClient.kg.GuaranteedCapacityMap(), res.gc.Key(), string(marshaled))
+
+		require.Eventually(t, func() bool {
+			return len(res.q1.getAccountLeases()) == 1 && len(res.q2.getAccountLeases()) == 1
+		}, 2*time.Second, 250*time.Millisecond)
+
+		// decrease to 1 and watch second lease get removed
+		res.gc.GuaranteedCapacity = 1
+		marshaled, err = json.Marshal(res.gc)
+		require.NoError(t, err)
+		res.r.HSet(res.q1.primaryQueueClient.kg.GuaranteedCapacityMap(), res.gc.Key(), string(marshaled))
+
+		require.Eventually(t, func() bool {
+			return (len(res.q1.getAccountLeases()) + len(res.q2.getAccountLeases())) == 1
+		}, 1*time.Second, 100*time.Millisecond)
+
+		// kill one worker and expect next worker to pick up lease
+		if len(res.q1.getAccountLeases()) == 1 {
+			cancelQ1()
+		} else {
+			cancelQ2()
+		}
+
+		require.Eventually(t, func() bool {
+			return (len(res.q1.getAccountLeases()) + len(res.q2.getAccountLeases())) == 1
+		}, 1*time.Second, 100*time.Millisecond)
 	})
 }
 
@@ -4027,17 +4407,17 @@ func TestAccountLease(t *testing.T) {
 		return &GuaranteedCapacity{
 			Scope:              enums.GuaranteedCapacityScopeAccount,
 			AccountID:          accountId,
-			GuaranteedCapacity: 1,
+			GuaranteedCapacity: 2,
 		}
 	}
 	q := NewQueue(NewQueueClient(rc, QueueDefaultKey), WithGuaranteedCapacityFinder(sf))
 
 	t.Run("Leasing an account without guaranteed capacity fails", func(t *testing.T) {
 		shard := sf(ctx, uuid.UUID{})
-		leaseID, err := q.leaseAccount(ctx, shard, 2*time.Second, 1)
+		leaseID, err := q.acquireAccountLease(ctx, *shard, 2*time.Second, 1)
 		require.Nil(t, leaseID, "Got lease ID: %v", leaseID)
 		require.NotNil(t, err)
-		require.ErrorContains(t, err, "guaranteed capacity not found")
+		require.ErrorIs(t, err, errGuaranteedCapacityNotFound)
 	})
 
 	// Ensure guaranteed capacity exists
@@ -4061,24 +4441,24 @@ func TestAccountLease(t *testing.T) {
 		// At the beginning, no shards have been leased.  Leasing a shard
 		// with an index of >= 1 should fail.
 		guaranteedCapacity := sf(ctx, idA)
-		leaseID, err := q.leaseAccount(ctx, guaranteedCapacity, 2*time.Second, 1)
+		leaseID, err := q.acquireAccountLease(ctx, *guaranteedCapacity, 2*time.Second, 1)
 		require.Nil(t, leaseID, "Got lease ID: %v", leaseID)
 		require.NotNil(t, err)
-		require.ErrorContains(t, err, "lease index is too high", r.Dump())
+		require.ErrorIs(t, err, errGuaranteedCapacityIndexInvalid, r.Dump())
 	})
 
 	t.Run("Leasing an account works", func(t *testing.T) {
 		shard := sf(ctx, idA)
 
 		t.Run("Basic lease", func(t *testing.T) {
-			leaseID, err := q.leaseAccount(ctx, shard, 1*time.Second, 0)
+			leaseID, err := q.acquireAccountLease(ctx, *shard, 1*time.Second, 0)
 			require.NotNil(t, leaseID, "Didn't get a lease ID for a basic lease")
 			require.Nil(t, err)
 		})
 
 		t.Run("Leasing a subsequent index works", func(t *testing.T) {
-			leaseID, err := q.leaseAccount(ctx, shard, 8*time.Second, 1) // Same length as the lease below, after wait
-			require.NotNil(t, leaseID, "Didn't get a lease ID for a secondary lease")
+			leaseID, err := q.acquireAccountLease(ctx, *shard, 8*time.Second, 1) // Same length as the lease below, after wait
+			require.NotNil(t, leaseID, "Didn't get a lease ID for a secondary lease", r.Dump())
 			require.Nil(t, err)
 		})
 
@@ -4087,7 +4467,7 @@ func TestAccountLease(t *testing.T) {
 			// is no longer valid, so leasing with an index of (1) should succeed.
 			<-time.After(2 * time.Second) // Wait a few seconds so that time.Now() in the call works.
 			r.FastForward(2 * time.Second)
-			leaseID, err := q.leaseAccount(ctx, shard, 10*time.Second, 1)
+			leaseID, err := q.acquireAccountLease(ctx, *shard, 10*time.Second, 1)
 			require.NotNil(t, leaseID)
 			require.Nil(t, err)
 
@@ -4095,7 +4475,7 @@ func TestAccountLease(t *testing.T) {
 		})
 
 		t.Run("Leasing an already leased index fails", func(t *testing.T) {
-			leaseID, err := q.leaseAccount(ctx, shard, 2*time.Second, 1)
+			leaseID, err := q.acquireAccountLease(ctx, *shard, 2*time.Second, 1)
 			require.Nil(t, leaseID, "got a lease ID for an existing lease")
 			require.NotNil(t, err)
 			require.ErrorContains(t, err, "index is already leased")
@@ -4103,7 +4483,7 @@ func TestAccountLease(t *testing.T) {
 
 		t.Run("Leasing a second account works", func(t *testing.T) {
 			// Try another shard name with an index of 0.
-			leaseID, err := q.leaseAccount(ctx, sf(ctx, idB), 2*time.Second, 0)
+			leaseID, err := q.acquireAccountLease(ctx, *sf(ctx, idB), 2*time.Second, 0)
 			require.NotNil(t, leaseID)
 			require.Nil(t, err)
 		})
@@ -4117,12 +4497,12 @@ func TestAccountLease(t *testing.T) {
 		require.Nil(t, err)
 
 		guaranteedCapacity := sf(ctx, idA)
-		leaseID, err := q.leaseAccount(ctx, guaranteedCapacity, 1*time.Second, 0)
+		leaseID, err := q.acquireAccountLease(ctx, *guaranteedCapacity, 1*time.Second, 0)
 		require.NotNil(t, leaseID, "could not lease account", r.Dump())
 		require.Nil(t, err)
 
 		t.Run("Current leases succeed", func(t *testing.T) {
-			leaseID, err = q.renewAccountLease(ctx, guaranteedCapacity, 2*time.Second, *leaseID)
+			leaseID, err = q.renewAccountLease(ctx, *guaranteedCapacity, 2*time.Second, *leaseID)
 			require.NotNil(t, leaseID, "did not get a new lease when renewing", r.Dump())
 			require.Nil(t, err)
 		})
@@ -4131,13 +4511,13 @@ func TestAccountLease(t *testing.T) {
 			<-time.After(3 * time.Second)
 			r.FastForward(3 * time.Second)
 
-			leaseID, err := q.renewAccountLease(ctx, guaranteedCapacity, 2*time.Second, *leaseID)
+			leaseID, err := q.renewAccountLease(ctx, *guaranteedCapacity, 2*time.Second, *leaseID)
 			require.ErrorContains(t, err, "lease not found")
 			require.Nil(t, leaseID)
 		})
 
 		t.Run("Invalid lease IDs fail", func(t *testing.T) {
-			leaseID, err := q.renewAccountLease(ctx, guaranteedCapacity, 2*time.Second, ulid.MustNew(ulid.Now(), rand.Reader))
+			leaseID, err := q.renewAccountLease(ctx, *guaranteedCapacity, 2*time.Second, ulid.MustNew(ulid.Now(), rand.Reader))
 			require.ErrorContains(t, err, "lease not found")
 			require.Nil(t, leaseID)
 		})
