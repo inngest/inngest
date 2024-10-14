@@ -2074,13 +2074,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	}
 
 	var potentiallyMissingPartitions, allPartitionIds []any
-	var totalItemCount int64 // number of items stored in partition ZSET
 	if len(returnedSet) == 3 {
-		totalItemCount, ok = returnedSet[0].(int64)
-		if !ok {
-			return nil, fmt.Errorf("unexpected first item in set returned from partitionPeek: %T", peekRet)
-		}
-
 		potentiallyMissingPartitions, ok = returnedSet[1].([]any)
 		if !ok {
 			return nil, fmt.Errorf("unexpected second item in set returned from partitionPeek: %T", peekRet)
@@ -2119,7 +2113,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	items := make([]*QueuePartition, len(encoded))
 	fnIDs := make(map[uuid.UUID]bool)
 	fnIDsMu := sync.Mutex{}
- 
+
 	// Use parallel decoding as per Peek
 	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueuePartition, error) {
 		if val == nil {
