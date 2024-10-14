@@ -380,7 +380,7 @@ func WithClock(c clockwork.Clock) func(q *queue) {
 	}
 }
 
-type ShardSelector func(ctx context.Context, i osqueue.QueueItem) osqueue.Enqueuer
+type ShardSelector func(ctx context.Context, i osqueue.QueueItem) (string, osqueue.Enqueuer)
 
 func WithShardSelector(s ShardSelector) func(q *queue) {
 	return func(q *queue) {
@@ -490,8 +490,8 @@ func NewQueue(primaryQueueClient *QueueClient, opts ...QueueOpt) *queue {
 	q.enqueuer = NewRedisEnqueuer(q, primaryQueueClient)
 
 	// default to using primary queue client for shard selection
-	q.shardSelector = func(_ context.Context, _ osqueue.QueueItem) osqueue.Enqueuer {
-		return q.enqueuer
+	q.shardSelector = func(_ context.Context, _ osqueue.QueueItem) (string, osqueue.Enqueuer) {
+		return "default", q.enqueuer
 	}
 
 	for _, opt := range opts {
@@ -504,14 +504,22 @@ func NewQueue(primaryQueueClient *QueueClient, opts ...QueueOpt) *queue {
 	return q
 }
 
+func WithQueueShardName(name string) QueueOpt {
+	return func(q *queue) {
+		q.queueShardName = name
+	}
+}
+
 type queue struct {
 	// name is the identifiable name for this worker, for logging.
 	name string
 
 	// primaryQueueClient stores the redis connection to use.
 	primaryQueueClient *QueueClient
-	shardSelector      ShardSelector
-	enqueuer           osqueue.Enqueuer
+	queueShardName     string
+
+	shardSelector ShardSelector
+	enqueuer      osqueue.Enqueuer
 
 	ppf PartitionPriorityFinder
 	apf AccountPriorityFinder
@@ -2517,9 +2525,9 @@ func (q *queue) Instrument(ctx context.Context) error {
 			q.logger.Error().Err(err).Msg("error retrieving guaranteedCapacityMap")
 		}
 
-		metrics.GaugeQueueGuaranteedCapacityCount(ctx, int64(len(guaranteedCapacityMap)), metrics.GaugeOpt{PkgName: pkgName})
+		metrics.GaugeQueueGuaranteedCapacityCount(ctx, int64(len(guaranteedCapacityMap)), metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.queueShardName}})
 		for _, guaranteedCapacity := range guaranteedCapacityMap {
-			tags := map[string]any{"account_id": guaranteedCapacity.AccountID}
+			tags := map[string]any{"account_id": guaranteedCapacity.AccountID, "queue_shard": q.queueShardName}
 
 			metrics.GaugeQueueAccountGuaranteedCapacityCount(ctx, int64(guaranteedCapacity.GuaranteedCapacity), metrics.GaugeOpt{
 				PkgName: pkgName,
@@ -2585,7 +2593,8 @@ func (q *queue) Instrument(ctx context.Context) error {
 					PkgName: pkgName,
 					Tags: map[string]any{
 						// NOTE: potentially high cardinality but this gives better clarify of stuff
-						"partition": pkey,
+						"partition":   pkey,
+						"queue_shard": q.queueShardName,
 					},
 				})
 
@@ -2604,6 +2613,9 @@ func (q *queue) Instrument(ctx context.Context) error {
 	// instrument the total count of global partition
 	metrics.GaugeGlobalPartitionSize(ctx, atomic.LoadInt64(&total), metrics.GaugeOpt{
 		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": q.queueShardName,
+		},
 	})
 
 	wg.Wait()
