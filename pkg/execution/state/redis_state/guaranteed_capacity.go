@@ -20,9 +20,9 @@ import (
 var (
 	// GuaranteedCapacityTickTime is the duration in which we periodically check guaranteed capacity for
 	// lease information, etc.
-	GuaranteedCapacityTickTime = 15 * time.Second
+	GuaranteedCapacityTickTime = 30 * time.Second
 	// AccountLeaseTime is how long accounts with guaranteed capacity are leased.
-	AccountLeaseTime = 10 * time.Second
+	AccountLeaseTime = 20 * time.Second
 
 	maxAccountLeaseAttempts = 10
 
