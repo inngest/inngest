@@ -392,6 +392,12 @@ func WithShardSelector(s ShardSelector) func(q *queue) {
 	}
 }
 
+func WithPeekEWMA(on bool) func(q *queue) {
+	return func(q *queue) {
+		q.usePeekEWMA = on
+	}
+}
+
 // QueueItemConcurrencyKeyLimitRefresher returns concurrency keys with current limits given a queue item.
 //
 // Each queue item can have its own concurrency keys.  For example, you can define
@@ -555,6 +561,8 @@ type queue struct {
 	// peek min & max sets the range for partitions to peek for items
 	peekMin int64
 	peekMax int64
+	// usePeekEWMA specifies whether we should use EWMA for peeking.
+	usePeekEWMA bool
 	// peekCurrMultiplier is a multiplier used for calculating the dynamic peek size
 	// based on the EWMA values
 	peekCurrMultiplier int64
