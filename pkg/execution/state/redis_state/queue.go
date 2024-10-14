@@ -171,7 +171,7 @@ type AccountPriorityFinder func(ctx context.Context, accountId uuid.UUID) uint
 //
 // NOTE: This is called frequently:  for every enqueue, lease, partition lease, and so on.
 // Expect this to be called tens of thousands of times per second.
-type GuaranteedCapacityFinder func(ctx context.Context, accountId uuid.UUID) *GuaranteedCapacity
+type GuaranteedCapacityFinder func(ctx context.Context, queueShardName string, accountId uuid.UUID) *GuaranteedCapacity
 
 type QueueOpt func(q *queue)
 

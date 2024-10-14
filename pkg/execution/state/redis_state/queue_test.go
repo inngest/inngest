@@ -3902,7 +3902,7 @@ func TestGuaranteedCapacity(t *testing.T) {
 		require.NoError(t, err)
 		ctx := context.Background()
 
-		sf := func(ctx context.Context, accountId uuid.UUID) *GuaranteedCapacity {
+		sf := func(ctx context.Context, _ string, accountId uuid.UUID) *GuaranteedCapacity {
 			if !enableGuaranteedCapacity {
 				return nil
 			}
@@ -3920,7 +3920,7 @@ func TestGuaranteedCapacity(t *testing.T) {
 			}),
 			WithGuaranteedCapacityFinder(sf),
 		)
-		require.NotNil(t, sf(ctx, accountId))
+		require.NotNil(t, sf(ctx, "", accountId))
 
 		empty := q1.getAccountLeases()
 		require.Len(t, empty, 0, "expected leases to be empty")
@@ -4403,7 +4403,7 @@ func TestAccountLease(t *testing.T) {
 	defer rc.Close()
 	ctx := context.Background()
 
-	sf := func(ctx context.Context, accountId uuid.UUID) *GuaranteedCapacity {
+	sf := func(ctx context.Context, _ string, accountId uuid.UUID) *GuaranteedCapacity {
 		return &GuaranteedCapacity{
 			Scope:              enums.GuaranteedCapacityScopeAccount,
 			AccountID:          accountId,
@@ -4413,7 +4413,7 @@ func TestAccountLease(t *testing.T) {
 	q := NewQueue(NewQueueClient(rc, QueueDefaultKey), WithGuaranteedCapacityFinder(sf))
 
 	t.Run("Leasing an account without guaranteed capacity fails", func(t *testing.T) {
-		shard := sf(ctx, uuid.UUID{})
+		shard := sf(ctx, "", uuid.UUID{})
 		leaseID, err := q.acquireAccountLease(ctx, *shard, 2*time.Second, 1)
 		require.Nil(t, leaseID, "Got lease ID: %v", leaseID)
 		require.NotNil(t, err)
@@ -4440,7 +4440,7 @@ func TestAccountLease(t *testing.T) {
 	t.Run("Leasing out-of-bounds fails", func(t *testing.T) {
 		// At the beginning, no shards have been leased.  Leasing a shard
 		// with an index of >= 1 should fail.
-		guaranteedCapacity := sf(ctx, idA)
+		guaranteedCapacity := sf(ctx, "", idA)
 		leaseID, err := q.acquireAccountLease(ctx, *guaranteedCapacity, 2*time.Second, 1)
 		require.Nil(t, leaseID, "Got lease ID: %v", leaseID)
 		require.NotNil(t, err)
@@ -4448,7 +4448,7 @@ func TestAccountLease(t *testing.T) {
 	})
 
 	t.Run("Leasing an account works", func(t *testing.T) {
-		shard := sf(ctx, idA)
+		shard := sf(ctx, "", idA)
 
 		t.Run("Basic lease", func(t *testing.T) {
 			leaseID, err := q.acquireAccountLease(ctx, *shard, 1*time.Second, 0)
@@ -4483,7 +4483,7 @@ func TestAccountLease(t *testing.T) {
 
 		t.Run("Leasing a second account works", func(t *testing.T) {
 			// Try another shard name with an index of 0.
-			leaseID, err := q.acquireAccountLease(ctx, *sf(ctx, idB), 2*time.Second, 0)
+			leaseID, err := q.acquireAccountLease(ctx, *sf(ctx, "", idB), 2*time.Second, 0)
 			require.NotNil(t, leaseID)
 			require.Nil(t, err)
 		})
@@ -4496,7 +4496,7 @@ func TestAccountLease(t *testing.T) {
 		_, err = q.enqueuer.EnqueueItem(ctx, osqueue.QueueItem{WorkspaceID: idA, Data: osqueue.Item{Identifier: state.Identifier{AccountID: idA}}}, time.Now())
 		require.Nil(t, err)
 
-		guaranteedCapacity := sf(ctx, idA)
+		guaranteedCapacity := sf(ctx, "", idA)
 		leaseID, err := q.acquireAccountLease(ctx, *guaranteedCapacity, 1*time.Second, 0)
 		require.NotNil(t, leaseID, "could not lease account", r.Dump())
 		require.Nil(t, err)
