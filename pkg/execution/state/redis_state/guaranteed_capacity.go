@@ -354,21 +354,22 @@ func (q *queue) claimUnleasedGuaranteedCapacity(ctx context.Context, scanTickTim
 					go func(ls leasedAccount) {
 						nextLeaseID, err := q.renewAccountLease(ctx, ls.GuaranteedCapacity, AccountLeaseTime, ls.Lease)
 						if err != nil {
+							// Renewing a lease should never fail, unless guaranteed capacity was removed.
+							// We must stop holding on to the account in any case.
+							q.removeLeasedAccount(ls.GuaranteedCapacity)
+
 							// If guaranteed capacity was removed, we can remove the internal lease state
 							if errors.Is(err, errGuaranteedCapacityNotFound) {
-								q.removeLeasedAccount(ls.GuaranteedCapacity)
 								return
 							}
 
 							// If our lease was stolen, play nice and remove the leased account
 							if errors.Is(err, errGuaranteedCapacityLeaseNotFound) {
 								q.logger.Warn().Interface("lease", ls).Msg("giving up lease since it was removed in the backing store")
-
-								q.removeLeasedAccount(ls.GuaranteedCapacity)
 								return
 							}
 
-							q.logger.Error().Err(err).Msg("error renewing account lease")
+							q.logger.Error().Interface("lease", ls).Err(err).Msg("error renewing account lease")
 							return
 						}
 						q.logger.Debug().Interface("account", ls).Msg("renewed account lease")
