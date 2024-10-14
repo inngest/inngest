@@ -4407,7 +4407,7 @@ func TestAccountLease(t *testing.T) {
 		return &GuaranteedCapacity{
 			Scope:              enums.GuaranteedCapacityScopeAccount,
 			AccountID:          accountId,
-			GuaranteedCapacity: 1,
+			GuaranteedCapacity: 2,
 		}
 	}
 	q := NewQueue(NewQueueClient(rc, QueueDefaultKey), WithGuaranteedCapacityFinder(sf))
@@ -4417,7 +4417,7 @@ func TestAccountLease(t *testing.T) {
 		leaseID, err := q.acquireAccountLease(ctx, *shard, 2*time.Second, 1)
 		require.Nil(t, leaseID, "Got lease ID: %v", leaseID)
 		require.NotNil(t, err)
-		require.ErrorContains(t, err, "guaranteed capacity not found")
+		require.ErrorIs(t, err, errGuaranteedCapacityNotFound)
 	})
 
 	// Ensure guaranteed capacity exists
@@ -4444,7 +4444,7 @@ func TestAccountLease(t *testing.T) {
 		leaseID, err := q.acquireAccountLease(ctx, *guaranteedCapacity, 2*time.Second, 1)
 		require.Nil(t, leaseID, "Got lease ID: %v", leaseID)
 		require.NotNil(t, err)
-		require.ErrorContains(t, err, "lease index is too high", r.Dump())
+		require.ErrorIs(t, err, errGuaranteedCapacityIndexInvalid, r.Dump())
 	})
 
 	t.Run("Leasing an account works", func(t *testing.T) {
@@ -4458,7 +4458,7 @@ func TestAccountLease(t *testing.T) {
 
 		t.Run("Leasing a subsequent index works", func(t *testing.T) {
 			leaseID, err := q.acquireAccountLease(ctx, *shard, 8*time.Second, 1) // Same length as the lease below, after wait
-			require.NotNil(t, leaseID, "Didn't get a lease ID for a secondary lease")
+			require.NotNil(t, leaseID, "Didn't get a lease ID for a secondary lease", r.Dump())
 			require.Nil(t, err)
 		})
 
