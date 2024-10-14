@@ -39,6 +39,12 @@ type APIServiceOptions struct {
 	// from an app. If this is set, only keys that match one of these values
 	// will be accepted.
 	LocalEventKeys []string
+
+	// requireKeys defines whether event and signing keys are required for the
+	// server to function. If this is true and signing keys are not defined,
+	// the server will still boot but core actions such as syncing, runs, and
+	// ingesting events will not work.
+	RequireKeys bool
 }
 
 func NewService(opts APIServiceOptions) service.Service {
@@ -46,6 +52,7 @@ func NewService(opts APIServiceOptions) service.Service {
 		config:         opts.Config,
 		mounts:         opts.Mounts,
 		localEventKeys: opts.LocalEventKeys,
+		requireKeys:    opts.RequireKeys,
 	}
 }
 
@@ -60,6 +67,12 @@ type apiServer struct {
 	// from an app. If this is set, only keys that match one of these values
 	// will be accepted.
 	localEventKeys []string
+
+	// requireKeys defines whether event and signing keys are required for the
+	// server to function. If this is true and signing keys are not defined,
+	// the server will still boot but core actions such as syncing, runs, and
+	// ingesting events will not work.
+	requireKeys bool
 }
 
 func (a *apiServer) Name() string {
@@ -74,6 +87,7 @@ func (a *apiServer) Pre(ctx context.Context) error {
 		Logger:         logger.From(ctx),
 		EventHandler:   a.handleEvent,
 		LocalEventKeys: a.localEventKeys,
+		RequireKeys:    a.requireKeys,
 	})
 	if err != nil {
 		return err
