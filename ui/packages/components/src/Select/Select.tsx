@@ -91,9 +91,13 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 );
 Button.displayName = 'Button';
 
-function Options({ children, as: Component }: React.PropsWithChildren<{ as: React.ElementType }>) {
+function Options({
+  children,
+  as: Component,
+  className,
+}: React.PropsWithChildren<{ as: React.ElementType; className?: string }>) {
   return (
-    <Component className="absolute z-10 mt-1 min-w-max">
+    <Component className={cn('absolute z-10 mt-1 min-w-max', className)}>
       <div className="border-muted bg-surfaceBase z-10 overflow-hidden rounded-md border py-1 drop-shadow-lg">
         {children}
       </div>
@@ -185,7 +189,9 @@ function Footer({
 Select.Button = forwardRef<HTMLButtonElement, Omit<ButtonProps, 'as'>>((props, ref) => (
   <Button {...props} ref={ref} as={Listbox.Button} />
 ));
-Select.Options = (props: React.PropsWithChildren) => <Options {...props} as={Listbox.Options} />;
+Select.Options = (props: React.PropsWithChildren<{ className?: string }>) => (
+  <Options {...props} as={Listbox.Options} />
+);
 Select.Option = (props: React.PropsWithChildren<{ option: Option }>) => (
   <Option {...props} as={Listbox.Option} />
 );
@@ -252,7 +258,7 @@ function Search<T>({ ...props }: ComboboxInputProps<'input', T>) {
 SelectWithSearch.Button = forwardRef<HTMLButtonElement, Omit<ButtonProps, 'as'>>((props, ref) => (
   <Button {...props} ref={ref} as={Combobox.Button} />
 ));
-SelectWithSearch.Options = (props: React.PropsWithChildren) => (
+SelectWithSearch.Options = (props: React.PropsWithChildren<{ className?: string }>) => (
   <Options {...props} as={Combobox.Options} />
 );
 SelectWithSearch.Option = (props: React.PropsWithChildren<{ option: Option }>) => (
