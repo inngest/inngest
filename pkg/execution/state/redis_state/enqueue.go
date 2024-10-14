@@ -69,7 +69,7 @@ func (r redisEnqueuer) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at 
 		// capacity configured, this will return nil, and we will remove any leftover
 		// items in the guaranteed capacity map
 		// Note: This function is called _a lot_ so the calls should be memoized.
-		guaranteedCapacity = r.q.gcf(ctx, i.Data.Identifier.AccountID)
+		guaranteedCapacity = r.q.gcf(ctx, r.q.queueShardName, i.Data.Identifier.AccountID)
 		if guaranteedCapacity != nil {
 			guaranteedCapacity.Leases = []ulid.ULID{}
 			guaranteedCapacityKey = guaranteedCapacity.Key()

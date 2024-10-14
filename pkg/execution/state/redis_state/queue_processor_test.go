@@ -281,7 +281,7 @@ func TestQueueRunExtended(t *testing.T) {
 	GuaranteedCapacityTickTime = 5 * time.Second
 	AccountLeaseTime = 5 * time.Second
 
-	sf := func(ctx context.Context, accountId uuid.UUID) *GuaranteedCapacity {
+	sf := func(ctx context.Context, _ string, accountId uuid.UUID) *GuaranteedCapacity {
 		// For nil UUIDs, return a shard.
 		if accountId == uuid.Nil {
 			return &GuaranteedCapacity{
@@ -879,7 +879,7 @@ func TestQueueRunGuaranteedCapacity(t *testing.T) {
 	priorityAccountId, regularAccountId := uuid.New(), uuid.New()
 	priorityFn, regularFn := uuid.New(), uuid.New()
 
-	sf := func(ctx context.Context, accountId uuid.UUID) *GuaranteedCapacity {
+	sf := func(ctx context.Context, _ string, accountId uuid.UUID) *GuaranteedCapacity {
 		if accountId == priorityAccountId {
 			return &GuaranteedCapacity{
 				Scope:              enums.GuaranteedCapacityScopeAccount,
