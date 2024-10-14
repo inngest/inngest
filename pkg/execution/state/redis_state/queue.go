@@ -487,19 +487,19 @@ func NewQueue(primaryQueueClient *QueueClient, opts ...QueueOpt) *queue {
 		clock:                           clockwork.NewRealClock(),
 	}
 
-	for _, opt := range opts {
-		opt(q)
-	}
-
-	q.sem = &trackingSemaphore{Weighted: semaphore.NewWeighted(int64(q.numWorkers))}
-	q.workers = make(chan processItem, q.numWorkers)
-
 	q.enqueuer = NewRedisEnqueuer(q, primaryQueueClient)
 
 	// default to using primary queue client for shard selection
 	q.shardSelector = func(_ context.Context, _ osqueue.QueueItem) osqueue.Enqueuer {
 		return q.enqueuer
 	}
+
+	for _, opt := range opts {
+		opt(q)
+	}
+
+	q.sem = &trackingSemaphore{Weighted: semaphore.NewWeighted(int64(q.numWorkers))}
+	q.workers = make(chan processItem, q.numWorkers)
 
 	return q
 }
