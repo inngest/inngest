@@ -98,7 +98,7 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		},
 	})
 
-	qi := QueueItem{
+	qi := osqueue.QueueItem{
 		ID:          id,
 		AtMS:        at.UnixMilli(),
 		WorkspaceID: item.WorkspaceID,
@@ -704,7 +704,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 	// to the worker, how long Redis takes to lease the item, etc.
 	fetch := q.clock.Now().Truncate(time.Second).Add(PartitionLookahead)
 
-	queue, err := duration(peekCtx, "peek", q.clock.Now(), func(ctx context.Context) ([]*QueueItem, error) {
+	queue, err := duration(peekCtx, "peek", q.clock.Now(), func(ctx context.Context) ([]*osqueue.QueueItem, error) {
 		peek := q.peekSize(ctx, p)
 		// NOTE: would love to instrument this value to see it over time per function but
 		// it's likely too high of a cardinality
@@ -784,7 +784,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 	return nil
 }
 
-func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *GuaranteedCapacity, f osqueue.RunFunc) error {
+func (q *queue) process(ctx context.Context, p QueuePartition, qi osqueue.QueueItem, s *GuaranteedCapacity, f osqueue.RunFunc) error {
 	var err error
 	leaseID := qi.LeaseID
 
@@ -1215,7 +1215,7 @@ func (t *trackingSemaphore) Release(n int64) {
 
 type processor struct {
 	partition          *QueuePartition
-	items              []*QueueItem
+	items              []*osqueue.QueueItem
 	guaranteedCapacity *GuaranteedCapacity
 
 	// queue is the queue that owns this processor.
@@ -1298,7 +1298,7 @@ func (p *processor) iterate(ctx context.Context) error {
 	return err
 }
 
-func (p *processor) process(ctx context.Context, item *QueueItem) error {
+func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error {
 	// TODO: Create an in-memory mapping of rate limit keys that have been hit,
 	//       and don't bother to process if the queue item has a limited key.  This
 	//       lessens work done in the queue, as we can `continue` immediately.

@@ -116,7 +116,7 @@ func TestQueueRunBasic(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	idA, idB, accountId := uuid.New(), uuid.New(), uuid.New()
-	items := []QueueItem{
+	items := []osqueue.QueueItem{
 		{
 			FunctionID: idA,
 			Data: osqueue.Item{
@@ -208,7 +208,7 @@ func TestQueueRunRetry(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	idA, accountId := uuid.New(), uuid.New()
-	items := []QueueItem{
+	items := []osqueue.QueueItem{
 		{
 			FunctionID: idA,
 			Data: osqueue.Item{
@@ -391,7 +391,7 @@ func TestQueueRunExtended(t *testing.T) {
 						id = uuid.UUID{}
 					}
 
-					item := QueueItem{
+					item := osqueue.QueueItem{
 						FunctionID:  id,
 						WorkspaceID: id,
 					}
@@ -578,7 +578,7 @@ func TestQueueAllowList(t *testing.T) {
 	}()
 
 	accountId := uuid.New()
-	items := []QueueItem{
+	items := []osqueue.QueueItem{
 		{
 			QueueName: &allowedQueueName,
 			ID:        "i1",
@@ -631,7 +631,7 @@ func TestQueueAllowList(t *testing.T) {
 	<-time.After(time.Second)
 
 	// Assert queue items have been dequeued, and peek is nil for workflows.
-	val := r.HGet(q.u.kg.QueueItem(), HashID(context.Background(), "i1"))
+	val := r.HGet(q.u.kg.QueueItem(), osqueue.HashID(context.Background(), "i1"))
 	require.Equal(t, "", val)
 
 	// No more items in system partition
@@ -692,7 +692,7 @@ func TestQueueDenyList(t *testing.T) {
 	}()
 
 	accountId := uuid.New()
-	items := []QueueItem{
+	items := []osqueue.QueueItem{
 		{
 			QueueName: &deniedQueueName,
 			ID:        "i1",
@@ -746,7 +746,7 @@ func TestQueueDenyList(t *testing.T) {
 	// Assert queue items have been dequeued, and peek is nil for workflows.
 
 	// Assert queue items have been dequeued, and peek is nil for workflows.
-	qi := getQueueItem(t, r, HashID(context.Background(), "i1"))
+	qi := getQueueItem(t, r, osqueue.HashID(context.Background(), "i1"))
 	require.Equal(t, *qi.QueueName, "denied")
 
 	// No more items in system partition
@@ -793,7 +793,7 @@ func TestQueueRunAccount(t *testing.T) {
 	idA, idB := uuid.New(), uuid.New()
 	accountIdA, accountIdB := uuid.New(), uuid.New()
 
-	items := []QueueItem{
+	items := []osqueue.QueueItem{
 		{
 			FunctionID: idA,
 			Data: osqueue.Item{
@@ -921,7 +921,7 @@ func TestQueueRunGuaranteedCapacity(t *testing.T) {
 	}()
 
 	// ensure guaranteed capacity exists
-	_, err = q.EnqueueItem(ctx, QueueItem{
+	_, err = q.EnqueueItem(ctx, osqueue.QueueItem{
 		FunctionID: priorityFn,
 		Data: osqueue.Item{
 			Kind:        osqueue.KindEdge,
@@ -942,7 +942,7 @@ func TestQueueRunGuaranteedCapacity(t *testing.T) {
 	require.Equal(t, 1, len(currentLeases), "number of leased accounts does not match")
 	require.Equal(t, priorityAccountId, currentLeases[0].GuaranteedCapacity.AccountID)
 
-	items := []QueueItem{
+	items := []osqueue.QueueItem{
 		{
 			FunctionID: priorityFn,
 			Data: osqueue.Item{

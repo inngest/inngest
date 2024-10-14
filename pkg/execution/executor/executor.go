@@ -505,12 +505,12 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	//
 	var throttle *queue.Throttle
 	if req.Function.Throttle != nil {
-		throttleKey := redis_state.HashID(ctx, req.Function.ID.String())
+		throttleKey := queue.HashID(ctx, req.Function.ID.String())
 		if req.Function.Throttle.Key != nil {
 			val, _, _ := expressions.Evaluate(ctx, *req.Function.Throttle.Key, map[string]any{
 				"event": evtMap,
 			})
-			throttleKey = throttleKey + "-" + redis_state.HashID(ctx, fmt.Sprintf("%v", val))
+			throttleKey = throttleKey + "-" + queue.HashID(ctx, fmt.Sprintf("%v", val))
 		}
 		throttle = &queue.Throttle{
 			Key:    throttleKey,
@@ -1023,7 +1023,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 		}
 
 		for _, j := range jobs {
-			qi, _ := j.Raw.(*redis_state.QueueItem)
+			qi, _ := j.Raw.(*queue.QueueItem)
 			if qi == nil {
 				continue
 			}
@@ -1735,8 +1735,8 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		// And dequeue the timeout job to remove unneeded work from the queue, etc.
 		if q, ok := e.queue.(redis_state.QueueManager); ok {
 			jobID := fmt.Sprintf("%s-%s", md.IdempotencyKey(), pause.DataKey)
-			err := q.Dequeue(ctx, redis_state.QueueItem{
-				ID:         redis_state.HashID(ctx, jobID),
+			err := q.Dequeue(ctx, queue.QueueItem{
+				ID:         queue.HashID(ctx, jobID),
 				FunctionID: md.ID.FunctionID,
 				Data: queue.Item{
 					Kind: queue.KindPause,
