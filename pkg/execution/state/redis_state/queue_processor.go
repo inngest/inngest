@@ -760,8 +760,10 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 
 	}
 
-	if err := q.setPeekEWMA(ctx, p.FunctionID, int64(iter.ctrConcurrency+iter.ctrRateLimit)); err != nil {
-		log.From(ctx).Warn().Err(err).Msg("error recording concurrency limit for EWMA")
+	if q.usePeekEWMA {
+		if err := q.setPeekEWMA(ctx, p.FunctionID, int64(iter.ctrConcurrency+iter.ctrRateLimit)); err != nil {
+			log.From(ctx).Warn().Err(err).Msg("error recording concurrency limit for EWMA")
+		}
 	}
 
 	// If we've hit concurrency issues OR we've only hit rate limit issues, re-enqueue the partition
@@ -1073,7 +1075,14 @@ func (q *queue) capacity() int64 {
 // 1. EWMA of concurrency limit hits
 // 2. configured min, max of peek size range
 // 3. worker capacity
-func (q *queue) peekSize(_ context.Context, _ *QueuePartition) int64 {
+func (q *queue) peekSize(ctx context.Context, p *QueuePartition) int64 {
+	if q.usePeekEWMA {
+		return q.ewmaPeekSize(ctx, p)
+	}
+	return q.peekSizeRandom(ctx, p)
+}
+
+func (q *queue) peekSizeRandom(_ context.Context, _ *QueuePartition) int64 {
 	// set ranges
 	pmin := q.peekMin
 	if pmin == 0 {
@@ -1085,7 +1094,7 @@ func (q *queue) peekSize(_ context.Context, _ *QueuePartition) int64 {
 	}
 
 	// Take a random amount between our range.
-	size := int64(rand.Intn(int(pmax-pmin))) + q.peekMin
+	size := int64(rand.Intn(int(pmax-pmin))) + pmin
 	// Limit to capacity
 	cap := q.capacity()
 	if size > cap {
