@@ -19,7 +19,6 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/jonboulle/clockwork"
@@ -153,8 +152,8 @@ type QueueManager interface {
 	osqueue.JobQueueReader
 	osqueue.Queue
 
-	Dequeue(ctx context.Context, i QueueItem) error
-	Requeue(ctx context.Context, i QueueItem, at time.Time) error
+	Dequeue(ctx context.Context, i osqueue.QueueItem) error
+	Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time) error
 	RequeueByJobID(ctx context.Context, jobID string, at time.Time) error
 }
 
@@ -212,7 +211,7 @@ func WithIdempotencyTTL(t time.Duration) QueueOpt {
 
 // WithIdempotencyTTLFunc returns custom idempotecy durations given a QueueItem.
 // This allows customization of the idempotency TTL based off of specific jobs.
-func WithIdempotencyTTLFunc(f func(context.Context, QueueItem) time.Duration) QueueOpt {
+func WithIdempotencyTTLFunc(f func(context.Context, osqueue.QueueItem) time.Duration) QueueOpt {
 	return func(q *queue) {
 		q.idempotencyTTLFunc = f
 	}
@@ -386,7 +385,7 @@ func WithClock(c clockwork.Clock) func(q *queue) {
 // Each queue item can have its own concurrency keys.  For example, you can define
 // concurrency limits for steps within a function.  This ensures that there will never be
 // more than N concurrent items running at once.
-type QueueItemConcurrencyKeyLimitRefresher func(ctx context.Context, i QueueItem) []state.CustomConcurrency
+type QueueItemConcurrencyKeyLimitRefresher func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency
 
 type PartitionConcurrencyLimits struct {
 	// AccountLimit returns the current account concurrency limit, which is always applied. Defaults to maximum concurrency.
@@ -467,7 +466,7 @@ func NewQueue(u *QueueClient, opts ...QueueOpt) *queue {
 				PartitionLimit: def,
 			}
 		},
-		customConcurrencyLimitRefresher: func(ctx context.Context, item QueueItem) []state.CustomConcurrency {
+		customConcurrencyLimitRefresher: func(ctx context.Context, item osqueue.QueueItem) []state.CustomConcurrency {
 			// No-op: Use whatever's in the queue item by default
 			return item.Data.GetConcurrencyKeys()
 		},
@@ -512,7 +511,7 @@ type queue struct {
 	idempotencyTTL time.Duration
 	// idempotencyTTLFunc returns an time.Duration representing how long job IDs
 	// remain idempotent.
-	idempotencyTTLFunc func(context.Context, QueueItem) time.Duration
+	idempotencyTTLFunc func(context.Context, osqueue.QueueItem) time.Duration
 	// pollTick is the interval between each scan for jobs.
 	pollTick time.Duration
 	// quit is a channel that any method can send on to trigger termination
@@ -622,7 +621,7 @@ type QueueRunMode struct {
 // keys to extend leases and dequeue.
 type processItem struct {
 	P QueuePartition
-	I QueueItem
+	I osqueue.QueueItem
 	G *GuaranteedCapacity
 }
 
@@ -828,116 +827,11 @@ func (q QueuePartition) MarshalBinary() ([]byte, error) {
 	return json.Marshal(q)
 }
 
-// QueueItem represents an individually queued work scheduled for some time in the
-// future.
-type QueueItem struct {
-	// ID represents a unique identifier for the queue item.  This can be any
-	// unique string and will be hashed.  Using the same ID provides idempotency
-	// guarantees within the queue's IdempotencyTTL.
-	ID string `json:"id"`
-	// EarliestPeekTime stores the earliest time that the job was peeked as a
-	// millisecond epoch timestamp.
-	//
-	// This lets us easily track sojourn latency.
-	EarliestPeekTime int64 `json:"pt,omitempty"`
-	// AtMS represents the score for the queue item - usually, the current time
-	// that this QueueItem needs to be executed at, as a millisecond epoch.
-	//
-	// Note that due to priority factors and function FIFO manipulation, if we're
-	// scheduling a job to run at `Now()` AtMS may be a time in the past to bump
-	// the item in the queue.
-	//
-	// This is necessary for rescoring partitions and checking latencies.
-	AtMS int64 `json:"at"`
-
-	// WallTimeMS represents the actual wall time in which the job should run, used to
-	// check latencies.  This is NOT used for scoring or ordering and is for internal
-	// accounting only.
-	//
-	// This is set when enqueueing or requeueing a job.
-	WallTimeMS int64 `json:"wt"`
-
-	// FunctionID is the workflow ID that this job belongs to.
-	FunctionID uuid.UUID `json:"wfID"`
-	// WorkspaceID is the workspace that this job belongs to.
-	WorkspaceID uuid.UUID `json:"wsID"`
-	// LeaseID is a ULID which embeds a timestamp denoting when the lease expires.
-	LeaseID *ulid.ULID `json:"leaseID,omitempty"`
-	// Data represents the enqueued data, eg. the edge to process or the pause
-	// to resume.
-	Data osqueue.Item `json:"data"`
-	// QueueName allows placing this job into a specific queue name. This is exclusively
-	// used for system-specific queues for handling pauses, recovery, and other features.
-	// If unset, the workflow-specific partitions for key queues will be used.
-	//
-	// This should almost always be nil.
-	QueueName *string `json:"queueID,omitempty"`
-	// IdempotencyPerioud allows customizing the idempotency period for this queue
-	// item.  For example, after a debounce queue has been consumed we want to remove
-	// the idempotency key immediately;  the same debounce key should become available
-	// for another debounced function run.
-	IdempotencyPeriod *time.Duration `json:"ip,omitempty"`
-}
-
-func (q *QueueItem) SetID(ctx context.Context, str string) {
-	q.ID = HashID(ctx, str)
-}
-
-// Score returns the score (time that the item should run) for the queue item.
-//
-// NOTE: In order to prioritize finishing older function runs with a busy function
-// queue, we sometimes use the function run's "started at" time to enqueue edges which
-// run steps.  This lets us push older function steps to the beginning of the queue,
-// ensuring they run before other newer function runs.
-//
-// We can ONLY do this for the first attempt, and we can ONLY do this for edges that
-// are not sleeps (eg. immediate runs)
-func (q QueueItem) Score(now time.Time) int64 {
-	if now.IsZero() {
-		now = time.Now()
-	}
-
-	// If this is not a start/simple edge/edge error, we can ignore this.
-	if (q.Data.Kind != osqueue.KindStart &&
-		q.Data.Kind != osqueue.KindEdge &&
-		q.Data.Kind != osqueue.KindEdgeError) || q.Data.Attempt > 0 {
-		return q.AtMS
-	}
-
-	// If this is > 2 seconds in the future, don't mess with the time.
-	// This prevents any accidental fudging of future run times, even if the
-	// kind is edge (which should never exist... but, better to be safe).
-	if q.AtMS > now.Add(consts.FutureAtLimit).UnixMilli() {
-		return q.AtMS
-	}
-
-	// Get the time for the function, based off of the run ID.
-	startAt := int64(q.Data.Identifier.RunID.Time())
-
-	if startAt == 0 {
-		return q.AtMS
-	}
-
-	// Remove the PriorityFactor from the time to push higher priority work
-	// earlier.
-	return startAt - q.Data.GetPriorityFactor()
-}
-
-func (q QueueItem) MarshalBinary() ([]byte, error) {
-	return json.Marshal(q)
-}
-
-// IsLeased checks if the QueueItem is currently already leased or not
-// based on the time passed in.
-func (q QueueItem) IsLeased(time time.Time) bool {
-	return q.LeaseID != nil && ulid.Time(q.LeaseID.Time()).After(time)
-}
-
 // ItemPartitions returns up 3 item partitions for a given queue item, as well as the account concurrency limit.
 // Note: Currently, we only ever return 2 partitions (2x custom concurrency keys or function + custom concurrency key)
 // Note: For backwards compatibility, we may return a third partition for the function itself, in case two custom concurrency keys are used.
 // This will change with the implementation of throttling key queues.
-func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) ([]QueuePartition, int) {
+func (q *queue) ItemPartitions(ctx context.Context, i osqueue.QueueItem) ([]QueuePartition, int) {
 	var (
 		partitions []QueuePartition
 		ckeys      = i.Data.GetConcurrencyKeys()
@@ -1109,7 +1003,7 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 		if len(str) == 0 {
 			continue
 		}
-		qi := &QueueItem{}
+		qi := &osqueue.QueueItem{}
 
 		if err := json.Unmarshal([]byte(str), qi); err != nil {
 			return nil, fmt.Errorf("error unmarshalling queue item: %w", err)
@@ -1256,13 +1150,13 @@ func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID
 // will be created for the queue item.
 //
 // The queue score must be added in milliseconds to process sub-second items in order.
-func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (QueueItem, error) {
+func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Time) (osqueue.QueueItem, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "EnqueueItem"), redis_telemetry.ScopeQueue)
 
 	if len(i.ID) == 0 {
 		i.SetID(ctx, ulid.MustNew(ulid.Now(), rnd).String())
 	} else {
-		i.ID = HashID(ctx, i.ID)
+		i.ID = osqueue.HashID(ctx, i.ID)
 	}
 
 	// XXX: If the length of ID >= max, error.
@@ -1399,7 +1293,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 //
 // If limit is -1, this will return the first unleased item - representing the next available item in the
 // queue.
-func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*QueueItem, error) {
+func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*osqueue.QueueItem, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Peek"), redis_telemetry.ScopeQueue)
 
 	if partition == nil {
@@ -1512,11 +1406,11 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 		if err != nil {
 			return nil, err
 		}
-		return []*QueueItem{i}, nil
+		return []*osqueue.QueueItem{i}, nil
 	}
 
 	now := q.clock.Now()
-	return util.ParallelDecode(items, func(val any) (*QueueItem, error) {
+	return util.ParallelDecode(items, func(val any) (*osqueue.QueueItem, error) {
 		if val == nil {
 			q.logger.Error().Str("partition", partition.zsetKey(q.u.kg)).Msg("nil item value in peek response")
 			return nil, nil
@@ -1530,12 +1424,12 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 	})
 }
 
-func (q *queue) decodeQueueItemFromPeek(str string, now time.Time) (*QueueItem, error) {
+func (q *queue) decodeQueueItemFromPeek(str string, now time.Time) (*osqueue.QueueItem, error) {
 	if str == "" {
 		return nil, fmt.Errorf("received empty string in decode queue item from peek")
 	}
 
-	qi := &QueueItem{}
+	qi := &osqueue.QueueItem{}
 	if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), qi); err != nil {
 		return nil, fmt.Errorf("error unmarshalling peeked queue item: %w", err)
 	}
@@ -1555,10 +1449,10 @@ func (q *queue) decodeQueueItemFromPeek(str string, now time.Time) (*QueueItem, 
 func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RequeueByJobID"), redis_telemetry.ScopeQueue)
 
-	jobID = HashID(ctx, jobID)
+	jobID = osqueue.HashID(ctx, jobID)
 
 	// Find the queue item so that we can fetch the shard info.
-	i := QueueItem{}
+	i := osqueue.QueueItem{}
 	if err := q.u.unshardedRc.Do(ctx, q.u.unshardedRc.B().Hget().Key(q.u.kg.QueueItem()).Field(jobID).Build()).DecodeJSON(&i); err != nil {
 		return err
 	}
@@ -1637,7 +1531,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) 
 //
 // Obtaining a lease updates the vesting time for the queue item until now() +
 // lease duration. This returns the newly acquired lease ID on success.
-func (q *queue) Lease(ctx context.Context, item QueueItem, duration time.Duration, now time.Time, denies *leaseDenies) (*ulid.ULID, error) {
+func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, duration time.Duration, now time.Time, denies *leaseDenies) (*ulid.ULID, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Lease"), redis_telemetry.ScopeQueue)
 
 	if item.Data.Throttle != nil && denies != nil && denies.denyThrottle(item.Data.Throttle.Key) {
@@ -1787,7 +1681,7 @@ func (q *queue) Lease(ctx context.Context, item QueueItem, duration time.Duratio
 //
 // Renewing a lease updates the vesting time for the queue item until now() +
 // lease duration. This returns the newly acquired lease ID on success.
-func (q *queue) ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
+func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ExtendLease"), redis_telemetry.ScopeQueue)
 
 	newLeaseID, err := ulid.New(ulid.Timestamp(q.clock.Now().Add(duration).UTC()), rnd)
@@ -1848,7 +1742,7 @@ func (q *queue) ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID,
 }
 
 // Dequeue removes an item from the queue entirely.
-func (q *queue) Dequeue(ctx context.Context, i QueueItem) error {
+func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Dequeue"), redis_telemetry.ScopeQueue)
 
 	// Remove all items from all partitions.  For this, we need all partitions for
@@ -1928,7 +1822,7 @@ func (q *queue) Dequeue(ctx context.Context, i QueueItem) error {
 }
 
 // Requeue requeues an item in the future.
-func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
+func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Requeue"), redis_telemetry.ScopeQueue)
 
 	now := q.clock.Now()
@@ -2947,7 +2841,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 				continue
 			}
 
-			qi := QueueItem{}
+			qi := osqueue.QueueItem{}
 			if err := json.Unmarshal([]byte(item), &qi); err != nil {
 				resultErr = multierror.Append(resultErr, fmt.Errorf("error unmarshalling job '%s': %w", item, err))
 				continue
@@ -3112,11 +3006,6 @@ func (q *queue) readFnMetadata(ctx context.Context, fnID uuid.UUID) (*FnMetadata
 		return nil, fmt.Errorf("error reading function metadata: %w", err)
 	}
 	return &retv, nil
-}
-
-func HashID(_ context.Context, id string) string {
-	ui := xxhash.Sum64String(id)
-	return strconv.FormatUint(ui, 36)
 }
 
 // frandRNG is a fast crypto-secure prng which uses a mutex to guard
