@@ -112,7 +112,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     endTime: endTime ?? null,
     status: filteredStatus.length > 0 ? filteredStatus : null,
     timeField,
-    celQuery: search ? decodeURIComponent(search) : '',
+    celQuery: search,
   };
 
   const [firstPageRes, fetchFirstPage] = useQuery({

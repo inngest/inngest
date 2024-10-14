@@ -64,7 +64,7 @@ export default function Page() {
         endTime: endTime,
         status: filteredStatus,
         timeField,
-        celQuery: search ? decodeURIComponent(search) : '',
+        celQuery: search,
       });
 
       const edges = data.runs.edges.map((edge) => {
@@ -111,7 +111,7 @@ export default function Page() {
         endTime,
         status: filteredStatus,
         timeField,
-        celQuery: search ? decodeURIComponent(search) : '',
+        celQuery: search,
       });
       setTotalCount(data.runs.totalCount);
     })();

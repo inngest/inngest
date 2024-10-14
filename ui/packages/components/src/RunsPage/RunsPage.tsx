@@ -228,8 +228,7 @@ export function RunsPage({
     (value: string) => {
       scrollToTop();
       if (value.length > 0) {
-        const encodedValue = encodeURIComponent(value);
-        setSearch(encodedValue);
+        setSearch(value);
       } else {
         removeSearch();
       }
@@ -376,7 +375,7 @@ export function RunsPage({
             <CodeSearch
               onSearch={onSearchChange}
               placeholder="event.data.userId == “1234” or output.count > 10"
-              value={search ? decodeURIComponent(search) : ''}
+              value={search}
             />
           </>
         )}
