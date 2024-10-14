@@ -478,6 +478,11 @@ func (q *queue) addLeasedAccount(guaranteedCapacity GuaranteedCapacity, lease ul
 
 func (q *queue) removeLeasedAccount(guaranteedCapacity GuaranteedCapacity) {
 	q.accountLeaseLock.Lock()
+	defer q.accountLeaseLock.Unlock()
+
+	if len(q.accountLeases) == 0 {
+		return
+	}
 
 	filtered := make([]leasedAccount, len(q.accountLeases)-1)
 	skipped := 0
@@ -491,8 +496,6 @@ func (q *queue) removeLeasedAccount(guaranteedCapacity GuaranteedCapacity) {
 	}
 
 	q.accountLeases = filtered
-
-	q.accountLeaseLock.Unlock()
 }
 
 // filterUnleasedAccounts filters guaranteed capacities during assignment, removing any accounts that this worker
