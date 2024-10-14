@@ -25,16 +25,16 @@ export function Secret({ className, kind, secret }: Props) {
   return (
     <div
       className={cn(
-        'border-muted flex overflow-hidden rounded-md border bg-slate-50 text-slate-500',
+        'border-subtle bg-CanvasBase text-light flex overflow-hidden rounded-md border',
         className
       )}
     >
-      <div className="flex grow items-center truncate p-2 font-mono text-sm text-slate-500">
+      <div className="text-btnPrimary flex grow items-center truncate p-2 font-mono text-sm">
         <span className="grow truncate">{value}</span>
       </div>
 
       <RevealButton
-        className="border-muted border-r"
+        className="border-subtle border-r"
         isRevealed={isRevealed}
         onClick={() => setIsRevealed((prev) => !prev)}
       />

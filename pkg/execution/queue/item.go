@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"time"
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -41,6 +44,111 @@ func WithJobID(ctx context.Context, jobID string) context.Context {
 func JobIDFromContext(ctx context.Context) string {
 	str, _ := ctx.Value(jobCtxVal).(string)
 	return str
+}
+
+// QueueItem represents an individually queued work scheduled for some time in the
+// future.
+type QueueItem struct {
+	// ID represents a unique identifier for the queue item.  This can be any
+	// unique string and will be hashed.  Using the same ID provides idempotency
+	// guarantees within the queue's IdempotencyTTL.
+	ID string `json:"id"`
+	// EarliestPeekTime stores the earliest time that the job was peeked as a
+	// millisecond epoch timestamp.
+	//
+	// This lets us easily track sojourn latency.
+	EarliestPeekTime int64 `json:"pt,omitempty"`
+	// AtMS represents the score for the queue item - usually, the current time
+	// that this QueueItem needs to be executed at, as a millisecond epoch.
+	//
+	// Note that due to priority factors and function FIFO manipulation, if we're
+	// scheduling a job to run at `Now()` AtMS may be a time in the past to bump
+	// the item in the queue.
+	//
+	// This is necessary for rescoring partitions and checking latencies.
+	AtMS int64 `json:"at"`
+
+	// WallTimeMS represents the actual wall time in which the job should run, used to
+	// check latencies.  This is NOT used for scoring or ordering and is for internal
+	// accounting only.
+	//
+	// This is set when enqueueing or requeueing a job.
+	WallTimeMS int64 `json:"wt"`
+
+	// FunctionID is the workflow ID that this job belongs to.
+	FunctionID uuid.UUID `json:"wfID"`
+	// WorkspaceID is the workspace that this job belongs to.
+	WorkspaceID uuid.UUID `json:"wsID"`
+	// LeaseID is a ULID which embeds a timestamp denoting when the lease expires.
+	LeaseID *ulid.ULID `json:"leaseID,omitempty"`
+	// Data represents the enqueued data, eg. the edge to process or the pause
+	// to resume.
+	Data Item `json:"data"`
+	// QueueName allows placing this job into a specific queue name. This is exclusively
+	// used for system-specific queues for handling pauses, recovery, and other features.
+	// If unset, the workflow-specific partitions for key queues will be used.
+	//
+	// This should almost always be nil.
+	QueueName *string `json:"queueID,omitempty"`
+	// IdempotencyPerioud allows customizing the idempotency period for this queue
+	// item.  For example, after a debounce queue has been consumed we want to remove
+	// the idempotency key immediately;  the same debounce key should become available
+	// for another debounced function run.
+	IdempotencyPeriod *time.Duration `json:"ip,omitempty"`
+}
+
+func (q *QueueItem) SetID(ctx context.Context, str string) {
+	q.ID = HashID(ctx, str)
+}
+
+// Score returns the score (time that the item should run) for the queue item.
+//
+// NOTE: In order to prioritize finishing older function runs with a busy function
+// queue, we sometimes use the function run's "started at" time to enqueue edges which
+// run steps.  This lets us push older function steps to the beginning of the queue,
+// ensuring they run before other newer function runs.
+//
+// We can ONLY do this for the first attempt, and we can ONLY do this for edges that
+// are not sleeps (eg. immediate runs)
+func (q QueueItem) Score(now time.Time) int64 {
+	if now.IsZero() {
+		now = time.Now()
+	}
+
+	// If this is not a start/simple edge/edge error, we can ignore this.
+	if (q.Data.Kind != KindStart &&
+		q.Data.Kind != KindEdge &&
+		q.Data.Kind != KindEdgeError) || q.Data.Attempt > 0 {
+		return q.AtMS
+	}
+
+	// If this is > 2 seconds in the future, don't mess with the time.
+	// This prevents any accidental fudging of future run times, even if the
+	// kind is edge (which should never exist... but, better to be safe).
+	if q.AtMS > now.Add(consts.FutureAtLimit).UnixMilli() {
+		return q.AtMS
+	}
+
+	// Get the time for the function, based off of the run ID.
+	startAt := int64(q.Data.Identifier.RunID.Time())
+
+	if startAt == 0 {
+		return q.AtMS
+	}
+
+	// Remove the PriorityFactor from the time to push higher priority work
+	// earlier.
+	return startAt - q.Data.GetPriorityFactor()
+}
+
+func (q QueueItem) MarshalBinary() ([]byte, error) {
+	return json.Marshal(q)
+}
+
+// IsLeased checks if the QueueItem is currently already leased or not
+// based on the time passed in.
+func (q QueueItem) IsLeased(time time.Time) bool {
+	return q.LeaseID != nil && ulid.Time(q.LeaseID.Time()).After(time)
 }
 
 // Item represents an item stored within a queue.
@@ -269,4 +377,9 @@ type PayloadEdge struct {
 type PayloadPauseTimeout struct {
 	PauseID   uuid.UUID `json:"pauseID"`
 	OnTimeout bool      `json:"onTimeout"`
+}
+
+func HashID(_ context.Context, id string) string {
+	ui := xxhash.Sum64String(id)
+	return strconv.FormatUint(ui, 36)
 }

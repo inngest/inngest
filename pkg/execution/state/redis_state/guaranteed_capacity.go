@@ -121,7 +121,7 @@ type leasedAccount struct {
 func (q *queue) getGuaranteedCapacityMap(ctx context.Context) (map[string]GuaranteedCapacity, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "getGuaranteedCapacityMap"), redis_telemetry.ScopeQueue)
 
-	m, err := q.u.unshardedRc.Do(ctx, q.u.unshardedRc.B().Hgetall().Key(q.u.kg.GuaranteedCapacityMap()).Build()).AsMap()
+	m, err := q.primaryQueueClient.unshardedRc.Do(ctx, q.primaryQueueClient.unshardedRc.B().Hgetall().Key(q.primaryQueueClient.kg.GuaranteedCapacityMap()).Build()).AsMap()
 	if rueidis.IsRedisNil(err) {
 		return nil, nil
 	}
@@ -156,7 +156,7 @@ func (q *queue) acquireAccountLease(ctx context.Context, guaranteedCapacity Guar
 		return nil, err
 	}
 
-	keys := []string{q.u.kg.GuaranteedCapacityMap()}
+	keys := []string{q.primaryQueueClient.kg.GuaranteedCapacityMap()}
 	args, err := StrSlice([]any{
 		now.UnixMilli(),
 		guaranteedCapacity.Key(),
@@ -169,7 +169,7 @@ func (q *queue) acquireAccountLease(ctx context.Context, guaranteedCapacity Guar
 
 	status, err := scripts["queue/guaranteedCapacityAccountLease"].Exec(
 		redis_telemetry.WithScriptName(ctx, "guaranteedCapacityAccountLease"),
-		q.u.unshardedRc,
+		q.primaryQueueClient.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
@@ -210,7 +210,7 @@ func (q *queue) renewAccountLease(ctx context.Context, guaranteedCapacity Guaran
 		expireArg = "1"
 	}
 
-	keys := []string{q.u.kg.GuaranteedCapacityMap()}
+	keys := []string{q.primaryQueueClient.kg.GuaranteedCapacityMap()}
 	args, err := StrSlice([]any{
 		expireArg,
 		now.UnixMilli(),
@@ -224,7 +224,7 @@ func (q *queue) renewAccountLease(ctx context.Context, guaranteedCapacity Guaran
 
 	status, err := scripts["queue/guaranteedCapacityRenewAccountLease"].Exec(
 		redis_telemetry.WithScriptName(ctx, "guaranteedCapacityRenewAccountLease"),
-		q.u.unshardedRc,
+		q.primaryQueueClient.unshardedRc,
 		keys,
 		args,
 	).AsInt64()

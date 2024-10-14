@@ -72,6 +72,9 @@ func GetItemConcurrencyLatency(ctx context.Context) (time.Duration, bool) {
 	return t, ok
 }
 
+// Enqueue adds an item to the queue to be processed at the given time.
+// TODO: Lift this function and the queue interface to a higher level, so that it's disconnected from the
+// concrete Redis implementation.
 func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) error {
 	// propagate
 	if item.Metadata == nil {
@@ -98,7 +101,7 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		},
 	})
 
-	qi := QueueItem{
+	qi := osqueue.QueueItem{
 		ID:          id,
 		AtMS:        at.UnixMilli(),
 		WorkspaceID: item.WorkspaceID,
@@ -122,7 +125,12 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		qi.AtMS -= factor
 	}
 
-	_, err := q.EnqueueItem(ctx, qi, next)
+	enqueuer := q.enqueuer
+	if q.shardSelector != nil {
+		enqueuer = q.shardSelector(ctx, qi)
+	}
+
+	_, err := enqueuer.EnqueueItem(ctx, qi, next)
 	if err != nil {
 		return err
 	}
@@ -209,7 +217,7 @@ func (q *queue) claimSequentialLease(ctx context.Context) {
 	}
 
 	// Attempt to claim the lease immediately.
-	leaseID, err := q.ConfigLease(ctx, q.u.kg.Sequential(), ConfigLeaseDuration, q.sequentialLease())
+	leaseID, err := q.ConfigLease(ctx, q.primaryQueueClient.kg.Sequential(), ConfigLeaseDuration, q.sequentialLease())
 	if err != ErrConfigAlreadyLeased && err != nil {
 		q.quit <- err
 		return
@@ -226,7 +234,7 @@ func (q *queue) claimSequentialLease(ctx context.Context) {
 			tick.Stop()
 			return
 		case <-tick.Chan():
-			leaseID, err := q.ConfigLease(ctx, q.u.kg.Sequential(), ConfigLeaseDuration, q.sequentialLease())
+			leaseID, err := q.ConfigLease(ctx, q.primaryQueueClient.kg.Sequential(), ConfigLeaseDuration, q.sequentialLease())
 			if err == ErrConfigAlreadyLeased {
 				// This is expected; every time there is > 1 runner listening to the
 				// queue there will be contention.
@@ -257,7 +265,7 @@ func (q *queue) claimSequentialLease(ctx context.Context) {
 
 func (q *queue) runScavenger(ctx context.Context) {
 	// Attempt to claim the lease immediately.
-	leaseID, err := q.ConfigLease(ctx, q.u.kg.Scavenger(), ConfigLeaseDuration, q.scavengerLease())
+	leaseID, err := q.ConfigLease(ctx, q.primaryQueueClient.kg.Scavenger(), ConfigLeaseDuration, q.scavengerLease())
 	if err != ErrConfigAlreadyLeased && err != nil {
 		q.quit <- err
 		return
@@ -289,7 +297,7 @@ func (q *queue) runScavenger(ctx context.Context) {
 			}
 		case <-tick.Chan():
 			// Attempt to re-lease the lock.
-			leaseID, err := q.ConfigLease(ctx, q.u.kg.Scavenger(), ConfigLeaseDuration, q.scavengerLease())
+			leaseID, err := q.ConfigLease(ctx, q.primaryQueueClient.kg.Scavenger(), ConfigLeaseDuration, q.scavengerLease())
 			if err == ErrConfigAlreadyLeased {
 				// This is expected; every time there is > 1 runner listening to the
 				// queue there will be contention.
@@ -321,7 +329,7 @@ func (q *queue) runScavenger(ctx context.Context) {
 func (q *queue) runInstrumentation(ctx context.Context) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Instrument"), redis_telemetry.ScopeQueue)
 
-	leaseID, err := q.ConfigLease(ctx, q.u.kg.Instrumentation(), ConfigLeaseMax, q.instrumentationLease())
+	leaseID, err := q.ConfigLease(ctx, q.primaryQueueClient.kg.Instrumentation(), ConfigLeaseMax, q.instrumentationLease())
 	if err != ErrConfigAlreadyLeased && err != nil {
 		q.quit <- err
 		return
@@ -357,7 +365,7 @@ func (q *queue) runInstrumentation(ctx context.Context) {
 		case <-tick.Chan():
 			metrics.GaugeWorkerQueueCapacity(ctx, int64(q.numWorkers), metrics.GaugeOpt{PkgName: pkgName})
 
-			leaseID, err := q.ConfigLease(ctx, q.u.kg.Instrumentation(), ConfigLeaseMax, q.instrumentationLease())
+			leaseID, err := q.ConfigLease(ctx, q.primaryQueueClient.kg.Instrumentation(), ConfigLeaseMax, q.instrumentationLease())
 			if err == ErrConfigAlreadyLeased {
 				setLease(nil)
 				continue
@@ -491,7 +499,7 @@ func (q *queue) scan(ctx context.Context) error {
 		metricShardName = "<guaranteed-capacity>:" + guaranteedCapacity.Key()
 
 		// When account is leased, process it
-		partitionKey := q.u.kg.AccountPartitionIndex(guaranteedCapacity.AccountID)
+		partitionKey := q.primaryQueueClient.kg.AccountPartitionIndex(guaranteedCapacity.AccountID)
 		var actualScannedPartitions int64
 
 		err := q.scanPartition(ctx, partitionKey, PartitionPeekMax, peekUntil, guaranteedCapacity, metricShardName, &guaranteedCapacity.AccountID, &actualScannedPartitions)
@@ -555,7 +563,7 @@ func (q *queue) scan(ctx context.Context) error {
 			wg.Add(1)
 			go func(account uuid.UUID) {
 				defer wg.Done()
-				partitionKey := q.u.kg.AccountPartitionIndex(account)
+				partitionKey := q.primaryQueueClient.kg.AccountPartitionIndex(account)
 
 				if err := q.scanPartition(ctx, partitionKey, accountPartitionPeekMax, peekUntil, nil, metricShardName, &account, &actualScannedPartitions); err != nil {
 					q.logger.Error().Err(err).Msg("error processing account partitions")
@@ -588,7 +596,7 @@ func (q *queue) scan(ctx context.Context) error {
 	)
 
 	// By default, use the global partition
-	partitionKey := q.u.kg.GlobalPartitionIndex()
+	partitionKey := q.primaryQueueClient.kg.GlobalPartitionIndex()
 
 	var actualScannedPartitions int64
 	err := q.scanPartition(ctx, partitionKey, PartitionPeekMax, peekUntil, nil, metricShardName, nil, &actualScannedPartitions)
@@ -704,7 +712,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 	// to the worker, how long Redis takes to lease the item, etc.
 	fetch := q.clock.Now().Truncate(time.Second).Add(PartitionLookahead)
 
-	queue, err := duration(peekCtx, "peek", q.clock.Now(), func(ctx context.Context) ([]*QueueItem, error) {
+	queue, err := duration(peekCtx, "peek", q.clock.Now(), func(ctx context.Context) ([]*osqueue.QueueItem, error) {
 		peek := q.peekSize(ctx, p)
 		// NOTE: would love to instrument this value to see it over time per function but
 		// it's likely too high of a cardinality
@@ -784,7 +792,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 	return nil
 }
 
-func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *GuaranteedCapacity, f osqueue.RunFunc) error {
+func (q *queue) process(ctx context.Context, p QueuePartition, qi osqueue.QueueItem, s *GuaranteedCapacity, f osqueue.RunFunc) error {
 	var err error
 	leaseID := qi.LeaseID
 
@@ -1114,7 +1122,7 @@ func (q *queue) ewmaPeekSize(ctx context.Context, p *QueuePartition) int64 {
 	}
 
 	dur := time.Hour * 24
-	qsize, _ := q.partitionSize(ctx, p.zsetKey(q.u.kg), q.clock.Now().Add(dur))
+	qsize, _ := q.partitionSize(ctx, p.zsetKey(q.primaryQueueClient.kg), q.clock.Now().Add(dur))
 	if qsize > size {
 		size = qsize
 	}
@@ -1215,7 +1223,7 @@ func (t *trackingSemaphore) Release(n int64) {
 
 type processor struct {
 	partition          *QueuePartition
-	items              []*QueueItem
+	items              []*osqueue.QueueItem
 	guaranteedCapacity *GuaranteedCapacity
 
 	// queue is the queue that owns this processor.
@@ -1298,7 +1306,7 @@ func (p *processor) iterate(ctx context.Context) error {
 	return err
 }
 
-func (p *processor) process(ctx context.Context, item *QueueItem) error {
+func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error {
 	// TODO: Create an in-memory mapping of rate limit keys that have been hit,
 	//       and don't bother to process if the queue item has a limited key.  This
 	//       lessens work done in the queue, as we can `continue` immediately.
