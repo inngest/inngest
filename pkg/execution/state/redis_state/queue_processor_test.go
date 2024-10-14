@@ -172,7 +172,7 @@ func TestQueueRunBasic(t *testing.T) {
 		if n == len(items)-1 {
 			at = time.Now().Add(10 * time.Second)
 		}
-		_, err := q.EnqueueItem(ctx, item, at)
+		_, err := q.enqueuer.EnqueueItem(ctx, item, at)
 		require.NoError(t, err)
 	}
 
@@ -236,7 +236,7 @@ func TestQueueRunRetry(t *testing.T) {
 	}()
 
 	for _, item := range items {
-		_, err := q.EnqueueItem(ctx, item, time.Now())
+		_, err := q.enqueuer.EnqueueItem(ctx, item, time.Now())
 		require.NoError(t, err)
 	}
 
@@ -399,7 +399,7 @@ func TestQueueRunExtended(t *testing.T) {
 					// Enqueue with a delay.
 					diff := mrand.Int31n(atomic.LoadInt32(&delayMax))
 
-					_, err := q.EnqueueItem(ctx, item, time.Now().Add(time.Duration(diff)*time.Millisecond))
+					_, err := q.enqueuer.EnqueueItem(ctx, item, time.Now().Add(time.Duration(diff)*time.Millisecond))
 					require.NoError(t, err)
 					atomic.AddInt64(&added, 1)
 				}
@@ -616,7 +616,7 @@ func TestQueueAllowList(t *testing.T) {
 
 	for _, item := range items {
 		at := time.Now()
-		_, err := q.EnqueueItem(ctx, item, at)
+		_, err := q.enqueuer.EnqueueItem(ctx, item, at)
 		require.NoError(t, err)
 	}
 
@@ -631,7 +631,7 @@ func TestQueueAllowList(t *testing.T) {
 	<-time.After(time.Second)
 
 	// Assert queue items have been dequeued, and peek is nil for workflows.
-	val := r.HGet(q.u.kg.QueueItem(), osqueue.HashID(context.Background(), "i1"))
+	val := r.HGet(q.primaryQueueClient.kg.QueueItem(), osqueue.HashID(context.Background(), "i1"))
 	require.Equal(t, "", val)
 
 	// No more items in system partition
@@ -730,7 +730,7 @@ func TestQueueDenyList(t *testing.T) {
 
 	for _, item := range items {
 		at := time.Now()
-		_, err := q.EnqueueItem(ctx, item, at)
+		_, err := q.enqueuer.EnqueueItem(ctx, item, at)
 		require.NoError(t, err)
 	}
 
@@ -848,7 +848,7 @@ func TestQueueRunAccount(t *testing.T) {
 		if n == len(items)-1 {
 			at = time.Now().Add(10 * time.Second)
 		}
-		_, err := q.EnqueueItem(ctx, item, at)
+		_, err := q.enqueuer.EnqueueItem(ctx, item, at)
 		require.NoError(t, err)
 	}
 
@@ -921,7 +921,7 @@ func TestQueueRunGuaranteedCapacity(t *testing.T) {
 	}()
 
 	// ensure guaranteed capacity exists
-	_, err = q.EnqueueItem(ctx, osqueue.QueueItem{
+	_, err = q.enqueuer.EnqueueItem(ctx, osqueue.QueueItem{
 		FunctionID: priorityFn,
 		Data: osqueue.Item{
 			Kind:        osqueue.KindEdge,
@@ -986,7 +986,7 @@ func TestQueueRunGuaranteedCapacity(t *testing.T) {
 		if n == len(items)-1 {
 			at = time.Now().Add(10 * time.Second)
 		}
-		_, err := q.EnqueueItem(ctx, item, at)
+		_, err := q.enqueuer.EnqueueItem(ctx, item, at)
 		require.NoError(t, err)
 	}
 
