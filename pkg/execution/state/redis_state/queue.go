@@ -2119,15 +2119,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	items := make([]*QueuePartition, len(encoded))
 	fnIDs := make(map[uuid.UUID]bool)
 	fnIDsMu := sync.Mutex{}
-
-	// if partition is empty, run an atomic check-and-delete operation to remove account from global account index
-	if accountId != nil && totalItemCount == 0 {
-		err := q.cleanupEmptyAccount(ctx, *accountId)
-		if err != nil {
-			return nil, fmt.Errorf("error cleaning up empty account after peeking account partitions: %w", err)
-		}
-	}
-
+ 
 	// Use parallel decoding as per Peek
 	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueuePartition, error) {
 		if val == nil {
