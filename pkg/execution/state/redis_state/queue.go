@@ -380,6 +380,8 @@ func WithClock(c clockwork.Clock) func(q *queue) {
 	}
 }
 
+// ShardSelector returns an enqueuer and shard name for the given queue item.
+// This allows applying a policy to enqueue items to different queue shards.
 type ShardSelector func(ctx context.Context, i osqueue.QueueItem) (string, osqueue.Enqueuer)
 
 func WithShardSelector(s ShardSelector) func(q *queue) {
