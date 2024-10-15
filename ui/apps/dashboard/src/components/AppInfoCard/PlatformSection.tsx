@@ -2,6 +2,7 @@ import type { Route } from 'next';
 import { Link } from '@inngest/components/Link';
 
 import { PlatformInfo } from '@/components/PlatformInfo';
+import { CardItem } from './CardItem';
 
 type Props = {
   sync: {
@@ -44,26 +45,9 @@ export function PlatformSection({ sync }: Props) {
 
   return (
     <>
-      <Description detail={<PlatformInfo platform={platform} />} term="Platform" />
-      <Description detail={projectValue} term="Vercel Project" />
-      <Description detail={deploymentValue} term="Vercel Deployment" />
+      <CardItem detail={<PlatformInfo platform={platform} />} term="Platform" />
+      <CardItem detail={projectValue} term="Vercel Project" />
+      <CardItem detail={deploymentValue} term="Vercel Deployment" />
     </>
-  );
-}
-
-function Description({
-  className,
-  detail,
-  term,
-}: {
-  className?: string;
-  detail: React.ReactNode;
-  term: string;
-}) {
-  return (
-    <div className={className}>
-      <dt className="pb-2 text-sm text-slate-400">{term}</dt>
-      <dd className="text-slate-800">{detail}</dd>
-    </div>
   );
 }

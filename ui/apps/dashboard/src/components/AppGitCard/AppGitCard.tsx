@@ -2,6 +2,8 @@ import type { Route } from 'next';
 import { Link } from '@inngest/components/Link';
 import { classNames } from '@inngest/components/utils/classNames';
 
+import { CardItem } from './CardItem';
+
 type Props = {
   className?: string;
   sync: {
@@ -70,33 +72,16 @@ export function AppGitCard({ className, sync }: Props) {
 
       <dl className="flex flex-col gap-4 px-6 py-4 md:grid md:grid-cols-4">
         {/* Row 1 */}
-        <Description className="col-span-4" detail={commitMessage} term="Commit Message" />
+        <CardItem className="col-span-4" detail={commitMessage} term="Commit Message" />
 
         {/* Row 2 */}
-        <Description className="truncate" detail={commitAuthor} term="Commit Author" />
-        <Description className="truncate" detail={commitRefValue} term="Commit Ref" />
-        <Description className="truncate" detail={commitHashValue} term="Commit Hash" />
+        <CardItem className="truncate" detail={commitAuthor} term="Commit Author" />
+        <CardItem className="truncate" detail={commitRefValue} term="Commit Ref" />
+        <CardItem className="truncate" detail={commitHashValue} term="Commit Hash" />
 
         {/* Row 3 */}
-        <Description className="col-span-4 truncate" detail={repositoryValue} term="Repository" />
+        <CardItem className="col-span-4 truncate" detail={repositoryValue} term="Repository" />
       </dl>
-    </div>
-  );
-}
-
-function Description({
-  className,
-  detail,
-  term,
-}: {
-  className?: string;
-  detail: React.ReactNode;
-  term: string;
-}) {
-  return (
-    <div className={className}>
-      <dt className="pb-2 text-sm text-slate-400">{term}</dt>
-      <dd className="leading-8 text-slate-800">{detail ?? ''}</dd>
     </div>
   );
 }
