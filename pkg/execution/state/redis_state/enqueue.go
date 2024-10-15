@@ -6,13 +6,56 @@ import (
 	"github.com/google/uuid"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
+	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
+	"github.com/rs/zerolog"
 	"time"
 )
 
 type redisEnqueuer struct {
 	u *QueueClient
+	q InternalQueue
+}
+
+type InternalQueue interface {
+	Clock() clockwork.Clock
+	ItemPartitions(ctx context.Context, i osqueue.QueueItem) ([]QueuePartition, int)
+	ItemIndexer(ctx context.Context, i osqueue.QueueItem, kg QueueKeyGenerator) QueueItemIndex
+	GuaranteedCapacityFinder(ctx context.Context, accountId uuid.UUID) *GuaranteedCapacity
+	HasGuaranteedCapacityFinder() bool
+	Logger() *zerolog.Logger
+}
+
+type internalAdapter struct {
 	q *queue
+}
+
+func (q *internalAdapter) HasGuaranteedCapacityFinder() bool {
+	return q.q.gcf != nil
+}
+
+func (q *internalAdapter) GuaranteedCapacityFinder(ctx context.Context, accountId uuid.UUID) *GuaranteedCapacity {
+	return q.q.gcf(ctx, q.q.queueShardName, accountId)
+}
+
+func (q *internalAdapter) Logger() *zerolog.Logger {
+	return q.q.logger
+}
+
+func (q *internalAdapter) Clock() clockwork.Clock {
+	return q.q.clock
+}
+
+func (q *internalAdapter) ItemPartitions(ctx context.Context, i osqueue.QueueItem) ([]QueuePartition, int) {
+	return q.q.ItemPartitions(ctx, i)
+}
+
+func (q *internalAdapter) ItemIndexer(ctx context.Context, i osqueue.QueueItem, kg QueueKeyGenerator) QueueItemIndex {
+	return q.q.itemIndexer(ctx, i, kg)
+}
+
+func (q *queue) Internal() InternalQueue {
+	return &internalAdapter{q}
 }
 
 func (r redisEnqueuer) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Time) (osqueue.QueueItem, error) {
@@ -29,9 +72,9 @@ func (r redisEnqueuer) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at 
 		i.WallTimeMS = at.UnixMilli()
 	}
 
-	if at.Before(r.q.clock.Now()) {
+	if at.Before(r.q.Clock().Now()) {
 		// Normalize to now to minimize latency.
-		i.WallTimeMS = r.q.clock.Now().UnixMilli()
+		i.WallTimeMS = r.q.Clock().Now().UnixMilli()
 	}
 
 	// Add the At timestamp, if not included.
@@ -44,18 +87,18 @@ func (r redisEnqueuer) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at 
 	}
 
 	partitionTime := at
-	if at.Before(r.q.clock.Now()) {
+	if at.Before(r.q.Clock().Now()) {
 		// We don't want to enqueue partitions (pointers to fns) before now.
 		// Doing so allows users to stay at the front of the queue for
 		// leases.
-		partitionTime = r.q.clock.Now()
+		partitionTime = r.q.Clock().Now()
 	}
 
 	parts, _ := r.q.ItemPartitions(ctx, i)
 	isSystemPartition := parts[0].IsSystem()
 
 	if i.Data.Identifier.AccountID == uuid.Nil && !isSystemPartition {
-		r.q.logger.Warn().Interface("item", i).Msg("attempting to enqueue item to non-system partition without account ID")
+		r.q.Logger().Warn().Interface("item", i).Msg("attempting to enqueue item to non-system partition without account ID")
 	}
 
 	var (
@@ -64,12 +107,12 @@ func (r redisEnqueuer) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at 
 		// initialize guaranteed capacity key for automatic cleanup
 		guaranteedCapacityKey = guaranteedCapacityKeyForAccount(i.Data.Identifier.AccountID)
 	)
-	if r.q.gcf != nil && !isSystemPartition {
+	if r.q.HasGuaranteedCapacityFinder() && !isSystemPartition {
 		// Fetch guaranteed capacity for the given account. If there is no guaranteed
 		// capacity configured, this will return nil, and we will remove any leftover
 		// items in the guaranteed capacity map
 		// Note: This function is called _a lot_ so the calls should be memoized.
-		guaranteedCapacity = r.q.gcf(ctx, r.q.queueShardName, i.Data.Identifier.AccountID)
+		guaranteedCapacity = r.q.GuaranteedCapacityFinder(ctx, i.Data.Identifier.AccountID)
 		if guaranteedCapacity != nil {
 			guaranteedCapacity.Leases = []ulid.ULID{}
 			guaranteedCapacityKey = guaranteedCapacity.Key()
@@ -92,7 +135,7 @@ func (r redisEnqueuer) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at 
 		parts[2].zsetKey(r.u.kg),
 	}
 	// Append indexes
-	for _, idx := range r.q.itemIndexer(ctx, i, r.u.kg) {
+	for _, idx := range r.q.ItemIndexer(ctx, i, r.u.kg) {
 		if idx != "" {
 			keys = append(keys, idx)
 		}
@@ -103,7 +146,7 @@ func (r redisEnqueuer) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at 
 		i.ID,
 		at.UnixMilli(),
 		partitionTime.Unix(),
-		r.q.clock.Now().UnixMilli(),
+		r.q.Clock().Now().UnixMilli(),
 		FnMetadata{
 			// enqueue.lua only writes function metadata if it doesn't already exist.
 			// if it doesn't exist, and we're enqueuing something, this implies the fn is not currently paused.
@@ -131,7 +174,7 @@ func (r redisEnqueuer) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at 
 		return i, err
 	}
 
-	r.q.logger.Trace().Interface("item", i).Interface("parts", parts).Interface("keys", keys).Interface("args", args).Msg("enqueueing item")
+	r.q.Logger().Trace().Interface("item", i).Interface("parts", parts).Interface("keys", keys).Interface("args", args).Msg("enqueueing item")
 
 	status, err := scripts["queue/enqueue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "enqueue"),
@@ -152,7 +195,7 @@ func (r redisEnqueuer) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at 
 	}
 }
 
-func NewRedisEnqueuer(q *queue, u *QueueClient) osqueue.Enqueuer {
+func NewRedisEnqueuer(q InternalQueue, u *QueueClient) osqueue.Enqueuer {
 	return &redisEnqueuer{
 		u: u,
 		q: q,

@@ -157,6 +157,8 @@ type QueueManager interface {
 	Dequeue(ctx context.Context, i osqueue.QueueItem) error
 	Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time) error
 	RequeueByJobID(ctx context.Context, jobID string, at time.Time) error
+
+	Internal() InternalQueue
 }
 
 // PartitionPriorityFinder returns the priority for a given queue partition.
