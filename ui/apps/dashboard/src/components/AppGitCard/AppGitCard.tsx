@@ -2,7 +2,7 @@ import type { Route } from 'next';
 import { Link } from '@inngest/components/Link';
 import { classNames } from '@inngest/components/utils/classNames';
 
-import { CardItem } from './CardItem';
+import { CardItem } from '../AppInfoCard/CardItem';
 
 type Props = {
   className?: string;
