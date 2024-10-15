@@ -410,6 +410,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			{At: "/debug", Handler: middleware.Profiler()},
 		},
 		LocalEventKeys: opts.EventKey,
+		RequireKeys:    true,
 	})
 
 	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice)

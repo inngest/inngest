@@ -130,6 +130,7 @@ func (a API) Stop(ctx context.Context) error {
 
 func (a API) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	a.log.Trace().Msg("healthcheck")
+	w.Header().Add("Content-Type", "application/json")
 	a.writeResponse(w, apiResponse{
 		StatusCode: http.StatusOK,
 		Message:    "OK",
@@ -142,15 +143,19 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 
 	// If self hosting and keys are not defined, error.
 	if a.requireKeys && len(a.localEventKeys) == 0 {
+		a.log.Error().Msg("rejecting event; event keys are required to process events securely")
+		w.Header().Add("Content-Type", "application/json")
 		a.writeResponse(w, apiResponse{
 			StatusCode: http.StatusServiceUnavailable,
-			Error:      "Event keys are required to ingest events securely",
+			Error:      "Event keys are required to process events securely",
 		})
 		return
 	}
 
 	key := chi.URLParam(r, "key")
 	if key == "" {
+		a.log.Error().Msg("rejecting event; event key is required")
+		w.Header().Add("Content-Type", "application/json")
 		a.writeResponse(w, apiResponse{
 			StatusCode: http.StatusUnauthorized,
 			Error:      "Event key is required",
@@ -169,6 +174,8 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if !found {
+			a.log.Error().Msg("rejecting event; event key not recognized")
+			w.Header().Add("Content-Type", "application/json")
 			a.writeResponse(w, apiResponse{
 				StatusCode: http.StatusUnauthorized,
 				Error:      "Event key not found",
