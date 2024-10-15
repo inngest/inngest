@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/inngest/inngest/pkg/enums"
 	"math"
 	"math/rand"
 	"runtime/debug"
@@ -117,10 +118,19 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		qi.AtMS -= factor
 	}
 
-	enqueuer := q.enqueuer
-	shardName := q.queueShardName
+	shard := SelectedShard{
+		Name:        q.queueShardName,
+		Kind:        string(enums.QueueShardKindRedis),
+		RedisClient: q.primaryQueueClient,
+	}
 	if q.shardSelector != nil {
-		shardName, enqueuer = q.shardSelector(ctx, qi)
+		selected, err := q.shardSelector(ctx, qi)
+		if err != nil {
+			q.logger.Error().Err(err).Interface("qi", qi).Msg("error selecting shard")
+			return fmt.Errorf("could not select shard: %w", err)
+		}
+
+		shard = selected
 	}
 
 	metrics.IncrQueueItemStatusCounter(ctx, metrics.CounterOpt{
@@ -128,16 +138,20 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		Tags: map[string]any{
 			"status":      "enqueued",
 			"kind":        item.Kind,
-			"queue_shard": shardName,
+			"queue_shard": shard.Name,
 		},
 	})
 
-	_, err := enqueuer.EnqueueItem(ctx, qi, next)
-	if err != nil {
-		return err
+	switch shard.Kind {
+	case string(enums.QueueShardKindRedis):
+		_, err := q.EnqueueItem(ctx, shard, qi, next)
+		if err != nil {
+			return err
+		}
+		return nil
+	default:
+		return fmt.Errorf("unknown shard kind: %s", shard.Kind)
 	}
-
-	return nil
 }
 
 func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
