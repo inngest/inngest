@@ -157,8 +157,6 @@ type QueueManager interface {
 	Dequeue(ctx context.Context, i osqueue.QueueItem) error
 	Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time) error
 	RequeueByJobID(ctx context.Context, jobID string, at time.Time) error
-
-	Internal() InternalQueue
 }
 
 // PartitionPriorityFinder returns the priority for a given queue partition.
@@ -384,9 +382,16 @@ func WithClock(c clockwork.Clock) func(q *queue) {
 	}
 }
 
-// ShardSelector returns an enqueuer and shard name for the given queue item.
+type SelectedShard struct {
+	Name string
+	Kind string
+
+	RedisClient *QueueClient
+}
+
+// ShardSelector returns a shard reference for the given queue item.
 // This allows applying a policy to enqueue items to different queue shards.
-type ShardSelector func(ctx context.Context, i osqueue.QueueItem) (string, osqueue.Enqueuer)
+type ShardSelector func(ctx context.Context, i osqueue.QueueItem) (SelectedShard, error)
 
 func WithShardSelector(s ShardSelector) func(q *queue) {
 	return func(q *queue) {
@@ -499,11 +504,13 @@ func NewQueue(primaryQueueClient *QueueClient, opts ...QueueOpt) *queue {
 		clock:                           clockwork.NewRealClock(),
 	}
 
-	q.enqueuer = NewRedisEnqueuer(q.Internal(), primaryQueueClient)
-
 	// default to using primary queue client for shard selection
-	q.shardSelector = func(_ context.Context, _ osqueue.QueueItem) (string, osqueue.Enqueuer) {
-		return "default", q.enqueuer
+	q.shardSelector = func(_ context.Context, _ osqueue.QueueItem) (SelectedShard, error) {
+		return SelectedShard{
+			Name:        consts.DefaultQueueShardName,
+			Kind:        string(enums.QueueShardKindRedis),
+			RedisClient: primaryQueueClient,
+		}, nil
 	}
 
 	for _, opt := range opts {
@@ -531,7 +538,6 @@ type queue struct {
 	queueShardName     string
 
 	shardSelector ShardSelector
-	enqueuer      osqueue.Enqueuer
 
 	ppf PartitionPriorityFinder
 	apf AccountPriorityFinder
@@ -1012,6 +1018,143 @@ func (q *queue) ItemPartitions(ctx context.Context, i osqueue.QueueItem) ([]Queu
 	}
 
 	return partitions, limits.AccountLimit
+}
+
+func (q *queue) EnqueueItem(ctx context.Context, shard SelectedShard, i osqueue.QueueItem, at time.Time) (osqueue.QueueItem, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "EnqueueItem"), redis_telemetry.ScopeQueue)
+
+	if len(i.ID) == 0 {
+		i.SetID(ctx, ulid.MustNew(ulid.Now(), rnd).String())
+	} else {
+		i.ID = osqueue.HashID(ctx, i.ID)
+	}
+
+	// XXX: If the length of ID >= max, error.
+	if i.WallTimeMS == 0 {
+		i.WallTimeMS = at.UnixMilli()
+	}
+
+	if at.Before(q.clock.Now()) {
+		// Normalize to now to minimize latency.
+		i.WallTimeMS = q.clock.Now().UnixMilli()
+	}
+
+	// Add the At timestamp, if not included.
+	if i.AtMS == 0 {
+		i.AtMS = at.UnixMilli()
+	}
+
+	if i.Data.JobID == nil {
+		i.Data.JobID = &i.ID
+	}
+
+	partitionTime := at
+	if at.Before(q.clock.Now()) {
+		// We don't want to enqueue partitions (pointers to fns) before now.
+		// Doing so allows users to stay at the front of the queue for
+		// leases.
+		partitionTime = q.clock.Now()
+	}
+
+	parts, _ := q.ItemPartitions(ctx, i)
+	isSystemPartition := parts[0].IsSystem()
+
+	if i.Data.Identifier.AccountID == uuid.Nil && !isSystemPartition {
+		q.logger.Warn().Interface("item", i).Msg("attempting to enqueue item to non-system partition without account ID")
+	}
+
+	var (
+		guaranteedCapacity *GuaranteedCapacity
+
+		// initialize guaranteed capacity key for automatic cleanup
+		guaranteedCapacityKey = guaranteedCapacityKeyForAccount(i.Data.Identifier.AccountID)
+	)
+	if q.gcf != nil && !isSystemPartition {
+		// Fetch guaranteed capacity for the given account. If there is no guaranteed
+		// capacity configured, this will return nil, and we will remove any leftover
+		// items in the guaranteed capacity map
+		// Note: This function is called _a lot_ so the calls should be memoized.
+		guaranteedCapacity = q.gcf(ctx, shard.Name, i.Data.Identifier.AccountID)
+		if guaranteedCapacity != nil {
+			guaranteedCapacity.Leases = []ulid.ULID{}
+			guaranteedCapacityKey = guaranteedCapacity.Key()
+		}
+	}
+
+	keys := []string{
+		shard.RedisClient.kg.QueueItem(),            // Queue item
+		shard.RedisClient.kg.PartitionItem(),        // Partition item, map
+		shard.RedisClient.kg.GlobalPartitionIndex(), // Global partition queue
+		shard.RedisClient.kg.GlobalAccountIndex(),
+		shard.RedisClient.kg.AccountPartitionIndex(i.Data.Identifier.AccountID), // new queue items always contain the account ID
+		shard.RedisClient.kg.Idempotency(i.ID),
+		shard.RedisClient.kg.FnMetadata(i.FunctionID),
+		shard.RedisClient.kg.GuaranteedCapacityMap(),
+
+		// Add all 3 partition sets
+		parts[0].zsetKey(shard.RedisClient.kg),
+		parts[1].zsetKey(shard.RedisClient.kg),
+		parts[2].zsetKey(shard.RedisClient.kg),
+	}
+	// Append indexes
+	for _, idx := range q.itemIndexer(ctx, i, shard.RedisClient.kg) {
+		if idx != "" {
+			keys = append(keys, idx)
+		}
+	}
+
+	args, err := StrSlice([]any{
+		i,
+		i.ID,
+		at.UnixMilli(),
+		partitionTime.Unix(),
+		q.clock.Now().UnixMilli(),
+		FnMetadata{
+			// enqueue.lua only writes function metadata if it doesn't already exist.
+			// if it doesn't exist, and we're enqueuing something, this implies the fn is not currently paused.
+			FnID:   i.FunctionID,
+			Paused: false,
+		},
+		parts[0],
+		parts[1],
+		parts[2],
+
+		parts[0].ID,
+		parts[1].ID,
+		parts[2].ID,
+
+		parts[0].PartitionType,
+		parts[1].PartitionType,
+		parts[2].PartitionType,
+
+		i.Data.Identifier.AccountID.String(),
+
+		guaranteedCapacity,
+		guaranteedCapacityKey,
+	})
+	if err != nil {
+		return i, err
+	}
+
+	q.logger.Trace().Interface("item", i).Interface("parts", parts).Interface("keys", keys).Interface("args", args).Msg("enqueueing item")
+
+	status, err := scripts["queue/enqueue"].Exec(
+		redis_telemetry.WithScriptName(ctx, "enqueue"),
+		shard.RedisClient.Client(),
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return i, fmt.Errorf("error enqueueing item: %w", err)
+	}
+	switch status {
+	case 0:
+		return i, nil
+	case 1:
+		return i, ErrQueueItemExists
+	default:
+		return i, fmt.Errorf("unknown response enqueueing item: %v (%T)", status, status)
+	}
 }
 
 // RunJobs returns a list of jobs that are due to run for a given run ID.

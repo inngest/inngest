@@ -121,6 +121,8 @@ const (
 	DevServerHistoryFile = "dev_history.json"
 
 	PauseExpiredDeletionGracePeriod = time.Second * 10
+
+	DefaultQueueShardName = "default"
 )
 
 var (
