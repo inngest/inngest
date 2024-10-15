@@ -499,7 +499,7 @@ func NewQueue(primaryQueueClient *QueueClient, opts ...QueueOpt) *queue {
 		clock:                           clockwork.NewRealClock(),
 	}
 
-	q.enqueuer = NewRedisEnqueuer(q, primaryQueueClient)
+	q.enqueuer = NewRedisEnqueuer(q.Internal(), primaryQueueClient)
 
 	// default to using primary queue client for shard selection
 	q.shardSelector = func(_ context.Context, _ osqueue.QueueItem) (string, osqueue.Enqueuer) {

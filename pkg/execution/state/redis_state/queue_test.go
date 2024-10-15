@@ -3823,7 +3823,7 @@ func TestQueueLeaseSequential(t *testing.T) {
 		},
 		clock: clockwork.NewRealClock(),
 	}
-	q.enqueuer = NewRedisEnqueuer(&q, qc)
+	q.enqueuer = NewRedisEnqueuer(q.Internal(), qc)
 
 	var (
 		leaseID *ulid.ULID
