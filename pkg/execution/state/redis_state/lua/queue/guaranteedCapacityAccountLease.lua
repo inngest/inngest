@@ -2,8 +2,9 @@
 
 Output:
     -1: Guaranteed capacity not found
-    -2: Lease already exists
-    -3: Invalid lease index
+    -2: Lease already exists (tried to overwrite a valid, existing lease)
+    -3: Invalid lease index (tried to lease index other than the next one)
+    -4: Exceeded guaranteed capacity (tried to lease same account more often than allowed)
     0: Success
 
 --]]
@@ -23,15 +24,9 @@ if guaranteedCapacity == nil then
     return -1
 end
 
--- TODO:
--- Filter expired leases based off of currentTimeMS
--- If index != remaining, fail.
--- Append lease to guaranteed capacity
--- Update map
--- Return OK
-
 local validLeases = {}
 
+-- Filter out expired leases
 if guaranteedCapacity.leases ~= nil and #guaranteedCapacity.leases > 0 then
     for _, lease in ipairs(guaranteedCapacity.leases) do
         if decode_ulid_time(lease) >= currentTimeMS then
@@ -40,12 +35,20 @@ if guaranteedCapacity.leases ~= nil and #guaranteedCapacity.leases > 0 then
     end
 end
 
+-- Prevent leasing already-leased index
 if leaseIndex < #validLeases then
     -- item is already leased due to contention:  someone asked for lease N, but
-    -- lease N already exists.
+    -- lease N already exists and is still valid.
     return -2
 end
 
+-- Prevent leasing higher index than guaranteed capacity (invariant must hold: index < guaranteedCapacity.gc)
+-- This is a sanity check and not strictly required, but this case should never happen.
+if guaranteedCapacity.gc ~= nil and leaseIndex >= tonumber(guaranteedCapacity.gc) then
+		return -4
+end
+
+-- Prevent skipping index (must lease immediate next index)
 if leaseIndex ~= #validLeases then
     return -3
 end

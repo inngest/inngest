@@ -43,7 +43,6 @@ export default function Page() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [filterApp] = useStringArraySearchParam('filterApp');
   const [totalCount, setTotalCount] = useState<number>();
-  const [celQuery, setCelQuery] = useState<string>();
   const [filteredStatus] = useValidatedArraySearchParam('filterStatus', isFunctionRunStatus);
   const [timeField = FunctionRunTimeField.QueuedAt] = useValidatedSearchParam(
     'timeField',
@@ -52,6 +51,7 @@ export default function Page() {
   const [lastDays] = useSearchParam('last');
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
+  const [search] = useSearchParam('search');
   const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
   const appsRes = useGetAppsQuery();
 
@@ -64,7 +64,7 @@ export default function Page() {
         endTime: endTime,
         status: filteredStatus,
         timeField,
-        celQuery,
+        celQuery: search,
       });
 
       const edges = data.runs.edges.map((edge) => {
@@ -85,7 +85,7 @@ export default function Page() {
         edges,
       };
     },
-    [filterApp, filteredStatus, calculatedStartTime, timeField, celQuery]
+    [filterApp, filteredStatus, calculatedStartTime, timeField, search]
   );
 
   const { data, fetchNextPage, isFetching, hasNextPage } = useInfiniteQuery({
@@ -111,11 +111,11 @@ export default function Page() {
         endTime,
         status: filteredStatus,
         timeField,
-        celQuery,
+        celQuery: search,
       });
       setTotalCount(data.runs.totalCount);
     })();
-  }, [calculatedStartTime, endTime, filteredStatus, timeField, celQuery]);
+  }, [calculatedStartTime, endTime, filteredStatus, timeField, search]);
 
   const runs = useMemo(() => {
     if (!data?.pages) {
@@ -204,7 +204,6 @@ export default function Page() {
         scope="env"
         totalCount={totalCount}
         hasSearchFlag={isSearchEnabled}
-        onSearch={setCelQuery}
       />
     </>
   );

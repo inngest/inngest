@@ -324,7 +324,7 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 			debounceID.String(),
 			string(byt),
 			strconv.Itoa(int(ttl.Seconds())),
-			redis_state.HashID(ctx, debounceID.String()),
+			queue.HashID(ctx, debounceID.String()),
 			strconv.Itoa(int(time.Now().UnixMilli())),
 			strconv.Itoa(int(di.Event.Timestamp)),
 		},

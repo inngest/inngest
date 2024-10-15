@@ -96,7 +96,7 @@ export const pathCreator = {
   onboarding(): Route {
     return `/env/production/onboarding/` as Route;
   },
-  onboardingSteps({ envSlug, step }: { envSlug: string; step: string }): Route {
+  onboardingSteps({ envSlug = 'production', step }: { envSlug?: string; step: string }): Route {
     return `/env/${envSlug}/onboarding/${step}` as Route;
   },
   runPopout({ envSlug, runID }: { envSlug: string; runID: string }): Route {
