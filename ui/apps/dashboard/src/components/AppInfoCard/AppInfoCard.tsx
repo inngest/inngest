@@ -2,7 +2,6 @@
 
 import { type Route } from 'next';
 import { Link } from '@inngest/components/Link';
-import { Skeleton } from '@inngest/components/Skeleton';
 import { TextClickToCopy } from '@inngest/components/Text';
 import { Time } from '@inngest/components/Time';
 import { cn } from '@inngest/components/utils/classNames';
@@ -11,6 +10,7 @@ import { useEnvironment } from '@/components/Environments/environment-context';
 import { FrameworkInfo } from '@/components/FrameworkInfo';
 import { LanguageInfo } from '@/components/LanguageInfo';
 import { SyncStatusPill } from '@/components/SyncStatusPill';
+import { CardItem } from './CardItem';
 import { PlatformSection } from './PlatformSection';
 
 type Props = {
@@ -97,17 +97,17 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
 
         <dl className="flex flex-col gap-4 px-6 py-4 md:grid md:grid-cols-4">
           {/* Row 1 */}
-          <Description
+          <CardItem
             detail={<div className="truncate">{app?.externalID ?? '-'}</div>}
             term="ID"
             loading={loading}
           />
-          <Description
+          <CardItem
             detail={<div className="truncate">{sync?.sdkVersion ?? '-'}</div>}
             term="SDK Version"
             loading={loading}
           />
-          <Description
+          <CardItem
             className="col-span-2"
             detail={<div className="truncate">{lastSyncValue ?? '-'}</div>}
             term="Last Sync"
@@ -115,17 +115,17 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
           />
 
           {/* Row 2 */}
-          <Description
+          <CardItem
             detail={<FrameworkInfo framework={sync?.framework} />}
             term="Framework"
             loading={loading}
           />
-          <Description
+          <CardItem
             detail={<LanguageInfo language={sync?.sdkLanguage} />}
             term="Language"
             loading={loading}
           />
-          <Description
+          <CardItem
             className="col-span-2"
             detail={<TextClickToCopy truncate>{sync?.url ?? '-'}</TextClickToCopy>}
             term="URL"
@@ -137,25 +137,5 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
         </dl>
       </div>
     </>
-  );
-}
-
-function Description({
-  className,
-  detail,
-  term,
-  loading,
-}: {
-  className?: string;
-  detail: React.ReactNode;
-  term: string;
-  loading?: boolean;
-}) {
-  return (
-    <div className={className}>
-      <dt className="text-muted pb-2 text-sm">{term}</dt>
-      {!loading && <dd className="text-basis leading-8">{detail}</dd>}
-      {loading && <Skeleton className="mb-2 block h-6 w-full" />}
-    </div>
   );
 }
