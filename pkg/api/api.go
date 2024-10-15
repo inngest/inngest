@@ -143,11 +143,11 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 
 	// If self hosting and keys are not defined, error.
 	if a.requireKeys && len(a.localEventKeys) == 0 {
-		a.log.Error().Msg("rejecting event; event keys are required to ingest events securely")
+		a.log.Error().Msg("rejecting event; event keys are required to process events securely")
 		w.Header().Add("Content-Type", "application/json")
 		a.writeResponse(w, apiResponse{
 			StatusCode: http.StatusServiceUnavailable,
-			Error:      "Event keys are required to ingest events securely",
+			Error:      "Event keys are required to process events securely",
 		})
 		return
 	}
