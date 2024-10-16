@@ -118,7 +118,7 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		qi.AtMS -= factor
 	}
 
-	shard := SelectedShard{
+	shard := QueueShard{
 		Name:        q.queueShardName,
 		Kind:        string(enums.QueueShardKindRedis),
 		RedisClient: q.primaryQueueClient,
