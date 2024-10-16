@@ -20,7 +20,7 @@ type Queue interface {
 	JobQueueReader
 
 	SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, paused bool) error
-	SetFunctionMigrate(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID, migrate string) error
+	SetFunctionMigrate(ctx context.Context, fnID uuid.UUID) error
 }
 
 type RunInfo struct {
@@ -195,4 +195,25 @@ type JobQueueReader interface {
 		limit,
 		offset int64,
 	) ([]JobResponse, error)
+}
+
+type FunctionMigrateOpts struct {
+	AccountID   uuid.UUID
+	WorkspaceID uuid.UUID
+	AppID       uuid.UUID
+	FunctionID  uuid.UUID
+
+	Source string
+	Dest   string
+}
+
+// MigratePayload stores the information to be used when migrating a queue to a separate cluster
+type MigratePayload struct {
+	AccountID  uuid.UUID
+	FunctionID uuid.UUID
+
+	// Source is the source queue where the migration will occur on
+	Source string
+	// Dest is the target destination the queue will be moved to
+	Dest string
 }
