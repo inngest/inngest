@@ -230,7 +230,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 	t.Run("It enqueues an item", func(t *testing.T) {
 		id := uuid.New()
 
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 			FunctionID: id,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
@@ -274,7 +274,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 	t.Run("It sets the right item score", func(t *testing.T) {
 		start := time.Now()
 
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, start)
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, start)
 		require.NoError(t, err)
 
 		requireItemScoreEquals(t, r, item, start)
@@ -286,7 +286,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 		at := time.Now().Add(time.Hour).Truncate(time.Second)
 
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
 					AccountID: accountId,
@@ -328,7 +328,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		at := now.Add(-10 * time.Minute).Truncate(time.Second)
 
 		// Note: This will reuse the existing partition (zero UUID) from the step above
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
 					AccountID: accountId,
@@ -371,7 +371,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 		accountId := uuid.New()
 
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 			FunctionID: uuid.New(),
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
@@ -405,7 +405,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 	t.Run("Stores default indexes", func(t *testing.T) {
 		at := time.Now().Truncate(time.Second)
 		rid := ulid.MustNew(ulid.Now(), rand.Reader)
-		_, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+		_, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 			FunctionID: uuid.New(),
 			Data: osqueue.Item{
 				Kind: osqueue.KindEdge,
@@ -426,7 +426,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		workflowId := uuid.New()
 		accountId := uuid.New()
 
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 			FunctionID: workflowId,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
@@ -440,7 +440,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		err = q.SetFunctionPaused(ctx, accountId, item.FunctionID, true)
 		require.NoError(t, err)
 
-		item, err = q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+		item, err = q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 			FunctionID: workflowId,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
@@ -454,7 +454,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		fnMeta := getFnMetadata(t, r, item.FunctionID)
 		require.True(t, fnMeta.Paused)
 
-		item, err = q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+		item, err = q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 			FunctionID: workflowId,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
@@ -508,7 +508,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 			assert.Equal(t, customkeyQueuePartition, actualItemPartitions[0])
 
-			i, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, qi, now.Add(10*time.Second))
+			i, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, qi, now.Add(10*time.Second))
 			require.NoError(t, err)
 
 			// There should be 2 partitions - custom key, and the function
@@ -599,7 +599,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 			}
 			assert.Equal(t, expectedDefaultPartition, actualItemPartitions[2])
 
-			i, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, qi, now.Add(10*time.Second))
+			i, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, qi, now.Add(10*time.Second))
 			require.NoError(t, err)
 
 			// just the default partition
@@ -658,7 +658,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 			Last:      1723814800026,
 		}, getPartition(t, r, enums.PartitionTypeDefault, id))
 
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 			FunctionID: id,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
@@ -701,7 +701,7 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 	t.Run("It enqueues an item only once", func(t *testing.T) {
 		i := osqueue.QueueItem{ID: "once"}
 
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, i, start)
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, i, start)
 
 		require.NoError(t, err)
 		require.Equal(t, osqueue.HashID(ctx, "once"), item.ID)
@@ -710,7 +710,7 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 		require.Equal(t, item, found)
 
 		// Ensure we can't enqueue again.
-		_, err = q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, i, start)
+		_, err = q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, i, start)
 		require.Equal(t, ErrQueueItemExists, err)
 
 		// Dequeue
@@ -718,13 +718,13 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 		require.NoError(t, err)
 
 		// Ensure we can't enqueue even after dequeue.
-		_, err = q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, i, start)
+		_, err = q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, i, start)
 		require.Equal(t, ErrQueueItemExists, err)
 
 		// Wait for the idempotency TTL to expire
 		r.FastForward(dur)
 
-		item, err = q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, i, start)
+		item, err = q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, i, start)
 		require.NoError(t, err)
 		require.Equal(t, osqueue.HashID(ctx, "once"), item.ID)
 		require.NotEqual(t, i.ID, item.ID)
@@ -767,7 +767,7 @@ func BenchmarkPeekTiming(b *testing.B) {
 
 	enqueue := func(id uuid.UUID, n int) {
 		for i := 0; i < n; i++ {
-			_, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: id}, time.Now())
+			_, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: id}, time.Now())
 			if err != nil {
 				panic(err)
 			}
@@ -829,7 +829,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 	}
 
 	t.Run("It enqueues an item", func(t *testing.T) {
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, qi, start)
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, qi, start)
 		require.NoError(t, err)
 		require.NotEqual(t, item.ID, ulid.ULID{})
 		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
@@ -884,12 +884,12 @@ func TestQueueSystemPartitions(t *testing.T) {
 	})
 
 	t.Run("leases partition items while respecting concurrency", func(t *testing.T) {
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, qi, start)
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, qi, start)
 		require.NoError(t, err)
 		require.NotEqual(t, item.ID, ulid.ULID{})
 		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
 
-		item2, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, qi, start)
+		item2, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, qi, start)
 		require.NoError(t, err)
 		require.NotEqual(t, item.ID, ulid.ULID{})
 		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
@@ -922,7 +922,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 
 		start := time.Now().Truncate(time.Second)
 
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, qi, start)
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, qi, start)
 		require.NoError(t, err)
 		require.NotEqual(t, item.ID, ulid.ULID{})
 		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
@@ -1018,7 +1018,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 			QueueName: &customQueueName,
 		}
 
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, qi, start)
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, qi, start)
 		require.NoError(t, err)
 		require.NotEqual(t, item.ID, ulid.ULID{})
 		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
@@ -1073,11 +1073,11 @@ func TestQueuePeek(t *testing.T) {
 		c := b.Add(2 * time.Second)
 		d := c.Add(2 * time.Second)
 
-		ia, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{ID: "a"}, a)
+		ia, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{ID: "a"}, a)
 		require.NoError(t, err)
-		ib, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{ID: "b"}, b)
+		ib, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{ID: "b"}, b)
 		require.NoError(t, err)
-		ic, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{ID: "c"}, c)
+		ic, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{ID: "c"}, c)
 		require.NoError(t, err)
 
 		items, err := q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, time.Now().Add(time.Hour), 10)
@@ -1086,7 +1086,7 @@ func TestQueuePeek(t *testing.T) {
 		require.EqualValues(t, []*osqueue.QueueItem{&ia, &ib, &ic}, items)
 		require.NotEqualValues(t, []*osqueue.QueueItem{&ib, &ia, &ic}, items)
 
-		id, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{ID: "d"}, d)
+		id, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{ID: "d"}, d)
 		require.NoError(t, err)
 
 		items, err = q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, time.Now().Add(time.Hour), 10)
@@ -1193,7 +1193,7 @@ func TestQueueLease(t *testing.T) {
 	start := time.Now().Truncate(time.Second)
 
 	t.Run("It leases an item", func(t *testing.T) {
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, start)
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, start)
 		require.NoError(t, err)
 
 		item = getQueueItem(t, r, item.ID)
@@ -1268,7 +1268,7 @@ func TestQueueLease(t *testing.T) {
 
 		t.Run("It should remove the item from the function queue, as this is now in the partition's in-progress concurrency queue", func(t *testing.T) {
 			start := time.Now()
-			item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, start)
+			item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, start)
 			require.NoError(t, err)
 			require.Nil(t, item.LeaseID)
 
@@ -1290,7 +1290,7 @@ func TestQueueLease(t *testing.T) {
 			acctId := uuid.New()
 
 			// Enqueue future item (partition time will be now + 5s)
-			item, err = q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+			item, err = q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 				Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctId}},
 			}, timeNowPlusFiveSeconds)
 			require.NoError(t, err)
@@ -1304,7 +1304,7 @@ func TestQueueLease(t *testing.T) {
 			requireAccountScoreEquals(t, r, acctId, timeNowPlusFiveSeconds)
 
 			// Enqueue current item (partition time will be moved up to now)
-			item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctId}}}, timeNow)
+			item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctId}}}, timeNow)
 			require.NoError(t, err)
 			require.Nil(t, item.LeaseID)
 
@@ -1336,9 +1336,9 @@ func TestQueueLease(t *testing.T) {
 
 		fnID := uuid.New()
 		// Create a new item
-		itemA, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: fnID}, start)
+		itemA, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: fnID}, start)
 		require.NoError(t, err)
-		itemB, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: fnID}, start)
+		itemB, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: fnID}, start)
 		require.NoError(t, err)
 		// Use the new item's workflow ID
 		p := QueuePartition{ID: itemA.FunctionID.String(), FunctionID: &itemA.FunctionID}
@@ -1380,9 +1380,9 @@ func TestQueueLease(t *testing.T) {
 		acctId := uuid.New()
 
 		// Create a new item
-		itemA, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: uuid.New(), Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctId}}}, start)
+		itemA, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: uuid.New(), Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctId}}}, start)
 		require.NoError(t, err)
-		itemB, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: uuid.New(), Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctId}}}, start)
+		itemB, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: uuid.New(), Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctId}}}, start)
 		require.NoError(t, err)
 
 		t.Run("Leases with capacity", func(t *testing.T) {
@@ -1413,7 +1413,7 @@ func TestQueueLease(t *testing.T) {
 			ck := createConcurrencyKey(enums.ConcurrencyScopeAccount, uuid.Nil, "foo", 1)
 
 			// Create a new item
-			itemA, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+			itemA, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 				FunctionID: uuid.New(),
 				Data: osqueue.Item{
 					CustomConcurrencyKeys: []state.CustomConcurrency{
@@ -1426,7 +1426,7 @@ func TestQueueLease(t *testing.T) {
 			}, start)
 			require.NoError(t, err)
 
-			itemB, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+			itemB, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 				FunctionID: uuid.New(),
 				Data: osqueue.Item{
 					CustomConcurrencyKeys: []state.CustomConcurrency{
@@ -1479,7 +1479,7 @@ func TestQueueLease(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create a new item
-			itemA, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+			itemA, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 				FunctionID: fnId,
 				Data: osqueue.Item{
 					CustomConcurrencyKeys: []state.CustomConcurrency{
@@ -1495,7 +1495,7 @@ func TestQueueLease(t *testing.T) {
 			}, start)
 			require.NoError(t, err)
 
-			itemB, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+			itemB, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 				FunctionID: fnId,
 				Data: osqueue.Item{
 					CustomConcurrencyKeys: []state.CustomConcurrency{
@@ -1585,13 +1585,13 @@ func TestQueueLease(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create a new item
-			itemA1, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: fnIDA, Data: osqueue.Item{CustomConcurrencyKeys: []state.CustomConcurrency{ckA}}}, start)
+			itemA1, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: fnIDA, Data: osqueue.Item{CustomConcurrencyKeys: []state.CustomConcurrency{ckA}}}, start)
 			require.NoError(t, err)
-			itemA2, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: fnIDA, Data: osqueue.Item{CustomConcurrencyKeys: []state.CustomConcurrency{ckA}}}, start)
+			itemA2, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: fnIDA, Data: osqueue.Item{CustomConcurrencyKeys: []state.CustomConcurrency{ckA}}}, start)
 			require.NoError(t, err)
-			itemB1, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: fnIDB, Data: osqueue.Item{CustomConcurrencyKeys: []state.CustomConcurrency{ckB}}}, start)
+			itemB1, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: fnIDB, Data: osqueue.Item{CustomConcurrencyKeys: []state.CustomConcurrency{ckB}}}, start)
 			require.NoError(t, err)
-			itemB2, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: fnIDB, Data: osqueue.Item{CustomConcurrencyKeys: []state.CustomConcurrency{ckB}}}, start)
+			itemB2, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: fnIDB, Data: osqueue.Item{CustomConcurrencyKeys: []state.CustomConcurrency{ckB}}}, start)
 			require.NoError(t, err)
 
 			// Use the new item's workflow ID
@@ -1636,7 +1636,7 @@ func TestQueueLease(t *testing.T) {
 			t.Run("With a single item in the queue hwen leasing, nothing updates", func(t *testing.T) {
 				at := time.Now().Truncate(time.Second).Add(time.Second)
 				accountId := uuid.New()
-				item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+				item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 					Data: osqueue.Item{Identifier: state.Identifier{AccountID: accountId}},
 				}, at)
 				require.NoError(t, err)
@@ -1670,7 +1670,7 @@ func TestQueueLease(t *testing.T) {
 
 			t.Run("It moves items from each concurrency queue", func(t *testing.T) {
 				at := time.Now().Truncate(time.Second).Add(time.Second)
-				itemA, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+				itemA, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 					Data: osqueue.Item{
 						CustomConcurrencyKeys: []state.CustomConcurrency{
 							{
@@ -1693,7 +1693,7 @@ func TestQueueLease(t *testing.T) {
 					},
 				}, at)
 				require.NoError(t, err)
-				itemB, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+				itemB, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 					Data: osqueue.Item{
 						CustomConcurrencyKeys: []state.CustomConcurrency{
 							{
@@ -1776,9 +1776,9 @@ func TestQueueLease(t *testing.T) {
 			atA := time.Now().Truncate(time.Second).Add(time.Second)
 			atB := atA.Add(time.Minute)
 
-			itemA, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, atA)
+			itemA, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, atA)
 			require.NoError(t, err)
-			_, err = q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, atB)
+			_, err = q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, atB)
 			require.NoError(t, err)
 
 			parts, _ := q.ItemPartitions(ctx, itemA)
@@ -1803,7 +1803,7 @@ func TestQueueLease(t *testing.T) {
 	t.Run("It does nothing for a zero value partition", func(t *testing.T) {
 		r.FlushAll()
 
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, start)
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, start)
 		require.NoError(t, err)
 
 		item = getQueueItem(t, r, item.ID)
@@ -1829,7 +1829,7 @@ func TestQueueLease(t *testing.T) {
 		r.FlushAll()
 
 		systemQueueName := "system-queue"
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 			QueueName: &systemQueueName,
 			Data: osqueue.Item{
 				QueueName: &systemQueueName,
@@ -1893,7 +1893,7 @@ func TestQueueLease(t *testing.T) {
 		require.Equal(t, "{queue}:queue:sorted:schedule-batch", parts[0].zsetKey(kg))
 		require.Equal(t, "{queue}:concurrency:p:00000000-0000-0000-0000-000000000000", parts[0].concurrencyKey(kg))
 
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, qi, start)
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, qi, start)
 		require.NoError(t, err)
 
 		require.True(t, r.Exists("{queue}:queue:sorted:schedule-batch"))
@@ -1936,7 +1936,7 @@ func TestQueueLease(t *testing.T) {
 		evaluatedKey := util.ConcurrencyKey(enums.ConcurrencyScopeAccount, accountId, "customer-1")
 
 		fnId := uuid.New()
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 			FunctionID: fnId,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
@@ -2024,7 +2024,7 @@ func TestQueueExtendLease(t *testing.T) {
 
 	start := time.Now().Truncate(time.Second)
 	t.Run("It leases an item", func(t *testing.T) {
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, start)
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, start)
 		require.NoError(t, err)
 
 		item = getQueueItem(t, r, item.ID)
@@ -2071,7 +2071,7 @@ func TestQueueExtendLease(t *testing.T) {
 	})
 
 	t.Run("It does not extend an unleased item", func(t *testing.T) {
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, start)
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, start)
 		require.NoError(t, err)
 
 		item = getQueueItem(t, r, item.ID)
@@ -2088,7 +2088,7 @@ func TestQueueExtendLease(t *testing.T) {
 	t.Run("With custom keys in multiple partitions", func(t *testing.T) {
 		r.FlushAll()
 
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 			FunctionID: uuid.New(),
 			Data: osqueue.Item{
 				CustomConcurrencyKeys: []state.CustomConcurrency{
@@ -2190,7 +2190,7 @@ func TestQueueDequeue(t *testing.T) {
 		start := time.Now().Truncate(time.Second)
 
 		// Enqueue two items to the same function
-		itemA, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+		itemA, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 			FunctionID: fnID,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
@@ -2217,7 +2217,7 @@ func TestQueueDequeue(t *testing.T) {
 			},
 		}, start)
 		require.Nil(t, err)
-		_, err = q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+		_, err = q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 			FunctionID: fnID,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
@@ -2290,7 +2290,7 @@ func TestQueueDequeue(t *testing.T) {
 
 		t.Run("with an unleased item", func(t *testing.T) {
 			r.FlushAll()
-			item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+			item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 				FunctionID: uuid.New(),
 				Data: osqueue.Item{
 					CustomConcurrencyKeys: []state.CustomConcurrency{
@@ -2336,7 +2336,7 @@ func TestQueueDequeue(t *testing.T) {
 
 		t.Run("with a leased item", func(t *testing.T) {
 			r.FlushAll()
-			item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+			item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 				FunctionID: uuid.New(),
 				Data: osqueue.Item{
 					CustomConcurrencyKeys: []state.CustomConcurrency{
@@ -2409,7 +2409,7 @@ func TestQueueDequeue(t *testing.T) {
 
 		start := time.Now()
 
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, start)
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, start)
 		require.NoError(t, err)
 
 		p := QueuePartition{FunctionID: &item.FunctionID}
@@ -2450,7 +2450,7 @@ func TestQueueDequeue(t *testing.T) {
 		})
 
 		t.Run("It should work if the item is not leased (eg. deletions)", func(t *testing.T) {
-			item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, start)
+			item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, start)
 			require.NoError(t, err)
 
 			err = q.Dequeue(ctx, item)
@@ -2463,7 +2463,7 @@ func TestQueueDequeue(t *testing.T) {
 		t.Run("Removes default indexes", func(t *testing.T) {
 			at := time.Now().Truncate(time.Second)
 			rid := ulid.MustNew(ulid.Now(), rand.Reader)
-			item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+			item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 				FunctionID: uuid.New(),
 				Data: osqueue.Item{
 					Kind: osqueue.KindEdge,
@@ -2494,7 +2494,7 @@ func TestQueueDequeue(t *testing.T) {
 		start := time.Now().Truncate(time.Second)
 
 		customQueueName := "custom-queue-name"
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 			FunctionID: uuid.New(),
 			Data: osqueue.Item{
 				QueueName: &customQueueName,
@@ -2572,7 +2572,7 @@ func TestQueueRequeue(t *testing.T) {
 	t.Run("Re-enqueuing a leased item should succeed", func(t *testing.T) {
 		now := time.Now()
 
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, now)
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, now)
 		require.NoError(t, err)
 
 		_, err = q.Lease(ctx, item, time.Second, time.Now(), nil)
@@ -2607,7 +2607,7 @@ func TestQueueRequeue(t *testing.T) {
 		})
 
 		t.Run("It should not update the partition's earliest time, if later", func(t *testing.T) {
-			_, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, now)
+			_, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{}, now)
 			require.NoError(t, err)
 
 			requirePartitionScoreEquals(t, r, pi.FunctionID, now)
@@ -2622,7 +2622,7 @@ func TestQueueRequeue(t *testing.T) {
 		t.Run("Updates default indexes", func(t *testing.T) {
 			at := time.Now().Truncate(time.Second)
 			rid := ulid.MustNew(ulid.Now(), rand.Reader)
-			item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+			item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 				FunctionID: uuid.New(),
 				Data: osqueue.Item{
 					Kind: osqueue.KindEdge,
@@ -2693,7 +2693,7 @@ func TestQueueRequeue(t *testing.T) {
 				},
 			},
 		}
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, item, now)
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, item, now)
 		require.NoError(t, err)
 
 		parts, _ := q.ItemPartitions(ctx, item)
@@ -2757,11 +2757,11 @@ func TestQueuePartitionLease(t *testing.T) {
 	q := NewQueue(NewQueueClient(rc, QueueDefaultKey))
 	ctx := context.Background()
 
-	_, err = q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: idA}, atA)
+	_, err = q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: idA}, atA)
 	require.NoError(t, err)
-	_, err = q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: idB}, atB)
+	_, err = q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: idB}, atB)
 	require.NoError(t, err)
-	_, err = q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: idC}, atC)
+	_, err = q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: idC}, atC)
 	require.NoError(t, err)
 
 	t.Run("Partitions are in order after enqueueing", func(t *testing.T) {
@@ -2843,11 +2843,11 @@ func TestQueuePartitionLease(t *testing.T) {
 		q := NewQueue(NewQueueClient(rc, QueueDefaultKey))
 		ctx := context.Background()
 
-		_, err = q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: idA}, atA)
+		_, err = q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: idA}, atA)
 		require.NoError(t, err)
-		_, err = q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: idB}, atB)
+		_, err = q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: idB}, atB)
 		require.NoError(t, err)
-		_, err = q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: idC}, atC)
+		_, err = q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: idC}, atC)
 		require.NoError(t, err)
 
 		t.Run("Fails to lease a paused partition", func(t *testing.T) {
@@ -2882,7 +2882,7 @@ func TestQueuePartitionLease(t *testing.T) {
 		// Enqueueing an item
 		ck := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "test", 1)
 
-		_, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+		_, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 			FunctionID: fnID,
 			Data: osqueue.Item{
 				CustomConcurrencyKeys: []state.CustomConcurrency{ck},
@@ -2912,9 +2912,9 @@ func TestQueuePartitionLease(t *testing.T) {
 
 			fnID := uuid.New()
 			// Create a new item
-			itemA, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: fnID}, start)
+			itemA, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: fnID}, start)
 			require.NoError(t, err)
-			_, err = q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: fnID}, start)
+			_, err = q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: fnID}, start)
 			require.NoError(t, err)
 			// Use the new item's workflow ID
 			p := QueuePartition{ID: itemA.FunctionID.String(), FunctionID: &itemA.FunctionID}
@@ -2947,10 +2947,10 @@ func TestQueuePartitionLease(t *testing.T) {
 			acctId := uuid.New()
 
 			// Create a new item
-			itemA, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: uuid.New(), Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctId}}}, start)
+			itemA, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: uuid.New(), Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctId}}}, start)
 			require.NoError(t, err)
 
-			_, err = q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: uuid.New(), Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctId}}}, start)
+			_, err = q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: uuid.New(), Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctId}}}, start)
 			require.NoError(t, err)
 
 			// Use the new item's workflow ID
@@ -2984,7 +2984,7 @@ func TestQueuePartitionLease(t *testing.T) {
 			ck := createConcurrencyKey(enums.ConcurrencyScopeAccount, accountId, "foo", 1)
 
 			// Create a new item
-			itemA, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+			itemA, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 				FunctionID: uuid.New(),
 				Data: osqueue.Item{
 					Identifier: state.Identifier{AccountID: accountId},
@@ -2998,7 +2998,7 @@ func TestQueuePartitionLease(t *testing.T) {
 			}, start)
 			require.NoError(t, err)
 
-			_, err = q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+			_, err = q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 				FunctionID: uuid.New(),
 				Data: osqueue.Item{
 					Identifier: state.Identifier{AccountID: accountId},
@@ -3080,11 +3080,11 @@ func TestQueuePartitionPeek(t *testing.T) {
 	enqueue := func(q *queue, now time.Time) {
 		atA, atB, atC := now, now.Add(2*time.Second), now.Add(4*time.Second)
 
-		_, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, newQueueItem(idA), atA)
+		_, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, newQueueItem(idA), atA)
 		require.NoError(t, err)
-		_, err = q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, newQueueItem(idB), atB)
+		_, err = q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, newQueueItem(idB), atB)
 		require.NoError(t, err)
-		_, err = q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, newQueueItem(idC), atC)
+		_, err = q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, newQueueItem(idC), atC)
 		require.NoError(t, err)
 	}
 	enqueue(q, now)
@@ -3298,7 +3298,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 	now := time.Now()
 
 	t.Run("For default items without concurrency settings", func(t *testing.T) {
-		qi, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: idA}, now)
+		qi, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: idA}, now)
 		require.NoError(t, err)
 
 		p := QueuePartition{FunctionID: &qi.FunctionID, EnvID: &qi.WorkspaceID}
@@ -3330,7 +3330,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 				loaded := getDefaultPartition(t, r, idA)
 				require.NotEmpty(t, loaded.ForceAtMS)
 
-				qi, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: idA}, now)
+				qi, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: idA}, now)
 
 				loaded = getDefaultPartition(t, r, idA)
 				require.NotEmpty(t, loaded.ForceAtMS)
@@ -3360,7 +3360,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		})
 
 		t.Run("Requeueing a paused partition does not affect the partition's pause state", func(t *testing.T) {
-			_, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: idA}, now)
+			_, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: idA}, now)
 			require.NoError(t, err)
 
 			_, _, err = q.PartitionLease(ctx, &QueuePartition{FunctionID: &idA}, time.Minute)
@@ -3383,7 +3383,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 			now := time.Now()
 			next = now.Add(10 * time.Second)
 
-			qi, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: idA}, now)
+			qi, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: idA}, now)
 			require.NoError(t, err)
 
 			requirePartitionScoreEquals(t, r, &idA, now)
@@ -3438,7 +3438,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 			// p has been changed to the default function partition.
 			p := parts[1]
 
-			item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, item, now)
+			item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, item, now)
 			require.NoError(t, err)
 
 			t.Run("Uses the next job item's time when requeueing with another job", func(t *testing.T) {
@@ -3510,7 +3510,7 @@ func TestQueueFunctionPause(t *testing.T) {
 
 	now := time.Now().Truncate(time.Second)
 	idA := uuid.New()
-	_, err = q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: idA}, now)
+	_, err = q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{FunctionID: idA}, now)
 	require.NoError(t, err)
 
 	err = q.SetFunctionPaused(ctx, uuid.Nil, idA, true)
@@ -3551,7 +3551,7 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 	)
 	ctx := context.Background()
 
-	_, err = q.EnqueueItem(ctx,SelectedShard{Nameconsts.DefaultQueueShardName,Kindstring(enums.QueueShardKindRedis},RedisClientq.primaryQueueClient, osqueue.QueueItem{FunctionID: idA}, now)
+	_, err = q.EnqueueItem(ctx,QueueShard{Nameconsts.DefaultQueueShardName,Kindstring(enums.QueueShardKindRedis},RedisClientq.primaryQueueClient, osqueue.QueueItem{FunctionID: idA}, now)
 	require.NoError(t, err)
 
 	first := getDefaultPartition(t, r, idA)
@@ -3617,7 +3617,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 				FunctionID:  wsA,
 				WorkspaceID: wsA,
 			}
-			_, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, item, time.Now().Add(time.Second))
+			_, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, item, time.Now().Add(time.Second))
 			require.NoError(t, err)
 
 			err = q.RequeueByJobID(ctx, "no bruv", time.Now().Add(5*time.Second))
@@ -3634,7 +3634,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 				WorkspaceID: wsA,
 			}
 
-			item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, item, time.Now().Add(time.Second))
+			item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, item, time.Now().Add(time.Second))
 			require.NoError(t, err)
 
 			partitions, err := q.PartitionPeek(ctx, true, time.Now().Add(5*time.Second), 10)
@@ -3662,7 +3662,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 			WorkspaceID: wsA,
 			AtMS:        at.UnixMilli(),
 		}
-		item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, item, at)
+		item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, item, at)
 		require.Equal(t, time.UnixMilli(item.WallTimeMS), at)
 		require.NoError(t, err)
 
@@ -3712,7 +3712,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 				WorkspaceID: wsA,
 				AtMS:        next.UnixMilli(),
 			}
-			_, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, item, next)
+			_, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, item, next)
 			require.NoError(t, err)
 		}
 
@@ -3724,7 +3724,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 			WorkspaceID: wsA,
 			AtMS:        target.UnixMilli(),
 		}
-		_, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, item, target)
+		_, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, item, target)
 		require.NoError(t, err)
 
 		parts, err := q.PartitionPeek(ctx, true, at.Add(time.Hour), 10)
@@ -3767,7 +3767,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 				WorkspaceID: wsA,
 				AtMS:        next.UnixMilli(),
 			}
-			_, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, item, next)
+			_, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, item, next)
 			require.NoError(t, err)
 		}
 
@@ -3779,7 +3779,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 			WorkspaceID: wsA,
 			AtMS:        target.UnixMilli(),
 		}
-		_, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, item, target)
+		_, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, item, target)
 		require.NoError(t, err)
 
 		parts, err := q.PartitionPeek(ctx, true, at.Add(time.Hour), 10)
@@ -3930,7 +3930,7 @@ func TestGuaranteedCapacity(t *testing.T) {
 
 		fnId := uuid.New()
 		//	randomUlid := ulid.MustNew(ulid.Now(), rand.Reader)
-		_, err = q1.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q1.primaryQueueClient}, osqueue.QueueItem{
+		_, err = q1.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q1.primaryQueueClient}, osqueue.QueueItem{
 			FunctionID: fnId,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
@@ -4422,13 +4422,13 @@ func TestAccountLease(t *testing.T) {
 	// Ensure guaranteed capacity exists
 	idA, idB := uuid.New(), uuid.New()
 
-	_, err = q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{Data: osqueue.Item{Identifier: state.Identifier{AccountID: idA}}}, time.Now())
+	_, err = q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{Data: osqueue.Item{Identifier: state.Identifier{AccountID: idA}}}, time.Now())
 	require.NoError(t, err)
 	exists, err := rc.Do(ctx, rc.B().Hexists().Key(q.primaryQueueClient.kg.GuaranteedCapacityMap()).Field(guaranteedCapacityKeyForAccount(idA)).Build()).AsBool()
 	require.NoError(t, err)
 	require.True(t, exists, r.Dump())
 
-	_, err = q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{Data: osqueue.Item{Identifier: state.Identifier{AccountID: idB}}}, time.Now())
+	_, err = q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{Data: osqueue.Item{Identifier: state.Identifier{AccountID: idB}}}, time.Now())
 	require.NoError(t, err)
 	exists, err = rc.Do(ctx, rc.B().Hexists().Key(q.primaryQueueClient.kg.GuaranteedCapacityMap()).Field(guaranteedCapacityKeyForAccount(idB)).Build()).AsBool()
 	require.NoError(t, err)
@@ -4492,7 +4492,7 @@ func TestAccountLease(t *testing.T) {
 
 	t.Run("Renewing account leases", func(t *testing.T) {
 		// Ensure that enqueueing succeeds to make the shard.
-		_, err = q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{WorkspaceID: idA, Data: osqueue.Item{Identifier: state.Identifier{AccountID: idA}}}, time.Now())
+		_, err = q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{WorkspaceID: idA, Data: osqueue.Item{Identifier: state.Identifier{AccountID: idA}}}, time.Now())
 		require.Nil(t, err)
 
 		guaranteedCapacity := sf(ctx, "", idA)
@@ -4548,7 +4548,7 @@ func TestQueueRateLimit(t *testing.T) {
 			Burst:  0, // No burst.
 		}
 
-		aa, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+		aa, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 			FunctionID: idA,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
@@ -4559,7 +4559,7 @@ func TestQueueRateLimit(t *testing.T) {
 		}, clock.Now())
 		r.NoError(err)
 
-		ab, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+		ab, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 			FunctionID: idA,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
@@ -4594,7 +4594,7 @@ func TestQueueRateLimit(t *testing.T) {
 		// clock.Advance(10 * time.Millisecond)
 
 		t.Run("Leasing another function succeeds", func(t *testing.T) {
-			ba, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+			ba, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 				FunctionID: idB,
 				Data: osqueue.Item{
 					Identifier: state.Identifier{
@@ -4638,7 +4638,7 @@ func TestQueueRateLimit(t *testing.T) {
 
 		items := []osqueue.QueueItem{}
 		for i := 0; i <= 20; i++ {
-			item, err := q.EnqueueItem(ctx, SelectedShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
+			item, err := q.EnqueueItem(ctx, QueueShard{Name: consts.DefaultQueueShardName, Kind: string(enums.QueueShardKindRedis), RedisClient: q.primaryQueueClient}, osqueue.QueueItem{
 				FunctionID: idA,
 				Data: osqueue.Item{
 					Identifier: state.Identifier{WorkflowID: idA},

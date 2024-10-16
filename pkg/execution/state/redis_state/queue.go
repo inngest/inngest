@@ -382,7 +382,7 @@ func WithClock(c clockwork.Clock) func(q *queue) {
 	}
 }
 
-type SelectedShard struct {
+type QueueShard struct {
 	Name string
 	Kind string
 
@@ -391,7 +391,7 @@ type SelectedShard struct {
 
 // ShardSelector returns a shard reference for the given queue item.
 // This allows applying a policy to enqueue items to different queue shards.
-type ShardSelector func(ctx context.Context, i osqueue.QueueItem) (SelectedShard, error)
+type ShardSelector func(ctx context.Context, i osqueue.QueueItem) (QueueShard, error)
 
 func WithShardSelector(s ShardSelector) func(q *queue) {
 	return func(q *queue) {
@@ -505,8 +505,8 @@ func NewQueue(primaryQueueClient *QueueClient, opts ...QueueOpt) *queue {
 	}
 
 	// default to using primary queue client for shard selection
-	q.shardSelector = func(_ context.Context, _ osqueue.QueueItem) (SelectedShard, error) {
-		return SelectedShard{
+	q.shardSelector = func(_ context.Context, _ osqueue.QueueItem) (QueueShard, error) {
+		return QueueShard{
 			Name:        consts.DefaultQueueShardName,
 			Kind:        string(enums.QueueShardKindRedis),
 			RedisClient: primaryQueueClient,
@@ -529,7 +529,7 @@ func WithQueueShardName(name string) QueueOpt {
 	}
 }
 
-func WithQueueShardClients(queueShards map[string]*QueueClient) QueueOpt {
+func WithQueueShardClients(queueShards map[string]QueueShard) QueueOpt {
 	return func(q *queue) {
 		q.queueShardClients = queueShards
 	}
@@ -542,9 +542,8 @@ type queue struct {
 	// primaryQueueClient stores the redis connection to use.
 	primaryQueueClient *QueueClient
 	queueShardName     string
-	// queueShardClients contains all non-default Redis queue shard clients.
-	// TODO Support other storage backends
-	queueShardClients map[string]*QueueClient
+	// queueShardClients contains all non-default queue shard clients.
+	queueShardClients map[string]QueueShard
 	shardSelector     ShardSelector
 
 	ppf PartitionPriorityFinder
@@ -1028,7 +1027,7 @@ func (q *queue) ItemPartitions(ctx context.Context, i osqueue.QueueItem) ([]Queu
 	return partitions, limits.AccountLimit
 }
 
-func (q *queue) EnqueueItem(ctx context.Context, shard SelectedShard, i osqueue.QueueItem, at time.Time) (osqueue.QueueItem, error) {
+func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.QueueItem, at time.Time) (osqueue.QueueItem, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "EnqueueItem"), redis_telemetry.ScopeQueue)
 
 	if len(i.ID) == 0 {
@@ -1257,9 +1256,14 @@ func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status st
 	if q.queueShardClients != nil {
 		eg := errgroup.Group{}
 
-		for shardName, client := range q.queueShardClients {
+		for shardName, shard := range q.queueShardClients {
+			if shard.Kind != string(enums.QueueShardKindRedis) {
+				// TODO Support other storage backends
+				continue
+			}
+
 			eg.Go(func() error {
-				shardCount, err := iterate(client)
+				shardCount, err := iterate(shard.RedisClient)
 				if err != nil {
 					return fmt.Errorf("could not count status for shard %s: %w", shardName, err)
 				}
@@ -1273,8 +1277,6 @@ func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status st
 			return 0, err
 		}
 	}
-
-	// TODO Support other storage backends
 
 	return count, nil
 }
@@ -1324,9 +1326,14 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 	if q.queueShardClients != nil {
 		eg := errgroup.Group{}
 
-		for shardName, client := range q.queueShardClients {
+		for shardName, shard := range q.queueShardClients {
+			if shard.Kind != string(enums.QueueShardKindRedis) {
+				// TODO Support other storage backends
+				continue
+			}
+
 			eg.Go(func() error {
-				shardCount, err := iterate(client)
+				shardCount, err := iterate(shard.RedisClient)
 				if err != nil {
 					return fmt.Errorf("could not count running jobs for shard %s: %w", shardName, err)
 				}
