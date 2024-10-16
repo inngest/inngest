@@ -33,6 +33,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
@@ -1438,38 +1439,56 @@ func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID
 
 func (q *queue) SetFunctionMigrate(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID, migrate string) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionMigrate"), redis_telemetry.ScopeQueue)
+	maxAttempts := 10
 
-	defaultMeta := FnMetadata{
-		FnID:    fnID,
-		Migrate: &migrate,
-	}
-
-	keys := []string{q.primaryQueueClient.kg.FnMetadata(fnID)}
-	args, err := StrSlice([]any{
-		migrate,
-		defaultMeta,
-	})
-	if err != nil {
-		return err
-	}
-
-	status, err := scripts["queue/fnSetMigrate"].Exec(
-		ctx,
-		q.primaryQueueClient.unshardedRc,
-		keys,
-		args,
-	).AsInt64()
-	if err != nil {
-		return fmt.Errorf("error updating queue migrate state: %w", err)
-	}
-
-	switch status {
-	case 0:
+	err := q.Enqueue(ctx, osqueue.Item{
+		GroupID:     uuid.New().String(),
+		Kind:        osqueue.KindScheduleBatch,
+		Identifier:  state.Identifier{},
+		Attempt:     0,
+		MaxAttempts: &maxAttempts,
+		Payload:     nil, // TODO: payload source + destination
+	}, time.Now())
+	switch err {
+	case nil:
 		return nil
-
+	case redis_state.ErrQueueItemExists:
+		return nil
 	default:
-		return fmt.Errorf("unknown response updating queue migration state: %d", err)
+		return fmt.Errorf("error enqueueing queue migrate: %w", err)
 	}
+
+	// defaultMeta := FnMetadata{
+	// 	FnID:    fnID,
+	// 	Migrate: &migrate,
+	// }
+
+	// keys := []string{q.primaryQueueClient.kg.FnMetadata(fnID)}
+	// args, err := StrSlice([]any{
+	// 	migrate,
+	// 	defaultMeta,
+	// })
+	// if err != nil {
+	// 	return err
+	// }
+
+	// status, err := scripts["queue/fnSetMigrate"].Exec(
+	// 	ctx,
+	// 	q.primaryQueueClient.unshardedRc,
+	// 	keys,
+	// 	args,
+	// ).AsInt64()
+	// if err != nil {
+	// 	return fmt.Errorf("error updating queue migrate state: %w", err)
+	// }
+
+	// switch status {
+	// case 0:
+	// 	return nil
+
+	// default:
+	// 	return fmt.Errorf("unknown response updating queue migration state: %d", err)
+	// }
 }
 
 // Peek takes n items from a queue, up until QueuePeekMax.  For peeking workflow/
@@ -2461,6 +2480,8 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	fnIDs := make(map[uuid.UUID]bool)
 	fnIDsMu := sync.Mutex{}
 
+	migrateIDs := map[uuid.UUID]string{}
+
 	// Use parallel decoding as per Peek
 	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueuePartition, error) {
 		if val == nil {
@@ -2540,6 +2561,9 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 
 				fnIDsMu.Lock()
 				fnIDs[fnMeta.FnID] = fnMeta.Paused
+				if fnMeta.Migrate != nil {
+					migrateIDs[fnMeta.FnID] = *fnMeta.Migrate
+				}
 				fnIDsMu.Unlock()
 
 				return nil, nil
@@ -2571,6 +2595,16 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 
 				ignored++
 				continue
+			}
+
+			if v, ok := migrateIDs[*item.FunctionID]; ok {
+				switch q.name {
+				case "migrator":
+					// no-op, let migrator do it's thing
+				default:
+					ignored++
+					continue
+				}
 			}
 		}
 
