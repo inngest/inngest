@@ -680,8 +680,8 @@ type FnMetadata struct {
 	// to a given partition if the partition belongs to a fn.
 	Paused bool `json:"off"`
 
-	// Migrate sets the target queue shard that the current function queue should be moved to
-	Migrate *string `json:"migrate"`
+	// Migrate indicates if this queue is to be migrated or not
+	Migrate bool `json:"migrate"`
 }
 
 // QueuePartition represents an individual queue for a workflow.  It stores the
@@ -2479,7 +2479,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	fnIDs := make(map[uuid.UUID]bool)
 	fnIDsMu := sync.Mutex{}
 
-	migrateIDs := map[uuid.UUID]string{}
+	migrateIDs := map[uuid.UUID]bool{}
 
 	// Use parallel decoding as per Peek
 	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueuePartition, error) {
@@ -2560,8 +2560,8 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 
 				fnIDsMu.Lock()
 				fnIDs[fnMeta.FnID] = fnMeta.Paused
-				if fnMeta.Migrate != nil {
-					migrateIDs[fnMeta.FnID] = *fnMeta.Migrate
+				if fnMeta.Migrate {
+					migrateIDs[fnMeta.FnID] = true
 				}
 				fnIDsMu.Unlock()
 
@@ -2598,9 +2598,10 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 
 			if _, ok := migrateIDs[*item.FunctionID]; ok {
 				switch q.name {
-				case "migrator":
+				case osqueue.QueueNameMigrator:
 					// no-op, let migrator do it's thing
 				default:
+					// skip this if the executor is not responsible for migrating queues
 					ignored++
 					continue
 				}

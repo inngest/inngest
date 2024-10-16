@@ -9,6 +9,10 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+const (
+	QueueNameMigrator = "queue-migrator"
+)
+
 type Queue interface {
 	Producer
 	Consumer
