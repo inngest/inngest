@@ -86,6 +86,7 @@ func TestVerifyKeyGenerator(t *testing.T) {
 	globalKg := globalKeyGenerator{stateDefaultKey: "estate"}
 
 	assert.Equal(t, legacyKg.Invoke(ctx, fakeUuid), globalKg.Invoke(ctx, fakeUuid))
-	assert.Equal(t, legacyKg.Workflow(ctx, fakeUuid, 1), globalKg.Workflow(ctx, fakeUuid, 1))
+	// No longer used
+	//assert.Equal(t, legacyKg.Workflow(ctx, fakeUuid, 1), globalKg.Workflow(ctx, fakeUuid, 1))
 
 }
