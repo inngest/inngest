@@ -60,3 +60,21 @@ export const testAutoSetup = async (input: CdcConnectionInput) => {
     input: input,
   });
 };
+
+const testManualSetupDocument = graphql(`
+  mutation testManualSetup($input: CDCConnectionInput!, $envID: UUID!) {
+    cdcManualSetup(input: $input, envID: $envID) {
+      steps
+      error
+    }
+  }
+`);
+
+export const testManualSetup = async (input: CdcConnectionInput) => {
+  const environment = await getProductionEnvironment();
+
+  return await graphqlAPI.request<{ cdcManualSetup: CdcSetupResponse }>(testManualSetupDocument, {
+    envID: environment.id,
+    input: input,
+  });
+};
