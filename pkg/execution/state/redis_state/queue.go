@@ -529,6 +529,12 @@ func WithQueueShardName(name string) QueueOpt {
 	}
 }
 
+func WithQueueShardClients(queueShards map[string]*QueueClient) QueueOpt {
+	return func(q *queue) {
+		q.queueShardClients = queueShards
+	}
+}
+
 type queue struct {
 	// name is the identifiable name for this worker, for logging.
 	name string
@@ -536,8 +542,8 @@ type queue struct {
 	// primaryQueueClient stores the redis connection to use.
 	primaryQueueClient *QueueClient
 	queueShardName     string
-
-	shardSelector ShardSelector
+	queueShardClients  map[string]*QueueClient
+	shardSelector      ShardSelector
 
 	ppf PartitionPriorityFinder
 	apf AccountPriorityFinder
@@ -1225,44 +1231,112 @@ func (q *queue) OutstandingJobCount(ctx context.Context, workspaceID, workflowID
 func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status string) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "StatusCount"), redis_telemetry.ScopeQueue)
 
-	key := q.primaryQueueClient.kg.Status(status, workflowID)
-	cmd := q.primaryQueueClient.unshardedRc.B().Zcount().Key(key).Min("-inf").Max("+inf").Build()
-	count, err := q.primaryQueueClient.unshardedRc.Do(ctx, cmd).AsInt64()
-	if err != nil {
-		return 0, fmt.Errorf("error inspecting function queue status: %w", err)
+	iterate := func(client *QueueClient) (int64, error) {
+		key := client.kg.Status(status, workflowID)
+		cmd := client.unshardedRc.B().Zcount().Key(key).Min("-inf").Max("+inf").Build()
+		count, err := client.unshardedRc.Do(ctx, cmd).AsInt64()
+		if err != nil {
+			return 0, fmt.Errorf("error inspecting function queue status: %w", err)
+		}
+
+		return count, nil
 	}
+
+	var count int64
+
+	// Start with default shard
+	defaultCount, err := iterate(q.primaryQueueClient)
+	if err != nil {
+		return 0, fmt.Errorf("could not count status for default shard: %w", err)
+	}
+	count += defaultCount
+
+	// Map-reduce over shards
+	if q.queueShardClients != nil {
+		eg := errgroup.Group{}
+
+		for shardName, client := range q.queueShardClients {
+			eg.Go(func() error {
+				shardCount, err := iterate(client)
+				if err != nil {
+					return fmt.Errorf("could not count status for shard %s: %w", shardName, err)
+				}
+				atomic.AddInt64(&count, shardCount)
+				return nil
+			})
+		}
+
+		err := eg.Wait()
+		if err != nil {
+			return 0, err
+		}
+	}
+
 	return count, nil
 }
 
 func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RunningCount"), redis_telemetry.ScopeQueue)
 
-	// Load the partition for a given queue.  This allows us to generate the concurrency
-	// key properly via the given function.
-	//
-	// TODO: Remove the ability to change keys based off of initialized inputs.  It's more trouble than
-	// it's worth, and ends up meaning we have more queries to write (such as this) in order to load
-	// relevant data.
-	cmd := q.primaryQueueClient.unshardedRc.B().Hget().Key(q.primaryQueueClient.kg.PartitionItem()).Field(workflowID.String()).Build()
-	enc, err := q.primaryQueueClient.unshardedRc.Do(ctx, cmd).AsBytes()
-	if rueidis.IsRedisNil(err) {
-		return 0, nil
-	}
-	if err != nil {
-		return 0, fmt.Errorf("error fetching partition: %w", err)
-	}
-	item := &QueuePartition{}
-	if err = json.Unmarshal(enc, item); err != nil {
-		return 0, fmt.Errorf("error reading partition item: %w", err)
+	iterate := func(client *QueueClient) (int64, error) {
+		// Load the partition for a given queue.  This allows us to generate the concurrency
+		// key properly via the given function.
+		//
+		// TODO: Remove the ability to change keys based off of initialized inputs.  It's more trouble than
+		// it's worth, and ends up meaning we have more queries to write (such as this) in order to load
+		// relevant data.
+		cmd := client.unshardedRc.B().Hget().Key(client.kg.PartitionItem()).Field(workflowID.String()).Build()
+		enc, err := client.unshardedRc.Do(ctx, cmd).AsBytes()
+		if rueidis.IsRedisNil(err) {
+			return 0, nil
+		}
+		if err != nil {
+			return 0, fmt.Errorf("error fetching partition: %w", err)
+		}
+		item := &QueuePartition{}
+		if err = json.Unmarshal(enc, item); err != nil {
+			return 0, fmt.Errorf("error reading partition item: %w", err)
+		}
+
+		// Fetch the concurrency via the partition concurrency name.
+		key := client.kg.Concurrency("p", workflowID.String())
+		cmd = client.unshardedRc.B().Zcard().Key(key).Build()
+		count, err := client.unshardedRc.Do(ctx, cmd).AsInt64()
+		if err != nil {
+			return 0, fmt.Errorf("error inspecting running job count: %w", err)
+		}
+		return count, nil
 	}
 
-	// Fetch the concurrency via the partition concurrency name.
-	key := q.primaryQueueClient.kg.Concurrency("p", workflowID.String())
-	cmd = q.primaryQueueClient.unshardedRc.B().Zcard().Key(key).Build()
-	count, err := q.primaryQueueClient.unshardedRc.Do(ctx, cmd).AsInt64()
+	// Start with default shard
+	var count int64
+	defaultCount, err := iterate(q.primaryQueueClient)
 	if err != nil {
-		return 0, fmt.Errorf("error inspecting running job count: %w", err)
+		return 0, err
 	}
+	count += defaultCount
+
+	// Map-reduce over shards
+	if q.queueShardClients != nil {
+		eg := errgroup.Group{}
+
+		for shardName, client := range q.queueShardClients {
+			eg.Go(func() error {
+				shardCount, err := iterate(client)
+				if err != nil {
+					return fmt.Errorf("could not count running jobs for shard %s: %w", shardName, err)
+				}
+				atomic.AddInt64(&count, shardCount)
+				return nil
+			})
+		}
+
+		err := eg.Wait()
+		if err != nil {
+			return 0, err
+		}
+	}
+
 	return count, nil
 }
 
