@@ -1,15 +1,15 @@
 --[[
 
-  Sets the "off" boolean on the metadata for the given function metadata key.
+  Sets the "migrate" value on the metadata for the given function metadata key.
 
   Return values:
-  0 - Updated "off" boolean
+  0 - Updated successfully
 
 ]]
 
 local keyFnMeta = KEYS[1]
 
-local isPaused     = tonumber(ARGV[1])
+local migrate     = ARGV[1]
 local defaultMeta  = ARGV[2]
 
 -- $include(get_fn_meta.lua)
@@ -19,11 +19,7 @@ if existing == nil then
 	return 0
 end
 
-if isPaused == 1 then
-    existing.off = true
-else
-    existing.off = false
-end
+existing.migrate = migrate
 redis.call("SET", keyFnMeta, cjson.encode(existing))
 
 return 0

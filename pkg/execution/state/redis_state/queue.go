@@ -679,6 +679,9 @@ type FnMetadata struct {
 	// Paused represents whether the fn is paused.  This allows us to prevent leases
 	// to a given partition if the partition belongs to a fn.
 	Paused bool `json:"off"`
+
+	// Migrate sets the target queue shard that the current function queue should be moved to
+	Migrate *string `json:"migrate"`
 }
 
 // QueuePartition represents an individual queue for a workflow.  It stores the
@@ -1431,6 +1434,42 @@ func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID
 	}
 
 	return nil
+}
+
+func (q *queue) SetFunctionMigrate(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID, migrate string) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionMigrate"), redis_telemetry.ScopeQueue)
+
+	defaultMeta := FnMetadata{
+		FnID:    fnID,
+		Migrate: &migrate,
+	}
+
+	keys := []string{q.primaryQueueClient.kg.FnMetadata(fnID)}
+	args, err := StrSlice([]any{
+		migrate,
+		defaultMeta,
+	})
+	if err != nil {
+		return err
+	}
+
+	status, err := scripts["queue/fnSetMigrate"].Exec(
+		ctx,
+		q.primaryQueueClient.unshardedRc,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error updating queue migrate state: %w", err)
+	}
+
+	switch status {
+	case 0:
+		return nil
+
+	default:
+		return fmt.Errorf("unknown response updating queue migration state: %d", err)
+	}
 }
 
 // Peek takes n items from a queue, up until QueuePeekMax.  For peeking workflow/

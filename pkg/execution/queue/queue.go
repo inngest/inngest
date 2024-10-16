@@ -16,6 +16,7 @@ type Queue interface {
 	JobQueueReader
 
 	SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, paused bool) error
+	SetFunctionMigrate(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID, migrate string) error
 }
 
 type RunInfo struct {
