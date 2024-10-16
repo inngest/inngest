@@ -437,9 +437,9 @@ type ConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) Partitio
 // SystemConcurrencyLimitGetter returns the concurrency limits for a given system partition.
 type SystemConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits
 
-func NewQueue(primaryQueueClient *QueueClient, opts ...QueueOpt) *queue {
+func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 	q := &queue{
-		primaryQueueClient: primaryQueueClient,
+		primaryQueueShard: primaryQueueShard,
 		ppf: func(_ context.Context, _ QueuePartition) uint {
 			return PriorityDefault
 		},
@@ -506,11 +506,7 @@ func NewQueue(primaryQueueClient *QueueClient, opts ...QueueOpt) *queue {
 
 	// default to using primary queue client for shard selection
 	q.shardSelector = func(_ context.Context, _ osqueue.QueueItem) (QueueShard, error) {
-		return QueueShard{
-			Name:        consts.DefaultQueueShardName,
-			Kind:        string(enums.QueueShardKindRedis),
-			RedisClient: primaryQueueClient,
-		}, nil
+		return q.primaryQueueShard, nil
 	}
 
 	for _, opt := range opts {
@@ -523,12 +519,6 @@ func NewQueue(primaryQueueClient *QueueClient, opts ...QueueOpt) *queue {
 	return q
 }
 
-func WithQueueShardName(name string) QueueOpt {
-	return func(q *queue) {
-		q.queueShardName = name
-	}
-}
-
 func WithQueueShardClients(queueShards map[string]QueueShard) QueueOpt {
 	return func(q *queue) {
 		q.queueShardClients = queueShards
@@ -539,9 +529,9 @@ type queue struct {
 	// name is the identifiable name for this worker, for logging.
 	name string
 
-	// primaryQueueClient stores the redis connection to use.
-	primaryQueueClient *QueueClient
-	queueShardName     string
+	// primaryQueueShard stores the queue shard to use.
+	primaryQueueShard QueueShard
+
 	// queueShardClients contains all non-default queue shard clients.
 	queueShardClients map[string]QueueShard
 	shardSelector     ShardSelector
@@ -884,7 +874,7 @@ func (q QueuePartition) MarshalBinary() ([]byte, error) {
 // Note: Currently, we only ever return 2 partitions (2x custom concurrency keys or function + custom concurrency key)
 // Note: For backwards compatibility, we may return a third partition for the function itself, in case two custom concurrency keys are used.
 // This will change with the implementation of throttling key queues.
-func (q *queue) ItemPartitions(ctx context.Context, i osqueue.QueueItem) ([]QueuePartition, int) {
+func (q *queue) ItemPartitions(ctx context.Context, shard QueueShard, i osqueue.QueueItem) ([]QueuePartition, int) {
 	var (
 		partitions []QueuePartition
 		ckeys      = i.Data.GetConcurrencyKeys()
@@ -981,7 +971,7 @@ func (q *queue) ItemPartitions(ctx context.Context, i osqueue.QueueItem) ([]Queu
 			}
 
 			partition := QueuePartition{
-				ID:               q.primaryQueueClient.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, id.String(), checksum),
+				ID:               shard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, id.String(), checksum),
 				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
 				FunctionID:       &i.FunctionID,
 				AccountID:        i.Data.Identifier.AccountID,
@@ -1030,6 +1020,10 @@ func (q *queue) ItemPartitions(ctx context.Context, i osqueue.QueueItem) ([]Queu
 func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.QueueItem, at time.Time) (osqueue.QueueItem, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "EnqueueItem"), redis_telemetry.ScopeQueue)
 
+	if shard.Kind != string(enums.QueueShardKindRedis) {
+		return osqueue.QueueItem{}, fmt.Errorf("unsupported queue shard kind for EnqueueItem: %s", shard.Kind)
+	}
+
 	if len(i.ID) == 0 {
 		i.SetID(ctx, ulid.MustNew(ulid.Now(), rnd).String())
 	} else {
@@ -1063,7 +1057,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		partitionTime = q.clock.Now()
 	}
 
-	parts, _ := q.ItemPartitions(ctx, i)
+	parts, _ := q.ItemPartitions(ctx, shard, i)
 	isSystemPartition := parts[0].IsSystem()
 
 	if i.Data.Identifier.AccountID == uuid.Nil && !isSystemPartition {
@@ -1170,10 +1164,14 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 		limit = 1000
 	}
 
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for RunJobs: %s", q.primaryQueueShard.Kind)
+	}
+
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RunJobs"), redis_telemetry.ScopeQueue)
 
-	cmd := q.primaryQueueClient.unshardedRc.B().Zscan().Key(q.primaryQueueClient.kg.RunIndex(runID)).Cursor(uint64(offset)).Count(limit).Build()
-	jobIDs, err := q.primaryQueueClient.unshardedRc.Do(ctx, cmd).AsScanEntry()
+	cmd := q.primaryQueueShard.RedisClient.unshardedRc.B().Zscan().Key(q.primaryQueueShard.RedisClient.kg.RunIndex(runID)).Cursor(uint64(offset)).Count(limit).Build()
+	jobIDs, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).AsScanEntry()
 	if err != nil {
 		return nil, fmt.Errorf("error reading index: %w", err)
 	}
@@ -1183,7 +1181,7 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 	}
 
 	// Get all job items.
-	jsonItems, err := q.primaryQueueClient.unshardedRc.Do(ctx, q.primaryQueueClient.unshardedRc.B().Hmget().Key(q.primaryQueueClient.kg.QueueItem()).Field(jobIDs.Elements...).Build()).AsStrSlice()
+	jsonItems, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, q.primaryQueueShard.RedisClient.unshardedRc.B().Hmget().Key(q.primaryQueueShard.RedisClient.kg.QueueItem()).Field(jobIDs.Elements...).Build()).AsStrSlice()
 	if err != nil {
 		return nil, fmt.Errorf("error reading jobs: %w", err)
 	}
@@ -1201,8 +1199,8 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 		if qi.Data.Identifier.WorkspaceID != workspaceID {
 			continue
 		}
-		cmd := q.primaryQueueClient.unshardedRc.B().Zrank().Key(q.primaryQueueClient.kg.FnQueueSet(workflowID.String())).Member(qi.ID).Build()
-		pos, err := q.primaryQueueClient.unshardedRc.Do(ctx, cmd).AsInt64()
+		cmd := q.primaryQueueShard.RedisClient.unshardedRc.B().Zrank().Key(q.primaryQueueShard.RedisClient.kg.FnQueueSet(workflowID.String())).Member(qi.ID).Build()
+		pos, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).AsInt64()
 		if !rueidis.IsRedisNil(err) && err != nil {
 			return nil, fmt.Errorf("error reading queue position: %w", err)
 		}
@@ -1221,8 +1219,12 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 func (q *queue) OutstandingJobCount(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID) (int, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "OutstandingJobCount"), redis_telemetry.ScopeQueue)
 
-	cmd := q.primaryQueueClient.unshardedRc.B().Zcard().Key(q.primaryQueueClient.kg.RunIndex(runID)).Build()
-	count, err := q.primaryQueueClient.unshardedRc.Do(ctx, cmd).AsInt64()
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return 0, fmt.Errorf("unsupported queue shard kind for OutstandingJobCount: %s", q.primaryQueueShard.Kind)
+	}
+
+	cmd := q.primaryQueueShard.RedisClient.unshardedRc.B().Zcard().Key(q.primaryQueueShard.RedisClient.kg.RunIndex(runID)).Build()
+	count, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).AsInt64()
 	if err != nil {
 		return 0, fmt.Errorf("error counting index cardinality: %w", err)
 	}
@@ -1245,12 +1247,15 @@ func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status st
 
 	var count int64
 
-	// Start with default shard
-	defaultCount, err := iterate(q.primaryQueueClient)
-	if err != nil {
-		return 0, fmt.Errorf("could not count status for default shard: %w", err)
+	// TODO Support other storage backends
+	if q.primaryQueueShard.Kind == string(enums.QueueShardKindRedis) {
+		// Start with default shard
+		defaultCount, err := iterate(q.primaryQueueShard.RedisClient)
+		if err != nil {
+			return 0, fmt.Errorf("could not count status for default shard: %w", err)
+		}
+		count += defaultCount
 	}
-	count += defaultCount
 
 	// Map-reduce over shards
 	if q.queueShardClients != nil {
@@ -1314,13 +1319,17 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 		return count, nil
 	}
 
-	// Start with default shard
 	var count int64
-	defaultCount, err := iterate(q.primaryQueueClient)
-	if err != nil {
-		return 0, err
+
+	// TODO Support other storage backends
+	if q.primaryQueueShard.Kind == string(enums.QueueShardKindRedis) {
+		// Start with default shard
+		defaultCount, err := iterate(q.primaryQueueShard.RedisClient)
+		if err != nil {
+			return 0, err
+		}
+		count += defaultCount
 	}
-	count += defaultCount
 
 	// Map-reduce over shards
 	if q.queueShardClients != nil {
@@ -1359,58 +1368,90 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, paused bool) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionPaused"), redis_telemetry.ScopeQueue)
 
-	pausedArg := "0"
-	if paused {
-		pausedArg = "1"
+	iterate := func(shard QueueShard) error {
+		// TODO Support other storage backends
+		if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+			return nil
+		}
+
+		pausedArg := "0"
+		if paused {
+			pausedArg = "1"
+		}
+
+		// This is written to the store if fn metadata doesn't exist.
+		defaultFnMetadata := FnMetadata{
+			FnID:   fnID,
+			Paused: paused,
+		}
+
+		keys := []string{shard.RedisClient.kg.FnMetadata(fnID)}
+		args, err := StrSlice([]any{
+			pausedArg,
+			defaultFnMetadata,
+		})
+		if err != nil {
+			return err
+		}
+
+		status, err := scripts["queue/fnSetPaused"].Exec(
+			redis_telemetry.WithScriptName(ctx, "fnSetPaused"),
+			shard.RedisClient.unshardedRc,
+			keys,
+			args,
+		).AsInt64()
+		if err != nil {
+			return fmt.Errorf("error updating paused state: %w", err)
+		}
+		switch status {
+		case 0:
+			// If a function was paused, there's no need to process it. We can push back paused partitions for a long time.
+			// Instead of doing this here, we push back paused partitions in partitionPeek to prevent racing a currently processing partition.
+			if !paused {
+				fnPart := QueuePartition{
+					ID:         fnID.String(),
+					FunctionID: &fnID,
+					AccountID:  accountId,
+				}
+
+				// When it does get unpaused, we should immediately start processing it again
+				err := q.PartitionRequeue(ctx, shard, &fnPart, time.Now(), false)
+				if err != nil && !errors.Is(err, ErrPartitionNotFound) && !errors.Is(err, ErrPartitionGarbageCollected) {
+
+					return fmt.Errorf("could not requeue partition after modifying paused state to %t: %w", paused, err)
+				}
+			}
+
+			return nil
+		default:
+			return fmt.Errorf("unknown response updating paused state: %d", status)
+		}
 	}
 
-	// This is written to the store if fn metadata doesn't exist.
-	defaultFnMetadata := FnMetadata{
-		FnID:   fnID,
-		Paused: paused,
-	}
-
-	keys := []string{q.primaryQueueClient.kg.FnMetadata(fnID)}
-	args, err := StrSlice([]any{
-		pausedArg,
-		defaultFnMetadata,
-	})
+	err := iterate(q.primaryQueueShard)
 	if err != nil {
 		return err
 	}
 
-	status, err := scripts["queue/fnSetPaused"].Exec(
-		redis_telemetry.WithScriptName(ctx, "fnSetPaused"),
-		q.primaryQueueClient.unshardedRc,
-		keys,
-		args,
-	).AsInt64()
-	if err != nil {
-		return fmt.Errorf("error updating paused state: %w", err)
-	}
-	switch status {
-	case 0:
-		// If a function was paused, there's no need to process it. We can push back paused partitions for a long time.
-		// Instead of doing this here, we push back paused partitions in partitionPeek to prevent racing a currently processing partition.
-		if !paused {
-			fnPart := QueuePartition{
-				ID:         fnID.String(),
-				FunctionID: &fnID,
-				AccountID:  accountId,
-			}
+	if q.queueShardClients != nil {
+		eg := errgroup.Group{}
+		for _, shard := range q.queueShardClients {
+			eg.Go(func() error {
+				err := iterate(shard)
+				if err != nil {
+					return fmt.Errorf("could not update paused state for shard %s: %w", shard.Name, err)
+				}
 
-			// When it does get unpaused, we should immediately start processing it again
-			err := q.PartitionRequeue(ctx, &fnPart, time.Now(), false)
-			if err != nil && !errors.Is(err, ErrPartitionNotFound) && !errors.Is(err, ErrPartitionGarbageCollected) {
-
-				return fmt.Errorf("could not requeue partition after modifying paused state to %t: %w", paused, err)
-			}
+				return nil
+			})
 		}
 
-		return nil
-	default:
-		return fmt.Errorf("unknown response updating paused state: %d", status)
+		if err := eg.Wait(); err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 // Peek takes n items from a queue, up until QueuePeekMax.  For peeking workflow/
@@ -1421,6 +1462,10 @@ func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID
 // queue.
 func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*osqueue.QueueItem, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Peek"), redis_telemetry.ScopeQueue)
+
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for Peek: %s", q.primaryQueueShard.Kind)
+	}
 
 	if partition == nil {
 		return nil, fmt.Errorf("expected partition to be set")
@@ -1451,10 +1496,10 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 
 	peekRet, err := scripts["queue/peek"].Exec(
 		redis_telemetry.WithScriptName(ctx, "peek"),
-		q.primaryQueueClient.unshardedRc,
+		q.primaryQueueShard.RedisClient.unshardedRc,
 		[]string{
-			partition.zsetKey(q.primaryQueueClient.kg),
-			q.primaryQueueClient.kg.QueueItem(),
+			partition.zsetKey(q.primaryQueueShard.RedisClient.kg),
+			q.primaryQueueShard.RedisClient.kg.QueueItem(),
 		},
 		args,
 	).ToAny()
@@ -1487,12 +1532,12 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 	for idx, itemId := range allQueueItemIds {
 		if potentiallyMissingItems[idx] == nil {
 			if itemId == nil {
-				return nil, fmt.Errorf("encountered nil queue item key in partition queue %q", partition.zsetKey(q.primaryQueueClient.kg))
+				return nil, fmt.Errorf("encountered nil queue item key in partition queue %q", partition.zsetKey(q.primaryQueueShard.RedisClient.kg))
 			}
 
 			str, ok := itemId.(string)
 			if !ok {
-				return nil, fmt.Errorf("encountered non-string queue item key in partition queue %q", partition.zsetKey(q.primaryQueueClient.kg))
+				return nil, fmt.Errorf("encountered non-string queue item key in partition queue %q", partition.zsetKey(q.primaryQueueShard.RedisClient.kg))
 			}
 
 			missingQueueItems = append(missingQueueItems, str)
@@ -1504,9 +1549,9 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 	if len(missingQueueItems) > 0 {
 		// TODO This can happen, be careful
 		if partition.AccountID == uuid.Nil {
-			q.logger.Error().Interface("items", missingQueueItems).Str("partition", partition.zsetKey(q.primaryQueueClient.kg)).Msg("encountered missing queue items")
+			q.logger.Error().Interface("items", missingQueueItems).Str("partition", partition.zsetKey(q.primaryQueueShard.RedisClient.kg)).Msg("encountered missing queue items")
 
-			return nil, fmt.Errorf("encountered missing queue items in partition queue %q", partition.zsetKey(q.primaryQueueClient.kg))
+			return nil, fmt.Errorf("encountered missing queue items in partition queue %q", partition.zsetKey(q.primaryQueueShard.RedisClient.kg))
 		}
 
 		eg := errgroup.Group{}
@@ -1538,7 +1583,7 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 	now := q.clock.Now()
 	return util.ParallelDecode(items, func(val any) (*osqueue.QueueItem, error) {
 		if val == nil {
-			q.logger.Error().Str("partition", partition.zsetKey(q.primaryQueueClient.kg)).Msg("nil item value in peek response")
+			q.logger.Error().Str("partition", partition.zsetKey(q.primaryQueueShard.RedisClient.kg)).Msg("nil item value in peek response")
 			return nil, nil
 		}
 
@@ -1575,11 +1620,15 @@ func (q *queue) decodeQueueItemFromPeek(str string, now time.Time) (*osqueue.Que
 func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RequeueByJobID"), redis_telemetry.ScopeQueue)
 
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return fmt.Errorf("unsupported queue shard kind for RequeueByJobID: %s", q.primaryQueueShard.Kind)
+	}
+
 	jobID = osqueue.HashID(ctx, jobID)
 
 	// Find the queue item so that we can fetch the shard info.
 	i := osqueue.QueueItem{}
-	if err := q.primaryQueueClient.unshardedRc.Do(ctx, q.primaryQueueClient.unshardedRc.B().Hget().Key(q.primaryQueueClient.kg.QueueItem()).Field(jobID).Build()).DecodeJSON(&i); err != nil {
+	if err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, q.primaryQueueShard.RedisClient.unshardedRc.B().Hget().Key(q.primaryQueueShard.RedisClient.kg.QueueItem()).Field(jobID).Build()).DecodeJSON(&i); err != nil {
 		return err
 	}
 
@@ -1593,18 +1642,18 @@ func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) 
 	// the queue item instead of just the partition passed via args.
 	//
 	// This is because a single queue item may be present in more than one queue.
-	parts, _ := q.ItemPartitions(ctx, i)
+	parts, _ := q.ItemPartitions(ctx, q.primaryQueueShard, i)
 
 	keys := []string{
-		q.primaryQueueClient.kg.QueueItem(),
-		q.primaryQueueClient.kg.PartitionItem(), // Partition item, map
-		q.primaryQueueClient.kg.GlobalPartitionIndex(),
-		q.primaryQueueClient.kg.GlobalAccountIndex(),
-		q.primaryQueueClient.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
+		q.primaryQueueShard.RedisClient.kg.QueueItem(),
+		q.primaryQueueShard.RedisClient.kg.PartitionItem(), // Partition item, map
+		q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex(),
+		q.primaryQueueShard.RedisClient.kg.GlobalAccountIndex(),
+		q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
 
-		parts[0].zsetKey(q.primaryQueueClient.kg),
-		parts[1].zsetKey(q.primaryQueueClient.kg),
-		parts[2].zsetKey(q.primaryQueueClient.kg),
+		parts[0].zsetKey(q.primaryQueueShard.RedisClient.kg),
+		parts[1].zsetKey(q.primaryQueueShard.RedisClient.kg),
+		parts[2].zsetKey(q.primaryQueueShard.RedisClient.kg),
 	}
 	args, err := StrSlice([]any{
 		jobID,
@@ -1626,7 +1675,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) 
 	}
 	status, err := scripts["queue/requeueByID"].Exec(
 		redis_telemetry.WithScriptName(ctx, "requeueByID"),
-		q.primaryQueueClient.unshardedRc,
+		q.primaryQueueShard.RedisClient.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
@@ -1660,6 +1709,10 @@ func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) 
 func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, duration time.Duration, now time.Time, denies *leaseDenies) (*ulid.ULID, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Lease"), redis_telemetry.ScopeQueue)
 
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for Lease: %s", q.primaryQueueShard.Kind)
+	}
+
 	if item.Data.Throttle != nil && denies != nil && denies.denyThrottle(item.Data.Throttle.Key) {
 		return nil, ErrQueueItemThrottled
 	}
@@ -1677,7 +1730,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, duration time
 	}
 
 	// Grab all partitions for the queue item
-	parts, acctLimit := q.ItemPartitions(ctx, item)
+	parts, acctLimit := q.ItemPartitions(ctx, q.primaryQueueShard, item)
 	for _, partition := range parts {
 		// Check to see if this key has already been denied in the lease iteration.
 		// If so, fail early.
@@ -1695,14 +1748,14 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, duration time
 	// For system partitions, this doesn't make a lot of sense, but it matches the previous
 	// implementation. In the future, we should streamline the abstraction layers so that the
 	// queue does not need to handle account-related details outside the account scope.
-	accountConcurrencyKey := q.primaryQueueClient.kg.Concurrency("account", item.Data.Identifier.AccountID.String())
+	accountConcurrencyKey := q.primaryQueueShard.RedisClient.kg.Concurrency("account", item.Data.Identifier.AccountID.String())
 	if len(parts) > 0 && parts[0].IsSystem() {
 		// Always apply system partition-specific concurrency limits
 		// "account" prefix is used for backwards-compatibility
-		accountConcurrencyKey = q.primaryQueueClient.kg.Concurrency("account", parts[0].Queue())
+		accountConcurrencyKey = q.primaryQueueShard.RedisClient.kg.Concurrency("account", parts[0].Queue())
 		if *parts[0].QueueName == osqueue.KindScheduleBatch {
 			// we previously used an empty uuid for account + partition, see concrete WithAccountConcurrencyKeyGenerator in cloud
-			accountConcurrencyKey = q.primaryQueueClient.kg.Concurrency("account", uuid.Nil.String())
+			accountConcurrencyKey = q.primaryQueueShard.RedisClient.kg.Concurrency("account", uuid.Nil.String())
 		}
 	} else if acctLimit <= 0 {
 		// NOTE: This should have been called in ItemPartitions.  We always need to fetch the latest
@@ -1715,20 +1768,20 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, duration time
 	}
 
 	keys := []string{
-		q.primaryQueueClient.kg.QueueItem(),
+		q.primaryQueueShard.RedisClient.kg.QueueItem(),
 		// Pass in the actual key queue
-		parts[0].zsetKey(q.primaryQueueClient.kg),
-		parts[1].zsetKey(q.primaryQueueClient.kg),
-		parts[2].zsetKey(q.primaryQueueClient.kg),
+		parts[0].zsetKey(q.primaryQueueShard.RedisClient.kg),
+		parts[1].zsetKey(q.primaryQueueShard.RedisClient.kg),
+		parts[2].zsetKey(q.primaryQueueShard.RedisClient.kg),
 		// And pass in the key queue's concurrency keys.
-		parts[0].concurrencyKey(q.primaryQueueClient.kg),
-		parts[1].concurrencyKey(q.primaryQueueClient.kg),
-		parts[2].concurrencyKey(q.primaryQueueClient.kg),
-		q.primaryQueueClient.kg.ConcurrencyIndex(),
-		q.primaryQueueClient.kg.GlobalPartitionIndex(),
-		q.primaryQueueClient.kg.GlobalAccountIndex(),
-		q.primaryQueueClient.kg.AccountPartitionIndex(item.Data.Identifier.AccountID),
-		q.primaryQueueClient.kg.ThrottleKey(item.Data.Throttle),
+		parts[0].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
+		parts[1].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
+		parts[2].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
+		q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex(),
+		q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex(),
+		q.primaryQueueShard.RedisClient.kg.GlobalAccountIndex(),
+		q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(item.Data.Identifier.AccountID),
+		q.primaryQueueShard.RedisClient.kg.ThrottleKey(item.Data.Throttle),
 		// Finally, there are ALWAYS account-level concurrency keys.
 		accountConcurrencyKey,
 	}
@@ -1753,7 +1806,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, duration time
 
 	status, err := scripts["queue/lease"].Exec(
 		redis_telemetry.WithScriptName(ctx, "lease"),
-		q.primaryQueueClient.unshardedRc,
+		q.primaryQueueShard.RedisClient.unshardedRc,
 		keys,
 		args,
 	).ToInt64()
@@ -1810,29 +1863,33 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, duration time
 func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ExtendLease"), redis_telemetry.ScopeQueue)
 
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for ExtendLease: %s", q.primaryQueueShard.Kind)
+	}
+
 	newLeaseID, err := ulid.New(ulid.Timestamp(q.clock.Now().Add(duration).UTC()), rnd)
 	if err != nil {
 		return nil, fmt.Errorf("error generating id: %w", err)
 	}
 
-	parts, _ := q.ItemPartitions(ctx, i)
-	accountConcurrencyKey := q.primaryQueueClient.kg.Concurrency("account", i.Data.Identifier.AccountID.String())
+	parts, _ := q.ItemPartitions(ctx, q.primaryQueueShard, i)
+	accountConcurrencyKey := q.primaryQueueShard.RedisClient.kg.Concurrency("account", i.Data.Identifier.AccountID.String())
 	if len(parts) > 0 && parts[0].IsSystem() {
-		accountConcurrencyKey = q.primaryQueueClient.kg.Concurrency("account", parts[0].Queue())
+		accountConcurrencyKey = q.primaryQueueShard.RedisClient.kg.Concurrency("account", parts[0].Queue())
 	}
 
 	keys := []string{
-		q.primaryQueueClient.kg.QueueItem(),
+		q.primaryQueueShard.RedisClient.kg.QueueItem(),
 		// Pass in the actual key queue
-		parts[0].zsetKey(q.primaryQueueClient.kg),
-		parts[1].zsetKey(q.primaryQueueClient.kg),
-		parts[2].zsetKey(q.primaryQueueClient.kg),
+		parts[0].zsetKey(q.primaryQueueShard.RedisClient.kg),
+		parts[1].zsetKey(q.primaryQueueShard.RedisClient.kg),
+		parts[2].zsetKey(q.primaryQueueShard.RedisClient.kg),
 		// And pass in the key queue's concurrency keys.
-		parts[0].concurrencyKey(q.primaryQueueClient.kg),
-		parts[1].concurrencyKey(q.primaryQueueClient.kg),
-		parts[2].concurrencyKey(q.primaryQueueClient.kg),
+		parts[0].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
+		parts[1].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
+		parts[2].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
 		accountConcurrencyKey,
-		q.primaryQueueClient.kg.ConcurrencyIndex(),
+		q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex(),
 	}
 
 	args, err := StrSlice([]any{
@@ -1846,7 +1903,7 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 
 	status, err := scripts["queue/extendLease"].Exec(
 		redis_telemetry.WithScriptName(ctx, "extendLease"),
-		q.primaryQueueClient.unshardedRc,
+		q.primaryQueueShard.RedisClient.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
@@ -1871,34 +1928,38 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Dequeue"), redis_telemetry.ScopeQueue)
 
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return fmt.Errorf("unsupported queue shard kind for Dequeue: %s", q.primaryQueueShard.Kind)
+	}
+
 	// Remove all items from all partitions.  For this, we need all partitions for
 	// the queue item instead of just the partition passed via args.
 	//
 	// This is because a single queue item may be present in more than one queue.
-	parts, _ := q.ItemPartitions(ctx, i)
-	accountConcurrencyKey := q.primaryQueueClient.kg.Concurrency("account", i.Data.Identifier.AccountID.String())
+	parts, _ := q.ItemPartitions(ctx, q.primaryQueueShard, i)
+	accountConcurrencyKey := q.primaryQueueShard.RedisClient.kg.Concurrency("account", i.Data.Identifier.AccountID.String())
 	if len(parts) > 0 && parts[0].IsSystem() {
-		accountConcurrencyKey = q.primaryQueueClient.kg.Concurrency("account", parts[0].Queue())
+		accountConcurrencyKey = q.primaryQueueShard.RedisClient.kg.Concurrency("account", parts[0].Queue())
 	}
 
 	keys := []string{
-		q.primaryQueueClient.kg.QueueItem(),
-		parts[0].zsetKey(q.primaryQueueClient.kg),
-		parts[1].zsetKey(q.primaryQueueClient.kg),
-		parts[2].zsetKey(q.primaryQueueClient.kg),
-		parts[0].concurrencyKey(q.primaryQueueClient.kg),
-		parts[1].concurrencyKey(q.primaryQueueClient.kg),
-		parts[2].concurrencyKey(q.primaryQueueClient.kg),
+		q.primaryQueueShard.RedisClient.kg.QueueItem(),
+		parts[0].zsetKey(q.primaryQueueShard.RedisClient.kg),
+		parts[1].zsetKey(q.primaryQueueShard.RedisClient.kg),
+		parts[2].zsetKey(q.primaryQueueShard.RedisClient.kg),
+		parts[0].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
+		parts[1].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
+		parts[2].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
 		accountConcurrencyKey,
-		q.primaryQueueClient.kg.Idempotency(i.ID),
-		q.primaryQueueClient.kg.ConcurrencyIndex(),
-		q.primaryQueueClient.kg.GlobalPartitionIndex(),
-		q.primaryQueueClient.kg.GlobalAccountIndex(),
-		q.primaryQueueClient.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
-		q.primaryQueueClient.kg.PartitionItem(),
+		q.primaryQueueShard.RedisClient.kg.Idempotency(i.ID),
+		q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex(),
+		q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex(),
+		q.primaryQueueShard.RedisClient.kg.GlobalAccountIndex(),
+		q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
+		q.primaryQueueShard.RedisClient.kg.PartitionItem(),
 	}
 	// Append indexes
-	for _, idx := range q.itemIndexer(ctx, i, q.primaryQueueClient.kg) {
+	for _, idx := range q.itemIndexer(ctx, i, q.primaryQueueShard.RedisClient.kg) {
 		if idx != "" {
 			keys = append(keys, idx)
 		}
@@ -1930,7 +1991,7 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem) error {
 
 	status, err := scripts["queue/dequeue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "dequeue"),
-		q.primaryQueueClient.unshardedRc,
+		q.primaryQueueShard.RedisClient.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
@@ -1951,6 +2012,10 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem) error {
 func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Requeue"), redis_telemetry.ScopeQueue)
 
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return fmt.Errorf("unsupported queue shard kind for Requeue: %s", q.primaryQueueShard.Kind)
+	}
+
 	now := q.clock.Now()
 	if at.Before(now) {
 		at = now
@@ -1969,30 +2034,30 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time) 
 	// the queue item instead of just the partition passed via args.
 	//
 	// This is because a single queue item may be present in more than one queue.
-	parts, _ := q.ItemPartitions(ctx, i)
-	accountConcurrencyKey := q.primaryQueueClient.kg.Concurrency("account", i.Data.Identifier.AccountID.String())
+	parts, _ := q.ItemPartitions(ctx, q.primaryQueueShard, i)
+	accountConcurrencyKey := q.primaryQueueShard.RedisClient.kg.Concurrency("account", i.Data.Identifier.AccountID.String())
 	if len(parts) > 0 && parts[0].IsSystem() {
-		accountConcurrencyKey = q.primaryQueueClient.kg.Concurrency("account", parts[0].Queue())
+		accountConcurrencyKey = q.primaryQueueShard.RedisClient.kg.Concurrency("account", parts[0].Queue())
 	}
 
 	keys := []string{
-		q.primaryQueueClient.kg.QueueItem(),
-		q.primaryQueueClient.kg.PartitionItem(), // Partition item, map
-		q.primaryQueueClient.kg.GlobalPartitionIndex(),
-		q.primaryQueueClient.kg.GlobalAccountIndex(),
-		q.primaryQueueClient.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
-		parts[0].zsetKey(q.primaryQueueClient.kg),
-		parts[1].zsetKey(q.primaryQueueClient.kg),
-		parts[2].zsetKey(q.primaryQueueClient.kg),
+		q.primaryQueueShard.RedisClient.kg.QueueItem(),
+		q.primaryQueueShard.RedisClient.kg.PartitionItem(), // Partition item, map
+		q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex(),
+		q.primaryQueueShard.RedisClient.kg.GlobalAccountIndex(),
+		q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
+		parts[0].zsetKey(q.primaryQueueShard.RedisClient.kg),
+		parts[1].zsetKey(q.primaryQueueShard.RedisClient.kg),
+		parts[2].zsetKey(q.primaryQueueShard.RedisClient.kg),
 		// And pass in the key queue's concurrency keys.
-		parts[0].concurrencyKey(q.primaryQueueClient.kg),
-		parts[1].concurrencyKey(q.primaryQueueClient.kg),
-		parts[2].concurrencyKey(q.primaryQueueClient.kg),
+		parts[0].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
+		parts[1].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
+		parts[2].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
 		accountConcurrencyKey,
-		q.primaryQueueClient.kg.ConcurrencyIndex(),
+		q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex(),
 	}
 	// Append indexes
-	for _, idx := range q.itemIndexer(ctx, i, q.primaryQueueClient.kg) {
+	for _, idx := range q.itemIndexer(ctx, i, q.primaryQueueShard.RedisClient.kg) {
 		if idx != "" {
 			keys = append(keys, idx)
 		}
@@ -2036,7 +2101,7 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time) 
 
 	status, err := scripts["queue/requeue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "requeue"),
-		q.primaryQueueClient.unshardedRc,
+		q.primaryQueueShard.RedisClient.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
@@ -2069,6 +2134,10 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time) 
 func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration) (*ulid.ULID, int, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PartitionLease"), redis_telemetry.ScopeQueue)
 
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, 0, fmt.Errorf("unsupported queue shard kind for PartitionLease: %s", q.primaryQueueShard.Kind)
+	}
+
 	var accountLimit, functionLimit, customKeyLimit int
 	if p.IsSystem() {
 		limits := q.systemConcurrencyLimitGetter(ctx, *p)
@@ -2098,20 +2167,20 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	}
 
 	keys := []string{
-		q.primaryQueueClient.kg.PartitionItem(),
-		q.primaryQueueClient.kg.GlobalPartitionIndex(),
-		q.primaryQueueClient.kg.GlobalAccountIndex(),
+		q.primaryQueueShard.RedisClient.kg.PartitionItem(),
+		q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex(),
+		q.primaryQueueShard.RedisClient.kg.GlobalAccountIndex(),
 		// NOTE: Old partitions will _not_ have an account ID until the next enqueue on the new code.
 		// Until this, we may not use account queues at all, as we cannot properly clean up
 		// here without knowing the Account ID
-		q.primaryQueueClient.kg.AccountPartitionIndex(p.AccountID),
-		q.primaryQueueClient.kg.FnMetadata(fnMetaKey),
+		q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(p.AccountID),
+		q.primaryQueueShard.RedisClient.kg.FnMetadata(fnMetaKey),
 
 		// These concurrency keys are for fast checking of partition
 		// concurrency limits prior to leasing, as an optimization.
-		p.acctConcurrencyKey(q.primaryQueueClient.kg),
-		p.fnConcurrencyKey(q.primaryQueueClient.kg),
-		p.customConcurrencyKey(q.primaryQueueClient.kg),
+		p.acctConcurrencyKey(q.primaryQueueShard.RedisClient.kg),
+		p.fnConcurrencyKey(q.primaryQueueShard.RedisClient.kg),
+		p.customConcurrencyKey(q.primaryQueueShard.RedisClient.kg),
 	}
 
 	args, err := StrSlice([]any{
@@ -2131,7 +2200,7 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	}
 	result, err := scripts["queue/partitionLease"].Exec(
 		redis_telemetry.WithScriptName(ctx, "partitionLease"),
-		q.primaryQueueClient.unshardedRc,
+		q.primaryQueueShard.RedisClient.unshardedRc,
 		keys,
 		args,
 	).AsIntSlice()
@@ -2179,14 +2248,18 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 // randomly, with higher priority partitions more likely to be selected.  This reduces
 // lease contention amongst multiple shared-nothing workers.
 func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error) {
-	return q.partitionPeek(ctx, q.primaryQueueClient.kg.GlobalPartitionIndex(), sequential, until, limit, nil)
+	return q.partitionPeek(ctx, q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex(), sequential, until, limit, nil)
 }
 
 func (q *queue) partitionSize(ctx context.Context, partitionKey string, until time.Time) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "partitionSize"), redis_telemetry.ScopeQueue)
 
-	cmd := q.primaryQueueClient.Client().B().Zcount().Key(partitionKey).Min("-inf").Max(strconv.Itoa(int(until.Unix()))).Build()
-	return q.primaryQueueClient.Client().Do(ctx, cmd).AsInt64()
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return 0, fmt.Errorf("unsupported queue shard kind for partitionSize: %s", q.primaryQueueShard.Kind)
+	}
+
+	cmd := q.primaryQueueShard.RedisClient.Client().B().Zcount().Key(partitionKey).Min("-inf").Max(strconv.Itoa(int(until.Unix()))).Build()
+	return q.primaryQueueShard.RedisClient.Client().Do(ctx, cmd).AsInt64()
 }
 
 // cleanupNilPartitionInAccount is invoked when we peek a missing partition in the account partitions pointer zset.
@@ -2196,11 +2269,15 @@ func (q *queue) partitionSize(ctx context.Context, partitionKey string, until ti
 func (q *queue) cleanupNilPartitionInAccount(ctx context.Context, accountId uuid.UUID, partitionKey string) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "cleanupNilPartitionInAccount"), redis_telemetry.ScopeQueue)
 
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return fmt.Errorf("unsupported queue shard kind for cleanupNilPartitionInAccount: %s", q.primaryQueueShard.Kind)
+	}
+
 	// Log because this should only happen as long as we run old code
 	q.logger.Warn().Interface("partition", partitionKey).Str("account_id", accountId.String()).Msg("removing account partitions pointer to missing partition")
 
-	cmd := q.primaryQueueClient.Client().B().Zrem().Key(q.primaryQueueClient.kg.AccountPartitionIndex(accountId)).Member(partitionKey).Build()
-	if err := q.primaryQueueClient.Client().Do(ctx, cmd).Error(); err != nil {
+	cmd := q.primaryQueueShard.RedisClient.Client().B().Zrem().Key(q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(accountId)).Member(partitionKey).Build()
+	if err := q.primaryQueueShard.RedisClient.Client().Do(ctx, cmd).Error(); err != nil {
 		return fmt.Errorf("failed to remove nil partition from account partitions pointer queue: %w", err)
 	}
 
@@ -2218,11 +2295,15 @@ func (q *queue) cleanupNilPartitionInAccount(ctx context.Context, accountId uuid
 func (q *queue) cleanupNilQueueItemInPartition(ctx context.Context, p QueuePartition, queueItemId string) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "cleanupNilQueueItemInPartition"), redis_telemetry.ScopeQueue)
 
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return fmt.Errorf("unsupported queue shard kind for cleanupNilQueueItemInPartition: %s", q.primaryQueueShard.Kind)
+	}
+
 	// Log because this should only happen as long as we run old code
 	q.logger.Warn().Interface("partition", p).Str("item_id", queueItemId).Msg("removing pointer to missing queue item")
 
-	cmd := q.primaryQueueClient.Client().B().Zrem().Key(p.zsetKey(q.primaryQueueClient.kg)).Member(queueItemId).Build()
-	if err := q.primaryQueueClient.Client().Do(ctx, cmd).Error(); err != nil {
+	cmd := q.primaryQueueShard.RedisClient.Client().B().Zrem().Key(p.zsetKey(q.primaryQueueShard.RedisClient.kg)).Member(queueItemId).Build()
+	if err := q.primaryQueueShard.RedisClient.Client().Do(ctx, cmd).Error(); err != nil {
 		return fmt.Errorf("failed to remove nil queue item from partition queue: %w", err)
 	}
 
@@ -2235,6 +2316,10 @@ func (q *queue) cleanupNilQueueItemInPartition(ctx context.Context, p QueueParti
 func (q *queue) cleanupEmptyAccount(ctx context.Context, accountId uuid.UUID) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "cleanupEmptyAccount"), redis_telemetry.ScopeQueue)
 
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return fmt.Errorf("unsupported queue shard kind for cleanupEmptyAccount: %s", q.primaryQueueShard.Kind)
+	}
+
 	if accountId == uuid.Nil {
 		q.logger.Warn().Msg("attempted to clean up empty account pointer with nil account ID")
 		return nil
@@ -2242,10 +2327,10 @@ func (q *queue) cleanupEmptyAccount(ctx context.Context, accountId uuid.UUID) er
 
 	status, err := scripts["queue/cleanupEmptyAccount"].Exec(
 		redis_telemetry.WithScriptName(ctx, "cleanupEmptyAccount"),
-		q.primaryQueueClient.Client(),
+		q.primaryQueueShard.RedisClient.Client(),
 		[]string{
-			q.primaryQueueClient.kg.GlobalAccountIndex(),
-			q.primaryQueueClient.kg.AccountPartitionIndex(accountId),
+			q.primaryQueueShard.RedisClient.kg.GlobalAccountIndex(),
+			q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(accountId),
 		},
 		[]string{
 			accountId.String(),
@@ -2266,6 +2351,10 @@ func (q *queue) cleanupEmptyAccount(ctx context.Context, accountId uuid.UUID) er
 // partitionPeek returns pending queue partitions within the global partition pointer _or_ account partition pointer ZSET.
 func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequential bool, until time.Time, limit int64, accountId *uuid.UUID) ([]*QueuePartition, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "partitionPeek"), redis_telemetry.ScopeQueue)
+
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for partitionPeek: %s", q.primaryQueueShard.Kind)
+	}
 
 	if limit > PartitionPeekMax {
 		return nil, ErrPartitionPeekMaxExceedsLimits
@@ -2295,10 +2384,10 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 
 	peekRet, err := scripts["queue/partitionPeek"].Exec(
 		redis_telemetry.WithScriptName(ctx, "partitionPeek"),
-		q.primaryQueueClient.Client(),
+		q.primaryQueueShard.RedisClient.Client(),
 		[]string{
 			partitionKey,
-			q.primaryQueueClient.kg.PartitionItem(),
+			q.primaryQueueShard.RedisClient.kg.PartitionItem(),
 		},
 		args,
 	).ToAny()
@@ -2408,10 +2497,10 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		keys := make([]string, len(fnIDs))
 		n := 0
 		for k := range fnIDs {
-			keys[n] = q.primaryQueueClient.kg.FnMetadata(k)
+			keys[n] = q.primaryQueueShard.RedisClient.kg.FnMetadata(k)
 			n++
 		}
-		vals, err := q.primaryQueueClient.unshardedRc.Do(ctx, q.primaryQueueClient.unshardedRc.B().Mget().Key(keys...).Build()).ToAny()
+		vals, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, q.primaryQueueShard.RedisClient.unshardedRc.B().Mget().Key(keys...).Build()).ToAny()
 		if err == nil {
 			// If this is an error, just ignore the error and continue.  The executor should gracefully handle
 			// accidental attempts at paused functions, as we cannot do this optimization for account or env-level
@@ -2455,7 +2544,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		if item.FunctionID != nil {
 			if paused := fnIDs[*item.FunctionID]; paused {
 				// Function is pulled up when it is unpaused, so we can push it back for a long time (see SetFunctionPaused)
-				err := q.PartitionRequeue(ctx, item, q.clock.Now().Truncate(time.Second).Add(PartitionPausedRequeueExtension), true)
+				err := q.PartitionRequeue(ctx, q.primaryQueueShard, item, q.clock.Now().Truncate(time.Second).Add(PartitionPausedRequeueExtension), true)
 				if err != nil && !errors.Is(err, ErrPartitionGarbageCollected) {
 					q.logger.Error().Interface("partition", item).Err(err).Msg("failed to push back paused partition")
 				} else {
@@ -2529,6 +2618,10 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 func (q *queue) accountPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "accountPeek"), redis_telemetry.ScopeQueue)
 
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for accountPeek: %s", q.primaryQueueShard.Kind)
+	}
+
 	if limit > AccountPeekMax {
 		return nil, ErrAccountPeekMaxExceedsLimits
 	}
@@ -2554,9 +2647,9 @@ func (q *queue) accountPeek(ctx context.Context, sequential bool, until time.Tim
 
 	peekRet, err := scripts["queue/accountPeek"].Exec(
 		redis_telemetry.WithScriptName(ctx, "accountPeek"),
-		q.primaryQueueClient.unshardedRc,
+		q.primaryQueueShard.RedisClient.unshardedRc,
 		[]string{
-			q.primaryQueueClient.kg.GlobalAccountIndex(),
+			q.primaryQueueShard.RedisClient.kg.GlobalAccountIndex(),
 		},
 		args,
 	).AsStrSlice()
@@ -2628,8 +2721,16 @@ func checkList(check string, exact, prefixes map[string]*struct{}) bool {
 // forceAt is used to enforce the given queue time.  This is used when partitions are at a
 // concurrency limit;  we don't want to scan the partition next time, so we force the partition
 // to be at a specific time instead of taking the earliest available queue item time
-func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time.Time, forceAt bool) error {
+func (q *queue) PartitionRequeue(ctx context.Context, shard QueueShard, p *QueuePartition, at time.Time, forceAt bool) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PartitionRequeue"), redis_telemetry.ScopeQueue)
+
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return fmt.Errorf("unsupported queue shard kind for PartitionRequeue: %s", q.primaryQueueShard.Kind)
+	}
+
+	if shard.Kind != string(enums.QueueShardKindRedis) {
+		return fmt.Errorf("unsupported queue shard kind for PartitionRequeue: %s", shard.Kind)
+	}
 
 	functionId := uuid.Nil
 	if p.FunctionID != nil {
@@ -2637,23 +2738,23 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 	}
 
 	keys := []string{
-		q.primaryQueueClient.kg.PartitionItem(),
-		q.primaryQueueClient.kg.GlobalPartitionIndex(),
-		q.primaryQueueClient.kg.GlobalAccountIndex(),
+		shard.RedisClient.kg.PartitionItem(),
+		shard.RedisClient.kg.GlobalPartitionIndex(),
+		shard.RedisClient.kg.GlobalAccountIndex(),
 		// NOTE: Old partitions will _not_ have an account ID until the next enqueue on the new code.
 		// Until this, we may not use account queues at all, as we cannot properly clean up
 		// here without knowing the Account ID
-		q.primaryQueueClient.kg.AccountPartitionIndex(p.AccountID),
+		shard.RedisClient.kg.AccountPartitionIndex(p.AccountID),
 
 		// NOTE: Partition metadata was replaced with function metadata and is being phased out
 		// We clean up all remaining partition metadata on completely empty partitions here
 		// and are adding function metadata on enqueue to migrate to the new system
-		q.primaryQueueClient.kg.PartitionMeta(p.Queue()),
-		q.primaryQueueClient.kg.FnMetadata(functionId),
+		shard.RedisClient.kg.PartitionMeta(p.Queue()),
+		shard.RedisClient.kg.FnMetadata(functionId),
 
-		p.zsetKey(q.primaryQueueClient.kg), // Partition ZSET itself
-		p.concurrencyKey(q.primaryQueueClient.kg),
-		q.primaryQueueClient.kg.QueueItem(),
+		p.zsetKey(shard.RedisClient.kg), // Partition ZSET itself
+		p.concurrencyKey(shard.RedisClient.kg),
+		shard.RedisClient.kg.QueueItem(),
 	}
 	force := 0
 	if forceAt {
@@ -2670,7 +2771,7 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 	}
 	status, err := scripts["queue/partitionRequeue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "partitionRequeue"),
-		q.primaryQueueClient.unshardedRc,
+		q.primaryQueueShard.RedisClient.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
@@ -2714,10 +2815,10 @@ func (q *queue) PartitionReprioritize(ctx context.Context, queueName string, pri
 		return err
 	}
 
-	keys := []string{q.primaryQueueClient.kg.PartitionItem()}
+	keys := []string{q.primaryQueueShard.RedisClient.kg.PartitionItem()}
 	status, err := scripts["queue/partitionReprioritize"].Exec(
 		redis_telemetry.WithScriptName(ctx, "partitionReprioritize"),
-		q.primaryQueueClient.unshardedRc,
+		q.primaryQueueShard.RedisClient.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
@@ -2738,12 +2839,12 @@ func (q *queue) InProgress(ctx context.Context, prefix string, concurrencyKey st
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "InProgress"), redis_telemetry.ScopeQueue)
 
 	s := q.clock.Now().UnixMilli()
-	cmd := q.primaryQueueClient.unshardedRc.B().Zcount().
-		Key(q.primaryQueueClient.kg.Concurrency(prefix, concurrencyKey)).
+	cmd := q.primaryQueueShard.RedisClient.unshardedRc.B().Zcount().
+		Key(q.primaryQueueShard.RedisClient.kg.Concurrency(prefix, concurrencyKey)).
 		Min(fmt.Sprintf("%d", s)).
 		Max("+inf").
 		Build()
-	return q.primaryQueueClient.unshardedRc.Do(ctx, cmd).AsInt64()
+	return q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).AsInt64()
 }
 
 func (q *queue) Instrument(ctx context.Context) error {
@@ -2755,9 +2856,9 @@ func (q *queue) Instrument(ctx context.Context) error {
 			q.logger.Error().Err(err).Msg("error retrieving guaranteedCapacityMap")
 		}
 
-		metrics.GaugeQueueGuaranteedCapacityCount(ctx, int64(len(guaranteedCapacityMap)), metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.queueShardName}})
+		metrics.GaugeQueueGuaranteedCapacityCount(ctx, int64(len(guaranteedCapacityMap)), metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
 		for _, guaranteedCapacity := range guaranteedCapacityMap {
-			tags := map[string]any{"account_id": guaranteedCapacity.AccountID, "queue_shard": q.queueShardName}
+			tags := map[string]any{"account_id": guaranteedCapacity.AccountID, "queue_shard": q.primaryQueueShard.Name}
 
 			metrics.GaugeQueueAccountGuaranteedCapacityCount(ctx, int64(guaranteedCapacity.GuaranteedCapacity), metrics.GaugeOpt{
 				PkgName: pkgName,
@@ -2768,7 +2869,7 @@ func (q *queue) Instrument(ctx context.Context) error {
 				Tags:    tags,
 			})
 
-			if size, err := q.partitionSize(ctx, q.primaryQueueClient.kg.AccountPartitionIndex(guaranteedCapacity.AccountID), q.clock.Now().Add(PartitionLookahead)); err == nil {
+			if size, err := q.partitionSize(ctx, q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(guaranteedCapacity.AccountID), q.clock.Now().Add(PartitionLookahead)); err == nil {
 				metrics.GaugeQueueGuaranteedCapacityAccountPartitionAvailableCount(ctx, size, metrics.GaugeOpt{
 					PkgName: pkgName,
 					Tags:    tags,
@@ -2781,13 +2882,13 @@ func (q *queue) Instrument(ctx context.Context) error {
 	var offset, total int64
 	chunkSize := int64(1000)
 
-	r := q.primaryQueueClient.unshardedRc
+	r := q.primaryQueueShard.RedisClient.unshardedRc
 	// iterate through all the partitions in the global partitions in chunks
 	wg := sync.WaitGroup{}
 	for {
 		// grab the global partition by chunks
 		cmd := r.B().Zrange().
-			Key(q.primaryQueueClient.kg.GlobalPartitionIndex()).
+			Key(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex()).
 			Min("-inf").
 			Max("+inf").
 			Byscore().
@@ -2809,11 +2910,11 @@ func (q *queue) Instrument(ctx context.Context) error {
 				// If this is not a fully-qualified key, assume that this is an old (system) partition queue
 				queueKey := pkey
 				if !isKeyConcurrencyPointerItem(pkey) {
-					queueKey = q.primaryQueueClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, pkey, "")
+					queueKey = q.primaryQueueShard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, pkey, "")
 				}
 
 				cntCmd := r.B().Zcount().Key(queueKey).Min("-inf").Max("+inf").Build()
-				count, err := q.primaryQueueClient.unshardedRc.Do(ctx, cntCmd).AsInt64()
+				count, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cntCmd).AsInt64()
 				if err != nil {
 					q.logger.Warn().Err(err).Str("pkey", pkey).Str("context", "instrumentation").Msg("error checking partition count")
 					return
@@ -2824,7 +2925,7 @@ func (q *queue) Instrument(ctx context.Context) error {
 					Tags: map[string]any{
 						// NOTE: potentially high cardinality but this gives better clarify of stuff
 						"partition":   pkey,
-						"queue_shard": q.queueShardName,
+						"queue_shard": q.primaryQueueShard.Name,
 					},
 				})
 
@@ -2844,7 +2945,7 @@ func (q *queue) Instrument(ctx context.Context) error {
 	metrics.GaugeGlobalPartitionSize(ctx, atomic.LoadInt64(&total), metrics.GaugeOpt{
 		PkgName: pkgName,
 		Tags: map[string]any{
-			"queue_shard": q.queueShardName,
+			"queue_shard": q.primaryQueueShard.Name,
 		},
 	})
 
@@ -2880,17 +2981,21 @@ func (q *queue) randomScavengeOffset(seed int64, count int64, limit int) int64 {
 func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Scavenge"), redis_telemetry.ScopeQueue)
 
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return 0, fmt.Errorf("unsupported queue shard kind for Scavenge: %s", q.primaryQueueShard.Kind)
+	}
+
 	// Find all items that have an expired lease - eg. where the min time for a lease is between
 	// (0-now] in unix milliseconds.
 	now := fmt.Sprintf("%d", q.clock.Now().UnixMilli())
 
-	count, err := q.primaryQueueClient.unshardedRc.Do(ctx, q.primaryQueueClient.unshardedRc.B().Zcount().Key(q.primaryQueueClient.kg.ConcurrencyIndex()).Min("-inf").Max(now).Build()).AsInt64()
+	count, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, q.primaryQueueShard.RedisClient.unshardedRc.B().Zcount().Key(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex()).Min("-inf").Max(now).Build()).AsInt64()
 	if err != nil {
 		return 0, fmt.Errorf("error counting concurrency index: %w", err)
 	}
 
-	cmd := q.primaryQueueClient.unshardedRc.B().Zrange().
-		Key(q.primaryQueueClient.kg.ConcurrencyIndex()).
+	cmd := q.primaryQueueShard.RedisClient.unshardedRc.B().Zrange().
+		Key(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex()).
 		Min("-inf").
 		Max(now).
 		Byscore().
@@ -2898,7 +3003,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 		Build()
 
 	// NOTE: Received keys can be legacy (workflow IDs or system/internal queue names) or new (full Redis keys)
-	pKeys, err := q.primaryQueueClient.unshardedRc.Do(ctx, cmd).AsStrSlice()
+	pKeys, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).AsStrSlice()
 	if err != nil {
 		return 0, fmt.Errorf("error scavenging for lost items: %w", err)
 	}
@@ -2913,17 +3018,17 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 		// This is for backwards compatibility with the previous concurrency index item format
 		queueKey := partition
 		if !isKeyConcurrencyPointerItem(partition) {
-			queueKey = q.primaryQueueClient.kg.Concurrency("p", partition)
+			queueKey = q.primaryQueueShard.RedisClient.kg.Concurrency("p", partition)
 		}
 
-		cmd := q.primaryQueueClient.unshardedRc.B().Zrange().
+		cmd := q.primaryQueueShard.RedisClient.unshardedRc.B().Zrange().
 			Key(queueKey).
 			Min("-inf").
 			Max(now).
 			Byscore().
 			Limit(0, 100).
 			Build()
-		itemIDs, err := q.primaryQueueClient.unshardedRc.Do(ctx, cmd).AsStrSlice()
+		itemIDs, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).AsStrSlice()
 		if err != nil && err != rueidis.Nil {
 			resultErr = multierror.Append(resultErr, fmt.Errorf("error querying partition concurrency queue '%s' during scavenge: %w", partition, err))
 			continue
@@ -2933,8 +3038,8 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 		}
 
 		// Fetch the queue item, then requeue.
-		cmd = q.primaryQueueClient.unshardedRc.B().Hmget().Key(q.primaryQueueClient.kg.QueueItem()).Field(itemIDs...).Build()
-		jobs, err := q.primaryQueueClient.unshardedRc.Do(ctx, cmd).AsStrSlice()
+		cmd = q.primaryQueueShard.RedisClient.unshardedRc.B().Hmget().Key(q.primaryQueueShard.RedisClient.kg.QueueItem()).Field(itemIDs...).Build()
+		jobs, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).AsStrSlice()
 		if err != nil && err != rueidis.Nil {
 			resultErr = multierror.Append(resultErr, fmt.Errorf("error fetching jobs for concurrency queue '%s' during scavenge: %w", partition, err))
 			continue
@@ -2950,7 +3055,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 					Msg("missing queue item in concurrency queue")
 
 				// Drop item reference to prevent spinning on this item
-				err := q.primaryQueueClient.unshardedRc.Do(ctx, q.primaryQueueClient.unshardedRc.B().Zrem().Key(queueKey).Member(itemID).Build()).Error()
+				err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, q.primaryQueueShard.RedisClient.unshardedRc.B().Zrem().Key(queueKey).Member(itemID).Build()).Error()
 				if err != nil {
 					resultErr = multierror.Append(resultErr, fmt.Errorf("error removing missing item '%s' from concurrency queue '%s': %w", itemID, partition, err))
 				}
@@ -2985,6 +3090,11 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 //
 // If the sequential key is leased, this allows a worker to peek partitions sequentially.
 func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error) {
+
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for ConfigLease: %s", q.primaryQueueShard.Kind)
+	}
+
 	if duration > ConfigLeaseMax {
 		return nil, ErrConfigLeaseExceedsLimits
 	}
@@ -3013,7 +3123,7 @@ func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Durat
 
 	status, err := scripts["queue/configLease"].Exec(
 		redis_telemetry.WithScriptName(ctx, "configLease"),
-		q.primaryQueueClient.unshardedRc,
+		q.primaryQueueShard.RedisClient.unshardedRc,
 		[]string{key},
 		args,
 	).AsInt64()
@@ -3035,9 +3145,13 @@ func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Durat
 func (q *queue) peekEWMA(ctx context.Context, fnID uuid.UUID) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "peekEWMA"), redis_telemetry.ScopeQueue)
 
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return 0, fmt.Errorf("unsupported queue shard kind for peekEWMA: %s", q.primaryQueueShard.Kind)
+	}
+
 	// retrieves the list from redis
-	cmd := q.primaryQueueClient.Client().B().Lrange().Key(q.primaryQueueClient.KeyGenerator().ConcurrencyFnEWMA(fnID)).Start(0).Stop(-1).Build()
-	strlist, err := q.primaryQueueClient.Client().Do(ctx, cmd).AsStrSlice()
+	cmd := q.primaryQueueShard.RedisClient.Client().B().Lrange().Key(q.primaryQueueShard.RedisClient.KeyGenerator().ConcurrencyFnEWMA(fnID)).Start(0).Stop(-1).Build()
+	strlist, err := q.primaryQueueShard.RedisClient.Client().Do(ctx, cmd).AsStrSlice()
 	if err != nil {
 		return 0, fmt.Errorf("error reading function concurrency EWMA values: %w", err)
 	}
@@ -3080,6 +3194,10 @@ func (q *queue) setPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) err
 		return nil
 	}
 
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return fmt.Errorf("unsupported queue shard kind for setPeekEWMA: %s", q.primaryQueueShard.Kind)
+	}
+
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "setPeekEWMA"), redis_telemetry.ScopeQueue)
 
 	listSize := q.peekEWMALen
@@ -3088,7 +3206,7 @@ func (q *queue) setPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) err
 	}
 
 	keys := []string{
-		q.primaryQueueClient.kg.ConcurrencyFnEWMA(*fnID),
+		q.primaryQueueShard.RedisClient.kg.ConcurrencyFnEWMA(*fnID),
 	}
 	args, err := StrSlice([]any{
 		val,
@@ -3100,7 +3218,7 @@ func (q *queue) setPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) err
 
 	_, err = scripts["queue/setPeekEWMA"].Exec(
 		redis_telemetry.WithScriptName(ctx, "setPeekEWMA"),
-		q.primaryQueueClient.Client(),
+		q.primaryQueueShard.RedisClient.Client(),
 		keys,
 		args,
 	).AsInt64()
@@ -3115,9 +3233,9 @@ func (q *queue) setPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) err
 func (q *queue) readFnMetadata(ctx context.Context, fnID uuid.UUID) (*FnMetadata, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "readFnMetadata"), redis_telemetry.ScopeQueue)
 
-	cmd := q.primaryQueueClient.unshardedRc.B().Get().Key(q.primaryQueueClient.kg.FnMetadata(fnID)).Build()
+	cmd := q.primaryQueueShard.RedisClient.unshardedRc.B().Get().Key(q.primaryQueueShard.RedisClient.kg.FnMetadata(fnID)).Build()
 	retv := FnMetadata{}
-	err := q.primaryQueueClient.unshardedRc.Do(ctx, cmd).DecodeJSON(&retv)
+	err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).DecodeJSON(&retv)
 	if err != nil {
 		return nil, fmt.Errorf("error reading function metadata: %w", err)
 	}

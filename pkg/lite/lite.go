@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/enums"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
@@ -220,7 +221,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			}),
 	}
 
-	rq := redis_state.NewQueue(unshardedClient.Queue(), queueOpts...)
+	rq := redis_state.NewQueue(redis_state.QueueShard{RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis), Name: consts.DefaultQueueShardName}, queueOpts...)
 
 	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
 
