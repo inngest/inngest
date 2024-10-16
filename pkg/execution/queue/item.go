@@ -26,6 +26,7 @@ const (
 	KindDebounce      = "debounce"
 	KindScheduleBatch = "schedule-batch"
 	KindEdgeError     = "edge-error" // KindEdgeError is used to indicate a final step error attempting a graceful save.
+	KindQueueMigrate  = "queue-migrate"
 )
 
 type jobIDValType struct{}
