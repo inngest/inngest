@@ -542,8 +542,10 @@ type queue struct {
 	// primaryQueueClient stores the redis connection to use.
 	primaryQueueClient *QueueClient
 	queueShardName     string
-	queueShardClients  map[string]*QueueClient
-	shardSelector      ShardSelector
+	// queueShardClients contains all non-default Redis queue shard clients.
+	// TODO Support other storage backends
+	queueShardClients map[string]*QueueClient
+	shardSelector     ShardSelector
 
 	ppf PartitionPriorityFinder
 	apf AccountPriorityFinder
@@ -1272,6 +1274,8 @@ func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status st
 		}
 	}
 
+	// TODO Support other storage backends
+
 	return count, nil
 }
 
@@ -1336,6 +1340,8 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 			return 0, err
 		}
 	}
+
+	// TODO Support other storage backends
 
 	return count, nil
 }
