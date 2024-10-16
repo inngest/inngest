@@ -9,7 +9,7 @@
 
 local keyFnMeta = KEYS[1]
 
-local migrate     = ARGV[1]
+local migrate     = tonumber(ARGV[1])
 local defaultMeta  = ARGV[2]
 
 -- $include(get_fn_meta.lua)
@@ -19,7 +19,11 @@ if existing == nil then
 	return 0
 end
 
-existing.migrate = migrate
+if migrate >= 1 then
+  existing.migrate = true
+else
+  existing.migrate = false
+end
 redis.call("SET", keyFnMeta, cjson.encode(existing))
 
 return 0

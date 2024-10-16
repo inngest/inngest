@@ -1436,58 +1436,40 @@ func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID
 	return nil
 }
 
-func (q *queue) SetFunctionMigrate(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID, migrate string) error {
+func (q *queue) SetFunctionMigrate(ctx context.Context, fnID uuid.UUID) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionMigrate"), redis_telemetry.ScopeQueue)
-	maxAttempts := 10
 
-	err := q.Enqueue(ctx, osqueue.Item{
-		GroupID:     uuid.New().String(),
-		Kind:        osqueue.KindScheduleBatch,
-		Identifier:  state.Identifier{},
-		Attempt:     0,
-		MaxAttempts: &maxAttempts,
-		Payload:     nil, // TODO: payload source + destination
-	}, time.Now())
-	switch err {
-	case nil:
-		return nil
-	case ErrQueueItemExists:
-		return nil
-	default:
-		return fmt.Errorf("error enqueueing queue migrate: %w", err)
+	defaultMeta := FnMetadata{
+		FnID:    fnID,
+		Migrate: true,
 	}
 
-	// defaultMeta := FnMetadata{
-	// 	FnID:    fnID,
-	// 	Migrate: &migrate,
-	// }
+	keys := []string{q.primaryQueueClient.kg.FnMetadata(fnID)}
+	args, err := StrSlice([]any{
+		1,
+		defaultMeta,
+	})
+	if err != nil {
+		return err
+	}
 
-	// keys := []string{q.primaryQueueClient.kg.FnMetadata(fnID)}
-	// args, err := StrSlice([]any{
-	// 	migrate,
-	// 	defaultMeta,
-	// })
-	// if err != nil {
-	// 	return err
-	// }
+	status, err := scripts["queue/fnSetMigrate"].Exec(
+		ctx,
+		q.primaryQueueClient.unshardedRc,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error updating queue migrate state: %w", err)
+	}
 
-	// status, err := scripts["queue/fnSetMigrate"].Exec(
-	// 	ctx,
-	// 	q.primaryQueueClient.unshardedRc,
-	// 	keys,
-	// 	args,
-	// ).AsInt64()
-	// if err != nil {
-	// 	return fmt.Errorf("error updating queue migrate state: %w", err)
-	// }
+	switch status {
+	case 0:
+		return nil
 
-	// switch status {
-	// case 0:
-	// 	return nil
-
-	// default:
-	// 	return fmt.Errorf("unknown response updating queue migration state: %d", err)
-	// }
+	default:
+		return fmt.Errorf("unknown response updating queue migration state: %d", err)
+	}
 }
 
 // Peek takes n items from a queue, up until QueuePeekMax.  For peeking workflow/
