@@ -33,7 +33,6 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
@@ -1452,7 +1451,7 @@ func (q *queue) SetFunctionMigrate(ctx context.Context, acctID uuid.UUID, fnID u
 	switch err {
 	case nil:
 		return nil
-	case redis_state.ErrQueueItemExists:
+	case ErrQueueItemExists:
 		return nil
 	default:
 		return fmt.Errorf("error enqueueing queue migrate: %w", err)
@@ -2597,7 +2596,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 				continue
 			}
 
-			if v, ok := migrateIDs[*item.FunctionID]; ok {
+			if _, ok := migrateIDs[*item.FunctionID]; ok {
 				switch q.name {
 				case "migrator":
 					// no-op, let migrator do it's thing
