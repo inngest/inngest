@@ -111,4 +111,7 @@ export const pathCreator = {
   unattachedSyncs({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/unattached-syncs` as Route;
   },
+  vercel(): Route {
+    return `/settings/integrations/vercel` as Route;
+  },
 };

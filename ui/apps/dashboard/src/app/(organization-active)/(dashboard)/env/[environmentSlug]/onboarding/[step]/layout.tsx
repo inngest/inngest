@@ -22,7 +22,7 @@ export default function Layout({
     return;
   }
   return (
-    <div className="my-12 grid grid-cols-3">
+    <div className="text-basis my-12 grid grid-cols-3">
       <main className="col-span-2 mx-20">
         <PageHeader step={step} />
         {children}
