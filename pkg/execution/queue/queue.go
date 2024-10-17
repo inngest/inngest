@@ -55,15 +55,15 @@ type Consumer interface {
 	Run(context.Context, RunFunc) error
 }
 
+type QueueMigrationHandler func(ctx context.Context, qi *QueueItem) error
+
 type Migrator interface {
 	// SetFunctionMigrate updates the function metadata to signal it's being migrated to
 	// another queue shard
 	SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID) error
-	// MigrationPeek does a peek operation like the normal peek, but ignores leases and other conditions a normal peek cares about.
+	// Migration does a peek operation like the normal peek, but ignores leases and other conditions a normal peek cares about.
 	// The sore goal is to grab things and migrate them to somewhere else
-	MigrationPeek(ctx context.Context, shard string, fnID uuid.UUID, limit int64) ([]*QueueItem, error)
-	// ItemMigrated removes the item from the specified shard, and other clean up necessary to remove the item entirely from the shard
-	ItemMigrated(ctx context.Context, shard string, item *QueueItem) error
+	Migrate(ctx context.Context, shard string, fnID uuid.UUID, limit int64, handler QueueMigrationHandler) (int64, error)
 }
 
 // QuitError is an error that, when returned, quits the queue.  This always retries
