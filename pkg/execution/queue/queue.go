@@ -14,6 +14,7 @@ type Queue interface {
 	Consumer
 
 	JobQueueReader
+	Migrator
 
 	SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, paused bool) error
 }
@@ -48,6 +49,17 @@ type Consumer interface {
 	// re-enqueued if Retryable() returns true.  For all other errors, the
 	// job will automatically be retried.
 	Run(context.Context, RunFunc) error
+}
+
+type QueueMigrationHandler func(ctx context.Context, qi *QueueItem) error
+
+type Migrator interface {
+	// SetFunctionMigrate updates the function metadata to signal it's being migrated to
+	// another queue shard
+	SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID) error
+	// Migration does a peek operation like the normal peek, but ignores leases and other conditions a normal peek cares about.
+	// The sore goal is to grab things and migrate them to somewhere else
+	Migrate(ctx context.Context, shard string, fnID uuid.UUID, limit int64, handler QueueMigrationHandler) (int64, error)
 }
 
 // QuitError is an error that, when returned, quits the queue.  This always retries
@@ -190,4 +202,15 @@ type JobQueueReader interface {
 		limit,
 		offset int64,
 	) ([]JobResponse, error)
+}
+
+// MigratePayload stores the information to be used when migrating a queue shard to another one
+type MigratePayload struct {
+	AccountID  uuid.UUID
+	FunctionID uuid.UUID
+
+	// Source is the source queue where the migration will occur on
+	Source string
+	// Dest is the target destination the queue will be moved to
+	Dest string
 }
