@@ -2,8 +2,6 @@ import { forwardRef } from 'react';
 import { cn } from '@inngest/components/utils/classNames';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 
-import { Card } from '../Card';
-
 export default function TabCards({
   children,
   ...props
@@ -47,9 +45,7 @@ const TabContent = forwardRef<
 >(({ children, value, ...props }, ref) => {
   return (
     <TabsPrimitive.Content value={value} asChild {...props} ref={ref}>
-      <Card>
-        <Card.Content>{children}</Card.Content>
-      </Card>
+      <div className="border-subtle rounded-md border px-6 py-4">{children}</div>
     </TabsPrimitive.Content>
   );
 });
