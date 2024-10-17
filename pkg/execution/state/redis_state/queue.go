@@ -1351,7 +1351,7 @@ func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID
 
 	iterate := func(shard QueueShard) error {
 		// TODO Support other storage backends
-		if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		if shard.Kind != string(enums.QueueShardKindRedis) {
 			return nil
 		}
 
@@ -2747,7 +2747,7 @@ func (q *queue) PartitionRequeue(ctx context.Context, shard QueueShard, p *Queue
 	}
 	status, err := scripts["queue/partitionRequeue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "partitionRequeue"),
-		q.primaryQueueShard.RedisClient.unshardedRc,
+		shard.RedisClient.Client(),
 		keys,
 		args,
 	).AsInt64()
