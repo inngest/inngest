@@ -1481,12 +1481,12 @@ func (q *queue) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID
 	}
 }
 
-func (q *queue) Migrate(ctx context.Context, shardName string, fnID uuid.UUID, limit int64, handler osqueue.QueueMigrationHandler) (int64, error) {
+func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.UUID, limit int64, handler osqueue.QueueMigrationHandler) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "MigrationPeek"), redis_telemetry.ScopeQueue)
 
-	shard, ok := q.queueShardClients[shardName]
+	shard, ok := q.queueShardClients[sourceShardName]
 	if !ok {
-		return -1, fmt.Errorf("no queue shard available for '%s'", shardName)
+		return -1, fmt.Errorf("no queue shard available for '%s'", sourceShardName)
 	}
 
 	if limit > QueuePeekMax || limit <= 0 {
