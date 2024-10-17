@@ -1481,14 +1481,12 @@ func (q *queue) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID
 	}
 }
 
-// MigrationPeek takes N items from a queue shard to be migrated to another shard.
-// Lease checks are not necessary in this case, and it's just a matter of grabbing the items so they can be moved else where
-func (q *queue) MigrationPeek(ctx context.Context, shardName string, fnID uuid.UUID, limit int64) ([]*osqueue.QueueItem, error) {
+func (q *queue) Migrate(ctx context.Context, shardName string, fnID uuid.UUID, limit int64, handler osqueue.QueueMigrationHandler) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "MigrationPeek"), redis_telemetry.ScopeQueue)
 
 	shard, ok := q.queueShardClients[shardName]
 	if !ok {
-		return nil, fmt.Errorf("no queue shard available for '%s'", shardName)
+		return -1, fmt.Errorf("no queue shard available for '%s'", shardName)
 	}
 
 	if limit > QueuePeekMax || limit <= 0 {
@@ -1506,7 +1504,7 @@ func (q *queue) MigrationPeek(ctx context.Context, shardName string, fnID uuid.U
 		limit,
 	})
 	if err != nil {
-		return nil, err
+		return -1, err
 	}
 
 	peekRet, err := scripts["queue/peek"].Exec(
@@ -1516,12 +1514,12 @@ func (q *queue) MigrationPeek(ctx context.Context, shardName string, fnID uuid.U
 		args,
 	).ToAny()
 	if err != nil {
-		return nil, fmt.Errorf("error peeking items for migration: %w", err)
+		return -1, fmt.Errorf("error peeking items for migration: %w", err)
 	}
 
 	returnedSet, ok := peekRet.([]any)
 	if !ok {
-		return nil, fmt.Errorf("unknown return type from migration peek: %T", peekRet)
+		return -1, fmt.Errorf("unknown return type from migration peek: %T", peekRet)
 	}
 
 	var potentiallyMissingItems, allQueueItemIDs []any
@@ -1531,15 +1529,15 @@ func (q *queue) MigrationPeek(ctx context.Context, shardName string, fnID uuid.U
 	case 2:
 		potentiallyMissingItems, ok = returnedSet[0].([]any)
 		if !ok {
-			return nil, fmt.Errorf("unexpected first item in set returned from migration peek: %T", peekRet)
+			return -1, fmt.Errorf("unexpected first item in set returned from migration peek: %T", peekRet)
 		}
 
 		allQueueItemIDs, ok = returnedSet[1].([]any)
 		if !ok {
-			return nil, fmt.Errorf("unexpected first item in set returned from migration peek: %T", peekRet)
+			return -1, fmt.Errorf("unexpected first item in set returned from migration peek: %T", peekRet)
 		}
 	default:
-		return nil, fmt.Errorf("expected zero or two items in set returned by migration peek: %v", returnedSet)
+		return -1, fmt.Errorf("expected zero or two items in set returned by migration peek: %v", returnedSet)
 	}
 
 	// filter out the items that are missing
@@ -1548,12 +1546,12 @@ func (q *queue) MigrationPeek(ctx context.Context, shardName string, fnID uuid.U
 	for i, itemID := range allQueueItemIDs {
 		if potentiallyMissingItems[i] == nil {
 			if itemID == nil {
-				return nil, fmt.Errorf("encountered nil queue item key in partition queue %q", partitionKey)
+				return -1, fmt.Errorf("encountered nil queue item key in partition queue %q", partitionKey)
 			}
 
 			id, ok := itemID.(string)
 			if !ok {
-				return nil, fmt.Errorf("encountered non-string queue item key in partition queue %q", partitionKey)
+				return -1, fmt.Errorf("encountered non-string queue item key in partition queue %q", partitionKey)
 			}
 
 			missing = append(missing, id)
@@ -1568,17 +1566,19 @@ func (q *queue) MigrationPeek(ctx context.Context, shardName string, fnID uuid.U
 		for _, mid := range missing {
 			id := mid
 			eg.Go(func() error {
-				r := shard.RedisClient.Client()
-				cmd := r.B().Zrem().Key(partitionKey).Member(id).Build()
-				if err := r.Do(ctx, cmd).Error(); err != nil {
+				if err := q.removeQueueItem(ctx, shard, partitionKey, id); err != nil {
 					return fmt.Errorf("failed to remove nil queue item from partition during migration: %w", err)
 				}
 				return nil
 			})
 		}
+
+		if err := eg.Wait(); err != nil {
+			return -1, err
+		}
 	}
 
-	return util.ParallelDecode(items, func(val any) (*osqueue.QueueItem, error) {
+	qis, err := util.ParallelDecode(items, func(val any) (*osqueue.QueueItem, error) {
 		if val == nil {
 			q.logger.Error().Str("partition", partitionKey).Msg("nil item value in migration peek response")
 			return nil, nil
@@ -1599,18 +1599,31 @@ func (q *queue) MigrationPeek(ctx context.Context, shardName string, fnID uuid.U
 		qi.Data.JobID = &qi.ID
 		return qi, nil
 	})
-}
-
-// RemoveItem attempts to remove a specific item in the target queue shard
-func (q *queue) ItemMigrated(ctx context.Context, shardName string, item *osqueue.QueueItem) error {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ItemMoved"), redis_telemetry.ScopeQueue)
-
-	_, ok := q.queueShardClients[shardName]
-	if !ok {
-		return fmt.Errorf("no shard available for '%s'", shardName)
+	if err != nil {
+		return -1, err
 	}
 
-	return fmt.Errorf("not implemented")
+	// Should process in order because we don't want out of order execution when moved over
+	var processed int64
+	for _, qi := range qis {
+		if err := handler(ctx, qi); err != nil {
+			return processed, err
+		}
+		if err := q.removeQueueItem(ctx, shard, partitionKey, qi.ID); err != nil {
+			logger.StdlibLogger(ctx).Error("error cleaning up queue item after migration", "error", err)
+		}
+		processed++
+	}
+
+	return processed, nil
+}
+
+// removeQueueItem attempts to remove a specific item in the target queue shard
+func (q *queue) removeQueueItem(ctx context.Context, shard QueueShard, partitionKey string, itemID string) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "removeQueueItem"), redis_telemetry.ScopeQueue)
+	r := shard.RedisClient.Client()
+	cmd := r.B().Zrem().Key(partitionKey).Member(itemID).Build()
+	return r.Do(ctx, cmd).Error()
 }
 
 // Peek takes n items from a queue, up until QueuePeekMax.  For peeking workflow/
