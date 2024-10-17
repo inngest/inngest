@@ -1481,6 +1481,138 @@ func (q *queue) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID
 	}
 }
 
+// MigrationPeek takes N items from a queue shard to be migrated to another shard.
+// Lease checks are not necessary in this case, and it's just a matter of grabbing the items so they can be moved else where
+func (q *queue) MigrationPeek(ctx context.Context, shardName string, fnID uuid.UUID, limit int64) ([]*osqueue.QueueItem, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "MigrationPeek"), redis_telemetry.ScopeQueue)
+
+	shard, ok := q.queueShardClients[shardName]
+	if !ok {
+		return nil, fmt.Errorf("no queue shard available for '%s'", shardName)
+	}
+
+	if limit > QueuePeekMax || limit <= 0 {
+		limit = QueuePeekMax
+	}
+
+	partitionKey := shard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), "")
+
+	keys := []string{
+		partitionKey,
+		shard.RedisClient.kg.QueueItem(),
+	}
+	args, err := StrSlice([]any{
+		"-1",
+		limit,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	peekRet, err := scripts["queue/peek"].Exec(
+		redis_telemetry.WithScriptName(ctx, "peek"),
+		shard.RedisClient.unshardedRc,
+		keys,
+		args,
+	).ToAny()
+	if err != nil {
+		return nil, fmt.Errorf("error peeking items for migration: %w", err)
+	}
+
+	returnedSet, ok := peekRet.([]any)
+	if !ok {
+		return nil, fmt.Errorf("unknown return type from migration peek: %T", peekRet)
+	}
+
+	var potentiallyMissingItems, allQueueItemIDs []any
+	switch len(returnedSet) {
+	case 0:
+		// no op
+	case 2:
+		potentiallyMissingItems, ok = returnedSet[0].([]any)
+		if !ok {
+			return nil, fmt.Errorf("unexpected first item in set returned from migration peek: %T", peekRet)
+		}
+
+		allQueueItemIDs, ok = returnedSet[1].([]any)
+		if !ok {
+			return nil, fmt.Errorf("unexpected first item in set returned from migration peek: %T", peekRet)
+		}
+	default:
+		return nil, fmt.Errorf("expected zero or two items in set returned by migration peek: %v", returnedSet)
+	}
+
+	// filter out the items that are missing
+	items := make([]any, 0, len(allQueueItemIDs))
+	missing := make([]string, 0, len(allQueueItemIDs))
+	for i, itemID := range allQueueItemIDs {
+		if potentiallyMissingItems[i] == nil {
+			if itemID == nil {
+				return nil, fmt.Errorf("encountered nil queue item key in partition queue %q", partitionKey)
+			}
+
+			id, ok := itemID.(string)
+			if !ok {
+				return nil, fmt.Errorf("encountered non-string queue item key in partition queue %q", partitionKey)
+			}
+
+			missing = append(missing, id)
+		} else {
+			items = append(items, potentiallyMissingItems[i])
+		}
+	}
+
+	// attempt clean up
+	if len(missing) > 0 {
+		eg := errgroup.Group{}
+		for _, mid := range missing {
+			id := mid
+			eg.Go(func() error {
+				r := shard.RedisClient.Client()
+				cmd := r.B().Zrem().Key(partitionKey).Member(id).Build()
+				if err := r.Do(ctx, cmd).Error(); err != nil {
+					return fmt.Errorf("failed to remove nil queue item from partition during migration: %w", err)
+				}
+				return nil
+			})
+		}
+	}
+
+	return util.ParallelDecode(items, func(val any) (*osqueue.QueueItem, error) {
+		if val == nil {
+			q.logger.Error().Str("partition", partitionKey).Msg("nil item value in migration peek response")
+			return nil, nil
+		}
+
+		str, ok := val.(string)
+		if !ok {
+			return nil, fmt.Errorf("non-string value in migration peek response: %T", val)
+		}
+		if str == "" {
+			return nil, fmt.Errorf("received empty string in decode queue item from migration peek")
+		}
+
+		qi := &osqueue.QueueItem{}
+		if err := json.Unmarshal([]byte(str), qi); err != nil {
+			return nil, fmt.Errorf("error unmarshalling migration peeked queue item: %w", err)
+		}
+		qi.Data.JobID = &qi.ID
+		return qi, nil
+	})
+}
+
+// RemoveItem attempts to remove a specific item in the target queue shard
+func (q *queue) ItemMigrated(ctx context.Context, shardName string, item *osqueue.QueueItem) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ItemMoved"), redis_telemetry.ScopeQueue)
+
+	_, ok := q.queueShardClients[shardName]
+	if !ok {
+		return fmt.Errorf("no shard available for '%s'", shardName)
+	}
+
+	return fmt.Errorf("not implemented")
+}
+
 // Peek takes n items from a queue, up until QueuePeekMax.  For peeking workflow/
 // function jobs the queue name must be the ID of the workflow;  each workflow has
 // its own queue of jobs using its ID as the queue name.
