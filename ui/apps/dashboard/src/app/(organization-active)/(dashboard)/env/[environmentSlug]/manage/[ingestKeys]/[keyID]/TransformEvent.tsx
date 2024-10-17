@@ -25,7 +25,8 @@ const preview = async (transform: string, input: string) => {
     // execute expression
     vm.evalCode(transform);
     vm.executePendingJobs(-1);
-    const res = vm.evalCode('transform(' + input + ')');
+    const escapedInput = JSON.stringify(input);
+    const res = vm.evalCode(`transform(${input}, {}, {}, ${escapedInput})`);
     const unwrapped = vm.unwrapResult(res);
     const ok = vm.dump(unwrapped);
     vm.dispose();
@@ -53,8 +54,11 @@ export function createTransform({
   commentBlock = defaultCommentBlock,
 }): string {
   return `// transform accepts the incoming JSON payload from your
-// webhook and must return an object that is in the Inngest event format
-function transform(evt, headers = {}, queryParams = {}) {
+// webhook and must return an object that is in the Inngest event format.
+//
+// The raw argument is the original stringified request body. This is useful
+// when you want to perform HMAC validation within your Inngest functions.
+function transform(evt, headers = {}, queryParams = {}, raw = "") {
   return {
     ${commentBlock}
     name: ${eventName},
