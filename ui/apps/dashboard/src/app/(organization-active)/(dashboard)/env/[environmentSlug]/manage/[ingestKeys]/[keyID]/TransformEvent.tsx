@@ -96,7 +96,6 @@ export default function TransformEvents({ keyID, metadata }: FilterEventsProps) 
       return;
     }
 
-    console.log(typeof incoming, incoming);
     const result = await preview(transform, incoming);
     setOutput(result);
     if (result === '' || result.indexOf('Error') === 0) {
