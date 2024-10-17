@@ -7,6 +7,6 @@ export function useGetTraceResult() {
   return useCallback(async (traceID: string) => {
     const data: GetTraceResultQuery = await client.request(GetTraceResultDocument, { traceID });
 
-    return data.runTraceSpanOutputByID;
+    return data.run?.output;
   }, []);
 }
