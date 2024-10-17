@@ -2733,14 +2733,9 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 			}
 
 			if _, ok := migrateIDs[*item.FunctionID]; ok {
-				switch q.name {
-				case osqueue.QueueNameMigrator:
-					// no-op, let migrator do it's thing
-				default:
-					// skip this if the executor is not responsible for migrating queues
-					ignored++
-					continue
-				}
+				// skip this since the executor is not responsible for migrating queues
+				ignored++
+				continue
 			}
 		}
 
