@@ -9,10 +9,6 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-const (
-	QueueNameMigrator = "queue-migrator"
-)
-
 type Queue interface {
 	Producer
 	Consumer
@@ -208,17 +204,7 @@ type JobQueueReader interface {
 	) ([]JobResponse, error)
 }
 
-type FunctionMigrateOpts struct {
-	AccountID   uuid.UUID
-	WorkspaceID uuid.UUID
-	AppID       uuid.UUID
-	FunctionID  uuid.UUID
-
-	Source string
-	Dest   string
-}
-
-// MigratePayload stores the information to be used when migrating a queue to a separate cluster
+// MigratePayload stores the information to be used when migrating a queue shard to another one
 type MigratePayload struct {
 	AccountID  uuid.UUID
 	FunctionID uuid.UUID
