@@ -12,7 +12,13 @@ import {
   type SetOptionOpts,
 } from 'echarts';
 
-export type { LineSeriesOption, LegendComponentOption, DefaultLabelFormatterCallbackParams };
+export type { DefaultLabelFormatterCallbackParams, LegendComponentOption, LineSeriesOption };
+
+declare global {
+  interface Window {
+    chartSelected?: number;
+  }
+}
 
 export interface ChartProps {
   option: EChartsOption;
@@ -61,6 +67,20 @@ export const Chart = ({
       const chart = getInstanceByDom(chartRef.current);
       chart?.setOption(option, settings);
 
+      chart?.on('mouseover', (params) => {
+        if (params.componentSubType == 'line') {
+          //
+          // Hack alert. The tooltip formatters inside
+          // the charts are vanilla js and html for perf reasons
+          // so we pass this data to them via global
+          window.chartSelected = params.seriesIndex;
+        }
+      });
+
+      chart?.on('mouseout', () => {
+        window.chartSelected = undefined;
+      });
+
       if (chart && group) {
         chart.group = group;
         connect(group);
@@ -72,8 +92,12 @@ export const Chart = ({
     <div
       ref={chartRef}
       className={className}
-      {...(group && { onMouseEnter: () => toggleTooltips(true) })}
-      {...(group && { onMouseLeave: () => toggleTooltips(false) })}
+      //
+      // for grouped charts, we only want tooltips to show for chart in focus
+      {...(group && {
+        onMouseLeave: () => toggleTooltips(false),
+        onMouseEnter: () => toggleTooltips(true),
+      })}
     />
   );
 };
