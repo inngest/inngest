@@ -93,19 +93,12 @@ func (s runStateKeyGenerator) Stack(ctx context.Context, isSharded bool, runID u
 }
 
 type GlobalKeyGenerator interface {
-	// Workflow returns the key for the current workflow ID and version.
-	Workflow(ctx context.Context, workflowID uuid.UUID, version int) string
-
 	// Invoke returns the key used to store the correlation key associated with invoke functions
 	Invoke(ctx context.Context, wsID uuid.UUID) string
 }
 
 type globalKeyGenerator struct {
 	stateDefaultKey string
-}
-
-func (u globalKeyGenerator) Workflow(ctx context.Context, workflowID uuid.UUID, version int) string {
-	return fmt.Sprintf("{%s}:workflows:%s-%d", u.stateDefaultKey, workflowID, version)
 }
 
 func (u globalKeyGenerator) Invoke(ctx context.Context, wsID uuid.UUID) string {

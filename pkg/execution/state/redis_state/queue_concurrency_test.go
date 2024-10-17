@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -65,7 +67,7 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 	}
 
 	q := NewQueue(
-		NewQueueClient(rc, QueueDefaultKey),
+		QueueShard{RedisClient: NewQueueClient(rc, QueueDefaultKey), Kind: string(enums.QueueShardKindRedis), Name: consts.DefaultQueueShardName},
 		WithNumWorkers(100),
 		WithConcurrencyLimitGetter(pkf),
 		WithQueueLifecycles(ll),

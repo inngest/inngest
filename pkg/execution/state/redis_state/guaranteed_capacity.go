@@ -119,9 +119,13 @@ type leasedAccount struct {
 }
 
 func (q *queue) getGuaranteedCapacityMap(ctx context.Context) (map[string]GuaranteedCapacity, error) {
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for getGuaranteedCapacityMap: %s", q.primaryQueueShard.Kind)
+	}
+
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "getGuaranteedCapacityMap"), redis_telemetry.ScopeQueue)
 
-	m, err := q.primaryQueueClient.unshardedRc.Do(ctx, q.primaryQueueClient.unshardedRc.B().Hgetall().Key(q.primaryQueueClient.kg.GuaranteedCapacityMap()).Build()).AsMap()
+	m, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, q.primaryQueueShard.RedisClient.unshardedRc.B().Hgetall().Key(q.primaryQueueShard.RedisClient.kg.GuaranteedCapacityMap()).Build()).AsMap()
 	if rueidis.IsRedisNil(err) {
 		return nil, nil
 	}
@@ -144,6 +148,10 @@ func (q *queue) getGuaranteedCapacityMap(ctx context.Context) (map[string]Guaran
 // from claiming the same lease index;  if workers A and B see an account with 0 leases and both attempt
 // to claim lease "0", only one will succeed.
 func (q *queue) acquireAccountLease(ctx context.Context, guaranteedCapacity GuaranteedCapacity, duration time.Duration, leaseIndex int) (*ulid.ULID, error) {
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for acquireAccountLease: %s", q.primaryQueueShard.Kind)
+	}
+
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "acquireAccountLease"), redis_telemetry.ScopeQueue)
 
 	if guaranteedCapacity.Scope != enums.GuaranteedCapacityScopeAccount {
@@ -156,7 +164,7 @@ func (q *queue) acquireAccountLease(ctx context.Context, guaranteedCapacity Guar
 		return nil, err
 	}
 
-	keys := []string{q.primaryQueueClient.kg.GuaranteedCapacityMap()}
+	keys := []string{q.primaryQueueShard.RedisClient.kg.GuaranteedCapacityMap()}
 	args, err := StrSlice([]any{
 		now.UnixMilli(),
 		guaranteedCapacity.Key(),
@@ -169,7 +177,7 @@ func (q *queue) acquireAccountLease(ctx context.Context, guaranteedCapacity Guar
 
 	status, err := scripts["queue/guaranteedCapacityAccountLease"].Exec(
 		redis_telemetry.WithScriptName(ctx, "guaranteedCapacityAccountLease"),
-		q.primaryQueueClient.unshardedRc,
+		q.primaryQueueShard.RedisClient.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
@@ -193,6 +201,10 @@ func (q *queue) acquireAccountLease(ctx context.Context, guaranteedCapacity Guar
 }
 
 func (q *queue) renewAccountLease(ctx context.Context, guaranteedCapacity GuaranteedCapacity, duration time.Duration, leaseID ulid.ULID) (*ulid.ULID, error) {
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for renewAccountLease: %s", q.primaryQueueShard.Kind)
+	}
+
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "renewAccountLease"), redis_telemetry.ScopeQueue)
 
 	if guaranteedCapacity.Scope != enums.GuaranteedCapacityScopeAccount {
@@ -210,7 +222,7 @@ func (q *queue) renewAccountLease(ctx context.Context, guaranteedCapacity Guaran
 		expireArg = "1"
 	}
 
-	keys := []string{q.primaryQueueClient.kg.GuaranteedCapacityMap()}
+	keys := []string{q.primaryQueueShard.RedisClient.kg.GuaranteedCapacityMap()}
 	args, err := StrSlice([]any{
 		expireArg,
 		now.UnixMilli(),
@@ -224,7 +236,7 @@ func (q *queue) renewAccountLease(ctx context.Context, guaranteedCapacity Guaran
 
 	status, err := scripts["queue/guaranteedCapacityRenewAccountLease"].Exec(
 		redis_telemetry.WithScriptName(ctx, "guaranteedCapacityRenewAccountLease"),
-		q.primaryQueueClient.unshardedRc,
+		q.primaryQueueShard.RedisClient.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
