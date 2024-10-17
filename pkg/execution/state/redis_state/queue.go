@@ -440,6 +440,7 @@ type SystemConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) Sy
 func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 	q := &queue{
 		primaryQueueShard: primaryQueueShard,
+		queueShardClients: map[string]QueueShard{primaryQueueShard.Name: primaryQueueShard},
 		ppf: func(_ context.Context, _ QueuePartition) uint {
 			return PriorityDefault
 		},
@@ -1247,16 +1248,6 @@ func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status st
 
 	var count int64
 
-	// TODO Support other storage backends
-	if q.primaryQueueShard.Kind == string(enums.QueueShardKindRedis) {
-		// Start with default shard
-		defaultCount, err := iterate(q.primaryQueueShard.RedisClient)
-		if err != nil {
-			return 0, fmt.Errorf("could not count status for default shard: %w", err)
-		}
-		count += defaultCount
-	}
-
 	// Map-reduce over shards
 	if q.queueShardClients != nil {
 		eg := errgroup.Group{}
@@ -1320,16 +1311,6 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 	}
 
 	var count int64
-
-	// TODO Support other storage backends
-	if q.primaryQueueShard.Kind == string(enums.QueueShardKindRedis) {
-		// Start with default shard
-		defaultCount, err := iterate(q.primaryQueueShard.RedisClient)
-		if err != nil {
-			return 0, err
-		}
-		count += defaultCount
-	}
 
 	// Map-reduce over shards
 	if q.queueShardClients != nil {
@@ -1426,11 +1407,6 @@ func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID
 		default:
 			return fmt.Errorf("unknown response updating paused state: %d", status)
 		}
-	}
-
-	err := iterate(q.primaryQueueShard)
-	if err != nil {
-		return err
 	}
 
 	if q.queueShardClients != nil {
