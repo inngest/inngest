@@ -215,7 +215,18 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 		<-time.After(750 * time.Millisecond)
 		return d.debounce(ctx, di, fn, ttl, n+1)
 	case ErrDebounceNotFound:
-		// TODO: create new debounce
+		// create new debounce
+		id, err := d.newDebounce(ctx, di, fn, ttl)
+		if err == nil {
+			return nil
+		}
+		if err != ErrDebounceExists {
+			// unknown error creating the debounce
+			return err
+		}
+		if id == nil {
+			return fmt.Errorf("expected debounce ID when debounce exists")
+		}
 	}
 
 	return err
