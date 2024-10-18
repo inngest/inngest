@@ -183,25 +183,11 @@ func (d debouncer) Debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 }
 
 func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Function, ttl time.Duration, n int) error {
-	// Call new debounce immediately.  If this returns ErrDebounceExists then
-	// update the debounce.  This ensures that checking and creating a debounce
-	// is atomic, and two individual threads/workers cannot create debounces simultaneously.
-	debounceID, err := d.newDebounce(ctx, di, fn, ttl)
-	if err == nil {
-		return nil
-	}
-	if err != ErrDebounceExists {
-		// There was an unkown error creating the debounce.
-		return err
-	}
-	if debounceID == nil {
-		return fmt.Errorf("expected debounce ID when debounce exists")
-	}
-
 	// A debounce must already exist for this fn.  Update it.
-	err = d.updateDebounce(ctx, di, fn, ttl, *debounceID)
-	if err == context.DeadlineExceeded || err == ErrDebounceInProgress || err == ErrDebounceNotFound {
-		if n == 5 {
+	err := d.updateDebounce(ctx, di, fn, ttl)
+	switch err {
+	case context.DeadlineExceeded, ErrDebounceInProgress, ErrDebounceNotFound:
+		if n >= 5 {
 			logger.StdlibLogger(ctx).Error("unable to update debounce", "error", err)
 			// Only recurse 5 times.
 			return fmt.Errorf("unable to update debounce: %w", err)
@@ -236,63 +222,11 @@ func (d debouncer) queueItem(ctx context.Context, di DebounceItem, debounceID ul
 	}
 }
 
-func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.Function, ttl time.Duration) (*ulid.ULID, error) {
-	now := time.Now()
-	debounceID := ulid.MustNew(ulid.Now(), rand.Reader)
-
-	key, err := d.debounceKey(ctx, di, fn)
-	if err != nil {
-		return nil, err
-	}
-
-	// Ensure we set the debounce's max lifetime.
-	if timeout := fn.Debounce.TimeoutDuration(); timeout != nil {
-		di.Timeout = time.Now().Add(*timeout).UnixMilli()
-	}
-
-	keyPtr := d.d.KeyGenerator().DebouncePointer(ctx, fn.ID, key)
-	keyDbc := d.d.KeyGenerator().Debounce(ctx)
-
-	byt, err := json.Marshal(di)
-	if err != nil {
-		return nil, fmt.Errorf("error marshalling debounce: %w", err)
-	}
-
-	out, err := scripts["newDebounce"].Exec(
-		ctx,
-		d.d.Client(),
-		[]string{keyPtr, keyDbc},
-		[]string{debounceID.String(), string(byt), strconv.Itoa(int(ttl.Seconds()))},
-	).ToString()
-	if err != nil {
-		return nil, fmt.Errorf("error creating debounce: %w", err)
-	}
-
-	if out == "0" {
-		// Enqueue the debounce job with extra buffer.  This ensures that we never
-		// attempt to start a debounce during the debounce's expiry (race conditions), and the extra
-		// second lets an updateDebounce call on TTL 0 finish, as the buffer is the updateDebounce
-		// deadline.
-		qi := d.queueItem(ctx, di, debounceID)
-		err = d.q.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second))
-		if err != nil {
-			return &debounceID, fmt.Errorf("error enqueueing debounce job: %w", err)
-		}
-		return &debounceID, nil
-	}
-
-	existingID, err := ulid.Parse(out)
-	if err != nil {
-		// This was not a ULID, so we have no idea what was returned.
-		return nil, fmt.Errorf("unknown new debounce return value: %s", out)
-	}
-	return &existingID, ErrDebounceExists
-}
-
 // updateDebounce updates the currently pending debounce to point to the new event ID.  It pushes
 // out the debounce's TTL, and re-enqueues the job to initialize fns from the debounce.
-func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn inngest.Function, ttl time.Duration, debounceID ulid.ULID) error {
+func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn inngest.Function, ttl time.Duration) error {
 	now := time.Now()
+	debounceID := ulid.MustNew(ulid.Now(), rand.Reader)
 
 	key, err := d.debounceKey(ctx, di, fn)
 	if err != nil {
@@ -312,7 +246,7 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 		return fmt.Errorf("error marshalling debounce: %w", err)
 	}
 
-	out, err := scripts["updateDebounce"].Exec(
+	resp, err := scripts["updateDebounce"].Exec(
 		ctx,
 		d.d.Client(),
 		[]string{
@@ -328,24 +262,36 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 			strconv.Itoa(int(time.Now().UnixMilli())),
 			strconv.Itoa(int(di.Event.Timestamp)),
 		},
-	).AsInt64()
+	).AsBytes()
 	if err != nil {
 		return fmt.Errorf("error creating debounce: %w", err)
 	}
-	switch out {
-	case -1:
+
+	result := DebounceResult{}
+	if err := json.Unmarshal(resp, &result); err != nil {
+		return fmt.Errorf("error decoding debounce result: %w", err)
+	}
+
+	switch result.Status {
+	case "in-progress":
 		// The debounce is in progress or has just finished.  Requeue.
 		return ErrDebounceInProgress
-	case -2:
+	case "out-of-order":
 		// The event is out-of-order and a newer event exists within the debounce.
 		// Do nothing.
 		return nil
-	case -3:
-		return ErrDebounceNotFound
+	case "new":
+		// new debounce
+		qi := d.queueItem(ctx, di, *result.ID)
+		err = d.q.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second))
+		if err != nil {
+			return fmt.Errorf("error enqueueing debounce job: %w", err)
+		}
+		return nil
 	default:
 		// Debounces should have a maximum timeout;  updating the debounce returns
 		// the timeout to use.
-		actualTTL := time.Second * time.Duration(out)
+		actualTTL := time.Second * time.Duration(result.TTL)
 		err = d.q.RequeueByJobID(
 			ctx,
 			debounceID.String(),
@@ -354,7 +300,7 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 		if err == redis_state.ErrQueueItemAlreadyLeased {
 			log.From(ctx).Warn().
 				Str("err", err.Error()).
-				Int64("ttl", out).
+				Int64("ttl", result.TTL).
 				Msg(ErrDebounceInProgress.Error())
 			// This is in progress.
 			return ErrDebounceInProgress
@@ -420,4 +366,13 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 		}
 		scripts[name] = rueidis.NewLuaScript(val)
 	}
+}
+
+type DebounceResult struct {
+	// The ID associated with the debounce process
+	ID *ulid.ULID `json:"id,omitempty"`
+	// TTL is seconds
+	TTL int64 `json:"ttl"`
+	// Status of the debounce lua script execution
+	Status string `json:"status"`
 }

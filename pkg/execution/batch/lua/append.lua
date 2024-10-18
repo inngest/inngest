@@ -21,7 +21,7 @@ local function get_or_create_batch_key(key)
   -- if empty or doesn't exist
   if is_empty(val) then
     -- create new pointer by setting the ULID
-    update_pointer(batchPointerKey, newULID)
+    update_pointer(key, newULID)
     val = newULID
   end
 
