@@ -679,6 +679,9 @@ type FnMetadata struct {
 	// Paused represents whether the fn is paused.  This allows us to prevent leases
 	// to a given partition if the partition belongs to a fn.
 	Paused bool `json:"off"`
+
+	// Migrate indicates if this queue is to be migrated or not
+	Migrate bool `json:"migrate"`
 }
 
 // QueuePartition represents an individual queue for a workflow.  It stores the
@@ -1432,6 +1435,196 @@ func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID
 	}
 
 	return nil
+}
+
+func (q *queue) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionMigrate"), redis_telemetry.ScopeQueue)
+
+	defaultMeta := FnMetadata{
+		FnID:    fnID,
+		Migrate: true,
+	}
+
+	if q.queueShardClients == nil {
+		return fmt.Errorf("no queue shard clients are available")
+	}
+
+	shard, ok := q.queueShardClients[sourceShard]
+	if !ok {
+		return fmt.Errorf("no queue shard available for '%s'", sourceShard)
+	}
+
+	keys := []string{shard.RedisClient.kg.FnMetadata(fnID)}
+	args, err := StrSlice([]any{
+		1,
+		defaultMeta,
+	})
+	if err != nil {
+		return err
+	}
+
+	status, err := scripts["queue/fnSetMigrate"].Exec(
+		ctx,
+		shard.RedisClient.unshardedRc,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error updating queue migrate state: %w", err)
+	}
+
+	switch status {
+	case 0:
+		return nil
+
+	default:
+		return fmt.Errorf("unknown response updating queue migration state: %d", err)
+	}
+}
+
+func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.UUID, limit int64, handler osqueue.QueueMigrationHandler) (int64, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "MigrationPeek"), redis_telemetry.ScopeQueue)
+
+	shard, ok := q.queueShardClients[sourceShardName]
+	if !ok {
+		return -1, fmt.Errorf("no queue shard available for '%s'", sourceShardName)
+	}
+
+	if limit > QueuePeekMax || limit <= 0 {
+		limit = QueuePeekMax
+	}
+
+	partitionKey := shard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), "")
+
+	keys := []string{
+		partitionKey,
+		shard.RedisClient.kg.QueueItem(),
+	}
+	args, err := StrSlice([]any{
+		"-1",
+		limit,
+	})
+	if err != nil {
+		return -1, err
+	}
+
+	peekRet, err := scripts["queue/peek"].Exec(
+		redis_telemetry.WithScriptName(ctx, "peek"),
+		shard.RedisClient.unshardedRc,
+		keys,
+		args,
+	).ToAny()
+	if err != nil {
+		return -1, fmt.Errorf("error peeking items for migration: %w", err)
+	}
+
+	returnedSet, ok := peekRet.([]any)
+	if !ok {
+		return -1, fmt.Errorf("unknown return type from migration peek: %T", peekRet)
+	}
+
+	var potentiallyMissingItems, allQueueItemIDs []any
+	switch len(returnedSet) {
+	case 0:
+		// no op
+	case 2:
+		potentiallyMissingItems, ok = returnedSet[0].([]any)
+		if !ok {
+			return -1, fmt.Errorf("unexpected first item in set returned from migration peek: %T", peekRet)
+		}
+
+		allQueueItemIDs, ok = returnedSet[1].([]any)
+		if !ok {
+			return -1, fmt.Errorf("unexpected first item in set returned from migration peek: %T", peekRet)
+		}
+	default:
+		return -1, fmt.Errorf("expected zero or two items in set returned by migration peek: %v", returnedSet)
+	}
+
+	// filter out the items that are missing
+	items := make([]any, 0, len(allQueueItemIDs))
+	missing := make([]string, 0, len(allQueueItemIDs))
+	for i, itemID := range allQueueItemIDs {
+		if potentiallyMissingItems[i] == nil {
+			if itemID == nil {
+				return -1, fmt.Errorf("encountered nil queue item key in partition queue %q", partitionKey)
+			}
+
+			id, ok := itemID.(string)
+			if !ok {
+				return -1, fmt.Errorf("encountered non-string queue item key in partition queue %q", partitionKey)
+			}
+
+			missing = append(missing, id)
+		} else {
+			items = append(items, potentiallyMissingItems[i])
+		}
+	}
+
+	// attempt clean up
+	if len(missing) > 0 {
+		eg := errgroup.Group{}
+		for _, mid := range missing {
+			id := mid
+			eg.Go(func() error {
+				if err := q.removeQueueItem(ctx, shard, partitionKey, id); err != nil {
+					return fmt.Errorf("failed to remove nil queue item from partition during migration: %w", err)
+				}
+				return nil
+			})
+		}
+
+		if err := eg.Wait(); err != nil {
+			return -1, err
+		}
+	}
+
+	qis, err := util.ParallelDecode(items, func(val any) (*osqueue.QueueItem, error) {
+		if val == nil {
+			q.logger.Error().Str("partition", partitionKey).Msg("nil item value in migration peek response")
+			return nil, nil
+		}
+
+		str, ok := val.(string)
+		if !ok {
+			return nil, fmt.Errorf("non-string value in migration peek response: %T", val)
+		}
+		if str == "" {
+			return nil, fmt.Errorf("received empty string in decode queue item from migration peek")
+		}
+
+		qi := &osqueue.QueueItem{}
+		if err := json.Unmarshal([]byte(str), qi); err != nil {
+			return nil, fmt.Errorf("error unmarshalling migration peeked queue item: %w", err)
+		}
+		qi.Data.JobID = &qi.ID
+		return qi, nil
+	})
+	if err != nil {
+		return -1, err
+	}
+
+	// Should process in order because we don't want out of order execution when moved over
+	var processed int64
+	for _, qi := range qis {
+		if err := handler(ctx, qi); err != nil {
+			return processed, err
+		}
+		if err := q.removeQueueItem(ctx, shard, partitionKey, qi.ID); err != nil {
+			logger.StdlibLogger(ctx).Error("error cleaning up queue item after migration", "error", err)
+		}
+		processed++
+	}
+
+	return processed, nil
+}
+
+// removeQueueItem attempts to remove a specific item in the target queue shard
+func (q *queue) removeQueueItem(ctx context.Context, shard QueueShard, partitionKey string, itemID string) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "removeQueueItem"), redis_telemetry.ScopeQueue)
+	r := shard.RedisClient.Client()
+	cmd := r.B().Zrem().Key(partitionKey).Member(itemID).Build()
+	return r.Do(ctx, cmd).Error()
 }
 
 // Peek takes n items from a queue, up until QueuePeekMax.  For peeking workflow/
@@ -2423,6 +2616,8 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	fnIDs := make(map[uuid.UUID]bool)
 	fnIDsMu := sync.Mutex{}
 
+	migrateIDs := map[uuid.UUID]bool{}
+
 	// Use parallel decoding as per Peek
 	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueuePartition, error) {
 		if val == nil {
@@ -2502,6 +2697,9 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 
 				fnIDsMu.Lock()
 				fnIDs[fnMeta.FnID] = fnMeta.Paused
+				if fnMeta.Migrate {
+					migrateIDs[fnMeta.FnID] = true
+				}
 				fnIDsMu.Unlock()
 
 				return nil, nil
@@ -2531,6 +2729,12 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 					q.logger.Trace().Interface("partition", item.Queue()).Msg("pushed back paused partition")
 				}
 
+				ignored++
+				continue
+			}
+
+			if _, ok := migrateIDs[*item.FunctionID]; ok {
+				// skip this since the executor is not responsible for migrating queues
 				ignored++
 				continue
 			}
