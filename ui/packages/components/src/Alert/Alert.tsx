@@ -1,4 +1,4 @@
-import { Link, type LinkProps } from '@inngest/components/Link';
+import { NewLink, type NewLinkProps } from '@inngest/components/Link';
 import { cn } from '@inngest/components/utils/classNames';
 import {
   RiCheckboxCircleFill,
@@ -99,10 +99,17 @@ export function Alert({ children, className, severity, showIcon = true, button, 
   );
 }
 
-function AlertLink({ href, severity, ...props }: LinkProps & { severity: Severity }) {
+function AlertLink({
+  href,
+  severity,
+  children,
+  ...props
+}: React.PropsWithChildren<NewLinkProps & { severity: Severity }>) {
   const styles = severityStyles[severity].linkClassName;
   return (
-    <Link href={href} {...props} className={cn(styles, props.className)} showIcon={false}></Link>
+    <NewLink href={href} {...props} className={cn(styles, props.className)}>
+      {children}
+    </NewLink>
   );
 }
 

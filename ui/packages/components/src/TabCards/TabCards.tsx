@@ -1,7 +1,6 @@
+import { forwardRef } from 'react';
 import { cn } from '@inngest/components/utils/classNames';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
-
-import { Card } from '../Card';
 
 export default function TabCards({
   children,
@@ -10,14 +9,13 @@ export default function TabCards({
   return <TabsPrimitive.Root {...props}>{children}</TabsPrimitive.Root>;
 }
 
-function TabButton({
-  children,
-  value,
-  className,
-  ...props
-}: React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>) {
+const TabButton = forwardRef<
+  React.ElementRef<typeof TabsPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
+>(({ children, value, className, ...props }, ref) => {
   return (
     <TabsPrimitive.Trigger
+      ref={ref}
       className={cn(
         'border-subtle bg-canvasBase hover:bg-canvasMuted hover:border-muted data-[state=active]:bg-canvasSubtle data-[state=active]:border-contrast data-[state=active]:border-1 rounded-sm border px-2 py-1.5 text-sm',
         className
@@ -28,32 +26,29 @@ function TabButton({
       {children}
     </TabsPrimitive.Trigger>
   );
-}
+});
 
-function TabList({
-  children,
-  ...props
-}: React.ComponentPropsWithoutRef<typeof TabsPrimitive.TabsList>) {
+const TabList = forwardRef<
+  React.ElementRef<typeof TabsPrimitive.List>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
+>(({ children, ...props }, ref) => {
   return (
-    <TabsPrimitive.List className="mb-4 flex items-center gap-1.5" {...props}>
+    <TabsPrimitive.List ref={ref} className="mb-4 flex items-center gap-1.5" {...props}>
       {children}
     </TabsPrimitive.List>
   );
-}
+});
 
-function TabContent({
-  children,
-  value,
-  ...props
-}: React.ComponentPropsWithoutRef<typeof TabsPrimitive.TabsContent>) {
+const TabContent = forwardRef<
+  React.ElementRef<typeof TabsPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
+>(({ children, value, ...props }, ref) => {
   return (
-    <TabsPrimitive.Content value={value} asChild {...props}>
-      <Card>
-        <Card.Content>{children}</Card.Content>
-      </Card>
+    <TabsPrimitive.Content value={value} asChild {...props} ref={ref}>
+      <div className="border-subtle rounded-md border px-6 py-4">{children}</div>
     </TabsPrimitive.Content>
   );
-}
+});
 
 TabCards.Button = TabButton;
 TabCards.ButtonList = TabList;
