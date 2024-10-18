@@ -372,7 +372,7 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*response, error) {
 		}
 	}
 
-	if resp.StatusCode == 0 {
+	if statusCode == 0 {
 		// Unreachable
 		log.From(ctx).Error().Err(err).
 			Str("body", string(byt)).
