@@ -6,7 +6,7 @@ Return values:
 - >=0 (int): OK, and the new TTL from our debounce.
 - -1: Debounce is already in progress, as the queue item is leased.
 - -2: Event is out of order and has no effect
-- -3: Debounce queue item is not found.
+- -3: New debounce
 ]]--
 
 local keyPtr = KEYS[1] -- fn -> debounce ptr
@@ -15,13 +15,16 @@ local keyDbc = KEYS[2] -- debounce info key
 -- and create a new debounce job.
 local keyQueueHash = KEYS[3]
 
-local debounceID  = ARGV[1]
-local debounce    = ARGV[2]
-local ttl         = tonumber(ARGV[3])
-local queueJobID  = ARGV[4]
-local currentTime = tonumber(ARGV[5]) -- in ms
-local eventTime   = tonumber(ARGV[6]) -- The `event.ts` value.  If this is less than the event stored in the debounce, we
+local newDebouceID  = ARGV[1]
+local debounce      = ARGV[2]
+local ttl           = tonumber(ARGV[3])
+local queueJobID    = ARGV[4]
+local currentTime   = tonumber(ARGV[5]) -- in ms
+local eventTime     = tonumber(ARGV[6]) -- The `event.ts` value.  If this is less than the event stored in the debounce, we
                                       -- will not update the debounce as it violates the debounce order.
+
+-- helper functions
+-- $include(helpers.lua)
 
 -- This table is used when decoding ulid timestamps.
 local ulidMap = { ["0"] = 0, ["1"] = 1, ["2"] = 2, ["3"] = 3, ["4"] = 4, ["5"] = 5, ["6"] = 6, ["7"] = 7, ["8"] = 8, ["9"] = 9, ["A"] = 10, ["B"] = 11, ["C"] = 12, ["D"] = 13, ["E"] = 14, ["F"] = 15, ["G"] = 16, ["H"] = 17, ["J"] = 18, ["K"] = 19, ["M"] = 20, ["N"] = 21, ["P"] = 22, ["Q"] = 23, ["R"] = 24, ["S"] = 25, ["T"] = 26, ["V"] = 27, ["W"] = 28, ["X"] = 29, ["Y"] = 30, ["Z"] = 31 }
@@ -52,6 +55,18 @@ local function get_queue_item(queueKey, queueID)
 	return nil
 end
 
+local function get_or_create_debounce_key(key)
+  local val = redis.call("GET", key)
+
+  if is_empty(val) then
+    update_pointer(key, newDebounceID)
+    val = newDebounceID
+  end
+
+  return val
+end
+
+local debounceID = get_or_create_debounce_key(keyPtr)
 -- Check that the queue item is not leased (ie. this debounce is not in progress)
 local item = get_queue_item(keyQueueHash, queueJobID)
 if item == nil then
@@ -62,13 +77,12 @@ if item == nil then
   -- Set debounce info
   redis.call("HSET", keyDbc, debounceID, debounce)
 
-  return 0
-  -- return -3
+  return { status = "new", id = debounceID, ttl = ttl }
 end
 
 if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > currentTime then
 	-- The debounce queue item is leased.
-	return -1
+  return { status = "in-progress" }
 end
 
 -- Get the debounce
@@ -79,7 +93,7 @@ if existing ~= false then
 	local item = cjson.decode(existing)
 	if item ~= nil and item.e ~= nil and item.e.ts > eventTime then
 		-- The stored event occurs after the event we're updating, so do nothing.
-		return -2
+		return { status = "out-of-order" }
 	end
 
 	-- Also, if there's an existing debounce, ensure that we respect the max timeout
@@ -113,5 +127,4 @@ redis.call("SETEX", keyPtr, ttl, debounceID)
 redis.call("HSET", keyDbc, debounceID, debounce)
 
 -- TODO: This should also reschedule the job directly in an atomic transaction.
-
-return ttl
+return { status = "update", id = debounceID, ttl = ttl }
