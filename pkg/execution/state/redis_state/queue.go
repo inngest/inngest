@@ -1415,6 +1415,7 @@ func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID
 	if q.queueShardClients != nil {
 		eg := errgroup.Group{}
 		for _, shard := range q.queueShardClients {
+			shard := shard
 			eg.Go(func() error {
 				err := iterate(shard)
 				if err != nil {
