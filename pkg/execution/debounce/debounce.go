@@ -200,7 +200,8 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 
 	// A debounce must already exist for this fn.  Update it.
 	err = d.updateDebounce(ctx, di, fn, ttl, *debounceID)
-	if err == context.DeadlineExceeded || err == ErrDebounceInProgress || err == ErrDebounceNotFound {
+	switch err {
+	case context.DeadlineExceeded, ErrDebounceInProgress:
 		if n == 5 {
 			logger.StdlibLogger(ctx).Error("unable to update debounce", "error", err)
 			// Only recurse 5 times.
@@ -213,6 +214,8 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 		// This needs to modify queue items and partitions directly.
 		<-time.After(750 * time.Millisecond)
 		return d.debounce(ctx, di, fn, ttl, n+1)
+	case ErrDebounceNotFound:
+		// TODO: create new debounce
 	}
 
 	return err
