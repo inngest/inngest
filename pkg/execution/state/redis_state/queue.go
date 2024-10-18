@@ -1253,6 +1253,8 @@ func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status st
 		eg := errgroup.Group{}
 
 		for shardName, shard := range q.queueShardClients {
+			shard := shard
+
 			if shard.Kind != string(enums.QueueShardKindRedis) {
 				// TODO Support other storage backends
 				continue
@@ -1316,16 +1318,17 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 	if q.queueShardClients != nil {
 		eg := errgroup.Group{}
 
-		for shardName, shard := range q.queueShardClients {
+		for _, shard := range q.queueShardClients {
 			if shard.Kind != string(enums.QueueShardKindRedis) {
 				// TODO Support other storage backends
 				continue
 			}
 
+			shard := shard
 			eg.Go(func() error {
 				shardCount, err := iterate(shard.RedisClient)
 				if err != nil {
-					return fmt.Errorf("could not count running jobs for shard %s: %w", shardName, err)
+					return fmt.Errorf("could not count running jobs for shard %s: %w", shard.Name, err)
 				}
 				atomic.AddInt64(&count, shardCount)
 				return nil
@@ -1412,6 +1415,7 @@ func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID
 	if q.queueShardClients != nil {
 		eg := errgroup.Group{}
 		for _, shard := range q.queueShardClients {
+			shard := shard
 			eg.Go(func() error {
 				err := iterate(shard)
 				if err != nil {
