@@ -21,7 +21,7 @@ type RunsTableProps = {
   sorting?: SortingState;
   setSorting?: OnChangeFn<SortingState>;
   isLoading?: boolean;
-  renderSubComponent: (props: { id: string }) => React.ReactElement;
+  renderSubComponent: (props: Run) => React.ReactElement;
   getRowCanExpand: (row: Row<Run>) => boolean;
   visibleColumns?: VisibilityState;
   scope: ViewScope;
@@ -164,7 +164,7 @@ export default function RunsTable({
                 // Overrides tableStyles divider color
                 <tr className="!border-transparent">
                   <td colSpan={row.getVisibleCells().length}>
-                    {renderSubComponent({ id: row.original.id })}
+                    {renderSubComponent({ ...row.original })}
                   </td>
                 </tr>
               )}
