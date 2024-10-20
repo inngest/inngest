@@ -3526,6 +3526,93 @@ func TestQueueFunctionPause(t *testing.T) {
 	require.False(t, fnMeta.Paused)
 }
 
+func TestQueueFunctionMigrate(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	t.Run("with default shard", func(t *testing.T) {
+		q := NewQueue(
+			QueueShard{Name: "default", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)},
+			WithPartitionPriorityFinder(func(ctx context.Context, part QueuePartition) uint {
+				return PriorityDefault
+			}),
+		)
+		ctx := context.Background()
+
+		acctID := uuid.New()
+		now := time.Now().Truncate(time.Second)
+		fnID := uuid.New()
+		id := state.Identifier{AccountID: acctID, WorkflowID: fnID}
+		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: fnID, Data: osqueue.Item{Identifier: id}}, now)
+		require.NoError(t, err)
+
+		err = q.SetFunctionMigrate(ctx, "default", fnID)
+		require.NoError(t, err)
+
+		meta := getFnMetadata(t, r, fnID)
+		require.True(t, meta.Migrate)
+	})
+
+	t.Run("with other shards", func(t *testing.T) {
+		other := miniredis.RunT(t)
+		rc2, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{other.Addr()}, DisableCache: true})
+		require.NoError(t, err)
+		defer rc2.Close()
+
+		yoloShard := QueueShard{Name: "yolo", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc2, QueueDefaultKey)}
+
+		q := NewQueue(
+			QueueShard{Name: "default", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)},
+			WithQueueShardClients(map[string]QueueShard{
+				"yolo": yoloShard,
+			}),
+			WithPartitionPriorityFinder(func(ctx context.Context, part QueuePartition) uint {
+				return PriorityDefault
+			}),
+		)
+
+		ctx := context.Background()
+		acctID := uuid.New()
+		now := time.Now().Truncate(time.Second)
+		fnID := uuid.New()
+		id := state.Identifier{AccountID: acctID, WorkflowID: fnID}
+		_, err = q.EnqueueItem(ctx, yoloShard, osqueue.QueueItem{FunctionID: fnID, Data: osqueue.Item{Identifier: id}}, now)
+		require.NoError(t, err)
+
+		err = q.SetFunctionMigrate(ctx, "yolo", fnID)
+		require.NoError(t, err)
+
+		// replicate the getFnMetadata function, changing it would be too much work :/
+		metaFinder := func(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) (*FnMetadata, error) {
+			t.Helper()
+			kg := &queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
+			valJSON, err := r.Get(kg.FnMetadata(id))
+			if err != nil {
+				return nil, err
+			}
+			retv := FnMetadata{}
+			err = json.Unmarshal([]byte(valJSON), &retv)
+			if err != nil {
+				return nil, err
+			}
+			return &retv, nil
+		}
+
+		// should not find it in the default shard
+		_, err = metaFinder(t, r, fnID)
+		require.ErrorContains(t, err, "no such key")
+
+		// should find metadata in the other shard
+		meta, err := metaFinder(t, other, fnID)
+		require.True(t, meta.Migrate)
+	})
+}
+
 /*
 TODO
 func TestQueuePartitionReprioritize(t *testing.T) {
