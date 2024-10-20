@@ -45,13 +45,30 @@ async function sendToDevServer(payload: string) {
   }
 }
 
-export function useDevServer() {
+export function useDevServer(pollingInterval?: number) {
   const [isRunning, setRunning] = useState<boolean>(false);
+
   useEffect(() => {
-    fetch(devServerURL)
-      .then(() => setRunning(true))
-      .catch(() => setRunning(false));
-  }, []);
+    const checkServerStatus = () => {
+      fetch(devServerURL)
+        .then(() => setRunning(true))
+        .catch(() => setRunning(false));
+    };
+
+    checkServerStatus();
+
+    let intervalId: NodeJS.Timeout | undefined;
+    if (pollingInterval) {
+      intervalId = setInterval(checkServerStatus, pollingInterval);
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [pollingInterval]);
+
   return {
     isRunning,
     send: sendToDevServer,
