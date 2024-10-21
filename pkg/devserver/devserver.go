@@ -142,6 +142,16 @@ func start(ctx context.Context, opts StartOpts) error {
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
 	})
 
+	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.QueueShard, error) {
+		return queueShard, nil
+	}
+
+	queueShards := map[string]redis_state.QueueShard{
+		consts.DefaultQueueShardName: queueShard,
+	}
+
 	var sm state.Manager
 	t := runner.NewTracker()
 	sm, err = redis_state.New(
@@ -229,13 +239,14 @@ func start(ctx context.Context, opts StartOpts) error {
 
 			return limits
 		}),
+		redis_state.WithShardSelector(shardSelector),
+		redis_state.WithQueueShardClients(queueShards),
 	}
 	if opts.RetryInterval > 0 {
 		queueOpts = append(queueOpts, redis_state.WithBackoffFunc(
 			backoff.GetLinearBackoffFunc(time.Duration(opts.RetryInterval)*time.Second),
 		))
 	}
-	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
 	rq := redis_state.NewQueue(queueShard, queueOpts...)
 
 	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
@@ -304,6 +315,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithSendingEventHandler(getSendingEventHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithDebouncer(debouncer),
 		executor.WithBatcher(batcher),
+		executor.WithAssignedQueueShard(queueShard),
+		executor.WithShardSelector(shardSelector),
 	)
 	if err != nil {
 		return err

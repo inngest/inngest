@@ -2769,12 +2769,6 @@ func (q *queue) PartitionRequeue(ctx context.Context, shard QueueShard, p *Queue
 	}
 }
 
-// PartitionDequeue removes a partition pointer from the queue.  This is used when peeking and
-// receiving zero items to run.
-func (q *queue) PartitionDequeue(ctx context.Context, queueName string, at time.Time) error {
-	panic("unimplemented: requeueing partitions handles this.")
-}
-
 // PartitionReprioritize reprioritizes a workflow's QueueItems within the queue.
 func (q *queue) PartitionReprioritize(ctx context.Context, queueName string, priority uint) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PartitionReprioritize"), redis_telemetry.ScopeQueue)
