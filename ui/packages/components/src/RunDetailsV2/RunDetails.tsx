@@ -108,7 +108,7 @@ export function RunDetails(props: Props) {
               standalone={standalone}
               result={resultRes.data}
             />
-            {runRes.error || resultRes.error ? (
+            {props.initialRunData?.status !== 'QUEUED' && (runRes.error || resultRes.error) ? (
               <ErrorCard
                 error={runRes.error || resultRes.error}
                 reset={runRes.error ? () => runRes.refetch() : () => resultRes.refetch()}
