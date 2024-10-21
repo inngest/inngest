@@ -19,7 +19,7 @@ type Props = {
   cancelRun: (runID: string) => Promise<unknown>;
   getResult: (outputID: string) => Promise<Result>;
   getRun: (runID: string) => Promise<Run>;
-  initialRunData: InitialRunData;
+  initialRunData?: InitialRunData;
   getTrigger: React.ComponentProps<typeof TriggerDetails>['getTrigger'];
   pathCreator: React.ComponentProps<typeof RunInfo>['pathCreator'];
   pollInterval?: number;

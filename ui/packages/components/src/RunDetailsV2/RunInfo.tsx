@@ -30,7 +30,7 @@ type Props = {
     runPopout: (params: { runID: string }) => Route;
   };
   rerun: (args: { fnID: string; runID: string }) => Promise<unknown>;
-  initialRunData: InitialRunData;
+  initialRunData?: InitialRunData;
   run: Lazy<Run>;
   runID: string;
   result?: Result;
