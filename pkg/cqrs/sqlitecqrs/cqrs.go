@@ -14,7 +14,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
-	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs/sqlc"
+	sqlc_postgres "github.com/inngest/inngest/pkg/cqrs/sqlitecqrs/sqlc/postgres"
+	sqlc "github.com/inngest/inngest/pkg/cqrs/sqlitecqrs/sqlc/sqlite"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -41,15 +42,538 @@ var (
 	nilUUID = uuid.UUID{}
 )
 
-func NewCQRS(db *sql.DB) cqrs.Manager {
+func NewQueries(db *sql.DB, driver string) *Queries {
+	q := &Queries{}
+	if driver == "postgres" {
+		q.postgresDriver = sqlc_postgres.New(db)
+	} else {
+		q.sqliteDriver = sqlc.New(db)
+	}
+
+	return q
+}
+
+func NewCQRS(db *sql.DB, driver string) cqrs.Manager {
 	return wrapper{
-		q:  sqlc.New(db),
+		q:  NewQueries(db, driver),
 		db: db,
 	}
 }
 
+type Queries struct {
+	sqliteDriver   *sqlc.Queries
+	postgresDriver *sqlc_postgres.Queries
+}
+
+func (q Queries) GetLatestQueueSnapshotChunks(ctx context.Context) ([]*sqlc.GetLatestQueueSnapshotChunksRow, error) {
+	if q.postgresDriver != nil {
+		rows, err := q.postgresDriver.GetLatestQueueSnapshotChunks(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		sqliteRows := make([]*sqlc.GetLatestQueueSnapshotChunksRow, len(rows))
+		for i, row := range rows {
+			sqliteRows[i], _ = row.ToSQLite()
+		}
+
+		return sqliteRows, nil
+	}
+
+	return q.sqliteDriver.GetLatestQueueSnapshotChunks(ctx)
+}
+
+func (q Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID interface{}) ([]*sqlc.GetQueueSnapshotChunksRow, error) {
+	if q.postgresDriver != nil {
+		snapshotIDStr, ok := snapshotID.(string)
+		if !ok {
+			return nil, fmt.Errorf("snapshotID must be a string")
+		}
+
+		rows, err := q.postgresDriver.GetQueueSnapshotChunks(ctx, snapshotIDStr)
+		if err != nil {
+			return nil, err
+		}
+
+		sqliteRows := make([]*sqlc.GetQueueSnapshotChunksRow, len(rows))
+		for i, row := range rows {
+			sqliteRows[i], _ = row.ToSQLite()
+		}
+
+		return sqliteRows, nil
+	}
+
+	return q.sqliteDriver.GetQueueSnapshotChunks(ctx, snapshotID)
+}
+
+func (q Queries) DeleteOldQueueSnapshots(ctx context.Context, limit int64) (int64, error) {
+	if q.postgresDriver != nil {
+		return q.postgresDriver.DeleteOldQueueSnapshots(ctx, int32(limit))
+	}
+
+	return q.sqliteDriver.DeleteOldQueueSnapshots(ctx, limit)
+}
+
+func (q Queries) InsertQueueSnapshotChunk(ctx context.Context, params sqlc.InsertQueueSnapshotChunkParams) error {
+	if q.postgresDriver != nil {
+		snapshotIDStr, ok := params.SnapshotID.(string)
+		if !ok {
+			return fmt.Errorf("snapshot ID must be a string")
+		}
+
+		return q.postgresDriver.InsertQueueSnapshotChunk(ctx, sqlc_postgres.InsertQueueSnapshotChunkParams{
+			SnapshotID: snapshotIDStr,
+			ChunkID:    int32(params.ChunkID),
+			Data:       params.Data,
+		})
+	}
+
+	return q.sqliteDriver.InsertQueueSnapshotChunk(ctx, params)
+}
+
+func (q Queries) GetApps(ctx context.Context) ([]*sqlc.App, error) {
+	if q.postgresDriver != nil {
+		apps, err := q.postgresDriver.GetApps(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		sqliteApps := make([]*sqlc.App, len(apps))
+		for i, app := range apps {
+			sqliteApps[i], _ = app.ToSQLite()
+		}
+
+		return sqliteApps, nil
+	}
+
+	return q.sqliteDriver.GetApps(ctx)
+}
+
+func (q Queries) GetAppByChecksum(ctx context.Context, checksum string) (*sqlc.App, error) {
+	if q.postgresDriver != nil {
+		app, err := q.postgresDriver.GetAppByChecksum(ctx, checksum)
+		if err != nil {
+			return nil, err
+		}
+
+		return app.ToSQLite()
+	}
+
+	return q.sqliteDriver.GetAppByChecksum(ctx, checksum)
+}
+
+func (q Queries) GetAppByID(ctx context.Context, id uuid.UUID) (*sqlc.App, error) {
+	if q.postgresDriver != nil {
+		app, err := q.postgresDriver.GetAppByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+
+		return app.ToSQLite()
+	}
+
+	return q.sqliteDriver.GetAppByID(ctx, id)
+}
+
+func (q Queries) GetAppByURL(ctx context.Context, url string) (*sqlc.App, error) {
+	if q.postgresDriver != nil {
+		app, err := q.postgresDriver.GetAppByURL(ctx, url)
+		if err != nil {
+			return nil, err
+		}
+
+		return app.ToSQLite()
+	}
+
+	return q.sqliteDriver.GetAppByURL(ctx, url)
+}
+
+func (q Queries) GetAllApps(ctx context.Context) ([]*sqlc.App, error) {
+	if q.postgresDriver != nil {
+		apps, err := q.postgresDriver.GetAllApps(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		sqliteApps := make([]*sqlc.App, len(apps))
+		for i, app := range apps {
+			sqliteApps[i], _ = app.ToSQLite()
+		}
+
+		return sqliteApps, nil
+	}
+
+	return q.sqliteDriver.GetAllApps(ctx)
+}
+
+func (q Queries) UpsertApp(ctx context.Context, params sqlc.UpsertAppParams) (*sqlc.App, error) {
+	if q.postgresDriver != nil {
+		pgParams := sqlc_postgres.UpsertAppParams{
+			ID:          params.ID,
+			Name:        params.Name,
+			SdkLanguage: params.SdkLanguage,
+			SdkVersion:  params.SdkVersion,
+			Framework:   params.Framework,
+			Metadata:    params.Metadata,
+			Status:      params.Status,
+			Error:       params.Error,
+			Checksum:    params.Checksum,
+			Url:         params.Url,
+		}
+
+		app, err := q.postgresDriver.UpsertApp(ctx, pgParams)
+		if err != nil {
+			return nil, err
+		}
+
+		return app.ToSQLite()
+	}
+
+	return q.sqliteDriver.UpsertApp(ctx, params)
+}
+
+func (q Queries) GetAppFunctions(ctx context.Context, appID uuid.UUID) ([]*sqlc.Function, error) {
+	if q.postgresDriver != nil {
+		functions, err := q.postgresDriver.GetAppFunctions(ctx, appID)
+		if err != nil {
+			return nil, err
+		}
+
+		sqliteFunctions := make([]*sqlc.Function, len(functions))
+		for i, function := range functions {
+			sqliteFunctions[i], _ = function.ToSQLite()
+		}
+
+		return sqliteFunctions, nil
+	}
+
+	return q.sqliteDriver.GetAppFunctions(ctx, appID)
+}
+
+func (q Queries) DeleteApp(ctx context.Context, id uuid.UUID) error {
+	if q.postgresDriver != nil {
+		return q.postgresDriver.DeleteApp(ctx, id)
+	}
+
+	return q.sqliteDriver.DeleteApp(ctx, id)
+}
+
+func (q Queries) GetApp(ctx context.Context, id uuid.UUID) (*sqlc.App, error) {
+	if q.postgresDriver != nil {
+		app, err := q.postgresDriver.GetApp(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+
+		return app.ToSQLite()
+	}
+
+	return q.sqliteDriver.GetApp(ctx, id)
+}
+
+func (q Queries) GetFunctionBySlug(ctx context.Context, slug string) (*sqlc.Function, error) {
+	if q.postgresDriver != nil {
+		function, err := q.postgresDriver.GetFunctionBySlug(ctx, slug)
+		if err != nil {
+			return nil, err
+		}
+
+		return function.ToSQLite()
+	}
+
+	return q.sqliteDriver.GetFunctionBySlug(ctx, slug)
+}
+
+func (q Queries) GetFunctionByID(ctx context.Context, id uuid.UUID) (*sqlc.Function, error) {
+	if q.postgresDriver != nil {
+		function, err := q.postgresDriver.GetFunctionByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+
+		return function.ToSQLite()
+	}
+
+	return q.sqliteDriver.GetFunctionByID(ctx, id)
+}
+
+func (q Queries) GetFunctions(ctx context.Context) ([]*sqlc.Function, error) {
+	if q.postgresDriver != nil {
+		functions, err := q.postgresDriver.GetFunctions(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		sqliteFunctions := make([]*sqlc.Function, len(functions))
+		for i, function := range functions {
+			sqliteFunctions[i], _ = function.ToSQLite()
+		}
+
+		return sqliteFunctions, nil
+	}
+
+	return q.sqliteDriver.GetFunctions(ctx)
+}
+
+func (q Queries) GetAppFunctionsBySlug(ctx context.Context, slug string) ([]*sqlc.Function, error) {
+	if q.postgresDriver != nil {
+		functions, err := q.postgresDriver.GetAppFunctionsBySlug(ctx, slug)
+		if err != nil {
+			return nil, err
+		}
+
+		sqliteFunctions := make([]*sqlc.Function, len(functions))
+		for i, function := range functions {
+			sqliteFunctions[i], _ = function.ToSQLite()
+		}
+
+		return sqliteFunctions, nil
+	}
+
+	return q.sqliteDriver.GetAppFunctionsBySlug(ctx, slug)
+}
+
+func (q Queries) InsertFunction(ctx context.Context, params sqlc.InsertFunctionParams) (*sqlc.Function, error) {
+	if q.postgresDriver != nil {
+		pgParams := sqlc_postgres.InsertFunctionParams{
+			ID:        params.ID,
+			AppID:     params.AppID,
+			Name:      params.Name,
+			Slug:      params.Slug,
+			Config:    params.Config,
+			CreatedAt: params.CreatedAt,
+		}
+
+		function, err := q.postgresDriver.InsertFunction(ctx, pgParams)
+		if err != nil {
+			return nil, err
+		}
+
+		return function.ToSQLite()
+	}
+
+	return q.sqliteDriver.InsertFunction(ctx, params)
+}
+
+func (q Queries) DeleteFunctionsByAppID(ctx context.Context, appID uuid.UUID) error {
+	if q.postgresDriver != nil {
+		return q.postgresDriver.DeleteFunctionsByAppID(ctx, appID)
+	}
+
+	return q.sqliteDriver.DeleteFunctionsByAppID(ctx, appID)
+}
+
+func (q Queries) DeleteFunctionsByIDs(ctx context.Context, ids []uuid.UUID) error {
+	if q.postgresDriver != nil {
+		return q.postgresDriver.DeleteFunctionsByIDs(ctx, ids)
+	}
+
+	return q.sqliteDriver.DeleteFunctionsByIDs(ctx, ids)
+}
+
+func (q Queries) UpdateFunctionConfig(ctx context.Context, arg sqlc.UpdateFunctionConfigParams) (*sqlc.Function, error) {
+	if q.postgresDriver != nil {
+		pgParams := sqlc_postgres.UpdateFunctionConfigParams{
+			Config: arg.Config,
+			ID:     arg.ID,
+		}
+
+		function, err := q.postgresDriver.UpdateFunctionConfig(ctx, pgParams)
+		if err != nil {
+			return nil, err
+		}
+
+		return function.ToSQLite()
+	}
+
+	return q.sqliteDriver.UpdateFunctionConfig(ctx, arg)
+}
+
+func (q Queries) InsertEvent(ctx context.Context, e sqlc.InsertEventParams) error {
+	if q.postgresDriver != nil {
+		pgParams := sqlc_postgres.InsertEventParams{
+			InternalID: e.InternalID,
+			ReceivedAt: e.ReceivedAt,
+			EventID:    e.EventID,
+			EventName:  e.EventName,
+			EventData:  e.EventData,
+			EventUser:  e.EventUser,
+			EventV:     e.EventV,
+			EventTs:    e.EventTs,
+		}
+
+		return q.postgresDriver.InsertEvent(ctx, pgParams)
+	}
+
+	return q.sqliteDriver.InsertEvent(ctx, e)
+}
+
+func (q Queries) InsertEventBatch(ctx context.Context, eb sqlc.InsertEventBatchParams) error {
+	if q.postgresDriver != nil {
+		pgParams := sqlc_postgres.InsertEventBatchParams{
+			ID:          eb.ID,
+			AccountID:   eb.AccountID,
+			WorkspaceID: eb.WorkspaceID,
+			AppID:       eb.AppID,
+			WorkflowID:  eb.WorkflowID,
+			RunID:       eb.RunID,
+			StartedAt:   eb.StartedAt,
+			ExecutedAt:  eb.ExecutedAt,
+			EventIds:    eb.EventIds,
+		}
+
+		return q.postgresDriver.InsertEventBatch(ctx, pgParams)
+	}
+
+	return q.sqliteDriver.InsertEventBatch(ctx, eb)
+}
+
+func (q Queries) GetEventByInternalID(ctx context.Context, internalID ulid.ULID) (*sqlc.Event, error) {
+	if q.postgresDriver != nil {
+		event, err := q.postgresDriver.GetEventByInternalID(ctx, internalID)
+		if err != nil {
+			return nil, err
+		}
+
+		return event.ToSQLite()
+	}
+
+	return q.sqliteDriver.GetEventByInternalID(ctx, internalID)
+}
+
+func (q Queries) GetEventBatchesByEventID(ctx context.Context, eventID string) ([]*sqlc.EventBatch, error) {
+	if q.postgresDriver != nil {
+		batches, err := q.postgresDriver.GetEventBatchesByEventID(ctx, eventID)
+		if err != nil {
+			return nil, err
+		}
+
+		sqliteBatches := make([]*sqlc.EventBatch, len(batches))
+		for i, batch := range batches {
+			sqliteBatches[i], _ = batch.ToSQLite()
+		}
+
+		return sqliteBatches, nil
+	}
+
+	return q.sqliteDriver.GetEventBatchesByEventID(ctx, eventID)
+}
+
+func (q Queries) GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*sqlc.EventBatch, error) {
+	if q.postgresDriver != nil {
+		batch, err := q.postgresDriver.GetEventBatchByRunID(ctx, runID)
+		if err != nil {
+			return nil, err
+		}
+
+		return batch.ToSQLite()
+	}
+
+	return q.sqliteDriver.GetEventBatchByRunID(ctx, runID)
+}
+
+func (q Queries) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([]*sqlc.Event, error) {
+	if q.postgresDriver != nil {
+		eventIDs := make([]string, len(ids))
+		for i, id := range ids {
+			eventIDs[i] = id.String()
+		}
+
+		events, err := q.postgresDriver.GetEventsByInternalIDs(ctx, eventIDs)
+		if err != nil {
+			return nil, err
+		}
+
+		sqliteEvents := make([]*sqlc.Event, len(events))
+
+		for i, event := range events {
+			sqliteEvents[i], _ = event.ToSQLite()
+		}
+
+		return sqliteEvents, nil
+	}
+
+	return q.sqliteDriver.GetEventsByInternalIDs(ctx, ids)
+}
+
+func (q Queries) WorkspaceEvents(ctx context.Context, params sqlc.WorkspaceEventsParams) ([]*sqlc.Event, error) {
+	return q.sqliteDriver.WorkspaceEvents(ctx, params)
+}
+
+func (q Queries) WorkspaceNamedEvents(ctx context.Context, params sqlc.WorkspaceNamedEventsParams) ([]*sqlc.Event, error) {
+	return q.sqliteDriver.WorkspaceNamedEvents(ctx, params)
+}
+
+func (q Queries) GetEventsIDbound(ctx context.Context, params sqlc.GetEventsIDboundParams) ([]*sqlc.Event, error) {
+	return q.sqliteDriver.GetEventsIDbound(ctx, params)
+}
+
+func (q Queries) InsertFunctionRun(ctx context.Context, e sqlc.InsertFunctionRunParams) error {
+	return q.sqliteDriver.InsertFunctionRun(ctx, e)
+}
+
+func (q Queries) GetFunctionRunsFromEvents(ctx context.Context, eventIDs []ulid.ULID) ([]*sqlc.GetFunctionRunsFromEventsRow, error) {
+	return q.sqliteDriver.GetFunctionRunsFromEvents(ctx, eventIDs)
+}
+
+func (q Queries) GetFunctionRun(ctx context.Context, id ulid.ULID) (*sqlc.GetFunctionRunRow, error) {
+	return q.sqliteDriver.GetFunctionRun(ctx, id)
+}
+
+func (q Queries) GetFunctionRunsTimebound(ctx context.Context, params sqlc.GetFunctionRunsTimeboundParams) ([]*sqlc.GetFunctionRunsTimeboundRow, error) {
+	return q.sqliteDriver.GetFunctionRunsTimebound(ctx, params)
+}
+
+func (q Queries) GetFunctionRunFinishesByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*sqlc.FunctionFinish, error) {
+	return q.sqliteDriver.GetFunctionRunFinishesByRunIDs(ctx, runIDs)
+}
+
+func (q Queries) InsertHistory(ctx context.Context, h sqlc.InsertHistoryParams) error {
+	return q.sqliteDriver.InsertHistory(ctx, h)
+}
+
+func (q Queries) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]*sqlc.History, error) {
+	return q.sqliteDriver.GetFunctionRunHistory(ctx, runID)
+}
+
+func (q Queries) InsertTrace(ctx context.Context, span sqlc.InsertTraceParams) error {
+	return q.sqliteDriver.InsertTrace(ctx, span)
+}
+
+func (q Queries) InsertTraceRun(ctx context.Context, span sqlc.InsertTraceRunParams) error {
+	return q.sqliteDriver.InsertTraceRun(ctx, span)
+}
+
+func (q Queries) GetTraceSpans(ctx context.Context, arg sqlc.GetTraceSpansParams) ([]*sqlc.Trace, error) {
+	return q.sqliteDriver.GetTraceSpans(ctx, arg)
+}
+
+func (q Queries) GetTraceRun(ctx context.Context, runID ulid.ULID) (*sqlc.TraceRun, error) {
+	return q.sqliteDriver.GetTraceRun(ctx, runID)
+}
+
+func (q Queries) GetTraceSpanOutput(ctx context.Context, arg sqlc.GetTraceSpanOutputParams) ([]*sqlc.Trace, error) {
+	return q.sqliteDriver.GetTraceSpanOutput(ctx, arg)
+}
+
+func (q Queries) InsertFunctionFinish(ctx context.Context, arg sqlc.InsertFunctionFinishParams) error {
+	return q.sqliteDriver.InsertFunctionFinish(ctx, arg)
+}
+
+func (q Queries) HistoryCountRuns(ctx context.Context) (int64, error) {
+	return q.sqliteDriver.HistoryCountRuns(ctx)
+}
+
+func (q Queries) GetHistoryItem(ctx context.Context, id ulid.ULID) (*sqlc.History, error) {
+	return q.sqliteDriver.GetHistoryItem(ctx, id)
+}
+
+func (q Queries) GetFunctionRuns(ctx context.Context) ([]*sqlc.GetFunctionRunsRow, error) {
+	return q.sqliteDriver.GetFunctionRuns(ctx)
+}
+
 type wrapper struct {
-	q  *sqlc.Queries
+	q  *Queries
 	db *sql.DB
 	tx *sql.Tx
 }
@@ -80,8 +604,16 @@ func (w wrapper) WithTx(ctx context.Context) (cqrs.TxManager, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	q := &Queries{}
+	if w.q.postgresDriver != nil {
+		q.postgresDriver = sqlc_postgres.New(tx)
+	} else {
+		q.sqliteDriver = sqlc.New(tx)
+	}
+
 	return &wrapper{
-		q:  sqlc.New(tx),
+		q:  q,
 		tx: tx,
 	}, nil
 }

@@ -109,6 +109,7 @@ func mapStartFlags(cmd *cobra.Command) error {
 	err = errors.Join(err, viper.BindPFlag("signing-key", cmd.Flags().Lookup("signing-key")))
 	err = errors.Join(err, viper.BindPFlag("event-key", cmd.Flags().Lookup("event-key")))
 	err = errors.Join(err, viper.BindPFlag("redis-uri", cmd.Flags().Lookup("redis-uri")))
+	err = errors.Join(err, viper.BindPFlag("postgres-uri", cmd.Flags().Lookup("postgres-uri")))
 	err = errors.Join(err, viper.BindPFlag("poll-interval", cmd.Flags().Lookup("poll-interval")))
 	err = errors.Join(err, viper.BindPFlag("retry-interval", cmd.Flags().Lookup("retry-interval")))
 	err = errors.Join(err, viper.BindPFlag("sdk-url", cmd.Flags().Lookup("sdk-url")))

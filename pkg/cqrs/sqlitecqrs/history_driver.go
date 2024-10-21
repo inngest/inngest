@@ -6,20 +6,20 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs/sqlc"
+	sqlc "github.com/inngest/inngest/pkg/cqrs/sqlitecqrs/sqlc/sqlite"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/oklog/ulid/v2"
 )
 
-func NewHistoryDriver(db *sql.DB) history.Driver {
+func NewHistoryDriver(db *sql.DB, driver string) history.Driver {
 	return historyDriver{
-		q: sqlc.New(db),
+		q: NewQueries(db, driver),
 	}
 }
 
 type historyDriver struct {
-	q *sqlc.Queries
+	q *Queries
 }
 
 func (d historyDriver) Write(ctx context.Context, h history.History) (err error) {

@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/inngest/inngest/pkg/enums"
 	"time"
+
+	"github.com/inngest/inngest/pkg/enums"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/coocood/freecache"
@@ -115,8 +116,9 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	// Initialize the devserver
-	dbcqrs := sqlitecqrs.NewCQRS(db)
-	hd := sqlitecqrs.NewHistoryDriver(db)
+	dbDriver := "sqlite"
+	dbcqrs := sqlitecqrs.NewCQRS(db, dbDriver)
+	hd := sqlitecqrs.NewHistoryDriver(db, dbDriver)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	stepLimitOverrides := make(map[string]int)
