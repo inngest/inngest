@@ -17,7 +17,7 @@ export default function EventListNotFound() {
   const router = useRouter();
   const environment = useEnvironment();
   const res = useDefaultEventKey({ envID: environment.id });
-  const key = res.data?.defaultKey?.presharedKey;
+  const key = res.data?.defaultKey.presharedKey;
 
   return (
     <div className="h-full w-full overflow-y-scroll py-16">

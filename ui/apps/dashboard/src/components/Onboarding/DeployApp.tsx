@@ -20,7 +20,7 @@ export default function DeployApp() {
   const router = useRouter();
   const env = useEnvironment();
   const res = useDefaultEventKey({ envID: env.id });
-  const defaultEventKey = res.data?.defaultKey?.presharedKey || 'Unknown key';
+  const defaultEventKey = res.data?.defaultKey.presharedKey || 'Unknown key';
 
   return (
     <div className="text-subtle">
