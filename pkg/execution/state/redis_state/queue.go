@@ -2393,26 +2393,6 @@ func (q *queue) cleanupNilPartitionInAccount(ctx context.Context, accountId uuid
 	return nil
 }
 
-// cleanupNilQueueItemInPartition is invoked for missing queue items, specifically in key queues, when an old executor processed and dequeued an item in the default partition.
-// This ensures we gracefully handle inconsistencies created by the backwards compatible (always enqueue to default partition) key queues implementation.
-func (q *queue) cleanupNilQueueItemInPartition(ctx context.Context, p QueuePartition, queueItemId string) error {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "cleanupNilQueueItemInPartition"), redis_telemetry.ScopeQueue)
-
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return fmt.Errorf("unsupported queue shard kind for cleanupNilQueueItemInPartition: %s", q.primaryQueueShard.Kind)
-	}
-
-	// Log because this should only happen as long as we run old code
-	q.logger.Warn().Interface("partition", p).Str("item_id", queueItemId).Msg("removing pointer to missing queue item")
-
-	cmd := q.primaryQueueShard.RedisClient.Client().B().Zrem().Key(p.zsetKey(q.primaryQueueShard.RedisClient.kg)).Member(queueItemId).Build()
-	if err := q.primaryQueueShard.RedisClient.Client().Do(ctx, cmd).Error(); err != nil {
-		return fmt.Errorf("failed to remove nil queue item from partition queue: %w", err)
-	}
-
-	return nil
-}
-
 // cleanupEmptyAccount is invoked when we peek an account without any partitions in the account pointer zset.
 // This happens when old executors process default function partitions and .
 // This ensures we gracefully handle inconsistencies created by the backwards compatible (keep using global partitions pointer _and_ account partitions) key queues implementation.
