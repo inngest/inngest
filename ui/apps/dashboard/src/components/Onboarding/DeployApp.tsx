@@ -9,13 +9,18 @@ import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { RiCheckboxCircleFill, RiCloudLine } from '@remixicon/react';
 
 import { Secret } from '@/components/Secret';
+import { useDefaultEventKey } from '@/queries/useDefaultEventKey';
 import { pathCreator } from '@/utils/urls';
+import { useEnvironment } from '../Environments/environment-context';
 import { OnboardingSteps } from '../Onboarding/types';
 import useOnboardingStep from './useOnboardingStep';
 
 export default function DeployApp() {
   const { updateLastCompletedStep } = useOnboardingStep();
   const router = useRouter();
+  const env = useEnvironment();
+  const res = useDefaultEventKey({ envID: env.id });
+  const defaultEventKey = res.data?.defaultKey?.presharedKey || 'Unknown key';
 
   return (
     <div className="text-subtle">
@@ -67,6 +72,7 @@ export default function DeployApp() {
               size="small"
               href="https://www.inngest.com/docs/events/creating-an-event-key?ref=app-onboarding-deploy-app"
               className="inline-block"
+              target="_blank"
             >
               Learn more about adding keys
             </NewLink>
@@ -79,8 +85,7 @@ export default function DeployApp() {
             </code>{' '}
             is used for sending events and invoking functions
           </p>
-          {/* TODO: get prod event key */}
-          <Secret kind="event-key" secret="key" className="mb-4" />
+          <Secret kind="event-key" secret={defaultEventKey} className="mb-4" />
           <div className="text-basis text-sm font-medium">Signing key</div>
           <p className="mb-2 text-sm">
             The{' '}
@@ -89,8 +94,7 @@ export default function DeployApp() {
             </code>{' '}
             is used for authenticating requests between Inngest and your app
           </p>
-          {/* TODO: get prod signing key */}
-          <Secret kind="signing-key" secret="key" className="mb-6" />
+          <Secret kind="signing-key" secret={env.webhookSigningKey} className="mb-6" />
           <NewButton
             label="Next"
             onClick={() => {
@@ -113,6 +117,7 @@ export default function DeployApp() {
               size="small"
               href="https://www.inngest.com/docs/deploy/vercel?ref=app-onboarding-deploy-app"
               className="inline-block"
+              target="_blank"
             >
               Read our Vercel documentation
             </NewLink>
@@ -144,21 +149,20 @@ export default function DeployApp() {
           </div>
           <p className="mb-4 text-sm">
             You can configure the environment variables on Cloudflare using Wrangler or through
-            their dashboard. Learn how to define them{' '}
+            their dashboard.{' '}
             <NewLink
               size="small"
               href="https://developers.cloudflare.com/workers/configuration/environment-variables/"
               className="inline-block"
+              target="_blank"
             >
-              here
+              Learn more about how to define the variables
             </NewLink>
           </p>
           <div className="text-basis mb-2 text-sm font-medium">Event key</div>
-          {/* TODO: get prod event key */}
-          <Secret kind="event-key" secret="key" className="mb-4" />
+          <Secret kind="event-key" secret={defaultEventKey} className="mb-4" />
           <div className="text-basis mb-2 text-sm font-medium">Signing key</div>
-          {/* TODO: get prod signing key */}
-          <Secret kind="signing-key" secret="key" className="mb-6" />
+          <Secret kind="signing-key" secret={env.webhookSigningKey} className="mb-6" />
           <NewButton
             label="Next"
             onClick={() => {
@@ -175,59 +179,61 @@ export default function DeployApp() {
             <p className="text-basis">Fly.io</p>
           </div>
           <p className="mb-4 text-sm">
-            You can configure the environment variables on Fly.io by adding the values below. Learn
-            more about how to set a secret in Fly.io{' '}
+            You can configure the environment variables on Fly.io by adding the values below.{' '}
             <NewLink
               size="small"
               href="https://fly.io/docs/rails/the-basics/configuration/"
               className="inline-block"
+              target="_blank"
             >
-              here
+              Learn more about how to set a secret in Fly.io
             </NewLink>
           </p>
-          {/* TODO: get prod event key */}
           <CommandBlock.Wrapper>
             <CommandBlock.Header className="flex items-center justify-between pr-4">
               <CommandBlock.Tabs
                 tabs={[
                   {
                     title: 'Event key',
-                    content: 'fly secrets set INNGEST_EVENT_KEY=',
+                    content: `fly secrets set INNGEST_EVENT_KEY=${defaultEventKey}`,
                     language: 'shell',
                   },
                 ]}
                 activeTab="Event key"
               />
-              <CommandBlock.CopyButton content="fly secrets set INNGEST_EVENT_KEY=" />
+              <CommandBlock.CopyButton
+                content={`fly secrets set INNGEST_EVENT_KEY=${defaultEventKey}`}
+              />
             </CommandBlock.Header>
             <CommandBlock
               currentTabContent={{
                 title: 'Event key',
-                content: 'fly secrets set INNGEST_EVENT_KEY=',
+                content: `fly secrets set INNGEST_EVENT_KEY=${defaultEventKey}`,
                 language: 'shell',
               }}
             />
           </CommandBlock.Wrapper>
           <div className="mb-4" />
-          {/* TODO: get prod signing key */}
           <CommandBlock.Wrapper>
             <CommandBlock.Header className="flex items-center justify-between pr-4">
               <CommandBlock.Tabs
                 tabs={[
                   {
                     title: 'Signing key',
-                    content: 'fly secrets set INNGEST_SIGNING_KEY=',
+                    content: `fly secrets set INNGEST_SIGNING_KEY=${env.webhookSigningKey}`,
                     language: 'shell',
                   },
                 ]}
                 activeTab="Signing key"
               />
-              <CommandBlock.CopyButton content="fly secrets set INNGEST_SIGNING_KEY=" />
+              <CommandBlock.CopyButton
+                content={`fly secrets set INNGEST_SIGNING_KEY=${env.webhookSigningKey}`}
+              />
             </CommandBlock.Header>
             <CommandBlock
               currentTabContent={{
                 title: 'Signing key',
-                content: 'fly secrets set INNGEST_SIGNING_KEY=',
+                content: `fly secrets set INNGEST_SIGNING_KEY=${env.webhookSigningKey}`,
                 language: 'shell',
               }}
             />
