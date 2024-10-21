@@ -5,14 +5,13 @@ import {
   connect,
   getInstanceByDom,
   init,
-  type DefaultLabelFormatterCallbackParams,
   type EChartsOption,
   type LegendComponentOption,
   type LineSeriesOption,
   type SetOptionOpts,
 } from 'echarts';
 
-export type { LineSeriesOption, LegendComponentOption, DefaultLabelFormatterCallbackParams };
+export type { LegendComponentOption, LineSeriesOption };
 
 export interface ChartProps {
   option: EChartsOption;
@@ -72,8 +71,12 @@ export const Chart = ({
     <div
       ref={chartRef}
       className={className}
-      {...(group && { onMouseEnter: () => toggleTooltips(true) })}
-      {...(group && { onMouseLeave: () => toggleTooltips(false) })}
+      //
+      // for grouped charts, we only want tooltips to show for chart in focus
+      {...(group && {
+        onMouseLeave: () => toggleTooltips(false),
+        onMouseEnter: () => toggleTooltips(true),
+      })}
     />
   );
 };

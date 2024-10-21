@@ -6,12 +6,10 @@ import type {
 import { resolveColor } from '@inngest/components/utils/colors';
 import { differenceInMilliseconds, lightFormat, toDate } from '@inngest/components/utils/date';
 import { isDark } from '@inngest/components/utils/theme';
-import ReactDOMServer from 'react-dom/server';
 import resolveConfig from 'tailwindcss/resolveConfig';
 
 import type { MetricsData, ScopedMetric } from '@/gql/graphql';
 import tailwindConfig from '../../../tailwind.config';
-import { ChartTooltip } from './ChartTooltip';
 import type { EntityLookup, EntityType } from './Dashboard';
 
 const {
@@ -41,9 +39,8 @@ export const seriesOptions: LineSeriesOption = {
   type: 'line',
   showSymbol: false,
   lineStyle: { width: 1 },
-  emphasis: {
-    focus: 'none',
-  },
+  triggerLineEvent: true,
+  emphasis: { focus: 'none' },
 };
 
 export const dateFormat = (dateString: string, diff: number) => {
@@ -79,13 +76,44 @@ export const sum = (data?: MetricsData[]) =>
 
 export const formatNumber = (number?: number | bigint) => (number || 0).toLocaleString(undefined);
 
+export const marker = (color: string) =>
+  `<span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;
+      border-width: 1px;border-color:${color};background-color:${color};"></span>`;
+
+export const formatDimension = (param: any) => {
+  const color = typeof param.color === 'object' ? param.color?.colorStops[0]?.color : param.color;
+
+  //
+  // FYI using vanilla html in formatter because rendering react here causes
+  // some lag with synched cursors
+  return `<div class="flex flex-row justify-between flex-nowrap items-center px-2">
+    <div>
+      <span class="mr">${marker(color)}
+      </span>
+      <span>
+      ${param.seriesName}
+      </span>
+    </div> 
+    <div class="ml-4 font-bold">${formatNumber(param.value)}</div>
+  </div>`;
+};
+
+const tooltipFormatter = (params: any) => {
+  return Array.isArray(params) && params[0]
+    ? `<div class="my-1"><div class="mb-1 mx-2 text-sm">${params[0].axisValue}</div>${params
+        .sort((a: any, b: any) => b.value - a.value)
+        .map((p: any) => formatDimension(p))
+        .join('')}</div>`
+    : '';
+};
+
 export const getLineChartOptions = (
   data: Partial<ChartProps['option']>,
   legendData?: LegendComponentOption['data']
 ): ChartProps['option'] => {
   return {
     tooltip: {
-      trigger: 'item',
+      trigger: 'axis',
       renderMode: 'html',
       enterable: true,
       position: 'top',
@@ -99,16 +127,11 @@ export const getLineChartOptions = (
       // Attach tooltips to a dedicated dom node above interim parents
       // with low z-indexes
       appendTo: () => document.getElementById('chart-tooltip'),
-      transitionDuration: 1,
-      //
-      // rendering our tooltip component to a string removes click events,
-      // so wrap the whole thing in a vanilla js clipboard cliip handler
-      formatter: (params: any) =>
-        `<div onclick="navigator.clipboard.writeText('${
-          params.name
-        }')">${ReactDOMServer.renderToString(ChartTooltip(params))}</div>`,
+      transitionDuration: 1.5,
+      formatter: (params) => tooltipFormatter(params),
       padding: 0,
-      extraCssText: `border: 0px;`,
+      extraCssText: 'max-height: 300px; overflow-y: scroll;',
+      className: 'no-scrollbar',
     },
     legend: {
       type: 'scroll',
@@ -147,10 +170,10 @@ export const getXAxis = (metrics: ScopedMetric[]) => {
     data: metrics[0]?.data.map(({ bucket }) => bucket) || ['No Data Found'],
     axisPointer: {
       show: true,
+      snap: true,
       type: 'line' as const,
       label: {
         show: false,
-        snap: true,
         borderWidth: 1,
         padding: 8,
         borderColor: resolveColor(borderColor.subtle, dark),
@@ -160,7 +183,9 @@ export const getXAxis = (metrics: ScopedMetric[]) => {
         shadowBlur: 4,
         formatter: ({ value }: any) => dateFormat(value, diff),
       },
-      triggerTooltip: false,
+
+      triggerTooltip: true,
+      triggerEmphasis: true,
     },
     axisLabel: {
       interval: dataLength <= 40 ? 2 : dataLength / (dataLength / 12),
