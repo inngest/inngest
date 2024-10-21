@@ -6,49 +6,18 @@ import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card';
 import { InlineCode } from '@inngest/components/InlineCode';
 import { RiErrorWarningLine } from '@remixicon/react';
-import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { Secret } from '@/components/Secret';
-import { graphql } from '@/gql';
 import VercelLogomark from '@/logos/vercel-logomark.svg';
+import { useDefaultEventKey } from '@/queries/useDefaultEventKey';
 import { pathCreator } from '@/utils/urls';
-
-const GetEventKeysForBlankSlateDocument = graphql(`
-  query GetEventKeysForBlankSlate($environmentID: ID!) {
-    environment: workspace(id: $environmentID) {
-      ingestKeys(filter: { source: "key" }) {
-        name
-        presharedKey
-        createdAt
-      }
-    }
-  }
-`);
-
-function getDefaultEventKey<T extends { createdAt: string; name: null | string }>(
-  keys: T[]
-): T | undefined {
-  const def = keys.find((k) => k.name && k.name.match(/default/i));
-  return (
-    def ||
-    [...keys].sort((a, b) => {
-      return Date.parse(a.createdAt) - Date.parse(b.createdAt);
-    })[0]
-  );
-}
 
 export default function EventListNotFound() {
   const router = useRouter();
   const environment = useEnvironment();
-  const [{ data }] = useQuery({
-    query: GetEventKeysForBlankSlateDocument,
-    variables: {
-      environmentID: environment.id,
-    },
-  });
-  const ingestKey = getDefaultEventKey(data?.environment.ingestKeys || []);
-  const key = ingestKey?.presharedKey;
+  const res = useDefaultEventKey({ envID: environment.id });
+  const key = res.data?.defaultKey.presharedKey;
 
   return (
     <div className="h-full w-full overflow-y-scroll py-16">

@@ -45,13 +45,30 @@ async function sendToDevServer(payload: string) {
   }
 }
 
-export function useDevServer() {
+export function useDevServer(pollingInterval?: number) {
   const [isRunning, setRunning] = useState<boolean>(false);
+
   useEffect(() => {
-    fetch(devServerURL)
-      .then(() => setRunning(true))
-      .catch(() => setRunning(false));
-  }, []);
+    const checkServerStatus = () => {
+      fetch(devServerURL)
+        .then(() => setRunning(true))
+        .catch(() => setRunning(false));
+    };
+
+    checkServerStatus();
+
+    let intervalId: number | undefined;
+    if (pollingInterval) {
+      intervalId = window.setInterval(checkServerStatus, pollingInterval);
+    }
+
+    return () => {
+      if (intervalId !== undefined) {
+        window.clearInterval(intervalId);
+      }
+    };
+  }, [pollingInterval]);
+
   return {
     isRunning,
     send: sendToDevServer,
