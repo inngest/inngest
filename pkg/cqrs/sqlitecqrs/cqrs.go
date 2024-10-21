@@ -475,6 +475,10 @@ func (q Queries) GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*sq
 }
 
 func (q Queries) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([]*sqlc.Event, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
 	if q.postgresDriver != nil {
 		events, err := q.postgresDriver.GetEventsByInternalIDs(ctx, ids)
 		if err != nil {
