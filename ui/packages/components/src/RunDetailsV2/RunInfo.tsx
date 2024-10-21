@@ -196,7 +196,7 @@ export function RunInfo({
         </Card.Content>
         {!result &&
           !isLazyDone(run) &&
-          (initialRunData.status === 'QUEUED' ? (
+          (initialRunData?.status === 'QUEUED' ? (
             <div className="border-muted bg-canvas border-t">
               <div className="border-l-status-queued flex items-center justify-between border-l-4">
                 <p className="text-subtle max-h-24 text-ellipsis break-words px-5 py-2.5 text-sm">
