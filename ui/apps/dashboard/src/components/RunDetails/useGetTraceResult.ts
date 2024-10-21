@@ -1,35 +1,29 @@
 import { useCallback } from 'react';
-import type { Result } from '@inngest/components/types/functionRun';
 import { useClient } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 
 const query = graphql(`
-  query TraceResult($envID: ID!, $traceID: String!) {
+  query TraceResult($envID: ID!, $runID: String!) {
     workspace(id: $envID) {
-      runTraceSpanOutputByID(outputID: $traceID) {
-        data
-        error {
-          message
-          name
-          stack
-        }
+      run(runID: $runID) {
+        output
       }
     }
   }
 `);
 
-export function useGetTraceResult(): (traceID: string) => Promise<Result> {
+export function useGetTraceResult(): (runID: string) => Promise<string | null> {
   const envID = useEnvironment().id;
   const client = useClient();
 
   return useCallback(
-    async (traceID: string) => {
+    async (runID: string) => {
       let res;
       try {
         res = await client
-          .query(query, { envID: envID, traceID }, { requestPolicy: 'network-only' })
+          .query(query, { envID: envID, runID }, { requestPolicy: 'network-only' })
           .toPromise();
       } catch (e) {
         if (e instanceof Error) {
@@ -43,7 +37,7 @@ export function useGetTraceResult(): (traceID: string) => Promise<Result> {
       if (!res.data) {
         throw new Error('no data returned');
       }
-      return res.data.workspace.runTraceSpanOutputByID;
+      return res.data.workspace.run?.output ?? null;
     },
     [client, envID]
   );
