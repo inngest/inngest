@@ -98,11 +98,13 @@ export const formatDimension = (param: any) => {
   </div>`;
 };
 
-const tooltipFormatter: any = (params: any) => {
-  return `<div class="my-1"><div class="mb-1 mx-2 text-sm">${params[0].axisValue}</div>${params
-    .sort((a: any, b: any) => b.value - a.value)
-    .map((p: any) => formatDimension(p))
-    .join('')}</div>`;
+const tooltipFormatter = (params: any) => {
+  return Array.isArray(params) && params[0]
+    ? `<div class="my-1"><div class="mb-1 mx-2 text-sm">${params[0].axisValue}</div>${params
+        .sort((a: any, b: any) => b.value - a.value)
+        .map((p: any) => formatDimension(p))
+        .join('')}</div>`
+    : '';
 };
 
 export const getLineChartOptions = (
@@ -126,7 +128,7 @@ export const getLineChartOptions = (
       // with low z-indexes
       appendTo: () => document.getElementById('chart-tooltip'),
       transitionDuration: 1.5,
-      formatter: (params: any) => tooltipFormatter(params),
+      formatter: (params) => tooltipFormatter(params),
       padding: 0,
       extraCssText: 'max-height: 300px; overflow-y: scroll;',
       className: 'no-scrollbar',

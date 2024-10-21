@@ -5,14 +5,13 @@ import {
   connect,
   getInstanceByDom,
   init,
-  type DefaultLabelFormatterCallbackParams,
   type EChartsOption,
   type LegendComponentOption,
   type LineSeriesOption,
   type SetOptionOpts,
 } from 'echarts';
 
-export type { DefaultLabelFormatterCallbackParams, LegendComponentOption, LineSeriesOption };
+export type { LegendComponentOption, LineSeriesOption };
 
 export interface ChartProps {
   option: EChartsOption;
