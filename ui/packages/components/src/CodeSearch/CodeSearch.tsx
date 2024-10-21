@@ -2,7 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { NewButton as Button } from '@inngest/components/Button';
-import { FONT, LINE_HEIGHT, createColors, createRules } from '@inngest/components/utils/monaco';
+import {
+  FONT,
+  LINE_HEIGHT,
+  celLanguageTokens,
+  createColors,
+  createRules,
+} from '@inngest/components/utils/monaco';
 import Editor, { useMonaco, type Monaco } from '@monaco-editor/react';
 import { languages, type editor } from 'monaco-editor';
 
@@ -199,42 +205,7 @@ export default function CodeSearch({
 
     monaco.languages.register({ id: 'cel' });
 
-    monaco.languages.setMonarchTokensProvider('cel', {
-      tokenizer: {
-        root: [
-          // Identifying keywords
-          [/\b(true|false|null)\b/, 'keyword.constant'],
-          [/\b(in|map|list|as|and|or|not)\b/, 'keyword.operator'],
-          [/\b(int|bool|string|double|bytes)\b/, 'keyword.type'],
-
-          // Identifying function calls (e.g. size, exists, all, etc.)
-          [/\b(size|exists|all|has)\b/, 'function'],
-
-          // Identifying identifiers (variables or field names)
-          [/[a-zA-Z_]\w*/, 'identifier'],
-
-          // Identifying string literals (single and double-quoted)
-          [/"([^"\\]|\\.)*"/, 'string'], // Double-quoted string with escaped characters
-          [/'([^'\\]|\\.)*'/, 'string'], // Single-quoted string with escaped characters
-
-          // Identifying numbers (only if not within a string)
-          [/\b\d+(\.\d+)?\b/, 'number'],
-
-          // Identifying comments (single-line and multi-line)
-          [/\/\/.*$/, 'comment'],
-          [/\/\*.*\*\//, 'comment'],
-
-          // Identifying operators
-          [/[=!<>]=|[-+*/%]/, 'operator'],
-
-          // Identifying parentheses, brackets, and curly braces
-          [/[\[\](){}]/, '@brackets'],
-
-          // Identifying whitespace
-          [/\s+/, 'white'],
-        ],
-      },
-    });
+    monaco.languages.setMonarchTokensProvider('cel', celLanguageTokens);
 
     monaco.editor.defineTheme('inngest-theme', {
       base: dark ? 'vs-dark' : 'vs',

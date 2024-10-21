@@ -3,6 +3,7 @@
 import CreateApp from '@/components/Onboarding/CreateApp';
 import DeployApp from '@/components/Onboarding/DeployApp';
 import InvokeFn from '@/components/Onboarding/InvokeFn';
+import SyncApp from '@/components/Onboarding/SyncApp';
 import { OnboardingSteps } from '@/components/Onboarding/types';
 
 export default function OnboardingStep({ params: { step } }: { params: { step: string } }) {
@@ -11,7 +12,7 @@ export default function OnboardingStep({ params: { step } }: { params: { step: s
   } else if (step === OnboardingSteps.DeployApp) {
     return <DeployApp />;
   } else if (step === OnboardingSteps.SyncApp) {
-    return <p>Sync component</p>;
+    return <SyncApp />;
   } else if (step === OnboardingSteps.InvokeFn) {
     return <InvokeFn />;
   }
