@@ -4,27 +4,20 @@ import { type Route } from 'next';
 import Link from 'next/link';
 import { Button } from '@inngest/components/Button';
 import { Link as InngestLink } from '@inngest/components/Link';
-import { RiErrorWarningLine } from '@remixicon/react';
 
 import Toaster from '@/components/Toaster';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useEnvironments } from '@/queries';
-import { EnvironmentType, LEGACY_TEST_MODE_NAME } from '@/utils/environments';
+import { EnvironmentType } from '@/utils/environments';
 import { EnvironmentArchiveButton } from './EnvironmentArchiveButton';
 import EnvironmentListTable from './EnvironmentListTable';
 
 export default function Environments() {
   const [{ data: envs = [], fetching }] = useEnvironments();
 
-  // Break the environments into different groups
-  const legacyTestMode = envs.find(
-    (env) => env.type === EnvironmentType.Test && env.name === LEGACY_TEST_MODE_NAME
-  );
   const branchParent = envs.find((env) => env.type === EnvironmentType.BranchParent);
   const branches = envs.filter((env) => env.type === EnvironmentType.BranchChild);
-  const otherTestEnvs = envs.filter(
-    (env) => env.type === EnvironmentType.Test && env.name !== LEGACY_TEST_MODE_NAME
-  );
+  const customEnvs = envs.filter((env) => env.type === EnvironmentType.Test);
 
   if (fetching) {
     return (
@@ -57,38 +50,6 @@ export default function Environments() {
             Production
           </h3>
         </Link>
-        {Boolean(legacyTestMode) && (
-          <div className="mt-12 border-t border-slate-100 pt-8">
-            <div className="mb-4 flex w-full items-center  justify-between">
-              <h2 className="text-lg font-medium text-slate-800">Test Mode</h2>
-              <div className="flex items-center gap-2">
-                <Button
-                  href={`/env/${legacyTestMode?.slug}/manage`}
-                  appearance="outlined"
-                  label="Manage"
-                />
-                <Button
-                  href={`/env/${legacyTestMode?.slug}/apps` as Route}
-                  kind="primary"
-                  label="Go To Apps"
-                />
-              </div>
-            </div>
-            <Link
-              href={`/env/${legacyTestMode?.slug}/functions` as Route}
-              className="mt-8 flex cursor-pointer items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm hover:bg-slate-100/60"
-            >
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                <span className="bg-primary-moderate block h-2 w-2 rounded-full" />
-                Test
-              </h3>
-            </Link>
-            <p className="mt-4 text-sm text-amber-600">
-              <RiErrorWarningLine className="mr-1 inline-block h-4 w-4 text-amber-500" />
-              Test mode is a legacy environment
-            </p>
-          </div>
-        )}
 
         {Boolean(branchParent) && (
           <div className="mt-12 border-t border-slate-100 pt-8">
@@ -116,8 +77,8 @@ export default function Environments() {
           </div>
         )}
 
-        {otherTestEnvs.length > 0 &&
-          otherTestEnvs.map((env) => (
+        {customEnvs.length > 0 &&
+          customEnvs.map((env) => (
             <div key={env.id} className="mt-12 border-t border-slate-100 pt-8">
               <div className="mb-4 flex w-full items-center  justify-between">
                 <h2 className="text-lg font-medium text-slate-800">{env.name}</h2>

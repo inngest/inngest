@@ -5,8 +5,6 @@ import { type NonEmptyArray } from '@/utils/isNonEmptyArray';
 
 export { EnvironmentType };
 
-export const LEGACY_TEST_MODE_NAME = 'Test';
-
 /** Environment is a "workspace" right now */
 export type Environment = {
   type: EnvironmentType;
@@ -36,20 +34,6 @@ export function getDefaultEnvironment(
   environments: NonEmptyArray<Environment>
 ): Environment | null {
   return environments.find((e) => e.type === EnvironmentType.Production) || null;
-}
-
-export function getLegacyTestMode(
-  environments: NonEmptyArray<Environment>,
-  includeArchived = true
-): Environment | null {
-  return (
-    environments.find((env) => {
-      if (!includeArchived && env.isArchived) {
-        return false;
-      }
-      return env.type === EnvironmentType.Test && env.name === LEGACY_TEST_MODE_NAME;
-    }) || null
-  );
 }
 
 function getRecentCutOffDate(): Date {
@@ -119,7 +103,7 @@ export function getTestEnvironments(
     if (!includeArchived && env.isArchived) {
       return false;
     }
-    return env.type === EnvironmentType.Test && env.name !== LEGACY_TEST_MODE_NAME;
+    return env.type === EnvironmentType.Test;
   });
 }
 
@@ -140,13 +124,9 @@ export function workspaceToEnvironment(
   >
 ): Environment {
   const isProduction = workspace.type === EnvironmentType.Production;
-  const isTestWorkspace = workspace.type === EnvironmentType.Test;
-  const isLegacyTestMode = isTestWorkspace && workspace.name === 'default';
 
   let environmentName = workspace.name;
-  if (isLegacyTestMode) {
-    environmentName = LEGACY_TEST_MODE_NAME;
-  } else if (isProduction) {
+  if (isProduction) {
     environmentName = 'Production';
   }
 
@@ -190,14 +170,9 @@ export function getEnvironmentSlug({
   environmentType,
 }: getEnvironmentSlugProps): string {
   const isProduction = environmentType === EnvironmentType.Production;
-  const isTestWorkspace = environmentType === EnvironmentType.Test;
-  const isLegacyTestMode = isTestWorkspace && environmentName === 'default';
 
   let slug = environmentSlug || '';
-  if (isLegacyTestMode) {
-    environmentName = LEGACY_TEST_MODE_NAME;
-    slug = slugify(environmentName);
-  } else if (isProduction) {
+  if (isProduction) {
     slug = staticSlugs.production;
   } else if (environmentType === EnvironmentType.BranchParent) {
     slug = staticSlugs.branch;
