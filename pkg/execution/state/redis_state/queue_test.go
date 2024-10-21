@@ -4830,11 +4830,11 @@ func TestMigrate(t *testing.T) {
 
 	acctID := uuid.New()
 	fnID := uuid.New()
-	id := state.Identifier{AccountID: acctID, WorkflowID: fnID}
 
 	// Enqueue to shard 1
 	for i := 0; i < 5; i++ {
 		lease := ulid.MustNew(ulid.Now(), rand.Reader)
+		id := state.Identifier{AccountID: acctID, WorkflowID: fnID, EventID: ulid.MustNew(ulid.Now(), rand.Reader), RunID: ulid.MustNew(ulid.Now(), rand.Reader)}
 		_, err = q1.EnqueueItem(ctx, shard1, osqueue.QueueItem{FunctionID: fnID, Data: osqueue.Item{Identifier: id}, LeaseID: &lease}, time.Now(), osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 	}
@@ -4852,7 +4852,7 @@ func TestMigrate(t *testing.T) {
 
 	// Attempt to migrate from shard1 to shard2
 	processed, err := q1.Migrate(ctx, shard1Name, fnID, 10, func(ctx context.Context, qi *osqueue.QueueItem) error {
-		return q2.Enqueue(ctx, qi.Data, time.UnixMilli(qi.AtMS), osqueue.EnqueueOpts{})
+		return q2.Enqueue(ctx, qi.Data, time.UnixMilli(qi.AtMS), osqueue.EnqueueOpts{PassthroughJobId: true})
 	})
 	require.NoError(t, err)
 	require.Equal(t, int64(5), processed)
@@ -4869,7 +4869,7 @@ func TestMigrate(t *testing.T) {
 
 	// Now, move everything back to queue 1
 	returned, err := q2.Migrate(ctx, shard2Name, fnID, 10, func(ctx context.Context, qi *osqueue.QueueItem) error {
-		return q1.Enqueue(ctx, qi.Data, time.UnixMilli(qi.AtMS), osqueue.EnqueueOpts{})
+		return q1.Enqueue(ctx, qi.Data, time.UnixMilli(qi.AtMS), osqueue.EnqueueOpts{PassthroughJobId: true})
 	})
 	require.NoError(t, err)
 	require.Equal(t, int64(5), returned)
