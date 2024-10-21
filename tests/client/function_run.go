@@ -141,7 +141,7 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 
 	data := &response{}
 	if err := json.Unmarshal(resp.Data, data); err != nil {
-		c.Fatalf(err.Error())
+		c.Fatal(err.Error())
 	}
 
 	return data.Runs.Edges, data.Runs.PageInfo, data.Runs.TotalCount
@@ -179,7 +179,7 @@ func (c *Client) Run(ctx context.Context, runID string) Run {
 
 	data := &response{}
 	if err := json.Unmarshal(resp.Data, data); err != nil {
-		c.Fatalf(err.Error())
+		c.Fatal(err.Error())
 	}
 
 	return data.FunctionRun
@@ -210,7 +210,7 @@ func (c *Client) WaitForRunStatus(
 			} else {
 				msg = fmt.Sprintf("Expected status %s, got %s", expectedStatus, run.Status)
 			}
-			t.Fatalf(msg)
+			t.Fatal(msg)
 		}
 
 		time.Sleep(100 * time.Millisecond)
@@ -410,7 +410,7 @@ func (c *Client) RunSpanOutput(ctx context.Context, outputID string) *models.Run
 	}
 	data := response{}
 	if err := json.Unmarshal(resp.Data, &data); err != nil {
-		c.Fatalf(err.Error())
+		c.Fatal(err.Error())
 	}
 
 	return data.Output
@@ -512,7 +512,7 @@ func (c *Client) RunsByEventID(ctx context.Context, eventID string) ([]runByEven
 
 	data := &response{}
 	if err := json.Unmarshal(resp.Data, data); err != nil {
-		c.Fatalf(err.Error())
+		c.Fatal(err.Error())
 	}
 
 	return data.Event.FunctionRuns, nil
