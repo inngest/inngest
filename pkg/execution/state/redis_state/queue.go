@@ -1499,7 +1499,6 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 		PartitionKey: partitionKey,
 		Limit:        limit,
 		Until:        time.Time{},
-		IgnoreLease:  true,
 	})
 	if err != nil {
 		return -1, fmt.Errorf("error peeking items for queue migration: %w", err)
@@ -1597,7 +1596,6 @@ type peekOpts struct {
 	PartitionKey string
 	Until        time.Time
 	Limit        int64
-	IgnoreLease  bool
 }
 
 func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*osqueue.QueueItem, error) {
@@ -1706,7 +1704,7 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 		if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), qi); err != nil {
 			return nil, fmt.Errorf("error unmarshalling peeked queue item: %w", err)
 		}
-		if !opts.IgnoreLease && qi.IsLeased(now) {
+		if qi.IsLeased(now) {
 			// Leased item, don't return.
 			return nil, nil
 		}
