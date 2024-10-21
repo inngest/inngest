@@ -8,7 +8,6 @@ import { StatusCell } from '../Table';
 import { Trace } from '../TimelineV2';
 import { Timeline } from '../TimelineV2/Timeline';
 import { TriggerDetails } from '../TriggerDetails';
-import type { Result } from '../types/functionRun';
 import { nullishToLazy } from '../utils/lazyLoad';
 import { ErrorCard } from './ErrorCard';
 import { RunInfo } from './RunInfo';
@@ -16,7 +15,7 @@ import { RunInfo } from './RunInfo';
 type Props = {
   standalone: boolean;
   cancelRun: (runID: string) => Promise<unknown>;
-  getResult: (outputID: string) => Promise<Result>;
+  getResult: (outputID: string) => Promise<string | null>;
   getRun: (runID: string) => Promise<Run>;
   getTrigger: React.ComponentProps<typeof TriggerDetails>['getTrigger'];
   pathCreator: React.ComponentProps<typeof RunInfo>['pathCreator'];
@@ -57,13 +56,8 @@ export function RunDetails(props: Props) {
     enabled: Boolean(outputID),
     queryKey: ['run-result', runID],
     queryFn: useCallback(() => {
-      if (!outputID) {
-        // Unreachable
-        throw new Error('missing outputID');
-      }
-
-      return getResult(outputID);
-    }, [getResult, outputID]),
+      return getResult(runID);
+    }, [getResult, runID]),
   });
 
   const cancelRun = useCallback(async () => {
@@ -109,12 +103,19 @@ export function RunDetails(props: Props) {
                 run={nullishToLazy(run)}
                 runID={runID}
                 standalone={standalone}
-                result={resultRes.data}
+                result={resultRes.data ?? null}
               />
             )}
           </div>
 
-          {run && <Timeline getResult={getResult} pathCreator={pathCreator} trace={run.trace} />}
+          {run && (
+            <Timeline
+              getResult={getResult}
+              pathCreator={pathCreator}
+              runID={runID}
+              trace={run.trace}
+            />
+          )}
         </div>
 
         <TriggerDetails getTrigger={getTrigger} runID={runID} />

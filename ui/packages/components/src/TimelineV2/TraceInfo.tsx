@@ -10,7 +10,6 @@ import {
 } from '../DetailsCard/Element';
 import { RunResult } from '../RunResult';
 import { Time } from '../Time';
-import type { Result } from '../types/functionRun';
 import { cn } from '../utils/classNames';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
 import { isStepInfoInvoke, isStepInfoSleep, isStepInfoWait, type Trace } from './types';
@@ -21,7 +20,7 @@ type Props = {
     runPopout: (params: { runID: string }) => Route;
   };
   trace: Trace;
-  result?: Result;
+  result: string | null;
 };
 
 export function TraceInfo({ className, pathCreator, trace, result }: Props) {
@@ -145,7 +144,13 @@ export function TraceInfo({ className, pathCreator, trace, result }: Props) {
             {stepKindInfo}
           </dl>
         </Card.Content>
-        {result && <RunResult className="border-subtle border-t" result={result} />}
+        {result && (
+          <RunResult
+            className="border-subtle border-t"
+            result={result}
+            isSuccess={trace.status === 'COMPLETED'}
+          />
+        )}
       </Card>
     </div>
   );

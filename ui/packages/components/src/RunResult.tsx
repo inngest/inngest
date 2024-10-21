@@ -1,46 +1,91 @@
 'use client';
 
-import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
+import { useMemo } from 'react';
+import z from 'zod';
 
 import { CodeBlock } from './CodeBlock';
-import type { Result } from './types/functionRun';
 
 type Props = {
   className?: string;
-  result: Result;
-  isSuccess?: boolean;
+  result: string;
+  isSuccess: boolean;
 };
 
 export function RunResult({ className, result, isSuccess }: Props) {
-  const prettyResult = result.data && usePrettyJson(result.data);
+  const parsedResult = useParsedResult({ isSuccess, result });
 
   return (
     <div className={className}>
-      {result.data && (
+      {parsedResult.isSuccess && (
         <CodeBlock
           header={{
             title: 'Output',
-            status: isSuccess ? 'success' : undefined,
+            status: 'success',
           }}
           tab={{
-            content: prettyResult || result.data,
+            content: parsedResult.data,
           }}
         />
       )}
 
-      {result.error && (
+      {!parsedResult.isSuccess && (
         <CodeBlock
           header={{
-            title:
-              (result.error.name || 'Error') +
-              (result.error.message ? ': ' + result.error.message : ''),
+            title: `${parsedResult.error.name}: ${parsedResult.error.message}`,
             status: 'error',
           }}
           tab={{
-            content: result.error.stack ?? '',
+            content: parsedResult.error.stack,
           }}
         />
       )}
     </div>
   );
+}
+
+const errorSchema = z.object({
+  name: z.string().nullish(),
+  message: z.string(),
+  stack: z.string().nullish(),
+});
+
+function useParsedResult({ isSuccess, result }: { isSuccess: boolean; result: string }) {
+  return useMemo(() => {
+    if (isSuccess) {
+      let data: unknown;
+      try {
+        data = JSON.parse(result);
+      } catch {
+        return {
+          data: result,
+          isSuccess,
+        };
+      }
+      return {
+        data: JSON.stringify(data, null, 2),
+        isSuccess,
+      };
+    }
+
+    const parsedError = errorSchema.safeParse(JSON.parse(result));
+    if (!parsedError.success) {
+      return {
+        error: {
+          name: 'Error',
+          message: '',
+          stack: result,
+        },
+        isSuccess,
+      };
+    }
+
+    return {
+      error: {
+        ...parsedError.data,
+        name: parsedError.data.name ?? 'Error',
+        stack: parsedError.data.stack ?? '',
+      },
+      isSuccess,
+    };
+  }, [isSuccess, result]);
 }

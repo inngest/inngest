@@ -12,7 +12,6 @@ import {
 import { Link } from '../Link';
 import { RerunButton } from '../RerunButtonV2';
 import { RunResult } from '../RunResult';
-import type { Result } from '../types/functionRun';
 import { cn } from '../utils/classNames';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
 import { isLazyDone, type Lazy } from '../utils/lazyLoad';
@@ -29,7 +28,7 @@ type Props = {
   rerun: (args: { fnID: string; runID: string }) => Promise<unknown>;
   run: Lazy<Run>;
   runID: string;
-  result?: Result;
+  result: string | null;
 };
 
 type Run = {
