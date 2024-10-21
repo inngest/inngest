@@ -1495,117 +1495,19 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 
 	partitionKey := shard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), "")
 
-	keys := []string{
-		partitionKey,
-		shard.RedisClient.kg.QueueItem(),
-	}
-	args, err := StrSlice([]any{
-		"-inf",
-		limit,
+	items, err := q.peek(ctx, shard, peekOpts{
+		PartitionKey: partitionKey,
+		Limit:        limit,
+		Until:        time.Time{},
+		IgnoreLease:  true,
 	})
 	if err != nil {
-		return -1, err
-	}
-
-	peekRet, err := scripts["queue/peek"].Exec(
-		redis_telemetry.WithScriptName(ctx, "peek"),
-		shard.RedisClient.unshardedRc,
-		keys,
-		args,
-	).ToAny()
-	if err != nil {
-		return -1, fmt.Errorf("error peeking items for migration: %w", err)
-	}
-
-	returnedSet, ok := peekRet.([]any)
-	if !ok {
-		return -1, fmt.Errorf("unknown return type from migration peek: %T", peekRet)
-	}
-
-	var potentiallyMissingItems, allQueueItemIDs []any
-	switch len(returnedSet) {
-	case 0:
-		// no op
-	case 2:
-		potentiallyMissingItems, ok = returnedSet[0].([]any)
-		if !ok {
-			return -1, fmt.Errorf("unexpected first item in set returned from migration peek: %T", peekRet)
-		}
-
-		allQueueItemIDs, ok = returnedSet[1].([]any)
-		if !ok {
-			return -1, fmt.Errorf("unexpected first item in set returned from migration peek: %T", peekRet)
-		}
-	default:
-		return -1, fmt.Errorf("expected zero or two items in set returned by migration peek: %v", returnedSet)
-	}
-
-	// filter out the items that are missing
-	items := make([]any, 0, len(allQueueItemIDs))
-	missing := make([]string, 0, len(allQueueItemIDs))
-	for i, itemID := range allQueueItemIDs {
-		if potentiallyMissingItems[i] == nil {
-			if itemID == nil {
-				return -1, fmt.Errorf("encountered nil queue item key in partition queue %q", partitionKey)
-			}
-
-			id, ok := itemID.(string)
-			if !ok {
-				return -1, fmt.Errorf("encountered non-string queue item key in partition queue %q", partitionKey)
-			}
-
-			missing = append(missing, id)
-		} else {
-			items = append(items, potentiallyMissingItems[i])
-		}
-	}
-
-	// attempt clean up
-	if len(missing) > 0 {
-		eg := errgroup.Group{}
-		for _, mid := range missing {
-			id := mid
-			eg.Go(func() error {
-				if err := q.removeQueueItem(ctx, shard, partitionKey, id); err != nil {
-					return fmt.Errorf("failed to remove nil queue item from partition during migration: %w", err)
-				}
-				return nil
-			})
-		}
-
-		if err := eg.Wait(); err != nil {
-			return -1, err
-		}
-	}
-
-	qis, err := util.ParallelDecode(items, func(val any) (*osqueue.QueueItem, error) {
-		if val == nil {
-			q.logger.Error().Str("partition", partitionKey).Msg("nil item value in migration peek response")
-			return nil, nil
-		}
-
-		str, ok := val.(string)
-		if !ok {
-			return nil, fmt.Errorf("non-string value in migration peek response: %T", val)
-		}
-		if str == "" {
-			return nil, fmt.Errorf("received empty string in decode queue item from migration peek")
-		}
-
-		qi := &osqueue.QueueItem{}
-		if err := json.Unmarshal([]byte(str), qi); err != nil {
-			return nil, fmt.Errorf("error unmarshalling migration peeked queue item: %w", err)
-		}
-		qi.Data.JobID = &qi.ID
-		return qi, nil
-	})
-	if err != nil {
-		return -1, err
+		return -1, fmt.Errorf("error peeking items for queue migration: %w", err)
 	}
 
 	// Should process in order because we don't want out of order execution when moved over
 	var processed int64
-	for _, qi := range qis {
+	for _, qi := range items {
 		if err := handler(ctx, qi); err != nil {
 			return processed, err
 		}
@@ -1674,6 +1576,7 @@ type peekOpts struct {
 	PartitionKey string
 	Until        time.Time
 	Limit        int64
+	IgnoreLease  bool
 }
 
 func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*osqueue.QueueItem, error) {
@@ -1785,7 +1688,7 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 		if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), qi); err != nil {
 			return nil, fmt.Errorf("error unmarshalling peeked queue item: %w", err)
 		}
-		if qi.IsLeased(now) {
+		if !opts.IgnoreLease && qi.IsLeased(now) {
 			// Leased item, don't return.
 			return nil, nil
 		}
