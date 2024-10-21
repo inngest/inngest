@@ -57,14 +57,14 @@ export function useDevServer(pollingInterval?: number) {
 
     checkServerStatus();
 
-    let intervalId: NodeJS.Timeout | undefined;
+    let intervalId: number | undefined;
     if (pollingInterval) {
-      intervalId = setInterval(checkServerStatus, pollingInterval);
+      intervalId = window.setInterval(checkServerStatus, pollingInterval);
     }
 
     return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
+      if (intervalId !== undefined) {
+        window.clearInterval(intervalId);
       }
     };
   }, [pollingInterval]);
