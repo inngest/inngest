@@ -251,14 +251,14 @@ func WithPreDeleteStateSizeReporter(f execution.PreDeleteStateSizeReporter) Exec
 	}
 }
 
-func (e *executor) WithAssignedQueueShard(shard redis_state.QueueShard) ExecutorOpt {
+func WithAssignedQueueShard(shard redis_state.QueueShard) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).assignedQueueShard = shard
 		return nil
 	}
 }
 
-func (e *executor) WithShardSelector(selector redis_state.ShardSelector) ExecutorOpt {
+func WithShardSelector(selector redis_state.ShardSelector) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).shardFinder = selector
 		return nil
