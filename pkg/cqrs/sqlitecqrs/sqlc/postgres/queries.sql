@@ -143,7 +143,7 @@ SELECT * FROM events WHERE internal_id = $1;
 SELECT * FROM events WHERE internal_id IN (sqlc.slice('ids'));;
 
 -- name: GetEventBatchByRunID :one
-SELECT * FROM event_batches WHERE run_id = $1;
+SELECT * FROM event_batches WHERE run_id = CAST($1 AS CHAR(26));
 
 -- name: GetEventBatchesByEventID :many
 SELECT * FROM event_batches WHERE POSITION(CAST($1 AS TEXT) IN CAST(event_ids AS TEXT)) > 0;

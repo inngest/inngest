@@ -463,7 +463,7 @@ func (q Queries) GetEventBatchesByEventID(ctx context.Context, eventID string) (
 
 func (q Queries) GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*sqlc.EventBatch, error) {
 	if q.postgresDriver != nil {
-		batch, err := q.postgresDriver.GetEventBatchByRunID(ctx, runID)
+		batch, err := q.postgresDriver.GetEventBatchByRunID(ctx, runID.String())
 		if err != nil {
 			return nil, err
 		}

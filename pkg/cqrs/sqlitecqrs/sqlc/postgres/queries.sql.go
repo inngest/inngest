@@ -317,11 +317,11 @@ func (q *Queries) GetApps(ctx context.Context) ([]*App, error) {
 }
 
 const getEventBatchByRunID = `-- name: GetEventBatchByRunID :one
-SELECT id, account_id, workspace_id, app_id, workflow_id, run_id, started_at, executed_at, event_ids FROM event_batches WHERE run_id = $1
+SELECT id, account_id, workspace_id, app_id, workflow_id, run_id, started_at, executed_at, event_ids FROM event_batches WHERE run_id = CAST($1 AS CHAR(26))
 `
 
-func (q *Queries) GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*EventBatch, error) {
-	row := q.db.QueryRowContext(ctx, getEventBatchByRunID, runID)
+func (q *Queries) GetEventBatchByRunID(ctx context.Context, dollar_1 string) (*EventBatch, error) {
+	row := q.db.QueryRowContext(ctx, getEventBatchByRunID, dollar_1)
 	var i EventBatch
 	err := row.Scan(
 		&i.ID,
