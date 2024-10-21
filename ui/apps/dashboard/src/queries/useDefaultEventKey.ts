@@ -23,6 +23,10 @@ export function useDefaultEventKey({ envID }: { envID: string }) {
     const keys = res.data.environment.ingestKeys;
     const defaultKey = getDefaultEventKey(keys);
 
+    if (!defaultKey) {
+      throw new Error(`No default key found in ${keys}`);
+    }
+
     return {
       ...res,
       data: {
