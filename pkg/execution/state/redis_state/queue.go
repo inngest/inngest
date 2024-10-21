@@ -1647,13 +1647,10 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 	}
 
 	if len(missingQueueItems) > 0 {
-		// NOTE: what's this??
-		// // TODO This can happen, be careful
-		// if partition.AccountID == uuid.Nil {
-		// 	q.logger.Error().Interface("items", missingQueueItems).Str("partition", partition.zsetKey(q.primaryQueueShard.RedisClient.kg)).Msg("encountered missing queue items")
-
-		// 	return nil, fmt.Errorf("encountered missing queue items in partition queue %q", partition.zsetKey(q.primaryQueueShard.RedisClient.kg))
-		// }
+		logger.StdlibLogger(ctx).Warn("encountered missing queue items in partition queue",
+			"key", opts.PartitionKey,
+			"items", missingQueueItems,
+		)
 
 		eg := errgroup.Group{}
 		for _, missingItemId := range missingQueueItems {
