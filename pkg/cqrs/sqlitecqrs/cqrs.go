@@ -474,18 +474,12 @@ func (q Queries) GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*sq
 
 func (q Queries) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([]*sqlc.Event, error) {
 	if q.postgresDriver != nil {
-		eventIDs := make([]string, len(ids))
-		for i, id := range ids {
-			eventIDs[i] = id.String()
-		}
-
-		events, err := q.postgresDriver.GetEventsByInternalIDs(ctx, eventIDs)
+		events, err := q.postgresDriver.GetEventsByInternalIDs(ctx, ids)
 		if err != nil {
 			return nil, err
 		}
 
 		sqliteEvents := make([]*sqlc.Event, len(events))
-
 		for i, event := range events {
 			sqliteEvents[i], _ = event.ToSQLite()
 		}
@@ -497,78 +491,403 @@ func (q Queries) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([
 }
 
 func (q Queries) WorkspaceEvents(ctx context.Context, params sqlc.WorkspaceEventsParams) ([]*sqlc.Event, error) {
+	if q.postgresDriver != nil {
+		pgParams := sqlc_postgres.WorkspaceEventsParams{
+			InternalID:   params.Cursor,
+			ReceivedAt:   params.Before,
+			ReceivedAt_2: params.After,
+			Limit:        int32(params.Limit),
+		}
+
+		events, err := q.postgresDriver.WorkspaceEvents(ctx, pgParams)
+		if err != nil {
+			return nil, err
+		}
+
+		sqliteEvents := make([]*sqlc.Event, len(events))
+		for i, event := range events {
+			sqliteEvents[i], _ = event.ToSQLite()
+		}
+
+		return sqliteEvents, nil
+	}
+
 	return q.sqliteDriver.WorkspaceEvents(ctx, params)
 }
 
 func (q Queries) WorkspaceNamedEvents(ctx context.Context, params sqlc.WorkspaceNamedEventsParams) ([]*sqlc.Event, error) {
+	if q.postgresDriver != nil {
+		pgParams := sqlc_postgres.WorkspaceNamedEventsParams{
+			InternalID:   params.Cursor,
+			ReceivedAt:   params.Before,
+			ReceivedAt_2: params.After,
+			EventName:    params.Name,
+			Limit:        int32(params.Limit),
+		}
+
+		events, err := q.postgresDriver.WorkspaceNamedEvents(ctx, pgParams)
+		if err != nil {
+			return nil, err
+		}
+
+		sqliteEvents := make([]*sqlc.Event, len(events))
+		for i, event := range events {
+			sqliteEvents[i], _ = event.ToSQLite()
+		}
+
+		return sqliteEvents, nil
+	}
+
 	return q.sqliteDriver.WorkspaceNamedEvents(ctx, params)
 }
 
 func (q Queries) GetEventsIDbound(ctx context.Context, params sqlc.GetEventsIDboundParams) ([]*sqlc.Event, error) {
+	if q.postgresDriver != nil {
+		pgParams := sqlc_postgres.GetEventsIDboundParams{
+			InternalID:   params.After,
+			InternalID_2: params.Before,
+			EventName:    params.IncludeInternal,
+			Limit:        int32(params.Limit),
+		}
+
+		events, err := q.postgresDriver.GetEventsIDbound(ctx, pgParams)
+		if err != nil {
+			return nil, err
+		}
+
+		sqliteEvents := make([]*sqlc.Event, len(events))
+		for i, event := range events {
+			sqliteEvents[i], _ = event.ToSQLite()
+		}
+
+		return sqliteEvents, nil
+	}
+
 	return q.sqliteDriver.GetEventsIDbound(ctx, params)
 }
 
 func (q Queries) InsertFunctionRun(ctx context.Context, e sqlc.InsertFunctionRunParams) error {
+	if q.postgresDriver != nil {
+		pgParams := sqlc_postgres.InsertFunctionRunParams{
+			RunID:           e.RunID,
+			RunStartedAt:    e.RunStartedAt,
+			FunctionID:      e.FunctionID,
+			FunctionVersion: int32(e.FunctionVersion),
+			TriggerType:     e.TriggerType,
+			EventID:         e.EventID,
+			BatchID:         e.BatchID,
+			OriginalRunID:   e.OriginalRunID,
+			Cron:            e.Cron,
+		}
+
+		return q.postgresDriver.InsertFunctionRun(ctx, pgParams)
+	}
+
 	return q.sqliteDriver.InsertFunctionRun(ctx, e)
 }
 
 func (q Queries) GetFunctionRunsFromEvents(ctx context.Context, eventIDs []ulid.ULID) ([]*sqlc.GetFunctionRunsFromEventsRow, error) {
+	if q.postgresDriver != nil {
+		rows, err := q.postgresDriver.GetFunctionRunsFromEvents(ctx, eventIDs)
+		if err != nil {
+			return nil, err
+		}
+
+		sqliteRows := make([]*sqlc.GetFunctionRunsFromEventsRow, len(rows))
+		for i, row := range rows {
+			sqliteRows[i], _ = row.ToSQLite()
+		}
+
+		return sqliteRows, nil
+	}
+
 	return q.sqliteDriver.GetFunctionRunsFromEvents(ctx, eventIDs)
 }
 
 func (q Queries) GetFunctionRun(ctx context.Context, id ulid.ULID) (*sqlc.GetFunctionRunRow, error) {
+	if q.postgresDriver != nil {
+		row, err := q.postgresDriver.GetFunctionRun(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+
+		return row.ToSQLite()
+	}
+
 	return q.sqliteDriver.GetFunctionRun(ctx, id)
 }
 
 func (q Queries) GetFunctionRunsTimebound(ctx context.Context, params sqlc.GetFunctionRunsTimeboundParams) ([]*sqlc.GetFunctionRunsTimeboundRow, error) {
+	if q.postgresDriver != nil {
+		pgParams := sqlc_postgres.GetFunctionRunsTimeboundParams{}
+
+		rows, err := q.postgresDriver.GetFunctionRunsTimebound(ctx, pgParams)
+		if err != nil {
+			return nil, err
+		}
+
+		sqliteRows := make([]*sqlc.GetFunctionRunsTimeboundRow, len(rows))
+		for i, row := range rows {
+			sqliteRows[i], _ = row.ToSQLite()
+		}
+
+		return sqliteRows, nil
+	}
+
 	return q.sqliteDriver.GetFunctionRunsTimebound(ctx, params)
 }
 
 func (q Queries) GetFunctionRunFinishesByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*sqlc.FunctionFinish, error) {
+	if q.postgresDriver != nil {
+		finishes, err := q.postgresDriver.GetFunctionRunFinishesByRunIDs(ctx, runIDs)
+		if err != nil {
+			return nil, err
+		}
+
+		sqliteFinishes := make([]*sqlc.FunctionFinish, len(finishes))
+		for i, finish := range finishes {
+			sqliteFinishes[i], _ = finish.ToSQLite()
+		}
+
+		return sqliteFinishes, nil
+	}
+
 	return q.sqliteDriver.GetFunctionRunFinishesByRunIDs(ctx, runIDs)
 }
 
 func (q Queries) InsertHistory(ctx context.Context, h sqlc.InsertHistoryParams) error {
+	if q.postgresDriver != nil {
+		latencyMs := sql.NullInt32{}
+		if h.LatencyMs.Valid {
+			latencyMs.Int32 = int32(h.LatencyMs.Int64)
+			latencyMs.Valid = true
+		}
+
+		pgParams := sqlc_postgres.InsertHistoryParams{
+			ID:                   h.ID,
+			CreatedAt:            h.CreatedAt,
+			RunStartedAt:         h.RunStartedAt,
+			FunctionID:           h.FunctionID,
+			FunctionVersion:      int32(h.FunctionVersion),
+			RunID:                h.RunID,
+			EventID:              h.EventID,
+			BatchID:              h.BatchID,
+			GroupID:              h.GroupID,
+			IdempotencyKey:       h.IdempotencyKey,
+			Type:                 h.Type,
+			Attempt:              int32(h.Attempt),
+			LatencyMs:            latencyMs,
+			StepName:             h.StepName,
+			StepID:               h.StepID,
+			StepType:             h.StepType,
+			Url:                  h.Url,
+			CancelRequest:        h.CancelRequest,
+			Sleep:                h.Sleep,
+			WaitForEvent:         h.WaitForEvent,
+			WaitResult:           h.WaitResult,
+			InvokeFunction:       h.InvokeFunction,
+			InvokeFunctionResult: h.InvokeFunctionResult,
+			Result:               h.Result,
+		}
+
+		return q.postgresDriver.InsertHistory(ctx, pgParams)
+	}
+
 	return q.sqliteDriver.InsertHistory(ctx, h)
 }
 
 func (q Queries) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]*sqlc.History, error) {
+	if q.postgresDriver != nil {
+		history, err := q.postgresDriver.GetFunctionRunHistory(ctx, runID)
+		if err != nil {
+			return nil, err
+		}
+
+		sqliteHistory := make([]*sqlc.History, len(history))
+		for i, h := range history {
+			sqliteHistory[i], _ = h.ToSQLite()
+		}
+
+		return sqliteHistory, nil
+	}
+
 	return q.sqliteDriver.GetFunctionRunHistory(ctx, runID)
 }
 
 func (q Queries) InsertTrace(ctx context.Context, span sqlc.InsertTraceParams) error {
+	if q.postgresDriver != nil {
+		pgSpan := sqlc_postgres.InsertTraceParams{
+			Timestamp:          span.Timestamp,
+			TimestampUnixMs:    int32(span.TimestampUnixMs),
+			TraceID:            span.TraceID,
+			SpanID:             span.SpanID,
+			ParentSpanID:       span.ParentSpanID,
+			TraceState:         span.TraceState,
+			SpanName:           span.SpanName,
+			SpanKind:           span.SpanKind,
+			ServiceName:        span.ServiceName,
+			ResourceAttributes: span.ResourceAttributes,
+			ScopeName:          span.ScopeName,
+			ScopeVersion:       span.ScopeVersion,
+			SpanAttributes:     span.SpanAttributes,
+			Duration:           int32(span.Duration),
+			StatusCode:         span.StatusCode,
+			StatusMessage:      span.StatusMessage,
+			Events:             span.Events,
+			Links:              span.Links,
+			RunID:              span.RunID,
+		}
+
+		return q.postgresDriver.InsertTrace(ctx, pgSpan)
+	}
+
 	return q.sqliteDriver.InsertTrace(ctx, span)
 }
 
 func (q Queries) InsertTraceRun(ctx context.Context, span sqlc.InsertTraceRunParams) error {
+	if q.postgresDriver != nil {
+		pgSpan := sqlc_postgres.InsertTraceRunParams{
+			AccountID:    span.AccountID,
+			WorkspaceID:  span.WorkspaceID,
+			AppID:        span.AppID,
+			FunctionID:   span.FunctionID,
+			TraceID:      span.TraceID,
+			RunID:        span.RunID,
+			QueuedAt:     int32(span.QueuedAt),
+			StartedAt:    int32(span.StartedAt),
+			EndedAt:      int32(span.EndedAt),
+			Status:       int32(span.Status),
+			SourceID:     span.SourceID,
+			TriggerIds:   span.TriggerIds,
+			Output:       span.Output,
+			BatchID:      span.BatchID,
+			IsDebounce:   span.IsDebounce,
+			CronSchedule: span.CronSchedule,
+		}
+
+		return q.postgresDriver.InsertTraceRun(ctx, pgSpan)
+	}
+
 	return q.sqliteDriver.InsertTraceRun(ctx, span)
 }
 
 func (q Queries) GetTraceSpans(ctx context.Context, arg sqlc.GetTraceSpansParams) ([]*sqlc.Trace, error) {
+	if q.postgresDriver != nil {
+		pgArg := sqlc_postgres.GetTraceSpansParams{
+			TraceID: arg.TraceID,
+			RunID:   arg.RunID,
+		}
+
+		traces, err := q.postgresDriver.GetTraceSpans(ctx, pgArg)
+		if err != nil {
+			return nil, err
+		}
+
+		sqliteTraces := make([]*sqlc.Trace, len(traces))
+		for i, trace := range traces {
+			sqliteTraces[i], _ = trace.ToSQLite()
+		}
+
+		return sqliteTraces, nil
+	}
+
 	return q.sqliteDriver.GetTraceSpans(ctx, arg)
 }
 
 func (q Queries) GetTraceRun(ctx context.Context, runID ulid.ULID) (*sqlc.TraceRun, error) {
+	if q.postgresDriver != nil {
+		traceRun, err := q.postgresDriver.GetTraceRun(ctx, runID)
+		if err != nil {
+			return nil, err
+		}
+
+		return traceRun.ToSQLite()
+	}
+
 	return q.sqliteDriver.GetTraceRun(ctx, runID)
 }
 
 func (q Queries) GetTraceSpanOutput(ctx context.Context, arg sqlc.GetTraceSpanOutputParams) ([]*sqlc.Trace, error) {
+	if q.postgresDriver != nil {
+		pgArg := sqlc_postgres.GetTraceSpanOutputParams{
+			TraceID: arg.TraceID,
+			SpanID:  arg.SpanID,
+		}
+
+		traces, err := q.postgresDriver.GetTraceSpanOutput(ctx, pgArg)
+		if err != nil {
+			return nil, err
+		}
+
+		sqliteTraces := make([]*sqlc.Trace, len(traces))
+		for i, trace := range traces {
+			sqliteTraces[i], _ = trace.ToSQLite()
+		}
+
+		return sqliteTraces, nil
+	}
+
 	return q.sqliteDriver.GetTraceSpanOutput(ctx, arg)
 }
 
 func (q Queries) InsertFunctionFinish(ctx context.Context, arg sqlc.InsertFunctionFinishParams) error {
+	if q.postgresDriver != nil {
+		completedStepCount := sql.NullInt32{}
+		if arg.CompletedStepCount.Valid {
+			completedStepCount.Int32 = int32(arg.CompletedStepCount.Int64)
+			completedStepCount.Valid = true
+		}
+
+		pgArg := sqlc_postgres.InsertFunctionFinishParams{
+			RunID:              arg.RunID,
+			Status:             arg.Status,
+			Output:             arg.Output,
+			CompletedStepCount: completedStepCount,
+			CreatedAt:          arg.CreatedAt,
+		}
+
+		return q.postgresDriver.InsertFunctionFinish(ctx, pgArg)
+	}
+
 	return q.sqliteDriver.InsertFunctionFinish(ctx, arg)
 }
 
 func (q Queries) HistoryCountRuns(ctx context.Context) (int64, error) {
+	if q.postgresDriver != nil {
+		return q.postgresDriver.HistoryCountRuns(ctx)
+	}
+
 	return q.sqliteDriver.HistoryCountRuns(ctx)
 }
 
 func (q Queries) GetHistoryItem(ctx context.Context, id ulid.ULID) (*sqlc.History, error) {
+	if q.postgresDriver != nil {
+		history, err := q.postgresDriver.GetHistoryItem(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+
+		return history.ToSQLite()
+	}
+
 	return q.sqliteDriver.GetHistoryItem(ctx, id)
 }
 
 func (q Queries) GetFunctionRuns(ctx context.Context) ([]*sqlc.GetFunctionRunsRow, error) {
+	if q.postgresDriver != nil {
+		rows, err := q.postgresDriver.GetFunctionRuns(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		sqliteRows := make([]*sqlc.GetFunctionRunsRow, len(rows))
+		for i, row := range rows {
+			sqliteRows[i], _ = row.ToSQLite()
+		}
+
+		return sqliteRows, nil
+	}
+
 	return q.sqliteDriver.GetFunctionRuns(ctx)
 }
 
