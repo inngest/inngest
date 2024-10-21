@@ -164,7 +164,11 @@ export function RunInfo({
                 lazy={run}
                 initial={initialRunData}
                 optimisticChildren={(initialRun: InitialRunData) =>
-                  initialRun.queuedAt ?? <TimeElement date={new Date(initialRun.queuedAt)} />
+                  initialRun.queuedAt ? (
+                    <TimeElement date={new Date(initialRun.queuedAt)} />
+                  ) : (
+                    <TextElement>-</TextElement>
+                  )
                 }
               >
                 {(run: Run) => {
@@ -172,7 +176,14 @@ export function RunInfo({
                 }}
               </OptimisticElementWrapper>
 
-              <LazyElementWrapper label="Started at" lazy={run}>
+              <OptimisticElementWrapper
+                label="Started at"
+                lazy={run}
+                initial={initialRunData}
+                optimisticChildren={(initialRun: InitialRunData) =>
+                  initialRun?.status === 'QUEUED' ? <TextElement>-</TextElement> : null
+                }
+              >
                 {(run: Run) => {
                   const startedAt = toMaybeDate(run.trace.startedAt);
                   if (!startedAt) {
@@ -180,9 +191,16 @@ export function RunInfo({
                   }
                   return <TimeElement date={startedAt} />;
                 }}
-              </LazyElementWrapper>
+              </OptimisticElementWrapper>
 
-              <LazyElementWrapper label="Ended at" lazy={run}>
+              <OptimisticElementWrapper
+                label="Ended at"
+                lazy={run}
+                initial={initialRunData}
+                optimisticChildren={(initialRun: InitialRunData) =>
+                  initialRun?.status === 'QUEUED' ? <TextElement>-</TextElement> : null
+                }
+              >
                 {(run: Run) => {
                   const endedAt = toMaybeDate(run.trace.endedAt);
                   if (!endedAt) {
@@ -190,7 +208,7 @@ export function RunInfo({
                   }
                   return <TimeElement date={endedAt} />;
                 }}
-              </LazyElementWrapper>
+              </OptimisticElementWrapper>
             </dl>
           </div>
         </Card.Content>

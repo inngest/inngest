@@ -84,6 +84,13 @@ export function RunDetails(props: Props) {
     setPollInterval(undefined);
   }
 
+  // Do not show the error if queued and the error is no spans
+  const isNoSpansFoundError = !!runRes.error?.toString().match(/no function run span found/gi);
+  const showError =
+    props.initialRunData?.status === 'QUEUED' && isNoSpansFoundError
+      ? false
+      : runRes.error || resultRes.error;
+
   return (
     <div>
       {standalone && run && (
@@ -108,13 +115,11 @@ export function RunDetails(props: Props) {
               standalone={standalone}
               result={resultRes.data}
             />
-            {props.initialRunData?.status !== 'QUEUED' && (runRes.error || resultRes.error) ? (
+            {showError && (
               <ErrorCard
                 error={runRes.error || resultRes.error}
                 reset={runRes.error ? () => runRes.refetch() : () => resultRes.refetch()}
               />
-            ) : (
-              <></>
             )}
           </div>
 

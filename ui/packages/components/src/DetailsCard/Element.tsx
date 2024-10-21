@@ -57,7 +57,7 @@ export function OptimisticElementWrapper<T, InitialType>({
   initial,
 }: {
   children: (loaded: T) => React.ReactNode;
-  optimisticChildren: (loaded: InitialType) => React.ReactNode;
+  optimisticChildren: (loaded: InitialType) => React.ReactNode | undefined;
   className?: string;
   label: string;
   lazy: Lazy<T>;
@@ -68,6 +68,9 @@ export function OptimisticElementWrapper<T, InitialType>({
     content = children(lazy);
   } else if (initial) {
     content = optimisticChildren(initial);
+    if (!content) {
+      content = <SkeletonElement />;
+    }
   } else {
     content = <SkeletonElement />;
   }
