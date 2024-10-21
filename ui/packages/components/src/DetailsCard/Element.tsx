@@ -40,10 +40,42 @@ export function LazyElementWrapper<T>({
   }
 
   return (
-    <div className={cn('w-64 text-sm', className)}>
-      <dt className="text-muted text-xs">{label}</dt>
-      <dd className="truncate">{content}</dd>
-    </div>
+    <ElementWrapper label={label} className={className}>
+      {content}
+    </ElementWrapper>
+  );
+}
+
+// Optimistically render an initial value while waiting for a
+// lazy loaded value to render the final component
+export function OptimisticElementWrapper<T, InitialType>({
+  children,
+  optimisticChildren,
+  className,
+  label,
+  lazy,
+  initial,
+}: {
+  children: (loaded: T) => React.ReactNode;
+  optimisticChildren: (loaded: InitialType) => React.ReactNode;
+  className?: string;
+  label: string;
+  lazy: Lazy<T>;
+  initial?: InitialType;
+}) {
+  let content;
+  if (isLazyDone(lazy)) {
+    content = children(lazy);
+  } else if (initial) {
+    content = optimisticChildren(initial);
+  } else {
+    content = <SkeletonElement />;
+  }
+
+  return (
+    <ElementWrapper label={label} className={className}>
+      {content}
+    </ElementWrapper>
   );
 }
 
