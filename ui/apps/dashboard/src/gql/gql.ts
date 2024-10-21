@@ -87,7 +87,6 @@ const documents = {
     "\n  mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {\n    disableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n": types.DisableEnvironmentAutoArchiveDocumentDocument,
     "\n  mutation EnableEnvironmentAutoArchive($id: ID!) {\n    enableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n": types.EnableEnvironmentAutoArchiveDocument,
     "\n  mutation ArchiveEvent($environmentId: ID!, $name: String!) {\n    archiveEvent(workspaceID: $environmentId, name: $name) {\n      name\n    }\n  }\n": types.ArchiveEventDocument,
-    "\n  query GetEventKeysForBlankSlate($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      ingestKeys(filter: { source: \"key\" }) {\n        name\n        presharedKey\n        createdAt\n      }\n    }\n  }\n": types.GetEventKeysForBlankSlateDocument,
     "\n  query GetLatestEventLogs($name: String, $environmentID: ID!) {\n    events(query: { name: $name, workspaceID: $environmentID }) {\n      data {\n        recent(count: 5) {\n          id\n          receivedAt\n          event\n          source {\n            name\n          }\n        }\n      }\n    }\n  }\n": types.GetLatestEventLogsDocument,
     "\n  query GetEventKeys($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      eventKeys: ingestKeys {\n        name\n        value: presharedKey\n      }\n    }\n  }\n": types.GetEventKeysDocument,
     "\n  mutation CreateCancellation($input: CreateCancellationInput!) {\n    createCancellation(input: $input) {\n      id\n    }\n  }\n": types.CreateCancellationDocument,
@@ -100,6 +99,7 @@ const documents = {
     "\n  query MetricsLookups($envSlug: String!, $page: Int, $pageSize: Int) {\n    envBySlug(slug: $envSlug) {\n      apps {\n        externalID\n        id\n        name\n        isArchived\n      }\n      workflows @paginated(perPage: $pageSize, page: $page) {\n        data {\n          name\n          id\n          slug\n        }\n        page {\n          page\n          totalPages\n          perPage\n        }\n      }\n    }\n  }\n": types.MetricsLookupsDocument,
     "\n  query GetGlobalSearch($opts: SearchInput!) {\n    account {\n      search(opts: $opts) {\n        results {\n          env {\n            name\n            id\n            type\n            slug\n          }\n          kind\n          value {\n            ... on ArchivedEvent {\n              id\n              name\n            }\n            ... on FunctionRun {\n              id\n              functionID: workflowID\n              startedAt\n            }\n          }\n        }\n      }\n    }\n  }\n": types.GetGlobalSearchDocument,
     "\n  query GetFunctionSlug($environmentID: ID!, $functionID: ID!) {\n    environment: workspace(id: $environmentID) {\n      function: workflow(id: $functionID) {\n        slug\n        name\n      }\n    }\n  }\n": types.GetFunctionSlugDocument,
+    "\n  mutation SyncOnboardingApp($appURL: String!, $envID: UUID!) {\n    syncNewApp(appURL: $appURL, envID: $envID) {\n      app {\n        externalID\n        id\n      }\n      error {\n        code\n        data\n        message\n      }\n    }\n  }\n": types.SyncOnboardingAppDocument,
     "\n  query getPostgresIntegrations($envID: ID!) {\n    environment: workspace(id: $envID) {\n      cdcConnections {\n        id\n        name\n        status\n        statusDetail\n        description\n      }\n    }\n  }\n": types.GetPostgresIntegrationsDocument,
     "\n  mutation testCredentials($input: CDCConnectionInput!, $envID: UUID!) {\n    cdcTestCredentials(input: $input, envID: $envID) {\n      steps\n      error\n    }\n  }\n": types.TestCredentialsDocument,
     "\n  mutation testReplication($input: CDCConnectionInput!, $envID: UUID!) {\n    cdcTestLogicalReplication(input: $input, envID: $envID) {\n      steps\n      error\n    }\n  }\n": types.TestReplicationDocument,
@@ -123,6 +123,7 @@ const documents = {
     "\n  query GetFunctionUsage($id: ID!, $environmentID: ID!, $startTime: Time!, $endTime: Time!) {\n    workspace(id: $environmentID) {\n      workflow(id: $id) {\n        dailyStarts: usage(opts: { from: $startTime, to: $endTime }, event: \"started\") {\n          period\n          total\n          data {\n            slot\n            count\n          }\n        }\n        dailyFailures: usage(opts: { from: $startTime, to: $endTime }, event: \"errored\") {\n          period\n          total\n          data {\n            slot\n            count\n          }\n        }\n      }\n    }\n  }\n": types.GetFunctionUsageDocument,
     "\n  query GetProductionWorkspace {\n    defaultEnv {\n      id\n      name\n      slug\n      parentID\n      test\n      type\n      createdAt\n      lastDeployedAt\n      isArchived\n      isAutoArchiveEnabled\n      webhookSigningKey\n    }\n  }\n": types.GetProductionWorkspaceDocument,
     "\n  mutation CancelRun($envID: UUID!, $runID: ULID!) {\n    cancelRun(envID: $envID, runID: $runID) {\n      id\n    }\n  }\n": types.CancelRunDocument,
+    "\n  query GetEventKeysForBlankSlate($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      ingestKeys(filter: { source: \"key\" }) {\n        name\n        presharedKey\n        createdAt\n      }\n    }\n  }\n": types.GetEventKeysForBlankSlateDocument,
     "\n  query GetPlanFeatures {\n    account {\n      plan {\n        features\n      }\n    }\n  }\n": types.GetPlanFeaturesDocument,
 };
 
@@ -439,10 +440,6 @@ export function graphql(source: "\n  mutation ArchiveEvent($environmentId: ID!, 
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  query GetEventKeysForBlankSlate($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      ingestKeys(filter: { source: \"key\" }) {\n        name\n        presharedKey\n        createdAt\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetEventKeysForBlankSlate($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      ingestKeys(filter: { source: \"key\" }) {\n        name\n        presharedKey\n        createdAt\n      }\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
 export function graphql(source: "\n  query GetLatestEventLogs($name: String, $environmentID: ID!) {\n    events(query: { name: $name, workspaceID: $environmentID }) {\n      data {\n        recent(count: 5) {\n          id\n          receivedAt\n          event\n          source {\n            name\n          }\n        }\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetLatestEventLogs($name: String, $environmentID: ID!) {\n    events(query: { name: $name, workspaceID: $environmentID }) {\n      data {\n        recent(count: 5) {\n          id\n          receivedAt\n          event\n          source {\n            name\n          }\n        }\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
@@ -488,6 +485,10 @@ export function graphql(source: "\n  query GetGlobalSearch($opts: SearchInput!) 
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query GetFunctionSlug($environmentID: ID!, $functionID: ID!) {\n    environment: workspace(id: $environmentID) {\n      function: workflow(id: $functionID) {\n        slug\n        name\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetFunctionSlug($environmentID: ID!, $functionID: ID!) {\n    environment: workspace(id: $environmentID) {\n      function: workflow(id: $functionID) {\n        slug\n        name\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SyncOnboardingApp($appURL: String!, $envID: UUID!) {\n    syncNewApp(appURL: $appURL, envID: $envID) {\n      app {\n        externalID\n        id\n      }\n      error {\n        code\n        data\n        message\n      }\n    }\n  }\n"): (typeof documents)["\n  mutation SyncOnboardingApp($appURL: String!, $envID: UUID!) {\n    syncNewApp(appURL: $appURL, envID: $envID) {\n      app {\n        externalID\n        id\n      }\n      error {\n        code\n        data\n        message\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -580,6 +581,10 @@ export function graphql(source: "\n  query GetProductionWorkspace {\n    default
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation CancelRun($envID: UUID!, $runID: ULID!) {\n    cancelRun(envID: $envID, runID: $runID) {\n      id\n    }\n  }\n"): (typeof documents)["\n  mutation CancelRun($envID: UUID!, $runID: ULID!) {\n    cancelRun(envID: $envID, runID: $runID) {\n      id\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query GetEventKeysForBlankSlate($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      ingestKeys(filter: { source: \"key\" }) {\n        name\n        presharedKey\n        createdAt\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetEventKeysForBlankSlate($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      ingestKeys(filter: { source: \"key\" }) {\n        name\n        presharedKey\n        createdAt\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

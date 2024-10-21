@@ -13,6 +13,7 @@ import { RiCheckboxCircleFill, RiInputCursorMove } from '@remixicon/react';
 import { type CodedError } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import { OnboardingSteps } from '../Onboarding/types';
+import { SyncFailure } from '../SyncFailure';
 import { syncAppManually } from './actions';
 import useOnboardingStep from './useOnboardingStep';
 
@@ -37,7 +38,7 @@ export default function SyncApp() {
         setError(error);
       }
     } catch (err) {
-      // setError({message: 'An unexpected error occurred'});
+      setError({ message: 'An unexpected error occurred', code: '', data: '' });
     } finally {
       setIsLoading(false);
     }
@@ -117,12 +118,7 @@ export default function SyncApp() {
               </div>
             </div>
           )}
-          {/* TODO: Add advanced error structure */}
-          {error && (
-            <Alert className="mb-3 text-sm" severity="error">
-              {error.message}
-            </Alert>
-          )}
+          {error && <SyncFailure className="mb-3 mt-0 text-sm" error={error} />}
           {!app && (
             <NewButton loading={isLoading} label="Sync app here" onClick={handleSyncAppManually} />
           )}
