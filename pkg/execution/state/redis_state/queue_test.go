@@ -451,7 +451,8 @@ func TestQueueEnqueueItem(t *testing.T) {
 		}, now, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		fnMeta := getFnMetadata(t, r, item.FunctionID)
+		fnMeta, err := getFnMetadata(t, r, item.FunctionID)
+		require.NoError(t, err)
 		require.True(t, fnMeta.Paused)
 
 		item, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
@@ -465,7 +466,8 @@ func TestQueueEnqueueItem(t *testing.T) {
 		}, now.Add(-10*time.Second), osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		fnMeta = getFnMetadata(t, r, item.FunctionID)
+		fnMeta, err = getFnMetadata(t, r, item.FunctionID)
+		require.NoError(t, err)
 		require.True(t, fnMeta.Paused)
 	})
 
@@ -3371,7 +3373,8 @@ func TestQueuePartitionRequeue(t *testing.T) {
 			err = q.PartitionRequeue(ctx, q.primaryQueueShard, &p, next, true)
 			require.NoError(t, err)
 
-			fnMeta := getFnMetadata(t, r, idA)
+			fnMeta, err := getFnMetadata(t, r, idA)
+			require.NoError(t, err)
 			require.True(t, fnMeta.Paused)
 		})
 
@@ -3515,13 +3518,15 @@ func TestQueueFunctionPause(t *testing.T) {
 	err = q.SetFunctionPaused(ctx, uuid.Nil, idA, true)
 	require.NoError(t, err)
 
-	fnMeta := getFnMetadata(t, r, idA)
+	fnMeta, err := getFnMetadata(t, r, idA)
+	require.NoError(t, err)
 	require.True(t, fnMeta.Paused)
 
 	err = q.SetFunctionPaused(ctx, uuid.Nil, idA, false)
 	require.NoError(t, err)
 
-	fnMeta = getFnMetadata(t, r, idA)
+	fnMeta, err = getFnMetadata(t, r, idA)
+	require.NoError(t, err)
 	require.False(t, fnMeta.Paused)
 }
 
@@ -3550,11 +3555,20 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: fnID, Data: osqueue.Item{Identifier: id}}, now, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		err = q.SetFunctionMigrate(ctx, "default", fnID)
+		err = q.SetFunctionMigrate(ctx, "default", fnID, true)
 		require.NoError(t, err)
 
-		meta := getFnMetadata(t, r, fnID)
+		meta, err := getFnMetadata(t, r, fnID)
+		require.NoError(t, err)
 		require.True(t, meta.Migrate)
+
+		// disable migration flag
+		err = q.SetFunctionMigrate(ctx, "default", fnID, false)
+		require.NoError(t, err)
+
+		meta, err = getFnMetadata(t, r, fnID)
+		require.NoError(t, err)
+		require.False(t, meta.Migrate)
 	})
 
 	t.Run("with other shards", func(t *testing.T) {
@@ -3583,31 +3597,16 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 		_, err = q.EnqueueItem(ctx, yoloShard, osqueue.QueueItem{FunctionID: fnID, Data: osqueue.Item{Identifier: id}}, now, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		err = q.SetFunctionMigrate(ctx, "yolo", fnID)
+		err = q.SetFunctionMigrate(ctx, "yolo", fnID, true)
 		require.NoError(t, err)
 
-		// replicate the getFnMetadata function, changing it would be too much work :/
-		metaFinder := func(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) (*FnMetadata, error) {
-			t.Helper()
-			kg := &queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-			valJSON, err := r.Get(kg.FnMetadata(id))
-			if err != nil {
-				return nil, err
-			}
-			retv := FnMetadata{}
-			err = json.Unmarshal([]byte(valJSON), &retv)
-			if err != nil {
-				return nil, err
-			}
-			return &retv, nil
-		}
-
 		// should not find it in the default shard
-		_, err = metaFinder(t, r, fnID)
+		_, err = getFnMetadata(t, r, fnID)
+		require.Error(t, err)
 		require.ErrorContains(t, err, "no such key")
 
 		// should find metadata in the other shard
-		meta, err := metaFinder(t, other, fnID)
+		meta, err := getFnMetadata(t, other, fnID)
 		require.NoError(t, err)
 		require.True(t, meta.Migrate)
 	})
@@ -4840,7 +4839,7 @@ func TestMigrate(t *testing.T) {
 	}
 
 	// Don't really need it since there are no executors to process the enqueued items
-	err = q1.SetFunctionMigrate(ctx, shard1Name, fnID)
+	err = q1.SetFunctionMigrate(ctx, shard1Name, fnID, true)
 	require.NoError(t, err)
 
 	queueKey := shard1.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), "")
@@ -5016,15 +5015,18 @@ func getPartition(t *testing.T, r *miniredis.Miniredis, pType enums.PartitionTyp
 	return qp
 }
 
-func getFnMetadata(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) FnMetadata {
+func getFnMetadata(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) (*FnMetadata, error) {
 	t.Helper()
 	kg := &queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
 	valJSON, err := r.Get(kg.FnMetadata(id))
-	require.NoError(t, err)
+	if err != nil {
+		return nil, err
+	}
+
 	retv := FnMetadata{}
 	err = json.Unmarshal([]byte(valJSON), &retv)
 	require.NoError(t, err)
-	return retv
+	return &retv, nil
 }
 
 func getItemCountForQueue(ctx context.Context, r rueidis.Client, key string) (int64, error) {

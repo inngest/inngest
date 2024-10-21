@@ -1441,7 +1441,7 @@ func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID
 	return nil
 }
 
-func (q *queue) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID) error {
+func (q *queue) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID, migrate bool) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionMigrate"), redis_telemetry.ScopeQueue)
 
 	defaultMeta := FnMetadata{
@@ -1458,9 +1458,14 @@ func (q *queue) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID
 		return fmt.Errorf("no queue shard available for '%s'", sourceShard)
 	}
 
+	flag := 1
+	if !migrate {
+		flag = 0
+	}
+
 	keys := []string{shard.RedisClient.kg.FnMetadata(fnID)}
 	args, err := StrSlice([]any{
-		1,
+		flag,
 		defaultMeta,
 	})
 	if err != nil {
