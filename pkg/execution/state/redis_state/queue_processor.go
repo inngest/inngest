@@ -120,7 +120,11 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 
 	shard := q.primaryQueueShard
 	if q.shardSelector != nil {
-		selected, err := q.shardSelector(ctx, qi)
+		qn := qi.Data.QueueName
+		if qn == nil {
+			qn = qi.QueueName
+		}
+		selected, err := q.shardSelector(ctx, qi.Data.Identifier.AccountID, qn)
 		if err != nil {
 			q.logger.Error().Err(err).Interface("qi", qi).Msg("error selecting shard")
 			return fmt.Errorf("could not select shard: %w", err)
@@ -1001,7 +1005,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi osqueue.QueueI
 			}
 
 			qi.AtMS = at.UnixMilli()
-			if err := q.Requeue(context.WithoutCancel(ctx), qi, at); err != nil {
+			if err := q.Requeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi, at); err != nil {
 				q.logger.Error().Err(err).Interface("item", qi).Msg("error requeuing job")
 				return err
 			}
@@ -1014,7 +1018,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi osqueue.QueueI
 
 		// Dequeue this entirely, as this permanently failed.
 		// XXX: Increase permanently failed counter here.
-		if err := q.Dequeue(context.WithoutCancel(ctx), qi); err != nil {
+		if err := q.Dequeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil
@@ -1029,7 +1033,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi osqueue.QueueI
 		}
 
 	case <-doneCh:
-		if err := q.Dequeue(context.WithoutCancel(ctx), qi); err != nil {
+		if err := q.Dequeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil
