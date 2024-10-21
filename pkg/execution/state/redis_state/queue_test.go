@@ -4833,7 +4833,13 @@ func TestMigrate(t *testing.T) {
 
 	// Enqueue to shard 1
 	for i := 0; i < 5; i++ {
-		_, err = q1.EnqueueItem(ctx, shard1, osqueue.QueueItem{FunctionID: fnID, Data: osqueue.Item{Identifier: id}}, time.Now())
+		lease := ulid.MustNew(ulid.Now(), rand.Reader)
+		_, err = q1.EnqueueItem(
+			ctx,
+			shard1,
+			osqueue.QueueItem{FunctionID: fnID, Data: osqueue.Item{Identifier: id}, LeaseID: &lease},
+			time.Now(),
+		)
 		require.NoError(t, err)
 	}
 
@@ -4850,8 +4856,7 @@ func TestMigrate(t *testing.T) {
 
 	// Attempt to migrate from shard1 to shard2
 	processed, err := q1.Migrate(ctx, shard1Name, fnID, 10, func(ctx context.Context, qi *osqueue.QueueItem) error {
-		_, err := q2.EnqueueItem(ctx, shard2, *qi, time.UnixMilli(qi.AtMS))
-		return err
+		return q2.Enqueue(ctx, qi.Data, time.UnixMilli(qi.AtMS))
 	})
 	require.NoError(t, err)
 	require.Equal(t, int64(5), processed)
