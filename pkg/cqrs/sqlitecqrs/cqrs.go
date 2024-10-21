@@ -27,6 +27,7 @@ import (
 	"github.com/oklog/ulid/v2"
 
 	sq "github.com/doug-martin/goqu/v9"
+	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
 	sqexp "github.com/doug-martin/goqu/v9/exp"
 )
@@ -55,8 +56,9 @@ func NewQueries(db *sql.DB, driver string) *Queries {
 
 func NewCQRS(db *sql.DB, driver string) cqrs.Manager {
 	return wrapper{
-		q:  NewQueries(db, driver),
-		db: db,
+		driver: driver,
+		q:      NewQueries(db, driver),
+		db:     db,
 	}
 }
 
@@ -892,9 +894,18 @@ func (q Queries) GetFunctionRuns(ctx context.Context) ([]*sqlc.GetFunctionRunsRo
 }
 
 type wrapper struct {
-	q  *Queries
-	db *sql.DB
-	tx *sql.Tx
+	driver string
+	q      *Queries
+	db     *sql.DB
+	tx     *sql.Tx
+}
+
+func (w wrapper) dialect() string {
+	if w.q.postgresDriver != nil {
+		return "postgres"
+	}
+
+	return "sqlite3"
 }
 
 // LoadFunction implements the state.FunctionLoader interface.
@@ -1352,7 +1363,7 @@ func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*c
 		return nil, err
 	}
 
-	sql, args, err := sq.Dialect("sqlite3").
+	sql, args, err := sq.Dialect(w.dialect()).
 		From("events").
 		Select(
 			"internal_id",
@@ -2106,8 +2117,9 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	// read from database
 	// TODO:
 	// change this to a continuous loop with limits instead of just attempting to grab everything.
-	// might not matter though since this is primarily meant for local development
-	sql, args, err := sq.Dialect("sqlite3").
+	// might not matter though since this is primarily meant for local
+	// development
+	sql, args, err := sq.Dialect(w.dialect()).
 		From("trace_runs").
 		Select(
 			"app_id",
