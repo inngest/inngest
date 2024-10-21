@@ -14,12 +14,6 @@ import {
 
 export type { DefaultLabelFormatterCallbackParams, LegendComponentOption, LineSeriesOption };
 
-declare global {
-  interface Window {
-    chartSelected?: number;
-  }
-}
-
 export interface ChartProps {
   option: EChartsOption;
   settings?: SetOptionOpts;
