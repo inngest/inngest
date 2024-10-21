@@ -1021,7 +1021,7 @@ func (q *queue) ItemPartitions(ctx context.Context, shard QueueShard, i osqueue.
 	return partitions, limits.AccountLimit
 }
 
-func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.QueueItem, at time.Time) (osqueue.QueueItem, error) {
+func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.QueueItem, at time.Time, opts *osqueue.EnqueueOpts) (osqueue.QueueItem, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "EnqueueItem"), redis_telemetry.ScopeQueue)
 
 	if shard.Kind != string(enums.QueueShardKindRedis) {
@@ -1031,7 +1031,12 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 	if len(i.ID) == 0 {
 		i.SetID(ctx, ulid.MustNew(ulid.Now(), rnd).String())
 	} else {
-		i.ID = osqueue.HashID(ctx, i.ID)
+		id := i.ID
+		if opts != nil && opts.PassthroughJobId {
+			i.ID = id
+		} else {
+			i.SetID(ctx, i.ID)
+		}
 	}
 
 	// XXX: If the length of ID >= max, error.

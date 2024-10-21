@@ -665,7 +665,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		},
 		Throttle: throttle,
 	}
-	err = e.queue.Enqueue(ctx, item, at)
+	err = e.queue.Enqueue(ctx, item, at, nil)
 	if err == redis_state.ErrQueueItemExists {
 		return nil, state.ErrIdentifierExists
 	}
@@ -1749,6 +1749,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				},
 			},
 			time.Now(),
+			nil,
 		)
 		if err != nil && err != redis_state.ErrQueueItemExists {
 			return fmt.Errorf("error enqueueing after pause: %w", err)
@@ -1958,7 +1959,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 	}
-	err = e.queue.Enqueue(ctx, nextItem, now)
+	err = e.queue.Enqueue(ctx, nextItem, now, nil)
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
@@ -2057,7 +2058,7 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 	}
-	err = e.queue.Enqueue(ctx, nextItem, now)
+	err = e.queue.Enqueue(ctx, nextItem, now, nil)
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
@@ -2104,7 +2105,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 			Edge: nextEdge,
 		},
 	}
-	err := e.queue.Enqueue(ctx, nextItem, now)
+	err := e.queue.Enqueue(ctx, nextItem, now, nil)
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
@@ -2152,7 +2153,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		Attempt:               0,
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
-	}, until)
+	}, until, nil)
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
@@ -2259,7 +2260,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 			PauseID:   pauseID,
 			OnTimeout: true,
 		},
-	}, expires)
+	}, expires, nil)
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
@@ -2385,7 +2386,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 			PauseID:   pauseID,
 			OnTimeout: true,
 		},
-	}, expires)
+	}, expires, nil)
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
