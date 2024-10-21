@@ -120,7 +120,11 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 
 	shard := q.primaryQueueShard
 	if q.shardSelector != nil {
-		selected, err := q.shardSelector(ctx, qi.Data.Identifier.AccountID, qi.QueueName)
+		qn := qi.Data.QueueName
+		if qn == nil {
+			qn = qi.QueueName
+		}
+		selected, err := q.shardSelector(ctx, qi.Data.Identifier.AccountID, qn)
 		if err != nil {
 			q.logger.Error().Err(err).Interface("qi", qi).Msg("error selecting shard")
 			return fmt.Errorf("could not select shard: %w", err)
