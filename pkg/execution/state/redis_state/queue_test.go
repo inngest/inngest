@@ -714,7 +714,7 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 		require.Equal(t, ErrQueueItemExists, err)
 
 		// Dequeue
-		err = q.Dequeue(ctx, item)
+		err = q.Dequeue(ctx, q.primaryQueueShard, item)
 		require.NoError(t, err)
 
 		// Ensure we can't enqueue even after dequeue.
@@ -1995,7 +1995,7 @@ func TestQueueLease(t *testing.T) {
 		require.True(t, r.Exists(defaultPart.concurrencyKey(kg)), evaluatedKey, concurrencyKeyQueue.concurrencyKey(kg), r.Dump())
 		require.True(t, r.Exists(kg.Concurrency("account", accountId.String())))
 
-		err = q.Dequeue(ctx, item)
+		err = q.Dequeue(ctx, q.primaryQueueShard, item)
 		require.NoError(t, err)
 
 		require.False(t, r.Exists(defaultPart.zsetKey(kg)))
@@ -2276,7 +2276,7 @@ func TestQueueDequeue(t *testing.T) {
 		})
 
 		// Dequeue to pull partition back to now
-		err = q.Dequeue(ctx, itemA)
+		err = q.Dequeue(ctx, q.primaryQueueShard, itemA)
 		require.Nil(t, err)
 
 		t.Run("The outstanding partition scores should reset", func(t *testing.T) {
@@ -2321,7 +2321,7 @@ func TestQueueDequeue(t *testing.T) {
 			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[1].PartitionType)
 			require.Equal(t, int(enums.PartitionTypeDefault), parts[2].PartitionType)
 
-			err = q.Dequeue(ctx, item)
+			err = q.Dequeue(ctx, q.primaryQueueShard, item)
 			require.Nil(t, err)
 
 			t.Run("The outstanding partition items should be empty", func(t *testing.T) {
@@ -2376,7 +2376,7 @@ func TestQueueDequeue(t *testing.T) {
 				require.NotEmpty(t, mems)
 			})
 
-			err = q.Dequeue(ctx, item)
+			err = q.Dequeue(ctx, q.primaryQueueShard, item)
 			require.Nil(t, err)
 
 			t.Run("The outstanding partition items should be empty", func(t *testing.T) {
@@ -2423,7 +2423,7 @@ func TestQueueDequeue(t *testing.T) {
 			require.EqualValues(t, 1, count, r.Dump())
 		})
 
-		err = q.Dequeue(ctx, item)
+		err = q.Dequeue(ctx, q.primaryQueueShard, item)
 		require.NoError(t, err)
 
 		t.Run("It should remove the item from the queue map", func(t *testing.T) {
@@ -2453,7 +2453,7 @@ func TestQueueDequeue(t *testing.T) {
 			item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{}, start)
 			require.NoError(t, err)
 
-			err = q.Dequeue(ctx, item)
+			err = q.Dequeue(ctx, q.primaryQueueShard, item)
 			require.NoError(t, err)
 
 			val := r.HGet(q.primaryQueueShard.RedisClient.kg.QueueItem(), id.String())
@@ -2478,7 +2478,7 @@ func TestQueueDequeue(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, 1, len(keys))
 
-			err = q.Dequeue(ctx, item)
+			err = q.Dequeue(ctx, q.primaryQueueShard, item)
 			require.NoError(t, err)
 
 			keys, err = r.ZMembers(fmt.Sprintf("{queue}:idx:run:%s", rid))
@@ -2543,7 +2543,7 @@ func TestQueueDequeue(t *testing.T) {
 		assert.Contains(t, mem[0], parts[0].ID)
 
 		// Dequeue the item.
-		err = q.Dequeue(ctx, item)
+		err = q.Dequeue(ctx, q.primaryQueueShard, item)
 		require.NoError(t, err)
 
 		itemCountMatches(0)
@@ -2585,7 +2585,7 @@ func TestQueueRequeue(t *testing.T) {
 		requirePartitionInProgress(t, q, item.FunctionID, 1)
 
 		next := now.Add(time.Hour)
-		err = q.Requeue(ctx, item, next)
+		err = q.Requeue(ctx, q.primaryQueueShard, item, next)
 		require.NoError(t, err)
 
 		t.Run("It should re-enqueue the item with the future time", func(t *testing.T) {
@@ -2613,7 +2613,7 @@ func TestQueueRequeue(t *testing.T) {
 			requirePartitionScoreEquals(t, r, pi.FunctionID, now)
 
 			next := now.Add(2 * time.Hour)
-			err = q.Requeue(ctx, item, next)
+			err = q.Requeue(ctx, q.primaryQueueShard, item, next)
 			require.NoError(t, err)
 
 			requirePartitionScoreEquals(t, r, pi.FunctionID, now)
@@ -2645,7 +2645,7 @@ func TestQueueRequeue(t *testing.T) {
 			require.EqualValues(t, at.UnixMilli(), scores[0])
 
 			next := now.Add(2 * time.Hour)
-			err = q.Requeue(ctx, item, next)
+			err = q.Requeue(ctx, q.primaryQueueShard, item, next)
 			require.NoError(t, err)
 
 			// Score should be the requeue time.
@@ -2716,7 +2716,7 @@ func TestQueueRequeue(t *testing.T) {
 
 		// Requeue
 		next := now.Add(time.Hour)
-		err = q.Requeue(ctx, item, next)
+		err = q.Requeue(ctx, q.primaryQueueShard, item, next)
 		require.NoError(t, err)
 
 		t.Run("It requeues all partitions", func(t *testing.T) {
@@ -3340,13 +3340,13 @@ func TestQueuePartitionRequeue(t *testing.T) {
 				requirePartitionScoreEquals(t, r, &idA, time.UnixMilli(loaded.ForceAtMS))
 
 				// Now remove this item, as we don't need it for any future tests.
-				err = q.Dequeue(ctx, qi)
+				err = q.Dequeue(ctx, q.primaryQueueShard, qi)
 				require.NoError(t, err)
 			})
 		})
 
 		t.Run("It returns a partition not found error if deleted", func(t *testing.T) {
-			err := q.Dequeue(ctx, qi)
+			err := q.Dequeue(ctx, q.primaryQueueShard, qi)
 			require.NoError(t, err)
 
 			err = q.PartitionRequeue(ctx, q.primaryQueueShard, &p, time.Now().Add(time.Minute), false)
@@ -3481,7 +3481,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 				require.False(t, r.Exists(p.zsetKey(q.primaryQueueShard.RedisClient.kg)))
 
 				t.Run("With an empty queue the zset is deleted", func(t *testing.T) {
-					err := q.Dequeue(ctx, item)
+					err := q.Dequeue(ctx, q.primaryQueueShard, item)
 					require.NoError(t, err)
 					err = q.PartitionRequeue(ctx, q.primaryQueueShard, &p, next, false)
 					require.Error(t, ErrPartitionGarbageCollected, err)
@@ -3620,7 +3620,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 			_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, time.Now().Add(time.Second))
 			require.NoError(t, err)
 
-			err = q.RequeueByJobID(ctx, "no bruv", time.Now().Add(5*time.Second))
+			err = q.RequeueByJobID(ctx, q.primaryQueueShard, "no bruv", time.Now().Add(5*time.Second))
 			require.NotNil(t, err)
 		})
 
@@ -3646,7 +3646,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, lid)
 
-			err = q.RequeueByJobID(ctx, jid, time.Now().Add(5*time.Second))
+			err = q.RequeueByJobID(ctx, q.primaryQueueShard, jid, time.Now().Add(5*time.Second))
 			require.NotNil(t, err)
 		})
 	})
@@ -3673,7 +3673,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 
 		// Requeue the function for 5 seconds in the future.
 		next := at.Add(5 * time.Second)
-		err = q.RequeueByJobID(ctx, jid, next)
+		err = q.RequeueByJobID(ctx, q.primaryQueueShard, jid, next)
 		require.Nil(t, err, r.Dump())
 
 		t.Run("It updates the queue's At time", func(t *testing.T) {
@@ -3738,7 +3738,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 		})
 
 		next := target.Add(5 * time.Second)
-		err = q.RequeueByJobID(ctx, jid, next)
+		err = q.RequeueByJobID(ctx, q.primaryQueueShard, jid, next)
 		require.Nil(t, err, r.Dump())
 
 		t.Run("The earliest time is still 'at' for the partition after requeueing", func(t *testing.T) {
@@ -3793,7 +3793,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 		})
 
 		next := target.Add(5 * time.Second)
-		err = q.RequeueByJobID(ctx, jid, next)
+		err = q.RequeueByJobID(ctx, q.primaryQueueShard, jid, next)
 		require.Nil(t, err, r.Dump())
 
 		t.Run("The earliest time is 'next' for the partition after requeueing", func(t *testing.T) {

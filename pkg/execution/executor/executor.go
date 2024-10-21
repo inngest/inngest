@@ -251,6 +251,20 @@ func WithPreDeleteStateSizeReporter(f execution.PreDeleteStateSizeReporter) Exec
 	}
 }
 
+func (e *executor) WithAssignedQueueShard(shard redis_state.QueueShard) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).assignedQueueShard = shard
+		return nil
+	}
+}
+
+func (e *executor) WithShardSelector(selector redis_state.ShardSelector) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).shardFinder = selector
+		return nil
+	}
+}
+
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log *zerolog.Logger
@@ -282,6 +296,9 @@ type executor struct {
 	stateSizeLimit func(sv2.ID) int
 
 	preDeleteStateSizeReporter execution.PreDeleteStateSizeReporter
+
+	assignedQueueShard redis_state.QueueShard
+	shardFinder        redis_state.ShardSelector
 }
 
 func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
@@ -891,7 +908,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 		// Check if this step permanently failed.  If so, the function is a failure.
 		if !resp.Retryable() {
 			// TODO: Refactor state input
-			if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+			if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *resp); err != nil {
 				l.Error("error running finish handler", "error", err)
 			}
 
@@ -919,7 +936,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 					resp.Err = &serialized
 				}
 
-				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *resp); err != nil {
 					l.Error("error running finish handler", "error", err)
 				}
 
@@ -936,7 +953,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 	}
 
 	// This is the function result.
-	if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+	if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *resp); err != nil {
 		l.Error("error running finish handler", "error", err)
 	}
 
@@ -982,7 +999,7 @@ func (f functionFinishedData) Map() map[string]any {
 // Returns a boolean indicating whether it performed finalization. If the run
 // had parallel steps then it may be false, since parallel steps cause the
 // function end to be reached multiple times in a single run
-func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, resp state.DriverResponse) error {
+func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, queueShard redis_state.QueueShard, resp state.DriverResponse) error {
 	// Parse events for the fail handler before deleting state.
 	inputEvents := make([]event.Event, len(evts))
 	for n, e := range evts {
@@ -1034,7 +1051,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 				continue
 			}
 
-			err := q.Dequeue(ctx, *qi)
+			err := q.Dequeue(ctx, queueShard, *qi)
 			if err != nil && !errors.Is(err, redis_state.ErrQueueItemNotFound) {
 				logger.StdlibLogger(ctx).Error("error dequeueing run job", "error", err)
 			}
@@ -1634,8 +1651,13 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 		return fmt.Errorf("unable to load function: %w", err)
 	}
 
+	shard, err := e.shardFinder(ctx, md.ID.Tenant.AccountID, nil)
+	if err != nil {
+		return fmt.Errorf("could not find shard for account %q: %w", md.ID.Tenant, err)
+	}
+
 	fnCancelledErr := state.ErrFunctionCancelled.Error()
-	if err := e.finalize(ctx, md, evts, f.Function.GetSlug(), state.DriverResponse{
+	if err := e.finalize(ctx, md, evts, f.Function.GetSlug(), shard, state.DriverResponse{
 		Err: &fnCancelledErr,
 	}); err != nil {
 		l.Error("error running finish handler", "error", err)
@@ -1734,8 +1756,15 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 
 		// And dequeue the timeout job to remove unneeded work from the queue, etc.
 		if q, ok := e.queue.(redis_state.QueueManager); ok {
+			// need to retrieve shard for system queue (see handleGeneratorWaitForEvent)
+			qn := queue.KindPause
+			shard, err := e.shardFinder(ctx, md.ID.Tenant.AccountID, &qn)
+			if err != nil {
+				return fmt.Errorf("could not find shard for pause timeout item for account %q: %w", md.ID.Tenant.AccountID, err)
+			}
+
 			jobID := fmt.Sprintf("%s-%s", md.IdempotencyKey(), pause.DataKey)
-			err := q.Dequeue(ctx, queue.QueueItem{
+			err = q.Dequeue(ctx, shard, queue.QueueItem{
 				ID:         queue.HashID(ctx, jobID),
 				FunctionID: md.ID.FunctionID,
 				Data: queue.Item{

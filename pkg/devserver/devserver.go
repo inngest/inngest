@@ -235,12 +235,13 @@ func start(ctx context.Context, opts StartOpts) error {
 			backoff.GetLinearBackoffFunc(time.Duration(opts.RetryInterval)*time.Second),
 		))
 	}
-	rq := redis_state.NewQueue(redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}, queueOpts...)
+	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	rq := redis_state.NewQueue(queueShard, queueOpts...)
 
 	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
 
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq)
-	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), rq)
+	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
 
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
