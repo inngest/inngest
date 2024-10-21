@@ -4,7 +4,7 @@ import { RiArrowDownSFill, RiArrowRightSFill } from '@remixicon/react';
 
 import { graphql } from '@/gql';
 import { MetricsScope } from '@/gql/graphql';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useGraphQLQuery, useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { useEnvironment } from '../Environments/environment-context';
 import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
 import { Backlog } from './Backlog';
@@ -237,7 +237,8 @@ export const MetricsVolume = ({
     scope,
   };
 
-  const { error, data } = useGraphQLQuery({
+  const { error, data } = useSkippableGraphQLQuery({
+    skip: !env.id,
     query: GetVolumeMetrics,
     pollIntervalInMilliseconds: autoRefresh ? AUTO_REFRESH_INTERVAL * 1000 : 0,
     variables,
