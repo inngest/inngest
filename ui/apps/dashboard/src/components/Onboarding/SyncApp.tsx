@@ -53,6 +53,7 @@ export default function SyncApp() {
           className="inline-block"
           size="small"
           href="https://www.inngest.com/docs/apps/cloud?ref=app-onboarding-sync-app"
+          target="_blank"
         >
           Learn more about syncs
         </NewLink>
@@ -94,6 +95,7 @@ export default function SyncApp() {
               className=""
               size="small"
               href="https://www.inngest.com/docs/reference/serve?ref=app-onboarding-sync-app"
+              target="_blank"
             >
               Learn more about serve()
             </Alert.Link>
