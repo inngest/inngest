@@ -1500,7 +1500,7 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 		shard.RedisClient.kg.QueueItem(),
 	}
 	args, err := StrSlice([]any{
-		"-1",
+		"-inf",
 		limit,
 	})
 	if err != nil {
@@ -1658,9 +1658,37 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 		limit = 1
 	}
 
+	partitionKey := partition.zsetKey(q.primaryQueueShard.RedisClient.kg)
+	return q.peek(
+		ctx,
+		q.primaryQueueShard,
+		peekOpts{
+			Limit:        limit,
+			Until:        until,
+			PartitionKey: partitionKey,
+		},
+	)
+}
+
+type peekOpts struct {
+	PartitionKey string
+	Until        time.Time
+	Limit        int64
+}
+
+func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*osqueue.QueueItem, error) {
+	until := "+inf"
+	if opts.Until.UnixMilli() > 0 {
+		until = strconv.Itoa(int(opts.Until.UnixMilli()))
+	}
+
+	keys := []string{
+		opts.PartitionKey,
+		shard.RedisClient.kg.QueueItem(),
+	}
 	args, err := StrSlice([]any{
-		until.UnixMilli(),
-		limit,
+		until,
+		opts.Limit,
 	})
 	if err != nil {
 		return nil, err
@@ -1668,11 +1696,8 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 
 	peekRet, err := scripts["queue/peek"].Exec(
 		redis_telemetry.WithScriptName(ctx, "peek"),
-		q.primaryQueueShard.RedisClient.unshardedRc,
-		[]string{
-			partition.zsetKey(q.primaryQueueShard.RedisClient.kg),
-			q.primaryQueueShard.RedisClient.kg.QueueItem(),
-		},
+		shard.RedisClient.unshardedRc,
+		keys,
 		args,
 	).ToAny()
 	if err != nil {
@@ -1704,12 +1729,12 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 	for idx, itemId := range allQueueItemIds {
 		if potentiallyMissingItems[idx] == nil {
 			if itemId == nil {
-				return nil, fmt.Errorf("encountered nil queue item key in partition queue %q", partition.zsetKey(q.primaryQueueShard.RedisClient.kg))
+				return nil, fmt.Errorf("encountered nil queue item key in partition queue %q", opts.PartitionKey)
 			}
 
 			str, ok := itemId.(string)
 			if !ok {
-				return nil, fmt.Errorf("encountered non-string queue item key in partition queue %q", partition.zsetKey(q.primaryQueueShard.RedisClient.kg))
+				return nil, fmt.Errorf("encountered non-string queue item key in partition queue %q", opts.PartitionKey)
 			}
 
 			missingQueueItems = append(missingQueueItems, str)
@@ -1719,18 +1744,19 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 	}
 
 	if len(missingQueueItems) > 0 {
-		// TODO This can happen, be careful
-		if partition.AccountID == uuid.Nil {
-			q.logger.Error().Interface("items", missingQueueItems).Str("partition", partition.zsetKey(q.primaryQueueShard.RedisClient.kg)).Msg("encountered missing queue items")
+		// NOTE: what's this??
+		// // TODO This can happen, be careful
+		// if partition.AccountID == uuid.Nil {
+		// 	q.logger.Error().Interface("items", missingQueueItems).Str("partition", partition.zsetKey(q.primaryQueueShard.RedisClient.kg)).Msg("encountered missing queue items")
 
-			return nil, fmt.Errorf("encountered missing queue items in partition queue %q", partition.zsetKey(q.primaryQueueShard.RedisClient.kg))
-		}
+		// 	return nil, fmt.Errorf("encountered missing queue items in partition queue %q", partition.zsetKey(q.primaryQueueShard.RedisClient.kg))
+		// }
 
 		eg := errgroup.Group{}
 		for _, missingItemId := range missingQueueItems {
 			id := missingItemId
 			eg.Go(func() error {
-				return q.cleanupNilQueueItemInPartition(ctx, *partition, id)
+				return q.removeQueueItem(ctx, shard, opts.PartitionKey, id)
 			})
 		}
 
@@ -1739,23 +1765,10 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 		}
 	}
 
-	if isPeekNext {
-		str, ok := items[0].(string)
-		if !ok {
-			return nil, fmt.Errorf("non-string value in next peek response: %T", items[0])
-		}
-
-		i, err := q.decodeQueueItemFromPeek(str, q.clock.Now())
-		if err != nil {
-			return nil, err
-		}
-		return []*osqueue.QueueItem{i}, nil
-	}
-
 	now := q.clock.Now()
 	return util.ParallelDecode(items, func(val any) (*osqueue.QueueItem, error) {
 		if val == nil {
-			q.logger.Error().Str("partition", partition.zsetKey(q.primaryQueueShard.RedisClient.kg)).Msg("nil item value in peek response")
+			q.logger.Error().Str("partition", opts.PartitionKey).Msg("nil item value in peek response")
 			return nil, nil
 		}
 
@@ -1763,26 +1776,23 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 		if !ok {
 			return nil, fmt.Errorf("non-string value in peek response: %T", val)
 		}
-		return q.decodeQueueItemFromPeek(str, now)
+
+		if str == "" {
+			return nil, fmt.Errorf("received empty string in decode queue item from peek")
+		}
+
+		qi := &osqueue.QueueItem{}
+		if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), qi); err != nil {
+			return nil, fmt.Errorf("error unmarshalling peeked queue item: %w", err)
+		}
+		if qi.IsLeased(now) {
+			// Leased item, don't return.
+			return nil, nil
+		}
+		// The nested osqueue.Item never has an ID set;  always re-set it
+		qi.Data.JobID = &qi.ID
+		return qi, nil
 	})
-}
-
-func (q *queue) decodeQueueItemFromPeek(str string, now time.Time) (*osqueue.QueueItem, error) {
-	if str == "" {
-		return nil, fmt.Errorf("received empty string in decode queue item from peek")
-	}
-
-	qi := &osqueue.QueueItem{}
-	if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), qi); err != nil {
-		return nil, fmt.Errorf("error unmarshalling peeked queue item: %w", err)
-	}
-	if qi.IsLeased(now) {
-		// Leased item, don't return.
-		return nil, nil
-	}
-	// The nested osqueue.Item never has an ID set;  always re-set it
-	qi.Data.JobID = &qi.ID
-	return qi, nil
 }
 
 // RequeueByJobID requeues a job for a specific time given a partition name and job ID.
