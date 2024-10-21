@@ -4871,6 +4871,23 @@ func TestMigrate(t *testing.T) {
 	count, err = getItemCountForQueue(ctx, rc1, queueKey)
 	require.NoError(t, err)
 	require.Equal(t, int64(0), count)
+
+	// Now, move everything back to queue 1
+	returned, err := q2.Migrate(ctx, shard2Name, fnID, 10, func(ctx context.Context, qi *osqueue.QueueItem) error {
+		return q1.Enqueue(ctx, qi.Data, time.UnixMilli(qi.AtMS))
+	})
+	require.NoError(t, err)
+	require.Equal(t, int64(5), returned)
+
+	// shard1 should no longer have anything
+	count, err = getItemCountForQueue(ctx, rc1, queueKey)
+	require.NoError(t, err)
+	require.Equal(t, int64(5), count)
+
+	// Verify that shard2 now have all the items
+	count2, err = getItemCountForQueue(ctx, rc2, queueKey)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), count2)
 }
 
 func getQueueItem(t *testing.T, r *miniredis.Miniredis, id string) osqueue.QueueItem {
