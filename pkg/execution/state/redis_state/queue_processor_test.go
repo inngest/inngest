@@ -173,7 +173,7 @@ func TestQueueRunBasic(t *testing.T) {
 		if n == len(items)-1 {
 			at = time.Now().Add(10 * time.Second)
 		}
-		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at)
+		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at, nil)
 		require.NoError(t, err)
 	}
 
@@ -237,7 +237,7 @@ func TestQueueRunRetry(t *testing.T) {
 	}()
 
 	for _, item := range items {
-		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, time.Now())
+		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, time.Now(), nil)
 		require.NoError(t, err)
 	}
 
@@ -400,7 +400,7 @@ func TestQueueRunExtended(t *testing.T) {
 					// Enqueue with a delay.
 					diff := mrand.Int31n(atomic.LoadInt32(&delayMax))
 
-					_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, time.Now().Add(time.Duration(diff)*time.Millisecond))
+					_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, time.Now().Add(time.Duration(diff)*time.Millisecond), nil)
 					require.NoError(t, err)
 					atomic.AddInt64(&added, 1)
 				}
@@ -517,7 +517,7 @@ func TestRunPriorityFactor(t *testing.T) {
 	at := time.Now().Add(2 * time.Second)
 
 	for _, item := range items {
-		err := q.Enqueue(ctx, item, at)
+		err := q.Enqueue(ctx, item, at, nil)
 		require.NoError(t, err)
 	}
 
@@ -617,7 +617,7 @@ func TestQueueAllowList(t *testing.T) {
 
 	for _, item := range items {
 		at := time.Now()
-		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at)
+		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at, nil)
 		require.NoError(t, err)
 	}
 
@@ -731,7 +731,7 @@ func TestQueueDenyList(t *testing.T) {
 
 	for _, item := range items {
 		at := time.Now()
-		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at)
+		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at, nil)
 		require.NoError(t, err)
 	}
 
@@ -849,7 +849,7 @@ func TestQueueRunAccount(t *testing.T) {
 		if n == len(items)-1 {
 			at = time.Now().Add(10 * time.Second)
 		}
-		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at)
+		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at, nil)
 		require.NoError(t, err)
 	}
 
@@ -933,7 +933,7 @@ func TestQueueRunGuaranteedCapacity(t *testing.T) {
 				AccountID:  priorityAccountId,
 			},
 		},
-	}, time.Now())
+	}, time.Now(), nil)
 	require.NoError(t, err)
 
 	// Wait for account to be locked
@@ -987,7 +987,7 @@ func TestQueueRunGuaranteedCapacity(t *testing.T) {
 		if n == len(items)-1 {
 			at = time.Now().Add(10 * time.Second)
 		}
-		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at)
+		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at, nil)
 		require.NoError(t, err)
 	}
 

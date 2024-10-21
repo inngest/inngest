@@ -116,7 +116,7 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 					WorkflowID: id,
 					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
 				},
-			}, at)
+			}, at, nil)
 			require.NoError(t, err)
 		}
 	}
