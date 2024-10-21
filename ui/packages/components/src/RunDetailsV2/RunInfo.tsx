@@ -216,15 +216,17 @@ export function RunInfo({
           !isLazyDone(run) &&
           (initialRunData?.status === 'QUEUED' ? (
             <div className="border-muted bg-canvas border-t">
-              <div className="border-l-status-queued flex items-center justify-between border-l-4">
-                <p className="text-subtle max-h-24 text-ellipsis break-words px-5 py-2.5 text-sm">
-                  Awaiting run start...
+              <div className="border-l-status-queued flex items-center justify-start border-l-4">
+                <span className="relative ml-4 flex h-3 w-3">
+                  <span className="bg-status-queued absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"></span>
+                  <span className="bg-status-queued relative inline-flex h-3 w-3 rounded-full"></span>
+                </span>
+                <p className="text-subtle max-h-24 text-ellipsis break-words py-2.5 pl-3 text-sm">
+                  Queued run awaiting start...
                 </p>
               </div>
             </div>
-          ) : (
-            ''
-          ))}
+          ) : null)}
         {result && (
           <RunResult className="border-muted border-t" result={result} isSuccess={isSuccess} />
         )}
