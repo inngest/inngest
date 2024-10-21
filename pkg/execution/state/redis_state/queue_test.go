@@ -3608,6 +3608,7 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 
 		// should find metadata in the other shard
 		meta, err := metaFinder(t, other, fnID)
+		require.NoError(t, err)
 		require.True(t, meta.Migrate)
 	})
 }

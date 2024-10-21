@@ -1521,11 +1521,32 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 }
 
 // removeQueueItem attempts to remove a specific item in the target queue shard
+// and also remove it from the queue item hash as well
 func (q *queue) removeQueueItem(ctx context.Context, shard QueueShard, partitionKey string, itemID string) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "removeQueueItem"), redis_telemetry.ScopeQueue)
-	r := shard.RedisClient.Client()
-	cmd := r.B().Zrem().Key(partitionKey).Member(itemID).Build()
-	return r.Do(ctx, cmd).Error()
+
+	keys := []string{
+		partitionKey,
+		shard.RedisClient.kg.QueueItem(),
+	}
+	args := []string{itemID}
+
+	code, err := scripts["queue/removeItem"].Exec(
+		ctx,
+		shard.RedisClient.Client(),
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error deleting queue item: %w", err)
+	}
+
+	switch code {
+	case 0:
+		return nil
+	default:
+		return fmt.Errorf("unknown status when attempting to remove item: %d", code)
+	}
 }
 
 // Peek takes n items from a queue, up until QueuePeekMax.  For peeking workflow/
