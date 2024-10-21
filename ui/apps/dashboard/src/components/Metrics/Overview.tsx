@@ -4,7 +4,7 @@ import { RiArrowDownSFill, RiArrowRightSFill } from '@remixicon/react';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
-import { useGraphQLQuery, useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
 import type { MetricsFilters } from './Dashboard';
 import { FailedFunctions } from './FailedFunctions';
