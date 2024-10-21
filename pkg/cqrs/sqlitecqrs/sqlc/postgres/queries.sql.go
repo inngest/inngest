@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	ulid "github.com/oklog/ulid/v2"
 )
 
@@ -627,7 +628,7 @@ func (q *Queries) GetFunctionRunFinishesByRunIDs(ctx context.Context, runIds []u
 }
 
 const getFunctionRunHistory = `-- name: GetFunctionRunHistory :many
-SELECT id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, step_type, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result FROM history WHERE run_id = $1 ORDER BY created_at ASC
+SELECT id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result, step_type FROM history WHERE run_id = $1 ORDER BY created_at ASC
 `
 
 func (q *Queries) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]*History, error) {
@@ -655,7 +656,6 @@ func (q *Queries) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([
 			&i.LatencyMs,
 			&i.StepName,
 			&i.StepID,
-			&i.StepType,
 			&i.Url,
 			&i.CancelRequest,
 			&i.Sleep,
@@ -664,6 +664,7 @@ func (q *Queries) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([
 			&i.InvokeFunction,
 			&i.InvokeFunctionResult,
 			&i.Result,
+			&i.StepType,
 		); err != nil {
 			return nil, err
 		}
@@ -727,28 +728,26 @@ func (q *Queries) GetFunctionRuns(ctx context.Context) ([]*GetFunctionRunsRow, e
 }
 
 const getFunctionRunsFromEvents = `-- name: GetFunctionRunsFromEvents :many
-SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_finishes.run_id, function_finishes.status, function_finishes.output, function_finishes.completed_step_count, function_finishes.created_at FROM function_runs
+SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron,
+    COALESCE(function_finishes.status, '') AS finish_status,
+    COALESCE(function_finishes.output, '') AS finish_output,
+    COALESCE(function_finishes.completed_step_count, 0) AS finish_completed_step_count,
+    COALESCE(function_finishes.created_at, function_runs.run_started_at) AS finish_created_at
+FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
-WHERE function_runs.event_id IN ($1)
+WHERE function_runs.event_id IN (SELECT UNNEST($1::BYTEA[]))
 `
 
 type GetFunctionRunsFromEventsRow struct {
-	FunctionRun    FunctionRun
-	FunctionFinish FunctionFinish
+	FunctionRun              FunctionRun
+	FinishStatus             string
+	FinishOutput             string
+	FinishCompletedStepCount int32
+	FinishCreatedAt          time.Time
 }
 
-func (q *Queries) GetFunctionRunsFromEvents(ctx context.Context, eventIds []ulid.ULID) ([]*GetFunctionRunsFromEventsRow, error) {
-	query := getFunctionRunsFromEvents
-	var queryParams []interface{}
-	if len(eventIds) > 0 {
-		for _, v := range eventIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:event_ids*/?", strings.Repeat(",?", len(eventIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:event_ids*/?", "NULL", 1)
-	}
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+func (q *Queries) GetFunctionRunsFromEvents(ctx context.Context, eventIds [][]byte) ([]*GetFunctionRunsFromEventsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getFunctionRunsFromEvents, pq.Array(eventIds))
 	if err != nil {
 		return nil, err
 	}
@@ -766,11 +765,10 @@ func (q *Queries) GetFunctionRunsFromEvents(ctx context.Context, eventIds []ulid
 			&i.FunctionRun.BatchID,
 			&i.FunctionRun.OriginalRunID,
 			&i.FunctionRun.Cron,
-			&i.FunctionFinish.RunID,
-			&i.FunctionFinish.Status,
-			&i.FunctionFinish.Output,
-			&i.FunctionFinish.CompletedStepCount,
-			&i.FunctionFinish.CreatedAt,
+			&i.FinishStatus,
+			&i.FinishOutput,
+			&i.FinishCompletedStepCount,
+			&i.FinishCreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -882,7 +880,7 @@ func (q *Queries) GetFunctions(ctx context.Context) ([]*Function, error) {
 }
 
 const getHistoryItem = `-- name: GetHistoryItem :one
-SELECT id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, step_type, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result FROM history WHERE id = $1
+SELECT id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result, step_type FROM history WHERE id = $1
 `
 
 func (q *Queries) GetHistoryItem(ctx context.Context, id ulid.ULID) (*History, error) {
@@ -904,7 +902,6 @@ func (q *Queries) GetHistoryItem(ctx context.Context, id ulid.ULID) (*History, e
 		&i.LatencyMs,
 		&i.StepName,
 		&i.StepID,
-		&i.StepType,
 		&i.Url,
 		&i.CancelRequest,
 		&i.Sleep,
@@ -913,6 +910,7 @@ func (q *Queries) GetHistoryItem(ctx context.Context, id ulid.ULID) (*History, e
 		&i.InvokeFunction,
 		&i.InvokeFunctionResult,
 		&i.Result,
+		&i.StepType,
 	)
 	return &i, err
 }
@@ -993,10 +991,10 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID string)
 }
 
 const getTraceRun = `-- name: GetTraceRun :one
-SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule FROM trace_runs WHERE run_id = $1
+SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule FROM trace_runs WHERE run_id = $1::CHAR(26)
 `
 
-func (q *Queries) GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, error) {
+func (q *Queries) GetTraceRun(ctx context.Context, runID string) (*TraceRun, error) {
 	row := q.db.QueryRowContext(ctx, getTraceRun, runID)
 	var i TraceRun
 	err := row.Scan(
@@ -1073,12 +1071,12 @@ func (q *Queries) GetTraceSpanOutput(ctx context.Context, arg GetTraceSpanOutput
 }
 
 const getTraceSpans = `-- name: GetTraceSpans :many
-SELECT timestamp, timestamp_unix_ms, trace_id, span_id, parent_span_id, trace_state, span_name, span_kind, service_name, resource_attributes, scope_name, scope_version, span_attributes, duration, status_code, status_message, events, links, run_id FROM traces WHERE trace_id = $1 AND run_id = $2 ORDER BY timestamp_unix_ms DESC, duration DESC
+SELECT timestamp, timestamp_unix_ms, trace_id, span_id, parent_span_id, trace_state, span_name, span_kind, service_name, resource_attributes, scope_name, scope_version, span_attributes, duration, status_code, status_message, events, links, run_id FROM traces WHERE trace_id = $1 AND run_id = $2::CHAR(26) ORDER BY timestamp_unix_ms DESC, duration DESC
 `
 
 type GetTraceSpansParams struct {
 	TraceID string
-	RunID   ulid.ULID
+	RunID   string
 }
 
 func (q *Queries) GetTraceSpans(ctx context.Context, arg GetTraceSpansParams) ([]*Trace, error) {
@@ -1250,10 +1248,10 @@ INSERT INTO function_finishes
 
 type InsertFunctionFinishParams struct {
 	RunID              ulid.ULID
-	Status             sql.NullString
-	Output             sql.NullString
-	CompletedStepCount sql.NullInt32
-	CreatedAt          sql.NullTime
+	Status             string
+	Output             string
+	CompletedStepCount int32
+	CreatedAt          time.Time
 }
 
 func (q *Queries) InsertFunctionFinish(ctx context.Context, arg InsertFunctionFinishParams) error {
@@ -1392,12 +1390,12 @@ const insertTrace = `-- name: InsertTrace :exec
 INSERT INTO traces
     (timestamp, timestamp_unix_ms, trace_id, span_id, parent_span_id, trace_state, span_name, span_kind, service_name, resource_attributes, scope_name, scope_version, span_attributes, duration, status_code, status_message, events, links, run_id)
 VALUES
-    ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+    ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19::CHAR(26))
 `
 
 type InsertTraceParams struct {
 	Timestamp          time.Time
-	TimestampUnixMs    int32
+	TimestampUnixMs    int64
 	TraceID            string
 	SpanID             string
 	ParentSpanID       sql.NullString
@@ -1414,7 +1412,7 @@ type InsertTraceParams struct {
 	StatusMessage      sql.NullString
 	Events             []byte
 	Links              []byte
-	RunID              ulid.ULID
+	RunID              string
 }
 
 // Traces
@@ -1447,7 +1445,23 @@ const insertTraceRun = `-- name: InsertTraceRun :exec
 INSERT INTO trace_runs
     (account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, batch_id, is_debounce, cron_schedule)
 VALUES
-    ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+    ($1, $2, $3, $4, $5, $6::CHAR(26), $7, $8, $9, $10, $11, $12, $13, $14::BYTEA, $15, $16)
+ON CONFLICT (run_id) DO UPDATE SET
+    account_id = excluded.account_id,
+    workspace_id = excluded.workspace_id,
+    app_id = excluded.app_id,
+    function_id = excluded.function_id,
+    trace_id = excluded.trace_id,
+    queued_at = excluded.queued_at,
+    started_at = excluded.started_at,
+    ended_at = excluded.ended_at,
+    status = excluded.status,
+    source_id = excluded.source_id,
+    trigger_ids = excluded.trigger_ids,
+    output = excluded.output,
+    batch_id = excluded.batch_id,
+    is_debounce = excluded.is_debounce,
+    cron_schedule = excluded.cron_schedule
 `
 
 type InsertTraceRunParams struct {
@@ -1456,15 +1470,15 @@ type InsertTraceRunParams struct {
 	AppID        uuid.UUID
 	FunctionID   uuid.UUID
 	TraceID      []byte
-	RunID        ulid.ULID
-	QueuedAt     int32
-	StartedAt    int32
-	EndedAt      int32
+	RunID        string
+	QueuedAt     int64
+	StartedAt    int64
+	EndedAt      int64
 	Status       int32
 	SourceID     string
 	TriggerIds   []byte
 	Output       []byte
-	BatchID      ulid.ULID
+	BatchID      []byte
 	IsDebounce   bool
 	CronSchedule sql.NullString
 }

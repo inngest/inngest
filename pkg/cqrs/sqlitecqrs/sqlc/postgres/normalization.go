@@ -81,18 +81,36 @@ func (r *FunctionRun) ToSQLite() (*sqlc.FunctionRun, error) {
 }
 
 func (f *FunctionFinish) ToSQLite() (*sqlc.FunctionFinish, error) {
+	status := sql.NullString{}
+	if f.Status != "" {
+		status.String = f.Status
+		status.Valid = true
+	}
+
+	output := sql.NullString{}
+	if f.Output != "" {
+		output.String = f.Output
+		output.Valid = true
+	}
+
 	completedStepCount := sql.NullInt64{}
-	if f.CompletedStepCount.Valid {
-		completedStepCount.Int64 = int64(f.CompletedStepCount.Int32)
+	if f.CompletedStepCount != 0 {
+		completedStepCount.Int64 = int64(f.CompletedStepCount)
 		completedStepCount.Valid = true
+	}
+
+	createdAt := sql.NullTime{}
+	if !f.CreatedAt.IsZero() {
+		createdAt.Time = f.CreatedAt
+		createdAt.Valid = true
 	}
 
 	return &sqlc.FunctionFinish{
 		RunID:              f.RunID,
-		Status:             f.Status,
-		Output:             f.Output,
+		Status:             status,
+		Output:             output,
 		CompletedStepCount: completedStepCount,
-		CreatedAt:          f.CreatedAt,
+		CreatedAt:          createdAt,
 	}, nil
 }
 
@@ -196,7 +214,14 @@ func (r *GetFunctionRunsFromEventsRow) ToSQLite() (*sqlc.GetFunctionRunsFromEven
 		return nil, err
 	}
 
-	finish, err := r.FunctionFinish.ToSQLite()
+	pgFinish := FunctionFinish{
+		RunID:              r.FunctionRun.RunID,
+		Status:             r.FinishStatus,
+		Output:             r.FinishOutput,
+		CompletedStepCount: r.FinishCompletedStepCount,
+		CreatedAt:          r.FinishCreatedAt,
+	}
+	finish, err := pgFinish.ToSQLite()
 	if err != nil {
 		return nil, err
 	}

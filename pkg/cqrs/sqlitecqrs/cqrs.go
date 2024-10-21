@@ -594,7 +594,12 @@ func (q Queries) InsertFunctionRun(ctx context.Context, e sqlc.InsertFunctionRun
 
 func (q Queries) GetFunctionRunsFromEvents(ctx context.Context, eventIDs []ulid.ULID) ([]*sqlc.GetFunctionRunsFromEventsRow, error) {
 	if q.postgresDriver != nil {
-		rows, err := q.postgresDriver.GetFunctionRunsFromEvents(ctx, eventIDs)
+		bytEventIDs := make([][]byte, len(eventIDs))
+		for i, id := range eventIDs {
+			bytEventIDs[i] = id.Bytes()
+		}
+
+		rows, err := q.postgresDriver.GetFunctionRunsFromEvents(ctx, bytEventIDs)
 		if err != nil {
 			return nil, err
 		}
@@ -724,7 +729,7 @@ func (q Queries) InsertTrace(ctx context.Context, span sqlc.InsertTraceParams) e
 	if q.postgresDriver != nil {
 		pgSpan := sqlc_postgres.InsertTraceParams{
 			Timestamp:          span.Timestamp,
-			TimestampUnixMs:    int32(span.TimestampUnixMs),
+			TimestampUnixMs:    span.TimestampUnixMs,
 			TraceID:            span.TraceID,
 			SpanID:             span.SpanID,
 			ParentSpanID:       span.ParentSpanID,
@@ -741,7 +746,7 @@ func (q Queries) InsertTrace(ctx context.Context, span sqlc.InsertTraceParams) e
 			StatusMessage:      span.StatusMessage,
 			Events:             span.Events,
 			Links:              span.Links,
-			RunID:              span.RunID,
+			RunID:              span.RunID.String(),
 		}
 
 		return q.postgresDriver.InsertTrace(ctx, pgSpan)
@@ -758,15 +763,15 @@ func (q Queries) InsertTraceRun(ctx context.Context, span sqlc.InsertTraceRunPar
 			AppID:        span.AppID,
 			FunctionID:   span.FunctionID,
 			TraceID:      span.TraceID,
-			RunID:        span.RunID,
-			QueuedAt:     int32(span.QueuedAt),
-			StartedAt:    int32(span.StartedAt),
-			EndedAt:      int32(span.EndedAt),
+			RunID:        span.RunID.String(),
+			QueuedAt:     span.QueuedAt,
+			StartedAt:    span.StartedAt,
+			EndedAt:      span.EndedAt,
 			Status:       int32(span.Status),
 			SourceID:     span.SourceID,
 			TriggerIds:   span.TriggerIds,
 			Output:       span.Output,
-			BatchID:      span.BatchID,
+			BatchID:      span.BatchID.Bytes(),
 			IsDebounce:   span.IsDebounce,
 			CronSchedule: span.CronSchedule,
 		}
@@ -781,7 +786,7 @@ func (q Queries) GetTraceSpans(ctx context.Context, arg sqlc.GetTraceSpansParams
 	if q.postgresDriver != nil {
 		pgArg := sqlc_postgres.GetTraceSpansParams{
 			TraceID: arg.TraceID,
-			RunID:   arg.RunID,
+			RunID:   arg.RunID.String(),
 		}
 
 		traces, err := q.postgresDriver.GetTraceSpans(ctx, pgArg)
@@ -802,7 +807,7 @@ func (q Queries) GetTraceSpans(ctx context.Context, arg sqlc.GetTraceSpansParams
 
 func (q Queries) GetTraceRun(ctx context.Context, runID ulid.ULID) (*sqlc.TraceRun, error) {
 	if q.postgresDriver != nil {
-		traceRun, err := q.postgresDriver.GetTraceRun(ctx, runID)
+		traceRun, err := q.postgresDriver.GetTraceRun(ctx, runID.String())
 		if err != nil {
 			return nil, err
 		}
@@ -838,18 +843,17 @@ func (q Queries) GetTraceSpanOutput(ctx context.Context, arg sqlc.GetTraceSpanOu
 
 func (q Queries) InsertFunctionFinish(ctx context.Context, arg sqlc.InsertFunctionFinishParams) error {
 	if q.postgresDriver != nil {
-		completedStepCount := sql.NullInt32{}
+		var completedStepCount int32
 		if arg.CompletedStepCount.Valid {
-			completedStepCount.Int32 = int32(arg.CompletedStepCount.Int64)
-			completedStepCount.Valid = true
+			completedStepCount = int32(arg.CompletedStepCount.Int64)
 		}
 
 		pgArg := sqlc_postgres.InsertFunctionFinishParams{
 			RunID:              arg.RunID,
-			Status:             arg.Status,
-			Output:             arg.Output,
+			Status:             arg.Status.String,
+			Output:             arg.Output.String,
 			CompletedStepCount: completedStepCount,
-			CreatedAt:          arg.CreatedAt,
+			CreatedAt:          arg.CreatedAt.Time,
 		}
 
 		return q.postgresDriver.InsertFunctionFinish(ctx, pgArg)

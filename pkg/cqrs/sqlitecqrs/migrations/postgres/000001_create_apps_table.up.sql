@@ -102,7 +102,7 @@ CREATE TABLE event_batches (
 
 CREATE TABLE traces (
 	timestamp TIMESTAMP NOT NULL,
-	timestamp_unix_ms INT NOT NULL,
+	timestamp_unix_ms BIGINT NOT NULL,
 	trace_id VARCHAR NOT NULL,
 	span_id VARCHAR NOT NULL,
 	parent_span_id VARCHAR,
@@ -131,9 +131,9 @@ CREATE TABLE trace_runs (
 	function_id CHAR(36) NOT NULL,
 	trace_id BYTEA NOT NULL,
 
-	queued_at INT NOT NULL,
-	started_at INT NOT NULL,
-	ended_at INT NOT NULL,
+	queued_at BIGINT NOT NULL,
+	started_at BIGINT NOT NULL,
+	ended_at BIGINT NOT NULL,
 
 	status INT NOT NULL, -- more like enum values
 	source_id VARCHAR NOT NULL,

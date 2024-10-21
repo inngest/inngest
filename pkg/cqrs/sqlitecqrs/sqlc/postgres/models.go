@@ -66,10 +66,10 @@ type Function struct {
 
 type FunctionFinish struct {
 	RunID              ulid.ULID
-	Status             sql.NullString
-	Output             sql.NullString
-	CompletedStepCount sql.NullInt32
-	CreatedAt          sql.NullTime
+	Status             string
+	Output             string
+	CompletedStepCount int32
+	CreatedAt          time.Time
 }
 
 type FunctionRun struct {
@@ -100,7 +100,6 @@ type History struct {
 	LatencyMs            sql.NullInt32
 	StepName             sql.NullString
 	StepID               sql.NullString
-	StepType             sql.NullString
 	Url                  sql.NullString
 	CancelRequest        sql.NullString
 	Sleep                sql.NullString
@@ -109,6 +108,7 @@ type History struct {
 	InvokeFunction       sql.NullString
 	InvokeFunctionResult sql.NullString
 	Result               sql.NullString
+	StepType             sql.NullString
 }
 
 type QueueSnapshotChunk struct {
@@ -119,7 +119,7 @@ type QueueSnapshotChunk struct {
 
 type Trace struct {
 	Timestamp          time.Time
-	TimestampUnixMs    int32
+	TimestampUnixMs    int64
 	TraceID            string
 	SpanID             string
 	ParentSpanID       sql.NullString
@@ -146,9 +146,9 @@ type TraceRun struct {
 	AppID        uuid.UUID
 	FunctionID   uuid.UUID
 	TraceID      []byte
-	QueuedAt     int32
-	StartedAt    int32
-	EndedAt      int32
+	QueuedAt     int64
+	StartedAt    int64
+	EndedAt      int64
 	Status       int32
 	SourceID     string
 	TriggerIds   []byte

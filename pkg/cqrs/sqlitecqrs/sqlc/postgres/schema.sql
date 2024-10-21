@@ -1,5 +1,5 @@
 CREATE TABLE apps (
-	id UUID PRIMARY KEY,
+	id CHAR(36) PRIMARY KEY,
 	name VARCHAR NOT NULL,
 	sdk_language VARCHAR NOT NULL,
 	sdk_version VARCHAR NOT NULL,
@@ -8,13 +8,27 @@ CREATE TABLE apps (
 	status VARCHAR NOT NULL,
 	error TEXT,
 	checksum VARCHAR NOT NULL,
-	created_at TIMESTAMP NOT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	archived_at TIMESTAMP,
 	url VARCHAR NOT NULL
 );
 
+-- XXX: - this is very basic right now.  it does not conform to the cloud.
+CREATE TABLE functions (
+	-- id CHAR(36) PRIMARY KEY, -- ADD this when https://github.com/duckdb/duckdb/issues/1631 is fixed.
+	id CHAR(36),
+	app_id CHAR(36),
+	name VARCHAR NOT NULL,
+	slug VARCHAR NOT NULL,
+	config VARCHAR NOT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	archived_at TIMESTAMP
+);
+
+-- XXX: This does not conform to the cloud.  It only includes basic fields.
 CREATE TABLE events (
-	internal_id CHAR(26) PRIMARY KEY,
+	internal_id BYTEA,
+	-- cannot use CHAR(26) for ulids, nor primary keys for null ter
 	account_id CHAR(36),
 	workspace_id CHAR(36),
 	source VARCHAR(255),
@@ -28,42 +42,32 @@ CREATE TABLE events (
 	event_ts TIMESTAMP NOT NULL
 );
 
-CREATE TABLE functions (
-	id UUID PRIMARY KEY,
-	app_id UUID,
-	name VARCHAR NOT NULL,
-	slug VARCHAR NOT NULL,
-	config VARCHAR NOT NULL,
-	created_at TIMESTAMP NOT NULL,
-	archived_at TIMESTAMP
-);
-
 CREATE TABLE function_runs (
-	run_id CHAR(26) NOT NULL,
-	run_started_at TIMESTAMP NOT NULL,
-	function_id UUID,
+	run_id BYTEA NOT NULL,
+	run_started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	function_id CHAR(36),
 	function_version INT NOT NULL,
-	trigger_type VARCHAR NOT NULL,
-	event_id CHAR(26) NOT NULL,
-	batch_id CHAR(26),
-	original_run_id CHAR(26),
+	trigger_type VARCHAR NOT NULL DEFAULT 'event',
+	-- or 'cron' if this is a cron-based function.
+	event_id BYTEA NOT NULL,
+	batch_id BYTEA,
+	original_run_id BYTEA,
 	cron VARCHAR
 );
 
 CREATE TABLE function_finishes (
 	run_id BYTEA,
-	-- Ignoring not null because of https://github.com/sqlc-dev/sqlc/issues/2806#issuecomment-1750038624
-	status VARCHAR,
-	output VARCHAR DEFAULT '{}',
-	completed_step_count INT DEFAULT 1,
-	created_at TIMESTAMP
+	status VARCHAR NOT NULL,
+	output VARCHAR NOT NULL DEFAULT '{}',
+	completed_step_count INT NOT NULL DEFAULT 1,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE history (
 	id BYTEA,
-	created_at TIMESTAMP NOT NULL,
-	run_started_at TIMESTAMP NOT NULL,
-	function_id UUID,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	run_started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	function_id CHAR(36),
 	function_version INT NOT NULL,
 	run_id BYTEA NOT NULL,
 	event_id BYTEA NOT NULL,
@@ -75,7 +79,6 @@ CREATE TABLE history (
 	latency_ms INT,
 	step_name VARCHAR,
 	step_id VARCHAR,
-	step_type VARCHAR,
 	url VARCHAR,
 	cancel_request VARCHAR,
 	sleep VARCHAR,
@@ -83,7 +86,8 @@ CREATE TABLE history (
 	wait_result VARCHAR,
 	invoke_function VARCHAR,
 	invoke_function_result VARCHAR,
-	result VARCHAR
+	result VARCHAR,
+	step_type VARCHAR
 );
 
 CREATE TABLE event_batches (
@@ -100,7 +104,7 @@ CREATE TABLE event_batches (
 
 CREATE TABLE traces (
 	timestamp TIMESTAMP NOT NULL,
-	timestamp_unix_ms INT NOT NULL,
+	timestamp_unix_ms BIGINT NOT NULL,
 	trace_id VARCHAR NOT NULL,
 	span_id VARCHAR NOT NULL,
 	parent_span_id VARCHAR,
@@ -129,9 +133,9 @@ CREATE TABLE trace_runs (
 	function_id CHAR(36) NOT NULL,
 	trace_id BYTEA NOT NULL,
 
-	queued_at INT NOT NULL,
-	started_at INT NOT NULL,
-	ended_at INT NOT NULL,
+	queued_at BIGINT NOT NULL,
+	started_at BIGINT NOT NULL,
+	ended_at BIGINT NOT NULL,
 
 	status INT NOT NULL, -- more like enum values
 	source_id VARCHAR NOT NULL,

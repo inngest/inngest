@@ -113,9 +113,14 @@ ORDER BY function_runs.run_started_at DESC
 LIMIT $3;
 
 -- name: GetFunctionRunsFromEvents :many
-SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes) FROM function_runs
+SELECT sqlc.embed(function_runs),
+    COALESCE(function_finishes.status, '') AS finish_status,
+    COALESCE(function_finishes.output, '') AS finish_output,
+    COALESCE(function_finishes.completed_step_count, 0) AS finish_completed_step_count,
+    COALESCE(function_finishes.created_at, function_runs.run_started_at) AS finish_created_at
+FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
-WHERE function_runs.event_id IN (sqlc.slice('event_ids'));
+WHERE function_runs.event_id IN (SELECT UNNEST(sqlc.slice('event_ids')::BYTEA[]));
 
 -- name: GetFunctionRunFinishesByRunIDs :many
 SELECT * FROM function_finishes WHERE run_id IN (sqlc.slice('run_ids'));
@@ -198,22 +203,38 @@ SELECT COUNT(DISTINCT run_id) FROM history;
 INSERT INTO traces
     (timestamp, timestamp_unix_ms, trace_id, span_id, parent_span_id, trace_state, span_name, span_kind, service_name, resource_attributes, scope_name, scope_version, span_attributes, duration, status_code, status_message, events, links, run_id)
 VALUES
-    ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19);
+    (sqlc.arg('timestamp'), sqlc.arg('timestamp_unix_ms'), sqlc.arg('trace_id'), sqlc.arg('span_id'), sqlc.arg('parent_span_id'), sqlc.arg('trace_state'), sqlc.arg('span_name'), sqlc.arg('span_kind'), sqlc.arg('service_name'), sqlc.arg('resource_attributes'), sqlc.arg('scope_name'), sqlc.arg('scope_version'), sqlc.arg('span_attributes'), sqlc.arg('duration'), sqlc.arg('status_code'), sqlc.arg('status_message'), sqlc.arg('events'), sqlc.arg('links'), sqlc.arg('run_id')::CHAR(26));
 
 -- name: InsertTraceRun :exec
 INSERT INTO trace_runs
     (account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, batch_id, is_debounce, cron_schedule)
 VALUES
-    ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16);
+    (sqlc.arg('account_id'), sqlc.arg('workspace_id'), sqlc.arg('app_id'), sqlc.arg('function_id'), sqlc.arg('trace_id'), sqlc.arg('run_id')::CHAR(26), sqlc.arg('queued_at'), sqlc.arg('started_at'), sqlc.arg('ended_at'), sqlc.arg('status'), sqlc.arg('source_id'), sqlc.arg('trigger_ids'), sqlc.arg('output'), sqlc.arg('batch_id')::BYTEA, sqlc.arg('is_debounce'), sqlc.arg('cron_schedule'))
+ON CONFLICT (run_id) DO UPDATE SET
+    account_id = excluded.account_id,
+    workspace_id = excluded.workspace_id,
+    app_id = excluded.app_id,
+    function_id = excluded.function_id,
+    trace_id = excluded.trace_id,
+    queued_at = excluded.queued_at,
+    started_at = excluded.started_at,
+    ended_at = excluded.ended_at,
+    status = excluded.status,
+    source_id = excluded.source_id,
+    trigger_ids = excluded.trigger_ids,
+    output = excluded.output,
+    batch_id = excluded.batch_id,
+    is_debounce = excluded.is_debounce,
+    cron_schedule = excluded.cron_schedule;
 
 -- name: GetTraceRun :one
-SELECT * FROM trace_runs WHERE run_id = $1;
+SELECT * FROM trace_runs WHERE run_id = sqlc.arg('run_id')::CHAR(26);
 
 -- name: GetTraceSpans :many
-SELECT * FROM traces WHERE trace_id = $1 AND run_id = $2 ORDER BY timestamp_unix_ms DESC, duration DESC;
+SELECT * FROM traces WHERE trace_id = sqlc.arg('trace_id') AND run_id = sqlc.arg('run_id')::CHAR(26) ORDER BY timestamp_unix_ms DESC, duration DESC;
 
 -- name: GetTraceSpanOutput :many
-SELECT * FROM traces WHERE trace_id = $1 AND span_id = $2 ORDER BY timestamp_unix_ms DESC, duration DESC;
+SELECT * FROM traces WHERE trace_id = sqlc.arg('trace_id') AND span_id = sqlc.arg('span_id') ORDER BY timestamp_unix_ms DESC, duration DESC;
 
 
 --
