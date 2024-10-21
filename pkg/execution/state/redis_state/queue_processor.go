@@ -144,7 +144,7 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time, op
 
 	switch shard.Kind {
 	case string(enums.QueueShardKindRedis):
-		_, err := q.EnqueueItem(ctx, shard, qi, next, opts)
+		_, err := q.EnqueueItem(ctx, shard, qi, next, osqueue.EnqueueOpts{})
 		if err != nil {
 			return err
 		}

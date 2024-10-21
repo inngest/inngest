@@ -173,7 +173,7 @@ func TestQueueRunBasic(t *testing.T) {
 		if n == len(items)-1 {
 			at = time.Now().Add(10 * time.Second)
 		}
-		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at, nil)
+		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 	}
 
@@ -237,7 +237,7 @@ func TestQueueRunRetry(t *testing.T) {
 	}()
 
 	for _, item := range items {
-		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, time.Now(), nil)
+		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, time.Now(), osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 	}
 
@@ -400,7 +400,7 @@ func TestQueueRunExtended(t *testing.T) {
 					// Enqueue with a delay.
 					diff := mrand.Int31n(atomic.LoadInt32(&delayMax))
 
-					_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, time.Now().Add(time.Duration(diff)*time.Millisecond), nil)
+					_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, time.Now().Add(time.Duration(diff)*time.Millisecond), osqueue.EnqueueOpts{})
 					require.NoError(t, err)
 					atomic.AddInt64(&added, 1)
 				}
@@ -617,7 +617,7 @@ func TestQueueAllowList(t *testing.T) {
 
 	for _, item := range items {
 		at := time.Now()
-		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at, nil)
+		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 	}
 
@@ -731,7 +731,7 @@ func TestQueueDenyList(t *testing.T) {
 
 	for _, item := range items {
 		at := time.Now()
-		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at, nil)
+		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 	}
 
@@ -849,7 +849,7 @@ func TestQueueRunAccount(t *testing.T) {
 		if n == len(items)-1 {
 			at = time.Now().Add(10 * time.Second)
 		}
-		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at, nil)
+		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 	}
 
@@ -933,7 +933,7 @@ func TestQueueRunGuaranteedCapacity(t *testing.T) {
 				AccountID:  priorityAccountId,
 			},
 		},
-	}, time.Now(), nil)
+	}, time.Now(), osqueue.EnqueueOpts{})
 	require.NoError(t, err)
 
 	// Wait for account to be locked
@@ -987,7 +987,7 @@ func TestQueueRunGuaranteedCapacity(t *testing.T) {
 		if n == len(items)-1 {
 			at = time.Now().Add(10 * time.Second)
 		}
-		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at, nil)
+		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 	}
 
