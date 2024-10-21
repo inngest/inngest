@@ -219,7 +219,7 @@ func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleB
 		MaxAttempts: &maxAttempts,
 		Payload:     opts.ScheduleBatchPayload,
 		QueueName:   &queueName,
-	}, opts.At, nil)
+	}, opts.At, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
 		log.From(ctx).
 			Debug().

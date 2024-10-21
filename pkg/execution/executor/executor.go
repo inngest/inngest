@@ -665,7 +665,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		},
 		Throttle: throttle,
 	}
-	err = e.queue.Enqueue(ctx, item, at, nil)
+	err = e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
 		return nil, state.ErrIdentifierExists
 	}
@@ -1732,25 +1732,20 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		// for the next run.  If the ConsumePause call comes after enqueue, the TCP
 		// conn may drop etc. and running the job may occur prior to saving state data.
 		jobID := fmt.Sprintf("%s-%s", pause.Identifier.IdempotencyKey(), pause.DataKey)
-		err = e.queue.Enqueue(
-			ctx,
-			queue.Item{
-				JobID: &jobID,
-				// Add a new group ID for the child;  this will be a new step.
-				GroupID:               uuid.New().String(),
-				WorkspaceID:           pause.WorkspaceID,
-				Kind:                  queue.KindEdge,
-				Identifier:            pause.Identifier,
-				PriorityFactor:        md.Config.PriorityFactor,
-				CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
-				MaxAttempts:           pause.MaxAttempts,
-				Payload: queue.PayloadEdge{
-					Edge: pause.Edge(),
-				},
+		err = e.queue.Enqueue(ctx, queue.Item{
+			JobID: &jobID,
+			// Add a new group ID for the child;  this will be a new step.
+			GroupID:               uuid.New().String(),
+			WorkspaceID:           pause.WorkspaceID,
+			Kind:                  queue.KindEdge,
+			Identifier:            pause.Identifier,
+			PriorityFactor:        md.Config.PriorityFactor,
+			CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
+			MaxAttempts:           pause.MaxAttempts,
+			Payload: queue.PayloadEdge{
+				Edge: pause.Edge(),
 			},
-			time.Now(),
-			nil,
-		)
+		}, time.Now(), queue.EnqueueOpts{})
 		if err != nil && err != redis_state.ErrQueueItemExists {
 			return fmt.Errorf("error enqueueing after pause: %w", err)
 		}
@@ -1959,7 +1954,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 	}
-	err = e.queue.Enqueue(ctx, nextItem, now, nil)
+	err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
@@ -2058,7 +2053,7 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 	}
-	err = e.queue.Enqueue(ctx, nextItem, now, nil)
+	err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
@@ -2105,7 +2100,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 			Edge: nextEdge,
 		},
 	}
-	err := e.queue.Enqueue(ctx, nextItem, now, nil)
+	err := e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
@@ -2153,7 +2148,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		Attempt:               0,
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
-	}, until, nil)
+	}, until, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
@@ -2260,7 +2255,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 			PauseID:   pauseID,
 			OnTimeout: true,
 		},
-	}, expires, nil)
+	}, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
@@ -2386,7 +2381,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 			PauseID:   pauseID,
 			OnTimeout: true,
 		},
-	}, expires, nil)
+	}, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}

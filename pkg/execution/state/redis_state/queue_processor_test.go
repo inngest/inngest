@@ -517,7 +517,7 @@ func TestRunPriorityFactor(t *testing.T) {
 	at := time.Now().Add(2 * time.Second)
 
 	for _, item := range items {
-		err := q.Enqueue(ctx, item, at, nil)
+		err := q.Enqueue(ctx, item, at, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 	}
 

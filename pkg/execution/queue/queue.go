@@ -35,7 +35,7 @@ type EnqueueOpts struct {
 
 type Producer interface {
 	// Enqueue allows an item to be enqueued ton run at the given time.
-	Enqueue(context.Context, Item, time.Time, *EnqueueOpts) error
+	Enqueue(context.Context, Item, time.Time, EnqueueOpts) error
 }
 
 type Enqueuer interface {
