@@ -5,7 +5,6 @@ import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
 
 import { MetricsActionMenu } from '@/components/Metrics/ActionMenu';
 import { Dashboard } from '@/components/Metrics/Dashboard';
-import { getMetricsLookups, preloadMetricsLookups } from '@/components/Metrics/data';
 
 type MetricsProps = {
   params: {
@@ -14,14 +13,6 @@ type MetricsProps = {
 };
 
 export default async function MetricsPage({ params: { environmentSlug: envSlug } }: MetricsProps) {
-  preloadMetricsLookups(envSlug);
-  const {
-    envBySlug: {
-      apps,
-      workflows: { data: functions },
-    },
-  } = await getMetricsLookups(envSlug);
-
   return (
     <>
       <Header
@@ -35,15 +26,7 @@ export default async function MetricsPage({ params: { environmentSlug: envSlug }
       />
       <div id="chart-tooltip" className="z-[1000]" />
       <div className="bg-canvasSubtle mx-auto flex h-full w-full flex-col">
-        <Dashboard
-          apps={apps
-            .filter(({ isArchived }) => isArchived === false)
-            .map((app: { id: string; externalID: string }) => ({
-              id: app.id,
-              name: app.externalID,
-            }))}
-          functions={functions}
-        />
+        <Dashboard envSlug={envSlug} />
       </div>
     </>
   );

@@ -1,8 +1,10 @@
 'use client';
 
 import { RangePicker } from '@inngest/components/DatePicker';
-import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicker.jsx';
+import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicker';
+import { Error } from '@inngest/components/Error/Error';
 import EntityFilter from '@inngest/components/Filter/EntityFilter';
+import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import {
   useBatchedSearchParams,
   useBooleanSearchParam,
@@ -18,6 +20,7 @@ import {
 } from '@inngest/components/utils/date';
 import { useQuery } from 'urql';
 
+import { graphql } from '@/gql';
 import { GetBillingPlanDocument, MetricsScope, type GetBillingPlanQuery } from '@/gql/graphql';
 import { MetricsOverview } from './Overview';
 import { MetricsVolume } from './Volume';
@@ -61,18 +64,37 @@ const getDefaultRange = (start?: Date, end?: Date, duration?: DurationType | '')
         duration: duration ? duration : DEFAULT_DURATION,
       };
 
+const MetricsLookupDocument = graphql(`
+  query MetricsLookups($envSlug: String!, $page: Int, $pageSize: Int) {
+    envBySlug(slug: $envSlug) {
+      apps {
+        externalID
+        id
+        name
+        isArchived
+      }
+      workflows @paginated(perPage: $pageSize, page: $page) {
+        data {
+          name
+          id
+          slug
+        }
+        page {
+          page
+          totalPages
+          perPage
+        }
+      }
+    }
+  }
+`);
+
 const getConcurrencyLimit = (planData?: GetBillingPlanQuery) =>
   Number(planData?.account.plan?.features.concurrency) ||
   Number(planData?.plans.find((p) => p?.name === 'Free Tier')?.features.concurrency) ||
   CONCURRENCY_LIMIT_DEFAULT;
 
-export const Dashboard = ({
-  apps = [],
-  functions = [],
-}: {
-  apps: EntityType[];
-  functions: EntityType[];
-}) => {
+export const Dashboard = ({ envSlug }: { envSlug: string }) => {
   const [selectedApps, setApps, removeApps] = useStringArraySearchParam('apps');
   const [selectedFns, setFns, removeFns] = useStringArraySearchParam('fns');
   const [start] = useSearchParam('start');
@@ -85,37 +107,63 @@ export const Dashboard = ({
   const parsedStart = toDate(start);
   const parsedEnd = toDate(end);
 
+  const page = 1;
+  //
+  // TODO: handle more
+  const pageSize = 1000;
+  const [{ data, fetching, error }] = useQuery({
+    query: MetricsLookupDocument,
+    variables: { envSlug, page, pageSize },
+  });
+
   const [{ data: planData }] = useQuery({
     query: GetBillingPlanDocument,
   });
+
+  const apps = data?.envBySlug?.apps
+    .filter(({ isArchived }) => isArchived === false)
+    .map((app: { id: string; externalID: string }) => ({
+      id: app.id,
+      name: app.externalID,
+    }));
+
+  const functions = data?.envBySlug?.workflows.data;
 
   const logRetention = Number(planData?.account.plan?.features.log_retention);
   const upgradeCutoff = subtractDuration(new Date(), { days: logRetention || 7 });
   const concurrenyLimit = getConcurrencyLimit(planData);
 
-  const envLookup = apps.length !== 1 && !selectedApps?.length && !selectedFns?.length;
+  const envLookup = apps?.length !== 1 && !selectedApps?.length && !selectedFns?.length;
   const mappedFunctions = convertLookup(functions);
   const mappedApps = convertLookup(apps);
   const mappedEntities = envLookup ? mappedApps : mappedFunctions;
+
+  error && console.error('Error fetcthing metrics lookup data', error);
 
   return (
     <div className="flex h-full w-full flex-col">
       <div className="bg-canvasBase flex h-16 w-full flex-row items-center justify-between px-3 py-5">
         <div className="flex flex-row items-center justify-start gap-x-2">
-          <EntityFilter
-            type="app"
-            onFilterChange={(apps) => (apps.length ? setApps(apps) : removeApps())}
-            selectedEntities={selectedApps || []}
-            entities={apps}
-            className="h-8"
-          />
-          <EntityFilter
-            type="function"
-            onFilterChange={(fns) => (fns.length ? setFns(fns) : removeFns())}
-            selectedEntities={selectedFns || []}
-            entities={functions}
-            className="h-8"
-          />
+          {fetching ? (
+            <Skeleton className="block h-8 w-60" />
+          ) : (
+            <>
+              <EntityFilter
+                type="app"
+                onFilterChange={(apps) => (apps.length ? setApps(apps) : removeApps())}
+                selectedEntities={selectedApps || []}
+                entities={apps || []}
+                className="h-8"
+              />
+              <EntityFilter
+                type="function"
+                onFilterChange={(fns) => (fns.length ? setFns(fns) : removeFns())}
+                selectedEntities={selectedFns || []}
+                entities={functions || []}
+                className="h-8"
+              />
+            </>
+          )}
         </div>
         <div className="flex flex-row items-center justify-end gap-x-2">
           <RangePicker
@@ -132,6 +180,7 @@ export const Dashboard = ({
           />
         </div>
       </div>
+      {error && <Error message="There was an error fetching metrics filter data." />}
       <div className="bg-canvasSubtle px-6">
         <MetricsOverview
           from={getFrom(parsedStart, parsedDuration)}
