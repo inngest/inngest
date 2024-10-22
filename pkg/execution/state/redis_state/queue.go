@@ -1446,7 +1446,7 @@ func (q *queue) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID
 
 	defaultMeta := FnMetadata{
 		FnID:    fnID,
-		Migrate: true,
+		Migrate: migrate,
 	}
 
 	if q.queueShardClients == nil {
@@ -1458,9 +1458,9 @@ func (q *queue) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID
 		return fmt.Errorf("no queue shard available for '%s'", sourceShard)
 	}
 
-	flag := 1
-	if !migrate {
-		flag = 0
+	flag := 0
+	if migrate {
+		flag = 1
 	}
 
 	keys := []string{shard.RedisClient.kg.FnMetadata(fnID)}

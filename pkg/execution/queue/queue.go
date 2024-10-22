@@ -60,7 +60,7 @@ type QueueMigrationHandler func(ctx context.Context, qi *QueueItem) error
 type Migrator interface {
 	// SetFunctionMigrate updates the function metadata to signal it's being migrated to
 	// another queue shard
-	SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID, migate bool) error
+	SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID, migrate bool) error
 	// Migration does a peek operation like the normal peek, but ignores leases and other conditions a normal peek cares about.
 	// The sore goal is to grab things and migrate them to somewhere else
 	Migrate(ctx context.Context, shard string, fnID uuid.UUID, limit int64, handler QueueMigrationHandler) (int64, error)
