@@ -217,4 +217,6 @@ type MigratePayload struct {
 	Source string
 	// Dest is the target destination the queue will be moved to
 	Dest string
+
+	PauseWhileMigrating bool
 }
