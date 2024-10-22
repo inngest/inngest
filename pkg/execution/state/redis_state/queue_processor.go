@@ -948,12 +948,16 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi osqueue.QueueI
 		})
 
 		runInfo := osqueue.RunInfo{
-			Latency:      latency,
-			SojournDelay: sojourn,
-			Priority:     q.ppf(ctx, p),
+			Latency:        latency,
+			SojournDelay:   sojourn,
+			Priority:       q.ppf(ctx, p),
+			QueueShardName: q.primaryQueueShard.Name,
 		}
 		if s != nil {
-			runInfo.GuaranteedCapacityKey = s.Key()
+			runInfo.GuaranteedCapacityKey = s.Name
+			if runInfo.GuaranteedCapacityKey == "" {
+				runInfo.GuaranteedCapacityKey = s.Key()
+			}
 		}
 
 		// Call the run func.

@@ -19,9 +19,10 @@ type Queue interface {
 }
 
 type RunInfo struct {
-	Latency      time.Duration
-	SojournDelay time.Duration
-	Priority     uint
+	Latency        time.Duration
+	SojournDelay   time.Duration
+	Priority       uint
+	QueueShardName string
 
 	GuaranteedCapacityKey string
 }
