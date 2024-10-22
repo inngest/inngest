@@ -218,5 +218,7 @@ type MigratePayload struct {
 	// Dest is the target destination the queue will be moved to
 	Dest string
 
-	PauseWhileMigrating bool
+	// DisableFnPause is a flag to disable the function pausing during migration
+	// if it's considered okay to do so
+	DisableFnPause bool
 }
