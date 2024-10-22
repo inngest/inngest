@@ -276,7 +276,7 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 		// second lets an updateDebounce call on TTL 0 finish, as the buffer is the updateDebounce
 		// deadline.
 		qi := d.queueItem(ctx, di, debounceID)
-		err = d.q.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second))
+		err = d.q.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second), queue.EnqueueOpts{})
 		if err != nil {
 			return &debounceID, fmt.Errorf("error enqueueing debounce job: %w", err)
 		}

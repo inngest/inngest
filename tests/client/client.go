@@ -39,7 +39,7 @@ func (c *Client) NewRequest(method string, path string, body io.Reader) (*http.R
 func (c *Client) MustDoGQL(ctx context.Context, input graphql.RawParams) *graphql.Response {
 	resp, err := c.DoGQL(ctx, input)
 	if err != nil {
-		c.Fatalf(err.Error())
+		c.Fatal(err.Error())
 	}
 
 	return resp
@@ -66,7 +66,7 @@ func (c *Client) doGQL(ctx context.Context, input graphql.RawParams) *graphql.Re
 	buf := jsonBuffer(input)
 	req, err := c.NewRequest(http.MethodPost, "/v0/gql", buf)
 	if err != nil {
-		c.Fatalf(err.Error())
+		c.Fatal(err.Error())
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -78,7 +78,7 @@ func (c *Client) doGQL(ctx context.Context, input graphql.RawParams) *graphql.Re
 
 	resp, err := c.Do(req)
 	if err != nil {
-		c.Fatalf(err.Error())
+		c.Fatal(err.Error())
 	}
 
 	defer resp.Body.Close()
@@ -91,7 +91,7 @@ func (c *Client) doGQL(ctx context.Context, input graphql.RawParams) *graphql.Re
 
 	r := &graphql.Response{}
 	if err = json.Unmarshal(body, &r); err != nil {
-		c.Fatalf(err.Error())
+		c.Fatal(err.Error())
 	}
 
 	return r

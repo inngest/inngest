@@ -76,7 +76,7 @@ func GetItemConcurrencyLatency(ctx context.Context) (time.Duration, bool) {
 // Enqueue adds an item to the queue to be processed at the given time.
 // TODO: Lift this function and the queue interface to a higher level, so that it's disconnected from the
 // concrete Redis implementation.
-func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) error {
+func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time, opts osqueue.EnqueueOpts) error {
 	// propagate
 	if item.Metadata == nil {
 		item.Metadata = map[string]string{}
@@ -144,7 +144,7 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 
 	switch shard.Kind {
 	case string(enums.QueueShardKindRedis):
-		_, err := q.EnqueueItem(ctx, shard, qi, next)
+		_, err := q.EnqueueItem(ctx, shard, qi, next, opts)
 		if err != nil {
 			return err
 		}

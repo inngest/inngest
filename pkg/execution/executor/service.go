@@ -185,6 +185,9 @@ func (s *svc) Run(ctx context.Context) error {
 			err = s.handleDebounce(ctx, item)
 		case queue.KindScheduleBatch:
 			err = s.handleScheduledBatch(ctx, item)
+		case queue.KindQueueMigrate:
+			// NOOP:
+			// this kind don't work in the Dev server
 		default:
 			err = fmt.Errorf("unknown payload type: %T", item.Payload)
 		}
