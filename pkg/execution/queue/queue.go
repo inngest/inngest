@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"errors"
+	"github.com/tonyhb/datos/vendor/github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,6 +23,7 @@ type RunInfo struct {
 	Latency      time.Duration
 	SojournDelay time.Duration
 	Priority     uint
+	QueueShard   redis_state.QueueShard
 
 	GuaranteedCapacityKey string
 }

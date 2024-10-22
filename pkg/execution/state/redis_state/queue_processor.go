@@ -953,7 +953,10 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi osqueue.QueueI
 			Priority:     q.ppf(ctx, p),
 		}
 		if s != nil {
-			runInfo.GuaranteedCapacityKey = s.Key()
+			runInfo.GuaranteedCapacityKey = s.Name
+			if runInfo.GuaranteedCapacityKey == "" {
+				runInfo.GuaranteedCapacityKey = s.Key()
+			}
 		}
 
 		// Call the run func.
