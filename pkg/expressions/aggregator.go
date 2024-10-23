@@ -105,13 +105,15 @@ type aggregator struct {
 }
 
 func (a *aggregator) EvaluateAsyncEvent(ctx context.Context, event event.TrackedEvent) ([]expr.Evaluable, int32, error) {
+	log := logger.StdlibLogger(ctx)
+
+	log.Debug("loading evaluator")
+
 	name := event.GetEvent().Name
 	eval, err := a.LoadEventEvaluator(ctx, event.GetWorkspaceID(), name, event.GetEvent().Time())
 	if err != nil {
 		return nil, 0, fmt.Errorf("Could not load an event evaluator: %w", err)
 	}
-
-	log := logger.StdlibLogger(ctx)
 
 	if eval.SlowLen() > 100 {
 		log.Warn(
