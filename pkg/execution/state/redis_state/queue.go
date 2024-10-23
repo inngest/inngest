@@ -3168,7 +3168,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 		if strings.HasPrefix(queueKey, "{q:v1}:concurrency:custom:") {
 			err := client.Do(ctx, client.B().Zrem().Key(kg.ConcurrencyIndex()).Member(partition).Build()).Error()
 			if err != nil {
-				resultErr = multierror.Append(resultErr, fmt.Errorf("error removing key queue '%s' from concurrency pointer '%s': %w", partition, err))
+				resultErr = multierror.Append(resultErr, fmt.Errorf("error removing key queue '%s' from concurrency pointer: %w", partition, err))
 			}
 			continue
 		}
