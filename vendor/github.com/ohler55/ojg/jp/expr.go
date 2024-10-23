@@ -42,6 +42,20 @@ func (x Expr) Append(buf []byte, brackets ...bool) []byte {
 	return buf
 }
 
+// Normal returns true if the only fragments in the expression are root, at,
+// child, and nth.
+func (x Expr) Normal() bool {
+	for _, f := range x {
+		switch f.(type) {
+		case Child, Nth, Root, At, Bracket:
+			// normal
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 func isNil(v any) bool {
 	return (*[2]uintptr)(unsafe.Pointer(&v))[1] == 0
 }

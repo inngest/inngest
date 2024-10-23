@@ -1654,7 +1654,12 @@ func (x Expr) reflectGetChild(data any, key string) (v any, has bool) {
 				has = true
 			}
 		case reflect.Map:
-			rv := rd.MapIndex(reflect.ValueOf(key))
+			mkt := rt.Key()
+			kt := reflect.TypeOf(key)
+			if !kt.ConvertibleTo(mkt) {
+				break
+			}
+			rv := rd.MapIndex(reflect.ValueOf(key).Convert(mkt))
 			if rv.IsValid() && rv.CanInterface() {
 				v = rv.Interface()
 				has = true

@@ -55,6 +55,20 @@ func (f Wildcard) remove(value any) (out any, changed bool) {
 				delete(tv, k)
 			}
 		}
+	case RemovableIndexed:
+		size := tv.Size()
+		for i := (size - 1); i >= 0; i-- {
+			changed = true
+			tv.RemoveValueAtIndex(i)
+		}
+	case Keyed:
+		keys := tv.Keys()
+		if 0 < len(keys) {
+			changed = true
+			for _, k := range keys {
+				tv.RemoveValueForKey(k)
+			}
+		}
 	default:
 		rv := reflect.ValueOf(value)
 		switch rv.Kind() {
@@ -105,6 +119,18 @@ func (f Wildcard) removeOne(value any) (out any, changed bool) {
 			}
 			sort.Strings(keys)
 			delete(tv, keys[0])
+		}
+	case RemovableIndexed:
+		if 0 < tv.Size() {
+			changed = true
+			tv.RemoveValueAtIndex(0)
+		}
+	case Keyed:
+		keys := tv.Keys()
+		if 0 < len(keys) {
+			changed = true
+			sort.Strings(keys)
+			tv.RemoveValueForKey(keys[0])
 		}
 	default:
 		rv := reflect.ValueOf(value)

@@ -15,7 +15,7 @@ type delFlagType struct{}
 
 var delFlag = &delFlagType{}
 
-// MustDel removes matching nodes and pinics on error.
+// MustDel removes matching nodes and panics on error.
 func (x Expr) MustDel(data any) {
 	if err := x.set(data, delFlag, "delete", false); err != nil {
 		panic(err)
@@ -27,7 +27,7 @@ func (x Expr) Del(data any) error {
 	return x.set(data, delFlag, "delete", false)
 }
 
-// MustDelOne removes one matching node and pinics on error.
+// MustDelOne removes one matching node and panics on error.
 func (x Expr) MustDelOne(data any) {
 	if err := x.set(data, delFlag, "delete", true); err != nil {
 		panic(err)

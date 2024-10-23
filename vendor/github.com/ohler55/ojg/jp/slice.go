@@ -138,6 +138,26 @@ func (f Slice) remove(value any) (out any, changed bool) {
 		if changed {
 			out = ns
 		}
+	case RemovableIndexed:
+		size := tv.Size()
+		if start < 0 {
+			start = size + start
+		}
+		if end < 0 {
+			end = size + end
+		}
+		if size <= end {
+			end = size - 1
+		}
+		if start < 0 || end < 0 || size <= start || size <= end || step == 0 {
+			return
+		}
+		for i := size - 1; 0 <= i; i-- {
+			if inStep(i, start, end, step) {
+				changed = true
+				tv.RemoveValueAtIndex(i)
+			}
+		}
 	default:
 		rv := reflect.ValueOf(value)
 		if rv.Kind() == reflect.Slice {
@@ -283,6 +303,27 @@ func (f Slice) removeOne(value any) (out any, changed bool) {
 		}
 		if changed {
 			out = ns
+		}
+	case RemovableIndexed:
+		size := tv.Size()
+		if start < 0 {
+			start = size + start
+		}
+		if end < 0 {
+			end = size + end
+		}
+		if size <= end {
+			end = size - 1
+		}
+		if start < 0 || end < 0 || size <= start || size <= end || step == 0 {
+			return
+		}
+		for i := 0; i < size; i++ {
+			if inStep(i, start, end, step) {
+				changed = true
+				tv.RemoveValueAtIndex(i)
+				break
+			}
 		}
 	default:
 		rv := reflect.ValueOf(value)

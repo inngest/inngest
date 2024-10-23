@@ -12,7 +12,7 @@ var (
 	//   0123456789abcdef0123456789abcdef
 	jMap = "" +
 		`........btn.fr..................` + // 0x00
-		`oo"oooh'ooooooo/oooooooooooooooo` + // 0x20
+		`oo"oooo'oooooooooooooooooooooooo` + // 0x20
 		`oooooooooooooooooooooooooooo\ooo` + // 0x40
 		"ooooooooooooooooooooooooooooooo." + // 0x60
 		`88888888888888888888888888888888` + // 0x80
@@ -73,7 +73,9 @@ func AppendString(buf []byte, s string, delim byte) []byte {
 			if start < i {
 				buf = append(buf, s[start:i]...)
 			}
-			buf = append(buf, '\\')
+			if delim != '/' { // don't escape regexp as they are already escaped
+				buf = append(buf, '\\')
+			}
 			buf = append(buf, c)
 			start = i + 1
 		}
