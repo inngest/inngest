@@ -25,12 +25,12 @@ local queueID         = ARGV[1]
 local currentLeaseKey = ARGV[2]
 local newLeaseKey     = ARGV[3]
 
-local partitionTypeA       	= tonumber(ARGV[4])
-local partitionTypeB        = tonumber(ARGV[5])
-local partitionTypeC        = tonumber(ARGV[6])
-local partitionIdA        	= ARGV[7]
-local partitionIdB        	= ARGV[8]
-local partitionIdC        	= ARGV[9]
+local partitionTypeA	= tonumber(ARGV[4])
+local partitionTypeB 	= tonumber(ARGV[5])
+local partitionTypeC 	= tonumber(ARGV[6])
+local partitionIdA 		= ARGV[7]
+local partitionIdB 		= ARGV[8]
+local partitionIdC 		= ARGV[9]
 
 -- $include(decode_ulid_time.lua)
 -- $include(get_queue_item.lua)
