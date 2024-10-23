@@ -120,18 +120,18 @@ redis.call("HSET", keyQueueMap, queueID, cjson.encode(item))
 
 local function handleLease(keyPartition, keyConcurrency, concurrencyLimit, partitionID, partitionType)
   if partitionType == 0 or concurrencyLimit > 0 then
-	-- Add item to in-progress/concurrency queue and set score to lease expiry time to be picked up by scavenger
-	redis.call("ZADD", keyConcurrency, nextTime, item.id)
+		-- Add item to in-progress/concurrency queue and set score to lease expiry time to be picked up by scavenger
+		redis.call("ZADD", keyConcurrency, nextTime, item.id)
 
-	-- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress
-	-- and stored in functionConcurrencyKey.
-	redis.call("ZREM", keyPartition, item.id)
-  end
+		-- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress
+		-- and stored in functionConcurrencyKey.
+		redis.call("ZREM", keyPartition, item.id)
+	end
 
   if partitionType ~= 0 then
-	-- Do not add key queues to concurrency pointer
-	return
-  end
+		-- Do not add key queues to concurrency pointer
+		return
+	end
 
 	-- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
 	-- so that expired leases can be re-processed.  We want to take the earliest time from the
