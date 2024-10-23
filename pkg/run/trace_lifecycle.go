@@ -327,9 +327,9 @@ func (l traceLifecycle) OnFunctionFinished(
 		span.SetAttributes(attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusFailed.ToCode()))
 	}
 
-	output := resp.Output
-	if resp.Err != nil {
-		output = *resp.Err
+	var output any = resp.Err
+	if resp.Output != nil {
+		output = resp.Output
 	}
 	span.SetFnOutput(output)
 }
@@ -694,9 +694,9 @@ func (l traceLifecycle) OnStepFinished(
 				attribute.Int(consts.OtelSysStepOutputSizeBytes, resp.OutputSize),
 			)
 
-			output := resp.Output
-			if resp.Err != nil {
-				output = *resp.Err
+			var output any = resp.Err
+			if resp.Output != nil {
+				output = resp.Output
 			}
 			span.SetStepOutput(output)
 		} else if resp.IsTraceVisibleFunctionExecution() {
@@ -711,9 +711,9 @@ func (l traceLifecycle) OnStepFinished(
 			span.SetAttributes(attribute.String(consts.OtelSysStepOpcode, enums.OpcodeNone.String()))
 			span.SetName(spanName)
 
-			output := resp.Output
-			if resp.Err != nil {
-				output = *resp.Err
+			var output any = resp.Err
+			if resp.Output != nil {
+				output = resp.Output
 			}
 			span.SetStepOutput(output)
 		} else {
