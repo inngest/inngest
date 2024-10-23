@@ -1205,9 +1205,9 @@ func (e *executor) executeDriverForStep(ctx context.Context, i *runInstance) (*s
 // HandlePauses handles pauses loaded from an incoming event.
 func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, evt event.TrackedEvent) (execution.HandlePauseResult, error) {
 	// Use the aggregator for all funciton finished events, if there are more than
-	// 50 waiting.  It only takes a few milliseconds to iterate and handle less
-	// than 50;  anything more runs the risk of running slow.
-	if iter.Count() > 10 {
+	// 20 waiting.  It only takes a few milliseconds to iterate and handle less
+	// than 20;  anything more runs the risk of running slow.
+	if iter.Count() > 20 {
 		aggRes, err := e.handleAggregatePauses(ctx, evt)
 		if err != nil {
 			log.From(ctx).Error().Err(err).Msg("error handling aggregate pauses")
