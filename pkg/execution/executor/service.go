@@ -272,7 +272,9 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 		return nil
 	}
 
-	r := execution.ResumeRequest{}
+	r := execution.ResumeRequest{
+		IsTimeout: true,
+	}
 
 	// If the pause timeout is for an invocation, store an error to cause the
 	// step to fail.

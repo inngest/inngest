@@ -1671,9 +1671,17 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 
 		// And dequeue the timeout job to remove unneeded work from the queue, etc.
 		if q, ok := e.queue.(redis_state.QueueManager); ok {
-			// need to retrieve shard for system queue (see handleGeneratorWaitForEvent)
-			qn := queue.KindPause
-			shard, err := e.shardFinder(ctx, md.ID.Tenant.AccountID, &qn)
+			var qn *string
+			if r.IsTimeout {
+				// timeouts are enqueued to the workflow partition (see handleGeneratorWaitForEvent)
+				// this is _not_ a system partition and lives on the account shard
+			} else {
+				// pause events are enqueued to a system partition (see pauseEventListener)
+				// system partitions live on the default shard
+				queueName := fmt.Sprintf("pause:%s", pause.WorkspaceID)
+				qn = &queueName
+			}
+			shard, err := e.shardFinder(ctx, md.ID.Tenant.AccountID, qn)
 			if err != nil {
 				return fmt.Errorf("could not find shard for pause timeout item for account %q: %w", md.ID.Tenant.AccountID, err)
 			}
