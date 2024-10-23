@@ -1330,8 +1330,8 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 		"workspace_id", evt.GetWorkspaceID(),
 		"event", evt.GetEvent().Name,
 	)
-	evtID := evt.GetInternalID()
 
+	evtID := evt.GetInternalID()
 	evals, count, err := e.exprAggregator.EvaluateAsyncEvent(ctx, evt)
 	if err != nil {
 		return execution.HandlePauseResult{count, 0}, err

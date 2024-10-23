@@ -326,6 +326,13 @@ func (p Predicate) String() string {
 	switch str := p.Literal.(type) {
 	case string:
 		return fmt.Sprintf("%s %s %v", p.Ident, strings.ReplaceAll(p.Operator, "_", ""), strconv.Quote(str))
+	case nil:
+		if p.LiteralIdent == nil {
+			// print `foo == null` instead of `foo == <nil>`, the Golang default.
+			// We onyl do this if we're not comparing to an identifier.
+			return fmt.Sprintf("%s %s null", p.Ident, strings.ReplaceAll(p.Operator, "_", ""))
+		}
+		return fmt.Sprintf("%s %s %v", p.Ident, strings.ReplaceAll(p.Operator, "_", ""), lit)
 	default:
 		return fmt.Sprintf("%s %s %v", p.Ident, strings.ReplaceAll(p.Operator, "_", ""), lit)
 	}
