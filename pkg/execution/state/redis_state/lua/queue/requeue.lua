@@ -66,9 +66,9 @@ local function handleRequeueConcurrency(keyConcurrency, partitionID, partitionTy
 	redis.call("ZREM", keyConcurrency, item.id) -- Remove from in-progress queue
 
 	if partitionType ~= 0 then
-      -- If this is not a default partition, we don't need to update the concurrency pointer (used by scavenger)
-      return
-  end
+		-- If this is not a default partition, we don't need to update the concurrency pointer (used by scavenger)
+		return
+	end
 
 	-- Backwards compatibility: For default partitions, use the partition ID (function ID) as the pointer
 	local pointerMember = keyConcurrency
