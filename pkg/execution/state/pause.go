@@ -100,6 +100,9 @@ type PauseIterator interface {
 
 	// Val returns the current Pause from the iterator.
 	Val(context.Context) *Pause
+
+	// Index shows how far the iterator has progressed
+	Index() int64
 }
 
 // PauseManager manages mutating and fetching pauses from a backend implementation.
