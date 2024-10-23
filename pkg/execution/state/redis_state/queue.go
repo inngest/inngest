@@ -2045,6 +2045,10 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 		i.ID,
 		leaseID.String(),
 		newLeaseID.String(),
+
+		parts[0].PartitionType,
+		parts[1].PartitionType,
+		parts[2].PartitionType,
 	})
 	if err != nil {
 		return nil, err
@@ -3113,23 +3117,28 @@ func (q *queue) randomScavengeOffset(seed int64, count int64, limit int) int64 {
 //
 // We scan all partition concurrency queues - queues of leases - to find leases that have expired.
 func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Scavenge"), redis_telemetry.ScopeQueue)
+	shard := q.primaryQueueShard
 
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return 0, fmt.Errorf("unsupported queue shard kind for Scavenge: %s", q.primaryQueueShard.Kind)
+	if shard.Kind != string(enums.QueueShardKindRedis) {
+		return 0, fmt.Errorf("unsupported queue shard kind for Scavenge: %s", shard.Kind)
 	}
+
+	client := shard.RedisClient.unshardedRc
+	kg := shard.RedisClient.KeyGenerator()
+
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Scavenge"), redis_telemetry.ScopeQueue)
 
 	// Find all items that have an expired lease - eg. where the min time for a lease is between
 	// (0-now] in unix milliseconds.
 	now := fmt.Sprintf("%d", q.clock.Now().UnixMilli())
 
-	count, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, q.primaryQueueShard.RedisClient.unshardedRc.B().Zcount().Key(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex()).Min("-inf").Max(now).Build()).AsInt64()
+	count, err := client.Do(ctx, client.B().Zcount().Key(kg.ConcurrencyIndex()).Min("-inf").Max(now).Build()).AsInt64()
 	if err != nil {
 		return 0, fmt.Errorf("error counting concurrency index: %w", err)
 	}
 
-	cmd := q.primaryQueueShard.RedisClient.unshardedRc.B().Zrange().
-		Key(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex()).
+	cmd := client.B().Zrange().
+		Key(kg.ConcurrencyIndex()).
 		Min("-inf").
 		Max(now).
 		Byscore().
@@ -3137,7 +3146,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 		Build()
 
 	// NOTE: Received keys can be legacy (workflow IDs or system/internal queue names) or new (full Redis keys)
-	pKeys, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).AsStrSlice()
+	pKeys, err := client.Do(ctx, cmd).AsStrSlice()
 	if err != nil {
 		return 0, fmt.Errorf("error scavenging for lost items: %w", err)
 	}
@@ -3152,17 +3161,26 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 		// This is for backwards compatibility with the previous concurrency index item format
 		queueKey := partition
 		if !isKeyConcurrencyPointerItem(partition) {
-			queueKey = q.primaryQueueShard.RedisClient.kg.Concurrency("p", partition)
+			queueKey = kg.Concurrency("p", partition)
 		}
 
-		cmd := q.primaryQueueShard.RedisClient.unshardedRc.B().Zrange().
+		// Drop key queues from concurrency pointer - these should not be in here
+		if strings.HasPrefix(queueKey, "{q:v1}:concurrency:custom:") {
+			err := client.Do(ctx, client.B().Zrem().Key(kg.ConcurrencyIndex()).Member(partition).Build()).Error()
+			if err != nil {
+				resultErr = multierror.Append(resultErr, fmt.Errorf("error removing key queue '%s' from concurrency pointer '%s': %w", partition, err))
+			}
+			continue
+		}
+
+		cmd := client.B().Zrange().
 			Key(queueKey).
 			Min("-inf").
 			Max(now).
 			Byscore().
 			Limit(0, 100).
 			Build()
-		itemIDs, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).AsStrSlice()
+		itemIDs, err := client.Do(ctx, cmd).AsStrSlice()
 		if err != nil && err != rueidis.Nil {
 			resultErr = multierror.Append(resultErr, fmt.Errorf("error querying partition concurrency queue '%s' during scavenge: %w", partition, err))
 			continue
@@ -3172,7 +3190,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 			err := q.dropPartitionPointerIfEmpty(
 				ctx,
 				q.primaryQueueShard,
-				q.primaryQueueShard.RedisClient.KeyGenerator().ConcurrencyIndex(),
+				kg.ConcurrencyIndex(),
 				queueKey,
 				partition,
 			)
@@ -3183,8 +3201,8 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 		}
 
 		// Fetch the queue item, then requeue.
-		cmd = q.primaryQueueShard.RedisClient.unshardedRc.B().Hmget().Key(q.primaryQueueShard.RedisClient.kg.QueueItem()).Field(itemIDs...).Build()
-		jobs, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).AsStrSlice()
+		cmd = client.B().Hmget().Key(kg.QueueItem()).Field(itemIDs...).Build()
+		jobs, err := client.Do(ctx, cmd).AsStrSlice()
 		if err != nil && err != rueidis.Nil {
 			resultErr = multierror.Append(resultErr, fmt.Errorf("error fetching jobs for concurrency queue '%s' during scavenge: %w", partition, err))
 			continue
@@ -3200,7 +3218,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 					Msg("missing queue item in concurrency queue")
 
 				// Drop item reference to prevent spinning on this item
-				err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, q.primaryQueueShard.RedisClient.unshardedRc.B().Zrem().Key(queueKey).Member(itemID).Build()).Error()
+				err := client.Do(ctx, client.B().Zrem().Key(queueKey).Member(itemID).Build()).Error()
 				if err != nil {
 					resultErr = multierror.Append(resultErr, fmt.Errorf("error removing missing item '%s' from concurrency queue '%s': %w", itemID, partition, err))
 				}
