@@ -3670,7 +3670,7 @@ func TestQueueScavenge(t *testing.T) {
 		itemCountMatches(1)
 		concurrencyItemCountMatches(0)
 
-		indexMembers, err = r.ZMembers(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex())
+		_, err = r.ZMembers(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex())
 		require.Error(t, err, r.Dump())
 		require.ErrorIs(t, err, miniredis.ErrKeyNotFound)
 
