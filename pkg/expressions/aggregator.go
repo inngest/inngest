@@ -157,6 +157,19 @@ func (a *aggregator) EvaluateAsyncEvent(ctx context.Context, event event.Tracked
 func (a *aggregator) LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, eventName string, eventTS time.Time) (expr.AggregateEvaluator, error) {
 	key := wsID.String() + ":" + eventName
 
+	a.mapLock.Lock()
+	lock, ok := a.locks[key]
+	if !ok {
+		a.locks[key] = &sync.Mutex{}
+		lock = a.locks[key]
+	}
+	a.mapLock.Unlock()
+	// lock this key to prevent a possible race where multiple goroutines could see that
+	// the bookkeeper is missing from the cache and try to create it at the same time,
+	// meaning we would drop one of those bookkeepers:
+	lock.Lock()
+	defer lock.Unlock()
+
 	var bk *bookkeeper
 
 	val := a.records.Get(key)
@@ -182,16 +195,6 @@ func (a *aggregator) LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, eve
 		return bk.ae, nil
 	}
 
-	a.mapLock.Lock()
-	lock, ok := a.locks[key]
-	if !ok {
-		a.locks[key] = &sync.Mutex{}
-		lock = a.locks[key]
-	}
-	a.mapLock.Unlock()
-
-	lock.Lock()
-	defer lock.Unlock()
 	if err := bk.update(ctx, a.loader); err != nil {
 		if bk.updatedAt.IsZero() {
 			return nil, fmt.Errorf("could not load evaluables for aggregate evaluator")
