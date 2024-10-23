@@ -66,13 +66,8 @@ func Interpolate(ctx context.Context, e string, data map[string]any) (string, er
 	for len(stack) > 0 {
 		i := stack[0]
 		stack = stack[1:]
-
-		for _, n := range i.Ands {
-			stack = append(stack, n)
-		}
-		for _, n := range i.Ors {
-			stack = append(stack, n)
-		}
+		stack = append(stack, i.Ands...)
+		stack = append(stack, i.Ors...)
 
 		if i.Predicate == nil {
 			continue
