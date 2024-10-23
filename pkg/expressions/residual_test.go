@@ -68,8 +68,21 @@ func TestInterpolate(t *testing.T) {
 		},
 		{
 			exprInput: `event.data.id == async.data.id && event.data.foo == async.data.foo`,
-			// event.data.foo is not present and should be left.
-			exprExpected: `"ab_1" == async.data.id && event.data.foo == async.data.foo`,
+			// event.data.foo is not present and should be null.
+			exprExpected: `async.data.id == "ab_1" && async.data.foo == null`,
+			vars: map[string]any{
+				"event": map[string]any{
+					"data": map[string]any{
+						"id": "ab_1",
+					},
+				},
+			},
+		},
+		// not present, matching ident
+		{
+			exprInput: `event.data.id == async.data.id && event.data.foo == 1`,
+			// event.data.foo is not present and should be null.
+			exprExpected: `async.data.id == "ab_1" && null == 1`,
 			vars: map[string]any{
 				"event": map[string]any{
 					"data": map[string]any{
