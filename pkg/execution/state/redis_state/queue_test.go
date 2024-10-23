@@ -1212,13 +1212,14 @@ func TestQueueLease(t *testing.T) {
 		})
 
 		now := time.Now()
+		leaseExpiry := now.Add(time.Second)
 		id, err := q.Lease(ctx, item, time.Second, time.Now(), nil)
 		require.NoError(t, err)
 
 		item = getQueueItem(t, r, item.ID)
 		require.NotNil(t, item.LeaseID)
 		require.EqualValues(t, id, item.LeaseID)
-		require.WithinDuration(t, now.Add(time.Second), ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
+		require.WithinDuration(t, leaseExpiry, ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
 
 		t.Run("It should remove from the pending partition queue", func(t *testing.T) {
 			mem, _ := r.ZMembers(p.zsetKey(q.primaryQueueShard.RedisClient.kg))
@@ -1239,7 +1240,7 @@ func TestQueueLease(t *testing.T) {
 
 			score, err := r.ZMScore(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex(), p.FunctionID.String())
 			require.NoError(t, err)
-			require.Equal(t, float64(now.Add(time.Second).UnixMilli()), score[0])
+			require.Equal(t, float64(leaseExpiry.UnixMilli()), score[0])
 		})
 
 		t.Run("Leasing again should fail", func(t *testing.T) {
