@@ -25,9 +25,12 @@ local queueID         = ARGV[1]
 local currentLeaseKey = ARGV[2]
 local newLeaseKey     = ARGV[3]
 
-local partitionTypeA        	= tonumber(ARGV[4])
-local partitionTypeB        	= tonumber(ARGV[5])
-local partitionTypeC        	= tonumber(ARGV[6])
+local partitionTypeA       	= tonumber(ARGV[4])
+local partitionTypeB        = tonumber(ARGV[5])
+local partitionTypeC        = tonumber(ARGV[6])
+local partitionIdA        	= ARGV[7]
+local partitionIdB        	= ARGV[8]
+local partitionIdC        	= ARGV[9]
 
 -- $include(decode_ulid_time.lua)
 -- $include(get_queue_item.lua)
@@ -56,12 +59,17 @@ redis.call("HSET", keyQueueMap, queueID, cjson.encode(item))
 
 -- This extends the item in the zset and also ensures that scavenger queues are
 -- updated.
-local function handleExtendLease(keyConcurrency, partitionType)
+local function handleExtendLease(keyConcurrency, partitionID, partitionType)
 	redis.call("ZADD", keyConcurrency, nextTime, item.id)
 
   if partitionType ~= 0 then
       -- Do not add key queues to concurrency pointer
       return
+  end
+
+  local pointerMember = keyConcurrency
+  if partitionType == 0 then
+      pointerMember = partitionID
   end
 
 	-- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
@@ -73,7 +81,7 @@ local function handleExtendLease(keyConcurrency, partitionType)
 		local earliestLease = tonumber(inProgressScores[2])
 		-- Add the earliest time to the pointer queue for in-progress, allowing us to scavenge
 		-- lost jobs easily.
-		redis.call("ZADD", keyConcurrencyPointer, earliestLease, keyConcurrency)
+		redis.call("ZADD", keyConcurrencyPointer, earliestLease, pointerMember)
 	end
 end
 
@@ -81,13 +89,13 @@ end
 redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
 
 if exists_without_ending(keyConcurrencyA, ":-") == true then
-	handleExtendLease(keyConcurrencyA, partitionTypeA)
+	handleExtendLease(keyConcurrencyA, partitionIdA, partitionTypeA)
 end
 if exists_without_ending(keyConcurrencyB, ":-") == true then
-	handleExtendLease(keyConcurrencyB, partitionTypeB)
+	handleExtendLease(keyConcurrencyB, partitionIdB, partitionTypeB)
 end
 if exists_without_ending(keyConcurrencyC, ":-") == true then
-	handleExtendLease(keyConcurrencyC, partitionTypeC)
+	handleExtendLease(keyConcurrencyC, partitionIdC, partitionTypeC)
 end
 
 return 0

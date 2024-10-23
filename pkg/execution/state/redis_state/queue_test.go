@@ -1231,6 +1231,17 @@ func TestQueueLease(t *testing.T) {
 			require.EqualValues(t, 1, count, r.Dump())
 		})
 
+		t.Run("Scavenge queue is updated", func(t *testing.T) {
+			mem, err := r.ZMembers(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex())
+			require.NoError(t, err)
+			require.Equal(t, 1, len(mem), "scavenge queue should have 1 item", mem)
+			require.Contains(t, mem, p.FunctionID.String())
+
+			score, err := r.ZMScore(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex(), p.FunctionID.String())
+			require.NoError(t, err)
+			require.Equal(t, float64(now.Add(time.Second).UnixMilli()), score[0])
+		})
+
 		t.Run("Leasing again should fail", func(t *testing.T) {
 			for i := 0; i < 50; i++ {
 				id, err := q.Lease(ctx, item, time.Second, time.Now(), nil)
@@ -1414,8 +1425,9 @@ func TestQueueLease(t *testing.T) {
 			ck := createConcurrencyKey(enums.ConcurrencyScopeAccount, uuid.Nil, "foo", 1)
 
 			// Create a new item
+			fnA := uuid.New()
 			itemA, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
-				FunctionID: uuid.New(),
+				FunctionID: fnA,
 				Data: osqueue.Item{
 					CustomConcurrencyKeys: []state.CustomConcurrency{
 						{
@@ -1449,8 +1461,20 @@ func TestQueueLease(t *testing.T) {
 			})
 
 			t.Run("Leases with capacity", func(t *testing.T) {
-				_, err = q.Lease(ctx, itemA, 5*time.Second, time.Now(), nil)
+				now := time.Now()
+				_, err = q.Lease(ctx, itemA, 5*time.Second, now, nil)
 				require.NoError(t, err)
+
+				t.Run("Scavenge queue is updated", func(t *testing.T) {
+					mem, err := r.ZMembers(queueClient.RedisClient.kg.ConcurrencyIndex())
+					require.NoError(t, err, r.Dump())
+					require.Equal(t, 1, len(mem), "scavenge queue should have 1 item", mem)
+					require.Contains(t, mem, fnA.String())
+
+					score, err := r.ZMScore(queueClient.RedisClient.kg.ConcurrencyIndex(), fnA.String())
+					require.NoError(t, err)
+					require.Equal(t, float64(now.Add(5*time.Second).UnixMilli()), score[0])
+				})
 			})
 
 			t.Run("Errors without capacity", func(t *testing.T) {
@@ -2118,6 +2142,7 @@ func TestQueueExtendLease(t *testing.T) {
 		parts, _ := q.ItemPartitions(ctx, q.primaryQueueShard, item)
 		require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[0].PartitionType)
 		require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[1].PartitionType)
+		require.Equal(t, int(enums.PartitionTypeDefault), parts[2].PartitionType)
 
 		// Lease the item.
 		id, err := q.Lease(ctx, item, time.Second, q.clock.Now(), nil)
@@ -2151,7 +2176,14 @@ func TestQueueExtendLease(t *testing.T) {
 		})
 
 		t.Run("Scavenge queue is updated", func(t *testing.T) {
-			score, err := r.ZMScore(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex(), parts[0].concurrencyKey(q.primaryQueueShard.RedisClient.kg))
+			mem, err := r.ZMembers(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex())
+			require.NoError(t, err)
+			require.Equal(t, 1, len(mem), "scavenge queue should have 1 item", mem)
+			require.NotContains(t, mem, parts[0].concurrencyKey(q.primaryQueueShard.RedisClient.kg))
+			require.NotContains(t, mem, parts[1].concurrencyKey(q.primaryQueueShard.RedisClient.kg))
+			require.Contains(t, mem, parts[2].ID)
+
+			score, err := r.ZMScore(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex(), parts[2].ID)
 			require.NoError(t, err)
 			require.NotZero(t, score[0])
 
@@ -2159,7 +2191,7 @@ func TestQueueExtendLease(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, id)
 
-			nextScore, err := r.ZMScore(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex(), parts[0].concurrencyKey(q.primaryQueueShard.RedisClient.kg))
+			nextScore, err := r.ZMScore(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex(), parts[2].ID)
 			require.NoError(t, err)
 
 			require.NotEqual(t, score[0], nextScore[0])

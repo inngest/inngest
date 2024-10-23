@@ -2049,6 +2049,10 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 		parts[0].PartitionType,
 		parts[1].PartitionType,
 		parts[2].PartitionType,
+
+		parts[0].ID,
+		parts[1].ID,
+		parts[2].ID,
 	})
 	if err != nil {
 		return nil, err

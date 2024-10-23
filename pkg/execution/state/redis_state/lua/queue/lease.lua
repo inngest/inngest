@@ -118,13 +118,15 @@ end
 item.leaseID = newLeaseKey
 redis.call("HSET", keyQueueMap, queueID, cjson.encode(item))
 
-local function handleLease(keyPartition, keyConcurrency, partitionID, partitionType)
-	-- Add item to in-progress/concurrency queue and set score to lease expiry time to be picked up by scavenger
-	redis.call("ZADD", keyConcurrency, nextTime, item.id)
+local function handleLease(keyPartition, keyConcurrency, concurrencyLimit, partitionID, partitionType)
+  if partitionType == 0 or concurrencyLimit > 0 then
+      -- Add item to in-progress/concurrency queue and set score to lease expiry time to be picked up by scavenger
+      redis.call("ZADD", keyConcurrency, nextTime, item.id)
 
-	-- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress
-	-- and stored in functionConcurrencyKey.
-	redis.call("ZREM", keyPartition, item.id)
+      -- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress
+      -- and stored in functionConcurrencyKey.
+      redis.call("ZREM", keyPartition, item.id)
+  end
 
 	if partitionType ~= 0 then
   		-- Do not add key queues to concurrency pointer
@@ -159,14 +161,14 @@ redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
 -- NOTE: We check if concurrency > 0 here because this disables concurrency.  AccountID
 -- and custom concurrency items may not be set, but the keys need to be set for clustered
 -- mode.
-if exists_without_ending(keyConcurrencyA, ":-") == true and concurrencyA > 0 then
-	handleLease(keyPartitionA, keyConcurrencyA, partitionIdA, partitionTypeA)
+if exists_without_ending(keyConcurrencyA, ":-") == true then
+	handleLease(keyPartitionA, keyConcurrencyA, concurrencyA, partitionIdA, partitionTypeA)
 end
-if exists_without_ending(keyConcurrencyB, ":-") == true and concurrencyB > 0 then
-	handleLease(keyPartitionB, keyConcurrencyB, partitionIdB, partitionTypeB)
+if exists_without_ending(keyConcurrencyB, ":-") == true then
+	handleLease(keyPartitionB, keyConcurrencyB, concurrencyB, partitionIdB, partitionTypeB)
 end
-if exists_without_ending(keyConcurrencyC, ":-") == true and concurrencyC > 0 then
-	handleLease(keyPartitionC, keyConcurrencyC, partitionIdC, partitionTypeC)
+if exists_without_ending(keyConcurrencyC, ":-") == true then
+	handleLease(keyPartitionC, keyConcurrencyC, concurrencyC, partitionIdC, partitionTypeC)
 end
 
 return 0
