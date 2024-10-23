@@ -111,9 +111,12 @@ func (a *aggregator) EvaluateAsyncEvent(ctx context.Context, event event.Tracked
 		return nil, 0, fmt.Errorf("Could not load an event evaluator: %w", err)
 	}
 
+	log := logger.StdlibLogger(ctx)
+
 	if eval.SlowLen() > 100 {
-		a.log.Warn(
-			"large number of non-aggregateable expressions",
+		log.Warn(
+			"evaluating aggregate pauses",
+			"warning", "large number of slow pauses",
 			"workspace_id", event.GetWorkspaceID(),
 			"event", name,
 			"error", err,
@@ -122,13 +125,23 @@ func (a *aggregator) EvaluateAsyncEvent(ctx context.Context, event event.Tracked
 			"fast_expression_len", eval.FastLen(),
 		)
 
+	} else {
+		log.Debug(
+			"evaluating aggregate pauses",
+			"workspace_id", event.GetWorkspaceID(),
+			"event", name,
+			"error", err,
+			"slow_expression_len", eval.SlowLen(),
+			"mixed_expression_len", eval.MixedLen(),
+			"fast_expression_len", eval.FastLen(),
+		)
 	}
 
 	found, evalCount, err := eval.Evaluate(ctx, map[string]any{
 		"async": event.GetEvent().Map(),
 	})
 	if err != nil {
-		a.log.Error(
+		log.Error(
 			"error evaluating aggregate expressions",
 			"workspace_id", event.GetWorkspaceID(),
 			"event", name,
@@ -138,7 +151,7 @@ func (a *aggregator) EvaluateAsyncEvent(ctx context.Context, event event.Tracked
 
 	}
 
-	a.log.Debug(
+	log.Debug(
 		"evaluated aggregate expressions",
 		"workspace_id", event.GetWorkspaceID(),
 		"event", name,
@@ -248,6 +261,7 @@ type bookkeeper struct {
 func (b *bookkeeper) update(ctx context.Context, l EvaluableLoader) error {
 	at := time.Now()
 	count := 0
+
 	err := l.LoadEvaluablesSince(ctx, b.wsID, b.event, b.updatedAt, func(ctx context.Context, eval expr.Evaluable) error {
 		if eval == nil {
 			return fmt.Errorf("adding nil pause")
