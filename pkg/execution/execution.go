@@ -198,8 +198,9 @@ type ResumeRequest struct {
 	EventID *ulid.ULID
 	// RunID is the ID of the run that causes this resume, used for invoking
 	// functions directly.
-	RunID    *ulid.ULID
-	StepName string
+	RunID     *ulid.ULID
+	StepName  string
+	IsTimeout bool
 }
 
 func (r *ResumeRequest) Error() string {
