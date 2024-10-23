@@ -71,7 +71,7 @@ local function handleDequeueConcurrency(keyConcurrency, keyPartitionSet, partiti
   		-- - update the concurrency pointer (used by scavenger)
   		-- - update the global or account pointer.
   		return
-  end
+  	end
 
 	-- Backwards compatibility: For default partitions, use the partition ID (function ID) as the pointer
 	local pointerMember = keyConcurrency
