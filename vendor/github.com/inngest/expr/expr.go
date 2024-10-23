@@ -95,7 +95,8 @@ func NewAggregateEvaluator(
 			EngineTypeNullMatch:  newNullMatcher(),
 			EngineTypeBTree:      newNumberMatcher(),
 		},
-		lock: &sync.RWMutex{},
+		lock:  &sync.RWMutex{},
+		mixed: map[uuid.UUID]struct{}{},
 	}
 }
 
@@ -115,10 +116,12 @@ type aggregator struct {
 	// fastLen stores the current len of purely aggregable expressions.
 	fastLen int32
 
-	// mixedLen stores the current len of mixed aggregable expressions,
+	// mixed stores the current len of mixed aggregable expressions,
 	// eg "foo == '1' && bar != '1'".  This is becasue != isn't aggregateable,
 	// but the first `==` is used as a prefilter.
-	mixedLen int32
+	//
+	// This stores all evaluable IDs for fast lookup with Evaluable.
+	mixed map[uuid.UUID]struct{}
 
 	// constants tracks evaluable IDs that must always be evaluated, due to
 	// the expression containing non-aggregateable clauses.
@@ -128,7 +131,7 @@ type aggregator struct {
 // Len returns the total number of aggregateable and constantly matched expressions
 // stored in the evaluator.
 func (a aggregator) Len() int {
-	return int(a.fastLen) + int(a.mixedLen) + len(a.constants)
+	return int(a.fastLen) + len(a.mixed) + len(a.constants)
 }
 
 // FastLen returns the number of expressions being matched by aggregated trees.
@@ -138,7 +141,7 @@ func (a aggregator) FastLen() int {
 
 // MixedLen returns the number of expressions being matched by aggregated trees.
 func (a aggregator) MixedLen() int {
-	return int(a.mixedLen)
+	return len(a.mixed)
 }
 
 // SlowLen returns the total number of expressions that must constantly
@@ -247,6 +250,7 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 			}
 
 			atomic.AddInt32(&matched, 1)
+
 			// NOTE: We don't need to add lifted expression variables,
 			// because match.Parsed.Evaluable() returns the original expression
 			// string.
@@ -320,6 +324,8 @@ func (a *aggregator) AggregateMatch(ctx context.Context, data map[string]any) ([
 			continue
 		}
 
+		// If this is a partial eval, always add it if there's a match for now.
+
 		// The GroupID required more comparisons to equate to true than
 		// we had, so this could never evaluate to true.  Skip this.
 		//
@@ -327,6 +333,14 @@ func (a *aggregator) AggregateMatch(ctx context.Context, data map[string]any) ([
 		// matching engine, so we cannot use group sizes if the expr part
 		// has an OR.
 		for _, i := range found[groupID] {
+
+			a.lock.RLock()
+			if _, ok := a.mixed[i.Parsed.EvaluableID]; ok {
+				// for now, mark this as viable as it had an OR
+				result = append(result, i)
+			}
+			a.lock.RUnlock()
+
 			if len(i.Parsed.Root.Ors) > 0 {
 				// for now, mark this as viable as it had an OR
 				result = append(result, i)
@@ -390,7 +404,10 @@ func (a *aggregator) Add(ctx context.Context, eval Evaluable) (float64, error) {
 		return stats.Ratio(), err
 	}
 
-	atomic.AddInt32(&a.mixedLen, 1)
+	a.lock.Lock()
+	a.mixed[parsed.EvaluableID] = struct{}{}
+	a.lock.Unlock()
+
 	return stats.Ratio(), err
 }
 
@@ -434,7 +451,10 @@ func (a *aggregator) Remove(ctx context.Context, eval Evaluable) error {
 		return nil
 	}
 
-	atomic.AddInt32(&a.mixedLen, -1)
+	a.lock.Lock()
+	delete(a.mixed, parsed.EvaluableID)
+	a.lock.Unlock()
+
 	return nil
 }
 
@@ -515,10 +535,6 @@ func (a *aggregator) iterGroup(ctx context.Context, node *Node, parsed *ParsedEx
 			if !n.HasPredicate() || len(n.Ors) > 0 {
 				// Don't handle sub-branching for now.
 				// TODO: Recursively iterate.
-				stats.AddSlow()
-				continue
-			}
-			if !isAggregateable(n) {
 				stats.AddSlow()
 				continue
 			}
