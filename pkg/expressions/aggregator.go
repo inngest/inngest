@@ -34,10 +34,11 @@ func NewAggregator(
 		log = logger.StdlibLogger(ctx)
 	}
 	return &aggregator{
-		log:     log,
-		records: ccache.New(ccache.Configure().MaxSize(size).ItemsToPrune(uint32(size) / 4)),
-		loader:  loader,
-		parser:  parser,
+		log:         log,
+		concurrency: concurrency,
+		records:     ccache.New(ccache.Configure().MaxSize(size).ItemsToPrune(uint32(size) / 4)),
+		loader:      loader,
+		parser:      parser,
 		// use the package's exprEvaluator function as the actual logic which evaluates
 		// expressions after the aggregate evaluator does matching.
 		evaluator: exprEvaluator,
