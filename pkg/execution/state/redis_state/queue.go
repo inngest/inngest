@@ -86,7 +86,8 @@ const (
 	ConfigLeaseDuration           = 10 * time.Second
 	ConfigLeaseMax                = 20 * time.Second
 
-	ScavengePeekSize = 100
+	ScavengePeekSize                 = 100
+	ScavengeConcurrencyQueuePeekSize = 100
 
 	PriorityMax     uint = 0
 	PriorityDefault uint = 5
@@ -3182,7 +3183,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 			Min("-inf").
 			Max(now).
 			Byscore().
-			Limit(0, 100).
+			Limit(0, ScavengeConcurrencyQueuePeekSize).
 			Build()
 		itemIDs, err := client.Do(ctx, cmd).AsStrSlice()
 		if err != nil && err != rueidis.Nil {
@@ -3193,7 +3194,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 			// Atomically attempt to drop empty pointer to prevent spinning on this item
 			err := q.dropPartitionPointerIfEmpty(
 				ctx,
-				q.primaryQueueShard,
+				shard,
 				kg.ConcurrencyIndex(),
 				queueKey,
 				partition,
@@ -3239,6 +3240,21 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 				continue
 			}
 			counter++
+		}
+
+		if len(itemIDs) < ScavengeConcurrencyQueuePeekSize {
+			// Atomically attempt to drop empty pointer if we've processed all items
+			err := q.dropPartitionPointerIfEmpty(
+				ctx,
+				shard,
+				kg.ConcurrencyIndex(),
+				queueKey,
+				partition,
+			)
+			if err != nil {
+				resultErr = multierror.Append(resultErr, fmt.Errorf("error dropping potentially empty pointer %q for partition %q: %w", partition, queueKey, err))
+			}
+			continue
 		}
 	}
 

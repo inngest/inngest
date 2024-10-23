@@ -3648,15 +3648,17 @@ func TestQueueScavenge(t *testing.T) {
 
 		leftoverData := []string{
 			q.primaryQueueShard.RedisClient.kg.Concurrency("p", id.String()),
+			"{queue}:concurrency:p:0ffd4629-317c-4f65-8b8f-b30fccfde46f",
 			"{queue}:concurrency:custom:f:0ffd4629-317c-4f65-8b8f-b30fccfde46f:1nt4mu0skse4a",
 		}
+		score := float64(leaseStart.Add(time.Second).UnixMilli())
 		for _, leftover := range leftoverData {
-			_, err = r.ZAdd(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex(), float64(leaseStart.Add(time.Second).UnixMilli()), leftover)
+			_, err = r.ZAdd(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex(), score, leftover)
 			require.NoError(t, err)
 		}
 		indexMembers, err = r.ZMembers(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex())
 		require.NoError(t, err)
-		require.Equal(t, 3, len(indexMembers))
+		require.Equal(t, 4, len(indexMembers))
 		for _, datum := range leftoverData {
 			require.Contains(t, indexMembers, datum)
 		}
@@ -3668,9 +3670,9 @@ func TestQueueScavenge(t *testing.T) {
 		itemCountMatches(1)
 		concurrencyItemCountMatches(0)
 
-		indexItems, err := rc.Do(ctx, rc.B().Zcard().Key(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex()).Build()).AsInt64()
-		require.NoError(t, err)
-		assert.Equal(t, 0, int(indexItems), "expected no items in the concurrency index", r.Dump())
+		indexMembers, err = r.ZMembers(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex())
+		require.Error(t, err, r.Dump())
+		require.ErrorIs(t, err, miniredis.ErrKeyNotFound)
 
 		newConcurrencyQueueItems, err := rc.Do(ctx, rc.B().Zcard().Key(incompatibleConcurrencyIndexItem).Build()).AsInt64()
 		require.NoError(t, err)
