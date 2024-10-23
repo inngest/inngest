@@ -1441,6 +1441,41 @@ func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID
 	return nil
 }
 
+// SetFunctionPaused sets the "Paused" flag (represented in JSON as "off") for the given
+// function ID's queue partition.
+// If a function is unpaused, we requeue the partition with a score of "now" to ensure that it is processed.
+func (q *queue) dropPartitionPointerIfEmpty(ctx context.Context, shard QueueShard, keyIndex, keyPartition, indexMember string) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionPaused"), redis_telemetry.ScopeQueue)
+
+	if shard.Kind != string(enums.QueueShardKindRedis) {
+		return nil
+	}
+
+	keys := []string{keyIndex, keyPartition}
+	args, err := StrSlice([]any{
+		indexMember,
+	})
+	if err != nil {
+		return err
+	}
+
+	status, err := scripts["queue/dropPartitionPointerIfEmpty"].Exec(
+		redis_telemetry.WithScriptName(ctx, "dropPartitionPointerIfEmpty"),
+		shard.RedisClient.unshardedRc,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error dropping pointer %q from %q if %q was empty: %w", indexMember, keyIndex, keyPartition, err)
+	}
+	switch status {
+	case 0, 1:
+		return nil
+	default:
+		return fmt.Errorf("unknown response dropping pointer if empty: %d", status)
+	}
+}
+
 func (q *queue) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID, migrate bool) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionMigrate"), redis_telemetry.ScopeQueue)
 
@@ -1908,6 +1943,9 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, duration time
 		parts[2].ConcurrencyLimit,
 		acctLimit,
 		item.Data.Identifier.AccountID,
+		parts[0].PartitionType,
+		parts[1].PartitionType,
+		parts[2].PartitionType,
 	})
 	if err != nil {
 		return nil, err
@@ -3130,6 +3168,17 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 			continue
 		}
 		if len(itemIDs) == 0 {
+			// Atomically attempt to drop empty pointer to prevent spinning on this item
+			err := q.dropPartitionPointerIfEmpty(
+				ctx,
+				q.primaryQueueShard,
+				q.primaryQueueShard.RedisClient.KeyGenerator().ConcurrencyIndex(),
+				queueKey,
+				partition,
+			)
+			if err != nil {
+				resultErr = multierror.Append(resultErr, fmt.Errorf("error dropping empty pointer %q for partition %q: %w", partition, queueKey, err))
+			}
 			continue
 		}
 

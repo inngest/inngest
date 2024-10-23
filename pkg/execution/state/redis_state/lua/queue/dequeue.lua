@@ -66,6 +66,13 @@ end
 local function handleDequeueConcurrency(keyConcurrency, keyPartitionSet, partitionID, partitionType)
 	redis.call("ZREM", keyConcurrency, item.id) -- remove from concurrency/in-progress queue
 
+	if partitionType ~= 0 then
+  		-- If this is not a default partition, we don't need to
+  		-- - update the concurrency pointer (used by scavenger)
+  		-- - update the global or account pointer.
+  		return
+  end
+
 	-- Backwards compatibility: For default partitions, use the partition ID (function ID) as the pointer
 	local pointerMember = keyConcurrency
 	if partitionType == 0 then
@@ -89,11 +96,6 @@ local function handleDequeueConcurrency(keyConcurrency, keyPartitionSet, partiti
 			-- Ensure that we update the score with the earliest lease
 			redis.call("ZADD", concurrencyPointer, earliestLease, pointerMember)
 		end
-	end
-
-	if partitionType ~= 0 then
-		-- If this is not a default partition, we don't need to update the global or account pointer.
-		return
 	end
 
 	-- For each partition, we now have an extra available capacity.  Check the partition's

@@ -45,6 +45,10 @@ local concurrencyC    				= tonumber(ARGV[9])
 -- And we always check against account concurrency limits
 local concurrencyAcct 				= tonumber(ARGV[10])
 local accountId       				= ARGV[11]
+local partitionTypeA = tonumber(ARGV[12])
+local partitionTypeB = tonumber(ARGV[13])
+local partitionTypeC = tonumber(ARGV[14])
+
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -114,13 +118,18 @@ end
 item.leaseID = newLeaseKey
 redis.call("HSET", keyQueueMap, queueID, cjson.encode(item))
 
-local function handleLease(keyPartition, keyConcurrency, partitionID)
+local function handleLease(keyPartition, keyConcurrency, partitionID, partitionType)
 	-- Add item to in-progress/concurrency queue and set score to lease expiry time to be picked up by scavenger
 	redis.call("ZADD", keyConcurrency, nextTime, item.id)
 
 	-- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress
 	-- and stored in functionConcurrencyKey.
 	redis.call("ZREM", keyPartition, item.id)
+
+	if partitionType ~= 0 then
+  		-- Do not add key queues to concurrency pointer
+  		return
+  end
 
 	-- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
 	-- so that expired leases can be re-processed.  We want to take the earliest time from the
@@ -135,9 +144,9 @@ local function handleLease(keyPartition, keyConcurrency, partitionID)
 
 		-- Backwards compatibility: For default partitions, use the partition ID (function ID) as the pointer
 		local pointerMember = keyConcurrency
-		if exists_without_ending(keyConcurrency, ":concurrency:p:" .. partitionID) == false then
-			pointerMember = partitionID
-		end
+		if partitionType == 0 then
+      pointerMember = partitionID
+    end
 
 		redis.call("ZADD", concurrencyPointer, earliestLease, pointerMember)
 	end
@@ -151,13 +160,13 @@ redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
 -- and custom concurrency items may not be set, but the keys need to be set for clustered
 -- mode.
 if exists_without_ending(keyConcurrencyA, ":-") == true and concurrencyA > 0 then
-	handleLease(keyPartitionA, keyConcurrencyA, partitionIdA)
+	handleLease(keyPartitionA, keyConcurrencyA, partitionIdA, partitionTypeA)
 end
 if exists_without_ending(keyConcurrencyB, ":-") == true and concurrencyB > 0 then
-	handleLease(keyPartitionB, keyConcurrencyB, partitionIdB)
+	handleLease(keyPartitionB, keyConcurrencyB, partitionIdB, partitionTypeB)
 end
 if exists_without_ending(keyConcurrencyC, ":-") == true and concurrencyC > 0 then
-	handleLease(keyPartitionC, keyConcurrencyC, partitionIdC)
+	handleLease(keyPartitionC, keyConcurrencyC, partitionIdC, partitionTypeC)
 end
 
 return 0
