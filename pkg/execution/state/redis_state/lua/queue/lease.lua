@@ -119,6 +119,8 @@ item.leaseID = newLeaseKey
 redis.call("HSET", keyQueueMap, queueID, cjson.encode(item))
 
 local function handleLease(keyPartition, keyConcurrency, concurrencyLimit, partitionID, partitionType)
+	-- If we're dealing with a default function partition, we still want to add
+	-- to the concurrency (in progress) queue. Otherwise, concurrency limits must be set.
 	if partitionType == 0 or concurrencyLimit > 0 then
 		-- Add item to in-progress/concurrency queue and set score to lease expiry time to be picked up by scavenger
 		redis.call("ZADD", keyConcurrency, nextTime, item.id)
