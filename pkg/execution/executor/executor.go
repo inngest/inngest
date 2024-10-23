@@ -1205,9 +1205,9 @@ func (e *executor) executeDriverForStep(ctx context.Context, i *runInstance) (*s
 // HandlePauses handles pauses loaded from an incoming event.
 func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, evt event.TrackedEvent) (execution.HandlePauseResult, error) {
 	// Use the aggregator for all funciton finished events, if there are more than
-	// 20 waiting.  It only takes a few milliseconds to iterate and handle less
-	// than 20;  anything more runs the risk of running slow.
-	if iter.Count() > 20 {
+	// 50 waiting.  It only takes a few milliseconds to iterate and handle less
+	// than 50;  anything more runs the risk of running slow.
+	if iter.Count() > 50 {
 		aggRes, err := e.handleAggregatePauses(ctx, evt)
 		if err != nil {
 			log.From(ctx).Error().Err(err).Msg("error handling aggregate pauses")
@@ -1325,7 +1325,11 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 		return execution.HandlePauseResult{}, fmt.Errorf("no expression evaluator found")
 	}
 
-	log := logger.StdlibLogger(ctx).With("event_id", evt.GetInternalID().String())
+	log := logger.StdlibLogger(ctx).With(
+		"event_id", evt.GetInternalID().String(),
+		"workspace_id", evt.GetWorkspaceID(),
+		"event", evt.GetEvent().Name,
+	)
 	evtID := evt.GetInternalID()
 
 	evals, count, err := e.exprAggregator.EvaluateAsyncEvent(ctx, evt)

@@ -111,6 +111,19 @@ func (a *aggregator) EvaluateAsyncEvent(ctx context.Context, event event.Tracked
 		return nil, 0, fmt.Errorf("Could not load an event evaluator: %w", err)
 	}
 
+	if eval.SlowLen() > 100 {
+		a.log.Warn(
+			"large number of non-aggregateable expressions",
+			"workspace_id", event.GetWorkspaceID(),
+			"event", name,
+			"error", err,
+			"slow_expression_len", eval.SlowLen(),
+			"mixed_expression_len", eval.MixedLen(),
+			"fast_expression_len", eval.FastLen(),
+		)
+
+	}
+
 	found, evalCount, err := eval.Evaluate(ctx, map[string]any{
 		"async": event.GetEvent().Map(),
 	})
@@ -133,6 +146,9 @@ func (a *aggregator) EvaluateAsyncEvent(ctx context.Context, event event.Tracked
 		"matched_count", len(found),
 		"total_count", eval.Len(),
 		"found_count", len(found),
+		"slow_expression_len", eval.SlowLen(),
+		"mixed_expression_len", eval.MixedLen(),
+		"fast_expression_len", eval.FastLen(),
 	)
 
 	return found, evalCount, err
