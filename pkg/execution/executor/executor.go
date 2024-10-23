@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 	"sync"
@@ -1229,11 +1230,7 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 		return res, fmt.Errorf("No queue or state manager specified")
 	}
 
-	log := e.log
-	if log == nil {
-		log = logger.From(ctx)
-	}
-	base := log.With().Str("event_id", evt.GetInternalID().String()).Logger()
+	log := logger.StdlibLogger(ctx).With("event_id", evt.GetInternalID().String())
 
 	var (
 		goerr error
@@ -1241,7 +1238,6 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 	)
 
 	evtID := evt.GetInternalID()
-	evtIDStr := evtID.String()
 
 	// Schedule up to PauseHandleConcurrency pauses at once.
 	sem := semaphore.NewWeighted(int64(PauseHandleConcurrency))
@@ -1266,46 +1262,13 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 				return
 			}
 
-			l := base.With().
-				Str("pause_id", pause.ID.String()).
-				Str("run_id", pause.Identifier.RunID.String()).
-				Str("workflow_id", pause.Identifier.WorkflowID.String()).
-				Str("expires", pause.Expires.String()).
-				Logger()
-
-			// NOTE: Some pauses may be nil or expired, as the iterator may take
-			// time to process.  We handle that here and assume that the event
-			// did not occur in time.
-			if pause.Expires.Time().Before(time.Now()) {
-				l.Debug().Msg("encountered expired pause")
-
-				shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
-				if shouldDelete {
-					// Consume this pause to remove it entirely
-					l.Debug().Msg("deleting expired pause")
-					_ = e.pm.DeletePause(context.Background(), *pause)
-				}
-
-				return
-			}
-
-			if pause.TriggeringEventID != nil && *pause.TriggeringEventID == evtIDStr {
-				return
-			}
-
-			if pause.Cancel {
-				// This is a cancellation signal.  Check if the function
-				// has ended, and if so remove the pause.
-				//
-				// NOTE: Bookkeeping must be added to individual function runs and handled on
-				// completion instead of here.  This is a hot path and should only exist whilst
-				// bookkeeping is not implemented.
-				if exists, err := e.smv2.Exists(ctx, sv2.IDFromV1(pause.Identifier)); !exists && err == nil {
-					// This function has ended.  Delete the pause and continue
-					_ = e.pm.DeletePause(context.Background(), *pause)
-					return
-				}
-			}
+			l := log.With(
+				"pause_id", pause.ID.String(),
+				"run_id", pause.Identifier.RunID.String(),
+				"workflow_id", pause.Identifier.WorkflowID.String(),
+				"expires", pause.Expires.String(),
+				"strategy", "naive",
+			)
 
 			// Run an expression if this exists.
 			if pause.Expression != nil {
@@ -1323,82 +1286,25 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 
 				expr, err := expressions.NewExpressionEvaluator(ctx, *pause.Expression)
 				if err != nil {
-					l.Error().Err(err).Msg("error compiling pause expression")
+					l.Error("error compiling pause expression", "error", err)
 					return
 				}
 
 				val, _, err := expr.Evaluate(ctx, data)
 				if err != nil {
-					l.Warn().Err(err).Msg("error evaluating pause expression")
+					l.Warn("error evaluating pause expression", "error", err)
 					return
 				}
 				result, _ := val.(bool)
 				if !result {
-					l.Trace().Msg("pause did not match expression")
 					return
 				}
 			}
 
-			// Ensure that we store the group ID for this pause, letting us properly track cancellation
-			// or continuation history
-			ctx = state.WithGroupID(ctx, pause.GroupID)
-
-			// Cancelling a function can happen before a lease, as it's an atomic operation that will always happen.
-			if pause.Cancel {
-				err := e.Cancel(ctx, sv2.IDFromV1(pause.Identifier), execution.CancelRequest{
-					EventID:    &evtID,
-					Expression: pause.Expression,
-				})
-				if errors.Is(err, state.ErrFunctionCancelled) ||
-					errors.Is(err, state.ErrFunctionComplete) ||
-					errors.Is(err, state.ErrFunctionFailed) ||
-					errors.Is(err, ErrFunctionEnded) {
-					// Safe to ignore.
-					return
-				}
-				if err != nil && !strings.Contains(err.Error(), "no status stored in metadata") {
-					goerr = errors.Join(goerr, fmt.Errorf("error cancelling function: %w", err))
-					return
-				}
-				// Ensure we consume this pause, as this isn't handled by the higher-level cancel function.
-				err = e.pm.ConsumePause(ctx, pause.ID, nil)
-				if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound || err == state.ErrRunNotFound {
-					// Done. Add to the counter.
-					_ = e.pm.DeletePause(context.Background(), *pause)
-					atomic.AddInt32(&res[1], 1)
-					return
-				}
-				goerr = errors.Join(goerr, fmt.Errorf("error consuming pause after cancel: %w", err))
-				return
+			if err := e.handlePause(ctx, evt, evtID, pause, &res, l); err != nil {
+				goerr = errors.Join(goerr, err)
+				l.Error("error handling pause", "error", err)
 			}
-
-			resumeData := pause.GetResumeData(evt.GetEvent())
-
-			if e.log != nil {
-				e.log.
-					Debug().
-					Interface("with", resumeData.With).
-					Str("pause.DataKey", pause.DataKey).
-					Msg("resuming pause")
-			}
-
-			err := e.Resume(ctx, *pause, execution.ResumeRequest{
-				With:     resumeData.With,
-				EventID:  &evtID,
-				RunID:    resumeData.RunID,
-				StepName: resumeData.StepName,
-			})
-			if errors.Is(err, state.ErrPauseLeased) ||
-				errors.Is(err, state.ErrPauseNotFound) ||
-				errors.Is(err, state.ErrRunNotFound) {
-				return
-			}
-			if err != nil {
-				goerr = errors.Join(goerr, fmt.Errorf("error resuming pause: %w", err))
-				return
-			}
-			// Add to the counter.
-			atomic.AddInt32(&res[1], 1)
 		}()
 
 	}
@@ -1421,7 +1327,6 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 
 	log := logger.StdlibLogger(ctx).With("event_id", evt.GetInternalID().String())
 	evtID := evt.GetInternalID()
-	evtIDStr := evtID.String()
 
 	evals, count, err := e.exprAggregator.EvaluateAsyncEvent(ctx, evt)
 	if err != nil {
@@ -1454,109 +1359,123 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 				"expires", pause.Expires.String(),
 			)
 
-			// NOTE: Some pauses may be nil or expired, as the iterator may take
-			// time to process.  We handle that here and assume that the event
-			// did not occur in time.
-			if pause.Expires.Time().Before(time.Now()) {
-				l.Debug("encountered expired pause")
-
-				shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
-				if shouldDelete {
-					// Consume this pause to remove it entirely
-					l.Debug("deleting expired pause")
-					_ = e.pm.DeletePause(context.Background(), pause)
-					_ = e.exprAggregator.RemovePause(ctx, pause)
-				}
-
-				return
-			}
-
-			if pause.TriggeringEventID != nil && *pause.TriggeringEventID == evtIDStr {
-				return
-			}
-
-			if pause.Cancel {
-				// This is a cancellation signal.  Check if the function
-				// has ended, and if so remove the pause.
-				//
-				// NOTE: Bookkeeping must be added to individual function runs and handled on
-				// completion instead of here.  This is a hot path and should only exist whilst
-				// bookkeeping is not implemented.
-				if exists, err := e.smv2.Exists(ctx, sv2.IDFromV1(pause.Identifier)); !exists && err == nil {
-					// This function has ended.  Delete the pause and continue
-					_ = e.pm.DeletePause(context.Background(), pause)
-					_ = e.exprAggregator.RemovePause(ctx, pause)
-					return
-				}
-			}
-
-			// Ensure that we store the group ID for this pause, letting us properly track cancellation
-			// or continuation history
-			ctx = state.WithGroupID(ctx, pause.GroupID)
-
-			// Cancelling a function can happen before a lease, as it's an atomic operation that will always happen.
-			if pause.Cancel {
-				err := e.Cancel(ctx, sv2.IDFromV1(pause.Identifier), execution.CancelRequest{
-					EventID:    &evtID,
-					Expression: pause.Expression,
-				})
-				if errors.Is(err, state.ErrFunctionCancelled) ||
-					errors.Is(err, state.ErrFunctionComplete) ||
-					errors.Is(err, state.ErrFunctionFailed) ||
-					errors.Is(err, ErrFunctionEnded) {
-					// Safe to ignore.
-					_ = e.exprAggregator.RemovePause(ctx, pause)
-					return
-				}
-				if err != nil && strings.Contains(err.Error(), "no status stored in metadata") {
-					// Safe to ignore.
-					_ = e.exprAggregator.RemovePause(ctx, pause)
-					return
-				}
-
-				if err != nil {
-					goerr = errors.Join(goerr, fmt.Errorf("error cancelling function: %w", err))
-					return
-				}
-				// Ensure we consume this pause, as this isn't handled by the higher-level cancel function.
-				err = e.pm.ConsumePause(ctx, pause.ID, nil)
-				if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
-					// Done. Add to the counter.
-					atomic.AddInt32(&res[1], 1)
-					_ = e.exprAggregator.RemovePause(ctx, pause)
-					return
-				}
-				goerr = errors.Join(goerr, fmt.Errorf("error consuming pause after cancel: %w", err))
-				return
-			}
-
-			resumeData := pause.GetResumeData(evt.GetEvent())
-
-			err := e.Resume(ctx, pause, execution.ResumeRequest{
-				With:     resumeData.With,
-				EventID:  &evtID,
-				RunID:    resumeData.RunID,
-				StepName: resumeData.StepName,
-			})
-			if errors.Is(err, state.ErrPauseLeased) ||
-				errors.Is(err, state.ErrPauseNotFound) ||
-				errors.Is(err, state.ErrRunNotFound) {
-				return
-			}
-			if err != nil {
-				goerr = errors.Join(goerr, fmt.Errorf("error resuming pause: %w", err))
-				return
-			}
-			// Add to the counter.
-			atomic.AddInt32(&res[1], 1)
-			if err := e.exprAggregator.RemovePause(ctx, pause); err != nil {
-				l.Warn("error removing pause from aggregator", "error", err)
+			if err := e.handlePause(ctx, evt, evtID, &pause, &res, l); err != nil {
+				goerr = errors.Join(goerr, err)
+				l.Error("error handling pause", "error", err)
 			}
 		}()
 	}
 	wg.Wait()
 
 	return res, goerr
+}
+
+func (e *executor) handlePause(
+	ctx context.Context,
+	evt event.TrackedEvent,
+	evtID ulid.ULID,
+	pause *state.Pause,
+	res *execution.HandlePauseResult,
+	l *slog.Logger,
+) error {
+	// NOTE: Some pauses may be nil or expired, as the iterator may take
+	// time to process.  We handle that here and assume that the event
+	// did not occur in time.
+	if pause.Expires.Time().Before(time.Now()) {
+		l.Debug("encountered expired pause")
+
+		shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
+		if shouldDelete {
+			// Consume this pause to remove it entirely
+			l.Debug("deleting expired pause")
+			_ = e.pm.DeletePause(context.Background(), *pause)
+			_ = e.exprAggregator.RemovePause(ctx, pause)
+		}
+
+		return nil
+	}
+
+	if pause.TriggeringEventID != nil && *pause.TriggeringEventID == evtID.String() {
+		return nil
+	}
+
+	if pause.Cancel {
+		// This is a cancellation signal.  Check if the function
+		// has ended, and if so remove the pause.
+		//
+		// NOTE: Bookkeeping must be added to individual function runs and handled on
+		// completion instead of here.  This is a hot path and should only exist whilst
+		// bookkeeping is not implemented.
+		if exists, err := e.smv2.Exists(ctx, sv2.IDFromV1(pause.Identifier)); !exists && err == nil {
+			// This function has ended.  Delete the pause and continue
+			_ = e.pm.DeletePause(context.Background(), *pause)
+			_ = e.exprAggregator.RemovePause(ctx, pause)
+			return nil
+		}
+	}
+
+	// Ensure that we store the group ID for this pause, letting us properly track cancellation
+	// or continuation history
+	ctx = state.WithGroupID(ctx, pause.GroupID)
+
+	// Cancelling a function can happen before a lease, as it's an atomic operation that will always happen.
+	if pause.Cancel {
+		err := e.Cancel(ctx, sv2.IDFromV1(pause.Identifier), execution.CancelRequest{
+			EventID:    &evtID,
+			Expression: pause.Expression,
+		})
+		if errors.Is(err, state.ErrFunctionCancelled) ||
+			errors.Is(err, state.ErrFunctionComplete) ||
+			errors.Is(err, state.ErrFunctionFailed) ||
+			errors.Is(err, ErrFunctionEnded) {
+			// Safe to ignore.
+			_ = e.exprAggregator.RemovePause(ctx, pause)
+			return nil
+		}
+		if err != nil && strings.Contains(err.Error(), "no status stored in metadata") {
+			// Safe to ignore.
+			_ = e.exprAggregator.RemovePause(ctx, pause)
+			return nil
+		}
+
+		if err != nil {
+			return fmt.Errorf("error cancelling function: %w", err)
+		}
+
+		// Ensure we consume this pause, as this isn't handled by the higher-level cancel function.
+		err = e.pm.ConsumePause(context.Background(), pause.ID, nil)
+		if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
+			atomic.AddInt32(&res[1], 1)
+			_ = e.exprAggregator.RemovePause(ctx, pause)
+			return nil
+		}
+		return fmt.Errorf("error consuming pause after cancel: %w", err)
+	}
+
+	resumeData := pause.GetResumeData(evt.GetEvent())
+
+	err := e.Resume(ctx, *pause, execution.ResumeRequest{
+		With:     resumeData.With,
+		EventID:  &evtID,
+		RunID:    resumeData.RunID,
+		StepName: resumeData.StepName,
+	})
+	if errors.Is(err, state.ErrPauseLeased) ||
+		errors.Is(err, state.ErrPauseNotFound) ||
+		errors.Is(err, state.ErrRunNotFound) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("error resuming pause: %w", err)
+	}
+
+	// Add to the counter.
+	atomic.AddInt32(&res[1], 1)
+	if err := e.exprAggregator.RemovePause(ctx, pause); err != nil {
+		l.Warn("error removing pause from aggregator", "error", err)
+	}
+
+	return nil
 }
 
 func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEvent) error {
