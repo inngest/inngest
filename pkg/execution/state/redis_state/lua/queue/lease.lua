@@ -45,6 +45,10 @@ local concurrencyC    				= tonumber(ARGV[9])
 -- And we always check against account concurrency limits
 local concurrencyAcct 				= tonumber(ARGV[10])
 local accountId       				= ARGV[11]
+local partitionTypeA = tonumber(ARGV[12])
+local partitionTypeB = tonumber(ARGV[13])
+local partitionTypeC = tonumber(ARGV[14])
+
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -114,13 +118,22 @@ end
 item.leaseID = newLeaseKey
 redis.call("HSET", keyQueueMap, queueID, cjson.encode(item))
 
-local function handleLease(keyPartition, keyConcurrency, partitionID)
-	-- Add item to in-progress/concurrency queue and set score to lease expiry time to be picked up by scavenger
-	redis.call("ZADD", keyConcurrency, nextTime, item.id)
+local function handleLease(keyPartition, keyConcurrency, concurrencyLimit, partitionID, partitionType)
+	-- If we're dealing with a default function partition, we still want to add
+	-- to the concurrency (in progress) queue. Otherwise, concurrency limits must be set.
+	if partitionType == 0 or concurrencyLimit > 0 then
+		-- Add item to in-progress/concurrency queue and set score to lease expiry time to be picked up by scavenger
+		redis.call("ZADD", keyConcurrency, nextTime, item.id)
 
-	-- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress
-	-- and stored in functionConcurrencyKey.
-	redis.call("ZREM", keyPartition, item.id)
+		-- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress
+		-- and stored in functionConcurrencyKey.
+		redis.call("ZREM", keyPartition, item.id)
+	end
+
+	if partitionType ~= 0 then
+		-- Do not add key queues to concurrency pointer
+		return
+	end
 
 	-- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
 	-- so that expired leases can be re-processed.  We want to take the earliest time from the
@@ -135,7 +148,7 @@ local function handleLease(keyPartition, keyConcurrency, partitionID)
 
 		-- Backwards compatibility: For default partitions, use the partition ID (function ID) as the pointer
 		local pointerMember = keyConcurrency
-		if exists_without_ending(keyConcurrency, ":concurrency:p:" .. partitionID) == false then
+		if partitionType == 0 then
 			pointerMember = partitionID
 		end
 
@@ -150,14 +163,14 @@ redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
 -- NOTE: We check if concurrency > 0 here because this disables concurrency.  AccountID
 -- and custom concurrency items may not be set, but the keys need to be set for clustered
 -- mode.
-if exists_without_ending(keyConcurrencyA, ":-") == true and concurrencyA > 0 then
-	handleLease(keyPartitionA, keyConcurrencyA, partitionIdA)
+if exists_without_ending(keyConcurrencyA, ":-") == true then
+	handleLease(keyPartitionA, keyConcurrencyA, concurrencyA, partitionIdA, partitionTypeA)
 end
-if exists_without_ending(keyConcurrencyB, ":-") == true and concurrencyB > 0 then
-	handleLease(keyPartitionB, keyConcurrencyB, partitionIdB)
+if exists_without_ending(keyConcurrencyB, ":-") == true then
+	handleLease(keyPartitionB, keyConcurrencyB, concurrencyB, partitionIdB, partitionTypeB)
 end
-if exists_without_ending(keyConcurrencyC, ":-") == true and concurrencyC > 0 then
-	handleLease(keyPartitionC, keyConcurrencyC, partitionIdC)
+if exists_without_ending(keyConcurrencyC, ":-") == true then
+	handleLease(keyPartitionC, keyConcurrencyC, concurrencyC, partitionIdC, partitionTypeC)
 end
 
 return 0

@@ -86,7 +86,8 @@ const (
 	ConfigLeaseDuration           = 10 * time.Second
 	ConfigLeaseMax                = 20 * time.Second
 
-	ScavengePeekSize = 100
+	ScavengePeekSize                 = 100
+	ScavengeConcurrencyQueuePeekSize = 100
 
 	PriorityMax     uint = 0
 	PriorityDefault uint = 5
@@ -1441,6 +1442,41 @@ func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID
 	return nil
 }
 
+// dropPartitionPointerIfEmpty atomically drops a pointer queue member if the associated
+// ZSET is empty. This is used to ensure that we don't have pointers to empty ZSETs, in case
+// the cleanup process fails.
+func (q *queue) dropPartitionPointerIfEmpty(ctx context.Context, shard QueueShard, keyIndex, keyPartition, indexMember string) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionPaused"), redis_telemetry.ScopeQueue)
+
+	if shard.Kind != string(enums.QueueShardKindRedis) {
+		return nil
+	}
+
+	keys := []string{keyIndex, keyPartition}
+	args, err := StrSlice([]any{
+		indexMember,
+	})
+	if err != nil {
+		return err
+	}
+
+	status, err := scripts["queue/dropPartitionPointerIfEmpty"].Exec(
+		redis_telemetry.WithScriptName(ctx, "dropPartitionPointerIfEmpty"),
+		shard.RedisClient.unshardedRc,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error dropping pointer %q from %q if %q was empty: %w", indexMember, keyIndex, keyPartition, err)
+	}
+	switch status {
+	case 0, 1:
+		return nil
+	default:
+		return fmt.Errorf("unknown response dropping pointer if empty: %d", status)
+	}
+}
+
 func (q *queue) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID, migrate bool) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionMigrate"), redis_telemetry.ScopeQueue)
 
@@ -1908,6 +1944,9 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, duration time
 		parts[2].ConcurrencyLimit,
 		acctLimit,
 		item.Data.Identifier.AccountID,
+		parts[0].PartitionType,
+		parts[1].PartitionType,
+		parts[2].PartitionType,
 	})
 	if err != nil {
 		return nil, err
@@ -2007,6 +2046,14 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 		i.ID,
 		leaseID.String(),
 		newLeaseID.String(),
+
+		parts[0].PartitionType,
+		parts[1].PartitionType,
+		parts[2].PartitionType,
+
+		parts[0].ID,
+		parts[1].ID,
+		parts[2].ID,
 	})
 	if err != nil {
 		return nil, err
@@ -3075,23 +3122,28 @@ func (q *queue) randomScavengeOffset(seed int64, count int64, limit int) int64 {
 //
 // We scan all partition concurrency queues - queues of leases - to find leases that have expired.
 func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Scavenge"), redis_telemetry.ScopeQueue)
+	shard := q.primaryQueueShard
 
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return 0, fmt.Errorf("unsupported queue shard kind for Scavenge: %s", q.primaryQueueShard.Kind)
+	if shard.Kind != string(enums.QueueShardKindRedis) {
+		return 0, fmt.Errorf("unsupported queue shard kind for Scavenge: %s", shard.Kind)
 	}
+
+	client := shard.RedisClient.unshardedRc
+	kg := shard.RedisClient.KeyGenerator()
+
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Scavenge"), redis_telemetry.ScopeQueue)
 
 	// Find all items that have an expired lease - eg. where the min time for a lease is between
 	// (0-now] in unix milliseconds.
 	now := fmt.Sprintf("%d", q.clock.Now().UnixMilli())
 
-	count, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, q.primaryQueueShard.RedisClient.unshardedRc.B().Zcount().Key(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex()).Min("-inf").Max(now).Build()).AsInt64()
+	count, err := client.Do(ctx, client.B().Zcount().Key(kg.ConcurrencyIndex()).Min("-inf").Max(now).Build()).AsInt64()
 	if err != nil {
 		return 0, fmt.Errorf("error counting concurrency index: %w", err)
 	}
 
-	cmd := q.primaryQueueShard.RedisClient.unshardedRc.B().Zrange().
-		Key(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex()).
+	cmd := client.B().Zrange().
+		Key(kg.ConcurrencyIndex()).
 		Min("-inf").
 		Max(now).
 		Byscore().
@@ -3099,7 +3151,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 		Build()
 
 	// NOTE: Received keys can be legacy (workflow IDs or system/internal queue names) or new (full Redis keys)
-	pKeys, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).AsStrSlice()
+	pKeys, err := client.Do(ctx, cmd).AsStrSlice()
 	if err != nil {
 		return 0, fmt.Errorf("error scavenging for lost items: %w", err)
 	}
@@ -3114,28 +3166,48 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 		// This is for backwards compatibility with the previous concurrency index item format
 		queueKey := partition
 		if !isKeyConcurrencyPointerItem(partition) {
-			queueKey = q.primaryQueueShard.RedisClient.kg.Concurrency("p", partition)
+			queueKey = kg.Concurrency("p", partition)
 		}
 
-		cmd := q.primaryQueueShard.RedisClient.unshardedRc.B().Zrange().
+		// Drop key queues from concurrency pointer - these should not be in here
+		if strings.HasPrefix(queueKey, "{q:v1}:concurrency:custom:") {
+			err := client.Do(ctx, client.B().Zrem().Key(kg.ConcurrencyIndex()).Member(partition).Build()).Error()
+			if err != nil {
+				resultErr = multierror.Append(resultErr, fmt.Errorf("error removing key queue '%s' from concurrency pointer: %w", partition, err))
+			}
+			continue
+		}
+
+		cmd := client.B().Zrange().
 			Key(queueKey).
 			Min("-inf").
 			Max(now).
 			Byscore().
-			Limit(0, 100).
+			Limit(0, ScavengeConcurrencyQueuePeekSize).
 			Build()
-		itemIDs, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).AsStrSlice()
+		itemIDs, err := client.Do(ctx, cmd).AsStrSlice()
 		if err != nil && err != rueidis.Nil {
 			resultErr = multierror.Append(resultErr, fmt.Errorf("error querying partition concurrency queue '%s' during scavenge: %w", partition, err))
 			continue
 		}
 		if len(itemIDs) == 0 {
+			// Atomically attempt to drop empty pointer to prevent spinning on this item
+			err := q.dropPartitionPointerIfEmpty(
+				ctx,
+				shard,
+				kg.ConcurrencyIndex(),
+				queueKey,
+				partition,
+			)
+			if err != nil {
+				resultErr = multierror.Append(resultErr, fmt.Errorf("error dropping empty pointer %q for partition %q: %w", partition, queueKey, err))
+			}
 			continue
 		}
 
 		// Fetch the queue item, then requeue.
-		cmd = q.primaryQueueShard.RedisClient.unshardedRc.B().Hmget().Key(q.primaryQueueShard.RedisClient.kg.QueueItem()).Field(itemIDs...).Build()
-		jobs, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).AsStrSlice()
+		cmd = client.B().Hmget().Key(kg.QueueItem()).Field(itemIDs...).Build()
+		jobs, err := client.Do(ctx, cmd).AsStrSlice()
 		if err != nil && err != rueidis.Nil {
 			resultErr = multierror.Append(resultErr, fmt.Errorf("error fetching jobs for concurrency queue '%s' during scavenge: %w", partition, err))
 			continue
@@ -3151,7 +3223,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 					Msg("missing queue item in concurrency queue")
 
 				// Drop item reference to prevent spinning on this item
-				err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, q.primaryQueueShard.RedisClient.unshardedRc.B().Zrem().Key(queueKey).Member(itemID).Build()).Error()
+				err := client.Do(ctx, client.B().Zrem().Key(queueKey).Member(itemID).Build()).Error()
 				if err != nil {
 					resultErr = multierror.Append(resultErr, fmt.Errorf("error removing missing item '%s' from concurrency queue '%s': %w", itemID, partition, err))
 				}
@@ -3168,6 +3240,21 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 				continue
 			}
 			counter++
+		}
+
+		if len(itemIDs) < ScavengeConcurrencyQueuePeekSize {
+			// Atomically attempt to drop empty pointer if we've processed all items
+			err := q.dropPartitionPointerIfEmpty(
+				ctx,
+				shard,
+				kg.ConcurrencyIndex(),
+				queueKey,
+				partition,
+			)
+			if err != nil {
+				resultErr = multierror.Append(resultErr, fmt.Errorf("error dropping potentially empty pointer %q for partition %q: %w", partition, queueKey, err))
+			}
+			continue
 		}
 	}
 
