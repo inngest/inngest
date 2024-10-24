@@ -73,7 +73,7 @@ func TestStreaming(t *testing.T) {
 					}
 					if tcpConn, ok := conn.(*net.TCPConn); ok {
 						// Send RST instead of FIN.
-						tcpConn.SetLinger(0)
+						_ = tcpConn.SetLinger(0)
 					}
 					conn.Close()
 				}
