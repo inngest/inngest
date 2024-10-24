@@ -778,13 +778,13 @@ func BenchmarkPeekTiming(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		id := uuid.New()
-		enqueue(id, int(QueuePeekMax))
-		items, err := q.Peek(ctx, &QueuePartition{FunctionID: &id}, time.Now(), QueuePeekMax)
+		enqueue(id, int(DefaultQueuePeekMax))
+		items, err := q.Peek(ctx, &QueuePartition{FunctionID: &id}, time.Now(), DefaultQueuePeekMax)
 		if err != nil {
 			panic(err)
 		}
-		if len(items) != int(QueuePeekMax) {
-			panic(fmt.Sprintf("expected %d, got %d", QueuePeekMax, len(items)))
+		if len(items) != int(DefaultQueuePeekMax) {
+			panic(fmt.Sprintf("expected %d, got %d", DefaultQueuePeekMax, len(items)))
 		}
 	}
 }
@@ -1103,11 +1103,11 @@ func TestQueuePeek(t *testing.T) {
 		})
 
 		t.Run("It should apply a peek offset", func(t *testing.T) {
-			items, err = q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, time.Now().Add(-1*time.Hour), QueuePeekMax)
+			items, err = q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, time.Now().Add(-1*time.Hour), DefaultQueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 0, len(items))
 
-			items, err = q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, c, QueuePeekMax)
+			items, err = q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, c, DefaultQueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 3, len(items))
 			require.EqualValues(t, []*osqueue.QueueItem{&ia, &ib, &ic}, items)
@@ -1118,7 +1118,7 @@ func TestQueuePeek(t *testing.T) {
 			_, err := q.Lease(ctx, ia, 50*time.Millisecond, time.Now(), nil)
 			require.NoError(t, err)
 
-			items, err = q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, d, QueuePeekMax)
+			items, err = q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, d, DefaultQueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 3, len(items))
 			require.EqualValues(t, []*osqueue.QueueItem{&ib, &ic, &id}, items)
@@ -1139,7 +1139,7 @@ func TestQueuePeek(t *testing.T) {
 			require.NoError(t, err)
 			require.EqualValues(t, 1, caught, "Items not found during scavenge\n%s", r.Dump())
 
-			items, err = q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, d, QueuePeekMax)
+			items, err = q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, d, DefaultQueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 4, len(items))
 

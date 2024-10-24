@@ -78,8 +78,10 @@ const (
 	PartitionLookahead                        = time.Second
 
 	// default values
-	QueuePeekMin            int64 = 300
-	QueuePeekMax            int64 = 750
+	DefaultQueuePeekMin  int64 = 300
+	DefaultQueuePeekMax  int64 = 750
+	AbsoluteQueuePeekMax int64 = 5000
+
 	QueuePeekCurrMultiplier int64 = 4 // threshold 25%
 	QueuePeekEWMALen        int   = 10
 	QueueLeaseDuration            = 20 * time.Second
@@ -111,7 +113,7 @@ var (
 	ErrQueueItemAlreadyLeased        = fmt.Errorf("queue item already leased")
 	ErrQueueItemLeaseMismatch        = fmt.Errorf("item lease does not match")
 	ErrQueueItemNotLeased            = fmt.Errorf("queue item is not leased")
-	ErrQueuePeekMaxExceedsLimits     = fmt.Errorf("peek exceeded the maximum limit of %d", QueuePeekMax)
+	ErrQueuePeekMaxExceedsLimits     = fmt.Errorf("peek exceeded the maximum limit of %d", AbsoluteQueuePeekMax)
 	ErrPriorityTooLow                = fmt.Errorf("priority is too low")
 	ErrPriorityTooHigh               = fmt.Errorf("priority is too high")
 	ErrWeightedSampleRead            = fmt.Errorf("error reading from weighted sample")
@@ -228,6 +230,9 @@ func WithNumWorkers(n int32) QueueOpt {
 
 func WithPeekSizeRange(min int64, max int64) QueueOpt {
 	return func(q *queue) {
+		if max > AbsoluteQueuePeekMax {
+			max = AbsoluteQueuePeekMax
+		}
 		q.peekMin = min
 		q.peekMax = max
 	}
@@ -448,8 +453,8 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		apf: func(_ context.Context, _ uuid.UUID) uint {
 			return PriorityDefault
 		},
-		peekMin: QueuePeekMin,
-		peekMax: QueuePeekMax,
+		peekMin: DefaultQueuePeekMin,
+		peekMax: DefaultQueuePeekMax,
 		runMode: QueueRunMode{
 			Sequential:         true,
 			Scavenger:          true,
@@ -1535,8 +1540,8 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 		return -1, fmt.Errorf("no queue shard available for '%s'", sourceShardName)
 	}
 
-	if limit > QueuePeekMax || limit <= 0 {
-		limit = QueuePeekMax
+	if limit > AbsoluteQueuePeekMax || limit <= 0 {
+		limit = AbsoluteQueuePeekMax
 	}
 
 	partitionKey := shard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), "")
@@ -1614,13 +1619,16 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 	// Check whether limit is -1, peeking next available time
 	isPeekNext := limit == -1
 
-	if limit > QueuePeekMax {
+	if limit > AbsoluteQueuePeekMax {
 		// Lua's max unpack() length is 8000; don't allow users to peek more than
 		// 1k at a time regardless.
-		limit = QueuePeekMax
+		limit = AbsoluteQueuePeekMax
+	}
+	if limit > q.peekMax {
+		limit = q.peekMax
 	}
 	if limit <= 0 {
-		limit = QueuePeekMin
+		limit = q.peekMin
 	}
 	if isPeekNext {
 		limit = 1
@@ -1638,8 +1646,41 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 	)
 }
 
+func (q *queue) PeekRandom(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*osqueue.QueueItem, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Peek"), redis_telemetry.ScopeQueue)
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for Peek: %s", q.primaryQueueShard.Kind)
+	}
+	if partition == nil {
+		return nil, fmt.Errorf("expected partition to be set")
+	}
+	if limit > AbsoluteQueuePeekMax {
+		// Lua's max unpack() length is 8000; don't allow users to peek more than
+		// 1k at a time regardless.
+		limit = AbsoluteQueuePeekMax
+	}
+	if limit > q.peekMax {
+		limit = q.peekMax
+	}
+	if limit <= 0 {
+		limit = q.peekMin
+	}
+	partitionKey := partition.zsetKey(q.primaryQueueShard.RedisClient.kg)
+	return q.peek(
+		ctx,
+		q.primaryQueueShard,
+		peekOpts{
+			Limit:        limit,
+			Until:        until,
+			PartitionKey: partitionKey,
+			Random:       true,
+		},
+	)
+}
+
 type peekOpts struct {
 	PartitionKey string
+	Random       bool
 	Until        time.Time
 	Limit        int64
 }
@@ -1650,6 +1691,11 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 		until = strconv.Itoa(int(opts.Until.UnixMilli()))
 	}
 
+	randomOffset := "0"
+	if opts.Random {
+		randomOffset = "1"
+	}
+
 	keys := []string{
 		opts.PartitionKey,
 		shard.RedisClient.kg.QueueItem(),
@@ -1657,6 +1703,7 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 	args, err := StrSlice([]any{
 		until,
 		opts.Limit,
+		randomOffset,
 	})
 	if err != nil {
 		return nil, err
