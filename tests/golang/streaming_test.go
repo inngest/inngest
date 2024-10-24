@@ -60,7 +60,7 @@ func TestStreaming(t *testing.T) {
 					return
 				}
 
-				w.Write([]byte(" "))
+				_, _ = w.Write([]byte(" "))
 				flusher.Flush()
 				<-time.After(1 * time.Second)
 
