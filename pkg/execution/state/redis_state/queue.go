@@ -1442,9 +1442,9 @@ func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID
 	return nil
 }
 
-// SetFunctionPaused sets the "Paused" flag (represented in JSON as "off") for the given
-// function ID's queue partition.
-// If a function is unpaused, we requeue the partition with a score of "now" to ensure that it is processed.
+// dropPartitionPointerIfEmpty atomically drops a pointer queue member if the associated
+// ZSET is empty. This is used to ensure that we don't have pointers to empty ZSETs, in case
+// the cleanup process fails.
 func (q *queue) dropPartitionPointerIfEmpty(ctx context.Context, shard QueueShard, keyIndex, keyPartition, indexMember string) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionPaused"), redis_telemetry.ScopeQueue)
 
