@@ -470,8 +470,6 @@ top:
 				buf = append(buf, '"')
 			case '\'':
 				buf = append(buf, '\'')
-			case '/':
-				buf = append(buf, '/')
 			case '\\':
 				buf = append(buf, '\\')
 			case 'x':
@@ -529,7 +527,19 @@ func (p *parser) readStr(term byte) string {
 }
 
 func (p *parser) readRegex() *regexp.Regexp {
-	rx, err := regexp.Compile(p.readStr('/'))
+	start := p.pos
+out:
+	for p.pos < len(p.buf) {
+		b := p.buf[p.pos]
+		p.pos++
+		switch b {
+		case '/':
+			break out
+		case '\\':
+			p.pos++ // skip and then continue
+		}
+	}
+	rx, err := regexp.Compile(string(p.buf[start : p.pos-1]))
 	if err != nil {
 		p.raise(err.Error())
 	}
@@ -540,12 +550,10 @@ func (p *parser) readFilter() *Filter {
 	if len(p.buf) <= p.pos {
 		p.raise("not terminated")
 	}
-	b := p.buf[p.pos]
-	if b == '(' {
-		p.pos++
-	}
-	eq := p.readEquation()
-	if len(p.buf) <= p.pos || p.buf[p.pos] != ']' {
+	eq := precedentCorrect(p.readEq())
+	eq = reduceGroups(eq, nil)
+	b := p.nextNonSpace()
+	if len(p.buf) <= p.pos || b != ']' {
 		p.raise("not terminated")
 	}
 	p.pos++
@@ -553,135 +561,105 @@ func (p *parser) readFilter() *Filter {
 	return eq.Filter()
 }
 
-func (p *parser) readEquation() (eq *Equation) {
-	if len(p.buf) <= p.pos {
-		p.raise("not terminated")
-	}
-	eq = &Equation{}
-
+// Reads an equation by reading the left value first and then seeing if there
+// is an operation after that. If so it reads the next equation and decides
+// based on precedent which is contained in the other.
+func (p *parser) readEq() (eq *Equation) {
 	b := p.nextNonSpace()
 	switch b {
 	case '!':
-		eq.o = not
 		p.pos++
-		eq.left = p.readEqValue()
-		b := p.nextNonSpace()
-		if b != ')' {
-			p.raise("not terminated")
-		}
-		p.pos++
-		return
-	case 'l':
-		p.readFunc(length, eq)
-	case 'c':
-		p.readFunc(count, eq)
-	case 'm':
-		p.readFunc(match, eq)
-	case 's':
-		p.readFunc(search, eq)
-	default:
-		eq.left = p.readEqValue()
-		var right bool
-		if eq.o, right = p.readEqOp(); right {
-			eq.right = &Equation{result: true}
-		} else {
-			eq.right = p.readEqValue()
-		}
-	}
-	for p.pos < len(p.buf) {
-		b = p.nextNonSpace()
-		switch b {
-		case ')':
-			p.pos++
-			return
-		case ']':
-			return
-		}
-		o, _ := p.readEqOp()
-		if eq.o.prec <= o.prec {
-			eq = &Equation{left: eq, o: o}
-			eq.right = p.readEqValue()
-		} else {
-			eq.right = &Equation{left: eq.right, o: o}
-			eq.right.right = p.readEqValue()
-		}
-	}
-	return
-}
-
-func (p *parser) readEqValue() (eq *Equation) {
-	b := p.nextNonSpace()
-	switch b {
+		eq = &Equation{o: not, left: p.readEq()}
 	case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-		var v any
 		p.pos++
-		v = p.readNum(b)
-		eq = &Equation{result: v}
+		eq = &Equation{result: p.readNum(b)}
 	case '\'', '"':
 		p.pos++
 		s := p.readStr(b)
 		eq = &Equation{result: s}
-	case 'n':
-		p.readEqToken([]byte("null"))
-		eq = &Equation{result: nil}
-	case 'N':
-		p.readEqToken([]byte("Nothing"))
-		eq = &Equation{result: Nothing}
-	case 't':
-		p.readEqToken([]byte("true"))
-		eq = &Equation{result: true}
-
-	case 'f':
-		p.readEqToken([]byte("false"))
-		eq = &Equation{result: false}
 	case '@', '$':
 		x := p.readExpr()
 		eq = &Equation{result: x}
 	case '(':
 		p.pos++
-		eq = p.readEquation()
-	case '[':
-		eq = &Equation{result: p.readEqList()}
-	case '/':
-		p.pos++
-		rx := p.readRegex()
-		eq = &Equation{result: rx}
-	case 'l':
-		eq = &Equation{}
-		p.readFunc(length, eq)
-	case 'c':
-		eq = &Equation{}
-		p.readFunc(count, eq)
-	case 'm':
-		eq = &Equation{}
-		p.readFunc(match, eq)
-	case 's':
-		eq = &Equation{}
-		p.readFunc(search, eq)
-	default:
-		p.raise("expected a value")
-	}
-	return
-}
-
-func (p *parser) readFunc(o *op, eq *Equation) {
-	if bytes.HasPrefix(p.buf[p.pos:], []byte(o.name)) && p.buf[p.pos+len(o.name)] == '(' {
-		eq.o = o
-		p.pos += len(o.name) + 1
-		eq.left = p.readEqValue()
-		b := p.nextNonSpace()
-		if b == ',' {
-			p.pos++
-			eq.right = p.readEqValue()
-			b = p.nextNonSpace()
-		}
+		eq = &Equation{left: p.readEq(), o: group}
+		b = p.nextNonSpace()
 		if b != ')' {
 			p.raise("not terminated")
 		}
 		p.pos++
-		return
+	case '[':
+		eq = &Equation{result: p.readEqList()}
+	case '/':
+		p.pos++
+		eq = &Equation{result: p.readRegex()}
+	case 'N':
+		p.readEqToken([]byte("Nothing"))
+		eq = &Equation{result: Nothing}
+	default:
+		before := p.pos
+		token := p.readToken()
+		switch {
+		case bytes.Equal([]byte("true"), token):
+			eq = &Equation{result: true}
+		case bytes.Equal([]byte("false"), token):
+			eq = &Equation{result: false}
+		case bytes.Equal([]byte("null"), token):
+			eq = &Equation{result: nil}
+		default:
+			if o := opMap[string(token)]; o != nil {
+				eq = p.readOpArgs(o)
+			} else {
+				p.pos = before
+				p.raise("'%s' is not a value or function", token)
+			}
+		}
 	}
-	p.raise("expected a %s function", o.name)
+	for p.pos < len(p.buf) {
+		b := p.nextNonSpace()
+		switch b {
+		case ',': // probably reading array elements or function arguments
+			return
+		case ')':
+			return
+		case ']', 0:
+			return
+		}
+		eq = &Equation{left: eq, o: p.readEqOp(), right: p.readEq()}
+	}
+	return
+}
+
+// reads just lower case alpha characters (a-z)
+func (p *parser) readToken() []byte {
+	start := p.pos
+	for ; p.pos < len(p.buf); p.pos++ {
+		b := p.buf[p.pos]
+		if b < 'a' || 'z' < b {
+			break
+		}
+	}
+	return p.buf[start:p.pos]
+}
+
+func (p *parser) readOpArgs(o *op) (eq *Equation) {
+	if p.buf[p.pos] != '(' {
+		p.raise("expected a %s function", o.name)
+	}
+	eq = &Equation{o: o}
+	p.pos++
+	eq.left = p.readEq()
+	b := p.nextNonSpace()
+	if b == ',' {
+		p.pos++
+		eq.right = p.readEq()
+		b = p.nextNonSpace()
+	}
+	if b != ')' {
+		p.raise("not terminated")
+	}
+	p.pos++
+	return
 }
 
 func (p *parser) readEqToken(token []byte) {
@@ -697,7 +675,7 @@ func (p *parser) readEqList() (list []any) {
 	p.pos++
 List:
 	for p.pos < len(p.buf) {
-		eq := p.readEqValue()
+		eq := p.readEq()
 		list = append(list, eq.result)
 		b := p.skipSpace()
 		switch b {
@@ -705,7 +683,7 @@ List:
 		case ']':
 			break List
 		default:
-			p.raise("expected a comma")
+			p.raise("expected a comma or an array close")
 		}
 	}
 	return
@@ -720,13 +698,9 @@ func partialOp(token []byte, b byte) bool {
 	return false
 }
 
-func (p *parser) readEqOp() (o *op, right bool) {
+func (p *parser) readEqOp() (o *op) {
 	var token []byte
 	b := p.nextNonSpace()
-	switch b {
-	case 0, ']', ')', '(':
-		return exists, true
-	}
 	for {
 		if eqMap[b] != 'o' {
 			if len(token) == 0 || !partialOp(token, b) {
@@ -764,8 +738,9 @@ func (p *parser) skipSpace() (b byte) {
 
 func (p *parser) nextNonSpace() (b byte) {
 	for p.pos < len(p.buf) {
-		b = p.buf[p.pos]
-		if b != ' ' {
+		b2 := p.buf[p.pos]
+		if b2 != ' ' {
+			b = b2
 			break
 		}
 		p.pos++

@@ -50,7 +50,7 @@ run:
 # output configuration options
 output:
   # colored-line-number|line-number|json|tab|checkstyle|code-climate, default is "colored-line-number"
-  format: colored-line-number
+  formats: colored-line-number
 
   # print lines of code with issue, default is true
   print-issued-lines: true
@@ -70,17 +70,12 @@ linters-settings:
     # default is false: such cases aren't reported by default.
     check-blank: false
 
-    # [deprecated] comma-separated list of pairs of the form pkg:regex
-    # the regex is used to ignore names within pkg. (default "fmt:.*").
-    # see https://github.com/kisielk/errcheck#the-deprecated-method for details
-    ignore: fmt:.*,io/ioutil:^Read.*
-
     # path to a file containing a list of functions to exclude from checking
     # see https://github.com/kisielk/errcheck#excluding-functions for details
     #exclude: /path/to/file.txt
   govet:
     # report about shadowed variables
-    check-shadowing: true
+    shadow: true
 
     # settings per analyzer
     settings:
@@ -174,17 +169,14 @@ linters-settings:
       rangeValCopy:
         sizeThreshold: 32
 
-# deadcode: Finds unused code [fast: true, auto-fix: false]
 # errcheck: Errcheck is a program for checking for unchecked errors in go programs. These unchecked errors can be critical bugs in some cases [fast: true, auto-fix: false]
 # gosimple: Linter for Go source code that specializes in simplifying a code [fast: false, auto-fix: false]
 # govet: (vet, vetshadow): Vet examines Go source code and reports suspicious constructs, such as Printf calls whose arguments do not align with the format string [fast: false, auto-fix: false]
 # ineffassign: Detects when assignments to existing variables are not used [fast: true, auto-fix: false]
 # staticcheck: Staticcheck is a go vet on steroids, applying a ton of static analysis checks [fast: false, auto-fix: false]
-# structcheck: Finds an unused struct fields [fast: true, auto-fix: false]
 # typecheck: Like the front-end of a Go compiler, parses and type-checks Go code [fast: true, auto-fix: false]
 # unparam: Reports unused function parameters [fast: false, auto-fix: false]
 # unused: Checks Go code for unused constants, variables, functions and types [fast: false, auto-fix: false]
-# varcheck: Finds unused global variables and constants [fast: true, auto-fix: false]
 
 # Disabled by your configuration linters:
 # depguard: Go linter that checks if package imports are in a list of acceptable packages [fast: true, auto-fix: false]
@@ -197,7 +189,6 @@ linters-settings:
 # gofmt: Gofmt checks whether code was gofmt-ed. By default this tool runs with -s option to check for code simplification [fast: true, auto-fix: true]
 # goimports: Goimports does everything that gofmt does. Additionally it checks unused imports [fast: true, auto-fix: true]
 # gosec (gas): Inspects source code for security problems [fast: true, auto-fix: false]
-# interfacer: Linter that suggests narrower interface types [fast: false, auto-fix: false]
 # lll: Reports long lines [fast: true, auto-fix: false]
 # misspell: Finds commonly misspelled English words in comments [fast: true, auto-fix: true]
 # nakedret: Finds naked returns in functions greater than a specified function length [fast: true, auto-fix: false]
@@ -213,7 +204,6 @@ linters:
     - goimports
     - ineffassign
     - lll
-    - megacheck
     - misspell
     - typecheck
     - unconvert
@@ -226,12 +216,10 @@ linters:
     - gochecknoinits
     - gocyclo
     - gosec
-    - interfacer
     - nakedret
     - prealloc
     - exhaustive
     - rowserrcheck # this is completely broken
-    - scopelint
     - bodyclose # thinks all body closes have to happen in the same function as the request
     - contextcheck # not ready for go1.18 yet
     - gosimple # not ready for go1.18 yet
@@ -239,13 +227,10 @@ linters:
     - noctx # not ready for go1.18 yet
     - sqlclosecheck # not ready for go1.18 yet
     - staticcheck # not ready for go1.18 yet
-    - structcheck # not ready for go1.18 yet
     - stylecheck # not ready for go1.18 yet
     - unparam # not ready for go1.18 yet
     - unused # not ready for go1.18 yet
     - asasalint # stupid rule that makes no sense
-    - varcheck # deprecated
-    - deadcode # deprecated
     - reassign # removed because it makes no sense to flag an assignment of a public variable as an error.
     - revive # complains about unexported return, calling it annoying
     - musttag # absolutely not wanted as it insists on JSON annotation on any public struct that is unmarshalled

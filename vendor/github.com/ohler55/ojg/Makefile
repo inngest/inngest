@@ -26,4 +26,7 @@ cover: lint
 
 test: cover
 
-.PHONY: all lint cover test
+build:
+	make -C cmd
+
+.PHONY: all lint cover test build

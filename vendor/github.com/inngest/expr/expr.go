@@ -130,23 +130,31 @@ type aggregator struct {
 
 // Len returns the total number of aggregateable and constantly matched expressions
 // stored in the evaluator.
-func (a aggregator) Len() int {
+func (a *aggregator) Len() int {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
 	return int(a.fastLen) + len(a.mixed) + len(a.constants)
 }
 
 // FastLen returns the number of expressions being matched by aggregated trees.
-func (a aggregator) FastLen() int {
+func (a *aggregator) FastLen() int {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
 	return int(a.fastLen)
 }
 
 // MixedLen returns the number of expressions being matched by aggregated trees.
-func (a aggregator) MixedLen() int {
+func (a *aggregator) MixedLen() int {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
 	return len(a.mixed)
 }
 
 // SlowLen returns the total number of expressions that must constantly
 // be matched due to non-aggregateable clauses in their expressions.
-func (a aggregator) SlowLen() int {
+func (a *aggregator) SlowLen() int {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
 	return len(a.constants)
 }
 
@@ -160,7 +168,9 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 
 	// TODO: Concurrently match constant expressions using a semaphore for capacity.
 	// Match constant expressions always.
+	a.lock.RLock()
 	constantEvals, err := a.loader(ctx, a.constants...)
+	a.lock.RUnlock()
 	if err != nil {
 		return nil, 0, err
 	}
@@ -176,7 +186,9 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 			defer a.sem.Release(1)
 			defer func() {
 				if r := recover(); r != nil {
+					s.Lock()
 					err = errors.Join(err, fmt.Errorf("recovered from panic in evaluate: %v", r))
+					s.Unlock()
 				}
 			}()
 
@@ -228,6 +240,7 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 	// are added (eg. >= operators on strings), ensure that we find the correct number of matches
 	// for each group ID and then skip evaluating expressions if the number of matches is <= the group
 	// ID's length.
+	seenMu := &sync.Mutex{}
 	seen := map[uuid.UUID]struct{}{}
 
 	eg = errgroup.Group{}
@@ -241,12 +254,19 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 			defer a.sem.Release(1)
 			defer func() {
 				if r := recover(); r != nil {
+					s.Lock()
 					err = errors.Join(err, fmt.Errorf("recovered from panic in evaluate: %v", r))
+					s.Unlock()
 				}
 			}()
 
+			seenMu.Lock()
 			if _, ok := seen[expr.GetID()]; ok {
+				seenMu.Unlock()
 				return nil
+			} else {
+				seen[expr.GetID()] = struct{}{}
+				seenMu.Unlock()
 			}
 
 			atomic.AddInt32(&matched, 1)
@@ -256,7 +276,6 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 			// string.
 			ok, evalerr := a.eval(ctx, expr, data)
 
-			seen[expr.GetID()] = struct{}{}
 			if evalerr != nil {
 				return evalerr
 			}
@@ -293,8 +312,6 @@ func (a *aggregator) AggregateMatch(ctx context.Context, data map[string]any) ([
 	counts := map[groupID]int{}
 	// Store all expression parts per group ID for returning.
 	found := map[groupID][]*StoredExpressionPart{}
-	// protect the above locks with a map.
-	lock := &sync.Mutex{}
 
 	for _, engine := range a.engines {
 		matched, err := engine.Match(ctx, data)
@@ -303,7 +320,6 @@ func (a *aggregator) AggregateMatch(ctx context.Context, data map[string]any) ([
 		}
 
 		// Add all found items from the engine to the above list.
-		lock.Lock()
 		for _, eval := range matched {
 			counts[eval.GroupID] += 1
 			if _, ok := found[eval.GroupID]; !ok {
@@ -311,7 +327,6 @@ func (a *aggregator) AggregateMatch(ctx context.Context, data map[string]any) ([
 			}
 			found[eval.GroupID] = append(found[eval.GroupID], eval)
 		}
-		lock.Unlock()
 	}
 
 	// Validate that groups meet the minimum size.
@@ -333,13 +348,10 @@ func (a *aggregator) AggregateMatch(ctx context.Context, data map[string]any) ([
 		// matching engine, so we cannot use group sizes if the expr part
 		// has an OR.
 		for _, i := range found[groupID] {
-
-			a.lock.RLock()
 			if _, ok := a.mixed[i.Parsed.EvaluableID]; ok {
 				// for now, mark this as viable as it had an OR
 				result = append(result, i)
 			}
-			a.lock.RUnlock()
 
 			if len(i.Parsed.Root.Ors) > 0 {
 				// for now, mark this as viable as it had an OR
@@ -426,7 +438,7 @@ func (a *aggregator) Remove(ctx context.Context, eval Evaluable) error {
 
 	for _, g := range parsed.RootGroups() {
 		s, err := a.iterGroup(ctx, g, parsed, a.removeNode)
-		if err == ErrExpressionPartNotFound {
+		if errors.Is(err, ErrExpressionPartNotFound) {
 			return ErrEvaluableNotFound
 		}
 
@@ -458,7 +470,10 @@ func (a *aggregator) Remove(ctx context.Context, eval Evaluable) error {
 	return nil
 }
 
-func (a *aggregator) removeConstantEvaluable(ctx context.Context, eval Evaluable) error {
+func (a *aggregator) removeConstantEvaluable(_ context.Context, eval Evaluable) error {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
 	// Find the index of the evaluable in constants and yank out.
 	idx := -1
 	for n, item := range a.constants {
@@ -471,21 +486,19 @@ func (a *aggregator) removeConstantEvaluable(ctx context.Context, eval Evaluable
 		return ErrEvaluableNotFound
 	}
 
-	a.lock.Lock()
 	a.constants = append(a.constants[:idx], a.constants[idx+1:]...)
-	a.lock.Unlock()
 	return nil
 }
 
 type exprAggregateStats [2]int
 
 // Fast returns the number of aggregateable predicates in the iterated expr
-func (e exprAggregateStats) Fast() int {
+func (e *exprAggregateStats) Fast() int {
 	return e[0]
 }
 
 // Slow returns the number of non-aggregateable predicates in the iterated expr
-func (e exprAggregateStats) Slow() int {
+func (e *exprAggregateStats) Slow() int {
 	return e[1]
 }
 
@@ -557,17 +570,15 @@ func (a *aggregator) iterGroup(ctx context.Context, node *Node, parsed *ParsedEx
 	for _, n := range all {
 		err := op(ctx, n, parsed)
 
-		switch err {
-		case nil:
+		switch {
+		case err == nil:
 			// This is okay.
 			stats.AddFast()
 			continue
-
-		case errEngineUnimplemented:
+		case errors.Is(err, errEngineUnimplemented):
 			// Not yet added to aggregator
 			stats.AddSlow()
 			continue
-
 		default:
 			// Some other error.
 			stats.AddSlow()

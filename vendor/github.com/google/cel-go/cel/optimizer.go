@@ -15,6 +15,8 @@
 package cel
 
 import (
+	"sort"
+
 	"github.com/google/cel-go/common"
 	"github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/types"
@@ -98,14 +100,21 @@ func (opt *StaticOptimizer) Optimize(env *Env, a *Ast) (*Ast, *Issues) {
 // that the ids within the expression correspond to the ids within macros.
 func normalizeIDs(idGen ast.IDGenerator, optimized ast.Expr, info *ast.SourceInfo) {
 	optimized.RenumberIDs(idGen)
-
 	if len(info.MacroCalls()) == 0 {
 		return
 	}
 
+	// Sort the macro ids to make sure that the renumbering of macro-specific variables
+	// is stable across normalization calls.
+	sortedMacroIDs := []int64{}
+	for id := range info.MacroCalls() {
+		sortedMacroIDs = append(sortedMacroIDs, id)
+	}
+	sort.Slice(sortedMacroIDs, func(i, j int) bool { return sortedMacroIDs[i] < sortedMacroIDs[j] })
+
 	// First, update the macro call ids themselves.
 	callIDMap := map[int64]int64{}
-	for id := range info.MacroCalls() {
+	for _, id := range sortedMacroIDs {
 		callIDMap[id] = idGen(id)
 	}
 	// Then update the macro call definitions which refer to these ids, but
@@ -116,7 +125,8 @@ func normalizeIDs(idGen ast.IDGenerator, optimized ast.Expr, info *ast.SourceInf
 		call ast.Expr
 	}
 	macroUpdates := []macroUpdate{}
-	for oldID, newID := range callIDMap {
+	for _, oldID := range sortedMacroIDs {
+		newID := callIDMap[oldID]
 		call, found := info.GetMacroCall(oldID)
 		if !found {
 			continue
@@ -134,6 +144,7 @@ func cleanupMacroRefs(expr ast.Expr, info *ast.SourceInfo) {
 	if len(info.MacroCalls()) == 0 {
 		return
 	}
+
 	// Sanitize the macro call references once the optimized expression has been computed
 	// and the ids normalized between the expression and the macros.
 	exprRefMap := make(map[int64]struct{})
@@ -212,6 +223,12 @@ type optimizerExprFactory struct {
 	sourceInfo *ast.SourceInfo
 }
 
+// NewAST creates an AST from the current expression using the tracked source info which
+// is modified and managed by the OptimizerContext.
+func (opt *optimizerExprFactory) NewAST(expr ast.Expr) *ast.AST {
+	return ast.NewAST(expr, opt.sourceInfo)
+}
+
 // CopyAST creates a renumbered copy of `Expr` and `SourceInfo` values of the input AST, where the
 // renumbering uses the same scheme as the core optimizer logic ensuring there are no collisions
 // between copies.
@@ -224,6 +241,32 @@ func (opt *optimizerExprFactory) CopyAST(a *ast.AST) (ast.Expr, *ast.SourceInfo)
 	copyInfo := ast.CopySourceInfo(a.SourceInfo())
 	normalizeIDs(idGen.renumberStable, copyExpr, copyInfo)
 	return copyExpr, copyInfo
+}
+
+// CopyASTAndMetadata copies the input AST and propagates the macro metadata into the AST being
+// optimized.
+func (opt *optimizerExprFactory) CopyASTAndMetadata(a *ast.AST) ast.Expr {
+	copyExpr, copyInfo := opt.CopyAST(a)
+	for macroID, call := range copyInfo.MacroCalls() {
+		opt.SetMacroCall(macroID, call)
+	}
+	return copyExpr
+}
+
+// ClearMacroCall clears the macro at the given expression id.
+func (opt *optimizerExprFactory) ClearMacroCall(id int64) {
+	opt.sourceInfo.ClearMacroCall(id)
+}
+
+// SetMacroCall sets the macro call metadata for the given macro id within the tracked source info
+// metadata.
+func (opt *optimizerExprFactory) SetMacroCall(id int64, expr ast.Expr) {
+	opt.sourceInfo.SetMacroCall(id, expr)
+}
+
+// MacroCalls returns the map of macro calls currently in the context.
+func (opt *optimizerExprFactory) MacroCalls() map[int64]ast.Expr {
+	return opt.sourceInfo.MacroCalls()
 }
 
 // NewBindMacro creates an AST expression representing the expanded bind() macro, and a macro expression
@@ -239,7 +282,7 @@ func (opt *optimizerExprFactory) NewBindMacro(macroID int64, varName string, var
 		return id
 	})
 	if call, exists := opt.sourceInfo.GetMacroCall(macroID); exists {
-		opt.sourceInfo.SetMacroCall(remainingID, opt.fac.CopyExpr(call))
+		opt.SetMacroCall(remainingID, opt.fac.CopyExpr(call))
 	}
 
 	astExpr = opt.fac.NewComprehension(macroID,
