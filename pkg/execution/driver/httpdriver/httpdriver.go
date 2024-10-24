@@ -361,14 +361,15 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*response, error) {
 		stream, err := ParseStream(byt)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing stream: %w", err)
-		}
-		// These are all contained within a single wrapper.
-		body = stream.Body
-		statusCode = stream.StatusCode
+		} else {
+			// These are all contained within a single wrapper.
+			body = stream.Body
+			statusCode = stream.StatusCode
 
-		// Upsert headers from the stream.
-		for k, v := range stream.Headers {
-			headers[k] = v
+			// Upsert headers from the stream.
+			for k, v := range stream.Headers {
+				headers[k] = v
+			}
 		}
 	}
 

@@ -327,7 +327,11 @@ func (l traceLifecycle) OnFunctionFinished(
 		span.SetAttributes(attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusFailed.ToCode()))
 	}
 
-	span.SetFnOutput(resp.Output)
+	var output any = resp.Err
+	if resp.Output != nil {
+		output = resp.Output
+	}
+	span.SetFnOutput(output)
 }
 
 func (l traceLifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata, req execution.CancelRequest, evts []json.RawMessage) {
@@ -689,7 +693,12 @@ func (l traceLifecycle) OnStepFinished(
 				attribute.Int(consts.OtelSysStepStatusCode, resp.StatusCode),
 				attribute.Int(consts.OtelSysStepOutputSizeBytes, resp.OutputSize),
 			)
-			span.SetStepOutput(resp.Output)
+
+			var output any = resp.Err
+			if resp.Output != nil {
+				output = resp.Output
+			}
+			span.SetStepOutput(output)
 		} else if resp.IsTraceVisibleFunctionExecution() {
 			spanName := consts.OtelExecFnOk
 			span.SetStatus(codes.Ok, "success")
@@ -701,7 +710,12 @@ func (l traceLifecycle) OnStepFinished(
 
 			span.SetAttributes(attribute.String(consts.OtelSysStepOpcode, enums.OpcodeNone.String()))
 			span.SetName(spanName)
-			span.SetFnOutput(resp.Output)
+
+			var output any = resp.Err
+			if resp.Output != nil {
+				output = resp.Output
+			}
+			span.SetStepOutput(output)
 		} else {
 			// if it's not a step or function response that represents either a failed or a successful execution.
 			// Do not record discovery spans and cancel it.
