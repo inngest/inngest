@@ -6,12 +6,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/database/sqlite"
+	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/inngest/inngest/pkg/consts"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "modernc.org/sqlite"
 )
 
@@ -23,6 +28,8 @@ var (
 type SqliteCQRSOptions struct {
 	InMemory bool
 
+	PostgresURI string
+
 	// The path at which the SQLite database should be stored.
 	Directory string
 }
@@ -30,7 +37,15 @@ type SqliteCQRSOptions struct {
 func New(opts SqliteCQRSOptions) (*sql.DB, error) {
 	var err error
 
-	if opts.InMemory {
+	if opts.PostgresURI != "" {
+		if !strings.HasPrefix(opts.PostgresURI, "postgres://") && !strings.HasPrefix(opts.PostgresURI, "postgresql://") {
+			return nil, fmt.Errorf("unsupported database URL: %s", opts.PostgresURI)
+		}
+
+		o.Do(func() {
+			db, err = sql.Open("pgx", opts.PostgresURI)
+		})
+	} else if opts.InMemory {
 		o.Do(func() {
 			db, err = sql.Open("sqlite", "file:inngest?mode=memory&cache=shared")
 		})
@@ -82,30 +97,53 @@ func New(opts SqliteCQRSOptions) (*sql.DB, error) {
 // FS contains the filesystem of the stdlib, containing all migrations in subdirs
 // relative to this package.
 //
-//go:embed **/*.sql
+//go:embed **/**/*.sql
 var FS embed.FS
 
 func up(db *sql.DB, opts SqliteCQRSOptions) error {
-	source, err := iofs.New(FS, "migrations")
-	if err != nil {
-		return err
-	}
+	var (
+		err    error
+		src    source.Driver
+		driver database.Driver
+		dbName string = ""
+	)
 
 	// Grab the migration driver.
-	driver, err := sqlite.WithInstance(db, &sqlite.Config{
-		MigrationsTable: "migrations",
-		NoTxWrap:        true,
-	})
-	if err != nil {
-		return err
+	if opts.PostgresURI != "" {
+		src, err = iofs.New(FS, filepath.Join("migrations", "postgres"))
+		if err != nil {
+			return err
+		}
+
+		driver, err = postgres.WithInstance(db, &postgres.Config{
+			MigrationsTable: "migrations",
+		})
+		if err != nil {
+			return err
+		}
+
+		dbName = "inngest"
+	} else {
+		src, err = iofs.New(FS, filepath.Join("migrations", "sqlite"))
+		if err != nil {
+			return err
+		}
+
+		driver, err = sqlite.WithInstance(db, &sqlite.Config{
+			MigrationsTable: "migrations",
+			NoTxWrap:        true,
+		})
+		if err != nil {
+			return err
+		}
+
+		dbName = "file:inngest?mode=memory&cache=shared"
+		if !opts.InMemory {
+			dbName = fmt.Sprintf("file:%s?cache=shared", fmt.Sprintf("%s/%s", consts.DefaultInngestConfigDir, consts.SQLiteDbFileName))
+		}
 	}
 
-	dbName := "file:inngest?mode=memory&cache=shared"
-	if !opts.InMemory {
-		dbName = fmt.Sprintf("file:%s?cache=shared", fmt.Sprintf("%s/%s", consts.DefaultInngestConfigDir, consts.SQLiteDbFileName))
-	}
-
-	m, err := migrate.NewWithInstance("iofs", source, dbName, driver)
+	m, err := migrate.NewWithInstance("iofs", src, dbName, driver)
 	if err != nil {
 		return err
 	}

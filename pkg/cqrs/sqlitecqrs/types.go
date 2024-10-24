@@ -1,7 +1,7 @@
 package sqlitecqrs
 
 import (
-	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs/sqlc"
+	sqlc "github.com/inngest/inngest/pkg/cqrs/sqlitecqrs/sqlc/sqlite"
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/jinzhu/copier"
 )
