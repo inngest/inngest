@@ -4,7 +4,7 @@ import { RiArrowDownSFill, RiArrowRightSFill } from '@remixicon/react';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
 import type { MetricsFilters } from './Dashboard';
 import { FailedFunctions } from './FailedFunctions';
@@ -150,7 +150,8 @@ export const MetricsOverview = ({
     scope,
   };
 
-  const { data, error } = useGraphQLQuery({
+  const { data, error } = useSkippableGraphQLQuery({
+    skip: !env.id,
     query: GetFunctionStatusMetrics,
     pollIntervalInMilliseconds: autoRefresh ? AUTO_REFRESH_INTERVAL * 1000 : 0,
     variables,
