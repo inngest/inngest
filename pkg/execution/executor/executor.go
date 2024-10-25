@@ -1701,7 +1701,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				},
 			})
 			if err != nil {
-				logger.StdlibLogger(ctx).Error("error dequeueing consumed pause job when resuming", "error", err)
+				logger.StdlibLogger(ctx).Error("error dequeueing consumed pause job when resuming", "error", err, "pause", pause, "shard", shard, "qn", qn)
 			}
 		}
 		return nil
