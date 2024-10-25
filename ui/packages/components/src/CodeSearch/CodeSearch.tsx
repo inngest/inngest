@@ -341,7 +341,14 @@ export default function CodeSearch({
 
   const handleSearch = () => {
     if (!hasValidationError) {
-      onSearch(content);
+      // Remove empty lines and trim whitespace
+      const processedContent = content
+        .split('\n')
+        .filter((line) => line.trim() !== '')
+        .join('\n')
+        .trim();
+
+      onSearch(processedContent);
     }
   };
 
