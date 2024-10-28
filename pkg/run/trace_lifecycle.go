@@ -679,6 +679,10 @@ func (l traceLifecycle) OnStepFinished(
 				attribute.String(consts.OtelSysStepOpcode, foundOp.String()),
 			)
 
+			if input, _ := op.Input(); input != "" {
+				span.SetStepInput(input)
+			}
+
 			if op.IsError() {
 				span.SetStepOutput(op.Error)
 				span.SetStatus(codes.Error, op.Error.Message)
@@ -693,6 +697,10 @@ func (l traceLifecycle) OnStepFinished(
 				attribute.Int(consts.OtelSysStepStatusCode, resp.StatusCode),
 				attribute.Int(consts.OtelSysStepOutputSizeBytes, resp.OutputSize),
 			)
+
+			if input, _ := op.Input(); input != "" {
+				span.SetStepInput(input)
+			}
 
 			var output any = resp.Err
 			if resp.Output != nil {
@@ -710,6 +718,10 @@ func (l traceLifecycle) OnStepFinished(
 
 			span.SetAttributes(attribute.String(consts.OtelSysStepOpcode, enums.OpcodeNone.String()))
 			span.SetName(spanName)
+
+			if input, _ := op.Input(); input != "" {
+				span.SetStepInput(input)
+			}
 
 			var output any = resp.Err
 			if resp.Output != nil {

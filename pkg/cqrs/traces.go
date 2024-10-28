@@ -184,6 +184,7 @@ type TraceRun struct {
 }
 
 type SpanOutput struct {
+	Input            []byte
 	Data             []byte
 	Timestamp        time.Time
 	Attributes       map[string]string
