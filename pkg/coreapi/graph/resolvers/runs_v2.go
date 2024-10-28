@@ -256,6 +256,9 @@ func (r *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID str
 	} else {
 		d := string(output.Data)
 		resp.Data = &d
+
+		input := string(output.Input)
+		resp.Input = &input
 	}
 
 	return &resp, nil
