@@ -698,10 +698,6 @@ func (l traceLifecycle) OnStepFinished(
 				attribute.Int(consts.OtelSysStepOutputSizeBytes, resp.OutputSize),
 			)
 
-			if input, _ := op.Input(); input != "" {
-				span.SetStepInput(input)
-			}
-
 			var output any = resp.Err
 			if resp.Output != nil {
 				output = resp.Output
@@ -718,10 +714,6 @@ func (l traceLifecycle) OnStepFinished(
 
 			span.SetAttributes(attribute.String(consts.OtelSysStepOpcode, enums.OpcodeNone.String()))
 			span.SetName(spanName)
-
-			if input, _ := op.Input(); input != "" {
-				span.SetStepInput(input)
-			}
 
 			var output any = resp.Err
 			if resp.Output != nil {
