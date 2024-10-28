@@ -1060,25 +1060,45 @@ func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*
 			return nil, fmt.Errorf("error parsing span outputs: %w", err)
 		}
 
-		for _, evt := range evts {
-			_, isFnOutput := evt.Attributes[consts.OtelSysFunctionOutput]
-			_, isStepOutput := evt.Attributes[consts.OtelSysStepOutput]
-			if isFnOutput || isStepOutput {
-				var isError bool
-				switch strings.ToUpper(s.StatusCode) {
-				case "ERROR", "STATUS_CODE_ERROR":
-					isError = true
-				}
+		var (
+			input      []byte
+			spanOutput *cqrs.SpanOutput
+		)
 
-				return &cqrs.SpanOutput{
-					Data:             []byte(evt.Name),
-					Timestamp:        evt.Timestamp,
-					Attributes:       evt.Attributes,
-					IsError:          isError,
-					IsFunctionOutput: isFnOutput,
-					IsStepOutput:     isStepOutput,
-				}, nil
+		for _, evt := range evts {
+			if spanOutput == nil {
+				_, isFnOutput := evt.Attributes[consts.OtelSysFunctionOutput]
+				_, isStepOutput := evt.Attributes[consts.OtelSysStepOutput]
+				if isFnOutput || isStepOutput {
+					var isError bool
+					switch strings.ToUpper(s.StatusCode) {
+					case "ERROR", "STATUS_CODE_ERROR":
+						isError = true
+					}
+
+					spanOutput = &cqrs.SpanOutput{
+						Data:             []byte(evt.Name),
+						Timestamp:        evt.Timestamp,
+						Attributes:       evt.Attributes,
+						IsError:          isError,
+						IsFunctionOutput: isFnOutput,
+						IsStepOutput:     isStepOutput,
+					}
+				}
 			}
+
+			if _, isInput := evt.Attributes[consts.OtelSysStepInput]; isInput && input == nil {
+				input = []byte(evt.Name)
+			}
+
+			if spanOutput != nil && input != nil {
+				break
+			}
+		}
+
+		if spanOutput != nil {
+			spanOutput.Input = input
+			return spanOutput, nil
 		}
 	}
 

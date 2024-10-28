@@ -300,6 +300,7 @@ type ComplexityRoot struct {
 	RunTraceSpanOutput struct {
 		Data  func(childComplexity int) int
 		Error func(childComplexity int) int
+		Input func(childComplexity int) int
 	}
 
 	RunTraceTrigger struct {
@@ -1751,6 +1752,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunTraceSpanOutput.Error(childComplexity), true
 
+	case "RunTraceSpanOutput.input":
+		if e.complexity.RunTraceSpanOutput.Input == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpanOutput.Input(childComplexity), true
+
 	case "RunTraceTrigger.batchID":
 		if e.complexity.RunTraceTrigger.BatchID == nil {
 			break
@@ -2625,6 +2633,7 @@ type RunTraceSpan {
 }
 
 type RunTraceSpanOutput {
+  input: Bytes
   data: Bytes
   error: StepError
 }
@@ -8578,6 +8587,8 @@ func (ec *executionContext) fieldContext_Query_runTraceSpanOutputByID(ctx contex
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
+			case "input":
+				return ec.fieldContext_RunTraceSpanOutput_input(ctx, field)
 			case "data":
 				return ec.fieldContext_RunTraceSpanOutput_data(ctx, field)
 			case "error":
@@ -11483,6 +11494,47 @@ func (ec *executionContext) fieldContext_RunTraceSpan_parentSpan(ctx context.Con
 				return ec.fieldContext_RunTraceSpan_parentSpan(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceSpanOutput_input(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpanOutput) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpanOutput_input(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Input, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOBytes2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpanOutput_input(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpanOutput",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Bytes does not have child fields")
 		},
 	}
 	return fc, nil
@@ -17469,6 +17521,10 @@ func (ec *executionContext) _RunTraceSpanOutput(ctx context.Context, sel ast.Sel
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("RunTraceSpanOutput")
+		case "input":
+
+			out.Values[i] = ec._RunTraceSpanOutput_input(ctx, field, obj)
+
 		case "data":
 
 			out.Values[i] = ec._RunTraceSpanOutput_data(ctx, field, obj)

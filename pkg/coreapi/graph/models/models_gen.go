@@ -187,6 +187,7 @@ type RunTraceSpan struct {
 }
 
 type RunTraceSpanOutput struct {
+	Input *string    `json:"input,omitempty"`
 	Data  *string    `json:"data,omitempty"`
 	Error *StepError `json:"error,omitempty"`
 }
