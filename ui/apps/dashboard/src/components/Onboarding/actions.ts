@@ -1,6 +1,7 @@
 'use server';
 
-import { syncNewApp } from './data';
+import { type InvokeFunctionMutationVariables } from '@/gql/graphql';
+import { invokeFn, syncNewApp } from './data';
 
 export async function syncAppManually(appURL: string) {
   try {
@@ -17,5 +18,26 @@ export async function syncAppManually(appURL: string) {
   } catch (error) {
     console.error('Error syncing app:', error);
     return { success: false, error: null, appName: null };
+  }
+}
+
+export async function invokeFunction({
+  functionSlug,
+  user,
+  data,
+}: Pick<InvokeFunctionMutationVariables, 'data' | 'functionSlug' | 'user'>) {
+  try {
+    const response = await invokeFn({ functionSlug, user, data });
+    const isSuccess = response.invokeFn.invokeFunction;
+
+    return {
+      success: isSuccess,
+    };
+  } catch (error) {
+    console.error('Error invoking:', error);
+    if (!(error instanceof Error)) {
+      return { success: false, error: 'Unknown error invoking' };
+    }
+    return { success: false, error: error };
   }
 }

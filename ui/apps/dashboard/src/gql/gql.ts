@@ -100,6 +100,7 @@ const documents = {
     "\n  query GetGlobalSearch($opts: SearchInput!) {\n    account {\n      search(opts: $opts) {\n        results {\n          env {\n            name\n            id\n            type\n            slug\n          }\n          kind\n          value {\n            ... on ArchivedEvent {\n              id\n              name\n            }\n            ... on FunctionRun {\n              id\n              functionID: workflowID\n              startedAt\n            }\n          }\n        }\n      }\n    }\n  }\n": types.GetGlobalSearchDocument,
     "\n  query GetFunctionSlug($environmentID: ID!, $functionID: ID!) {\n    environment: workspace(id: $environmentID) {\n      function: workflow(id: $functionID) {\n        slug\n        name\n      }\n    }\n  }\n": types.GetFunctionSlugDocument,
     "\n  mutation SyncOnboardingApp($appURL: String!, $envID: UUID!) {\n    syncNewApp(appURL: $appURL, envID: $envID) {\n      app {\n        externalID\n        id\n      }\n      error {\n        code\n        data\n        message\n      }\n    }\n  }\n": types.SyncOnboardingAppDocument,
+    "\n  mutation InvokeFunctionOnboarding($envID: UUID!, $data: Map, $functionSlug: String!, $user: Map) {\n    invokeFunction(envID: $envID, data: $data, functionSlug: $functionSlug, user: $user)\n  }\n": types.InvokeFunctionOnboardingDocument,
     "\n  query getPostgresIntegrations($envID: ID!) {\n    environment: workspace(id: $envID) {\n      cdcConnections {\n        id\n        name\n        status\n        statusDetail\n        description\n      }\n    }\n  }\n": types.GetPostgresIntegrationsDocument,
     "\n  mutation testCredentials($input: CDCConnectionInput!, $envID: UUID!) {\n    cdcTestCredentials(input: $input, envID: $envID) {\n      steps\n      error\n    }\n  }\n": types.TestCredentialsDocument,
     "\n  mutation testReplication($input: CDCConnectionInput!, $envID: UUID!) {\n    cdcTestLogicalReplication(input: $input, envID: $envID) {\n      steps\n      error\n    }\n  }\n": types.TestReplicationDocument,
@@ -489,6 +490,10 @@ export function graphql(source: "\n  query GetFunctionSlug($environmentID: ID!, 
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation SyncOnboardingApp($appURL: String!, $envID: UUID!) {\n    syncNewApp(appURL: $appURL, envID: $envID) {\n      app {\n        externalID\n        id\n      }\n      error {\n        code\n        data\n        message\n      }\n    }\n  }\n"): (typeof documents)["\n  mutation SyncOnboardingApp($appURL: String!, $envID: UUID!) {\n    syncNewApp(appURL: $appURL, envID: $envID) {\n      app {\n        externalID\n        id\n      }\n      error {\n        code\n        data\n        message\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation InvokeFunctionOnboarding($envID: UUID!, $data: Map, $functionSlug: String!, $user: Map) {\n    invokeFunction(envID: $envID, data: $data, functionSlug: $functionSlug, user: $user)\n  }\n"): (typeof documents)["\n  mutation InvokeFunctionOnboarding($envID: UUID!, $data: Map, $functionSlug: String!, $user: Map) {\n    invokeFunction(envID: $envID, data: $data, functionSlug: $functionSlug, user: $user)\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
