@@ -16,6 +16,17 @@ export function RunResult({ className, result, isSuccess }: Props) {
 
   return (
     <div className={className}>
+      {result.input && (
+        <CodeBlock
+          header={{
+            title: 'Input',
+          }}
+          tab={{
+            content: result.input,
+          }}
+        />
+      )}
+
       {result.data && (
         <CodeBlock
           header={{

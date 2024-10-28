@@ -467,6 +467,7 @@ export type RunTraceSpanOutput = {
   __typename?: 'RunTraceSpanOutput';
   data: Maybe<Scalars['Bytes']>;
   error: Maybe<StepError>;
+  input: Maybe<Scalars['Bytes']>;
 };
 
 export enum RunTraceSpanStatus {
@@ -747,7 +748,7 @@ export type GetTraceResultQueryVariables = Exact<{
 }>;
 
 
-export type GetTraceResultQuery = { __typename?: 'Query', runTraceSpanOutputByID: { __typename?: 'RunTraceSpanOutput', data: any | null, error: { __typename?: 'StepError', message: string, name: string | null, stack: string | null } | null } };
+export type GetTraceResultQuery = { __typename?: 'Query', runTraceSpanOutputByID: { __typename?: 'RunTraceSpanOutput', input: any | null, data: any | null, error: { __typename?: 'StepError', message: string, name: string | null, stack: string | null } | null } };
 
 export type GetTriggerQueryVariables = Exact<{
   runID: Scalars['String'];
@@ -1092,6 +1093,7 @@ export const GetRunDocument = `
 export const GetTraceResultDocument = `
     query GetTraceResult($traceID: String!) {
   runTraceSpanOutputByID(outputID: $traceID) {
+    input
     data
     error {
       message
