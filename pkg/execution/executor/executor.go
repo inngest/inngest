@@ -759,16 +759,17 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, fmt.Errorf("cannot load run events: %w", err)
 	}
 
-	// for recording function start time after a successful step.
-	if md.Config.StartedAt.IsZero() {
-		md.Config.StartedAt = time.Now()
-	}
-
 	// Validate that the run can execute.
 	v := newRunValidator(e, ef.Function, md, events, item) // TODO: Load events for this.
 	if err := v.validate(ctx); err != nil {
 		return nil, err
 	}
+
+	// for recording function start time after a successful step.
+	if md.Config.StartedAt.IsZero() {
+		md.Config.StartedAt = time.Now()
+	}
+
 	if v.stopWithoutRetry {
 		if e.preDeleteStateSizeReporter != nil {
 			e.preDeleteStateSizeReporter(ctx, md)
