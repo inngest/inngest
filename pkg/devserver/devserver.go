@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/connect"
 	"github.com/inngest/inngest/pkg/enums"
 	"time"
 
@@ -392,7 +393,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
-	connectSvc, err :=
+	connectSvc, connectHandler := connect.NewConnectGatewayService()
 
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
@@ -406,14 +407,12 @@ func start(ctx context.Context, opts StartOpts) error {
 			{At: "/", Router: devAPI},
 			{At: "/v0", Router: core.Router},
 			{At: "/debug", Handler: middleware.Profiler()},
-
+			{At: "/connect", Handler: connectHandler},
 		},
 		LocalEventKeys: opts.EventKeys,
 	})
 
-
-
-	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice)
+	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice, connectSvc)
 }
 
 func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Client, error) {
