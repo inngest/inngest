@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -498,6 +499,11 @@ func (q Queries) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([
 
 func (q Queries) WorkspaceEvents(ctx context.Context, params sqlc.WorkspaceEventsParams) ([]*sqlc.Event, error) {
 	if q.postgresDriver != nil {
+		// Keep CodeQL happy
+		if params.Limit > math.MaxInt32 || params.Limit < math.MinInt32 {
+			return nil, fmt.Errorf("limit must be a valid int32")
+		}
+
 		pgParams := sqlc_postgres.WorkspaceEventsParams{
 			InternalID:   params.Cursor,
 			ReceivedAt:   params.Before,
@@ -523,6 +529,11 @@ func (q Queries) WorkspaceEvents(ctx context.Context, params sqlc.WorkspaceEvent
 
 func (q Queries) WorkspaceNamedEvents(ctx context.Context, params sqlc.WorkspaceNamedEventsParams) ([]*sqlc.Event, error) {
 	if q.postgresDriver != nil {
+		// Keep CodeQL happy
+		if params.Limit > math.MaxInt32 || params.Limit < math.MinInt32 {
+			return nil, fmt.Errorf("limit must be a valid int32")
+		}
+
 		pgParams := sqlc_postgres.WorkspaceNamedEventsParams{
 			InternalID:   params.Cursor,
 			ReceivedAt:   params.Before,
