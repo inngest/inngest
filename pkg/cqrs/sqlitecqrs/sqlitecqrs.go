@@ -105,7 +105,7 @@ func up(db *sql.DB, opts SqliteCQRSOptions) error {
 		err    error
 		src    source.Driver
 		driver database.Driver
-		dbName string = ""
+		dbName string
 	)
 
 	// Grab the migration driver.
