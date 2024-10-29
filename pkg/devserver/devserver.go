@@ -392,6 +392,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
+	connectSvc, err :=
+
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
 	// server UI, events, and API for loading data.
@@ -404,9 +406,12 @@ func start(ctx context.Context, opts StartOpts) error {
 			{At: "/", Router: devAPI},
 			{At: "/v0", Router: core.Router},
 			{At: "/debug", Handler: middleware.Profiler()},
+
 		},
 		LocalEventKeys: opts.EventKeys,
 	})
+
+
 
 	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice)
 }
