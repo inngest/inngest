@@ -13,14 +13,15 @@ import (
 	"time"
 )
 
-const GatewaySubProtocol = "v0.connect.inngest.com"
-
 type connectGatewaySvc struct {
 	runCtx context.Context
 }
 
+const GatewaySubProtocol = "v0.connect.inngest.com"
+
 type gatewayMessageType string
 
+const gatewayMessageTypeHello gatewayMessageType = "gateway-hello"
 const gatewayMessageTypeSDKConnect gatewayMessageType = "sdk-connect"
 
 const gatewayMessageTypeExecutorRequest gatewayMessageType = "executor-request"
@@ -52,7 +53,9 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			ws.CloseNow()
 		}()
 
-		err = ws.Write(ctx, websocket.MessageText, []byte(`{"kind":"connect-hello"}`))
+		err = wsjson.Write(ctx, ws, gatewayMessage{
+			Kind: gatewayMessageTypeHello,
+		})
 		if err != nil {
 			return
 		}
