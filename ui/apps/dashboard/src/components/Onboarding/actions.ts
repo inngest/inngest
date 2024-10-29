@@ -1,6 +1,8 @@
 'use server';
 
 import { type InvokeFunctionMutationVariables } from '@/gql/graphql';
+import { getProductionEnvironment } from '@/queries/server-only/getEnvironment';
+import { getMetricsLookups, preloadMetricsLookups } from '../Metrics/data';
 import { invokeFn, syncNewApp } from './data';
 
 export async function syncAppManually(appURL: string) {
@@ -40,4 +42,17 @@ export async function invokeFunction({
     }
     return { success: false, error: error };
   }
+}
+
+export async function prefetchFunctions() {
+  const environment = await getProductionEnvironment();
+
+  preloadMetricsLookups(environment.slug);
+  const {
+    envBySlug: {
+      workflows: { data: functions },
+    },
+  } = await getMetricsLookups(environment.slug);
+
+  return functions;
 }

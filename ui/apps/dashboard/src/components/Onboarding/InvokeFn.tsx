@@ -1,30 +1,81 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Alert } from '@inngest/components/Alert/Alert';
 import { NewButton } from '@inngest/components/Button';
 import { CodeBlock } from '@inngest/components/CodeBlock/CodeBlock';
+import { parseCode } from '@inngest/components/InvokeButton/utils';
 import { NewLink } from '@inngest/components/Link';
 import { Select } from '@inngest/components/Select/Select';
 
 import { pathCreator } from '@/utils/urls';
+import { type EntityType } from '../Metrics/Dashboard';
 import { OnboardingSteps } from '../Onboarding/types';
+import { invokeFunction, prefetchFunctions } from './actions';
 import useOnboardingStep from './useOnboardingStep';
 
-/* TODO: fetch list of functions action */
-const functions = [
+const initialCode = JSON.stringify(
   {
-    id: '1',
-    name: 'Function 1',
+    data: {
+      example: 'type a JSON payload here to test your function',
+    },
   },
-  {
-    id: '2',
-    name: 'Function 2',
-  },
-];
+  null,
+  2
+);
 
 export default function InvokeFn() {
   const { updateLastCompletedStep } = useOnboardingStep();
-  const [selectedFunction, setSelectedFunction] = useState(functions[0]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>();
+  const [functions, setFunctions] = useState<EntityType[]>([]);
+  const [selectedFunction, setSelectedFunction] = useState<EntityType | undefined>();
+  const [rawPayload, setRawPayload] = useState(initialCode);
   const router = useRouter();
+
+  useEffect(() => {
+    const loadFunctions = async () => {
+      try {
+        setLoading(true);
+        const fetchedFunctions = await prefetchFunctions();
+        setFunctions(fetchedFunctions);
+
+        // // Set the initial selected function
+        // if (fetchedFunctions.length > 0) {
+        //   setSelectedFunction(fetchedFunctions[0]);
+        // }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load functions');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadFunctions();
+  }, []);
+  console.log(functions);
+  // const doesFunctionAcceptPayload =
+  //   fn?.current?.triggers.some((trigger) => {
+  //     return trigger.eventName;
+  //   }) ?? false;
+
+  const handleInvokeFn = async () => {
+    if (!selectedFunction || !selectedFunction.slug) return;
+    try {
+      const { success } = await invokeFunction({
+        functionSlug: selectedFunction.slug,
+        user: parseCode(rawPayload).user,
+        data: parseCode(rawPayload).data,
+      });
+      if (success) {
+        updateLastCompletedStep(OnboardingSteps.InvokeFn);
+        setError(undefined);
+      } else {
+        // setError()
+      }
+    } catch (err) {
+    } finally {
+    }
+  };
 
   return (
     <div className="text-subtle">
@@ -35,6 +86,7 @@ export default function InvokeFn() {
           className="inline-block"
           size="small"
           href="https://www.inngest.com/docs/features/events-triggers?ref=app-onboarding-invoke-fn"
+          target="_blank"
         >
           Read more
         </NewLink>
@@ -44,7 +96,7 @@ export default function InvokeFn() {
         <Select
           onChange={setSelectedFunction}
           isLabelVisible={false}
-          label="Select function"
+          label={loading ? 'Loading functions...' : 'Select function'}
           multiple={false}
           value={selectedFunction}
           className="mb-6"
@@ -68,28 +120,23 @@ export default function InvokeFn() {
           <CodeBlock
             header={{ title: 'Invoke function' }}
             tab={{
-              content: JSON.stringify(
-                {
-                  data: {
-                    example: 'type a JSON payload here to test your function',
-                  },
-                },
-                null,
-                2
-              ),
+              content: rawPayload,
               readOnly: false,
               language: 'json',
+              handleChange: setRawPayload,
             }}
           />
         </CodeBlock.Wrapper>
+        {error && (
+          <Alert className="mt-6" severity="error">
+            {error}
+          </Alert>
+        )}
         <div className="mt-6 flex items-center gap-2">
           <NewButton
             label="Invoke test function"
             onClick={() => {
-              updateLastCompletedStep(OnboardingSteps.InvokeFn);
-              {
-                /* TODO: add invoke action */
-              }
+              handleInvokeFn();
             }}
           />
           {/* TODO: add tracking */}
