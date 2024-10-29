@@ -3,15 +3,18 @@ import type { Route } from 'next';
 import { CancelRunButton } from '../CancelRunButton';
 import { Card } from '../Card';
 import {
+  ElementWrapper,
   IDElement,
   LazyElementWrapper,
   LinkElement,
+  OptimisticElementWrapper,
   TextElement,
   TimeElement,
 } from '../DetailsCard/Element';
 import { Link } from '../Link';
 import { RerunButton } from '../RerunButtonV2';
 import { RunResult } from '../RunResult';
+import type { Run as InitialRunData } from '../RunsPage/types';
 import type { Result } from '../types/functionRun';
 import { cn } from '../utils/classNames';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
@@ -27,6 +30,7 @@ type Props = {
     runPopout: (params: { runID: string }) => Route;
   };
   rerun: (args: { fnID: string; runID: string }) => Promise<unknown>;
+  initialRunData?: InitialRunData;
   run: Lazy<Run>;
   runID: string;
   result?: Result;
@@ -57,6 +61,7 @@ export function RunInfo({
   className,
   pathCreator,
   rerun,
+  initialRunData,
   run,
   runID,
   standalone,
@@ -92,13 +97,16 @@ export function RunInfo({
         <Card.Content>
           <div>
             <dl className="flex flex-wrap gap-4">
-              <LazyElementWrapper label="Run ID" lazy={run}>
-                {(run: Run) => {
-                  return <IDElement>{run.id}</IDElement>;
-                }}
-              </LazyElementWrapper>
+              <ElementWrapper label="Run ID">
+                <IDElement>{runID}</IDElement>
+              </ElementWrapper>
 
-              <LazyElementWrapper label="App" lazy={run}>
+              <OptimisticElementWrapper
+                label="App"
+                lazy={run}
+                initial={initialRunData}
+                optimisticChildren={(initialRun: InitialRunData) => <>{initialRun.app.name}</>}
+              >
                 {(run: Run) => {
                   return (
                     <LinkElement
@@ -110,9 +118,14 @@ export function RunInfo({
                     </LinkElement>
                   );
                 }}
-              </LazyElementWrapper>
+              </OptimisticElementWrapper>
 
-              <LazyElementWrapper label="Function" lazy={run}>
+              <OptimisticElementWrapper
+                label="Function"
+                lazy={run}
+                initial={initialRunData}
+                optimisticChildren={(initialRun: InitialRunData) => <>{initialRun.function.name}</>}
+              >
                 {(run: Run) => {
                   return (
                     <LinkElement
@@ -124,9 +137,14 @@ export function RunInfo({
                     </LinkElement>
                   );
                 }}
-              </LazyElementWrapper>
+              </OptimisticElementWrapper>
 
-              <LazyElementWrapper label="Duration" lazy={run}>
+              <OptimisticElementWrapper
+                label="Duration"
+                lazy={run}
+                initial={initialRunData}
+                optimisticChildren={(initialRun: InitialRunData) => <TextElement>-</TextElement>}
+              >
                 {(run: Run) => {
                   let durationText = '-';
 
@@ -139,15 +157,33 @@ export function RunInfo({
 
                   return <TextElement>{durationText}</TextElement>;
                 }}
-              </LazyElementWrapper>
+              </OptimisticElementWrapper>
 
-              <LazyElementWrapper label="Queued at" lazy={run}>
+              <OptimisticElementWrapper
+                label="Queued at"
+                lazy={run}
+                initial={initialRunData}
+                optimisticChildren={(initialRun: InitialRunData) =>
+                  initialRun.queuedAt ? (
+                    <TimeElement date={new Date(initialRun.queuedAt)} />
+                  ) : (
+                    <TextElement>-</TextElement>
+                  )
+                }
+              >
                 {(run: Run) => {
                   return <TimeElement date={new Date(run.trace.queuedAt)} />;
                 }}
-              </LazyElementWrapper>
+              </OptimisticElementWrapper>
 
-              <LazyElementWrapper label="Started at" lazy={run}>
+              <OptimisticElementWrapper
+                label="Started at"
+                lazy={run}
+                initial={initialRunData}
+                optimisticChildren={(initialRun: InitialRunData) =>
+                  initialRun?.status === 'QUEUED' ? <TextElement>-</TextElement> : null
+                }
+              >
                 {(run: Run) => {
                   const startedAt = toMaybeDate(run.trace.startedAt);
                   if (!startedAt) {
@@ -155,9 +191,16 @@ export function RunInfo({
                   }
                   return <TimeElement date={startedAt} />;
                 }}
-              </LazyElementWrapper>
+              </OptimisticElementWrapper>
 
-              <LazyElementWrapper label="Ended at" lazy={run}>
+              <OptimisticElementWrapper
+                label="Ended at"
+                lazy={run}
+                initial={initialRunData}
+                optimisticChildren={(initialRun: InitialRunData) =>
+                  initialRun?.status === 'QUEUED' ? <TextElement>-</TextElement> : null
+                }
+              >
                 {(run: Run) => {
                   const endedAt = toMaybeDate(run.trace.endedAt);
                   if (!endedAt) {
@@ -165,10 +208,25 @@ export function RunInfo({
                   }
                   return <TimeElement date={endedAt} />;
                 }}
-              </LazyElementWrapper>
+              </OptimisticElementWrapper>
             </dl>
           </div>
         </Card.Content>
+        {!result &&
+          !isLazyDone(run) &&
+          (initialRunData?.status === 'QUEUED' ? (
+            <div className="border-muted bg-canvas border-t">
+              <div className="border-l-status-queued flex items-center justify-start border-l-4">
+                <span className="relative ml-4 flex h-2.5 w-2.5">
+                  <span className="bg-status-queued absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"></span>
+                  <span className="bg-status-queued relative inline-flex h-2.5 w-2.5 rounded-full"></span>
+                </span>
+                <p className="text-subtle max-h-24 text-ellipsis break-words py-2.5 pl-3 text-sm">
+                  Queued run awaiting start...
+                </p>
+              </div>
+            </div>
+          ) : null)}
         {result && (
           <RunResult className="border-muted border-t" result={result} isSuccess={isSuccess} />
         )}

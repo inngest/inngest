@@ -24,8 +24,7 @@ func Int64ToRaw(i int64) uint64 {
 }
 
 func RawToInt64(r uint64) int64 {
-	// Assumes original was a valid int64 (overflow not checked).
-	return int64(r) // nolint: gosec
+	return int64(r)
 }
 
 func Float64ToRaw(f float64) uint64 {
@@ -37,11 +36,9 @@ func RawToFloat64(r uint64) float64 {
 }
 
 func RawPtrToFloat64Ptr(r *uint64) *float64 {
-	// Assumes original was a valid *float64 (overflow not checked).
-	return (*float64)(unsafe.Pointer(r)) // nolint: gosec
+	return (*float64)(unsafe.Pointer(r))
 }
 
 func RawPtrToInt64Ptr(r *uint64) *int64 {
-	// Assumes original was a valid *int64 (overflow not checked).
-	return (*int64)(unsafe.Pointer(r)) // nolint: gosec
+	return (*int64)(unsafe.Pointer(r))
 }

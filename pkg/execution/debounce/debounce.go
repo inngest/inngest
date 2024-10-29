@@ -127,16 +127,18 @@ type Debouncer interface {
 	DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID) error
 }
 
-func NewRedisDebouncer(d *redis_state.DebounceClient, q redis_state.QueueManager) Debouncer {
+func NewRedisDebouncer(d *redis_state.DebounceClient, defaultQueueShard redis_state.QueueShard, q redis_state.QueueManager) Debouncer {
 	return debouncer{
-		d: d,
-		q: q,
+		d:                 d,
+		q:                 q,
+		defaultQueueShard: defaultQueueShard,
 	}
 }
 
 type debouncer struct {
-	d *redis_state.DebounceClient
-	q redis_state.QueueManager
+	d                 *redis_state.DebounceClient
+	q                 redis_state.QueueManager
+	defaultQueueShard redis_state.QueueShard
 }
 
 // DeleteDebounceItem removes a debounce from the map.
@@ -274,7 +276,7 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 		// second lets an updateDebounce call on TTL 0 finish, as the buffer is the updateDebounce
 		// deadline.
 		qi := d.queueItem(ctx, di, debounceID)
-		err = d.q.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second))
+		err = d.q.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second), queue.EnqueueOpts{})
 		if err != nil {
 			return &debounceID, fmt.Errorf("error enqueueing debounce job: %w", err)
 		}
@@ -348,6 +350,7 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 		actualTTL := time.Second * time.Duration(out)
 		err = d.q.RequeueByJobID(
 			ctx,
+			d.defaultQueueShard,
 			debounceID.String(),
 			now.Add(actualTTL).Add(buffer).Add(time.Second),
 		)

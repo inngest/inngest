@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"github.com/google/uuid"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -22,6 +23,7 @@ func TestParseAttributes(t *testing.T) {
 				"uint":   uint(10),
 				"float":  0.2,
 				"bool":   true,
+				"uuid":   uuid.MustParse("a8267138-39c2-4a36-8fa3-ed530b765006"),
 			},
 			expected: []attribute.KeyValue{
 				{Key: attribute.Key("string"), Value: attribute.StringValue("world")},
@@ -30,6 +32,7 @@ func TestParseAttributes(t *testing.T) {
 				{Key: attribute.Key("uint"), Value: attribute.Int64Value(10)},
 				{Key: attribute.Key("float"), Value: attribute.Float64Value(0.2)},
 				{Key: attribute.Key("bool"), Value: attribute.BoolValue(true)},
+				{Key: attribute.Key("uuid"), Value: attribute.StringValue("a8267138-39c2-4a36-8fa3-ed530b765006")},
 			},
 		},
 		{

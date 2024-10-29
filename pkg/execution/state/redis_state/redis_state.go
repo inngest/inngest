@@ -1259,6 +1259,7 @@ func (m unshardedMgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.
 type bufIter struct {
 	r     rueidis.Client
 	items []string
+	idx   int64
 
 	val *state.Pause
 	err error
@@ -1280,6 +1281,10 @@ func (i *bufIter) Count() int {
 	return len(i.items)
 }
 
+func (i *bufIter) Index() int64 {
+	return i.idx
+}
+
 func (i *bufIter) Next(ctx context.Context) bool {
 	i.l.Lock()
 	defer i.l.Unlock()
@@ -1294,6 +1299,7 @@ func (i *bufIter) Next(ctx context.Context) bool {
 	i.val = pause
 	// Remove one from the slice.
 	i.items = i.items[1:]
+	i.idx++
 	return i.err == nil
 }
 
@@ -1321,6 +1327,7 @@ type scanIter struct {
 	// iterator fields
 	i      int
 	cursor int
+	idx    int64
 	vals   rueidis.ScanEntry
 	err    error
 
@@ -1349,6 +1356,10 @@ func (i *scanIter) init(ctx context.Context, key string, chunk int64) error {
 
 func (i *scanIter) Count() int {
 	return int(i.count)
+}
+
+func (i *scanIter) Index() int64 {
+	return i.idx
 }
 
 func (i *scanIter) fetch(ctx context.Context) error {
@@ -1405,6 +1416,7 @@ func (i *scanIter) Next(ctx context.Context) bool {
 	i.i++
 	// Get the value.
 	i.i++
+	i.idx++
 	return true
 }
 
@@ -1539,6 +1551,7 @@ type keyIter struct {
 	keys []string
 	// vals stores pauses as strings from MGET
 	vals []string
+	idx  int64
 	err  error
 }
 
@@ -1558,6 +1571,10 @@ func (i *keyIter) init(ctx context.Context, keys []string, chunk int64) error {
 
 func (i *keyIter) Count() int {
 	return len(i.keys)
+}
+
+func (i *keyIter) Index() int64 {
+	return i.idx
 }
 
 func (i *keyIter) fetch(ctx context.Context) error {

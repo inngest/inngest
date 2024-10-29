@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"reflect"
 	"strconv"
 	"strings"
 	"unicode"
@@ -110,7 +111,7 @@ func parseUntypedTextArray(src string) (*untypedTextArray, error) {
 
 	r, _, err := buf.ReadRune()
 	if err != nil {
-		return nil, fmt.Errorf("invalid array: %w", err)
+		return nil, fmt.Errorf("invalid array: %v", err)
 	}
 
 	var explicitDimensions []ArrayDimension
@@ -122,7 +123,7 @@ func parseUntypedTextArray(src string) (*untypedTextArray, error) {
 		for {
 			r, _, err = buf.ReadRune()
 			if err != nil {
-				return nil, fmt.Errorf("invalid array: %w", err)
+				return nil, fmt.Errorf("invalid array: %v", err)
 			}
 
 			if r == '=' {
@@ -133,12 +134,12 @@ func parseUntypedTextArray(src string) (*untypedTextArray, error) {
 
 			lower, err := arrayParseInteger(buf)
 			if err != nil {
-				return nil, fmt.Errorf("invalid array: %w", err)
+				return nil, fmt.Errorf("invalid array: %v", err)
 			}
 
 			r, _, err = buf.ReadRune()
 			if err != nil {
-				return nil, fmt.Errorf("invalid array: %w", err)
+				return nil, fmt.Errorf("invalid array: %v", err)
 			}
 
 			if r != ':' {
@@ -147,12 +148,12 @@ func parseUntypedTextArray(src string) (*untypedTextArray, error) {
 
 			upper, err := arrayParseInteger(buf)
 			if err != nil {
-				return nil, fmt.Errorf("invalid array: %w", err)
+				return nil, fmt.Errorf("invalid array: %v", err)
 			}
 
 			r, _, err = buf.ReadRune()
 			if err != nil {
-				return nil, fmt.Errorf("invalid array: %w", err)
+				return nil, fmt.Errorf("invalid array: %v", err)
 			}
 
 			if r != ']' {
@@ -164,12 +165,12 @@ func parseUntypedTextArray(src string) (*untypedTextArray, error) {
 
 		r, _, err = buf.ReadRune()
 		if err != nil {
-			return nil, fmt.Errorf("invalid array: %w", err)
+			return nil, fmt.Errorf("invalid array: %v", err)
 		}
 	}
 
 	if r != '{' {
-		return nil, fmt.Errorf("invalid array, expected '{' got %v", r)
+		return nil, fmt.Errorf("invalid array, expected '{': %v", err)
 	}
 
 	implicitDimensions := []ArrayDimension{{LowerBound: 1, Length: 0}}
@@ -178,7 +179,7 @@ func parseUntypedTextArray(src string) (*untypedTextArray, error) {
 	for {
 		r, _, err = buf.ReadRune()
 		if err != nil {
-			return nil, fmt.Errorf("invalid array: %w", err)
+			return nil, fmt.Errorf("invalid array: %v", err)
 		}
 
 		if r == '{' {
@@ -195,7 +196,7 @@ func parseUntypedTextArray(src string) (*untypedTextArray, error) {
 	for {
 		r, _, err = buf.ReadRune()
 		if err != nil {
-			return nil, fmt.Errorf("invalid array: %w", err)
+			return nil, fmt.Errorf("invalid array: %v", err)
 		}
 
 		switch r {
@@ -214,7 +215,7 @@ func parseUntypedTextArray(src string) (*untypedTextArray, error) {
 			buf.UnreadRune()
 			value, quoted, err := arrayParseValue(buf)
 			if err != nil {
-				return nil, fmt.Errorf("invalid array value: %w", err)
+				return nil, fmt.Errorf("invalid array value: %v", err)
 			}
 			if currentDim == counterDim {
 				implicitDimensions[currentDim].Length++
@@ -362,16 +363,36 @@ func quoteArrayElement(src string) string {
 }
 
 func isSpace(ch byte) bool {
-	// see array_isspace:
-	// https://github.com/postgres/postgres/blob/master/src/backend/utils/adt/arrayfuncs.c
-	return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\v' || ch == '\f'
+	// see https://github.com/postgres/postgres/blob/REL_12_STABLE/src/backend/parser/scansup.c#L224
+	return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\f'
 }
 
 func quoteArrayElementIfNeeded(src string) string {
-	if src == "" || (len(src) == 4 && strings.EqualFold(src, "null")) || isSpace(src[0]) || isSpace(src[len(src)-1]) || strings.ContainsAny(src, `{},"\`) {
+	if src == "" || (len(src) == 4 && strings.ToLower(src) == "null") || isSpace(src[0]) || isSpace(src[len(src)-1]) || strings.ContainsAny(src, `{},"\`) {
 		return quoteArrayElement(src)
 	}
 	return src
+}
+
+func findDimensionsFromValue(value reflect.Value, dimensions []ArrayDimension, elementsLength int) ([]ArrayDimension, int, bool) {
+	switch value.Kind() {
+	case reflect.Array:
+		fallthrough
+	case reflect.Slice:
+		length := value.Len()
+		if 0 == elementsLength {
+			elementsLength = length
+		} else {
+			elementsLength *= length
+		}
+		dimensions = append(dimensions, ArrayDimension{Length: int32(length), LowerBound: 1})
+		for i := 0; i < length; i++ {
+			if d, l, ok := findDimensionsFromValue(value.Index(i), dimensions, elementsLength); ok {
+				return d, l, true
+			}
+		}
+	}
+	return dimensions, elementsLength, true
 }
 
 // Array represents a PostgreSQL array for T. It implements the ArrayGetter and ArraySetter interfaces. It preserves

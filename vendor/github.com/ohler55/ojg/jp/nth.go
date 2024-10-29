@@ -59,6 +59,15 @@ func (f Nth) remove(value any) (out any, changed bool) {
 			out = append(tv[:i], tv[i+1:]...)
 			changed = true
 		}
+	case RemovableIndexed:
+		size := tv.Size()
+		if i < 0 {
+			i = size + i
+		}
+		if 0 <= i && i < size {
+			tv.RemoveValueAtIndex(i)
+			changed = true
+		}
 	default:
 		if rt := reflect.TypeOf(value); rt != nil {
 			if rt.Kind() == reflect.Slice {

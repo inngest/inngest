@@ -12,7 +12,15 @@ import (
 	"github.com/ohler55/ojg/gen"
 )
 
-// MustModify modifies matching nodes and panics on an expression error.
+// MustModify modifies matching nodes and panics on an expression error. In
+// go, maps can be modified in place as the map itself is modified. Slice
+// elements can be replaced in place but elements can not be added or removed
+// without potentially needing to replace the original slice with a new
+// one. This function and the other jp.Modify functions allow a slice to be
+// replaced by stopping at the parent of the target slice and applying a
+// modifier function to the target which is then replaced in the
+// parent. Without that functionality slice element can only be replaced.
+//
 // Modified elements replace the original element in the data. The modified
 // data is returned. Unless the data is a slice and modified the returned data
 // will be the same object as the original. The modifier function will be
@@ -123,19 +131,21 @@ done:
 							}
 						}
 					} else {
-						switch v.(type) {
-						case map[string]any, []any, gen.Object, gen.Array:
-							stack = append(stack, v)
-						default:
-							kind := reflect.Invalid
-							if rt := reflect.TypeOf(v); rt != nil {
-								kind = rt.Kind()
-							}
-							switch kind {
-							case reflect.Ptr, reflect.Slice, reflect.Struct, reflect.Array, reflect.Map:
-								stack = append(stack, v)
+						stack = stackAddValue(stack, v)
+					}
+				}
+			case Keyed:
+				if v, has = tv.ValueForKey(key); has {
+					if int(fi) == len(wx)-1 { // last one
+						if nv, changed := modifier(v); changed {
+							tv.SetValueForKey(key, nv)
+							if one && changed {
+								break done
 							}
 						}
+
+					} else {
+						stack = stackAddValue(stack, v)
 					}
 				}
 			case gen.Object:
@@ -164,19 +174,7 @@ done:
 							}
 						}
 					} else {
-						switch v.(type) {
-						case map[string]any, []any, gen.Object, gen.Array:
-							stack = append(stack, v)
-						default:
-							kind := reflect.Invalid
-							if rt := reflect.TypeOf(v); rt != nil {
-								kind = rt.Kind()
-							}
-							switch kind {
-							case reflect.Ptr, reflect.Slice, reflect.Struct, reflect.Array, reflect.Map:
-								stack = append(stack, v)
-							}
-						}
+						stack = stackAddValue(stack, v)
 					}
 				}
 			}
@@ -196,20 +194,25 @@ done:
 							}
 						}
 					} else {
-						v = tv[i]
-						switch v.(type) {
-						case map[string]any, []any, gen.Object, gen.Array:
-							stack = append(stack, v)
-						default:
-							kind := reflect.Invalid
-							if rt := reflect.TypeOf(v); rt != nil {
-								kind = rt.Kind()
-							}
-							switch kind {
-							case reflect.Ptr, reflect.Slice, reflect.Struct, reflect.Array, reflect.Map:
-								stack = append(stack, v)
+						stack = stackAddValue(stack, tv[i])
+					}
+				}
+			case Indexed:
+				size := tv.Size()
+				if i < 0 {
+					i = size + i
+				}
+				if 0 <= i && i < size {
+					v = tv.ValueAtIndex(i)
+					if int(fi) == len(wx)-1 { // last one
+						if nv, changed := modifier(v); changed {
+							tv.SetValueAtIndex(i, nv)
+							if one && changed {
+								break done
 							}
 						}
+					} else {
+						stack = stackAddValue(stack, v)
 					}
 				}
 			case gen.Array:
@@ -243,19 +246,7 @@ done:
 							}
 						}
 					} else {
-						switch v.(type) {
-						case map[string]any, []any, gen.Object, gen.Array:
-							stack = append(stack, v)
-						default:
-							kind := reflect.Invalid
-							if rt := reflect.TypeOf(v); rt != nil {
-								kind = rt.Kind()
-							}
-							switch kind {
-							case reflect.Ptr, reflect.Slice, reflect.Struct, reflect.Array, reflect.Map:
-								stack = append(stack, v)
-							}
-						}
+						stack = stackAddValue(stack, v)
 					}
 				}
 			}
@@ -274,19 +265,7 @@ done:
 					}
 				} else {
 					for _, v = range tv {
-						switch v.(type) {
-						case map[string]any, []any, gen.Object, gen.Array:
-							stack = append(stack, v)
-						default:
-							kind := reflect.Invalid
-							if rt := reflect.TypeOf(v); rt != nil {
-								kind = rt.Kind()
-							}
-							switch kind {
-							case reflect.Ptr, reflect.Slice, reflect.Struct, reflect.Array, reflect.Map:
-								stack = append(stack, v)
-							}
-						}
+						stack = stackAddValue(stack, v)
 					}
 				}
 			case []any:
@@ -301,19 +280,40 @@ done:
 					}
 				} else {
 					for _, v = range tv {
-						switch v.(type) {
-						case map[string]any, []any, gen.Object, gen.Array:
-							stack = append(stack, v)
-						default:
-							kind := reflect.Invalid
-							if rt := reflect.TypeOf(v); rt != nil {
-								kind = rt.Kind()
-							}
-							switch kind {
-							case reflect.Ptr, reflect.Slice, reflect.Struct, reflect.Array, reflect.Map:
-								stack = append(stack, v)
+						stack = stackAddValue(stack, v)
+					}
+				}
+			case Keyed:
+				if int(fi) == len(wx)-1 { // last one
+					for _, k := range tv.Keys() {
+						v, _ = tv.ValueForKey(k)
+						if nv, changed := modifier(v); changed {
+							tv.SetValueForKey(k, nv)
+							if one && changed {
+								break done
 							}
 						}
+					}
+				} else {
+					for _, k := range tv.Keys() {
+						v, _ = tv.ValueForKey(k)
+						stack = stackAddValue(stack, v)
+					}
+				}
+			case Indexed:
+				size := tv.Size()
+				if int(fi) == len(wx)-1 { // last one
+					for i := 0; i < size; i++ {
+						if nv, changed := modifier(tv.ValueAtIndex(i)); changed {
+							tv.SetValueAtIndex(i, nv)
+							if one && changed {
+								break done
+							}
+						}
+					}
+				} else {
+					for i := 0; i < size; i++ {
+						stack = stackAddValue(stack, tv.ValueAtIndex(i))
 					}
 				}
 			case gen.Object:
@@ -385,19 +385,7 @@ done:
 					}
 				} else {
 					for _, v := range wx.reflectGetWild(tv) {
-						switch v.(type) {
-						case map[string]any, []any, gen.Object, gen.Array:
-							stack = append(stack, v)
-						default:
-							kind := reflect.Invalid
-							if rt := reflect.TypeOf(v); rt != nil {
-								kind = rt.Kind()
-							}
-							switch kind {
-							case reflect.Ptr, reflect.Slice, reflect.Struct, reflect.Array, reflect.Map:
-								stack = append(stack, v)
-							}
-						}
+						stack = stackAddValue(stack, v)
 					}
 				}
 			}
@@ -417,19 +405,20 @@ done:
 									}
 								}
 							} else {
-								switch v.(type) {
-								case map[string]any, []any, gen.Object, gen.Array:
-									stack = append(stack, v)
-								default:
-									kind := reflect.Invalid
-									if rt := reflect.TypeOf(v); rt != nil {
-										kind = rt.Kind()
-									}
-									switch kind {
-									case reflect.Ptr, reflect.Slice, reflect.Struct, reflect.Array, reflect.Map:
-										stack = append(stack, v)
+								stack = stackAddValue(stack, v)
+							}
+						}
+					case Keyed:
+						if v, has = tv.ValueForKey(tu); has {
+							if int(fi) == len(wx)-1 { // last one
+								if nv, changed := modifier(v); changed {
+									tv.SetValueForKey(tu, nv)
+									if one && changed {
+										break done
 									}
 								}
+							} else {
+								stack = stackAddValue(stack, v)
 							}
 						}
 					case gen.Object:
@@ -459,19 +448,7 @@ done:
 									}
 								}
 							} else {
-								switch v.(type) {
-								case map[string]any, []any, gen.Object, gen.Array:
-									stack = append(stack, v)
-								default:
-									kind := reflect.Invalid
-									if rt := reflect.TypeOf(v); rt != nil {
-										kind = rt.Kind()
-									}
-									switch kind {
-									case reflect.Ptr, reflect.Slice, reflect.Struct, reflect.Array, reflect.Map:
-										stack = append(stack, v)
-									}
-								}
+								stack = stackAddValue(stack, v)
 							}
 						}
 					}
@@ -492,19 +469,25 @@ done:
 									}
 								}
 							} else {
-								switch v.(type) {
-								case map[string]any, []any, gen.Object, gen.Array:
-									stack = append(stack, v)
-								default:
-									kind := reflect.Invalid
-									if rt := reflect.TypeOf(v); rt != nil {
-										kind = rt.Kind()
-									}
-									switch kind {
-									case reflect.Ptr, reflect.Slice, reflect.Struct, reflect.Array, reflect.Map:
-										stack = append(stack, v)
+								stack = stackAddValue(stack, v)
+							}
+						}
+					case Indexed:
+						size := tv.Size()
+						if i < 0 {
+							i = size + i
+						}
+						if 0 <= i && i < size {
+							v = tv.ValueAtIndex(i)
+							if int(fi) == len(wx)-1 { // last one
+								if nv, changed := modifier(v); changed {
+									tv.SetValueAtIndex(i, nv)
+									if one && changed {
+										break done
 									}
 								}
+							} else {
+								stack = stackAddValue(stack, v)
 							}
 						}
 					case gen.Array:
@@ -548,19 +531,7 @@ done:
 						} else {
 							var has bool
 							if v, has = wx.reflectGetNth(tv, i); has {
-								switch v.(type) {
-								case map[string]any, []any, gen.Object, gen.Array:
-									stack = append(stack, v)
-								default:
-									kind := reflect.Invalid
-									if rt := reflect.TypeOf(v); rt != nil {
-										kind = rt.Kind()
-									}
-									switch kind {
-									case reflect.Ptr, reflect.Slice, reflect.Struct, reflect.Array, reflect.Map:
-										stack = append(stack, v)
-									}
-								}
+								stack = stackAddValue(stack, v)
 							}
 						}
 					}
@@ -605,7 +576,7 @@ done:
 							}
 						} else {
 							switch v.(type) {
-							case map[string]any, []any, gen.Object, gen.Array:
+							case map[string]any, []any, gen.Object, gen.Array, Keyed, Indexed:
 								stack = append(stack, v)
 							}
 						}
@@ -622,7 +593,56 @@ done:
 							}
 						} else {
 							switch v.(type) {
-							case map[string]any, []any, gen.Object, gen.Array:
+							case map[string]any, []any, gen.Object, gen.Array, Keyed, Indexed:
+								stack = append(stack, v)
+							}
+						}
+					}
+				}
+			case Indexed:
+				size := tv.Size()
+				if start < 0 {
+					start = size + start
+				}
+				if end < 0 {
+					end = size + end
+				}
+				if size <= end {
+					end = size - 1
+				}
+				if start < 0 || end < 0 || size <= start || step == 0 {
+					continue
+				}
+				if 0 < step {
+					for i := start; i <= end; i += step {
+						v = tv.ValueAtIndex(i)
+						if int(fi) == len(wx)-1 { // last one
+							if nv, changed := modifier(v); changed {
+								tv.SetValueAtIndex(i, nv)
+								if one && changed {
+									break done
+								}
+							}
+						} else {
+							switch v.(type) {
+							case map[string]any, []any, gen.Object, gen.Array, Keyed, Indexed:
+								stack = append(stack, v)
+							}
+						}
+					}
+				} else {
+					for i := start; end <= i; i += step {
+						v = tv.ValueAtIndex(i)
+						if int(fi) == len(wx)-1 { // last one
+							if nv, changed := modifier(v); changed {
+								tv.SetValueAtIndex(i, nv)
+								if one && changed {
+									break done
+								}
+							}
+						} else {
+							switch v.(type) {
+							case map[string]any, []any, gen.Object, gen.Array, Keyed, Indexed:
 								stack = append(stack, v)
 							}
 						}
@@ -716,20 +736,8 @@ done:
 						}
 					}
 				} else {
-					for _, v := range wx.reflectGetSlice(tv, start, end, step) {
-						switch v.(type) {
-						case map[string]any, []any, gen.Object, gen.Array:
-							stack = append(stack, v)
-						default:
-							kind := reflect.Invalid
-							if rt := reflect.TypeOf(v); rt != nil {
-								kind = rt.Kind()
-							}
-							switch kind {
-							case reflect.Ptr, reflect.Slice, reflect.Struct, reflect.Array, reflect.Map:
-								stack = append(stack, v)
-							}
-						}
+					for _, v = range wx.reflectGetSlice(tv, start, end, step) {
+						stack = stackAddValue(stack, v)
 					}
 				}
 			}
@@ -741,6 +749,19 @@ done:
 						if tf.Match(vv) {
 							if nv, changed := modifier(vv); changed {
 								tv[i] = nv
+								if one && changed {
+									break done
+								}
+							}
+						}
+					}
+				case Indexed:
+					size := tv.Size()
+					for i := 0; i < size; i++ {
+						v = tv.ValueAtIndex(i)
+						if tf.Match(v) {
+							if nv, changed := modifier(v); changed {
+								tv.SetValueAtIndex(i, nv)
 								if one && changed {
 									break done
 								}
@@ -808,45 +829,30 @@ done:
 					stack[len(stack)-1] = prev
 					stack = append(stack, di|descentFlag)
 					for _, v = range tv {
-						switch v.(type) {
-						case nil, gen.Bool, gen.Int, gen.Float, gen.String,
-							bool, string, float64, float32, int, uint, int8, int16, int32, int64, uint8, uint16, uint32, uint64:
-						case map[string]any, []any, gen.Object, gen.Array:
-							stack = append(stack, v)
-							stack = append(stack, fi|descentChildFlag)
-						default:
-							kind := reflect.Invalid
-							if rt := reflect.TypeOf(v); rt != nil {
-								kind = rt.Kind()
-							}
-							switch kind {
-							case reflect.Ptr, reflect.Slice, reflect.Struct, reflect.Array, reflect.Map:
-								stack = append(stack, v)
-							}
-						}
+						stack = descentAddValue(stack, v, fi)
 					}
 				case []any:
 					// Put prev back and slide fi.
 					stack[len(stack)-1] = prev
 					stack = append(stack, di|descentFlag)
 					for i := len(tv) - 1; 0 <= i; i-- {
-						v = tv[i]
-						switch v.(type) {
-						case nil, gen.Bool, gen.Int, gen.Float, gen.String,
-							bool, string, float64, float32, int, uint, int8, int16, int32, int64, uint8, uint16, uint32, uint64:
-						case map[string]any, []any, gen.Object, gen.Array:
-							stack = append(stack, v)
-							stack = append(stack, fi|descentChildFlag)
-						default:
-							kind := reflect.Invalid
-							if rt := reflect.TypeOf(v); rt != nil {
-								kind = rt.Kind()
-							}
-							switch kind {
-							case reflect.Ptr, reflect.Slice, reflect.Struct, reflect.Array, reflect.Map:
-								stack = append(stack, v)
-							}
-						}
+						stack = descentAddValue(stack, tv[i], fi)
+					}
+				case Keyed:
+					// Put prev back and slide fi.
+					stack[len(stack)-1] = prev
+					stack = append(stack, di|descentFlag)
+					for _, k := range tv.Keys() {
+						v, _ = tv.ValueForKey(k)
+						stack = descentAddValue(stack, v, fi)
+					}
+				case Indexed:
+					// Put prev back and slide fi.
+					stack[len(stack)-1] = prev
+					stack = append(stack, di|descentFlag)
+					size := tv.Size()
+					for i := size - 1; 0 <= i; i-- {
+						stack = descentAddValue(stack, tv.ValueAtIndex(i), fi)
 					}
 				case gen.Object:
 					// Put prev back and slide fi.
@@ -854,7 +860,7 @@ done:
 					stack = append(stack, di|descentFlag)
 					for _, v = range tv {
 						switch v.(type) {
-						case map[string]any, []any, gen.Object, gen.Array:
+						case map[string]any, []any, gen.Object, gen.Array, Keyed, Indexed:
 							stack = append(stack, v)
 							stack = append(stack, fi|descentChildFlag)
 						}
@@ -866,7 +872,7 @@ done:
 					for i := len(tv) - 1; 0 <= i; i-- {
 						v = tv[i]
 						switch v.(type) {
-						case map[string]any, []any, gen.Object, gen.Array:
+						case map[string]any, []any, gen.Object, gen.Array, Keyed, Indexed:
 							stack = append(stack, v)
 							stack = append(stack, fi|descentChildFlag)
 						}
@@ -906,4 +912,42 @@ done:
 		}
 	}
 	return wrap[0]
+}
+
+func stackAddValue(stack []any, v any) []any {
+	switch v.(type) {
+	case map[string]any, []any, gen.Object, gen.Array, Keyed, Indexed:
+		stack = append(stack, v)
+	default:
+		kind := reflect.Invalid
+		if rt := reflect.TypeOf(v); rt != nil {
+			kind = rt.Kind()
+		}
+		switch kind {
+		case reflect.Ptr, reflect.Slice, reflect.Struct, reflect.Array, reflect.Map:
+			stack = append(stack, v)
+		}
+	}
+	return stack
+}
+
+func descentAddValue(stack []any, v any, fi fragIndex) []any {
+	switch v.(type) {
+	case nil, gen.Bool, gen.Int, gen.Float, gen.String,
+		bool, string, float64, float32,
+		int, uint, int8, int16, int32, int64, uint8, uint16, uint32, uint64:
+	case map[string]any, []any, gen.Object, gen.Array, Keyed, Indexed:
+		stack = append(stack, v)
+		stack = append(stack, fi|descentChildFlag)
+	default:
+		kind := reflect.Invalid
+		if rt := reflect.TypeOf(v); rt != nil {
+			kind = rt.Kind()
+		}
+		switch kind {
+		case reflect.Ptr, reflect.Slice, reflect.Struct, reflect.Array, reflect.Map:
+			stack = append(stack, v)
+		}
+	}
+	return stack
 }

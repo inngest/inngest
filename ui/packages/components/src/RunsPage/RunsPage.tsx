@@ -15,8 +15,9 @@ import {
   isFunctionTimeField,
   type FunctionRunStatus,
 } from '@inngest/components/types/functionRun';
+import { cn } from '@inngest/components/utils/classNames';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
-import { RiArrowRightUpLine, RiRefreshLine } from '@remixicon/react';
+import { RiArrowRightUpLine, RiRefreshLine, RiSearchLine } from '@remixicon/react';
 import { type VisibilityState } from '@tanstack/react-table';
 import { useLocalStorage } from 'react-use';
 
@@ -237,18 +238,19 @@ export function RunsPage({
   );
 
   const renderSubComponent = useCallback(
-    ({ id }: { id: string }) => {
+    (rowData: Run) => {
       return (
         <div className="border-subtle border-l-4 pb-6">
           <RunDetails
             cancelRun={cancelRun}
             getResult={getTraceResult}
             getRun={getRun}
+            initialRunData={rowData}
             getTrigger={getTrigger}
             pathCreator={pathCreator}
             pollInterval={pollInterval}
             rerun={rerun}
-            runID={id}
+            runID={rowData.id}
             standalone={false}
           />
         </div>
@@ -330,22 +332,24 @@ export function RunsPage({
                 entities={functions}
               />
             )}
-
-            <TotalCount totalCount={totalCount} />
-          </div>
-          <div className="flex items-center gap-2">
             {hasSearchFlag && (
               <NewButton
-                appearance="ghost"
+                icon={<RiSearchLine />}
+                iconSide="left"
+                appearance="outlined"
                 label={showSearch ? 'Hide search' : 'Show search'}
                 onClick={() => setShowSearch((prev) => !prev)}
-                className={
+                className={cn(
+                  'h-[42px]',
                   search
                     ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
                     : ''
-                }
+                )}
               />
             )}
+            <TotalCount totalCount={totalCount} />
+          </div>
+          <div className="flex items-center gap-2">
             <TableFilter
               columnVisibility={columnVisibility}
               setColumnVisibility={setColumnVisibility}
@@ -368,8 +372,7 @@ export function RunsPage({
                 icon={<RiArrowRightUpLine />}
                 iconSide="right"
                 size="small"
-                // TODO: enable when docs are up
-                disabled
+                href="https://www.inngest.com/docs/platform/monitor/inspecting-function-runs#searching-function-runs?ref=app-runs-search"
               />
             </div>
             <CodeSearch

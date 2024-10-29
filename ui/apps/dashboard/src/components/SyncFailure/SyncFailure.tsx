@@ -1,13 +1,15 @@
 import { Alert } from '@inngest/components/Alert';
+import { cn } from '@inngest/components/utils/classNames';
 
 import { httpDataSchema, type CodedError } from '@/codedError';
 import { getMessage } from './utils';
 
 type Props = {
   error: CodedError;
+  className?: string;
 };
 
-export function SyncFailure({ error }: Props) {
+export function SyncFailure({ error, className }: Props) {
   let dataJSON: unknown;
   if (typeof error.data === 'string') {
     try {
@@ -20,7 +22,7 @@ export function SyncFailure({ error }: Props) {
   const httpData = httpDataSchema.safeParse(dataJSON);
 
   return (
-    <Alert className="my-2" severity="error">
+    <Alert className={cn('my-2', className)} severity="error">
       <span>{getMessage(error)}</span>
 
       {httpData.success && httpData.data.statusCode > 0 && (

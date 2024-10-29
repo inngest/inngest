@@ -38,11 +38,17 @@ func (dst *AuthenticationSASLContinue) Decode(src []byte) error {
 }
 
 // Encode encodes src into dst. dst will include the 1 byte message type identifier and the 4 byte message length.
-func (src *AuthenticationSASLContinue) Encode(dst []byte) ([]byte, error) {
-	dst, sp := beginMessage(dst, 'R')
+func (src *AuthenticationSASLContinue) Encode(dst []byte) []byte {
+	dst = append(dst, 'R')
+	sp := len(dst)
+	dst = pgio.AppendInt32(dst, -1)
 	dst = pgio.AppendUint32(dst, AuthTypeSASLContinue)
+
 	dst = append(dst, src.Data...)
-	return finishMessage(dst, sp)
+
+	pgio.SetInt32(dst[sp:], int32(len(dst[sp:])))
+
+	return dst
 }
 
 // MarshalJSON implements encoding/json.Marshaler.

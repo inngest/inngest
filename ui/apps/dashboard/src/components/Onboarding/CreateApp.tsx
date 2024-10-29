@@ -5,6 +5,7 @@ import { Card } from '@inngest/components/Card/Card';
 import CommandBlock from '@inngest/components/CodeBlock/CommandBlock';
 import { NewLink } from '@inngest/components/Link';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
+import { useDevServer } from '@inngest/components/utils/useDevServer';
 import { RiCheckboxCircleFill, RiExternalLinkLine } from '@remixicon/react';
 
 import { pathCreator } from '@/utils/urls';
@@ -14,22 +15,17 @@ import useOnboardingStep from './useOnboardingStep';
 const tabs = [
   {
     title: 'npm',
-    content: 'npm install inngest',
-    language: 'shell', // TODO: add shell language to monaco
+    content: 'npx inngest-cli@latest dev',
+    language: 'shell',
   },
   {
     title: 'yarn',
-    content: 'yarn add inngest',
+    content: 'yarn dlx inngest-cli@latest dev',
     language: 'shell',
   },
   {
     title: 'pnpm',
-    content: 'pnpm add inngest',
-    language: 'shell',
-  },
-  {
-    title: 'bun',
-    content: 'bun add inngest',
+    content: 'pnpm dlx inngest-cli@latest dev',
     language: 'shell',
   },
 ];
@@ -39,13 +35,7 @@ export default function CreateApp() {
   const [activeTab, setActiveTab] = useState(tabs[0]?.title || '');
   const currentTabContent = tabs.find((tab) => tab.title === activeTab) || tabs[0];
   const router = useRouter();
-
-  {
-    /* TODO: add request to check dev server with polling */
-  }
-  const devServerIsRunning = (): boolean => {
-    return Math.random() < 0.5;
-  };
+  const { isRunning: devServerIsRunning } = useDevServer(2500);
 
   return (
     <div className="text-subtle">
@@ -60,6 +50,7 @@ export default function CreateApp() {
         <NewLink
           className="inline-block"
           size="small"
+          target="_blank"
           href="https://www.inngest.com/docs/local-development?ref=app-onboarding-create-app"
         >
           Learn more about local development
@@ -80,7 +71,7 @@ export default function CreateApp() {
           <div>
             <div className="mb-1 flex items-center gap-1">
               <p className=" text-basis text-base font-medium">Dev Server UI</p>
-              {devServerIsRunning() && (
+              {devServerIsRunning && (
                 <div className="text-success flex items-center gap-0.5 text-sm">
                   <RiCheckboxCircleFill className="h-4 w-4" />
                   Running
@@ -95,7 +86,7 @@ export default function CreateApp() {
               and follow the guide to create your app.
             </p>
           </div>
-          {devServerIsRunning() ? (
+          {devServerIsRunning ? (
             <NewButton
               icon={<RiExternalLinkLine />}
               iconSide="left"

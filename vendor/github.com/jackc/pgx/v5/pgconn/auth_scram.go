@@ -42,12 +42,12 @@ func (c *PgConn) scramAuth(serverAuthMechanisms []string) error {
 		Data:          sc.clientFirstMessage(),
 	}
 	c.frontend.Send(saslInitialResponse)
-	err = c.flushWithPotentialWriteReadDeadlock()
+	err = c.frontend.Flush()
 	if err != nil {
 		return err
 	}
 
-	// Receive server-first-message payload in an AuthenticationSASLContinue.
+	// Receive server-first-message payload in a AuthenticationSASLContinue.
 	saslContinue, err := c.rxSASLContinue()
 	if err != nil {
 		return err
@@ -62,12 +62,12 @@ func (c *PgConn) scramAuth(serverAuthMechanisms []string) error {
 		Data: []byte(sc.clientFinalMessage()),
 	}
 	c.frontend.Send(saslResponse)
-	err = c.flushWithPotentialWriteReadDeadlock()
+	err = c.frontend.Flush()
 	if err != nil {
 		return err
 	}
 
-	// Receive server-final-message payload in an AuthenticationSASLFinal.
+	// Receive server-final-message payload in a AuthenticationSASLFinal.
 	saslFinal, err := c.rxSASLFinal()
 	if err != nil {
 		return err

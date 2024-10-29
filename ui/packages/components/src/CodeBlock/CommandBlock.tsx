@@ -4,7 +4,13 @@ import { useEffect, useRef, useState } from 'react';
 import { CopyButton } from '@inngest/components/CopyButton';
 import { useCopyToClipboard } from '@inngest/components/hooks/useCopyToClipboard';
 import { cn } from '@inngest/components/utils/classNames';
-import { FONT, LINE_HEIGHT, createColors, createRules } from '@inngest/components/utils/monaco';
+import {
+  FONT,
+  LINE_HEIGHT,
+  createColors,
+  createRules,
+  shellLanguageTokens,
+} from '@inngest/components/utils/monaco';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import * as Tabs from '@radix-ui/react-tabs';
 import { type editor } from 'monaco-editor';
@@ -46,6 +52,9 @@ const CommandBlock = ({ currentTabContent }: { currentTabContent?: TabsProps }) 
       rules: dark ? createRules(true) : createRules(false),
       colors: dark ? createColors(true) : createColors(false),
     });
+
+    monaco.languages.register({ id: 'shell' });
+    monaco.languages.setMonarchTokensProvider('shell', shellLanguageTokens);
   }, [monaco, dark]);
 
   const handleEditorDidMount = (editor: MonacoEditorType) => {

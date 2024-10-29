@@ -82,6 +82,9 @@ func ParseStream(resp []byte) (*StreamResponse, error) {
 	if err := json.Unmarshal(resp, &body); err != nil {
 		return nil, fmt.Errorf("error reading response body to check for status code: %w", err)
 	}
+	if body.Error != nil {
+		return nil, fmt.Errorf("%s", *body.Error)
+	}
 	// Check to see if the body is double-encoded.
 	if len(body.Body) > 0 && body.Body[0] == '"' && body.Body[len(body.Body)-1] == '"' {
 		var str string
@@ -93,6 +96,7 @@ func ParseStream(resp []byte) (*StreamResponse, error) {
 }
 
 type StreamResponse struct {
+	Error      *string           `json:"error"`
 	StatusCode int               `json:"status"`
 	Body       json.RawMessage   `json:"body"`
 	Headers    map[string]string `json:"headers"`

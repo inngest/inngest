@@ -171,7 +171,7 @@ func (d *devserver) Run(ctx context.Context) error {
 			fmt.Println("")
 			fmt.Println("")
 			fmt.Print(cli.BoldStyle.Render(fmt.Sprintf("\tInngest%s online ", prettyName)))
-			fmt.Printf(cli.TextStyle.Render(fmt.Sprintf("at %s, visible at the following URLs:", addr)) + "\n\n")
+			fmt.Printf("%s\n\n", cli.TextStyle.Render(fmt.Sprintf("at %s, visible at the following URLs:", addr)))
 			for n, ip := range localIPs() {
 				style := cli.BoldStyle
 				if n > 0 {

@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/enums"
 	"math"
 	"math/rand"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/inngest/inngest/pkg/enums"
 
 	"github.com/google/uuid"
 
@@ -76,7 +77,7 @@ func GetItemConcurrencyLatency(ctx context.Context) (time.Duration, bool) {
 // Enqueue adds an item to the queue to be processed at the given time.
 // TODO: Lift this function and the queue interface to a higher level, so that it's disconnected from the
 // concrete Redis implementation.
-func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) error {
+func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time, opts osqueue.EnqueueOpts) error {
 	// propagate
 	if item.Metadata == nil {
 		item.Metadata = map[string]string{}
@@ -120,7 +121,11 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 
 	shard := q.primaryQueueShard
 	if q.shardSelector != nil {
-		selected, err := q.shardSelector(ctx, qi)
+		qn := qi.Data.QueueName
+		if qn == nil {
+			qn = qi.QueueName
+		}
+		selected, err := q.shardSelector(ctx, qi.Data.Identifier.AccountID, qn)
 		if err != nil {
 			q.logger.Error().Err(err).Interface("qi", qi).Msg("error selecting shard")
 			return fmt.Errorf("could not select shard: %w", err)
@@ -140,7 +145,7 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 
 	switch shard.Kind {
 	case string(enums.QueueShardKindRedis):
-		_, err := q.EnqueueItem(ctx, shard, qi, next)
+		_, err := q.EnqueueItem(ctx, shard, qi, next, opts)
 		if err != nil {
 			return err
 		}
@@ -452,7 +457,7 @@ func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimi
 				metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"shard": metricShardName, "queue_shard": q.primaryQueueShard.Name}})
 				return nil
 			}
-			if err := q.processPartition(ctx, &p, guaranteedCapacity); err != nil {
+			if err := q.processPartition(ctx, &p, guaranteedCapacity, false); err != nil {
 				if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
 					// Another worker grabbed the partition, or the partition was deleted
 					// during the scan by an another worker.
@@ -638,7 +643,7 @@ func (q *queue) scan(ctx context.Context) error {
 
 // NOTE: Shard is only passed as a reference if the partition was peeked from
 // a shard.  It exists for accounting and tracking purposes only, eg. to report shard metrics.
-func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guaranteedCapacity *GuaranteedCapacity) error {
+func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guaranteedCapacity *GuaranteedCapacity, randomOffset bool) error {
 	// Attempt to lease items.  This checks partition-level concurrency limits
 	//
 	// For optimization, because this is the only thread that can be leasing
@@ -737,6 +742,11 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 		// NOTE: would love to instrument this value to see it over time per function but
 		// it's likely too high of a cardinality
 		go metrics.HistogramQueuePeekEWMA(ctx, peek, metrics.HistogramOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
+
+		if randomOffset {
+			return q.PeekRandom(peekCtx, p, fetch, peek)
+		}
+
 		return q.Peek(peekCtx, p, fetch, peek)
 	})
 	if err != nil {
@@ -750,8 +760,10 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 	// parallel all queue names with internal mappings for now.
 	// XXX: Allow parallel partitions for all functions except for fns opting into FIFO
 	_, isSystemFn := q.queueKindMapping[p.Queue()]
-	_, parallel := q.disableFifoForFunctions[p.Queue()]
+	_, parallelFn := q.disableFifoForFunctions[p.Queue()]
 	_, parallelAccount := q.disableFifoForAccounts[p.AccountID.String()]
+
+	parallel := parallelFn || parallelAccount || isSystemFn
 
 	iter := processor{
 		partition:          p,
@@ -760,7 +772,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 		queue:              q,
 		denies:             newLeaseDenyList(),
 		staticTime:         q.clock.Now(),
-		parallel:           parallel || parallelAccount || isSystemFn,
+		parallel:           parallel,
 	}
 
 	if processErr := iter.iterate(ctx); processErr != nil {
@@ -774,6 +786,19 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 		if err := q.setPeekEWMA(ctx, p.FunctionID, int64(iter.ctrConcurrency+iter.ctrRateLimit)); err != nil {
 			log.From(ctx).Warn().Err(err).Msg("error recording concurrency limit for EWMA")
 		}
+	}
+
+	if iter.isRequeuable() && iter.isCustomKeyLimitOnly && !randomOffset && parallel {
+		// We hit custom concurrency key issues.  Re-process this partition at a random offset, as long
+		// as random offset is currently false (so we don't loop forever)
+
+		// Note: we must requeue the partition to remove the lease.
+		err := q.PartitionRequeue(ctx, q.primaryQueueShard, p, q.clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
+		if err != nil {
+			log.From(ctx).Warn().Err(err).Msg("error requeuieng partition for random peek")
+		}
+
+		return q.processPartition(ctx, p, guaranteedCapacity, true)
 	}
 
 	// If we've hit concurrency issues OR we've only hit rate limit issues, re-enqueue the partition
@@ -944,12 +969,16 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi osqueue.QueueI
 		})
 
 		runInfo := osqueue.RunInfo{
-			Latency:      latency,
-			SojournDelay: sojourn,
-			Priority:     q.ppf(ctx, p),
+			Latency:        latency,
+			SojournDelay:   sojourn,
+			Priority:       q.ppf(ctx, p),
+			QueueShardName: q.primaryQueueShard.Name,
 		}
 		if s != nil {
-			runInfo.GuaranteedCapacityKey = s.Key()
+			runInfo.GuaranteedCapacityKey = s.Name
+			if runInfo.GuaranteedCapacityKey == "" {
+				runInfo.GuaranteedCapacityKey = s.Key()
+			}
 		}
 
 		// Call the run func.
@@ -1001,7 +1030,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi osqueue.QueueI
 			}
 
 			qi.AtMS = at.UnixMilli()
-			if err := q.Requeue(context.WithoutCancel(ctx), qi, at); err != nil {
+			if err := q.Requeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi, at); err != nil {
 				q.logger.Error().Err(err).Interface("item", qi).Msg("error requeuing job")
 				return err
 			}
@@ -1014,7 +1043,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi osqueue.QueueI
 
 		// Dequeue this entirely, as this permanently failed.
 		// XXX: Increase permanently failed counter here.
-		if err := q.Dequeue(context.WithoutCancel(ctx), qi); err != nil {
+		if err := q.Dequeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil
@@ -1029,7 +1058,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi osqueue.QueueI
 		}
 
 	case <-doneCh:
-		if err := q.Dequeue(context.WithoutCancel(ctx), qi); err != nil {
+		if err := q.Dequeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil
@@ -1096,11 +1125,11 @@ func (q *queue) peekSizeRandom(_ context.Context, _ *QueuePartition) int64 {
 	// set ranges
 	pmin := q.peekMin
 	if pmin == 0 {
-		pmin = QueuePeekMin
+		pmin = q.peekMin
 	}
 	pmax := q.peekMax
 	if pmax == 0 {
-		pmax = QueuePeekMax
+		pmax = q.peekMax
 	}
 
 	// Take a random amount between our range.
@@ -1135,11 +1164,11 @@ func (q *queue) ewmaPeekSize(ctx context.Context, p *QueuePartition) int64 {
 	// set ranges
 	pmin := q.peekMin
 	if pmin == 0 {
-		pmin = QueuePeekMin
+		pmin = DefaultQueuePeekMin
 	}
 	pmax := q.peekMax
 	if pmax == 0 {
-		pmax = QueuePeekMax
+		pmax = DefaultQueuePeekMax
 	}
 
 	// calculate size with EWMA and multiplier
@@ -1285,10 +1314,18 @@ type processor struct {
 	ctrSuccess     int32
 	ctrConcurrency int32
 	ctrRateLimit   int32
+
+	// isCustomKeyLimitOnly records whether we ONLY hit custom concurrency key limits.
+	// This lets us know whether to peek from a random offset if we have FIFO disabled
+	// to attempt to find other possible functions outside of the key(s) with issues.
+	isCustomKeyLimitOnly bool
 }
 
 func (p *processor) iterate(ctx context.Context) error {
 	var err error
+
+	// set flag to true to begin with
+	p.isCustomKeyLimitOnly = true
 
 	eg := errgroup.Group{}
 	for _, i := range p.items {
@@ -1417,6 +1454,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 
 	switch cause {
 	case ErrQueueItemThrottled:
+		p.isCustomKeyLimitOnly = false
 		// Here we denylist each throttled key that's been limited here, then ignore
 		// any other jobs from being leased as we continue to iterate through the loop.
 		// This maintains FIFO ordering amongst all custom concurrency keys.
@@ -1429,6 +1467,8 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		})
 		return nil
 	case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit, ErrSystemConcurrencyLimit:
+		p.isCustomKeyLimitOnly = false
+
 		p.ctrConcurrency++
 		// Since the queue is at capacity on a fn or account level, no
 		// more jobs in this loop should be worked on - so break.

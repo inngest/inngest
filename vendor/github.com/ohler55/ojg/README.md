@@ -84,7 +84,6 @@ go install ./...
 The `oj` application can be installed with brew.
 
 ```
-brew tap ohler55/tap
 brew install oj
 ```
 

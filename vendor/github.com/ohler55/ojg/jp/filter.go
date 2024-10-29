@@ -31,13 +31,13 @@ func NewFilter(str string) (f *Filter, err error) {
 // MustNewFilter creates a new Filter and panics on error.
 func MustNewFilter(str string) (f *Filter) {
 	p := &parser{buf: []byte(str)}
-	if len(p.buf) <= 5 ||
-		p.buf[0] != '[' || p.buf[1] != '?' || p.buf[2] != '(' ||
-		p.buf[len(p.buf)-2] != ')' || p.buf[len(p.buf)-1] != ']' {
-		panic(fmt.Errorf("a filter must start with a '[?(' and end with ')]'"))
+	if len(p.buf) <= 3 ||
+		p.buf[0] != '[' || p.buf[1] != '?' || p.buf[len(p.buf)-1] != ']' {
+		panic(fmt.Errorf("a filter must start with a '[?' and end with ']'"))
 	}
-	p.buf = p.buf[3 : len(p.buf)-1]
-	eq := p.readEquation()
+	p.buf = p.buf[2 : len(p.buf)-1]
+	eq := precedentCorrect(p.readEq())
+	eq = reduceGroups(eq, nil)
 
 	return eq.Filter()
 }
@@ -95,6 +95,24 @@ func (f Filter) remove(value any) (out any, changed bool) {
 		for k, v := range tv {
 			if f.Match(v) {
 				delete(tv, k)
+				changed = true
+			}
+		}
+	case RemovableIndexed:
+		size := tv.Size()
+		for i := (size - 1); i >= 0; i-- {
+			v := tv.ValueAtIndex(i)
+			if f.Match(v) {
+				tv.RemoveValueAtIndex(i)
+				changed = true
+			}
+		}
+	case Keyed:
+		keys := tv.Keys()
+		for _, key := range keys {
+			v, _ := tv.ValueForKey(key)
+			if f.Match(v) {
+				tv.RemoveValueForKey(key)
 				changed = true
 			}
 		}
@@ -199,6 +217,27 @@ func (f Filter) removeOne(value any) (out any, changed bool) {
 					changed = true
 					break
 				}
+			}
+		}
+	case RemovableIndexed:
+		size := tv.Size()
+		for i := 0; i < size; i++ {
+			v := tv.ValueAtIndex(i)
+			if f.Match(v) {
+				tv.RemoveValueAtIndex(i)
+				changed = true
+				break
+			}
+		}
+	case Keyed:
+		keys := tv.Keys()
+		sort.Strings(keys)
+		for _, key := range keys {
+			v, _ := tv.ValueForKey(key)
+			if f.Match(v) {
+				tv.RemoveValueForKey(key)
+				changed = true
+				break
 			}
 		}
 	default:

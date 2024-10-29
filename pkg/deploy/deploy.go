@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -161,7 +162,7 @@ func GetDeployError(resp *http.Response) error {
 		} else if strings.Contains(r.Message, "No INNGEST_ENV branch name found") {
 			return DeployErrNoBranchName
 		}
-		return fmt.Errorf(r.Message)
+		return errors.New(r.Message)
 	}
 	if resp.StatusCode == http.StatusUnauthorized {
 		return DeployErrUnauthorized

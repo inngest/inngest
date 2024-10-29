@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 	"sync"
@@ -251,6 +252,20 @@ func WithPreDeleteStateSizeReporter(f execution.PreDeleteStateSizeReporter) Exec
 	}
 }
 
+func WithAssignedQueueShard(shard redis_state.QueueShard) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).assignedQueueShard = shard
+		return nil
+	}
+}
+
+func WithShardSelector(selector redis_state.ShardSelector) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).shardFinder = selector
+		return nil
+	}
+}
+
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log *zerolog.Logger
@@ -282,6 +297,9 @@ type executor struct {
 	stateSizeLimit func(sv2.ID) int
 
 	preDeleteStateSizeReporter execution.PreDeleteStateSizeReporter
+
+	assignedQueueShard redis_state.QueueShard
+	shardFinder        redis_state.ShardSelector
 }
 
 func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
@@ -648,7 +666,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		},
 		Throttle: throttle,
 	}
-	err = e.queue.Enqueue(ctx, item, at)
+	err = e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
 		return nil, state.ErrIdentifierExists
 	}
@@ -741,16 +759,17 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, fmt.Errorf("cannot load run events: %w", err)
 	}
 
-	// for recording function start time after a successful step.
-	if md.Config.StartedAt.IsZero() {
-		md.Config.StartedAt = time.Now()
-	}
-
 	// Validate that the run can execute.
 	v := newRunValidator(e, ef.Function, md, events, item) // TODO: Load events for this.
 	if err := v.validate(ctx); err != nil {
 		return nil, err
 	}
+
+	// for recording function start time after a successful step.
+	if md.Config.StartedAt.IsZero() {
+		md.Config.StartedAt = time.Now()
+	}
+
 	if v.stopWithoutRetry {
 		if e.preDeleteStateSizeReporter != nil {
 			e.preDeleteStateSizeReporter(ctx, md)
@@ -891,7 +910,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 		// Check if this step permanently failed.  If so, the function is a failure.
 		if !resp.Retryable() {
 			// TODO: Refactor state input
-			if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+			if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *resp); err != nil {
 				l.Error("error running finish handler", "error", err)
 			}
 
@@ -919,7 +938,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 					resp.Err = &serialized
 				}
 
-				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *resp); err != nil {
 					l.Error("error running finish handler", "error", err)
 				}
 
@@ -936,7 +955,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 	}
 
 	// This is the function result.
-	if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+	if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *resp); err != nil {
 		l.Error("error running finish handler", "error", err)
 	}
 
@@ -982,7 +1001,7 @@ func (f functionFinishedData) Map() map[string]any {
 // Returns a boolean indicating whether it performed finalization. If the run
 // had parallel steps then it may be false, since parallel steps cause the
 // function end to be reached multiple times in a single run
-func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, resp state.DriverResponse) error {
+func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, queueShard redis_state.QueueShard, resp state.DriverResponse) error {
 	// Parse events for the fail handler before deleting state.
 	inputEvents := make([]event.Event, len(evts))
 	for n, e := range evts {
@@ -1034,7 +1053,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 				continue
 			}
 
-			err := q.Dequeue(ctx, *qi)
+			err := q.Dequeue(ctx, queueShard, *qi)
 			if err != nil && !errors.Is(err, redis_state.ErrQueueItemNotFound) {
 				logger.StdlibLogger(ctx).Error("error dequeueing run job", "error", err)
 			}
@@ -1189,7 +1208,7 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 	// Use the aggregator for all funciton finished events, if there are more than
 	// 50 waiting.  It only takes a few milliseconds to iterate and handle less
 	// than 50;  anything more runs the risk of running slow.
-	if iter.Count() > 10 {
+	if iter.Count() > 50 {
 		aggRes, err := e.handleAggregatePauses(ctx, evt)
 		if err != nil {
 			log.From(ctx).Error().Err(err).Msg("error handling aggregate pauses")
@@ -1212,11 +1231,7 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 		return res, fmt.Errorf("No queue or state manager specified")
 	}
 
-	log := e.log
-	if log == nil {
-		log = logger.From(ctx)
-	}
-	base := log.With().Str("event_id", evt.GetInternalID().String()).Logger()
+	log := logger.StdlibLogger(ctx).With("event_id", evt.GetInternalID().String())
 
 	var (
 		goerr error
@@ -1224,7 +1239,6 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 	)
 
 	evtID := evt.GetInternalID()
-	evtIDStr := evtID.String()
 
 	// Schedule up to PauseHandleConcurrency pauses at once.
 	sem := semaphore.NewWeighted(int64(PauseHandleConcurrency))
@@ -1249,46 +1263,13 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 				return
 			}
 
-			l := base.With().
-				Str("pause_id", pause.ID.String()).
-				Str("run_id", pause.Identifier.RunID.String()).
-				Str("workflow_id", pause.Identifier.WorkflowID.String()).
-				Str("expires", pause.Expires.String()).
-				Logger()
-
-			// NOTE: Some pauses may be nil or expired, as the iterator may take
-			// time to process.  We handle that here and assume that the event
-			// did not occur in time.
-			if pause.Expires.Time().Before(time.Now()) {
-				l.Debug().Msg("encountered expired pause")
-
-				shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
-				if shouldDelete {
-					// Consume this pause to remove it entirely
-					l.Debug().Msg("deleting expired pause")
-					_ = e.pm.DeletePause(context.Background(), *pause)
-				}
-
-				return
-			}
-
-			if pause.TriggeringEventID != nil && *pause.TriggeringEventID == evtIDStr {
-				return
-			}
-
-			if pause.Cancel {
-				// This is a cancellation signal.  Check if the function
-				// has ended, and if so remove the pause.
-				//
-				// NOTE: Bookkeeping must be added to individual function runs and handled on
-				// completion instead of here.  This is a hot path and should only exist whilst
-				// bookkeeping is not implemented.
-				if exists, err := e.smv2.Exists(ctx, sv2.IDFromV1(pause.Identifier)); !exists && err == nil {
-					// This function has ended.  Delete the pause and continue
-					_ = e.pm.DeletePause(context.Background(), *pause)
-					return
-				}
-			}
+			l := log.With(
+				"pause_id", pause.ID.String(),
+				"run_id", pause.Identifier.RunID.String(),
+				"workflow_id", pause.Identifier.WorkflowID.String(),
+				"expires", pause.Expires.String(),
+				"strategy", "naive",
+			)
 
 			// Run an expression if this exists.
 			if pause.Expression != nil {
@@ -1306,82 +1287,25 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 
 				expr, err := expressions.NewExpressionEvaluator(ctx, *pause.Expression)
 				if err != nil {
-					l.Error().Err(err).Msg("error compiling pause expression")
+					l.Error("error compiling pause expression", "error", err)
 					return
 				}
 
 				val, _, err := expr.Evaluate(ctx, data)
 				if err != nil {
-					l.Warn().Err(err).Msg("error evaluating pause expression")
+					l.Warn("error evaluating pause expression", "error", err)
 					return
 				}
 				result, _ := val.(bool)
 				if !result {
-					l.Trace().Msg("pause did not match expression")
 					return
 				}
 			}
 
-			// Ensure that we store the group ID for this pause, letting us properly track cancellation
-			// or continuation history
-			ctx = state.WithGroupID(ctx, pause.GroupID)
-
-			// Cancelling a function can happen before a lease, as it's an atomic operation that will always happen.
-			if pause.Cancel {
-				err := e.Cancel(ctx, sv2.IDFromV1(pause.Identifier), execution.CancelRequest{
-					EventID:    &evtID,
-					Expression: pause.Expression,
-				})
-				if errors.Is(err, state.ErrFunctionCancelled) ||
-					errors.Is(err, state.ErrFunctionComplete) ||
-					errors.Is(err, state.ErrFunctionFailed) ||
-					errors.Is(err, ErrFunctionEnded) {
-					// Safe to ignore.
-					return
-				}
-				if err != nil && !strings.Contains(err.Error(), "no status stored in metadata") {
-					goerr = errors.Join(goerr, fmt.Errorf("error cancelling function: %w", err))
-					return
-				}
-				// Ensure we consume this pause, as this isn't handled by the higher-level cancel function.
-				err = e.pm.ConsumePause(ctx, pause.ID, nil)
-				if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound || err == state.ErrRunNotFound {
-					// Done. Add to the counter.
-					_ = e.pm.DeletePause(context.Background(), *pause)
-					atomic.AddInt32(&res[1], 1)
-					return
-				}
-				goerr = errors.Join(goerr, fmt.Errorf("error consuming pause after cancel: %w", err))
-				return
+			if err := e.handlePause(ctx, evt, evtID, pause, &res, l); err != nil {
+				goerr = errors.Join(goerr, err)
+				l.Error("error handling pause", "error", err)
 			}
-
-			resumeData := pause.GetResumeData(evt.GetEvent())
-
-			if e.log != nil {
-				e.log.
-					Debug().
-					Interface("with", resumeData.With).
-					Str("pause.DataKey", pause.DataKey).
-					Msg("resuming pause")
-			}
-
-			err := e.Resume(ctx, *pause, execution.ResumeRequest{
-				With:     resumeData.With,
-				EventID:  &evtID,
-				RunID:    resumeData.RunID,
-				StepName: resumeData.StepName,
-			})
-			if errors.Is(err, state.ErrPauseLeased) ||
-				errors.Is(err, state.ErrPauseNotFound) ||
-				errors.Is(err, state.ErrRunNotFound) {
-				return
-			}
-			if err != nil {
-				goerr = errors.Join(goerr, fmt.Errorf("error resuming pause: %w", err))
-				return
-			}
-			// Add to the counter.
-			atomic.AddInt32(&res[1], 1)
 		}()
 
 	}
@@ -1402,10 +1326,13 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 		return execution.HandlePauseResult{}, fmt.Errorf("no expression evaluator found")
 	}
 
-	log := logger.StdlibLogger(ctx).With("event_id", evt.GetInternalID().String())
-	evtID := evt.GetInternalID()
-	evtIDStr := evtID.String()
+	log := logger.StdlibLogger(ctx).With(
+		"event_id", evt.GetInternalID().String(),
+		"workspace_id", evt.GetWorkspaceID(),
+		"event", evt.GetEvent().Name,
+	)
 
+	evtID := evt.GetInternalID()
 	evals, count, err := e.exprAggregator.EvaluateAsyncEvent(ctx, evt)
 	if err != nil {
 		return execution.HandlePauseResult{count, 0}, err
@@ -1437,109 +1364,125 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 				"expires", pause.Expires.String(),
 			)
 
-			// NOTE: Some pauses may be nil or expired, as the iterator may take
-			// time to process.  We handle that here and assume that the event
-			// did not occur in time.
-			if pause.Expires.Time().Before(time.Now()) {
-				l.Debug("encountered expired pause")
-
-				shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
-				if shouldDelete {
-					// Consume this pause to remove it entirely
-					l.Debug("deleting expired pause")
-					_ = e.pm.DeletePause(context.Background(), pause)
-					_ = e.exprAggregator.RemovePause(ctx, pause)
-				}
-
-				return
-			}
-
-			if pause.TriggeringEventID != nil && *pause.TriggeringEventID == evtIDStr {
-				return
-			}
-
-			if pause.Cancel {
-				// This is a cancellation signal.  Check if the function
-				// has ended, and if so remove the pause.
-				//
-				// NOTE: Bookkeeping must be added to individual function runs and handled on
-				// completion instead of here.  This is a hot path and should only exist whilst
-				// bookkeeping is not implemented.
-				if exists, err := e.smv2.Exists(ctx, sv2.IDFromV1(pause.Identifier)); !exists && err == nil {
-					// This function has ended.  Delete the pause and continue
-					_ = e.pm.DeletePause(context.Background(), pause)
-					_ = e.exprAggregator.RemovePause(ctx, pause)
-					return
-				}
-			}
-
-			// Ensure that we store the group ID for this pause, letting us properly track cancellation
-			// or continuation history
-			ctx = state.WithGroupID(ctx, pause.GroupID)
-
-			// Cancelling a function can happen before a lease, as it's an atomic operation that will always happen.
-			if pause.Cancel {
-				err := e.Cancel(ctx, sv2.IDFromV1(pause.Identifier), execution.CancelRequest{
-					EventID:    &evtID,
-					Expression: pause.Expression,
-				})
-				if errors.Is(err, state.ErrFunctionCancelled) ||
-					errors.Is(err, state.ErrFunctionComplete) ||
-					errors.Is(err, state.ErrFunctionFailed) ||
-					errors.Is(err, ErrFunctionEnded) {
-					// Safe to ignore.
-					_ = e.exprAggregator.RemovePause(ctx, pause)
-					return
-				}
-				if err != nil && strings.Contains(err.Error(), "no status stored in metadata") {
-					// Safe to ignore.
-					_ = e.exprAggregator.RemovePause(ctx, pause)
-					return
-				}
-
-				if err != nil {
-					goerr = errors.Join(goerr, fmt.Errorf("error cancelling function: %w", err))
-					return
-				}
-				// Ensure we consume this pause, as this isn't handled by the higher-level cancel function.
-				err = e.pm.ConsumePause(ctx, pause.ID, nil)
-				if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
-					// Done. Add to the counter.
-					atomic.AddInt32(&res[1], 1)
-					_ = e.exprAggregator.RemovePause(ctx, pause)
-					return
-				}
-				goerr = errors.Join(goerr, fmt.Errorf("error consuming pause after cancel: %w", err))
-				return
-			}
-
-			resumeData := pause.GetResumeData(evt.GetEvent())
-
-			err := e.Resume(ctx, pause, execution.ResumeRequest{
-				With:     resumeData.With,
-				EventID:  &evtID,
-				RunID:    resumeData.RunID,
-				StepName: resumeData.StepName,
-			})
-			if errors.Is(err, state.ErrPauseLeased) ||
-				errors.Is(err, state.ErrPauseNotFound) ||
-				errors.Is(err, state.ErrRunNotFound) {
-				return
-			}
-			if err != nil {
-				goerr = errors.Join(goerr, fmt.Errorf("error resuming pause: %w", err))
-				return
-			}
-			// Add to the counter.
-			atomic.AddInt32(&res[1], 1)
-			if err := e.exprAggregator.RemovePause(ctx, pause); err != nil {
-				l.Warn("error removing pause from aggregator", "error", err)
+			if err := e.handlePause(ctx, evt, evtID, &pause, &res, l); err != nil {
+				goerr = errors.Join(goerr, err)
+				l.Error("error handling pause", "error", err)
 			}
 		}()
 	}
 	wg.Wait()
 
 	return res, goerr
+}
+
+func (e *executor) handlePause(
+	ctx context.Context,
+	evt event.TrackedEvent,
+	evtID ulid.ULID,
+	pause *state.Pause,
+	res *execution.HandlePauseResult,
+	l *slog.Logger,
+) error {
+
+	return util.Crit(ctx, "handle pause", func(ctx context.Context) error {
+		// NOTE: Some pauses may be nil or expired, as the iterator may take
+		// time to process.  We handle that here and assume that the event
+		// did not occur in time.
+		if pause.Expires.Time().Before(time.Now()) {
+			l.Debug("encountered expired pause")
+
+			shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
+			if shouldDelete {
+				// Consume this pause to remove it entirely
+				l.Debug("deleting expired pause")
+				_ = e.pm.DeletePause(context.Background(), *pause)
+				_ = e.exprAggregator.RemovePause(ctx, pause)
+			}
+
+			return nil
+		}
+
+		if pause.TriggeringEventID != nil && *pause.TriggeringEventID == evtID.String() {
+			return nil
+		}
+
+		if pause.Cancel {
+			// This is a cancellation signal.  Check if the function
+			// has ended, and if so remove the pause.
+			//
+			// NOTE: Bookkeeping must be added to individual function runs and handled on
+			// completion instead of here.  This is a hot path and should only exist whilst
+			// bookkeeping is not implemented.
+			if exists, err := e.smv2.Exists(ctx, sv2.IDFromV1(pause.Identifier)); !exists && err == nil {
+				// This function has ended.  Delete the pause and continue
+				_ = e.pm.DeletePause(context.Background(), *pause)
+				_ = e.exprAggregator.RemovePause(ctx, pause)
+				return nil
+			}
+		}
+
+		// Ensure that we store the group ID for this pause, letting us properly track cancellation
+		// or continuation history
+		ctx = state.WithGroupID(ctx, pause.GroupID)
+
+		// Cancelling a function can happen before a lease, as it's an atomic operation that will always happen.
+		if pause.Cancel {
+			err := e.Cancel(ctx, sv2.IDFromV1(pause.Identifier), execution.CancelRequest{
+				EventID:    &evtID,
+				Expression: pause.Expression,
+			})
+			if errors.Is(err, state.ErrFunctionCancelled) ||
+				errors.Is(err, state.ErrFunctionComplete) ||
+				errors.Is(err, state.ErrFunctionFailed) ||
+				errors.Is(err, ErrFunctionEnded) {
+				// Safe to ignore.
+				_ = e.exprAggregator.RemovePause(ctx, pause)
+				return nil
+			}
+			if err != nil && strings.Contains(err.Error(), "no status stored in metadata") {
+				// Safe to ignore.
+				_ = e.exprAggregator.RemovePause(ctx, pause)
+				return nil
+			}
+
+			if err != nil {
+				return fmt.Errorf("error cancelling function: %w", err)
+			}
+
+			// Ensure we consume this pause, as this isn't handled by the higher-level cancel function.
+			err = e.pm.ConsumePause(context.Background(), pause.ID, nil)
+			if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
+				atomic.AddInt32(&res[1], 1)
+				_ = e.exprAggregator.RemovePause(ctx, pause)
+				return nil
+			}
+			return fmt.Errorf("error consuming pause after cancel: %w", err)
+		}
+
+		resumeData := pause.GetResumeData(evt.GetEvent())
+
+		err := e.Resume(ctx, *pause, execution.ResumeRequest{
+			With:     resumeData.With,
+			EventID:  &evtID,
+			RunID:    resumeData.RunID,
+			StepName: resumeData.StepName,
+		})
+		if errors.Is(err, state.ErrPauseLeased) ||
+			errors.Is(err, state.ErrPauseNotFound) ||
+			errors.Is(err, state.ErrRunNotFound) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("error resuming pause: %w", err)
+		}
+
+		// Add to the counter.
+		atomic.AddInt32(&res[1], 1)
+		if err := e.exprAggregator.RemovePause(ctx, pause); err != nil {
+			l.Warn("error removing pause from aggregator", "error", err)
+		}
+		return nil
+	})
 }
 
 func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEvent) error {
@@ -1634,8 +1577,13 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 		return fmt.Errorf("unable to load function: %w", err)
 	}
 
+	shard, err := e.shardFinder(ctx, md.ID.Tenant.AccountID, nil)
+	if err != nil {
+		return fmt.Errorf("could not find shard for account %q: %w", md.ID.Tenant, err)
+	}
+
 	fnCancelledErr := state.ErrFunctionCancelled.Error()
-	if err := e.finalize(ctx, md, evts, f.Function.GetSlug(), state.DriverResponse{
+	if err := e.finalize(ctx, md, evts, f.Function.GetSlug(), shard, state.DriverResponse{
 		Err: &fnCancelledErr,
 	}); err != nil {
 		l.Error("error running finish handler", "error", err)
@@ -1710,32 +1658,43 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		// for the next run.  If the ConsumePause call comes after enqueue, the TCP
 		// conn may drop etc. and running the job may occur prior to saving state data.
 		jobID := fmt.Sprintf("%s-%s", pause.Identifier.IdempotencyKey(), pause.DataKey)
-		err = e.queue.Enqueue(
-			ctx,
-			queue.Item{
-				JobID: &jobID,
-				// Add a new group ID for the child;  this will be a new step.
-				GroupID:               uuid.New().String(),
-				WorkspaceID:           pause.WorkspaceID,
-				Kind:                  queue.KindEdge,
-				Identifier:            pause.Identifier,
-				PriorityFactor:        md.Config.PriorityFactor,
-				CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
-				MaxAttempts:           pause.MaxAttempts,
-				Payload: queue.PayloadEdge{
-					Edge: pause.Edge(),
-				},
+		err = e.queue.Enqueue(ctx, queue.Item{
+			JobID: &jobID,
+			// Add a new group ID for the child;  this will be a new step.
+			GroupID:               uuid.New().String(),
+			WorkspaceID:           pause.WorkspaceID,
+			Kind:                  queue.KindEdge,
+			Identifier:            pause.Identifier,
+			PriorityFactor:        md.Config.PriorityFactor,
+			CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
+			MaxAttempts:           pause.MaxAttempts,
+			Payload: queue.PayloadEdge{
+				Edge: pause.Edge(),
 			},
-			time.Now(),
-		)
+		}, time.Now(), queue.EnqueueOpts{})
 		if err != nil && err != redis_state.ErrQueueItemExists {
 			return fmt.Errorf("error enqueueing after pause: %w", err)
 		}
 
 		// And dequeue the timeout job to remove unneeded work from the queue, etc.
 		if q, ok := e.queue.(redis_state.QueueManager); ok {
+			var qn *string
+			if r.IsTimeout {
+				// timeouts are enqueued to the workflow partition (see handleGeneratorWaitForEvent)
+				// this is _not_ a system partition and lives on the account shard
+			} else {
+				// pause events are enqueued to a system partition (see pauseEventListener)
+				// system partitions live on the default shard
+				queueName := fmt.Sprintf("pause:%s", pause.WorkspaceID)
+				qn = &queueName
+			}
+			shard, err := e.shardFinder(ctx, md.ID.Tenant.AccountID, qn)
+			if err != nil {
+				return fmt.Errorf("could not find shard for pause timeout item for account %q: %w", md.ID.Tenant.AccountID, err)
+			}
+
 			jobID := fmt.Sprintf("%s-%s", md.IdempotencyKey(), pause.DataKey)
-			err := q.Dequeue(ctx, queue.QueueItem{
+			err = q.Dequeue(ctx, shard, queue.QueueItem{
 				ID:         queue.HashID(ctx, jobID),
 				FunctionID: md.ID.FunctionID,
 				Data: queue.Item{
@@ -1743,7 +1702,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				},
 			})
 			if err != nil {
-				logger.StdlibLogger(ctx).Error("error dequeueing consumed pause job when resuming", "error", err)
+				logger.StdlibLogger(ctx).Error("error dequeueing consumed pause job when resuming", "error", err, "pause", pause, "shard", shard, "qn", qn)
 			}
 		}
 		return nil
@@ -1929,7 +1888,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 	}
-	err = e.queue.Enqueue(ctx, nextItem, now)
+	err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
@@ -2028,7 +1987,7 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 	}
-	err = e.queue.Enqueue(ctx, nextItem, now)
+	err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
@@ -2075,7 +2034,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 			Edge: nextEdge,
 		},
 	}
-	err := e.queue.Enqueue(ctx, nextItem, now)
+	err := e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
@@ -2123,7 +2082,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		Attempt:               0,
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
-	}, until)
+	}, until, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
@@ -2230,7 +2189,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 			PauseID:   pauseID,
 			OnTimeout: true,
 		},
-	}, expires)
+	}, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
@@ -2356,7 +2315,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 			PauseID:   pauseID,
 			OnTimeout: true,
 		},
-	}, expires)
+	}, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}

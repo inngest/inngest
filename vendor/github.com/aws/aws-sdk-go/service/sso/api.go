@@ -29,13 +29,14 @@ const opGetRoleCredentials = "GetRoleCredentials"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
-//	// Example sending a request using the GetRoleCredentialsRequest method.
-//	req, resp := client.GetRoleCredentialsRequest(params)
 //
-//	err := req.Send()
-//	if err == nil { // resp is now filled
-//	    fmt.Println(resp)
-//	}
+//    // Example sending a request using the GetRoleCredentialsRequest method.
+//    req, resp := client.GetRoleCredentialsRequest(params)
+//
+//    err := req.Send()
+//    if err == nil { // resp is now filled
+//        fmt.Println(resp)
+//    }
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/sso-2019-06-10/GetRoleCredentials
 func (c *SSO) GetRoleCredentialsRequest(input *GetRoleCredentialsInput) (req *request.Request, output *GetRoleCredentialsOutput) {
@@ -68,21 +69,20 @@ func (c *SSO) GetRoleCredentialsRequest(input *GetRoleCredentialsInput) (req *re
 // API operation GetRoleCredentials for usage and error information.
 //
 // Returned Error Types:
+//   * InvalidRequestException
+//   Indicates that a problem occurred with the input to the request. For example,
+//   a required parameter might be missing or out of range.
 //
-//   - InvalidRequestException
-//     Indicates that a problem occurred with the input to the request. For example,
-//     a required parameter might be missing or out of range.
+//   * UnauthorizedException
+//   Indicates that the request is not authorized. This can happen due to an invalid
+//   access token in the request.
 //
-//   - UnauthorizedException
-//     Indicates that the request is not authorized. This can happen due to an invalid
-//     access token in the request.
+//   * TooManyRequestsException
+//   Indicates that the request is being made too frequently and is more than
+//   what the server can handle.
 //
-//   - TooManyRequestsException
-//     Indicates that the request is being made too frequently and is more than
-//     what the server can handle.
-//
-//   - ResourceNotFoundException
-//     The specified resource doesn't exist.
+//   * ResourceNotFoundException
+//   The specified resource doesn't exist.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/sso-2019-06-10/GetRoleCredentials
 func (c *SSO) GetRoleCredentials(input *GetRoleCredentialsInput) (*GetRoleCredentialsOutput, error) {
@@ -122,13 +122,14 @@ const opListAccountRoles = "ListAccountRoles"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
-//	// Example sending a request using the ListAccountRolesRequest method.
-//	req, resp := client.ListAccountRolesRequest(params)
 //
-//	err := req.Send()
-//	if err == nil { // resp is now filled
-//	    fmt.Println(resp)
-//	}
+//    // Example sending a request using the ListAccountRolesRequest method.
+//    req, resp := client.ListAccountRolesRequest(params)
+//
+//    err := req.Send()
+//    if err == nil { // resp is now filled
+//        fmt.Println(resp)
+//    }
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/sso-2019-06-10/ListAccountRoles
 func (c *SSO) ListAccountRolesRequest(input *ListAccountRolesInput) (req *request.Request, output *ListAccountRolesOutput) {
@@ -166,21 +167,20 @@ func (c *SSO) ListAccountRolesRequest(input *ListAccountRolesInput) (req *reques
 // API operation ListAccountRoles for usage and error information.
 //
 // Returned Error Types:
+//   * InvalidRequestException
+//   Indicates that a problem occurred with the input to the request. For example,
+//   a required parameter might be missing or out of range.
 //
-//   - InvalidRequestException
-//     Indicates that a problem occurred with the input to the request. For example,
-//     a required parameter might be missing or out of range.
+//   * UnauthorizedException
+//   Indicates that the request is not authorized. This can happen due to an invalid
+//   access token in the request.
 //
-//   - UnauthorizedException
-//     Indicates that the request is not authorized. This can happen due to an invalid
-//     access token in the request.
+//   * TooManyRequestsException
+//   Indicates that the request is being made too frequently and is more than
+//   what the server can handle.
 //
-//   - TooManyRequestsException
-//     Indicates that the request is being made too frequently and is more than
-//     what the server can handle.
-//
-//   - ResourceNotFoundException
-//     The specified resource doesn't exist.
+//   * ResourceNotFoundException
+//   The specified resource doesn't exist.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/sso-2019-06-10/ListAccountRoles
 func (c *SSO) ListAccountRoles(input *ListAccountRolesInput) (*ListAccountRolesOutput, error) {
@@ -212,14 +212,15 @@ func (c *SSO) ListAccountRolesWithContext(ctx aws.Context, input *ListAccountRol
 //
 // Note: This operation can generate multiple requests to a service.
 //
-//	// Example iterating over at most 3 pages of a ListAccountRoles operation.
-//	pageNum := 0
-//	err := client.ListAccountRolesPages(params,
-//	    func(page *sso.ListAccountRolesOutput, lastPage bool) bool {
-//	        pageNum++
-//	        fmt.Println(page)
-//	        return pageNum <= 3
-//	    })
+//    // Example iterating over at most 3 pages of a ListAccountRoles operation.
+//    pageNum := 0
+//    err := client.ListAccountRolesPages(params,
+//        func(page *sso.ListAccountRolesOutput, lastPage bool) bool {
+//            pageNum++
+//            fmt.Println(page)
+//            return pageNum <= 3
+//        })
+//
 func (c *SSO) ListAccountRolesPages(input *ListAccountRolesInput, fn func(*ListAccountRolesOutput, bool) bool) error {
 	return c.ListAccountRolesPagesWithContext(aws.BackgroundContext(), input, fn)
 }
@@ -271,13 +272,14 @@ const opListAccounts = "ListAccounts"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
-//	// Example sending a request using the ListAccountsRequest method.
-//	req, resp := client.ListAccountsRequest(params)
 //
-//	err := req.Send()
-//	if err == nil { // resp is now filled
-//	    fmt.Println(resp)
-//	}
+//    // Example sending a request using the ListAccountsRequest method.
+//    req, resp := client.ListAccountsRequest(params)
+//
+//    err := req.Send()
+//    if err == nil { // resp is now filled
+//        fmt.Println(resp)
+//    }
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/sso-2019-06-10/ListAccounts
 func (c *SSO) ListAccountsRequest(input *ListAccountsInput) (req *request.Request, output *ListAccountsOutput) {
@@ -308,8 +310,7 @@ func (c *SSO) ListAccountsRequest(input *ListAccountsInput) (req *request.Reques
 // Lists all AWS accounts assigned to the user. These AWS accounts are assigned
 // by the administrator of the account. For more information, see Assign User
 // Access (https://docs.aws.amazon.com/singlesignon/latest/userguide/useraccess.html#assignusers)
-// in the IAM Identity Center User Guide. This operation returns a paginated
-// response.
+// in the AWS SSO User Guide. This operation returns a paginated response.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -319,21 +320,20 @@ func (c *SSO) ListAccountsRequest(input *ListAccountsInput) (req *request.Reques
 // API operation ListAccounts for usage and error information.
 //
 // Returned Error Types:
+//   * InvalidRequestException
+//   Indicates that a problem occurred with the input to the request. For example,
+//   a required parameter might be missing or out of range.
 //
-//   - InvalidRequestException
-//     Indicates that a problem occurred with the input to the request. For example,
-//     a required parameter might be missing or out of range.
+//   * UnauthorizedException
+//   Indicates that the request is not authorized. This can happen due to an invalid
+//   access token in the request.
 //
-//   - UnauthorizedException
-//     Indicates that the request is not authorized. This can happen due to an invalid
-//     access token in the request.
+//   * TooManyRequestsException
+//   Indicates that the request is being made too frequently and is more than
+//   what the server can handle.
 //
-//   - TooManyRequestsException
-//     Indicates that the request is being made too frequently and is more than
-//     what the server can handle.
-//
-//   - ResourceNotFoundException
-//     The specified resource doesn't exist.
+//   * ResourceNotFoundException
+//   The specified resource doesn't exist.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/sso-2019-06-10/ListAccounts
 func (c *SSO) ListAccounts(input *ListAccountsInput) (*ListAccountsOutput, error) {
@@ -365,14 +365,15 @@ func (c *SSO) ListAccountsWithContext(ctx aws.Context, input *ListAccountsInput,
 //
 // Note: This operation can generate multiple requests to a service.
 //
-//	// Example iterating over at most 3 pages of a ListAccounts operation.
-//	pageNum := 0
-//	err := client.ListAccountsPages(params,
-//	    func(page *sso.ListAccountsOutput, lastPage bool) bool {
-//	        pageNum++
-//	        fmt.Println(page)
-//	        return pageNum <= 3
-//	    })
+//    // Example iterating over at most 3 pages of a ListAccounts operation.
+//    pageNum := 0
+//    err := client.ListAccountsPages(params,
+//        func(page *sso.ListAccountsOutput, lastPage bool) bool {
+//            pageNum++
+//            fmt.Println(page)
+//            return pageNum <= 3
+//        })
+//
 func (c *SSO) ListAccountsPages(input *ListAccountsInput, fn func(*ListAccountsOutput, bool) bool) error {
 	return c.ListAccountsPagesWithContext(aws.BackgroundContext(), input, fn)
 }
@@ -424,13 +425,14 @@ const opLogout = "Logout"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
-//	// Example sending a request using the LogoutRequest method.
-//	req, resp := client.LogoutRequest(params)
 //
-//	err := req.Send()
-//	if err == nil { // resp is now filled
-//	    fmt.Println(resp)
-//	}
+//    // Example sending a request using the LogoutRequest method.
+//    req, resp := client.LogoutRequest(params)
+//
+//    err := req.Send()
+//    if err == nil { // resp is now filled
+//        fmt.Println(resp)
+//    }
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/sso-2019-06-10/Logout
 func (c *SSO) LogoutRequest(input *LogoutInput) (req *request.Request, output *LogoutOutput) {
@@ -453,21 +455,7 @@ func (c *SSO) LogoutRequest(input *LogoutInput) (req *request.Request, output *L
 
 // Logout API operation for AWS Single Sign-On.
 //
-// Removes the locally stored SSO tokens from the client-side cache and sends
-// an API call to the IAM Identity Center service to invalidate the corresponding
-// server-side IAM Identity Center sign in session.
-//
-// If a user uses IAM Identity Center to access the AWS CLI, the user’s IAM
-// Identity Center sign in session is used to obtain an IAM session, as specified
-// in the corresponding IAM Identity Center permission set. More specifically,
-// IAM Identity Center assumes an IAM role in the target account on behalf of
-// the user, and the corresponding temporary AWS credentials are returned to
-// the client.
-//
-// After user logout, any existing IAM role sessions that were created by using
-// IAM Identity Center permission sets continue based on the duration configured
-// in the permission set. For more information, see User authentications (https://docs.aws.amazon.com/singlesignon/latest/userguide/authconcept.html)
-// in the IAM Identity Center User Guide.
+// Removes the client- and server-side session that is associated with the user.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -477,18 +465,17 @@ func (c *SSO) LogoutRequest(input *LogoutInput) (req *request.Request, output *L
 // API operation Logout for usage and error information.
 //
 // Returned Error Types:
+//   * InvalidRequestException
+//   Indicates that a problem occurred with the input to the request. For example,
+//   a required parameter might be missing or out of range.
 //
-//   - InvalidRequestException
-//     Indicates that a problem occurred with the input to the request. For example,
-//     a required parameter might be missing or out of range.
+//   * UnauthorizedException
+//   Indicates that the request is not authorized. This can happen due to an invalid
+//   access token in the request.
 //
-//   - UnauthorizedException
-//     Indicates that the request is not authorized. This can happen due to an invalid
-//     access token in the request.
-//
-//   - TooManyRequestsException
-//     Indicates that the request is being made too frequently and is more than
-//     what the server can handle.
+//   * TooManyRequestsException
+//   Indicates that the request is being made too frequently and is more than
+//   what the server can handle.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/sso-2019-06-10/Logout
 func (c *SSO) Logout(input *LogoutInput) (*LogoutOutput, error) {
@@ -567,7 +554,7 @@ type GetRoleCredentialsInput struct {
 
 	// The token issued by the CreateToken API call. For more information, see CreateToken
 	// (https://docs.aws.amazon.com/singlesignon/latest/OIDCAPIReference/API_CreateToken.html)
-	// in the IAM Identity Center OIDC API Reference Guide.
+	// in the AWS SSO OIDC API Reference Guide.
 	//
 	// AccessToken is a sensitive parameter and its value will be
 	// replaced with "sensitive" in string returned by GetRoleCredentialsInput's
@@ -743,7 +730,7 @@ type ListAccountRolesInput struct {
 
 	// The token issued by the CreateToken API call. For more information, see CreateToken
 	// (https://docs.aws.amazon.com/singlesignon/latest/OIDCAPIReference/API_CreateToken.html)
-	// in the IAM Identity Center OIDC API Reference Guide.
+	// in the AWS SSO OIDC API Reference Guide.
 	//
 	// AccessToken is a sensitive parameter and its value will be
 	// replaced with "sensitive" in string returned by ListAccountRolesInput's
@@ -872,7 +859,7 @@ type ListAccountsInput struct {
 
 	// The token issued by the CreateToken API call. For more information, see CreateToken
 	// (https://docs.aws.amazon.com/singlesignon/latest/OIDCAPIReference/API_CreateToken.html)
-	// in the IAM Identity Center OIDC API Reference Guide.
+	// in the AWS SSO OIDC API Reference Guide.
 	//
 	// AccessToken is a sensitive parameter and its value will be
 	// replaced with "sensitive" in string returned by ListAccountsInput's
@@ -987,7 +974,7 @@ type LogoutInput struct {
 
 	// The token issued by the CreateToken API call. For more information, see CreateToken
 	// (https://docs.aws.amazon.com/singlesignon/latest/OIDCAPIReference/API_CreateToken.html)
-	// in the IAM Identity Center OIDC API Reference Guide.
+	// in the AWS SSO OIDC API Reference Guide.
 	//
 	// AccessToken is a sensitive parameter and its value will be
 	// replaced with "sensitive" in string returned by LogoutInput's

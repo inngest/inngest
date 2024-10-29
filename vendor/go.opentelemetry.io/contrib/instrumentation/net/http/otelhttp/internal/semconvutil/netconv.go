@@ -2,7 +2,17 @@
 // source: internal/shared/semconvutil/netconv.go.tmpl
 
 // Copyright The OpenTelemetry Authors
-// SPDX-License-Identifier: Apache-2.0
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package semconvutil // import "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/semconvutil"
 
@@ -92,7 +102,7 @@ func (c *netConv) Host(address string) []attribute.KeyValue {
 	attrs := make([]attribute.KeyValue, 0, n)
 	attrs = append(attrs, c.HostName(h))
 	if p > 0 {
-		attrs = append(attrs, c.HostPort(p))
+		attrs = append(attrs, c.HostPort(int(p)))
 	}
 	return attrs
 }
@@ -138,7 +148,7 @@ func (c *netConv) Peer(address string) []attribute.KeyValue {
 	attrs := make([]attribute.KeyValue, 0, n)
 	attrs = append(attrs, c.PeerName(h))
 	if p > 0 {
-		attrs = append(attrs, c.PeerPort(p))
+		attrs = append(attrs, c.PeerPort(int(p)))
 	}
 	return attrs
 }
@@ -195,7 +205,7 @@ func splitHostPort(hostport string) (host string, port int) {
 	if err != nil {
 		return
 	}
-	return host, int(p) // nolint: gosec  // Bitsize checked to be 16 above.
+	return host, int(p)
 }
 
 func netProtocol(proto string) (name string, version string) {

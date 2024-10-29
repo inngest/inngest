@@ -48,6 +48,8 @@ func (f Child) remove(value any) (out any, changed bool) {
 		if _, changed = tv[key]; changed {
 			delete(tv, key)
 		}
+	case Keyed:
+		tv.RemoveValueForKey(key)
 	default:
 		if rt := reflect.TypeOf(value); rt != nil {
 			// Can't remove a field from a struct so only a map can be modified.

@@ -57,23 +57,22 @@ func (pe *PgError) SQLState() string {
 	return pe.Code
 }
 
-// ConnectError is the error returned when a connection attempt fails.
-type ConnectError struct {
-	Config *Config // The configuration that was used in the connection attempt.
+type connectError struct {
+	config *Config
 	msg    string
 	err    error
 }
 
-func (e *ConnectError) Error() string {
+func (e *connectError) Error() string {
 	sb := &strings.Builder{}
-	fmt.Fprintf(sb, "failed to connect to `host=%s user=%s database=%s`: %s", e.Config.Host, e.Config.User, e.Config.Database, e.msg)
+	fmt.Fprintf(sb, "failed to connect to `host=%s user=%s database=%s`: %s", e.config.Host, e.config.User, e.config.Database, e.msg)
 	if e.err != nil {
 		fmt.Fprintf(sb, " (%s)", e.err.Error())
 	}
 	return sb.String()
 }
 
-func (e *ConnectError) Unwrap() error {
+func (e *connectError) Unwrap() error {
 	return e.err
 }
 
@@ -89,38 +88,33 @@ func (e *connLockError) Error() string {
 	return e.status
 }
 
-// ParseConfigError is the error returned when a connection string cannot be parsed.
-type ParseConfigError struct {
-	ConnString string // The connection string that could not be parsed.
+type parseConfigError struct {
+	connString string
 	msg        string
 	err        error
 }
 
-func (e *ParseConfigError) Error() string {
-	// Now that ParseConfigError is public and ConnString is available to the developer, perhaps it would be better only
-	// return a static string. That would ensure that the error message cannot leak a password. The ConnString field would
-	// allow access to the original string if desired and Unwrap would allow access to the underlying error.
-	connString := redactPW(e.ConnString)
+func (e *parseConfigError) Error() string {
+	connString := redactPW(e.connString)
 	if e.err == nil {
 		return fmt.Sprintf("cannot parse `%s`: %s", connString, e.msg)
 	}
 	return fmt.Sprintf("cannot parse `%s`: %s (%s)", connString, e.msg, e.err.Error())
 }
 
-func (e *ParseConfigError) Unwrap() error {
+func (e *parseConfigError) Unwrap() error {
 	return e.err
 }
 
 func normalizeTimeoutError(ctx context.Context, err error) error {
-	var netErr net.Error
-	if errors.As(err, &netErr) && netErr.Timeout() {
+	if err, ok := err.(net.Error); ok && err.Timeout() {
 		if ctx.Err() == context.Canceled {
 			// Since the timeout was caused by a context cancellation, the actual error is context.Canceled not the timeout error.
 			return context.Canceled
 		} else if ctx.Err() == context.DeadlineExceeded {
 			return &errTimeout{err: ctx.Err()}
 		} else {
-			return &errTimeout{err: netErr}
+			return &errTimeout{err: err}
 		}
 	}
 	return err

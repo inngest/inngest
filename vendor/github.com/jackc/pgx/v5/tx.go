@@ -44,10 +44,6 @@ type TxOptions struct {
 	IsoLevel       TxIsoLevel
 	AccessMode     TxAccessMode
 	DeferrableMode TxDeferrableMode
-
-	// BeginQuery is the SQL query that will be executed to begin the transaction. This allows using non-standard syntax
-	// such as BEGIN PRIORITY HIGH with CockroachDB. If set this will override the other settings.
-	BeginQuery string
 }
 
 var emptyTxOptions TxOptions
@@ -55,10 +51,6 @@ var emptyTxOptions TxOptions
 func (txOptions TxOptions) beginSQL() string {
 	if txOptions == emptyTxOptions {
 		return "begin"
-	}
-
-	if txOptions.BeginQuery != "" {
-		return txOptions.BeginQuery
 	}
 
 	var buf strings.Builder
@@ -152,6 +144,7 @@ type Tx interface {
 // called on the dbTx.
 type dbTx struct {
 	conn         *Conn
+	err          error
 	savepointNum int64
 	closed       bool
 }

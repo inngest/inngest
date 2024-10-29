@@ -3,6 +3,8 @@ package pgproto3
 import (
 	"bytes"
 	"encoding/json"
+
+	"github.com/jackc/pgx/v5/internal/pgio"
 )
 
 type ParameterStatus struct {
@@ -35,13 +37,19 @@ func (dst *ParameterStatus) Decode(src []byte) error {
 }
 
 // Encode encodes src into dst. dst will include the 1 byte message type identifier and the 4 byte message length.
-func (src *ParameterStatus) Encode(dst []byte) ([]byte, error) {
-	dst, sp := beginMessage(dst, 'S')
+func (src *ParameterStatus) Encode(dst []byte) []byte {
+	dst = append(dst, 'S')
+	sp := len(dst)
+	dst = pgio.AppendInt32(dst, -1)
+
 	dst = append(dst, src.Name...)
 	dst = append(dst, 0)
 	dst = append(dst, src.Value...)
 	dst = append(dst, 0)
-	return finishMessage(dst, sp)
+
+	pgio.SetInt32(dst[sp:], int32(len(dst[sp:])))
+
+	return dst
 }
 
 // MarshalJSON implements encoding/json.Marshaler.

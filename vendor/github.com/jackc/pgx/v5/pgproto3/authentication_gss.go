@@ -27,10 +27,11 @@ func (a *AuthenticationGSS) Decode(src []byte) error {
 	return nil
 }
 
-func (a *AuthenticationGSS) Encode(dst []byte) ([]byte, error) {
-	dst, sp := beginMessage(dst, 'R')
+func (a *AuthenticationGSS) Encode(dst []byte) []byte {
+	dst = append(dst, 'R')
+	dst = pgio.AppendInt32(dst, 4)
 	dst = pgio.AppendUint32(dst, AuthTypeGSS)
-	return finishMessage(dst, sp)
+	return dst
 }
 
 func (a *AuthenticationGSS) MarshalJSON() ([]byte, error) {

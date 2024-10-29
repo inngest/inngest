@@ -34,10 +34,11 @@ func NewAggregator(
 		log = logger.StdlibLogger(ctx)
 	}
 	return &aggregator{
-		log:     log,
-		records: ccache.New(ccache.Configure().MaxSize(size).ItemsToPrune(uint32(size) / 4)),
-		loader:  loader,
-		parser:  parser,
+		log:         log,
+		concurrency: concurrency,
+		records:     ccache.New(ccache.Configure().MaxSize(size).ItemsToPrune(uint32(size) / 4)),
+		loader:      loader,
+		parser:      parser,
 		// use the package's exprEvaluator function as the actual logic which evaluates
 		// expressions after the aggregate evaluator does matching.
 		evaluator: exprEvaluator,
@@ -105,17 +106,45 @@ type aggregator struct {
 }
 
 func (a *aggregator) EvaluateAsyncEvent(ctx context.Context, event event.TrackedEvent) ([]expr.Evaluable, int32, error) {
+	log := logger.StdlibLogger(ctx)
+
+	log.Debug("loading evaluator")
+
 	name := event.GetEvent().Name
 	eval, err := a.LoadEventEvaluator(ctx, event.GetWorkspaceID(), name, event.GetEvent().Time())
 	if err != nil {
 		return nil, 0, fmt.Errorf("Could not load an event evaluator: %w", err)
 	}
 
+	if eval.SlowLen() > 100 {
+		log.Warn(
+			"evaluating aggregate pauses",
+			"warning", "large number of slow pauses",
+			"workspace_id", event.GetWorkspaceID(),
+			"event", name,
+			"error", err,
+			"slow_expression_len", eval.SlowLen(),
+			"mixed_expression_len", eval.MixedLen(),
+			"fast_expression_len", eval.FastLen(),
+		)
+
+	} else {
+		log.Debug(
+			"evaluating aggregate pauses",
+			"workspace_id", event.GetWorkspaceID(),
+			"event", name,
+			"error", err,
+			"slow_expression_len", eval.SlowLen(),
+			"mixed_expression_len", eval.MixedLen(),
+			"fast_expression_len", eval.FastLen(),
+		)
+	}
+
 	found, evalCount, err := eval.Evaluate(ctx, map[string]any{
 		"async": event.GetEvent().Map(),
 	})
 	if err != nil {
-		a.log.Error(
+		log.Error(
 			"error evaluating aggregate expressions",
 			"workspace_id", event.GetWorkspaceID(),
 			"event", name,
@@ -125,7 +154,7 @@ func (a *aggregator) EvaluateAsyncEvent(ctx context.Context, event event.Tracked
 
 	}
 
-	a.log.Debug(
+	log.Debug(
 		"evaluated aggregate expressions",
 		"workspace_id", event.GetWorkspaceID(),
 		"event", name,
@@ -133,6 +162,9 @@ func (a *aggregator) EvaluateAsyncEvent(ctx context.Context, event event.Tracked
 		"matched_count", len(found),
 		"total_count", eval.Len(),
 		"found_count", len(found),
+		"slow_expression_len", eval.SlowLen(),
+		"mixed_expression_len", eval.MixedLen(),
+		"fast_expression_len", eval.FastLen(),
 	)
 
 	return found, evalCount, err
@@ -140,6 +172,19 @@ func (a *aggregator) EvaluateAsyncEvent(ctx context.Context, event event.Tracked
 
 func (a *aggregator) LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, eventName string, eventTS time.Time) (expr.AggregateEvaluator, error) {
 	key := wsID.String() + ":" + eventName
+
+	a.mapLock.Lock()
+	lock, ok := a.locks[key]
+	if !ok {
+		a.locks[key] = &sync.Mutex{}
+		lock = a.locks[key]
+	}
+	a.mapLock.Unlock()
+	// lock this key to prevent a possible race where multiple goroutines could see that
+	// the bookkeeper is missing from the cache and try to create it at the same time,
+	// meaning we would drop one of those bookkeepers:
+	lock.Lock()
+	defer lock.Unlock()
 
 	var bk *bookkeeper
 
@@ -166,16 +211,6 @@ func (a *aggregator) LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, eve
 		return bk.ae, nil
 	}
 
-	a.mapLock.Lock()
-	lock, ok := a.locks[key]
-	if !ok {
-		a.locks[key] = &sync.Mutex{}
-		lock = a.locks[key]
-	}
-	a.mapLock.Unlock()
-
-	lock.Lock()
-	defer lock.Unlock()
 	if err := bk.update(ctx, a.loader); err != nil {
 		if bk.updatedAt.IsZero() {
 			return nil, fmt.Errorf("could not load evaluables for aggregate evaluator")
@@ -232,6 +267,7 @@ type bookkeeper struct {
 func (b *bookkeeper) update(ctx context.Context, l EvaluableLoader) error {
 	at := time.Now()
 	count := 0
+
 	err := l.LoadEvaluablesSince(ctx, b.wsID, b.event, b.updatedAt, func(ctx context.Context, eval expr.Evaluable) error {
 		if eval == nil {
 			return fmt.Errorf("adding nil pause")

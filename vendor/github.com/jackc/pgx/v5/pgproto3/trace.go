@@ -6,18 +6,15 @@ import (
 	"io"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
 // tracer traces the messages send to and from a Backend or Frontend. The format it produces roughly mimics the
 // format produced by the libpq C function PQtrace.
 type tracer struct {
-	TracerOptions
-
-	mux sync.Mutex
 	w   io.Writer
 	buf *bytes.Buffer
+	TracerOptions
 }
 
 // TracerOptions controls tracing behavior. It is roughly equivalent to the libpq function PQsetTraceFlags.
@@ -122,255 +119,278 @@ func (t *tracer) traceMessage(sender byte, encodedLen int32, msg Message) {
 	case *Terminate:
 		t.traceTerminate(sender, encodedLen, msg)
 	default:
-		t.writeTrace(sender, encodedLen, "Unknown", nil)
+		t.beginTrace(sender, encodedLen, "Unknown")
+		t.finishTrace()
 	}
 }
 
 func (t *tracer) traceAuthenticationCleartextPassword(sender byte, encodedLen int32, msg *AuthenticationCleartextPassword) {
-	t.writeTrace(sender, encodedLen, "AuthenticationCleartextPassword", nil)
+	t.beginTrace(sender, encodedLen, "AuthenticationCleartextPassword")
+	t.finishTrace()
 }
 
 func (t *tracer) traceAuthenticationGSS(sender byte, encodedLen int32, msg *AuthenticationGSS) {
-	t.writeTrace(sender, encodedLen, "AuthenticationGSS", nil)
+	t.beginTrace(sender, encodedLen, "AuthenticationGSS")
+	t.finishTrace()
 }
 
 func (t *tracer) traceAuthenticationGSSContinue(sender byte, encodedLen int32, msg *AuthenticationGSSContinue) {
-	t.writeTrace(sender, encodedLen, "AuthenticationGSSContinue", nil)
+	t.beginTrace(sender, encodedLen, "AuthenticationGSSContinue")
+	t.finishTrace()
 }
 
 func (t *tracer) traceAuthenticationMD5Password(sender byte, encodedLen int32, msg *AuthenticationMD5Password) {
-	t.writeTrace(sender, encodedLen, "AuthenticationMD5Password", nil)
+	t.beginTrace(sender, encodedLen, "AuthenticationMD5Password")
+	t.finishTrace()
 }
 
 func (t *tracer) traceAuthenticationOk(sender byte, encodedLen int32, msg *AuthenticationOk) {
-	t.writeTrace(sender, encodedLen, "AuthenticationOk", nil)
+	t.beginTrace(sender, encodedLen, "AuthenticationOk")
+	t.finishTrace()
 }
 
 func (t *tracer) traceAuthenticationSASL(sender byte, encodedLen int32, msg *AuthenticationSASL) {
-	t.writeTrace(sender, encodedLen, "AuthenticationSASL", nil)
+	t.beginTrace(sender, encodedLen, "AuthenticationSASL")
+	t.finishTrace()
 }
 
 func (t *tracer) traceAuthenticationSASLContinue(sender byte, encodedLen int32, msg *AuthenticationSASLContinue) {
-	t.writeTrace(sender, encodedLen, "AuthenticationSASLContinue", nil)
+	t.beginTrace(sender, encodedLen, "AuthenticationSASLContinue")
+	t.finishTrace()
 }
 
 func (t *tracer) traceAuthenticationSASLFinal(sender byte, encodedLen int32, msg *AuthenticationSASLFinal) {
-	t.writeTrace(sender, encodedLen, "AuthenticationSASLFinal", nil)
+	t.beginTrace(sender, encodedLen, "AuthenticationSASLFinal")
+	t.finishTrace()
 }
 
 func (t *tracer) traceBackendKeyData(sender byte, encodedLen int32, msg *BackendKeyData) {
-	t.writeTrace(sender, encodedLen, "BackendKeyData", func() {
-		if t.RegressMode {
-			t.buf.WriteString("\t NNNN NNNN")
-		} else {
-			fmt.Fprintf(t.buf, "\t %d %d", msg.ProcessID, msg.SecretKey)
-		}
-	})
+	t.beginTrace(sender, encodedLen, "BackendKeyData")
+	if t.RegressMode {
+		t.buf.WriteString("\t NNNN NNNN")
+	} else {
+		fmt.Fprintf(t.buf, "\t %d %d", msg.ProcessID, msg.SecretKey)
+	}
+	t.finishTrace()
 }
 
 func (t *tracer) traceBind(sender byte, encodedLen int32, msg *Bind) {
-	t.writeTrace(sender, encodedLen, "Bind", func() {
-		fmt.Fprintf(t.buf, "\t %s %s %d", traceDoubleQuotedString([]byte(msg.DestinationPortal)), traceDoubleQuotedString([]byte(msg.PreparedStatement)), len(msg.ParameterFormatCodes))
-		for _, fc := range msg.ParameterFormatCodes {
-			fmt.Fprintf(t.buf, " %d", fc)
-		}
-		fmt.Fprintf(t.buf, " %d", len(msg.Parameters))
-		for _, p := range msg.Parameters {
-			fmt.Fprintf(t.buf, " %s", traceSingleQuotedString(p))
-		}
-		fmt.Fprintf(t.buf, " %d", len(msg.ResultFormatCodes))
-		for _, fc := range msg.ResultFormatCodes {
-			fmt.Fprintf(t.buf, " %d", fc)
-		}
-	})
+	t.beginTrace(sender, encodedLen, "Bind")
+	fmt.Fprintf(t.buf, "\t %s %s %d", traceDoubleQuotedString([]byte(msg.DestinationPortal)), traceDoubleQuotedString([]byte(msg.PreparedStatement)), len(msg.ParameterFormatCodes))
+	for _, fc := range msg.ParameterFormatCodes {
+		fmt.Fprintf(t.buf, " %d", fc)
+	}
+	fmt.Fprintf(t.buf, " %d", len(msg.Parameters))
+	for _, p := range msg.Parameters {
+		fmt.Fprintf(t.buf, " %s", traceSingleQuotedString(p))
+	}
+	fmt.Fprintf(t.buf, " %d", len(msg.ResultFormatCodes))
+	for _, fc := range msg.ResultFormatCodes {
+		fmt.Fprintf(t.buf, " %d", fc)
+	}
+	t.finishTrace()
 }
 
 func (t *tracer) traceBindComplete(sender byte, encodedLen int32, msg *BindComplete) {
-	t.writeTrace(sender, encodedLen, "BindComplete", nil)
+	t.beginTrace(sender, encodedLen, "BindComplete")
+	t.finishTrace()
 }
 
 func (t *tracer) traceCancelRequest(sender byte, encodedLen int32, msg *CancelRequest) {
-	t.writeTrace(sender, encodedLen, "CancelRequest", nil)
+	t.beginTrace(sender, encodedLen, "CancelRequest")
+	t.finishTrace()
 }
 
 func (t *tracer) traceClose(sender byte, encodedLen int32, msg *Close) {
-	t.writeTrace(sender, encodedLen, "Close", nil)
+	t.beginTrace(sender, encodedLen, "Close")
+	t.finishTrace()
 }
 
 func (t *tracer) traceCloseComplete(sender byte, encodedLen int32, msg *CloseComplete) {
-	t.writeTrace(sender, encodedLen, "CloseComplete", nil)
+	t.beginTrace(sender, encodedLen, "CloseComplete")
+	t.finishTrace()
 }
 
 func (t *tracer) traceCommandComplete(sender byte, encodedLen int32, msg *CommandComplete) {
-	t.writeTrace(sender, encodedLen, "CommandComplete", func() {
-		fmt.Fprintf(t.buf, "\t %s", traceDoubleQuotedString(msg.CommandTag))
-	})
+	t.beginTrace(sender, encodedLen, "CommandComplete")
+	fmt.Fprintf(t.buf, "\t %s", traceDoubleQuotedString(msg.CommandTag))
+	t.finishTrace()
 }
 
 func (t *tracer) traceCopyBothResponse(sender byte, encodedLen int32, msg *CopyBothResponse) {
-	t.writeTrace(sender, encodedLen, "CopyBothResponse", nil)
+	t.beginTrace(sender, encodedLen, "CopyBothResponse")
+	t.finishTrace()
 }
 
 func (t *tracer) traceCopyData(sender byte, encodedLen int32, msg *CopyData) {
-	t.writeTrace(sender, encodedLen, "CopyData", nil)
+	t.beginTrace(sender, encodedLen, "CopyData")
+	t.finishTrace()
 }
 
 func (t *tracer) traceCopyDone(sender byte, encodedLen int32, msg *CopyDone) {
-	t.writeTrace(sender, encodedLen, "CopyDone", nil)
+	t.beginTrace(sender, encodedLen, "CopyDone")
+	t.finishTrace()
 }
 
 func (t *tracer) traceCopyFail(sender byte, encodedLen int32, msg *CopyFail) {
-	t.writeTrace(sender, encodedLen, "CopyFail", func() {
-		fmt.Fprintf(t.buf, "\t %s", traceDoubleQuotedString([]byte(msg.Message)))
-	})
+	t.beginTrace(sender, encodedLen, "CopyFail")
+	fmt.Fprintf(t.buf, "\t %s", traceDoubleQuotedString([]byte(msg.Message)))
+	t.finishTrace()
 }
 
 func (t *tracer) traceCopyInResponse(sender byte, encodedLen int32, msg *CopyInResponse) {
-	t.writeTrace(sender, encodedLen, "CopyInResponse", nil)
+	t.beginTrace(sender, encodedLen, "CopyInResponse")
+	t.finishTrace()
 }
 
 func (t *tracer) traceCopyOutResponse(sender byte, encodedLen int32, msg *CopyOutResponse) {
-	t.writeTrace(sender, encodedLen, "CopyOutResponse", nil)
+	t.beginTrace(sender, encodedLen, "CopyOutResponse")
+	t.finishTrace()
 }
 
 func (t *tracer) traceDataRow(sender byte, encodedLen int32, msg *DataRow) {
-	t.writeTrace(sender, encodedLen, "DataRow", func() {
-		fmt.Fprintf(t.buf, "\t %d", len(msg.Values))
-		for _, v := range msg.Values {
-			if v == nil {
-				t.buf.WriteString(" -1")
-			} else {
-				fmt.Fprintf(t.buf, " %d %s", len(v), traceSingleQuotedString(v))
-			}
+	t.beginTrace(sender, encodedLen, "DataRow")
+	fmt.Fprintf(t.buf, "\t %d", len(msg.Values))
+	for _, v := range msg.Values {
+		if v == nil {
+			t.buf.WriteString(" -1")
+		} else {
+			fmt.Fprintf(t.buf, " %d %s", len(v), traceSingleQuotedString(v))
 		}
-	})
+	}
+	t.finishTrace()
 }
 
 func (t *tracer) traceDescribe(sender byte, encodedLen int32, msg *Describe) {
-	t.writeTrace(sender, encodedLen, "Describe", func() {
-		fmt.Fprintf(t.buf, "\t %c %s", msg.ObjectType, traceDoubleQuotedString([]byte(msg.Name)))
-	})
+	t.beginTrace(sender, encodedLen, "Describe")
+	fmt.Fprintf(t.buf, "\t %c %s", msg.ObjectType, traceDoubleQuotedString([]byte(msg.Name)))
+	t.finishTrace()
 }
 
 func (t *tracer) traceEmptyQueryResponse(sender byte, encodedLen int32, msg *EmptyQueryResponse) {
-	t.writeTrace(sender, encodedLen, "EmptyQueryResponse", nil)
+	t.beginTrace(sender, encodedLen, "EmptyQueryResponse")
+	t.finishTrace()
 }
 
 func (t *tracer) traceErrorResponse(sender byte, encodedLen int32, msg *ErrorResponse) {
-	t.writeTrace(sender, encodedLen, "ErrorResponse", nil)
+	t.beginTrace(sender, encodedLen, "ErrorResponse")
+	t.finishTrace()
 }
 
 func (t *tracer) TraceQueryute(sender byte, encodedLen int32, msg *Execute) {
-	t.writeTrace(sender, encodedLen, "Execute", func() {
-		fmt.Fprintf(t.buf, "\t %s %d", traceDoubleQuotedString([]byte(msg.Portal)), msg.MaxRows)
-	})
+	t.beginTrace(sender, encodedLen, "Execute")
+	fmt.Fprintf(t.buf, "\t %s %d", traceDoubleQuotedString([]byte(msg.Portal)), msg.MaxRows)
+	t.finishTrace()
 }
 
 func (t *tracer) traceFlush(sender byte, encodedLen int32, msg *Flush) {
-	t.writeTrace(sender, encodedLen, "Flush", nil)
+	t.beginTrace(sender, encodedLen, "Flush")
+	t.finishTrace()
 }
 
 func (t *tracer) traceFunctionCall(sender byte, encodedLen int32, msg *FunctionCall) {
-	t.writeTrace(sender, encodedLen, "FunctionCall", nil)
+	t.beginTrace(sender, encodedLen, "FunctionCall")
+	t.finishTrace()
 }
 
 func (t *tracer) traceFunctionCallResponse(sender byte, encodedLen int32, msg *FunctionCallResponse) {
-	t.writeTrace(sender, encodedLen, "FunctionCallResponse", nil)
+	t.beginTrace(sender, encodedLen, "FunctionCallResponse")
+	t.finishTrace()
 }
 
 func (t *tracer) traceGSSEncRequest(sender byte, encodedLen int32, msg *GSSEncRequest) {
-	t.writeTrace(sender, encodedLen, "GSSEncRequest", nil)
+	t.beginTrace(sender, encodedLen, "GSSEncRequest")
+	t.finishTrace()
 }
 
 func (t *tracer) traceNoData(sender byte, encodedLen int32, msg *NoData) {
-	t.writeTrace(sender, encodedLen, "NoData", nil)
+	t.beginTrace(sender, encodedLen, "NoData")
+	t.finishTrace()
 }
 
 func (t *tracer) traceNoticeResponse(sender byte, encodedLen int32, msg *NoticeResponse) {
-	t.writeTrace(sender, encodedLen, "NoticeResponse", nil)
+	t.beginTrace(sender, encodedLen, "NoticeResponse")
+	t.finishTrace()
 }
 
 func (t *tracer) traceNotificationResponse(sender byte, encodedLen int32, msg *NotificationResponse) {
-	t.writeTrace(sender, encodedLen, "NotificationResponse", func() {
-		fmt.Fprintf(t.buf, "\t %d %s %s", msg.PID, traceDoubleQuotedString([]byte(msg.Channel)), traceDoubleQuotedString([]byte(msg.Payload)))
-	})
+	t.beginTrace(sender, encodedLen, "NotificationResponse")
+	fmt.Fprintf(t.buf, "\t %d %s %s", msg.PID, traceDoubleQuotedString([]byte(msg.Channel)), traceDoubleQuotedString([]byte(msg.Payload)))
+	t.finishTrace()
 }
 
 func (t *tracer) traceParameterDescription(sender byte, encodedLen int32, msg *ParameterDescription) {
-	t.writeTrace(sender, encodedLen, "ParameterDescription", nil)
+	t.beginTrace(sender, encodedLen, "ParameterDescription")
+	t.finishTrace()
 }
 
 func (t *tracer) traceParameterStatus(sender byte, encodedLen int32, msg *ParameterStatus) {
-	t.writeTrace(sender, encodedLen, "ParameterStatus", func() {
-		fmt.Fprintf(t.buf, "\t %s %s", traceDoubleQuotedString([]byte(msg.Name)), traceDoubleQuotedString([]byte(msg.Value)))
-	})
+	t.beginTrace(sender, encodedLen, "ParameterStatus")
+	fmt.Fprintf(t.buf, "\t %s %s", traceDoubleQuotedString([]byte(msg.Name)), traceDoubleQuotedString([]byte(msg.Value)))
+	t.finishTrace()
 }
 
 func (t *tracer) traceParse(sender byte, encodedLen int32, msg *Parse) {
-	t.writeTrace(sender, encodedLen, "Parse", func() {
-		fmt.Fprintf(t.buf, "\t %s %s %d", traceDoubleQuotedString([]byte(msg.Name)), traceDoubleQuotedString([]byte(msg.Query)), len(msg.ParameterOIDs))
-		for _, oid := range msg.ParameterOIDs {
-			fmt.Fprintf(t.buf, " %d", oid)
-		}
-	})
+	t.beginTrace(sender, encodedLen, "Parse")
+	fmt.Fprintf(t.buf, "\t %s %s %d", traceDoubleQuotedString([]byte(msg.Name)), traceDoubleQuotedString([]byte(msg.Query)), len(msg.ParameterOIDs))
+	for _, oid := range msg.ParameterOIDs {
+		fmt.Fprintf(t.buf, " %d", oid)
+	}
+	t.finishTrace()
 }
 
 func (t *tracer) traceParseComplete(sender byte, encodedLen int32, msg *ParseComplete) {
-	t.writeTrace(sender, encodedLen, "ParseComplete", nil)
+	t.beginTrace(sender, encodedLen, "ParseComplete")
+	t.finishTrace()
 }
 
 func (t *tracer) tracePortalSuspended(sender byte, encodedLen int32, msg *PortalSuspended) {
-	t.writeTrace(sender, encodedLen, "PortalSuspended", nil)
+	t.beginTrace(sender, encodedLen, "PortalSuspended")
+	t.finishTrace()
 }
 
 func (t *tracer) traceQuery(sender byte, encodedLen int32, msg *Query) {
-	t.writeTrace(sender, encodedLen, "Query", func() {
-		fmt.Fprintf(t.buf, "\t %s", traceDoubleQuotedString([]byte(msg.String)))
-	})
+	t.beginTrace(sender, encodedLen, "Query")
+	fmt.Fprintf(t.buf, "\t %s", traceDoubleQuotedString([]byte(msg.String)))
+	t.finishTrace()
 }
 
 func (t *tracer) traceReadyForQuery(sender byte, encodedLen int32, msg *ReadyForQuery) {
-	t.writeTrace(sender, encodedLen, "ReadyForQuery", func() {
-		fmt.Fprintf(t.buf, "\t %c", msg.TxStatus)
-	})
+	t.beginTrace(sender, encodedLen, "ReadyForQuery")
+	fmt.Fprintf(t.buf, "\t %c", msg.TxStatus)
+	t.finishTrace()
 }
 
 func (t *tracer) traceRowDescription(sender byte, encodedLen int32, msg *RowDescription) {
-	t.writeTrace(sender, encodedLen, "RowDescription", func() {
-		fmt.Fprintf(t.buf, "\t %d", len(msg.Fields))
-		for _, fd := range msg.Fields {
-			fmt.Fprintf(t.buf, ` %s %d %d %d %d %d %d`, traceDoubleQuotedString(fd.Name), fd.TableOID, fd.TableAttributeNumber, fd.DataTypeOID, fd.DataTypeSize, fd.TypeModifier, fd.Format)
-		}
-	})
+	t.beginTrace(sender, encodedLen, "RowDescription")
+	fmt.Fprintf(t.buf, "\t %d", len(msg.Fields))
+	for _, fd := range msg.Fields {
+		fmt.Fprintf(t.buf, ` %s %d %d %d %d %d %d`, traceDoubleQuotedString(fd.Name), fd.TableOID, fd.TableAttributeNumber, fd.DataTypeOID, fd.DataTypeSize, fd.TypeModifier, fd.Format)
+	}
+	t.finishTrace()
 }
 
 func (t *tracer) traceSSLRequest(sender byte, encodedLen int32, msg *SSLRequest) {
-	t.writeTrace(sender, encodedLen, "SSLRequest", nil)
+	t.beginTrace(sender, encodedLen, "SSLRequest")
+	t.finishTrace()
 }
 
 func (t *tracer) traceStartupMessage(sender byte, encodedLen int32, msg *StartupMessage) {
-	t.writeTrace(sender, encodedLen, "StartupMessage", nil)
+	t.beginTrace(sender, encodedLen, "StartupMessage")
+	t.finishTrace()
 }
 
 func (t *tracer) traceSync(sender byte, encodedLen int32, msg *Sync) {
-	t.writeTrace(sender, encodedLen, "Sync", nil)
+	t.beginTrace(sender, encodedLen, "Sync")
+	t.finishTrace()
 }
 
 func (t *tracer) traceTerminate(sender byte, encodedLen int32, msg *Terminate) {
-	t.writeTrace(sender, encodedLen, "Terminate", nil)
+	t.beginTrace(sender, encodedLen, "Terminate")
+	t.finishTrace()
 }
 
-func (t *tracer) writeTrace(sender byte, encodedLen int32, msgType string, writeDetails func()) {
-	t.mux.Lock()
-	defer t.mux.Unlock()
-	defer func() {
-		if t.buf.Cap() > 1024 {
-			t.buf = &bytes.Buffer{}
-		} else {
-			t.buf.Reset()
-		}
-	}()
-
+func (t *tracer) beginTrace(sender byte, encodedLen int32, msgType string) {
 	if !t.SuppressTimestamps {
 		now := time.Now()
 		t.buf.WriteString(now.Format("2006-01-02 15:04:05.000000"))
@@ -382,13 +402,17 @@ func (t *tracer) writeTrace(sender byte, encodedLen int32, msgType string, write
 	t.buf.WriteString(msgType)
 	t.buf.WriteByte('\t')
 	t.buf.WriteString(strconv.FormatInt(int64(encodedLen), 10))
+}
 
-	if writeDetails != nil {
-		writeDetails()
-	}
-
+func (t *tracer) finishTrace() {
 	t.buf.WriteByte('\n')
 	t.buf.WriteTo(t.w)
+
+	if t.buf.Cap() > 1024 {
+		t.buf = &bytes.Buffer{}
+	} else {
+		t.buf.Reset()
+	}
 }
 
 // traceDoubleQuotedString returns t.buf as a double-quoted string without any escaping. It is roughly equivalent to

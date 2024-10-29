@@ -38,14 +38,14 @@ func (dst *StartupMessage) Decode(src []byte) error {
 	for {
 		idx := bytes.IndexByte(src[rp:], 0)
 		if idx < 0 {
-			return &invalidMessageFormatErr{messageType: "StartupMessage"}
+			return &invalidMessageFormatErr{messageType: "StartupMesage"}
 		}
 		key := string(src[rp : rp+idx])
 		rp += idx + 1
 
 		idx = bytes.IndexByte(src[rp:], 0)
 		if idx < 0 {
-			return &invalidMessageFormatErr{messageType: "StartupMessage"}
+			return &invalidMessageFormatErr{messageType: "StartupMesage"}
 		}
 		value := string(src[rp : rp+idx])
 		rp += idx + 1
@@ -64,7 +64,7 @@ func (dst *StartupMessage) Decode(src []byte) error {
 }
 
 // Encode encodes src into dst. dst will include the 1 byte message type identifier and the 4 byte message length.
-func (src *StartupMessage) Encode(dst []byte) ([]byte, error) {
+func (src *StartupMessage) Encode(dst []byte) []byte {
 	sp := len(dst)
 	dst = pgio.AppendInt32(dst, -1)
 
@@ -77,7 +77,9 @@ func (src *StartupMessage) Encode(dst []byte) ([]byte, error) {
 	}
 	dst = append(dst, 0)
 
-	return finishMessage(dst, sp)
+	pgio.SetInt32(dst[sp:], int32(len(dst[sp:])))
+
+	return dst
 }
 
 // MarshalJSON implements encoding/json.Marshaler.

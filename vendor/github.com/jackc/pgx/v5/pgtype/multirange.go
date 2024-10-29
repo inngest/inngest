@@ -339,18 +339,18 @@ func parseUntypedTextMultirange(src []byte) ([]string, error) {
 
 	r, _, err := buf.ReadRune()
 	if err != nil {
-		return nil, fmt.Errorf("invalid array: %w", err)
+		return nil, fmt.Errorf("invalid array: %v", err)
 	}
 
 	if r != '{' {
-		return nil, fmt.Errorf("invalid multirange, expected '{' got %v", r)
+		return nil, fmt.Errorf("invalid multirange, expected '{': %v", err)
 	}
 
 parseValueLoop:
 	for {
 		r, _, err = buf.ReadRune()
 		if err != nil {
-			return nil, fmt.Errorf("invalid multirange: %w", err)
+			return nil, fmt.Errorf("invalid multirange: %v", err)
 		}
 
 		switch r {
@@ -361,7 +361,7 @@ parseValueLoop:
 			buf.UnreadRune()
 			value, err := parseRange(buf)
 			if err != nil {
-				return nil, fmt.Errorf("invalid multirange value: %w", err)
+				return nil, fmt.Errorf("invalid multirange value: %v", err)
 			}
 			elements = append(elements, value)
 		}

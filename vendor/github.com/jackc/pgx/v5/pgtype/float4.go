@@ -3,7 +3,6 @@ package pgtype
 import (
 	"database/sql/driver"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"math"
 	"strconv"
@@ -64,29 +63,6 @@ func (f Float4) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return float64(f.Float32), nil
-}
-
-func (f Float4) MarshalJSON() ([]byte, error) {
-	if !f.Valid {
-		return []byte("null"), nil
-	}
-	return json.Marshal(f.Float32)
-}
-
-func (f *Float4) UnmarshalJSON(b []byte) error {
-	var n *float32
-	err := json.Unmarshal(b, &n)
-	if err != nil {
-		return err
-	}
-
-	if n == nil {
-		*f = Float4{}
-	} else {
-		*f = Float4{Float32: *n, Valid: true}
-	}
-
-	return nil
 }
 
 type Float4Codec struct{}
@@ -297,12 +273,12 @@ func (c Float4Codec) DecodeDatabaseSQLValue(m *Map, oid uint32, format int16, sr
 		return nil, nil
 	}
 
-	var n float32
+	var n float64
 	err := codecScan(c, m, oid, format, src, &n)
 	if err != nil {
 		return nil, err
 	}
-	return float64(n), nil
+	return n, nil
 }
 
 func (c Float4Codec) DecodeValue(m *Map, oid uint32, format int16, src []byte) (any, error) {

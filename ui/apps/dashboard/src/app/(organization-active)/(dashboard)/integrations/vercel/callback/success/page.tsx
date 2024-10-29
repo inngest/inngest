@@ -57,7 +57,7 @@ export default async function SuccessPage({ searchParams }: SuccessProps) {
             kind="primary"
             appearance="solid"
             size="medium"
-            label="Continue to Inngest Vercel Dashbaord"
+            label="Continue to Inngest Vercel Dashboard"
             href={
               searchParams.source === 'marketplace'
                 ? searchParams.onSuccessRedirectURL

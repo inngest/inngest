@@ -185,6 +185,9 @@ func (s *svc) Run(ctx context.Context) error {
 			err = s.handleDebounce(ctx, item)
 		case queue.KindScheduleBatch:
 			err = s.handleScheduledBatch(ctx, item)
+		case queue.KindQueueMigrate:
+			// NOOP:
+			// this kind don't work in the Dev server
 		default:
 			err = fmt.Errorf("unknown payload type: %T", item.Payload)
 		}
@@ -269,7 +272,9 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 		return nil
 	}
 
-	r := execution.ResumeRequest{}
+	r := execution.ResumeRequest{
+		IsTimeout: true,
+	}
 
 	// If the pause timeout is for an invocation, store an error to cause the
 	// step to fail.

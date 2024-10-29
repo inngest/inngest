@@ -41,6 +41,8 @@ func guaranteedCapacityKeyForAccount(accountId uuid.UUID) string {
 
 // GuaranteedCapacity represents an account with guaranteed capacity.
 type GuaranteedCapacity struct {
+	Name string `json:"n,omitempty"`
+
 	// Scope identifies the level of guaranteed capacity, currently we only support account
 	Scope enums.GuaranteedCapacityScope `json:"s"`
 

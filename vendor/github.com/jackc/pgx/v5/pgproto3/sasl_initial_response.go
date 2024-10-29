@@ -39,8 +39,10 @@ func (dst *SASLInitialResponse) Decode(src []byte) error {
 }
 
 // Encode encodes src into dst. dst will include the 1 byte message type identifier and the 4 byte message length.
-func (src *SASLInitialResponse) Encode(dst []byte) ([]byte, error) {
-	dst, sp := beginMessage(dst, 'p')
+func (src *SASLInitialResponse) Encode(dst []byte) []byte {
+	dst = append(dst, 'p')
+	sp := len(dst)
+	dst = pgio.AppendInt32(dst, -1)
 
 	dst = append(dst, []byte(src.AuthMechanism)...)
 	dst = append(dst, 0)
@@ -48,7 +50,9 @@ func (src *SASLInitialResponse) Encode(dst []byte) ([]byte, error) {
 	dst = pgio.AppendInt32(dst, int32(len(src.Data)))
 	dst = append(dst, src.Data...)
 
-	return finishMessage(dst, sp)
+	pgio.SetInt32(dst[sp:], int32(len(dst[sp:])))
+
+	return dst
 }
 
 // MarshalJSON implements encoding/json.Marshaler.

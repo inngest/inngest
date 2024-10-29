@@ -16,8 +16,7 @@ type Backend struct {
 	// before it is actually transmitted (i.e. before Flush).
 	tracer *tracer
 
-	wbuf        []byte
-	encodeError error
+	wbuf []byte
 
 	// Frontend message flyweights
 	bind           Bind
@@ -39,7 +38,6 @@ type Backend struct {
 	terminate      Terminate
 
 	bodyLen    int
-	maxBodyLen int // maxBodyLen is the maximum length of a message body in octets. If a message body exceeds this length, Receive will return an error.
 	msgType    byte
 	partialMsg bool
 	authType   uint32
@@ -56,21 +54,11 @@ func NewBackend(r io.Reader, w io.Writer) *Backend {
 	return &Backend{cr: cr, w: w}
 }
 
-// Send sends a message to the frontend (i.e. the client). The message is buffered until Flush is called. Any error
-// encountered will be returned from Flush.
+// Send sends a message to the frontend (i.e. the client). The message is not guaranteed to be written until Flush is
+// called.
 func (b *Backend) Send(msg BackendMessage) {
-	if b.encodeError != nil {
-		return
-	}
-
 	prevLen := len(b.wbuf)
-	newBuf, err := msg.Encode(b.wbuf)
-	if err != nil {
-		b.encodeError = err
-		return
-	}
-	b.wbuf = newBuf
-
+	b.wbuf = msg.Encode(b.wbuf)
 	if b.tracer != nil {
 		b.tracer.traceMessage('B', int32(len(b.wbuf)-prevLen), msg)
 	}
@@ -78,12 +66,6 @@ func (b *Backend) Send(msg BackendMessage) {
 
 // Flush writes any pending messages to the frontend (i.e. the client).
 func (b *Backend) Flush() error {
-	if err := b.encodeError; err != nil {
-		b.encodeError = nil
-		b.wbuf = b.wbuf[:0]
-		return &writeError{err: err, safeToRetry: true}
-	}
-
 	n, err := b.w.Write(b.wbuf)
 
 	const maxLen = 1024
@@ -176,9 +158,6 @@ func (b *Backend) Receive() (FrontendMessage, error) {
 
 		b.msgType = header[0]
 		b.bodyLen = int(binary.BigEndian.Uint32(header[1:])) - 4
-		if b.maxBodyLen > 0 && b.bodyLen > b.maxBodyLen {
-			return nil, &ExceededMaxBodyLenErr{b.maxBodyLen, b.bodyLen}
-		}
 		b.partialMsg = true
 	}
 
@@ -280,13 +259,4 @@ func (b *Backend) SetAuthType(authType uint32) error {
 	}
 
 	return nil
-}
-
-// SetMaxBodyLen sets the maximum length of a message body in octets. If a message body exceeds this length, Receive will return
-// an error. This is useful for protecting against malicious clients that send large messages with the intent of
-// causing memory exhaustion.
-// The default value is 0.
-// If maxBodyLen is 0, then no maximum is enforced.
-func (b *Backend) SetMaxBodyLen(maxBodyLen int) {
-	b.maxBodyLen = maxBodyLen
 }

@@ -2,17 +2,18 @@
 package stmtcache
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
+	"strconv"
+	"sync/atomic"
 
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// StatementName returns a statement name that will be stable for sql across multiple connections and program
-// executions.
-func StatementName(sql string) string {
-	digest := sha256.Sum256([]byte(sql))
-	return "stmtcache_" + hex.EncodeToString(digest[0:24])
+var stmtCounter int64
+
+// NextStatementName returns a statement name that will be unique for the lifetime of the program.
+func NextStatementName() string {
+	n := atomic.AddInt64(&stmtCounter, 1)
+	return "stmtcache_" + strconv.FormatInt(n, 10)
 }
 
 // Cache caches statement descriptions.
@@ -29,17 +30,28 @@ type Cache interface {
 	// InvalidateAll invalidates all statement descriptions.
 	InvalidateAll()
 
-	// GetInvalidated returns a slice of all statement descriptions invalidated since the last call to RemoveInvalidated.
-	GetInvalidated() []*pgconn.StatementDescription
-
-	// RemoveInvalidated removes all invalidated statement descriptions. No other calls to Cache must be made between a
-	// call to GetInvalidated and RemoveInvalidated or RemoveInvalidated may remove statement descriptions that were
-	// never seen by the call to GetInvalidated.
-	RemoveInvalidated()
+	// HandleInvalidated returns a slice of all statement descriptions invalidated since the last call to HandleInvalidated.
+	HandleInvalidated() []*pgconn.StatementDescription
 
 	// Len returns the number of cached prepared statement descriptions.
 	Len() int
 
 	// Cap returns the maximum number of cached prepared statement descriptions.
 	Cap() int
+}
+
+func IsStatementInvalid(err error) bool {
+	pgErr, ok := err.(*pgconn.PgError)
+	if !ok {
+		return false
+	}
+
+	// https://github.com/jackc/pgx/issues/1162
+	//
+	// We used to look for the message "cached plan must not change result type". However, that message can be localized.
+	// Unfortunately, error code "0A000" - "FEATURE NOT SUPPORTED" is used for many different errors and the only way to
+	// tell the difference is by the message. But all that happens is we clear a statement that we otherwise wouldn't
+	// have so it should be safe.
+	possibleInvalidCachedPlanError := pgErr.Code == "0A000"
+	return possibleInvalidCachedPlanError
 }

@@ -98,7 +98,7 @@ func (r *runValidator) checkStepLimit(ctx context.Context) error {
 		resp.Err = &gracefulErr
 		resp.SetFinal()
 
-		if err := r.e.finalize(ctx, r.md, r.evts, r.f.GetSlug(), resp); err != nil {
+		if err := r.e.finalize(ctx, r.md, r.evts, r.f.GetSlug(), r.e.assignedQueueShard, resp); err != nil {
 			l.Error("error running finish handler", "error", err)
 		}
 
@@ -166,7 +166,7 @@ func (r *runValidator) checkCancellation(ctx context.Context) error {
 func (r *runValidator) checkStartTimeout(ctx context.Context) error {
 	if r.f.Timeouts != nil {
 		since := time.Since(ulid.Time(r.md.ID.RunID.Time()))
-		if r.f.Timeouts.Start > 0 && since > r.f.Timeouts.Start {
+		if r.f.Timeouts.Start > 0 && since > r.f.Timeouts.Start && r.md.Config.StartedAt.IsZero() {
 			logger.StdlibLogger(ctx).Debug("start timeout reached", "run_id", r.md.ID.RunID.String())
 			if err := r.e.Cancel(ctx, r.md.ID, execution.CancelRequest{}); err != nil {
 				return err

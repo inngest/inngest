@@ -20,7 +20,6 @@ import cn from '@/utils/cn';
 import {
   EnvironmentType,
   getDefaultEnvironment,
-  getLegacyTestMode,
   getSortedBranchEnvironments,
   getTestEnvironments,
   type Environment,
@@ -137,7 +136,6 @@ export default function EnvironmentSelectMenu({
 
   const defaultEnvironment = getDefaultEnvironment(envs);
   const includeArchived = false;
-  const legacyTestMode = getLegacyTestMode(envs, includeArchived);
   const mostRecentlyCreatedBranchEnvironments = getSortedBranchEnvironments(
     envs,
     includeArchived
@@ -180,12 +178,6 @@ export default function EnvironmentSelectMenu({
 
           <Listbox.Options className="bg-canvasBase border-subtle overflow-y-truncate absolute top-10 z-50 w-[188px] divide-none rounded border shadow focus:outline-none">
             {defaultEnvironment !== null && <EnvironmentItem environment={defaultEnvironment} />}
-
-            {legacyTestMode !== null && (
-              <div>
-                <EnvironmentItem environment={legacyTestMode} name="Test mode" />
-              </div>
-            )}
 
             {testEnvironments.length > 0 &&
               testEnvironments.map((env) => <EnvironmentItem key={env.id} environment={env} />)}

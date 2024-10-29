@@ -4,7 +4,6 @@
 
   Return values:
   0 - Updated "off" boolean
-  1 - Function meta not found
 
 ]]
 
