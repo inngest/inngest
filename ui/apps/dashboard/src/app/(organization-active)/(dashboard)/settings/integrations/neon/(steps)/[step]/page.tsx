@@ -9,7 +9,12 @@ import { toast } from 'sonner';
 
 import { useSteps } from '@/components/PostgresIntegration/Context';
 import { pathCreator } from '@/utils/urls';
-import { verifyAutoSetup, verifyCredentials, verifyLogicalReplication } from './actions';
+import {
+  verifyAutoSetup,
+  verifyCredentials,
+  verifyLogicalReplication,
+  verifyManualSetup,
+} from './actions';
 
 export default function NeonStep({ params: { step } }: { params: { step: string } }) {
   const { setStepsCompleted, credentials, setCredentials } = useSteps();
@@ -53,6 +58,8 @@ export default function NeonStep({ params: { step } }: { params: { step: string 
         }}
         // @ts-ignore for now
         verifyAutoSetup={verifyAutoSetup}
+        // @ts-ignore for now
+        verifyManualSetup={verifyManualSetup}
         savedCredentials={credentials}
         handleLostCredentials={handleLostCredentials}
       />

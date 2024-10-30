@@ -1,14 +1,23 @@
 import { useState } from 'react';
 import CommandBlock, { type TabsProps } from '@inngest/components/CodeBlock/CommandBlock';
 
-const PostgresCommandBlock = ({ tabs }: { tabs: TabsProps[] }) => {
+const PostgresCommandBlock = ({
+  tabs,
+  enableCopy,
+}: {
+  tabs: TabsProps[];
+  enableCopy?: boolean;
+}) => {
   const [activeTab, setActiveTab] = useState(tabs[0]?.title || '');
   const currentTabContent = tabs.find((tab) => tab.title === activeTab) || tabs[0];
 
   return (
     <CommandBlock.Wrapper>
-      <CommandBlock.Header>
+      <CommandBlock.Header
+        className={`${enableCopy ? 'flex items-center justify-between pr-4' : ''}`}
+      >
         <CommandBlock.Tabs tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} />
+        {enableCopy && <CommandBlock.CopyButton content={currentTabContent?.content} />}
       </CommandBlock.Header>
       <CommandBlock currentTabContent={currentTabContent} />
     </CommandBlock.Wrapper>
@@ -17,6 +26,19 @@ const PostgresCommandBlock = ({ tabs }: { tabs: TabsProps[] }) => {
 
 export const RoleCommand = () => (
   <PostgresCommandBlock
+    tabs={[
+      {
+        title: 'Create role',
+        content: 'CREATE USER inngest WITH REPLICATION',
+        language: 'sql',
+      },
+    ]}
+  />
+);
+
+export const RoleCommandManual = () => (
+  <PostgresCommandBlock
+    enableCopy
     tabs={[
       {
         title: 'Create role',
@@ -39,8 +61,34 @@ export const AccessCommand = () => (
   />
 );
 
+export const AccessCommandManual = () => (
+  <PostgresCommandBlock
+    enableCopy
+    tabs={[
+      {
+        title: 'Access command',
+        content: `GRANT USAGE ON SCHEMA public TO replication_user;\n\GRANT SELECT ON ALL TABLES IN SCHEMA public TO replication_user;\n\ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO replication_user;`,
+        language: 'sql',
+      },
+    ]}
+  />
+);
+
 export const ReplicationSlotCommand = () => (
   <PostgresCommandBlock
+    tabs={[
+      {
+        title: 'Replication slot command',
+        content: "SELECT pg_create_logical_replication_slot('inngest_cdc', 'pgoutput');",
+        language: 'sql',
+      },
+    ]}
+  />
+);
+
+export const ReplicationSlotCommandManual = () => (
+  <PostgresCommandBlock
+    enableCopy
     tabs={[
       {
         title: 'Replication slot command',
@@ -63,12 +111,64 @@ export const AlterTableReplicationCommandOne = () => (
   />
 );
 
+export const AlterTableReplicationCommandOneManual = () => (
+  <PostgresCommandBlock
+    enableCopy
+    tabs={[
+      {
+        title: 'Alter table - Default',
+        content: 'ALTER TABLE <table_name> REPLICA IDENTITY DEFAULT;',
+        language: 'sql',
+      },
+    ]}
+  />
+);
+export const AlterTableReplicationCommandOneFullManual = () => (
+  <PostgresCommandBlock
+    enableCopy
+    tabs={[
+      {
+        title: 'Alter table - Full',
+        content: 'ALTER TABLE <table_name> REPLICA IDENTITY FULL;',
+        language: 'sql',
+      },
+    ]}
+  />
+);
+
 export const AlterTableReplicationCommandTwo = () => (
   <PostgresCommandBlock
     tabs={[
       {
         title: 'Alter table - Default',
         content: 'CREATE PUBLICATION inngest FOR ALL TABLES;',
+        language: 'sql',
+      },
+    ]}
+  />
+);
+
+export const AlterTableReplicationCommandTwoManual = () => (
+  <PostgresCommandBlock
+    enableCopy
+    tabs={[
+      {
+        title: 'Alter table - Default',
+        content:
+          'CREATE PUBLICATION airbyte_publication FOR TABLE <table_name, table_name, table_name>;',
+        language: 'sql',
+      },
+    ]}
+  />
+);
+
+export const AlterTableReplicationCommandTwoFullManual = () => (
+  <PostgresCommandBlock
+    enableCopy
+    tabs={[
+      {
+        title: 'Alter table - Full',
+        content: 'ALTER TABLE <table_name> REPLICA IDENTITY FULL;',
         language: 'sql',
       },
     ]}
