@@ -1678,17 +1678,9 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 
 		// And dequeue the timeout job to remove unneeded work from the queue, etc.
 		if q, ok := e.queue.(redis_state.QueueManager); ok {
-			var qn *string
-			if r.IsTimeout {
-				// timeouts are enqueued to the workflow partition (see handleGeneratorWaitForEvent)
-				// this is _not_ a system partition and lives on the account shard
-			} else {
-				// pause events are enqueued to a system partition (see pauseEventListener)
-				// system partitions live on the default shard
-				queueName := fmt.Sprintf("pause:%s", pause.WorkspaceID)
-				qn = &queueName
-			}
-			shard, err := e.shardFinder(ctx, md.ID.Tenant.AccountID, qn)
+			// timeout jobs are enqueued to the workflow partition (see handleGeneratorWaitForEvent)
+			// this is _not_ a system partition and lives on the account shard, which we need to retrieve
+			shard, err := e.shardFinder(ctx, md.ID.Tenant.AccountID, nil)
 			if err != nil {
 				return fmt.Errorf("could not find shard for pause timeout item for account %q: %w", md.ID.Tenant.AccountID, err)
 			}
@@ -1702,7 +1694,12 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				},
 			})
 			if err != nil {
-				logger.StdlibLogger(ctx).Error("error dequeueing consumed pause job when resuming", "error", err, "pause", pause, "shard", shard, "qn", qn)
+				if errors.Is(err, redis_state.ErrQueueItemNotFound) {
+					logger.StdlibLogger(ctx).Warn("missing pause timeout item", "shard", shard.Name, "pause", pause)
+				} else {
+					logger.StdlibLogger(ctx).Error("error dequeueing consumed pause job when resuming", "error", err)
+
+				}
 			}
 		}
 		return nil
