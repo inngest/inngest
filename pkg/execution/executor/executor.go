@@ -1695,7 +1695,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			})
 			if err != nil {
 				if errors.Is(err, redis_state.ErrQueueItemNotFound) {
-					logger.StdlibLogger(ctx).Warn("missing pause timeout item", "shard", shard.Name)
+					logger.StdlibLogger(ctx).Warn("missing pause timeout item", "shard", shard.Name, "pause", pause)
 				} else {
 					logger.StdlibLogger(ctx).Error("error dequeueing consumed pause job when resuming", "error", err)
 
