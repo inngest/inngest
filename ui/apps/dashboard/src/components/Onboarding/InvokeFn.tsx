@@ -5,10 +5,10 @@ import { NewButton } from '@inngest/components/Button';
 import { CodeBlock } from '@inngest/components/CodeBlock/CodeBlock';
 import { parseCode } from '@inngest/components/InvokeButton/utils';
 import { NewLink } from '@inngest/components/Link';
-import { Select } from '@inngest/components/Select/Select';
+import { Select, type Option } from '@inngest/components/Select/Select';
+import { toast } from 'sonner';
 
 import { pathCreator } from '@/utils/urls';
-import { type EntityType } from '../Metrics/Dashboard';
 import { OnboardingSteps } from '../Onboarding/types';
 import { invokeFunction, prefetchFunctions } from './actions';
 import useOnboardingStep from './useOnboardingStep';
@@ -23,14 +23,27 @@ const initialCode = JSON.stringify(
   2
 );
 
+interface FunctionOption extends Option {
+  slug: string;
+  current: {
+    triggers: {
+      eventName?: string;
+    }[];
+  };
+}
+
 export default function InvokeFn() {
   const { updateLastCompletedStep } = useOnboardingStep();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
-  const [functions, setFunctions] = useState<EntityType[]>([]);
-  const [selectedFunction, setSelectedFunction] = useState<EntityType | undefined>();
+  const [functions, setFunctions] = useState<FunctionOption[]>([]);
+  const [selectedFunction, setSelectedFunction] = useState<FunctionOption | undefined>();
   const [rawPayload, setRawPayload] = useState(initialCode);
+  const [isFnInvoked, setIsFnInvoked] = useState(false);
   const router = useRouter();
+
+  const hasEventTrigger =
+    selectedFunction?.current.triggers.some((trigger) => trigger.eventName) ?? false;
 
   useEffect(() => {
     const loadFunctions = async () => {
@@ -38,11 +51,6 @@ export default function InvokeFn() {
         setLoading(true);
         const fetchedFunctions = await prefetchFunctions();
         setFunctions(fetchedFunctions);
-
-        // // Set the initial selected function
-        // if (fetchedFunctions.length > 0) {
-        //   setSelectedFunction(fetchedFunctions[0]);
-        // }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load functions');
       } finally {
@@ -53,29 +61,41 @@ export default function InvokeFn() {
     loadFunctions();
   }, []);
   console.log(functions);
-  // const doesFunctionAcceptPayload =
-  //   fn?.current?.triggers.some((trigger) => {
-  //     return trigger.eventName;
-  //   }) ?? false;
 
   const handleInvokeFn = async () => {
     if (!selectedFunction || !selectedFunction.slug) return;
+    let payload: ReturnType<typeof parseCode>;
+    if (hasEventTrigger) {
+      payload = parseCode(rawPayload);
+    } else {
+      payload = { data: {}, user: null };
+    }
     try {
-      const { success } = await invokeFunction({
+      const { success, error } = await invokeFunction({
         functionSlug: selectedFunction.slug,
-        user: parseCode(rawPayload).user,
-        data: parseCode(rawPayload).data,
+        user: payload.user,
+        data: payload.data,
       });
       if (success) {
         updateLastCompletedStep(OnboardingSteps.InvokeFn);
         setError(undefined);
+        setIsFnInvoked(true);
+        // TO DO: add link to run ID, need to update mutation first to return ID
+        toast.success('Function successfully invoked');
       } else {
-        // setError()
+        setIsFnInvoked(false);
+        setError(error);
       }
     } catch (err) {
-    } finally {
+      setError('An error occurred');
     }
   };
+
+  const selectDisplay = loading
+    ? 'Loading functions...'
+    : functions.length === 0
+    ? 'No functions'
+    : 'Select function';
 
   return (
     <div className="text-subtle">
@@ -94,61 +114,86 @@ export default function InvokeFn() {
       <div className="border-subtle my-6 rounded-sm border px-6 py-4">
         <p className="text-muted mb-2 text-sm font-medium">Select function to test:</p>
         <Select
-          onChange={setSelectedFunction}
+          onChange={(option) => setSelectedFunction(option as FunctionOption)}
           isLabelVisible={false}
-          label={loading ? 'Loading functions...' : 'Select function'}
+          label={selectDisplay}
           multiple={false}
           value={selectedFunction}
           className="mb-6"
         >
-          <Select.Button>
+          <Select.Button
+            className={functions.length === 0 ? 'text-disabled cursor-not-allowed' : ''}
+          >
             <div className="text-sm font-medium leading-tight">
-              {selectedFunction?.name || 'Select function'}
+              {selectedFunction?.name || selectDisplay}
             </div>
           </Select.Button>
-          <Select.Options className="w-full">
-            {functions.map((option) => {
-              return (
-                <Select.Option key={option.id} option={option}>
-                  {option.name}
-                </Select.Option>
-              );
-            })}
-          </Select.Options>
+          {functions.length > 0 && (
+            <Select.Options className="w-full">
+              {functions.map((option) => {
+                return (
+                  <Select.Option key={option.id} option={option}>
+                    {option.name}
+                  </Select.Option>
+                );
+              })}
+            </Select.Options>
+          )}
         </Select>
-        <CodeBlock.Wrapper>
-          <CodeBlock
-            header={{ title: 'Invoke function' }}
-            tab={{
-              content: rawPayload,
-              readOnly: false,
-              language: 'json',
-              handleChange: setRawPayload,
-            }}
-          />
-        </CodeBlock.Wrapper>
-        {error && (
-          <Alert className="mt-6" severity="error">
-            {error}
+        {functions.length === 0 && !loading && (
+          <Alert className="mt-6" severity="warning">
+            <p className="text-sm">Make sure your app is synced and has functions.</p>
           </Alert>
         )}
-        <div className="mt-6 flex items-center gap-2">
+        {hasEventTrigger && (
+          <CodeBlock.Wrapper>
+            <CodeBlock
+              header={{ title: 'Invoke function' }}
+              tab={{
+                content: rawPayload,
+                readOnly: false,
+                language: 'json',
+                handleChange: setRawPayload,
+              }}
+            />
+          </CodeBlock.Wrapper>
+        )}
+        {!hasEventTrigger && selectedFunction && (
+          <p>Cron functions without event triggers cannot include payload data.</p>
+        )}
+
+        {error && (
+          <Alert className="mt-6" severity="error">
+            <p className="text-sm">{error}</p>
+          </Alert>
+        )}
+        {!isFnInvoked ? (
+          <div className="mt-6 flex items-center gap-2">
+            <NewButton
+              label="Invoke test function"
+              disabled={!selectedFunction}
+              onClick={() => {
+                handleInvokeFn();
+              }}
+            />
+            {/* TODO: add tracking */}
+            <NewButton
+              appearance="outlined"
+              label="Skip, take me to dashboard"
+              onClick={() => {
+                updateLastCompletedStep(OnboardingSteps.InvokeFn);
+                router.push(pathCreator.apps({ envSlug: 'production' }));
+              }}
+            />
+          </div>
+        ) : (
           <NewButton
-            label="Invoke test function"
+            label="Go to runs"
             onClick={() => {
-              handleInvokeFn();
+              router.push(pathCreator.runs({ envSlug: 'production' }));
             }}
           />
-          {/* TODO: add tracking */}
-          <NewButton
-            appearance="outlined"
-            label="Skip, take me to dashboard"
-            onClick={() => {
-              updateLastCompletedStep(OnboardingSteps.InvokeFn);
-              router.push(pathCreator.apps({ envSlug: 'production' }));
-            }}
-          />
-        </div>
+        )}
       </div>
     </div>
   );

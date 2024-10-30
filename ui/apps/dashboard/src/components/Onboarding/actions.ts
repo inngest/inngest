@@ -2,8 +2,12 @@
 
 import { type InvokeFunctionMutationVariables } from '@/gql/graphql';
 import { getProductionEnvironment } from '@/queries/server-only/getEnvironment';
-import { getMetricsLookups, preloadMetricsLookups } from '../Metrics/data';
-import { invokeFn, syncNewApp } from './data';
+import {
+  getInvokeFunctionLookups,
+  invokeFn,
+  preloadInvokeFunctionLookups,
+  syncNewApp,
+} from './data';
 
 export async function syncAppManually(appURL: string) {
   try {
@@ -40,19 +44,19 @@ export async function invokeFunction({
     if (!(error instanceof Error)) {
       return { success: false, error: 'Unknown error invoking' };
     }
-    return { success: false, error: error };
+    return { success: false, error: error.message };
   }
 }
 
 export async function prefetchFunctions() {
   const environment = await getProductionEnvironment();
 
-  preloadMetricsLookups(environment.slug);
+  preloadInvokeFunctionLookups(environment.slug);
   const {
     envBySlug: {
       workflows: { data: functions },
     },
-  } = await getMetricsLookups(environment.slug);
+  } = await getInvokeFunctionLookups(environment.slug);
 
   return functions;
 }
