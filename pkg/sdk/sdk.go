@@ -81,16 +81,21 @@ type RegisterRequest struct {
 	checksum string
 
 	Capabilities Capabilities `json:"capabilities"`
+
+	// UseConnect specifies whether the SDK is expected to establish an outbound connection.
+	UseConnect bool `json:"useConnect"`
 }
 
 const (
 	InBandSyncV1 string = "v1"
 	TrustProbeV1 string = "v1"
+	ConnectV1    string = "v1"
 )
 
 type Capabilities struct {
 	InBandSync string `json:"in_band_sync"`
 	TrustProbe string `json:"trust_probe"`
+	Connect    string `json:"connect"`
 }
 
 type Headers struct {

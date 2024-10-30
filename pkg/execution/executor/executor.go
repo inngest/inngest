@@ -682,12 +682,13 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 }
 
 type runInstance struct {
-	md         sv2.Metadata
-	f          inngest.Function
-	events     []json.RawMessage
-	item       queue.Item
-	edge       inngest.Edge
-	stackIndex int
+	md           sv2.Metadata
+	f            inngest.Function
+	events       []json.RawMessage
+	item         queue.Item
+	edge         inngest.Edge
+	stackIndex   int
+	appIsConnect bool
 }
 
 // Execute loads a workflow and the current run state, then executes the
@@ -836,12 +837,13 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	instance := runInstance{
-		md:         md,
-		f:          *ef.Function,
-		events:     events,
-		item:       item,
-		edge:       edge,
-		stackIndex: stackIndex,
+		md:           md,
+		f:            *ef.Function,
+		events:       events,
+		item:         item,
+		edge:         edge,
+		stackIndex:   stackIndex,
+		appIsConnect: ef.AppIsConnect,
 	}
 
 	resp, err := e.run(ctx, &instance)
@@ -1156,6 +1158,10 @@ func (e *executor) executeDriverForStep(ctx context.Context, i *runInstance) (*s
 	url, _ := i.f.URI()
 
 	driverName := inngest.SchemeDriver(url.Scheme)
+	if i.appIsConnect {
+		driverName = "connect"
+	}
+
 	d, ok := e.runtimeDrivers[driverName]
 	if !ok {
 		return nil, fmt.Errorf("%w: '%s'", ErrNoRuntimeDriver, driverName)
