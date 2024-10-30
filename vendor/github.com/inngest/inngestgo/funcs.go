@@ -9,6 +9,8 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 )
 
+func BoolPtr(b bool) *bool { return &b }
+
 func StrPtr(i string) *string { return &i }
 
 func IntPtr(i int) *int { return &i }
