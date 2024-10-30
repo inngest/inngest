@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngestgo/connect"
 	sdkerrors "github.com/inngest/inngestgo/errors"
+	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"github.com/oklog/ulid/v2"
 	"os"
 	"strings"
@@ -184,6 +185,12 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 func (h *connectHandler) connectInvoke(ctx context.Context, msg connect.GatewayMessage) (*connect.SdkResponse, error) {
 	body := &connect.GatewayMessageTypeExecutorRequestData{}
 	if err := json.Unmarshal(msg.Data, body); err != nil {
+		h.h.Logger.Error("error decoding gateway request data", "error", err)
+		return nil, fmt.Errorf("invalid gateway message data: %w", err)
+	}
+
+	var request sdkrequest.Request
+	if err := json.Unmarshal(body.RequestBytes, &request); err != nil {
 		h.h.Logger.Error("error decoding sdk request", "error", err)
 		return nil, publicerr.Error{
 			Message: "malformed input",
@@ -191,7 +198,7 @@ func (h *connectHandler) connectInvoke(ctx context.Context, msg connect.GatewayM
 		}
 	}
 
-	if body.Request.UseAPI {
+	if request.UseAPI {
 		// TODO: implement this
 		// retrieve data from API
 		// request.Steps =
@@ -224,7 +231,7 @@ func (h *connectHandler) connectInvoke(ctx context.Context, msg connect.GatewayM
 		stepId = body.StepId
 	}
 
-	resp, ops, err := invoke(ctx, fn, &body.Request, stepId)
+	resp, ops, err := invoke(ctx, fn, &request, stepId)
 
 	// NOTE: When triggering step errors, we should have an OpcodeStepError
 	// within ops alongside an error.  We can safely ignore that error, as it's
@@ -267,23 +274,33 @@ func (h *connectHandler) connectInvoke(ctx context.Context, msg connect.GatewayM
 		// TODO Make sure this is properly surfaced in the executor!
 		return &connect.SdkResponse{
 			Status: connect.SdkResponseStatusError,
-			Err:    StrPtr(fmt.Sprintf("error calling function: %s", err.Error())),
+			Body:   []byte(fmt.Sprintf("error calling function: %s", err.Error())),
 		}, nil
 	}
 
 	if len(ops) > 0 {
+		serializedOps, err := json.Marshal(ops)
+		if err != nil {
+			return nil, fmt.Errorf("could not serialize ops: %w", err)
+		}
+
 		// Return the function opcode returned here so that we can re-invoke this
 		// function and manage state appropriately.  Any opcode here takes precedence
 		// over function return values as the function has not yet finished.
 		return &connect.SdkResponse{
 			Status: connect.SdkResponseStatusNotCompleted,
-			Ops:    ops,
+			Body:   serializedOps,
 		}, nil
+	}
+
+	serializedResp, err := json.Marshal(resp)
+	if err != nil {
+		return nil, fmt.Errorf("could not serialize resp: %w", err)
 	}
 
 	// Return the function response.
 	return &connect.SdkResponse{
 		Status: connect.SdkResponseStatusDone,
-		Resp:   resp,
+		Body:   serializedResp,
 	}, nil
 }

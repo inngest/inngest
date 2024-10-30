@@ -2,8 +2,6 @@ package connect
 
 import (
 	"encoding/json"
-	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"net/http"
 )
 
@@ -48,9 +46,9 @@ type GatewayMessageTypeSDKConnectData struct {
 const GatewayMessageTypeExecutorRequest GatewayMessageType = "executor-request"
 
 type GatewayMessageTypeExecutorRequestData struct {
-	FunctionSlug string             `json:"fn_slug"`
-	StepId       *string            `json:"step_id"`
-	Request      sdkrequest.Request `json:"req"`
+	FunctionSlug string  `json:"fn_slug"`
+	StepId       *string `json:"step_id"`
+	RequestBytes []byte  `json:"req"`
 }
 
 const GatewayMessageTypeSDKReply GatewayMessageType = "sdk-reply"
@@ -64,10 +62,13 @@ const (
 )
 
 type SdkResponse struct {
-	Status SdkResponseStatus       `json:"status"`
-	Ops    []state.GeneratorOpcode `json:"ops"`
-	Resp   any                     `json:"resp"`
-	Err    *string                 `json:"err"`
+	Status SdkResponseStatus `json:"status"`
+	Body   []byte            `json:"body"`
+
+	// These are modeled after the headers for code reuse in httpdriver.ShouldRetry
+	NoRetry    string `json:"no_retry"`
+	RetryAfter string `json:"retry_after"`
+	SdkVersion string `json:"sdk_version"`
 }
 
 type GatewayMessage struct {
