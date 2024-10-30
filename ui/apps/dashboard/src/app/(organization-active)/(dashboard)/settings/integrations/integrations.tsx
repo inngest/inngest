@@ -6,6 +6,7 @@ import { Card } from '@inngest/components/Card';
 import { IconDatadog } from '@inngest/components/icons/platforms/Datadog';
 import { IconNeon } from '@inngest/components/icons/platforms/Neon';
 import { IconNetlify } from '@inngest/components/icons/platforms/Netlify';
+import { IconSupabase } from '@inngest/components/icons/platforms/Supabase';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { RiExternalLinkLine } from '@remixicon/react';
 
@@ -55,7 +56,26 @@ const INTEGRATIONS: Integration[] = [
         prefetch={true}
       />
     ),
-    description: 'Connect to send events directly from changes in your Neon Database.',
+    description: 'Connect to send events directly from changes in your Neon database.',
+  },
+  {
+    title: 'Supabase',
+    slug: 'supabase',
+    Icon: <IconSupabase className="text-onContrast h-6 w-6" />,
+    actionButton: (enabled, loading) => (
+      <NewButton
+        kind="primary"
+        appearance="solid"
+        size="medium"
+        loading={loading}
+        href={
+          enabled ? '/settings/integrations/supabase' : '/settings/integrations/supabase/connect'
+        }
+        label={enabled ? 'Manage' : 'Connect'}
+        prefetch={true}
+      />
+    ),
+    description: 'Connect to send events directly from changes in your Subapase database.',
   },
   {
     title: 'Netlify',
@@ -97,6 +117,9 @@ const INTEGRATIONS: Integration[] = [
 
 export default function IntegrationsList({ integrations }: { integrations: VercelIntegration[] }) {
   const { value: postgressIntegration } = useBooleanFlag('postgres-integration');
+
+  console.log('main integrations', integrations);
+
   const getIntegrationData = (slug: string) =>
     integrations.find((integration) => integration.slug === slug);
 
