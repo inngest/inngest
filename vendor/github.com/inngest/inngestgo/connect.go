@@ -325,8 +325,9 @@ func (h *connectHandler) connectInvoke(ctx context.Context, msg connect.GatewayM
 		h.h.Logger.Error("error calling function", "error", err)
 		// TODO Make sure this is properly surfaced in the executor!
 		return &connect.SdkResponse{
-			Status: connect.SdkResponseStatusError,
-			Body:   []byte(fmt.Sprintf("error calling function: %s", err.Error())),
+			RequestId: body.RequestId,
+			Status:    connect.SdkResponseStatusError,
+			Body:      []byte(fmt.Sprintf("error calling function: %s", err.Error())),
 		}, nil
 	}
 
@@ -340,8 +341,9 @@ func (h *connectHandler) connectInvoke(ctx context.Context, msg connect.GatewayM
 		// function and manage state appropriately.  Any opcode here takes precedence
 		// over function return values as the function has not yet finished.
 		return &connect.SdkResponse{
-			Status: connect.SdkResponseStatusNotCompleted,
-			Body:   serializedOps,
+			RequestId: body.RequestId,
+			Status:    connect.SdkResponseStatusNotCompleted,
+			Body:      serializedOps,
 		}, nil
 	}
 
@@ -352,8 +354,9 @@ func (h *connectHandler) connectInvoke(ctx context.Context, msg connect.GatewayM
 
 	// Return the function response.
 	return &connect.SdkResponse{
-		Status: connect.SdkResponseStatusDone,
-		Body:   serializedResp,
+		RequestId: body.RequestId,
+		Status:    connect.SdkResponseStatusDone,
+		Body:      serializedResp,
 	}, nil
 }
 

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
 	sdk_connect "github.com/inngest/inngestgo/connect"
@@ -16,7 +17,12 @@ import (
 
 type gatewayOpt func(*connectGatewaySvc)
 
-type GatewayAuthHandler func(context.Context, sdk_connect.GatewayMessageTypeSDKConnectData) (bool, error)
+type AuthResponse struct {
+	AppID     uuid.UUID
+	AccountID uuid.UUID
+}
+
+type GatewayAuthHandler func(context.Context, sdk_connect.GatewayMessageTypeSDKConnectData) (*AuthResponse, error)
 
 type connectGatewaySvc struct {
 	runCtx context.Context
@@ -100,44 +106,67 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}
 
+		var authResp *AuthResponse
 		{
 			// Run auth, add to distributed state
-			ok, err := c.auther(ctx, initialMessageData)
+			authResp, err = c.auther(ctx, initialMessageData)
 			if err != nil {
 				logger.StdlibLogger(ctx).Error("connect auth failed", "err", err)
 				ws.Close(websocket.StatusInternalError, "Internal error")
 				return
 			}
 
-			if !ok {
+			if authResp == nil {
 				ws.Close(websocket.StatusPolicyViolation, "Authentication failed")
 				return
 			}
 		}
 
+		// Wait for relevant messages and forward them to the socket
+		go func() {
+			c.receiver.ReceiveExecutorMessages(ctx, authResp.AppID, func(data sdk_connect.GatewayMessageTypeExecutorRequestData) {
+				marshaled, err := json.Marshal(data)
+				if err != nil {
+					return
+				}
+
+				err = wsjson.Write(ctx, ws, sdk_connect.GatewayMessage{
+					Kind: sdk_connect.GatewayMessageTypeExecutorRequest,
+					Data: marshaled,
+				})
+				if err != nil {
+					// TODO The connection cannot be used, we need to let the executor know!
+				}
+			})
+		}()
+
 		// Run loop
-		for {
-			if ctx.Err() != nil {
-				break
-			}
+		go func() {
+			for {
+				if ctx.Err() != nil {
+					break
+				}
 
-			var v sdk_connect.GatewayMessage
-			err = wsjson.Read(ctx, ws, &v)
-			if err != nil {
-				return
-			}
+				var v sdk_connect.GatewayMessage
+				err = wsjson.Read(ctx, ws, &v)
+				if err != nil {
+					return
+				}
 
-			log.Printf("received: %v", v)
+				log.Printf("received: %v", v)
 
-			switch v.Kind {
-			case sdk_connect.GatewayMessageTypeSDKReply:
-				// TODO Handle SDK reply
-			default:
-				// TODO Handle proper connection cleanup
-				ws.Close(websocket.StatusPolicyViolation, "Invalid message kind")
-				return
+				switch v.Kind {
+				case sdk_connect.GatewayMessageTypeSDKReply:
+					// TODO Handle SDK reply
+				default:
+					// TODO Handle proper connection cleanup
+					ws.Close(websocket.StatusPolicyViolation, "Invalid message kind")
+					return
+				}
 			}
-		}
+		}()
+
+		<-ctx.Done()
 
 		ws.Close(websocket.StatusNormalClosure, "")
 	})
