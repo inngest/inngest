@@ -1,18 +1,24 @@
 package inngestgo
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/publicerr"
+	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngestgo/connect"
 	sdkerrors "github.com/inngest/inngestgo/errors"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"github.com/oklog/ulid/v2"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -25,20 +31,22 @@ type connectHandler struct {
 }
 
 func (h *connectHandler) connectURLs() []string {
-	connectURLs := strings.Split(defaultConnectOrigins, ",")
 	if h.h.isDev() {
-		connectURLs = []string{fmt.Sprintf("%s/connect", strings.Replace(DevServerURL(), "http", "ws", 1))}
+		return []string{fmt.Sprintf("%s/connect", strings.Replace(DevServerURL(), "http", "ws", 1))}
 	}
 
 	if len(h.h.ConnectURLs) > 0 {
-		connectURLs = h.h.ConnectURLs
+		return h.h.ConnectURLs
 	}
 
-	return connectURLs
+	return nil
 }
 
 func (h *connectHandler) connectToGateway(ctx context.Context) (*websocket.Conn, error) {
 	hosts := h.connectURLs()
+	if len(hosts) == 0 {
+		return nil, fmt.Errorf("no connect URLs provided")
+	}
 
 	for _, gatewayHost := range hosts {
 		// Establish WebSocket connection to one of the gateways
@@ -59,6 +67,7 @@ func (h *connectHandler) connectToGateway(ctx context.Context) (*websocket.Conn,
 }
 
 func (h *handler) Connect(ctx context.Context) error {
+	h.useConnect = true
 	ch := connectHandler{h: h}
 	return ch.Connect(ctx)
 }
@@ -81,7 +90,31 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 
+	signingKey := h.h.GetSigningKey()
+	if signingKey == "" {
+		return fmt.Errorf("must provide signing key")
+	}
+
+	var functionHash []byte
+	{
+		fns, err := createFunctionConfigs(h.h.appName, h.h.funcs, url.URL{}, true)
+		if err != nil {
+			return fmt.Errorf("error creating function configs: %w", err)
+		}
+
+		serialized, err := json.Marshal(fns)
+		if err != nil {
+			return fmt.Errorf("failed to serialize functions: %w", err)
+		}
+
+		res := sha256.Sum256(serialized)
+		functionHash = res[:]
+	}
+
 	ws, err := h.connectToGateway(ctx)
+	if err != nil {
+		return fmt.Errorf("could not connect: %w", err)
+	}
 	defer ws.CloseNow()
 
 	h.connectionId = ulid.MustNew(ulid.Now(), rand.Reader)
@@ -103,25 +136,31 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 
 	// Send connect message
 	{
+		hashedKey, err := hashedSigningKey([]byte(signingKey))
+		if err != nil {
+			return fmt.Errorf("could not hash signing key: %w", err)
+		}
+
 		data, err := json.Marshal(connect.GatewayMessageTypeSDKConnectData{
+			Authz: connect.AuthData{
+				HashedSigningKey: hashedKey,
+			},
 			AppName: h.h.appName,
+			Env:     h.h.Env,
 			Session: connect.SessionDetails{
+				FunctionHash: functionHash,
+				BuildID:      h.h.BuildId,
 				InstanceId:   h.instanceId(),
 				ConnectionId: h.connectionId.String(),
 			},
-			Authz:       connect.AuthData{},
-			Env:         nil,
-			Framework:   nil,
-			Platform:    nil,
-			SDKAuthor:   "",
-			SDKLanguage: "",
-			SDKVersion:  "",
+			SDKAuthor:   SDKAuthor,
+			SDKLanguage: SDKLanguage,
+			SDKVersion:  SDKVersion,
 		})
 		if err != nil {
 			return fmt.Errorf("could not serialize sdk connect message: %w", err)
 		}
 
-		// TODO Include authz data, version data (SDK version, code build tag), instance identifier
 		err = wsjson.Write(ctx, ws, connect.GatewayMessage{
 			Kind: connect.GatewayMessageTypeSDKConnect,
 			Data: data,
@@ -146,6 +185,19 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 		h.h.Logger.Debug("received gateway request", "msg", msg)
 
 		switch msg.Kind {
+		case connect.GatewayMessageTypeSync:
+			var data connect.GatewayMessageTypeSyncData
+			if err := json.Unmarshal(msg.Data, &data); err != nil {
+				h.h.Logger.Error("error decoding sync message", "error", err)
+				continue
+			}
+
+			err := h.h.connectSync(data.DeployId)
+			if err != nil {
+				h.h.Logger.Error("error syncing", "error", err)
+				// TODO Should we drop the connection? Continue receiving messages?
+				continue
+			}
 		case connect.GatewayMessageTypeExecutorRequest:
 			resp, err := h.connectInvoke(ctx, msg)
 			if err != nil {
@@ -303,4 +355,78 @@ func (h *connectHandler) connectInvoke(ctx context.Context, msg connect.GatewayM
 		Status: connect.SdkResponseStatusDone,
 		Body:   serializedResp,
 	}, nil
+}
+
+func (h *handler) connectSync(deployId *string) error {
+	config := sdk.RegisterRequest{
+		V:          "1",
+		DeployType: "ping",
+		SDK:        HeaderValueSDK,
+		AppName:    h.appName,
+		Headers: sdk.Headers{
+			Env:      h.GetEnv(),
+			Platform: platform(),
+		},
+		Capabilities: capabilities,
+		UseConnect:   h.useConnect,
+	}
+
+	fns, err := createFunctionConfigs(h.appName, h.funcs, url.URL{}, true)
+	if err != nil {
+		return fmt.Errorf("error creating function configs: %w", err)
+	}
+	config.Functions = fns
+
+	registerURL := fmt.Sprintf("%s/fn/register", defaultAPIOrigin)
+	if h.isDev() {
+		// TODO: Check if dev server is up.  If not, error.  We can't deploy to production.
+		registerURL = fmt.Sprintf("%s/fn/register", DevServerURL())
+	}
+	if h.RegisterURL != nil {
+		registerURL = *h.RegisterURL
+	}
+
+	createRequest := func() (*http.Request, error) {
+		byt, err := json.Marshal(config)
+		if err != nil {
+			return nil, fmt.Errorf("error marshalling function config: %w", err)
+		}
+
+		req, err := http.NewRequest(http.MethodPost, registerURL, bytes.NewReader(byt))
+		if err != nil {
+			return nil, fmt.Errorf("error creating new request: %w", err)
+		}
+		if deployId != nil {
+			qp := req.URL.Query()
+			qp.Set("deployId", *deployId)
+			req.URL.RawQuery = qp.Encode()
+		}
+
+		if h.GetEnv() != "" {
+			req.Header.Add(HeaderKeyEnv, h.GetEnv())
+		}
+
+		SetBasicRequestHeaders(req)
+
+		return req, nil
+	}
+
+	resp, err := fetchWithAuthFallback(
+		createRequest,
+		h.GetSigningKey(),
+		h.GetSigningKeyFallback(),
+	)
+	if err != nil {
+		return fmt.Errorf("error performing connect registration request: %w", err)
+	}
+	if resp.StatusCode > 299 {
+		body := map[string]any{}
+		byt, _ := io.ReadAll(resp.Body)
+		if err := json.Unmarshal(byt, &body); err != nil {
+			return fmt.Errorf("error reading register response: %w\n\n%s", err, byt)
+		}
+		return fmt.Errorf("Error registering functions: %s", body["error"])
+	}
+
+	return nil
 }

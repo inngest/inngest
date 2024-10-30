@@ -21,6 +21,10 @@ func (Config) RuntimeName() string { return "connect" }
 func (Config) DriverName() string { return "connect" }
 
 func (c Config) NewDriver(opts ...registration.NewDriverOpts) (driver.Driver, error) {
+	e := &executor{}
+	if len(opts) > 0 {
+		e.forwarder = opts[0].ConnectForwarder
+	}
 
-	return &executor{}, nil
+	return e, nil
 }

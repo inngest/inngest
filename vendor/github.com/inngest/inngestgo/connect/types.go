@@ -14,8 +14,7 @@ const GatewayMessageTypeHello GatewayMessageType = "gateway-hello"
 const GatewayMessageTypeSDKConnect GatewayMessageType = "sdk-connect"
 
 type AuthData struct {
-	Challenge []byte `json:"challenge"`
-	Signature []byte `json:"signature"`
+	HashedSigningKey []byte `json:"hashed_signing_key"`
 }
 
 type SessionDetails struct {
@@ -26,7 +25,10 @@ type SessionDetails struct {
 	// ConnectionId is the transient identifier for a concrete connection. This is different
 	// from InstanceId as it is generated for each connection.
 	// This is mainly used for debugging purposes.
-	ConnectionId string `json:"connectionId"`
+	ConnectionId string `json:"connection_id"`
+
+	FunctionHash []byte  `json:"function_hash"`
+	BuildID      *string `json:"build_id"`
 }
 
 type GatewayMessageTypeSDKConnectData struct {
@@ -41,6 +43,12 @@ type GatewayMessageTypeSDKConnectData struct {
 	SDKAuthor   string  `json:"sdk_author"`
 	SDKLanguage string  `json:"sdk_language"`
 	SDKVersion  string  `json:"sdk_version"`
+}
+
+const GatewayMessageTypeSync GatewayMessageType = "sync"
+
+type GatewayMessageTypeSyncData struct {
+	DeployId *string `json:"deployId"`
 }
 
 const GatewayMessageTypeExecutorRequest GatewayMessageType = "executor-request"
