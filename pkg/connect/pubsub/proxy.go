@@ -61,38 +61,58 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, data connect_sdk.Gatew
 		return nil, fmt.Errorf("could not marshal executor request: %w", err)
 	}
 
-	err = i.client.Do(ctx, i.client.B().Publish().Channel(i.channelAppRequests(data.AppId)).Message(string(dataBytes)).Build()).Error()
+	ackErrChan := make(chan error)
+	var acked bool
+	{
+		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		go func() {
+			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(data.AppId, data.RequestId), func(msg string) {
+				acked = true
+			}, true)
+			ackErrChan <- err
+		}()
+	}
+
+	replyErrChan := make(chan error)
+	var reply ProxyResponse
+	go func() {
+		// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
+		err = i.subscribe(ctx, i.channelAppRequestsReply(data.AppId, data.RequestId), func(msg string) {
+			err := json.Unmarshal([]byte(msg), &reply)
+			if err != nil {
+				// TODO This should never happen, push message into dead-letter channel and report
+			}
+		}, true)
+		replyErrChan <- err
+	}()
+
+	channelName := i.channelAppRequests(data.AppId)
+	fmt.Println("published to", channelName, data.RequestId)
+	err = i.client.Do(ctx, i.client.B().Publish().Channel(channelName).Message(string(dataBytes)).Build()).Error()
 	if err != nil {
 		return nil, fmt.Errorf("could not publish executor request: %w", err)
 	}
 
 	// Sanity check: Ensure the gateway received the message using a request-specific ack channel
 	{
-		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
-		defer cancel()
-
-		var acked bool
-		err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(data.AppId, data.RequestId), func(msg string) {
-			acked = true
-		}, true)
+		err := <-ackErrChan
+		close(ackErrChan)
 		if err != nil && !errors.Is(err, context.DeadlineExceeded) {
 			return nil, fmt.Errorf("could not receive executor request ack: %w", err)
 		}
+
 		if !acked {
 			return nil, fmt.Errorf("gateway did not ack in time")
 		}
 	}
 
-	// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
-	var reply ProxyResponse
-	err = i.subscribe(ctx, i.channelAppRequestsReply(data.AppId, data.RequestId), func(msg string) {
-		err := json.Unmarshal([]byte(msg), &reply)
+	{
+		err := <-replyErrChan
+		close(replyErrChan)
 		if err != nil {
-			// TODO This should never happen, push message into dead-letter channel and report
+			return nil, fmt.Errorf("could not receive executor response: %w", err)
 		}
-	}, true)
-	if err != nil {
-		return nil, fmt.Errorf("could not receive executor response: %w", err)
 	}
 
 	return reply.SdkResponse, nil
@@ -120,7 +140,6 @@ func (i *redisPubSubConnector) subscribe(ctx context.Context, channel string, on
 
 	if _, ok := i.subscribers[channel]; !ok {
 		// subscribe to channel
-		i.pubSubClient.Do(ctx, i.pubSubClient.B().Subscribe().Channel().Build())
 		i.subscribers[channel] = make(map[string]chan string)
 	}
 
@@ -135,24 +154,40 @@ func (i *redisPubSubConnector) subscribe(ctx context.Context, channel string, on
 		defer i.subscribersLock.Unlock()
 
 		close(msgs)
+		fmt.Println("removing subscription", channel, subId)
 		delete(i.subscribers[channel], subId)
 		if len(i.subscribers[channel]) == 0 {
+			fmt.Println("unsubscribing from", channel)
 			delete(i.subscribers, channel)
-			i.pubSubClient.Do(ctx, i.pubSubClient.B().Unsubscribe().Channel().Build())
+			i.pubSubClient.Do(ctx, i.pubSubClient.B().Unsubscribe().Channel(channel).Build())
 		}
 	}()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case msg := <-msgs:
-			onMessage(msg)
-			if once {
-				return nil
+	done := make(chan struct{})
+	go func() {
+		defer func() {
+			done <- struct{}{}
+		}()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg := <-msgs:
+				onMessage(msg)
+				if once {
+					return
+				}
 			}
 		}
-	}
+	}()
+
+	i.pubSubClient.Do(ctx, i.pubSubClient.B().Subscribe().Channel(channel).Build())
+
+	fmt.Println("subscribed to", channel)
+
+	<-done
+	return nil
 }
 
 func (i *redisPubSubConnector) ReceiveExecutorMessages(ctx context.Context, appId uuid.UUID, onMessage func(data connect_sdk.GatewayMessageTypeExecutorRequestData)) error {
@@ -176,6 +211,8 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 	go func() {
 		<-ctx.Done()
 
+		fmt.Println("gracefully shutting down pubsub subscriber")
+
 		i.subscribersLock.Lock()
 		defer i.subscribersLock.Unlock()
 
@@ -194,6 +231,8 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 
 	wait := c.SetPubSubHooks(rueidis.PubSubHooks{
 		OnMessage: func(m rueidis.PubSubMessage) {
+			fmt.Println("received message", m.Channel)
+
 			// Handle the message. Note that if you want to call another `c.Do()` here, you need to do it in another goroutine or the `c` will be blocked.
 			go func() {
 				i.subscribersLock.RLock()
@@ -220,17 +259,21 @@ func (i *redisPubSubConnector) NotifyExecutor(ctx context.Context, appId uuid.UU
 		return fmt.Errorf("could not serialize response: %w", err)
 	}
 
+	channelName := i.channelAppRequestsReply(appId, resp.SdkResponse.RequestId)
+
 	err = i.client.Do(
 		ctx,
 		i.client.B().
 			Publish().
-			Channel(i.channelAppRequestsReply(appId, resp.SdkResponse.RequestId)).
+			Channel(channelName).
 			Message(string(serialized)).
 			Build()).
 		Error()
 	if err != nil {
 		return fmt.Errorf("could not publish response: %w", err)
 	}
+
+	fmt.Println("sent reply to", channelName)
 
 	return nil
 }

@@ -3,10 +3,12 @@ package connectdriver
 import (
 	"context"
 	"errors"
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	connect_sdk "github.com/inngest/inngestgo/connect"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
@@ -28,26 +30,34 @@ func (e executor) RuntimeType() string {
 }
 
 func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadata, item queue.Item, edge inngest.Edge, step inngest.Step, idx, attempt int) (*state.DriverResponse, error) {
-
 	input, err := driver.MarshalV1(ctx, sl, s, step, idx, "", attempt)
 	if err != nil {
 		return nil, err
 	}
 
-	return ProxyRequest(ctx, e.forwarder, httpdriver.Request{
-		Input: input,
-		Edge:  edge,
-		Step:  step,
+	uri, err := url.Parse(step.URI)
+	if err != nil {
+		return nil, err
+	}
+
+	return ProxyRequest(ctx, e.forwarder, s.ID.Tenant.AppID, httpdriver.Request{
+		WorkflowID: s.ID.FunctionID,
+		RunID:      s.ID.RunID,
+		URL:        *uri,
+		Input:      input,
+		Edge:       edge,
+		Step:       step,
 	})
 }
 
 // ProxyRequest proxies the request to the SDK over a long-lived connection with the given input.
-func ProxyRequest(ctx context.Context, forwarder pubsub.RequestForwarder, r httpdriver.Request) (*state.DriverResponse, error) {
+func ProxyRequest(ctx context.Context, forwarder pubsub.RequestForwarder, appId uuid.UUID, r httpdriver.Request) (*state.DriverResponse, error) {
 	requestToForward := connect_sdk.GatewayMessageTypeExecutorRequestData{
 		// TODO Find out if we can supply this in a better way. We still use the URL concept a lot,
 		// even though this has no meaning in connect.
 		FunctionSlug: r.URL.Query().Get("fnId"),
 		RequestBytes: r.Input,
+		AppId:        appId,
 	}
 	// If we have a generator step name, ensure we add the step ID parameter
 	if r.Edge.IncomingGeneratorStep != "" {
@@ -77,6 +87,9 @@ func do(ctx context.Context, forwarder pubsub.RequestForwarder, data connect_sdk
 	dur := time.Since(pre)
 
 	// TODO Check if we need some of the request error handling logic from httpdriver.do()
+	if err != nil && resp == nil {
+		return nil, err
+	}
 
 	// Return gateway-handled errors like  syscode.CodeOutputTooLarge
 	var sysErr *syscode.Error

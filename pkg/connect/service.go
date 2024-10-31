@@ -2,6 +2,7 @@ package connect
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -163,28 +164,38 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			if err != nil {
 				return
 			}
-
-			// Wait 10 seconds for app to register
-			<-time.After(time.Second * 5)
 		}
 
-		apps, err := c.dbcqrs.GetAllApps(ctx)
-		if err != nil {
-			logger.StdlibLogger(ctx).Error("could not get apps", "err", err)
-			ws.Close(websocket.StatusInternalError, "Internal error")
-			return
-		}
-
+		// wait until app is ready, then fetch details
+		// TODO Find better way to load app by name, account for initial register delay
+		attempts := 0
 		var appId uuid.UUID
-		for _, app := range apps {
-			if app.Name == initialMessageData.AppName {
-				appId = app.ID
+		for {
+			apps, err := c.dbcqrs.GetAllApps(ctx)
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				logger.StdlibLogger(ctx).Error("could not get apps", "err", err)
+				ws.Close(websocket.StatusInternalError, "Internal error")
+				return
 			}
-		}
-		if appId == uuid.Nil {
-			logger.StdlibLogger(ctx).Error("could not find app", "appName", initialMessageData.AppName)
-			ws.Close(websocket.StatusPolicyViolation, "Could not find app")
-			return
+
+			for _, app := range apps {
+				if app.Name == initialMessageData.AppName {
+					appId = app.ID
+				}
+			}
+			if appId == uuid.Nil {
+				if attempts < 10 {
+					<-time.After(1 * time.Second)
+					attempts++
+					continue
+				}
+
+				logger.StdlibLogger(ctx).Error("could not find app", "appName", initialMessageData.AppName)
+				ws.Close(websocket.StatusPolicyViolation, "Could not find app")
+				return
+			}
+
+			break
 		}
 
 		fmt.Println("found app, connection is ready")
@@ -196,6 +207,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			// - There are possibly multiple SDK deployments, each with their own WebSocket connection
 			// -> We need to prevent sending the same request multiple times, to different connections
 			err := c.receiver.ReceiveExecutorMessages(ctx, appId, func(data sdk_connect.GatewayMessageTypeExecutorRequestData) {
+				fmt.Println("received msg", appId, data.RequestId)
 				// This will be sent at least once (if there are more than one connection, every connection receives the message)
 				err = c.receiver.AckMessage(ctx, appId, data.RequestId)
 				if err != nil {
@@ -281,6 +293,8 @@ func (c *connectGatewaySvc) handleSdkReply(ctx context.Context, appId uuid.UUID,
 	if err := json.Unmarshal(msg.Data, &data); err != nil {
 		return fmt.Errorf("invalid response type: %w", err)
 	}
+
+	fmt.Println("notifying executor about response", appId, data.RequestId)
 
 	err := c.receiver.NotifyExecutor(ctx, appId, pubsub.ProxyResponse{
 		SdkResponse: &data,

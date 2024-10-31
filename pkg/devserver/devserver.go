@@ -266,6 +266,14 @@ func start(ctx context.Context, opts StartOpts) error {
 	gatewayProxy := pubsub2.NewRedisPubSubConnector(connectRc)
 	connectionManager := connect.NewRedisConnectionStateManager(connectRc)
 
+	go func() {
+		// set up PubSub manager, this is required for connect to work
+		err := gatewayProxy.Wait(ctx)
+		if err != nil {
+			logger.From(ctx).Error().Err(err).Msg("error waiting for pubsub messages")
+		}
+	}()
+
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
 
