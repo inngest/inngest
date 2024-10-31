@@ -2,7 +2,7 @@ package registration
 
 import (
 	"context"
-	"github.com/inngest/inngest/pkg/connect"
+	"github.com/inngest/inngest/pkg/connect/pubsub"
 
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -60,7 +60,7 @@ type NewDriverOpts struct {
 	LocalSigningKey        *string
 	RequireLocalSigningKey bool
 
-	ConnectForwarder connect.RequestForwarder
+	ConnectForwarder pubsub.RequestForwarder
 }
 
 // DriverConfig is an interface used to determine driver config structs.
