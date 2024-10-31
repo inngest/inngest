@@ -15,9 +15,9 @@ local randomOffset = ARGV[3]
 local offset = 0
 
 if randomOffset == "1" then
-	local count = redis.call("ZRANGE", queueIndex, "-inf", peekUntil)
+	local count = redis.call("ZCOUNT", queueIndex, "-inf", peekUntil)
 	if count > limit then
-		math.randomseed(peekUntil);
+		math.randomseed(tonumber(peekUntil));
 		-- We have to +1 then -1 to ensure that we have 0 as a valid random offset.
 		offset = math.random((count-limit)+1) - 1
 	end

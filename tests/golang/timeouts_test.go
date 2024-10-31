@@ -69,8 +69,7 @@ func TestTimeoutStart(t *testing.T) {
 
 // TestTimeoutFinish ensures that the Timeouts.Finish config works correctly.
 func TestTimeoutFinish(t *testing.T) {
-
-	// In this test, a function has two steps which take 5 seconds to run.  The
+	// In this test, a function has two steps which take 2 seconds to run.  The
 	// finish timeout is 3 seconds, so the function should be cancelled after the
 	// first step.
 	t.Run("When steps take too long", func(t *testing.T) {
@@ -78,8 +77,8 @@ func TestTimeoutFinish(t *testing.T) {
 		defer server.Close()
 
 		var (
-			progressStart, progressA, progressB int32
-			stepDuration                        = 5
+			progressA, progressB, progressC int32
+			stepDuration                    = 2
 		)
 
 		trigger := "test/timeouts-finish"
@@ -88,6 +87,7 @@ func TestTimeoutFinish(t *testing.T) {
 			inngestgo.FunctionOpts{
 				Name: "timeouts-finish",
 				Timeouts: &inngestgo.Timeouts{
+					Start:  1 * time.Second,
 					Finish: 3 * time.Second,
 				},
 			},
@@ -95,19 +95,24 @@ func TestTimeoutFinish(t *testing.T) {
 			func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[any, any]]) (any, error) {
 				fmt.Println("Running func", *input.Event.ID, input.Event.Data)
 
-				atomic.AddInt32(&progressStart, 1)
 				_, _ = step.Run(ctx, "a", func(ctx context.Context) (any, error) {
 					<-time.After(time.Duration(stepDuration) * time.Second)
+					atomic.AddInt32(&progressA, 1)
 					return nil, nil
 				})
 
-				atomic.AddInt32(&progressA, 1)
 				_, _ = step.Run(ctx, "b", func(ctx context.Context) (any, error) {
 					<-time.After(time.Duration(stepDuration) * time.Second)
+					atomic.AddInt32(&progressB, 1)
 					return nil, nil
 				})
 
-				atomic.AddInt32(&progressB, 1)
+				_, _ = step.Run(ctx, "c", func(ctx context.Context) (any, error) {
+					<-time.After(time.Duration(stepDuration) * time.Second)
+					atomic.AddInt32(&progressC, 1)
+					return nil, nil
+				})
+
 				return true, nil
 			},
 		)
@@ -127,9 +132,9 @@ func TestTimeoutFinish(t *testing.T) {
 		}
 
 		<-time.After(8 * time.Second)
-		require.EqualValues(t, 3, progressStart)
-		require.EqualValues(t, 0, progressA)
-		require.EqualValues(t, 0, progressB)
+		require.EqualValues(t, 3, progressA)
+		require.EqualValues(t, 3, progressB)
+		require.EqualValues(t, 0, progressC)
 
 		// XXX: Hit API to ensure runs have been cancelled here alongside testing counts.
 	})
