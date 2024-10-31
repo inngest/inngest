@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Alert } from '@inngest/components/Alert/Alert';
 
 import { ArchivedEnvBanner } from '@/components/ArchivedEnvBanner';
+import { BillingBanner } from '@/components/BillingBanner';
 import { getEnv } from '@/components/Environments/data';
 import { EnvironmentProvider } from '@/components/Environments/environment-context';
 import Layout from '@/components/Layout/Layout';
@@ -24,6 +25,7 @@ const NotFound = () => (
 const Env = ({ env, children }: { env?: Environment; children: ReactNode }) =>
   env ? (
     <>
+      <BillingBanner />
       <ArchivedEnvBanner env={env} />
       <EnvironmentProvider env={env}>{children}</EnvironmentProvider>
     </>

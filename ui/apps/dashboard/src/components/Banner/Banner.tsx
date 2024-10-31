@@ -38,9 +38,9 @@ export function Banner({
         'flex w-full items-center justify-between px-2 py-2 md:px-4 lg:px-8'
       )}
     >
-      <div className="flex items-start gap-1 text-sm">
+      <div className="flex grow items-start gap-1 text-sm">
         <span className="shrink-0">{icon}</span>
-        <span className="leading-6">{children}</span>
+        <span className="grow leading-6">{children}</span>
       </div>
       {onDismiss && (
         <Button
