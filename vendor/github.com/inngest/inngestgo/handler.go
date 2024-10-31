@@ -663,9 +663,7 @@ func createFunctionConfigs(
 		appURL.RawQuery = values.Encode()
 
 		runtime := make(map[string]any)
-		if !isConnect {
-			runtime["url"] = appURL.String()
-		}
+		runtime["url"] = appURL.String()
 
 		f := sdk.SDKFunction{
 			Name:        fn.Name(),
