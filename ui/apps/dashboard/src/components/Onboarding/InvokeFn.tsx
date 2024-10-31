@@ -60,7 +60,6 @@ export default function InvokeFn() {
 
     loadFunctions();
   }, []);
-  console.log(functions);
 
   const handleInvokeFn = async () => {
     if (!selectedFunction || !selectedFunction.slug) return;
@@ -159,7 +158,9 @@ export default function InvokeFn() {
           </CodeBlock.Wrapper>
         )}
         {!hasEventTrigger && selectedFunction && (
-          <p>Cron functions without event triggers cannot include payload data.</p>
+          <p className="text-sm">
+            Cron functions without event triggers cannot include payload data.
+          </p>
         )}
 
         {error && (

@@ -34,17 +34,24 @@ export async function invokeFunction({
 }: Pick<InvokeFunctionMutationVariables, 'data' | 'functionSlug' | 'user'>) {
   try {
     const response = await invokeFn({ functionSlug, user, data });
-    const isSuccess = response.invokeFn.invokeFunction;
 
     return {
-      success: isSuccess,
+      success: !!response.invokeFn,
     };
   } catch (error) {
-    console.error('Error invoking:', error);
-    if (!(error instanceof Error)) {
-      return { success: false, error: 'Unknown error invoking' };
+    console.error('Error invoking function:', error);
+
+    if (error instanceof Error) {
+      return {
+        success: false,
+        error: error.message,
+      };
     }
-    return { success: false, error: error.message };
+
+    return {
+      success: false,
+      error: 'Unknown error occurred while invoking function',
+    };
   }
 }
 
