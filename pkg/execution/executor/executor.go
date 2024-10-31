@@ -13,9 +13,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -266,6 +268,13 @@ func WithShardSelector(selector redis_state.ShardSelector) ExecutorOpt {
 	}
 }
 
+func WithTraceReader(m cqrs.TraceReader) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).traceReader = m
+		return nil
+	}
+}
+
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log *zerolog.Logger
@@ -300,6 +309,8 @@ type executor struct {
 
 	assignedQueueShard redis_state.QueueShard
 	shardFinder        redis_state.ShardSelector
+
+	traceReader cqrs.TraceReader
 }
 
 func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
@@ -542,10 +553,125 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// Create the run state.
 	//
 
-	err := e.smv2.Create(ctx, sv2.CreateState{
-		Metadata: metadata,
+	newState := sv2.CreateState{
 		Events:   evts,
-	})
+		Metadata: metadata,
+		Steps:    []state.InputStep{},
+	}
+
+	if req.OriginalRunID != nil && req.FromStep != nil && req.FromStep.StepID != "" {
+		// Load the original run state and copy the state from the original
+		// run to the new run.
+		origTraceRun, err := e.traceReader.GetTraceRun(ctx, cqrs.TraceRunIdentifier{
+			RunID: *req.OriginalRunID,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error loading original trace run: %w", err)
+		}
+
+		spans, err := e.traceReader.GetTraceSpansByRun(ctx, cqrs.TraceRunIdentifier{
+			AccountID:   req.AccountID,
+			WorkspaceID: req.WorkspaceID,
+			AppID:       req.AppID,
+			FunctionID:  req.Function.ID,
+			TraceID:     origTraceRun.TraceID,
+			RunID:       *req.OriginalRunID,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error loading trace spans: %w", err)
+		}
+
+		// Get the stack and organize spans by step IDs
+		var stack []string
+		stepSpans := map[string]*cqrs.Span{}
+		foundStepToRunFrom := false
+
+		for _, span := range spans {
+			if stepID, ok := span.SpanAttributes[consts.OtelSysStepID]; ok && stepID != "" {
+				stepSpans[stepID] = span
+
+				if stepID == req.FromStep.StepID {
+					foundStepToRunFrom = true
+				}
+			}
+
+			if span.SpanName == consts.OtelExecFnOk || span.SpanName == consts.OtelExecFnErr {
+				if spanStack, ok := span.SpanAttributes[consts.OtelSysStepStack]; ok {
+					spew.Dump("FOUND SPANSTACK", spanStack)
+					stack = strings.Split(spanStack, ",")
+				}
+			}
+		}
+
+		if len(stack) == 0 {
+			// TODO is this a safe check? edge cases?
+			return nil, fmt.Errorf("stack not found in original run")
+		}
+
+		if !foundStepToRunFrom {
+			// TODO okay to check this here?
+			return nil, fmt.Errorf("step to run from not found in original run")
+		}
+
+		// Copy the state from the original run to the new run.
+		// TODO Also just testing - holy moly don't do this probably or something
+		for _, stepID := range stack {
+			if stepID == req.FromStep.StepID {
+				// We've reached the step to run from, so we can stop
+				// copying
+				if req.FromStep.Input != nil {
+					// TODO This is a weird way to declare it.
+					newState.Steps = append(newState.Steps, state.InputStep{
+						ID:   stepID,
+						Data: map[string]any{"input": req.FromStep.Input},
+					})
+				}
+
+				break
+			}
+
+			span, ok := stepSpans[stepID]
+			if !ok {
+				// TODO is this ever possible? bad run?
+				return nil, fmt.Errorf("step found in stack but span not found in original run")
+			}
+
+			output, err := e.traceReader.GetSpanOutput(ctx, cqrs.SpanIdentifier{
+				AccountID:   req.AccountID,
+				WorkspaceID: req.WorkspaceID,
+				AppID:       req.AppID,
+				FunctionID:  req.Function.ID,
+				TraceID:     origTraceRun.TraceID,
+				SpanID:      span.SpanID,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("error loading span output: %w", err)
+			}
+
+			var data any
+			_ = json.Unmarshal(output.Data, &data)
+
+			// 🤷‍♂️
+			if output.IsError {
+				// TODO extra handling here needed similar to runs_v2
+				newState.Steps = append(newState.Steps, state.InputStep{
+					ID:   stepID,
+					Data: map[string]any{"error": data},
+				})
+			} else {
+				newState.Steps = append(newState.Steps, state.InputStep{
+					ID:   stepID,
+					Data: map[string]any{"data": data},
+				})
+			}
+
+		}
+
+	}
+
+	spew.Dump("newState", newState)
+
+	err := e.smv2.Create(ctx, newState)
 	if err == state.ErrIdentifierExists {
 		// This function was already created.
 		return nil, state.ErrIdentifierExists

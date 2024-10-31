@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 
 	"github.com/google/uuid"
@@ -289,6 +290,8 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 		return nil, fmt.Errorf("error storing run state in redis: %w", err)
 	}
 
+	spew.Dump("Steps being parsed", input.Steps)
+
 	args, err := StrSlice([]any{
 		events,
 		metadataByt,
@@ -305,6 +308,7 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 			fnRunState.kg.Events(ctx, isSharded, input.Identifier),
 			fnRunState.kg.RunMetadata(ctx, isSharded, input.Identifier.RunID),
 			fnRunState.kg.Actions(ctx, isSharded, input.Identifier),
+			fnRunState.kg.Stack(ctx, isSharded, input.Identifier.RunID),
 		},
 		args,
 	).AsInt64()
@@ -312,7 +316,6 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 	if err != nil {
 		return nil, fmt.Errorf("error storing run state in redis: %w", err)
 	}
-
 	if status == 1 {
 		return nil, state.ErrIdentifierExists
 	}
@@ -586,14 +589,17 @@ func (m shardedMgr) Load(ctx context.Context, accountId uuid.UUID, runID ulid.UL
 	if err != nil {
 		return nil, fmt.Errorf("failed loading actions; %w", err)
 	}
-	actions := map[string]any{}
+	actions := []state.InputStep{}
 	for stepID, marshalled := range rmap {
 		var data any
 		err = json.Unmarshal([]byte(marshalled), &data)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal step \"%s\" with data \"%s\"; %w", stepID, marshalled, err)
 		}
-		actions[stepID] = data
+		actions = append(actions, state.InputStep{
+			ID:   stepID,
+			Data: data,
+		})
 	}
 
 	meta := metadata.Metadata()
