@@ -42,6 +42,7 @@ package config
 			[runtime=_]: #Driver & {name: string}
 		} | *{
 			http: #HTTPDriver
+			connect: #ConnectDriver
 		}
 
 		// logOutput logs output from steps within logs.  This may
@@ -204,7 +205,7 @@ package config
 }
 
 // Drivers handle execution of each step within a function.
-#Driver: #MockDriver | #HTTPDriver
+#Driver: #MockDriver | #HTTPDriver | #ConnectDriver
 
 // MockDriver is used in testing to mock and stub function executions.  You
 // almost certainly do not need to include this in your config.
@@ -217,4 +218,8 @@ package config
 	name:        "http"
 	timeout?:    int | *7200 // 2 hours
 	signingKey?: string
+}
+
+#ConnectDriver: {
+	name:        "connect"
 }

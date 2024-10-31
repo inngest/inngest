@@ -165,7 +165,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 
 			// Wait 10 seconds for app to register
-			<-time.After(time.Second * 10)
+			<-time.After(time.Second * 5)
 		}
 
 		apps, err := c.dbcqrs.GetAllApps(ctx)
@@ -186,6 +186,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			ws.Close(websocket.StatusPolicyViolation, "Could not find app")
 			return
 		}
+
+		fmt.Println("found app, connection is ready")
 
 		// Wait for relevant messages and forward them to the socket
 		go func() {

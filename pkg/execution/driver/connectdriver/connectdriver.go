@@ -3,7 +3,7 @@ package connectdriver
 import (
 	"context"
 	"errors"
-	"github.com/inngest/inngest/pkg/connect"
+	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	connect_sdk "github.com/inngest/inngestgo/connect"
 	"net/http"
@@ -19,7 +19,7 @@ import (
 )
 
 type executor struct {
-	forwarder connect.RequestForwarder
+	forwarder pubsub.RequestForwarder
 }
 
 // RuntimeType fulfills the inngest.Runtime interface.
@@ -42,7 +42,7 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 }
 
 // ProxyRequest proxies the request to the SDK over a long-lived connection with the given input.
-func ProxyRequest(ctx context.Context, forwarder connect.RequestForwarder, r httpdriver.Request) (*state.DriverResponse, error) {
+func ProxyRequest(ctx context.Context, forwarder pubsub.RequestForwarder, r httpdriver.Request) (*state.DriverResponse, error) {
 	requestToForward := connect_sdk.GatewayMessageTypeExecutorRequestData{
 		// TODO Find out if we can supply this in a better way. We still use the URL concept a lot,
 		// even though this has no meaning in connect.
@@ -64,7 +64,7 @@ func ProxyRequest(ctx context.Context, forwarder connect.RequestForwarder, r htt
 	return httpdriver.HandleHttpResponse(ctx, r, resp)
 }
 
-func do(ctx context.Context, forwarder connect.RequestForwarder, data connect_sdk.GatewayMessageTypeExecutorRequestData) (*httpdriver.Response, error) {
+func do(ctx context.Context, forwarder pubsub.RequestForwarder, data connect_sdk.GatewayMessageTypeExecutorRequestData) (*httpdriver.Response, error) {
 	ctx, cancel := context.WithTimeout(ctx, consts.MaxFunctionTimeout)
 	defer cancel()
 
