@@ -55,7 +55,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/throttled/throttled/v2 v2.11.0
 	github.com/valyala/fastjson v1.6.4
-	github.com/vektah/gqlparser/v2 v2.5.1
+	github.com/vektah/gqlparser/v2 v2.5.15
 	github.com/xhit/go-str2duration/v2 v2.1.0
 	go.opentelemetry.io/collector/pdata v1.6.0
 	go.opentelemetry.io/otel v1.28.0
