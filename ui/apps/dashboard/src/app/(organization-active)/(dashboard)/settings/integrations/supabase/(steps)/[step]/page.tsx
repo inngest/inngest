@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 
 import { useSteps } from '@/components/PostgresIntegration/Context';
 import { pathCreator } from '@/utils/urls';
-import { verifyAutoSetup, verifyCredentials, verifyLogicalReplication } from './actions';
+import { verifyAutoSetup, verifyCredentials } from './actions';
 
 export default function Step({ params: { step } }: { params: { step: string } }) {
   const { setStepsCompleted, credentials, setCredentials } = useSteps();
