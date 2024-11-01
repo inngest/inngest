@@ -45,7 +45,6 @@ export default async function RootLayout({
     entitlementUsage = (await graphqlAPI.request(entitlementUsageQuery)).account.entitlementUsage;
   } catch (e) {
     console.error(e);
-    return null;
   }
 
   return (
