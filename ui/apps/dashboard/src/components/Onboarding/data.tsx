@@ -48,7 +48,7 @@ export const invokeFn = async ({
 }: Pick<InvokeFunctionMutationVariables, 'data' | 'functionSlug' | 'user'>) => {
   const environment = await getProductionEnvironment();
 
-  return await graphqlAPI.request<{ invokeFn: InvokeFunctionMutation }>(
+  return await graphqlAPI.request<{ invokeFunction: InvokeFunctionMutation }>(
     InvokeFunctionOnboardingDocument,
     {
       envID: environment.id,

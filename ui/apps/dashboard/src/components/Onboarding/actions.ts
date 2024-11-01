@@ -36,7 +36,7 @@ export async function invokeFunction({
     const response = await invokeFn({ functionSlug, user, data });
 
     return {
-      success: !!response.invokeFn,
+      success: !!response.invokeFunction,
     };
   } catch (error) {
     console.error('Error invoking function:', error);
