@@ -33,7 +33,7 @@ export async function invokeFunction({
   data,
 }: Pick<InvokeFunctionMutationVariables, 'data' | 'functionSlug' | 'user'>) {
   try {
-    const response = await invokeFn({ functionSlug, user, data });
+    await invokeFn({ functionSlug, user, data });
 
     return {
       success: true,
