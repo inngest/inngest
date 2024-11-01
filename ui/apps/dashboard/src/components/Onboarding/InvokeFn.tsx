@@ -189,6 +189,7 @@ export default function InvokeFn() {
           </div>
         ) : (
           <NewButton
+            className="mt-6"
             label="Go to runs"
             onClick={() => {
               router.push(pathCreator.runs({ envSlug: 'production' }));
