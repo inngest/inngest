@@ -3,11 +3,9 @@ package commands
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/inngest/inngest/cmd/commands/internal/localconfig"
-	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/lite"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
@@ -82,28 +80,11 @@ func NewCmdStart(rootCmd *cobra.Command) *cobra.Command {
 
 func doStart(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
+
 	// TODO Likely need a `Start()`
-	conf, err := config.Dev(ctx)
-	if err != nil {
+	if err := localconfig.InitStartConfig(ctx, cmd); err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
-	}
-
-	if err = localconfig.InitStartConfig(ctx, cmd); err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-
-	port, err := strconv.Atoi(viper.GetString("port"))
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-	conf.EventAPI.Port = port
-
-	host := viper.GetString("host")
-	if host != "" {
-		conf.EventAPI.Addr = host
 	}
 
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
@@ -125,7 +106,6 @@ func doStart(cmd *cobra.Command, args []string) {
 	}
 
 	opts := lite.StartOpts{
-		Config:        *conf,
 		PollInterval:  viper.GetInt("poll-interval"),
 		RedisURI:      viper.GetString("redis-uri"),
 		RetryInterval: viper.GetInt("retry-interval"),
@@ -136,7 +116,7 @@ func doStart(cmd *cobra.Command, args []string) {
 		EventKey:      viper.GetStringSlice("event-key"),
 	}
 
-	err = lite.New(ctx, opts)
+	err := lite.New(ctx, opts)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

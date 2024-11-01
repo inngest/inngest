@@ -5,14 +5,11 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/inngest/inngest/cmd/commands/internal/localconfig"
-	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/devserver"
-	"github.com/inngest/inngest/pkg/headers"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -56,27 +53,10 @@ func doDev(cmd *cobra.Command, args []string) {
 	}()
 
 	ctx := cmd.Context()
-	conf, err := config.Dev(ctx)
-	if err != nil {
+
+	if err := localconfig.InitDevConfig(ctx, cmd); err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
-	}
-
-	if err = localconfig.InitDevConfig(ctx, cmd); err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-
-	port, err := strconv.Atoi(viper.GetString("port"))
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-	conf.EventAPI.Port = port
-
-	host := viper.GetString("host")
-	if host != "" {
-		conf.EventAPI.Addr = host
 	}
 
 	urls := viper.GetStringSlice("sdk-url")
@@ -101,11 +81,8 @@ func doDev(cmd *cobra.Command, args []string) {
 		_ = itrace.CloseUserTracer(ctx)
 	}()
 
-	conf.ServerKind = headers.ServerKindDev
-
 	opts := devserver.StartOpts{
 		Autodiscover:  !noDiscovery,
-		Config:        *conf,
 		Poll:          !noPoll,
 		PollInterval:  pollInterval,
 		RetryInterval: retryInterval,
@@ -113,7 +90,7 @@ func doDev(cmd *cobra.Command, args []string) {
 		URLs:          urls,
 	}
 
-	err = devserver.New(ctx, opts)
+	err := devserver.New(ctx, opts)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

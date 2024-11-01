@@ -1,47 +1,12 @@
 package config
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/headers"
 )
-
-const devConfig = `package main
-
-import (
-	config "inngest.com/defs/config"
-)
-
-config.#Config & {
-	log: {
-		format: "console"
-	}
-	execution: {
-		drivers: {
-			http: config.#HTTPDriver & {
-				signingKey: "dev-signing-key"
-			}
-		}
-	}
-}
-`
-
-// Load loads the configu from the given locations in order.  If locs is empty,
-// we use the default locations of "./inngest.(cue|json)" and "/etc/inngest.(cue|json)".
-func Load(ctx context.Context, locs ...string) (*Config, error) {
-	return loadAll(ctx, locs...)
-}
-
-func Default(ctx context.Context) (*Config, error) {
-	return Parse(nil)
-}
-
-func Dev(ctx context.Context) (*Config, error) {
-	return Parse([]byte(devConfig))
-}
 
 // Config represents configuration for running the Inngest services.
 type Config struct {
