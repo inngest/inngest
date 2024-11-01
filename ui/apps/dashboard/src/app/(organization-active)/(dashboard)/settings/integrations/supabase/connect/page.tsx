@@ -2,19 +2,19 @@
 
 import { useRouter } from 'next/navigation';
 import ConnectPage from '@inngest/components/PostgresIntegrations/ConnectPage';
-import { neonConnectContent } from '@inngest/components/PostgresIntegrations/Neon/neonContent';
+import { connectContent } from '@inngest/components/PostgresIntegrations/Supabase/supabaseContent';
 import { STEPS_ORDER } from '@inngest/components/PostgresIntegrations/types';
 
 import { pathCreator } from '@/utils/urls';
 
-export default function NeonConnect() {
+export default function Connect() {
   const router = useRouter();
   const firstStep = STEPS_ORDER[0]!;
   return (
     <ConnectPage
-      content={neonConnectContent}
+      content={connectContent}
       onStartInstallation={() => {
-        router.push(pathCreator.pgIntegrationStep({ integration: 'neon', step: firstStep }));
+        router.push(pathCreator.pgIntegrationStep({ integration: 'supabase', step: firstStep }));
       }}
     />
   );

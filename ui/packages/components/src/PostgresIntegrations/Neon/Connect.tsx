@@ -39,10 +39,12 @@ export default function Connect({
   savedCredentials,
   verifyAutoSetup,
   handleLostCredentials,
+  integration,
 }: {
   onSuccess: () => void;
   handleLostCredentials: () => void;
   savedCredentials?: string;
+  integration: string;
   verifyAutoSetup: (variables: {
     adminConn: string;
     engine: string;
@@ -96,7 +98,7 @@ export default function Connect({
       return;
     }
 
-    const parsedInput = parseConnectionString(savedCredentials);
+    const parsedInput = parseConnectionString(integration, savedCredentials);
 
     if (!parsedInput) {
       setError('Invalid connection string format. Please check your input.');
@@ -129,8 +131,8 @@ export default function Connect({
   return (
     <>
       <p className="text-sm">
-        Inngest can setup and connect to your Neon Database automatically. Click the button below
-        and we will run a few lines of code for you to make your set up easier.
+        Inngest can setup and connect to your database automatically. Click the button below and we
+        will run a few lines of code for you to make your set up easier.
       </p>
 
       <div className="my-6">
@@ -150,13 +152,8 @@ export default function Connect({
 
             <AccordionList.Content>
               <p className="mb-3">
-                Create a dedicated Postgres role for replicating data. The role must have the{' '}
-                <code className="text-accent-xIntense text-xs">REPLICATION</code> privilege. The
-                default Postgres role created with your Neon project and roles created using the
-                Neon CLI, Console, or API are granted membership in the{' '}
-                <code className="text-link text-xs">neon_superuser</code> role, which has the
-                required <code className="text-accent-xIntense text-xs">REPLICATION</code>{' '}
-                privilege.
+                Create a dedicated Inngest role for replicating data. The role must have the{' '}
+                <code className="text-accent-xIntense text-xs">REPLICATION</code> privilege:
               </p>
               <RoleCommand />
             </AccordionList.Content>
@@ -164,7 +161,7 @@ export default function Connect({
           <AccordionList.Item value="roles_granted">
             <AccordionList.Trigger>
               <div className="flex w-full items-center justify-between">
-                <p>Grant schema access to your Postgres role</p>
+                <p>Grant schema access to your new role:</p>
                 <StatusIndicator
                   loading={isVerifying}
                   success={completionStatus.roles_granted === true}
@@ -174,10 +171,10 @@ export default function Connect({
             </AccordionList.Trigger>
             <AccordionList.Content>
               <p className="mb-3">
-                Granting{' '}
+                Grant{' '}
                 <code className="text-accent-xIntense text-xs">SELECT ON ALL TABLES IN SCHEMA</code>{' '}
                 instead of naming the specific tables avoids having to add privileges later if you
-                add tables to your publication.
+                add tables to your publication:
               </p>
               <AccessCommand />
             </AccordionList.Content>
@@ -222,36 +219,28 @@ export default function Connect({
               </div>
             </AccordionList.Trigger>
             <AccordionList.Content>
-              <ol className="list-decimal pl-10">
+              <ol className="list-decimal pb-2 pl-10">
                 <li className="mb-3">
-                  Add the replication identity (the method of distinguishing between rows) for each
-                  table you want to replicate:
-                </li>
-                <AlterTableReplicationCommandOne />
-                <li className="mb-3 mt-6">
                   Create the Postgres publication. Include all tables you want to replicate as part
                   of the publication:
                 </li>
                 <AlterTableReplicationCommandTwo />
+                <li className="mb-3 mt-6">
+                  Add the replication identity (the method of distinguishing between rows) for each
+                  table you want to replicate:
+                </li>
+                <AlterTableReplicationCommandOne />
               </ol>
-              <p className="mt-3">
-                The publication name is customizable. Refer to the{' '}
-                <NewLink
-                  className="inline-block"
-                  size="small"
-                  href="https://neon.tech/docs/guides/logical-replication-manage"
-                >
-                  Postgres Docs
-                </NewLink>{' '}
-                if you need to add or remove tables from your publication.
-              </p>
             </AccordionList.Content>
           </AccordionList.Item>
         </AccordionList>
       </div>
 
       {isVerified ? (
-        <NewButton label="See integration" href={`/settings/integrations/neon`} />
+        <NewButton
+          label="Connected. See your integration"
+          href={`/settings/integrations/${integration}`}
+        />
       ) : (
         <NewButton
           label="Complete setup automatically"

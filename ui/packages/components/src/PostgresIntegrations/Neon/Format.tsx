@@ -9,10 +9,12 @@ export default function NeonFormat({
   savedCredentials,
   verifyLogicalReplication,
   handleLostCredentials,
+  integration,
 }: {
   onSuccess: () => void;
   handleLostCredentials: () => void;
   savedCredentials?: string;
+  integration: string;
   verifyLogicalReplication: (variables: {
     adminConn: string;
     engine: string;
@@ -31,7 +33,7 @@ export default function NeonFormat({
       handleLostCredentials();
       return;
     }
-    const parsedInput = parseConnectionString(savedCredentials);
+    const parsedInput = parseConnectionString(integration, savedCredentials);
 
     if (!parsedInput) {
       setError('Invalid connection string format. Please check your input.');
@@ -96,7 +98,7 @@ export default function NeonFormat({
       {isVerified ? (
         <NewButton
           label="Next"
-          href={`/settings/integrations/neon/${IntegrationSteps.ConnectDb}`}
+          href={`/settings/integrations/${integration}/${IntegrationSteps.ConnectDb}`}
         />
       ) : (
         <NewButton

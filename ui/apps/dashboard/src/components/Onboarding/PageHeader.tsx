@@ -10,7 +10,7 @@ import { pathCreator } from '@/utils/urls';
 export default function PageHeader({ step }: { step: string }) {
   const router = useRouter();
   if (!isValidStep(step)) {
-    router.push(pathCreator.neonIntegrationStep({}));
+    router.push(pathCreator.pgIntegrationStep({ integration: 'neon' }));
     return;
   }
   const currentStep = STEPS_ORDER.indexOf(step);
