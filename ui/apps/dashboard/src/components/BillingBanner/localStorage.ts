@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-export /**
+/**
  * Get and set a boolean value in localStorage. Includes a flag to indicate if
  * the value has been hydrated, avoiding a flash of content.
  */
-function useBooleanLocalStorage(
+export function useBooleanLocalStorage(
   key: string,
   defaultValue: boolean
 ): {
