@@ -7,6 +7,8 @@ import { getEnv } from '@/components/Environments/data';
 import { EnvironmentProvider } from '@/components/Environments/environment-context';
 import Layout from '@/components/Layout/Layout';
 import Toaster from '@/components/Toaster';
+import { graphql } from '@/gql';
+import graphqlAPI from '@/queries/graphqlAPI';
 import type { Environment } from '@/utils/environments';
 
 type RootLayoutProps = {
@@ -25,7 +27,6 @@ const NotFound = () => (
 const Env = ({ env, children }: { env?: Environment; children: ReactNode }) =>
   env ? (
     <>
-      <BillingBanner />
       <ArchivedEnvBanner env={env} />
       <EnvironmentProvider env={env}>{children}</EnvironmentProvider>
     </>
@@ -39,9 +40,18 @@ export default async function RootLayout({
 }: RootLayoutProps) {
   const env = await getEnv(environmentSlug);
 
+  let entitlementUsage;
+  try {
+    entitlementUsage = (await graphqlAPI.request(entitlementUsageQuery)).account.entitlementUsage;
+  } catch (e) {
+    console.error(e);
+    return null;
+  }
+
   return (
     <>
       <Layout activeEnv={env}>
+        {entitlementUsage && <BillingBanner entitlementUsage={entitlementUsage} />}
         <Env env={env}>{children}</Env>
       </Layout>
       <Toaster
@@ -53,3 +63,17 @@ export default async function RootLayout({
     </>
   );
 }
+
+const entitlementUsageQuery = graphql(`
+  query EntitlementUsage {
+    account {
+      id
+      entitlementUsage {
+        runCount {
+          current
+          limit
+        }
+      }
+    }
+  }
+`);

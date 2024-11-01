@@ -1,26 +1,54 @@
+'use client';
+
+import { useMemo } from 'react';
 import { NewButton } from '@inngest/components/Button';
 
-import { graphql } from '@/gql';
-import graphqlAPI from '@/queries/graphqlAPI';
 import { pathCreator } from '@/utils/urls';
 import { Banner } from '../Banner';
+import { useBooleanLocalStorage } from './localStorage';
 import { parseEntitlementUsage } from './parse';
 
-export async function BillingBanner() {
-  let res;
-  try {
-    res = await graphqlAPI.request(query);
-  } catch (e) {
-    console.error(e);
+type Props = {
+  entitlementUsage: {
+    runCount: {
+      current: number;
+      limit: number | null;
+    };
+  };
+};
+
+export function BillingBanner({ entitlementUsage }: Props) {
+  const { bannerMessage, bannerSeverity, items } = parseEntitlementUsage(entitlementUsage);
+
+  const isVisible = useBooleanLocalStorage('BillingBanner:visible', true);
+
+  const onDismiss = useMemo(() => {
+    // Error banners can't be dismissed.
+    if (bannerSeverity === 'error') {
+      return;
+    }
+
+    return () => {
+      isVisible.set(false);
+    };
+  }, [bannerSeverity, isVisible]);
+
+  // Error banners are always visible.
+  if (!isVisible.value && bannerSeverity !== 'error') {
     return null;
   }
 
-  const { bannerMessage, bannerSeverity, items } = parseEntitlementUsage(
-    res.account.entitlementUsage
-  );
+  if (items.length === 0) {
+    return null;
+  }
+
+  // Wait for localStorage to be hydrated before rendering the banner.
+  if (!isVisible.isReady) {
+    return null;
+  }
 
   return (
-    <Banner className="flex" kind={bannerSeverity}>
+    <Banner className="flex" kind={bannerSeverity} onDismiss={onDismiss}>
       <div className="flex grow">
         <div className="grow">
           {bannerMessage}
@@ -43,17 +71,3 @@ export async function BillingBanner() {
     </Banner>
   );
 }
-
-const query = graphql(`
-  query EntitlementUsage {
-    account {
-      id
-      entitlementUsage {
-        runCount {
-          current
-          limit
-        }
-      }
-    }
-  }
-`);

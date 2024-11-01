@@ -55,6 +55,7 @@ const documents = {
     "\n  query GetFunctionRunsCount(\n    $environmentID: ID!\n    $functionSlug: String!\n    $functionRunStatuses: [FunctionRunStatus!]\n    $timeRangeStart: Time!\n    $timeRangeEnd: Time!\n    $timeField: FunctionRunTimeField!\n  ) {\n    environment: workspace(id: $environmentID) {\n      function: workflowBySlug(slug: $functionSlug) {\n        id\n        isPaused\n        runs: runsV2(\n          filter: {\n            status: $functionRunStatuses\n            lowerTime: $timeRangeStart\n            upperTime: $timeRangeEnd\n            timeField: $timeField\n          }\n        ) {\n          totalCount\n        }\n      }\n    }\n  }\n": types.GetFunctionRunsCountDocument,
     "\n  query GetReplays($environmentID: ID!, $functionSlug: String!) {\n    environment: workspace(id: $environmentID) {\n      id\n      function: workflowBySlug(slug: $functionSlug) {\n        id\n        replays {\n          id\n          name\n          createdAt\n          endedAt\n          functionRunsScheduledCount\n        }\n      }\n    }\n  }\n": types.GetReplaysDocument,
     "\n  query GetFunctionPauseState($environmentID: ID!, $functionSlug: String!) {\n    environment: workspace(id: $environmentID) {\n      function: workflowBySlug(slug: $functionSlug) {\n        id\n        isPaused\n      }\n    }\n  }\n": types.GetFunctionPauseStateDocument,
+    "\n  query EntitlementUsage {\n    account {\n      id\n      entitlementUsage {\n        runCount {\n          current\n          limit\n        }\n      }\n    }\n  }\n": types.EntitlementUsageDocument,
     "\n  mutation NewIngestKey($input: NewIngestKey!) {\n    key: createIngestKey(input: $input) {\n      id\n    }\n  }\n": types.NewIngestKeyDocument,
     "\n  query GetIngestKeys($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      ingestKeys {\n        id\n        name\n        createdAt\n        source\n      }\n    }\n  }\n": types.GetIngestKeysDocument,
     "\n  mutation UpdateIngestKey($id: ID!, $input: UpdateIngestKey!) {\n    updateIngestKey(id: $id, input: $input) {\n      id\n      name\n      createdAt\n      presharedKey\n      url\n      filter {\n        type\n        ips\n        events\n      }\n      metadata\n    }\n  }\n": types.UpdateIngestKeyDocument,
@@ -82,7 +83,6 @@ const documents = {
     "\n  query GetAccountSupportInfo {\n    account {\n      id\n      plan {\n        id\n        name\n        amount\n        features\n      }\n    }\n  }\n": types.GetAccountSupportInfoDocument,
     "\n  query GetArchivedAppBannerData($envID: ID!, $externalAppID: String!) {\n    environment: workspace(id: $envID) {\n      app: appByExternalID(externalID: $externalAppID) {\n        isArchived\n      }\n    }\n  }\n": types.GetArchivedAppBannerDataDocument,
     "\n  query GetArchivedFuncBannerData($envID: ID!, $funcID: ID!) {\n    environment: workspace(id: $envID) {\n      function: workflow(id: $funcID) {\n        id\n        archivedAt\n      }\n    }\n  }\n": types.GetArchivedFuncBannerDataDocument,
-    "\n  query EntitlementUsage {\n    account {\n      id\n      entitlementUsage {\n        runCount {\n          current\n          limit\n        }\n      }\n    }\n  }\n": types.EntitlementUsageDocument,
     "\n  mutation ArchiveEnvironment($id: ID!) {\n    archiveEnvironment(id: $id) {\n      id\n    }\n  }\n": types.ArchiveEnvironmentDocument,
     "\n  mutation UnarchiveEnvironment($id: ID!) {\n    unarchiveEnvironment(id: $id) {\n      id\n    }\n  }\n": types.UnarchiveEnvironmentDocument,
     "\n  mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {\n    disableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n": types.DisableEnvironmentAutoArchiveDocumentDocument,
@@ -313,6 +313,10 @@ export function graphql(source: "\n  query GetFunctionPauseState($environmentID:
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
+export function graphql(source: "\n  query EntitlementUsage {\n    account {\n      id\n      entitlementUsage {\n        runCount {\n          current\n          limit\n        }\n      }\n    }\n  }\n"): (typeof documents)["\n  query EntitlementUsage {\n    account {\n      id\n      entitlementUsage {\n        runCount {\n          current\n          limit\n        }\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
 export function graphql(source: "\n  mutation NewIngestKey($input: NewIngestKey!) {\n    key: createIngestKey(input: $input) {\n      id\n    }\n  }\n"): (typeof documents)["\n  mutation NewIngestKey($input: NewIngestKey!) {\n    key: createIngestKey(input: $input) {\n      id\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
@@ -418,10 +422,6 @@ export function graphql(source: "\n  query GetArchivedAppBannerData($envID: ID!,
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query GetArchivedFuncBannerData($envID: ID!, $funcID: ID!) {\n    environment: workspace(id: $envID) {\n      function: workflow(id: $funcID) {\n        id\n        archivedAt\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetArchivedFuncBannerData($envID: ID!, $funcID: ID!) {\n    environment: workspace(id: $envID) {\n      function: workflow(id: $funcID) {\n        id\n        archivedAt\n      }\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  query EntitlementUsage {\n    account {\n      id\n      entitlementUsage {\n        runCount {\n          current\n          limit\n        }\n      }\n    }\n  }\n"): (typeof documents)["\n  query EntitlementUsage {\n    account {\n      id\n      entitlementUsage {\n        runCount {\n          current\n          limit\n        }\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
