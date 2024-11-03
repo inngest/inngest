@@ -20,14 +20,12 @@ export default function OnboardingWidget({
   closeWidget: () => void;
 }) {
   const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
-  const { lastCompletedStep, isFinalStep, nextStep } = useOnboardingStep();
-  const segmentsCompleted = lastCompletedStep ? STEPS_ORDER.indexOf(lastCompletedStep) + 1 : 0;
+  const { isFinalStep, nextStep } = useOnboardingStep();
+  const segmentsCompleted = STEPS_ORDER.indexOf(nextStep);
 
   const stepContent = isFinalStep
-    ? onboardingWidgetContent.step['success']
-    : lastCompletedStep
-    ? onboardingWidgetContent.step[lastCompletedStep]
-    : onboardingWidgetContent.step[STEPS_ORDER[0]!];
+    ? onboardingWidgetContent.step.success
+    : onboardingWidgetContent.step[nextStep];
 
   if (!onboardingFlow) return;
   return (

@@ -107,6 +107,7 @@ export default function CreateApp() {
       <div className="flex items-center gap-2">
         <NewButton
           label="Next"
+          disabled={!devServerIsRunning}
           onClick={() => {
             updateLastCompletedStep(OnboardingSteps.CreateApp);
             router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.DeployApp }));
