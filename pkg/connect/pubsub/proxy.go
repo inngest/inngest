@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
-	connect_sdk "github.com/inngest/inngestgo/connect"
+	"github.com/inngest/inngest/pkg/connect/types"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"sync"
@@ -17,15 +17,15 @@ import (
 type ProxyResponse struct {
 	Status string
 
-	SdkResponse *connect_sdk.SdkResponse
+	SdkResponse *types.SdkResponse
 }
 
 type RequestForwarder interface {
-	Proxy(ctx context.Context, data connect_sdk.GatewayMessageTypeExecutorRequestData) (*connect_sdk.SdkResponse, error)
+	Proxy(ctx context.Context, data types.GatewayMessageTypeExecutorRequestData) (*types.SdkResponse, error)
 }
 
 type RequestReceiver interface {
-	ReceiveExecutorMessages(ctx context.Context, appId uuid.UUID, onMessage func(data connect_sdk.GatewayMessageTypeExecutorRequestData)) error
+	ReceiveExecutorMessages(ctx context.Context, appId uuid.UUID, onMessage func(data types.GatewayMessageTypeExecutorRequestData)) error
 	NotifyExecutor(ctx context.Context, appId uuid.UUID, resp ProxyResponse) error
 	AckMessage(ctx context.Context, appId uuid.UUID, requestId string) error
 
@@ -51,7 +51,7 @@ func NewRedisPubSubConnector(client rueidis.Client) *redisPubSubConnector {
 	}
 }
 
-func (i *redisPubSubConnector) Proxy(ctx context.Context, data connect_sdk.GatewayMessageTypeExecutorRequestData) (*connect_sdk.SdkResponse, error) {
+func (i *redisPubSubConnector) Proxy(ctx context.Context, data types.GatewayMessageTypeExecutorRequestData) (*types.SdkResponse, error) {
 	if data.RequestId == "" {
 		data.RequestId = ulid.MustNew(ulid.Now(), rand.Reader).String()
 	}
@@ -82,6 +82,7 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, data connect_sdk.Gatew
 			err := json.Unmarshal([]byte(msg), &reply)
 			if err != nil {
 				// TODO This should never happen, push message into dead-letter channel and report
+				return
 			}
 		}, true)
 		replyErrChan <- err
@@ -190,9 +191,9 @@ func (i *redisPubSubConnector) subscribe(ctx context.Context, channel string, on
 	return nil
 }
 
-func (i *redisPubSubConnector) ReceiveExecutorMessages(ctx context.Context, appId uuid.UUID, onMessage func(data connect_sdk.GatewayMessageTypeExecutorRequestData)) error {
+func (i *redisPubSubConnector) ReceiveExecutorMessages(ctx context.Context, appId uuid.UUID, onMessage func(data types.GatewayMessageTypeExecutorRequestData)) error {
 	return i.subscribe(ctx, i.channelAppRequests(appId), func(msg string) {
-		var data connect_sdk.GatewayMessageTypeExecutorRequestData
+		var data types.GatewayMessageTypeExecutorRequestData
 		err := json.Unmarshal([]byte(msg), &data)
 		if err != nil {
 			// TODO This should never happen, but PubSub will not redeliver, should we push the message into a dead-letter channel?

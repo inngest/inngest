@@ -10,10 +10,10 @@ import (
 	"github.com/coder/websocket/wsjson"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
+	"github.com/inngest/inngest/pkg/connect/types"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
-	sdk_connect "github.com/inngest/inngestgo/connect"
 	"log"
 	"net/http"
 	"time"
@@ -25,7 +25,7 @@ type AuthResponse struct {
 	AccountID uuid.UUID
 }
 
-type GatewayAuthHandler func(context.Context, sdk_connect.GatewayMessageTypeSDKConnectData) (*AuthResponse, error)
+type GatewayAuthHandler func(context.Context, types.GatewayMessageTypeSDKConnectData) (*AuthResponse, error)
 
 type connectGatewaySvc struct {
 	runCtx context.Context
@@ -69,7 +69,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 			Subprotocols: []string{
-				sdk_connect.GatewaySubProtocol,
+				types.GatewaySubProtocol,
 			},
 		})
 		if err != nil {
@@ -78,14 +78,14 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		defer func() {
 			logger.StdlibLogger(ctx).Debug("Closing WebSocket connection")
 
-			ws.CloseNow()
+			_ = ws.CloseNow()
 		}()
 
 		logger.StdlibLogger(ctx).Debug("WebSocket connection established, sending hello")
 
 		{
-			err = wsjson.Write(ctx, ws, sdk_connect.GatewayMessage{
-				Kind: sdk_connect.GatewayMessageTypeHello,
+			err = wsjson.Write(ctx, ws, types.GatewayMessage{
+				Kind: types.GatewayMessageTypeHello,
 			})
 			if err != nil {
 				logger.StdlibLogger(ctx).Error("could not send hello", "err", err)
@@ -94,9 +94,9 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}
 
-		var initialMessageData sdk_connect.GatewayMessageTypeSDKConnectData
+		var initialMessageData types.GatewayMessageTypeSDKConnectData
 		{
-			var initialMessage sdk_connect.GatewayMessage
+			var initialMessage types.GatewayMessage
 			shorterContext, cancelShorter := context.WithTimeout(ctx, 5*time.Second)
 			defer cancelShorter()
 			err = wsjson.Read(shorterContext, ws, &initialMessage)
@@ -109,7 +109,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				return
 			}
 
-			if initialMessage.Kind != sdk_connect.GatewayMessageTypeSDKConnect {
+			if initialMessage.Kind != types.GatewayMessageTypeSDKConnect {
 				logger.StdlibLogger(ctx).Debug("initial SDK message was not connect")
 
 				ws.Close(websocket.StatusPolicyViolation, "Invalid first message, expected sdk-connect")
@@ -157,8 +157,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				// TODO Handle this properly
 				return
 			}
-			err = wsjson.Write(ctx, ws, sdk_connect.GatewayMessage{
-				Kind: sdk_connect.GatewayMessageTypeSync,
+			err = wsjson.Write(ctx, ws, types.GatewayMessage{
+				Kind: types.GatewayMessageTypeSync,
 				Data: marshaled,
 			})
 			if err != nil {
@@ -206,7 +206,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			// - There are multiple gateway instances
 			// - There are possibly multiple SDK deployments, each with their own WebSocket connection
 			// -> We need to prevent sending the same request multiple times, to different connections
-			err := c.receiver.ReceiveExecutorMessages(ctx, appId, func(data sdk_connect.GatewayMessageTypeExecutorRequestData) {
+			err := c.receiver.ReceiveExecutorMessages(ctx, appId, func(data types.GatewayMessageTypeExecutorRequestData) {
 				fmt.Println("received msg", appId, data.RequestId)
 				// This will be sent at least once (if there are more than one connection, every connection receives the message)
 				err = c.receiver.AckMessage(ctx, appId, data.RequestId)
@@ -237,8 +237,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				}
 
 				// Forward message to SDK!
-				err = wsjson.Write(ctx, ws, sdk_connect.GatewayMessage{
-					Kind: sdk_connect.GatewayMessageTypeExecutorRequest,
+				err = wsjson.Write(ctx, ws, types.GatewayMessage{
+					Kind: types.GatewayMessageTypeExecutorRequest,
 					Data: marshaled,
 				})
 				if err != nil {
@@ -248,6 +248,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			})
 			if err != nil {
 				// TODO Log error, retry?
+				return
 			}
 		}()
 
@@ -258,7 +259,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					break
 				}
 
-				var msg sdk_connect.GatewayMessage
+				var msg types.GatewayMessage
 				err = wsjson.Read(ctx, ws, &msg)
 				if err != nil {
 					return
@@ -267,7 +268,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				log.Printf("received: %v", msg)
 
 				switch msg.Kind {
-				case sdk_connect.GatewayMessageTypeSDKReply:
+				case types.GatewayMessageTypeSDKReply:
 					// Handle SDK reply
 					err := c.handleSdkReply(ctx, appId, msg)
 					if err != nil {
@@ -288,8 +289,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 	})
 }
 
-func (c *connectGatewaySvc) handleSdkReply(ctx context.Context, appId uuid.UUID, msg sdk_connect.GatewayMessage) error {
-	var data sdk_connect.SdkResponse
+func (c *connectGatewaySvc) handleSdkReply(ctx context.Context, appId uuid.UUID, msg types.GatewayMessage) error {
+	var data types.SdkResponse
 	if err := json.Unmarshal(msg.Data, &data); err != nil {
 		return fmt.Errorf("invalid response type: %w", err)
 	}
