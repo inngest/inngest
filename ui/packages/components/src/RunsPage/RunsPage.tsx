@@ -281,7 +281,7 @@ export function RunsPage({
 
   return (
     <main className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-auto focus-visible:outline-none">
-      <div className="bg-canvasBase border-subtle sticky top-0 z-10 flex flex-col border-b px-3">
+      <div className="bg-canvasBase border-subtle over sticky top-0 z-10 flex flex-col border-b px-3">
         <div className="flex h-[58px] items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <SelectGroup>
@@ -357,8 +357,7 @@ export function RunsPage({
             />
           </div>
         </div>
-      </div>
-      <>
+
         {hasSearchFlag && showSearch && (
           <>
             <div className="bg-codeEditor flex items-center justify-between px-4 pt-4">
@@ -382,7 +381,8 @@ export function RunsPage({
             />
           </>
         )}
-      </>
+      </div>
+
       <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
         <RunsTable
           data={data}
