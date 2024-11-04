@@ -95,8 +95,9 @@ func NewAggregateEvaluator(
 			EngineTypeNullMatch:  newNullMatcher(),
 			EngineTypeBTree:      newNumberMatcher(),
 		},
-		lock:  &sync.RWMutex{},
-		mixed: map[uuid.UUID]struct{}{},
+		lock:      &sync.RWMutex{},
+		constants: map[uuid.UUID]struct{}{},
+		mixed:     map[uuid.UUID]struct{}{},
 	}
 }
 
@@ -125,7 +126,7 @@ type aggregator struct {
 
 	// constants tracks evaluable IDs that must always be evaluated, due to
 	// the expression containing non-aggregateable clauses.
-	constants []uuid.UUID
+	constants map[uuid.UUID]struct{}
 }
 
 // Len returns the total number of aggregateable and constantly matched expressions
@@ -167,10 +168,17 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 	)
 
 	// TODO: Concurrently match constant expressions using a semaphore for capacity.
+
 	// Match constant expressions always.
 	a.lock.RLock()
-	constantEvals, err := a.loader(ctx, a.constants...)
+	uuids := make([]uuid.UUID, len(a.constants))
+	n := 0
+	for id := range a.constants {
+		uuids[n] = id
+		n++
+	}
 	a.lock.RUnlock()
+	constantEvals, err := a.loader(ctx, uuids...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -227,7 +235,7 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 	}
 
 	// Load all evaluable instances directly.
-	uuids := make([]uuid.UUID, len(matches))
+	uuids = make([]uuid.UUID, len(matches))
 	for n, m := range matches {
 		uuids[n] = m.Parsed.EvaluableID
 	}
@@ -322,6 +330,7 @@ func (a *aggregator) AggregateMatch(ctx context.Context, data map[string]any) ([
 		// Add all found items from the engine to the above list.
 		for _, eval := range matched {
 			counts[eval.GroupID] += 1
+
 			if _, ok := found[eval.GroupID]; !ok {
 				found[eval.GroupID] = []*StoredExpressionPart{}
 			}
@@ -348,15 +357,15 @@ func (a *aggregator) AggregateMatch(ctx context.Context, data map[string]any) ([
 		// matching engine, so we cannot use group sizes if the expr part
 		// has an OR.
 		for _, i := range found[groupID] {
+			// if this is purely aggregateable, we're safe to rely on group IDs.
+			//
+			// So, we only need to care if this expression is mixed.  If it's mixed,
+			// we can ignore group IDs for the time being.
 			if _, ok := a.mixed[i.Parsed.EvaluableID]; ok {
-				// for now, mark this as viable as it had an OR
+				// this wasn't fully aggregatable so evaluate it.
 				result = append(result, i)
 			}
 
-			if len(i.Parsed.Root.Ors) > 0 {
-				// for now, mark this as viable as it had an OR
-				result = append(result, i)
-			}
 		}
 	}
 
@@ -380,7 +389,7 @@ func (a *aggregator) Add(ctx context.Context, eval Evaluable) (float64, error) {
 	if eval.GetExpression() == "" || parsed.HasMacros {
 		// This is an empty expression which always matches.
 		a.lock.Lock()
-		a.constants = append(a.constants, parsed.EvaluableID)
+		a.constants[parsed.EvaluableID] = struct{}{}
 		a.lock.Unlock()
 		return -1, nil
 	}
@@ -393,7 +402,7 @@ func (a *aggregator) Add(ctx context.Context, eval Evaluable) (float64, error) {
 			// This is the first time we're seeing a non-aggregateable
 			// group, so add it to the constants list and don't do anything else.
 			a.lock.Lock()
-			a.constants = append(a.constants, parsed.EvaluableID)
+			a.constants[parsed.EvaluableID] = struct{}{}
 			a.lock.Unlock()
 			return -1, err
 		}
@@ -405,7 +414,7 @@ func (a *aggregator) Add(ctx context.Context, eval Evaluable) (float64, error) {
 		// This is a non-aggregateable, slow expression.
 		// Add it to the constants list and don't do anything else.
 		a.lock.Lock()
-		a.constants = append(a.constants, parsed.EvaluableID)
+		a.constants[parsed.EvaluableID] = struct{}{}
 		a.lock.Unlock()
 		return stats.Ratio(), err
 	}
@@ -475,18 +484,11 @@ func (a *aggregator) removeConstantEvaluable(_ context.Context, eval Evaluable) 
 	defer a.lock.Unlock()
 
 	// Find the index of the evaluable in constants and yank out.
-	idx := -1
-	for n, item := range a.constants {
-		if item == eval.GetID() {
-			idx = n
-			break
-		}
-	}
-	if idx == -1 {
+	if _, ok := a.constants[eval.GetID()]; !ok {
 		return ErrEvaluableNotFound
 	}
 
-	a.constants = append(a.constants[:idx], a.constants[idx+1:]...)
+	delete(a.constants, eval.GetID())
 	return nil
 }
 
@@ -554,9 +556,22 @@ func (a *aggregator) iterGroup(ctx context.Context, node *Node, parsed *ParsedEx
 		}
 	}
 
-	// XXX: Here we must add the OR groups to make group IDs a success.
-
 	all := node.Ands
+
+	// XXX: Here we must add the OR groups to make group IDs a success.
+	if len(node.Ors) > 0 {
+		for _, n := range node.Ors {
+			if !n.HasPredicate() || len(n.Ors) > 0 {
+				// Don't handle sub-branching for now.
+				// TODO: Recursively iterate.
+				stats.AddSlow()
+				continue
+			}
+
+			all = append(all, n)
+		}
+	}
+
 	if node.Predicate != nil {
 		if !isAggregateable(node) {
 			stats.AddSlow()
