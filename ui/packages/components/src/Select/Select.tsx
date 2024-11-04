@@ -26,7 +26,7 @@ type MultiProps = {
 };
 
 type SingleProps = {
-  onChange: (value: Option | null) => void;
+  onChange: (value: Option) => void;
   value?: Option | null;
   multiple?: false;
 };
