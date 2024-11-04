@@ -303,7 +303,6 @@ github.com/coder/websocket/internal/errd
 github.com/coder/websocket/internal/util
 github.com/coder/websocket/internal/wsjs
 github.com/coder/websocket/internal/xsync
-github.com/coder/websocket/wsjson
 # github.com/coocood/freecache v1.2.3
 ## explicit; go 1.13
 github.com/coocood/freecache
@@ -517,7 +516,7 @@ github.com/inconshreveable/mousetrap
 # github.com/inngest/expr v0.0.0-20241023211115-139798ff6d8a
 ## explicit; go 1.21.0
 github.com/inngest/expr
-# github.com/inngest/inngestgo v0.7.5-0.20241104093834-2568c067e081
+# github.com/inngest/inngestgo v0.7.5-0.20241104135505-01ef42a20670
 ## explicit; go 1.22.0
 github.com/inngest/inngestgo
 github.com/inngest/inngestgo/errors

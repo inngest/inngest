@@ -8,11 +8,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/coder/websocket"
-	"github.com/coder/websocket/wsjson"
 	"github.com/inngest/inngest/pkg/connect/types"
+	"github.com/inngest/inngest/pkg/connect/wsproto"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/sdk"
+	connectproto "github.com/inngest/inngest/proto/gen/connect/v1"
 	sdkerrors "github.com/inngest/inngestgo/errors"
 
 	"github.com/inngest/inngestgo/internal/sdkrequest"
@@ -133,13 +136,13 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 	{
 		initialMessageTimeout, cancelInitialTimeout := context.WithTimeout(ctx, 5*time.Second)
 		defer cancelInitialTimeout()
-		var helloMessage types.GatewayMessage
-		err = wsjson.Read(initialMessageTimeout, ws, &helloMessage)
+		var helloMessage connectproto.ConnectMessage
+		err = wsproto.Read(initialMessageTimeout, ws, &helloMessage)
 		if err != nil {
 			return fmt.Errorf("did not receive gateway hello message: %w", err)
 		}
 
-		if helloMessage.Kind != types.GatewayMessageTypeHello {
+		if helloMessage.Kind != connectproto.GatewayMessageType_GATEWAY_HELLO {
 			return fmt.Errorf("expected gateway hello message, got %s", helloMessage.Kind)
 		}
 
@@ -153,29 +156,29 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 			return fmt.Errorf("could not hash signing key: %w", err)
 		}
 
-		data, err := json.Marshal(types.GatewayMessageTypeSDKConnectData{
-			Authz: types.AuthData{
+		data, err := proto.Marshal(&connectproto.SDKConnectRequestData{
+			AuthData: &connectproto.AuthData{
 				HashedSigningKey: hashedKey,
 			},
-			AppName: h.h.appName,
-			Env:     h.h.Env,
-			Session: types.SessionDetails{
+			AppName:     h.h.appName,
+			Environment: h.h.Env,
+			SessionDetails: &connectproto.SessionDetails{
 				FunctionHash: functionHash,
-				BuildID:      h.h.BuildId,
+				BuildId:      h.h.BuildId,
 				InstanceId:   h.instanceId(),
 				ConnectionId: h.connectionId.String(),
 			},
-			SDKAuthor:   SDKAuthor,
-			SDKLanguage: SDKLanguage,
-			SDKVersion:  SDKVersion,
+			SdkAuthor:   StrPtr(SDKAuthor),
+			SdkLanguage: StrPtr(SDKLanguage),
+			SdkVersion:  StrPtr(SDKVersion),
 		})
 		if err != nil {
 			return fmt.Errorf("could not serialize sdk connect message: %w", err)
 		}
 
-		err = wsjson.Write(ctx, ws, types.GatewayMessage{
-			Kind: types.GatewayMessageTypeSDKConnect,
-			Data: data,
+		err = wsproto.Write(ctx, ws, &connectproto.ConnectMessage{
+			Kind:    connectproto.GatewayMessageType_SDK_CONNECT,
+			Payload: data,
 		})
 		if err != nil {
 			return fmt.Errorf("could not send initial message")
@@ -187,19 +190,19 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 			break
 		}
 
-		var msg types.GatewayMessage
-		err = wsjson.Read(ctx, ws, &msg)
+		var msg connectproto.ConnectMessage
+		err = wsproto.Read(ctx, ws, &msg)
 		if err != nil {
 			// TODO Handle issues reading message: Should we re-establish the connection?
 			return err
 		}
 
-		h.h.Logger.Debug("received gateway request", "msg", msg)
+		h.h.Logger.Debug("received gateway request", "msg", &msg)
 
 		switch msg.Kind {
-		case types.GatewayMessageTypeSync:
-			var data types.GatewayMessageTypeSyncData
-			if err := json.Unmarshal(msg.Data, &data); err != nil {
+		case connectproto.GatewayMessageType_GATEWAY_REQUEST_SYNC:
+			var data connectproto.GatewaySyncRequestData
+			if err := proto.Unmarshal(msg.Payload, &data); err != nil {
 				h.h.Logger.Error("error decoding sync message", "error", err)
 				return err
 			}
@@ -210,24 +213,24 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 				// TODO Should we drop the connection? Continue receiving messages?
 				return err
 			}
-		case types.GatewayMessageTypeExecutorRequest:
-			resp, err := h.connectInvoke(ctx, msg)
+		case connectproto.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST:
+			resp, err := h.connectInvoke(ctx, &msg)
 			if err != nil {
 				h.h.Logger.Error("failed to handle sdk request", "err", err)
 				// TODO Should we drop the connection? Continue receiving messages?
 				return err
 			}
 
-			data, err := json.Marshal(resp)
+			data, err := proto.Marshal(resp)
 			if err != nil {
 				h.h.Logger.Error("failed to serialize sdk response", "err", err)
 				// TODO This should never happen; Signal that we should retry
 				continue
 			}
 
-			err = wsjson.Write(ctx, ws, types.GatewayMessage{
-				Kind: types.GatewayMessageTypeSDKReply,
-				Data: data,
+			err = wsproto.Write(ctx, ws, &connectproto.ConnectMessage{
+				Kind:    connectproto.GatewayMessageType_SDK_REPLY,
+				Payload: data,
 			})
 			if err != nil {
 				h.h.Logger.Error("failed to send sdk response", "err", err)
@@ -247,15 +250,17 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 }
 
 // connectInvoke is the counterpart to invoke for connect
-func (h *connectHandler) connectInvoke(ctx context.Context, msg types.GatewayMessage) (*types.SdkResponse, error) {
-	body := &types.GatewayMessageTypeExecutorRequestData{}
-	if err := json.Unmarshal(msg.Data, body); err != nil {
+func (h *connectHandler) connectInvoke(ctx context.Context, msg *connectproto.ConnectMessage) (*connectproto.SDKResponse, error) {
+	body := connectproto.GatewayExecutorRequestData{}
+	if err := proto.Unmarshal(msg.Payload, &body); err != nil {
 		h.h.Logger.Error("error decoding gateway request data", "error", err)
 		return nil, fmt.Errorf("invalid gateway message data: %w", err)
 	}
 
+	// Note: This still uses JSON
+	// TODO Replace with Protobuf
 	var request sdkrequest.Request
-	if err := json.Unmarshal(body.RequestBytes, &request); err != nil {
+	if err := json.Unmarshal(body.RequestPayload, &request); err != nil {
 		h.h.Logger.Error("error decoding sdk request", "error", err)
 		return nil, publicerr.Error{
 			Message: "malformed input",
@@ -325,27 +330,25 @@ func (h *connectHandler) connectInvoke(ctx context.Context, msg types.GatewayMes
 	}
 
 	// These may be added even for 2xx codes with step errors.
-	noRetryVal := ""
-	if noRetry {
-		noRetryVal = "true"
-	}
-	retryAfterVal := ""
+	var retryAfterVal *string
 	if retryAt != nil {
-		retryAfterVal = retryAt.Format(time.RFC3339)
+		retryAfterVal = StrPtr(retryAt.Format(time.RFC3339))
 	}
 
 	if err != nil {
 		h.h.Logger.Error("error calling function", "error", err)
-		return &types.SdkResponse{
+		return &connectproto.SDKResponse{
 			RequestId:  body.RequestId,
-			Status:     types.SdkResponseStatusError,
+			Status:     connectproto.SDKResponseStatus_ERROR,
 			Body:       []byte(fmt.Sprintf("error calling function: %s", err.Error())),
-			NoRetry:    noRetryVal,
+			NoRetry:    noRetry,
 			RetryAfter: retryAfterVal,
 		}, nil
 	}
 
 	if len(ops) > 0 {
+		// Note: This still uses JSON
+		// TODO Replace with Protobuf
 		serializedOps, err := json.Marshal(ops)
 		if err != nil {
 			return nil, fmt.Errorf("could not serialize ops: %w", err)
@@ -354,26 +357,28 @@ func (h *connectHandler) connectInvoke(ctx context.Context, msg types.GatewayMes
 		// Return the function opcode returned here so that we can re-invoke this
 		// function and manage state appropriately.  Any opcode here takes precedence
 		// over function return values as the function has not yet finished.
-		return &types.SdkResponse{
+		return &connectproto.SDKResponse{
 			RequestId:  body.RequestId,
-			Status:     types.SdkResponseStatusNotCompleted,
+			Status:     connectproto.SDKResponseStatus_NOT_COMPLETED,
 			Body:       serializedOps,
-			NoRetry:    noRetryVal,
+			NoRetry:    noRetry,
 			RetryAfter: retryAfterVal,
 		}, nil
 	}
 
+	// Note: This still uses JSON
+	// TODO Replace with Protobuf
 	serializedResp, err := json.Marshal(resp)
 	if err != nil {
 		return nil, fmt.Errorf("could not serialize resp: %w", err)
 	}
 
 	// Return the function response.
-	return &types.SdkResponse{
+	return &connectproto.SDKResponse{
 		RequestId:  body.RequestId,
-		Status:     types.SdkResponseStatusDone,
+		Status:     connectproto.SDKResponseStatus_DONE,
 		Body:       serializedResp,
-		NoRetry:    noRetryVal,
+		NoRetry:    noRetry,
 		RetryAfter: retryAfterVal,
 	}, nil
 }

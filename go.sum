@@ -495,6 +495,8 @@ github.com/inngest/expr v0.0.0-20241023211115-139798ff6d8a h1:yF0w1XfiPGxxLx21ml
 github.com/inngest/expr v0.0.0-20241023211115-139798ff6d8a/go.mod h1:Dq8dNC1Q/cZBjl6ltxCoAeNn8fstrBJWWjeSisqTL94=
 github.com/inngest/inngestgo v0.7.5-0.20241104093834-2568c067e081 h1:Ud/JRHKprymu6+1yw7aQPi3L0LbzLR9/7+ZsjN6cbJE=
 github.com/inngest/inngestgo v0.7.5-0.20241104093834-2568c067e081/go.mod h1:J7jjlMtTSWFZQ4I18dLWq4oi+gexXVjPPpDkwRHdYJI=
+github.com/inngest/inngestgo v0.7.5-0.20241104135505-01ef42a20670 h1:DO7vGVnH+EwNyt0Q6vHFYNn9iOwB61BMRXrPV6U5VLs=
+github.com/inngest/inngestgo v0.7.5-0.20241104135505-01ef42a20670/go.mod h1:UHVkamp5T0y0BqxudUHaT8tVf13DaHEDUg9KMORK0+s=
 github.com/jackc/chunkreader v1.0.0/go.mod h1:RT6O25fNZIuasFJRyZ4R/Y2BbhasbmZXF9QQ7T3kePo=
 github.com/jackc/chunkreader/v2 v2.0.0/go.mod h1:odVSm741yZoC3dpHEUXIqA9tQRhFrgOHwnPIn9lDKlk=
 github.com/jackc/chunkreader/v2 v2.0.1/go.mod h1:odVSm741yZoC3dpHEUXIqA9tQRhFrgOHwnPIn9lDKlk=
