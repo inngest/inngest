@@ -9,11 +9,12 @@ import (
 	"fmt"
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
+	"github.com/inngest/inngest/pkg/connect/types"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/sdk"
-	"github.com/inngest/inngestgo/connect"
 	sdkerrors "github.com/inngest/inngestgo/errors"
+
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"github.com/oklog/ulid/v2"
 	"io"
@@ -54,7 +55,7 @@ func (h *connectHandler) connectToGateway(ctx context.Context) (*websocket.Conn,
 		// Establish WebSocket connection to one of the gateways
 		ws, _, err := websocket.Dial(ctx, gatewayHost, &websocket.DialOptions{
 			Subprotocols: []string{
-				connect.GatewaySubProtocol,
+				types.GatewaySubProtocol,
 			},
 		})
 		if err != nil {
@@ -120,7 +121,9 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("could not connect: %w", err)
 	}
-	defer ws.CloseNow()
+	defer func() {
+		_ = ws.CloseNow()
+	}()
 
 	h.connectionId = ulid.MustNew(ulid.Now(), rand.Reader)
 
@@ -130,13 +133,13 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 	{
 		initialMessageTimeout, cancelInitialTimeout := context.WithTimeout(ctx, 5*time.Second)
 		defer cancelInitialTimeout()
-		var helloMessage connect.GatewayMessage
+		var helloMessage types.GatewayMessage
 		err = wsjson.Read(initialMessageTimeout, ws, &helloMessage)
 		if err != nil {
 			return fmt.Errorf("did not receive gateway hello message: %w", err)
 		}
 
-		if helloMessage.Kind != connect.GatewayMessageTypeHello {
+		if helloMessage.Kind != types.GatewayMessageTypeHello {
 			return fmt.Errorf("expected gateway hello message, got %s", helloMessage.Kind)
 		}
 
@@ -150,13 +153,13 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 			return fmt.Errorf("could not hash signing key: %w", err)
 		}
 
-		data, err := json.Marshal(connect.GatewayMessageTypeSDKConnectData{
-			Authz: connect.AuthData{
+		data, err := json.Marshal(types.GatewayMessageTypeSDKConnectData{
+			Authz: types.AuthData{
 				HashedSigningKey: hashedKey,
 			},
 			AppName: h.h.appName,
 			Env:     h.h.Env,
-			Session: connect.SessionDetails{
+			Session: types.SessionDetails{
 				FunctionHash: functionHash,
 				BuildID:      h.h.BuildId,
 				InstanceId:   h.instanceId(),
@@ -170,8 +173,8 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 			return fmt.Errorf("could not serialize sdk connect message: %w", err)
 		}
 
-		err = wsjson.Write(ctx, ws, connect.GatewayMessage{
-			Kind: connect.GatewayMessageTypeSDKConnect,
+		err = wsjson.Write(ctx, ws, types.GatewayMessage{
+			Kind: types.GatewayMessageTypeSDKConnect,
 			Data: data,
 		})
 		if err != nil {
@@ -184,7 +187,7 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 			break
 		}
 
-		var msg connect.GatewayMessage
+		var msg types.GatewayMessage
 		err = wsjson.Read(ctx, ws, &msg)
 		if err != nil {
 			// TODO Handle issues reading message: Should we re-establish the connection?
@@ -194,8 +197,8 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 		h.h.Logger.Debug("received gateway request", "msg", msg)
 
 		switch msg.Kind {
-		case connect.GatewayMessageTypeSync:
-			var data connect.GatewayMessageTypeSyncData
+		case types.GatewayMessageTypeSync:
+			var data types.GatewayMessageTypeSyncData
 			if err := json.Unmarshal(msg.Data, &data); err != nil {
 				h.h.Logger.Error("error decoding sync message", "error", err)
 				return err
@@ -207,7 +210,7 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 				// TODO Should we drop the connection? Continue receiving messages?
 				return err
 			}
-		case connect.GatewayMessageTypeExecutorRequest:
+		case types.GatewayMessageTypeExecutorRequest:
 			resp, err := h.connectInvoke(ctx, msg)
 			if err != nil {
 				h.h.Logger.Error("failed to handle sdk request", "err", err)
@@ -222,8 +225,8 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 				continue
 			}
 
-			err = wsjson.Write(ctx, ws, connect.GatewayMessage{
-				Kind: connect.GatewayMessageTypeSDKReply,
+			err = wsjson.Write(ctx, ws, types.GatewayMessage{
+				Kind: types.GatewayMessageTypeSDKReply,
 				Data: data,
 			})
 			if err != nil {
@@ -237,14 +240,15 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 		}
 	}
 
-	ws.Close(websocket.StatusNormalClosure, "")
+	// TODO Perform graceful shutdown routine
+	_ = ws.Close(websocket.StatusNormalClosure, "")
 
 	return nil
 }
 
 // connectInvoke is the counterpart to invoke for connect
-func (h *connectHandler) connectInvoke(ctx context.Context, msg connect.GatewayMessage) (*connect.SdkResponse, error) {
-	body := &connect.GatewayMessageTypeExecutorRequestData{}
+func (h *connectHandler) connectInvoke(ctx context.Context, msg types.GatewayMessage) (*types.SdkResponse, error) {
+	body := &types.GatewayMessageTypeExecutorRequestData{}
 	if err := json.Unmarshal(msg.Data, body); err != nil {
 		h.h.Logger.Error("error decoding gateway request data", "error", err)
 		return nil, fmt.Errorf("invalid gateway message data: %w", err)
@@ -321,22 +325,23 @@ func (h *connectHandler) connectInvoke(ctx context.Context, msg connect.GatewayM
 	}
 
 	// These may be added even for 2xx codes with step errors.
+	noRetryVal := ""
 	if noRetry {
-		// TODO Do we need to supply this?
-		//w.Header().Add(HeaderKeyNoRetry, "true")
+		noRetryVal = "true"
 	}
+	retryAfterVal := ""
 	if retryAt != nil {
-		// TODO Do we need to supply this?
-		//w.Header().Add(HeaderKeyRetryAfter, retryAt.Format(time.RFC3339))
+		retryAfterVal = retryAt.Format(time.RFC3339)
 	}
 
 	if err != nil {
 		h.h.Logger.Error("error calling function", "error", err)
-		// TODO Make sure this is properly surfaced in the executor!
-		return &connect.SdkResponse{
-			RequestId: body.RequestId,
-			Status:    connect.SdkResponseStatusError,
-			Body:      []byte(fmt.Sprintf("error calling function: %s", err.Error())),
+		return &types.SdkResponse{
+			RequestId:  body.RequestId,
+			Status:     types.SdkResponseStatusError,
+			Body:       []byte(fmt.Sprintf("error calling function: %s", err.Error())),
+			NoRetry:    noRetryVal,
+			RetryAfter: retryAfterVal,
 		}, nil
 	}
 
@@ -349,10 +354,12 @@ func (h *connectHandler) connectInvoke(ctx context.Context, msg connect.GatewayM
 		// Return the function opcode returned here so that we can re-invoke this
 		// function and manage state appropriately.  Any opcode here takes precedence
 		// over function return values as the function has not yet finished.
-		return &connect.SdkResponse{
-			RequestId: body.RequestId,
-			Status:    connect.SdkResponseStatusNotCompleted,
-			Body:      serializedOps,
+		return &types.SdkResponse{
+			RequestId:  body.RequestId,
+			Status:     types.SdkResponseStatusNotCompleted,
+			Body:       serializedOps,
+			NoRetry:    noRetryVal,
+			RetryAfter: retryAfterVal,
 		}, nil
 	}
 
@@ -362,10 +369,12 @@ func (h *connectHandler) connectInvoke(ctx context.Context, msg connect.GatewayM
 	}
 
 	// Return the function response.
-	return &connect.SdkResponse{
-		RequestId: body.RequestId,
-		Status:    connect.SdkResponseStatusDone,
-		Body:      serializedResp,
+	return &types.SdkResponse{
+		RequestId:  body.RequestId,
+		Status:     types.SdkResponseStatusDone,
+		Body:       serializedResp,
+		NoRetry:    noRetryVal,
+		RetryAfter: retryAfterVal,
 	}, nil
 }
 
