@@ -98,7 +98,7 @@ export default function DeployApp() {
           <NewButton
             label="Next"
             onClick={() => {
-              updateLastCompletedStep(OnboardingSteps.DeployApp);
+              updateLastCompletedStep(OnboardingSteps.DeployApp, 'manual');
               router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.SyncApp }));
             }}
           />
@@ -135,7 +135,7 @@ export default function DeployApp() {
           <NewButton
             label="Next"
             onClick={() => {
-              updateLastCompletedStep(OnboardingSteps.DeployApp);
+              updateLastCompletedStep(OnboardingSteps.DeployApp, 'manual');
               router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.SyncApp }));
             }}
           />
@@ -166,7 +166,7 @@ export default function DeployApp() {
           <NewButton
             label="Next"
             onClick={() => {
-              updateLastCompletedStep(OnboardingSteps.DeployApp);
+              updateLastCompletedStep(OnboardingSteps.DeployApp, 'manual');
               router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.SyncApp }));
             }}
           />
@@ -242,7 +242,7 @@ export default function DeployApp() {
           <NewButton
             label="Next"
             onClick={() => {
-              updateLastCompletedStep(OnboardingSteps.DeployApp);
+              updateLastCompletedStep(OnboardingSteps.DeployApp, 'manual');
               router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.SyncApp }));
             }}
           />

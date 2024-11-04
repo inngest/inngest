@@ -33,7 +33,7 @@ export default function SyncApp() {
       const { success, error, appName } = await syncAppManually(inputValue);
       if (success) {
         setApp(appName);
-        updateLastCompletedStep(OnboardingSteps.SyncApp);
+        updateLastCompletedStep(OnboardingSteps.SyncApp, 'manual');
       } else {
         setError(error);
       }
@@ -161,8 +161,8 @@ export default function SyncApp() {
           <NewButton
             label="Next"
             onClick={() => {
-              updateLastCompletedStep(OnboardingSteps.DeployApp);
-              router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.SyncApp }));
+              updateLastCompletedStep(OnboardingSteps.SyncApp, 'manual');
+              router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.InvokeFn }));
             }}
           />
         </TabCards.Content>

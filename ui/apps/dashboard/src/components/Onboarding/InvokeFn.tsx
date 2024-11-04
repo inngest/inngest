@@ -76,7 +76,7 @@ export default function InvokeFn() {
         data: payload.data,
       });
       if (success) {
-        updateLastCompletedStep(OnboardingSteps.InvokeFn);
+        updateLastCompletedStep(OnboardingSteps.InvokeFn, 'manual');
         setError(undefined);
         setIsFnInvoked(true);
         // TO DO: add link to run ID, need to update mutation first to return ID
@@ -178,12 +178,11 @@ export default function InvokeFn() {
                 handleInvokeFn();
               }}
             />
-            {/* TODO: add tracking */}
             <NewButton
               appearance="outlined"
               label="Skip, take me to dashboard"
               onClick={() => {
-                updateLastCompletedStep(OnboardingSteps.InvokeFn);
+                updateLastCompletedStep(OnboardingSteps.InvokeFn, 'manual');
                 router.push(pathCreator.apps({ envSlug: 'production' }));
               }}
             />
