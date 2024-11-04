@@ -50,7 +50,7 @@ export default function InvokeFn() {
       try {
         setLoading(true);
         const fetchedFunctions = await prefetchFunctions();
-        setFunctions(fetchedFunctions);
+        setFunctions(fetchedFunctions || []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load functions');
       } finally {
