@@ -75,7 +75,6 @@ class Issues {
   }
 
   getBannerSeverity(): Severity {
-    return 'warning';
     if (this.maxIssueSeverity === IssueSeverity.nearingLimit) {
       return 'warning';
     }
