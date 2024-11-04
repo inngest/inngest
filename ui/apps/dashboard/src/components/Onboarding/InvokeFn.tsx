@@ -37,7 +37,7 @@ export default function InvokeFn() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const [functions, setFunctions] = useState<FunctionOption[]>([]);
-  const [selectedFunction, setSelectedFunction] = useState<FunctionOption | undefined>();
+  const [selectedFunction, setSelectedFunction] = useState<FunctionOption | null>(null);
   const [rawPayload, setRawPayload] = useState(initialCode);
   const [isFnInvoked, setIsFnInvoked] = useState(false);
   const router = useRouter();
@@ -112,6 +112,7 @@ export default function InvokeFn() {
       </p>
       <div className="border-subtle my-6 rounded-sm border px-6 py-4">
         <p className="text-muted mb-2 text-sm font-medium">Select function to test:</p>
+
         <Select
           onChange={(option) => setSelectedFunction(option as FunctionOption)}
           isLabelVisible={false}

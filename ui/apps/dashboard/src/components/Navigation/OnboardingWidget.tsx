@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { NewButton } from '@inngest/components/Button';
 import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import SegmentedProgressBar from '@inngest/components/ProgressBar/SegmentedProgressBar';
@@ -19,6 +20,7 @@ export default function OnboardingWidget({
   collapsed: boolean;
   closeWidget: () => void;
 }) {
+  const router = useRouter();
   const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
   const { isFinalStep, nextStep } = useOnboardingStep();
   const segmentsCompleted = STEPS_ORDER.indexOf(nextStep);
@@ -94,7 +96,7 @@ export default function OnboardingWidget({
                 appearance="outlined"
                 className="hover:bg-canvasBase w-full text-sm"
                 label={stepContent.cta}
-                href="/settings/billing"
+                onClick={() => router.push('/settings/billing')}
               />
             )}
           </div>
