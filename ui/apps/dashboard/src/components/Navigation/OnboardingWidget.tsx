@@ -12,6 +12,7 @@ import { pathCreator } from '@/utils/urls';
 import { onboardingWidgetContent } from '../Onboarding/content';
 import { STEPS_ORDER } from '../Onboarding/types';
 import useOnboardingStep from '../Onboarding/useOnboardingStep';
+import { useOnboardingTracking } from '../Onboarding/useOnboardingTracking';
 
 export default function OnboardingWidget({
   collapsed,
@@ -24,6 +25,7 @@ export default function OnboardingWidget({
   const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
   const { isFinalStep, nextStep } = useOnboardingStep();
   const segmentsCompleted = STEPS_ORDER.indexOf(nextStep);
+  const tracking = useOnboardingTracking();
 
   const stepContent = isFinalStep
     ? onboardingWidgetContent.step.success
@@ -74,6 +76,7 @@ export default function OnboardingWidget({
                       className="hover:bg-canvasBase"
                       onClick={(e) => {
                         e.preventDefault();
+                        tracking?.trackWidgetDismissed(segmentsCompleted);
                         closeWidget();
                       }}
                     />
