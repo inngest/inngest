@@ -53,6 +53,7 @@ export default function OnboardingWidget({
             envSlug: EnvironmentType.Production.toLowerCase(),
             step: nextStep,
           })}
+          onClick={() => tracking?.trackOnboardingOpened(segmentsCompleted, 'widget')}
           className="text-basis bg-canvasBase hover:bg-canvasSubtle border-subtle mb-5 block rounded border p-3 leading-tight"
         >
           <div className="flex h-[110px] flex-col justify-between">
