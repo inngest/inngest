@@ -5,8 +5,8 @@ import (
 	"errors"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
-	"github.com/inngest/inngest/pkg/connect/types"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
+	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"net/http"
 	"net/url"
 	"time"
@@ -52,12 +52,12 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 
 // ProxyRequest proxies the request to the SDK over a long-lived connection with the given input.
 func ProxyRequest(ctx context.Context, forwarder pubsub.RequestForwarder, appId uuid.UUID, r httpdriver.Request) (*state.DriverResponse, error) {
-	requestToForward := types.GatewayMessageTypeExecutorRequestData{
+	requestToForward := connect.GatewayExecutorRequestData{
 		// TODO Find out if we can supply this in a better way. We still use the URL concept a lot,
 		// even though this has no meaning in connect.
-		FunctionSlug: r.URL.Query().Get("fnId"),
-		RequestBytes: r.Input,
-		AppId:        appId,
+		FunctionSlug:   r.URL.Query().Get("fnId"),
+		RequestPayload: r.Input,
+		AppId:          appId.String(),
 	}
 	// If we have a generator step name, ensure we add the step ID parameter
 	if r.Edge.IncomingGeneratorStep != "" {
@@ -66,7 +66,7 @@ func ProxyRequest(ctx context.Context, forwarder pubsub.RequestForwarder, appId 
 		requestToForward.StepId = &r.Edge.Incoming
 	}
 
-	resp, err := do(ctx, forwarder, requestToForward)
+	resp, err := do(ctx, forwarder, appId, &requestToForward)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func ProxyRequest(ctx context.Context, forwarder pubsub.RequestForwarder, appId 
 	return httpdriver.HandleHttpResponse(ctx, r, resp)
 }
 
-func do(ctx context.Context, forwarder pubsub.RequestForwarder, data types.GatewayMessageTypeExecutorRequestData) (*httpdriver.Response, error) {
+func do(ctx context.Context, forwarder pubsub.RequestForwarder, appId uuid.UUID, data *connect.GatewayExecutorRequestData) (*httpdriver.Response, error) {
 	ctx, cancel := context.WithTimeout(ctx, consts.MaxFunctionTimeout)
 	defer cancel()
 
@@ -83,7 +83,7 @@ func do(ctx context.Context, forwarder pubsub.RequestForwarder, data types.Gatew
 	// itrace.UserTracer().Propagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
 
 	pre := time.Now()
-	resp, err := forwarder.Proxy(ctx, data)
+	resp, err := forwarder.Proxy(ctx, appId, data)
 	dur := time.Since(pre)
 
 	// TODO Check if we need some of the request error handling logic from httpdriver.do()
@@ -116,13 +116,18 @@ func do(ctx context.Context, forwarder pubsub.RequestForwarder, data types.Gatew
 	//	byt, _ = json.Marshal(sysErr.Code)
 	//}
 
+	noRetryStr := ""
+	if resp.NoRetry {
+		noRetryStr = "true"
+	}
+
 	// Check the retry status from the headers and versions.
-	noRetry := !httpdriver.ShouldRetry(int(resp.Status), resp.NoRetry, resp.SdkVersion)
+	noRetry := !httpdriver.ShouldRetry(int(resp.Status), noRetryStr, resp.SdkVersion)
 
 	// Extract the retry at header if it hasn't been set explicitly in streaming.
 	var retryAtStr *string
-	if after := resp.RetryAfter; retryAtStr == nil && after != "" {
-		retryAtStr = &after
+	if after := resp.RetryAfter; retryAtStr == nil && after != nil {
+		retryAtStr = after
 	}
 	var retryAt *time.Time
 	if retryAtStr != nil {

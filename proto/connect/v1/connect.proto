@@ -8,6 +8,7 @@ enum GatewayMessageType {
   SDK_CONNECT = 1;
   GATEWAY_REQUEST_SYNC = 2;
   GATEWAY_EXECUTOR_REQUEST = 3;
+  SDK_REPLY = 4;
 }
 
 message ConnectMessage {
@@ -49,4 +50,19 @@ message GatewayExecutorRequestData {
 	string function_slug = 3;
 	optional string step_id = 4;
 	bytes request_payload = 5;
+}
+
+enum SDKResponseStatus {
+	NOT_COMPLETED = 0;
+	DONE = 1;
+	ERROR = 2;
+}
+
+message SDKResponse {
+	string request_id = 1;
+	SDKResponseStatus status = 2;
+	bytes body = 3;
+	bool no_retry = 4;
+	optional string retry_after = 5;
+	string sdk_version = 6;
 }

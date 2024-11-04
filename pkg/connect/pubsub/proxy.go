@@ -3,30 +3,24 @@ package pubsub
 import (
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/connect/types"
+	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
+	"google.golang.org/protobuf/proto"
 	"sync"
 	"time"
 )
 
-type ProxyResponse struct {
-	Status string
-
-	SdkResponse *types.SdkResponse
-}
-
 type RequestForwarder interface {
-	Proxy(ctx context.Context, data types.GatewayMessageTypeExecutorRequestData) (*types.SdkResponse, error)
+	Proxy(ctx context.Context, appId uuid.UUID, data *connect.GatewayExecutorRequestData) (*connect.SDKResponse, error)
 }
 
 type RequestReceiver interface {
-	ReceiveExecutorMessages(ctx context.Context, appId uuid.UUID, onMessage func(data types.GatewayMessageTypeExecutorRequestData)) error
-	NotifyExecutor(ctx context.Context, appId uuid.UUID, resp ProxyResponse) error
+	ReceiveExecutorMessages(ctx context.Context, appId uuid.UUID, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error
+	NotifyExecutor(ctx context.Context, appId uuid.UUID, resp *connect.SDKResponse) error
 	AckMessage(ctx context.Context, appId uuid.UUID, requestId string) error
 
 	Wait(ctx context.Context) error
@@ -51,12 +45,12 @@ func NewRedisPubSubConnector(client rueidis.Client) *redisPubSubConnector {
 	}
 }
 
-func (i *redisPubSubConnector) Proxy(ctx context.Context, data types.GatewayMessageTypeExecutorRequestData) (*types.SdkResponse, error) {
+func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data *connect.GatewayExecutorRequestData) (*connect.SDKResponse, error) {
 	if data.RequestId == "" {
 		data.RequestId = ulid.MustNew(ulid.Now(), rand.Reader).String()
 	}
 
-	dataBytes, err := json.Marshal(data)
+	dataBytes, err := proto.Marshal(data)
 	if err != nil {
 		return nil, fmt.Errorf("could not marshal executor request: %w", err)
 	}
@@ -67,7 +61,7 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, data types.GatewayMess
 		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		go func() {
-			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(data.AppId, data.RequestId), func(msg string) {
+			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(appId, data.RequestId), func(msg string) {
 				acked = true
 			}, true)
 			ackErrChan <- err
@@ -75,11 +69,11 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, data types.GatewayMess
 	}
 
 	replyErrChan := make(chan error)
-	var reply ProxyResponse
+	var reply connect.SDKResponse
 	go func() {
 		// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
-		err = i.subscribe(ctx, i.channelAppRequestsReply(data.AppId, data.RequestId), func(msg string) {
-			err := json.Unmarshal([]byte(msg), &reply)
+		err = i.subscribe(ctx, i.channelAppRequestsReply(appId, data.RequestId), func(msg string) {
+			err := proto.Unmarshal([]byte(msg), &reply)
 			if err != nil {
 				// TODO This should never happen, push message into dead-letter channel and report
 				return
@@ -88,7 +82,7 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, data types.GatewayMess
 		replyErrChan <- err
 	}()
 
-	channelName := i.channelAppRequests(data.AppId)
+	channelName := i.channelAppRequests(appId)
 	fmt.Println("published to", channelName, data.RequestId)
 	err = i.client.Do(ctx, i.client.B().Publish().Channel(channelName).Message(string(dataBytes)).Build()).Error()
 	if err != nil {
@@ -116,7 +110,7 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, data types.GatewayMess
 		}
 	}
 
-	return reply.SdkResponse, nil
+	return &reply, nil
 }
 
 // channelAppRequests returns the channel name for executor requests for a specific app.
@@ -191,16 +185,18 @@ func (i *redisPubSubConnector) subscribe(ctx context.Context, channel string, on
 	return nil
 }
 
-func (i *redisPubSubConnector) ReceiveExecutorMessages(ctx context.Context, appId uuid.UUID, onMessage func(data types.GatewayMessageTypeExecutorRequestData)) error {
+func (i *redisPubSubConnector) ReceiveExecutorMessages(ctx context.Context, appId uuid.UUID, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error {
 	return i.subscribe(ctx, i.channelAppRequests(appId), func(msg string) {
-		var data types.GatewayMessageTypeExecutorRequestData
-		err := json.Unmarshal([]byte(msg), &data)
+		msgBytes := []byte(msg)
+
+		var data connect.GatewayExecutorRequestData
+		err := proto.Unmarshal(msgBytes, &data)
 		if err != nil {
 			// TODO This should never happen, but PubSub will not redeliver, should we push the message into a dead-letter channel?
 			return
 		}
 
-		onMessage(data)
+		onMessage(msgBytes, &data)
 	}, false)
 }
 
@@ -254,13 +250,13 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 	return nil
 }
 
-func (i *redisPubSubConnector) NotifyExecutor(ctx context.Context, appId uuid.UUID, resp ProxyResponse) error {
-	serialized, err := json.Marshal(resp)
+func (i *redisPubSubConnector) NotifyExecutor(ctx context.Context, appId uuid.UUID, resp *connect.SDKResponse) error {
+	serialized, err := proto.Marshal(resp)
 	if err != nil {
 		return fmt.Errorf("could not serialize response: %w", err)
 	}
 
-	channelName := i.channelAppRequestsReply(appId, resp.SdkResponse.RequestId)
+	channelName := i.channelAppRequestsReply(appId, resp.RequestId)
 
 	err = i.client.Do(
 		ctx,

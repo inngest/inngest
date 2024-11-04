@@ -3,18 +3,18 @@ package connect
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/coder/websocket"
-	"github.com/coder/websocket/wsjson"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/types"
+	"github.com/inngest/inngest/pkg/connect/wsproto"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
-	"log"
+	"github.com/inngest/inngest/proto/gen/connect/v1"
+	"google.golang.org/protobuf/proto"
 	"net/http"
 	"time"
 )
@@ -25,7 +25,7 @@ type AuthResponse struct {
 	AccountID uuid.UUID
 }
 
-type GatewayAuthHandler func(context.Context, types.GatewayMessageTypeSDKConnectData) (*AuthResponse, error)
+type GatewayAuthHandler func(context.Context, *connect.SDKConnectRequestData) (*AuthResponse, error)
 
 type connectGatewaySvc struct {
 	runCtx context.Context
@@ -84,8 +84,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		logger.StdlibLogger(ctx).Debug("WebSocket connection established, sending hello")
 
 		{
-			err = wsjson.Write(ctx, ws, types.GatewayMessage{
-				Kind: types.GatewayMessageTypeHello,
+			err = wsproto.Write(ctx, ws, &connect.ConnectMessage{
+				Kind: connect.GatewayMessageType_GATEWAY_HELLO,
 			})
 			if err != nil {
 				logger.StdlibLogger(ctx).Error("could not send hello", "err", err)
@@ -94,32 +94,32 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}
 
-		var initialMessageData types.GatewayMessageTypeSDKConnectData
+		var initialMessageData connect.SDKConnectRequestData
 		{
-			var initialMessage types.GatewayMessage
+			var initialMessage connect.ConnectMessage
 			shorterContext, cancelShorter := context.WithTimeout(ctx, 5*time.Second)
 			defer cancelShorter()
-			err = wsjson.Read(shorterContext, ws, &initialMessage)
+			err = wsproto.Read(shorterContext, ws, &initialMessage)
 			if err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
 					logger.StdlibLogger(ctx).Debug("Timeout waiting for SDK connect message")
-					ws.Close(websocket.StatusPolicyViolation, "Timeout waiting for SDK connect message")
+					_ = ws.Close(websocket.StatusPolicyViolation, "Timeout waiting for SDK connect message")
 				}
 
 				return
 			}
 
-			if initialMessage.Kind != types.GatewayMessageTypeSDKConnect {
+			if initialMessage.Kind != connect.GatewayMessageType_SDK_CONNECT {
 				logger.StdlibLogger(ctx).Debug("initial SDK message was not connect")
 
-				ws.Close(websocket.StatusPolicyViolation, "Invalid first message, expected sdk-connect")
+				_ = ws.Close(websocket.StatusPolicyViolation, "Invalid first message, expected sdk-connect")
 				return
 			}
 
-			if err := json.Unmarshal(initialMessage.Data, &initialMessageData); err != nil {
-				logger.StdlibLogger(ctx).Debug("initial SDK message contained invalid JSON")
+			if err := proto.Unmarshal(initialMessage.Payload, &initialMessageData); err != nil {
+				logger.StdlibLogger(ctx).Debug("initial SDK message contained invalid Protobuf")
 
-				ws.Close(websocket.StatusPolicyViolation, "Invalid JSON in SDK connect message")
+				_ = ws.Close(websocket.StatusPolicyViolation, "Invalid Protobuf in SDK connect message")
 				return
 			}
 		}
@@ -127,17 +127,17 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		var authResp *AuthResponse
 		{
 			// Run auth, add to distributed state
-			authResp, err = c.auther(ctx, initialMessageData)
+			authResp, err = c.auther(ctx, &initialMessageData)
 			if err != nil {
 				logger.StdlibLogger(ctx).Error("connect auth failed", "err", err)
-				ws.Close(websocket.StatusInternalError, "Internal error")
+				_ = ws.Close(websocket.StatusInternalError, "Internal error")
 				return
 			}
 
 			if authResp == nil {
 				logger.StdlibLogger(ctx).Debug("Auth failed")
 
-				ws.Close(websocket.StatusPolicyViolation, "Authentication failed")
+				_ = ws.Close(websocket.StatusPolicyViolation, "Authentication failed")
 				return
 			}
 		}
@@ -148,18 +148,19 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		isAlreadySynced := false
 		if !isAlreadySynced {
 			logger.StdlibLogger(ctx).Debug("Sending sync message to SDK")
-			data := map[string]any{
+			data := &connect.GatewaySyncRequestData{
 				// TODO Set this to prevent unattached syncs!
-				"deployId": nil,
+				DeployId: nil,
 			}
-			marshaled, err := json.Marshal(data)
+			marshaled, err := proto.Marshal(data)
+
 			if err != nil {
 				// TODO Handle this properly
 				return
 			}
-			err = wsjson.Write(ctx, ws, types.GatewayMessage{
-				Kind: types.GatewayMessageTypeSync,
-				Data: marshaled,
+			err = wsproto.Write(ctx, ws, &connect.ConnectMessage{
+				Kind:    connect.GatewayMessageType_GATEWAY_REQUEST_SYNC,
+				Payload: marshaled,
 			})
 			if err != nil {
 				return
@@ -206,7 +207,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			// - There are multiple gateway instances
 			// - There are possibly multiple SDK deployments, each with their own WebSocket connection
 			// -> We need to prevent sending the same request multiple times, to different connections
-			err := c.receiver.ReceiveExecutorMessages(ctx, appId, func(data types.GatewayMessageTypeExecutorRequestData) {
+			err := c.receiver.ReceiveExecutorMessages(ctx, appId, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
 				fmt.Println("received msg", appId, data.RequestId)
 				// This will be sent at least once (if there are more than one connection, every connection receives the message)
 				err = c.receiver.AckMessage(ctx, appId, data.RequestId)
@@ -231,15 +232,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 				// Now we're guaranteed to be the exclusive connection processing this message!
 
-				marshaled, err := json.Marshal(data)
-				if err != nil {
-					return
-				}
-
 				// Forward message to SDK!
-				err = wsjson.Write(ctx, ws, types.GatewayMessage{
-					Kind: types.GatewayMessageTypeExecutorRequest,
-					Data: marshaled,
+				err = wsproto.Write(ctx, ws, &connect.ConnectMessage{
+					Kind:    connect.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST,
+					Payload: rawBytes,
 				})
 				if err != nil {
 					// TODO The connection cannot be used, we need to let the executor know!
@@ -259,18 +255,16 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					break
 				}
 
-				var msg types.GatewayMessage
-				err = wsjson.Read(ctx, ws, &msg)
+				var msg connect.ConnectMessage
+				err = wsproto.Read(ctx, ws, &msg)
 				if err != nil {
 					return
 				}
 
-				log.Printf("received: %v", msg)
-
 				switch msg.Kind {
-				case types.GatewayMessageTypeSDKReply:
+				case connect.GatewayMessageType_SDK_REPLY:
 					// Handle SDK reply
-					err := c.handleSdkReply(ctx, appId, msg)
+					err := c.handleSdkReply(ctx, appId, &msg)
 					if err != nil {
 						// TODO Handle error
 						continue
@@ -289,17 +283,15 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 	})
 }
 
-func (c *connectGatewaySvc) handleSdkReply(ctx context.Context, appId uuid.UUID, msg types.GatewayMessage) error {
-	var data types.SdkResponse
-	if err := json.Unmarshal(msg.Data, &data); err != nil {
+func (c *connectGatewaySvc) handleSdkReply(ctx context.Context, appId uuid.UUID, msg *connect.ConnectMessage) error {
+	var data connect.SDKResponse
+	if err := proto.Unmarshal(msg.Payload, &data); err != nil {
 		return fmt.Errorf("invalid response type: %w", err)
 	}
 
 	fmt.Println("notifying executor about response", appId, data.RequestId)
 
-	err := c.receiver.NotifyExecutor(ctx, appId, pubsub.ProxyResponse{
-		SdkResponse: &data,
-	})
+	err := c.receiver.NotifyExecutor(ctx, appId, &data)
 	if err != nil {
 		return fmt.Errorf("could not notify executor: %w", err)
 	}

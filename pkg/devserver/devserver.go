@@ -7,8 +7,8 @@ import (
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/connect"
 	pubsub2 "github.com/inngest/inngest/pkg/connect/pubsub"
-	"github.com/inngest/inngest/pkg/connect/types"
 	"github.com/inngest/inngest/pkg/enums"
+	connectproto "github.com/inngest/inngest/proto/gen/connect/v1"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
@@ -417,7 +417,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	connectSvc, connectHandler := connect.NewConnectGatewayService(
 		connect.WithConnectionStateManager(connectionManager),
 		connect.WithRequestReceiver(gatewayProxy),
-		connect.WithGatewayAuthHandler(func(ctx context.Context, data types.GatewayMessageTypeSDKConnectData) (*connect.AuthResponse, error) {
+		connect.WithGatewayAuthHandler(func(ctx context.Context, data *connectproto.SDKConnectRequestData) (*connect.AuthResponse, error) {
 			return &connect.AuthResponse{
 				AccountID: consts.DevServerAccountId,
 			}, nil
