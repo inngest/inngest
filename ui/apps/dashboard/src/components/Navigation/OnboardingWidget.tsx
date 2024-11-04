@@ -72,7 +72,10 @@ export default function OnboardingWidget({
                       appearance="ghost"
                       size="small"
                       className="hover:bg-canvasBase"
-                      onClick={() => closeWidget()}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        closeWidget();
+                      }}
                     />
                   </TooltipTrigger>
                   <TooltipContent side="right" className="dark max-w-40">
@@ -96,7 +99,10 @@ export default function OnboardingWidget({
                 appearance="outlined"
                 className="hover:bg-canvasBase w-full text-sm"
                 label={stepContent.cta}
-                onClick={() => router.push('/settings/billing')}
+                onClick={(e) => {
+                  e.preventDefault();
+                  router.push('/settings/billing');
+                }}
               />
             )}
           </div>
