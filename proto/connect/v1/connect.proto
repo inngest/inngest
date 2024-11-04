@@ -1,0 +1,52 @@
+syntax = "proto3";
+package connect.v1;
+
+option go_package = "github.com/inngest/inngest/proto/gen/connect/v1;connect";
+
+enum GatewayMessageType {
+  GATEWAY_HELLO = 0;
+  SDK_CONNECT = 1;
+  GATEWAY_REQUEST_SYNC = 2;
+  GATEWAY_EXECUTOR_REQUEST = 3;
+}
+
+message ConnectMessage {
+	GatewayMessageType kind = 1;
+	bytes payload = 2;
+}
+
+message SessionDetails {
+	string instance_id = 1;
+	string connection_id = 2;
+	bytes function_hash = 3;
+	optional string build_id = 4;
+}
+
+message AuthData {
+	bytes hashed_signing_key = 1;
+}
+
+message SDKConnectRequestData {
+	SessionDetails session_details = 1;
+	AuthData auth_data = 2;
+
+	string app_name = 3;
+	optional string environment = 4;
+	optional string framework = 5;
+	optional string platform = 6;
+	optional string sdk_version = 7;
+	optional string sdk_language = 8;
+	optional string sdk_author = 9;
+}
+
+message GatewaySyncRequestData {
+	optional string deploy_id = 1;
+}
+
+message GatewayExecutorRequestData {
+	string request_id = 1;
+	string app_id = 2;
+	string function_slug = 3;
+	optional string step_id = 4;
+	bytes request_payload = 5;
+}
