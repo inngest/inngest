@@ -70,11 +70,24 @@ export function useOnboardingTracking() {
     });
   };
 
+  const trackInvokeFnAction = (type: string, selectedFunctionID?: string) => {
+    trackEvent({
+      name: 'onboarding/invoke-fn.action',
+      data: {
+        type: type,
+        selectedFunctionID: selectedFunctionID,
+      },
+      user: trackingUser,
+      v: '2024-11-04.1',
+    });
+  };
+
   return {
     trackOnboardingStepCompleted,
     trackWidgetDismissed,
     trackOnboardingOpened,
     trackCreateAppAction,
     trackDeployAppAction,
+    trackInvokeFnAction,
   };
 }

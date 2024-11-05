@@ -12,6 +12,7 @@ import { pathCreator } from '@/utils/urls';
 import { OnboardingSteps } from '../Onboarding/types';
 import { invokeFunction, prefetchFunctions } from './actions';
 import useOnboardingStep from './useOnboardingStep';
+import { useOnboardingTracking } from './useOnboardingTracking';
 
 const initialCode = JSON.stringify(
   {
@@ -41,6 +42,7 @@ export default function InvokeFn() {
   const [rawPayload, setRawPayload] = useState(initialCode);
   const [isFnInvoked, setIsFnInvoked] = useState(false);
   const router = useRouter();
+  const tracking = useOnboardingTracking();
 
   const hasEventTrigger =
     selectedFunction?.current.triggers.some((trigger) => trigger.eventName) ?? false;
@@ -178,6 +180,7 @@ export default function InvokeFn() {
               label="Invoke test function"
               disabled={!selectedFunction}
               onClick={() => {
+                tracking?.trackInvokeFnAction('invoke', selectedFunction?.id);
                 handleInvokeFn();
               }}
             />
@@ -186,6 +189,7 @@ export default function InvokeFn() {
               label="Skip, take me to dashboard"
               onClick={() => {
                 updateLastCompletedStep(OnboardingSteps.InvokeFn, 'manual');
+                tracking?.trackInvokeFnAction('skip', selectedFunction?.id);
                 router.push(pathCreator.apps({ envSlug: 'production' }));
               }}
             />
@@ -195,6 +199,7 @@ export default function InvokeFn() {
             className="mt-6"
             label="Go to runs"
             onClick={() => {
+              tracking?.trackInvokeFnAction('go-to-runs', selectedFunction?.id);
               router.push(pathCreator.runs({ envSlug: 'production' }));
             }}
           />
