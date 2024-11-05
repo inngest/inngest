@@ -58,10 +58,23 @@ export function useOnboardingTracking() {
     });
   };
 
+  const trackDeployAppAction = (type: string, hostingProvider: string) => {
+    trackEvent({
+      name: 'onboarding/deploy-app.action',
+      data: {
+        type: type,
+        hostingProvider: hostingProvider,
+      },
+      user: trackingUser,
+      v: '2024-11-04.1',
+    });
+  };
+
   return {
     trackOnboardingStepCompleted,
     trackWidgetDismissed,
     trackOnboardingOpened,
     trackCreateAppAction,
+    trackDeployAppAction,
   };
 }

@@ -15,6 +15,7 @@ import { useEnvironment } from '../Environments/environment-context';
 import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { OnboardingSteps } from '../Onboarding/types';
 import useOnboardingStep from './useOnboardingStep';
+import { useOnboardingTracking } from './useOnboardingTracking';
 
 export default function DeployApp() {
   const { updateLastCompletedStep } = useOnboardingStep();
@@ -23,6 +24,7 @@ export default function DeployApp() {
   const res = useDefaultEventKey({ envID: env.id });
   const defaultEventKey = res.data?.defaultKey.presharedKey || 'Unknown key';
   const { value: vercelFlowEnabled } = useBooleanFlag('onboarding-vercel-flow');
+  const tracking = useOnboardingTracking();
 
   return (
     <div className="text-subtle">
@@ -103,6 +105,7 @@ export default function DeployApp() {
             label="Next"
             onClick={() => {
               updateLastCompletedStep(OnboardingSteps.DeployApp, 'manual');
+              tracking?.trackDeployAppAction('next', 'all');
               router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.SyncApp }));
             }}
           />
@@ -142,6 +145,7 @@ export default function DeployApp() {
               label="Next"
               onClick={() => {
                 updateLastCompletedStep(OnboardingSteps.DeployApp, 'manual');
+                tracking?.trackDeployAppAction('next', 'vercel');
                 router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.SyncApp }));
               }}
             />
@@ -174,6 +178,7 @@ export default function DeployApp() {
             label="Next"
             onClick={() => {
               updateLastCompletedStep(OnboardingSteps.DeployApp, 'manual');
+              tracking?.trackDeployAppAction('next', 'cloudflare');
               router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.SyncApp }));
             }}
           />
@@ -250,6 +255,7 @@ export default function DeployApp() {
             label="Next"
             onClick={() => {
               updateLastCompletedStep(OnboardingSteps.DeployApp, 'manual');
+              tracking?.trackDeployAppAction('next', 'flyio');
               router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.SyncApp }));
             }}
           />
