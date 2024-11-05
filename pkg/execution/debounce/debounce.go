@@ -173,6 +173,7 @@ func (d debouncer) GetDebounceItem(ctx context.Context, debounceID ulid.ULID) (*
 	return di, nil
 }
 
+// StartExecution swaps out the underlying pointer of the debounce
 func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn inngest.Function) error {
 	dkey, err := d.debounceKey(ctx, di, fn)
 	if err != nil {
@@ -181,9 +182,7 @@ func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn innge
 
 	newDebounceID := ulid.MustNew(ulid.Now(), rand.Reader)
 
-	keys := []string{
-		d.d.KeyGenerator().DebouncePointer(ctx, fn.ID, dkey),
-	}
+	keys := []string{d.d.KeyGenerator().DebouncePointer(ctx, fn.ID, dkey)}
 	args := []string{newDebounceID.String()}
 
 	res, err := scripts["start"].Exec(
