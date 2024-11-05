@@ -16,7 +16,7 @@ export const neonConnectContent: ConnectPostgresIntegrationContent = {
   step: {
     authorize: {
       title: 'Authorize',
-      description: 'Add your postgres credentials so Inngest can access your database.',
+      description: 'Add your postgres credentials so Inngest can prepare your database.',
     },
     'format-wal': {
       title: 'Format WAL',
@@ -24,7 +24,7 @@ export const neonConnectContent: ConnectPostgresIntegrationContent = {
     },
     'connect-db': {
       title: 'Connect Neon to Inngest',
-      description: 'Add your postgres credentials so Inngest can access your database.',
+      description: 'Create the connection from Inngest to Neon',
     },
   },
 };
