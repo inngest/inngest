@@ -56,12 +56,8 @@ end
 -- Check that the queue item is not leased (ie. this debounce is not in progress)
 local item = get_queue_item(keyQueueHash, queueJobID)
 if item == nil then
-	-- The queue item was not found.  Create a new debounce.
-
-  redis.call("SETEX", keyPtr, ttl, debounceID)
-  redis.call("HSET", keyDbc, debounceID, debounce)
-
-  return ttl
+	-- The queue item was not found. return not found
+  return -3
 end
 
 if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > currentTime then

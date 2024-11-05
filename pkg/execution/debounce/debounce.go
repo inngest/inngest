@@ -184,17 +184,22 @@ func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn innge
 	keys := []string{d.d.KeyGenerator().DebouncePointer(ctx, fn.ID, dkey)}
 	args := []string{newDebounceID.String()}
 
-	err = scripts["start"].Exec(
+	res, err := scripts["start"].Exec(
 		ctx,
 		d.d.Client(),
 		keys,
 		args,
-	).Error()
+	).AsInt64()
 	if err != nil {
 		return err
 	}
 
-	return nil
+	switch res {
+	case 0:
+		return nil
+	default:
+		return fmt.Errorf("invalid status returned when starting debounce: %d", res)
+	}
 }
 
 // Debounce debounces a given function with the given DebounceItem.
@@ -368,7 +373,10 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 		// Do nothing.
 		return nil
 	case -3:
-		return ErrDebounceNotFound
+		// The item is not found with the debounceID
+		// enqueue a new item
+		qi := d.queueItem(ctx, di, debounceID)
+		return d.q.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second), queue.EnqueueOpts{})
 	default:
 		// Debounces should have a maximum timeout;  updating the debounce returns
 		// the timeout to use.

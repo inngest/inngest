@@ -4,10 +4,10 @@
 --  one on new events
 -- ]]
 
-local debouncePointerKey = KEYS[2]
+local debouncePointerKey = KEYS[1]
 
 local newDebounceID = ARGV[1]
 
 redis.call("SET", debouncePointerKey, newDebounceID)
 
-return "0"
+return 0
