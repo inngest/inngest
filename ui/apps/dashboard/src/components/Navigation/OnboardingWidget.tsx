@@ -23,8 +23,7 @@ export default function OnboardingWidget({
 }) {
   const router = useRouter();
   const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
-  const { isFinalStep, nextStep } = useOnboardingStep();
-  const segmentsCompleted = STEPS_ORDER.indexOf(nextStep);
+  const { isFinalStep, nextStep, totalStepsCompleted } = useOnboardingStep();
   const tracking = useOnboardingTracking();
 
   const stepContent = isFinalStep
@@ -53,7 +52,7 @@ export default function OnboardingWidget({
             envSlug: EnvironmentType.Production.toLowerCase(),
             step: nextStep,
           })}
-          onClick={() => tracking?.trackOnboardingOpened(segmentsCompleted, 'widget')}
+          onClick={() => tracking?.trackOnboardingOpened(totalStepsCompleted, 'widget')}
           className="text-basis bg-canvasBase hover:bg-canvasSubtle border-subtle mb-5 block rounded border p-3 leading-tight"
         >
           <div className="flex h-[110px] flex-col justify-between">
@@ -77,7 +76,7 @@ export default function OnboardingWidget({
                       className="hover:bg-canvasBase"
                       onClick={(e) => {
                         e.preventDefault();
-                        tracking?.trackWidgetDismissed(segmentsCompleted);
+                        tracking?.trackWidgetDismissed(totalStepsCompleted);
                         closeWidget();
                       }}
                     />
@@ -91,7 +90,7 @@ export default function OnboardingWidget({
             </div>
             {!isFinalStep && (
               <SegmentedProgressBar
-                segmentsCompleted={segmentsCompleted}
+                segmentsCompleted={totalStepsCompleted}
                 segments={STEPS_ORDER.length}
               />
             )}

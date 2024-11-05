@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { STEPS_ORDER, type OnboardingSteps } from './types';
+import { STEPS_ORDER, type OnboardingSteps, type TotalStepsCompleted } from './types';
 import { useOnboardingTracking } from './useOnboardingTracking';
 
 export default function useOnboardingStep() {
@@ -51,6 +51,10 @@ export default function useOnboardingStep() {
       : STEPS_ORDER[STEPS_ORDER.indexOf(lastCompletedStep) + 1]
   ) as OnboardingSteps;
 
+  const totalStepsCompleted: TotalStepsCompleted = isFinalStep
+    ? STEPS_ORDER.length
+    : STEPS_ORDER.indexOf(nextStep);
+
   const updateLastCompletedStep = (
     step: OnboardingSteps,
     completionSource: string = 'automatic'
@@ -70,5 +74,5 @@ export default function useOnboardingStep() {
     }
   };
 
-  return { lastCompletedStep, updateLastCompletedStep, isFinalStep, nextStep };
+  return { lastCompletedStep, updateLastCompletedStep, isFinalStep, nextStep, totalStepsCompleted };
 }

@@ -14,15 +14,12 @@ export const STEPS_ORDER: OnboardingSteps[] = [
   OnboardingSteps.InvokeFn,
 ];
 
-type ArrayLengthRange<
-  T extends readonly any[],
-  R extends number[] = [],
-  Start extends number = 1
-> = R['length'] extends T['length']
-  ? Start | R[number] | T['length']
-  : ArrayLengthRange<T, [0, ...R], Start>;
+type ArrayLengthRange<T extends readonly any[]> = Extract<
+  keyof { [K in 0 | T['length']]: K },
+  number
+>;
 
-// Type representing the possible number of completed steps (1 to 4)
+// Type representing the possible number of completed steps (0 to 4)
 export type TotalStepsCompleted = ArrayLengthRange<typeof STEPS_ORDER>;
 
 export function isValidStep(step: string): step is OnboardingSteps {

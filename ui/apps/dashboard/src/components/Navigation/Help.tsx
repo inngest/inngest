@@ -17,17 +17,15 @@ import { useSystemStatus } from '@/app/(organization-active)/support/statusPage'
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { EnvironmentType } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
-import { STEPS_ORDER } from '../Onboarding/types';
 import useOnboardingStep from '../Onboarding/useOnboardingStep';
 import { useOnboardingTracking } from '../Onboarding/useOnboardingTracking';
 import SystemStatusIcon from './SystemStatusIcon';
 
 export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget: () => void }) => {
   const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
-  const { nextStep } = useOnboardingStep();
+  const { nextStep, totalStepsCompleted } = useOnboardingStep();
   const status = useSystemStatus();
   const tracking = useOnboardingTracking();
-  const segmentsCompleted = STEPS_ORDER.indexOf(nextStep);
 
   return (
     <Listbox>
@@ -117,7 +115,7 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
                 })}
                 onClick={() => {
                   showWidget();
-                  tracking?.trackOnboardingOpened(segmentsCompleted, 'widget');
+                  tracking?.trackOnboardingOpened(totalStepsCompleted, 'widget');
                 }}
               >
                 <Listbox.Option
