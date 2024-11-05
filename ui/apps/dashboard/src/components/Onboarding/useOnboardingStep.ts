@@ -12,34 +12,32 @@ export default function useOnboardingStep() {
   const tracking = useOnboardingTracking();
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('onboardingLastStepCompleted');
-      if (stored) {
-        setLastCompletedStep(JSON.parse(stored));
-      }
-
-      const handleStorageChange = (event: StorageEvent) => {
-        if (event.key === 'onboardingLastStepCompleted') {
-          const newValue = event.newValue ? JSON.parse(event.newValue) : undefined;
-          setLastCompletedStep(newValue);
-        }
-      };
-
-      // Listen for storage events from other components
-      window.addEventListener('storage', handleStorageChange);
-
-      // Custom event for same-window updates
-      const handleCustomEvent = (event: CustomEvent) => {
-        setLastCompletedStep(event.detail);
-      };
-
-      window.addEventListener('onboardingStepUpdate', handleCustomEvent as EventListener);
-
-      return () => {
-        window.removeEventListener('storage', handleStorageChange);
-        window.removeEventListener('onboardingStepUpdate', handleCustomEvent as EventListener);
-      };
+    const stored = localStorage.getItem('onboardingLastStepCompleted');
+    if (stored) {
+      setLastCompletedStep(JSON.parse(stored));
     }
+
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === 'onboardingLastStepCompleted') {
+        const newValue = event.newValue ? JSON.parse(event.newValue) : undefined;
+        setLastCompletedStep(newValue);
+      }
+    };
+
+    // Listen for storage events from other components
+    window.addEventListener('storage', handleStorageChange);
+
+    // Custom event for same-window updates
+    const handleCustomEvent = (event: CustomEvent) => {
+      setLastCompletedStep(event.detail);
+    };
+
+    window.addEventListener('onboardingStepUpdate', handleCustomEvent as EventListener);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('onboardingStepUpdate', handleCustomEvent as EventListener);
+    };
   }, []);
 
   const isFinalStep = lastCompletedStep === STEPS_ORDER[STEPS_ORDER.length - 1];

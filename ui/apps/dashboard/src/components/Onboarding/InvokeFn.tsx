@@ -53,6 +53,7 @@ export default function InvokeFn() {
         setFunctions(fetchedFunctions);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load functions');
+        console.error('Failed to load functions: ', err);
       } finally {
         setLoading(false);
       }
@@ -84,9 +85,11 @@ export default function InvokeFn() {
       } else {
         setIsFnInvoked(false);
         setError(error);
+        console.error('Failed to invoke: ', error);
       }
     } catch (err) {
       setError('An error occurred');
+      console.error('Failed to invoke: ', err);
     }
   };
 
