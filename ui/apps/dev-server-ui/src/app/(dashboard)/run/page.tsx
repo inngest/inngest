@@ -1,6 +1,6 @@
 'use client';
 
-import { RunDetails } from '@inngest/components/RunDetailsV2/RunDetails';
+import { RunDetailsV2 } from '@inngest/components/RunDetailsV2/RunDetailsV2';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import { cn } from '@inngest/components/utils/classNames';
 
@@ -25,7 +25,7 @@ export default function Page() {
 
   return (
     <div className={cn('bg-canvasBase overflow-y-auto pt-8')}>
-      <RunDetails
+      <RunDetailsV2
         pathCreator={pathCreator}
         standalone
         cancelRun={cancelRun}
@@ -35,6 +35,7 @@ export default function Page() {
         pollInterval={2500}
         rerun={rerun}
         runID={runID}
+        stepAIEnabled={featureFlags.includes('step.ai')}
       />
     </div>
   );

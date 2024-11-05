@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { StatusCell } from '../Table';
 import { Trace } from '../TimelineV2';
-import { Timeline } from '../TimelineV2/Timeline';
+import { TimelineV2 } from '../TimelineV2/Timeline';
 import { TriggerDetails } from '../TriggerDetails';
 import type { Result } from '../types/functionRun';
 import { nullishToLazy } from '../utils/lazyLoad';
@@ -25,6 +25,7 @@ type Props = {
   pollInterval?: number;
   rerun: React.ComponentProps<typeof RunInfo>['rerun'];
   runID: string;
+  stepAIEnabled?: boolean;
 };
 
 type Run = {
@@ -41,7 +42,7 @@ type Run = {
   trace: React.ComponentProps<typeof Trace>['trace'];
 };
 
-export function RunDetails(props: Props) {
+export function RunDetailsV2(props: Props) {
   const { getResult, getRun, getTrigger, pathCreator, rerun, runID, standalone } = props;
   const [pollInterval, setPollInterval] = useState(props.pollInterval);
 
@@ -123,7 +124,14 @@ export function RunDetails(props: Props) {
             )}
           </div>
 
-          {run && <Timeline getResult={getResult} pathCreator={pathCreator} trace={run.trace} />}
+          {run && (
+            <TimelineV2
+              getResult={getResult}
+              pathCreator={pathCreator}
+              trace={run.trace}
+              stepAIEnabled={props.stepAIEnabled}
+            />
+          )}
         </div>
 
         <TriggerDetails getTrigger={getTrigger} runID={runID} />

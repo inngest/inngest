@@ -1,5 +1,6 @@
 import type { Route } from 'next';
 
+import type { ExperimentalAI } from '../AI/utils';
 import { Card } from '../Card';
 import {
   CodeElement,
@@ -13,6 +14,7 @@ import { Time } from '../Time';
 import type { Result } from '../types/functionRun';
 import { cn } from '../utils/classNames';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
+import { StepAITrace } from './StepAITrace';
 import { isStepInfoInvoke, isStepInfoSleep, isStepInfoWait, type Trace } from './types';
 
 type Props = {
@@ -22,9 +24,10 @@ type Props = {
   };
   trace: Trace;
   result?: Result;
+  aiOutput?: ExperimentalAI;
 };
 
-export function TraceInfo({ className, pathCreator, trace, result }: Props) {
+export function TraceInfo({ className, pathCreator, trace, result, aiOutput }: Props) {
   const delayText = formatMilliseconds(
     (toMaybeDate(trace.startedAt) ?? new Date()).getTime() - new Date(trace.queuedAt).getTime()
   );
@@ -143,6 +146,8 @@ export function TraceInfo({ className, pathCreator, trace, result }: Props) {
             </ElementWrapper>
 
             {stepKindInfo}
+
+            {aiOutput && <StepAITrace aiOutput={aiOutput} />}
           </dl>
         </Card.Content>
         {result && <RunResult className="border-subtle border-t" result={result} />}

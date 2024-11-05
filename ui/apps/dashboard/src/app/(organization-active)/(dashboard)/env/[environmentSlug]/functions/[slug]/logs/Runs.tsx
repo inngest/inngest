@@ -51,7 +51,7 @@ const GetFunctionRunsCountDocument = graphql(`
   }
 `);
 
-export default function RunsPage({ params }: RunsPageProps) {
+export default function DashboardRuns({ params }: RunsPageProps) {
   const functionSlug = decodeURIComponent(params.slug);
   const [selectedStatuses, setSelectedStatuses] = useState<FunctionRunStatus[]>([]);
   const [selectedTimeField, setSelectedTimeField] =

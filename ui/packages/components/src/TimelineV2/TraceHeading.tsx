@@ -1,7 +1,9 @@
 import { RiArrowRightSLine } from '@remixicon/react';
 
+import type { ExperimentalAI } from '../AI/utils';
 import { Badge } from '../Badge';
 import { Button } from '../Button';
+import { Pill } from '../Pill';
 import { Time } from '../Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
 import { isFunctionRunStatus } from '../types/functionRun';
@@ -21,9 +23,16 @@ type Props = {
     status: string;
     stepOp?: string | null;
   };
+  aiOutput?: ExperimentalAI;
 };
 
-export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, trace }: Props) {
+export function TraceHeading({
+  isExpanded,
+  isExpandable,
+  onClickExpandToggle,
+  trace,
+  aiOutput,
+}: Props) {
   const isAttempt = trace.stepOp === 'RUN' && (trace.childrenSpans?.length ?? 0) === 0;
   let opCodeBadge;
   if (trace.stepOp && !isAttempt) {
@@ -31,7 +40,7 @@ export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, tr
     const isRetried = (trace.attempts ?? 0) > 1;
 
     opCodeBadge = (
-      <span className="ml-2 flex h-fit">
+      <span className="flex h-fit">
         <Tooltip>
           <TooltipTrigger>
             <Badge
@@ -80,8 +89,9 @@ export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, tr
       )}
 
       <div className="grow">
-        <div className="flex">
+        <div className="flex gap-2">
           <span className="mt-1 h-fit self-start text-sm">{trace.name}</span>
+          <div>{aiOutput && <Pill kind="info">AI</Pill>}</div>
           <div className="h-8">{opCodeBadge}</div>
         </div>
         <TimeWithText trace={trace} />

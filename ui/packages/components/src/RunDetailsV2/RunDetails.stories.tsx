@@ -1,20 +1,20 @@
 import type { Meta, StoryObj } from '@storybook/react';
 
-import { RunDetails } from './RunDetails';
+import { RunDetailsV2 } from './RunDetailsV2';
 
 const meta = {
   title: 'Components/RunDetailsV2',
-  component: RunDetails,
+  component: RunDetailsV2,
   parameters: {
     themes: {
       themeOverride: 'light',
     },
   },
-} satisfies Meta<typeof RunDetails>;
+} satisfies Meta<typeof RunDetailsV2>;
 
 export default meta;
 
-type Story = StoryObj<typeof RunDetails>;
+type Story = StoryObj<typeof RunDetailsV2>;
 
 const app = {
   name: 'My app',

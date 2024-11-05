@@ -50,6 +50,7 @@ export type Account = {
   __typename?: 'Account';
   billingEmail: Scalars['String'];
   createdAt: Scalars['Time'];
+  entitlementUsage: EntitlementUsage;
   id: Scalars['ID'];
   name: Maybe<Scalars['NullString']>;
   paymentIntents: Array<PaymentIntent>;
@@ -366,6 +367,17 @@ export type EditWorkflowInput = {
   promote?: InputMaybe<Scalars['Time']>;
   version: Scalars['Int'];
   workflowID: Scalars['ID'];
+};
+
+export type EntitlementUsage = {
+  __typename?: 'EntitlementUsage';
+  runCount: EntitlementUsageRunCount;
+};
+
+export type EntitlementUsageRunCount = {
+  __typename?: 'EntitlementUsageRunCount';
+  current: Scalars['Int'];
+  limit: Maybe<Scalars['Int']>;
 };
 
 export type EnvEdge = {
@@ -725,6 +737,7 @@ export type Mutation = {
   resyncApp: SyncResponse;
   retryWorkflowRun: Maybe<StartWorkflowResponse>;
   rotateSigningKey: SigningKey;
+  setAccountEntitlement: Scalars['UUID'];
   setUpAccount: Maybe<SetUpAccountPayload>;
   syncNewApp: SyncResponse;
   unarchiveApp: App;
@@ -900,6 +913,12 @@ export type MutationRetryWorkflowRunArgs = {
 
 export type MutationRotateSigningKeyArgs = {
   envID: Scalars['UUID'];
+};
+
+
+export type MutationSetAccountEntitlementArgs = {
+  entitlementName: Scalars['String'];
+  value: Scalars['Int'];
 };
 
 
