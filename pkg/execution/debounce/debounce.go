@@ -125,6 +125,7 @@ type Debouncer interface {
 	Debounce(ctx context.Context, d DebounceItem, fn inngest.Function) error
 	GetDebounceItem(ctx context.Context, debounceID ulid.ULID) (*DebounceItem, error)
 	DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID) error
+	StartExecution(ctx context.Context, d DebounceItem, fn inngest.Function) error
 }
 
 func NewRedisDebouncer(d *redis_state.DebounceClient, defaultQueueShard redis_state.QueueShard, q redis_state.QueueManager) Debouncer {
@@ -170,6 +171,30 @@ func (d debouncer) GetDebounceItem(ctx context.Context, debounceID ulid.ULID) (*
 		return nil, fmt.Errorf("error unmarshalling debounce item: %w", err)
 	}
 	return di, nil
+}
+
+func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn inngest.Function) error {
+	dkey, err := d.debounceKey(ctx, di, fn)
+	if err != nil {
+		return err
+	}
+
+	newDebounceID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	keys := []string{d.d.KeyGenerator().DebouncePointer(ctx, fn.ID, dkey)}
+	args := []string{newDebounceID.String()}
+
+	err = scripts["start"].Exec(
+		ctx,
+		d.d.Client(),
+		keys,
+		args,
+	).Error()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Debounce debounces a given function with the given DebounceItem.
