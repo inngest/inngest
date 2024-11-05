@@ -17,6 +17,7 @@ import { OnboardingSteps } from '../Onboarding/types';
 import { SyncFailure } from '../SyncFailure';
 import { syncAppManually } from './actions';
 import useOnboardingStep from './useOnboardingStep';
+import { useOnboardingTracking } from './useOnboardingTracking';
 
 export default function SyncApp() {
   const [inputValue, setInputValue] = useState('');
@@ -26,6 +27,7 @@ export default function SyncApp() {
   const { updateLastCompletedStep } = useOnboardingStep();
   const router = useRouter();
   const { value: vercelFlowEnabled } = useBooleanFlag('onboarding-vercel-flow');
+  const tracking = useOnboardingTracking();
 
   const handleSyncAppManually = async () => {
     setIsLoading(true);
@@ -126,12 +128,20 @@ export default function SyncApp() {
           )}
           {error && <SyncFailure className="mb-3 mt-0 text-sm" error={error} />}
           {!app && (
-            <NewButton loading={isLoading} label="Sync app here" onClick={handleSyncAppManually} />
+            <NewButton
+              loading={isLoading}
+              label="Sync app here"
+              onClick={() => {
+                tracking?.trackSyncAppAction('sync', 'manual');
+                handleSyncAppManually();
+              }}
+            />
           )}
           {app && (
             <NewButton
               label="Next"
               onClick={() => {
+                tracking?.trackSyncAppAction('next', 'manual');
                 router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.InvokeFn }));
               }}
             />
@@ -152,6 +162,7 @@ export default function SyncApp() {
                 label="View Vercel dashboard"
                 href={pathCreator.vercel()}
                 size="small"
+                onClick={() => tracking?.trackSyncAppAction('view-dashboard', 'vercel')}
               />
             </div>
             <p className="mb-4 text-sm">
@@ -167,6 +178,7 @@ export default function SyncApp() {
               label="Next"
               onClick={() => {
                 updateLastCompletedStep(OnboardingSteps.SyncApp, 'manual');
+                tracking?.trackSyncAppAction('next', 'vercel');
                 router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.InvokeFn }));
               }}
             />

@@ -70,6 +70,18 @@ export function useOnboardingTracking() {
     });
   };
 
+  const trackSyncAppAction = (type: string, method: string) => {
+    trackEvent({
+      name: 'onboarding/sync-app.action',
+      data: {
+        type: type,
+        method: method,
+      },
+      user: trackingUser,
+      v: '2024-11-04.1',
+    });
+  };
+
   const trackInvokeFnAction = (type: string, selectedFunctionID?: string) => {
     trackEvent({
       name: 'onboarding/invoke-fn.action',
@@ -88,6 +100,7 @@ export function useOnboardingTracking() {
     trackOnboardingOpened,
     trackCreateAppAction,
     trackDeployAppAction,
+    trackSyncAppAction,
     trackInvokeFnAction,
   };
 }
