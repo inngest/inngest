@@ -60,6 +60,7 @@ This document presents the Open Source SDK Specification for Inngest, outlining 
     - [6.3.1](#631-function-run). Function run
     - [6.3.2](#632-event-send). Event send
   - [6.4](#64-glossary). Glossary
+- [7](#7-modes). Modes
 
 # 1. Introduction
 
@@ -1341,3 +1342,15 @@ There are two lifecycles groups to cover: a function run and sending an event.
 The vast majority of the time, "unmemoized code" is function-level code encountered after exhausting the memoized step data.
 
 However, a non-deterministic function may cause the SDK to encounter an unmemoized step before exhausting the memoized step data. In this case, the unmemoized step is the start of the unmemoized code.
+
+# 7. Modes
+
+The SDK can be in one of 2 modes: `cloud` or `dev`. The SDK defaults to `cloud` mode, but can be switched to `dev` mode by setting the `INNGEST_DEV` environment variable.
+
+When in `cloud` mode:
+- The SDK defaults to Inngest Cloud URLs (API is `https://api.inngest.com` and Event API is `https://inn.gs`).
+- All incoming request signatures are required and verified (unless stated otherwise in this spec).
+
+When in `dev` mode:
+- The SDK defaults to the Dev Server's default URL (`http://localhost:8288`).
+- Incoming request signatures are only validated if present and the SDK has a signing key.

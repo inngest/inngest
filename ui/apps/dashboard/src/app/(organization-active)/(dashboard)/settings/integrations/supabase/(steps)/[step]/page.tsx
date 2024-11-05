@@ -1,59 +1,46 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import NeonAuth from '@inngest/components/PostgresIntegrations/Neon/Auth';
-import NeonConnect from '@inngest/components/PostgresIntegrations/Neon/Connect';
-import NeonFormat from '@inngest/components/PostgresIntegrations/Neon/Format';
+import Auth from '@inngest/components/PostgresIntegrations/Neon/Auth';
+import Connect from '@inngest/components/PostgresIntegrations/Neon/Connect';
 import { IntegrationSteps, STEPS_ORDER } from '@inngest/components/PostgresIntegrations/types';
 import { toast } from 'sonner';
 
 import { useSteps } from '@/components/PostgresIntegration/Context';
 import { pathCreator } from '@/utils/urls';
-import { verifyAutoSetup, verifyCredentials, verifyLogicalReplication } from './actions';
+import { verifyAutoSetup, verifyCredentials } from './actions';
 
-export default function NeonStep({ params: { step } }: { params: { step: string } }) {
+export default function Step({ params: { step } }: { params: { step: string } }) {
   const { setStepsCompleted, credentials, setCredentials } = useSteps();
   const router = useRouter();
   const firstStep = STEPS_ORDER[0]!;
 
   function handleLostCredentials() {
     toast.error('Lost credentials. Going back to the first step.');
-    router.push(pathCreator.pgIntegrationStep({ integration: 'neon', step: firstStep }));
+    router.push(pathCreator.pgIntegrationStep({ integration: 'supabase', step: firstStep }));
   }
 
   if (step === IntegrationSteps.Authorize) {
     return (
-      <NeonAuth
+      <Auth
         savedCredentials={credentials}
+        integration="supabase"
         onSuccess={(value) => {
           setCredentials(value);
           setStepsCompleted(IntegrationSteps.Authorize);
         }}
-        integration="neon"
         // @ts-ignore for now
         verifyCredentials={verifyCredentials}
-      />
-    );
-  } else if (step === IntegrationSteps.FormatWal) {
-    return (
-      <NeonFormat
-        onSuccess={() => {
-          setStepsCompleted(IntegrationSteps.FormatWal);
-        }}
-        integration="neon"
-        // @ts-ignore for now
-        verifyLogicalReplication={verifyLogicalReplication}
-        savedCredentials={credentials}
-        handleLostCredentials={handleLostCredentials}
+        nextStep={IntegrationSteps.ConnectDb}
       />
     );
   } else if (step === IntegrationSteps.ConnectDb) {
     return (
-      <NeonConnect
+      <Connect
         onSuccess={() => {
           setStepsCompleted(IntegrationSteps.ConnectDb);
         }}
-        integration="neon"
+        integration="supabase"
         // @ts-ignore for now
         verifyAutoSetup={verifyAutoSetup}
         savedCredentials={credentials}
