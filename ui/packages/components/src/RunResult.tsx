@@ -1,6 +1,5 @@
 'use client';
 
-import { useMemo } from 'react';
 import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
 
 import { CodeBlock } from './CodeBlock';
@@ -13,13 +12,8 @@ type Props = {
 };
 
 export function RunResult({ className, result, isSuccess }: Props) {
-  const prettyInput = useMemo(() => {
-    return ((result.input && usePrettyJson(result.input)) || result.input) ?? '';
-  }, [result.data]);
-
-  const prettyOutput = useMemo(() => {
-    return ((result.data && usePrettyJson(result.data)) || result.data) ?? '';
-  }, [result.data]);
+  const prettyInput = usePrettyJson(result.input ?? '') || (result.input ?? '');
+  const prettyOutput = usePrettyJson(result.data ?? '') || (result.data ?? '');
 
   return (
     <div className={className}>
