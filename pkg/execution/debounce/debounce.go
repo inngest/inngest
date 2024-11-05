@@ -125,7 +125,7 @@ type Debouncer interface {
 	Debounce(ctx context.Context, d DebounceItem, fn inngest.Function) error
 	GetDebounceItem(ctx context.Context, debounceID ulid.ULID) (*DebounceItem, error)
 	DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID) error
-	StartExecution(ctx context.Context, d DebounceItem, fn inngest.Function) error
+	StartExecution(ctx context.Context, d DebounceItem, fn inngest.Function, debounceID ulid.ULID) error
 }
 
 func NewRedisDebouncer(d *redis_state.DebounceClient, defaultQueueShard redis_state.QueueShard, q redis_state.QueueManager) Debouncer {
@@ -174,7 +174,7 @@ func (d debouncer) GetDebounceItem(ctx context.Context, debounceID ulid.ULID) (*
 }
 
 // StartExecution swaps out the underlying pointer of the debounce
-func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn inngest.Function) error {
+func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn inngest.Function, debounceID ulid.ULID) error {
 	dkey, err := d.debounceKey(ctx, di, fn)
 	if err != nil {
 		return err
@@ -183,7 +183,10 @@ func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn innge
 	newDebounceID := ulid.MustNew(ulid.Now(), rand.Reader)
 
 	keys := []string{d.d.KeyGenerator().DebouncePointer(ctx, fn.ID, dkey)}
-	args := []string{newDebounceID.String()}
+	args := []string{
+		newDebounceID.String(),
+		debounceID.String(),
+	}
 
 	res, err := scripts["start"].Exec(
 		ctx,
@@ -196,7 +199,7 @@ func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn innge
 	}
 
 	switch res {
-	case 0:
+	case 0, 1:
 		return nil
 	default:
 		return fmt.Errorf("invalid status returned when starting debounce: %d", res)
