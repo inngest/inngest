@@ -181,7 +181,9 @@ func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn innge
 
 	newDebounceID := ulid.MustNew(ulid.Now(), rand.Reader)
 
-	keys := []string{d.d.KeyGenerator().DebouncePointer(ctx, fn.ID, dkey)}
+	keys := []string{
+		d.d.KeyGenerator().DebouncePointer(ctx, fn.ID, dkey),
+	}
 	args := []string{newDebounceID.String()}
 
 	res, err := scripts["start"].Exec(
