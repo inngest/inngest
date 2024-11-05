@@ -96,6 +96,7 @@ func NewAggregateEvaluator(
 			EngineTypeBTree:      newNumberMatcher(),
 		},
 		lock:      &sync.RWMutex{},
+		evals:     map[uuid.UUID]Evaluable{},
 		constants: map[uuid.UUID]struct{}{},
 		mixed:     map[uuid.UUID]struct{}{},
 	}
@@ -116,6 +117,9 @@ type aggregator struct {
 
 	// fastLen stores the current len of purely aggregable expressions.
 	fastLen int32
+
+	// evals stores all original evaluables in the aggregator.
+	evals map[uuid.UUID]Evaluable
 
 	// mixed stores the current len of mixed aggregable expressions,
 	// eg "foo == '1' && bar != '1'".  This is becasue != isn't aggregateable,
@@ -171,20 +175,22 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 
 	// Match constant expressions always.
 	a.lock.RLock()
-	uuids := make([]uuid.UUID, len(a.constants))
+	constantEvals := make([]Evaluable, len(a.constants))
 	n := 0
-	for id := range a.constants {
-		uuids[n] = id
-		n++
+	for uuid := range a.constants {
+		if eval, ok := a.evals[uuid]; ok {
+			constantEvals[n] = eval
+			n++
+		}
 	}
 	a.lock.RUnlock()
-	constantEvals, err := a.loader(ctx, uuids...)
-	if err != nil {
-		return nil, 0, err
-	}
 
 	eg := errgroup.Group{}
 	for _, item := range constantEvals {
+		if item == nil {
+			continue
+		}
+
 		if err := a.sem.Acquire(ctx, 1); err != nil {
 			return result, matched, err
 		}
@@ -234,15 +240,17 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 		err = errors.Join(err, merr)
 	}
 
-	// Load all evaluable instances directly.
-	uuids = make([]uuid.UUID, len(matches))
-	for n, m := range matches {
-		uuids[n] = m.Parsed.EvaluableID
+	// Load all evaluable instances directly from the match
+	a.lock.RLock()
+	n = 0
+	evaluables := make([]Evaluable, len(matches))
+	for _, el := range matches {
+		if eval, ok := a.evals[el.Parsed.EvaluableID]; ok {
+			evaluables[n] = eval
+			n++
+		}
 	}
-	evaluables, lerr := a.loader(ctx, uuids...)
-	if err != nil {
-		err = errors.Join(err, lerr)
-	}
+	a.lock.RUnlock()
 
 	// Each match here is a potential success.  When other trees and operators which are walkable
 	// are added (eg. >= operators on strings), ensure that we find the correct number of matches
@@ -253,6 +261,10 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 
 	eg = errgroup.Group{}
 	for _, match := range evaluables {
+		if match == nil {
+			continue
+		}
+
 		if err := a.sem.Acquire(ctx, 1); err != nil {
 			return result, matched, err
 		}
@@ -386,6 +398,10 @@ func (a *aggregator) Add(ctx context.Context, eval Evaluable) (float64, error) {
 		return -1, err
 	}
 
+	a.lock.Lock()
+	a.evals[eval.GetID()] = eval
+	a.lock.Unlock()
+
 	if eval.GetExpression() == "" || parsed.HasMacros {
 		// This is an empty expression which always matches.
 		a.lock.Lock()
@@ -433,6 +449,10 @@ func (a *aggregator) Add(ctx context.Context, eval Evaluable) (float64, error) {
 }
 
 func (a *aggregator) Remove(ctx context.Context, eval Evaluable) error {
+	a.lock.Lock()
+	delete(a.evals, eval.GetID())
+	a.lock.Unlock()
+
 	if eval.GetExpression() == "" {
 		return a.removeConstantEvaluable(ctx, eval)
 	}
