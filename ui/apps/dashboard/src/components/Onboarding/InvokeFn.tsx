@@ -1,30 +1,103 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Alert } from '@inngest/components/Alert/Alert';
 import { NewButton } from '@inngest/components/Button';
 import { CodeBlock } from '@inngest/components/CodeBlock/CodeBlock';
+import { parseCode } from '@inngest/components/InvokeButton/utils';
 import { NewLink } from '@inngest/components/Link';
-import { Select } from '@inngest/components/Select/Select';
+import { Select, type Option } from '@inngest/components/Select/Select';
+import { toast } from 'sonner';
 
 import { pathCreator } from '@/utils/urls';
 import { OnboardingSteps } from '../Onboarding/types';
+import { invokeFunction, prefetchFunctions } from './actions';
 import useOnboardingStep from './useOnboardingStep';
 
-/* TODO: fetch list of functions action */
-const functions = [
+const initialCode = JSON.stringify(
   {
-    id: '1',
-    name: 'Function 1',
+    data: {
+      example: 'type a JSON payload here to test your function',
+    },
   },
-  {
-    id: '2',
-    name: 'Function 2',
-  },
-];
+  null,
+  2
+);
+
+interface FunctionOption extends Option {
+  slug: string;
+  current: {
+    triggers: {
+      eventName?: string;
+    }[];
+  };
+}
 
 export default function InvokeFn() {
   const { updateLastCompletedStep } = useOnboardingStep();
-  const [selectedFunction, setSelectedFunction] = useState(functions[0]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>();
+  const [functions, setFunctions] = useState<FunctionOption[]>([]);
+  const [selectedFunction, setSelectedFunction] = useState<FunctionOption | null>(null);
+  const [rawPayload, setRawPayload] = useState(initialCode);
+  const [isFnInvoked, setIsFnInvoked] = useState(false);
   const router = useRouter();
+
+  const hasEventTrigger =
+    selectedFunction?.current.triggers.some((trigger) => trigger.eventName) ?? false;
+
+  useEffect(() => {
+    const loadFunctions = async () => {
+      try {
+        setLoading(true);
+        const fetchedFunctions = await prefetchFunctions();
+        setFunctions(fetchedFunctions);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load functions');
+        console.error('Failed to load functions: ', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadFunctions();
+  }, []);
+
+  const handleInvokeFn = async () => {
+    if (!selectedFunction || !selectedFunction.slug) return;
+    let payload: ReturnType<typeof parseCode>;
+    if (hasEventTrigger) {
+      payload = parseCode(rawPayload);
+    } else {
+      payload = { data: {}, user: null };
+    }
+    try {
+      const { success, error } = await invokeFunction({
+        functionSlug: selectedFunction.slug,
+        user: payload.user,
+        data: payload.data,
+      });
+      if (success) {
+        updateLastCompletedStep(OnboardingSteps.InvokeFn, 'manual');
+        setError(undefined);
+        setIsFnInvoked(true);
+        // TO DO: add link to run ID, need to update mutation first to return ID
+        toast.success('Function successfully invoked');
+      } else {
+        setIsFnInvoked(false);
+        setError(error);
+        console.error('Failed to invoke: ', error);
+      }
+    } catch (err) {
+      setError('An error occurred');
+      console.error('Failed to invoke: ', err);
+    }
+  };
+
+  const selectDisplay = loading
+    ? 'Loading functions...'
+    : functions.length === 0
+    ? 'No functions'
+    : 'Select function';
 
   return (
     <div className="text-subtle">
@@ -35,73 +108,97 @@ export default function InvokeFn() {
           className="inline-block"
           size="small"
           href="https://www.inngest.com/docs/features/events-triggers?ref=app-onboarding-invoke-fn"
+          target="_blank"
         >
           Read more
         </NewLink>
       </p>
       <div className="border-subtle my-6 rounded-sm border px-6 py-4">
         <p className="text-muted mb-2 text-sm font-medium">Select function to test:</p>
+
         <Select
-          onChange={setSelectedFunction}
+          onChange={(option) => setSelectedFunction(option as FunctionOption)}
           isLabelVisible={false}
-          label="Select function"
+          label={selectDisplay}
           multiple={false}
           value={selectedFunction}
           className="mb-6"
         >
-          <Select.Button>
+          <Select.Button
+            className={functions.length === 0 ? 'text-disabled cursor-not-allowed' : ''}
+          >
             <div className="text-sm font-medium leading-tight">
-              {selectedFunction?.name || 'Select function'}
+              {selectedFunction?.name || selectDisplay}
             </div>
           </Select.Button>
-          <Select.Options className="w-full">
-            {functions.map((option) => {
-              return (
-                <Select.Option key={option.id} option={option}>
-                  {option.name}
-                </Select.Option>
-              );
-            })}
-          </Select.Options>
+          {functions.length > 0 && (
+            <Select.Options className="w-full">
+              {functions.map((option) => {
+                return (
+                  <Select.Option key={option.id} option={option}>
+                    {option.name}
+                  </Select.Option>
+                );
+              })}
+            </Select.Options>
+          )}
         </Select>
-        <CodeBlock.Wrapper>
-          <CodeBlock
-            header={{ title: 'Invoke function' }}
-            tab={{
-              content: JSON.stringify(
-                {
-                  data: {
-                    example: 'type a JSON payload here to test your function',
-                  },
-                },
-                null,
-                2
-              ),
-              readOnly: false,
-              language: 'json',
-            }}
-          />
-        </CodeBlock.Wrapper>
-        <div className="mt-6 flex items-center gap-2">
+        {functions.length === 0 && !loading && (
+          <Alert className="mt-6" severity="warning">
+            <p className="text-sm">Make sure your app is synced and has functions.</p>
+          </Alert>
+        )}
+        {hasEventTrigger && (
+          <CodeBlock.Wrapper>
+            <CodeBlock
+              header={{ title: 'Invoke function' }}
+              tab={{
+                content: rawPayload,
+                readOnly: false,
+                language: 'json',
+                handleChange: setRawPayload,
+              }}
+            />
+          </CodeBlock.Wrapper>
+        )}
+        {!hasEventTrigger && selectedFunction && (
+          <p className="text-sm">
+            Cron functions without event triggers cannot include payload data.
+          </p>
+        )}
+
+        {error && (
+          <Alert className="mt-6" severity="error">
+            <p className="text-sm">{error}</p>
+          </Alert>
+        )}
+        {!isFnInvoked ? (
+          <div className="mt-6 flex items-center gap-2">
+            <NewButton
+              label="Invoke test function"
+              disabled={!selectedFunction}
+              onClick={() => {
+                handleInvokeFn();
+              }}
+            />
+            <NewButton
+              appearance="outlined"
+              label="Skip, take me to dashboard"
+              onClick={() => {
+                updateLastCompletedStep(OnboardingSteps.InvokeFn, 'manual');
+                router.push(pathCreator.apps({ envSlug: 'production' }));
+              }}
+            />
+          </div>
+        ) : (
           <NewButton
-            label="Invoke test function"
+            className="mt-6"
+            label="Go to runs"
             onClick={() => {
-              updateLastCompletedStep(OnboardingSteps.InvokeFn);
-              {
-                /* TODO: add invoke action */
-              }
+              router.push(pathCreator.runs({ envSlug: 'production' }));
             }}
           />
-          {/* TODO: add tracking */}
-          <NewButton
-            appearance="outlined"
-            label="Skip, take me to dashboard"
-            onClick={() => {
-              updateLastCompletedStep(OnboardingSteps.InvokeFn);
-              router.push(pathCreator.apps({ envSlug: 'production' }));
-            }}
-          />
-        </div>
+        )}
       </div>
     </div>
   );
