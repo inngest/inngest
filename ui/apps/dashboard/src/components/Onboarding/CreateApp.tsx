@@ -11,6 +11,7 @@ import { RiCheckboxCircleFill, RiExternalLinkLine } from '@remixicon/react';
 import { pathCreator } from '@/utils/urls';
 import { OnboardingSteps } from '../Onboarding/types';
 import useOnboardingStep from './useOnboardingStep';
+import { useOnboardingTracking } from './useOnboardingTracking';
 
 const tabs = [
   {
@@ -36,6 +37,7 @@ export default function CreateApp() {
   const currentTabContent = tabs.find((tab) => tab.title === activeTab) || tabs[0];
   const router = useRouter();
   const { isRunning: devServerIsRunning } = useDevServer(2500);
+  const tracking = useOnboardingTracking();
 
   return (
     <div className="text-subtle">
@@ -95,6 +97,7 @@ export default function CreateApp() {
               href="http://localhost:8288"
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => tracking?.trackCreateAppAction('open-dev-server')}
             />
           ) : (
             <div className="text-link flex items-center gap-1.5 text-sm">
@@ -110,15 +113,16 @@ export default function CreateApp() {
           disabled={!devServerIsRunning}
           onClick={() => {
             updateLastCompletedStep(OnboardingSteps.CreateApp, 'manual');
+            tracking?.trackCreateAppAction('next');
             router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.DeployApp }));
           }}
         />
-        {/* TODO: add tracking */}
         <NewButton
           appearance="outlined"
           label="I already have an Inngest app"
           onClick={() => {
             updateLastCompletedStep(OnboardingSteps.CreateApp, 'manual');
+            tracking?.trackCreateAppAction('skip');
             router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.DeployApp }));
           }}
         />

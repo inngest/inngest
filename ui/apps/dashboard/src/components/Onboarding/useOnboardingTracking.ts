@@ -47,5 +47,21 @@ export function useOnboardingTracking() {
     });
   };
 
-  return { trackOnboardingStepCompleted, trackWidgetDismissed, trackOnboardingOpened };
+  const trackCreateAppAction = (type: string) => {
+    trackEvent({
+      name: 'onboarding/create-app.action',
+      data: {
+        type: type,
+      },
+      user: trackingUser,
+      v: '2024-11-04.1',
+    });
+  };
+
+  return {
+    trackOnboardingStepCompleted,
+    trackWidgetDismissed,
+    trackOnboardingOpened,
+    trackCreateAppAction,
+  };
 }
