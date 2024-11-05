@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 
-import { STEPS_ORDER, type OnboardingSteps } from './types';
+import { STEPS_ORDER, type OnboardingSteps, type TotalStepsCompleted } from './types';
+import { useOnboardingTracking } from './useOnboardingTracking';
 
 export default function useOnboardingStep() {
   // Temporary approach, we will store this value in the backend in the future
   const [lastCompletedStep, setLastCompletedStep] = useState<OnboardingSteps | undefined>(
     undefined
   );
+
+  const tracking = useOnboardingTracking();
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -48,7 +51,14 @@ export default function useOnboardingStep() {
       : STEPS_ORDER[STEPS_ORDER.indexOf(lastCompletedStep) + 1]
   ) as OnboardingSteps;
 
-  const updateLastCompletedStep = (step: OnboardingSteps) => {
+  const totalStepsCompleted: TotalStepsCompleted = isFinalStep
+    ? STEPS_ORDER.length
+    : STEPS_ORDER.indexOf(nextStep);
+
+  const updateLastCompletedStep = (
+    step: OnboardingSteps,
+    completionSource: string = 'automatic'
+  ) => {
     if (typeof window !== 'undefined') {
       // Update localStorage
       localStorage.setItem('onboardingLastStepCompleted', JSON.stringify(step));
@@ -58,8 +68,11 @@ export default function useOnboardingStep() {
 
       // Dispatch custom event for other components in the same window
       window.dispatchEvent(new CustomEvent('onboardingStepUpdate', { detail: step }));
+
+      const willBeFinalStep = step === STEPS_ORDER[STEPS_ORDER.length - 1];
+      tracking?.trackOnboardingStepCompleted(step, willBeFinalStep, completionSource);
     }
   };
 
-  return { lastCompletedStep, updateLastCompletedStep, isFinalStep, nextStep };
+  return { lastCompletedStep, updateLastCompletedStep, isFinalStep, nextStep, totalStepsCompleted };
 }

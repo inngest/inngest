@@ -12,6 +12,7 @@ import { pathCreator } from '@/utils/urls';
 import { onboardingWidgetContent } from '../Onboarding/content';
 import { STEPS_ORDER } from '../Onboarding/types';
 import useOnboardingStep from '../Onboarding/useOnboardingStep';
+import { useOnboardingTracking } from '../Onboarding/useOnboardingTracking';
 
 export default function OnboardingWidget({
   collapsed,
@@ -22,8 +23,8 @@ export default function OnboardingWidget({
 }) {
   const router = useRouter();
   const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
-  const { isFinalStep, nextStep } = useOnboardingStep();
-  const segmentsCompleted = STEPS_ORDER.indexOf(nextStep);
+  const { isFinalStep, nextStep, totalStepsCompleted } = useOnboardingStep();
+  const tracking = useOnboardingTracking();
 
   const stepContent = isFinalStep
     ? onboardingWidgetContent.step.success
@@ -51,6 +52,7 @@ export default function OnboardingWidget({
             envSlug: EnvironmentType.Production.toLowerCase(),
             step: nextStep,
           })}
+          onClick={() => tracking?.trackOnboardingOpened(totalStepsCompleted, 'widget')}
           className="text-basis bg-canvasBase hover:bg-canvasSubtle border-subtle mb-5 block rounded border p-3 leading-tight"
         >
           <div className="flex h-[110px] flex-col justify-between">
@@ -74,6 +76,7 @@ export default function OnboardingWidget({
                       className="hover:bg-canvasBase"
                       onClick={(e) => {
                         e.preventDefault();
+                        tracking?.trackWidgetDismissed(totalStepsCompleted);
                         closeWidget();
                       }}
                     />
@@ -87,7 +90,7 @@ export default function OnboardingWidget({
             </div>
             {!isFinalStep && (
               <SegmentedProgressBar
-                segmentsCompleted={segmentsCompleted}
+                segmentsCompleted={totalStepsCompleted}
                 segments={STEPS_ORDER.length}
               />
             )}
