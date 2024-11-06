@@ -171,27 +171,17 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 		s       sync.Mutex
 	)
 
-	// TODO: Concurrently match constant expressions using a semaphore for capacity.
-
-	// Match constant expressions always.
-	a.lock.RLock()
-	constantEvals := make([]Evaluable, len(a.constants))
-	n := 0
-	for uuid := range a.constants {
-		if eval, ok := a.evals[uuid]; ok {
-			constantEvals[n] = eval
-			n++
-		}
-	}
-	a.lock.RUnlock()
-
 	eg := errgroup.Group{}
-	for _, item := range constantEvals {
-		if item == nil {
+
+	a.lock.RLock()
+	for uuid := range a.constants {
+		item, ok := a.evals[uuid]
+		if !ok || item == nil {
 			continue
 		}
 
 		if err := a.sem.Acquire(ctx, 1); err != nil {
+			a.lock.RUnlock()
 			return result, matched, err
 		}
 
@@ -230,6 +220,7 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 			return nil
 		})
 	}
+	a.lock.RUnlock()
 
 	if werr := eg.Wait(); werr != nil {
 		err = errors.Join(err, werr)
@@ -240,18 +231,6 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 		err = errors.Join(err, merr)
 	}
 
-	// Load all evaluable instances directly from the match
-	a.lock.RLock()
-	n = 0
-	evaluables := make([]Evaluable, len(matches))
-	for _, el := range matches {
-		if eval, ok := a.evals[el.Parsed.EvaluableID]; ok {
-			evaluables[n] = eval
-			n++
-		}
-	}
-	a.lock.RUnlock()
-
 	// Each match here is a potential success.  When other trees and operators which are walkable
 	// are added (eg. >= operators on strings), ensure that we find the correct number of matches
 	// for each group ID and then skip evaluating expressions if the number of matches is <= the group
@@ -259,17 +238,18 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 	seenMu := &sync.Mutex{}
 	seen := map[uuid.UUID]struct{}{}
 
-	eg = errgroup.Group{}
-	for _, match := range evaluables {
-		if match == nil {
+	a.lock.RLock()
+	for _, expr := range matches {
+		eval, ok := a.evals[expr.Parsed.EvaluableID]
+		if !ok || eval == nil {
 			continue
 		}
 
 		if err := a.sem.Acquire(ctx, 1); err != nil {
+			a.lock.RUnlock()
 			return result, matched, err
 		}
 
-		expr := match
 		eg.Go(func() error {
 			defer a.sem.Release(1)
 			defer func() {
@@ -281,11 +261,11 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 			}()
 
 			seenMu.Lock()
-			if _, ok := seen[expr.GetID()]; ok {
+			if _, ok := seen[eval.GetID()]; ok {
 				seenMu.Unlock()
 				return nil
 			} else {
-				seen[expr.GetID()] = struct{}{}
+				seen[eval.GetID()] = struct{}{}
 				seenMu.Unlock()
 			}
 
@@ -294,19 +274,20 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 			// NOTE: We don't need to add lifted expression variables,
 			// because match.Parsed.Evaluable() returns the original expression
 			// string.
-			ok, evalerr := a.eval(ctx, expr, data)
+			ok, evalerr := a.eval(ctx, eval, data)
 
 			if evalerr != nil {
 				return evalerr
 			}
 			if ok {
 				s.Lock()
-				result = append(result, expr)
+				result = append(result, eval)
 				s.Unlock()
 			}
 			return nil
 		})
 	}
+	a.lock.RUnlock()
 
 	if werr := eg.Wait(); werr != nil {
 		err = errors.Join(err, werr)
@@ -329,11 +310,14 @@ func (a *aggregator) AggregateMatch(ctx context.Context, data map[string]any) ([
 	// else we know a required comparason did not match.
 	//
 	// Note that having a count >= the group ID value does not guarantee that the expression is valid.
-	counts := map[groupID]int{}
+	//
+	// Note that we break this down per evaluable ID (UUID)
+	totalCounts := map[uuid.UUID]map[groupID]int{}
 	// Store all expression parts per group ID for returning.
-	found := map[groupID][]*StoredExpressionPart{}
+	found := map[uuid.UUID]map[groupID][]*StoredExpressionPart{}
 
 	for _, engine := range a.engines {
+		// we explicitly ignore the deny path for now.
 		matched, err := engine.Match(ctx, data)
 		if err != nil {
 			return nil, err
@@ -341,43 +325,64 @@ func (a *aggregator) AggregateMatch(ctx context.Context, data map[string]any) ([
 
 		// Add all found items from the engine to the above list.
 		for _, eval := range matched {
-			counts[eval.GroupID] += 1
+			idCount, idFound := totalCounts[eval.Parsed.EvaluableID], found[eval.Parsed.EvaluableID]
 
-			if _, ok := found[eval.GroupID]; !ok {
-				found[eval.GroupID] = []*StoredExpressionPart{}
+			if idCount == nil {
+				idCount = map[groupID]int{}
+				idFound = map[groupID][]*StoredExpressionPart{}
 			}
-			found[eval.GroupID] = append(found[eval.GroupID], eval)
+
+			idCount[eval.GroupID] += 1
+			if _, ok := idFound[eval.GroupID]; !ok {
+				idFound[eval.GroupID] = []*StoredExpressionPart{}
+			}
+			idFound[eval.GroupID] = append(idFound[eval.GroupID], eval)
+
+			// Update mapping
+			totalCounts[eval.Parsed.EvaluableID] = idCount
+			found[eval.Parsed.EvaluableID] = idFound
 		}
+
 	}
 
+	seen := map[uuid.UUID]struct{}{}
+
 	// Validate that groups meet the minimum size.
-	for groupID, matchingCount := range counts {
-		requiredSize := int(groupID.Size()) // The total req size from the group ID
+	for evalID, counts := range totalCounts {
+		for groupID, matchingCount := range counts {
 
-		if matchingCount >= requiredSize {
-			// The matching count met the group size;  all results are safe.
-			result = append(result, found[groupID]...)
-			continue
-		}
+			requiredSize := int(groupID.Size()) // The total req size from the group ID
 
-		// If this is a partial eval, always add it if there's a match for now.
-
-		// The GroupID required more comparisons to equate to true than
-		// we had, so this could never evaluate to true.  Skip this.
-		//
-		// NOTE: We currently don't add items with OR predicates to the
-		// matching engine, so we cannot use group sizes if the expr part
-		// has an OR.
-		for _, i := range found[groupID] {
-			// if this is purely aggregateable, we're safe to rely on group IDs.
-			//
-			// So, we only need to care if this expression is mixed.  If it's mixed,
-			// we can ignore group IDs for the time being.
-			if _, ok := a.mixed[i.Parsed.EvaluableID]; ok {
-				// this wasn't fully aggregatable so evaluate it.
-				result = append(result, i)
+			if matchingCount >= requiredSize {
+				for _, i := range found[evalID][groupID] {
+					if _, ok := seen[i.Parsed.EvaluableID]; ok {
+						continue
+					}
+					seen[i.Parsed.EvaluableID] = struct{}{}
+					result = append(result, i)
+				}
+				continue
 			}
 
+			// If this is a partial eval, always add it if there's a match for now.
+
+			// The GroupID required more comparisons to equate to true than
+			// we had, so this could never evaluate to true.  Skip this.
+			//
+			// NOTE: We currently don't add items with OR predicates to the
+			// matching engine, so we cannot use group sizes if the expr part
+			// has an OR.
+			for _, i := range found[evalID][groupID] {
+				// if this is purely aggregateable, we're safe to rely on group IDs.
+				//
+				// So, we only need to care if this expression is mixed.  If it's mixed,
+				// we can ignore group IDs for the time being.
+				if _, ok := a.mixed[i.Parsed.EvaluableID]; ok {
+					// this wasn't fully aggregatable so evaluate it.
+					result = append(result, i)
+				}
+
+			}
 		}
 	}
 
@@ -636,8 +641,8 @@ func engineType(p Predicate) EngineType {
 		// return EngineTypeNone
 		return EngineTypeBTree
 	case string:
-		if p.Operator == operators.Equals {
-			// StringHash is only used for matching on equality.
+		if p.Operator == operators.Equals || p.Operator == operators.NotEquals {
+			// StringHash is only used for matching on in/equality.
 			return EngineTypeStringHash
 		}
 	case nil:
