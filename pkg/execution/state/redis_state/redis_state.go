@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 
 	"github.com/google/uuid"
@@ -1584,6 +1585,15 @@ func (i *keyIter) Index() int64 {
 }
 
 func (i *keyIter) fetch(ctx context.Context) error {
+	start := time.Now()
+	defer func() {
+		dur := time.Since(start).Milliseconds()
+		metrics.HistogramAggregatePausesLoadDuration(ctx, dur, metrics.HistogramOpt{
+			PkgName: pkgName,
+			// TODO: tag workspace ID eventually??
+		})
+	}()
+
 	if len(i.keys) == 0 {
 		// No more present.
 		i.err = context.Canceled

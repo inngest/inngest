@@ -199,3 +199,21 @@ func IncrSpanBatchProcessorDeadLetterPublishStatusCounter(ctx context.Context, o
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrAggregatePausesEvaluatedCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "aggr_pauses_evaluated_total",
+		Description: "Total number of pauses evaluated",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrAggregatePausesFoundCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "aggr_pauses_found_total",
+		Description: "Total number of pauses founded via evaluation",
+		Tags:        opts.Tags,
+	})
+}
