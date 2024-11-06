@@ -94,10 +94,20 @@ export const pathCreator = {
   },
   // TODO: Support environments
   onboarding(): Route {
-    return `/env/production/onboarding/` as Route;
+    return `/env/production/onboarding` as Route;
   },
-  onboardingSteps({ envSlug = 'production', step }: { envSlug?: string; step: string }): Route {
-    return `/env/${envSlug}/onboarding/${step}` as Route;
+  onboardingSteps({
+    envSlug = 'production',
+    step,
+    ref,
+  }: {
+    envSlug?: string;
+    step?: string;
+    ref?: string;
+  }): Route {
+    return `/env/${envSlug}/onboarding/${step ? `/${step}` : ''}${
+      ref ? `?ref=${ref}` : ''
+    }` as Route;
   },
   runPopout({ envSlug, runID }: { envSlug: string; runID: string }): Route {
     return `/env/${envSlug}/runs/${runID}` as Route;
@@ -105,8 +115,8 @@ export const pathCreator = {
   runs({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/runs` as Route;
   },
-  support(): Route {
-    return '/support' as Route;
+  support({ ref }: { ref?: string } = {}): Route {
+    return `/support${ref ? `?ref=${ref}` : ''}` as Route;
   },
   unattachedSyncs({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/unattached-syncs` as Route;
