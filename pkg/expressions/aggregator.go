@@ -149,7 +149,10 @@ func (a *aggregator) EvaluateAsyncEvent(ctx context.Context, event event.Tracked
 	})
 	metrics.HistogramAggregatePausesEvalDuration(ctx, time.Since(start).Milliseconds(), metrics.HistogramOpt{
 		PkgName: pkgName,
-		Tags:    map[string]any{"workspaceID": wsID.String()},
+		Tags: map[string]any{
+			"workspaceID": wsID.String(),
+			"success":     err == nil,
+		},
 	})
 	if err != nil {
 		log.Error(
