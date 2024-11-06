@@ -36,26 +36,17 @@ export const steps: OnboardingStep[] = [
   },
 ];
 
-export const STEPS_ORDER: OnboardingSteps[] = [
-  OnboardingSteps.CreateApp,
-  OnboardingSteps.DeployApp,
-  OnboardingSteps.SyncApp,
-  OnboardingSteps.InvokeFn,
-];
-
 type ArrayLengthRange<T extends readonly any[]> = Extract<
   keyof { [K in 0 | T['length']]: K },
   number
 >;
 
 // Type representing the possible number of completed steps (0 to 4)
-export type TotalStepsCompleted = ArrayLengthRange<typeof STEPS_ORDER>;
+export type TotalStepsCompleted = ArrayLengthRange<typeof steps>;
 
-export function isValidStep(step: string): step is OnboardingSteps {
-  return STEPS_ORDER.includes(step as OnboardingSteps);
+export function isValidStep(stepName: string): stepName is OnboardingSteps {
+  return steps.some((step) => step.name === stepName);
 }
-
-export type OnboardingStepsCompleted = OnboardingSteps[] | [];
 
 type OnboardingWidgetStepContent = {
   title: string;
