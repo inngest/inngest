@@ -1,5 +1,6 @@
 import type { Route } from 'next';
 
+import { StepAITrace } from '../AI/AITrace';
 import type { ExperimentalAI } from '../AI/utils';
 import { Card } from '../Card';
 import {
@@ -14,7 +15,6 @@ import { Time } from '../Time';
 import type { Result } from '../types/functionRun';
 import { cn } from '../utils/classNames';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
-import { StepAITrace } from './StepAITrace';
 import { isStepInfoInvoke, isStepInfoSleep, isStepInfoWait, type Trace } from './types';
 
 type Props = {

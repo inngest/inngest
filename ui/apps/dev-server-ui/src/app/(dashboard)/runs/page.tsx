@@ -204,6 +204,7 @@ export default function Page() {
         scope="env"
         totalCount={totalCount}
         hasSearchFlag={isSearchEnabled}
+        stepAIEnabled={true}
       />
     </>
   );
