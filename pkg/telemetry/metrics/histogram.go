@@ -20,6 +20,14 @@ var (
 	}
 
 	peekSizeBoundaries = []float64{10, 30, 50, 100, 250, 500, 1000, 3000, 5000}
+
+	PausesBoundaries = []float64{
+		5, 10, 50, 100, 200, 500, // < 1s
+		1000, 2000, 5000, 30_000, // < 1m
+		60_000, 300_000, // < 10m
+		600_000, 1_800_000, // < 1h
+		3_600_000, // 1h
+	}
 )
 
 func HistogramQueueItemLatency(ctx context.Context, value int64, opts HistogramOpt) {
@@ -83,5 +91,27 @@ func HistogramRedisCommandDuration(ctx context.Context, value int64, opts Histog
 		Tags:        opts.Tags,
 		Unit:        "ms",
 		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramAggregatePausesLoadDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "aggr_pauses_load_duration",
+		Description: "Duration for loading aggregate pauses processing",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  PausesBoundaries,
+	})
+}
+
+func HistogramAggregatePausesEvalDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "aggr_pauses_eval_duration",
+		Description: "Duration for evaluating aggregate pauses processing",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  PausesBoundaries,
 	})
 }
