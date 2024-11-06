@@ -280,9 +280,9 @@ export function RunsPage({
     pollInterval && pollInterval < 1000 ? isLoadingInitial : isLoadingMore || isLoadingInitial;
 
   return (
-    <main className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-auto focus-visible:outline-none">
-      <div className="bg-canvasBase border-subtle over sticky top-0 z-10 flex flex-col border-b px-3">
-        <div className="flex h-[58px] items-center justify-between gap-2">
+    <main className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
+      <div className="bg-canvasBase sticky top-0 z-10 flex flex-col">
+        <div className="border-subtle flex h-[58px] items-center justify-between gap-2 border-b px-3">
           <div className="flex items-center gap-2">
             <SelectGroup>
               <TimeFieldFilter
