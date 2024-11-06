@@ -27,7 +27,7 @@ export default function Layout({
         <PageHeader step={step} />
         {children}
       </main>
-      <Menu envSlug={envSlug} step={step} />
+      <Menu envSlug={envSlug} stepName={step} />
     </div>
   );
 }

@@ -32,7 +32,7 @@ const tabs = [
 ];
 
 export default function CreateApp() {
-  const { updateLastCompletedStep } = useOnboardingStep();
+  const { updateCompletedSteps } = useOnboardingStep();
   const [activeTab, setActiveTab] = useState(tabs[0]?.title || '');
   const currentTabContent = tabs.find((tab) => tab.title === activeTab) || tabs[0];
   const router = useRouter();
@@ -112,7 +112,7 @@ export default function CreateApp() {
           label="Next"
           disabled={!devServerIsRunning}
           onClick={() => {
-            updateLastCompletedStep(OnboardingSteps.CreateApp, 'manual');
+            updateCompletedSteps(OnboardingSteps.CreateApp, 'manual');
             tracking?.trackCreateAppAction('next');
             router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.DeployApp }));
           }}
@@ -121,7 +121,7 @@ export default function CreateApp() {
           appearance="outlined"
           label="I already have an Inngest app"
           onClick={() => {
-            updateLastCompletedStep(OnboardingSteps.CreateApp, 'manual');
+            updateCompletedSteps(OnboardingSteps.CreateApp, 'manual');
             tracking?.trackCreateAppAction('skip');
             router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.DeployApp }));
           }}

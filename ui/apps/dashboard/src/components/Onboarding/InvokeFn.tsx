@@ -34,7 +34,7 @@ interface FunctionOption extends Option {
 }
 
 export default function InvokeFn() {
-  const { updateLastCompletedStep } = useOnboardingStep();
+  const { updateCompletedSteps } = useOnboardingStep();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const [functions, setFunctions] = useState<FunctionOption[]>([]);
@@ -79,7 +79,7 @@ export default function InvokeFn() {
         data: payload.data,
       });
       if (success) {
-        updateLastCompletedStep(OnboardingSteps.InvokeFn, 'manual');
+        updateCompletedSteps(OnboardingSteps.InvokeFn, 'manual');
         setError(undefined);
         setIsFnInvoked(true);
         // TO DO: add link to run ID, need to update mutation first to return ID
@@ -188,7 +188,7 @@ export default function InvokeFn() {
               appearance="outlined"
               label="Skip, take me to dashboard"
               onClick={() => {
-                updateLastCompletedStep(OnboardingSteps.InvokeFn, 'manual');
+                updateCompletedSteps(OnboardingSteps.InvokeFn, 'manual');
                 tracking?.trackInvokeFnAction('skip', selectedFunction?.id);
                 router.push(pathCreator.apps({ envSlug: 'production' }));
               }}

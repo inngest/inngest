@@ -24,7 +24,7 @@ export default function SyncApp() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<CodedError | null>();
   const [app, setApp] = useState<string | null>();
-  const { updateLastCompletedStep } = useOnboardingStep();
+  const { updateCompletedSteps } = useOnboardingStep();
   const router = useRouter();
   const { value: vercelFlowEnabled } = useBooleanFlag('onboarding-vercel-flow');
   const tracking = useOnboardingTracking();
@@ -37,7 +37,7 @@ export default function SyncApp() {
       const { success, error, appName } = await syncAppManually(inputValue);
       if (success) {
         setApp(appName);
-        updateLastCompletedStep(OnboardingSteps.SyncApp, 'manual');
+        updateCompletedSteps(OnboardingSteps.SyncApp, 'manual');
       } else {
         setError(error);
       }
@@ -177,7 +177,7 @@ export default function SyncApp() {
             <NewButton
               label="Next"
               onClick={() => {
-                updateLastCompletedStep(OnboardingSteps.SyncApp, 'manual');
+                updateCompletedSteps(OnboardingSteps.SyncApp, 'manual');
                 tracking?.trackSyncAppAction('next', 'vercel');
                 router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.InvokeFn }));
               }}
