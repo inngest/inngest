@@ -1,26 +1,45 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
-import { STEPS_ORDER, type OnboardingSteps, type TotalStepsCompleted } from './types';
-import { useOnboardingTracking } from './useOnboardingTracking';
+import {
+  steps,
+  type OnboardingStep,
+  type OnboardingSteps,
+  type TotalStepsCompleted,
+} from './types';
+import { useOnboardingStepCompletedTracking } from './useOnboardingTracking';
+
+const getHighestStep = (steps: OnboardingStep[]): OnboardingStep | null => {
+  return steps.length > 0
+    ? steps.reduce((prev, current) => (current.stepNumber > prev.stepNumber ? current : prev))
+    : null;
+};
 
 export default function useOnboardingStep() {
   // Temporary approach, we will store this value in the backend in the future
-  const [lastCompletedStep, setLastCompletedStep] = useState<OnboardingSteps | undefined>(
-    undefined
-  );
+  const [lastCompletedStep, setLastCompletedStep] = useState<OnboardingStep | null>(null);
+  const [completedSteps, setCompletedSteps] = useState<OnboardingStep[] | []>([]);
 
-  const tracking = useOnboardingTracking();
+  const tracking = useOnboardingStepCompletedTracking();
 
   useEffect(() => {
-    const stored = localStorage.getItem('onboardingLastStepCompleted');
-    if (stored) {
-      setLastCompletedStep(JSON.parse(stored));
+    const storedSteps = localStorage.getItem('onboardingCompletedSteps');
+    if (storedSteps) {
+      const parsedSteps: OnboardingStep[] = JSON.parse(storedSteps);
+      setCompletedSteps(parsedSteps);
+
+      // Set the initial lastCompletedStep based on the highest stepNumber in parsedSteps
+      const highestStep = getHighestStep(parsedSteps);
+      setLastCompletedStep(highestStep);
     }
 
     const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === 'onboardingLastStepCompleted') {
-        const newValue = event.newValue ? JSON.parse(event.newValue) : undefined;
+      if (event.key === 'onboardingCompletedSteps') {
+        const newValue = event.newValue ? JSON.parse(event.newValue) : [];
         setLastCompletedStep(newValue);
+
+        // Update lastCompletedStep
+        const highestStep = getHighestStep(newValue);
+        setLastCompletedStep(highestStep);
       }
     };
 
@@ -29,7 +48,12 @@ export default function useOnboardingStep() {
 
     // Custom event for same-window updates
     const handleCustomEvent = (event: CustomEvent) => {
-      setLastCompletedStep(event.detail);
+      const newCompletedSteps: OnboardingStep[] = event.detail;
+      setCompletedSteps(newCompletedSteps);
+
+      // Update lastCompletedStep
+      const highestStep = getHighestStep(newCompletedSteps);
+      setLastCompletedStep(highestStep);
     };
 
     window.addEventListener('onboardingStepUpdate', handleCustomEvent as EventListener);
@@ -40,37 +64,51 @@ export default function useOnboardingStep() {
     };
   }, []);
 
-  const isFinalStep = lastCompletedStep === STEPS_ORDER[STEPS_ORDER.length - 1];
-  const nextStep = (
-    !lastCompletedStep
-      ? STEPS_ORDER[0]
-      : isFinalStep
-      ? lastCompletedStep
-      : STEPS_ORDER[STEPS_ORDER.indexOf(lastCompletedStep) + 1]
-  ) as OnboardingSteps;
+  const nextStep = useMemo(() => {
+    if (!lastCompletedStep) {
+      // If no step has been completed, return the first step
+      return steps.find((step) => step.stepNumber === 1) || null;
+    }
+    // Find the next step based on the lastCompletedStep's stepNumber
+    return steps.find((step) => step.stepNumber === lastCompletedStep.stepNumber + 1) || null;
+  }, [lastCompletedStep]);
 
-  const totalStepsCompleted: TotalStepsCompleted = isFinalStep
-    ? STEPS_ORDER.length
-    : STEPS_ORDER.indexOf(nextStep);
+  const totalStepsCompleted: TotalStepsCompleted = completedSteps.length;
 
-  const updateLastCompletedStep = (
-    step: OnboardingSteps,
+  const updateCompletedSteps = (
+    stepName: OnboardingSteps,
     completionSource: string = 'automatic'
   ) => {
     if (typeof window !== 'undefined') {
-      // Update localStorage
-      localStorage.setItem('onboardingLastStepCompleted', JSON.stringify(step));
+      // Find the full step details from the steps array
+      const step = steps.find((s) => s.name === stepName);
 
-      // Update local state
-      setLastCompletedStep(step);
+      if (!step) {
+        console.warn(`Step with name ${stepName} not found.`);
+        return;
+      }
 
-      // Dispatch custom event for other components in the same window
-      window.dispatchEvent(new CustomEvent('onboardingStepUpdate', { detail: step }));
+      // Avoid adding duplicate steps by name
+      if (!completedSteps.some((s) => s.name === step.name)) {
+        const newCompletedSteps = [...completedSteps, step];
 
-      const willBeFinalStep = step === STEPS_ORDER[STEPS_ORDER.length - 1];
-      tracking?.trackOnboardingStepCompleted(step, willBeFinalStep, completionSource);
+        // Update local state
+        setCompletedSteps(newCompletedSteps);
+        setLastCompletedStep(step);
+
+        // Update localStorage
+        localStorage.setItem('onboardingCompletedSteps', JSON.stringify(newCompletedSteps));
+
+        // Dispatch event for other components
+        window.dispatchEvent(
+          new CustomEvent('onboardingStepUpdate', { detail: newCompletedSteps })
+        );
+
+        tracking?.trackOnboardingStepCompleted(step, completionSource);
+      }
+      // TO DO: dispatch tracking for automatically completed steps
     }
   };
 
-  return { lastCompletedStep, updateLastCompletedStep, isFinalStep, nextStep, totalStepsCompleted };
+  return { lastCompletedStep, completedSteps, updateCompletedSteps, nextStep, totalStepsCompleted };
 }

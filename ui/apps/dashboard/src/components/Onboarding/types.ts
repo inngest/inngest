@@ -7,6 +7,35 @@ export enum OnboardingSteps {
   InvokeFn = 'invoke-fn',
 }
 
+export type OnboardingStep = {
+  name: OnboardingSteps;
+  stepNumber: ArrayLengthRange<typeof steps>;
+  isFinalStep: boolean;
+};
+
+export const steps: OnboardingStep[] = [
+  {
+    name: OnboardingSteps.CreateApp,
+    stepNumber: 1,
+    isFinalStep: false,
+  },
+  {
+    name: OnboardingSteps.DeployApp,
+    stepNumber: 2,
+    isFinalStep: false,
+  },
+  {
+    name: OnboardingSteps.SyncApp,
+    stepNumber: 3,
+    isFinalStep: false,
+  },
+  {
+    name: OnboardingSteps.InvokeFn,
+    stepNumber: 4,
+    isFinalStep: true,
+  },
+];
+
 export const STEPS_ORDER: OnboardingSteps[] = [
   OnboardingSteps.CreateApp,
   OnboardingSteps.DeployApp,
