@@ -489,8 +489,8 @@ github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
-github.com/inngest/expr v0.0.0-20241106181335-b8451aa7ec61 h1:/8nV9aOxZnJrXYqtqVpsAELtGoluZYx9PSjZL/1la9M=
-github.com/inngest/expr v0.0.0-20241106181335-b8451aa7ec61/go.mod h1:Dq8dNC1Q/cZBjl6ltxCoAeNn8fstrBJWWjeSisqTL94=
+github.com/inngest/expr v0.0.0-20241106234328-863dff7deec0 h1:cqaGD0mx745BYyVGZ3GJsiZETktC64h1r9zdDInmKIs=
+github.com/inngest/expr v0.0.0-20241106234328-863dff7deec0/go.mod h1:0Dllw9clwlMWWxfiSsHY9VdE+Zjt/8SVCMxK9r39aKE=
 github.com/inngest/inngestgo v0.7.5-0.20240919173141-dccf7b2deffe h1:vwGvSB+AoHOtzK2UvyQn1Z4ba00hVYKH/1TKeP3NVys=
 github.com/inngest/inngestgo v0.7.5-0.20240919173141-dccf7b2deffe/go.mod h1:G0XZalzZnS90LbqBrjuUJDcZPvyz6mp2BaeYx8xN11E=
 github.com/jackc/chunkreader v1.0.0/go.mod h1:RT6O25fNZIuasFJRyZ4R/Y2BbhasbmZXF9QQ7T3kePo=
@@ -747,6 +747,8 @@ github.com/sirupsen/logrus v1.2.0/go.mod h1:LxeOpSwHxABJmUn/MG1IvRgCAasNZTLOkJPx
 github.com/sirupsen/logrus v1.4.1/go.mod h1:ni0Sbl8bgC9z8RoU9G6nDWqqs/fq4eDPysMBDgk/93Q=
 github.com/sirupsen/logrus v1.4.2/go.mod h1:tLMulIdttU9McNUspp0xgXVQah82FyeX6MwdIuYE2rE=
 github.com/soheilhy/cmux v0.1.4/go.mod h1:IM3LyeVVIOuxMH7sFAkER9+bJ4dT7Ms6E4xg4kGIyLM=
+github.com/sourcegraph/conc v0.3.0 h1:OQTbbt6P72L20UqAkXXuLOj79LfEanQ+YQFNpLA9ySo=
+github.com/sourcegraph/conc v0.3.0/go.mod h1:Sdozi7LEKbFPqYX2/J+iBAM6HpqSLTASQIKqDmF7Mt0=
 github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72/go.mod h1:JwIasOWyU6f++ZhiEuf87xNszmSA2myDM2Kzu9HwQUA=
 github.com/spf13/afero v1.1.2/go.mod h1:j4pytiNVoe2o6bmDsKpLACNPDBIoEAkihy7loJ1B0CQ=
 github.com/spf13/afero v1.6.0 h1:xoax2sJ2DT8S8xA2paPFjDCScCNeWsg75VG0DLRreiY=

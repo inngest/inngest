@@ -9,14 +9,16 @@ import (
 
 	"github.com/google/cel-go/common/operators"
 	"github.com/google/uuid"
-	"golang.org/x/sync/errgroup"
-	"golang.org/x/sync/semaphore"
 )
 
 var (
 	ErrEvaluableNotFound      = fmt.Errorf("Evaluable instance not found in aggregator")
 	ErrInvalidType            = fmt.Errorf("invalid type for tree")
 	ErrExpressionPartNotFound = fmt.Errorf("expression part not found")
+)
+
+const (
+	defaultConcurrency = 1000
 )
 
 // errEngineUnimplemented is used while we develop the aggregate tree library when trees
@@ -82,23 +84,23 @@ func NewAggregateEvaluator(
 	concurrency int64,
 ) AggregateEvaluator {
 	if concurrency <= 0 {
-		concurrency = 1
+		concurrency = defaultConcurrency
 	}
 
 	return &aggregator{
 		eval:   eval,
 		parser: parser,
 		loader: evalLoader,
-		sem:    semaphore.NewWeighted(concurrency),
 		engines: map[EngineType]MatchingEngine{
-			EngineTypeStringHash: newStringEqualityMatcher(),
-			EngineTypeNullMatch:  newNullMatcher(),
-			EngineTypeBTree:      newNumberMatcher(),
+			EngineTypeStringHash: newStringEqualityMatcher(concurrency),
+			EngineTypeNullMatch:  newNullMatcher(concurrency),
+			EngineTypeBTree:      newNumberMatcher(concurrency),
 		},
-		lock:      &sync.RWMutex{},
-		evals:     map[uuid.UUID]Evaluable{},
-		constants: map[uuid.UUID]struct{}{},
-		mixed:     map[uuid.UUID]struct{}{},
+		lock:        &sync.RWMutex{},
+		evals:       map[uuid.UUID]Evaluable{},
+		constants:   map[uuid.UUID]struct{}{},
+		mixed:       map[uuid.UUID]struct{}{},
+		concurrency: concurrency,
 	}
 }
 
@@ -109,8 +111,6 @@ type aggregator struct {
 
 	// engines records all engines
 	engines map[EngineType]MatchingEngine
-
-	sem *semaphore.Weighted
 
 	// lock prevents concurrent updates of data
 	lock *sync.RWMutex
@@ -131,6 +131,8 @@ type aggregator struct {
 	// constants tracks evaluable IDs that must always be evaluated, due to
 	// the expression containing non-aggregateable clauses.
 	constants map[uuid.UUID]struct{}
+
+	concurrency int64
 }
 
 // Len returns the total number of aggregateable and constantly matched expressions
@@ -171,7 +173,7 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 		s       sync.Mutex
 	)
 
-	eg := errgroup.Group{}
+	napool := newErrPool(errPoolOpts{concurrency: a.concurrency})
 
 	a.lock.RLock()
 	for uuid := range a.constants {
@@ -180,14 +182,8 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 			continue
 		}
 
-		if err := a.sem.Acquire(ctx, 1); err != nil {
-			a.lock.RUnlock()
-			return result, matched, err
-		}
-
 		expr := item
-		eg.Go(func() error {
-			defer a.sem.Release(1)
+		napool.Go(func() error {
 			defer func() {
 				if r := recover(); r != nil {
 					s.Lock()
@@ -222,7 +218,7 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 	}
 	a.lock.RUnlock()
 
-	if werr := eg.Wait(); werr != nil {
+	if werr := napool.Wait(); werr != nil {
 		err = errors.Join(err, werr)
 	}
 
@@ -238,6 +234,8 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 	seenMu := &sync.Mutex{}
 	seen := map[uuid.UUID]struct{}{}
 
+	mpool := newErrPool(errPoolOpts{concurrency: a.concurrency})
+
 	a.lock.RLock()
 	for _, expr := range matches {
 		eval, ok := a.evals[expr.Parsed.EvaluableID]
@@ -245,13 +243,7 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 			continue
 		}
 
-		if err := a.sem.Acquire(ctx, 1); err != nil {
-			a.lock.RUnlock()
-			return result, matched, err
-		}
-
-		eg.Go(func() error {
-			defer a.sem.Release(1)
+		mpool.Go(func() error {
 			defer func() {
 				if r := recover(); r != nil {
 					s.Lock()
@@ -289,7 +281,7 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 	}
 	a.lock.RUnlock()
 
-	if werr := eg.Wait(); werr != nil {
+	if werr := mpool.Wait(); werr != nil {
 		err = errors.Join(err, werr)
 	}
 

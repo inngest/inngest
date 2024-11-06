@@ -6,15 +6,15 @@ import (
 
 	"github.com/google/cel-go/common/operators"
 	"github.com/ohler55/ojg/jp"
-	"golang.org/x/sync/errgroup"
 )
 
-func newNullMatcher() MatchingEngine {
+func newNullMatcher(concurrency int64) MatchingEngine {
 	return &nullLookup{
-		lock:  &sync.RWMutex{},
-		paths: map[string]struct{}{},
-		null:  map[string][]*StoredExpressionPart{},
-		not:   map[string][]*StoredExpressionPart{},
+		lock:        &sync.RWMutex{},
+		paths:       map[string]struct{}{},
+		null:        map[string][]*StoredExpressionPart{},
+		not:         map[string][]*StoredExpressionPart{},
+		concurrency: concurrency,
 	}
 }
 
@@ -26,6 +26,8 @@ type nullLookup struct {
 
 	null map[string][]*StoredExpressionPart
 	not  map[string][]*StoredExpressionPart
+
+	concurrency int64
 }
 
 func (n *nullLookup) Type() EngineType {
@@ -35,11 +37,12 @@ func (n *nullLookup) Type() EngineType {
 func (n *nullLookup) Match(ctx context.Context, data map[string]any) (matched []*StoredExpressionPart, err error) {
 	l := &sync.Mutex{}
 	matched = []*StoredExpressionPart{}
-	eg := errgroup.Group{}
+
+	pool := newErrPool(errPoolOpts{concurrency: n.concurrency})
 
 	for item := range n.paths {
 		path := item
-		eg.Go(func() error {
+		pool.Go(func() error {
 			x, err := jp.ParseString(path)
 			if err != nil {
 				return err
@@ -65,7 +68,7 @@ func (n *nullLookup) Match(ctx context.Context, data map[string]any) (matched []
 		})
 	}
 
-	return matched, eg.Wait()
+	return matched, pool.Wait()
 }
 
 func (n *nullLookup) Search(ctx context.Context, variable string, input any) (matched []*StoredExpressionPart) {

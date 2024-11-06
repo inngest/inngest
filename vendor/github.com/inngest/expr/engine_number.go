@@ -9,14 +9,14 @@ import (
 	"github.com/google/cel-go/common/operators"
 	"github.com/ohler55/ojg/jp"
 	"github.com/tidwall/btree"
-	"golang.org/x/sync/errgroup"
 )
 
-func newNumberMatcher() MatchingEngine {
+func newNumberMatcher(concurrency int64) MatchingEngine {
 	return &numbers{
 		lock: &sync.RWMutex{},
 
-		paths: map[string]struct{}{},
+		paths:       map[string]struct{}{},
+		concurrency: concurrency,
 
 		exact: btree.NewMap[float64, []*StoredExpressionPart](64),
 		gt:    btree.NewMap[float64, []*StoredExpressionPart](64),
@@ -33,6 +33,8 @@ type numbers struct {
 	exact *btree.Map[float64, []*StoredExpressionPart]
 	gt    *btree.Map[float64, []*StoredExpressionPart]
 	lt    *btree.Map[float64, []*StoredExpressionPart]
+
+	concurrency int64
 }
 
 func (n numbers) Type() EngineType {
@@ -42,11 +44,12 @@ func (n numbers) Type() EngineType {
 func (n *numbers) Match(ctx context.Context, input map[string]any) (matched []*StoredExpressionPart, err error) {
 	l := &sync.Mutex{}
 	matched = []*StoredExpressionPart{}
-	eg := errgroup.Group{}
+
+	pool := newErrPool(errPoolOpts{concurrency: n.concurrency})
 
 	for item := range n.paths {
 		path := item
-		eg.Go(func() error {
+		pool.Go(func() error {
 			x, err := jp.ParseString(path)
 			if err != nil {
 				return err
@@ -80,7 +83,7 @@ func (n *numbers) Match(ctx context.Context, input map[string]any) (matched []*S
 		})
 	}
 
-	return matched, eg.Wait()
+	return matched, pool.Wait()
 }
 
 // Search returns all ExpressionParts which match the given input, ignoring the variable name

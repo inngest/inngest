@@ -9,15 +9,15 @@ import (
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/cel-go/common/operators"
 	"github.com/ohler55/ojg/jp"
-	"golang.org/x/sync/errgroup"
 )
 
-func newStringEqualityMatcher() MatchingEngine {
+func newStringEqualityMatcher(concurrency int64) MatchingEngine {
 	return &stringLookup{
-		lock:       &sync.RWMutex{},
-		vars:       map[string]struct{}{},
-		equality:   variableMap{},
-		inequality: inequalityMap{},
+		lock:        &sync.RWMutex{},
+		vars:        map[string]struct{}{},
+		equality:    variableMap{},
+		inequality:  inequalityMap{},
+		concurrency: concurrency,
 	}
 }
 
@@ -51,6 +51,8 @@ type stringLookup struct {
 	//
 	// this lets us quickly map neq in a fast manner
 	inequality inequalityMap
+
+	concurrency int64
 }
 
 func (s stringLookup) Type() EngineType {
@@ -61,12 +63,13 @@ func (n *stringLookup) Match(ctx context.Context, input map[string]any) ([]*Stor
 	l := &sync.Mutex{}
 
 	matched := []*StoredExpressionPart{}
-	eg := errgroup.Group{}
+
+	pool := newErrPool(errPoolOpts{concurrency: n.concurrency})
 
 	// First, handle equality matching.
 	for item := range n.vars {
 		path := item
-		eg.Go(func() error {
+		pool.Go(func() error {
 			x, err := jp.ParseString(path)
 			if err != nil {
 				return err
@@ -92,7 +95,7 @@ func (n *stringLookup) Match(ctx context.Context, input map[string]any) ([]*Stor
 	// Then, iterate through the inequality matches.
 	for item := range n.inequality {
 		path := item
-		eg.Go(func() error {
+		pool.Go(func() error {
 			x, err := jp.ParseString(path)
 			if err != nil {
 				return err
@@ -115,7 +118,7 @@ func (n *stringLookup) Match(ctx context.Context, input map[string]any) ([]*Stor
 		})
 	}
 
-	return matched, eg.Wait()
+	return matched, pool.Wait()
 }
 
 // Search returns all ExpressionParts which match the given input, ignoring the variable name
