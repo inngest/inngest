@@ -5,6 +5,7 @@ import { graphql } from '@/gql';
 import {
   type InvokeFunctionMutation,
   type InvokeFunctionMutationVariables,
+  type ProductionAppsQuery,
   type SyncResponse,
 } from '@/gql/graphql';
 import graphqlAPI from '@/queries/graphqlAPI';
@@ -121,3 +122,21 @@ export const getInvokeFunctionLookups = cache(async (envSlug: string) => {
 
   return results;
 });
+
+export const GetProductionAppsDocument = graphql(`
+  query ProductionApps($envID: ID!) {
+    environment: workspace(id: $envID) {
+      apps {
+        id
+      }
+    }
+  }
+`);
+
+export const getProductionApps = async () => {
+  const environment = await getProductionEnvironment();
+
+  return await graphqlAPI.request<ProductionAppsQuery>(GetProductionAppsDocument, {
+    envID: environment.id,
+  });
+};
