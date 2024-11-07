@@ -54,7 +54,6 @@ export default function OnboardingWidget({
             step: nextStep ? nextStep.name : lastCompletedStep?.name,
             ref: 'app-onboarding-widget',
           })}
-          onClick={() => tracking?.trackOnboardingOpened(totalStepsCompleted, 'widget')}
           className="text-basis bg-canvasBase hover:bg-canvasSubtle border-subtle mb-5 block rounded border p-3 leading-tight"
         >
           <div className="flex h-[110px] flex-col justify-between">
@@ -80,7 +79,9 @@ export default function OnboardingWidget({
                       className="hover:bg-canvasBase"
                       onClick={(e) => {
                         e.preventDefault();
-                        tracking?.trackWidgetDismissed(totalStepsCompleted);
+                        tracking?.trackOnboardingAction(undefined, {
+                          metadata: { totalStepsCompleted: totalStepsCompleted },
+                        });
                         closeWidget();
                       }}
                     />

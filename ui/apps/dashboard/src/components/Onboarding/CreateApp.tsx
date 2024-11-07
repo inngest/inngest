@@ -32,6 +32,7 @@ const tabs = [
 ];
 
 export default function CreateApp() {
+  const currentStepName = OnboardingSteps.CreateApp;
   const { updateCompletedSteps } = useOnboardingStep();
   const [activeTab, setActiveTab] = useState(tabs[0]?.title || '');
   const currentTabContent = tabs.find((tab) => tab.title === activeTab) || tabs[0];
@@ -97,7 +98,11 @@ export default function CreateApp() {
               href="http://localhost:8288"
               target="_blank"
               rel="noopener noreferrer"
-              onClick={() => tracking?.trackCreateAppAction('open-dev-server')}
+              onClick={() =>
+                tracking?.trackOnboardingAction(currentStepName, {
+                  metadata: { type: 'btn-click', label: 'open-dev-server' },
+                })
+              }
             />
           ) : (
             <div className="text-link flex items-center gap-1.5 text-sm">
@@ -112,8 +117,14 @@ export default function CreateApp() {
           label="Next"
           disabled={!devServerIsRunning}
           onClick={() => {
-            updateCompletedSteps(OnboardingSteps.CreateApp, 'manual');
-            tracking?.trackCreateAppAction('next');
+            updateCompletedSteps(currentStepName, {
+              metadata: {
+                completionSource: 'manual',
+              },
+            });
+            tracking?.trackOnboardingAction(currentStepName, {
+              metadata: { type: 'btn-click', label: 'next' },
+            });
             router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.DeployApp }));
           }}
         />
@@ -121,8 +132,14 @@ export default function CreateApp() {
           appearance="outlined"
           label="I already have an Inngest app"
           onClick={() => {
-            updateCompletedSteps(OnboardingSteps.CreateApp, 'manual');
-            tracking?.trackCreateAppAction('skip');
+            updateCompletedSteps(currentStepName, {
+              metadata: {
+                completionSource: 'manual',
+              },
+            });
+            tracking?.trackOnboardingAction(currentStepName, {
+              metadata: { type: 'btn-click', label: 'skip' },
+            });
             router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.DeployApp }));
           }}
         />

@@ -20,6 +20,7 @@ import useOnboardingStep from './useOnboardingStep';
 import { useOnboardingTracking } from './useOnboardingTracking';
 
 export default function SyncApp() {
+  const currentStepName = OnboardingSteps.SyncApp;
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<CodedError | null>();
@@ -37,7 +38,12 @@ export default function SyncApp() {
       const { success, error, appName } = await syncAppManually(inputValue);
       if (success) {
         setApp(appName);
-        updateCompletedSteps(OnboardingSteps.SyncApp, 'manual');
+        updateCompletedSteps(currentStepName, {
+          metadata: {
+            completionSource: 'manual',
+            syncMethod: 'manual',
+          },
+        });
       } else {
         setError(error);
       }
@@ -132,7 +138,9 @@ export default function SyncApp() {
               loading={isLoading}
               label="Sync app here"
               onClick={() => {
-                tracking?.trackSyncAppAction('sync', 'manual');
+                tracking?.trackOnboardingAction(currentStepName, {
+                  metadata: { type: 'btn-click', label: 'sync', syncMethod: 'manual' },
+                });
                 handleSyncAppManually();
               }}
             />
@@ -141,7 +149,9 @@ export default function SyncApp() {
             <NewButton
               label="Next"
               onClick={() => {
-                tracking?.trackSyncAppAction('next', 'manual');
+                tracking?.trackOnboardingAction(currentStepName, {
+                  metadata: { type: 'btn-click', label: 'next', syncMethod: 'manual' },
+                });
                 router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.InvokeFn }));
               }}
             />
@@ -162,7 +172,11 @@ export default function SyncApp() {
                 label="View Vercel dashboard"
                 href={pathCreator.vercel()}
                 size="small"
-                onClick={() => tracking?.trackSyncAppAction('view-dashboard', 'vercel')}
+                onClick={() =>
+                  tracking?.trackOnboardingAction(currentStepName, {
+                    metadata: { type: 'btn-click', label: 'view-dashboard', syncMethod: 'vercel' },
+                  })
+                }
               />
             </div>
             <p className="mb-4 text-sm">
@@ -177,8 +191,15 @@ export default function SyncApp() {
             <NewButton
               label="Next"
               onClick={() => {
-                updateCompletedSteps(OnboardingSteps.SyncApp, 'manual');
-                tracking?.trackSyncAppAction('next', 'vercel');
+                updateCompletedSteps(currentStepName, {
+                  metadata: {
+                    completionSource: 'manual',
+                    syncMethod: 'vercel',
+                  },
+                });
+                tracking?.trackOnboardingAction(currentStepName, {
+                  metadata: { type: 'btn-click', label: 'next', syncMethod: 'vercel' },
+                });
                 router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.InvokeFn }));
               }}
             />

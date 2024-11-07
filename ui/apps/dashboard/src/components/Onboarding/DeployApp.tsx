@@ -18,6 +18,7 @@ import useOnboardingStep from './useOnboardingStep';
 import { useOnboardingTracking } from './useOnboardingTracking';
 
 export default function DeployApp() {
+  const currentStepName = OnboardingSteps.DeployApp;
   const { updateCompletedSteps } = useOnboardingStep();
   const router = useRouter();
   const env = useEnvironment();
@@ -106,8 +107,18 @@ export default function DeployApp() {
           <NewButton
             label="Next"
             onClick={() => {
-              updateCompletedSteps(OnboardingSteps.DeployApp, 'manual');
-              tracking?.trackDeployAppAction('next', 'all');
+              updateCompletedSteps(currentStepName, {
+                metadata: {
+                  completionSource: 'manual',
+                  hostingProvider: 'all',
+                },
+              });
+              tracking?.trackOnboardingAction(currentStepName, {
+                metadata: { type: 'btn-click', label: 'skip', hostingProvider: 'all' },
+              });
+              tracking?.trackOnboardingAction(currentStepName, {
+                metadata: { type: 'btn-click', label: 'next', hostingProvider: 'all' },
+              });
               router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.SyncApp }));
             }}
           />
@@ -126,7 +137,13 @@ export default function DeployApp() {
                 kind="secondary"
                 appearance="outlined"
                 onClick={() => {
-                  tracking?.trackDeployAppAction('go-to-vercel', 'vercel');
+                  tracking?.trackOnboardingAction(currentStepName, {
+                    metadata: {
+                      type: 'btn-click',
+                      label: 'go-to-vercel',
+                      hostingProvider: 'vercel',
+                    },
+                  });
                   router.push(pathCreator.vercel());
                 }}
               />
@@ -158,7 +175,9 @@ export default function DeployApp() {
               <NewButton
                 label="Connect Inngest to Vercel"
                 onClick={() => {
-                  tracking?.trackDeployAppAction('connect', 'vercel');
+                  tracking?.trackOnboardingAction(currentStepName, {
+                    metadata: { type: 'btn-click', label: 'connect', hostingProvider: 'vercel' },
+                  });
                   const nextUrl = encodeURIComponent(
                     'https://app.inngest.com/env/production/onboarding/deploy-app'
                   );
@@ -176,8 +195,15 @@ export default function DeployApp() {
               <NewButton
                 label="Next"
                 onClick={() => {
-                  updateCompletedSteps(OnboardingSteps.DeployApp, 'manual');
-                  tracking?.trackDeployAppAction('next', 'vercel');
+                  updateCompletedSteps(currentStepName, {
+                    metadata: {
+                      completionSource: 'manual',
+                      hostingProvider: 'vercel',
+                    },
+                  });
+                  tracking?.trackOnboardingAction(currentStepName, {
+                    metadata: { type: 'btn-click', label: 'next', hostingProvider: 'vercel' },
+                  });
                   router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.SyncApp }));
                 }}
               />
@@ -210,8 +236,15 @@ export default function DeployApp() {
           <NewButton
             label="Next"
             onClick={() => {
-              updateCompletedSteps(OnboardingSteps.DeployApp, 'manual');
-              tracking?.trackDeployAppAction('next', 'cloudflare');
+              updateCompletedSteps(currentStepName, {
+                metadata: {
+                  completionSource: 'manual',
+                  hostingProvider: 'cloudflare',
+                },
+              });
+              tracking?.trackOnboardingAction(currentStepName, {
+                metadata: { type: 'btn-click', label: 'next', hostingProvider: 'cloudflare' },
+              });
               router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.SyncApp }));
             }}
           />
@@ -287,8 +320,15 @@ export default function DeployApp() {
           <NewButton
             label="Next"
             onClick={() => {
-              updateCompletedSteps(OnboardingSteps.DeployApp, 'manual');
-              tracking?.trackDeployAppAction('next', 'flyio');
+              updateCompletedSteps(currentStepName, {
+                metadata: {
+                  completionSource: 'manual',
+                  hostingProvider: 'flyio',
+                },
+              });
+              tracking?.trackOnboardingAction(currentStepName, {
+                metadata: { type: 'btn-click', label: 'next', hostingProvider: 'flyio' },
+              });
               router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.SyncApp }));
             }}
           />

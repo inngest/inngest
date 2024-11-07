@@ -75,10 +75,7 @@ export default function useOnboardingStep() {
 
   const totalStepsCompleted: TotalStepsCompleted = completedSteps.length;
 
-  const updateCompletedSteps = (
-    stepName: OnboardingSteps,
-    completionSource: string = 'automatic'
-  ) => {
+  const updateCompletedSteps = (stepName: OnboardingSteps, metadata?: Record<string, any>) => {
     if (typeof window !== 'undefined') {
       // Find the full step details from the steps array
       const step = steps.find((s) => s.name === stepName);
@@ -104,7 +101,7 @@ export default function useOnboardingStep() {
           new CustomEvent('onboardingStepUpdate', { detail: newCompletedSteps })
         );
 
-        tracking?.trackOnboardingStepCompleted(step, completionSource);
+        tracking?.trackOnboardingStepCompleted(step, metadata);
       }
       // TO DO: dispatch tracking for automatically completed steps
     }

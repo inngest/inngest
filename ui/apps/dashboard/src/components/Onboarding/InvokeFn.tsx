@@ -34,6 +34,7 @@ interface FunctionOption extends Option {
 }
 
 export default function InvokeFn() {
+  const currentStepName = OnboardingSteps.InvokeFn;
   const { updateCompletedSteps } = useOnboardingStep();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
@@ -79,7 +80,12 @@ export default function InvokeFn() {
         data: payload.data,
       });
       if (success) {
-        updateCompletedSteps(OnboardingSteps.InvokeFn, 'manual');
+        updateCompletedSteps(currentStepName, {
+          metadata: {
+            completionSource: 'manual',
+            invokedFunction: selectedFunction,
+          },
+        });
         setError(undefined);
         setIsFnInvoked(true);
         // TO DO: add link to run ID, need to update mutation first to return ID
@@ -180,7 +186,13 @@ export default function InvokeFn() {
               label="Invoke test function"
               disabled={!selectedFunction}
               onClick={() => {
-                tracking?.trackInvokeFnAction('invoke', selectedFunction?.id);
+                tracking?.trackOnboardingAction(currentStepName, {
+                  metadata: {
+                    type: 'btn-click',
+                    label: 'invoke',
+                    invokedFunction: selectedFunction,
+                  },
+                });
                 handleInvokeFn();
               }}
             />
@@ -188,8 +200,15 @@ export default function InvokeFn() {
               appearance="outlined"
               label="Skip, take me to dashboard"
               onClick={() => {
-                updateCompletedSteps(OnboardingSteps.InvokeFn, 'manual');
-                tracking?.trackInvokeFnAction('skip', selectedFunction?.id);
+                updateCompletedSteps(currentStepName, {
+                  metadata: {
+                    completionSource: 'manual',
+                    invokedFunction: null,
+                  },
+                });
+                tracking?.trackOnboardingAction(currentStepName, {
+                  metadata: { type: 'btn-click', label: 'skip', invokedFunction: selectedFunction },
+                });
                 router.push(pathCreator.apps({ envSlug: 'production' }));
               }}
             />
@@ -199,7 +218,13 @@ export default function InvokeFn() {
             className="mt-6"
             label="Go to runs"
             onClick={() => {
-              tracking?.trackInvokeFnAction('go-to-runs', selectedFunction?.id);
+              tracking?.trackOnboardingAction(currentStepName, {
+                metadata: {
+                  type: 'btn-click',
+                  label: 'go-to-runs',
+                  invokedFunction: selectedFunction,
+                },
+              });
               router.push(pathCreator.runs({ envSlug: 'production' }));
             }}
           />
