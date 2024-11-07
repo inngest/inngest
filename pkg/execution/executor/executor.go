@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -1271,7 +1272,7 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 			// was received before the run (due to eg. latency in a bad case).
 			//
 			// NOTE: Fast path this before handling the expression.
-			if pause.Cancel && evtID.Time() < pause.Identifier.RunID.Time() {
+			if pause.Cancel && bytes.Compare(evtID[:], pause.Identifier.RunID[:]) <= 0 {
 				return
 			}
 
@@ -1390,7 +1391,7 @@ func (e *executor) handlePause(
 
 	// If this is a cancellation, ensure that we're not handling an event that
 	// was received before the run (due to eg. latency in a bad case).
-	if pause.Cancel && evtID.Time() < pause.Identifier.RunID.Time() {
+	if pause.Cancel && bytes.Compare(evtID[:], pause.Identifier.RunID[:]) <= 0 {
 		return nil
 	}
 
