@@ -18,9 +18,11 @@ import { SyncFailure } from '../SyncFailure';
 import { syncAppManually } from './actions';
 import useOnboardingStep from './useOnboardingStep';
 import { useOnboardingTracking } from './useOnboardingTracking';
+import { getNextStepName } from './utils';
 
 export default function SyncApp() {
   const currentStepName = OnboardingSteps.SyncApp;
+  const nextStepName = getNextStepName(currentStepName);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<CodedError | null>();
@@ -152,7 +154,7 @@ export default function SyncApp() {
                 tracking?.trackOnboardingAction(currentStepName, {
                   metadata: { type: 'btn-click', label: 'next', syncMethod: 'manual' },
                 });
-                router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.InvokeFn }));
+                router.push(pathCreator.onboardingSteps({ step: nextStepName }));
               }}
             />
           )}
@@ -200,7 +202,7 @@ export default function SyncApp() {
                 tracking?.trackOnboardingAction(currentStepName, {
                   metadata: { type: 'btn-click', label: 'next', syncMethod: 'vercel' },
                 });
-                router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.InvokeFn }));
+                router.push(pathCreator.onboardingSteps({ step: nextStepName }));
               }}
             />
           </TabCards.Content>

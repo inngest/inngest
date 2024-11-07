@@ -16,9 +16,11 @@ import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { OnboardingSteps } from '../Onboarding/types';
 import useOnboardingStep from './useOnboardingStep';
 import { useOnboardingTracking } from './useOnboardingTracking';
+import { getNextStepName } from './utils';
 
 export default function DeployApp() {
   const currentStepName = OnboardingSteps.DeployApp;
+  const nextStepName = getNextStepName(currentStepName);
   const { updateCompletedSteps } = useOnboardingStep();
   const router = useRouter();
   const env = useEnvironment();
@@ -119,7 +121,7 @@ export default function DeployApp() {
               tracking?.trackOnboardingAction(currentStepName, {
                 metadata: { type: 'btn-click', label: 'next', hostingProvider: 'all' },
               });
-              router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.SyncApp }));
+              router.push(pathCreator.onboardingSteps({ step: nextStepName }));
             }}
           />
         </TabCards.Content>
@@ -204,7 +206,7 @@ export default function DeployApp() {
                   tracking?.trackOnboardingAction(currentStepName, {
                     metadata: { type: 'btn-click', label: 'next', hostingProvider: 'vercel' },
                   });
-                  router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.SyncApp }));
+                  router.push(pathCreator.onboardingSteps({ step: nextStepName }));
                 }}
               />
             )}
@@ -245,7 +247,7 @@ export default function DeployApp() {
               tracking?.trackOnboardingAction(currentStepName, {
                 metadata: { type: 'btn-click', label: 'next', hostingProvider: 'cloudflare' },
               });
-              router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.SyncApp }));
+              router.push(pathCreator.onboardingSteps({ step: nextStepName }));
             }}
           />
         </TabCards.Content>
@@ -329,7 +331,7 @@ export default function DeployApp() {
               tracking?.trackOnboardingAction(currentStepName, {
                 metadata: { type: 'btn-click', label: 'next', hostingProvider: 'flyio' },
               });
-              router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.SyncApp }));
+              router.push(pathCreator.onboardingSteps({ step: nextStepName }));
             }}
           />
         </TabCards.Content>

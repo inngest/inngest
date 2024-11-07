@@ -12,6 +12,7 @@ import { pathCreator } from '@/utils/urls';
 import { OnboardingSteps } from '../Onboarding/types';
 import useOnboardingStep from './useOnboardingStep';
 import { useOnboardingTracking } from './useOnboardingTracking';
+import { getNextStepName } from './utils';
 
 const tabs = [
   {
@@ -33,6 +34,7 @@ const tabs = [
 
 export default function CreateApp() {
   const currentStepName = OnboardingSteps.CreateApp;
+  const nextStepName = getNextStepName(currentStepName);
   const { updateCompletedSteps } = useOnboardingStep();
   const [activeTab, setActiveTab] = useState(tabs[0]?.title || '');
   const currentTabContent = tabs.find((tab) => tab.title === activeTab) || tabs[0];
@@ -125,7 +127,7 @@ export default function CreateApp() {
             tracking?.trackOnboardingAction(currentStepName, {
               metadata: { type: 'btn-click', label: 'next' },
             });
-            router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.DeployApp }));
+            router.push(pathCreator.onboardingSteps({ step: nextStepName }));
           }}
         />
         <NewButton
@@ -140,7 +142,7 @@ export default function CreateApp() {
             tracking?.trackOnboardingAction(currentStepName, {
               metadata: { type: 'btn-click', label: 'skip' },
             });
-            router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.DeployApp }));
+            router.push(pathCreator.onboardingSteps({ step: nextStepName }));
           }}
         />
       </div>
