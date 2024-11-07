@@ -18,14 +18,12 @@ import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { EnvironmentType } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import useOnboardingStep from '../Onboarding/useOnboardingStep';
-import { useOnboardingTracking } from '../Onboarding/useOnboardingTracking';
 import SystemStatusIcon from './SystemStatusIcon';
 
 export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget: () => void }) => {
   const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
-  const { nextStep, totalStepsCompleted } = useOnboardingStep();
+  const { nextStep, lastCompletedStep } = useOnboardingStep();
   const status = useSystemStatus();
-  const tracking = useOnboardingTracking();
 
   return (
     <Listbox>
@@ -111,12 +109,10 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
               <Link
                 href={pathCreator.onboardingSteps({
                   envSlug: EnvironmentType.Production.toLowerCase(),
-                  step: nextStep,
+                  step: nextStep ? nextStep.name : lastCompletedStep?.name,
+                  ref: 'app-navbar-help',
                 })}
-                onClick={() => {
-                  showWidget();
-                  tracking?.trackOnboardingOpened(totalStepsCompleted, 'widget');
-                }}
+                onClick={() => showWidget()}
               >
                 <Listbox.Option
                   className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"

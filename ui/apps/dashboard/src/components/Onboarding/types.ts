@@ -7,11 +7,33 @@ export enum OnboardingSteps {
   InvokeFn = 'invoke-fn',
 }
 
-export const STEPS_ORDER: OnboardingSteps[] = [
-  OnboardingSteps.CreateApp,
-  OnboardingSteps.DeployApp,
-  OnboardingSteps.SyncApp,
-  OnboardingSteps.InvokeFn,
+export type OnboardingStep = {
+  name: OnboardingSteps;
+  stepNumber: ArrayLengthRange<typeof steps>;
+  isFinalStep: boolean;
+};
+
+export const steps: OnboardingStep[] = [
+  {
+    name: OnboardingSteps.CreateApp,
+    stepNumber: 1,
+    isFinalStep: false,
+  },
+  {
+    name: OnboardingSteps.DeployApp,
+    stepNumber: 2,
+    isFinalStep: false,
+  },
+  {
+    name: OnboardingSteps.SyncApp,
+    stepNumber: 3,
+    isFinalStep: false,
+  },
+  {
+    name: OnboardingSteps.InvokeFn,
+    stepNumber: 4,
+    isFinalStep: true,
+  },
 ];
 
 type ArrayLengthRange<T extends readonly any[]> = Extract<
@@ -20,13 +42,11 @@ type ArrayLengthRange<T extends readonly any[]> = Extract<
 >;
 
 // Type representing the possible number of completed steps (0 to 4)
-export type TotalStepsCompleted = ArrayLengthRange<typeof STEPS_ORDER>;
+export type TotalStepsCompleted = ArrayLengthRange<typeof steps>;
 
-export function isValidStep(step: string): step is OnboardingSteps {
-  return STEPS_ORDER.includes(step as OnboardingSteps);
+export function isValidStep(stepName: string): stepName is OnboardingSteps {
+  return steps.some((step) => step.name === stepName);
 }
-
-export type OnboardingStepsCompleted = OnboardingSteps[] | [];
 
 type OnboardingWidgetStepContent = {
   title: string;

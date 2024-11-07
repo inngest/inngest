@@ -1,51 +1,53 @@
 'use client';
 
 import { trackEvent, useTrackingUser } from '@/utils/tracking';
-import { OnboardingSteps, type TotalStepsCompleted } from './types';
+import { OnboardingSteps, steps, type OnboardingStep } from './types';
+import useOnboardingStep from './useOnboardingStep';
 
-export function useOnboardingTracking() {
+export function useOnboardingStepCompletedTracking() {
   const trackingUser = useTrackingUser();
   if (!trackingUser) return null;
 
   const trackOnboardingStepCompleted = (
-    step: OnboardingSteps,
-    isFinalStep: boolean,
-    completionSource?: string
+    step: OnboardingStep,
+    metadata: Record<string, any> = {}
   ) => {
     trackEvent({
       name: 'onboarding/step.completed',
       data: {
-        step: step,
-        isFinalStep: isFinalStep,
-        completionSource: completionSource,
+        ...step,
+        ...metadata,
       },
       user: trackingUser,
       v: '2024-11-04.1',
     });
   };
 
-  const trackWidgetDismissed = (stepsCompleted: TotalStepsCompleted) => {
+  return { trackOnboardingStepCompleted };
+}
+
+export function useOnboardingTracking() {
+  const trackingUser = useTrackingUser();
+  const { lastCompletedStep } = useOnboardingStep();
+  if (!trackingUser) return null;
+
+  const trackOnboardingAction = (
+    stepName?: OnboardingSteps,
+    metadata: Record<string, any> = {}
+  ) => {
+    const step = steps.find((s) => s.name === stepName);
+
     trackEvent({
-      name: 'onboarding/widget.dismissed',
+      name: 'onboarding/action',
       data: {
-        stepsCompleted: stepsCompleted,
+        step,
+        lastCompletedStep: lastCompletedStep,
+        ...metadata,
       },
       user: trackingUser,
       v: '2024-11-04.1',
     });
   };
 
-  const trackOnboardingOpened = (stepsCompleted: TotalStepsCompleted, source: string) => {
-    trackEvent({
-      name: 'onboarding/page.opened',
-      data: {
-        stepsCompleted: stepsCompleted,
-        source: source,
-      },
-      user: trackingUser,
-      v: '2024-11-04.1',
-    });
-  };
-
-  return { trackOnboardingStepCompleted, trackWidgetDismissed, trackOnboardingOpened };
+  return { trackOnboardingAction };
 }

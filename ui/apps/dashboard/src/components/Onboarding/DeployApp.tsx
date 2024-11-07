@@ -15,14 +15,21 @@ import { useEnvironment } from '../Environments/environment-context';
 import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { OnboardingSteps } from '../Onboarding/types';
 import useOnboardingStep from './useOnboardingStep';
+import { useOnboardingTracking } from './useOnboardingTracking';
+import { getNextStepName } from './utils';
 
 export default function DeployApp() {
-  const { updateLastCompletedStep } = useOnboardingStep();
+  const currentStepName = OnboardingSteps.DeployApp;
+  const nextStepName = getNextStepName(currentStepName);
+  const { updateCompletedSteps } = useOnboardingStep();
   const router = useRouter();
   const env = useEnvironment();
   const res = useDefaultEventKey({ envID: env.id });
   const defaultEventKey = res.data?.defaultKey.presharedKey || 'Unknown key';
   const { value: vercelFlowEnabled } = useBooleanFlag('onboarding-vercel-flow');
+  const tracking = useOnboardingTracking();
+  const hasVercelIntegration = Math.random() > 0.5; // temp
+  const vercelProjects = [];
 
   return (
     <div className="text-subtle">
@@ -102,18 +109,46 @@ export default function DeployApp() {
           <NewButton
             label="Next"
             onClick={() => {
-              updateLastCompletedStep(OnboardingSteps.DeployApp, 'manual');
-              router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.SyncApp }));
+              updateCompletedSteps(currentStepName, {
+                metadata: {
+                  completionSource: 'manual',
+                  hostingProvider: 'all',
+                },
+              });
+              tracking?.trackOnboardingAction(currentStepName, {
+                metadata: { type: 'btn-click', label: 'skip', hostingProvider: 'all' },
+              });
+              tracking?.trackOnboardingAction(currentStepName, {
+                metadata: { type: 'btn-click', label: 'next', hostingProvider: 'all' },
+              });
+              router.push(pathCreator.onboardingSteps({ step: nextStepName }));
             }}
           />
         </TabCards.Content>
         {vercelFlowEnabled && (
           <TabCards.Content value="vercel">
-            <div className="mb-4 flex items-center gap-2">
-              <div className="bg-canvasMuted flex h-9 w-9 items-center justify-center rounded">
-                <IconVercel className="text-basis h-4 w-4" />
+            <div className="mb-4 flex items-center justify-between ">
+              <div className="flex items-center gap-2">
+                <div className="bg-canvasMuted flex h-9 w-9 items-center justify-center rounded">
+                  <IconVercel className="text-basis h-4 w-4" />
+                </div>
+                <p className="text-basis">Vercel</p>
               </div>
-              <p className="text-basis">Vercel</p>
+              <NewButton
+                label="View Vercel Dashboard"
+                kind="secondary"
+                appearance="outlined"
+                onClick={() => {
+                  tracking?.trackOnboardingAction(currentStepName, {
+                    metadata: {
+                      type: 'btn-click',
+                      label: 'go-to-vercel',
+                      hostingProvider: 'vercel',
+                    },
+                  });
+                  router.push(pathCreator.vercel());
+                }}
+              />
             </div>
             <p className="mb-4 text-sm">
               The Vercel integration enables you to host your Inngest functions on the Vercel
@@ -138,13 +173,43 @@ export default function DeployApp() {
                 environments
               </div>
             </div>
-            <NewButton
-              label="Next"
-              onClick={() => {
-                updateLastCompletedStep(OnboardingSteps.DeployApp, 'manual');
-                router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.SyncApp }));
-              }}
-            />
+            {!hasVercelIntegration && (
+              <NewButton
+                label="Connect Inngest to Vercel"
+                onClick={() => {
+                  tracking?.trackOnboardingAction(currentStepName, {
+                    metadata: { type: 'btn-click', label: 'connect', hostingProvider: 'vercel' },
+                  });
+                  const nextUrl = encodeURIComponent(
+                    'https://app.inngest.com/env/production/onboarding/deploy-app'
+                  );
+                  router.push(`https://vercel.com/integrations/inngest/new?next=${nextUrl}`);
+                }}
+              />
+            )}
+            {hasVercelIntegration && (
+              <p className="text-success my-4 text-sm">
+                {vercelProjects.length} project{vercelProjects.length === 1 ? '' : 's'} enabled
+                successfully
+              </p>
+            )}
+            {hasVercelIntegration && (
+              <NewButton
+                label="Next"
+                onClick={() => {
+                  updateCompletedSteps(currentStepName, {
+                    metadata: {
+                      completionSource: 'manual',
+                      hostingProvider: 'vercel',
+                    },
+                  });
+                  tracking?.trackOnboardingAction(currentStepName, {
+                    metadata: { type: 'btn-click', label: 'next', hostingProvider: 'vercel' },
+                  });
+                  router.push(pathCreator.onboardingSteps({ step: nextStepName }));
+                }}
+              />
+            )}
           </TabCards.Content>
         )}
         <TabCards.Content value="cloudflare">
@@ -173,8 +238,16 @@ export default function DeployApp() {
           <NewButton
             label="Next"
             onClick={() => {
-              updateLastCompletedStep(OnboardingSteps.DeployApp, 'manual');
-              router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.SyncApp }));
+              updateCompletedSteps(currentStepName, {
+                metadata: {
+                  completionSource: 'manual',
+                  hostingProvider: 'cloudflare',
+                },
+              });
+              tracking?.trackOnboardingAction(currentStepName, {
+                metadata: { type: 'btn-click', label: 'next', hostingProvider: 'cloudflare' },
+              });
+              router.push(pathCreator.onboardingSteps({ step: nextStepName }));
             }}
           />
         </TabCards.Content>
@@ -249,8 +322,16 @@ export default function DeployApp() {
           <NewButton
             label="Next"
             onClick={() => {
-              updateLastCompletedStep(OnboardingSteps.DeployApp, 'manual');
-              router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.SyncApp }));
+              updateCompletedSteps(currentStepName, {
+                metadata: {
+                  completionSource: 'manual',
+                  hostingProvider: 'flyio',
+                },
+              });
+              tracking?.trackOnboardingAction(currentStepName, {
+                metadata: { type: 'btn-click', label: 'next', hostingProvider: 'flyio' },
+              });
+              router.push(pathCreator.onboardingSteps({ step: nextStepName }));
             }}
           />
         </TabCards.Content>

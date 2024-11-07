@@ -4,28 +4,32 @@ import StepsMenu from '@inngest/components/Steps/StepsMenu';
 import { RiDiscordLine, RiExternalLinkLine, RiMailLine } from '@remixicon/react';
 
 import { pathCreator } from '@/utils/urls';
-import { STEPS_ORDER, isValidStep } from '../Onboarding/types';
+import { isValidStep, steps } from '../Onboarding/types';
 import { onboardingMenuStepContent } from './content';
 import useOnboardingStep from './useOnboardingStep';
 
-export default function Menu({ envSlug, step }: { envSlug: string; step: string }) {
-  const { lastCompletedStep } = useOnboardingStep();
+export default function Menu({ envSlug, stepName }: { envSlug: string; stepName: string }) {
+  const { completedSteps } = useOnboardingStep();
 
   return (
     <StepsMenu title={onboardingMenuStepContent.title} links={links}>
-      {STEPS_ORDER.map((stepKey) => {
-        if (!isValidStep(stepKey)) {
+      {steps.map((stepObj) => {
+        const { name, stepNumber } = stepObj;
+
+        if (!isValidStep(stepName)) {
           return 'error';
         }
-        const isCompleted = lastCompletedStep
-          ? STEPS_ORDER.indexOf(stepKey) <= STEPS_ORDER.indexOf(lastCompletedStep)
-          : false;
-        const isActive = step === stepKey;
-        const stepContent = onboardingMenuStepContent.step[stepKey];
-        const url = pathCreator.onboardingSteps({ envSlug: envSlug, step: stepKey });
+
+        const isCompleted = completedSteps.some((step) => step.stepNumber === stepNumber);
+
+        const isActive = stepName === name;
+
+        const stepContent = onboardingMenuStepContent.step[name];
+        const url = pathCreator.onboardingSteps({ envSlug: envSlug, step: name });
+
         return (
           <StepsMenu.MenuItem
-            key={stepKey}
+            key={name}
             stepContent={stepContent}
             isCompleted={isCompleted}
             isActive={isActive}
@@ -41,17 +45,20 @@ const links = (
   <>
     <StepsMenu.Link
       iconBefore={<RiExternalLinkLine className="h-4 w-4" />}
-      href="https://www.inngest.com/docs"
+      href="https://www.inngest.com/docs?ref=app-onboarding-menu"
     >
       See documentation
     </StepsMenu.Link>
     <StepsMenu.Link
       iconBefore={<RiDiscordLine className="h-4 w-4" />}
-      href="https://www.inngest.com/discord"
+      href="https://www.inngest.com/discord?ref=app-onboarding-menu"
     >
       Join discord community
     </StepsMenu.Link>
-    <StepsMenu.Link iconBefore={<RiMailLine className="h-4 w-4" />} href={pathCreator.support()}>
+    <StepsMenu.Link
+      iconBefore={<RiMailLine className="h-4 w-4" />}
+      href={pathCreator.support({ ref: 'app-onboarding-menu' })}
+    >
       Request a demo
     </StepsMenu.Link>
   </>
