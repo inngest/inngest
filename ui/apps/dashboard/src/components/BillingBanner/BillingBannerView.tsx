@@ -14,6 +14,7 @@ type Props = {
       current: number;
       limit: number | null;
     };
+    accountConcurrencyLimitHits: number;
   };
 };
 
