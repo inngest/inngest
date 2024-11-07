@@ -22,6 +22,7 @@ const (
 type MatchingEngine interface {
 	// Type returns the EngineType
 	Type() EngineType
+
 	// Match takes an input event, containing key:value pairs of data, and
 	// matches the given data to any ExpressionParts stored in the engine.
 	//
@@ -29,7 +30,8 @@ type MatchingEngine interface {
 	// expression parts received.  Some may return false positives, but
 	// each MatchingEngine should NEVER omit ExpressionParts which match
 	// the given input.
-	Match(ctx context.Context, input map[string]any) ([]*StoredExpressionPart, error)
+	Match(ctx context.Context, input map[string]any) (matched []*StoredExpressionPart, err error)
+
 	// Add adds a new expression part to the matching engine for future matches.
 	Add(ctx context.Context, p ExpressionPart) error
 	// Remove removes an expression part from the matching engine, ensuring that the
@@ -44,7 +46,7 @@ type MatchingEngine interface {
 	// ignoring the variable name.  Note that each MatchingEngine should NEVER
 	// omit ExpressionParts which match the given input;  false positives are okay,
 	// but not returning valid matches must be impossible.
-	Search(ctx context.Context, variable string, input any) []*StoredExpressionPart
+	Search(ctx context.Context, variable string, input any) (matched []*StoredExpressionPart)
 }
 
 // Leaf represents the leaf within a tree.  This stores all expressions
