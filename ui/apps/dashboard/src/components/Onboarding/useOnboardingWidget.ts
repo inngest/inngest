@@ -8,9 +8,10 @@ const useOnboardingWidget = () => {
   useEffect(() => {
     const fetchProductionApps = async () => {
       try {
-        const apps = await getProdApps();
-        // Default to true only when user doesn't have prod apps
-        setIsOpen(apps.length === 0);
+        const { apps, unattachedSyncs } = await getProdApps();
+        const hasAppsOrUnattachedSyncs = apps.length > 0 || unattachedSyncs.length > 0;
+        // Show widget by default when user doesn't have prod apps
+        setIsOpen(!hasAppsOrUnattachedSyncs);
       } catch (error) {
         console.error('Error in useOnboardingWidget:', error);
       }

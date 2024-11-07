@@ -50,8 +50,9 @@ export default function AppsPage({
   useEffect(() => {
     async function fetchProductionApps() {
       try {
-        const apps = await getProdApps();
-        setHasProductionApps(apps.length > 0);
+        const { apps, unattachedSyncs } = await getProdApps();
+        const hasAppsOrUnattachedSyncs = apps.length > 0 || unattachedSyncs.length > 0;
+        setHasProductionApps(hasAppsOrUnattachedSyncs);
       } catch (error) {
         console.error('Error fetching production apps', error);
         setHasProductionApps(false);

@@ -129,6 +129,9 @@ export const GetProductionAppsDocument = graphql(`
       apps {
         id
       }
+      unattachedSyncs(first: 1) {
+        lastSyncedAt
+      }
     }
   }
 `);

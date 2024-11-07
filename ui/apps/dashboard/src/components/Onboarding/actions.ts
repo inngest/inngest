@@ -72,9 +72,10 @@ export async function prefetchFunctions() {
 export async function getProdApps() {
   try {
     const response = await getProductionApps();
-    return response.environment.apps;
+    const { apps, unattachedSyncs } = response.environment;
+    return { apps, unattachedSyncs };
   } catch (error) {
     console.error('Error fetching production apps:', error);
-    return [];
+    return { apps: [], unattachedSyncs: [] };
   }
 }
