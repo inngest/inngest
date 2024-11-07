@@ -69,7 +69,6 @@ export default function useOnboardingStep() {
       // If no step has been completed, return the first step
       return steps.find((step) => step.stepNumber === 1) || null;
     }
-    // Find the next step based on the lastCompletedStep's stepNumber
     return steps.find((step) => step.stepNumber === lastCompletedStep.stepNumber + 1) || null;
   }, [lastCompletedStep]);
 
@@ -77,7 +76,6 @@ export default function useOnboardingStep() {
 
   const updateCompletedSteps = (stepName: OnboardingSteps, metadata?: Record<string, any>) => {
     if (typeof window !== 'undefined') {
-      // Find the full step details from the steps array
       const step = steps.find((s) => s.name === stepName);
 
       if (!step) {
@@ -87,7 +85,14 @@ export default function useOnboardingStep() {
 
       // Avoid adding duplicate steps by name
       if (!completedSteps.some((s) => s.name === step.name)) {
-        const newCompletedSteps = [...completedSteps, step];
+        // If we have previous steps not completed yet by the user, we automatically mark them as completed
+        const stepsToAdd = steps.filter(
+          (s) =>
+            s.stepNumber <= step.stepNumber &&
+            !completedSteps.some((cs) => cs.stepNumber === s.stepNumber)
+        );
+
+        const newCompletedSteps = [...completedSteps, ...stepsToAdd];
 
         // Update local state
         setCompletedSteps(newCompletedSteps);
@@ -101,9 +106,13 @@ export default function useOnboardingStep() {
           new CustomEvent('onboardingStepUpdate', { detail: newCompletedSteps })
         );
 
+        // Tracking for the previous steps marked with automatic completion
+        stepsToAdd.forEach((s) => {
+          tracking?.trackOnboardingStepCompleted(s, { completionSource: 'automatic' });
+        });
+
         tracking?.trackOnboardingStepCompleted(step, metadata);
       }
-      // TO DO: dispatch tracking for automatically completed steps
     }
   };
 

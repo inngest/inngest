@@ -9,7 +9,7 @@ import { onboardingMenuStepContent } from './content';
 import useOnboardingStep from './useOnboardingStep';
 
 export default function Menu({ envSlug, stepName }: { envSlug: string; stepName: string }) {
-  const { lastCompletedStep } = useOnboardingStep();
+  const { completedSteps } = useOnboardingStep();
 
   return (
     <StepsMenu title={onboardingMenuStepContent.title} links={links}>
@@ -20,7 +20,7 @@ export default function Menu({ envSlug, stepName }: { envSlug: string; stepName:
           return 'error';
         }
 
-        const isCompleted = lastCompletedStep ? stepNumber <= lastCompletedStep.stepNumber : false;
+        const isCompleted = completedSteps.some((step) => step.stepNumber === stepNumber);
 
         const isActive = stepName === name;
 
