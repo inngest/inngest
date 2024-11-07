@@ -4,6 +4,7 @@ import { type InvokeFunctionMutationVariables } from '@/gql/graphql';
 import { getProductionEnvironment } from '@/queries/server-only/getEnvironment';
 import {
   getInvokeFunctionLookups,
+  getProductionApps,
   invokeFn,
   preloadInvokeFunctionLookups,
   syncNewApp,
@@ -66,4 +67,14 @@ export async function prefetchFunctions() {
   } = await getInvokeFunctionLookups(environment.slug);
 
   return functions;
+}
+
+export async function getProdApps() {
+  try {
+    const response = await getProductionApps();
+    return response.environment.apps;
+  } catch (error) {
+    console.error('Error fetching production apps:', error);
+    return [];
+  }
 }

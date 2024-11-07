@@ -1,3 +1,6 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import { NewButton } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
 import { NewLink } from '@inngest/components/Link/Link';
@@ -5,9 +8,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Too
 import { RiAddLine, RiQuestionLine } from '@remixicon/react';
 
 import { StatusMenu } from '@/components/Apps/StatusMenu';
-import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import EmptyAppsCard from '@/components/Onboarding/EmptyAppsCard';
-import { getProductionApps } from '@/components/Onboarding/data';
+import { getProdApps } from '@/components/Onboarding/actions';
 import { staticSlugs } from '@/utils/environments';
 import { pathCreator } from '@/utils/urls';
 import { Apps } from './Apps';
@@ -33,23 +36,30 @@ const AppInfo = () => (
   </Tooltip>
 );
 
-export default async function AppsPage({
+export default function AppsPage({
   params: { environmentSlug: envSlug },
   searchParams: { archived },
 }: {
   params: { environmentSlug: string };
   searchParams: { archived: string };
 }) {
+  const [hasProductionApps, setHasProductionApps] = useState(false);
   const isArchived = archived === 'true';
-  const onboardingFlow = await getBooleanFlag('onboarding-flow-cloud');
+  const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
 
-  let hasProductionApps = false;
-  try {
-    const response = await getProductionApps();
-    hasProductionApps = response?.environment?.apps?.length > 0;
-  } catch (error) {
-    console.error('Error fetching production apps:', error);
-  }
+  useEffect(() => {
+    async function fetchProductionApps() {
+      try {
+        const apps = await getProdApps();
+        setHasProductionApps(apps.length > 0);
+      } catch (error) {
+        console.error('Error fetching production apps', error);
+        setHasProductionApps(false);
+      }
+    }
+
+    fetchProductionApps();
+  }, []);
 
   const displayOnboarding =
     envSlug === staticSlugs.production && onboardingFlow && !hasProductionApps;
