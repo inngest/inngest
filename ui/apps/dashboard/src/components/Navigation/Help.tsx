@@ -15,7 +15,6 @@ import {
 
 import { useSystemStatus } from '@/app/(organization-active)/support/statusPage';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
-import { EnvironmentType } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import useOnboardingStep from '../Onboarding/useOnboardingStep';
 import SystemStatusIcon from './SystemStatusIcon';
@@ -108,7 +107,6 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
               <hr />
               <Link
                 href={pathCreator.onboardingSteps({
-                  envSlug: EnvironmentType.Production.toLowerCase(),
                   step: nextStep ? nextStep.name : lastCompletedStep?.name,
                   ref: 'app-navbar-help',
                 })}

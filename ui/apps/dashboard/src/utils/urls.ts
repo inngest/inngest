@@ -96,8 +96,8 @@ export const pathCreator = {
     return `/settings/integrations/${integration}${step ? `/${step}` : ''}` as Route;
   },
   // TODO: Support environments
-  onboarding({ ref }: { ref?: string } = {}): Route {
-    return `/env/production/onboarding${ref ? `?ref=${ref}` : ''}` as Route;
+  onboarding(): Route {
+    return `/env/production/onboarding` as Route;
   },
   onboardingSteps({
     envSlug = 'production',

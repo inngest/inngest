@@ -7,7 +7,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Too
 import { RiBookReadLine, RiCheckboxCircleFill, RiCloseLine } from '@remixicon/react';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
-import { EnvironmentType } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import { onboardingWidgetContent } from '../Onboarding/content';
 import { OnboardingSteps, steps } from '../Onboarding/types';
@@ -36,7 +35,6 @@ export default function OnboardingWidget({
       {collapsed && (
         <MenuItem
           href={pathCreator.onboardingSteps({
-            envSlug: EnvironmentType.Production.toLowerCase(),
             step: nextStep ? nextStep.name : lastCompletedStep?.name,
             ref: 'app-onboarding-widget',
           })}
@@ -50,7 +48,6 @@ export default function OnboardingWidget({
       {!collapsed && (
         <Link
           href={pathCreator.onboardingSteps({
-            envSlug: EnvironmentType.Production.toLowerCase(),
             step: nextStep ? nextStep.name : lastCompletedStep?.name,
             ref: 'app-onboarding-widget',
           })}

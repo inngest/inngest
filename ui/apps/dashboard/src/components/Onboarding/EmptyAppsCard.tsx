@@ -5,9 +5,11 @@ import { NewButton } from '@inngest/components/Button';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 
 import { pathCreator } from '@/utils/urls';
+import useOnboardingStep from './useOnboardingStep';
 
 export default function EmptyAppsCard() {
   const router = useRouter();
+  const { nextStep, lastCompletedStep } = useOnboardingStep();
 
   return (
     <div className="border-muted bg-canvasSubtle flex flex-col items-center gap-6 rounded-lg border border-dashed px-6 py-9">
@@ -24,7 +26,14 @@ export default function EmptyAppsCard() {
       </div>
       <NewButton
         label="Take me to onboarding"
-        onClick={() => router.push(pathCreator.onboarding({ ref: 'app-empty-apps' }))}
+        onClick={() =>
+          router.push(
+            pathCreator.onboardingSteps({
+              step: nextStep ? nextStep.name : lastCompletedStep?.name,
+              ref: 'app-apps-empty',
+            })
+          )
+        }
       />
     </div>
   );
