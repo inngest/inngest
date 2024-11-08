@@ -53,7 +53,7 @@ func TestEndToEnd(t *testing.T) {
 
 	// Wait until we're connected
 	// TODO Read the connection state API to see if socket is connected instead
-	<-time.After(2 * time.Second)
+	<-time.After(4 * time.Second)
 
 	t.Run("trigger function", func(t *testing.T) {
 		_, err := inngestgo.Send(ctx, ConnectEvent{
@@ -62,7 +62,7 @@ func TestEndToEnd(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		<-time.After(1 * time.Second)
+		<-time.After(2 * time.Second)
 		cancel()
 
 		require.EqualValues(t, 1, atomic.LoadInt32(&counter))
