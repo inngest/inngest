@@ -214,36 +214,21 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		log.Debug("found app, connection is ready")
 
-		// Wait for relevant messages and forward them to the socket
+		// TODO: Persist connection state
+
+		// Wait for relevant messages and forward them over the WebSocket connection
 		go func() {
-			// NOTE: This is not an exclusive 1-1 link between PubSub messages and connections:
-			// - There are multiple gateway instances
-			// - There are possibly multiple SDK deployments, each with their own WebSocket connection
-			// -> We need to prevent sending the same request multiple times, to different connections
+			// Receive execution-related messages for the app, forwarded by the router.
+			// The router selects only one gateway to handle a request from a pool of one or more workers (and thus WebSockets)
+			// running for each app.
 			err := c.receiver.ReceiveRouterMessages(ctx, c.gatewayId, appId, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
 				log.Debug("received msg", "app_id", appId, "req_id", data.RequestId)
-				// This will be sent at least once (if there are more than one connection, every connection receives the message)
+				// This will be sent exactly once, as the router selected this gateway to handle the request
 				err = c.receiver.AckMessage(ctx, appId, data.RequestId)
 				if err != nil {
 					// TODO Log error, retry?
 					return
 				}
-
-				err = c.stateManager.SetRequestIdempotency(ctx, appId, data.RequestId)
-				if err != nil {
-					if errors.Is(err, ErrIdempotencyKeyExists) {
-						// Another connection was faster than us, we can ignore this message
-						return
-					}
-
-					// TODO Log error
-					return
-				}
-
-				// TODO What if something goes wrong inbetween setting idempotency (claiming exclusivity) and forwarding the req?
-				// We'll potentially lose data here
-
-				// Now we're guaranteed to be the exclusive connection processing this message!
 
 				// Forward message to SDK!
 				err = wsproto.Write(ctx, ws, &connect.ConnectMessage{

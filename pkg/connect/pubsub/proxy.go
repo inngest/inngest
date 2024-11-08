@@ -16,9 +16,9 @@ import (
 )
 
 type RequestForwarder interface {
-	// Proxy forwards a request to the executor and waits for a response.
+	// Proxy forwards a request from the executor to the SDK via the connect infrastructure and waits for a response.
 	//
-	// If the gateway does not ack the message within a 10-second timeout, an error is returned.
+	// If no responsible gateway ack the message within a 10-second timeout, an error is returned.
 	// If no response is received before the context is canceled, an error is returned.
 	Proxy(ctx context.Context, appId uuid.UUID, data *connect.GatewayExecutorRequestData) (*connect.SDKResponse, error)
 }
