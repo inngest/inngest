@@ -265,7 +265,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				switch msg.Kind {
 				case connect.GatewayMessageType_SDK_REPLY:
 					// Handle SDK reply
-					err := c.handleSdkReply(ctx, appId, &msg)
+					err := c.handleSdkReply(ctx, log, appId, &msg)
 					if err != nil {
 						// TODO Handle error
 						continue
@@ -284,13 +284,13 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 	})
 }
 
-func (c *connectGatewaySvc) handleSdkReply(ctx context.Context, appId uuid.UUID, msg *connect.ConnectMessage) error {
+func (c *connectGatewaySvc) handleSdkReply(ctx context.Context, log *slog.Logger, appId uuid.UUID, msg *connect.ConnectMessage) error {
 	var data connect.SDKResponse
 	if err := proto.Unmarshal(msg.Payload, &data); err != nil {
 		return fmt.Errorf("invalid response type: %w", err)
 	}
 
-	c.logger.Debug("notifying executor about response", appId, data.RequestId)
+	log.Debug("notifying executor about response")
 
 	err := c.receiver.NotifyExecutor(ctx, appId, &data)
 	if err != nil {

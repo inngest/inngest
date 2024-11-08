@@ -61,6 +61,42 @@ func NewSDKHandler(t *testing.T, appID string, hopts ...opt) (inngestgo.Handler,
 	return h, server, r
 }
 
+func WithBuildId(buildId string) opt {
+	return func(h *inngestgo.HandlerOpts) {
+		h.BuildId = &buildId
+	}
+}
+
+func WithInstanceId(instanceId string) opt {
+	return func(h *inngestgo.HandlerOpts) {
+		h.InstanceId = &instanceId
+	}
+}
+
+func NewSDKConnectHandler(t *testing.T, appID string, hopts ...opt) inngestgo.Handler {
+	t.Helper()
+
+	key := "test"
+	inngestgo.DefaultClient = inngestgo.NewClient(inngestgo.ClientOpts{
+		EventKey: &key,
+	})
+
+	_ = os.Setenv("INNGEST_DEV", DEV_URL)
+
+	opts := inngestgo.HandlerOpts{
+		RegisterURL: inngestgo.StrPtr(fmt.Sprintf("%s/fn/register", DEV_URL)),
+		Logger:      slog.Default(),
+	}
+
+	for _, o := range hopts {
+		o(&opts)
+	}
+
+	h := inngestgo.NewHandler(appID, opts)
+
+	return h
+}
+
 type HTTPServer struct {
 	*http.Server
 
