@@ -214,15 +214,16 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		log.Debug("found app, connection is ready")
 
-		// TODO: Persist connection state
+		// TODO Persist connection state
 
 		// Wait for relevant messages and forward them over the WebSocket connection
 		go func() {
 			// Receive execution-related messages for the app, forwarded by the router.
 			// The router selects only one gateway to handle a request from a pool of one or more workers (and thus WebSockets)
 			// running for each app.
-			err := c.receiver.ReceiveRouterMessages(ctx, c.gatewayId, appId, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
+			err := c.receiver.ReceiveRoutedRequest(ctx, c.gatewayId, appId, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
 				log.Debug("received msg", "app_id", appId, "req_id", data.RequestId)
+
 				// This will be sent exactly once, as the router selected this gateway to handle the request
 				err = c.receiver.AckMessage(ctx, appId, data.RequestId)
 				if err != nil {
@@ -327,6 +328,9 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 func (c *connectGatewaySvc) Run(ctx context.Context) error {
 	c.runCtx = ctx
 
+	// TODO Mark gateway as active a couple seconds into the future (how do we make sure PubSub is connected and ready to receive?)
+
+	// Start listening for messages, this will block until the context is cancelled
 	err := c.receiver.Wait(ctx)
 	if err != nil {
 		// TODO Should we retry? Exit here? This will interrupt existing connections!
@@ -337,6 +341,10 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 }
 
 func (c *connectGatewaySvc) Stop(ctx context.Context) error {
+	// TODO Mark gateway as inactive, stop receiving requests
+
+	// TODO Drain connections!
+
 	return nil
 }
 
@@ -404,6 +412,8 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 			return
 		}
 	}()
+
+	// TODO Periodically ping random gateways via PubSub and only consider them active if they respond in time -> Multiple routers will do this
 
 	err := c.receiver.Wait(ctx)
 	if err != nil {
