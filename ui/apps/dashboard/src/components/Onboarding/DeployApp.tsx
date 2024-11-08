@@ -30,7 +30,7 @@ export default function DeployApp() {
   const { value: vercelFlowEnabled } = useBooleanFlag('onboarding-vercel-flow');
   const tracking = useOnboardingTracking();
 
-  const { data, fetching, error: fetchError } = useVercelIntegration();
+  const { data } = useVercelIntegration();
 
   const hasVercelIntegration = data.id === 'enabled-integration-id';
   const vercelProjects = data.projects;
