@@ -9,6 +9,11 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 )
 
+// Ptr converts the given type to a pointer.  Nil pointers are sometimes
+// used for optional arguments within configuration, meaning we need pointers
+// within struct values.  This util helps.
+func Ptr[T any](i T) *T { return &i }
+
 func BoolPtr(b bool) *bool { return &b }
 
 func StrPtr(i string) *string { return &i }

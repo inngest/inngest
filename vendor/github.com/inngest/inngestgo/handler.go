@@ -662,9 +662,6 @@ func createFunctionConfigs(
 		values.Set("step", "step")
 		appURL.RawQuery = values.Encode()
 
-		runtime := make(map[string]any)
-		runtime["url"] = appURL.String()
-
 		f := sdk.SDKFunction{
 			Name:        fn.Name(),
 			Slug:        appName + "-" + fn.Slug(),
@@ -680,7 +677,9 @@ func createFunctionConfigs(
 					ID:      "step",
 					Name:    fn.Name(),
 					Retries: retries,
-					Runtime: runtime,
+					Runtime: map[string]any{
+						"url": appURL.String(),
+					},
 				},
 			},
 		}
