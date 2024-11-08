@@ -41,6 +41,8 @@ func SchemeDriver(scheme string) string {
 	switch scheme {
 	case "http", "https":
 		return "http"
+	case "ws", "wss":
+		return "connect"
 	default:
 		return ""
 	}

@@ -81,16 +81,21 @@ type RegisterRequest struct {
 	checksum string
 
 	Capabilities Capabilities `json:"capabilities"`
+
+	// UseConnect specifies whether the SDK is expected to establish an outbound connection.
+	UseConnect bool `json:"useConnect"`
 }
 
 const (
 	InBandSyncV1 string = "v1"
 	TrustProbeV1 string = "v1"
+	ConnectV1    string = "v1"
 )
 
 type Capabilities struct {
 	InBandSync string `json:"in_band_sync"`
 	TrustProbe string `json:"trust_probe"`
+	Connect    string `json:"connect"`
 }
 
 type Headers struct {
@@ -147,25 +152,27 @@ func (f RegisterRequest) Parse(ctx context.Context) ([]*inngest.Function, error)
 			continue
 		}
 
-		fn, ferr := sdkFn.Function()
+		fn, ferr := sdkFn.Function(f.UseConnect)
 		if ferr != nil {
 			err = multierror.Append(err, ferr)
 			continue
 		}
 		funcs[n] = fn
 
-		if ferr := fn.Validate(ctx); ferr != nil {
+		if ferr := fn.Validate(ctx, f.UseConnect); ferr != nil {
 			err = multierror.Append(err, ferr)
 		}
 
 		for n, step := range fn.Steps {
-			uri, ferr := url.Parse(step.URI)
-			if ferr != nil {
-				err = multierror.Append(err, fmt.Errorf("Step '%s' has an invalid URI", step.ID))
-			}
-			if uri.Scheme != "http" && uri.Scheme != "https" {
-				err = multierror.Append(err, fmt.Errorf("Step '%s' has an invalid driver. Only HTTP drivers may be used with SDK functions.", step.ID))
-				continue
+			if !f.UseConnect {
+				uri, ferr := url.Parse(step.URI)
+				if ferr != nil {
+					err = multierror.Append(err, fmt.Errorf("Step '%s' has an invalid URI", step.ID))
+				}
+				if uri.Scheme != "http" && uri.Scheme != "https" {
+					err = multierror.Append(err, fmt.Errorf("Step '%s' has an invalid driver. Only HTTP drivers may be used with SDK functions.", step.ID))
+					continue
+				}
 			}
 			fn.Steps[n] = step
 		}

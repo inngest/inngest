@@ -154,6 +154,8 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	ctx := r.Context()
 
+	logger.StdlibLogger(ctx).Debug("received register request")
+
 	expectedServerKind := r.Header.Get(headers.HeaderKeyExpectedServerKind)
 	if expectedServerKind != "" && expectedServerKind != a.devserver.Opts.Config.GetServerKind() {
 		a.err(ctx, w, 400, fmt.Errorf("Expected server kind %s, got %s", a.devserver.Opts.Config.GetServerKind(), expectedServerKind))
@@ -225,6 +227,14 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 	}
 
 	defer func() {
+		isConnect := sql.NullBool{Valid: false}
+		if r.Capabilities.Connect == sdk.ConnectV1 && r.UseConnect {
+			isConnect = sql.NullBool{
+				Bool:  true,
+				Valid: true,
+			}
+		}
+
 		appParams := cqrs.UpsertAppParams{
 			// Use a deterministic ID for the app in dev.
 			ID:          appID,
@@ -235,8 +245,9 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 				String: r.Framework,
 				Valid:  r.Framework != "",
 			},
-			Url:      r.URL,
-			Checksum: sum,
+			Url:       r.URL,
+			Checksum:  sum,
+			IsConnect: isConnect,
 		}
 
 		// We want to save an app at the end, after handling each error.

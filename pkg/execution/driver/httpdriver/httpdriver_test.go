@@ -52,8 +52,8 @@ func TestRedirect(t *testing.T) {
 
 	res, err := do(context.Background(), DefaultClient, Request{URL: parseURL(ts.URL), Input: input})
 	require.NoError(t, err)
-	require.Equal(t, 200, res.statusCode)
-	require.Equal(t, []byte("ok"), res.body)
+	require.Equal(t, 200, res.StatusCode)
+	require.Equal(t, []byte("ok"), res.Body)
 }
 
 func TestRetryAfter(t *testing.T) {
@@ -73,10 +73,10 @@ func TestRetryAfter(t *testing.T) {
 
 		res, err := do(context.Background(), DefaultClient, Request{URL: parseURL(ts.URL), Input: input})
 		require.NoError(t, err)
-		require.Equal(t, 500, res.statusCode)
-		require.Equal(t, []byte(`{"error":true}`), res.body)
-		require.NotNil(t, res.retryAt)
-		require.EqualValues(t, at, *res.retryAt)
+		require.Equal(t, 500, res.StatusCode)
+		require.Equal(t, []byte(`{"error":true}`), res.Body)
+		require.NotNil(t, res.RetryAt)
+		require.EqualValues(t, at, *res.RetryAt)
 	}
 }
 
@@ -205,7 +205,7 @@ func TestStreamResponseTooLarge(t *testing.T) {
 		URL: *u,
 	})
 	require.NotNil(t, r)
-	require.NotNil(t, r.sysErr)
-	require.Equal(t, r.sysErr.Code, syscode.CodeOutputTooLarge)
+	require.NotNil(t, r.SysErr)
+	require.Equal(t, r.SysErr.Code, syscode.CodeOutputTooLarge)
 	require.Nil(t, err)
 }

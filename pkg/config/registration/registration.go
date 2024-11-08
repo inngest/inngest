@@ -2,6 +2,7 @@ package registration
 
 import (
 	"context"
+	"github.com/inngest/inngest/pkg/connect/pubsub"
 
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -58,6 +59,8 @@ func RegisterState(f func() any) {
 type NewDriverOpts struct {
 	LocalSigningKey        *string
 	RequireLocalSigningKey bool
+
+	ConnectForwarder pubsub.RequestForwarder
 }
 
 // DriverConfig is an interface used to determine driver config structs.
