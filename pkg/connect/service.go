@@ -14,9 +14,11 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
+	"github.com/oklog/ulid/v2"
 	"google.golang.org/protobuf/proto"
 	"log/slog"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -300,7 +302,10 @@ func (c *connectGatewaySvc) handleSdkReply(ctx context.Context, log *slog.Logger
 
 func NewConnectGatewayService(opts ...gatewayOpt) ([]service.Service, http.Handler) {
 	gateway := &connectGatewaySvc{
-		gatewayId: "gw1",
+		gatewayId: ulid.MustNew(ulid.Now(), nil).String(),
+	}
+	if os.Getenv("CONNECT_TEST_GATEWAY_ID") != "" {
+		gateway.gatewayId = os.Getenv("CONNECT_TEST_GATEWAY_ID")
 	}
 
 	for _, opt := range opts {
@@ -392,7 +397,10 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 			// Now we're guaranteed to be the exclusive connection processing this message!
 
 			// TODO Resolve gateway
-			gatewayId := "gw1"
+			gatewayId := ""
+			if os.Getenv("CONNECT_TEST_GATEWAY_ID") != "" {
+				gatewayId = os.Getenv("CONNECT_TEST_GATEWAY_ID")
+			}
 
 			// TODO What if something goes wrong inbetween setting idempotency (claiming exclusivity) and forwarding the req?
 			// We'll potentially lose data here
