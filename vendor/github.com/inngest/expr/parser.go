@@ -2,7 +2,6 @@ package expr
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"math/rand"
@@ -95,8 +94,7 @@ func (p *parser) Parse(ctx context.Context, eval Evaluable) (*ParsedExpression, 
 		//
 		// We only overwrite this if rander is not nil so that we can inject rander during tests.
 		id := eval.GetID()
-		digest := sha256.Sum256(id[:])
-		seed := int64(binary.NativeEndian.Uint64(digest[:8]))
+		seed := int64(binary.NativeEndian.Uint64(id[:8]))
 		r = rand.New(rand.NewSource(seed)).Read
 	}
 

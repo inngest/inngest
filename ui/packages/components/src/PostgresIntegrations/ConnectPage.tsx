@@ -10,6 +10,10 @@ export default function ConnectPage({
   onStartInstallation: () => void;
 }) {
   const { title, description, logo, url, step } = content;
+
+  const totalSteps = Object.values(step).filter(Boolean).length;
+  let index = 0;
+
   return (
     <div className="mx-auto mt-16 flex w-[800px] flex-col gap-9">
       <div>
@@ -30,14 +34,22 @@ export default function ConnectPage({
       </div>
       <p className="font-lg text-basis">Installation overview</p>
       <div>
-        {STEPS_ORDER.map((stepKey, index) => {
+        {STEPS_ORDER.filter(Boolean).map((stepKey) => {
           const stepContent = step[stepKey];
-          const isLastStep = index === STEPS_ORDER.length - 1;
+
+          if (!stepContent) {
+            // Some integrations do not have all steps.
+            return null;
+          }
+
+          index++;
+
+          const isLastStep = index === totalSteps;
           return (
             <div key={stepKey} className={`border-subtle ml-3 ${!isLastStep ? 'border-l' : ''} `}>
               <div
                 className="before:border-subtle before:text-light before:bg-canvasBase relative ml-[32px] pb-7 before:absolute before:left-[-46px] before:flex before:h-[28px] before:w-[28px] before:items-center before:justify-center before:rounded-full before:border before:text-[13px] before:content-[attr(data-step-number)]"
-                data-step-number={index + 1}
+                data-step-number={index}
               >
                 <div className="text-basis text-base">{stepContent.title}</div>
                 <div className="text-subtle text-sm">{stepContent.description}</div>

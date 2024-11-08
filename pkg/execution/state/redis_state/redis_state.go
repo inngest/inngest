@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 
 	"github.com/google/uuid"
@@ -1145,6 +1146,11 @@ func (m unshardedMgr) PauseByStep(ctx context.Context, i state.Identifier, actio
 
 // PausesByEvent returns all pauses for a given event within a workspace.
 func (m unshardedMgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event string) (state.PauseIterator, error) {
+	return m.pausesByEvent(ctx, workspaceID, event, time.Time{})
+}
+
+// pausesByEvent returns all pauses for a given event within a workspace.
+func (m unshardedMgr) pausesByEvent(ctx context.Context, workspaceID uuid.UUID, event string, aggregateStart time.Time) (state.PauseIterator, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PausesByEvent"), redis_telemetry.ScopePauses)
 
 	pauses := m.u.Pauses()
@@ -1158,8 +1164,9 @@ func (m unshardedMgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, 
 	if err != nil || cnt > 1000 {
 		key := pauses.kg.PauseEvent(ctx, workspaceID, event)
 		iter := &scanIter{
-			count: cnt,
-			r:     pauses.Client(),
+			count:          cnt,
+			r:              pauses.Client(),
+			aggregateStart: aggregateStart,
 		}
 		err := iter.init(ctx, key, 1000)
 		return iter, err
@@ -1167,14 +1174,16 @@ func (m unshardedMgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, 
 
 	// If there are less than a thousand items, query the keys
 	// for iteration.
-	iter := &bufIter{r: pauses.Client()}
+	iter := &bufIter{r: pauses.Client(), aggregateStart: aggregateStart}
 	err = iter.init(ctx, key)
 	return iter, err
 }
 
 func (m unshardedMgr) PausesByEventSince(ctx context.Context, workspaceID uuid.UUID, event string, since time.Time) (state.PauseIterator, error) {
+	start := time.Now()
+
 	if since.IsZero() {
-		return m.PausesByEvent(ctx, workspaceID, event)
+		return m.pausesByEvent(ctx, workspaceID, event, start)
 	}
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PausesByEventSince"), redis_telemetry.ScopePauses)
@@ -1194,8 +1203,9 @@ func (m unshardedMgr) PausesByEventSince(ctx context.Context, workspaceID uuid.U
 	}
 
 	iter := &keyIter{
-		r:  pauses.Client(),
-		kf: pauses.kg,
+		r:     pauses.Client(),
+		kf:    pauses.kg,
+		start: start,
 	}
 	err = iter.init(ctx, ids, 100)
 	return iter, err
@@ -1264,7 +1274,8 @@ type bufIter struct {
 	val *state.Pause
 	err error
 
-	l sync.Mutex
+	l              sync.Mutex
+	aggregateStart time.Time
 }
 
 func (i *bufIter) init(ctx context.Context, key string) error {
@@ -1291,6 +1302,13 @@ func (i *bufIter) Next(ctx context.Context) bool {
 
 	if len(i.items) == 0 {
 		i.err = context.Canceled
+		if !i.aggregateStart.IsZero() {
+			dur := time.Since(i.aggregateStart).Milliseconds()
+			metrics.HistogramAggregatePausesLoadDuration(ctx, dur, metrics.HistogramOpt{
+				PkgName: pkgName,
+				// TODO: tag workspace ID eventually??
+			})
+		}
 		return false
 	}
 
@@ -1332,6 +1350,8 @@ type scanIter struct {
 	err    error
 
 	l sync.Mutex
+
+	aggregateStart time.Time
 }
 
 func (i *scanIter) Error() error {
@@ -1404,6 +1424,13 @@ func (i *scanIter) Next(ctx context.Context) bool {
 		if err == scanDoneErr {
 			// No more present.
 			i.err = context.Canceled
+			if !i.aggregateStart.IsZero() {
+				dur := time.Since(i.aggregateStart).Milliseconds()
+				metrics.HistogramAggregatePausesLoadDuration(ctx, dur, metrics.HistogramOpt{
+					PkgName: pkgName,
+					// TODO: tag workspace ID eventually??
+				})
+			}
 			return false
 		}
 		if err != nil {
@@ -1550,9 +1577,10 @@ type keyIter struct {
 	// keys stores pause IDs to fetch in batches
 	keys []string
 	// vals stores pauses as strings from MGET
-	vals []string
-	idx  int64
-	err  error
+	vals  []string
+	idx   int64
+	err   error
+	start time.Time
 }
 
 func (i *keyIter) Error() error {
@@ -1581,6 +1609,11 @@ func (i *keyIter) fetch(ctx context.Context) error {
 	if len(i.keys) == 0 {
 		// No more present.
 		i.err = context.Canceled
+		dur := time.Since(i.start).Milliseconds()
+		metrics.HistogramAggregatePausesLoadDuration(ctx, dur, metrics.HistogramOpt{
+			PkgName: pkgName,
+			// TODO: tag workspace ID eventually??
+		})
 		return scanDoneErr
 	}
 

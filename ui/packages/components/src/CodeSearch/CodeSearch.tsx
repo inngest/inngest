@@ -339,10 +339,11 @@ export default function CodeSearch({
     }
   };
 
-  const handleSearch = () => {
+  const handleSearch = (editorContent?: string) => {
+    const updatedContent = editorContent || content;
     if (!hasValidationError) {
       // Remove empty lines and trim whitespace
-      const processedContent = content
+      const processedContent = updatedContent
         .split('\n')
         .filter((line) => line.trim() !== '')
         .join('\n')
@@ -389,7 +390,18 @@ export default function CodeSearch({
             defaultLanguage="cel"
             value={content}
             theme="inngest-theme"
-            onMount={handleEditorDidMount}
+            onMount={(editor) => {
+              editor.addAction({
+                id: 'searchRun',
+                label: 'Search Run',
+                keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
+                run: () => {
+                  const latestContent = editor.getValue();
+                  handleSearch(latestContent);
+                },
+              });
+              handleEditorDidMount(editor);
+            }}
             onChange={handleContentChange}
             options={{
               lineNumbersMinChars: 4,
@@ -432,7 +444,7 @@ export default function CodeSearch({
         </div>
       )}
       <div className="bg-codeEditor flex items-center gap-4 py-4 pl-4">
-        <Button onClick={handleSearch} label="Search" size="small" />
+        <Button onClick={() => handleSearch()} label="Search" size="small" />
         <Button
           onClick={handleReset}
           appearance="ghost"

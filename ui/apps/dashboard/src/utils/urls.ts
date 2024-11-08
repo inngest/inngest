@@ -45,6 +45,9 @@ export const pathCreator = {
   appSyncs({ envSlug, externalAppID }: { envSlug: string; externalAppID: string }): Route {
     return `/env/${envSlug}/apps/${encodeURIComponent(externalAppID)}/syncs` as Route;
   },
+  billing(): Route {
+    return '/settings/billing' as Route;
+  },
   createApp({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/apps/sync-new` as Route;
   },
@@ -89,15 +92,25 @@ export const pathCreator = {
   keys({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/manage/keys` as Route;
   },
-  neonIntegrationStep({ step }: { step?: string }): Route {
-    return `/settings/integrations/neon${step ? `/${step}` : ''}` as Route;
+  pgIntegrationStep({ integration, step }: { integration: string; step?: string }): Route {
+    return `/settings/integrations/${integration}${step ? `/${step}` : ''}` as Route;
   },
   // TODO: Support environments
   onboarding(): Route {
-    return `/env/production/onboarding/` as Route;
+    return `/env/production/onboarding` as Route;
   },
-  onboardingSteps({ envSlug = 'production', step }: { envSlug?: string; step: string }): Route {
-    return `/env/${envSlug}/onboarding/${step}` as Route;
+  onboardingSteps({
+    envSlug = 'production',
+    step,
+    ref,
+  }: {
+    envSlug?: string;
+    step?: string;
+    ref?: string;
+  }): Route {
+    return `/env/${envSlug}/onboarding/${step ? `/${step}` : ''}${
+      ref ? `?ref=${ref}` : ''
+    }` as Route;
   },
   runPopout({ envSlug, runID }: { envSlug: string; runID: string }): Route {
     return `/env/${envSlug}/runs/${runID}` as Route;
@@ -105,8 +118,8 @@ export const pathCreator = {
   runs({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/runs` as Route;
   },
-  support(): Route {
-    return '/support' as Route;
+  support({ ref }: { ref?: string } = {}): Route {
+    return `/support${ref ? `?ref=${ref}` : ''}` as Route;
   },
   unattachedSyncs({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/unattached-syncs` as Route;

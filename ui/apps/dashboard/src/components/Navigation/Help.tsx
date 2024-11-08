@@ -22,7 +22,7 @@ import SystemStatusIcon from './SystemStatusIcon';
 
 export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget: () => void }) => {
   const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
-  const { nextStep } = useOnboardingStep();
+  const { nextStep, lastCompletedStep } = useOnboardingStep();
   const status = useSystemStatus();
 
   return (
@@ -109,7 +109,8 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
               <Link
                 href={pathCreator.onboardingSteps({
                   envSlug: EnvironmentType.Production.toLowerCase(),
-                  step: nextStep,
+                  step: nextStep ? nextStep.name : lastCompletedStep?.name,
+                  ref: 'app-navbar-help',
                 })}
                 onClick={() => showWidget()}
               >

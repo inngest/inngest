@@ -12,18 +12,25 @@ import { RiCheckboxCircleFill, RiInputCursorMove } from '@remixicon/react';
 
 import { type CodedError } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
+import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { OnboardingSteps } from '../Onboarding/types';
 import { SyncFailure } from '../SyncFailure';
 import { syncAppManually } from './actions';
 import useOnboardingStep from './useOnboardingStep';
+import { useOnboardingTracking } from './useOnboardingTracking';
+import { getNextStepName } from './utils';
 
 export default function SyncApp() {
+  const currentStepName = OnboardingSteps.SyncApp;
+  const nextStepName = getNextStepName(currentStepName);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<CodedError | null>();
   const [app, setApp] = useState<string | null>();
-  const { updateLastCompletedStep } = useOnboardingStep();
+  const { updateCompletedSteps } = useOnboardingStep();
   const router = useRouter();
+  const { value: vercelFlowEnabled } = useBooleanFlag('onboarding-vercel-flow');
+  const tracking = useOnboardingTracking();
 
   const handleSyncAppManually = async () => {
     setIsLoading(true);
@@ -33,7 +40,12 @@ export default function SyncApp() {
       const { success, error, appName } = await syncAppManually(inputValue);
       if (success) {
         setApp(appName);
-        updateLastCompletedStep(OnboardingSteps.SyncApp);
+        updateCompletedSteps(currentStepName, {
+          metadata: {
+            completionSource: 'manual',
+            syncMethod: 'manual',
+          },
+        });
       } else {
         setError(error);
       }
@@ -67,11 +79,13 @@ export default function SyncApp() {
               <RiInputCursorMove className="h-5 w-5" /> Sync manually
             </div>
           </TabCards.Button>
-          <TabCards.Button className="w-36" value="vercel">
-            <div className="flex items-center gap-1.5">
-              <IconVercel className="h-4 w-4" /> Sync with Vercel
-            </div>
-          </TabCards.Button>
+          {vercelFlowEnabled && (
+            <TabCards.Button className="w-36" value="vercel">
+              <div className="flex items-center gap-1.5">
+                <IconVercel className="h-4 w-4" /> Sync with Vercel
+              </div>
+            </TabCards.Button>
+          )}
         </TabCards.ButtonList>
         <TabCards.Content value="manually">
           <div className="mb-4 flex items-center gap-2">
@@ -122,50 +136,77 @@ export default function SyncApp() {
           )}
           {error && <SyncFailure className="mb-3 mt-0 text-sm" error={error} />}
           {!app && (
-            <NewButton loading={isLoading} label="Sync app here" onClick={handleSyncAppManually} />
+            <NewButton
+              loading={isLoading}
+              label="Sync app here"
+              onClick={() => {
+                tracking?.trackOnboardingAction(currentStepName, {
+                  metadata: { type: 'btn-click', label: 'sync', syncMethod: 'manual' },
+                });
+                handleSyncAppManually();
+              }}
+            />
           )}
           {app && (
             <NewButton
               label="Next"
               onClick={() => {
-                router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.InvokeFn }));
+                tracking?.trackOnboardingAction(currentStepName, {
+                  metadata: { type: 'btn-click', label: 'next', syncMethod: 'manual' },
+                });
+                router.push(pathCreator.onboardingSteps({ step: nextStepName }));
               }}
             />
           )}
         </TabCards.Content>
-        <TabCards.Content value="vercel">
-          <div className="mb-4 flex items-center justify-between gap-1">
-            <div className="flex items-center gap-2">
-              <div className="bg-canvasMuted flex h-9 w-9 items-center justify-center rounded">
-                <IconVercel className="text-basis h-4 w-4" />
+        {vercelFlowEnabled && (
+          <TabCards.Content value="vercel">
+            <div className="mb-4 flex items-center justify-between gap-1">
+              <div className="flex items-center gap-2">
+                <div className="bg-canvasMuted flex h-9 w-9 items-center justify-center rounded">
+                  <IconVercel className="text-basis h-4 w-4" />
+                </div>
+                <p className="text-basis">Vercel</p>
               </div>
-              <p className="text-basis">Vercel</p>
+              <NewButton
+                kind="secondary"
+                appearance="outlined"
+                label="View Vercel dashboard"
+                href={pathCreator.vercel()}
+                size="small"
+                onClick={() =>
+                  tracking?.trackOnboardingAction(currentStepName, {
+                    metadata: { type: 'btn-click', label: 'view-dashboard', syncMethod: 'vercel' },
+                  })
+                }
+              />
+            </div>
+            <p className="mb-4 text-sm">
+              Inngest <span className="font-medium">automatically</span> syncs your app upon
+              deployment, ensuring a seamless connection.
+            </p>
+            {/* TODO: wire vercel integration flow */}
+            <div className="text-link mb-4 flex items-center gap-1 text-sm">
+              <IconSpinner className="fill-link h-4 w-4" />
+              Syncing app
             </div>
             <NewButton
-              kind="secondary"
-              appearance="outlined"
-              label="View Vercel dashboard"
-              href={pathCreator.vercel()}
-              size="small"
+              label="Next"
+              onClick={() => {
+                updateCompletedSteps(currentStepName, {
+                  metadata: {
+                    completionSource: 'manual',
+                    syncMethod: 'vercel',
+                  },
+                });
+                tracking?.trackOnboardingAction(currentStepName, {
+                  metadata: { type: 'btn-click', label: 'next', syncMethod: 'vercel' },
+                });
+                router.push(pathCreator.onboardingSteps({ step: nextStepName }));
+              }}
             />
-          </div>
-          <p className="mb-4 text-sm">
-            Inngest <span className="font-medium">automatically</span> syncs your app upon
-            deployment, ensuring a seamless connection.
-          </p>
-          {/* TODO: wire vercel integration flow */}
-          <div className="text-link mb-4 flex items-center gap-1 text-sm">
-            <IconSpinner className="fill-link h-4 w-4" />
-            Syncing app
-          </div>
-          <NewButton
-            label="Next"
-            onClick={() => {
-              updateLastCompletedStep(OnboardingSteps.DeployApp);
-              router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.SyncApp }));
-            }}
-          />
-        </TabCards.Content>
+          </TabCards.Content>
+        )}
       </TabCards>
     </div>
   );

@@ -3,7 +3,11 @@
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { neonMenuStepContent } from '@inngest/components/PostgresIntegrations/Neon/neonContent';
-import { STEPS_ORDER, isValidStep } from '@inngest/components/PostgresIntegrations/types';
+import {
+  IntegrationSteps,
+  STEPS_ORDER,
+  isValidStep,
+} from '@inngest/components/PostgresIntegrations/types';
 import StepsMenu from '@inngest/components/Steps/StepsMenu';
 import { RiExternalLinkLine } from '@remixicon/react';
 
@@ -14,11 +18,17 @@ const Menu = dynamic(() => import('@inngest/components/PostgresIntegrations/Step
   ssr: false,
 });
 
-export default function NeonStepsMenu({ step }: { step: string }) {
+export default function NeonStepsMenu({
+  step,
+  steps = STEPS_ORDER,
+}: {
+  step: string;
+  steps?: IntegrationSteps[];
+}) {
   const router = useRouter();
   const { stepsCompleted } = useSteps();
   if (!isValidStep(step)) {
-    router.push(pathCreator.neonIntegrationStep({}));
+    router.push(pathCreator.pgIntegrationStep({ integration: 'supabase' }));
     return;
   }
 
@@ -28,8 +38,8 @@ export default function NeonStepsMenu({ step }: { step: string }) {
       activeStep={step}
       content={neonMenuStepContent}
       links={links}
-      steps={STEPS_ORDER}
-      pathname={pathCreator.neonIntegrationStep({})}
+      steps={steps}
+      pathname={pathCreator.pgIntegrationStep({ integration: 'supabase' })}
     />
   );
 }
