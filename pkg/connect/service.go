@@ -364,13 +364,16 @@ func (c *connectRouterSvc) Name() string {
 }
 
 func (c *connectRouterSvc) Pre(ctx context.Context) error {
+	// Set up router-specific logger with info for correlations
+	c.logger = logger.StdlibLogger(ctx)
+
 	return nil
 }
 
 func (c *connectRouterSvc) Run(ctx context.Context) error {
 	go func() {
 		err := c.receiver.ReceiveExecutorMessages(ctx, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
-			log := logger.StdlibLogger(ctx).With("app_id", data.AppId, "req_id", data.RequestId)
+			log := c.logger.With("app_id", data.AppId, "req_id", data.RequestId)
 
 			appId, err := uuid.Parse(data.AppId)
 			if err != nil {
