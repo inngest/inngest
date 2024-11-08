@@ -160,7 +160,7 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data 
 
 // channelExecutorRequests returns the channel name for executor requests to be processed by the router.
 func (i *redisPubSubConnector) channelExecutorRequests() string {
-	return fmt.Sprintf("executor_requests")
+	return "executor_requests"
 }
 
 // channelGatewayAppRequests returns the channel name for routed executor requests received by the gateway for a specific app.
