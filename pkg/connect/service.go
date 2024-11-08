@@ -2,6 +2,7 @@ package connect
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -14,7 +15,9 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
+	"github.com/oklog/ulid/v2"
 	"google.golang.org/protobuf/proto"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -28,6 +31,12 @@ type AuthResponse struct {
 type GatewayAuthHandler func(context.Context, *connect.SDKConnectRequestData) (*AuthResponse, error)
 
 type connectGatewaySvc struct {
+	// gatewayId is a unique identifier, generated each time the service is started.
+	// This should be used to uniquely identify the gateway instance when sending messages and routing requests.
+	gatewayId string
+
+	logger *slog.Logger
+
 	runCtx context.Context
 
 	auther       GatewayAuthHandler
@@ -76,19 +85,19 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 		defer func() {
-			logger.StdlibLogger(ctx).Debug("Closing WebSocket connection")
+			c.logger.Debug("Closing WebSocket connection")
 
 			_ = ws.CloseNow()
 		}()
 
-		logger.StdlibLogger(ctx).Debug("WebSocket connection established, sending hello")
+		c.logger.Debug("WebSocket connection established, sending hello")
 
 		{
 			err = wsproto.Write(ctx, ws, &connect.ConnectMessage{
 				Kind: connect.GatewayMessageType_GATEWAY_HELLO,
 			})
 			if err != nil {
-				logger.StdlibLogger(ctx).Error("could not send hello", "err", err)
+				c.logger.Error("could not send hello", "err", err)
 
 				return
 			}
@@ -102,7 +111,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			err = wsproto.Read(shorterContext, ws, &initialMessage)
 			if err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
-					logger.StdlibLogger(ctx).Debug("Timeout waiting for SDK connect message")
+					c.logger.Debug("Timeout waiting for SDK connect message")
 					_ = ws.Close(websocket.StatusPolicyViolation, "Timeout waiting for SDK connect message")
 				}
 
@@ -110,14 +119,14 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 
 			if initialMessage.Kind != connect.GatewayMessageType_SDK_CONNECT {
-				logger.StdlibLogger(ctx).Debug("initial SDK message was not connect")
+				c.logger.Debug("initial SDK message was not connect")
 
 				_ = ws.Close(websocket.StatusPolicyViolation, "Invalid first message, expected sdk-connect")
 				return
 			}
 
 			if err := proto.Unmarshal(initialMessage.Payload, &initialMessageData); err != nil {
-				logger.StdlibLogger(ctx).Debug("initial SDK message contained invalid Protobuf")
+				c.logger.Debug("initial SDK message contained invalid Protobuf")
 
 				_ = ws.Close(websocket.StatusPolicyViolation, "Invalid Protobuf in SDK connect message")
 				return
@@ -129,25 +138,25 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			// Run auth, add to distributed state
 			authResp, err = c.auther(ctx, &initialMessageData)
 			if err != nil {
-				logger.StdlibLogger(ctx).Error("connect auth failed", "err", err)
+				c.logger.Error("connect auth failed", "err", err)
 				_ = ws.Close(websocket.StatusInternalError, "Internal error")
 				return
 			}
 
 			if authResp == nil {
-				logger.StdlibLogger(ctx).Debug("Auth failed")
+				c.logger.Debug("Auth failed")
 
 				_ = ws.Close(websocket.StatusPolicyViolation, "Authentication failed")
 				return
 			}
 		}
 
-		logger.StdlibLogger(ctx).Debug("SDK successfully authenticated", "authResp", authResp)
+		c.logger.Debug("SDK successfully authenticated", "authResp", authResp)
 
 		// TODO Check whether SDK group was already synced
 		isAlreadySynced := false
 		if !isAlreadySynced {
-			logger.StdlibLogger(ctx).Debug("Sending sync message to SDK")
+			c.logger.Debug("Sending sync message to SDK")
 			data := &connect.GatewaySyncRequestData{
 				// TODO Set this to prevent unattached syncs!
 				DeployId: nil,
@@ -174,7 +183,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		for {
 			apps, err := c.dbcqrs.GetAllApps(ctx)
 			if err != nil && !errors.Is(err, sql.ErrNoRows) {
-				logger.StdlibLogger(ctx).Error("could not get apps", "err", err)
+				c.logger.Error("could not get apps", "err", err)
 				ws.Close(websocket.StatusInternalError, "Internal error")
 				return
 			}
@@ -191,7 +200,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					continue
 				}
 
-				logger.StdlibLogger(ctx).Error("could not find app", "appName", initialMessageData.AppName)
+				c.logger.Error("could not find app", "appName", initialMessageData.AppName)
 				ws.Close(websocket.StatusPolicyViolation, "Could not find app")
 				return
 			}
@@ -199,7 +208,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			break
 		}
 
-		fmt.Println("found app, connection is ready")
+		c.logger.Debug("found app, connection is ready")
 
 		// Wait for relevant messages and forward them to the socket
 		go func() {
@@ -208,7 +217,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			// - There are possibly multiple SDK deployments, each with their own WebSocket connection
 			// -> We need to prevent sending the same request multiple times, to different connections
 			err := c.receiver.ReceiveExecutorMessages(ctx, appId, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
-				fmt.Println("received msg", appId, data.RequestId)
+				c.logger.Debug("received msg", "app_id", appId, "req_id", data.RequestId)
 				// This will be sent at least once (if there are more than one connection, every connection receives the message)
 				err = c.receiver.AckMessage(ctx, appId, data.RequestId)
 				if err != nil {
@@ -289,7 +298,7 @@ func (c *connectGatewaySvc) handleSdkReply(ctx context.Context, appId uuid.UUID,
 		return fmt.Errorf("invalid response type: %w", err)
 	}
 
-	fmt.Println("notifying executor about response", appId, data.RequestId)
+	c.logger.Debug("notifying executor about response", appId, data.RequestId)
 
 	err := c.receiver.NotifyExecutor(ctx, appId, &data)
 	if err != nil {
@@ -299,14 +308,18 @@ func (c *connectGatewaySvc) handleSdkReply(ctx context.Context, appId uuid.UUID,
 	return nil
 }
 
-func NewConnectGatewayService(opts ...gatewayOpt) (service.Service, http.Handler) {
-	svc := &connectGatewaySvc{}
-
-	for _, opt := range opts {
-		opt(svc)
+func NewConnectGatewayService(opts ...gatewayOpt) ([]service.Service, http.Handler) {
+	gateway := &connectGatewaySvc{
+		gatewayId: ulid.MustNew(ulid.Now(), rand.Reader).String(),
 	}
 
-	return svc, svc.Handler()
+	for _, opt := range opts {
+		opt(gateway)
+	}
+
+	router := newConnectRouter(gateway.stateManager, gateway.receiver, gateway.dbcqrs)
+
+	return []service.Service{gateway, router}, gateway.Handler()
 }
 
 func (c *connectGatewaySvc) Name() string {
@@ -314,6 +327,9 @@ func (c *connectGatewaySvc) Name() string {
 }
 
 func (c *connectGatewaySvc) Pre(ctx context.Context) error {
+	// Set up gateway-specific logger with info for correlations
+	c.logger = logger.StdlibLogger(ctx).With("gateway_id", c.gatewayId)
+
 	return nil
 }
 
@@ -331,4 +347,42 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 
 func (c *connectGatewaySvc) Stop(ctx context.Context) error {
 	return nil
+}
+
+type connectRouterSvc struct {
+	logger *slog.Logger
+
+	stateManager ConnectionStateManager
+	receiver     pubsub.RequestReceiver
+	dbcqrs       cqrs.Manager
+}
+
+func (c *connectRouterSvc) Name() string {
+	return "connect-router"
+}
+
+func (c *connectRouterSvc) Pre(ctx context.Context) error {
+	return nil
+}
+
+func (c *connectRouterSvc) Run(ctx context.Context) error {
+	err := c.receiver.Wait(ctx)
+	if err != nil {
+		return fmt.Errorf("could not listen for pubsub messages: %w", err)
+	}
+
+	return nil
+
+}
+
+func (c *connectRouterSvc) Stop(ctx context.Context) error {
+	return nil
+}
+
+func newConnectRouter(stateManager ConnectionStateManager, receiver pubsub.RequestReceiver, db cqrs.Manager) service.Service {
+	return &connectRouterSvc{
+		stateManager: stateManager,
+		receiver:     receiver,
+		dbcqrs:       db,
+	}
 }
