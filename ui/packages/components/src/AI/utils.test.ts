@@ -3,6 +3,90 @@ import { describe, it } from 'vitest';
 
 import { getAIInfo, type OpenAIOutput } from './utils';
 
+const googleOutput = {
+  body: {
+    response: {
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                text: 'A function calls self,\nSolving problems by layers,\nA fractal of code. \n',
+              },
+            ],
+            role: 'model',
+          },
+          finishReason: 'STOP',
+          index: 0,
+          safetyRatings: [
+            {
+              category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+              probability: 'NEGLIGIBLE',
+            },
+            {
+              category: 'HARM_CATEGORY_HATE_SPEECH',
+              probability: 'NEGLIGIBLE',
+            },
+            {
+              category: 'HARM_CATEGORY_HARASSMENT',
+              probability: 'NEGLIGIBLE',
+            },
+            {
+              category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+              probability: 'NEGLIGIBLE',
+            },
+          ],
+        },
+      ],
+      modelVersion: 'gemini-1.5-flash-001',
+      usageMetadata: {
+        candidatesTokenCount: 17,
+        promptTokenCount: 9,
+        totalTokenCount: 26,
+      },
+    },
+  },
+  event: {
+    data: {
+      _inngest: {
+        expire: 0,
+        fn_id: 'inngest-ai-generate-text',
+        gid: '',
+        name: '',
+        source_app_id: '',
+        source_fn_id: '',
+        source_fn_v: 0,
+      },
+      model: 'gemini-1.5-flash',
+      prompt: 'Write a haiku about recursion in programming.',
+      provider: 'google',
+    },
+    id: '01JC6AHCZAGTDDAXN95H4XW8DP',
+    name: 'inngest/function.invoked',
+    ts: 1731084202986,
+    user: {},
+  },
+};
+
+const anthropicOutput = {
+  id: 'msg_01Eu6wq1Dt6FFPMsxhpnPVfM',
+  type: 'message',
+  role: 'assistant',
+  model: 'claude-3-5-sonnet-20241022',
+  content: [
+    {
+      type: 'text',
+      text: "Here's a haiku about recursion:\n\nFunction calls itself\nUntil base case is reached, then\nReturns back through time",
+    },
+  ],
+  stop_reason: 'end_turn',
+  stop_sequence: null,
+  usage: {
+    input_tokens: 17,
+    output_tokens: 35,
+  },
+};
+
 const openAIOutput: OpenAIOutput = {
   id: 'chatcmpl-AQd7Vqr5yNdAeoQC5yra9XXsaTRth',
   object: 'chat.completion',
@@ -40,7 +124,7 @@ const openAIOutput: OpenAIOutput = {
   system_fingerprint: 'fp_0ba0d124f1',
 };
 
-const vercelOutput: VercelOutput = {
+const vercelOutput = {
   body: {
     experimental_providerMetadata: {
       openai: {
@@ -307,6 +391,28 @@ describe('parseAIOutput', (t) => {
       promptTokens: 16,
       totalTokens: 35,
       model: 'gpt-4o-mini-2024-07-18',
+    });
+  });
+
+  it('test anthropic output parsing', () => {
+    const aiInfo = getAIInfo(anthropicOutput);
+
+    assert.deepStrictEqual(aiInfo, {
+      completionTokens: 35,
+      promptTokens: 17,
+      totalTokens: 52,
+      model: 'claude-3-5-sonnet-20241022',
+    });
+  });
+
+  it('test google output parsing', () => {
+    const aiInfo = getAIInfo(googleOutput);
+
+    assert.deepStrictEqual(aiInfo, {
+      completionTokens: 17,
+      promptTokens: 9,
+      totalTokens: 26,
+      model: 'gemini-1.5-flash-001',
     });
   });
 });

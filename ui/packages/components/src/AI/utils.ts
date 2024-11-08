@@ -1,14 +1,24 @@
 export type OpenAIOutput = {
   model: string;
   experimental_providerMetadata?: never;
+  response?: never;
 } & Object;
 
 export type VercelAIOutput = {
   experimental_providerMetadata: unknown;
   model?: never;
+  response?: never;
 } & Object;
 
-export type ExperimentalAI = OpenAIOutput | VercelAIOutput;
+export type GoogleAIOutput = {
+  response: {
+    modelVersion?: string;
+  };
+  model?: never;
+  experimental_providerMetadata: unknown;
+} & Object;
+
+export type ExperimentalAI = OpenAIOutput | VercelAIOutput | GoogleAIOutput;
 
 export const parseAIOutput = (output: string): ExperimentalAI | undefined => {
   try {
@@ -17,7 +27,7 @@ export const parseAIOutput = (output: string): ExperimentalAI | undefined => {
     //
     // a temporary hack to detect ai output until first class
     // step.ai indicators are added
-    if (data.model || data.experimental_providerMetadata) {
+    if (data.model || data.experimental_providerMetadata || data.response) {
       return data;
     }
     return undefined;
@@ -31,9 +41,10 @@ export const parseAIOutput = (output: string): ExperimentalAI | undefined => {
 // regex pattern to match the key pieces of ai information in outputs:
 // promptTokens, completionTokens, totalTokens, model and common variations
 // such as promptTokens, prompt_tokens, modelId, model, etc.
-const pattern = /\b(?:prompt|completion|total|model|modelId)[ _]?(?:tokens?|model|modelId)?\b/i;
+const pattern =
+  /\b(?:prompt|input|completion|output|total|model)[ _]?(?:id|version|tokens?|TokenCount)?\b|\b(?:prompt|candidates|total)[ _]?(?:tokens?|TokenCount)\b/i;
 
-type Value = string | number | boolean | null;
+export type Value = string | number | boolean | null;
 type Object = { [key: string]: Value | Object | Array<Value | Object> };
 
 type ResultType = {
@@ -43,12 +54,14 @@ type ResultType = {
   model?: Value;
 };
 
+const toNumber = (input?: Value): number => (isNaN(Number(input)) ? 0 : Number(input));
+
 /*
  * recursively search through the object to find any of the key pieces of ai information
  * we care about. For now just take the first match we find for each and stop there.
  */
 export const getAIInfo = (obj: Object): ResultType => {
-  return Object.keys(obj).reduce<ResultType>((acc, key) => {
+  const info = Object.keys(obj).reduce<ResultType>((acc, key) => {
     if (acc.promptTokens && acc.completionTokens && acc.totalTokens && acc.model) {
       return acc;
     }
@@ -74,9 +87,12 @@ export const getAIInfo = (obj: Object): ResultType => {
     const match = pattern.exec(key);
 
     if (match) {
-      if (!acc.promptTokens && /prompt/.test(key)) {
+      if (!acc.promptTokens && (/prompt/.test(key) || /input/.test(key))) {
         acc.promptTokens = value;
-      } else if (!acc.completionTokens && /completion/.test(key)) {
+      } else if (
+        !acc.completionTokens &&
+        (/completion/.test(key) || /output/.test(key) || /candidatesTokenCount/.test(key))
+      ) {
         acc.completionTokens = value;
       } else if (!acc.totalTokens && /total/.test(key)) {
         acc.totalTokens = value;
@@ -87,4 +103,10 @@ export const getAIInfo = (obj: Object): ResultType => {
 
     return acc;
   }, {});
+
+  if (!info.totalTokens) {
+    info.totalTokens = toNumber(info.promptTokens) + toNumber(info.completionTokens);
+  }
+
+  return info;
 };
