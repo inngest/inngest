@@ -151,7 +151,9 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}
 
-		c.logger.Debug("SDK successfully authenticated", "authResp", authResp)
+		log := c.logger.With("account_id", authResp.AccountID)
+
+		log.Debug("SDK successfully authenticated", "authResp", authResp)
 
 		// TODO Check whether SDK group was already synced
 		isAlreadySynced := false
@@ -208,7 +210,9 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			break
 		}
 
-		c.logger.Debug("found app, connection is ready")
+		log = log.With("app_id", appId)
+
+		log.Debug("found app, connection is ready")
 
 		// Wait for relevant messages and forward them to the socket
 		go func() {
@@ -216,8 +220,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			// - There are multiple gateway instances
 			// - There are possibly multiple SDK deployments, each with their own WebSocket connection
 			// -> We need to prevent sending the same request multiple times, to different connections
-			err := c.receiver.ReceiveExecutorMessages(ctx, appId, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
-				c.logger.Debug("received msg", "app_id", appId, "req_id", data.RequestId)
+			err := c.receiver.ReceiveRouterMessages(ctx, c.gatewayId, appId, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
+				log.Debug("received msg", "app_id", appId, "req_id", data.RequestId)
 				// This will be sent at least once (if there are more than one connection, every connection receives the message)
 				err = c.receiver.AckMessage(ctx, appId, data.RequestId)
 				if err != nil {
@@ -269,6 +273,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				if err != nil {
 					return
 				}
+
+				log.Debug("received WebSocket message", "kind", msg.Kind)
 
 				switch msg.Kind {
 				case connect.GatewayMessageType_SDK_REPLY:
@@ -366,6 +372,54 @@ func (c *connectRouterSvc) Pre(ctx context.Context) error {
 }
 
 func (c *connectRouterSvc) Run(ctx context.Context) error {
+	go func() {
+		err := c.receiver.ReceiveExecutorMessages(ctx, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
+			log := logger.StdlibLogger(ctx).With("app_id", data.AppId, "req_id", data.RequestId)
+
+			appId, err := uuid.Parse(data.AppId)
+			if err != nil {
+				log.Error("could not parse app ID")
+				return
+			}
+
+			log.Debug("received msg")
+
+			// TODO Should the router ack or the gateway itself?
+
+			// We need to add an idempotency key to ensure only one router instance processes the message
+			err = c.stateManager.SetRequestIdempotency(ctx, appId, data.RequestId)
+			if err != nil {
+				if errors.Is(err, ErrIdempotencyKeyExists) {
+					// Another connection was faster than us, we can ignore this message
+					return
+				}
+
+				// TODO Log error
+				return
+			}
+
+			// Now we're guaranteed to be the exclusive connection processing this message!
+
+			// TODO Resolve gateway
+			gatewayId := ""
+
+			// TODO What if something goes wrong inbetween setting idempotency (claiming exclusivity) and forwarding the req?
+			// We'll potentially lose data here
+
+			// Forward message to the gateway
+			err = c.receiver.RouteExecutorRequest(ctx, gatewayId, appId, data)
+			if err != nil {
+				// TODO Should we retry? Log error?
+				log.Error("failed to route request to gateway", "err", err, "gateway_id", gatewayId)
+				return
+			}
+		})
+		if err != nil {
+			// TODO Log error, retry?
+			return
+		}
+	}()
+
 	err := c.receiver.Wait(ctx)
 	if err != nil {
 		return fmt.Errorf("could not listen for pubsub messages: %w", err)

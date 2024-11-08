@@ -24,15 +24,22 @@ type RequestForwarder interface {
 }
 
 type RequestReceiver interface {
-	// ReceiveExecutorMessages listens for incoming PubSub messages for a specific app and calls the provided callback.
+	// ReceiveExecutorMessages listens for incoming PubSub messages for the connect router.
 	// This is a blocking call which only stops once the context is canceled.
-	ReceiveExecutorMessages(ctx context.Context, appId uuid.UUID, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error
-
-	// NotifyExecutor sends a response to the executor for a specific request.
-	NotifyExecutor(ctx context.Context, appId uuid.UUID, resp *connect.SDKResponse) error
+	ReceiveExecutorMessages(ctx context.Context, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error
 
 	// AckMessage sends an acknowledgment for a specific request.
 	AckMessage(ctx context.Context, appId uuid.UUID, requestId string) error
+
+	// RouteExecutorRequest forwards an executor request to the respective gateway
+	RouteExecutorRequest(ctx context.Context, gatewayId string, appId uuid.UUID, data *connect.GatewayExecutorRequestData) error
+
+	// ReceiveRouterMessages listens for incoming PubSub messages for a specific gateway and app and calls the provided callback.
+	// This is a blocking call which only stops once the context is canceled.
+	ReceiveRouterMessages(ctx context.Context, gatewayId string, appId uuid.UUID, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error
+
+	// NotifyExecutor sends a response to the executor for a specific request.
+	NotifyExecutor(ctx context.Context, appId uuid.UUID, resp *connect.SDKResponse) error
 
 	// Wait blocks and listens for incoming PubSub messages for the internal subscribers. This must be run before
 	// subscribing to any channels to ensure that the PubSub client is connected and ready to receive messages.
@@ -102,7 +109,7 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data 
 	}()
 
 	// After setting up ack and reply subscriptions, publish the request
-	channelName := i.channelAppRequests(appId)
+	channelName := i.channelExecutorRequests()
 	logger.StdlibLogger(ctx).Debug("published connect pubsub message", "channel", channelName, "request_id", data.RequestId)
 	// TODO Test whether this works with marshaled Protobuf bytes
 	err = i.client.Do(ctx, i.client.B().Publish().Channel(channelName).Message(string(dataBytes)).Build()).Error()
@@ -136,9 +143,14 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data 
 	return &reply, nil
 }
 
-// channelAppRequests returns the channel name for executor requests for a specific app.
-func (i *redisPubSubConnector) channelAppRequests(appId uuid.UUID) string {
-	return fmt.Sprintf("app_requests:%s", appId)
+// channelExecutorRequests returns the channel name for executor requests to be processed by the router.
+func (i *redisPubSubConnector) channelExecutorRequests() string {
+	return fmt.Sprintf("executor_requests")
+}
+
+// channelGatewayAppRequests returns the channel name for routed executor requests received by the gateway for a specific app.
+func (i *redisPubSubConnector) channelGatewayAppRequests(gatewayId string, appId uuid.UUID) string {
+	return fmt.Sprintf("app_requests:%s:%s", gatewayId, appId)
 }
 
 func (i *redisPubSubConnector) channelAppRequestsAck(appId uuid.UUID, requestId string) string {
@@ -224,8 +236,26 @@ func (i *redisPubSubConnector) subscribe(ctx context.Context, channel string, on
 
 // ReceiveExecutorMessages listens for incoming PubSub messages for a specific app and calls the provided callback.
 // This is a blocking call which only stops once the context is canceled.
-func (i *redisPubSubConnector) ReceiveExecutorMessages(ctx context.Context, appId uuid.UUID, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error {
-	return i.subscribe(ctx, i.channelAppRequests(appId), func(msg string) {
+func (i *redisPubSubConnector) ReceiveRouterMessages(ctx context.Context, gatewayId string, appId uuid.UUID, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error {
+	return i.subscribe(ctx, i.channelGatewayAppRequests(gatewayId, appId), func(msg string) {
+		// TODO Test whether this works with marshaled Protobuf bytes
+		msgBytes := []byte(msg)
+
+		var data connect.GatewayExecutorRequestData
+		err := proto.Unmarshal(msgBytes, &data)
+		if err != nil {
+			// TODO This should never happen, but PubSub will not redeliver, should we push the message into a dead-letter channel?
+			return
+		}
+
+		onMessage(msgBytes, &data)
+	}, false)
+}
+
+// ReceiveExecutorMessages listens for incoming PubSub messages for a specific app and calls the provided callback.
+// This is a blocking call which only stops once the context is canceled.
+func (i *redisPubSubConnector) ReceiveExecutorMessages(ctx context.Context, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error {
+	return i.subscribe(ctx, i.channelExecutorRequests(), func(msg string) {
 		// TODO Test whether this works with marshaled Protobuf bytes
 		msgBytes := []byte(msg)
 
@@ -337,6 +367,24 @@ func (i *redisPubSubConnector) AckMessage(ctx context.Context, appId uuid.UUID, 
 		Error()
 	if err != nil {
 		return fmt.Errorf("could not publish response: %w", err)
+	}
+
+	return nil
+}
+
+// RouteExecutorRequest forwards an executor request to the respective gateway
+func (i *redisPubSubConnector) RouteExecutorRequest(ctx context.Context, gatewayId string, appId uuid.UUID, data *connect.GatewayExecutorRequestData) error {
+	dataBytes, err := proto.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("could not marshal executor request: %w", err)
+	}
+
+	channelName := i.channelGatewayAppRequests(gatewayId, appId)
+	logger.StdlibLogger(ctx).Debug("forwarded connect request to gateway", "gateway_id", gatewayId, "channel", channelName, "request_id", data.RequestId)
+	// TODO Test whether this works with marshaled Protobuf bytes
+	err = i.client.Do(ctx, i.client.B().Publish().Channel(channelName).Message(string(dataBytes)).Build()).Error()
+	if err != nil {
+		return fmt.Errorf("could not publish executor request: %w", err)
 	}
 
 	return nil
