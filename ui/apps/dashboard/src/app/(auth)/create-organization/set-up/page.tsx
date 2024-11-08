@@ -13,7 +13,7 @@ const SetUpAccountDocument = graphql(`
     }
   }
 `);
-//
+
 export default async function OrganizationSetupPage() {
   const onboardingFlow = await getBooleanFlag('onboarding-flow-cloud');
   await graphqlAPI.request(SetUpAccountDocument);
