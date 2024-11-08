@@ -8,6 +8,7 @@ import { IconFlyIo } from '@inngest/components/icons/platforms/FlyIo';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { RiCheckboxCircleFill, RiCloudLine } from '@remixicon/react';
 
+import { useVercelIntegration } from '@/app/(organization-active)/(dashboard)/settings/integrations/vercel/useVercelIntegration';
 import { Secret } from '@/components/Secret';
 import { useDefaultEventKey } from '@/queries/useDefaultEventKey';
 import { pathCreator } from '@/utils/urls';
@@ -28,8 +29,12 @@ export default function DeployApp() {
   const defaultEventKey = res.data?.defaultKey.presharedKey || 'Unknown key';
   const { value: vercelFlowEnabled } = useBooleanFlag('onboarding-vercel-flow');
   const tracking = useOnboardingTracking();
-  const hasVercelIntegration = Math.random() > 0.5; // temp
-  const vercelProjects = [];
+
+  const { data, fetching, error: fetchError } = useVercelIntegration();
+
+  const hasVercelIntegration = data.id === 'enabled-integration-id';
+  const vercelProjects = data.projects;
+  console.log(data);
 
   return (
     <div className="text-subtle">
