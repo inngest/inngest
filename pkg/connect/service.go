@@ -2,7 +2,6 @@ package connect
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -15,7 +14,6 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
-	"github.com/oklog/ulid/v2"
 	"google.golang.org/protobuf/proto"
 	"log/slog"
 	"net/http"
@@ -222,7 +220,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			// The router selects only one gateway to handle a request from a pool of one or more workers (and thus WebSockets)
 			// running for each app.
 			err := c.receiver.ReceiveRoutedRequest(ctx, c.gatewayId, appId, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
-				log.Debug("received msg", "app_id", appId, "req_id", data.RequestId)
+				log.Debug("gateway received msg", "app_id", appId, "req_id", data.RequestId)
 
 				// This will be sent exactly once, as the router selected this gateway to handle the request
 				err = c.receiver.AckMessage(ctx, appId, data.RequestId)
@@ -260,7 +258,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					return
 				}
 
-				log.Debug("received WebSocket message", "kind", msg.Kind)
+				log.Debug("received WebSocket message", "kind", msg.Kind.String())
 
 				switch msg.Kind {
 				case connect.GatewayMessageType_SDK_REPLY:
@@ -290,7 +288,7 @@ func (c *connectGatewaySvc) handleSdkReply(ctx context.Context, log *slog.Logger
 		return fmt.Errorf("invalid response type: %w", err)
 	}
 
-	log.Debug("notifying executor about response")
+	log.Debug("notifying executor about response", "status", data.Status.String(), "no_retry", data.NoRetry, "retry_after", data.RetryAfter)
 
 	err := c.receiver.NotifyExecutor(ctx, appId, &data)
 	if err != nil {
@@ -302,7 +300,7 @@ func (c *connectGatewaySvc) handleSdkReply(ctx context.Context, log *slog.Logger
 
 func NewConnectGatewayService(opts ...gatewayOpt) ([]service.Service, http.Handler) {
 	gateway := &connectGatewaySvc{
-		gatewayId: ulid.MustNew(ulid.Now(), rand.Reader).String(),
+		gatewayId: "gw1",
 	}
 
 	for _, opt := range opts {
@@ -375,7 +373,7 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 				return
 			}
 
-			log.Debug("received msg")
+			log.Debug("router received msg")
 
 			// TODO Should the router ack or the gateway itself?
 
@@ -394,7 +392,7 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 			// Now we're guaranteed to be the exclusive connection processing this message!
 
 			// TODO Resolve gateway
-			gatewayId := ""
+			gatewayId := "gw1"
 
 			// TODO What if something goes wrong inbetween setting idempotency (claiming exclusivity) and forwarding the req?
 			// We'll potentially lose data here
