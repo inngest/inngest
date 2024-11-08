@@ -13,6 +13,7 @@ import EmptyAppsCard from '@/components/Onboarding/EmptyAppsCard';
 import { getProdApps } from '@/components/Onboarding/actions';
 import { staticSlugs } from '@/utils/environments';
 import { pathCreator } from '@/utils/urls';
+import { SkeletonCard } from './AppCard';
 import { Apps } from './Apps';
 
 const AppInfo = () => (
@@ -36,6 +37,22 @@ const AppInfo = () => (
   </Tooltip>
 );
 
+type LoadingState = {
+  hasProductionApps: boolean;
+  isLoading: boolean;
+};
+
+async function fetchInitialData(): Promise<LoadingState> {
+  try {
+    const { apps, unattachedSyncs } = await getProdApps();
+    const hasAppsOrUnattachedSyncs = apps.length > 0 || unattachedSyncs.length > 0;
+    return { hasProductionApps: hasAppsOrUnattachedSyncs, isLoading: false };
+  } catch (error) {
+    console.error('Error fetching production apps', error);
+    return { hasProductionApps: false, isLoading: false };
+  }
+}
+
 export default function AppsPage({
   params: { environmentSlug: envSlug },
   searchParams: { archived },
@@ -43,23 +60,18 @@ export default function AppsPage({
   params: { environmentSlug: string };
   searchParams: { archived: string };
 }) {
-  const [hasProductionApps, setHasProductionApps] = useState(false);
+  const [{ hasProductionApps, isLoading }, setState] = useState<LoadingState>({
+    hasProductionApps: true,
+    isLoading: true,
+  });
+
   const isArchived = archived === 'true';
   const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
 
   useEffect(() => {
-    async function fetchProductionApps() {
-      try {
-        const { apps, unattachedSyncs } = await getProdApps();
-        const hasAppsOrUnattachedSyncs = apps.length > 0 || unattachedSyncs.length > 0;
-        setHasProductionApps(hasAppsOrUnattachedSyncs);
-      } catch (error) {
-        console.error('Error fetching production apps', error);
-        setHasProductionApps(false);
-      }
-    }
-
-    fetchProductionApps();
+    fetchInitialData().then((data) => {
+      setState(data);
+    });
   }, []);
 
   const displayOnboarding =
@@ -83,14 +95,24 @@ export default function AppsPage({
         }
       />
       <div className="bg-canvasBase mx-auto flex h-full w-full max-w-[1200px] flex-col px-6 pt-16">
-        {displayOnboarding ? (
-          <EmptyAppsCard />
+        {isLoading ? (
+          <div className="mb-4 flex items-center justify-center">
+            <div className="mt-[50px] w-full max-w-[1200px]">
+              <SkeletonCard />
+            </div>
+          </div>
         ) : (
           <>
-            <div className="relative flex w-full flex-row justify-start">
-              <StatusMenu archived={isArchived} envSlug={envSlug} />
-            </div>
-            <Apps isArchived={isArchived} />
+            {displayOnboarding ? (
+              <EmptyAppsCard />
+            ) : (
+              <>
+                <div className="relative flex w-full flex-row justify-start">
+                  <StatusMenu archived={isArchived} envSlug={envSlug} />
+                </div>
+                <Apps isArchived={isArchived} />
+              </>
+            )}
           </>
         )}
       </div>
