@@ -218,7 +218,7 @@ export default function SyncApp() {
             )}
             {vercelSyncs && (
               <>
-                {vercelSyncs.apps?.length ? (
+                {vercelSyncs.apps.length ? (
                   <div>
                     {vercelSyncs.apps.map((app) => (
                       <div
@@ -236,7 +236,7 @@ export default function SyncApp() {
                       </div>
                     ))}
                   </div>
-                ) : vercelSyncs.unattachedSyncs?.length ? (
+                ) : vercelSyncs.unattachedSyncs.length ? (
                   <>
                     <SyncFailure
                       className="mb-4"

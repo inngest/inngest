@@ -17,7 +17,7 @@ export default function CommonVercelErrors() {
           <AccordionList.Content className="text-subtle">
             <p>
               Inngest may not be able to communicate with your application by default. The sync can
-              fail if the deployment protection key isn't bypassed.{' '}
+              fail if the deployment protection key isn&apos;t bypassed.{' '}
               <NewLink
                 className="inline"
                 size="small"
