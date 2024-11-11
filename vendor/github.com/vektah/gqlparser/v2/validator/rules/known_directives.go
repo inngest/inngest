@@ -2,6 +2,8 @@ package validator
 
 import (
 	"github.com/vektah/gqlparser/v2/ast"
+
+	//nolint:revive // Validator rules each use dot imports for convenience.
 	. "github.com/vektah/gqlparser/v2/validator"
 )
 
@@ -12,7 +14,7 @@ func init() {
 			Line   int
 			Column int
 		}
-		var seen map[mayNotBeUsedDirective]bool = map[mayNotBeUsedDirective]bool{}
+		seen := map[mayNotBeUsedDirective]bool{}
 		observers.OnDirective(func(walker *Walker, directive *ast.Directive) {
 			if directive.Definition == nil {
 				addError(

@@ -743,8 +743,8 @@ github.com/urfave/cli/v2
 ## explicit; go 1.12
 github.com/valyala/fastjson
 github.com/valyala/fastjson/fastfloat
-# github.com/vektah/gqlparser/v2 v2.5.1
-## explicit; go 1.16
+# github.com/vektah/gqlparser/v2 v2.5.15
+## explicit; go 1.19
 github.com/vektah/gqlparser/v2
 github.com/vektah/gqlparser/v2/ast
 github.com/vektah/gqlparser/v2/gqlerror
