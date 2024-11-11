@@ -8,7 +8,7 @@ import TabCards from '@inngest/components/TabCards/TabCards';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
-import { RiCheckboxCircleFill, RiInputCursorMove } from '@remixicon/react';
+import { RiCheckboxCircleFill, RiCloseCircleFill, RiInputCursorMove } from '@remixicon/react';
 
 import { type CodedError } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
@@ -225,14 +225,15 @@ export default function SyncApp() {
                         key={app.id}
                         className="border-subtle mb-4 flex items-center justify-between rounded border p-3"
                       >
-                        <div className="flex items-center gap-2">
-                          <div className="bg-contrast border-muted flex h-9 w-9 items-center justify-center rounded border">
-                            <AppsIcon className="text-onContrast h-4 w-4" />
+                        {app.name && (
+                          <div className="flex items-center gap-2">
+                            <div className="bg-contrast border-muted flex h-9 w-9 items-center justify-center rounded border">
+                              <AppsIcon className="text-onContrast h-4 w-4" />
+                            </div>
+                            <p className="text-basis">{app.name}</p>
                           </div>
-                          <p className="text-basis">{app.name}</p>
-                        </div>
-                        {/* TO DO: different status and error */}
-                        <div className="text-sm">App synced successfully</div>
+                        )}
+                        <StatusIndicator status={app.latestSync?.status} />
                       </div>
                     ))}
                   </div>
@@ -249,7 +250,9 @@ export default function SyncApp() {
                   </>
                 ) : (
                   <div className="mb-4">
-                    No syncs found
+                    <div className="border-subtle mb-4 flex items-center justify-between rounded-md border p-3 text-sm">
+                      No syncs found
+                    </div>
                     <CommonVercelErrors />
                   </div>
                 )}
@@ -276,3 +279,35 @@ export default function SyncApp() {
     </div>
   );
 }
+
+const StatusIndicator = ({ status }: { status?: string }) => {
+  if (status === 'pending')
+    return (
+      <div className="text-link flex items-center gap-1 text-sm">
+        <IconSpinner className="fill-link h-4 w-4" />
+        Syncing app
+      </div>
+    );
+  if (status === 'success')
+    return (
+      <div className="text-success flex items-center gap-1 text-sm">
+        <RiCheckboxCircleFill className="text-success h-4 w-4" />
+        App synced successfully
+      </div>
+    );
+  if (status === 'error')
+    return (
+      <div className="text-error flex items-center gap-1 text-sm">
+        <RiCloseCircleFill className="text-error h-5 w-5" />
+        App failed to sync
+      </div>
+    );
+  if (status === 'duplicate')
+    return (
+      <div className="text-success flex items-center gap-1 text-sm">
+        <RiCheckboxCircleFill className="text-success h-4 w-4" />
+        App synced successfully
+      </div>
+    );
+  return <></>;
+};

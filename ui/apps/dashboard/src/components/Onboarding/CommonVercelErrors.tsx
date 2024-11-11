@@ -4,12 +4,12 @@ import { NewLink } from '@inngest/components/Link';
 export default function CommonVercelErrors() {
   return (
     <div className="my-6">
-      <p className="mb-3 text-sm font-medium">
+      <p className="bg-canvasSubtle border-subtle text-subtle rounded-t-lg border border-b-0 px-3 py-2 text-sm font-medium">
         {' '}
         Why might the syncs fail, and how can I resolve it?
       </p>
-      <AccordionList type="multiple" defaultValue={[]}>
-        <AccordionList.Item value="protection-key">
+      <AccordionList type="multiple" defaultValue={[]} className="rounded-t-none">
+        <AccordionList.Item value="protection-key" className="first:rounded-t-none">
           <AccordionList.Trigger className="text-subtle text-sm">
             Deployment protection key is enabled
           </AccordionList.Trigger>
