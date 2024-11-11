@@ -123,8 +123,8 @@ export const getInvokeFunctionLookups = cache(async (envSlug: string) => {
   return results;
 });
 
-export const getVercelAppsOnboardingDocument = graphql(`
-  query getVercelApps($envID: ID!) {
+export const GetVercelAppsOnboardingDocument = graphql(`
+  query GetVercelApps($envID: ID!) {
     environment: workspace(id: $envID) {
       unattachedSyncs(first: 1) {
         lastSyncedAt
@@ -155,7 +155,7 @@ export const getVercelAppsOnboardingDocument = graphql(`
 export const getVercelApps = async () => {
   const environment = await getProductionEnvironment();
 
-  return await graphqlAPI.request<GetVercelAppsQuery>(getVercelAppsOnboardingDocument, {
+  return await graphqlAPI.request<GetVercelAppsQuery>(GetVercelAppsOnboardingDocument, {
     envID: environment.id,
   });
 };
