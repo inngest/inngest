@@ -3,6 +3,7 @@ import { cache } from 'react';
 
 import { graphql } from '@/gql';
 import {
+  type GetVercelAppsQuery,
   type InvokeFunctionMutation,
   type InvokeFunctionMutationVariables,
   type SyncResponse,
@@ -121,3 +122,40 @@ export const getInvokeFunctionLookups = cache(async (envSlug: string) => {
 
   return results;
 });
+
+export const getVercelAppsOnboardingDocument = graphql(`
+  query getVercelApps($envID: ID!) {
+    environment: workspace(id: $envID) {
+      unattachedSyncs(first: 1) {
+        lastSyncedAt
+        error
+      }
+      vercelApps {
+        id
+        projectID
+        path
+        originOverride
+      }
+      apps {
+        id
+        externalID
+        latestSync {
+          error
+          id
+          platform
+          vercelDeploymentID
+          vercelProjectID
+          status
+        }
+      }
+    }
+  }
+`);
+
+export const getVercelApps = async () => {
+  const environment = await getProductionEnvironment();
+
+  return await graphqlAPI.request<GetVercelAppsQuery>(getVercelAppsOnboardingDocument, {
+    envID: environment.id,
+  });
+};

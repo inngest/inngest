@@ -4,6 +4,7 @@ import { type InvokeFunctionMutationVariables } from '@/gql/graphql';
 import { getProductionEnvironment } from '@/queries/server-only/getEnvironment';
 import {
   getInvokeFunctionLookups,
+  getVercelApps,
   invokeFn,
   preloadInvokeFunctionLookups,
   syncNewApp,
@@ -66,4 +67,15 @@ export async function prefetchFunctions() {
   } = await getInvokeFunctionLookups(environment.slug);
 
   return functions;
+}
+
+export async function getVercelSyncs() {
+  try {
+    const response = await getVercelApps();
+    const syncs = response.environment;
+    return syncs;
+  } catch (error) {
+    console.error('Error fetching vercel apps:', error);
+    return {};
+  }
 }

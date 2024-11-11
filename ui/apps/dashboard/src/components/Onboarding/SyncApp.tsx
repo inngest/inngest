@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
 import { NewButton } from '@inngest/components/Button';
@@ -15,7 +15,7 @@ import { pathCreator } from '@/utils/urls';
 import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { OnboardingSteps } from '../Onboarding/types';
 import { SyncFailure } from '../SyncFailure';
-import { syncAppManually } from './actions';
+import { getVercelSyncs, syncAppManually } from './actions';
 import useOnboardingStep from './useOnboardingStep';
 import { useOnboardingTracking } from './useOnboardingTracking';
 import { getNextStepName } from './utils';
@@ -25,12 +25,32 @@ export default function SyncApp() {
   const nextStepName = getNextStepName(currentStepName);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingVercelApps, setIsLoadingVercelApps] = useState(false);
+  const [vercelApps, setVercelApps] = useState({});
   const [error, setError] = useState<CodedError | null>();
   const [app, setApp] = useState<string | null>();
   const { updateCompletedSteps } = useOnboardingStep();
   const router = useRouter();
   const { value: vercelFlowEnabled } = useBooleanFlag('onboarding-vercel-flow');
   const tracking = useOnboardingTracking();
+
+  useEffect(() => {
+    const loadVercelSyncs = async () => {
+      try {
+        setIsLoadingVercelApps(true);
+        const apps = await getVercelSyncs();
+        setVercelApps(apps);
+      } catch (err) {
+        console.error('Failed to load syncs: ', err);
+      } finally {
+        setIsLoadingVercelApps(false);
+      }
+    };
+
+    loadVercelSyncs();
+  }, []);
+
+  console.log('vercel', vercelApps);
 
   const handleSyncAppManually = async () => {
     setIsLoading(true);
@@ -186,10 +206,12 @@ export default function SyncApp() {
               deployment, ensuring a seamless connection.
             </p>
             {/* TODO: wire vercel integration flow */}
-            <div className="text-link mb-4 flex items-center gap-1 text-sm">
-              <IconSpinner className="fill-link h-4 w-4" />
-              Syncing app
-            </div>
+            {isLoadingVercelApps && (
+              <div className="text-link mb-4 flex items-center gap-1 text-sm">
+                <IconSpinner className="fill-link h-4 w-4" />
+                Loading apps
+              </div>
+            )}
             <NewButton
               label="Next"
               onClick={() => {
