@@ -3,6 +3,8 @@ import { cache } from 'react';
 
 import { graphql } from '@/gql';
 import {
+  type App,
+  type Deploy,
   type GetVercelAppsQuery,
   type InvokeFunctionMutation,
   type InvokeFunctionMutationVariables,
@@ -129,15 +131,12 @@ export const GetVercelAppsOnboardingDocument = graphql(`
       unattachedSyncs(first: 1) {
         lastSyncedAt
         error
-      }
-      vercelApps {
-        id
-        projectID
-        path
-        originOverride
+        url
+        vercelDeploymentURL
       }
       apps {
         id
+        name
         externalID
         latestSync {
           error
@@ -159,3 +158,12 @@ export const getVercelApps = async () => {
     envID: environment.id,
   });
 };
+
+export type VercelApp = Pick<App, 'id' | 'name' | 'externalID'> & {
+  latestSync: Pick<
+    Deploy,
+    'id' | 'error' | 'platform' | 'vercelDeploymentID' | 'vercelProjectID' | 'status'
+  > | null;
+};
+
+export type UnattachedSync = Pick<Deploy, 'lastSyncedAt' | 'error' | 'url' | 'vercelDeploymentURL'>;

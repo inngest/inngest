@@ -73,9 +73,19 @@ export async function getVercelSyncs() {
   try {
     const response = await getVercelApps();
     const syncs = response.environment;
-    return syncs;
+
+    // Filter apps to only include those with latestSync.platform === "vercel"
+    const vercelApps = syncs.apps.filter((app) => app.latestSync?.platform === 'vercel');
+
+    // Filter unattachedSyncs to only include those with a vercelDeploymentURL
+    const unattachedSyncs = syncs.unattachedSyncs.filter((sync) => sync.vercelDeploymentURL);
+
+    return {
+      apps: vercelApps,
+      unattachedSyncs: unattachedSyncs,
+    };
   } catch (error) {
     console.error('Error fetching vercel apps:', error);
-    return {};
+    return { apps: [], unattachedSyncs: [] };
   }
 }

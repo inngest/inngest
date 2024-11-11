@@ -15,7 +15,9 @@ import { pathCreator } from '@/utils/urls';
 import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { OnboardingSteps } from '../Onboarding/types';
 import { SyncFailure } from '../SyncFailure';
+import CommonVercelErrors from './CommonVercelErrors';
 import { getVercelSyncs, syncAppManually } from './actions';
+import { type UnattachedSync, type VercelApp } from './data';
 import useOnboardingStep from './useOnboardingStep';
 import { useOnboardingTracking } from './useOnboardingTracking';
 import { getNextStepName } from './utils';
@@ -26,7 +28,10 @@ export default function SyncApp() {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingVercelApps, setIsLoadingVercelApps] = useState(false);
-  const [vercelApps, setVercelApps] = useState({});
+  const [vercelSyncs, setVercelSyncs] = useState<{
+    apps: VercelApp[];
+    unattachedSyncs: UnattachedSync[];
+  }>();
   const [error, setError] = useState<CodedError | null>();
   const [app, setApp] = useState<string | null>();
   const { updateCompletedSteps } = useOnboardingStep();
@@ -38,8 +43,8 @@ export default function SyncApp() {
     const loadVercelSyncs = async () => {
       try {
         setIsLoadingVercelApps(true);
-        const apps = await getVercelSyncs();
-        setVercelApps(apps);
+        const syncs = await getVercelSyncs();
+        setVercelSyncs(syncs);
       } catch (err) {
         console.error('Failed to load syncs: ', err);
       } finally {
@@ -50,7 +55,7 @@ export default function SyncApp() {
     loadVercelSyncs();
   }, []);
 
-  console.log('vercel', vercelApps);
+  console.log('vercel', vercelSyncs);
 
   const handleSyncAppManually = async () => {
     setIsLoading(true);
@@ -205,12 +210,50 @@ export default function SyncApp() {
               Inngest <span className="font-medium">automatically</span> syncs your app upon
               deployment, ensuring a seamless connection.
             </p>
-            {/* TODO: wire vercel integration flow */}
             {isLoadingVercelApps && (
               <div className="text-link mb-4 flex items-center gap-1 text-sm">
                 <IconSpinner className="fill-link h-4 w-4" />
                 Loading apps
               </div>
+            )}
+            {vercelSyncs && (
+              <>
+                {vercelSyncs.apps?.length ? (
+                  <div>
+                    {vercelSyncs.apps.map((app) => (
+                      <div
+                        key={app.id}
+                        className="border-subtle mb-4 flex items-center justify-between rounded border p-3"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="bg-contrast border-muted flex h-9 w-9 items-center justify-center rounded border">
+                            <AppsIcon className="text-onContrast h-4 w-4" />
+                          </div>
+                          <p className="text-basis">{app.name}</p>
+                        </div>
+                        {/* TO DO: different status and error */}
+                        <div className="text-sm">App synced successfully</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : vercelSyncs.unattachedSyncs?.length ? (
+                  <>
+                    <SyncFailure
+                      className="mb-4"
+                      error={{
+                        message: vercelSyncs.unattachedSyncs[0]?.error || 'Unknown error',
+                        code: 'unknown',
+                      }}
+                    />
+                    <CommonVercelErrors />
+                  </>
+                ) : (
+                  <div className="mb-4">
+                    No syncs found
+                    <CommonVercelErrors />
+                  </div>
+                )}
+              </>
             )}
             <NewButton
               label="Next"
