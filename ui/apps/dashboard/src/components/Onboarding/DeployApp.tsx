@@ -220,7 +220,9 @@ export default function DeployApp() {
                   tracking?.trackOnboardingAction(currentStepName, {
                     metadata: { type: 'btn-click', label: 'next', hostingProvider: 'vercel' },
                   });
-                  router.push(pathCreator.onboardingSteps({ step: nextStepName }));
+                  router.push(
+                    pathCreator.onboardingSteps({ step: nextStepName }) + '?fromVercel=true'
+                  );
                 }}
               />
             )}

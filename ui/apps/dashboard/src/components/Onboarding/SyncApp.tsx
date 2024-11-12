@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
 import { NewButton } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
@@ -35,6 +35,9 @@ export default function SyncApp() {
   const router = useRouter();
   const { value: vercelFlowEnabled } = useBooleanFlag('onboarding-vercel-flow');
   const tracking = useOnboardingTracking();
+
+  const searchParams = useSearchParams();
+  const fromVercel = searchParams.get('fromVercel') === 'true';
 
   const loadVercelSyncs = async () => {
     try {
@@ -129,7 +132,7 @@ export default function SyncApp() {
       </p>
 
       <h4 className="mb-4 text-sm font-medium">Choose syncing method:</h4>
-      <TabCards defaultValue="manually">
+      <TabCards defaultValue={fromVercel ? 'vercel' : 'manually'}>
         <TabCards.ButtonList>
           <TabCards.Button className="w-36" value="manually">
             <div className="flex items-center gap-1.5">
