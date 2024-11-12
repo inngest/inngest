@@ -10,7 +10,7 @@ export const Profile = ({ collapsed, profile }: { collapsed: boolean; profile: P
   const pathname = usePathname();
   const active =
     pathname.startsWith('/settings/organization') ||
-    pathname.startsWith('/settings/billing') ||
+    pathname.startsWith('/billing') ||
     pathname.startsWith('/settings/user');
 
   return (
