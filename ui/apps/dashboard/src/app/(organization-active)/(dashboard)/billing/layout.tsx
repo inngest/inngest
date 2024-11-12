@@ -8,6 +8,7 @@ export default async function BillingLayout({ children }: React.PropsWithChildre
     <Layout>
       <div className="flex-col">
         <Header
+          backNav={true}
           breadcrumb={[{ text: 'Billing', href: '/billing' }]}
           tabs={[
             {
