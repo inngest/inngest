@@ -139,9 +139,20 @@ func do(ctx context.Context, forwarder pubsub.RequestForwarder, appId uuid.UUID,
 	// TODO connect is only implemented by SDKs, but we can include a flag in the proxied resp as well...
 	isSDK := true
 
+	statusCode := 0
+	switch resp.Status {
+	case connect.SDKResponseStatus_DONE:
+		statusCode = http.StatusOK
+	case connect.SDKResponseStatus_ERROR:
+		statusCode = http.StatusInternalServerError
+	case connect.SDKResponseStatus_NOT_COMPLETED:
+		statusCode = http.StatusPartialContent
+
+	}
+
 	return &httpdriver.Response{
 		Body:           resp.Body,
-		StatusCode:     int(resp.Status),
+		StatusCode:     statusCode,
 		Duration:       dur,
 		RetryAt:        retryAt,
 		NoRetry:        noRetry,
