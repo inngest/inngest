@@ -28,6 +28,7 @@ func TestEndToEnd(t *testing.T) {
 	)
 
 	connectCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	a := inngestgo.CreateFunction(
 		inngestgo.FunctionOpts{Name: "connect test"},
@@ -62,9 +63,9 @@ func TestEndToEnd(t *testing.T) {
 		require.NoError(t, err)
 
 		<-time.After(2 * time.Second)
-		cancel()
-
 		require.EqualValues(t, 1, atomic.LoadInt32(&counter))
+		
+		cancel()
 	})
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
