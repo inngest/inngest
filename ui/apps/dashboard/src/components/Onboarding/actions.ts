@@ -8,6 +8,8 @@ import {
   invokeFn,
   preloadInvokeFunctionLookups,
   syncNewApp,
+  type UnattachedSync,
+  type VercelApp,
 } from './data';
 
 export async function syncAppManually(appURL: string) {
@@ -69,7 +71,12 @@ export async function prefetchFunctions() {
   return functions;
 }
 
-export async function getVercelSyncs() {
+export type VercelSyncsResponse = {
+  apps: VercelApp[];
+  unattachedSyncs: UnattachedSync[];
+};
+
+export async function getVercelSyncs(): Promise<VercelSyncsResponse> {
   try {
     const response = await getVercelApps();
     const syncs = response.environment;

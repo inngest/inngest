@@ -16,8 +16,8 @@ import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { OnboardingSteps } from '../Onboarding/types';
 import { SyncFailure } from '../SyncFailure';
 import CommonVercelErrors from './CommonVercelErrors';
-import { getVercelSyncs, syncAppManually } from './actions';
-import { type UnattachedSync, type VercelApp } from './data';
+import { getVercelSyncs, syncAppManually, type VercelSyncsResponse } from './actions';
+import { type VercelApp } from './data';
 import useOnboardingStep from './useOnboardingStep';
 import { useOnboardingTracking } from './useOnboardingTracking';
 import { getNextStepName } from './utils';
@@ -28,10 +28,7 @@ export default function SyncApp() {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingVercelApps, setIsLoadingVercelApps] = useState(false);
-  const [vercelSyncs, setVercelSyncs] = useState<{
-    apps: VercelApp[];
-    unattachedSyncs: UnattachedSync[];
-  }>();
+  const [vercelSyncs, setVercelSyncs] = useState<VercelSyncsResponse>();
   const [error, setError] = useState<CodedError | null>();
   const [app, setApp] = useState<string | null>();
   const { updateCompletedSteps } = useOnboardingStep();
@@ -39,23 +36,58 @@ export default function SyncApp() {
   const { value: vercelFlowEnabled } = useBooleanFlag('onboarding-vercel-flow');
   const tracking = useOnboardingTracking();
 
+  const loadVercelSyncs = async () => {
+    try {
+      setIsLoadingVercelApps(true);
+      const syncs = await getVercelSyncs();
+      setVercelSyncs(syncs);
+      return syncs;
+    } catch (err) {
+      console.error('Failed to load syncs: ', err);
+    } finally {
+      setIsLoadingVercelApps(false);
+    }
+  };
+
   useEffect(() => {
-    const loadVercelSyncs = async () => {
-      try {
-        setIsLoadingVercelApps(true);
-        const syncs = await getVercelSyncs();
-        setVercelSyncs(syncs);
-      } catch (err) {
-        console.error('Failed to load syncs: ', err);
-      } finally {
-        setIsLoadingVercelApps(false);
+    let intervalId: number | undefined;
+
+    const checkAndPoll = async () => {
+      const syncs = await loadVercelSyncs();
+
+      const hasPendingSync = syncs?.apps.some(
+        (app: VercelApp) => app.latestSync?.status === 'pending'
+      );
+
+      if (hasPendingSync) {
+        intervalId = window.setInterval(async () => {
+          const newSyncs = await loadVercelSyncs();
+          const newHasPendingSync = newSyncs?.apps.some(
+            (app: VercelApp) => app.latestSync?.status === 'pending'
+          );
+
+          // Clear interval if the pending syncs are resolved
+          if (!newHasPendingSync && intervalId !== undefined) {
+            window.clearInterval(intervalId);
+          }
+        }, 2500);
       }
     };
 
-    loadVercelSyncs();
+    checkAndPoll();
+
+    return () => {
+      if (intervalId !== undefined) {
+        window.clearInterval(intervalId);
+      }
+    };
   }, []);
 
   console.log('vercel', vercelSyncs);
+
+  const hasSuccessfulSync = vercelSyncs?.apps.some(
+    (app) => app.latestSync?.status === 'success' || app.latestSync?.status === 'duplicate'
+  );
 
   const handleSyncAppManually = async () => {
     setIsLoading(true);
@@ -210,7 +242,7 @@ export default function SyncApp() {
               Inngest <span className="font-medium">automatically</span> syncs your app upon
               deployment, ensuring a seamless connection.
             </p>
-            {isLoadingVercelApps && (
+            {isLoadingVercelApps && !vercelSyncs && (
               <div className="text-link mb-4 flex items-center gap-1 text-sm">
                 <IconSpinner className="fill-link h-4 w-4" />
                 Loading apps
@@ -259,6 +291,7 @@ export default function SyncApp() {
               </>
             )}
             <NewButton
+              disabled={!hasSuccessfulSync}
               label="Next"
               onClick={() => {
                 updateCompletedSteps(currentStepName, {
