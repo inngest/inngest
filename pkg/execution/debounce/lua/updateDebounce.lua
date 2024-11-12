@@ -7,7 +7,6 @@ Return values:
 - -1: Debounce is already in progress, as the queue item is leased.
 - -2: Event is out of order and has no effect
 - -3: Debounce queue item is not found.
-
 ]]--
 
 local keyPtr = KEYS[1] -- fn -> debounce ptr
@@ -16,7 +15,7 @@ local keyDbc = KEYS[2] -- debounce info key
 -- and create a new debounce job.
 local keyQueueHash = KEYS[3]
 
-local debounceID  = ARGV[1] 
+local debounceID  = ARGV[1]
 local debounce    = ARGV[2]
 local ttl         = tonumber(ARGV[3])
 local queueJobID  = ARGV[4]
@@ -56,12 +55,15 @@ end
 -- Check that the queue item is not leased (ie. this debounce is not in progress)
 local item = get_queue_item(keyQueueHash, queueJobID)
 if item == nil then
-	-- The queue item was not found.  Return a new debounce.
-	return -3
+	-- The queue item was not found. return not found but set the debounce in the hash map
+  -- for lookup
+  redis.call("SETEX", keyPtr, ttl, debounceID)
+  redis.call("HSET", keyDbc, debounceID, debounce)
+  return -3
 end
 
 if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > currentTime then
-	-- The debounce queue item is leased. 
+	-- The debounce queue item is leased.
 	return -1
 end
 
