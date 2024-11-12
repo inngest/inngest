@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"regexp"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
@@ -9,6 +10,8 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 )
+
+var tsSuffix = regexp.MustCompile(`\s*&&\s*\(\s*async.ts\s+==\s*null\s*\|\|\s*async.ts\s*>\s*\d*\)\s*$`)
 
 // PauseMutater manages creating, leasing, and consuming pauses from a backend implementation.
 type PauseMutater interface {
@@ -205,6 +208,14 @@ func (p Pause) GetExpression() string {
 	if p.Expression == nil {
 		return ""
 	}
+
+	// If this is a cancellation, ensure it doesn't have our `event.ts` suffix
+	// added, eg:
+	//  && (async.ts == null || async.ts > 1731035030976)
+	if p.Cancel {
+		return tsSuffix.ReplaceAllString(*p.Expression, "")
+	}
+
 	return *p.Expression
 }
 
