@@ -121,7 +121,7 @@ export default function InvokeFn() {
           Read more
         </NewLink>
       </p>
-      <div className="border-subtle my-6 rounded-sm border px-6 py-4">
+      <div className="border-subtle my-6 rounded-md border px-6 py-4">
         <p className="text-muted mb-2 text-sm font-medium">Select function to test:</p>
 
         <Select
