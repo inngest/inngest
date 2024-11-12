@@ -3,6 +3,9 @@ import { cache } from 'react';
 
 import { graphql } from '@/gql';
 import {
+  type App,
+  type Deploy,
+  type GetVercelAppsQuery,
   type InvokeFunctionMutation,
   type InvokeFunctionMutationVariables,
   type SyncResponse,
@@ -121,3 +124,46 @@ export const getInvokeFunctionLookups = cache(async (envSlug: string) => {
 
   return results;
 });
+
+export const GetVercelAppsOnboardingDocument = graphql(`
+  query GetVercelApps($envID: ID!) {
+    environment: workspace(id: $envID) {
+      unattachedSyncs(first: 1) {
+        lastSyncedAt
+        error
+        url
+        vercelDeploymentURL
+      }
+      apps {
+        id
+        name
+        externalID
+        latestSync {
+          error
+          id
+          platform
+          vercelDeploymentID
+          vercelProjectID
+          status
+        }
+      }
+    }
+  }
+`);
+
+export const getVercelApps = async () => {
+  const environment = await getProductionEnvironment();
+
+  return await graphqlAPI.request<GetVercelAppsQuery>(GetVercelAppsOnboardingDocument, {
+    envID: environment.id,
+  });
+};
+
+export type VercelApp = Pick<App, 'id' | 'name' | 'externalID'> & {
+  latestSync: Pick<
+    Deploy,
+    'id' | 'error' | 'platform' | 'vercelDeploymentID' | 'vercelProjectID' | 'status'
+  > | null;
+};
+
+export type UnattachedSync = Pick<Deploy, 'lastSyncedAt' | 'error' | 'url' | 'vercelDeploymentURL'>;

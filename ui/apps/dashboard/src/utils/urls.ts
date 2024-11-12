@@ -107,7 +107,7 @@ export const pathCreator = {
     step?: string;
     ref?: string;
   }): Route {
-    return `/env/${envSlug}/onboarding/${step ? `/${step}` : ''}${
+    return `/env/${envSlug}/onboarding${step ? `/${step}` : ''}${
       ref ? `?ref=${ref}` : ''
     }` as Route;
   },
