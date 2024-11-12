@@ -47,7 +47,7 @@ func CheckRedirect(req *http.Request, via []*http.Request) (err error) {
 		return fmt.Errorf("stopped after 10 redirects")
 	}
 
-	if via[0].Body != nil {
+	if via[0].Body != nil && via[0].GetBody != nil {
 		req.Body, err = via[0].GetBody()
 		if err != nil {
 			return err
