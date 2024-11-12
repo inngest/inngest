@@ -19,9 +19,9 @@ export default function EmptyAppsCard() {
       <div className="text-center">
         <p className="mb-2 text-2xl">Sync your first Inngest App</p>
         <p className="max-w-3xl">
-          In Inngest, apps are a group of functions served on a single endpoint or server. The first
-          step is to create your app and functions, serve it, and test it locally with the Inngest
-          Dev Server.
+          In Inngest, an app is a group of functions served on a single endpoint or server. The
+          first step is to create your app and functions, serve it, and test it locally with the
+          Inngest Dev Server.
         </p>
       </div>
       <NewButton

@@ -76,7 +76,7 @@ export default function DeployApp() {
             <div className="bg-canvasMuted flex h-9 w-9 items-center justify-center rounded">
               <RiCloudLine className="text-basis h-4 w-4" />
             </div>
-            <p className="text-basis">All hosting providers (Docker, Kubernetes, etc.)</p>
+            <p className="text-basis">All hosting providers (AWS, GCP, Azure, etc.)</p>
           </div>
           <p className="mb-4 text-sm">
             Add the two environment variables required for your app to securely communicate with
