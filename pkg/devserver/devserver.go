@@ -4,7 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/config/registration"
+	"github.com/inngest/inngest/pkg/connect"
+	pubsub2 "github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/enums"
+	connectproto "github.com/inngest/inngest/proto/gen/connect/v1"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
@@ -132,6 +136,11 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
+	connectRc, err := createInmemoryRedis(ctx, opts.Tick)
+	if err != nil {
+		return err
+	}
+
 	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
 		UnshardedClient:        unshardedClient,
@@ -254,12 +263,25 @@ func start(ctx context.Context, opts StartOpts) error {
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq)
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
 
+	gatewayProxy := pubsub2.NewRedisPubSubConnector(connectRc)
+	connectionManager := connect.NewRedisConnectionStateManager(connectRc)
+
+	go func() {
+		// set up PubSub manager, this is required for connect to work
+		err := gatewayProxy.Wait(ctx)
+		if err != nil {
+			logger.From(ctx).Error().Err(err).Msg("error waiting for pubsub messages")
+		}
+	}()
+
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
 
 	var drivers = []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
-		d, err := driverConfig.NewDriver()
+		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
+			ConnectForwarder: gatewayProxy,
+		})
 		if err != nil {
 			return err
 		}
@@ -392,6 +414,17 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
+	connectSvc, connectHandler := connect.NewConnectGatewayService(
+		connect.WithConnectionStateManager(connectionManager),
+		connect.WithRequestReceiver(gatewayProxy),
+		connect.WithGatewayAuthHandler(func(ctx context.Context, data *connectproto.SDKConnectRequestData) (*connect.AuthResponse, error) {
+			return &connect.AuthResponse{
+				AccountID: consts.DevServerAccountId,
+			}, nil
+		}),
+		connect.WithDB(dbcqrs),
+	)
+
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
 	// server UI, events, and API for loading data.
@@ -404,11 +437,14 @@ func start(ctx context.Context, opts StartOpts) error {
 			{At: "/", Router: devAPI},
 			{At: "/v0", Router: core.Router},
 			{At: "/debug", Handler: middleware.Profiler()},
+			{At: "/connect", Handler: connectHandler},
 		},
 		LocalEventKeys: opts.EventKeys,
 	})
 
-	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice)
+	svcs := []service.Service{ds, runner, executorSvc, ds.Apiservice}
+	svcs = append(svcs, connectSvc...)
+	return service.StartAll(ctx, svcs...)
 }
 
 func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Client, error) {

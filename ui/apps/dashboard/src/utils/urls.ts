@@ -95,9 +95,8 @@ export const pathCreator = {
   pgIntegrationStep({ integration, step }: { integration: string; step?: string }): Route {
     return `/settings/integrations/${integration}${step ? `/${step}` : ''}` as Route;
   },
-  // TODO: Support environments
-  onboarding(): Route {
-    return `/env/production/onboarding` as Route;
+  onboarding({ envSlug = 'production' }: { envSlug?: string } = {}): Route {
+    return `/env/${envSlug}/onboarding` as Route;
   },
   onboardingSteps({
     envSlug = 'production',
@@ -108,7 +107,7 @@ export const pathCreator = {
     step?: string;
     ref?: string;
   }): Route {
-    return `/env/${envSlug}/onboarding/${step ? `/${step}` : ''}${
+    return `/env/${envSlug}/onboarding${step ? `/${step}` : ''}${
       ref ? `?ref=${ref}` : ''
     }` as Route;
   },

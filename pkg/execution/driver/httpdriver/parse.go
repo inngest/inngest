@@ -141,7 +141,7 @@ func parseRetry(retry string) (time.Time, error) {
 	return dateutil.ParseString(retry)
 }
 
-func parseResponse(byt []byte) any {
+func ParseResponse(byt []byte) any {
 	if len(byt) == 0 {
 		return nil
 	}

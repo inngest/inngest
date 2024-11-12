@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -569,34 +570,31 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				expires = time.Now().Add(dur)
 			}
 
-			// Evaluate the expression.  This lets us inspect the expression's attributes
-			// so that we can store only the attrs used in the expression in the pause,
-			// saving space, bandwidth, etc.
-			expr := generateCancelExpression(eventIDs[0], c.If)
-			eval, err := expressions.NewExpressionEvaluator(ctx, expr)
-			if err != nil {
-				return &metadata, err
-			}
-			ed := expressions.NewData(map[string]any{"event": req.Events[0].GetEvent().Map()})
-			data := eval.FilteredAttributes(ctx, ed).Map()
-
 			// The triggering event ID should be the first ID in the batch.
 			triggeringID := req.Events[0].GetInternalID().String()
 
-			// Remove `event` data from the expression and replace with actual event
-			// data as values, now that we have the event.
-			//
-			// This improves performance in matching, as we can then use the values within
-			// aggregate trees.
-			interpolated, err := expressions.Interpolate(ctx, expr, map[string]any{
-				"event": evtMap,
-			})
-			if err != nil {
-				logger.StdlibLogger(ctx).Warn(
-					"error interpolating cancellation expression",
-					"error", err,
-					"expression", expr,
-				)
+			var expr *string
+			// Evaluate the expression.  This lets us inspect the expression's attributes
+			// so that we can store only the attrs used in the expression in the pause,
+			// saving space, bandwidth, etc.
+			if c.If != nil {
+
+				// Remove `event` data from the expression and replace with actual event
+				// data as values, now that we have the event.
+				//
+				// This improves performance in matching, as we can then use the values within
+				// aggregate trees.
+				interpolated, err := expressions.Interpolate(ctx, *c.If, map[string]any{
+					"event": evtMap,
+				})
+				if err != nil {
+					logger.StdlibLogger(ctx).Warn(
+						"error interpolating cancellation expression",
+						"error", err,
+						"expression", expr,
+					)
+				}
+				expr = &interpolated
 			}
 
 			pause := state.Pause{
@@ -613,8 +611,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				ID:                pauseID,
 				Expires:           state.Time(expires),
 				Event:             &c.Event,
-				Expression:        &interpolated,
-				ExpressionData:    data,
+				Expression:        expr,
 				Cancel:            true,
 				TriggeringEventID: &triggeringID,
 			}
@@ -682,12 +679,13 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 }
 
 type runInstance struct {
-	md         sv2.Metadata
-	f          inngest.Function
-	events     []json.RawMessage
-	item       queue.Item
-	edge       inngest.Edge
-	stackIndex int
+	md           sv2.Metadata
+	f            inngest.Function
+	events       []json.RawMessage
+	item         queue.Item
+	edge         inngest.Edge
+	stackIndex   int
+	appIsConnect bool
 }
 
 // Execute loads a workflow and the current run state, then executes the
@@ -836,12 +834,13 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	instance := runInstance{
-		md:         md,
-		f:          *ef.Function,
-		events:     events,
-		item:       item,
-		edge:       edge,
-		stackIndex: stackIndex,
+		md:           md,
+		f:            *ef.Function,
+		events:       events,
+		item:         item,
+		edge:         edge,
+		stackIndex:   stackIndex,
+		appIsConnect: ef.AppIsConnect,
 	}
 
 	resp, err := e.run(ctx, &instance)
@@ -1156,6 +1155,10 @@ func (e *executor) executeDriverForStep(ctx context.Context, i *runInstance) (*s
 	url, _ := i.f.URI()
 
 	driverName := inngest.SchemeDriver(url.Scheme)
+	if i.appIsConnect {
+		driverName = "connect"
+	}
+
 	d, ok := e.runtimeDrivers[driverName]
 	if !ok {
 		return nil, fmt.Errorf("%w: '%s'", ErrNoRuntimeDriver, driverName)
@@ -1271,6 +1274,14 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 				"strategy", "naive",
 			)
 
+			// If this is a cancellation, ensure that we're not handling an event that
+			// was received before the run (due to eg. latency in a bad case).
+			//
+			// NOTE: Fast path this before handling the expression.
+			if pause.Cancel && bytes.Compare(evtID[:], pause.Identifier.RunID[:]) <= 0 {
+				return
+			}
+
 			// Run an expression if this exists.
 			if pause.Expression != nil {
 				// Precompute the expression data once, as a value (not pointer)
@@ -1383,6 +1394,12 @@ func (e *executor) handlePause(
 	res *execution.HandlePauseResult,
 	l *slog.Logger,
 ) error {
+
+	// If this is a cancellation, ensure that we're not handling an event that
+	// was received before the run (due to eg. latency in a bad case).
+	if pause.Cancel && bytes.Compare(evtID[:], pause.Identifier.RunID[:]) <= 0 {
+		return nil
+	}
 
 	return util.Crit(ctx, "handle pause", func(ctx context.Context) error {
 		// NOTE: Some pauses may be nil or expired, as the iterator may take
@@ -2535,20 +2552,6 @@ func (e execError) Error() string {
 
 func (e execError) Retryable() bool {
 	return !e.final
-}
-
-func generateCancelExpression(eventID ulid.ULID, expr *string) string {
-	// Ensure that we only listen to cancellation events that occur
-	// after the initial event is received.
-	//
-	// NOTE: We don't use `event.ts` here as people can use a future-TS date
-	// to schedule future runs.  Events received between now and that date should
-	// still cancel the run.
-	res := fmt.Sprintf("(async.ts == null || async.ts > %d)", eventID.Time())
-	if expr != nil {
-		res = *expr + " && " + res
-	}
-	return res
 }
 
 // extractTraceCtx extracts the trace context from the given item, if it exists.

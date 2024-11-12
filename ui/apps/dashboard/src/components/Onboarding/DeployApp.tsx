@@ -3,11 +3,13 @@ import { NewButton } from '@inngest/components/Button';
 import CommandBlock from '@inngest/components/CodeBlock/CommandBlock';
 import { NewLink } from '@inngest/components/Link';
 import TabCards from '@inngest/components/TabCards/TabCards';
+import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { IconCloudflare } from '@inngest/components/icons/platforms/Cloudflare';
 import { IconFlyIo } from '@inngest/components/icons/platforms/FlyIo';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { RiCheckboxCircleFill, RiCloudLine } from '@remixicon/react';
 
+import { useVercelIntegration } from '@/app/(organization-active)/(dashboard)/settings/integrations/vercel/useVercelIntegration';
 import { Secret } from '@/components/Secret';
 import { useDefaultEventKey } from '@/queries/useDefaultEventKey';
 import { pathCreator } from '@/utils/urls';
@@ -28,8 +30,12 @@ export default function DeployApp() {
   const defaultEventKey = res.data?.defaultKey.presharedKey || 'Unknown key';
   const { value: vercelFlowEnabled } = useBooleanFlag('onboarding-vercel-flow');
   const tracking = useOnboardingTracking();
-  const hasVercelIntegration = Math.random() > 0.5; // temp
-  const vercelProjects = [];
+
+  const { data, fetching, error } = useVercelIntegration();
+  if (error) console.error(error);
+
+  const hasVercelIntegration = data.enabled;
+  const vercelProjects = data.projects;
 
   return (
     <div className="text-subtle">
@@ -162,7 +168,6 @@ export default function DeployApp() {
                 Read our Vercel documentation
               </NewLink>
             </p>
-            {/* TODO: wire vercel integration flow */}
             <div className="border-subtle divide-subtle mb-4 divide-y border text-sm">
               <div className="flex items-center gap-2 px-3 py-2">
                 <RiCheckboxCircleFill className="text-primary-moderate h-4 w-4" /> Auto-syncs on
@@ -174,18 +179,27 @@ export default function DeployApp() {
               </div>
             </div>
             {!hasVercelIntegration && (
-              <NewButton
-                label="Connect Inngest to Vercel"
-                onClick={() => {
-                  tracking?.trackOnboardingAction(currentStepName, {
-                    metadata: { type: 'btn-click', label: 'connect', hostingProvider: 'vercel' },
-                  });
-                  const nextUrl = encodeURIComponent(
-                    'https://app.inngest.com/env/production/onboarding/deploy-app'
-                  );
-                  router.push(`https://vercel.com/integrations/inngest/new?next=${nextUrl}`);
-                }}
-              />
+              <div className="flex items-center justify-between">
+                <NewButton
+                  label="Connect Inngest to Vercel"
+                  onClick={() => {
+                    tracking?.trackOnboardingAction(currentStepName, {
+                      metadata: { type: 'btn-click', label: 'connect', hostingProvider: 'vercel' },
+                    });
+                    const nextUrl = encodeURIComponent(
+                      'https://app.inngest.com/env/production/onboarding/deploy-app'
+                    );
+                    router.push(`https://vercel.com/integrations/inngest/new?next=${nextUrl}`);
+                  }}
+                  disabled={fetching}
+                />
+                {fetching && (
+                  <div className="text-link flex items-center gap-1.5 text-sm">
+                    <IconSpinner className="fill-link h-4 w-4" />
+                    Searching for integration
+                  </div>
+                )}
+              </div>
             )}
             {hasVercelIntegration && (
               <p className="text-success my-4 text-sm">
@@ -206,7 +220,9 @@ export default function DeployApp() {
                   tracking?.trackOnboardingAction(currentStepName, {
                     metadata: { type: 'btn-click', label: 'next', hostingProvider: 'vercel' },
                   });
-                  router.push(pathCreator.onboardingSteps({ step: nextStepName }));
+                  router.push(
+                    pathCreator.onboardingSteps({ step: nextStepName }) + '?fromVercel=true'
+                  );
                 }}
               />
             )}
