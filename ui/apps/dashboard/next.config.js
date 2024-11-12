@@ -44,6 +44,17 @@ const nextConfig = {
         permanent: false,
       },
       {
+        source: '/settings/billing',
+        destination: '/billing/usage',
+        permanent: false,
+      },
+      // Temp, when we add usage, this is no longer needed
+      {
+        source: '/billing',
+        destination: '/billing/usage',
+        permanent: false,
+      },
+      {
         source: '/login',
         destination: '/sign-in',
         permanent: false,
