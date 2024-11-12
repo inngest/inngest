@@ -1,10 +1,9 @@
-package connect
+package golang
 
 import (
 	"context"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/tests/client"
-	"github.com/inngest/inngest/tests/golang"
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
 	"os"
@@ -21,7 +20,7 @@ func TestEndToEnd(t *testing.T) {
 	type ConnectEvent = inngestgo.GenericEvent[any, any]
 	ctx := context.Background()
 	c := client.New(t)
-	h := golang.NewSDKConnectHandler(t, "connect")
+	h := NewSDKConnectHandler(t, "connect")
 
 	var (
 		counter int32
