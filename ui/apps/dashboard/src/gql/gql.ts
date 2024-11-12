@@ -15,6 +15,7 @@ import type { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-
 const documents = {
     "\n  mutation SetUpAccount {\n    setUpAccount {\n      account {\n        id\n      }\n    }\n  }\n": types.SetUpAccountDocument,
     "\n  mutation CreateUser {\n    createUser {\n      user {\n        id\n      }\n    }\n  }\n": types.CreateUserDocument,
+    "\n  query GetBillingInfo {\n    account {\n      billingEmail\n      name\n      plan {\n        id\n        name\n        amount\n        billingPeriod\n        features\n      }\n      subscription {\n        nextInvoiceDate\n      }\n\n      paymentMethods {\n        brand\n        last4\n        expMonth\n        expYear\n        createdAt\n        default\n      }\n    }\n\n    plans {\n      id\n      name\n      amount\n      billingPeriod\n      features\n    }\n  }\n": types.GetBillingInfoDocument,
     "\n  mutation CreateEnvironment($name: String!) {\n    createWorkspace(input: { name: $name }) {\n      id\n    }\n  }\n": types.CreateEnvironmentDocument,
     "\n  mutation AchiveApp($appID: UUID!) {\n    archiveApp(id: $appID) {\n      id\n    }\n  }\n": types.AchiveAppDocument,
     "\n  mutation UnachiveApp($appID: UUID!) {\n    unarchiveApp(id: $appID) {\n      id\n    }\n  }\n": types.UnachiveAppDocument,
@@ -72,7 +73,6 @@ const documents = {
     "\n  mutation UpdatePlan($planID: ID!) {\n    updatePlan(to: $planID) {\n      plan {\n        id\n        name\n      }\n    }\n  }\n": types.UpdatePlanDocument,
     "\n  query GetPaymentIntents {\n    account {\n      paymentIntents {\n        status\n        createdAt\n        amountLabel\n        description\n        invoiceURL\n      }\n    }\n  }\n": types.GetPaymentIntentsDocument,
     "\n  mutation UpdatePaymentMethod($token: String!) {\n    updatePaymentMethod(token: $token) {\n      brand\n      last4\n      expMonth\n      expYear\n      createdAt\n      default\n    }\n  }\n": types.UpdatePaymentMethodDocument,
-    "\n  query GetBillingInfo {\n    account {\n      billingEmail\n      name\n      plan {\n        id\n        name\n        amount\n        billingPeriod\n        features\n      }\n      subscription {\n        nextInvoiceDate\n      }\n\n      paymentMethods {\n        brand\n        last4\n        expMonth\n        expYear\n        createdAt\n        default\n      }\n    }\n\n    plans {\n      id\n      name\n      amount\n      billingPeriod\n      features\n    }\n  }\n": types.GetBillingInfoDocument,
     "\n  query GetSavedVercelProjects($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      savedVercelProjects: vercelApps {\n        id\n        originOverride\n        projectID\n        protectionBypassSecret\n        path\n        workspaceID\n        originOverride\n        protectionBypassSecret\n      }\n    }\n  }\n": types.GetSavedVercelProjectsDocument,
     "\n  mutation CreateVercelApp($input: CreateVercelAppInput!) {\n    createVercelApp(input: $input) {\n      success\n    }\n  }\n": types.CreateVercelAppDocument,
     "\n  mutation UpdateVercelApp($input: UpdateVercelAppInput!) {\n    updateVercelApp(input: $input) {\n      success\n    }\n  }\n": types.UpdateVercelAppDocument,
@@ -154,6 +154,10 @@ export function graphql(source: "\n  mutation SetUpAccount {\n    setUpAccount {
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation CreateUser {\n    createUser {\n      user {\n        id\n      }\n    }\n  }\n"): (typeof documents)["\n  mutation CreateUser {\n    createUser {\n      user {\n        id\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query GetBillingInfo {\n    account {\n      billingEmail\n      name\n      plan {\n        id\n        name\n        amount\n        billingPeriod\n        features\n      }\n      subscription {\n        nextInvoiceDate\n      }\n\n      paymentMethods {\n        brand\n        last4\n        expMonth\n        expYear\n        createdAt\n        default\n      }\n    }\n\n    plans {\n      id\n      name\n      amount\n      billingPeriod\n      features\n    }\n  }\n"): (typeof documents)["\n  query GetBillingInfo {\n    account {\n      billingEmail\n      name\n      plan {\n        id\n        name\n        amount\n        billingPeriod\n        features\n      }\n      subscription {\n        nextInvoiceDate\n      }\n\n      paymentMethods {\n        brand\n        last4\n        expMonth\n        expYear\n        createdAt\n        default\n      }\n    }\n\n    plans {\n      id\n      name\n      amount\n      billingPeriod\n      features\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -382,10 +386,6 @@ export function graphql(source: "\n  query GetPaymentIntents {\n    account {\n 
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation UpdatePaymentMethod($token: String!) {\n    updatePaymentMethod(token: $token) {\n      brand\n      last4\n      expMonth\n      expYear\n      createdAt\n      default\n    }\n  }\n"): (typeof documents)["\n  mutation UpdatePaymentMethod($token: String!) {\n    updatePaymentMethod(token: $token) {\n      brand\n      last4\n      expMonth\n      expYear\n      createdAt\n      default\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  query GetBillingInfo {\n    account {\n      billingEmail\n      name\n      plan {\n        id\n        name\n        amount\n        billingPeriod\n        features\n      }\n      subscription {\n        nextInvoiceDate\n      }\n\n      paymentMethods {\n        brand\n        last4\n        expMonth\n        expYear\n        createdAt\n        default\n      }\n    }\n\n    plans {\n      id\n      name\n      amount\n      billingPeriod\n      features\n    }\n  }\n"): (typeof documents)["\n  query GetBillingInfo {\n    account {\n      billingEmail\n      name\n      plan {\n        id\n        name\n        amount\n        billingPeriod\n        features\n      }\n      subscription {\n        nextInvoiceDate\n      }\n\n      paymentMethods {\n        brand\n        last4\n        expMonth\n        expYear\n        createdAt\n        default\n      }\n    }\n\n    plans {\n      id\n      name\n      amount\n      billingPeriod\n      features\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

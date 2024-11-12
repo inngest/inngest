@@ -106,7 +106,7 @@ export default function OnboardingWidget({
                 label={stepContent.cta}
                 onClick={(e) => {
                   e.preventDefault();
-                  router.push('/settings/billing?ref=app-onboarding-widget');
+                  router.push(pathCreator.billing() + '?ref=app-onboarding-widget');
                 }}
               />
             )}
