@@ -6,14 +6,25 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/proto/gen/connect/v1"
+	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/redis/rueidis"
 )
 
-type ConnectionStateManager interface {
-	ConnectGatewayLifecycleListener
+var (
+	notImplementedError = fmt.Errorf("not implemented")
+)
 
+type ConnectionStateManager interface {
 	SetRequestIdempotency(ctx context.Context, appId uuid.UUID, requestId string) error
+	// GetConnections retrieves a list of connections in a workspace
+	GetConnections(ctx context.Context, wsID uuid.UUID, opts GetConnOpts) ([]*connpb.ConnMetadata, error)
+	AddConnection(ctx context.Context, wsID uuid.UUID, meta *connpb.ConnMetadata) error
+	DeleteConnection(ctx context.Context, connID string) error
+}
+
+type GetConnOpts struct {
+	AppID  *uuid.UUID
+	Status string // TODO: should this be an enum?
 }
 
 type redisConnectionStateManager struct {
@@ -45,15 +56,30 @@ func (r redisConnectionStateManager) SetRequestIdempotency(ctx context.Context, 
 	return nil
 }
 
+func (r *redisConnectionStateManager) GetConnections(ctx context.Context, wsID uuid.UUID, opts GetConnOpts) ([]*connpb.ConnMetadata, error) {
+	return nil, notImplementedError
+}
+
+func (r *redisConnectionStateManager) AddConnection(ctx context.Context, wsID uuid.UUID, meta *connpb.ConnMetadata) error {
+	return notImplementedError
+}
+
+func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, connID string) error {
+	return notImplementedError
+}
+
 //
 // Lifecycle hooks
 //
 
-func (r *redisConnectionStateManager) OnConnected(ctx context.Context, data *connect.SDKConnectRequestData) {
+func (r *redisConnectionStateManager) OnConnected(ctx context.Context, data *connpb.SDKConnectRequestData) {
 }
 
-func (r *redisConnectionStateManager) OnAuthenticated(ctx context.Context, auth *AuthResponse) {}
+func (r *redisConnectionStateManager) OnAuthenticated(ctx context.Context, auth *AuthResponse) {
+}
 
-func (r *redisConnectionStateManager) OnSynced(ctx context.Context) {}
+func (r *redisConnectionStateManager) OnSynced(ctx context.Context) {
+}
 
-func (r *redisConnectionStateManager) OnDisconnected(ctx context.Context) {}
+func (r *redisConnectionStateManager) OnDisconnected(ctx context.Context) {
+}
