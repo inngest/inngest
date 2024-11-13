@@ -5,21 +5,28 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
+	"net/http"
+	"os"
+	"strconv"
+	"time"
+
 	"github.com/coder/websocket"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/types"
 	"github.com/inngest/inngest/pkg/connect/wsproto"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
-	"log/slog"
-	"net/http"
-	"os"
-	"time"
 )
 
 type gatewayOpt func(*connectGatewaySvc)
@@ -44,6 +51,9 @@ type connectGatewaySvc struct {
 	stateManager ConnectionStateManager
 	receiver     pubsub.RequestReceiver
 	dbcqrs       cqrs.Manager
+
+	router     chi.Router
+	grpcServer *grpc.Server
 
 	lifecycles []ConnectGatewayLifecycleListener
 }
@@ -328,6 +338,7 @@ func NewConnectGatewayService(opts ...gatewayOpt) ([]service.Service, http.Handl
 	gateway := &connectGatewaySvc{
 		gatewayId:  ulid.MustNew(ulid.Now(), nil).String(),
 		lifecycles: []ConnectGatewayLifecycleListener{},
+		router:     chi.NewRouter(),
 	}
 	if os.Getenv("CONNECT_TEST_GATEWAY_ID") != "" {
 		gateway.gatewayId = os.Getenv("CONNECT_TEST_GATEWAY_ID")
@@ -350,22 +361,51 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 	// Set up gateway-specific logger with info for correlations
 	c.logger = logger.StdlibLogger(ctx).With("gateway_id", c.gatewayId)
 
+	// Setup REST endpoint
+	c.router.Use(
+		middleware.Heartbeat("/health"),
+	)
+	c.router.Route("/v0", func(r chi.Router) {
+		r.Use(headers.ContentTypeJsonResponse())
+	})
+
+	// Setup gRPC server
+
 	return nil
 }
 
 func (c *connectGatewaySvc) Run(ctx context.Context) error {
 	c.runCtx = ctx
 
-	// TODO Mark gateway as active a couple seconds into the future (how do we make sure PubSub is connected and ready to receive?)
+	eg, ctx := errgroup.WithContext(ctx)
 
-	// Start listening for messages, this will block until the context is cancelled
-	err := c.receiver.Wait(ctx)
-	if err != nil {
-		// TODO Should we retry? Exit here? This will interrupt existing connections!
-		return fmt.Errorf("could not listen for pubsub messages: %w", err)
-	}
+	eg.Go(func() error {
+		port := 8289
+		if v, err := strconv.Atoi(os.Getenv("CONNECT_GATEWAY_API_PORT")); err == nil && v > 0 {
+			port = v
+		}
+		addr := fmt.Sprintf(":%d", port)
+		server := &http.Server{
+			Addr:    addr,
+			Handler: c.router,
+		}
+		c.logger.Info(fmt.Sprintf("starting gateway api at %s", addr))
+		return server.ListenAndServe()
+	})
 
-	return nil
+	eg.Go(func() error {
+		// TODO Mark gateway as active a couple seconds into the future (how do we make sure PubSub is connected and ready to receive?)
+		// Start listening for messages, this will block until the context is cancelled
+		err := c.receiver.Wait(ctx)
+		if err != nil {
+			// TODO Should we retry? Exit here? This will interrupt existing connections!
+			return fmt.Errorf("could not listen for pubsub messages: %w", err)
+		}
+
+		return nil
+	})
+
+	return eg.Wait()
 }
 
 func (c *connectGatewaySvc) Stop(ctx context.Context) error {
