@@ -73,10 +73,22 @@ message ConnMetadata {
 	SystemAttributes attributes = 1;
 	string language = 2;
 	string version = 3;
+	string env_id = 4;
+	string app_id = 5;
+	SessionDetails session = 6;
 }
 
 message SystemAttributes {
 	int32 cpu_cores = 1;
 	int64 mem_bytes = 2;
 	string os = 3;
+}
+
+message ConnGroup {
+	string env_id = 1;
+	string app_id = 2;
+	string hash = 3;
+	repeated ConnMetadata conns = 4;
+	optional string sync_id = 5;
+	optional string build_id = 6;
 }
