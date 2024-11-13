@@ -25,7 +25,6 @@ import (
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
-	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -39,6 +38,8 @@ type AuthResponse struct {
 type GatewayAuthHandler func(context.Context, *connect.SDKConnectRequestData) (*AuthResponse, error)
 
 type connectGatewaySvc struct {
+	chi.Router
+
 	// gatewayId is a unique identifier, generated each time the service is started.
 	// This should be used to uniquely identify the gateway instance when sending messages and routing requests.
 	gatewayId string
@@ -51,9 +52,6 @@ type connectGatewaySvc struct {
 	stateManager ConnectionStateManager
 	receiver     pubsub.RequestReceiver
 	dbcqrs       cqrs.Manager
-
-	router     chi.Router
-	grpcServer *grpc.Server
 
 	lifecycles []ConnectGatewayLifecycleListener
 }
@@ -336,9 +334,9 @@ func (c *connectGatewaySvc) handleSdkReply(ctx context.Context, log *slog.Logger
 
 func NewConnectGatewayService(opts ...gatewayOpt) ([]service.Service, http.Handler) {
 	gateway := &connectGatewaySvc{
+		Router:     chi.NewRouter(),
 		gatewayId:  ulid.MustNew(ulid.Now(), nil).String(),
 		lifecycles: []ConnectGatewayLifecycleListener{},
-		router:     chi.NewRouter(),
 	}
 	if os.Getenv("CONNECT_TEST_GATEWAY_ID") != "" {
 		gateway.gatewayId = os.Getenv("CONNECT_TEST_GATEWAY_ID")
@@ -362,16 +360,16 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 	c.logger = logger.StdlibLogger(ctx).With("gateway_id", c.gatewayId)
 
 	// Setup REST endpoint
-	c.router.Use(
+	c.Use(
 		middleware.Heartbeat("/health"),
 	)
-	c.router.Route("/v0", func(r chi.Router) {
+	c.Route("/v0", func(r chi.Router) {
 		r.Use(headers.ContentTypeJsonResponse())
 
 		r.Get("/conns", c.showConnections)
 	})
 
-	// Setup gRPC server
+	// TODO: Setup gRPC server
 
 	return nil
 }
@@ -389,7 +387,7 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 		addr := fmt.Sprintf(":%d", port)
 		server := &http.Server{
 			Addr:    addr,
-			Handler: c.router,
+			Handler: c,
 		}
 		c.logger.Info(fmt.Sprintf("starting gateway api at %s", addr))
 		return server.ListenAndServe()

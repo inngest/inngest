@@ -92,3 +92,7 @@ message ConnGroup {
 	optional string sync_id = 5;
 	optional string build_id = 6;
 }
+
+message ShowConnsReply {
+	repeated ConnMetadata data = 1;
+}
