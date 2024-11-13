@@ -17,11 +17,6 @@ local stepID  = ARGV[1]
 local data    = ARGV[2]
 
 if redis.call("HEXISTS", keyStep, stepID) == 1 then
-  -- TODO Hmmmmm, this means we're saving input in the state store and it's
-  -- travelling to SDKs with every request. This is not good, as input could be
-  -- enormous. We should probably filter out input in the marshalled request if
-  -- we're not explicitly targeting a step with mutated input and then enable
-  -- disableImmediateExecution for every input-specific rerun
   local existingData = cjson.decode(redis.call("HGET", keyStep, stepID))
 
   if existingData.input == nil then
