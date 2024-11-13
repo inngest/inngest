@@ -25,6 +25,8 @@ message SessionDetails {
 
 message AuthData {
 	bytes hashed_signing_key = 1;
+	string account_id = 2;
+	string env_id = 3;
 }
 
 message SDKConnectRequestData {
