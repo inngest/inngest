@@ -1,7 +1,7 @@
 import { NewButton } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
 
-import { LimitBar } from '@/components/Billing/LimitBars/LimitBar';
+import { LimitBar } from '@/components/Billing/LimitBar';
 import { getEntitlementUsage } from '@/components/Billing/actions';
 import { pathCreator } from '@/utils/urls';
 
