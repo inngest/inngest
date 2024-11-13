@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/expr"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/karlseguin/ccache/v2"
 )
 
@@ -140,8 +141,18 @@ func (a *aggregator) EvaluateAsyncEvent(ctx context.Context, event event.Tracked
 		)
 	}
 
+	wsID := event.GetWorkspaceID()
+
+	start := time.Now()
 	found, evalCount, err := eval.Evaluate(ctx, map[string]any{
 		"async": event.GetEvent().Map(),
+	})
+	metrics.HistogramAggregatePausesEvalDuration(ctx, time.Since(start).Milliseconds(), metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"workspaceID": wsID.String(),
+			"success":     err == nil,
+		},
 	})
 	if err != nil {
 		log.Error(
@@ -154,9 +165,18 @@ func (a *aggregator) EvaluateAsyncEvent(ctx context.Context, event event.Tracked
 
 	}
 
+	metrics.IncrAggregatePausesFoundCounter(ctx, int64(len(found)), metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags:    map[string]any{"workspaceID": wsID.String()},
+	})
+	metrics.IncrAggregatePausesEvaluatedCounter(ctx, int64(evalCount), metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags:    map[string]any{"workspaceID": wsID.String()},
+	})
+
 	log.Debug(
 		"evaluated aggregate expressions",
-		"workspace_id", event.GetWorkspaceID(),
+		"workspace_id", wsID,
 		"event", name,
 		"eval_count", evalCount,
 		"matched_count", len(found),

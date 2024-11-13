@@ -12,7 +12,8 @@ type Props = {
 };
 
 export function RunResult({ className, result, isSuccess }: Props) {
-  const prettyResult = result.data && usePrettyJson(result.data);
+  const prettyInput = usePrettyJson(result.input ?? '') || (result.input ?? '');
+  const prettyOutput = usePrettyJson(result.data ?? '') || (result.data ?? '');
 
   return (
     <div className={className}>
@@ -22,7 +23,7 @@ export function RunResult({ className, result, isSuccess }: Props) {
             title: 'Input',
           }}
           tab={{
-            content: result.input,
+            content: prettyInput,
           }}
         />
       )}
@@ -34,7 +35,7 @@ export function RunResult({ className, result, isSuccess }: Props) {
             status: isSuccess ? 'success' : undefined,
           }}
           tab={{
-            content: prettyResult || result.data,
+            content: prettyOutput,
           }}
         />
       )}

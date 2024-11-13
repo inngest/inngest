@@ -324,6 +324,7 @@ export const TRACE_DETAILS_FRAGMENT = gql`
     isRoot
     outputID
     spanID
+    stepID
     stepOp
     stepInfo {
       __typename

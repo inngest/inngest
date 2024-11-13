@@ -359,6 +359,11 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 		}
 	}
 
+	var stepID *string
+	if attrStepID, ok := s.SpanAttributes[consts.OtelSysStepID]; ok && attrStepID != "" {
+		stepID = &attrStepID
+	}
+
 	return &rpbv2.RunSpan{
 		AccountId:    acctID.String(),
 		WorkspaceId:  wsID.String(),
@@ -374,6 +379,7 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 		StartedAt:    timestamppb.New(s.Timestamp),
 		EndedAt:      timestamppb.New(endedAt),
 		DurationMs:   dur,
+		StepId:       stepID,
 	}, false
 }
 

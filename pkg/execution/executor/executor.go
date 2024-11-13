@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -16,6 +17,7 @@ import (
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -266,6 +268,13 @@ func WithShardSelector(selector redis_state.ShardSelector) ExecutorOpt {
 	}
 }
 
+func WithTraceReader(m cqrs.TraceReader) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).traceReader = m
+		return nil
+	}
+}
+
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log *zerolog.Logger
@@ -300,6 +309,8 @@ type executor struct {
 
 	assignedQueueShard redis_state.QueueShard
 	shardFinder        redis_state.ShardSelector
+
+	traceReader cqrs.TraceReader
 }
 
 func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
@@ -542,10 +553,122 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// Create the run state.
 	//
 
-	err := e.smv2.Create(ctx, sv2.CreateState{
-		Metadata: metadata,
+	newState := sv2.CreateState{
 		Events:   evts,
-	})
+		Metadata: metadata,
+		Steps:    []state.InputStep{},
+	}
+
+	if req.OriginalRunID != nil && req.FromStep != nil && req.FromStep.StepID != "" {
+		// Load the original run state and copy the state from the original
+		// run to the new run.
+		origTraceRun, err := e.traceReader.GetTraceRun(ctx, cqrs.TraceRunIdentifier{
+			RunID: *req.OriginalRunID,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error loading original trace run: %w", err)
+		}
+
+		spans, err := e.traceReader.GetTraceSpansByRun(ctx, cqrs.TraceRunIdentifier{
+			AccountID:   req.AccountID,
+			WorkspaceID: req.WorkspaceID,
+			AppID:       req.AppID,
+			FunctionID:  req.Function.ID,
+			TraceID:     origTraceRun.TraceID,
+			RunID:       *req.OriginalRunID,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error loading trace spans: %w", err)
+		}
+
+		// Get the stack and organize spans by step IDs
+		var stack []string
+		stepSpans := map[string]*cqrs.Span{}
+		foundStepToRunFrom := false
+
+		for _, span := range spans {
+			if stepID, ok := span.SpanAttributes[consts.OtelSysStepID]; ok && stepID != "" {
+				stepSpans[stepID] = span
+
+				if stepID == req.FromStep.StepID {
+					foundStepToRunFrom = true
+				}
+			}
+
+			if span.SpanName == consts.OtelExecFnOk || span.SpanName == consts.OtelExecFnErr {
+				if spanStack, ok := span.SpanAttributes[consts.OtelSysStepStack]; ok {
+					stack = strings.Split(spanStack, ",")
+				}
+			}
+		}
+
+		if len(stack) == 0 {
+			// This can happen for older runs that don't save the stack; we
+			// shouldn't try to recover from this as we could accidentally
+			// make the run resolve to a different path without it.
+			return nil, fmt.Errorf("stack not found in original run")
+		}
+
+		if !foundStepToRunFrom {
+			// This implementation has been given a step to run from that
+			// doesn't exist in this run.  This is a bad request.
+			return nil, fmt.Errorf("step to run from not found in original run")
+		}
+
+		// Copy the state from the original run to the new run.
+		for _, stepID := range stack {
+			if stepID == req.FromStep.StepID {
+				// We've reached the step to run from, so we can stop
+				// copying and memoize the input data instead.
+				if req.FromStep.Input != nil {
+					newState.Steps = append(newState.Steps, state.InputStep{
+						ID:   stepID,
+						Data: map[string]any{"input": req.FromStep.Input},
+					})
+				}
+
+				break
+			}
+
+			span, ok := stepSpans[stepID]
+			if !ok {
+				// This signifies that the step was present in the stack but
+				// we couldn't find the span that represents it. This
+				// indicates a data integrity issue and we should not
+				// attempt to recover from this.
+				return nil, fmt.Errorf("step found in stack but span not found in original run")
+			}
+
+			output, err := e.traceReader.GetSpanOutput(ctx, cqrs.SpanIdentifier{
+				AccountID:   req.AccountID,
+				WorkspaceID: req.WorkspaceID,
+				AppID:       req.AppID,
+				FunctionID:  req.Function.ID,
+				TraceID:     origTraceRun.TraceID,
+				SpanID:      span.SpanID,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("error loading span output: %w", err)
+			}
+
+			var data any
+			_ = json.Unmarshal(output.Data, &data)
+
+			memoizedStep := state.InputStep{
+				ID:   stepID,
+				Data: map[string]any{"data": data},
+			}
+			if output.IsError {
+				memoizedStep.Data = map[string]any{"error": data}
+			}
+
+			newState.Steps = append(newState.Steps, memoizedStep)
+
+		}
+
+	}
+
+	err := e.smv2.Create(ctx, newState)
 	if err == state.ErrIdentifierExists {
 		// This function was already created.
 		return nil, state.ErrIdentifierExists
@@ -569,34 +692,31 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				expires = time.Now().Add(dur)
 			}
 
-			// Evaluate the expression.  This lets us inspect the expression's attributes
-			// so that we can store only the attrs used in the expression in the pause,
-			// saving space, bandwidth, etc.
-			expr := generateCancelExpression(eventIDs[0], c.If)
-			eval, err := expressions.NewExpressionEvaluator(ctx, expr)
-			if err != nil {
-				return &metadata, err
-			}
-			ed := expressions.NewData(map[string]any{"event": req.Events[0].GetEvent().Map()})
-			data := eval.FilteredAttributes(ctx, ed).Map()
-
 			// The triggering event ID should be the first ID in the batch.
 			triggeringID := req.Events[0].GetInternalID().String()
 
-			// Remove `event` data from the expression and replace with actual event
-			// data as values, now that we have the event.
-			//
-			// This improves performance in matching, as we can then use the values within
-			// aggregate trees.
-			interpolated, err := expressions.Interpolate(ctx, expr, map[string]any{
-				"event": evtMap,
-			})
-			if err != nil {
-				logger.StdlibLogger(ctx).Warn(
-					"error interpolating cancellation expression",
-					"error", err,
-					"expression", expr,
-				)
+			var expr *string
+			// Evaluate the expression.  This lets us inspect the expression's attributes
+			// so that we can store only the attrs used in the expression in the pause,
+			// saving space, bandwidth, etc.
+			if c.If != nil {
+
+				// Remove `event` data from the expression and replace with actual event
+				// data as values, now that we have the event.
+				//
+				// This improves performance in matching, as we can then use the values within
+				// aggregate trees.
+				interpolated, err := expressions.Interpolate(ctx, *c.If, map[string]any{
+					"event": evtMap,
+				})
+				if err != nil {
+					logger.StdlibLogger(ctx).Warn(
+						"error interpolating cancellation expression",
+						"error", err,
+						"expression", expr,
+					)
+				}
+				expr = &interpolated
 			}
 
 			pause := state.Pause{
@@ -613,8 +733,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				ID:                pauseID,
 				Expires:           state.Time(expires),
 				Event:             &c.Event,
-				Expression:        &interpolated,
-				ExpressionData:    data,
+				Expression:        expr,
 				Cancel:            true,
 				TriggeringEventID: &triggeringID,
 			}
@@ -682,12 +801,13 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 }
 
 type runInstance struct {
-	md         sv2.Metadata
-	f          inngest.Function
-	events     []json.RawMessage
-	item       queue.Item
-	edge       inngest.Edge
-	stackIndex int
+	md           sv2.Metadata
+	f            inngest.Function
+	events       []json.RawMessage
+	item         queue.Item
+	edge         inngest.Edge
+	stackIndex   int
+	appIsConnect bool
 }
 
 // Execute loads a workflow and the current run state, then executes the
@@ -836,12 +956,13 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	instance := runInstance{
-		md:         md,
-		f:          *ef.Function,
-		events:     events,
-		item:       item,
-		edge:       edge,
-		stackIndex: stackIndex,
+		md:           md,
+		f:            *ef.Function,
+		events:       events,
+		item:         item,
+		edge:         edge,
+		stackIndex:   stackIndex,
+		appIsConnect: ef.AppIsConnect,
 	}
 
 	resp, err := e.run(ctx, &instance)
@@ -1156,6 +1277,10 @@ func (e *executor) executeDriverForStep(ctx context.Context, i *runInstance) (*s
 	url, _ := i.f.URI()
 
 	driverName := inngest.SchemeDriver(url.Scheme)
+	if i.appIsConnect {
+		driverName = "connect"
+	}
+
 	d, ok := e.runtimeDrivers[driverName]
 	if !ok {
 		return nil, fmt.Errorf("%w: '%s'", ErrNoRuntimeDriver, driverName)
@@ -1271,6 +1396,14 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 				"strategy", "naive",
 			)
 
+			// If this is a cancellation, ensure that we're not handling an event that
+			// was received before the run (due to eg. latency in a bad case).
+			//
+			// NOTE: Fast path this before handling the expression.
+			if pause.Cancel && bytes.Compare(evtID[:], pause.Identifier.RunID[:]) <= 0 {
+				return
+			}
+
 			// Run an expression if this exists.
 			if pause.Expression != nil {
 				// Precompute the expression data once, as a value (not pointer)
@@ -1383,6 +1516,12 @@ func (e *executor) handlePause(
 	res *execution.HandlePauseResult,
 	l *slog.Logger,
 ) error {
+
+	// If this is a cancellation, ensure that we're not handling an event that
+	// was received before the run (due to eg. latency in a bad case).
+	if pause.Cancel && bytes.Compare(evtID[:], pause.Identifier.RunID[:]) <= 0 {
+		return nil
+	}
 
 	return util.Crit(ctx, "handle pause", func(ctx context.Context) error {
 		// NOTE: Some pauses may be nil or expired, as the iterator may take
@@ -2535,20 +2674,6 @@ func (e execError) Error() string {
 
 func (e execError) Retryable() bool {
 	return !e.final
-}
-
-func generateCancelExpression(eventID ulid.ULID, expr *string) string {
-	// Ensure that we only listen to cancellation events that occur
-	// after the initial event is received.
-	//
-	// NOTE: We don't use `event.ts` here as people can use a future-TS date
-	// to schedule future runs.  Events received between now and that date should
-	// still cancel the run.
-	res := fmt.Sprintf("(async.ts == null || async.ts > %d)", eventID.Time())
-	if expr != nil {
-		res = *expr + " && " + res
-	}
-	return res
 }
 
 // extractTraceCtx extracts the trace context from the given item, if it exists.

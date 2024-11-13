@@ -67,10 +67,13 @@ function StepMenuItem({
       >
         {isCompleted ? (
           <RiCheckboxCircleFill
-            className={cn('text-primary-moderate', !isDisabled && 'group-hover:text-alwaysWhite')}
+            className={cn(
+              'text-primary-moderate h-5 w-5',
+              !isDisabled && 'group-hover:text-alwaysWhite'
+            )}
           />
         ) : (
-          <Icon className={cn('h-5 w-5', !isDisabled && 'group-hover:text-onContrast')} />
+          <Icon className={cn('h-4 w-4', !isDisabled && 'group-hover:text-onContrast')} />
         )}
       </div>
       <div>

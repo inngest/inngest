@@ -21,6 +21,7 @@ type App struct {
 	CreatedAt   time.Time
 	DeletedAt   time.Time
 	Url         string
+	IsConnect   sql.NullBool
 }
 
 type AppManager interface {
@@ -64,6 +65,7 @@ type UpsertAppParams struct {
 	Error       sql.NullString
 	Checksum    string
 	Url         string
+	IsConnect   sql.NullBool
 }
 
 type UpdateAppErrorParams struct {

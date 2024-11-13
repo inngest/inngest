@@ -19,6 +19,9 @@ export function isValidStep(step: string): step is IntegrationSteps {
 type ConnectStepContent = {
   title: string;
   description: string;
+  // skip indicates if the current Postgres provider's integration skips
+  // this step.
+  skip?: boolean;
 };
 
 export type ConnectPostgresIntegrationContent = {

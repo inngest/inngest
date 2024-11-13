@@ -41,6 +41,7 @@ const (
 	OtelSysFunctionOutput     = "sys.function.output"
 	OtelSysFunctionLink       = "sys.function.link"
 
+	OtelSysStepID              = "sys.step.id"
 	OtelSysStepDisplayName     = "sys.step.display.name"
 	OtelSysStepOpcode          = "sys.step.opcode"
 	OtelSysStepScheduleAt      = "sys.step.time.schedule"
@@ -55,6 +56,7 @@ const (
 	OtelSysStepOutputSizeBytes = "sys.step.output.size.bytes"
 	OtelSysStepFirst           = "sys.step.first"
 	OtelSysStepGroupID         = "sys.step.group.id"
+	OtelSysStepStack           = "sys.step.stack"
 
 	OtelSysStepSleepEndAt = "sys.step.sleep.end"
 

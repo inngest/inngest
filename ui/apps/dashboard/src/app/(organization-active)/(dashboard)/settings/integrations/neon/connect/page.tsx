@@ -14,7 +14,7 @@ export default function NeonConnect() {
     <ConnectPage
       content={neonConnectContent}
       onStartInstallation={() => {
-        router.push(pathCreator.neonIntegrationStep({ step: firstStep }));
+        router.push(pathCreator.pgIntegrationStep({ integration: 'neon', step: firstStep }));
       }}
     />
   );

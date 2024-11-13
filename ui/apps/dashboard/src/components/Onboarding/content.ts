@@ -1,26 +1,26 @@
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { RiLoopRightLine, RiMagicLine, RiSendPlaneLine } from '@remixicon/react';
 
-import { type OnboardingMenuContent, type OnboardingWidgetContent } from './types';
+import { OnboardingSteps, type OnboardingMenuContent, type OnboardingWidgetContent } from './types';
 
 export const onboardingWidgetContent: OnboardingWidgetContent = {
   step: {
-    'create-app': {
+    [OnboardingSteps.CreateApp]: {
       title: 'Getting started',
       description: "Let's get your system up and running on Inngest.",
       eta: 'Est. 10 mins remaining',
     },
-    'deploy-app': {
+    [OnboardingSteps.DeployApp]: {
       title: 'Getting started',
       description: "Let's get your system up and running on Inngest.",
       eta: 'Est. 10 mins remaining',
     },
-    'sync-app': {
+    [OnboardingSteps.SyncApp]: {
       title: 'Getting started',
       description: "Let's get your system up and running on Inngest.",
       eta: 'Est. 7 mins remaining',
     },
-    'invoke-fn': {
+    [OnboardingSteps.InvokeFn]: {
       title: 'Almost there!',
       description: "Let's get your system up and running on Inngest.",
       eta: 'Est. 3 mins remaining',
@@ -39,22 +39,22 @@ export const onboardingWidgetContent: OnboardingWidgetContent = {
 export const onboardingMenuStepContent: OnboardingMenuContent = {
   title: 'Explore onboarding guide',
   step: {
-    'create-app': {
+    [OnboardingSteps.CreateApp]: {
       title: 'Create Inngest app',
       description: 'Start building in local development',
       icon: AppsIcon,
     },
-    'deploy-app': {
+    [OnboardingSteps.DeployApp]: {
       title: 'Deploy Inngest app',
       description: 'Host your app on any platform or infra',
       icon: RiSendPlaneLine,
     },
-    'sync-app': {
+    [OnboardingSteps.SyncApp]: {
       title: 'Sync app to Inngest',
       description: 'Tell Inngest where your app is running',
       icon: RiLoopRightLine,
     },
-    'invoke-fn': {
+    [OnboardingSteps.InvokeFn]: {
       title: 'Invoke your function',
       description: 'Trigger and monitor your first function',
       icon: RiMagicLine,

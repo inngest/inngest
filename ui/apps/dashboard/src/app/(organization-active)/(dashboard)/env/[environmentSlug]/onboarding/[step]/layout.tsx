@@ -24,10 +24,10 @@ export default function Layout({
   return (
     <div className="text-basis my-12 grid grid-cols-3">
       <main className="col-span-2 mx-20">
-        <PageHeader step={step} />
+        <PageHeader stepName={step} />
         {children}
       </main>
-      <Menu envSlug={envSlug} step={step} />
+      <Menu envSlug={envSlug} stepName={step} />
     </div>
   );
 }
