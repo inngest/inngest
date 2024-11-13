@@ -14,7 +14,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -598,7 +597,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 			if span.SpanName == consts.OtelExecFnOk || span.SpanName == consts.OtelExecFnErr {
 				if spanStack, ok := span.SpanAttributes[consts.OtelSysStepStack]; ok {
-					spew.Dump("FOUND SPANSTACK", spanStack)
 					stack = strings.Split(spanStack, ",")
 				}
 			}
@@ -669,8 +667,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		}
 
 	}
-
-	spew.Dump("newState", newState)
 
 	err := e.smv2.Create(ctx, newState)
 	if err == state.ErrIdentifierExists {
