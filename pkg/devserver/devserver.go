@@ -21,6 +21,7 @@ import (
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/connect"
 	pubsub2 "github.com/inngest/inngest/pkg/connect/pubsub"
+	connstate "github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs"
@@ -264,7 +265,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
 
 	gatewayProxy := pubsub2.NewRedisPubSubConnector(connectRc)
-	connectionManager := connect.NewRedisConnectionStateManager(connectRc)
+	connectionManager := connstate.NewRedisConnectionStateManager(connectRc)
 
 	go func() {
 		// set up PubSub manager, this is required for connect to work
@@ -424,6 +425,9 @@ func start(ctx context.Context, opts StartOpts) error {
 			}, nil
 		}),
 		connect.WithDB(dbcqrs),
+		connect.WithLifeCycles([]connect.ConnectGatewayLifecycleListener{
+			connectionManager,
+		}),
 	)
 
 	// Create a new data API directly in the devserver.  This allows us to inject
