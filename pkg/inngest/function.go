@@ -275,7 +275,7 @@ func (f Function) IsBatchEnabled() bool {
 }
 
 // Validate returns an error if the function definition is invalid.
-func (f Function) Validate(ctx context.Context) error {
+func (f Function) Validate(ctx context.Context, isConnect bool) error {
 	var err error
 	if f.Name == "" {
 		err = multierror.Append(err, fmt.Errorf("A function name is required"))
@@ -318,6 +318,7 @@ func (f Function) Validate(ctx context.Context) error {
 		if step.Name == "" {
 			err = multierror.Append(err, fmt.Errorf("All steps must have a name"))
 		}
+
 		uri, serr := url.Parse(step.URI)
 		if serr != nil {
 			err = multierror.Append(err, fmt.Errorf("Steps must have a valid URI"))
@@ -325,6 +326,10 @@ func (f Function) Validate(ctx context.Context) error {
 		switch uri.Scheme {
 		case "http", "https":
 			continue
+		case "ws", "wss":
+			if !isConnect {
+				err = multierror.Append(err, fmt.Errorf("Non-HTTP steps are not yet supported"))
+			}
 		default:
 			err = multierror.Append(err, fmt.Errorf("Non-HTTP steps are not yet supported"))
 		}

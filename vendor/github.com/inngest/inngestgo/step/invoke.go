@@ -75,7 +75,7 @@ func Invoke[T any](ctx context.Context, id string, opts InvokeOpts) (T, error) {
 				errMsg += "; " + errObj.Message
 			}
 
-			customErr := errors.NoRetryError(fmt.Errorf(errMsg))
+			customErr := errors.NoRetryError(fmt.Errorf("%s", errMsg))
 			mgr.SetErr(customErr)
 			panic(ControlHijack{})
 		}

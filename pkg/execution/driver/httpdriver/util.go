@@ -47,7 +47,7 @@ func CheckRedirect(req *http.Request, via []*http.Request) (err error) {
 		return fmt.Errorf("stopped after 10 redirects")
 	}
 
-	if via[0].Body != nil {
+	if via[0].Body != nil && via[0].GetBody != nil {
 		req.Body, err = via[0].GetBody()
 		if err != nil {
 			return err
@@ -73,12 +73,12 @@ func CheckRedirect(req *http.Request, via []*http.Request) (err error) {
 	return nil
 }
 
-// shouldRetry determines if a request should be retried based on the response
+// ShouldRetry determines if a request should be retried based on the response
 // status code and headers.
 //
 // This is a best-effort attempt to determine if a request should be retried; we
 // fall back to retrying if the request doesn't give us a firm answer.
-func shouldRetry(status int, noRetryHeader, sdkVersion string) bool {
+func ShouldRetry(status int, noRetryHeader, sdkVersion string) bool {
 	// noRetryHeader := resp.Header.Get("x-inngest-no-retry")
 	// Always obey the no-retry header if it's set.
 	if noRetryHeader != "" {

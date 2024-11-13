@@ -30,17 +30,28 @@ const nextConfig = {
       },
       {
         source: '/env/:slug/onboarding',
-        destination: '/env/production/onboarding/1',
+        destination: '/env/production/onboarding/create-app',
         permanent: false,
       },
       {
         source: '/env/:slug((?!production)[^/]+)/onboarding/:step',
-        destination: '/env/production/onboarding/:step',
+        destination: '/env/:slug/apps',
         permanent: false,
       },
       {
         source: '/integrations/vercel',
         destination: '/integrations/vercel/callback',
+        permanent: false,
+      },
+      {
+        source: '/settings/billing',
+        destination: '/billing/usage',
+        permanent: false,
+      },
+      // Temp, when we add usage, this is no longer needed
+      {
+        source: '/billing',
+        destination: '/billing/usage',
         permanent: false,
       },
       {

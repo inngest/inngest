@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
 import { NewButton } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
@@ -8,24 +8,89 @@ import TabCards from '@inngest/components/TabCards/TabCards';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
-import { RiCheckboxCircleFill, RiInputCursorMove } from '@remixicon/react';
+import { RiCheckboxCircleFill, RiCloseCircleFill, RiInputCursorMove } from '@remixicon/react';
 
 import { type CodedError } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { OnboardingSteps } from '../Onboarding/types';
 import { SyncFailure } from '../SyncFailure';
-import { syncAppManually } from './actions';
+import CommonVercelErrors from './CommonVercelErrors';
+import { getVercelSyncs, syncAppManually, type VercelSyncsResponse } from './actions';
+import { type VercelApp } from './data';
 import useOnboardingStep from './useOnboardingStep';
+import { useOnboardingTracking } from './useOnboardingTracking';
+import { getNextStepName } from './utils';
 
 export default function SyncApp() {
+  const currentStepName = OnboardingSteps.SyncApp;
+  const nextStepName = getNextStepName(currentStepName);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingVercelApps, setIsLoadingVercelApps] = useState(false);
+  const [vercelSyncs, setVercelSyncs] = useState<VercelSyncsResponse>();
   const [error, setError] = useState<CodedError | null>();
   const [app, setApp] = useState<string | null>();
-  const { updateLastCompletedStep } = useOnboardingStep();
+  const { updateCompletedSteps } = useOnboardingStep();
   const router = useRouter();
   const { value: vercelFlowEnabled } = useBooleanFlag('onboarding-vercel-flow');
+  const tracking = useOnboardingTracking();
+
+  const searchParams = useSearchParams();
+  const fromVercel = searchParams.get('fromVercel') === 'true';
+
+  const loadVercelSyncs = async () => {
+    try {
+      setIsLoadingVercelApps(true);
+      const syncs = await getVercelSyncs();
+      setVercelSyncs(syncs);
+      return syncs;
+    } catch (err) {
+      console.error('Failed to load syncs: ', err);
+    } finally {
+      setIsLoadingVercelApps(false);
+    }
+  };
+
+  useEffect(() => {
+    let intervalId: number | undefined;
+
+    const checkAndPoll = async () => {
+      const syncs = await loadVercelSyncs();
+
+      const hasPendingSync = syncs?.apps.some(
+        (app: VercelApp) => app.latestSync?.status === 'pending'
+      );
+
+      if (hasPendingSync) {
+        intervalId = window.setInterval(async () => {
+          const newSyncs = await loadVercelSyncs();
+          const newHasPendingSync = newSyncs?.apps.some(
+            (app: VercelApp) => app.latestSync?.status === 'pending'
+          );
+
+          // Clear interval if the pending syncs are resolved
+          if (!newHasPendingSync && intervalId !== undefined) {
+            window.clearInterval(intervalId);
+          }
+        }, 2500);
+      }
+    };
+
+    checkAndPoll();
+
+    return () => {
+      if (intervalId !== undefined) {
+        window.clearInterval(intervalId);
+      }
+    };
+  }, []);
+
+  console.log('vercel', vercelSyncs);
+
+  const hasSuccessfulSync = vercelSyncs?.apps.some(
+    (app) => app.latestSync?.status === 'success' || app.latestSync?.status === 'duplicate'
+  );
 
   const handleSyncAppManually = async () => {
     setIsLoading(true);
@@ -35,7 +100,12 @@ export default function SyncApp() {
       const { success, error, appName } = await syncAppManually(inputValue);
       if (success) {
         setApp(appName);
-        updateLastCompletedStep(OnboardingSteps.SyncApp, 'manual');
+        updateCompletedSteps(currentStepName, {
+          metadata: {
+            completionSource: 'manual',
+            syncMethod: 'manual',
+          },
+        });
       } else {
         setError(error);
       }
@@ -62,7 +132,7 @@ export default function SyncApp() {
       </p>
 
       <h4 className="mb-4 text-sm font-medium">Choose syncing method:</h4>
-      <TabCards defaultValue="manually">
+      <TabCards defaultValue={fromVercel ? 'vercel' : 'manually'}>
         <TabCards.ButtonList>
           <TabCards.Button className="w-36" value="manually">
             <div className="flex items-center gap-1.5">
@@ -126,13 +196,25 @@ export default function SyncApp() {
           )}
           {error && <SyncFailure className="mb-3 mt-0 text-sm" error={error} />}
           {!app && (
-            <NewButton loading={isLoading} label="Sync app here" onClick={handleSyncAppManually} />
+            <NewButton
+              loading={isLoading}
+              label="Sync app here"
+              onClick={() => {
+                tracking?.trackOnboardingAction(currentStepName, {
+                  metadata: { type: 'btn-click', label: 'sync', syncMethod: 'manual' },
+                });
+                handleSyncAppManually();
+              }}
+            />
           )}
           {app && (
             <NewButton
               label="Next"
               onClick={() => {
-                router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.InvokeFn }));
+                tracking?.trackOnboardingAction(currentStepName, {
+                  metadata: { type: 'btn-click', label: 'next', syncMethod: 'manual' },
+                });
+                router.push(pathCreator.onboardingSteps({ step: nextStepName }));
               }}
             />
           )}
@@ -152,22 +234,79 @@ export default function SyncApp() {
                 label="View Vercel dashboard"
                 href={pathCreator.vercel()}
                 size="small"
+                onClick={() =>
+                  tracking?.trackOnboardingAction(currentStepName, {
+                    metadata: { type: 'btn-click', label: 'view-dashboard', syncMethod: 'vercel' },
+                  })
+                }
               />
             </div>
             <p className="mb-4 text-sm">
               Inngest <span className="font-medium">automatically</span> syncs your app upon
               deployment, ensuring a seamless connection.
             </p>
-            {/* TODO: wire vercel integration flow */}
-            <div className="text-link mb-4 flex items-center gap-1 text-sm">
-              <IconSpinner className="fill-link h-4 w-4" />
-              Syncing app
-            </div>
+            {isLoadingVercelApps && !vercelSyncs && (
+              <div className="text-link mb-4 flex items-center gap-1 text-sm">
+                <IconSpinner className="fill-link h-4 w-4" />
+                Loading apps
+              </div>
+            )}
+            {vercelSyncs && (
+              <>
+                {vercelSyncs.apps.length ? (
+                  <div>
+                    {vercelSyncs.apps.map((app) => (
+                      <div
+                        key={app.id}
+                        className="border-subtle mb-4 flex items-center justify-between rounded border p-3"
+                      >
+                        {app.name && (
+                          <div className="flex items-center gap-2">
+                            <div className="bg-contrast border-muted flex h-9 w-9 items-center justify-center rounded border">
+                              <AppsIcon className="text-onContrast h-4 w-4" />
+                            </div>
+                            <p className="text-basis">{app.name}</p>
+                          </div>
+                        )}
+                        <StatusIndicator status={app.latestSync?.status} />
+                      </div>
+                    ))}
+                  </div>
+                ) : vercelSyncs.unattachedSyncs.length ? (
+                  <>
+                    <SyncFailure
+                      className="mb-4"
+                      error={{
+                        message: vercelSyncs.unattachedSyncs[0]?.error || 'Unknown error',
+                        code: 'unknown',
+                      }}
+                    />
+                    <CommonVercelErrors />
+                  </>
+                ) : (
+                  <div className="mb-4">
+                    <div className="border-subtle mb-4 flex items-center justify-between rounded-md border p-3 text-sm">
+                      No syncs found
+                    </div>
+                    <CommonVercelErrors />
+                  </div>
+                )}
+              </>
+            )}
             <NewButton
+              disabled={!hasSuccessfulSync}
               label="Next"
               onClick={() => {
-                updateLastCompletedStep(OnboardingSteps.SyncApp, 'manual');
-                router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.InvokeFn }));
+                updateCompletedSteps(currentStepName, {
+                  metadata: {
+                    completionSource: 'manual',
+                    syncMethod: 'vercel',
+                  },
+                });
+                tracking?.trackOnboardingAction(currentStepName, {
+                  metadata: { type: 'btn-click', label: 'next', syncMethod: 'vercel' },
+                });
+                router.push(pathCreator.onboardingSteps({ step: nextStepName }));
               }}
             />
           </TabCards.Content>
@@ -176,3 +315,35 @@ export default function SyncApp() {
     </div>
   );
 }
+
+const StatusIndicator = ({ status }: { status?: string }) => {
+  if (status === 'pending')
+    return (
+      <div className="text-link flex items-center gap-1 text-sm">
+        <IconSpinner className="fill-link h-4 w-4" />
+        Syncing app
+      </div>
+    );
+  if (status === 'success')
+    return (
+      <div className="text-success flex items-center gap-1 text-sm">
+        <RiCheckboxCircleFill className="text-success h-4 w-4" />
+        App synced successfully
+      </div>
+    );
+  if (status === 'error')
+    return (
+      <div className="text-error flex items-center gap-1 text-sm">
+        <RiCloseCircleFill className="text-error h-5 w-5" />
+        App failed to sync
+      </div>
+    );
+  if (status === 'duplicate')
+    return (
+      <div className="text-success flex items-center gap-1 text-sm">
+        <RiCheckboxCircleFill className="text-success h-4 w-4" />
+        App synced successfully
+      </div>
+    );
+  return <></>;
+};

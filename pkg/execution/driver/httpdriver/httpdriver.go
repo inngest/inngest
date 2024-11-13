@@ -138,21 +138,26 @@ func DoRequest(ctx context.Context, c HTTPDoer, r Request) (*state.DriverRespons
 		return nil, err
 	}
 
-	if resp.statusCode == 206 {
+	return HandleHttpResponse(ctx, r, resp)
+}
+
+func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.DriverResponse, error) {
+	var err error
+	if resp.StatusCode == 206 {
 		// This is a generator-based function returning opcodes.
 		dr := &state.DriverResponse{
 			Step:           r.Step,
-			Duration:       resp.duration,
-			Output:         string(resp.body),
-			OutputSize:     len(resp.body),
-			NoRetry:        resp.noRetry,
-			RetryAt:        resp.retryAt,
-			RequestVersion: resp.requestVersion,
-			StatusCode:     resp.statusCode,
-			SDK:            resp.sdk,
-			Header:         resp.header,
+			Duration:       resp.Duration,
+			Output:         string(resp.Body),
+			OutputSize:     len(resp.Body),
+			NoRetry:        resp.NoRetry,
+			RetryAt:        resp.RetryAt,
+			RequestVersion: resp.RequestVersion,
+			StatusCode:     resp.StatusCode,
+			SDK:            resp.Sdk,
+			Header:         resp.Header,
 		}
-		dr.Generator, err = ParseGenerator(ctx, resp.body, resp.noRetry)
+		dr.Generator, err = ParseGenerator(ctx, resp.Body, resp.NoRetry)
 		if err != nil {
 			return nil, err
 		}
@@ -168,33 +173,33 @@ func DoRequest(ctx context.Context, c HTTPDoer, r Request) (*state.DriverRespons
 			dr.Step.Name = op.UserDefinedName()
 		}
 
-		if resp.sysErr != nil {
-			dr.SetError(resp.sysErr)
+		if resp.SysErr != nil {
+			dr.SetError(resp.SysErr)
 		}
 
 		return dr, nil
 	}
 
-	body := parseResponse(resp.body)
+	body := ParseResponse(resp.Body)
 	dr := &state.DriverResponse{
 		Step:           r.Step,
 		Output:         body,
-		Duration:       resp.duration,
-		OutputSize:     len(resp.body),
-		NoRetry:        resp.noRetry,
-		RetryAt:        resp.retryAt,
-		RequestVersion: resp.requestVersion,
-		StatusCode:     resp.statusCode,
-		SDK:            resp.sdk,
-		Header:         resp.header,
+		Duration:       resp.Duration,
+		OutputSize:     len(resp.Body),
+		NoRetry:        resp.NoRetry,
+		RetryAt:        resp.RetryAt,
+		RequestVersion: resp.RequestVersion,
+		StatusCode:     resp.StatusCode,
+		SDK:            resp.Sdk,
+		Header:         resp.Header,
 	}
-	if resp.sysErr != nil {
-		dr.SetError(resp.sysErr)
+	if resp.SysErr != nil {
+		dr.SetError(resp.SysErr)
 	}
 
-	if dr.Err == nil && resp.statusCode == 200 && !resp.isSDK {
+	if dr.Err == nil && resp.StatusCode == 200 && !resp.IsSDK {
 		log.From(ctx).Info().
-			Interface("headers", resp.header).
+			Interface("headers", resp.Header).
 			Str("run_id", r.RunID.String()).
 			Str("url", r.URL.String()).
 			Msg("response did not come from an Inngest SDK")
@@ -202,7 +207,7 @@ func DoRequest(ctx context.Context, c HTTPDoer, r Request) (*state.DriverRespons
 		// because we want to observe logs first
 	}
 
-	if resp.statusCode < 200 || resp.statusCode > 299 {
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		// Add an error to driver.Response if the status code isn't 2XX.
 		//
 		// This is IMPERATIVE, as dr.Err is used to indicate communication errors,
@@ -213,10 +218,10 @@ func DoRequest(ctx context.Context, c HTTPDoer, r Request) (*state.DriverRespons
 		// - The SDK isn't invoked (proxy error, etc.)
 		// - The SDK has a catastrophic failure and does not respond gracefully.
 		// - The function fails or errors (these are not *yet* opcodes, but should be).
-		err = fmt.Errorf("invalid status code: %d", resp.statusCode)
+		err = fmt.Errorf("invalid status code: %d", resp.StatusCode)
 		dr.SetError(err)
 	}
-	if resp.noRetry {
+	if resp.NoRetry {
 		// Ensure we return a NonRetriableError to indicate that
 		// we're not retrying when we store the error message.
 		//
@@ -225,10 +230,11 @@ func DoRequest(ctx context.Context, c HTTPDoer, r Request) (*state.DriverRespons
 		err = errors.New("NonRetriableError")
 		dr.SetError(err)
 	}
+
 	return dr, err
 }
 
-func do(ctx context.Context, c HTTPDoer, r Request) (*response, error) {
+func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 	if c == nil {
 		c = DefaultClient
 	}
@@ -382,7 +388,7 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*response, error) {
 	}
 
 	// Check the retry status from the headers and versions.
-	noRetry = !shouldRetry(statusCode, headers[headerNoRetry], headers[headerSDK])
+	noRetry = !ShouldRetry(statusCode, headers[headerNoRetry], headers[headerSDK])
 
 	// Extract the retry at header if it hasn't been set explicitly in streaming.
 	if after := headers["retry-after"]; retryAtStr == nil && after != "" {
@@ -404,39 +410,39 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*response, error) {
 
 	// Get the request version
 	rv, _ := strconv.Atoi(headers[headerRequestVersion])
-	return &response{
-		body:           body,
-		statusCode:     statusCode,
-		duration:       dur,
-		retryAt:        retryAt,
-		noRetry:        noRetry,
-		requestVersion: rv,
-		isSDK:          isSDK,
-		sdk:            headers[headerSDK],
-		header:         resp.Header,
-		sysErr:         sysErr,
+	return &Response{
+		Body:           body,
+		StatusCode:     statusCode,
+		Duration:       dur,
+		RetryAt:        retryAt,
+		NoRetry:        noRetry,
+		RequestVersion: rv,
+		IsSDK:          isSDK,
+		Sdk:            headers[headerSDK],
+		Header:         resp.Header,
+		SysErr:         sysErr,
 	}, err
 
 }
 
-type response struct {
-	body           []byte
-	statusCode     int
-	duration       time.Duration
-	requestVersion int
+type Response struct {
+	Body           []byte
+	StatusCode     int
+	Duration       time.Duration
+	RequestVersion int
 	// retryAt is the time to retry this step at, on failure, if specified in the
 	// Retry-After headers, or X-Retry-After.
 	//
 	// This adheres to the HTTP spec; we support both seconds and times in this header.
-	retryAt *time.Time
+	RetryAt *time.Time
 	// noRetry indicates whether this is a non-retryable error
-	noRetry bool
+	NoRetry bool
 	// sdk represents the SDK language and version used for these
 	// functions, in the format: "js:v0.1.0"
-	sdk string
+	Sdk string
 
-	header http.Header
+	Header http.Header
 
-	sysErr *syscode.Error
-	isSDK  bool
+	SysErr *syscode.Error
+	IsSDK  bool
 }

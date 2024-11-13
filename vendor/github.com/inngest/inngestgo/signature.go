@@ -110,11 +110,12 @@ func ValidateRequestSignature(
 	signingKey string,
 	signingKeyFallback string,
 	body []byte,
+	isDev bool,
 ) (bool, string, error) {
 	// The key that was used to sign the request
 	correctKey := ""
 
-	if IsDev() {
+	if isDev {
 		return true, correctKey, nil
 	}
 

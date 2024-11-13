@@ -2,13 +2,19 @@ import { forwardRef } from 'react';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
 import { RiArrowDownSLine } from '@remixicon/react';
 
+import { cn } from '../utils/classNames';
+
 export function AccordionList({
   children,
+  className,
   ...props
 }: React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Root>) {
   return (
     <AccordionPrimitive.Root
-      className="border-muted bg-canvasBase divide-subtle divide-y overflow-hidden rounded-lg border"
+      className={cn(
+        'border-subtle bg-canvasBase divide-subtle divide-y overflow-hidden rounded-lg border',
+        className
+      )}
       {...props}
     >
       {children}
@@ -19,12 +25,12 @@ export function AccordionList({
 const AccordionItem = forwardRef<
   React.ElementRef<typeof AccordionPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Item>
->(({ children, ...props }, forwardedRef) => {
+>(({ children, className, ...props }, forwardedRef) => {
   return (
     <AccordionPrimitive.Item
       {...props}
       ref={forwardedRef}
-      className="first:rounded-t last:rounded-b"
+      className={cn('first:rounded-t last:rounded-b', className)}
     >
       {children}
     </AccordionPrimitive.Item>
@@ -36,7 +42,7 @@ const AccordionTrigger = forwardRef<
   React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Trigger>
 >(({ children, ...props }, forwardedRef) => {
   return (
-    <AccordionPrimitive.Header className="data-[state=open]:border-muted flex items-center text-sm data-[state=open]:border-b">
+    <AccordionPrimitive.Header className="data-[state=open]:border-subtle flex items-center text-sm data-[state=open]:border-b">
       <AccordionPrimitive.Trigger
         {...props}
         ref={forwardedRef}

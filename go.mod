@@ -1,8 +1,8 @@
 module github.com/inngest/inngest
 
-go 1.22.0
+go 1.23.2
 
-toolchain go1.23.1
+toolchain go1.23.3
 
 replace github.com/tencentcloud/tencentcloud-sdk-go v3.0.82+incompatible => github.com/tencentcloud/tencentcloud-sdk-go v1.0.191
 
@@ -15,6 +15,7 @@ require (
 	github.com/aws/aws-lambda-go v1.41.0
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/charmbracelet/lipgloss v0.5.0
+	github.com/coder/websocket v1.8.12
 	github.com/coocood/freecache v1.2.3
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dmarkham/enumer v1.5.8
@@ -33,8 +34,8 @@ require (
 	github.com/gowebpki/jcs v1.0.0
 	github.com/graph-gophers/dataloader v5.0.0+incompatible
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/inngest/expr v0.0.0-20241105150843-774832e1d055
-	github.com/inngest/inngestgo v0.7.5-0.20240919173141-dccf7b2deffe
+	github.com/inngest/expr v0.0.0-20241106234328-863dff7deec0
+	github.com/inngest/inngestgo v0.7.5-0.20241108150946-a8250a58daaf
 	github.com/jedib0t/go-pretty/v6 v6.3.0
 	github.com/jinzhu/copier v0.3.5
 	github.com/jonboulle/clockwork v0.4.0
@@ -55,7 +56,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/throttled/throttled/v2 v2.11.0
 	github.com/valyala/fastjson v1.6.4
-	github.com/vektah/gqlparser/v2 v2.5.1
+	github.com/vektah/gqlparser/v2 v2.5.15
 	github.com/xhit/go-str2duration/v2 v2.1.0
 	go.opentelemetry.io/collector/pdata v1.6.0
 	go.opentelemetry.io/otel v1.28.0
@@ -167,6 +168,7 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.6.0 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect

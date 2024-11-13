@@ -8,7 +8,6 @@ import { Header, type BreadCrumbType } from '@inngest/components/Header/Header';
 // are their own top level pages with their own breadcrumb
 const paths: [string, string][] = [
   ['/integrations', 'Integrations'],
-  ['/billing', 'Billing'],
   ['/organization', 'Organization'],
   ['/organization/organization-members', 'Members'],
   ['/user', 'Your profile'],

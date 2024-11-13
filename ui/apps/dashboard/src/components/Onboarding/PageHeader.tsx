@@ -4,22 +4,22 @@ import { useRouter } from 'next/navigation';
 import StepsPageHeader from '@inngest/components/Steps/StepsPageHeader';
 
 import { onboardingMenuStepContent } from '@/components/Onboarding/content';
-import { STEPS_ORDER, isValidStep } from '@/components/Onboarding/types';
+import { isValidStep, steps } from '@/components/Onboarding/types';
 import { pathCreator } from '@/utils/urls';
 
-export default function PageHeader({ step }: { step: string }) {
+export default function PageHeader({ stepName }: { stepName: string }) {
   const router = useRouter();
-  if (!isValidStep(step)) {
-    router.push(pathCreator.pgIntegrationStep({ integration: 'neon' }));
+  if (!isValidStep(stepName)) {
+    router.push(pathCreator.onboarding());
     return;
   }
-  const currentStep = STEPS_ORDER.indexOf(step);
-  const stepContent = onboardingMenuStepContent.step[step];
+  const currentStep = steps.find((step) => step.name === stepName)?.stepNumber;
+  const stepContent = onboardingMenuStepContent.step[stepName];
 
   return (
     <StepsPageHeader
-      currentStep={currentStep + 1}
-      totalSteps={STEPS_ORDER.length}
+      currentStep={currentStep || 1}
+      totalSteps={steps.length}
       title={stepContent.title}
     />
   );

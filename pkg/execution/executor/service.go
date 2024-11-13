@@ -346,6 +346,10 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 				return err
 			}
 
+			if err := s.debouncer.StartExecution(ctx, *di, f, d.DebounceID); err != nil {
+				return err
+			}
+
 			ctx, span := run.NewSpan(ctx,
 				run.WithScope(consts.OtelScopeDebounce),
 				run.WithName(consts.OtelSpanDebounce),

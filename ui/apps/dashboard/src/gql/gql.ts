@@ -15,6 +15,7 @@ import type { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-
 const documents = {
     "\n  mutation SetUpAccount {\n    setUpAccount {\n      account {\n        id\n      }\n    }\n  }\n": types.SetUpAccountDocument,
     "\n  mutation CreateUser {\n    createUser {\n      user {\n        id\n      }\n    }\n  }\n": types.CreateUserDocument,
+    "\n  query GetBillingInfo {\n    account {\n      billingEmail\n      name\n      plan {\n        id\n        name\n        amount\n        billingPeriod\n        features\n      }\n      subscription {\n        nextInvoiceDate\n      }\n\n      paymentMethods {\n        brand\n        last4\n        expMonth\n        expYear\n        createdAt\n        default\n      }\n    }\n\n    plans {\n      id\n      name\n      amount\n      billingPeriod\n      features\n    }\n  }\n": types.GetBillingInfoDocument,
     "\n  mutation CreateEnvironment($name: String!) {\n    createWorkspace(input: { name: $name }) {\n      id\n    }\n  }\n": types.CreateEnvironmentDocument,
     "\n  mutation AchiveApp($appID: UUID!) {\n    archiveApp(id: $appID) {\n      id\n    }\n  }\n": types.AchiveAppDocument,
     "\n  mutation UnachiveApp($appID: UUID!) {\n    unarchiveApp(id: $appID) {\n      id\n    }\n  }\n": types.UnachiveAppDocument,
@@ -72,7 +73,6 @@ const documents = {
     "\n  mutation UpdatePlan($planID: ID!) {\n    updatePlan(to: $planID) {\n      plan {\n        id\n        name\n      }\n    }\n  }\n": types.UpdatePlanDocument,
     "\n  query GetPaymentIntents {\n    account {\n      paymentIntents {\n        status\n        createdAt\n        amountLabel\n        description\n        invoiceURL\n      }\n    }\n  }\n": types.GetPaymentIntentsDocument,
     "\n  mutation UpdatePaymentMethod($token: String!) {\n    updatePaymentMethod(token: $token) {\n      brand\n      last4\n      expMonth\n      expYear\n      createdAt\n      default\n    }\n  }\n": types.UpdatePaymentMethodDocument,
-    "\n  query GetBillingInfo {\n    account {\n      billingEmail\n      name\n      plan {\n        id\n        name\n        amount\n        billingPeriod\n        features\n      }\n      subscription {\n        nextInvoiceDate\n      }\n\n      paymentMethods {\n        brand\n        last4\n        expMonth\n        expYear\n        createdAt\n        default\n      }\n    }\n\n    plans {\n      id\n      name\n      amount\n      billingPeriod\n      features\n    }\n  }\n": types.GetBillingInfoDocument,
     "\n  query GetSavedVercelProjects($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      savedVercelProjects: vercelApps {\n        id\n        originOverride\n        projectID\n        protectionBypassSecret\n        path\n        workspaceID\n        originOverride\n        protectionBypassSecret\n      }\n    }\n  }\n": types.GetSavedVercelProjectsDocument,
     "\n  mutation CreateVercelApp($input: CreateVercelAppInput!) {\n    createVercelApp(input: $input) {\n      success\n    }\n  }\n": types.CreateVercelAppDocument,
     "\n  mutation UpdateVercelApp($input: UpdateVercelAppInput!) {\n    updateVercelApp(input: $input) {\n      success\n    }\n  }\n": types.UpdateVercelAppDocument,
@@ -82,6 +82,7 @@ const documents = {
     "\n  query GetAccountSupportInfo {\n    account {\n      id\n      plan {\n        id\n        name\n        amount\n        features\n      }\n    }\n  }\n": types.GetAccountSupportInfoDocument,
     "\n  query GetArchivedAppBannerData($envID: ID!, $externalAppID: String!) {\n    environment: workspace(id: $envID) {\n      app: appByExternalID(externalID: $externalAppID) {\n        isArchived\n      }\n    }\n  }\n": types.GetArchivedAppBannerDataDocument,
     "\n  query GetArchivedFuncBannerData($envID: ID!, $funcID: ID!) {\n    environment: workspace(id: $envID) {\n      function: workflow(id: $funcID) {\n        id\n        archivedAt\n      }\n    }\n  }\n": types.GetArchivedFuncBannerDataDocument,
+    "\n  query EntitlementUsage {\n    account {\n      id\n      entitlementUsage {\n        runCount {\n          current\n          limit\n        }\n      }\n    }\n  }\n": types.EntitlementUsageDocument,
     "\n  mutation ArchiveEnvironment($id: ID!) {\n    archiveEnvironment(id: $id) {\n      id\n    }\n  }\n": types.ArchiveEnvironmentDocument,
     "\n  mutation UnarchiveEnvironment($id: ID!) {\n    unarchiveEnvironment(id: $id) {\n      id\n    }\n  }\n": types.UnarchiveEnvironmentDocument,
     "\n  mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {\n    disableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n": types.DisableEnvironmentAutoArchiveDocumentDocument,
@@ -102,6 +103,8 @@ const documents = {
     "\n  mutation SyncOnboardingApp($appURL: String!, $envID: UUID!) {\n    syncNewApp(appURL: $appURL, envID: $envID) {\n      app {\n        externalID\n        id\n      }\n      error {\n        code\n        data\n        message\n      }\n    }\n  }\n": types.SyncOnboardingAppDocument,
     "\n  mutation InvokeFunctionOnboarding($envID: UUID!, $data: Map, $functionSlug: String!, $user: Map) {\n    invokeFunction(envID: $envID, data: $data, functionSlug: $functionSlug, user: $user)\n  }\n": types.InvokeFunctionOnboardingDocument,
     "\n  query InvokeFunctionLookup($envSlug: String!, $page: Int, $pageSize: Int) {\n    envBySlug(slug: $envSlug) {\n      workflows @paginated(perPage: $pageSize, page: $page) {\n        data {\n          name\n          id\n          slug\n          current {\n            triggers {\n              eventName\n            }\n          }\n        }\n        page {\n          page\n          totalPages\n          perPage\n        }\n      }\n    }\n  }\n": types.InvokeFunctionLookupDocument,
+    "\n  query GetVercelApps($envID: ID!) {\n    environment: workspace(id: $envID) {\n      unattachedSyncs(first: 1) {\n        lastSyncedAt\n        error\n        url\n        vercelDeploymentURL\n      }\n      apps {\n        id\n        name\n        externalID\n        latestSync {\n          error\n          id\n          platform\n          vercelDeploymentID\n          vercelProjectID\n          status\n        }\n      }\n    }\n  }\n": types.GetVercelAppsDocument,
+    "\n  query ProductionApps($envID: ID!) {\n    environment: workspace(id: $envID) {\n      apps {\n        id\n      }\n      unattachedSyncs(first: 1) {\n        lastSyncedAt\n      }\n    }\n  }\n": types.ProductionAppsDocument,
     "\n  query getPostgresIntegrations($envID: ID!) {\n    environment: workspace(id: $envID) {\n      cdcConnections {\n        id\n        name\n        status\n        statusDetail\n        description\n      }\n    }\n  }\n": types.GetPostgresIntegrationsDocument,
     "\n  mutation testCredentials($input: CDCConnectionInput!, $envID: UUID!) {\n    cdcTestCredentials(input: $input, envID: $envID) {\n      steps\n      error\n    }\n  }\n": types.TestCredentialsDocument,
     "\n  mutation testReplication($input: CDCConnectionInput!, $envID: UUID!) {\n    cdcTestLogicalReplication(input: $input, envID: $envID) {\n      steps\n      error\n    }\n  }\n": types.TestReplicationDocument,
@@ -151,6 +154,10 @@ export function graphql(source: "\n  mutation SetUpAccount {\n    setUpAccount {
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation CreateUser {\n    createUser {\n      user {\n        id\n      }\n    }\n  }\n"): (typeof documents)["\n  mutation CreateUser {\n    createUser {\n      user {\n        id\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query GetBillingInfo {\n    account {\n      billingEmail\n      name\n      plan {\n        id\n        name\n        amount\n        billingPeriod\n        features\n      }\n      subscription {\n        nextInvoiceDate\n      }\n\n      paymentMethods {\n        brand\n        last4\n        expMonth\n        expYear\n        createdAt\n        default\n      }\n    }\n\n    plans {\n      id\n      name\n      amount\n      billingPeriod\n      features\n    }\n  }\n"): (typeof documents)["\n  query GetBillingInfo {\n    account {\n      billingEmail\n      name\n      plan {\n        id\n        name\n        amount\n        billingPeriod\n        features\n      }\n      subscription {\n        nextInvoiceDate\n      }\n\n      paymentMethods {\n        brand\n        last4\n        expMonth\n        expYear\n        createdAt\n        default\n      }\n    }\n\n    plans {\n      id\n      name\n      amount\n      billingPeriod\n      features\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -382,10 +389,6 @@ export function graphql(source: "\n  mutation UpdatePaymentMethod($token: String
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  query GetBillingInfo {\n    account {\n      billingEmail\n      name\n      plan {\n        id\n        name\n        amount\n        billingPeriod\n        features\n      }\n      subscription {\n        nextInvoiceDate\n      }\n\n      paymentMethods {\n        brand\n        last4\n        expMonth\n        expYear\n        createdAt\n        default\n      }\n    }\n\n    plans {\n      id\n      name\n      amount\n      billingPeriod\n      features\n    }\n  }\n"): (typeof documents)["\n  query GetBillingInfo {\n    account {\n      billingEmail\n      name\n      plan {\n        id\n        name\n        amount\n        billingPeriod\n        features\n      }\n      subscription {\n        nextInvoiceDate\n      }\n\n      paymentMethods {\n        brand\n        last4\n        expMonth\n        expYear\n        createdAt\n        default\n      }\n    }\n\n    plans {\n      id\n      name\n      amount\n      billingPeriod\n      features\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
 export function graphql(source: "\n  query GetSavedVercelProjects($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      savedVercelProjects: vercelApps {\n        id\n        originOverride\n        projectID\n        protectionBypassSecret\n        path\n        workspaceID\n        originOverride\n        protectionBypassSecret\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetSavedVercelProjects($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      savedVercelProjects: vercelApps {\n        id\n        originOverride\n        projectID\n        protectionBypassSecret\n        path\n        workspaceID\n        originOverride\n        protectionBypassSecret\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
@@ -419,6 +422,10 @@ export function graphql(source: "\n  query GetArchivedAppBannerData($envID: ID!,
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query GetArchivedFuncBannerData($envID: ID!, $funcID: ID!) {\n    environment: workspace(id: $envID) {\n      function: workflow(id: $funcID) {\n        id\n        archivedAt\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetArchivedFuncBannerData($envID: ID!, $funcID: ID!) {\n    environment: workspace(id: $envID) {\n      function: workflow(id: $funcID) {\n        id\n        archivedAt\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query EntitlementUsage {\n    account {\n      id\n      entitlementUsage {\n        runCount {\n          current\n          limit\n        }\n      }\n    }\n  }\n"): (typeof documents)["\n  query EntitlementUsage {\n    account {\n      id\n      entitlementUsage {\n        runCount {\n          current\n          limit\n        }\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -499,6 +506,14 @@ export function graphql(source: "\n  mutation InvokeFunctionOnboarding($envID: U
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query InvokeFunctionLookup($envSlug: String!, $page: Int, $pageSize: Int) {\n    envBySlug(slug: $envSlug) {\n      workflows @paginated(perPage: $pageSize, page: $page) {\n        data {\n          name\n          id\n          slug\n          current {\n            triggers {\n              eventName\n            }\n          }\n        }\n        page {\n          page\n          totalPages\n          perPage\n        }\n      }\n    }\n  }\n"): (typeof documents)["\n  query InvokeFunctionLookup($envSlug: String!, $page: Int, $pageSize: Int) {\n    envBySlug(slug: $envSlug) {\n      workflows @paginated(perPage: $pageSize, page: $page) {\n        data {\n          name\n          id\n          slug\n          current {\n            triggers {\n              eventName\n            }\n          }\n        }\n        page {\n          page\n          totalPages\n          perPage\n        }\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query GetVercelApps($envID: ID!) {\n    environment: workspace(id: $envID) {\n      unattachedSyncs(first: 1) {\n        lastSyncedAt\n        error\n        url\n        vercelDeploymentURL\n      }\n      apps {\n        id\n        name\n        externalID\n        latestSync {\n          error\n          id\n          platform\n          vercelDeploymentID\n          vercelProjectID\n          status\n        }\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetVercelApps($envID: ID!) {\n    environment: workspace(id: $envID) {\n      unattachedSyncs(first: 1) {\n        lastSyncedAt\n        error\n        url\n        vercelDeploymentURL\n      }\n      apps {\n        id\n        name\n        externalID\n        latestSync {\n          error\n          id\n          platform\n          vercelDeploymentID\n          vercelProjectID\n          status\n        }\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query ProductionApps($envID: ID!) {\n    environment: workspace(id: $envID) {\n      apps {\n        id\n      }\n      unattachedSyncs(first: 1) {\n        lastSyncedAt\n      }\n    }\n  }\n"): (typeof documents)["\n  query ProductionApps($envID: ID!) {\n    environment: workspace(id: $envID) {\n      apps {\n        id\n      }\n      unattachedSyncs(first: 1) {\n        lastSyncedAt\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
