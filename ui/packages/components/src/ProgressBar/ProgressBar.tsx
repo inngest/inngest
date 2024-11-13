@@ -1,0 +1,43 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import * as Progress from '@radix-ui/react-progress';
+
+import { cn } from '../utils/classNames';
+
+type ProgressBarProps = {
+  limit: number;
+  value: number;
+};
+
+const ProgressBar = ({ limit, value }: ProgressBarProps) => {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const calculatedProgress = Math.min((value / limit) * 100, 100);
+    const timer = setTimeout(() => setProgress(calculatedProgress), 500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const isOverTheLimit = value > limit;
+
+  return (
+    <Progress.Root
+      className="bg-canvasMuted relative h-6 overflow-hidden rounded-md"
+      style={{
+        transform: 'translateZ(0)',
+      }}
+      value={progress}
+    >
+      <Progress.Indicator
+        className={cn(
+          'ease-[cubic-bezier(0.65, 0, 0.35, 1)] bg-primary-moderate size-full transition-transform duration-700',
+          isOverTheLimit && 'bg-accent-subtle'
+        )}
+        style={{ transform: `translateX(-${100 - progress}%)` }}
+      />
+    </Progress.Root>
+  );
+};
+
+export default ProgressBar;
