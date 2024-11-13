@@ -13,14 +13,14 @@ export default async function Page() {
     title: 'Runs',
     description: 'A single durable function execution. Additional runs are available for purchase.',
     current: entitlementUsage?.runCount.current || 0,
-    limit: entitlementUsage?.runCount.limit || 0,
+    limit: entitlementUsage?.runCount.limit || null,
   };
 
   // const steps = {
   //   title: 'Steps',
   //   description: 'An individual step in durable functions. Additional steps are available for purchase.',
   //   current: entitlementUsage?.stepCount?.current || 0,
-  //   limit: entitlementUsage?.stepCount?.limit || 0,
+  //   limit: entitlementUsage?.stepCount?.limit || null,
   // };
 
   return (

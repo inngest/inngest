@@ -6,7 +6,7 @@ import * as Progress from '@radix-ui/react-progress';
 import { cn } from '../utils/classNames';
 
 type ProgressBarProps = {
-  limit: number;
+  limit: number | null;
   value: number;
 };
 
@@ -14,16 +14,19 @@ const ProgressBar = ({ limit, value }: ProgressBarProps) => {
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    const calculatedProgress = Math.min((value / limit) * 100, 100);
+    const calculatedProgress = limit === null ? 0 : Math.min((value / limit) * 100, 100);
     const timer = setTimeout(() => setProgress(calculatedProgress), 500);
     return () => clearTimeout(timer);
   }, []);
 
-  const isOverTheLimit = value > limit;
+  const isOverTheLimit = limit !== null && value > limit;
 
   return (
     <Progress.Root
-      className="bg-canvasMuted relative h-6 overflow-hidden rounded-md"
+      className={cn(
+        'bg-canvasMuted relative h-6 overflow-hidden rounded-md',
+        limit === null && 'bg-secondary-subtle'
+      )}
       style={{
         transform: 'translateZ(0)',
       }}
