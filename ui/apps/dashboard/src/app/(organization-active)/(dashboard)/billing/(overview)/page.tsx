@@ -1,6 +1,8 @@
 import { NewButton } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
 
+import BillingInformation from '@/components/Billing/BillingDetails/BillingInformation';
+import PaymentMethod from '@/components/Billing/BillingDetails/PaymentMethod';
 import { LimitBar } from '@/components/Billing/LimitBar';
 import {
   getBillingDetails,
@@ -9,8 +11,6 @@ import {
 } from '@/components/Billing/actions';
 import { day } from '@/utils/date';
 import { pathCreator } from '@/utils/urls';
-import BillingInformation from '../../settings/billing/BillingInformation';
-import PaymentMethod from '../../settings/billing/PaymentMethod';
 
 export default async function Page() {
   const entitlementUsage = await getEntitlementUsage();

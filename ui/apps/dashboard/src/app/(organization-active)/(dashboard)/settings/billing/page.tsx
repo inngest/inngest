@@ -5,11 +5,11 @@ import { useQuery } from 'urql';
 import { graphql } from '@/gql';
 import type { BillingPlan } from '@/gql/graphql';
 import LoadingIcon from '@/icons/LoadingIcon';
+import BillingInformation from '../../../../../components/Billing/BillingDetails/BillingInformation';
+import PaymentMethod from '../../../../../components/Billing/BillingDetails/PaymentMethod';
 import { BillableStepUsage } from './BillableStepUsage/BillableStepUsage';
-import BillingInformation from './BillingInformation';
 import BillingPlanSelector from './BillingPlanSelector';
 import CurrentSubscription from './CurrentSubscription';
-import PaymentMethod from './PaymentMethod';
 import Payments from './Payments';
 import { isEnterprisePlan, transformPlan } from './utils';
 
