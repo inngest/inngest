@@ -3,6 +3,7 @@ import { Card } from '@inngest/components/Card/Card';
 
 import { LimitBar } from '@/components/Billing/LimitBar';
 import { getCurrentPlan, getEntitlementUsage } from '@/components/Billing/actions';
+import { day } from '@/utils/date';
 import { pathCreator } from '@/utils/urls';
 
 export default async function Page() {
@@ -23,6 +24,11 @@ export default async function Page() {
   //   limit: entitlementUsage?.stepCount?.limit || null,
   // };
 
+  const nextInvoiceDate = account?.subscription?.nextInvoiceDate
+    ? day(account.subscription.nextInvoiceDate)
+    : undefined;
+
+  const nextInvoiceAmount = account?.plan?.amount ? `$${account.plan.amount / 100}` : 'Free';
   return (
     <div className="grid grid-cols-3 gap-4">
       <Card className="col-span-2">
@@ -44,7 +50,13 @@ export default async function Page() {
       <Card className="col-span-1">
         <Card.Content>
           <p className="text-muted mb-1">Next payment</p>
-          <p className="text-basis text-lg">{account?.subscription?.nextInvoiceDate}</p>
+          <p className="text-basis text-lg">{nextInvoiceAmount}</p>
+          {nextInvoiceDate && (
+            <>
+              <p className="text-subtle mb-1 mt-4 text-xs font-medium">Payment due date</p>
+              <p className="text-basis text-sm">{nextInvoiceDate}</p>
+            </>
+          )}
         </Card.Content>
       </Card>
     </div>
