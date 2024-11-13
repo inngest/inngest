@@ -33,11 +33,10 @@ message SDKConnectRequestData {
 
 	string app_name = 3;
 	optional string environment = 4;
-	optional string framework = 5;
+	string framework = 5;
 	optional string platform = 6;
-	optional string sdk_version = 7;
-	optional string sdk_language = 8;
-	optional string sdk_author = 9;
+	string sdk_version = 7;
+	string sdk_language = 8;
 }
 
 message GatewaySyncRequestData {
