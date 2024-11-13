@@ -14,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 
@@ -290,8 +289,6 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 	if err != nil {
 		return nil, fmt.Errorf("error storing run state in redis: %w", err)
 	}
-
-	spew.Dump("Steps being parsed", input.Steps)
 
 	args, err := StrSlice([]any{
 		events,
