@@ -15,4 +15,7 @@ type ConnectionStateManager interface {
 	DeleteConnection(ctx context.Context, connID string) error
 }
 
-type AuthContext struct{}
+type AuthContext struct {
+	AccountID uuid.UUID
+	EnvID     uuid.UUID
+}
