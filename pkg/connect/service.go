@@ -126,28 +126,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			c.logger.Error("error establishing connection", "error", err)
 			return
 		}
-
-		var authResp *AuthResponse
-		{
-			// Run auth, add to distributed state
-			authResp, err = c.auther(ctx, initialMessageData)
-			if err != nil {
-				c.logger.Error("connect auth failed", "err", err)
-				_ = ws.Close(websocket.StatusInternalError, "Internal error")
-				return
-			}
-
-			if authResp == nil {
-				c.logger.Debug("Auth failed")
-
-				_ = ws.Close(websocket.StatusPolicyViolation, "Authentication failed")
-				return
-			}
-		}
-
-		log := c.logger.With("account_id", authResp.AccountID)
-
-		log.Debug("SDK successfully authenticated", "authResp", authResp)
+		log := c.logger.With("account_id", initialMessageData.AuthData.AccountId)
 
 		// TODO Check whether SDK group was already synced
 		isAlreadySynced := false
@@ -308,6 +287,29 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 
 		_ = ws.Close(websocket.StatusPolicyViolation, "Invalid Protobuf in SDK connect message")
 		return nil, err
+	}
+
+	var authResp *AuthResponse
+	{
+		// Run auth, add to distributed state
+		authResp, err = c.auther(ctx, &initialMessageData)
+		if err != nil {
+			c.logger.Error("connect auth failed", "err", err)
+			_ = ws.Close(websocket.StatusInternalError, "Internal error")
+			return nil, err
+		}
+
+		if authResp == nil {
+			c.logger.Debug("Auth failed")
+
+			_ = ws.Close(websocket.StatusPolicyViolation, "Authentication failed")
+			return nil, err
+		}
+
+		initialMessageData.AuthData.AccountId = authResp.AccountID.String()
+		initialMessageData.AuthData.EnvId = authResp.EnvID.String()
+
+		c.logger.Debug("SDK successfully authenticated", "authResp", authResp)
 	}
 
 	for _, l := range c.lifecycles {

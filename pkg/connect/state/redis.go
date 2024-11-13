@@ -118,8 +118,9 @@ func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, conn
 func (r *redisConnectionStateManager) OnConnected(ctx context.Context, data *connpb.SDKConnectRequestData) {
 	// meta := &connpb.ConnMetadata{
 	// 	Language: data.SdkLanguage,
+	// 	Version:  data.SdkVersion,
+	// 	Session:  data.SessionDetails,
 	// }
-
 }
 
 func (r *redisConnectionStateManager) OnAuthenticated(ctx context.Context, auth *AuthContext) {
