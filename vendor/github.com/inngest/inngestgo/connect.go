@@ -168,9 +168,8 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 				InstanceId:   h.instanceId(),
 				ConnectionId: h.connectionId.String(),
 			},
-			SdkAuthor:   StrPtr(SDKAuthor),
-			SdkLanguage: StrPtr(SDKLanguage),
-			SdkVersion:  StrPtr(SDKVersion),
+			SdkLanguage: SDKLanguage,
+			SdkVersion:  SDKVersion,
 		})
 		if err != nil {
 			return fmt.Errorf("could not serialize sdk connect message: %w", err)
