@@ -290,7 +290,7 @@ export type MutationInvokeFunctionArgs = {
 
 
 export type MutationRerunArgs = {
-  fromStep: InputMaybe<Scalars['String']>;
+  fromStep: InputMaybe<RerunFromStepInput>;
   runID: Scalars['ULID'];
 };
 
@@ -367,6 +367,11 @@ export type QueryRunsArgs = {
 
 export type QueryStreamArgs = {
   query: StreamQuery;
+};
+
+export type RerunFromStepInput = {
+  input?: InputMaybe<Scalars['Bytes']>;
+  stepID: Scalars['String'];
 };
 
 export type RunHistoryCancel = {
