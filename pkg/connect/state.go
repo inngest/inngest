@@ -6,10 +6,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/redis/rueidis"
 )
 
 type ConnectionStateManager interface {
+	ConnectGatewayLifecycleListener
+
 	SetRequestIdempotency(ctx context.Context, appId uuid.UUID, requestId string) error
 }
 
@@ -18,6 +21,12 @@ type redisConnectionStateManager struct {
 }
 
 var ErrIdempotencyKeyExists = fmt.Errorf("idempotency key exists")
+
+func NewRedisConnectionStateManager(client rueidis.Client) ConnectionStateManager {
+	return &redisConnectionStateManager{
+		client: client,
+	}
+}
 
 func (r redisConnectionStateManager) SetRequestIdempotency(ctx context.Context, appId uuid.UUID, requestId string) error {
 	idempotencyKey := fmt.Sprintf("{%s}:idempotency:%s", appId, requestId)
@@ -36,8 +45,15 @@ func (r redisConnectionStateManager) SetRequestIdempotency(ctx context.Context, 
 	return nil
 }
 
-func NewRedisConnectionStateManager(client rueidis.Client) ConnectionStateManager {
-	return &redisConnectionStateManager{
-		client: client,
-	}
+//
+// Lifecycle hooks
+//
+
+func (r *redisConnectionStateManager) OnConnected(ctx context.Context, data *connect.SDKConnectRequestData) {
 }
+
+func (r *redisConnectionStateManager) OnAuthenticated(ctx context.Context, auth *AuthResponse) {}
+
+func (r *redisConnectionStateManager) OnSynced(ctx context.Context) {}
+
+func (r *redisConnectionStateManager) OnDisconnected(ctx context.Context) {}

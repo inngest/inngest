@@ -423,6 +423,9 @@ func start(ctx context.Context, opts StartOpts) error {
 			}, nil
 		}),
 		connect.WithDB(dbcqrs),
+		connect.WithLifeCycles([]connect.ConnectGatewayLifecycleListener{
+			connectionManager,
+		}),
 	)
 
 	// Create a new data API directly in the devserver.  This allows us to inject
