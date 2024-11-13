@@ -366,10 +366,9 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 	c.Route("/v0", func(r chi.Router) {
 		r.Use(headers.ContentTypeJsonResponse())
 
-		r.Get("/conns", c.showConnections)
+		r.Get("/envs/{envID}/conns", c.showConnectionsByEnv)
+		r.Get("/apps/{appID}/conns", c.showConnectionsByApp)
 	})
-
-	// TODO: Setup gRPC server
 
 	return nil
 }

@@ -16,8 +16,8 @@ var (
 
 type ConnectionStateManager interface {
 	SetRequestIdempotency(ctx context.Context, appId uuid.UUID, requestId string) error
-	// GetConnections retrieves a list of connections in a workspace
-	GetConnections(ctx context.Context, wsID uuid.UUID, opts GetConnOpts) ([]*connpb.ConnMetadata, error)
+	GetConnectionsByEnvID(ctx context.Context, wsID uuid.UUID) ([]*connpb.ConnMetadata, error)
+	GetConnectionsByAppID(ctx context.Context, appID uuid.UUID) ([]*connpb.ConnMetadata, error)
 	AddConnection(ctx context.Context, wsID uuid.UUID, meta *connpb.ConnMetadata) error
 	DeleteConnection(ctx context.Context, connID string) error
 }
@@ -56,7 +56,11 @@ func (r redisConnectionStateManager) SetRequestIdempotency(ctx context.Context, 
 	return nil
 }
 
-func (r *redisConnectionStateManager) GetConnections(ctx context.Context, wsID uuid.UUID, opts GetConnOpts) ([]*connpb.ConnMetadata, error) {
+func (r *redisConnectionStateManager) GetConnectionsByEnvID(ctx context.Context, wsID uuid.UUID) ([]*connpb.ConnMetadata, error) {
+	return nil, notImplementedError
+}
+
+func (r *redisConnectionStateManager) GetConnectionsByAppID(ctx context.Context, appID uuid.UUID) ([]*connpb.ConnMetadata, error) {
 	return nil, notImplementedError
 }
 
