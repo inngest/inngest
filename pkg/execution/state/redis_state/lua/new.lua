@@ -9,7 +9,6 @@ Output:
 local eventsKey = KEYS[1]
 local metadataKey = KEYS[2]
 local stepKey = KEYS[3]
--- local stepInputKey = KEYS[4]
 local stepStackKey = KEYS[4]
 
 local events = ARGV[1]
@@ -24,33 +23,28 @@ for k, v in pairs(metadataJson) do
   redis.call("HSET", metadataKey, k, tostring(v))
 end
 
--- TODO Must also set stack and increment `step_count` and `state_size` in
--- metadata. How do we know what the stack was at this point?
--- if steps ~= nil and steps ~= "" then
---   local stepsJson = cjson.decode(steps)
+local stepCount = 0
+local stateSize = 0
 
---   for k, v in pairs(stepsJson) do
---     redis.call("HSET", stepKey, k, cjson.encode(v))
---   end
--- end
 if steps ~= nil and #steps > 0 then
   local stepsArray = cjson.decode(steps)
+  stepCount = #stepsArray
 
   for _, step in ipairs(stepsArray) do
-    redis.call("HSET", stepKey, step.id, cjson.encode(step.data))
+    local stepData = cjson.encode(step.data)
+    stateSize = stateSize + #stepData
+
+    redis.call("HSET", stepKey, step.id, stepData)
     redis.call("RPUSH", stepStackKey, step.id)
   end
 end
 
--- if stepInputs ~= nil and stepInputs ~= "" then
---   local stepInputsJson = cjson.decode(stepInputs)
-
---   for k, v in pairs(stepInputsJson) do
---     redis.call("HSET", stepInputKey, k, cjson.encode(v))
---   end
--- end
-
 redis.call("SETNX", eventsKey, events)
 redis.call("HINCRBY", metadataKey, "event_size", #events)
+
+if stepCount > 0 then
+  redis.call("HINCRBY", metadataKey, "step_count", stepCount)
+  redis.call("HINCRBY", metadataKey, "state_size", stateSize)
+end
 
 return 0
