@@ -26,6 +26,7 @@ type gatewayOpt func(*connectGatewaySvc)
 
 type AuthResponse struct {
 	AccountID uuid.UUID
+	EnvID     uuid.UUID
 }
 
 type GatewayAuthHandler func(context.Context, *connect.SDKConnectRequestData) (*AuthResponse, error)
@@ -43,6 +44,8 @@ type connectGatewaySvc struct {
 	stateManager ConnectionStateManager
 	receiver     pubsub.RequestReceiver
 	dbcqrs       cqrs.Manager
+
+	lifecycles []ConnectGatewayLifecycleListener
 }
 
 func WithGatewayAuthHandler(auth GatewayAuthHandler) gatewayOpt {
@@ -66,6 +69,12 @@ func WithRequestReceiver(r pubsub.RequestReceiver) gatewayOpt {
 func WithDB(m cqrs.Manager) gatewayOpt {
 	return func(svc *connectGatewaySvc) {
 		svc.dbcqrs = m
+	}
+}
+
+func WithLifeCycles(lifecycles []ConnectGatewayLifecycleListener) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.lifecycles = lifecycles
 	}
 }
 
@@ -103,40 +112,16 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}
 
-		var initialMessageData connect.SDKConnectRequestData
-		{
-			var initialMessage connect.ConnectMessage
-			shorterContext, cancelShorter := context.WithTimeout(ctx, 5*time.Second)
-			defer cancelShorter()
-			err = wsproto.Read(shorterContext, ws, &initialMessage)
-			if err != nil {
-				if errors.Is(err, context.DeadlineExceeded) {
-					c.logger.Debug("Timeout waiting for SDK connect message")
-					_ = ws.Close(websocket.StatusPolicyViolation, "Timeout waiting for SDK connect message")
-				}
-
-				return
-			}
-
-			if initialMessage.Kind != connect.GatewayMessageType_SDK_CONNECT {
-				c.logger.Debug("initial SDK message was not connect")
-
-				_ = ws.Close(websocket.StatusPolicyViolation, "Invalid first message, expected sdk-connect")
-				return
-			}
-
-			if err := proto.Unmarshal(initialMessage.Payload, &initialMessageData); err != nil {
-				c.logger.Debug("initial SDK message contained invalid Protobuf")
-
-				_ = ws.Close(websocket.StatusPolicyViolation, "Invalid Protobuf in SDK connect message")
-				return
-			}
+		initialMessageData, err := c.establishConnection(ctx, ws)
+		if err != nil {
+			c.logger.Error("error establishing connection", "error", err)
+			return
 		}
 
 		var authResp *AuthResponse
 		{
 			// Run auth, add to distributed state
-			authResp, err = c.auther(ctx, &initialMessageData)
+			authResp, err = c.auther(ctx, initialMessageData)
 			if err != nil {
 				c.logger.Error("connect auth failed", "err", err)
 				_ = ws.Close(websocket.StatusInternalError, "Internal error")
@@ -284,6 +269,45 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 	})
 }
 
+func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websocket.Conn) (*connect.SDKConnectRequestData, error) {
+	var (
+		initialMessageData connect.SDKConnectRequestData
+		initialMessage     connect.ConnectMessage
+	)
+
+	shorterContext, cancelShorter := context.WithTimeout(ctx, 5*time.Second)
+	defer cancelShorter()
+	err := wsproto.Read(shorterContext, ws, &initialMessage)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			c.logger.Debug("Timeout waiting for SDK connect message")
+			_ = ws.Close(websocket.StatusPolicyViolation, "Timeout waiting for SDK connect message")
+		}
+
+		return nil, err
+	}
+
+	if initialMessage.Kind != connect.GatewayMessageType_SDK_CONNECT {
+		c.logger.Debug("initial SDK message was not connect")
+
+		_ = ws.Close(websocket.StatusPolicyViolation, "Invalid first message, expected sdk-connect")
+		return nil, err
+	}
+
+	if err := proto.Unmarshal(initialMessage.Payload, &initialMessageData); err != nil {
+		c.logger.Debug("initial SDK message contained invalid Protobuf")
+
+		_ = ws.Close(websocket.StatusPolicyViolation, "Invalid Protobuf in SDK connect message")
+		return nil, err
+	}
+
+	for _, l := range c.lifecycles {
+		go l.OnConnected(ctx, &initialMessageData)
+	}
+
+	return &initialMessageData, nil
+}
+
 func (c *connectGatewaySvc) handleSdkReply(ctx context.Context, log *slog.Logger, appId uuid.UUID, msg *connect.ConnectMessage) error {
 	var data connect.SDKResponse
 	if err := proto.Unmarshal(msg.Payload, &data); err != nil {
@@ -302,7 +326,8 @@ func (c *connectGatewaySvc) handleSdkReply(ctx context.Context, log *slog.Logger
 
 func NewConnectGatewayService(opts ...gatewayOpt) ([]service.Service, http.Handler) {
 	gateway := &connectGatewaySvc{
-		gatewayId: ulid.MustNew(ulid.Now(), nil).String(),
+		gatewayId:  ulid.MustNew(ulid.Now(), nil).String(),
+		lifecycles: []ConnectGatewayLifecycleListener{},
 	}
 	if os.Getenv("CONNECT_TEST_GATEWAY_ID") != "" {
 		gateway.gatewayId = os.Getenv("CONNECT_TEST_GATEWAY_ID")

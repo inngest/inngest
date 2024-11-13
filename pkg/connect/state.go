@@ -3,9 +3,10 @@ package connect
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/redis/rueidis"
-	"time"
 )
 
 type ConnectionStateManager interface {
