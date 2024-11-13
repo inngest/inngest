@@ -123,9 +123,6 @@ func (r *redisConnectionStateManager) OnConnected(ctx context.Context, data *con
 	// }
 }
 
-func (r *redisConnectionStateManager) OnAuthenticated(ctx context.Context, auth *AuthContext) {
-}
-
 func (r *redisConnectionStateManager) OnSynced(ctx context.Context) {
 }
 
