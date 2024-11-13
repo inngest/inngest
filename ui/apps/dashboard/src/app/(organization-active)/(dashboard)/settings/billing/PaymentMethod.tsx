@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import { capitalCase } from 'change-case';
 
 import BillingCard from './BillingCard';
@@ -34,10 +34,10 @@ export default function PaymentMethod({
       heading="Payment Method"
       className="mb-3"
       actions={
-        <Button
-          appearance="text"
+        <NewButton
+          appearance="ghost"
           kind="primary"
-          btnAction={() => setIsEditing(true)}
+          onClick={() => setIsEditing(true)}
           label="Edit"
           className="font-semibold"
         />
@@ -52,8 +52,8 @@ export default function PaymentMethod({
           <Row label="Expiration" value={`${paymentMethod.expMonth}/${paymentMethod.expYear}`} />
         </>
       ) : (
-        <p className="text-sm font-medium text-slate-600">
-          Please select a plan above to add a payment method
+        <p className="text-subtle text-sm font-medium">
+          Please select a paid plan to add a payment method
         </p>
       )}
       {isEditing && <UpdateCardModal onSuccess={onSuccess} onCancel={() => setIsEditing(false)} />}
@@ -63,7 +63,7 @@ export default function PaymentMethod({
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="mt-1.5 grid grid-cols-2 items-center gap-5 text-sm leading-8 text-slate-600">
+    <div className="text-subtle mt-1.5 grid grid-cols-2 items-center gap-5 text-sm leading-8">
       <div className="font-medium">{label}</div>
       <div className="font-bold">{value}</div>
     </div>

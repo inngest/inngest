@@ -1,6 +1,10 @@
 import 'server-only';
 import { graphql } from '@/gql';
-import { type EntitlementUsageQuery, type GetCurrentPlanQuery } from '@/gql/graphql';
+import {
+  type EntitlementUsageQuery,
+  type GetBillingDetailsQuery,
+  type GetCurrentPlanQuery,
+} from '@/gql/graphql';
 import graphqlAPI from '@/queries/graphqlAPI';
 
 export const entitlementUsageDocument = graphql(`
@@ -40,4 +44,25 @@ export const currentPlanDocument = graphql(`
 
 export const currentPlan = async () => {
   return await graphqlAPI.request<GetCurrentPlanQuery>(currentPlanDocument);
+};
+
+export const billingDetailsDocument = graphql(`
+  query GetBillingDetails {
+    account {
+      billingEmail
+      name
+      paymentMethods {
+        brand
+        last4
+        expMonth
+        expYear
+        createdAt
+        default
+      }
+    }
+  }
+`);
+
+export const billingDetails = async () => {
+  return await graphqlAPI.request<GetBillingDetailsQuery>(billingDetailsDocument);
 };

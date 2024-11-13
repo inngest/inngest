@@ -1,6 +1,6 @@
 'use server';
 
-import { currentPlan, entitlementUsage } from './data';
+import { billingDetails, currentPlan, entitlementUsage } from './data';
 
 export async function getEntitlementUsage() {
   try {
@@ -18,6 +18,16 @@ export async function getCurrentPlan() {
     return response;
   } catch (error) {
     console.error('Error fetching plan:', error);
+    return null;
+  }
+}
+
+export async function getBillingDetails() {
+  try {
+    const response = (await billingDetails()).account;
+    return response;
+  } catch (error) {
+    console.error('Error fetching billing details:', error);
     return null;
   }
 }
