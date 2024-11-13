@@ -603,23 +603,24 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		}
 
 		if len(stack) == 0 {
-			// TODO is this a safe check? edge cases?
+			// This can happen for older runs that don't save the stack; we
+			// shouldn't try to recover from this as we could accidentally
+			// make the run resolve to a different path without it.
 			return nil, fmt.Errorf("stack not found in original run")
 		}
 
 		if !foundStepToRunFrom {
-			// TODO okay to check this here?
+			// This implementation has been given a step to run from that
+			// doesn't exist in this run.  This is a bad request.
 			return nil, fmt.Errorf("step to run from not found in original run")
 		}
 
 		// Copy the state from the original run to the new run.
-		// TODO Also just testing - holy moly don't do this probably or something
 		for _, stepID := range stack {
 			if stepID == req.FromStep.StepID {
 				// We've reached the step to run from, so we can stop
-				// copying
+				// copying and memoize the input data instead.
 				if req.FromStep.Input != nil {
-					// TODO This is a weird way to declare it.
 					newState.Steps = append(newState.Steps, state.InputStep{
 						ID:   stepID,
 						Data: map[string]any{"input": req.FromStep.Input},
@@ -631,7 +632,10 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 			span, ok := stepSpans[stepID]
 			if !ok {
-				// TODO is this ever possible? bad run?
+				// This signifies that the step was present in the stack but
+				// we couldn't find the span that represents it. This
+				// indicates a data integrity issue and we should not
+				// attempt to recover from this.
 				return nil, fmt.Errorf("step found in stack but span not found in original run")
 			}
 
@@ -650,19 +654,15 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			var data any
 			_ = json.Unmarshal(output.Data, &data)
 
-			// 🤷‍♂️
-			if output.IsError {
-				// TODO extra handling here needed similar to runs_v2
-				newState.Steps = append(newState.Steps, state.InputStep{
-					ID:   stepID,
-					Data: map[string]any{"error": data},
-				})
-			} else {
-				newState.Steps = append(newState.Steps, state.InputStep{
-					ID:   stepID,
-					Data: map[string]any{"data": data},
-				})
+			memoizedStep := state.InputStep{
+				ID:   stepID,
+				Data: map[string]any{"data": data},
 			}
+			if output.IsError {
+				memoizedStep.Data = map[string]any{"error": data}
+			}
+
+			newState.Steps = append(newState.Steps, memoizedStep)
 
 		}
 
