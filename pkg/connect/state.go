@@ -22,7 +22,7 @@ type redisConnectionStateManager struct {
 
 var ErrIdempotencyKeyExists = fmt.Errorf("idempotency key exists")
 
-func NewRedisConnectionStateManager(client rueidis.Client) ConnectionStateManager {
+func NewRedisConnectionStateManager(client rueidis.Client) *redisConnectionStateManager {
 	return &redisConnectionStateManager{
 		client: client,
 	}
