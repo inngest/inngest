@@ -70,7 +70,7 @@ export default function BillingInformation({
             <NewButton
               appearance="ghost"
               disabled={isSaveDisabled}
-              className="font-semibold"
+              className="h-6 font-semibold"
               type="submit"
               onClick={handleSubmit}
               label="Save"
@@ -79,7 +79,7 @@ export default function BillingInformation({
             <NewButton
               appearance="ghost"
               kind="primary"
-              className="font-semibold"
+              className="h-6 font-semibold"
               onClick={onEditButtonClick}
               label="Edit"
             />

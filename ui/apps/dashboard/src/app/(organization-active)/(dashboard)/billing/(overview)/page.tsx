@@ -69,8 +69,8 @@ export default async function Page() {
             )}
           </Card.Content>
         </Card>
-        {billing?.billingEmail && (
-          <BillingInformation billingEmail={billing?.billingEmail} accountName={billing?.name} />
+        {billing && (
+          <BillingInformation billingEmail={billing.billingEmail} accountName={billing.name} />
         )}
         <PaymentMethod paymentMethod={paymentMethod} />
       </div>
