@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
+	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/connect/types"
 	"github.com/inngest/inngest/pkg/connect/wsproto"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -49,7 +50,7 @@ type connectGatewaySvc struct {
 	runCtx context.Context
 
 	auther       GatewayAuthHandler
-	stateManager ConnectionStateManager
+	stateManager state.ConnectionStateManager
 	receiver     pubsub.RequestReceiver
 	dbcqrs       cqrs.Manager
 
@@ -62,7 +63,7 @@ func WithGatewayAuthHandler(auth GatewayAuthHandler) gatewayOpt {
 	}
 }
 
-func WithConnectionStateManager(m ConnectionStateManager) gatewayOpt {
+func WithConnectionStateManager(m state.ConnectionStateManager) gatewayOpt {
 	return func(c *connectGatewaySvc) {
 		c.stateManager = m
 	}
@@ -418,7 +419,7 @@ func (c *connectGatewaySvc) Stop(ctx context.Context) error {
 type connectRouterSvc struct {
 	logger *slog.Logger
 
-	stateManager ConnectionStateManager
+	stateManager state.ConnectionStateManager
 	receiver     pubsub.RequestReceiver
 	dbcqrs       cqrs.Manager
 }
@@ -452,7 +453,7 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 			// We need to add an idempotency key to ensure only one router instance processes the message
 			err = c.stateManager.SetRequestIdempotency(ctx, appId, data.RequestId)
 			if err != nil {
-				if errors.Is(err, ErrIdempotencyKeyExists) {
+				if errors.Is(err, state.ErrIdempotencyKeyExists) {
 					// Another connection was faster than us, we can ignore this message
 					return
 				}
@@ -501,7 +502,7 @@ func (c *connectRouterSvc) Stop(ctx context.Context) error {
 	return nil
 }
 
-func newConnectRouter(stateManager ConnectionStateManager, receiver pubsub.RequestReceiver, db cqrs.Manager) service.Service {
+func newConnectRouter(stateManager state.ConnectionStateManager, receiver pubsub.RequestReceiver, db cqrs.Manager) service.Service {
 	return &connectRouterSvc{
 		stateManager: stateManager,
 		receiver:     receiver,

@@ -7,6 +7,7 @@ import (
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/connect"
 	pubsub2 "github.com/inngest/inngest/pkg/connect/pubsub"
+	connstate "github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/enums"
 	connectproto "github.com/inngest/inngest/proto/gen/connect/v1"
 	"time"
@@ -264,7 +265,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
 
 	gatewayProxy := pubsub2.NewRedisPubSubConnector(connectRc)
-	connectionManager := connect.NewRedisConnectionStateManager(connectRc)
+	connectionManager := connstate.NewRedisConnectionStateManager(connectRc)
 
 	go func() {
 		// set up PubSub manager, this is required for connect to work

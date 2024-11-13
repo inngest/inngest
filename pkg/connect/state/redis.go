@@ -1,4 +1,4 @@
-package connect
+package state
 
 import (
 	"context"
@@ -10,28 +10,9 @@ import (
 	"github.com/redis/rueidis"
 )
 
-var (
-	notImplementedError = fmt.Errorf("not implemented")
-)
-
-type ConnectionStateManager interface {
-	SetRequestIdempotency(ctx context.Context, appId uuid.UUID, requestId string) error
-	GetConnectionsByEnvID(ctx context.Context, wsID uuid.UUID) ([]*connpb.ConnMetadata, error)
-	GetConnectionsByAppID(ctx context.Context, appID uuid.UUID) ([]*connpb.ConnMetadata, error)
-	AddConnection(ctx context.Context, wsID uuid.UUID, meta *connpb.ConnMetadata) error
-	DeleteConnection(ctx context.Context, connID string) error
-}
-
-type GetConnOpts struct {
-	AppID  *uuid.UUID
-	Status string // TODO: should this be an enum?
-}
-
 type redisConnectionStateManager struct {
 	client rueidis.Client
 }
-
-var ErrIdempotencyKeyExists = fmt.Errorf("idempotency key exists")
 
 func NewRedisConnectionStateManager(client rueidis.Client) *redisConnectionStateManager {
 	return &redisConnectionStateManager{
@@ -79,7 +60,7 @@ func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, conn
 func (r *redisConnectionStateManager) OnConnected(ctx context.Context, data *connpb.SDKConnectRequestData) {
 }
 
-func (r *redisConnectionStateManager) OnAuthenticated(ctx context.Context, auth *AuthResponse) {
+func (r *redisConnectionStateManager) OnAuthenticated(ctx context.Context, auth *AuthContext) {
 }
 
 func (r *redisConnectionStateManager) OnSynced(ctx context.Context) {
