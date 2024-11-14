@@ -87,6 +87,7 @@ message ConnMetadata {
 	string env_id = 4;
 	string app_id = 5;
 	SessionDetails session = 6;
+	string group_id = 7;
 }
 
 message SystemAttributes {
