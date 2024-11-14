@@ -53,7 +53,7 @@ type WorkerGroup struct {
 	Hash string `json:"hash"`
 
 	// used for syncing
-	hashedSigningKey string
+	// hashedSigningKey string
 }
 
 func NewWorkerGroupFromConnRequest(ctx context.Context, req *connpb.SDKConnectRequestData) (*WorkerGroup, error) {

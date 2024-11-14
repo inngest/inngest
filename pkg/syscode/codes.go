@@ -14,4 +14,12 @@ const (
 	CodeSigVerificationFailed     = "sig_verification_failed"
 	CodeUnknown                   = "unknown"
 	CodeBatchKeyExpressionInvalid = "batch_key_expression_invalid"
+
+	// Connect
+	CodeConnectHelloTimeout        = "connect_hello_timeout"
+	CodeConnectHelloInvalidMsg     = "connect_hello_invalid_msg"
+	CodeConnectHelloInvalidPayload = "connect_hello_invalid_payload"
+	CodeConnectAuthFailed          = "connect_authentication_failed"
+	CodeConnectConnNotSaved        = "connect_connection_not_saved"
+	CodeConnectInternal            = "connect_internal_error"
 )

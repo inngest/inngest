@@ -23,6 +23,7 @@ import (
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
@@ -128,9 +129,11 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}
 
-		initialMessageData, err := c.establishConnection(ctx, ws)
-		if err != nil {
+		initialMessageData, serr := c.establishConnection(ctx, ws)
+		if serr != nil {
 			c.logger.Error("error establishing connection", "error", err)
+			_ = ws.Close(serr.StatusCode, serr.Error())
+
 			return
 		}
 		log := c.logger.With("account_id", initialMessageData.AuthData.AccountId)
@@ -264,7 +267,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 	})
 }
 
-func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websocket.Conn) (*connect.SDKConnectRequestData, error) {
+func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websocket.Conn) (*connect.SDKConnectRequestData, *SocketError) {
 	var (
 		initialMessageData connect.SDKConnectRequestData
 		initialMessage     connect.ConnectMessage
@@ -274,26 +277,43 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 	defer cancelShorter()
 	err := wsproto.Read(shorterContext, ws, &initialMessage)
 	if err != nil {
+		code := syscode.CodeConnectInternal
+		statusCode := websocket.StatusInternalError
+		msg := err.Error()
+
 		if errors.Is(err, context.DeadlineExceeded) {
+			code = syscode.CodeConnectHelloTimeout
+			statusCode = websocket.StatusPolicyViolation
+			msg = "Timeout waiting for SDK connect message"
+
 			c.logger.Debug("Timeout waiting for SDK connect message")
-			_ = ws.Close(websocket.StatusPolicyViolation, "Timeout waiting for SDK connect message")
 		}
 
-		return nil, err
+		return nil, &SocketError{
+			SysCode:    code,
+			StatusCode: statusCode,
+			Msg:        msg,
+		}
 	}
 
 	if initialMessage.Kind != connect.GatewayMessageType_SDK_CONNECT {
 		c.logger.Debug("initial SDK message was not connect")
 
-		_ = ws.Close(websocket.StatusPolicyViolation, "Invalid first message, expected sdk-connect")
-		return nil, err
+		return nil, &SocketError{
+			SysCode:    syscode.CodeConnectHelloInvalidMsg,
+			StatusCode: websocket.StatusPolicyViolation,
+			Msg:        "Invalid first message, expected sdk-connect",
+		}
 	}
 
 	if err := proto.Unmarshal(initialMessage.Payload, &initialMessageData); err != nil {
 		c.logger.Debug("initial SDK message contained invalid Protobuf")
 
-		_ = ws.Close(websocket.StatusPolicyViolation, "Invalid Protobuf in SDK connect message")
-		return nil, err
+		return nil, &SocketError{
+			SysCode:    syscode.CodeConnectHelloInvalidPayload,
+			StatusCode: websocket.StatusPolicyViolation,
+			Msg:        "Invalid Protobuf in SDK connect message",
+		}
 	}
 
 	var authResp *AuthResponse
@@ -302,15 +322,20 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 		authResp, err = c.auther(ctx, &initialMessageData)
 		if err != nil {
 			c.logger.Error("connect auth failed", "err", err)
-			_ = ws.Close(websocket.StatusInternalError, "Internal error")
-			return nil, err
+			return nil, &SocketError{
+				SysCode:    syscode.CodeConnectInternal,
+				StatusCode: websocket.StatusInternalError,
+				Msg:        "Internal error",
+			}
 		}
 
 		if authResp == nil {
 			c.logger.Debug("Auth failed")
-
-			_ = ws.Close(websocket.StatusPolicyViolation, "Authentication failed")
-			return nil, err
+			return nil, &SocketError{
+				SysCode:    syscode.CodeConnectAuthFailed,
+				StatusCode: websocket.StatusPolicyViolation,
+				Msg:        "Authentication failed",
+			}
 		}
 
 		initialMessageData.AuthData.AccountId = authResp.AccountID.String()
@@ -321,7 +346,11 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 
 	if err := c.stateManager.AddConnection(ctx, &initialMessageData); err != nil {
 		_ = ws.Close(websocket.StatusInternalError, "connection not stored")
-		return nil, err
+		return nil, &SocketError{
+			SysCode:    syscode.CodeConnectInternal,
+			StatusCode: websocket.StatusInternalError,
+			Msg:        "connection not stored",
+		}
 	}
 
 	for _, l := range c.lifecycles {
