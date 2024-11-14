@@ -1,30 +1,14 @@
-import { graphql } from '@/gql';
-import graphqlAPI from '@/queries/graphqlAPI';
+import { entitlementUsage } from '@/components/Billing/data';
 import { BillingBannerView } from './BillingBannerView';
 
 export async function BillingBanner() {
-  let entitlementUsage;
+  let entUsage;
   try {
-    entitlementUsage = (await graphqlAPI.request(entitlementUsageQuery)).account.entitlementUsage;
+    entUsage = (await entitlementUsage()).account.entitlementUsage;
   } catch (e) {
     console.error(e);
     return null;
   }
 
-  return <BillingBannerView entitlementUsage={entitlementUsage} />;
+  return <BillingBannerView entitlementUsage={entUsage} />;
 }
-
-const entitlementUsageQuery = graphql(`
-  query EntitlementUsage {
-    account {
-      id
-      entitlementUsage {
-        runCount {
-          current
-          limit
-        }
-        accountConcurrencyLimitHits
-      }
-    }
-  }
-`);

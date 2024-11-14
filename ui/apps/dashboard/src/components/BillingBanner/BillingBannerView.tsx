@@ -3,19 +3,14 @@
 import { useMemo } from 'react';
 import { NewButton } from '@inngest/components/Button';
 
+import type { EntitlementUsageQuery } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import { Banner } from '../Banner';
 import { useBooleanLocalStorage } from './localStorage';
 import { parseEntitlementUsage } from './parse';
 
 type Props = {
-  entitlementUsage: {
-    runCount: {
-      current: number;
-      limit: number | null;
-    };
-    accountConcurrencyLimitHits: number;
-  };
+  entitlementUsage: EntitlementUsageQuery['account']['entitlementUsage'];
 };
 
 export function BillingBannerView({ entitlementUsage }: Props) {

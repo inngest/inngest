@@ -9,7 +9,9 @@ export function parseEntitlementUsage(data: EntitlementUsageQuery['account']['en
   const { runCount, accountConcurrencyLimitHits } = data;
   const issues = new Issues();
 
-  if (runCount.limit) {
+  // Users who can buy additional runs should not warnings about nearing the run
+  // limit.
+  if (runCount.limit && !runCount.overageAllowed) {
     if (runCount.current >= runCount.limit) {
       issues.add(
         'run_count',
