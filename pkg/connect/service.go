@@ -36,8 +36,9 @@ import (
 type gatewayOpt func(*connectGatewaySvc)
 
 type AuthResponse struct {
-	AccountID uuid.UUID
-	EnvID     uuid.UUID
+	AccountID        uuid.UUID
+	EnvID            uuid.UUID
+	HashedSigningKey string
 }
 
 type GatewayAuthHandler func(context.Context, *connect.WorkerConnectRequestData) (*AuthResponse, error)

@@ -42,6 +42,13 @@ func workerGroupHashFromConnRequest(req *connect.WorkerConnectRequestData, authR
 		return "", fmt.Errorf("could not add SDK version to hash input: %w", err)
 	}
 
+	if req.Platform != nil {
+		_, err = h.Write([]byte(req.GetPlatform()))
+		if err != nil {
+			return "", fmt.Errorf("could not add SDK platform to hash input: %w", err)
+		}
+	}
+
 	_, err = h.Write(sessionDetails.FunctionHash)
 	if err != nil {
 		return "", fmt.Errorf("could not add function hash to hash input: %w", err)
@@ -55,7 +62,23 @@ func workerGroupHashFromConnRequest(req *connect.WorkerConnectRequestData, authR
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-func NewWorkerGroupFromConnRequest(ctx context.Context, req *connect.WorkerConnectRequestData, authResp *AuthResponse, sessionDetails *connect.SessionDetails) (*state.WorkerGroup, error) {
+func NewWorkerGroupFromConnRequest(
+	ctx context.Context,
+	req *connect.WorkerConnectRequestData,
+	authResp *AuthResponse,
+	sessionDetails *connect.SessionDetails,
+) (*state.WorkerGroup, error) {
+	hash, err := workerGroupHashFromConnRequest(req, authResp, sessionDetails)
+	if err != nil {
+		return nil, &SocketError{
+			SysCode:    syscode.CodeConnectInternal,
+			StatusCode: websocket.StatusInternalError,
+			Msg:        "Internal error",
+		}
+	}
+
+	// TODO: check state store and see if group already exists, if so return that
+
 	var (
 		functions    []sdk.SDKFunction
 		capabilities sdk.Capabilities
@@ -81,15 +104,6 @@ func NewWorkerGroupFromConnRequest(ctx context.Context, req *connect.WorkerConne
 		slugs[i] = fn.Slug
 	}
 
-	hash, err := workerGroupHashFromConnRequest(req, authResp, sessionDetails)
-	if err != nil {
-		return nil, &SocketError{
-			SysCode:    syscode.CodeConnectInternal,
-			StatusCode: websocket.StatusInternalError,
-			Msg:        "Internal error",
-		}
-	}
-
 	workerGroup := &state.WorkerGroup{
 		AccountID: authResp.AccountID,
 		EnvID:     authResp.EnvID,
@@ -97,13 +111,17 @@ func NewWorkerGroupFromConnRequest(ctx context.Context, req *connect.WorkerConne
 		AppID:         &uuid.Nil, // If the app was not synced, the ID won't exist yet.
 		SDKLang:       req.SdkLanguage,
 		SDKVersion:    req.SdkVersion,
+		SDKPlatform:   req.GetPlatform(),
 		FunctionSlugs: slugs,
 		// TODO Can we load the initial sync ID from the state?
 		SyncID: nil,
 		Hash:   hash,
 		SyncData: state.SyncData{
-			Functions:    functions,
-			Capabilities: sdk.Capabilities{},
+			Env:              req.GetEnvironment(),
+			Functions:        functions,
+			Capabilities:     sdk.Capabilities{},
+			APIOrigin:        "http://127.0.0.1:8288",
+			HashedSigningKey: authResp.HashedSigningKey,
 		},
 	}
 

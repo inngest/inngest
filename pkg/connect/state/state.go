@@ -1,7 +1,13 @@
 package state
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/url"
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/sdk"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
@@ -21,9 +27,16 @@ type AuthContext struct {
 }
 
 type SyncData struct {
-	// hashedSigningKey string
+	Env          string
+	AppName      string
 	Functions    []sdk.SDKFunction
 	Capabilities sdk.Capabilities
+
+	// APIOrigin used for syncing the app
+	APIOrigin string
+
+	// Used for syncing
+	HashedSigningKey string
 }
 
 // WorkerGroup groups a list of connected workers to simplify operations, which
@@ -37,8 +50,9 @@ type WorkerGroup struct {
 	AppID *uuid.UUID `json:"app_id,omitempty"`
 
 	// Typical metadata associated with the SDK
-	SDKLang    string `json:"sdk_lang"`
-	SDKVersion string `json:"sdk_version"`
+	SDKLang     string `json:"sdk_lang"`
+	SDKVersion  string `json:"sdk_version"`
+	SDKPlatform string `json:"sdk_platform"`
 
 	// FunctionSlugs stores the list of slugs of functions associated by the workers
 	// This allows the gateway to know what functions the workers in this group can handle,
@@ -54,28 +68,75 @@ type WorkerGroup struct {
 	// - EnvID
 	// - SDKLang
 	// - SDKVersion
+	// - SDKPlatform - can be empty string
 	// - Function Configurations
 	// - User provided identifier (e.g. git sha, release tag, etc)
 	Hash string `json:"hash"`
 
 	// used for syncing
 	SyncData SyncData `json:"-"`
+
+	// Dev signals if the sync is for dev server or not
+	Dev bool `json:"-"`
 }
 
 // Sync handles the sync of the worker group
 func (g *WorkerGroup) Sync(ctx context.Context) error {
-	// TODO:
-	// - checks state to see if it's already synced
-	// - if not, then attempt a sync
-	// - retrieve the deploy ID for the sync and update state with it
-
-	// TODO Check whether SDK group was already synced
-	isAlreadySynced := false
-	if isAlreadySynced {
+	// Already synced, no need to attempt again
+	if g.SyncID != nil {
 		return nil
 	}
 
-	// TODO Sync config if policy allows (otherwise, store data for later syncing)
+	// Construct sync request via off-band sync
+	// Can't do in-band
+	connURL := url.URL{Scheme: "ws", Host: "connect"}
+	sdkVersion := fmt.Sprintf("%s:%s", g.SDKLang, g.SDKVersion)
 
-	return notImplementedError
+	config := sdk.RegisterRequest{
+		V:          "1",
+		URL:        connURL.String(),
+		DeployType: "ping", // TODO: should allow 'connect' as an input
+		SDK:        sdkVersion,
+		AppName:    g.SyncData.AppName,
+		Headers: sdk.Headers{
+			Env:      g.SyncData.Env,
+			Platform: g.SDKPlatform,
+		},
+		Capabilities: g.SyncData.Capabilities,
+		UseConnect:   true, // NOTE: probably not needed if `DeployType` can have `connect` as input?
+		Functions:    g.SyncData.Functions,
+	}
+
+	registerURL := fmt.Sprintf("%s/fn/register", g.SyncData.APIOrigin)
+
+	byt, err := json.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("error serializing function config: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, registerURL, bytes.NewReader(byt))
+	if err != nil {
+		return fmt.Errorf("error creating new sync request: %w", err)
+	}
+
+	// Set basic headers
+	// TODO: use constants for these header keys
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Inngest-SDK", sdkVersion)
+	req.Header.Set("User-Agent", sdkVersion)
+
+	if g.SyncData.HashedSigningKey == "" {
+		return fmt.Errorf("no signing key available for syncing")
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", g.SyncData.HashedSigningKey))
+
+	_, err = http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("error making sync request: %w", err)
+	}
+
+	// TODO:
+	// - retrieve the deploy ID for the sync and update state with it
+
+	return nil
 }

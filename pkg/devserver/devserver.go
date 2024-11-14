@@ -420,8 +420,9 @@ func start(ctx context.Context, opts StartOpts) error {
 		connect.WithRequestReceiver(gatewayProxy),
 		connect.WithGatewayAuthHandler(func(ctx context.Context, data *connectproto.WorkerConnectRequestData) (*connect.AuthResponse, error) {
 			return &connect.AuthResponse{
-				AccountID: consts.DevServerAccountId,
-				EnvID:     consts.DevServerEnvId,
+				AccountID:        consts.DevServerAccountId,
+				EnvID:            consts.DevServerEnvId,
+				HashedSigningKey: "signed-key-7468697320697320612074657374206b6579",
 			}, nil
 		}),
 		connect.WithDB(dbcqrs),
