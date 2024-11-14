@@ -244,6 +244,13 @@ func (w wrapper) GetAppByURL(ctx context.Context, url string) (*cqrs.App, error)
 	return copyInto(ctx, f, &cqrs.App{})
 }
 
+func (w wrapper) GetAppByName(ctx context.Context, name string) (*cqrs.App, error) {
+	f := func(ctx context.Context) (*sqlc.App, error) {
+		return w.q.GetAppByName(ctx, name)
+	}
+	return copyInto(ctx, f, &cqrs.App{})
+}
+
 // GetAllApps returns all apps.
 func (w wrapper) GetAllApps(ctx context.Context) ([]*cqrs.App, error) {
 	return copyInto(ctx, w.q.GetAllApps, []*cqrs.App{})

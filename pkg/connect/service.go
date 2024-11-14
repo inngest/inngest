@@ -95,6 +95,10 @@ func WithDev() gatewayOpt {
 	}
 }
 
+func closeWithConnectError(ws *websocket.Conn, serr *SocketError) {
+	_ = ws.Close(serr.StatusCode, serr.Error())
+}
+
 func (c *connectGatewaySvc) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Set the context as needed. Use of r.Context() is not recommended
@@ -124,6 +128,11 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			})
 			if err != nil {
 				c.logger.Error("could not send hello", "err", err)
+				closeWithConnectError(ws, &SocketError{
+					SysCode:    syscode.CodeConnectInternal,
+					StatusCode: websocket.StatusInternalError,
+					Msg:        "could not send gateway hello",
+				})
 
 				return
 			}
@@ -131,69 +140,50 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		initialMessageData, serr := c.establishConnection(ctx, ws)
 		if serr != nil {
-			c.logger.Error("error establishing connection", "error", err)
-			_ = ws.Close(serr.StatusCode, serr.Error())
+			c.logger.Error("error establishing connection", "error", serr)
+			closeWithConnectError(ws, serr)
 
 			return
 		}
+
+		defer func() {
+			for _, lifecycle := range c.lifecycles {
+				lifecycle.OnDisconnected(ctx)
+			}
+		}()
+
 		log := c.logger.With("account_id", initialMessageData.AuthData.AccountId)
 
-		// TODO Check whether SDK group was already synced
-		isAlreadySynced := false
-		if !isAlreadySynced {
-			c.logger.Debug("Sending sync message to SDK")
-			data := &connect.GatewaySyncRequestData{
-				// TODO Set this to prevent unattached syncs!
-				DeployId: nil,
-			}
-			marshaled, err := proto.Marshal(data)
+		serr = c.handleSync(ctx, ws, initialMessageData)
+		if serr != nil {
+			c.logger.Error("error handling sync", "error", serr)
+			closeWithConnectError(ws, serr)
 
-			if err != nil {
-				// TODO Handle this properly
-				return
-			}
-			err = wsproto.Write(ctx, ws, &connect.ConnectMessage{
-				Kind:    connect.GatewayMessageType_GATEWAY_REQUEST_SYNC,
-				Payload: marshaled,
+			return
+		}
+
+		app, err := c.dbcqrs.GetAppByName(ctx, initialMessageData.AppName)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			c.logger.Error("could not get app by name", "appName", initialMessageData.AppName, "err", err)
+			closeWithConnectError(ws, &SocketError{
+				SysCode:    syscode.CodeConnectInternal,
+				StatusCode: websocket.StatusInternalError,
+				Msg:        "could not get app by name",
 			})
-			if err != nil {
-				return
-			}
+			return
 		}
 
-		// wait until app is ready, then fetch details
-		// TODO Find better way to load app by name, account for initial register delay
-		attempts := 0
-		var appId uuid.UUID
-		for {
-			apps, err := c.dbcqrs.GetAllApps(ctx)
-			if err != nil && !errors.Is(err, sql.ErrNoRows) {
-				c.logger.Error("could not get apps", "err", err)
-				ws.Close(websocket.StatusInternalError, "Internal error")
-				return
-			}
-
-			for _, app := range apps {
-				if app.Name == initialMessageData.AppName {
-					appId = app.ID
-				}
-			}
-			if appId == uuid.Nil {
-				if attempts < 10 {
-					<-time.After(1 * time.Second)
-					attempts++
-					continue
-				}
-
-				c.logger.Error("could not find app", "appName", initialMessageData.AppName)
-				ws.Close(websocket.StatusPolicyViolation, "Could not find app")
-				return
-			}
-
-			break
+		if errors.Is(err, sql.ErrNoRows) || app == nil {
+			c.logger.Error("could not find app", "appName", initialMessageData.AppName)
+			closeWithConnectError(ws, &SocketError{
+				SysCode:    syscode.CodeConnectInternal,
+				StatusCode: websocket.StatusInternalError,
+				Msg:        "could not find app",
+			})
+			return
 		}
 
-		log = log.With("app_id", appId)
+		log = log.With("app_id", app.ID)
 
 		log.Debug("found app, connection is ready")
 
@@ -204,12 +194,19 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			// Receive execution-related messages for the app, forwarded by the router.
 			// The router selects only one gateway to handle a request from a pool of one or more workers (and thus WebSockets)
 			// running for each app.
-			err := c.receiver.ReceiveRoutedRequest(ctx, c.gatewayId, appId, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
-				log.Debug("gateway received msg", "app_id", appId, "req_id", data.RequestId)
+			err := c.receiver.ReceiveRoutedRequest(ctx, c.gatewayId, app.ID, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
+				log := log.With(
+					"req_id", data.RequestId,
+					"fn_slug", data.FunctionSlug,
+					"step_id", data.StepId,
+				)
+
+				log.Debug("gateway received msg")
 
 				// This will be sent exactly once, as the router selected this gateway to handle the request
-				err = c.receiver.AckMessage(ctx, appId, data.RequestId)
+				err = c.receiver.AckMessage(ctx, app.ID, data.RequestId)
 				if err != nil {
+					log.Error("failed to ack message", "err", err)
 					// TODO Log error, retry?
 					return
 				}
@@ -220,11 +217,15 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					Payload: rawBytes,
 				})
 				if err != nil {
+					log.Error("failed to forward message to worker", "err", err)
+
 					// TODO The connection cannot be used, we need to let the executor know!
 					return
 				}
 			})
 			if err != nil {
+				log.Error("failed to receive routed requests", "err", err)
+
 				// TODO Log error, retry?
 				return
 			}
@@ -232,14 +233,38 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		// Run loop
 		go func() {
+			// Once the run loop is exited, we need to close the connection
+			defer cancel()
+
 			for {
 				if ctx.Err() != nil {
-					break
+					closeWithConnectError(ws, &SocketError{
+						SysCode:    syscode.CodeConnectGatewayClosing,
+						StatusCode: websocket.StatusGoingAway,
+						Msg:        "run loop context ended",
+					})
+					return
 				}
 
 				var msg connect.ConnectMessage
 				err = wsproto.Read(ctx, ws, &msg)
 				if err != nil {
+					if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+						closeWithConnectError(ws, &SocketError{
+							SysCode:    syscode.CodeConnectGatewayClosing,
+							StatusCode: websocket.StatusGoingAway,
+							Msg:        "read context ended",
+						})
+						return
+					}
+
+					log.Error("failed to read websocket message", "err", err)
+
+					closeWithConnectError(ws, &SocketError{
+						SysCode:    syscode.CodeConnectInternal,
+						StatusCode: websocket.StatusInternalError,
+						Msg:        "could not read next message",
+					})
 					return
 				}
 
@@ -248,22 +273,23 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				switch msg.Kind {
 				case connect.GatewayMessageType_SDK_REPLY:
 					// Handle SDK reply
-					err := c.handleSdkReply(ctx, log, appId, &msg)
+					err := c.handleSdkReply(ctx, log, app.ID, &msg)
 					if err != nil {
 						// TODO Handle error
 						continue
 					}
 				default:
-					// TODO Handle proper connection cleanup
-					ws.Close(websocket.StatusPolicyViolation, "Invalid message kind")
+					closeWithConnectError(ws, &SocketError{
+						SysCode:    syscode.CodeConnectRunInvalidMessage,
+						StatusCode: websocket.StatusPolicyViolation,
+						Msg:        fmt.Sprintf("invalid message kind %q", msg.Kind),
+					})
 					return
 				}
 			}
 		}()
 
 		<-ctx.Done()
-
-		ws.Close(websocket.StatusNormalClosure, "")
 	})
 }
 
@@ -275,6 +301,7 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 
 	shorterContext, cancelShorter := context.WithTimeout(ctx, 5*time.Second)
 	defer cancelShorter()
+
 	err := wsproto.Read(shorterContext, ws, &initialMessage)
 	if err != nil {
 		code := syscode.CodeConnectInternal
@@ -282,11 +309,11 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 		msg := err.Error()
 
 		if errors.Is(err, context.DeadlineExceeded) {
-			code = syscode.CodeConnectHelloTimeout
+			code = syscode.CodeConnectWorkerHelloTimeout
 			statusCode = websocket.StatusPolicyViolation
-			msg = "Timeout waiting for SDK connect message"
+			msg = "Timeout waiting for worker SDK connect message"
 
-			c.logger.Debug("Timeout waiting for SDK connect message")
+			c.logger.Debug("Timeout waiting for worker SDK connect message")
 		}
 
 		return nil, &SocketError{
@@ -297,10 +324,10 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 	}
 
 	if initialMessage.Kind != connect.GatewayMessageType_SDK_CONNECT {
-		c.logger.Debug("initial SDK message was not connect")
+		c.logger.Debug("initial worker SDK message was not connect")
 
 		return nil, &SocketError{
-			SysCode:    syscode.CodeConnectHelloInvalidMsg,
+			SysCode:    syscode.CodeConnectWorkerHelloInvalidMsg,
 			StatusCode: websocket.StatusPolicyViolation,
 			Msg:        "Invalid first message, expected sdk-connect",
 		}
@@ -310,7 +337,7 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 		c.logger.Debug("initial SDK message contained invalid Protobuf")
 
 		return nil, &SocketError{
-			SysCode:    syscode.CodeConnectHelloInvalidPayload,
+			SysCode:    syscode.CodeConnectWorkerHelloInvalidPayload,
 			StatusCode: websocket.StatusPolicyViolation,
 			Msg:        "Invalid Protobuf in SDK connect message",
 		}
@@ -345,7 +372,7 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 	}
 
 	if err := c.stateManager.AddConnection(ctx, &initialMessageData); err != nil {
-		_ = ws.Close(websocket.StatusInternalError, "connection not stored")
+		c.logger.Error("adding connection state failed", "err", err)
 		return nil, &SocketError{
 			SysCode:    syscode.CodeConnectInternal,
 			StatusCode: websocket.StatusInternalError,
@@ -358,6 +385,43 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 	}
 
 	return &initialMessageData, nil
+}
+
+func (c *connectGatewaySvc) handleSync(ctx context.Context, ws *websocket.Conn, initialMsg *connect.SDKConnectRequestData) *SocketError {
+	// TODO Check whether SDK group was already synced
+	isAlreadySynced := false
+	if isAlreadySynced {
+		return nil
+	}
+
+	c.logger.Debug("Sending sync message to SDK")
+	data := &connect.GatewaySyncRequestData{
+		// TODO Set this to prevent unattached syncs!
+		DeployId: nil,
+	}
+	marshaled, err := proto.Marshal(data)
+	if err != nil {
+		c.logger.Error("failed to serialize gateway sync request", "err", err)
+		return &SocketError{
+			SysCode:    syscode.CodeConnectInternal,
+			StatusCode: websocket.StatusInternalError,
+			Msg:        "invalid message",
+		}
+	}
+	err = wsproto.Write(ctx, ws, &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_GATEWAY_REQUEST_SYNC,
+		Payload: marshaled,
+	})
+	if err != nil {
+		c.logger.Error("failed to send gateway sync request", "err", err)
+		return &SocketError{
+			SysCode:    syscode.CodeConnectInternal,
+			StatusCode: websocket.StatusInternalError,
+			Msg:        "failed to write sync message",
+		}
+	}
+
+	return nil
 }
 
 func (c *connectGatewaySvc) handleSdkReply(ctx context.Context, log *slog.Logger, appId uuid.UUID, msg *connect.ConnectMessage) error {
