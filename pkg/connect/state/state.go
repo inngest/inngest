@@ -1,7 +1,12 @@
 package state
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/url"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/sdk"
@@ -61,4 +66,74 @@ type WorkerGroup struct {
 
 	// used for syncing
 	SyncData SyncData `json:"-"`
+}
+
+// Connection have all the metadata assocaited with a worker connection
+type Connection struct {
+	Data    *connpb.WorkerConnectRequestData
+	Session *connpb.SessionDetails
+	Group   *WorkerGroup
+}
+
+func (c *Connection) Sync(ctx context.Context) error {
+	if c.Group == nil {
+		return fmt.Errorf("worker group is required for syncing")
+	}
+
+	// TODO: Check state to see if group already exists
+
+	// Construct sync request via off-band sync
+	// Can't do in-band
+	connURL := url.URL{Scheme: "ws", Host: "connect"}
+	sdkVersion := fmt.Sprintf("%s:%s", c.Group.SDKLang, c.Group.SDKVersion)
+
+	config := sdk.RegisterRequest{
+		V:          "1",
+		URL:        connURL.String(),
+		DeployType: "ping", // TODO: should allow 'connect' as an input
+		SDK:        sdkVersion,
+		AppName:    c.Data.GetAppName(),
+		Headers: sdk.Headers{
+			Env:      c.Data.GetEnvironment(),
+			Platform: c.Data.GetPlatform(),
+		},
+		Capabilities: sdk.Capabilities{},
+		UseConnect:   true, // NOTE: probably not needed if `DeployType` can have `connect` as input?
+		Functions:    c.Group.SyncData.Functions,
+	}
+
+	apiOrigin := "http://127.0.0.1:8288"
+	registerURL := fmt.Sprintf("%s/fn/register", apiOrigin)
+
+	byt, err := json.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("error serializing function config: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, registerURL, bytes.NewReader(byt))
+	if err != nil {
+		return fmt.Errorf("error creating new sync request: %w", err)
+	}
+
+	// Set basic headers
+	// TODO: use constants for these header keys
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Inngest-SDK", sdkVersion)
+	req.Header.Set("User-Agent", sdkVersion)
+
+	hashedSigningKey := string(c.Data.AuthData.HashedSigningKey)
+	if hashedSigningKey == "" {
+		return fmt.Errorf("no signing key available for syncing")
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", hashedSigningKey))
+
+	_, err = http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("error making sync request: %w", err)
+	}
+
+	// TODO:
+	// - retrieve the deploy ID for the sync and update state with it
+
+	return nil
 }

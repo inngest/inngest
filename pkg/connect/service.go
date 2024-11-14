@@ -1,11 +1,9 @@
 package connect
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -15,14 +13,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gowebpki/jcs"
-
-	"net/url"
-
 	"github.com/coder/websocket"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
+	"github.com/gowebpki/jcs"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/connect/types"
@@ -30,7 +25,6 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
@@ -168,7 +162,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}()
 
-		log := c.logger.With("account_id", connectionData.initialData.AuthData.AccountId)
+		log := c.logger.With("account_id", connectionData.Data.AuthData.AccountId)
 
 		err = connectionData.Sync(ctx)
 		if err != nil {
@@ -190,9 +184,9 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
-		app, err := c.dbcqrs.GetAppByName(ctx, connectionData.initialData.AppName)
+		app, err := c.dbcqrs.GetAppByName(ctx, connectionData.Data.AppName)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			log.Error("could not get app by name", "appName", connectionData.initialData.AppName, "err", err)
+			log.Error("could not get app by name", "appName", connectionData.Data.AppName, "err", err)
 			closeWithConnectError(ws, &SocketError{
 				SysCode:    syscode.CodeConnectInternal,
 				StatusCode: websocket.StatusInternalError,
@@ -202,7 +196,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		}
 
 		if errors.Is(err, sql.ErrNoRows) || app == nil {
-			log.Error("could not find app", "appName", connectionData.initialData.AppName)
+			log.Error("could not find app", "appName", connectionData.Data.AppName)
 			closeWithConnectError(ws, &SocketError{
 				SysCode:    syscode.CodeConnectInternal,
 				StatusCode: websocket.StatusInternalError,
@@ -288,76 +282,6 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 	})
 }
 
-type establishedState struct {
-	initialData    *connect.WorkerConnectRequestData
-	sessionDetails *connect.SessionDetails
-	workerGroup    *state.WorkerGroup
-}
-
-// Sync handles the sync of the worker group
-func (s *establishedState) Sync(ctx context.Context) error {
-	if s.workerGroup == nil {
-		return fmt.Errorf("worker group is required for syncing")
-	}
-
-	// TODO: Check state to see if group already exists
-
-	// Construct sync request via off-band sync
-	// Can't do in-band
-	connURL := url.URL{Scheme: "ws", Host: "connect"}
-	sdkVersion := fmt.Sprintf("%s:%s", s.workerGroup.SDKLang, s.workerGroup.SDKVersion)
-
-	config := sdk.RegisterRequest{
-		V:          "1",
-		URL:        connURL.String(),
-		DeployType: "ping", // TODO: should allow 'connect' as an input
-		SDK:        sdkVersion,
-		AppName:    s.initialData.GetAppName(),
-		Headers: sdk.Headers{
-			Env:      s.initialData.GetEnvironment(),
-			Platform: s.initialData.GetPlatform(),
-		},
-		Capabilities: sdk.Capabilities{},
-		UseConnect:   true, // NOTE: probably not needed if `DeployType` can have `connect` as input?
-		Functions:    s.workerGroup.SyncData.Functions,
-	}
-
-	apiOrigin := "http://127.0.0.1:8288"
-	registerURL := fmt.Sprintf("%s/fn/register", apiOrigin)
-
-	byt, err := json.Marshal(config)
-	if err != nil {
-		return fmt.Errorf("error serializing function config: %w", err)
-	}
-
-	req, err := http.NewRequest(http.MethodPost, registerURL, bytes.NewReader(byt))
-	if err != nil {
-		return fmt.Errorf("error creating new sync request: %w", err)
-	}
-
-	// Set basic headers
-	// TODO: use constants for these header keys
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Inngest-SDK", sdkVersion)
-	req.Header.Set("User-Agent", sdkVersion)
-
-	hashedSigningKey := string(s.initialData.AuthData.HashedSigningKey)
-	if hashedSigningKey == "" {
-		return fmt.Errorf("no signing key available for syncing")
-	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", hashedSigningKey))
-
-	_, err = http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("error making sync request: %w", err)
-	}
-
-	// TODO:
-	// - retrieve the deploy ID for the sync and update state with it
-
-	return nil
-}
-
 func (c *connectGatewaySvc) handleIncomingWebSocketMessage(ctx context.Context, appId uuid.UUID, msg *connect.ConnectMessage, log *slog.Logger) *SocketError {
 	log.Debug("received WebSocket message", "kind", msg.Kind.String())
 
@@ -426,7 +350,7 @@ func (c *connectGatewaySvc) receiveRouterMessages(ctx context.Context, appId uui
 	}
 }
 
-func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websocket.Conn) (*establishedState, *SocketError) {
+func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websocket.Conn) (*state.Connection, *SocketError) {
 	var (
 		initialMessageData connect.WorkerConnectRequestData
 		initialMessage     connect.ConnectMessage
@@ -551,10 +475,10 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 		go l.OnConnected(ctx, &initialMessageData)
 	}
 
-	return &establishedState{
-		initialData:    &initialMessageData,
-		sessionDetails: sessionDetails,
-		workerGroup:    workerGroup,
+	return &state.Connection{
+		Data:    &initialMessageData,
+		Session: sessionDetails,
+		Group:   workerGroup,
 	}, nil
 }
 
