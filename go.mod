@@ -35,7 +35,7 @@ require (
 	github.com/graph-gophers/dataloader v5.0.0+incompatible
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/inngest/expr v0.0.0-20241106234328-863dff7deec0
-	github.com/inngest/inngestgo v0.7.5-0.20241113072033-5dd80b3616ed
+	github.com/inngest/inngestgo v0.7.5-0.20241114093813-ed025b1466ee
 	github.com/jedib0t/go-pretty/v6 v6.3.0
 	github.com/jinzhu/copier v0.3.5
 	github.com/jonboulle/clockwork v0.4.0
@@ -158,6 +158,7 @@ require (
 	github.com/ohler55/ojg v1.24.1 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pascaldekloe/name v1.0.1 // indirect
+	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 	github.com/pelletier/go-toml v1.9.4 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.17.0 // indirect
