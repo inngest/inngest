@@ -43,7 +43,15 @@ export default async function Page() {
       <Card className="col-span-2">
         <Card.Content>
           <p className="text-muted mb-1">Your plan</p>
-          <p className="text-basis text-xl">{plan?.plan?.name}</p>
+          <div className="flex items-center justify-between">
+            <p className="text-basis text-xl">{plan?.plan?.name}</p>
+            {/* Temporarily send to usage, while there is no plans page */}
+            <NewButton
+              appearance="ghost"
+              label="Change plan"
+              href="/billing/usage?ref=app-billing-overview"
+            />
+          </div>
           {entitlementUsage?.runCount && <LimitBar data={runs} className="my-4" />}
           {/* {entitlementUsage?.stepCount && <LimitBar data={steps} className="mb-6" />} */}
           <div className="flex flex-col items-center gap-2">
