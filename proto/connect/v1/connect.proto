@@ -5,10 +5,9 @@ option go_package = "github.com/inngest/inngest/proto/gen/connect/v1;connect";
 
 enum GatewayMessageType {
   GATEWAY_HELLO = 0;
-  SDK_CONNECT = 1;
-  GATEWAY_REQUEST_SYNC = 2;
-  GATEWAY_EXECUTOR_REQUEST = 3;
-  SDK_REPLY = 4;
+  WORKER_CONNECT = 1;
+  GATEWAY_EXECUTOR_REQUEST = 2;
+  WORKER_REPLY = 3;
 }
 
 message ConnectMessage {
@@ -16,11 +15,20 @@ message ConnectMessage {
 	bytes payload = 2;
 }
 
-message SessionDetails {
+message SessionIdentifier {
 	string instance_id = 1;
 	string connection_id = 2;
-	bytes function_hash = 3;
 	optional string build_id = 4;
+}
+
+message SessionDetails {
+	SessionIdentifier session_id = 1;
+	bytes function_hash = 3;
+}
+
+message ConfigDetails {
+	bytes capabilities = 1;
+	bytes functions = 2;
 }
 
 message AuthData {
@@ -29,16 +37,18 @@ message AuthData {
 	string env_id = 3;
 }
 
-message SDKConnectRequestData {
-	SessionDetails session_details = 1;
+message WorkerConnectRequestData {
+	SessionIdentifier session_id = 1;
 	AuthData auth_data = 2;
-
 	string app_name = 3;
-	optional string environment = 4;
-	string framework = 5;
-	optional string platform = 6;
-	string sdk_version = 7;
-	string sdk_language = 8;
+	ConfigDetails config = 4;
+
+	SystemAttributes system_attributes = 5;
+	optional string environment = 6;
+	string framework = 7;
+	optional string platform = 8;
+	string sdk_version = 9;
+	string sdk_language = 10;
 }
 
 message GatewaySyncRequestData {

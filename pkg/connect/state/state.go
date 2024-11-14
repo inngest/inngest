@@ -11,7 +11,7 @@ type ConnectionStateManager interface {
 	SetRequestIdempotency(ctx context.Context, appId uuid.UUID, requestId string) error
 	GetConnectionsByEnvID(ctx context.Context, wsID uuid.UUID) ([]*connpb.ConnMetadata, error)
 	GetConnectionsByAppID(ctx context.Context, appID uuid.UUID) ([]*connpb.ConnMetadata, error)
-	AddConnection(ctx context.Context, data *connpb.SDKConnectRequestData) error
+	AddConnection(ctx context.Context, data *connpb.WorkerConnectRequestData, sessionDetails *connpb.SessionDetails) error
 	DeleteConnection(ctx context.Context, connID string) error
 }
 
@@ -56,7 +56,7 @@ type WorkerGroup struct {
 	// hashedSigningKey string
 }
 
-func NewWorkerGroupFromConnRequest(ctx context.Context, req *connpb.SDKConnectRequestData) (*WorkerGroup, error) {
+func NewWorkerGroupFromConnRequest(ctx context.Context, req *connpb.WorkerConnectRequestData) (*WorkerGroup, error) {
 	return nil, notImplementedError
 }
 

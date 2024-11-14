@@ -8,7 +8,7 @@ import (
 
 type ConnectGatewayLifecycleListener interface {
 	// OnConnected is called when a new connection is established and authenticated on the gateway
-	OnConnected(ctx context.Context, data *connect.SDKConnectRequestData)
+	OnConnected(ctx context.Context, data *connect.WorkerConnectRequestData)
 
 	// OnSynced is called when the gateway successfully synced a worker group configuration
 	OnSynced(ctx context.Context)

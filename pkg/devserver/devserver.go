@@ -418,7 +418,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	connectSvc, connectHandler := connect.NewConnectGatewayService(
 		connect.WithConnectionStateManager(connectionManager),
 		connect.WithRequestReceiver(gatewayProxy),
-		connect.WithGatewayAuthHandler(func(ctx context.Context, data *connectproto.SDKConnectRequestData) (*connect.AuthResponse, error) {
+		connect.WithGatewayAuthHandler(func(ctx context.Context, data *connectproto.WorkerConnectRequestData) (*connect.AuthResponse, error) {
 			return &connect.AuthResponse{
 				AccountID: consts.DevServerAccountId,
 				EnvID:     consts.DevServerEnvId,

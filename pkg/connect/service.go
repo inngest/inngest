@@ -37,7 +37,7 @@ type AuthResponse struct {
 	EnvID     uuid.UUID
 }
 
-type GatewayAuthHandler func(context.Context, *connect.SDKConnectRequestData) (*AuthResponse, error)
+type GatewayAuthHandler func(context.Context, *connect.WorkerConnectRequestData) (*AuthResponse, error)
 
 type connectGatewaySvc struct {
 	chi.Router
@@ -138,7 +138,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}
 
-		initialMessageData, serr := c.establishConnection(ctx, ws)
+		initialMessageData, sessionDetails, serr := c.establishConnection(ctx, ws)
 		if serr != nil {
 			c.logger.Error("error establishing connection", "error", serr)
 			closeWithConnectError(ws, serr)
@@ -154,7 +154,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		log := c.logger.With("account_id", initialMessageData.AuthData.AccountId)
 
-		serr = c.handleSync(ctx, ws, initialMessageData)
+		serr = c.handleSync(ctx, ws, initialMessageData, sessionDetails)
 		if serr != nil {
 			c.logger.Error("error handling sync", "error", serr)
 			closeWithConnectError(ws, serr)
@@ -271,7 +271,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				log.Debug("received WebSocket message", "kind", msg.Kind.String())
 
 				switch msg.Kind {
-				case connect.GatewayMessageType_SDK_REPLY:
+				case connect.GatewayMessageType_WORKER_REPLY:
 					// Handle SDK reply
 					err := c.handleSdkReply(ctx, log, app.ID, &msg)
 					if err != nil {
@@ -293,9 +293,9 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 	})
 }
 
-func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websocket.Conn) (*connect.SDKConnectRequestData, *SocketError) {
+func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websocket.Conn) (*connect.WorkerConnectRequestData, *connect.SessionDetails, *SocketError) {
 	var (
-		initialMessageData connect.SDKConnectRequestData
+		initialMessageData connect.WorkerConnectRequestData
 		initialMessage     connect.ConnectMessage
 	)
 
@@ -316,17 +316,17 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 			c.logger.Debug("Timeout waiting for worker SDK connect message")
 		}
 
-		return nil, &SocketError{
+		return nil, nil, &SocketError{
 			SysCode:    code,
 			StatusCode: statusCode,
 			Msg:        msg,
 		}
 	}
 
-	if initialMessage.Kind != connect.GatewayMessageType_SDK_CONNECT {
+	if initialMessage.Kind != connect.GatewayMessageType_WORKER_CONNECT {
 		c.logger.Debug("initial worker SDK message was not connect")
 
-		return nil, &SocketError{
+		return nil, nil, &SocketError{
 			SysCode:    syscode.CodeConnectWorkerHelloInvalidMsg,
 			StatusCode: websocket.StatusPolicyViolation,
 			Msg:        "Invalid first message, expected sdk-connect",
@@ -336,7 +336,7 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 	if err := proto.Unmarshal(initialMessage.Payload, &initialMessageData); err != nil {
 		c.logger.Debug("initial SDK message contained invalid Protobuf")
 
-		return nil, &SocketError{
+		return nil, nil, &SocketError{
 			SysCode:    syscode.CodeConnectWorkerHelloInvalidPayload,
 			StatusCode: websocket.StatusPolicyViolation,
 			Msg:        "Invalid Protobuf in SDK connect message",
@@ -349,7 +349,7 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 		authResp, err = c.auther(ctx, &initialMessageData)
 		if err != nil {
 			c.logger.Error("connect auth failed", "err", err)
-			return nil, &SocketError{
+			return nil, nil, &SocketError{
 				SysCode:    syscode.CodeConnectInternal,
 				StatusCode: websocket.StatusInternalError,
 				Msg:        "Internal error",
@@ -358,7 +358,7 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 
 		if authResp == nil {
 			c.logger.Debug("Auth failed")
-			return nil, &SocketError{
+			return nil, nil, &SocketError{
 				SysCode:    syscode.CodeConnectAuthFailed,
 				StatusCode: websocket.StatusPolicyViolation,
 				Msg:        "Authentication failed",
@@ -371,9 +371,17 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 		c.logger.Debug("SDK successfully authenticated", "authResp", authResp)
 	}
 
-	if err := c.stateManager.AddConnection(ctx, &initialMessageData); err != nil {
+	var functionHash []byte
+	// TODO Compute hash
+
+	sessionDetails := &connect.SessionDetails{
+		SessionId:    initialMessageData.SessionId,
+		FunctionHash: functionHash,
+	}
+
+	if err := c.stateManager.AddConnection(ctx, &initialMessageData, sessionDetails); err != nil {
 		c.logger.Error("adding connection state failed", "err", err)
-		return nil, &SocketError{
+		return nil, nil, &SocketError{
 			SysCode:    syscode.CodeConnectInternal,
 			StatusCode: websocket.StatusInternalError,
 			Msg:        "connection not stored",
@@ -384,42 +392,19 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 		go l.OnConnected(ctx, &initialMessageData)
 	}
 
-	return &initialMessageData, nil
+	return &initialMessageData, sessionDetails, nil
 }
 
-func (c *connectGatewaySvc) handleSync(ctx context.Context, ws *websocket.Conn, initialMsg *connect.SDKConnectRequestData) *SocketError {
+func (c *connectGatewaySvc) handleSync(ctx context.Context, ws *websocket.Conn, initialMsg *connect.WorkerConnectRequestData, details *connect.SessionDetails) *SocketError {
 	// TODO Check whether SDK group was already synced
 	isAlreadySynced := false
 	if isAlreadySynced {
 		return nil
 	}
 
-	c.logger.Debug("Sending sync message to SDK")
-	data := &connect.GatewaySyncRequestData{
-		// TODO Set this to prevent unattached syncs!
-		DeployId: nil,
-	}
-	marshaled, err := proto.Marshal(data)
-	if err != nil {
-		c.logger.Error("failed to serialize gateway sync request", "err", err)
-		return &SocketError{
-			SysCode:    syscode.CodeConnectInternal,
-			StatusCode: websocket.StatusInternalError,
-			Msg:        "invalid message",
-		}
-	}
-	err = wsproto.Write(ctx, ws, &connect.ConnectMessage{
-		Kind:    connect.GatewayMessageType_GATEWAY_REQUEST_SYNC,
-		Payload: marshaled,
-	})
-	if err != nil {
-		c.logger.Error("failed to send gateway sync request", "err", err)
-		return &SocketError{
-			SysCode:    syscode.CodeConnectInternal,
-			StatusCode: websocket.StatusInternalError,
-			Msg:        "failed to write sync message",
-		}
-	}
+	// TODO Sync config:
+	// initialMsg.Config.Capabilities
+	// initialMsg.Config.Functions
 
 	return nil
 }

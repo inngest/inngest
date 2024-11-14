@@ -125,7 +125,7 @@ func (r *redisConnectionStateManager) GetConnectionsByAppID(ctx context.Context,
 	return nil, notImplementedError
 }
 
-func (r *redisConnectionStateManager) AddConnection(ctx context.Context, data *connpb.SDKConnectRequestData) error {
+func (r *redisConnectionStateManager) AddConnection(ctx context.Context, data *connpb.WorkerConnectRequestData, sessionDetails *connpb.SessionDetails) error {
 	envID := data.AuthData.GetEnvId()
 
 	// groupID := data.SessionDetails.FunctionHash
@@ -136,7 +136,7 @@ func (r *redisConnectionStateManager) AddConnection(ctx context.Context, data *c
 		Language: data.SdkLanguage,
 		Version:  data.SdkVersion,
 		EnvId:    envID,
-		Session:  data.SessionDetails,
+		Session:  sessionDetails,
 	}
 
 	byt, err := json.Marshal(meta)
@@ -149,7 +149,7 @@ func (r *redisConnectionStateManager) AddConnection(ctx context.Context, data *c
 		groupKey,
 	}
 	args := []string{
-		data.SessionDetails.ConnectionId,
+		sessionDetails.SessionId.ConnectionId,
 		string(byt),
 	}
 	if err != nil {
