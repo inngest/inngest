@@ -22,16 +22,7 @@ type AuthContext struct {
 }
 
 type SyncData struct {
-	Env          string
-	AppName      string
-	Functions    []sdk.SDKFunction
-	Capabilities sdk.Capabilities
-
-	// APIOrigin used for syncing the app
-	APIOrigin string
-
-	// Used for syncing
-	HashedSigningKey string
+	Functions []sdk.SDKFunction
 }
 
 // WorkerGroup groups a list of connected workers to simplify operations, which
@@ -70,7 +61,4 @@ type WorkerGroup struct {
 
 	// used for syncing
 	SyncData SyncData `json:"-"`
-
-	// Dev signals if the sync is for dev server or not
-	Dev bool `json:"-"`
 }

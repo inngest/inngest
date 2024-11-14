@@ -296,10 +296,11 @@ type establishedState struct {
 
 // Sync handles the sync of the worker group
 func (s *establishedState) Sync(ctx context.Context) error {
-	// Already synced, no need to attempt again
-	if s.workerGroup.SyncID != nil {
-		return nil
+	if s.workerGroup == nil {
+		return fmt.Errorf("worker group is required for syncing")
 	}
+
+	// TODO: Check state to see if group already exists
 
 	// Construct sync request via off-band sync
 	// Can't do in-band
@@ -311,17 +312,18 @@ func (s *establishedState) Sync(ctx context.Context) error {
 		URL:        connURL.String(),
 		DeployType: "ping", // TODO: should allow 'connect' as an input
 		SDK:        sdkVersion,
-		AppName:    s.workerGroup.SyncData.AppName,
+		AppName:    s.initialData.GetAppName(),
 		Headers: sdk.Headers{
-			Env:      s.workerGroup.SyncData.Env,
-			Platform: s.workerGroup.SDKPlatform,
+			Env:      s.initialData.GetEnvironment(),
+			Platform: s.initialData.GetPlatform(),
 		},
-		Capabilities: s.workerGroup.SyncData.Capabilities,
+		Capabilities: sdk.Capabilities{},
 		UseConnect:   true, // NOTE: probably not needed if `DeployType` can have `connect` as input?
 		Functions:    s.workerGroup.SyncData.Functions,
 	}
 
-	registerURL := fmt.Sprintf("%s/fn/register", s.workerGroup.SyncData.APIOrigin)
+	apiOrigin := "http://127.0.0.1:8288"
+	registerURL := fmt.Sprintf("%s/fn/register", apiOrigin)
 
 	byt, err := json.Marshal(config)
 	if err != nil {
@@ -339,10 +341,11 @@ func (s *establishedState) Sync(ctx context.Context) error {
 	req.Header.Set("X-Inngest-SDK", sdkVersion)
 	req.Header.Set("User-Agent", sdkVersion)
 
-	if s.workerGroup.SyncData.HashedSigningKey == "" {
+	hashedSigningKey := string(s.initialData.AuthData.HashedSigningKey)
+	if hashedSigningKey == "" {
 		return fmt.Errorf("no signing key available for syncing")
 	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.workerGroup.SyncData.HashedSigningKey))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", hashedSigningKey))
 
 	_, err = http.DefaultClient.Do(req)
 	if err != nil {

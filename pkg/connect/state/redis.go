@@ -152,9 +152,6 @@ func (r *redisConnectionStateManager) AddConnection(ctx context.Context, data *c
 		sessionDetails.SessionId.ConnectionId,
 		string(byt),
 	}
-	if err != nil {
-		return err
-	}
 
 	status, err := scripts["add_conn"].Exec(
 		ctx,

@@ -99,12 +99,7 @@ func NewWorkerGroupFromConnRequest(
 		SyncID: nil,
 		Hash:   hash,
 		SyncData: state.SyncData{
-			Env:              req.GetEnvironment(),
-			Functions:        functions,
-			Capabilities:     sdk.Capabilities{},
-			AppName:          req.AppName,
-			APIOrigin:        "http://127.0.0.1:8288",
-			HashedSigningKey: string(req.AuthData.GetHashedSigningKey()),
+			Functions: functions,
 		},
 	}
 
