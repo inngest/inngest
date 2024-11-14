@@ -129,13 +129,14 @@ func (r *redisConnectionStateManager) AddConnection(ctx context.Context, conn *C
 	envID := conn.Data.AuthData.GetEnvId()
 
 	// groupID := data.SessionDetails.FunctionHash
-	groupID := "something"
+	groupID := conn.Group.Hash
 	groupKey := fmt.Sprintf("{%s}:groups:%s", envID, groupID)
 
 	meta := &connpb.ConnMetadata{
 		Language: conn.Data.SdkLanguage,
 		Version:  conn.Data.SdkVersion,
 		EnvId:    envID,
+		GroupId:  groupID,
 		Session:  conn.Session,
 	}
 
