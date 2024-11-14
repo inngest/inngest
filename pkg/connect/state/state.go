@@ -2,8 +2,8 @@ package state
 
 import (
 	"context"
-
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/sdk"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 )
 
@@ -18,6 +18,12 @@ type ConnectionStateManager interface {
 type AuthContext struct {
 	AccountID uuid.UUID
 	EnvID     uuid.UUID
+}
+
+type SyncData struct {
+	// hashedSigningKey string
+	Functions    []sdk.SDKFunction
+	Capabilities sdk.Capabilities
 }
 
 // WorkerGroup groups a list of connected workers to simplify operations, which
@@ -53,11 +59,7 @@ type WorkerGroup struct {
 	Hash string `json:"hash"`
 
 	// used for syncing
-	// hashedSigningKey string
-}
-
-func NewWorkerGroupFromConnRequest(ctx context.Context, req *connpb.WorkerConnectRequestData) (*WorkerGroup, error) {
-	return nil, notImplementedError
+	SyncData SyncData `json:"-"`
 }
 
 // Sync handles the sync of the worker group
@@ -66,6 +68,14 @@ func (g *WorkerGroup) Sync(ctx context.Context) error {
 	// - checks state to see if it's already synced
 	// - if not, then attempt a sync
 	// - retrieve the deploy ID for the sync and update state with it
+
+	// TODO Check whether SDK group was already synced
+	isAlreadySynced := false
+	if isAlreadySynced {
+		return nil
+	}
+
+	// TODO Sync config if policy allows (otherwise, store data for later syncing)
 
 	return notImplementedError
 }

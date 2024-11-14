@@ -24,4 +24,5 @@ const (
 	CodeConnectInternal                  = "connect_internal_error"
 	CodeConnectGatewayClosing            = "connect_gateway_closing"
 	CodeConnectRunInvalidMessage         = "connect_run_invalid_message"
+	CodeConnectInvalidFunctionConfig     = "connect_invalid_function_config"
 )

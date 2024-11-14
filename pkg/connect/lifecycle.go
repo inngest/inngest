@@ -14,5 +14,5 @@ type ConnectGatewayLifecycleListener interface {
 	OnSynced(ctx context.Context)
 
 	// OnDisconnected is called when a connection on the gateway is lost
-	OnDisconnected(ctx context.Context)
+	OnDisconnected(ctx context.Context, closeReason string)
 }
