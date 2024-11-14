@@ -421,6 +421,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		connect.WithGatewayAuthHandler(func(ctx context.Context, data *connectproto.SDKConnectRequestData) (*connect.AuthResponse, error) {
 			return &connect.AuthResponse{
 				AccountID: consts.DevServerAccountId,
+				EnvID:     consts.DevServerEnvId,
 			}, nil
 		}),
 		connect.WithDB(dbcqrs),

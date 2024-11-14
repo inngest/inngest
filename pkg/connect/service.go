@@ -312,6 +312,11 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 		c.logger.Debug("SDK successfully authenticated", "authResp", authResp)
 	}
 
+	if err := c.stateManager.AddConnection(ctx, &initialMessageData); err != nil {
+		_ = ws.Close(websocket.StatusInternalError, "connection not stored")
+		return nil, err
+	}
+
 	for _, l := range c.lifecycles {
 		go l.OnConnected(ctx, &initialMessageData)
 	}
