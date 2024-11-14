@@ -276,6 +276,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}()
 
+		// TODO Mark connection as ready to receive traffic unless we require manual client ready signal (optional)
+
 		<-ctx.Done()
 	})
 }
@@ -455,9 +457,9 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 		FunctionHash: functionHash,
 	}
 
-	workerGroup, err := NewWorkerGroupFromConnRequest(ctx, log, &initialMessageData, authResp, sessionDetails)
+	workerGroup, err := NewWorkerGroupFromConnRequest(ctx, &initialMessageData, authResp, sessionDetails)
 	if err != nil {
-		c.logger.Error("could not create worker group for request", "err", err)
+		log.Error("could not create worker group for request", "err", err)
 		return nil, &SocketError{
 			SysCode:    syscode.CodeConnectInternal,
 			StatusCode: websocket.StatusInternalError,
@@ -466,7 +468,7 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 	}
 
 	if err := c.stateManager.AddConnection(ctx, &initialMessageData, sessionDetails); err != nil {
-		c.logger.Error("adding connection state failed", "err", err)
+		log.Error("adding connection state failed", "err", err)
 		return nil, &SocketError{
 			SysCode:    syscode.CodeConnectInternal,
 			StatusCode: websocket.StatusInternalError,
@@ -474,6 +476,7 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 		}
 	}
 
+	// TODO Connection should not be marked as ready to receive traffic until the read loop is set up, sync is handled, and the client optionally sent a ready signal
 	for _, l := range c.lifecycles {
 		go l.OnConnected(ctx, &initialMessageData)
 	}

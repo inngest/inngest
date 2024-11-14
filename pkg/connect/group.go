@@ -12,7 +12,6 @@ import (
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
-	"log/slog"
 )
 
 func workerGroupHashFromConnRequest(req *connect.WorkerConnectRequestData, authResp *AuthResponse, sessionDetails *connect.SessionDetails) (string, error) {
@@ -56,7 +55,7 @@ func workerGroupHashFromConnRequest(req *connect.WorkerConnectRequestData, authR
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-func NewWorkerGroupFromConnRequest(ctx context.Context, log *slog.Logger, req *connect.WorkerConnectRequestData, authResp *AuthResponse, sessionDetails *connect.SessionDetails) (*state.WorkerGroup, error) {
+func NewWorkerGroupFromConnRequest(ctx context.Context, req *connect.WorkerConnectRequestData, authResp *AuthResponse, sessionDetails *connect.SessionDetails) (*state.WorkerGroup, error) {
 	var (
 		functions    []sdk.SDKFunction
 		capabilities sdk.Capabilities
