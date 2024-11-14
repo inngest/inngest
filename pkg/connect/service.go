@@ -44,6 +44,7 @@ type connectGatewaySvc struct {
 	// gatewayId is a unique identifier, generated each time the service is started.
 	// This should be used to uniquely identify the gateway instance when sending messages and routing requests.
 	gatewayId string
+	dev       bool
 
 	logger *slog.Logger
 
@@ -84,6 +85,12 @@ func WithDB(m cqrs.Manager) gatewayOpt {
 func WithLifeCycles(lifecycles []ConnectGatewayLifecycleListener) gatewayOpt {
 	return func(svc *connectGatewaySvc) {
 		svc.lifecycles = lifecycles
+	}
+}
+
+func WithDev() gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.dev = true
 	}
 }
 
