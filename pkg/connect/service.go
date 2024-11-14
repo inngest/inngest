@@ -2,9 +2,13 @@ package connect
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gowebpki/jcs"
+	"github.com/inngest/inngest/pkg/sdk"
 	"log/slog"
 	"net/http"
 	"os"
@@ -138,7 +142,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}
 
-		initialMessageData, sessionDetails, serr := c.establishConnection(ctx, ws)
+		connectionData, serr := c.establishConnection(ctx, ws)
 		if serr != nil {
 			c.logger.Error("error establishing connection", "error", serr)
 			closeWithConnectError(ws, serr)
@@ -152,19 +156,19 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}()
 
-		log := c.logger.With("account_id", initialMessageData.AuthData.AccountId)
+		log := c.logger.With("account_id", connectionData.initialData.AuthData.AccountId)
 
-		serr = c.handleSync(ctx, ws, initialMessageData, sessionDetails)
+		serr = c.handleSync(ctx, ws, connectionData, log)
 		if serr != nil {
-			c.logger.Error("error handling sync", "error", serr)
+			log.Error("error handling sync", "error", serr)
 			closeWithConnectError(ws, serr)
 
 			return
 		}
 
-		app, err := c.dbcqrs.GetAppByName(ctx, initialMessageData.AppName)
+		app, err := c.dbcqrs.GetAppByName(ctx, connectionData.initialData.AppName)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			c.logger.Error("could not get app by name", "appName", initialMessageData.AppName, "err", err)
+			log.Error("could not get app by name", "appName", connectionData.initialData.AppName, "err", err)
 			closeWithConnectError(ws, &SocketError{
 				SysCode:    syscode.CodeConnectInternal,
 				StatusCode: websocket.StatusInternalError,
@@ -174,7 +178,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		}
 
 		if errors.Is(err, sql.ErrNoRows) || app == nil {
-			c.logger.Error("could not find app", "appName", initialMessageData.AppName)
+			log.Error("could not find app", "appName", connectionData.initialData.AppName)
 			closeWithConnectError(ws, &SocketError{
 				SysCode:    syscode.CodeConnectInternal,
 				StatusCode: websocket.StatusInternalError,
@@ -293,7 +297,13 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 	})
 }
 
-func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websocket.Conn) (*connect.WorkerConnectRequestData, *connect.SessionDetails, *SocketError) {
+type establishedState struct {
+	initialData    *connect.WorkerConnectRequestData
+	sessionDetails *connect.SessionDetails
+	functions      []sdk.SDKFunction
+}
+
+func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websocket.Conn) (*establishedState, *SocketError) {
 	var (
 		initialMessageData connect.WorkerConnectRequestData
 		initialMessage     connect.ConnectMessage
@@ -316,7 +326,7 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 			c.logger.Debug("Timeout waiting for worker SDK connect message")
 		}
 
-		return nil, nil, &SocketError{
+		return nil, &SocketError{
 			SysCode:    code,
 			StatusCode: statusCode,
 			Msg:        msg,
@@ -326,7 +336,7 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 	if initialMessage.Kind != connect.GatewayMessageType_WORKER_CONNECT {
 		c.logger.Debug("initial worker SDK message was not connect")
 
-		return nil, nil, &SocketError{
+		return nil, &SocketError{
 			SysCode:    syscode.CodeConnectWorkerHelloInvalidMsg,
 			StatusCode: websocket.StatusPolicyViolation,
 			Msg:        "Invalid first message, expected sdk-connect",
@@ -336,7 +346,7 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 	if err := proto.Unmarshal(initialMessage.Payload, &initialMessageData); err != nil {
 		c.logger.Debug("initial SDK message contained invalid Protobuf")
 
-		return nil, nil, &SocketError{
+		return nil, &SocketError{
 			SysCode:    syscode.CodeConnectWorkerHelloInvalidPayload,
 			StatusCode: websocket.StatusPolicyViolation,
 			Msg:        "Invalid Protobuf in SDK connect message",
@@ -349,7 +359,7 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 		authResp, err = c.auther(ctx, &initialMessageData)
 		if err != nil {
 			c.logger.Error("connect auth failed", "err", err)
-			return nil, nil, &SocketError{
+			return nil, &SocketError{
 				SysCode:    syscode.CodeConnectInternal,
 				StatusCode: websocket.StatusInternalError,
 				Msg:        "Internal error",
@@ -358,7 +368,7 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 
 		if authResp == nil {
 			c.logger.Debug("Auth failed")
-			return nil, nil, &SocketError{
+			return nil, &SocketError{
 				SysCode:    syscode.CodeConnectAuthFailed,
 				StatusCode: websocket.StatusPolicyViolation,
 				Msg:        "Authentication failed",
@@ -371,8 +381,35 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 		c.logger.Debug("SDK successfully authenticated", "authResp", authResp)
 	}
 
+	log := c.logger.With("account_id", initialMessageData.AuthData.AccountId)
+
 	var functionHash []byte
-	// TODO Compute hash
+	{
+		b, err := jcs.Transform(initialMessageData.Config.Functions)
+		if err != nil {
+			c.logger.Error("transforming function config failed", "err", err)
+			return nil, &SocketError{
+				SysCode:    syscode.CodeConnectInternal,
+				StatusCode: websocket.StatusInternalError,
+				Msg:        "Internal error",
+			}
+		}
+
+		res := sha256.Sum256(b)
+		functionHash = res[:]
+	}
+
+	var functions []sdk.SDKFunction
+	if err := json.Unmarshal(initialMessageData.Config.Functions, &functions); err != nil {
+		log.Error("could not unmarshal functions", "err", err)
+		return nil, &SocketError{
+			SysCode:    syscode.CodeConnectInternal,
+			StatusCode: websocket.StatusInternalError,
+			Msg:        "could not unmarshal functions",
+		}
+	}
+
+	// TODO Update SDK group state with allowed fns
 
 	sessionDetails := &connect.SessionDetails{
 		SessionId:    initialMessageData.SessionId,
@@ -381,7 +418,7 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 
 	if err := c.stateManager.AddConnection(ctx, &initialMessageData, sessionDetails); err != nil {
 		c.logger.Error("adding connection state failed", "err", err)
-		return nil, nil, &SocketError{
+		return nil, &SocketError{
 			SysCode:    syscode.CodeConnectInternal,
 			StatusCode: websocket.StatusInternalError,
 			Msg:        "connection not stored",
@@ -392,20 +429,32 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 		go l.OnConnected(ctx, &initialMessageData)
 	}
 
-	return &initialMessageData, sessionDetails, nil
+	return &establishedState{
+		initialData:    &initialMessageData,
+		sessionDetails: sessionDetails,
+		functions:      functions,
+	}, nil
 }
 
-func (c *connectGatewaySvc) handleSync(ctx context.Context, ws *websocket.Conn, initialMsg *connect.WorkerConnectRequestData, details *connect.SessionDetails) *SocketError {
+func (c *connectGatewaySvc) handleSync(ctx context.Context, ws *websocket.Conn, connectionData *establishedState, log *slog.Logger) *SocketError {
 	// TODO Check whether SDK group was already synced
 	isAlreadySynced := false
 	if isAlreadySynced {
 		return nil
 	}
 
-	// TODO Sync config:
-	// initialMsg.Config.Capabilities
-	// initialMsg.Config.Functions
+	var capabilities sdk.Capabilities
 
+	if err := json.Unmarshal(connectionData.initialData.Config.Capabilities, &capabilities); err != nil {
+		log.Error("could not unmarshal capabilities", "err", err)
+		return &SocketError{
+			SysCode:    syscode.CodeConnectInternal,
+			StatusCode: websocket.StatusInternalError,
+			Msg:        "could not unmarshal capabilities",
+		}
+	}
+
+	// TODO Sync config if policy allows (otherwise, store data for later syncing)
 	return nil
 }
 
