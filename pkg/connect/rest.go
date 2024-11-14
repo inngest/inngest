@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/publicerr"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 )
@@ -15,7 +16,12 @@ func (c *connectGatewaySvc) showConnectionsByEnv(w http.ResponseWriter, r *http.
 	ctx := r.Context()
 
 	var wsID uuid.UUID
-	{
+	switch c.dev {
+	case true:
+		wsID = consts.DevServerEnvId
+
+	case false:
+		// TODO: allow grabbing by slug instead of UUIDs
 		param := chi.URLParam(r, "envID")
 		id, err := uuid.Parse(param)
 		if err != nil {
