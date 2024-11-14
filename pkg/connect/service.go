@@ -1,18 +1,23 @@
 package connect
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gowebpki/jcs"
 	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/gowebpki/jcs"
+
+	"net/url"
 
 	"github.com/coder/websocket"
 	"github.com/go-chi/chi/v5"
@@ -25,6 +30,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
@@ -164,7 +170,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		log := c.logger.With("account_id", connectionData.initialData.AuthData.AccountId)
 
-		err = connectionData.workerGroup.Sync(ctx)
+		err = connectionData.Sync(ctx)
 		if err != nil {
 			log.Error("error handling sync", "error", err)
 
@@ -286,6 +292,67 @@ type establishedState struct {
 	initialData    *connect.WorkerConnectRequestData
 	sessionDetails *connect.SessionDetails
 	workerGroup    *state.WorkerGroup
+}
+
+// Sync handles the sync of the worker group
+func (s *establishedState) Sync(ctx context.Context) error {
+	// Already synced, no need to attempt again
+	if s.workerGroup.SyncID != nil {
+		return nil
+	}
+
+	// Construct sync request via off-band sync
+	// Can't do in-band
+	connURL := url.URL{Scheme: "ws", Host: "connect"}
+	sdkVersion := fmt.Sprintf("%s:%s", s.workerGroup.SDKLang, s.workerGroup.SDKVersion)
+
+	config := sdk.RegisterRequest{
+		V:          "1",
+		URL:        connURL.String(),
+		DeployType: "ping", // TODO: should allow 'connect' as an input
+		SDK:        sdkVersion,
+		AppName:    s.workerGroup.SyncData.AppName,
+		Headers: sdk.Headers{
+			Env:      s.workerGroup.SyncData.Env,
+			Platform: s.workerGroup.SDKPlatform,
+		},
+		Capabilities: s.workerGroup.SyncData.Capabilities,
+		UseConnect:   true, // NOTE: probably not needed if `DeployType` can have `connect` as input?
+		Functions:    s.workerGroup.SyncData.Functions,
+	}
+
+	registerURL := fmt.Sprintf("%s/fn/register", s.workerGroup.SyncData.APIOrigin)
+
+	byt, err := json.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("error serializing function config: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, registerURL, bytes.NewReader(byt))
+	if err != nil {
+		return fmt.Errorf("error creating new sync request: %w", err)
+	}
+
+	// Set basic headers
+	// TODO: use constants for these header keys
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Inngest-SDK", sdkVersion)
+	req.Header.Set("User-Agent", sdkVersion)
+
+	if s.workerGroup.SyncData.HashedSigningKey == "" {
+		return fmt.Errorf("no signing key available for syncing")
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.workerGroup.SyncData.HashedSigningKey))
+
+	_, err = http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("error making sync request: %w", err)
+	}
+
+	// TODO:
+	// - retrieve the deploy ID for the sync and update state with it
+
+	return nil
 }
 
 func (c *connectGatewaySvc) handleIncomingWebSocketMessage(ctx context.Context, appId uuid.UUID, msg *connect.ConnectMessage, log *slog.Logger) *SocketError {

@@ -1,12 +1,7 @@
 package state
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"net/url"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/sdk"
@@ -78,65 +73,4 @@ type WorkerGroup struct {
 
 	// Dev signals if the sync is for dev server or not
 	Dev bool `json:"-"`
-}
-
-// Sync handles the sync of the worker group
-func (g *WorkerGroup) Sync(ctx context.Context) error {
-	// Already synced, no need to attempt again
-	if g.SyncID != nil {
-		return nil
-	}
-
-	// Construct sync request via off-band sync
-	// Can't do in-band
-	connURL := url.URL{Scheme: "ws", Host: "connect"}
-	sdkVersion := fmt.Sprintf("%s:%s", g.SDKLang, g.SDKVersion)
-
-	config := sdk.RegisterRequest{
-		V:          "1",
-		URL:        connURL.String(),
-		DeployType: "ping", // TODO: should allow 'connect' as an input
-		SDK:        sdkVersion,
-		AppName:    g.SyncData.AppName,
-		Headers: sdk.Headers{
-			Env:      g.SyncData.Env,
-			Platform: g.SDKPlatform,
-		},
-		Capabilities: g.SyncData.Capabilities,
-		UseConnect:   true, // NOTE: probably not needed if `DeployType` can have `connect` as input?
-		Functions:    g.SyncData.Functions,
-	}
-
-	registerURL := fmt.Sprintf("%s/fn/register", g.SyncData.APIOrigin)
-
-	byt, err := json.Marshal(config)
-	if err != nil {
-		return fmt.Errorf("error serializing function config: %w", err)
-	}
-
-	req, err := http.NewRequest(http.MethodPost, registerURL, bytes.NewReader(byt))
-	if err != nil {
-		return fmt.Errorf("error creating new sync request: %w", err)
-	}
-
-	// Set basic headers
-	// TODO: use constants for these header keys
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Inngest-SDK", sdkVersion)
-	req.Header.Set("User-Agent", sdkVersion)
-
-	if g.SyncData.HashedSigningKey == "" {
-		return fmt.Errorf("no signing key available for syncing")
-	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", g.SyncData.HashedSigningKey))
-
-	_, err = http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("error making sync request: %w", err)
-	}
-
-	// TODO:
-	// - retrieve the deploy ID for the sync and update state with it
-
-	return nil
 }
