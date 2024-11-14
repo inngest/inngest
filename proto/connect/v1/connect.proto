@@ -107,3 +107,7 @@ message ConnGroup {
 message ShowConnsReply {
 	repeated ConnMetadata data = 1;
 }
+
+enum WorkerDisconnectReason {
+	WORKER_SHUTDOWN = 0;
+}

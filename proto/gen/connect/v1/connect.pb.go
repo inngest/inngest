@@ -121,6 +121,49 @@ func (SDKResponseStatus) EnumDescriptor() ([]byte, []int) {
 	return file_connect_v1_connect_proto_rawDescGZIP(), []int{1}
 }
 
+type WorkerDisconnectReason int32
+
+const (
+	WorkerDisconnectReason_WORKER_SHUTDOWN WorkerDisconnectReason = 0
+)
+
+// Enum value maps for WorkerDisconnectReason.
+var (
+	WorkerDisconnectReason_name = map[int32]string{
+		0: "WORKER_SHUTDOWN",
+	}
+	WorkerDisconnectReason_value = map[string]int32{
+		"WORKER_SHUTDOWN": 0,
+	}
+)
+
+func (x WorkerDisconnectReason) Enum() *WorkerDisconnectReason {
+	p := new(WorkerDisconnectReason)
+	*p = x
+	return p
+}
+
+func (x WorkerDisconnectReason) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (WorkerDisconnectReason) Descriptor() protoreflect.EnumDescriptor {
+	return file_connect_v1_connect_proto_enumTypes[2].Descriptor()
+}
+
+func (WorkerDisconnectReason) Type() protoreflect.EnumType {
+	return &file_connect_v1_connect_proto_enumTypes[2]
+}
+
+func (x WorkerDisconnectReason) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use WorkerDisconnectReason.Descriptor instead.
+func (WorkerDisconnectReason) EnumDescriptor() ([]byte, []int) {
+	return file_connect_v1_connect_proto_rawDescGZIP(), []int{2}
+}
+
 type ConnectMessage struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1180,11 +1223,14 @@ var file_connect_v1_connect_proto_rawDesc = []byte{
 	0x73, 0x65, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x12, 0x11, 0x0a, 0x0d, 0x4e, 0x4f, 0x54, 0x5f,
 	0x43, 0x4f, 0x4d, 0x50, 0x4c, 0x45, 0x54, 0x45, 0x44, 0x10, 0x00, 0x12, 0x08, 0x0a, 0x04, 0x44,
 	0x4f, 0x4e, 0x45, 0x10, 0x01, 0x12, 0x09, 0x0a, 0x05, 0x45, 0x52, 0x52, 0x4f, 0x52, 0x10, 0x02,
-	0x42, 0x39, 0x5a, 0x37, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x69,
-	0x6e, 0x6e, 0x67, 0x65, 0x73, 0x74, 0x2f, 0x69, 0x6e, 0x6e, 0x67, 0x65, 0x73, 0x74, 0x2f, 0x70,
-	0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x67, 0x65, 0x6e, 0x2f, 0x63, 0x6f, 0x6e, 0x6e, 0x65, 0x63, 0x74,
-	0x2f, 0x76, 0x31, 0x3b, 0x63, 0x6f, 0x6e, 0x6e, 0x65, 0x63, 0x74, 0x62, 0x06, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x33,
+	0x2a, 0x2d, 0x0a, 0x16, 0x57, 0x6f, 0x72, 0x6b, 0x65, 0x72, 0x44, 0x69, 0x73, 0x63, 0x6f, 0x6e,
+	0x6e, 0x65, 0x63, 0x74, 0x52, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x12, 0x13, 0x0a, 0x0f, 0x57, 0x4f,
+	0x52, 0x4b, 0x45, 0x52, 0x5f, 0x53, 0x48, 0x55, 0x54, 0x44, 0x4f, 0x57, 0x4e, 0x10, 0x00, 0x42,
+	0x39, 0x5a, 0x37, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x69, 0x6e,
+	0x6e, 0x67, 0x65, 0x73, 0x74, 0x2f, 0x69, 0x6e, 0x6e, 0x67, 0x65, 0x73, 0x74, 0x2f, 0x70, 0x72,
+	0x6f, 0x74, 0x6f, 0x2f, 0x67, 0x65, 0x6e, 0x2f, 0x63, 0x6f, 0x6e, 0x6e, 0x65, 0x63, 0x74, 0x2f,
+	0x76, 0x31, 0x3b, 0x63, 0x6f, 0x6e, 0x6e, 0x65, 0x63, 0x74, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74,
+	0x6f, 0x33,
 }
 
 var (
@@ -1199,37 +1245,38 @@ func file_connect_v1_connect_proto_rawDescGZIP() []byte {
 	return file_connect_v1_connect_proto_rawDescData
 }
 
-var file_connect_v1_connect_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_connect_v1_connect_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
 var file_connect_v1_connect_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_connect_v1_connect_proto_goTypes = []any{
 	(GatewayMessageType)(0),            // 0: connect.v1.GatewayMessageType
 	(SDKResponseStatus)(0),             // 1: connect.v1.SDKResponseStatus
-	(*ConnectMessage)(nil),             // 2: connect.v1.ConnectMessage
-	(*SessionIdentifier)(nil),          // 3: connect.v1.SessionIdentifier
-	(*SessionDetails)(nil),             // 4: connect.v1.SessionDetails
-	(*ConfigDetails)(nil),              // 5: connect.v1.ConfigDetails
-	(*AuthData)(nil),                   // 6: connect.v1.AuthData
-	(*WorkerConnectRequestData)(nil),   // 7: connect.v1.WorkerConnectRequestData
-	(*GatewaySyncRequestData)(nil),     // 8: connect.v1.GatewaySyncRequestData
-	(*GatewayExecutorRequestData)(nil), // 9: connect.v1.GatewayExecutorRequestData
-	(*SDKResponse)(nil),                // 10: connect.v1.SDKResponse
-	(*ConnMetadata)(nil),               // 11: connect.v1.ConnMetadata
-	(*SystemAttributes)(nil),           // 12: connect.v1.SystemAttributes
-	(*ConnGroup)(nil),                  // 13: connect.v1.ConnGroup
-	(*ShowConnsReply)(nil),             // 14: connect.v1.ShowConnsReply
+	(WorkerDisconnectReason)(0),        // 2: connect.v1.WorkerDisconnectReason
+	(*ConnectMessage)(nil),             // 3: connect.v1.ConnectMessage
+	(*SessionIdentifier)(nil),          // 4: connect.v1.SessionIdentifier
+	(*SessionDetails)(nil),             // 5: connect.v1.SessionDetails
+	(*ConfigDetails)(nil),              // 6: connect.v1.ConfigDetails
+	(*AuthData)(nil),                   // 7: connect.v1.AuthData
+	(*WorkerConnectRequestData)(nil),   // 8: connect.v1.WorkerConnectRequestData
+	(*GatewaySyncRequestData)(nil),     // 9: connect.v1.GatewaySyncRequestData
+	(*GatewayExecutorRequestData)(nil), // 10: connect.v1.GatewayExecutorRequestData
+	(*SDKResponse)(nil),                // 11: connect.v1.SDKResponse
+	(*ConnMetadata)(nil),               // 12: connect.v1.ConnMetadata
+	(*SystemAttributes)(nil),           // 13: connect.v1.SystemAttributes
+	(*ConnGroup)(nil),                  // 14: connect.v1.ConnGroup
+	(*ShowConnsReply)(nil),             // 15: connect.v1.ShowConnsReply
 }
 var file_connect_v1_connect_proto_depIdxs = []int32{
 	0,  // 0: connect.v1.ConnectMessage.kind:type_name -> connect.v1.GatewayMessageType
-	3,  // 1: connect.v1.SessionDetails.session_id:type_name -> connect.v1.SessionIdentifier
-	3,  // 2: connect.v1.WorkerConnectRequestData.session_id:type_name -> connect.v1.SessionIdentifier
-	6,  // 3: connect.v1.WorkerConnectRequestData.auth_data:type_name -> connect.v1.AuthData
-	5,  // 4: connect.v1.WorkerConnectRequestData.config:type_name -> connect.v1.ConfigDetails
-	12, // 5: connect.v1.WorkerConnectRequestData.system_attributes:type_name -> connect.v1.SystemAttributes
+	4,  // 1: connect.v1.SessionDetails.session_id:type_name -> connect.v1.SessionIdentifier
+	4,  // 2: connect.v1.WorkerConnectRequestData.session_id:type_name -> connect.v1.SessionIdentifier
+	7,  // 3: connect.v1.WorkerConnectRequestData.auth_data:type_name -> connect.v1.AuthData
+	6,  // 4: connect.v1.WorkerConnectRequestData.config:type_name -> connect.v1.ConfigDetails
+	13, // 5: connect.v1.WorkerConnectRequestData.system_attributes:type_name -> connect.v1.SystemAttributes
 	1,  // 6: connect.v1.SDKResponse.status:type_name -> connect.v1.SDKResponseStatus
-	12, // 7: connect.v1.ConnMetadata.attributes:type_name -> connect.v1.SystemAttributes
-	4,  // 8: connect.v1.ConnMetadata.session:type_name -> connect.v1.SessionDetails
-	11, // 9: connect.v1.ConnGroup.conns:type_name -> connect.v1.ConnMetadata
-	11, // 10: connect.v1.ShowConnsReply.data:type_name -> connect.v1.ConnMetadata
+	13, // 7: connect.v1.ConnMetadata.attributes:type_name -> connect.v1.SystemAttributes
+	5,  // 8: connect.v1.ConnMetadata.session:type_name -> connect.v1.SessionDetails
+	12, // 9: connect.v1.ConnGroup.conns:type_name -> connect.v1.ConnMetadata
+	12, // 10: connect.v1.ShowConnsReply.data:type_name -> connect.v1.ConnMetadata
 	11, // [11:11] is the sub-list for method output_type
 	11, // [11:11] is the sub-list for method input_type
 	11, // [11:11] is the sub-list for extension type_name
@@ -1411,7 +1458,7 @@ func file_connect_v1_connect_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_connect_v1_connect_proto_rawDesc,
-			NumEnums:      2,
+			NumEnums:      3,
 			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   0,
