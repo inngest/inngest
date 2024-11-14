@@ -120,6 +120,7 @@ func NewWorkerGroupFromConnRequest(
 			Env:              req.GetEnvironment(),
 			Functions:        functions,
 			Capabilities:     sdk.Capabilities{},
+			AppName:          req.AppName,
 			APIOrigin:        "http://127.0.0.1:8288",
 			HashedSigningKey: string(req.AuthData.GetHashedSigningKey()),
 		},
