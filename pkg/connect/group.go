@@ -20,43 +20,25 @@ func workerGroupHashFromConnRequest(req *connect.WorkerConnectRequestData, authR
 		buildId = *req.SessionId.BuildId
 	}
 
-	h := sha256.New()
-
-	_, err := h.Write(authResp.AccountID[:])
-	if err != nil {
-		return "", fmt.Errorf("could not add account ID to hash input: %w", err)
-	}
-
-	_, err = h.Write(authResp.EnvID[:])
-	if err != nil {
-		return "", fmt.Errorf("could not add env ID to hash input: %w", err)
-	}
-
-	_, err = h.Write([]byte(req.SdkLanguage))
-	if err != nil {
-		return "", fmt.Errorf("could not add SDK language to hash input: %w", err)
-	}
-
-	_, err = h.Write([]byte(req.SdkVersion))
-	if err != nil {
-		return "", fmt.Errorf("could not add SDK version to hash input: %w", err)
-	}
-
+	platform := "-"
 	if req.Platform != nil {
-		_, err = h.Write([]byte(req.GetPlatform()))
-		if err != nil {
-			return "", fmt.Errorf("could not add SDK platform to hash input: %w", err)
-		}
+		platform = req.GetPlatform()
 	}
 
-	_, err = h.Write(sessionDetails.FunctionHash)
-	if err != nil {
-		return "", fmt.Errorf("could not add function hash to hash input: %w", err)
-	}
+	base := fmt.Sprintf("%s:%s:%s:%s:%s:%s:%s",
+		authResp.AccountID,
+		authResp.EnvID,
+		req.SdkLanguage,
+		req.SdkVersion,
+		platform,
+		sessionDetails.FunctionHash,
+		buildId,
+	)
 
-	_, err = h.Write([]byte(buildId))
+	h := sha256.New()
+	_, err := h.Write([]byte(base))
 	if err != nil {
-		return "", fmt.Errorf("could not add build ID to hash input: %w", err)
+		return "", fmt.Errorf("could not compute worker group hash: %w", err)
 	}
 
 	return hex.EncodeToString(h.Sum(nil)), nil

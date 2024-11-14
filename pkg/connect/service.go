@@ -267,7 +267,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				}
 
 				go func() {
-					serr := c.handleIncomingWebSocketMessage(ctx, app.ID, ws, &msg, log)
+					serr := c.handleIncomingWebSocketMessage(ctx, app.ID, &msg, log)
 					if serr != nil {
 						closeWithConnectError(ws, serr)
 						return
@@ -288,7 +288,7 @@ type establishedState struct {
 	workerGroup    *state.WorkerGroup
 }
 
-func (c *connectGatewaySvc) handleIncomingWebSocketMessage(ctx context.Context, appId uuid.UUID, ws *websocket.Conn, msg *connect.ConnectMessage, log *slog.Logger) *SocketError {
+func (c *connectGatewaySvc) handleIncomingWebSocketMessage(ctx context.Context, appId uuid.UUID, msg *connect.ConnectMessage, log *slog.Logger) *SocketError {
 	log.Debug("received WebSocket message", "kind", msg.Kind.String())
 
 	switch msg.Kind {
