@@ -3,13 +3,16 @@ package state
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/logger"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/redis/rueidis"
 )
@@ -70,11 +73,13 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 
 type redisConnectionStateManager struct {
 	client rueidis.Client
+	logger *slog.Logger
 }
 
 func NewRedisConnectionStateManager(client rueidis.Client) *redisConnectionStateManager {
 	return &redisConnectionStateManager{
 		client: client,
+		logger: logger.StdlibLogger(context.Background()),
 	}
 }
 
@@ -96,35 +101,84 @@ func (r redisConnectionStateManager) SetRequestIdempotency(ctx context.Context, 
 }
 
 func (r *redisConnectionStateManager) GetConnectionsByEnvID(ctx context.Context, wsID uuid.UUID) ([]*connpb.ConnMetadata, error) {
-	return nil, notImplementedError
+	key := r.connKey(wsID.String())
+	cmd := r.client.B().Hvals().Key(key).Build()
+
+	res, err := r.client.Do(ctx, cmd).AsStrSlice()
+	if err != nil {
+		return nil, err
+	}
+
+	conns := []*connpb.ConnMetadata{}
+	for _, meta := range res {
+		var conn connpb.ConnMetadata
+		if err := json.Unmarshal([]byte(meta), &conn); err != nil {
+			return nil, err
+		}
+		conns = append(conns, &conn)
+	}
+
+	return conns, nil
 }
 
 func (r *redisConnectionStateManager) GetConnectionsByAppID(ctx context.Context, appID uuid.UUID) ([]*connpb.ConnMetadata, error) {
 	return nil, notImplementedError
 }
 
-func (r *redisConnectionStateManager) AddConnection(ctx context.Context, wsID uuid.UUID, meta *connpb.ConnMetadata) error {
-	return notImplementedError
+func (r *redisConnectionStateManager) AddConnection(ctx context.Context, data *connpb.SDKConnectRequestData) error {
+	envID := data.AuthData.GetEnvId()
+
+	// groupID := data.SessionDetails.FunctionHash
+	groupID := "something"
+	groupKey := fmt.Sprintf("{%s}:groups:%s", envID, groupID)
+
+	meta := &connpb.ConnMetadata{
+		Language: data.SdkLanguage,
+		Version:  data.SdkVersion,
+		EnvId:    envID,
+		Session:  data.SessionDetails,
+	}
+
+	byt, err := json.Marshal(meta)
+	if err != nil {
+		return err
+	}
+
+	keys := []string{
+		r.connKey(envID),
+		groupKey,
+	}
+	args := []string{
+		data.SessionDetails.ConnectionId,
+		string(byt),
+	}
+	if err != nil {
+		return err
+	}
+
+	status, err := scripts["add_conn"].Exec(
+		ctx,
+		r.client,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return err
+	}
+
+	switch status {
+	case 0:
+		return nil
+
+	default:
+		return fmt.Errorf("unknown status when storing connection metadata: %d", status)
+	}
 }
 
 func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, connID string) error {
 	return notImplementedError
 }
 
-//
-// Lifecycle hooks
-//
-
-func (r *redisConnectionStateManager) OnConnected(ctx context.Context, data *connpb.SDKConnectRequestData) {
-	// meta := &connpb.ConnMetadata{
-	// 	Language: data.SdkLanguage,
-	// 	Version:  data.SdkVersion,
-	// 	Session:  data.SessionDetails,
-	// }
-}
-
-func (r *redisConnectionStateManager) OnSynced(ctx context.Context) {
-}
-
-func (r *redisConnectionStateManager) OnDisconnected(ctx context.Context) {
+func (r *redisConnectionStateManager) connKey(envID string) string {
+	return fmt.Sprintf("{%s}:conns", envID)
 }
