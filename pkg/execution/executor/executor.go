@@ -25,6 +25,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/cancellation"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/driver"
+	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
@@ -1875,6 +1876,8 @@ func (e *executor) handleGenerator(ctx context.Context, i *runInstance, gen stat
 		return e.handleGeneratorWaitForEvent(ctx, i, gen, edge)
 	case enums.OpcodeInvokeFunction:
 		return e.handleGeneratorInvokeFunction(ctx, i, gen, edge)
+	case enums.OpcodeAIGateway:
+		return e.handleGeneratorAIGateway(ctx, i, gen, edge)
 	}
 
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
@@ -2123,6 +2126,70 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 
 	for _, e := range e.lifecycles {
 		go e.OnSleep(context.WithoutCancel(ctx), i.md, i.item, gen, until)
+	}
+
+	return err
+}
+
+func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	input, err := gen.AIGatewayOpts()
+	if err != nil {
+		return fmt.Errorf("error parsing ai gateway step: %w", err)
+	}
+
+	// XXX: Store input, model, provider in trace.
+
+	req, err := input.HTTPRequest()
+	if err != nil {
+		return fmt.Errorf("error creating ai gateway request: %w", err)
+	}
+
+	_, output, _, err := httpdriver.ExecuteRequest(ctx, httpdriver.DefaultClient, req)
+	if err != nil {
+		return fmt.Errorf("error making inferene request", err)
+	}
+
+	// Save the output as the step result.
+	if err := e.smv2.SaveStep(ctx, i.md.ID, gen.ID, output); err != nil {
+		return err
+	}
+
+	// TODO: Parse the response based off of req.Opts.Format.  If auto-call is supported and a tool is
+	// provided, do the auto-call stuff.
+
+	// XXX: Remove once deprecated from history.
+	groupID := uuid.New().String()
+	ctx = state.WithGroupID(ctx, groupID)
+
+	// Enqueue the next step
+	nextEdge := inngest.Edge{
+		Outgoing: gen.ID,             // Going from the current step
+		Incoming: edge.Edge.Incoming, // And re-calling the incoming function in a loop
+	}
+	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID)
+	now := time.Now()
+	nextItem := queue.Item{
+		JobID:                 &jobID,
+		WorkspaceID:           i.md.ID.Tenant.EnvID,
+		GroupID:               groupID,
+		Kind:                  queue.KindEdge,
+		Identifier:            i.item.Identifier, // TODO: Refactor
+		PriorityFactor:        i.item.PriorityFactor,
+		CustomConcurrencyKeys: i.item.CustomConcurrencyKeys,
+		Attempt:               0,
+		MaxAttempts:           i.item.MaxAttempts,
+		Payload:               queue.PayloadEdge{Edge: nextEdge},
+	}
+	err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
+	if err == redis_state.ErrQueueItemExists {
+		return nil
+	}
+
+	for _, l := range e.lifecycles {
+		// We can't specify step name here since that will result in the
+		// "followup discovery step" having the same name as its predecessor.
+		var stepName *string = nil
+		go l.OnStepScheduled(ctx, i.md, nextItem, stepName)
 	}
 
 	return err

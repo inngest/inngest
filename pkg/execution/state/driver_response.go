@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/xhit/go-str2duration/v2"
 )
 
@@ -316,6 +317,36 @@ func (w WaitForEventOpts) Expires() (time.Time, error) {
 		return time.Time{}, err
 	}
 	return time.Now().Add(dur), nil
+}
+
+// AIGatewayOpts returns the AI gateway options within the driver.
+func (g GeneratorOpcode) AIGatewayOpts() (aigateway.Request, error) {
+	opts := aigateway.RequestOpts{}
+
+	// Ensure we unmarshal g.Opts  into the request options.
+	// This contains Inngest-related and auth-related options
+	// that do not go in the API request body we make to the provider
+	var optByt []byte
+	switch typ := g.Opts.(type) {
+	case []byte:
+		optByt = typ
+	default:
+		var err error
+		optByt, err = json.Marshal(g.Opts)
+		if err != nil {
+			return aigateway.Request{}, err
+		}
+	}
+	if err := json.Unmarshal(optByt, &opts); err != nil {
+		return aigateway.Request{}, err
+	}
+
+	// g.Data contains the raw data to send through to the AI
+	// inference provider.
+	return aigateway.Request{
+		Opts: opts,
+		Raw:  g.Data,
+	}, nil
 }
 
 // DriverResponse is returned after a driver executes an action.  This represents any
