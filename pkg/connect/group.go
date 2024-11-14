@@ -121,7 +121,7 @@ func NewWorkerGroupFromConnRequest(
 			Functions:        functions,
 			Capabilities:     sdk.Capabilities{},
 			APIOrigin:        "http://127.0.0.1:8288",
-			HashedSigningKey: authResp.HashedSigningKey,
+			HashedSigningKey: string(req.AuthData.GetHashedSigningKey()),
 		},
 	}
 
