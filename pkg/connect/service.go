@@ -461,7 +461,13 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 		}
 	}
 
-	if err := c.stateManager.AddConnection(ctx, &initialMessageData, sessionDetails); err != nil {
+	conn := state.Connection{
+		Data:    &initialMessageData,
+		Session: sessionDetails,
+		Group:   workerGroup,
+	}
+
+	if err := c.stateManager.AddConnection(ctx, &conn); err != nil {
 		log.Error("adding connection state failed", "err", err)
 		return nil, &SocketError{
 			SysCode:    syscode.CodeConnectInternal,
@@ -472,14 +478,10 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 
 	// TODO Connection should not be marked as ready to receive traffic until the read loop is set up, sync is handled, and the client optionally sent a ready signal
 	for _, l := range c.lifecycles {
-		go l.OnConnected(ctx, &initialMessageData)
+		go l.OnConnected(ctx, &conn)
 	}
 
-	return &state.Connection{
-		Data:    &initialMessageData,
-		Session: sessionDetails,
-		Group:   workerGroup,
-	}, nil
+	return &conn, nil
 }
 
 func (c *connectGatewaySvc) handleSdkReply(ctx context.Context, log *slog.Logger, appId uuid.UUID, msg *connect.ConnectMessage) error {

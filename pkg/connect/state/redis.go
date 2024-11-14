@@ -125,18 +125,18 @@ func (r *redisConnectionStateManager) GetConnectionsByAppID(ctx context.Context,
 	return nil, notImplementedError
 }
 
-func (r *redisConnectionStateManager) AddConnection(ctx context.Context, data *connpb.WorkerConnectRequestData, sessionDetails *connpb.SessionDetails) error {
-	envID := data.AuthData.GetEnvId()
+func (r *redisConnectionStateManager) AddConnection(ctx context.Context, conn *Connection) error {
+	envID := conn.Data.AuthData.GetEnvId()
 
 	// groupID := data.SessionDetails.FunctionHash
 	groupID := "something"
 	groupKey := fmt.Sprintf("{%s}:groups:%s", envID, groupID)
 
 	meta := &connpb.ConnMetadata{
-		Language: data.SdkLanguage,
-		Version:  data.SdkVersion,
+		Language: conn.Data.SdkLanguage,
+		Version:  conn.Data.SdkVersion,
 		EnvId:    envID,
-		Session:  sessionDetails,
+		Session:  conn.Session,
 	}
 
 	byt, err := json.Marshal(meta)
@@ -149,7 +149,7 @@ func (r *redisConnectionStateManager) AddConnection(ctx context.Context, data *c
 		groupKey,
 	}
 	args := []string{
-		sessionDetails.SessionId.ConnectionId,
+		conn.Session.SessionId.ConnectionId,
 		string(byt),
 	}
 
