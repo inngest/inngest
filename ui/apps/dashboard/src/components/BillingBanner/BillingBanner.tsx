@@ -23,6 +23,7 @@ const entitlementUsageQuery = graphql(`
           current
           limit
         }
+        accountConcurrencyLimitHits
       }
     }
   }
