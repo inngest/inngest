@@ -10,15 +10,25 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/sdk"
+	v1apipb "github.com/inngest/inngest/proto/gen/api/v1"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 )
 
-type ConnectionStateManager interface {
+type StateManager interface {
+	ConnectionManager
+	WorkerGroupManager
+
 	SetRequestIdempotency(ctx context.Context, appId uuid.UUID, requestId string) error
+}
+
+type ConnectionManager interface {
 	GetConnectionsByEnvID(ctx context.Context, envID uuid.UUID) ([]*connpb.ConnMetadata, error)
 	GetConnectionsByAppID(ctx context.Context, appID uuid.UUID) ([]*connpb.ConnMetadata, error)
 	AddConnection(ctx context.Context, conn *Connection) error
 	DeleteConnection(ctx context.Context, connID string) error
+}
+
+type WorkerGroupManager interface {
 	GetWorkerGroupByHash(ctx context.Context, envID uuid.UUID, hash string) (*WorkerGroup, error)
 	UpdateWorkerGroup(ctx context.Context, envID uuid.UUID, group *WorkerGroup) error
 }
@@ -72,6 +82,8 @@ type WorkerGroup struct {
 
 // Connection have all the metadata assocaited with a worker connection
 type Connection struct {
+	GroupManager WorkerGroupManager
+
 	Data    *connpb.WorkerConnectRequestData
 	Session *connpb.SessionDetails
 	Group   *WorkerGroup
@@ -82,7 +94,24 @@ func (c *Connection) Sync(ctx context.Context) error {
 		return fmt.Errorf("worker group is required for syncing")
 	}
 
-	// TODO: Check state to see if group already exists
+	// Check state to see if group already exists
+	var envID uuid.UUID
+	{
+		id, err := uuid.Parse(c.Data.AuthData.EnvId)
+		if err != nil {
+			return fmt.Errorf("error parsing environment ID: %w", err)
+		}
+		envID = id
+	}
+
+	group, err := c.GroupManager.GetWorkerGroupByHash(ctx, envID, c.Group.Hash)
+	if err != nil {
+		return fmt.Errorf("error attempting to retrieve worker group: %w", err)
+	}
+	// Don't attempt to sync if it's already sync'd
+	if group != nil && group.SyncID != nil {
+		return nil
+	}
 
 	// Construct sync request via off-band sync
 	// Can't do in-band
@@ -131,13 +160,29 @@ func (c *Connection) Sync(ctx context.Context) error {
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", hashedSigningKey))
 
-	_, err = http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("error making sync request: %w", err)
 	}
 
-	// TODO:
-	// - retrieve the deploy ID for the sync and update state with it
+	// Retrieve the deploy ID for the sync and update state with it if available
+	var syncReply v1apipb.SyncReply
+	if err := json.NewDecoder(resp.Body).Decode(&syncReply); err != nil {
+		return fmt.Errorf("error parsing sync response: %w", err)
+	}
+
+	if syncReply.SyncId != nil {
+		syncID, err := uuid.Parse(syncReply.GetSyncId())
+		if err != nil {
+			return fmt.Errorf("invalid syncID, expected UUID: %s", syncReply.GetSyncId())
+		}
+
+		group.SyncID = &syncID
+		// Update the worker group with the syncID so it's aware that it's already sync'd before
+		if err := c.GroupManager.UpdateWorkerGroup(ctx, envID, group); err != nil {
+			return fmt.Errorf("error updating worker group: %w", err)
+		}
+	}
 
 	return nil
 }

@@ -209,7 +209,19 @@ func (r *redisConnectionStateManager) GetWorkerGroupByHash(ctx context.Context, 
 }
 
 func (r *redisConnectionStateManager) UpdateWorkerGroup(ctx context.Context, envID uuid.UUID, group *WorkerGroup) error {
-	return notImplementedError
+	byt, err := json.Marshal(group)
+	if err != nil {
+		return fmt.Errorf("error serializing worker group for update: %w", err)
+	}
+
+	key := r.groupKey(envID.String())
+	cmd := r.client.B().Hset().Key(key).FieldValue().FieldValue(group.Hash, string(byt)).Build()
+
+	if err := r.client.Do(ctx, cmd).Error(); err != nil {
+		return fmt.Errorf("error updating worker group: %w", err)
+	}
+
+	return nil
 }
 
 func (r *redisConnectionStateManager) connKey(envID string) string {

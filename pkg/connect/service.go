@@ -55,7 +55,7 @@ type connectGatewaySvc struct {
 	runCtx context.Context
 
 	auther       GatewayAuthHandler
-	stateManager state.ConnectionStateManager
+	stateManager state.StateManager
 	receiver     pubsub.RequestReceiver
 	dbcqrs       cqrs.Manager
 
@@ -68,7 +68,7 @@ func WithGatewayAuthHandler(auth GatewayAuthHandler) gatewayOpt {
 	}
 }
 
-func WithConnectionStateManager(m state.ConnectionStateManager) gatewayOpt {
+func WithConnectionStateManager(m state.StateManager) gatewayOpt {
 	return func(c *connectGatewaySvc) {
 		c.stateManager = m
 	}
@@ -462,6 +462,8 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 	}
 
 	conn := state.Connection{
+		GroupManager: c.stateManager,
+
 		Data:    &initialMessageData,
 		Session: sessionDetails,
 		Group:   workerGroup,
@@ -586,7 +588,7 @@ func (c *connectGatewaySvc) Stop(ctx context.Context) error {
 type connectRouterSvc struct {
 	logger *slog.Logger
 
-	stateManager state.ConnectionStateManager
+	stateManager state.StateManager
 	receiver     pubsub.RequestReceiver
 	dbcqrs       cqrs.Manager
 }
@@ -669,7 +671,7 @@ func (c *connectRouterSvc) Stop(ctx context.Context) error {
 	return nil
 }
 
-func newConnectRouter(stateManager state.ConnectionStateManager, receiver pubsub.RequestReceiver, db cqrs.Manager) service.Service {
+func newConnectRouter(stateManager state.StateManager, receiver pubsub.RequestReceiver, db cqrs.Manager) service.Service {
 	return &connectRouterSvc{
 		stateManager: stateManager,
 		receiver:     receiver,
