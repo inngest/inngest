@@ -26,7 +26,7 @@ type ConnectionManager interface {
 	GetConnectionsByEnvID(ctx context.Context, envID uuid.UUID) ([]*connpb.ConnMetadata, error)
 	GetConnectionsByAppID(ctx context.Context, appID uuid.UUID) ([]*connpb.ConnMetadata, error)
 	AddConnection(ctx context.Context, conn *Connection) error
-	DeleteConnection(ctx context.Context, connID string) error
+	DeleteConnection(ctx context.Context, conn *Connection) error
 }
 
 type WorkerGroupManager interface {
