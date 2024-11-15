@@ -19,6 +19,7 @@ type ConnectionStateManager interface {
 	GetConnectionsByAppID(ctx context.Context, appID uuid.UUID) ([]*connpb.ConnMetadata, error)
 	AddConnection(ctx context.Context, conn *Connection) error
 	DeleteConnection(ctx context.Context, connID string) error
+	GetWorkerGroupByHash(ctx context.Context, hash string) (*WorkerGroup, error)
 }
 
 type AuthContext struct {
