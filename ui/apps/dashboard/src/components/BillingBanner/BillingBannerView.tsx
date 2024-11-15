@@ -3,22 +3,13 @@
 import { useMemo } from 'react';
 import { NewButton } from '@inngest/components/Button';
 
+import { type EntitlementUsage } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import { Banner } from '../Banner';
 import { useBooleanLocalStorage } from './localStorage';
 import { parseEntitlementUsage } from './parse';
 
-type Props = {
-  entitlementUsage: {
-    runCount: {
-      current: number;
-      limit: number | null;
-    };
-    accountConcurrencyLimitHits: number;
-  };
-};
-
-export function BillingBannerView({ entitlementUsage }: Props) {
+export function BillingBannerView({ entitlementUsage }: { entitlementUsage: EntitlementUsage }) {
   const { bannerMessage, bannerSeverity, items } = parseEntitlementUsage(entitlementUsage);
 
   const isVisible = useBooleanLocalStorage('BillingBanner:visible', true);
