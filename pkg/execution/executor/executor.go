@@ -2181,6 +2181,16 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 	} else {
 		// The response output is actually now the result of this AI call. We need
 		// to modify the opcode data so that accessing the step output is correct.
+		//
+		// Also note that the output is always wrapped within "data", allowing us
+		// to differentiate between success and failure in the SDK in the single
+		// opcode map.
+		output, err = json.Marshal(map[string]json.RawMessage{
+			"data": output,
+		})
+		if err != nil {
+			return fmt.Errorf("error wrapping ai result in map: %w", err)
+		}
 		i.resp.UpdateOpcodeOutput(gen, output)
 	}
 
