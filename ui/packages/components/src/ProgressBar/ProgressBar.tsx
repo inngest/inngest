@@ -8,9 +8,10 @@ import { cn } from '../utils/classNames';
 type ProgressBarProps = {
   limit: number | null;
   value: number;
+  overageAllowed?: boolean;
 };
 
-const ProgressBar = ({ limit, value }: ProgressBarProps) => {
+const ProgressBar = ({ limit, value, overageAllowed }: ProgressBarProps) => {
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
@@ -35,7 +36,8 @@ const ProgressBar = ({ limit, value }: ProgressBarProps) => {
       <Progress.Indicator
         className={cn(
           'ease-[cubic-bezier(0.65, 0, 0.35, 1)] bg-primary-moderate size-full transition-transform duration-700',
-          isOverTheLimit && 'bg-accent-subtle'
+          isOverTheLimit && overageAllowed && 'bg-accent-subtle',
+          isOverTheLimit && !overageAllowed && 'bg-error'
         )}
         style={{ transform: `translateX(-${100 - progress}%)` }}
       />

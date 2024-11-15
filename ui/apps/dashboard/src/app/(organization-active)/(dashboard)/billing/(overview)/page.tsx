@@ -3,7 +3,7 @@ import { Card } from '@inngest/components/Card/Card';
 
 import BillingInformation from '@/components/Billing/BillingDetails/BillingInformation';
 import PaymentMethod from '@/components/Billing/BillingDetails/PaymentMethod';
-import { LimitBar } from '@/components/Billing/LimitBar';
+import { LimitBar, type Data } from '@/components/Billing/LimitBar';
 import {
   getBillingDetails,
   getCurrentPlan,
@@ -17,16 +17,17 @@ export default async function Page() {
   const plan = await getCurrentPlan();
   const billing = await getBillingDetails();
 
-  const runs = {
+  const runs: Data = {
     title: 'Runs',
     description: `A single durable function execution. ${
       entitlementUsage?.runCount.overageAllowed ? 'Additional runs are available for purchase.' : ''
     }`,
     current: entitlementUsage?.runCount.current || 0,
     limit: entitlementUsage?.runCount.limit || null,
+    overageAllowed: entitlementUsage?.runCount.overageAllowed,
   };
 
-  const steps = {
+  const steps: Data = {
     title: 'Steps',
     description: `An individual step in durable functions. ${
       entitlementUsage?.runCount.overageAllowed
@@ -35,6 +36,7 @@ export default async function Page() {
     }`,
     current: entitlementUsage?.stepCount.current || 0,
     limit: entitlementUsage?.stepCount.limit || null,
+    overageAllowed: entitlementUsage?.stepCount.overageAllowed,
   };
 
   const nextInvoiceDate = plan?.subscription?.nextInvoiceDate

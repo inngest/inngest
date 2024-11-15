@@ -40,8 +40,8 @@ const useSwitchablePathname = (): string => {
     return '/functions';
   }
 
-  if (pathname.match(/^\/billing\//)) {
-    return '/functions';
+  if (pathname.match(/^\/billing\/.+$/)) {
+    return '/apps';
   }
 
   // Deploys should always move to the root resource level
