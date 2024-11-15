@@ -670,7 +670,7 @@ func createFunctionConfigs(
 			Triggers:    inngest.MultipleTriggers{},
 			RateLimit:   fn.Config().GetRateLimit(),
 			Cancel:      fn.Config().Cancel,
-			Timeouts:    (*inngest.Timeouts)(fn.Config().Timeouts),
+			Timeouts:    fn.Config().GetTimeouts(),
 			Throttle:    (*inngest.Throttle)(fn.Config().Throttle),
 			Steps: map[string]sdk.SDKStep{
 				"step": {
