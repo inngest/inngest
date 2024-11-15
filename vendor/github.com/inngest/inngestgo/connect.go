@@ -161,6 +161,11 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 			return fmt.Errorf("could not hash signing key: %w", err)
 		}
 
+		apiOrigin := defaultAPIOrigin
+		if h.h.isDev() {
+			apiOrigin = DevServerURL()
+		}
+
 		data, err := proto.Marshal(&connectproto.WorkerConnectRequestData{
 			SessionId: &connectproto.SessionIdentifier{
 				BuildId:      h.h.BuildId,
@@ -174,6 +179,7 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 			Config: &connectproto.ConfigDetails{
 				Capabilities: marshaledCapabilities,
 				Functions:    marshaledFns,
+				ApiOrigin:    apiOrigin,
 			},
 			SystemAttributes: &connectproto.SystemAttributes{
 				CpuCores: int32(numCpuCores),
