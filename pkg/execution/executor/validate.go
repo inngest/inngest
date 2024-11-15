@@ -164,9 +164,9 @@ func (r *runValidator) checkCancellation(ctx context.Context) error {
 }
 
 func (r *runValidator) checkStartTimeout(ctx context.Context) error {
-	if r.f.Timeouts != nil {
+	if r.f.Timeouts != nil && r.f.Timeouts.Start != nil {
 		since := time.Since(ulid.Time(r.md.ID.RunID.Time()))
-		if r.f.Timeouts.Start > 0 && since > r.f.Timeouts.Start && r.md.Config.StartedAt.IsZero() {
+		if *r.f.Timeouts.StartDuration() > 0 && since > *r.f.Timeouts.StartDuration() && r.md.Config.StartedAt.IsZero() {
 			logger.StdlibLogger(ctx).Debug("start timeout reached", "run_id", r.md.ID.RunID.String())
 			if err := r.e.Cancel(ctx, r.md.ID, execution.CancelRequest{}); err != nil {
 				return err
@@ -181,17 +181,17 @@ func (r *runValidator) checkStartTimeout(ctx context.Context) error {
 }
 
 func (r *runValidator) checkFinishTimeout(ctx context.Context) error {
-	if r.f.Timeouts != nil && r.f.Timeouts.Finish > 0 {
+	if r.f.Timeouts != nil && r.f.Timeouts.Finish != nil && *r.f.Timeouts.FinishDuration() > 0 {
 		started := r.md.Config.StartedAt
 
-		if started.IsZero() || started.Unix() == 0 || time.Since(started) <= r.f.Timeouts.Finish {
+		if started.IsZero() || started.Unix() == 0 || time.Since(started) <= *r.f.Timeouts.FinishDuration() {
 			return nil
 		}
 		logger.StdlibLogger(ctx).Info(
 			"finish timeout reached",
 			"run_id", r.md.ID.RunID,
 			"started_at", started.UTC(),
-			"timeout", r.f.Timeouts.Finish.String(),
+			"timeout", r.f.Timeouts.Finish,
 			"since", time.Since(started).String(),
 		)
 		if err := r.e.Cancel(ctx, r.md.ID, execution.CancelRequest{}); err != nil {
