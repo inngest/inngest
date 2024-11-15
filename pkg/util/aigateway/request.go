@@ -66,7 +66,9 @@ func (r Request) HTTPRequest() (*http.Request, error) {
 	switch r.Opts.Format {
 	case FormatGemini:
 		// Gemini adds the auth key as a query param
-		req.URL.Query().Add("key", r.Opts.AuthKey)
+		values := req.URL.Query()
+		values.Add("key", r.Opts.AuthKey)
+		req.URL.RawQuery = values.Encode()
 	case FormatBedrock:
 		// Bedrock's auth should be the fully-generated AWS key derived from the
 		// secret and signing key.

@@ -37,6 +37,9 @@ func ExecuteRequest(ctx context.Context, c HTTPDoer, req *http.Request) (*http.R
 	pre := time.Now()
 	resp, err := c.Do(req)
 	dur := time.Since(pre)
+	if err != nil {
+		return resp, nil, dur, err
+	}
 	defer func() {
 		if resp != nil {
 			_ = resp.Body.Close()

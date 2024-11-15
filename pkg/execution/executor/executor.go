@@ -2146,7 +2146,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 
 	_, output, _, err := httpdriver.ExecuteRequest(ctx, httpdriver.DefaultClient, req)
 	if err != nil {
-		return fmt.Errorf("error making inferene request", err)
+		return fmt.Errorf("error making inference request: %w", err)
 	}
 
 	// Save the output as the step result.
