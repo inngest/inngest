@@ -33,8 +33,8 @@ export default async function Page() {
         ? 'Additional steps are available for purchase.'
         : ''
     }`,
-    current: entitlementUsage?.stepCount?.current || 0,
-    limit: entitlementUsage?.stepCount?.limit || null,
+    current: entitlementUsage?.stepCount.current || 0,
+    limit: entitlementUsage?.stepCount.limit || null,
   };
 
   const nextInvoiceDate = plan?.subscription?.nextInvoiceDate
