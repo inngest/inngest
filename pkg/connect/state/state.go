@@ -15,11 +15,12 @@ import (
 
 type ConnectionStateManager interface {
 	SetRequestIdempotency(ctx context.Context, appId uuid.UUID, requestId string) error
-	GetConnectionsByEnvID(ctx context.Context, wsID uuid.UUID) ([]*connpb.ConnMetadata, error)
+	GetConnectionsByEnvID(ctx context.Context, envID uuid.UUID) ([]*connpb.ConnMetadata, error)
 	GetConnectionsByAppID(ctx context.Context, appID uuid.UUID) ([]*connpb.ConnMetadata, error)
 	AddConnection(ctx context.Context, conn *Connection) error
 	DeleteConnection(ctx context.Context, connID string) error
-	GetWorkerGroupByHash(ctx context.Context, hash string) (*WorkerGroup, error)
+	GetWorkerGroupByHash(ctx context.Context, envID uuid.UUID, hash string) (*WorkerGroup, error)
+	UpdateWorkerGroup(ctx context.Context, envID uuid.UUID, group *WorkerGroup) error
 }
 
 type AuthContext struct {
@@ -103,6 +104,8 @@ func (c *Connection) Sync(ctx context.Context) error {
 		Functions:    c.Group.SyncData.Functions,
 	}
 
+	// NOTE: pick this up via SDK
+	// technically it should only be accessible to the system that's the gateway is associated with
 	apiOrigin := "http://127.0.0.1:8288"
 	registerURL := fmt.Sprintf("%s/fn/register", apiOrigin)
 

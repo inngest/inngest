@@ -100,8 +100,8 @@ func (r redisConnectionStateManager) SetRequestIdempotency(ctx context.Context, 
 	return nil
 }
 
-func (r *redisConnectionStateManager) GetConnectionsByEnvID(ctx context.Context, wsID uuid.UUID) ([]*connpb.ConnMetadata, error) {
-	key := r.connKey(wsID.String())
+func (r *redisConnectionStateManager) GetConnectionsByEnvID(ctx context.Context, envID uuid.UUID) ([]*connpb.ConnMetadata, error) {
+	key := r.connKey(envID.String())
 	cmd := r.client.B().Hvals().Key(key).Build()
 
 	res, err := r.client.Do(ctx, cmd).AsStrSlice()
@@ -140,7 +140,7 @@ func (r *redisConnectionStateManager) AddConnection(ctx context.Context, conn *C
 
 	keys := []string{
 		r.connKey(envID),
-		r.groupKey(envID, groupID),
+		r.groupKey(envID),
 	}
 
 	// NOTE: redis_state.StrSlice format the data in a non JSON way, not sure why
@@ -191,14 +191,31 @@ func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, conn
 	return notImplementedError
 }
 
-func (r *redisConnectionStateManager) GetWorkerGroupByHash(ctx context.Context, hash string) (*WorkerGroup, error) {
-	return nil, notImplementedError
+func (r *redisConnectionStateManager) GetWorkerGroupByHash(ctx context.Context, envID uuid.UUID, hash string) (*WorkerGroup, error) {
+	key := r.groupKey(envID.String())
+	cmd := r.client.B().Hget().Key(key).Field(hash).Build()
+
+	byt, err := r.client.Do(ctx, cmd).AsBytes()
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving worker group: %w", err)
+	}
+
+	var group WorkerGroup
+	if err := json.Unmarshal(byt, &group); err != nil {
+		return nil, fmt.Errorf("error deserializing worker group: %w", err)
+	}
+
+	return &group, nil
+}
+
+func (r *redisConnectionStateManager) UpdateWorkerGroup(ctx context.Context, envID uuid.UUID, group *WorkerGroup) error {
+	return notImplementedError
 }
 
 func (r *redisConnectionStateManager) connKey(envID string) string {
 	return fmt.Sprintf("{%s}:conns", envID)
 }
 
-func (r *redisConnectionStateManager) groupKey(envID, groupID string) string {
-	return fmt.Sprintf("{%s}:groups:%s", envID, groupID)
+func (r *redisConnectionStateManager) groupKey(envID string) string {
+	return fmt.Sprintf("{%s}:groups", envID)
 }
