@@ -89,6 +89,12 @@ type Connection struct {
 	Group   *WorkerGroup
 }
 
+// Sync attempts to sync the worker group configuration
+//
+// TODO:
+// this should be dedupped when there's a large number of workers coming up at once
+// so it doesn't attempt to sync multiple times prior to the worker group getting
+// a response
 func (c *Connection) Sync(ctx context.Context) error {
 	if c.Group == nil {
 		return fmt.Errorf("worker group is required for syncing")
@@ -175,6 +181,7 @@ func (c *Connection) Sync(ctx context.Context) error {
 		return fmt.Errorf("error parsing sync response: %w", err)
 	}
 
+	// Update the worker group to make sure it store the appropriate IDs
 	if syncReply.IsSuccess() {
 		group.SyncID = syncReply.SyncID
 		group.AppID = syncReply.AppID
