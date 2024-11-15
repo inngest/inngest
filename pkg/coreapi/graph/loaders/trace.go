@@ -196,6 +196,7 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 		EndedAt:      endedAt,
 		OutputID:     pb.OutputId,
 		StepOp:       stepOp,
+		StepID:       pb.StepId,
 	}
 
 	if pb.GetStepInfo() != nil {

@@ -17,6 +17,7 @@ import (
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -267,6 +268,13 @@ func WithShardSelector(selector redis_state.ShardSelector) ExecutorOpt {
 	}
 }
 
+func WithTraceReader(m cqrs.TraceReader) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).traceReader = m
+		return nil
+	}
+}
+
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log *zerolog.Logger
@@ -301,6 +309,8 @@ type executor struct {
 
 	assignedQueueShard redis_state.QueueShard
 	shardFinder        redis_state.ShardSelector
+
+	traceReader cqrs.TraceReader
 }
 
 func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
@@ -543,10 +553,20 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// Create the run state.
 	//
 
-	err := e.smv2.Create(ctx, sv2.CreateState{
-		Metadata: metadata,
+	newState := sv2.CreateState{
 		Events:   evts,
-	})
+		Metadata: metadata,
+		Steps:    []state.InputStep{},
+	}
+
+	if req.OriginalRunID != nil && req.FromStep != nil && req.FromStep.StepID != "" {
+		var err error
+		if newState.Steps, err = reconstruct(ctx, e.traceReader, req); err != nil {
+			return nil, fmt.Errorf("error reconstructing input state: %w", err)
+		}
+	}
+
+	err := e.smv2.Create(ctx, newState)
 	if err == state.ErrIdentifierExists {
 		// This function was already created.
 		return nil, state.ErrIdentifierExists

@@ -17,7 +17,11 @@ local stepID  = ARGV[1]
 local data    = ARGV[2]
 
 if redis.call("HEXISTS", keyStep, stepID) == 1 then
-	return -1
+  local existingData = cjson.decode(redis.call("HGET", keyStep, stepID))
+
+  if existingData.input == nil then
+	  return -1
+  end
 end
 
 redis.call("HINCRBY", keyMetadata, "step_count", 1)

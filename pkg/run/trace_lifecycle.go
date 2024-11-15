@@ -625,6 +625,7 @@ func (l traceLifecycle) OnStepFinished(
 			attribute.Int(consts.OtelSysStepMaxAttempt, item.GetMaxAttempts()),
 			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
 			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeStepPlanned.String()),
+			attribute.String(consts.OtelSysStepStack, strings.Join(md.Stack, ",")),
 		),
 	)
 	defer span.End()
@@ -675,9 +676,14 @@ func (l traceLifecycle) OnStepFinished(
 			span.SetAttributes(
 				attribute.Int(consts.OtelSysStepStatusCode, resp.StatusCode),
 				attribute.Int(consts.OtelSysStepOutputSizeBytes, resp.OutputSize),
+				attribute.String(consts.OtelSysStepID, op.ID),
 				attribute.String(consts.OtelSysStepDisplayName, op.UserDefinedName()),
 				attribute.String(consts.OtelSysStepOpcode, foundOp.String()),
 			)
+
+			if input, _ := op.Input(); input != "" {
+				span.SetStepInput(input)
+			}
 
 			if op.IsError() {
 				span.SetStepOutput(op.Error)

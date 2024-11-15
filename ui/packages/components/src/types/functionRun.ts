@@ -54,6 +54,7 @@ export function isFunctionTimeField(s: string): s is FunctionRunTimeField {
 }
 
 export type Result = {
+  input: string | null;
   data: string | null;
   error: {
     message: string;

@@ -163,6 +163,11 @@ type PageInfo struct {
 	EndCursor *string `json:"endCursor,omitempty"`
 }
 
+type RerunFromStepInput struct {
+	StepID string  `json:"stepID"`
+	Input  *string `json:"input,omitempty"`
+}
+
 type RunTraceSpan struct {
 	AppID         uuid.UUID          `json:"appID"`
 	FunctionID    uuid.UUID          `json:"functionID"`
@@ -180,6 +185,7 @@ type RunTraceSpan struct {
 	EndedAt       *time.Time         `json:"endedAt,omitempty"`
 	ChildrenSpans []*RunTraceSpan    `json:"childrenSpans"`
 	StepOp        *StepOp            `json:"stepOp,omitempty"`
+	StepID        *string            `json:"stepID,omitempty"`
 	StepInfo      StepInfo           `json:"stepInfo,omitempty"`
 	IsRoot        bool               `json:"isRoot"`
 	ParentSpanID  *string            `json:"parentSpanID,omitempty"`
@@ -187,6 +193,7 @@ type RunTraceSpan struct {
 }
 
 type RunTraceSpanOutput struct {
+	Input *string    `json:"input,omitempty"`
 	Data  *string    `json:"data,omitempty"`
 	Error *StepError `json:"error,omitempty"`
 }

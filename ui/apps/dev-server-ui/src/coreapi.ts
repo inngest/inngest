@@ -324,6 +324,7 @@ export const TRACE_DETAILS_FRAGMENT = gql`
     isRoot
     outputID
     spanID
+    stepID
     stepOp
     stepInfo {
       __typename
@@ -376,6 +377,7 @@ export const GET_RUN = gql`
 export const GET_TRACE_RESULT = gql`
   query GetTraceResult($traceID: String!) {
     runTraceSpanOutputByID(outputID: $traceID) {
+      input
       data
       error {
         message
