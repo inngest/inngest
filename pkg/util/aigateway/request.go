@@ -51,9 +51,6 @@ type Request struct {
 	// Raw indicates the raw content of the request, as a slice of JSON bytes.
 	// It's expected that this comes from our SDKs directly.
 	Raw json.RawMessage `json:"raw"`
-
-	// model is the model.
-	model string
 }
 
 func (r Request) HTTPRequest() (*http.Request, error) {

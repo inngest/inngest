@@ -263,6 +263,7 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 
 	resp, byt, dur, err := ExecuteRequest(ctx, c, req)
 
+	// Handle no response errors.
 	if errors.Is(err, ErrUnableToReach) {
 		log.From(ctx).
 			Warn().
@@ -273,13 +274,17 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 			Msg("EOF writing request to SDK")
 		return nil, err
 	}
-
 	if err != nil && len(byt) == 0 {
 		return nil, err
 	}
 
 	var sysErr *syscode.Error
 	if errors.Is(err, ErrBodyTooLarge) {
+		// In this case, strangely, the actual reported error should be nil.  This
+		// has something to do with the DriverResponse.Err we return and should be
+		// refactored.
+		err = nil
+
 		sysErr = &syscode.Error{Code: syscode.CodeOutputTooLarge}
 
 		// Override the output so the user sees the syserrV in the UI rather
