@@ -9,8 +9,8 @@ import (
 	"net/url"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/sdk"
-	v1apipb "github.com/inngest/inngest/proto/gen/api/v1"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 )
 
@@ -109,7 +109,7 @@ func (c *Connection) Sync(ctx context.Context) error {
 		return fmt.Errorf("error attempting to retrieve worker group: %w", err)
 	}
 	// Don't attempt to sync if it's already sync'd
-	if group != nil && group.SyncID != nil {
+	if group != nil && group.SyncID != nil && group.AppID != nil {
 		return nil
 	}
 
@@ -117,6 +117,11 @@ func (c *Connection) Sync(ctx context.Context) error {
 	// Can't do in-band
 	connURL := url.URL{Scheme: "ws", Host: "connect"}
 	sdkVersion := fmt.Sprintf("%s:%s", c.Group.SDKLang, c.Group.SDKVersion)
+
+	var cap sdk.Capabilities
+	if err := json.Unmarshal(c.Data.Config.Capabilities, &cap); err != nil {
+		return fmt.Errorf("error deserializing sync capabilities: %w", err)
+	}
 
 	config := sdk.RegisterRequest{
 		V:          "1",
@@ -128,7 +133,7 @@ func (c *Connection) Sync(ctx context.Context) error {
 			Env:      c.Data.GetEnvironment(),
 			Platform: c.Data.GetPlatform(),
 		},
-		Capabilities: sdk.Capabilities{},
+		Capabilities: cap,
 		UseConnect:   true, // NOTE: probably not needed if `DeployType` can have `connect` as input?
 		Functions:    c.Group.SyncData.Functions,
 	}
@@ -165,18 +170,14 @@ func (c *Connection) Sync(ctx context.Context) error {
 	}
 
 	// Retrieve the deploy ID for the sync and update state with it if available
-	var syncReply v1apipb.SyncReply
+	var syncReply cqrs.SyncReply
 	if err := json.NewDecoder(resp.Body).Decode(&syncReply); err != nil {
 		return fmt.Errorf("error parsing sync response: %w", err)
 	}
 
-	if syncReply.SyncId != nil {
-		syncID, err := uuid.Parse(syncReply.GetSyncId())
-		if err != nil {
-			return fmt.Errorf("invalid syncID, expected UUID: %s", syncReply.GetSyncId())
-		}
-
-		group.SyncID = &syncID
+	if syncReply.IsSuccess() {
+		group.SyncID = syncReply.SyncID
+		group.AppID = syncReply.AppID
 		// Update the worker group with the syncID so it's aware that it's already sync'd before
 		if err := c.GroupManager.UpdateWorkerGroup(ctx, envID, group); err != nil {
 			return fmt.Errorf("error updating worker group: %w", err)
