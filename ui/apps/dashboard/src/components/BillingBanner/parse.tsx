@@ -1,5 +1,6 @@
 import type { EntitlementUsageQuery } from '@/gql/graphql';
 import type { Severity } from '../Banner';
+import { BillingBannerTooltip } from './BillingBannerTooltip';
 
 export function parseEntitlementUsage(data: EntitlementUsageQuery['account']['entitlementUsage']): {
   bannerMessage: React.ReactNode;
@@ -13,33 +14,40 @@ export function parseEntitlementUsage(data: EntitlementUsageQuery['account']['en
     if (runCount.current >= runCount.limit) {
       issues.add(
         'run_count',
-        <>
-          <span className="font-semibold">{Intl.NumberFormat().format(runCount.current)}</span> /{' '}
+        <div className="flex items-center">
+          {Intl.NumberFormat().format(runCount.current)} /{' '}
           {Intl.NumberFormat().format(runCount.limit)} function runs
-        </>,
-        IssueSeverity.limitExceeded
+          <BillingBannerTooltip>
+            Exceeding the function run limit may result in service disruption.
+          </BillingBannerTooltip>
+        </div>,
+        IssueSeverity.hardLimitReached
       );
     } else if (runCount.current >= runCount.limit * 0.8) {
       issues.add(
         'run_count',
-        <>
-          <span className="font-semibold">{Intl.NumberFormat().format(runCount.current)}</span> /{' '}
+        <div className="flex items-center">
+          {Intl.NumberFormat().format(runCount.current)} /{' '}
           {Intl.NumberFormat().format(runCount.limit)} function runs
-        </>,
-        IssueSeverity.nearingLimit
+          <BillingBannerTooltip>
+            Exceeding the function run limit may result in service disruption.
+          </BillingBannerTooltip>
+        </div>,
+        IssueSeverity.hardLimitNear
       );
     }
   }
   if (accountConcurrencyLimitHits >= 12) {
     issues.add(
       'concurrency',
-      <>
-        <span className="font-semibold">
-          Account concurrency limit reached in {accountConcurrencyLimitHits}
-        </span>{' '}
-        of the past 24 hours
-      </>,
-      IssueSeverity.limitReached
+      <div className="flex items-center">
+        Account concurrency limit reached in {accountConcurrencyLimitHits} of the past 24 hours
+        <BillingBannerTooltip>
+          Reaching the concurrency limit adds delays between steps, making function runs take longer
+          to complete.
+        </BillingBannerTooltip>
+      </div>,
+      IssueSeverity.softLimitReached
     );
   }
 
@@ -51,15 +59,15 @@ export function parseEntitlementUsage(data: EntitlementUsageQuery['account']['en
 }
 
 const IssueSeverity = {
-  limitReached: 0,
-  nearingLimit: 1,
-  limitExceeded: 2,
+  softLimitReached: 0,
+  hardLimitNear: 1,
+  hardLimitReached: 2,
 } as const;
 type IssueSeverity = (typeof IssueSeverity)[keyof typeof IssueSeverity];
 
 class Issues {
   private items: Record<string, React.ReactNode> = {};
-  private maxIssueSeverity: IssueSeverity = IssueSeverity.nearingLimit;
+  private maxIssueSeverity: IssueSeverity = IssueSeverity.softLimitReached;
 
   add(key: string, message: React.ReactNode, severity: IssueSeverity) {
     this.items[key] = message;
@@ -70,14 +78,14 @@ class Issues {
   }
 
   getBannerMessage(): React.ReactNode {
-    if (this.maxIssueSeverity === IssueSeverity.nearingLimit) {
+    if (this.maxIssueSeverity === IssueSeverity.hardLimitNear) {
       return (
         <>
           <span className="font-semibold">High usage.</span> You are nearing the usage included in
           your plan. Please upgrade to avoid service disruption.
         </>
       );
-    } else if (this.maxIssueSeverity === IssueSeverity.limitExceeded) {
+    } else if (this.maxIssueSeverity === IssueSeverity.hardLimitReached) {
       return (
         <>
           <span className="font-semibold">Limit exceeded.</span> You have exceeded the usage
@@ -87,15 +95,14 @@ class Issues {
     } else {
       return (
         <>
-          <span className="font-semibold">Limit reached.</span> You are using the full capacity
-          included in your plan. Some function runs will take longer to complete until you upgrade.
+          <span className="font-semibold">Limit reached.</span> Performance may be impacted.
         </>
       );
     }
   }
 
   getBannerSeverity(): Severity {
-    if (this.maxIssueSeverity === IssueSeverity.limitExceeded) {
+    if (this.maxIssueSeverity === IssueSeverity.hardLimitReached) {
       return 'error';
     }
 
