@@ -24,9 +24,11 @@ type RequestOpts struct {
 	// URL is the full endpoint that we're sending the request to.  This must
 	// always be provided by our SDKs.
 	URL string `json:"url,omitempty"`
+	// Headers represent additional headers to send in the request.
+	Headers map[string]string `json:"headers,omitempty"`
 	// AuthKey is an API key to be sent with the request.  This contains
 	// API tokens which are never logged.
-	AuthKey string `json:"auth_key"`
+	AuthKey string `json:"auth_key,omitempty"`
 	// AutoToolCall indicates whether the request should automatically invoke functions
 	// when using inngest functions as tools.  This allows us to immediately execute without
 	// round trips.
@@ -79,7 +81,11 @@ func (r Request) HTTPRequest() (*http.Request, error) {
 	default:
 		// By default, use standards.
 		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", r.Opts.AuthKey))
+	}
 
+	// Overwrite any headers if custom headers are added to opts.
+	for header, val := range r.Opts.Headers {
+		req.Header.Add(header, val)
 	}
 
 	return req, nil
