@@ -1,0 +1,10 @@
+syntax = "proto3";
+package api.v1;
+
+option go_package = "github.com/inngest/inngest/proto/gen/api/v1;api";
+
+message SyncReply {
+  string message = 1;
+  bool modified = 2;
+  optional string sync_id = 3;
+}
