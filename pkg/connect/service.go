@@ -154,15 +154,23 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		var closeReason string
 		var closeReasonLock sync.Mutex
 
+		log := c.logger.With("account_id", connectionData.Data.AuthData.AccountId)
+
 		// Once connection is established, we must make sure to update the state on any disconnect,
 		// regardless of whether it's permanent or temporary
 		defer func() {
+			err := c.stateManager.DeleteConnection(ctx, connectionData)
+			switch err {
+			case nil, state.ConnDeletedWithGroupErr:
+				// no-op
+			default:
+				log.Error("error deleting connection from state", "error", err)
+			}
+
 			for _, lifecycle := range c.lifecycles {
 				lifecycle.OnDisconnected(ctx, closeReason)
 			}
 		}()
-
-		log := c.logger.With("account_id", connectionData.Data.AuthData.AccountId)
 
 		err = connectionData.Sync(ctx)
 		if err != nil {
@@ -211,24 +219,24 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		// TODO Persist connection state
 
+		eg := errgroup.Group{}
+
 		// Wait for relevant messages and forward them over the WebSocket connection
 		go c.receiveRouterMessages(ctx, app.ID, ws, log)
 
 		// Run loop
-		go func() {
-			// Once the run loop is exited, we need to close the connection
-			defer cancel()
-
+		eg.Go(func() error {
 			for {
 				// If the context is canceled due to a shutdown or other reason, we need to close the connection
 				// and let the client know we're going away intentionally.
 				if ctx.Err() != nil {
-					closeWithConnectError(ws, &SocketError{
+					serr := &SocketError{
 						SysCode:    syscode.CodeConnectGatewayClosing,
 						StatusCode: websocket.StatusGoingAway,
 						Msg:        "run loop context ended",
-					})
-					return
+					}
+					closeWithConnectError(ws, serr)
+					return err
 				}
 
 				var msg connect.ConnectMessage
@@ -242,18 +250,19 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 						closeReasonLock.Lock()
 						closeReason = closeErr.Reason
 						closeReasonLock.Unlock()
-						return
+						return closeErr
 					}
 
 					// If the parent context timed out or got canceled, we should signal the client that we're going away,
 					// and it should reconnect to another gateway.
 					if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-						closeWithConnectError(ws, &SocketError{
+						serr := &SocketError{
 							SysCode:    syscode.CodeConnectGatewayClosing,
 							StatusCode: websocket.StatusGoingAway,
 							Msg:        "read context ended",
-						})
-						return
+						}
+						closeWithConnectError(ws, serr)
+						return err
 					}
 
 					log.Error("failed to read websocket message", "err", err)
@@ -266,19 +275,19 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					})
 				}
 
-				go func() {
-					serr := c.handleIncomingWebSocketMessage(ctx, app.ID, &msg, log)
-					if serr != nil {
-						closeWithConnectError(ws, serr)
-						return
-					}
-				}()
+				serr := c.handleIncomingWebSocketMessage(ctx, app.ID, &msg, log)
+				if serr != nil {
+					closeWithConnectError(ws, serr)
+					return serr
+				}
 			}
-		}()
+		})
+
+		if err := eg.Wait(); err != nil {
+			return
+		}
 
 		// TODO Mark connection as ready to receive traffic unless we require manual client ready signal (optional)
-
-		<-ctx.Done()
 	})
 }
 
