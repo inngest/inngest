@@ -19,17 +19,23 @@ export default async function Page() {
 
   const runs = {
     title: 'Runs',
-    description: 'A single durable function execution. Additional runs are available for purchase.',
+    description: `A single durable function execution. ${
+      entitlementUsage?.runCount.overageAllowed ? 'Additional runs are available for purchase.' : ''
+    }`,
     current: entitlementUsage?.runCount.current || 0,
     limit: entitlementUsage?.runCount.limit || null,
   };
 
-  // const steps = {
-  //   title: 'Steps',
-  //   description: 'An individual step in durable functions. Additional steps are available for purchase.',
-  //   current: entitlementUsage?.stepCount?.current || 0,
-  //   limit: entitlementUsage?.stepCount?.limit || null,
-  // };
+  const steps = {
+    title: 'Steps',
+    description: `An individual step in durable functions. ${
+      entitlementUsage?.runCount.overageAllowed
+        ? 'Additional steps are available for purchase.'
+        : ''
+    }`,
+    current: entitlementUsage?.stepCount?.current || 0,
+    limit: entitlementUsage?.stepCount?.limit || null,
+  };
 
   const nextInvoiceDate = plan?.subscription?.nextInvoiceDate
     ? day(plan.subscription.nextInvoiceDate)
@@ -53,7 +59,7 @@ export default async function Page() {
             />
           </div>
           {entitlementUsage?.runCount && <LimitBar data={runs} className="my-4" />}
-          {/* {entitlementUsage?.stepCount && <LimitBar data={steps} className="mb-6" />} */}
+          {entitlementUsage?.stepCount && <LimitBar data={steps} className="mb-6" />}
           <div className="flex flex-col items-center gap-2">
             <p>Custom needs?</p>
             <NewButton

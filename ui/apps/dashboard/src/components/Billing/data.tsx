@@ -15,6 +15,12 @@ export const entitlementUsageDocument = graphql(`
         runCount {
           current
           limit
+          overageAllowed
+        }
+        stepCount {
+          current
+          limit
+          overageAllowed
         }
       }
     }
