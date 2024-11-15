@@ -2170,11 +2170,11 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 			return fmt.Errorf("error making inference request: %w", err)
 		}
 
-		// If we don't retry the request, carry on by enqueueing the next step,
-		// in the same way that OpcodeStepError works.
+		// If we can't retry, carry on by enqueueing the next step, in the same way
+		// that OpcodeStepError works.
 		//
-		// The actuall error should be wrapped with an "error" so that if this
-		// permanently fails it respects the error wrapping of step errors.
+		// The actual error should be wrapped with an "error" so that it respects the
+		// error wrapping of step errors.
 		output, _ = json.Marshal(map[string]json.RawMessage{
 			"error": output,
 		})
