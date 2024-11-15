@@ -20,7 +20,9 @@ export default async function Page() {
   const runs: Data = {
     title: 'Runs',
     description: `A single durable function execution. ${
-      entitlementUsage?.runCount.overageAllowed ? 'Additional runs are billed at the start of the next billing cycle.' : ''
+      entitlementUsage?.runCount.overageAllowed
+        ? 'Additional runs are billed at the start of the next billing cycle.'
+        : ''
     }`,
     current: entitlementUsage?.runCount.current || 0,
     limit: entitlementUsage?.runCount.limit || null,
@@ -60,7 +62,9 @@ export default async function Page() {
               href="/billing/usage?ref=app-billing-overview"
             />
           </div>
-          {entitlementUsage?.runCount && <LimitBar data={runs} className="my-4" />}
+          {entitlementUsage?.runCount && entitlementUsage.runCount.limit !== null && (
+            <LimitBar data={runs} className="my-4" />
+          )}
           {entitlementUsage?.stepCount && <LimitBar data={steps} className="mb-6" />}
           <div className="flex flex-col items-center gap-2">
             <p>Custom needs?</p>
