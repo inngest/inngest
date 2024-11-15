@@ -20,7 +20,7 @@ export default async function Page() {
   const runs: Data = {
     title: 'Runs',
     description: `A single durable function execution. ${
-      entitlementUsage?.runCount.overageAllowed ? 'Additional runs are available for purchase.' : ''
+      entitlementUsage?.runCount.overageAllowed ? 'Additional runs are billed at the start of the next billing cycle.' : ''
     }`,
     current: entitlementUsage?.runCount.current || 0,
     limit: entitlementUsage?.runCount.limit || null,
@@ -31,7 +31,7 @@ export default async function Page() {
     title: 'Steps',
     description: `An individual step in durable functions. ${
       entitlementUsage?.runCount.overageAllowed
-        ? 'Additional steps are available for purchase.'
+        ? 'Additional steps are billed at the start of the next billing cycle.'
         : ''
     }`,
     current: entitlementUsage?.stepCount.current || 0,
