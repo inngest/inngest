@@ -135,8 +135,7 @@ func (c *Connection) Sync(ctx context.Context) error {
 
 	// NOTE: pick this up via SDK
 	// technically it should only be accessible to the system that's the gateway is associated with
-	apiOrigin := "http://127.0.0.1:8288"
-	registerURL := fmt.Sprintf("%s/fn/register", apiOrigin)
+	registerURL := fmt.Sprintf("%s/fn/register", c.Data.Config.ApiOrigin)
 
 	byt, err := json.Marshal(config)
 	if err != nil {
