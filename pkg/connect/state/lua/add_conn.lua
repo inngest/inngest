@@ -6,6 +6,7 @@
 
 local connKey = KEYS[1]
 local groupKey = KEYS[2]
+local groupIDKey = KEYS[3]
 
 local connID = ARGV[1]
 local connMeta = ARGV[2]
@@ -19,6 +20,6 @@ redis.call("HSET", connKey, connID, connMeta)
 redis.call("HSETNX", groupKey, groupID, workerGroup)
 
 -- Add connID into the group
-redis.call("SADD", groupID, connID)
+redis.call("SADD", groupIDKey, connID)
 
 return 0
