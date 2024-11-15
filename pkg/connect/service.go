@@ -5,44 +5,58 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/coder/websocket"
-	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/connect/pubsub"
-	"github.com/inngest/inngest/pkg/connect/types"
-	"github.com/inngest/inngest/pkg/connect/wsproto"
-	"github.com/inngest/inngest/pkg/cqrs"
-	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/service"
-	"github.com/inngest/inngest/proto/gen/connect/v1"
-	"github.com/oklog/ulid/v2"
-	"google.golang.org/protobuf/proto"
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
+
+	"github.com/coder/websocket"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/connect/pubsub"
+	"github.com/inngest/inngest/pkg/connect/state"
+	"github.com/inngest/inngest/pkg/connect/types"
+	"github.com/inngest/inngest/pkg/connect/wsproto"
+	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/headers"
+	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/syscode"
+	"github.com/inngest/inngest/proto/gen/connect/v1"
+	"github.com/oklog/ulid/v2"
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/proto"
 )
 
 type gatewayOpt func(*connectGatewaySvc)
 
 type AuthResponse struct {
 	AccountID uuid.UUID
+	EnvID     uuid.UUID
 }
 
 type GatewayAuthHandler func(context.Context, *connect.SDKConnectRequestData) (*AuthResponse, error)
 
 type connectGatewaySvc struct {
+	chi.Router
+
 	// gatewayId is a unique identifier, generated each time the service is started.
 	// This should be used to uniquely identify the gateway instance when sending messages and routing requests.
 	gatewayId string
+	dev       bool
 
 	logger *slog.Logger
 
 	runCtx context.Context
 
 	auther       GatewayAuthHandler
-	stateManager ConnectionStateManager
+	stateManager state.ConnectionStateManager
 	receiver     pubsub.RequestReceiver
 	dbcqrs       cqrs.Manager
+
+	lifecycles []ConnectGatewayLifecycleListener
 }
 
 func WithGatewayAuthHandler(auth GatewayAuthHandler) gatewayOpt {
@@ -51,7 +65,7 @@ func WithGatewayAuthHandler(auth GatewayAuthHandler) gatewayOpt {
 	}
 }
 
-func WithConnectionStateManager(m ConnectionStateManager) gatewayOpt {
+func WithConnectionStateManager(m state.ConnectionStateManager) gatewayOpt {
 	return func(c *connectGatewaySvc) {
 		c.stateManager = m
 	}
@@ -66,6 +80,18 @@ func WithRequestReceiver(r pubsub.RequestReceiver) gatewayOpt {
 func WithDB(m cqrs.Manager) gatewayOpt {
 	return func(svc *connectGatewaySvc) {
 		svc.dbcqrs = m
+	}
+}
+
+func WithLifeCycles(lifecycles []ConnectGatewayLifecycleListener) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.lifecycles = lifecycles
+	}
+}
+
+func WithDev() gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.dev = true
 	}
 }
 
@@ -103,57 +129,14 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}
 
-		var initialMessageData connect.SDKConnectRequestData
-		{
-			var initialMessage connect.ConnectMessage
-			shorterContext, cancelShorter := context.WithTimeout(ctx, 5*time.Second)
-			defer cancelShorter()
-			err = wsproto.Read(shorterContext, ws, &initialMessage)
-			if err != nil {
-				if errors.Is(err, context.DeadlineExceeded) {
-					c.logger.Debug("Timeout waiting for SDK connect message")
-					_ = ws.Close(websocket.StatusPolicyViolation, "Timeout waiting for SDK connect message")
-				}
+		initialMessageData, serr := c.establishConnection(ctx, ws)
+		if serr != nil {
+			c.logger.Error("error establishing connection", "error", err)
+			_ = ws.Close(serr.StatusCode, serr.Error())
 
-				return
-			}
-
-			if initialMessage.Kind != connect.GatewayMessageType_SDK_CONNECT {
-				c.logger.Debug("initial SDK message was not connect")
-
-				_ = ws.Close(websocket.StatusPolicyViolation, "Invalid first message, expected sdk-connect")
-				return
-			}
-
-			if err := proto.Unmarshal(initialMessage.Payload, &initialMessageData); err != nil {
-				c.logger.Debug("initial SDK message contained invalid Protobuf")
-
-				_ = ws.Close(websocket.StatusPolicyViolation, "Invalid Protobuf in SDK connect message")
-				return
-			}
+			return
 		}
-
-		var authResp *AuthResponse
-		{
-			// Run auth, add to distributed state
-			authResp, err = c.auther(ctx, &initialMessageData)
-			if err != nil {
-				c.logger.Error("connect auth failed", "err", err)
-				_ = ws.Close(websocket.StatusInternalError, "Internal error")
-				return
-			}
-
-			if authResp == nil {
-				c.logger.Debug("Auth failed")
-
-				_ = ws.Close(websocket.StatusPolicyViolation, "Authentication failed")
-				return
-			}
-		}
-
-		log := c.logger.With("account_id", authResp.AccountID)
-
-		log.Debug("SDK successfully authenticated", "authResp", authResp)
+		log := c.logger.With("account_id", initialMessageData.AuthData.AccountId)
 
 		// TODO Check whether SDK group was already synced
 		isAlreadySynced := false
@@ -284,6 +267,99 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 	})
 }
 
+func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websocket.Conn) (*connect.SDKConnectRequestData, *SocketError) {
+	var (
+		initialMessageData connect.SDKConnectRequestData
+		initialMessage     connect.ConnectMessage
+	)
+
+	shorterContext, cancelShorter := context.WithTimeout(ctx, 5*time.Second)
+	defer cancelShorter()
+	err := wsproto.Read(shorterContext, ws, &initialMessage)
+	if err != nil {
+		code := syscode.CodeConnectInternal
+		statusCode := websocket.StatusInternalError
+		msg := err.Error()
+
+		if errors.Is(err, context.DeadlineExceeded) {
+			code = syscode.CodeConnectHelloTimeout
+			statusCode = websocket.StatusPolicyViolation
+			msg = "Timeout waiting for SDK connect message"
+
+			c.logger.Debug("Timeout waiting for SDK connect message")
+		}
+
+		return nil, &SocketError{
+			SysCode:    code,
+			StatusCode: statusCode,
+			Msg:        msg,
+		}
+	}
+
+	if initialMessage.Kind != connect.GatewayMessageType_SDK_CONNECT {
+		c.logger.Debug("initial SDK message was not connect")
+
+		return nil, &SocketError{
+			SysCode:    syscode.CodeConnectHelloInvalidMsg,
+			StatusCode: websocket.StatusPolicyViolation,
+			Msg:        "Invalid first message, expected sdk-connect",
+		}
+	}
+
+	if err := proto.Unmarshal(initialMessage.Payload, &initialMessageData); err != nil {
+		c.logger.Debug("initial SDK message contained invalid Protobuf")
+
+		return nil, &SocketError{
+			SysCode:    syscode.CodeConnectHelloInvalidPayload,
+			StatusCode: websocket.StatusPolicyViolation,
+			Msg:        "Invalid Protobuf in SDK connect message",
+		}
+	}
+
+	var authResp *AuthResponse
+	{
+		// Run auth, add to distributed state
+		authResp, err = c.auther(ctx, &initialMessageData)
+		if err != nil {
+			c.logger.Error("connect auth failed", "err", err)
+			return nil, &SocketError{
+				SysCode:    syscode.CodeConnectInternal,
+				StatusCode: websocket.StatusInternalError,
+				Msg:        "Internal error",
+			}
+		}
+
+		if authResp == nil {
+			c.logger.Debug("Auth failed")
+			return nil, &SocketError{
+				SysCode:    syscode.CodeConnectAuthFailed,
+				StatusCode: websocket.StatusPolicyViolation,
+				Msg:        "Authentication failed",
+			}
+		}
+
+		initialMessageData.AuthData.AccountId = authResp.AccountID.String()
+		initialMessageData.AuthData.EnvId = authResp.EnvID.String()
+
+		c.logger.Debug("SDK successfully authenticated", "authResp", authResp)
+	}
+
+	if err := c.stateManager.AddConnection(ctx, &initialMessageData); err != nil {
+		_ = ws.Close(websocket.StatusInternalError, "connection not stored")
+		return nil, &SocketError{
+			SysCode:    syscode.CodeConnectInternal,
+			StatusCode: websocket.StatusInternalError,
+			Msg:        "connection not stored",
+		}
+	}
+
+	for _, l := range c.lifecycles {
+		go l.OnConnected(ctx, &initialMessageData)
+	}
+
+	return &initialMessageData, nil
+}
+
 func (c *connectGatewaySvc) handleSdkReply(ctx context.Context, log *slog.Logger, appId uuid.UUID, msg *connect.ConnectMessage) error {
 	var data connect.SDKResponse
 	if err := proto.Unmarshal(msg.Payload, &data); err != nil {
@@ -302,7 +378,9 @@ func (c *connectGatewaySvc) handleSdkReply(ctx context.Context, log *slog.Logger
 
 func NewConnectGatewayService(opts ...gatewayOpt) ([]service.Service, http.Handler) {
 	gateway := &connectGatewaySvc{
-		gatewayId: ulid.MustNew(ulid.Now(), nil).String(),
+		Router:     chi.NewRouter(),
+		gatewayId:  ulid.MustNew(ulid.Now(), nil).String(),
+		lifecycles: []ConnectGatewayLifecycleListener{},
 	}
 	if os.Getenv("CONNECT_TEST_GATEWAY_ID") != "" {
 		gateway.gatewayId = os.Getenv("CONNECT_TEST_GATEWAY_ID")
@@ -325,22 +403,52 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 	// Set up gateway-specific logger with info for correlations
 	c.logger = logger.StdlibLogger(ctx).With("gateway_id", c.gatewayId)
 
+	// Setup REST endpoint
+	c.Use(
+		middleware.Heartbeat("/health"),
+	)
+	c.Route("/v0", func(r chi.Router) {
+		r.Use(headers.ContentTypeJsonResponse())
+
+		r.Get("/envs/{envID}/conns", c.showConnectionsByEnv)
+		r.Get("/apps/{appID}/conns", c.showConnectionsByApp)
+	})
+
 	return nil
 }
 
 func (c *connectGatewaySvc) Run(ctx context.Context) error {
 	c.runCtx = ctx
 
-	// TODO Mark gateway as active a couple seconds into the future (how do we make sure PubSub is connected and ready to receive?)
+	eg, ctx := errgroup.WithContext(ctx)
 
-	// Start listening for messages, this will block until the context is cancelled
-	err := c.receiver.Wait(ctx)
-	if err != nil {
-		// TODO Should we retry? Exit here? This will interrupt existing connections!
-		return fmt.Errorf("could not listen for pubsub messages: %w", err)
-	}
+	eg.Go(func() error {
+		port := 8289
+		if v, err := strconv.Atoi(os.Getenv("CONNECT_GATEWAY_API_PORT")); err == nil && v > 0 {
+			port = v
+		}
+		addr := fmt.Sprintf(":%d", port)
+		server := &http.Server{
+			Addr:    addr,
+			Handler: c,
+		}
+		c.logger.Info(fmt.Sprintf("starting gateway api at %s", addr))
+		return server.ListenAndServe()
+	})
 
-	return nil
+	eg.Go(func() error {
+		// TODO Mark gateway as active a couple seconds into the future (how do we make sure PubSub is connected and ready to receive?)
+		// Start listening for messages, this will block until the context is cancelled
+		err := c.receiver.Wait(ctx)
+		if err != nil {
+			// TODO Should we retry? Exit here? This will interrupt existing connections!
+			return fmt.Errorf("could not listen for pubsub messages: %w", err)
+		}
+
+		return nil
+	})
+
+	return eg.Wait()
 }
 
 func (c *connectGatewaySvc) Stop(ctx context.Context) error {
@@ -354,7 +462,7 @@ func (c *connectGatewaySvc) Stop(ctx context.Context) error {
 type connectRouterSvc struct {
 	logger *slog.Logger
 
-	stateManager ConnectionStateManager
+	stateManager state.ConnectionStateManager
 	receiver     pubsub.RequestReceiver
 	dbcqrs       cqrs.Manager
 }
@@ -388,7 +496,7 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 			// We need to add an idempotency key to ensure only one router instance processes the message
 			err = c.stateManager.SetRequestIdempotency(ctx, appId, data.RequestId)
 			if err != nil {
-				if errors.Is(err, ErrIdempotencyKeyExists) {
+				if errors.Is(err, state.ErrIdempotencyKeyExists) {
 					// Another connection was faster than us, we can ignore this message
 					return
 				}
@@ -437,7 +545,7 @@ func (c *connectRouterSvc) Stop(ctx context.Context) error {
 	return nil
 }
 
-func newConnectRouter(stateManager ConnectionStateManager, receiver pubsub.RequestReceiver, db cqrs.Manager) service.Service {
+func newConnectRouter(stateManager state.ConnectionStateManager, receiver pubsub.RequestReceiver, db cqrs.Manager) service.Service {
 	return &connectRouterSvc{
 		stateManager: stateManager,
 		receiver:     receiver,

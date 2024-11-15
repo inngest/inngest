@@ -6,7 +6,7 @@ export function parseEntitlementUsage(data: EntitlementUsageQuery['account']['en
   bannerSeverity: Severity;
   items: [string, React.ReactNode][];
 } {
-  const { runCount } = data;
+  const { runCount, accountConcurrencyLimitHits } = data;
   const issues = new Issues();
 
   if (runCount.limit) {
@@ -29,6 +29,18 @@ export function parseEntitlementUsage(data: EntitlementUsageQuery['account']['en
         IssueSeverity.nearingLimit
       );
     }
+  }
+  if (accountConcurrencyLimitHits >= 12) {
+    issues.add(
+      'concurrency',
+      <>
+        <span className="font-semibold">
+          Account concurrency limit reached in {accountConcurrencyLimitHits}
+        </span>{' '}
+        / past 24 hours
+      </>,
+      IssueSeverity.nearingLimit
+    );
   }
 
   return {

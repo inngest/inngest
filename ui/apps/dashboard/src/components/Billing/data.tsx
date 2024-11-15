@@ -22,6 +22,7 @@ export const entitlementUsageDocument = graphql(`
           limit
           overageAllowed
         }
+        accountConcurrencyLimitHits
       }
     }
   }

@@ -2,16 +2,21 @@ package golang
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
-	"github.com/inngest/inngest/pkg/coreapi/graph/models"
-	"github.com/inngest/inngest/tests/client"
-	"github.com/inngest/inngestgo"
-	"github.com/stretchr/testify/require"
 	"net"
+	"net/http"
 	"os"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/inngest/inngest/pkg/coreapi/graph/models"
+	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
+	"github.com/inngest/inngest/tests/client"
+	"github.com/inngest/inngestgo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEndToEnd(t *testing.T) {
@@ -64,9 +69,24 @@ func TestEndToEnd(t *testing.T) {
 		}
 	}()
 
-	// Wait until we're connected
-	// TODO Read the connection state API to see if socket is connected instead
-	<-time.After(4 * time.Second)
+	t.Run("verify connection is established", func(t *testing.T) {
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			a := assert.New(collect)
+
+			resp, err := http.Get("http://127.0.0.1:8289/v0/envs/dev/conns")
+			a.NoError(err)
+
+			var reply connpb.ShowConnsReply
+			err = json.NewDecoder(resp.Body).Decode(&reply)
+			a.NoError(err)
+
+			data := reply.GetData()
+			a.Equal(1, len(data))
+		}, 5*time.Second, 500*time.Millisecond)
+	})
+
+	// TODO: Check if the SDK is synced instead
+	<-time.After(2 * time.Second)
 
 	t.Run("trigger function", func(t *testing.T) {
 		_, err := inngestgo.Send(ctx, ConnectEvent{
