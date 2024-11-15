@@ -234,7 +234,7 @@ func checkNew_stepdata(t *testing.T, m state.Manager) {
 
 	data := loaded.Actions()
 	require.Equal(t, 1, len(data), "New should store predetermined step data")
-	require.Equal(t, init.Steps[0], data["step-a"], "New should store predetermined step data")
+	require.Equal(t, init.Steps[0].Data, data["step-a"], "New should store predetermined step data")
 }
 
 func checkUpdateMetadata(t *testing.T, m state.Manager) {
