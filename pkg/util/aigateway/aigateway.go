@@ -3,6 +3,7 @@ package aigateway
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/url"
 )
 
@@ -32,6 +33,10 @@ type ParsedInferenceResponse struct {
 	// TODO: Tool use selections, parsed.
 }
 
+func ParseUnknownInput(ctx context.Context, req json.RawMessage) (ParsedInferenceRequest, error) {
+	return ParsedInferenceRequest{}, fmt.Errorf("todo")
+}
+
 // Parse validates an inference request.  This checks which model, format, and URLs we should
 // use for the given request which is passed through to the end provider.
 //
@@ -44,7 +49,7 @@ type ParsedInferenceResponse struct {
 // * Mistral
 // * Cohere
 // * Groq (must include URL)
-func Parse(ctx context.Context, req Request) (ParsedInferenceRequest, error) {
+func ParseInput(ctx context.Context, req Request) (ParsedInferenceRequest, error) {
 	switch req.Opts.Format {
 	case FormatOpenAIChat:
 		// OpenAI Chat is the default format, so fall through to the default.

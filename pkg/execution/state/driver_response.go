@@ -32,7 +32,7 @@ type UserError struct {
 	// the SDK MAY choose to store additional data for its own purposes here.
 	Data json.RawMessage `json:"data,omitempty"`
 
-	// NoRetry is set when parsing the opcide via the retry header.
+	// NoRetry is set when parsing the opcode via the retry header.
 	// It is NOT set via the SDK.
 	NoRetry bool `json:"noRetry,omitempty"`
 
@@ -75,17 +75,23 @@ func (g GeneratorOpcode) UserDefinedName() string {
 	return g.Name
 }
 
-// Get the stringified input of the step.
+// Get the stringified input of the step, if `step.Run` was passed inputs
+// or if we're using request offloading.
 func (g GeneratorOpcode) Input() (string, error) {
-	runOpts, _ := g.RunOpts()
-	if runOpts != nil && runOpts.Input != nil {
-		return string(runOpts.Input), nil
+	// Only specific operations can have inputs.  These are currently limited
+	// to OpcodeStepRun and OpcodeStepAIGateway.
+	switch g.Op {
+	case enums.OpcodeStepRun, enums.OpcodeStep:
+		runOpts, _ := g.RunOpts()
+		if runOpts != nil && runOpts.Input != nil {
+			return string(runOpts.Input), nil
+		}
+	case enums.OpcodeAIGateway:
+		// The input for the AI Gateway is the entire request.
+		return string(g.Data), nil
 	}
 
-	// Failure to unwrap run opts just means this isn't an op that can provide
-	// input, so ignore.
 	return "", nil
-
 }
 
 // Get the stringified output of the step.
@@ -560,6 +566,26 @@ func (r *DriverResponse) TraceVisibleStepExecution() *GeneratorOpcode {
 // response and should be visible in a trace.
 func (r *DriverResponse) IsTraceVisibleFunctionExecution() bool {
 	return r.StatusCode != 206
+}
+
+func (r *DriverResponse) UpdateOpcodeOutput(op GeneratorOpcode, to json.RawMessage) {
+	for n, o := range r.Generator {
+		if o.ID != op.ID {
+			continue
+		}
+		r.Generator[n].Data = to
+	}
+}
+
+// UpdateOpcodeError updates an opcode's data and error to the given inputs.
+func (r *DriverResponse) UpdateOpcodeError(op GeneratorOpcode, data json.RawMessage, err UserError) {
+	for n, o := range r.Generator {
+		if o.ID != op.ID {
+			continue
+		}
+		r.Generator[n].Data = data
+		r.Generator[n].Error = &err
+	}
 }
 
 type WrappedStandardError struct {

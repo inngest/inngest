@@ -33,6 +33,10 @@ var (
 	ErrInvalidEmptyResponse = fmt.Errorf("Error performing request to SDK URL")
 )
 
+// ExecuteRequest executes an HTTP request.  This returns the HTTP response, the body (limited by
+// our max step size), the duration for the request, and any connection errors.
+//
+// NOTE: This does NOT handle HTTP errors, and instead only handles system errors.
 func ExecuteRequest(ctx context.Context, c HTTPDoer, req *http.Request) (*http.Response, []byte, time.Duration, error) {
 	pre := time.Now()
 	resp, err := c.Do(req)

@@ -705,6 +705,7 @@ type runInstance struct {
 	events       []json.RawMessage
 	item         queue.Item
 	edge         inngest.Edge
+	resp         *state.DriverResponse
 	stackIndex   int
 	appIsConnect bool
 }
@@ -865,35 +866,36 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	resp, err := e.run(ctx, &instance)
-	if resp == nil && err != nil {
-		for _, e := range e.lifecycles {
-			// OnStepFinished handles step success and step errors/failures.  It is
-			// currently the responsibility of the lifecycle manager to handle the differing
-			// step statuses when a step finishes.
-			go e.OnStepFinished(context.WithoutCancel(ctx), md, item, edge, resp, err)
-		}
-		return nil, err
+	if resp != nil && err == nil {
+		// Now we have a response, update the run instance.  We need to do this as request
+		// offloads must mutate the response directly.
+		instance.resp = resp
+
+		// Handle the response properly, as long as hitting the SDK didn't return an error.
+		err = e.HandleResponse(ctx, &instance)
 	}
 
-	err = e.HandleResponse(ctx, &instance, resp)
+	// And, finally, call the StepFinished lifecycles.
+	//
+	// Before gateways and request offloading existed, the SDK would do all of the work,
+	// meaning that finishing the `.run` SDK call completes the step. Now that we have request
+	// offloading, it's unknown as to whether the step actually _finished_ or if we
+	// need to make an offloaded AI request and _then_ finish the step.
+	//
+	// For this reason, we need to handle the response and parse the generator outputs before
+	// marking the step as complete.
+	for _, e := range e.lifecycles {
+		go e.OnStepFinished(context.WithoutCancel(ctx), md, item, edge, resp, err)
+	}
+
 	return resp, err
 }
 
-func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *state.DriverResponse) error {
+func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 	l := logger.StdlibLogger(ctx).With(
 		"run_id", i.md.ID.RunID.String(),
 		"workflow_id", i.md.ID.FunctionID.String(),
 	)
-
-	for _, e := range e.lifecycles {
-		// OnStepFinished handles step success and step errors/failures.  It is
-		// currently the responsibility of the lifecycle manager to handle the differing
-		// step statuses when a step finishes.
-		//
-		// TODO (tonyhb): This should probably change, as each lifecycle listener has to
-		// do the same parsing & conditional checks.
-		go e.OnStepFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, resp, nil)
-	}
 
 	// Check for temporary failures.  The outputs of transient errors are not
 	// stored in the state store;  they're tracked via executor lifecycle methods
@@ -904,20 +906,20 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 	// error.
 	//
 	// This is purely for network errors or top-level function code errors.
-	if resp.Err != nil {
-		if resp.Retryable() {
+	if i.resp.Err != nil {
+		if i.resp.Retryable() {
 			// Retries are a native aspect of the queue;  returning errors always
 			// retries steps if possible.
 			for _, e := range e.lifecycles {
 				// Run the lifecycle method for this retry, which is baked into the queue.
 				i.item.Attempt += 1
-				go e.OnStepScheduled(context.WithoutCancel(ctx), i.md, i.item, &resp.Step.Name)
+				go e.OnStepScheduled(context.WithoutCancel(ctx), i.md, i.item, &i.resp.Step.Name)
 			}
 
-			return resp
+			return i.resp
 		}
 
-		// If resp.Err != nil, we don't know whether to invoke the fn again
+		// If i.resp.Err != nil, we don't know whether to invoke the fn again
 		// with per-step errors, as we don't know if the intent behind this queue item
 		// is a step.
 		//
@@ -928,25 +930,25 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 		// TODO: Improve this.
 
 		// Check if this step permanently failed.  If so, the function is a failure.
-		if !resp.Retryable() {
+		if !i.resp.Retryable() {
 			// TODO: Refactor state input
-			if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *resp); err != nil {
+			if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
 				l.Error("error running finish handler", "error", err)
 			}
 
 			// Can be reached multiple times for parallel discovery steps
 			for _, e := range e.lifecycles {
-				go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
+				go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
 			}
 
-			return resp
+			return i.resp
 		}
 	}
 
 	// This is a success, which means either a generator or a function result.
-	if len(resp.Generator) > 0 {
+	if len(i.resp.Generator) > 0 {
 		// Handle generator responses then return.
-		if serr := e.HandleGeneratorResponse(ctx, i, resp); serr != nil {
+		if serr := e.HandleGeneratorResponse(ctx, i, i.resp); serr != nil {
 
 			// If this is an error compiling async expressions, fail the function.
 			shouldFailEarly := errors.Is(serr, &expressions.CompileError{}) || errors.Is(serr, state.ErrStateOverflowed) || errors.Is(serr, state.ErrFunctionOverflowed)
@@ -954,17 +956,17 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 				var gracefulErr *state.WrappedStandardError
 				if hasGracefulErr := errors.As(serr, &gracefulErr); hasGracefulErr {
 					serialized := gracefulErr.Serialize(execution.StateErrorKey)
-					resp.Output = nil
-					resp.Err = &serialized
+					i.resp.Output = nil
+					i.resp.Err = &serialized
 				}
 
-				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *resp); err != nil {
+				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
 					l.Error("error running finish handler", "error", err)
 				}
 
 				// Can be reached multiple times for parallel discovery steps
 				for _, e := range e.lifecycles {
-					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
+					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
 				}
 
 				return nil
@@ -975,13 +977,13 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 	}
 
 	// This is the function result.
-	if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *resp); err != nil {
+	if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
 		l.Error("error running finish handler", "error", err)
 	}
 
 	// Can be reached multiple times for parallel discovery steps
 	for _, e := range e.lifecycles {
-		go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *resp)
+		go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
 	}
 
 	return nil
@@ -1989,9 +1991,6 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 	// This was the final step attempt and we still failed.
 	//
 	// First, save the error to our state store.
-	//
-	// Note that `onStepFinished` is called immediately after a step response is returned, so
-	// the history for this error will have already been handled.
 	output, err := gen.Output()
 	if err != nil {
 		return err
@@ -2137,16 +2136,52 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		return fmt.Errorf("error parsing ai gateway step: %w", err)
 	}
 
-	// XXX: Store input, model, provider in trace.
+	// NOTE:  It's the responsibility of `trace_lifecycle` to parse the gateway request,
+	// then generate an aigateway.ParsedInferenceRequest to store in the history store.
+	// This happens automatically within trace_lifecycle.go.
 
 	req, err := input.HTTPRequest()
 	if err != nil {
 		return fmt.Errorf("error creating ai gateway request: %w", err)
 	}
 
-	_, output, _, err := httpdriver.ExecuteRequest(ctx, httpdriver.DefaultClient, req)
-	if err != nil {
-		return fmt.Errorf("error making inference request: %w", err)
+	hr, output, _, err := httpdriver.ExecuteRequest(ctx, httpdriver.DefaultClient, req)
+	failure := err != nil || (hr != nil && hr.StatusCode > 299)
+
+	// Handle errors individually, here.
+	if failure {
+		if len(output) == 0 {
+			// Add some output for the response.
+			output = []byte(`{"error":"Error making AI request"}`)
+		}
+
+		// Ensure the opcode is treated as an error when calling OnStepFinish.
+		i.resp.UpdateOpcodeError(gen, output, state.UserError{
+			Name:    fmt.Sprintf("Error making AI request: %s", err),
+			Message: string(output),
+			Data:    output, // For golang's multiple returns.
+		})
+
+		// And, finally, if this is retryable return an error which will be retried.
+		// Otherwise, we enqueue the next step directly so that the SDK can throw
+		// an error on output.
+		if queue.ShouldRetry(nil, i.item.Attempt, i.item.GetMaxAttempts()) {
+			// This will retry, as it hits the queue directly.
+			return fmt.Errorf("error making inference request: %w", err)
+		}
+
+		// If we don't retry the request, carry on by enqueueing the next step,
+		// in the same way that OpcodeStepError works.
+		//
+		// The actuall error should be wrapped with an "error" so that if this
+		// permanently fails it respects the error wrapping of step errors.
+		output, _ = json.Marshal(map[string]json.RawMessage{
+			"error": output,
+		})
+	} else {
+		// The response output is actually now the result of this AI call. We need
+		// to modify the opcode data so that accessing the step output is correct.
+		i.resp.UpdateOpcodeOutput(gen, output)
 	}
 
 	// Save the output as the step result.
@@ -2154,8 +2189,9 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		return err
 	}
 
-	// TODO: Parse the response based off of req.Opts.Format.  If auto-call is supported and a tool is
-	// provided, do the auto-call stuff.
+	// TODO: If auto-call is supported and a tool is provided, auto-call invokes
+	// before scheduling the next step.
+	// if !failure {}
 
 	// XXX: Remove once deprecated from history.
 	groupID := uuid.New().String()

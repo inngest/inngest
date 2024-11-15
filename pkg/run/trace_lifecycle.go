@@ -19,6 +19,7 @@ import (
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -681,10 +682,6 @@ func (l traceLifecycle) OnStepFinished(
 				attribute.String(consts.OtelSysStepOpcode, foundOp.String()),
 			)
 
-			if input, _ := op.Input(); input != "" {
-				span.SetStepInput(input)
-			}
-
 			if op.IsError() {
 				span.SetStepOutput(op.Error)
 				span.SetStatus(codes.Error, op.Error.Message)
@@ -692,6 +689,29 @@ func (l traceLifecycle) OnStepFinished(
 				span.SetStepOutput(op.Data)
 				span.SetStatus(codes.Ok, string(op.Data))
 			}
+
+			if input, _ := op.Input(); input != "" {
+				span.SetStepInput(input)
+			}
+
+			// If we have AI calls, parse the input and output metadata directly.
+			switch op.Op {
+			case enums.OpcodeAIGateway:
+				req, _ := op.AIGatewayOpts()
+				if parsed, err := aigateway.ParseInput(ctx, req); err == nil {
+					span.SetAIRequestMetadata(parsed)
+				}
+			case enums.OpcodeStep, enums.OpcodeStepRun:
+				// Handle input and attempt to best-effort parse.
+				input, _ := op.Input()
+				if parsed, err := aigateway.ParseUnknownInput(ctx, json.RawMessage(input)); err == nil {
+					span.SetAIRequestMetadata(parsed)
+
+					// Now that we know the step run was a wrapped AI call, we can also parse the output
+					// to see if we can store the response metadata correctly.
+				}
+			}
+
 		} else if resp.Retryable() { // these are function retries
 			span.SetStatus(codes.Error, *resp.Err)
 			span.SetAttributes(
