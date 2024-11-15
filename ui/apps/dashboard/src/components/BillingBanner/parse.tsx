@@ -37,7 +37,7 @@ export function parseEntitlementUsage(data: EntitlementUsageQuery['account']['en
         <span className="font-semibold">
           Account concurrency limit reached in {accountConcurrencyLimitHits}
         </span>{' '}
-        / past 24 hours
+        of the past 24 hours
       </>,
       IssueSeverity.nearingLimit
     );
