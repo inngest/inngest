@@ -39,7 +39,7 @@ export function parseEntitlementUsage(data: EntitlementUsageQuery['account']['en
         </span>{' '}
         of the past 24 hours
       </>,
-      IssueSeverity.nearingLimit
+      IssueSeverity.limitReached
     );
   }
 
@@ -51,8 +51,9 @@ export function parseEntitlementUsage(data: EntitlementUsageQuery['account']['en
 }
 
 const IssueSeverity = {
-  nearingLimit: 0,
-  limitExceeded: 1,
+  limitReached: 0,
+  nearingLimit: 1,
+  limitExceeded: 2,
 } as const;
 type IssueSeverity = (typeof IssueSeverity)[keyof typeof IssueSeverity];
 
@@ -76,22 +77,29 @@ class Issues {
           your plan. Please upgrade to avoid service disruption.
         </>
       );
+    } else if (this.maxIssueSeverity === IssueSeverity.limitExceeded) {
+      return (
+        <>
+          <span className="font-semibold">Limit exceeded.</span> You have exceeded the usage
+          included in your plan. Please upgrade to avoid service disruption.
+        </>
+      );
+    } else {
+      return (
+        <>
+          <span className="font-semibold">Limit reached.</span> You are using the full capacity
+          included in your plan. Some function runs will take longer to complete until you upgrade.
+        </>
+      );
     }
-
-    return (
-      <>
-        <span className="font-semibold">Limit exceeded.</span> You have exceeded the usage included
-        in your plan. Please upgrade to avoid service disruption.
-      </>
-    );
   }
 
   getBannerSeverity(): Severity {
-    if (this.maxIssueSeverity === IssueSeverity.nearingLimit) {
-      return 'warning';
+    if (this.maxIssueSeverity === IssueSeverity.limitExceeded) {
+      return 'error';
     }
 
-    return 'error';
+    return 'warning';
   }
 
   getItems(): [string, React.ReactNode][] {
