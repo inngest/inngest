@@ -186,6 +186,31 @@ func (q *Queries) GetAppByID(ctx context.Context, id uuid.UUID) (*App, error) {
 	return &i, err
 }
 
+const getAppByName = `-- name: GetAppByName :one
+SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url, is_connect FROM apps WHERE name = ? AND archived_at IS NULL LIMIT 1
+`
+
+func (q *Queries) GetAppByName(ctx context.Context, name string) (*App, error) {
+	row := q.db.QueryRowContext(ctx, getAppByName, name)
+	var i App
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.SdkLanguage,
+		&i.SdkVersion,
+		&i.Framework,
+		&i.Metadata,
+		&i.Status,
+		&i.Error,
+		&i.Checksum,
+		&i.CreatedAt,
+		&i.ArchivedAt,
+		&i.Url,
+		&i.IsConnect,
+	)
+	return &i, err
+}
+
 const getAppByURL = `-- name: GetAppByURL :one
 SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url, is_connect FROM apps WHERE url = ? AND archived_at IS NULL LIMIT 1
 `

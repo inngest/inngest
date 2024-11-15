@@ -185,7 +185,18 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, _ = w.Write([]byte(`{"ok":true}`))
+	reply := cqrs.SyncReply{
+		OK:       true,
+		Modified: true,
+	}
+
+	resp, err := json.Marshal(reply)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, err)
+		return
+	}
+
+	_, _ = w.Write(resp)
 }
 
 func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error) {

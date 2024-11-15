@@ -36,6 +36,8 @@ type AppReader interface {
 	GetAppByChecksum(ctx context.Context, checksum string) (*App, error)
 	// GetAppByURL returns an app by URL
 	GetAppByURL(ctx context.Context, url string) (*App, error)
+	// GetAppByName returns an app by name
+	GetAppByName(ctx context.Context, name string) (*App, error)
 	// GetAllApps returns all apps.
 	GetAllApps(ctx context.Context) ([]*App, error)
 
