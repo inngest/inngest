@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/sdk"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 )
@@ -160,15 +161,15 @@ func (c *Connection) Sync(ctx context.Context) error {
 
 	// Set basic headers
 	// TODO: use constants for these header keys
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Inngest-SDK", sdkVersion)
-	req.Header.Set("User-Agent", sdkVersion)
+	req.Header.Set(headers.HeaderContentType, "application/json")
+	req.Header.Set(headers.HeaderKeySDK, sdkVersion)
+	req.Header.Set(headers.HeaderUserAgent, sdkVersion)
 
 	hashedSigningKey := string(c.Data.AuthData.HashedSigningKey)
 	if hashedSigningKey == "" {
 		return fmt.Errorf("no signing key available for syncing")
 	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", hashedSigningKey))
+	req.Header.Set(headers.HeaderAuthorization, fmt.Sprintf("Bearer %s", hashedSigningKey))
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

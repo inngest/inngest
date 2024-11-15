@@ -17,6 +17,10 @@ const (
 	HeaderKeyExpectedServerKind = "X-Inngest-Expected-Server-Kind"
 
 	HeaderKeySignature = "X-Inngest-Signature"
+
+	HeaderAuthorization = "Authorization"
+	HeaderContentType   = "Content-Type"
+	HeaderUserAgent     = "User-Agent"
 )
 
 const (
