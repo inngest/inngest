@@ -60,7 +60,7 @@ export function BillingBannerView({ entitlementUsage }: Props) {
           </ul>
         </div>
 
-        <div className="flex items-center">
+        <div className="mr-2 flex items-center">
           <NewButton
             appearance="outlined"
             href={pathCreator.billing()}
