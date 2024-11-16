@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"reflect"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -20,31 +21,6 @@ const (
 	InferFormatGemini     InferFormat = "gemini"
 	InferFormatBedrock    InferFormat = "bedrock"
 )
-
-type InferRequestOpts struct {
-	// URL is the provider URL which is used when making the request.
-	URL string `json:"url"`
-	// Headers represent additional headers to send in the request.
-	Headers map[string]string `json:"headers,omitempty"`
-	// AuthKey is your API key.  This will be added to the inference request depending
-	// on the API format chosen in Format.
-	//
-	// This is NEVER logged or kept.
-	AuthKey string `json:"auth_key"`
-	// Format represents the format for the API request and response.  Infer allows
-	// the use of common formats, and we create the request and infer metadata based
-	// off of the API format.  Note that many providers support an open OpenAI-like
-	// format.
-	Format InferFormat `json:"format"`
-	// AutoToolCall bool `json:"auto_tool_call"`
-}
-
-type InferOpts[RequestT any] struct {
-	// Opts represents the Inngest-specific step and request opts
-	Opts InferRequestOpts
-	// Body is the raw request type, eg. the Anthropic or OpenAI request.
-	Body RequestT
-}
 
 // StepRun runs any code reliably, with retries, returning the resulting data.  If this
 // fails the function stops.
@@ -128,4 +104,48 @@ func Infer[InputT any, OutputT any](
 		Data: reqBytes,
 	})
 	panic(ControlHijack{})
+}
+
+type InferRequestOpts struct {
+	// URL is the provider URL which is used when making the request.
+	URL string `json:"url"`
+	// Headers represent additional headers to send in the request.
+	Headers map[string]string `json:"headers,omitempty"`
+	// AuthKey is your API key.  This will be added to the inference request depending
+	// on the API format chosen in Format.
+	//
+	// This is NEVER logged or kept.
+	AuthKey string `json:"auth_key"`
+	// Format represents the format for the API request and response.  Infer allows
+	// the use of common formats, and we create the request and infer metadata based
+	// off of the API format.  Note that many providers support an open OpenAI-like
+	// format.
+	Format InferFormat `json:"format"`
+	// AutoToolCall bool `json:"auto_tool_call"`
+}
+
+type InferOpts[RequestT any] struct {
+	// Opts represents the Inngest-specific step and request opts
+	Opts InferRequestOpts
+	// Body is the raw request type, eg. the Anthropic or OpenAI request.
+	Body RequestT
+}
+
+// InferOpenAIOpts is a helper function for generating OpenAI opts.
+func InferOpenAIOpts(key *string, baseURL *string) InferRequestOpts {
+	api := os.Getenv("OPENAI_API_KEY")
+	if key != nil {
+		api = *key
+	}
+
+	base := "https://api.openai.com"
+	if baseURL != nil {
+		base = *baseURL
+	}
+
+	return InferRequestOpts{
+		URL:     base + "/v1/chat/completions",
+		AuthKey: api,
+		Format:  InferFormatOpenAIChat,
+	}
 }
