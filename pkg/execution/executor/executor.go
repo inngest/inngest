@@ -1165,7 +1165,6 @@ func (e *executor) run(ctx context.Context, i *runInstance) (*state.DriverRespon
 
 	// Execute the actual step.
 	response, err := e.executeDriverForStep(ctx, i)
-
 	if response.Err != nil && err == nil {
 		// This step errored, so always return an error.
 		return response, fmt.Errorf("%s", *response.Err)

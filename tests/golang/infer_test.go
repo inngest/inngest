@@ -20,7 +20,7 @@ func TestStepInfer(t *testing.T) {
 
 	// Create a new mock test server.
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`{
+		_, _ = w.Write([]byte(`{
 		    "id": "chatcmpl-AU1N8cUSBVK5kXQ7Q0zFmBXvKTmQd",
 		    "object": "chat.completion",
 		    "created": 1731718478,
