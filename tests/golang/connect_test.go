@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
-	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/assert"
@@ -76,12 +76,11 @@ func TestEndToEnd(t *testing.T) {
 			resp, err := http.Get("http://127.0.0.1:8289/v0/envs/dev/conns")
 			a.NoError(err)
 
-			var reply connpb.ShowConnsReply
+			var reply cqrs.ShowConnsReply
 			err = json.NewDecoder(resp.Body).Decode(&reply)
 			a.NoError(err)
 
-			data := reply.GetData()
-			a.Equal(1, len(data))
+			a.Equal(1, len(reply.Data))
 		}, 5*time.Second, 500*time.Millisecond)
 	})
 

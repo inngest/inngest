@@ -134,11 +134,12 @@ func (r *redisConnectionStateManager) AddConnection(ctx context.Context, conn *C
 
 	groupID := conn.Group.Hash
 	meta := &connpb.ConnMetadata{
-		Language: conn.Data.SdkLanguage,
-		Version:  conn.Data.SdkVersion,
-		EnvId:    envID,
-		GroupId:  groupID,
-		Session:  conn.Session,
+		Id:         conn.Session.SessionId.ConnectionId,
+		InstanceId: conn.Session.SessionId.InstanceId,
+		Language:   conn.Data.SdkLanguage,
+		Version:    conn.Data.SdkVersion,
+		GroupId:    groupID,
+		Attributes: conn.Data.SystemAttributes,
 	}
 
 	keys := []string{
@@ -166,7 +167,7 @@ func (r *redisConnectionStateManager) AddConnection(ctx context.Context, conn *C
 	}
 
 	args := []string{
-		conn.Session.SessionId.ConnectionId,
+		meta.Id,
 		metaArg,
 		groupID,
 		groupArg,

@@ -143,7 +143,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}
 
-		connectionData, serr := c.establishConnection(ctx, ws)
+		conn, serr := c.establishConnection(ctx, ws)
 		if serr != nil {
 			c.logger.Error("error establishing connection", "error", serr)
 			closeWithConnectError(ws, serr)
@@ -154,12 +154,12 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		var closeReason string
 		var closeReasonLock sync.Mutex
 
-		log := c.logger.With("account_id", connectionData.Data.AuthData.AccountId)
+		log := c.logger.With("account_id", conn.Data.AuthData.AccountId)
 
 		// Once connection is established, we must make sure to update the state on any disconnect,
 		// regardless of whether it's permanent or temporary
 		defer func() {
-			err := c.stateManager.DeleteConnection(ctx, connectionData)
+			err := c.stateManager.DeleteConnection(ctx, conn)
 			switch err {
 			case nil, state.ConnDeletedWithGroupErr:
 				// no-op
@@ -172,7 +172,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}()
 
-		err = connectionData.Sync(ctx)
+		err = conn.Sync(ctx, c.stateManager)
 		if err != nil {
 			log.Error("error handling sync", "error", err)
 
@@ -192,9 +192,9 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
-		app, err := c.dbcqrs.GetAppByName(ctx, connectionData.Data.AppName)
+		app, err := c.dbcqrs.GetAppByName(ctx, conn.Data.AppName)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			log.Error("could not get app by name", "appName", connectionData.Data.AppName, "err", err)
+			log.Error("could not get app by name", "appName", conn.Data.AppName, "err", err)
 			closeWithConnectError(ws, &SocketError{
 				SysCode:    syscode.CodeConnectInternal,
 				StatusCode: websocket.StatusInternalError,
@@ -204,7 +204,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		}
 
 		if errors.Is(err, sql.ErrNoRows) || app == nil {
-			log.Error("could not find app", "appName", connectionData.Data.AppName)
+			log.Error("could not find app", "appName", conn.Data.AppName)
 			closeWithConnectError(ws, &SocketError{
 				SysCode:    syscode.CodeConnectInternal,
 				StatusCode: websocket.StatusInternalError,
@@ -471,8 +471,6 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 	}
 
 	conn := state.Connection{
-		GroupManager: c.stateManager,
-
 		Data:    &initialMessageData,
 		Session: sessionDetails,
 		Group:   workerGroup,
