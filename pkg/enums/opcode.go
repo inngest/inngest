@@ -14,4 +14,5 @@ const (
 	OpcodeSleep
 	OpcodeWaitForEvent
 	OpcodeInvokeFunction
+	OpcodeStepNotFound // The SDK tried to run a particular step but couldn't find it
 )
