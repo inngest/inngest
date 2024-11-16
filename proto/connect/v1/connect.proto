@@ -82,13 +82,12 @@ message SDKResponse {
 
 // Connection metadata
 message ConnMetadata {
-	SystemAttributes attributes = 1;
-	string language = 2;
-	string version = 3;
-	string env_id = 4;
-	string app_id = 5;
-	SessionDetails session = 6;
-	string group_id = 7;
+	string id = 1;
+	string instance_id = 2;
+	string group_id = 3;
+	string language = 4;
+	string version = 5;
+	SystemAttributes attributes = 8;
 }
 
 message SystemAttributes {
@@ -104,10 +103,6 @@ message ConnGroup {
 	repeated ConnMetadata conns = 4;
 	optional string sync_id = 5;
 	optional string build_id = 6;
-}
-
-message ShowConnsReply {
-	repeated ConnMetadata data = 1;
 }
 
 enum WorkerDisconnectReason {

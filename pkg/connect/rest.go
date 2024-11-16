@@ -7,8 +7,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/publicerr"
-	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 )
 
 // showConnections retrieves the list of connections from the gateway state
@@ -48,7 +48,7 @@ func (c *connectGatewaySvc) showConnectionsByEnv(w http.ResponseWriter, r *http.
 		return
 	}
 
-	reply := &connpb.ShowConnsReply{
+	reply := &cqrs.ShowConnsReply{
 		Data: conns,
 	}
 
@@ -94,7 +94,7 @@ func (c *connectGatewaySvc) showConnectionsByApp(w http.ResponseWriter, r *http.
 		return
 	}
 
-	reply := &connpb.ShowConnsReply{
+	reply := &cqrs.ShowConnsReply{
 		Data: conns,
 	}
 
