@@ -129,6 +129,35 @@ func (r *redisConnectionStateManager) GetConnectionsByAppID(ctx context.Context,
 	return nil, notImplementedError
 }
 
+func (r *redisConnectionStateManager) GetConnectionsByGroupID(ctx context.Context, envID uuid.UUID, groupID string) ([]*connpb.ConnMetadata, error) {
+	keys := []string{
+		r.connKey(envID.String()),
+		r.groupIDKey(envID.String(), groupID),
+	}
+	args := []string{}
+
+	res, err := scripts["get_conns_by_group"].Exec(
+		ctx,
+		r.client,
+		keys,
+		args,
+	).AsStrSlice()
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving conns by group: %w", err)
+	}
+
+	conns := []*connpb.ConnMetadata{}
+	for _, cs := range res {
+		var conn connpb.ConnMetadata
+		if err := json.Unmarshal([]byte(cs), &conn); err != nil {
+			return nil, fmt.Errorf("error deserializing conn metadata: %w", err)
+		}
+		conns = append(conns, &conn)
+	}
+
+	return conns, nil
+}
+
 func (r *redisConnectionStateManager) AddConnection(ctx context.Context, conn *Connection) error {
 	envID := conn.Data.AuthData.GetEnvId()
 

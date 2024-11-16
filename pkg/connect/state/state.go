@@ -25,6 +25,7 @@ type StateManager interface {
 type ConnectionManager interface {
 	GetConnectionsByEnvID(ctx context.Context, envID uuid.UUID) ([]*connpb.ConnMetadata, error)
 	GetConnectionsByAppID(ctx context.Context, appID uuid.UUID) ([]*connpb.ConnMetadata, error)
+	GetConnectionsByGroupID(ctx context.Context, envID uuid.UUID, groupID string) ([]*connpb.ConnMetadata, error)
 	AddConnection(ctx context.Context, conn *Connection) error
 	DeleteConnection(ctx context.Context, conn *Connection) error
 }
