@@ -952,6 +952,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 
 			// If this is an error compiling async expressions, fail the function.
 			shouldFailEarly := errors.Is(serr, &expressions.CompileError{}) || errors.Is(serr, state.ErrStateOverflowed) || errors.Is(serr, state.ErrFunctionOverflowed)
+
 			if shouldFailEarly {
 				var gracefulErr *state.WrappedStandardError
 				if hasGracefulErr := errors.As(serr, &gracefulErr); hasGracefulErr {
@@ -2155,6 +2156,10 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 			output = []byte(`{"error":"Error making AI request"}`)
 		}
 
+		if err == nil {
+			err = fmt.Errorf("unsuccessful status code: %d", hr.StatusCode)
+		}
+
 		// Ensure the opcode is treated as an error when calling OnStepFinish.
 		i.resp.UpdateOpcodeError(gen, output, state.UserError{
 			Name:    fmt.Sprintf("Error making AI request: %s", err),
@@ -2166,6 +2171,8 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		// Otherwise, we enqueue the next step directly so that the SDK can throw
 		// an error on output.
 		if queue.ShouldRetry(nil, i.item.Attempt, i.item.GetMaxAttempts()) {
+			// Set the response error, ensuring the response is retryable in the queue.
+			i.resp.SetError(err)
 			// This will retry, as it hits the queue directly.
 			return fmt.Errorf("error making inference request: %w", err)
 		}
