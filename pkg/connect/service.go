@@ -123,6 +123,7 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 		r.Use(headers.ContentTypeJsonResponse())
 
 		r.Get("/envs/{envID}/conns", c.showConnectionsByEnv)
+		r.Get("/envs/{envID}/groups/{groupID}", c.showWorkerGroup)
 		r.Get("/apps/{appID}/conns", c.showConnectionsByApp)
 	})
 
