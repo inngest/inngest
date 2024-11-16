@@ -2161,7 +2161,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		}
 
 		// Ensure the opcode is treated as an error when calling OnStepFinish.
-		i.resp.UpdateOpcodeError(gen, output, state.UserError{
+		i.resp.UpdateOpcodeError(gen, state.UserError{
 			Name:    fmt.Sprintf("Error making AI request: %s", err),
 			Message: string(output),
 			Data:    output, // For golang's multiple returns.
