@@ -346,6 +346,9 @@ export const TRACE_DETAILS_FRAGMENT = gql`
         foundEventID
         timedOut
       }
+      ... on RunStepInfo {
+        type
+      }
     }
   }
 `;
