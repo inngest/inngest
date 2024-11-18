@@ -50,14 +50,14 @@ func ParseUnknownInput(ctx context.Context, req json.RawMessage) (ParsedInferenc
 // * Cohere
 // * Groq (must include URL)
 func ParseInput(ctx context.Context, req Request) (ParsedInferenceRequest, error) {
-	switch req.Opts.Format {
+	switch req.Format {
 	case FormatOpenAIChat:
 		// OpenAI Chat is the default format, so fall through to the default.
 		fallthrough
 	default:
 		// Parse everything as an OpenAI Chat request.
 		rf := RFOpenAIChatCompletion{}
-		if err := json.Unmarshal(req.Raw, &rf); err != nil {
+		if err := json.Unmarshal(req.Body, &rf); err != nil {
 			return ParsedInferenceRequest{}, err
 		}
 

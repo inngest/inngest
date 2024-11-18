@@ -312,7 +312,7 @@ func (w WaitForEventOpts) Expires() (time.Time, error) {
 
 // AIGatewayOpts returns the AI gateway options within the driver.
 func (g *GeneratorOpcode) AIGatewayOpts() (aigateway.Request, error) {
-	opts := aigateway.RequestOpts{}
+	req := aigateway.Request{}
 
 	// Ensure we unmarshal g.Opts  into the request options.
 	// This contains Inngest-related and auth-related options
@@ -328,14 +328,9 @@ func (g *GeneratorOpcode) AIGatewayOpts() (aigateway.Request, error) {
 			return aigateway.Request{}, err
 		}
 	}
-	if err := json.Unmarshal(optByt, &opts); err != nil {
+	if err := json.Unmarshal(optByt, &req); err != nil {
 		return aigateway.Request{}, err
 	}
 
-	// g.Data contains the raw data to send through to the AI
-	// inference provider.
-	return aigateway.Request{
-		Opts: opts,
-		Raw:  g.Data,
-	}, nil
+	return req, nil
 }

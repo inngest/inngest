@@ -20,7 +20,7 @@ const (
 	FormatBedrock    = "bedrock"
 )
 
-type RequestOpts struct {
+type Request struct {
 	// URL is the full endpoint that we're sending the request to.  This must
 	// always be provided by our SDKs.
 	URL string `json:"url,omitempty"`
@@ -36,27 +36,21 @@ type RequestOpts struct {
 	// Format represents the request format type, eg. an OpenAI compatible endpoint
 	// request, or a Groq request.
 	Format string `json:"format"`
+	// Body indicates the raw content of the request, as a slice of JSON bytes.
+	// It's expected that this comes from our SDKs directly.
+	Body json.RawMessage `json:"body"`
 }
 
-func (r RequestOpts) MarshalJSON() ([]byte, error) {
+func (r Request) MarshalJSON() ([]byte, error) {
 	// Do not allow this to be marshalled.  We do not want the auth creds to
 	// be logged.
 	return nil, nil
 }
 
-// Input is the generative request.
-type Request struct {
-	// RequestOpts are the options for the request.  This must never be logged,
-	// as it contains auth credentials.
-	Opts RequestOpts `json:"-"`
-
-	// Raw indicates the raw content of the request, as a slice of JSON bytes.
-	// It's expected that this comes from our SDKs directly.
-	Raw json.RawMessage `json:"raw"`
-}
-
 func (r Request) HTTPRequest() (*http.Request, error) {
-	req, err := http.NewRequest(http.MethodPost, r.Opts.URL, bytes.NewReader(r.Raw))
+
+
+	req, err := http.NewRequest(http.MethodPost, r.URL, bytes.NewReader(r.Body))
 	if err != nil {
 		return nil, err
 	}
@@ -65,26 +59,26 @@ func (r Request) HTTPRequest() (*http.Request, error) {
 	req.Header.Add("content-type", "application/json")
 
 	// Add auth, depending on the format.
-	switch r.Opts.Format {
+	switch r.Format {
 	case FormatGemini:
 		// Gemini adds the auth key as a query param
 		values := req.URL.Query()
-		values.Add("key", r.Opts.AuthKey)
+		values.Add("key", r.AuthKey)
 		req.URL.RawQuery = values.Encode()
 	case FormatBedrock:
 		// Bedrock's auth should be the fully-generated AWS key derived from the
 		// secret and signing key.
-		req.Header.Add("Authorization", r.Opts.AuthKey)
+		req.Header.Add("Authorization", r.AuthKey)
 	case FormatAnthropic:
 		// Anthropic uses a non-standard header.
-		req.Header.Add("x-api-key", r.Opts.AuthKey)
+		req.Header.Add("x-api-key", r.AuthKey)
 	default:
 		// By default, use standards.
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", r.Opts.AuthKey))
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", r.AuthKey))
 	}
 
 	// Overwrite any headers if custom headers are added to opts.
-	for header, val := range r.Opts.Headers {
+	for header, val := range r.Headers {
 		req.Header.Add(header, val)
 	}
 
