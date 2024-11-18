@@ -363,15 +363,12 @@
 }
 [data-sonner-toast][data-type='error'] {
   --toast-accent-color: var(--color-tertiary-moderate);
-  /* border-color: rgb(var(--color-tertiary-moderate)) !important; */
 }
 [data-sonner-toast][data-type='warning'] {
   --toast-accent-color: var(--color-accent-moderate);
-  /* border-color: rgb(var(--color-accent-moderate)) !important; */
 }
 [data-sonner-toast][data-type='info'] {
   --toast-accent-color: var(--color-secondary-moderate);
-  /* border-color: rgb(var(--color-secondary-moderate)) !important; */
 }
 
 /* width */
