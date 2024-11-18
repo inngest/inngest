@@ -37,7 +37,7 @@ const ProgressBar = ({ limit, value, overageAllowed }: ProgressBarProps) => {
         className={cn(
           'ease-[cubic-bezier(0.65, 0, 0.35, 1)] bg-primary-moderate size-full transition-transform duration-700',
           isOverTheLimit && overageAllowed && 'bg-accent-subtle',
-          isOverTheLimit && !overageAllowed && 'bg-error'
+          isOverTheLimit && !overageAllowed && 'bg-errorContrast'
         )}
         style={{ transform: `translateX(-${100 - progress}%)` }}
       />
