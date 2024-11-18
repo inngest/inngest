@@ -13,7 +13,13 @@ import { Time } from '../Time';
 import type { Result } from '../types/functionRun';
 import { cn } from '../utils/classNames';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
-import { isStepInfoInvoke, isStepInfoSleep, isStepInfoWait, type Trace } from './types';
+import {
+  isStepInfoInvoke,
+  isStepInfoRun,
+  isStepInfoSleep,
+  isStepInfoWait,
+  type Trace,
+} from './types';
 
 type Props = {
   className?: string;
@@ -51,7 +57,9 @@ export function TraceInfo({ className, pathCreator, trace, result }: Props) {
 
   let stepKindInfo = null;
 
-  if (isStepInfoInvoke(trace.stepInfo)) {
+  if (isStepInfoRun(trace.stepInfo)) {
+    trace.stepInfo.type; // e.g. `"step.ai.wrap"` or `null`
+  } else if (isStepInfoInvoke(trace.stepInfo)) {
     const timeout = toMaybeDate(trace.stepInfo.timeout);
     stepKindInfo = (
       <>
