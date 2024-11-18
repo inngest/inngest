@@ -10,11 +10,14 @@ local eventsKey = KEYS[1]
 local metadataKey = KEYS[2]
 local stepKey = KEYS[3]
 local stepStackKey = KEYS[4]
+local stepInputsKey = KEYS[5]
 
 local events = ARGV[1]
 local metadata = ARGV[2]
 local steps = ARGV[3]
+local stepInputs = ARGV[4]
 
+-- Save all metadata
 local metadataJson = cjson.decode(metadata)
 for k, v in pairs(metadataJson) do
   if k == "ctx" or k == "id" then
@@ -23,28 +26,31 @@ for k, v in pairs(metadataJson) do
   redis.call("HSET", metadataKey, k, tostring(v))
 end
 
-local stepCount = 0
-local stateSize = 0
-
+-- Save pre-memoized steps
 if steps ~= nil and #steps > 0 then
   local stepsArray = cjson.decode(steps)
-  stepCount = #stepsArray
 
   for _, step in ipairs(stepsArray) do
-    local stepData = cjson.encode(step.data)
-    stateSize = stateSize + #stepData
-
-    redis.call("HSET", stepKey, step.id, stepData)
+    redis.call("HSET", stepKey, step.id, cjson.encode(step.data))
     redis.call("RPUSH", stepStackKey, step.id)
   end
 end
 
+-- Save pre-memoized step inputs
+if stepInputs ~= nil and #stepInputs > 0 then
+  local stepInputsArray = cjson.decode(stepInputs)
+
+  for _, stepInput in ipairs(stepInputsArray) do
+    redis.call("HSET", stepInputsKey, stepInput.id, cjson.encode(stepInput.data))
+  end
+
+  -- for k, v in pairs(stepInputsJson) do
+  --   redis.call("HSET", stepInputsKey, k, cjson.encode(v))
+  -- end
+end
+
+-- Save events
 redis.call("SETNX", eventsKey, events)
 redis.call("HINCRBY", metadataKey, "event_size", #events)
-
-if stepCount > 0 then
-  redis.call("HINCRBY", metadataKey, "step_count", stepCount)
-  redis.call("HINCRBY", metadataKey, "state_size", stateSize)
-end
 
 return 0
