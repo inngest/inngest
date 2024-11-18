@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
+import { Input } from '@inngest/components/Forms/Input';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
-import Input from '@/components/Forms/Input';
 import { graphql } from '@/gql';
 import BillingCard from './BillingCard';
 
@@ -67,20 +67,20 @@ export default function BillingInformation({
       actions={
         <>
           {isEditing ? (
-            <Button
-              appearance="text"
+            <NewButton
+              appearance="ghost"
               disabled={isSaveDisabled}
-              className="font-semibold"
+              className="h-6 font-semibold"
               type="submit"
-              btnAction={handleSubmit}
+              onClick={handleSubmit}
               label="Save"
             />
           ) : (
-            <Button
-              appearance="text"
+            <NewButton
+              appearance="ghost"
               kind="primary"
-              className="font-semibold"
-              btnAction={onEditButtonClick}
+              className="h-6 font-semibold"
+              onClick={onEditButtonClick}
               label="Edit"
             />
           )}
@@ -89,7 +89,7 @@ export default function BillingInformation({
     >
       {billingEmail || name ? (
         <>
-          <div className="mt-1.5 grid grid-cols-2 items-center gap-5 text-sm text-slate-600">
+          <div className="text-subtle mt-1.5 grid grid-cols-2 items-center gap-5 text-sm">
             <label htmlFor="name" className="font-medium">
               Name
             </label>
@@ -99,10 +99,10 @@ export default function BillingInformation({
               defaultValue={name}
               type="text"
               onChange={handleNameChange}
-              readonly={!isEditing}
+              readOnly={!isEditing}
             />
           </div>
-          <div className="mt-1.5 grid grid-cols-2 items-center gap-5 text-sm text-slate-600">
+          <div className="text-subtle mt-1.5 grid grid-cols-2 items-center gap-5 text-sm">
             <label htmlFor="billingEmail" className="font-medium">
               Billing Email
             </label>
@@ -112,12 +112,12 @@ export default function BillingInformation({
               defaultValue={email}
               type="email"
               onChange={handleEmailChange}
-              readonly={!isEditing}
+              readOnly={!isEditing}
             />
           </div>
         </>
       ) : (
-        <p className="text-sm font-medium text-slate-600">
+        <p className="text-subtle text-sm font-medium">
           Please select a plan to add billing information
         </p>
       )}
