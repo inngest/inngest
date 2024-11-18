@@ -34,16 +34,6 @@ type GeneratorOpcode struct {
 	Error *UserError `json:"error"`
 	// SDK versions < 3.?.? don't respond with the display name.
 	DisplayName *string `json:"displayName"`
-
-	// With AI gateways, the Data field is the AI request.  In other opcodes, the
-	// Data field is always the response of the step.
-	//
-	// To combat this, we call DriverResponse.UpdateOpcodeOutput() to overwrite
-	// op.Data.  However, this blows away the request.  We ensure that we track the
-	// input here, copying opcode.Data to opcode.Input when replacing output.
-	//
-	// This is not ideal.
-	input json.RawMessage
 }
 
 // Get the name of the step as defined in code by the user.
@@ -70,10 +60,8 @@ func (g GeneratorOpcode) Input() (string, error) {
 			return string(runOpts.Input), nil
 		}
 	case enums.OpcodeAIGateway:
-		if len(g.input) > 0 {
-			return string(g.input), nil
-		}
-		return string(g.Data), nil
+		req, _ := g.AIGatewayOpts()
+		return string(req.Body), nil
 	}
 
 	return "", nil

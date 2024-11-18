@@ -254,8 +254,6 @@ func (r *DriverResponse) UpdateOpcodeOutput(op GeneratorOpcode, to json.RawMessa
 		if o.ID != op.ID {
 			continue
 		}
-		// enusre we copy the previous data as input.
-		r.Generator[n].input = r.Generator[n].Data
 		r.Generator[n].Data = to
 	}
 }
