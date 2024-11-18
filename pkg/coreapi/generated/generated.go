@@ -274,6 +274,10 @@ type ComplexityRoot struct {
 		Timeout func(childComplexity int) int
 	}
 
+	RunStepInfo struct {
+		Type func(childComplexity int) int
+	}
+
 	RunTraceSpan struct {
 		AppID         func(childComplexity int) int
 		Attempts      func(childComplexity int) int
@@ -1599,6 +1603,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunHistoryWaitResult.Timeout(childComplexity), true
 
+	case "RunStepInfo.type":
+		if e.complexity.RunStepInfo.Type == nil {
+			break
+		}
+
+		return e.complexity.RunStepInfo.Type(childComplexity), true
+
 	case "RunTraceSpan.appID":
 		if e.complexity.RunTraceSpan.AppID == nil {
 			break
@@ -2593,7 +2604,7 @@ enum StepOp {
   WAIT_FOR_EVENT # wait for an event
 }
 
-union StepInfo = InvokeStepInfo | SleepStepInfo | WaitForEventStepInfo
+union StepInfo = InvokeStepInfo | SleepStepInfo | WaitForEventStepInfo | RunStepInfo
 
 type InvokeStepInfo {
   triggeringEventID: ULID!
@@ -2614,6 +2625,10 @@ type WaitForEventStepInfo {
   timeout: Time!
   foundEventID: ULID
   timedOut: Boolean
+}
+
+type RunStepInfo {
+  type: String
 }
 
 type RunTraceSpan {
@@ -10550,6 +10565,47 @@ func (ec *executionContext) fieldContext_RunHistoryWaitResult_timeout(ctx contex
 	return fc, nil
 }
 
+func (ec *executionContext) _RunStepInfo_type(ctx context.Context, field graphql.CollectedField, obj *models.RunStepInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunStepInfo_type(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Type, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunStepInfo_type(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunStepInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _RunTraceSpan_appID(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_RunTraceSpan_appID(ctx, field)
 	if err != nil {
@@ -15669,6 +15725,13 @@ func (ec *executionContext) _StepInfo(ctx context.Context, sel ast.SelectionSet,
 			return graphql.Null
 		}
 		return ec._WaitForEventStepInfo(ctx, sel, obj)
+	case models.RunStepInfo:
+		return ec._RunStepInfo(ctx, sel, &obj)
+	case *models.RunStepInfo:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._RunStepInfo(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -17473,6 +17536,31 @@ func (ec *executionContext) _RunHistoryWaitResult(ctx context.Context, sel ast.S
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var runStepInfoImplementors = []string{"RunStepInfo", "StepInfo"}
+
+func (ec *executionContext) _RunStepInfo(ctx context.Context, sel ast.SelectionSet, obj *models.RunStepInfo) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, runStepInfoImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RunStepInfo")
+		case "type":
+
+			out.Values[i] = ec._RunStepInfo_type(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

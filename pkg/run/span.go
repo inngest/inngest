@@ -546,6 +546,10 @@ func (s *Span) SetStepOutput(data any) {
 	s.setAttrData(data, consts.OtelSysStepOutput)
 }
 
+func (s *Span) SetStepRunType(t string) {
+	s.SetAttributes(attribute.String(consts.OtelSysStepRunType, t))
+}
+
 func (s *Span) setAttrData(data any, key string) {
 	attr := []attribute.KeyValue{
 		attribute.Bool(key, true),

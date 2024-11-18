@@ -168,6 +168,12 @@ type RerunFromStepInput struct {
 	Input  *string `json:"input,omitempty"`
 }
 
+type RunStepInfo struct {
+	Type *string `json:"type,omitempty"`
+}
+
+func (RunStepInfo) IsStepInfo() {}
+
 type RunTraceSpan struct {
 	AppID         uuid.UUID          `json:"appID"`
 	FunctionID    uuid.UUID          `json:"functionID"`

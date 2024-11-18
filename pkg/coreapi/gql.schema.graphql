@@ -388,7 +388,7 @@ enum StepOp {
   WAIT_FOR_EVENT # wait for an event
 }
 
-union StepInfo = InvokeStepInfo | SleepStepInfo | WaitForEventStepInfo
+union StepInfo = InvokeStepInfo | SleepStepInfo | WaitForEventStepInfo | RunStepInfo
 
 type InvokeStepInfo {
   triggeringEventID: ULID!
@@ -409,6 +409,10 @@ type WaitForEventStepInfo {
   timeout: Time!
   foundEventID: ULID
   timedOut: Boolean
+}
+
+type RunStepInfo {
+  type: String
 }
 
 type RunTraceSpan {

@@ -127,6 +127,15 @@ func (g GeneratorOpcode) RunOpts() (*RunOpts, error) {
 	return opts, nil
 }
 
+// Returns, if any, the type of a StepRun operation.
+func (g GeneratorOpcode) RunType() string {
+	opts, err := g.RunOpts()
+	if err != nil {
+		return ""
+	}
+	return opts.Type
+}
+
 func (g GeneratorOpcode) WaitForEventOpts() (*WaitForEventOpts, error) {
 	if opts, ok := g.Opts.(*WaitForEventOpts); ok && opts != nil {
 		return opts, nil
@@ -249,6 +258,7 @@ func (s *SleepOpts) UnmarshalAny(a any) error {
 }
 
 type RunOpts struct {
+	Type  string          `json:"type,omitempty"`
 	Input json.RawMessage `json:"input"`
 }
 

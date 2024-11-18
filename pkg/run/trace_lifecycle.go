@@ -685,6 +685,10 @@ func (l traceLifecycle) OnStepFinished(
 				span.SetStepInput(input)
 			}
 
+			if typ := op.RunType(); typ != "" {
+				span.SetStepRunType(typ)
+			}
+
 			if op.IsError() {
 				span.SetStepOutput(op.Error)
 				span.SetStatus(codes.Error, op.Error.Message)
