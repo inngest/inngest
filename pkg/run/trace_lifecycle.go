@@ -682,6 +682,10 @@ func (l traceLifecycle) OnStepFinished(
 				attribute.String(consts.OtelSysStepOpcode, foundOp.String()),
 			)
 
+			if typ := op.RunType(); typ != "" {
+				span.SetStepRunType(typ)
+			}
+
 			if op.IsError() {
 				span.SetStepOutput(op.Error)
 				span.SetStatus(codes.Error, op.Error.Message)

@@ -111,6 +111,15 @@ func (g GeneratorOpcode) IsError() bool {
 	return g.Error != nil
 }
 
+// Returns, if any, the type of a StepRun operation.
+func (g GeneratorOpcode) RunType() string {
+	opts, err := g.RunOpts()
+	if err != nil {
+		return ""
+	}
+	return opts.Type
+}
+
 func (g GeneratorOpcode) RunOpts() (*RunOpts, error) {
 	opts := &RunOpts{}
 	if err := opts.UnmarshalAny(g.Opts); err != nil {
@@ -241,6 +250,7 @@ func (s *SleepOpts) UnmarshalAny(a any) error {
 }
 
 type RunOpts struct {
+	Type  string          `json:"type,omitempty"`
 	Input json.RawMessage `json:"input"`
 }
 

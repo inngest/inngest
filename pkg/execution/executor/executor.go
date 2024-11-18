@@ -557,12 +557,11 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	newState := sv2.CreateState{
 		Events:   evts,
 		Metadata: metadata,
-		Steps:    []state.InputStep{},
+		Steps:    []state.MemoizedStep{},
 	}
 
 	if req.OriginalRunID != nil && req.FromStep != nil && req.FromStep.StepID != "" {
-		var err error
-		if newState.Steps, err = reconstruct(ctx, e.traceReader, req); err != nil {
+		if err := reconstruct(ctx, e.traceReader, req, &newState); err != nil {
 			return nil, fmt.Errorf("error reconstructing input state: %w", err)
 		}
 	}

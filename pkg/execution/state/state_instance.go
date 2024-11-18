@@ -20,7 +20,7 @@ func NewStateInstance(
 	id Identifier,
 	metadata Metadata,
 	events []map[string]any,
-	actions []InputStep,
+	actions []MemoizedStep,
 	stack []string,
 ) State {
 	return &memstate{
@@ -44,7 +44,7 @@ type memstate struct {
 	stack []string
 
 	// Actions stores a map of all output from each individual action
-	actions []InputStep
+	actions []MemoizedStep
 
 	// errors stores a map of action errors
 	errors map[string]error

@@ -213,7 +213,7 @@ func checkNew_stepdata(t *testing.T, m state.Manager) {
 	init := state.Input{
 		Identifier:     id,
 		EventBatchData: batch,
-		Steps: []state.InputStep{
+		Steps: []state.MemoizedStep{
 			{
 				ID:   "step-a",
 				Data: map[string]any{"result": "predetermined"},
@@ -251,7 +251,7 @@ func checkUpdateMetadata(t *testing.T, m state.Manager) {
 	init := state.Input{
 		Identifier:     id,
 		EventBatchData: batch,
-		Steps: []state.InputStep{
+		Steps: []state.MemoizedStep{
 			{
 				ID:   "step-a",
 				Data: map[string]any{"result": "predetermined"},

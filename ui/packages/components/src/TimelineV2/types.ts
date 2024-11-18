@@ -9,7 +9,7 @@ export type Trace = {
   spanID: string;
   startedAt: string | null;
   status: string;
-  stepInfo: StepInfoInvoke | StepInfoSleep | StepInfoWait | null;
+  stepInfo: StepInfoInvoke | StepInfoSleep | StepInfoWait | StepInfoRun | null;
   stepOp?: string | null;
 };
 
@@ -33,6 +33,18 @@ type StepInfoWait = {
   foundEventID: string | null;
   timedOut: boolean | null;
 };
+
+type StepInfoRun = {
+  type: string | null;
+};
+
+export function isStepInfoRun(stepInfo: Trace['stepInfo']): stepInfo is StepInfoRun {
+  if (!stepInfo) {
+    return false;
+  }
+
+  return 'type' in stepInfo;
+}
 
 export function isStepInfoInvoke(stepInfo: Trace['stepInfo']): stepInfo is StepInfoInvoke {
   if (!stepInfo) {
