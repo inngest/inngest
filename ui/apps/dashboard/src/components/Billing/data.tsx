@@ -29,7 +29,13 @@ export const entitlementUsageDocument = graphql(`
 `);
 
 export const entitlementUsage = async () => {
-  return await graphqlAPI.request<EntitlementUsageQuery>(entitlementUsageDocument);
+  try {
+    const res = await graphqlAPI.request<EntitlementUsageQuery>(entitlementUsageDocument);
+    return res.account.entitlementUsage;
+  } catch (error) {
+    console.error('Error fetching entitlement usage:', error);
+    throw new Error('Failed to fetch entitlement usage');
+  }
 };
 
 export const currentPlanDocument = graphql(`
@@ -50,7 +56,13 @@ export const currentPlanDocument = graphql(`
 `);
 
 export const currentPlan = async () => {
-  return await graphqlAPI.request<GetCurrentPlanQuery>(currentPlanDocument);
+  try {
+    const res = await graphqlAPI.request<GetCurrentPlanQuery>(currentPlanDocument);
+    return res.account;
+  } catch (error) {
+    console.error('Error fetching current plan:', error);
+    throw new Error('Failed to fetch current plan');
+  }
 };
 
 export const billingDetailsDocument = graphql(`
@@ -71,5 +83,11 @@ export const billingDetailsDocument = graphql(`
 `);
 
 export const billingDetails = async () => {
-  return await graphqlAPI.request<GetBillingDetailsQuery>(billingDetailsDocument);
+  try {
+    const res = await graphqlAPI.request<GetBillingDetailsQuery>(billingDetailsDocument);
+    return res.account;
+  } catch (error) {
+    console.error('Error fetching billing details:', error);
+    throw new Error('Failed to fetch billing details');
+  }
 };

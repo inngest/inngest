@@ -6,10 +6,10 @@ import BillingInformation from '@/components/Billing/BillingDetails/BillingInfor
 import PaymentMethod from '@/components/Billing/BillingDetails/PaymentMethod';
 import { LimitBar, type Data } from '@/components/Billing/LimitBar';
 import {
-  getBillingDetails,
-  getCurrentPlan,
-  getEntitlementUsage,
-} from '@/components/Billing/actions';
+  billingDetails as getBillingDetails,
+  currentPlan as getCurrentPlan,
+  entitlementUsage as getEntitlementUsage,
+} from '@/components/Billing/data';
 import { day } from '@/utils/date';
 import { pathCreator } from '@/utils/urls';
 
@@ -21,43 +21,43 @@ export default async function Page() {
   const runs: Data = {
     title: 'Runs',
     description: `A single durable function execution. ${
-      entitlementUsage?.runCount.overageAllowed
+      entitlementUsage.runCount.overageAllowed
         ? 'Additional usage incurred at additional charge.'
         : ''
     }`,
-    current: entitlementUsage?.runCount.current || 0,
-    limit: entitlementUsage?.runCount.limit || null,
-    overageAllowed: entitlementUsage?.runCount.overageAllowed,
+    current: entitlementUsage.runCount.current || 0,
+    limit: entitlementUsage.runCount.limit || null,
+    overageAllowed: entitlementUsage.runCount.overageAllowed,
   };
 
   const steps: Data = {
     title: 'Steps',
     description: `An individual step in durable functions. ${
-      entitlementUsage?.runCount.overageAllowed
+      entitlementUsage.runCount.overageAllowed
         ? 'Additional usage incurred at additional charge. Additional runs include 5 steps per run.'
         : ''
     }`,
-    current: entitlementUsage?.stepCount.current || 0,
-    limit: entitlementUsage?.stepCount.limit || null,
-    overageAllowed: entitlementUsage?.stepCount.overageAllowed,
+    current: entitlementUsage.stepCount.current || 0,
+    limit: entitlementUsage.stepCount.limit || null,
+    overageAllowed: entitlementUsage.stepCount.overageAllowed,
   };
 
-  const nextInvoiceDate = plan?.subscription?.nextInvoiceDate
+  const nextInvoiceDate = plan.subscription?.nextInvoiceDate
     ? day(plan.subscription.nextInvoiceDate)
     : undefined;
 
-  const nextInvoiceAmount = plan?.plan?.amount ? `$${plan.plan.amount / 100}` : 'Free';
+  const nextInvoiceAmount = plan.plan?.amount ? `$${plan.plan.amount / 100}` : 'Free';
   const overageAllowed =
-    entitlementUsage?.runCount.overageAllowed || entitlementUsage?.stepCount.overageAllowed;
+    entitlementUsage.runCount.overageAllowed || entitlementUsage.stepCount.overageAllowed;
 
-  const paymentMethod = billing?.paymentMethods?.[0] || null;
+  const paymentMethod = billing.paymentMethods?.[0] || null;
   return (
     <div className="grid grid-cols-3 gap-4">
       <Card className="col-span-2">
         <Card.Content>
           <p className="text-muted mb-1">Your plan</p>
           <div className="flex items-center justify-between">
-            <p className="text-basis text-xl">{plan?.plan?.name}</p>
+            <p className="text-basis text-xl">{plan.plan?.name}</p>
             {/* Temporarily send to usage, while there is no plans page */}
             <NewButton
               appearance="ghost"
@@ -65,10 +65,8 @@ export default async function Page() {
               href="/billing/usage?ref=app-billing-overview"
             />
           </div>
-          {entitlementUsage?.runCount && entitlementUsage.runCount.limit !== null && (
-            <LimitBar data={runs} className="my-4" />
-          )}
-          {entitlementUsage?.stepCount && <LimitBar data={steps} className="mb-6" />}
+          {entitlementUsage.runCount.limit !== null && <LimitBar data={runs} className="my-4" />}
+          <LimitBar data={steps} className="mb-6" />
           {!overageAllowed && (
             <Alert
               severity="info"
@@ -117,9 +115,7 @@ export default async function Page() {
             )}
           </Card.Content>
         </Card>
-        {billing && (
-          <BillingInformation billingEmail={billing.billingEmail} accountName={billing.name} />
-        )}
+        <BillingInformation billingEmail={billing.billingEmail} accountName={billing.name} />
         <PaymentMethod paymentMethod={paymentMethod} />
       </div>
     </div>
