@@ -43,10 +43,6 @@ if stepInputs ~= nil and #stepInputs > 0 then
   for _, stepInput in ipairs(stepInputsArray) do
     redis.call("HSET", stepInputsKey, stepInput.id, cjson.encode(stepInput.data))
   end
-
-  -- for k, v in pairs(stepInputsJson) do
-  --   redis.call("HSET", stepInputsKey, k, cjson.encode(v))
-  -- end
 end
 
 -- Save events
