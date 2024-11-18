@@ -1,14 +1,11 @@
 'use client';
 
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 
 export default function PaymentsButton() {
-  function scrollToPayments() {
-    document.getElementById('payments')?.scrollIntoView();
-  }
   return (
-    <Button
-      btnAction={scrollToPayments}
+    <NewButton
+      href="/billing/payments?ref=app-billing-usage"
       appearance="outlined"
       className="mt-4"
       label="View All Payments"
