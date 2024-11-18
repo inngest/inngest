@@ -400,7 +400,7 @@ type Mutater interface {
 	) error
 }
 
-type InputStep struct {
+type MemoizedStep struct {
 	ID   string `json:"id"`
 	Data any    `json:"data"`
 }
@@ -425,7 +425,11 @@ type Input struct {
 
 	// Steps allows users to specify pre-defined steps to run workflows from
 	// arbitrary points.
-	Steps []InputStep
+	Steps []MemoizedStep
+
+	// StepInputs allows users to specify pre-defined step inputs to run
+	// workflows from arbitrary points.
+	StepInputs []MemoizedStep
 
 	// Context is additional context for the run stored in metadata.
 	Context map[string]any

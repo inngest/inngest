@@ -14,7 +14,10 @@ type CreateState struct {
 	Events []json.RawMessage
 	// Steps allows users to specify pre-defined steps to run workflows from
 	// arbitrary points.
-	Steps []state.InputStep
+	Steps []state.MemoizedStep
+	// StepInputs allows users to specify pre-defined step inputs to run
+	// workflows from arbitrary points.
+	StepInputs []state.MemoizedStep
 }
 
 type StateService interface {
