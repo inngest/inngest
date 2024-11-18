@@ -100,10 +100,35 @@ func Infer[InputT any, OutputT any](
 		ID:   hashedID,
 		Op:   enums.OpcodeAIGateway,
 		Name: id,
-		Opts: in.Opts,
+		Opts: inferOpcodeOpts{
+			URL:     in.Opts.URL,
+			Headers: in.Opts.Headers,
+			AuthKey: in.Opts.AuthKey,
+			Format:  in.Opts.Format,
+			Body:    in.Body,
+		},
 		Data: reqBytes,
 	})
 	panic(ControlHijack{})
+}
+
+type inferOpcodeOpts struct {
+	// URL is the provider URL which is used when making the request.
+	URL string `json:"url"`
+	// Headers represent additional headers to send in the request.
+	Headers map[string]string `json:"headers,omitempty"`
+	// AuthKey is your API key.  This will be added to the inference request depending
+	// on the API format chosen in Format.
+	//
+	// This is NEVER logged or kept.
+	AuthKey string `json:"auth_key"`
+	// Format represents the format for the API request and response.  Infer allows
+	// the use of common formats, and we create the request and infer metadata based
+	// off of the API format.  Note that many providers support an open OpenAI-like
+	// format.
+	Format InferFormat `json:"format"`
+	// Body represents the raw request.
+	Body any `json:"body"`
 }
 
 type InferRequestOpts struct {
