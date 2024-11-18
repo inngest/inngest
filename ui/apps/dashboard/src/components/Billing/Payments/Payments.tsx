@@ -8,7 +8,7 @@ import { Table, TextCell } from '@inngest/components/Table';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 import { useQuery } from 'urql';
 
-import PaymentStatusPill from '@/components/Billing/PaymentStatusPill';
+import PaymentStatusPill from '@/components/Billing/Payments/PaymentStatusPill';
 import { graphql } from '@/gql';
 import { day } from '@/utils/date';
 

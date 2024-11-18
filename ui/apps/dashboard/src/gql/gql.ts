@@ -70,7 +70,6 @@ const documents = {
     "\n  query GetBillableSteps($month: Int!, $year: Int!) {\n    billableStepTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n": types.GetBillableStepsDocument,
     "\n  mutation CreateStripeSubscription($input: StripeSubscriptionInput!) {\n    createStripeSubscription(input: $input) {\n      clientSecret\n      message\n    }\n  }\n": types.CreateStripeSubscriptionDocument,
     "\n  mutation UpdatePlan($planID: ID!) {\n    updatePlan(to: $planID) {\n      plan {\n        id\n        name\n      }\n    }\n  }\n": types.UpdatePlanDocument,
-    "\n  query GetPaymentIntents {\n    account {\n      paymentIntents {\n        status\n        createdAt\n        amountLabel\n        description\n        invoiceURL\n      }\n    }\n  }\n": types.GetPaymentIntentsDocument,
     "\n  query GetSavedVercelProjects($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      savedVercelProjects: vercelApps {\n        id\n        originOverride\n        projectID\n        protectionBypassSecret\n        path\n        workspaceID\n        originOverride\n        protectionBypassSecret\n      }\n    }\n  }\n": types.GetSavedVercelProjectsDocument,
     "\n  mutation CreateVercelApp($input: CreateVercelAppInput!) {\n    createVercelApp(input: $input) {\n      success\n    }\n  }\n": types.CreateVercelAppDocument,
     "\n  mutation UpdateVercelApp($input: UpdateVercelAppInput!) {\n    updateVercelApp(input: $input) {\n      success\n    }\n  }\n": types.UpdateVercelAppDocument,
@@ -82,6 +81,7 @@ const documents = {
     "\n  query GetArchivedFuncBannerData($envID: ID!, $funcID: ID!) {\n    environment: workspace(id: $envID) {\n      function: workflow(id: $funcID) {\n        id\n        archivedAt\n      }\n    }\n  }\n": types.GetArchivedFuncBannerDataDocument,
     "\n  mutation UpdateAccount($input: UpdateAccount!) {\n    account: updateAccount(input: $input) {\n      billingEmail\n      name\n    }\n  }\n": types.UpdateAccountDocument,
     "\n  mutation UpdatePaymentMethod($token: String!) {\n    updatePaymentMethod(token: $token) {\n      brand\n      last4\n      expMonth\n      expYear\n      createdAt\n      default\n    }\n  }\n": types.UpdatePaymentMethodDocument,
+    "\n  query GetPaymentIntents {\n    account {\n      paymentIntents {\n        status\n        createdAt\n        amountLabel\n        description\n        invoiceURL\n      }\n    }\n  }\n": types.GetPaymentIntentsDocument,
     "\n  query EntitlementUsage {\n    account {\n      id\n      entitlementUsage {\n        runCount {\n          current\n          limit\n          overageAllowed\n        }\n        stepCount {\n          current\n          limit\n          overageAllowed\n        }\n        accountConcurrencyLimitHits\n      }\n    }\n  }\n": types.EntitlementUsageDocument,
     "\n  query GetCurrentPlan {\n    account {\n      plan {\n        id\n        name\n        amount\n        billingPeriod\n        features\n      }\n      subscription {\n        nextInvoiceDate\n      }\n    }\n  }\n": types.GetCurrentPlanDocument,
     "\n  query GetBillingDetails {\n    account {\n      billingEmail\n      name\n      paymentMethods {\n        brand\n        last4\n        expMonth\n        expYear\n        createdAt\n        default\n      }\n    }\n  }\n": types.GetBillingDetailsDocument,
@@ -379,10 +379,6 @@ export function graphql(source: "\n  mutation UpdatePlan($planID: ID!) {\n    up
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  query GetPaymentIntents {\n    account {\n      paymentIntents {\n        status\n        createdAt\n        amountLabel\n        description\n        invoiceURL\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetPaymentIntents {\n    account {\n      paymentIntents {\n        status\n        createdAt\n        amountLabel\n        description\n        invoiceURL\n      }\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
 export function graphql(source: "\n  query GetSavedVercelProjects($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      savedVercelProjects: vercelApps {\n        id\n        originOverride\n        projectID\n        protectionBypassSecret\n        path\n        workspaceID\n        originOverride\n        protectionBypassSecret\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetSavedVercelProjects($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      savedVercelProjects: vercelApps {\n        id\n        originOverride\n        projectID\n        protectionBypassSecret\n        path\n        workspaceID\n        originOverride\n        protectionBypassSecret\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
@@ -424,6 +420,10 @@ export function graphql(source: "\n  mutation UpdateAccount($input: UpdateAccoun
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation UpdatePaymentMethod($token: String!) {\n    updatePaymentMethod(token: $token) {\n      brand\n      last4\n      expMonth\n      expYear\n      createdAt\n      default\n    }\n  }\n"): (typeof documents)["\n  mutation UpdatePaymentMethod($token: String!) {\n    updatePaymentMethod(token: $token) {\n      brand\n      last4\n      expMonth\n      expYear\n      createdAt\n      default\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query GetPaymentIntents {\n    account {\n      paymentIntents {\n        status\n        createdAt\n        amountLabel\n        description\n        invoiceURL\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetPaymentIntents {\n    account {\n      paymentIntents {\n        status\n        createdAt\n        amountLabel\n        description\n        invoiceURL\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
