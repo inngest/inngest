@@ -1,3 +1,4 @@
+import { Alert } from '@inngest/components/Alert/Alert';
 import { NewButton } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
 
@@ -21,7 +22,7 @@ export default async function Page() {
     title: 'Runs',
     description: `A single durable function execution. ${
       entitlementUsage?.runCount.overageAllowed
-        ? 'Additional runs are billed at the start of the next billing cycle.'
+        ? 'Additional usage incurred at additional charge.'
         : ''
     }`,
     current: entitlementUsage?.runCount.current || 0,
@@ -33,7 +34,7 @@ export default async function Page() {
     title: 'Steps',
     description: `An individual step in durable functions. ${
       entitlementUsage?.runCount.overageAllowed
-        ? 'Additional steps are billed at the start of the next billing cycle.'
+        ? 'Additional usage incurred at additional charge. Additional runs include 5 steps per run.'
         : ''
     }`,
     current: entitlementUsage?.stepCount.current || 0,
@@ -46,6 +47,8 @@ export default async function Page() {
     : undefined;
 
   const nextInvoiceAmount = plan?.plan?.amount ? `$${plan.plan.amount / 100}` : 'Free';
+  const overageAllowed =
+    entitlementUsage?.runCount.overageAllowed || entitlementUsage?.stepCount.overageAllowed;
 
   const paymentMethod = billing?.paymentMethods?.[0] || null;
   return (
@@ -66,6 +69,22 @@ export default async function Page() {
             <LimitBar data={runs} className="my-4" />
           )}
           {entitlementUsage?.stepCount && <LimitBar data={steps} className="mb-6" />}
+          {!overageAllowed && (
+            <Alert
+              severity="info"
+              className="mb-6 flex items-center justify-between text-sm"
+              link={
+                <NewButton
+                  appearance="outlined"
+                  kind="secondary"
+                  label="Upgrade plan"
+                  href="/billing/usage?ref=app-billing-overview"
+                />
+              }
+            >
+              For usage beyond the limits of this plan, upgrade to a new plan.
+            </Alert>
+          )}
           <div className="flex flex-col items-center gap-2">
             <p>Custom needs?</p>
             <NewButton
@@ -79,13 +98,22 @@ export default async function Page() {
       <div className="col-span-1">
         <Card className="mb-4">
           <Card.Content>
-            <p className="text-muted mb-1">Next payment</p>
-            <p className="text-basis text-lg">{nextInvoiceAmount}</p>
+            <p className="text-muted mb-1">Next subscription payment</p>
+            <p className="text-basis text-lg">
+              {nextInvoiceAmount}
+              {overageAllowed && <span className="text-tertiary-moderate">*</span>}
+            </p>
             {nextInvoiceDate && (
               <>
                 <p className="text-subtle mb-1 mt-4 text-xs font-medium">Payment due date</p>
                 <p className="text-basis text-sm">{nextInvoiceDate}</p>
               </>
+            )}
+            {overageAllowed && (
+              <p className="text-subtle mt-4 text-xs italic">
+                <span className="text-tertiary-moderate">*</span>Base plan cost. Additional usage
+                calculated at the start of the next billing cycle.
+              </p>
             )}
           </Card.Content>
         </Card>
