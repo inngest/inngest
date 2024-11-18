@@ -57,6 +57,7 @@ const (
 	OtelSysStepFirst           = "sys.step.first"
 	OtelSysStepGroupID         = "sys.step.group.id"
 	OtelSysStepStack           = "sys.step.stack"
+	OtelSysStepRunType         = "sys.step.run.type"
 
 	OtelSysStepSleepEndAt = "sys.step.sleep.end"
 

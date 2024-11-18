@@ -65,6 +65,7 @@ message StepInfo {
     StepInfoSleep sleep = 1;
     StepInfoWaitForEvent wait = 2;
     StepInfoInvoke invoke = 3;
+    StepInfoRun run = 4;
   }
 }
 
@@ -87,6 +88,10 @@ message StepInfoWaitForEvent {
   optional string expression = 3;
   optional string found_event_id = 4;
   optional bool timed_out = 5;
+}
+
+message StepInfoRun {
+  optional string type = 1;
 }
 
 message RunSpanOutput {
