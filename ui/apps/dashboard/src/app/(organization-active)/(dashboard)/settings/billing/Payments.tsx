@@ -1,15 +1,16 @@
 'use client';
 
-import type React from 'react';
+import { useMemo, useRef } from 'react';
 import { type Route } from 'next';
-import { Link } from '@inngest/components/Link';
+import { NewLink } from '@inngest/components/Link';
+import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
+import { Table, TextCell } from '@inngest/components/Table';
+import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 import { useQuery } from 'urql';
 
-import Placeholder from '@/components/Placeholder';
-import Table from '@/components/Table';
+import PaymentStatusPill from '@/components/Billing/PaymentStatusPill';
 import { graphql } from '@/gql';
 import { day } from '@/utils/date';
-import PaymentIcon from './PaymentIcons';
 
 const GetPaymentIntentsDocument = graphql(`
   query GetPaymentIntents {
@@ -26,65 +27,100 @@ const GetPaymentIntentsDocument = graphql(`
 `);
 
 type TableRow = {
-  status: React.ReactNode;
-  description: React.ReactNode | string;
-  createdAt: React.ReactNode | string;
+  status: string;
+  description: string;
+  createdAt: string;
   amount: React.ReactNode;
   url: React.ReactNode;
 };
 
-const loadingPlaceholder = (
-  <div className="flex">
-    <Placeholder className="mx-1 my-1 h-2 w-full max-w-[120px] bg-slate-200" />
-  </div>
-);
+const columnHelper = createColumnHelper<TableRow>();
 
-const loadingRows: TableRow[] = [1, 2, 3].map(() => ({
-  status: <></>,
-  description: loadingPlaceholder,
-  createdAt: loadingPlaceholder,
-  amount: loadingPlaceholder,
-  url: loadingPlaceholder,
-}));
+const columns = [
+  columnHelper.accessor('status', {
+    header: () => <span>Status</span>,
+    cell: (props) => <PaymentStatusPill status={props.getValue()} />,
+  }),
+  columnHelper.accessor('description', {
+    header: () => <span>Description</span>,
+    cell: (props) => <TextCell>{props.getValue()}</TextCell>,
+  }),
+  columnHelper.accessor('amount', {
+    header: () => <span>Amount</span>,
+    cell: (props) => {
+      const isCanceled = props.row.original.status === 'canceled';
+      return (
+        <TextCell>
+          <span className={isCanceled ? 'text-muted' : ''}>{props.getValue()}</span>
+        </TextCell>
+      );
+    },
+  }),
+  columnHelper.accessor('createdAt', {
+    header: () => <span>Created at</span>,
+    cell: (props) => <TextCell>{props.getValue()}</TextCell>,
+  }),
+  columnHelper.accessor('url', {
+    header: () => <span />,
+    cell: (props) => {
+      const url = props.getValue();
+      const requiresConfirmation = props.row.original.status === 'requires_confirmation';
+      if (url) {
+        return (
+          <NewLink href={url as Route} size="small">
+            {requiresConfirmation ? 'Pay invoice' : 'View invoice'}
+          </NewLink>
+        );
+      }
+      return null;
+    },
+  }),
+];
 
 export default function Payments() {
+  const tableContainerRef = useRef<HTMLDivElement>(null);
   const [{ data, fetching }] = useQuery({
     query: GetPaymentIntentsDocument,
   });
   const payments = data?.account.paymentIntents || [];
 
-  const paymentTableData = fetching
-    ? loadingRows
-    : payments.map(
-        (payment): TableRow => ({
-          status: <PaymentIcon status={payment.status} />,
-          description: payment.description,
-          createdAt: day(payment.createdAt),
-          amount:
-            payment.status === 'canceled' ? (
-              <span className="text-slate-400">{payment.amountLabel}</span>
-            ) : (
-              payment.amountLabel
-            ),
-          url: payment.invoiceURL ? (
-            <Link href={payment.invoiceURL as Route}>
-              {payment.status === 'requires_confirmation' ? 'Pay' : 'View'}
-            </Link>
-          ) : null,
-        })
-      );
+  const tableColumns = useMemo(
+    () =>
+      fetching
+        ? columns.map((column) => ({
+            ...column,
+            cell: () => <Skeleton className="my-1 block h-4" />,
+          }))
+        : columns,
+    [fetching]
+  );
+
+  const paymentTableData = payments.map(
+    (payment): TableRow => ({
+      status: payment.status,
+      description: payment.description,
+      createdAt: day(payment.createdAt),
+      amount: payment.amountLabel,
+      url: payment.invoiceURL,
+    })
+  );
 
   return (
-    <Table
-      columns={[
-        { key: 'status', className: 'w-14' },
-        { key: 'description', label: 'Description' },
-        { key: 'amount', label: 'Amount' },
-        { key: 'createdAt', label: 'Created At' },
-        { key: 'url', label: 'Invoice', className: 'w-20' },
-      ]}
-      data={paymentTableData}
-      empty="You have no prior payments"
-    />
+    <main
+      className="border-muted min-h-0 overflow-y-auto rounded-lg border [&>table]:border-b-0"
+      ref={tableContainerRef}
+    >
+      <Table
+        tableContainerRef={tableContainerRef}
+        isVirtualized={false}
+        options={{
+          data: paymentTableData,
+          columns: tableColumns,
+          getCoreRowModel: getCoreRowModel(),
+          enableSorting: false,
+        }}
+        blankState={<p>You have no prior payments</p>}
+      />
+    </main>
   );
 }
