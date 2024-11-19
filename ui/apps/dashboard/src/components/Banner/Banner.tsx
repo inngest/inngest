@@ -1,55 +1,137 @@
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
+import { NewLink, type NewLinkProps } from '@inngest/components/Link';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiCloseLine, RiErrorWarningLine, RiInformationLine } from '@remixicon/react';
+import {
+  RiCheckboxCircleLine,
+  RiCloseLine,
+  RiErrorWarningLine,
+  RiInformationLine,
+  type RemixiconComponentType,
+} from '@remixicon/react';
 
-export type Severity = 'info' | 'error' | 'warning';
+export type Severity = 'error' | 'info' | 'success' | 'warning';
 
-const backgroundColors = {
-  info: 'bg-blue-100',
-  error: 'bg-rose-100',
-  warning: 'bg-amber-100',
-} as const satisfies { [key in Severity]: string };
+type SeveritySpecific = {
+  icon: RemixiconComponentType;
+  iconClassName: string;
+  wrapperClassName: string;
+  linkClassName: string;
+};
 
-const icons = {
-  info: <RiInformationLine className="h-6 w-6 text-blue-700" />,
-  error: <RiErrorWarningLine className="h-6 w-6 text-rose-700" />,
-  warning: <RiErrorWarningLine className="h-6 w-6 text-amber-700" />,
-} as const satisfies { [key in Severity]: React.ReactNode };
+const severityStyles = {
+  error: {
+    icon: RiErrorWarningLine,
+    iconClassName: 'text-error',
+    wrapperClassName: 'bg-error dark:bg-error/40 text-error',
+    linkClassName:
+      'text-error decoration-error hover:text-tertiary-2xIntense hover:decoration-tertiary-2xIntense',
+  },
+  info: {
+    icon: RiInformationLine,
+    iconClassName: 'text-info',
+    wrapperClassName: 'bg-info dark:bg-info/40 text-info',
+    linkClassName:
+      'text-info decoration-info  hover:text-secondary-2xIntense hover:decoration-secondary-2xIntense',
+  },
+  success: {
+    icon: RiCheckboxCircleLine,
+    iconClassName: 'text-success',
+    wrapperClassName: 'bg-success dark:bg-success/40 text-success',
+    linkClassName:
+      'text-success decoration-success hover:text-primary-2xIntense hover:decoration-primary-2xIntense',
+  },
+  warning: {
+    icon: RiErrorWarningLine,
+    iconClassName: 'text-warning',
+    wrapperClassName: 'bg-warning dark:bg-warning/40 text-warning',
+    linkClassName:
+      'text-warning decoration-warning hover:text-accent-2xIntense hover:decoration-accent-2xIntense',
+  },
+} as const satisfies { [key in Severity]: SeveritySpecific };
+
+type Props = {
+  /**
+   * The content of the alert.
+   */
+  children: React.ReactNode;
+
+  /**
+   * Additional class names to apply to the alert.
+   */
+  className?: string;
+
+  /**
+   * The severity of the alert.
+   */
+  severity: Severity;
+
+  /**
+   * Whether to show the icon for the alert.
+   */
+  showIcon?: boolean;
+
+  /**
+   * Ability to close the banner.
+   */
+  onDismiss?: () => void;
+
+  /**
+   * Additional link CTA.
+   */
+  link?: React.ReactNode;
+};
 
 export function Banner({
   children,
   className,
   onDismiss,
-  kind = 'info',
-}: {
-  children: React.ReactNode;
-  className?: string;
-  onDismiss?: () => void;
-  kind?: Severity;
-}) {
-  const icon = icons[kind];
-  const color = backgroundColors[kind];
+  severity = 'info',
+  showIcon = true,
+  link,
+}: Props) {
+  const Icon = severityStyles[severity].icon;
 
   return (
     <div
       className={cn(
         className,
-        color,
+        severityStyles[severity].wrapperClassName,
         'flex w-full items-center justify-between px-2 py-2 md:px-4 lg:px-8'
       )}
     >
       <div className="flex grow items-start gap-1 text-sm">
-        <span className="shrink-0">{icon}</span>
+        {showIcon && (
+          <span className="shrink-0">
+            <Icon className={cn('h-5 w-5 shrink-0', severityStyles[severity].iconClassName)} />
+          </span>
+        )}
         <span className="grow leading-6">{children}</span>
       </div>
+      {link}
       {onDismiss && (
-        <Button
+        <NewButton
           size="small"
-          appearance="text"
-          btnAction={onDismiss}
-          icon={<RiCloseLine className="h-5 w-5" />}
+          appearance="ghost"
+          onClick={onDismiss}
+          icon={<RiCloseLine className={cn('h-5 w-5', severityStyles[severity].iconClassName)} />}
         />
       )}
     </div>
   );
 }
+
+function BannerLink({
+  href,
+  severity,
+  children,
+  ...props
+}: React.PropsWithChildren<NewLinkProps & { severity: Severity }>) {
+  const styles = severityStyles[severity].linkClassName;
+  return (
+    <NewLink href={href} {...props} className={cn(styles, props.className)}>
+      {children}
+    </NewLink>
+  );
+}
+
+Banner.Link = BannerLink;
