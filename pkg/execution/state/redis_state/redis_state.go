@@ -711,6 +711,7 @@ func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID
 		fnRunState.kg.Actions(ctx, isSharded, i),
 		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
 		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
+		fnRunState.kg.ActionInputs(ctx, isSharded, i),
 	}
 	args := []string{stepID, marshalledOuptut}
 

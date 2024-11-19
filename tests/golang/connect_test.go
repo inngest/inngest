@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -11,8 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/connect"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
-	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/assert"
@@ -69,6 +70,7 @@ func TestEndToEnd(t *testing.T) {
 		}
 	}()
 
+	var workerGroupID string
 	t.Run("verify connection is established", func(t *testing.T) {
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
 			a := assert.New(collect)
@@ -76,17 +78,33 @@ func TestEndToEnd(t *testing.T) {
 			resp, err := http.Get("http://127.0.0.1:8289/v0/envs/dev/conns")
 			a.NoError(err)
 
-			var reply connpb.ShowConnsReply
+			var reply connect.ShowConnsReply
 			err = json.NewDecoder(resp.Body).Decode(&reply)
 			a.NoError(err)
 
-			data := reply.GetData()
-			a.Equal(1, len(data))
+			a.Equal(1, len(reply.Data))
+
+			if len(reply.Data) > 0 {
+				workerGroupID = reply.Data[0].GroupId
+			}
 		}, 5*time.Second, 500*time.Millisecond)
 	})
 
-	// TODO: Check if the SDK is synced instead
-	<-time.After(2 * time.Second)
+	// Check if the SDK is synced
+	t.Run("verify the worker is synced", func(t *testing.T) {
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			a := assert.New(collect)
+
+			endpoint := fmt.Sprintf("http://127.0.0.1:8289/v0/envs/dev/groups/%s", workerGroupID)
+			resp, err := http.Get(endpoint)
+			a.NoError(err)
+
+			var reply connect.ShowWorkerGroupReply
+			a.NoError(json.NewDecoder(resp.Body).Decode(&reply))
+
+			a.True(reply.Data.Synced)
+		}, 5*time.Second, 500*time.Millisecond)
+	})
 
 	t.Run("trigger function", func(t *testing.T) {
 		_, err := inngestgo.Send(ctx, ConnectEvent{
@@ -101,6 +119,7 @@ func TestEndToEnd(t *testing.T) {
 		cancel()
 	})
 
+	// Check span tree
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusCompleted})
 

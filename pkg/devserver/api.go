@@ -172,7 +172,8 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := a.register(ctx, req); err != nil {
+	reply, err := a.register(ctx, req)
+	if err != nil {
 		logger.From(ctx).Warn().Msgf("Error registering functions:\n%s", err)
 		_ = publicerr.WriteHTTP(w, err)
 		return
@@ -185,11 +186,6 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reply := cqrs.SyncReply{
-		OK:       true,
-		Modified: true,
-	}
-
 	resp, err := json.Marshal(reply)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, err)
@@ -199,17 +195,17 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(resp)
 }
 
-func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error) {
+func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*cqrs.SyncReply, error) {
 	sum, err := r.Checksum()
 	if err != nil {
-		return publicerr.Wrap(err, 400, "Invalid request")
+		return nil, publicerr.Wrap(err, 400, "Invalid request")
 	}
 
 	if app, err := a.devserver.Data.GetAppByChecksum(ctx, sum); err == nil {
 		if !app.Error.Valid {
 			// Skip registration since the app was already successfully
 			// registered.
-			return nil
+			return &cqrs.SyncReply{OK: true}, nil
 		}
 
 		// Clear app error.
@@ -221,10 +217,11 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 			},
 		)
 		if err != nil {
-			return publicerr.Wrap(err, 500, "Error updating app error")
+			return nil, publicerr.Wrap(err, 500, "Error updating app error")
 		}
 	}
 
+	syncID := uuid.New()
 	// Attempt to get the existing app by URL, and delete it if possible.
 	// We're going to recreate it below.
 	//
@@ -234,7 +231,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 
 	tx, err := a.devserver.Data.WithTx(ctx)
 	if err != nil {
-		return publicerr.Wrap(err, 500, "Error starting registration tx")
+		return nil, publicerr.Wrap(err, 500, "Error starting registration tx")
 	}
 
 	defer func() {
@@ -285,7 +282,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 	// signing key and warn if the user has an invalid key.
 	funcs, err := r.Parse(ctx)
 	if err != nil && err != sdk.ErrNoFunctions {
-		return publicerr.Wrap(err, 400, "At least one function is invalid")
+		return nil, publicerr.Wrap(err, 400, "At least one function is invalid")
 	}
 
 	// For each function,
@@ -298,7 +295,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 
 		config, err := json.Marshal(fn)
 		if err != nil {
-			return publicerr.Wrap(err, 500, "Error marshalling function")
+			return nil, publicerr.Wrap(err, 500, "Error marshalling function")
 		}
 
 		if _, err := tx.GetFunctionByInternalUUID(ctx, uuid.UUID{}, fn.ID); err == nil {
@@ -308,7 +305,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 				Config: string(config),
 			})
 			if err != nil {
-				return publicerr.Wrap(err, 500, "Error updating function config")
+				return nil, publicerr.Wrap(err, 500, "Error updating function config")
 			}
 			continue
 		}
@@ -323,8 +320,15 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		})
 		if err != nil {
 			err = fmt.Errorf("Function %s is invalid: %w", fn.Slug, err)
-			return publicerr.Wrap(err, 500, "Error saving function")
+			return nil, publicerr.Wrap(err, 500, "Error saving function")
 		}
+	}
+
+	reply := &cqrs.SyncReply{
+		OK:       true,
+		Modified: true,
+		AppID:    &appID,
+		SyncID:   &syncID,
 	}
 
 	// Remove all unseen functions.
@@ -335,13 +339,13 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		}
 	}
 	if len(deletes) == 0 {
-		return nil
+		return reply, nil
 	}
 
 	if err = tx.DeleteFunctionsByIDs(ctx, deletes); err != nil {
-		return publicerr.Wrap(err, 500, "Error deleting removed function")
+		return nil, publicerr.Wrap(err, 500, "Error deleting removed function")
 	}
-	return nil
+	return reply, nil
 }
 
 func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {

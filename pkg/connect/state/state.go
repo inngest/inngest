@@ -25,8 +25,9 @@ type StateManager interface {
 type ConnectionManager interface {
 	GetConnectionsByEnvID(ctx context.Context, envID uuid.UUID) ([]*connpb.ConnMetadata, error)
 	GetConnectionsByAppID(ctx context.Context, appID uuid.UUID) ([]*connpb.ConnMetadata, error)
+	GetConnectionsByGroupID(ctx context.Context, envID uuid.UUID, groupID string) ([]*connpb.ConnMetadata, error)
 	AddConnection(ctx context.Context, conn *Connection) error
-	DeleteConnection(ctx context.Context, connID string) error
+	DeleteConnection(ctx context.Context, conn *Connection) error
 }
 
 type WorkerGroupManager interface {
@@ -83,8 +84,6 @@ type WorkerGroup struct {
 
 // Connection have all the metadata assocaited with a worker connection
 type Connection struct {
-	GroupManager WorkerGroupManager
-
 	Data    *connpb.WorkerConnectRequestData
 	Session *connpb.SessionDetails
 	Group   *WorkerGroup
@@ -96,7 +95,7 @@ type Connection struct {
 // this should be dedupped when there's a large number of workers coming up at once
 // so it doesn't attempt to sync multiple times prior to the worker group getting
 // a response
-func (c *Connection) Sync(ctx context.Context) error {
+func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager) error {
 	if c.Group == nil {
 		return fmt.Errorf("worker group is required for syncing")
 	}
@@ -111,7 +110,7 @@ func (c *Connection) Sync(ctx context.Context) error {
 		envID = id
 	}
 
-	group, err := c.GroupManager.GetWorkerGroupByHash(ctx, envID, c.Group.Hash)
+	group, err := groupManager.GetWorkerGroupByHash(ctx, envID, c.Group.Hash)
 	if err != nil {
 		return fmt.Errorf("error attempting to retrieve worker group: %w", err)
 	}
@@ -160,7 +159,6 @@ func (c *Connection) Sync(ctx context.Context) error {
 	}
 
 	// Set basic headers
-	// TODO: use constants for these header keys
 	req.Header.Set(headers.HeaderContentType, "application/json")
 	req.Header.Set(headers.HeaderKeySDK, sdkVersion)
 	req.Header.Set(headers.HeaderUserAgent, sdkVersion)
@@ -187,7 +185,7 @@ func (c *Connection) Sync(ctx context.Context) error {
 		group.SyncID = syncReply.SyncID
 		group.AppID = syncReply.AppID
 		// Update the worker group with the syncID so it's aware that it's already sync'd before
-		if err := c.GroupManager.UpdateWorkerGroup(ctx, envID, group); err != nil {
+		if err := groupManager.UpdateWorkerGroup(ctx, envID, group); err != nil {
 			return fmt.Errorf("error updating worker group: %w", err)
 		}
 	}

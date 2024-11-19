@@ -25,6 +25,10 @@ var (
 	include = regexp.MustCompile(`-- \$include\(([\w.]+)\)`)
 )
 
+var (
+	ConnDeletedWithGroupErr = fmt.Errorf("group deleted with conn")
+)
+
 func init() {
 	entries, err := embedded.ReadDir("lua")
 	if err != nil {
@@ -125,22 +129,52 @@ func (r *redisConnectionStateManager) GetConnectionsByAppID(ctx context.Context,
 	return nil, notImplementedError
 }
 
+func (r *redisConnectionStateManager) GetConnectionsByGroupID(ctx context.Context, envID uuid.UUID, groupID string) ([]*connpb.ConnMetadata, error) {
+	keys := []string{
+		r.connKey(envID.String()),
+		r.groupIDKey(envID.String(), groupID),
+	}
+	args := []string{}
+
+	res, err := scripts["get_conns_by_group"].Exec(
+		ctx,
+		r.client,
+		keys,
+		args,
+	).AsStrSlice()
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving conns by group: %w", err)
+	}
+
+	conns := []*connpb.ConnMetadata{}
+	for _, cs := range res {
+		var conn connpb.ConnMetadata
+		if err := json.Unmarshal([]byte(cs), &conn); err != nil {
+			return nil, fmt.Errorf("error deserializing conn metadata: %w", err)
+		}
+		conns = append(conns, &conn)
+	}
+
+	return conns, nil
+}
+
 func (r *redisConnectionStateManager) AddConnection(ctx context.Context, conn *Connection) error {
 	envID := conn.Data.AuthData.GetEnvId()
 
-	// groupID := data.SessionDetails.FunctionHash
 	groupID := conn.Group.Hash
 	meta := &connpb.ConnMetadata{
-		Language: conn.Data.SdkLanguage,
-		Version:  conn.Data.SdkVersion,
-		EnvId:    envID,
-		GroupId:  groupID,
-		Session:  conn.Session,
+		Id:         conn.Session.SessionId.ConnectionId,
+		InstanceId: conn.Session.SessionId.InstanceId,
+		Language:   conn.Data.SdkLanguage,
+		Version:    conn.Data.SdkVersion,
+		GroupId:    groupID,
+		Attributes: conn.Data.SystemAttributes,
 	}
 
 	keys := []string{
 		r.connKey(envID),
 		r.groupKey(envID),
+		r.groupIDKey(envID, groupID),
 	}
 
 	// NOTE: redis_state.StrSlice format the data in a non JSON way, not sure why
@@ -162,7 +196,7 @@ func (r *redisConnectionStateManager) AddConnection(ctx context.Context, conn *C
 	}
 
 	args := []string{
-		conn.Session.SessionId.ConnectionId,
+		meta.Id,
 		metaArg,
 		groupID,
 		groupArg,
@@ -187,8 +221,41 @@ func (r *redisConnectionStateManager) AddConnection(ctx context.Context, conn *C
 	}
 }
 
-func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, connID string) error {
-	return notImplementedError
+func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, conn *Connection) error {
+	envID := conn.Data.AuthData.GetEnvId()
+	groupID := conn.Group.Hash
+
+	keys := []string{
+		r.connKey(envID),
+		r.groupKey(envID),
+		r.groupIDKey(envID, groupID),
+	}
+
+	args := []string{
+		conn.Session.SessionId.ConnectionId,
+		groupID,
+	}
+
+	status, err := scripts["delete_conn"].Exec(
+		ctx,
+		r.client,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error deleting connection: %w", err)
+	}
+
+	switch status {
+	case 0:
+		return nil
+
+	case 1:
+		return ConnDeletedWithGroupErr
+
+	default:
+		return fmt.Errorf("unknow status when deleting connection: %w", err)
+	}
 }
 
 func (r *redisConnectionStateManager) GetWorkerGroupByHash(ctx context.Context, envID uuid.UUID, hash string) (*WorkerGroup, error) {
@@ -230,4 +297,8 @@ func (r *redisConnectionStateManager) connKey(envID string) string {
 
 func (r *redisConnectionStateManager) groupKey(envID string) string {
 	return fmt.Sprintf("{%s}:groups", envID)
+}
+
+func (r *redisConnectionStateManager) groupIDKey(envID, groupID string) string {
+	return fmt.Sprintf("{%s}:groups:%s", envID, groupID)
 }

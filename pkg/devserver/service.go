@@ -215,8 +215,12 @@ func (d *devserver) Stop(ctx context.Context) error {
 	return nil
 }
 
+func (d *devserver) HasPersistence() bool {
+	return d.singleNodeServiceOpts != nil && d.singleNodeServiceOpts.PersistenceInterval != nil
+}
+
 func (d *devserver) startPersistenceRoutine(ctx context.Context) {
-	if !d.IsSingleNodeService() {
+	if !d.HasPersistence() {
 		return
 	}
 
