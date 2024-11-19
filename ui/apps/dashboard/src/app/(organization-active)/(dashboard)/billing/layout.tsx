@@ -24,6 +24,10 @@ export default async function BillingLayout({ children }: React.PropsWithChildre
               children: 'Payments',
               href: `/billing/payments`,
             },
+            {
+              children: 'Plans',
+              href: `/billing/plans`,
+            },
           ]}
         />
         <div className="no-scrollbar mx-auto w-full max-w-[1200px] overflow-y-scroll px-6 py-16">
