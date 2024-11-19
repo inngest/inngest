@@ -339,6 +339,32 @@
 #maze-media-host {
   pointer-events: auto;
 }
+/* Toasts */
+[data-sonner-toast] {
+  /* We can remove important when we upgrade Sonner */
+  --toast-accent-color: var(--color-background-canvas-muted);
+  border-color: rgb(var(--toast-accent-color)) !important;
+}
+.dark [data-sonner-toast] {
+  --tw-drop-shadow: drop-shadow(0 10px 20px rgb(172 172 172 / 0.1))
+    drop-shadow(0 4px 10px rgb(172 172 172 / 0.4));
+}
+[data-sonner-toast] [data-icon] svg {
+  transform: scale(0.8);
+  color: rgb(var(--toast-accent-color));
+}
+[data-sonner-toast][data-type='success'] {
+  --toast-accent-color: var(--color-primary-moderate);
+}
+[data-sonner-toast][data-type='error'] {
+  --toast-accent-color: var(--color-tertiary-moderate);
+}
+[data-sonner-toast][data-type='warning'] {
+  --toast-accent-color: var(--color-accent-moderate);
+}
+[data-sonner-toast][data-type='info'] {
+  --toast-accent-color: var(--color-secondary-moderate);
+}
 
 /* width */
 .dark ::-webkit-scrollbar {

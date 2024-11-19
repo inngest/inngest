@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { BlankSlate } from '@inngest/components/BlankSlate';
 import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
@@ -16,6 +17,7 @@ import {
   getSortedRowModel,
   type SortingState,
 } from '@tanstack/react-table';
+import { toast } from 'sonner';
 
 import SearchInput from '@/components/SearchInput/SearchInput';
 import Skeleton from '@/components/Skeleton';
@@ -81,6 +83,7 @@ const columns = [
     id: 'triggerCTA',
     size: 55,
     cell: (props) => {
+      const router = useRouter();
       const doesFunctionAcceptPayload = useMemo(() => {
         return Boolean(
           props.row?.original?.triggers?.some(
@@ -96,12 +99,14 @@ const columns = [
           disabled={false}
           doesFunctionAcceptPayload={doesFunctionAcceptPayload}
           btnAppearance="outlined"
-          btnAction={({ data, user }) => {
-            invokeFunction({
+          btnAction={async ({ data, user }) => {
+            await invokeFunction({
               data,
               functionSlug: props.row.original.slug,
               user,
             });
+            toast.success('Function invoked');
+            router.push('/runs');
           }}
         />
       );
