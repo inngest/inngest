@@ -95,15 +95,28 @@ export default function Payments() {
     [fetching]
   );
 
-  const paymentTableData = payments.map(
-    (payment): TableRow => ({
-      status: payment.status,
-      description: payment.description,
-      createdAt: day(payment.createdAt),
-      amount: payment.amountLabel,
-      url: payment.invoiceURL,
-    })
-  );
+  const paymentTableData = useMemo(() => {
+    if (fetching) {
+      return Array(columns.length)
+        .fill(null)
+        .map((_, index) => {
+          return {
+            // Need an ID to avoid "missing key" errors when rendering rows
+            id: index,
+          };
+        }) as unknown as TableRow[]; // Casting is bad but we need to do this for the loading skeleton
+    }
+
+    return payments.map(
+      (payment): TableRow => ({
+        status: payment.status,
+        description: payment.description,
+        createdAt: day(payment.createdAt),
+        amount: payment.amountLabel,
+        url: payment.invoiceURL,
+      })
+    );
+  }, [fetching, data]);
 
   return (
     <main
@@ -119,7 +132,7 @@ export default function Payments() {
           getCoreRowModel: getCoreRowModel(),
           enableSorting: false,
         }}
-        blankState={<p>You have no prior payments</p>}
+        blankState={!fetching && <p>You have no prior payments</p>}
       />
     </main>
   );
