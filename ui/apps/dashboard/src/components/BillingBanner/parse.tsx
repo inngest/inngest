@@ -7,7 +7,7 @@ export function parseEntitlementUsage(data: EntitlementUsageQuery['account']['en
   bannerSeverity: Severity;
   items: [string, React.ReactNode][];
 } {
-  const { runCount, accountConcurrencyLimitHits } = data;
+  const { runCount, accountConcurrencyLimitHits, stepCount } = data;
   const issues = new Issues();
 
   // Users who can buy additional runs should not warnings about nearing the run
@@ -39,6 +39,37 @@ export function parseEntitlementUsage(data: EntitlementUsageQuery['account']['en
       );
     }
   }
+
+  // Users who can buy additional steps should not warnings about nearing the
+  // step limit.
+  if (stepCount.limit && !stepCount.overageAllowed) {
+    if (stepCount.current >= stepCount.limit) {
+      issues.add(
+        'step_count',
+        <div className="flex items-center">
+          {Intl.NumberFormat().format(stepCount.current)} /{' '}
+          {Intl.NumberFormat().format(stepCount.limit)} steps
+          <BillingBannerTooltip>
+            Exceeding the step limit may result in service disruption.
+          </BillingBannerTooltip>
+        </div>,
+        IssueSeverity.hardLimitReached
+      );
+    } else if (stepCount.current >= stepCount.limit * 0.8) {
+      issues.add(
+        'step_count',
+        <div className="flex items-center">
+          {Intl.NumberFormat().format(stepCount.current)} /{' '}
+          {Intl.NumberFormat().format(stepCount.limit)} steps
+          <BillingBannerTooltip>
+            Exceeding the step limit may result in service disruption.
+          </BillingBannerTooltip>
+        </div>,
+        IssueSeverity.hardLimitNear
+      );
+    }
+  }
+
   if (accountConcurrencyLimitHits >= 12) {
     issues.add(
       'concurrency',
