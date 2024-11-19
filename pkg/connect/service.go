@@ -31,6 +31,11 @@ type AuthResponse struct {
 
 type GatewayAuthHandler func(context.Context, *connect.WorkerConnectRequestData) (*AuthResponse, error)
 
+type ConnectAppLoader interface {
+	// GetAppByName returns an app by name
+	GetAppByName(ctx context.Context, name string) (*cqrs.App, error)
+}
+
 type connectGatewaySvc struct {
 	chi.Router
 
@@ -46,7 +51,7 @@ type connectGatewaySvc struct {
 	auther       GatewayAuthHandler
 	stateManager state.StateManager
 	receiver     pubsub.RequestReceiver
-	dbcqrs       cqrs.Manager
+	appLoader    ConnectAppLoader
 
 	lifecycles []ConnectGatewayLifecycleListener
 }
@@ -69,9 +74,9 @@ func WithRequestReceiver(r pubsub.RequestReceiver) gatewayOpt {
 	}
 }
 
-func WithDB(m cqrs.Manager) gatewayOpt {
+func WithAppLoader(l ConnectAppLoader) gatewayOpt {
 	return func(svc *connectGatewaySvc) {
-		svc.dbcqrs = m
+		svc.appLoader = l
 	}
 }
 
@@ -98,7 +103,7 @@ func NewConnectGatewayService(opts ...gatewayOpt) (*connectGatewaySvc, *connectR
 		opt(gateway)
 	}
 
-	router := newConnectRouter(gateway.stateManager, gateway.receiver, gateway.dbcqrs)
+	router := newConnectRouter(gateway.stateManager, gateway.receiver)
 
 	return gateway, router, gateway.Handler()
 }

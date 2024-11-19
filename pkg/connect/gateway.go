@@ -137,7 +137,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
-		app, err := c.dbcqrs.GetAppByName(ctx, conn.Data.AppName)
+		app, err := c.appLoader.GetAppByName(ctx, conn.Data.AppName)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			ch.log.Error("could not get app by name", "appName", conn.Data.AppName, "err", err)
 			closeWithConnectError(ws, &SocketError{

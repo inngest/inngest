@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
-	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
@@ -20,7 +19,6 @@ type connectRouterSvc struct {
 
 	stateManager state.StateManager
 	receiver     pubsub.RequestReceiver
-	dbcqrs       cqrs.Manager
 
 	rnd *util.FrandRNG
 }
@@ -180,10 +178,9 @@ func (c *connectRouterSvc) Stop(ctx context.Context) error {
 	return nil
 }
 
-func newConnectRouter(stateManager state.StateManager, receiver pubsub.RequestReceiver, db cqrs.Manager) *connectRouterSvc {
+func newConnectRouter(stateManager state.StateManager, receiver pubsub.RequestReceiver) *connectRouterSvc {
 	return &connectRouterSvc{
 		stateManager: stateManager,
 		receiver:     receiver,
-		dbcqrs:       db,
 	}
 }
