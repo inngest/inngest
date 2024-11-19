@@ -120,6 +120,7 @@ func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager) 
 
 	// Don't attempt to sync if it's already sync'd
 	if group != nil && group.SyncID != nil && group.AppID != nil {
+		c.Group = group
 		return nil
 	}
 
