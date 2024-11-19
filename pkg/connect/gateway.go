@@ -252,18 +252,20 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}
 
-		// Mark connection as ready to receive traffic unless we require manual client ready signal (optional)
-		conn.Status = connect.ConnectionStatus_READY
-		err = c.stateManager.UpsertConnection(ctx, conn)
-		if err != nil {
-			ch.log.Error("could not update connection status", "err", err)
-			closeWithConnectError(ws, &SocketError{
-				SysCode:    syscode.CodeConnectInternal,
-				StatusCode: websocket.StatusInternalError,
-				Msg:        "could not update connection status",
-			})
+		if !conn.Data.WorkerManualReadinessAck {
+			// Mark connection as ready to receive traffic unless we require manual client ready signal (optional)
+			conn.Status = connect.ConnectionStatus_READY
+			err = c.stateManager.UpsertConnection(ctx, conn)
+			if err != nil {
+				ch.log.Error("could not update connection status", "err", err)
+				closeWithConnectError(ws, &SocketError{
+					SysCode:    syscode.CodeConnectInternal,
+					StatusCode: websocket.StatusInternalError,
+					Msg:        "could not update connection status",
+				})
 
-			return
+				return
+			}
 		}
 
 		if err := eg.Wait(); err != nil {
