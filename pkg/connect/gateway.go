@@ -279,8 +279,19 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 
 	switch msg.Kind {
 	case connect.GatewayMessageType_WORKER_READY:
-		// Handle SDK reply
 		err := c.updateConnStatus(connect.ConnectionStatus_READY)
+		if err != nil {
+			// TODO Should we actually close the connection here?
+			return &SocketError{
+				SysCode:    syscode.CodeConnectInternal,
+				StatusCode: websocket.StatusInternalError,
+				Msg:        "could not update connection status",
+			}
+		}
+
+		return nil
+	case connect.GatewayMessageType_WORKER_PAUSE:
+		err := c.updateConnStatus(connect.ConnectionStatus_DRAINING)
 		if err != nil {
 			// TODO Should we actually close the connection here?
 			return &SocketError{

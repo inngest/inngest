@@ -11,6 +11,7 @@ enum GatewayMessageType {
   WORKER_READY = 4;
   WORKER_REQUEST_ACK = 5;
   WORKER_REPLY = 6;
+  WORKER_PAUSE = 7;
 }
 
 message ConnectMessage {
