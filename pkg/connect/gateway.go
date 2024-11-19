@@ -262,6 +262,8 @@ func (c *connectGatewaySvc) handleIncomingWebSocketMessage(ctx context.Context, 
 				}
 			}
 
+			// TODO Should we send a reverse ack to the worker to start processing the request?
+
 			return nil
 		}
 	case connect.GatewayMessageType_WORKER_REPLY:
