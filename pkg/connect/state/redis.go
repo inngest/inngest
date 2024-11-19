@@ -27,6 +27,7 @@ var (
 
 var (
 	ConnDeletedWithGroupErr = fmt.Errorf("group deleted with conn")
+	WorkerGroupNotFoundErr  = fmt.Errorf("worker group not found")
 )
 
 func init() {
@@ -131,6 +132,10 @@ func (r *redisConnectionStateManager) GetConnectionsByAppID(ctx context.Context,
 	connIds, err := r.client.Do(ctx, r.client.B().Smembers().Key(key).Build()).AsStrSlice()
 	if err != nil {
 		return nil, err
+	}
+
+	if len(connIds) == 0 {
+		return nil, nil
 	}
 
 	res, err := r.client.Do(ctx, r.client.B().Hmget().Key(r.connKey(envId.String())).Field(connIds...).Build()).AsStrSlice()
@@ -295,6 +300,9 @@ func (r *redisConnectionStateManager) GetWorkerGroupByHash(ctx context.Context, 
 
 	byt, err := r.client.Do(ctx, cmd).AsBytes()
 	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return nil, WorkerGroupNotFoundErr
+		}
 		return nil, fmt.Errorf("error retrieving worker group: %w", err)
 	}
 
@@ -329,7 +337,7 @@ func (r *redisConnectionStateManager) connKey(envID string) string {
 func (r *redisConnectionStateManager) connIndexByApp(envID string, appId *uuid.UUID) string {
 	// For the initial connection upsert, the app won't be synced just yet, so we cannot update this index.
 	// We still need to provide a key with the same slot, otherwise Redis will complain
-	if appId == nil {
+	if appId == nil || *appId == uuid.Nil {
 		return fmt.Sprintf("{%s}:index_disabled", envID)
 	}
 	return fmt.Sprintf("{%s}:conns_appid:%s", envID, appId)

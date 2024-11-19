@@ -85,6 +85,11 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 				return
 			}
 
+			if routeTo == nil {
+				log.Warn("no healthy connections")
+				return
+			}
+
 			log = log.With("gateway_id", routeTo.GatewayId, "conn_id", routeTo.Id, "group_hash", routeTo.GroupId)
 
 			// TODO What if something goes wrong inbetween setting idempotency (claiming exclusivity) and forwarding the req?
@@ -119,6 +124,10 @@ func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, envId uuid
 	conns, err := c.stateManager.GetConnectionsByAppID(ctx, envId, appId)
 	if err != nil {
 		return nil, fmt.Errorf("could not get connections by app ID: %w", err)
+	}
+
+	if len(conns) == 0 {
+		return nil, nil
 	}
 
 	healthy := make([]*connect.ConnMetadata, 0, len(conns))

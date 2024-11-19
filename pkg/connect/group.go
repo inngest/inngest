@@ -7,11 +7,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/coder/websocket"
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
+	"strings"
 )
 
 func workerGroupHashFromConnRequest(req *connect.WorkerConnectRequestData, authResp *AuthResponse, sessionDetails *connect.SessionDetails) (string, error) {
@@ -83,21 +83,17 @@ func NewWorkerGroupFromConnRequest(
 
 	slugs := make([]string, len(functions))
 	for i, fn := range functions {
-		slugs[i] = fn.Slug
+		slugs[i] = strings.TrimPrefix(fn.Slug, fmt.Sprintf("%s-", req.AppName))
 	}
 
 	workerGroup := &state.WorkerGroup{
-		AccountID: authResp.AccountID,
-		EnvID:     authResp.EnvID,
-		// TODO Fix this
-		AppID:         &uuid.Nil, // If the app was not synced, the ID won't exist yet.
+		AccountID:     authResp.AccountID,
+		EnvID:         authResp.EnvID,
 		SDKLang:       req.SdkLanguage,
 		SDKVersion:    req.SdkVersion,
 		SDKPlatform:   req.GetPlatform(),
 		FunctionSlugs: slugs,
-		// TODO Can we load the initial sync ID from the state?
-		SyncID: nil,
-		Hash:   hash,
+		Hash:          hash,
 		SyncData: state.SyncData{
 			Functions: functions,
 		},

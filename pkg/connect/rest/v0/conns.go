@@ -2,6 +2,7 @@ package v0
 
 import (
 	"encoding/json"
+	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -115,6 +116,10 @@ func (c *router) showConnectionsByApp(w http.ResponseWriter, r *http.Request) {
 			Status:  http.StatusInternalServerError,
 		})
 		return
+	}
+
+	if len(conns) == 0 {
+		conns = []*connpb.ConnMetadata{}
 	}
 
 	reply := &rest.ShowConnsReply{
