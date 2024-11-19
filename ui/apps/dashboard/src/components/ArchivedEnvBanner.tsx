@@ -1,8 +1,9 @@
 'use client';
 
+import { Banner } from '@inngest/components/Banner';
+
 import type { Environment } from '@/utils/environments';
 import { pathCreator } from '@/utils/urls';
-import { Banner } from './Banner';
 
 export function ArchivedEnvBanner({ env }: { env: Environment }) {
   if (!env.isArchived) {

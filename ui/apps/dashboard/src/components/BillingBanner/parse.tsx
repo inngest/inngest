@@ -1,5 +1,6 @@
+import type { Severity } from '@inngest/components/Banner';
+
 import type { EntitlementUsageQuery } from '@/gql/graphql';
-import type { Severity } from '../Banner';
 import { BillingBannerTooltip } from './BillingBannerTooltip';
 
 export function parseEntitlementUsage(data: EntitlementUsageQuery['account']['entitlementUsage']): {

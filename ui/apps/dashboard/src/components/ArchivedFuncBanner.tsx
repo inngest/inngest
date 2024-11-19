@@ -1,9 +1,10 @@
 'use client';
 
+import { Banner } from '@inngest/components/Banner';
+
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
-import { Banner } from './Banner';
 
 const Query = graphql(`
   query GetArchivedFuncBannerData($envID: ID!, $funcID: ID!) {

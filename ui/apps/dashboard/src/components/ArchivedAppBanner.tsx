@@ -1,10 +1,11 @@
 'use client';
 
+import { Banner } from '@inngest/components/Banner';
+
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import { pathCreator } from '@/utils/urls';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
-import { Banner } from './Banner';
 
 const Query = graphql(`
   query GetArchivedAppBannerData($envID: ID!, $externalAppID: String!) {

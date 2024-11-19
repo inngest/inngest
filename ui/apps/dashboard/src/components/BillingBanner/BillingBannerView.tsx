@@ -1,11 +1,11 @@
 'use client';
 
 import { useMemo } from 'react';
+import { ContextualBanner } from '@inngest/components/Banner';
 import { NewButton } from '@inngest/components/Button';
 
 import { type EntitlementUsage } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
-import { ContextualBanner } from '../Banner';
 import { useBooleanLocalStorage } from './localStorage';
 import { parseEntitlementUsage } from './parse';
 

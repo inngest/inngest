@@ -1,6 +1,7 @@
 'use client';
 
-import { Banner, type Severity } from '@/components/Banner';
+import { Banner, type Severity } from '@inngest/components/Banner';
+
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { useSystemStatus } from './support/statusPage';
 
