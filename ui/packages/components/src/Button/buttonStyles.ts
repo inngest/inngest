@@ -28,14 +28,14 @@ export const getButtonColors = ({ kind, appearance, loading }: ButtonColorParams
 
   const outlinedButtonStyles = {
     primary: loading
-      ? 'border border-subtle text-btnPrimaryDisabled'
-      : 'border border-muted text-btnPrimary focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:border-disabled disabled:bg-disabled disabled:text-btnPrimaryDisabled',
+      ? 'border border-subtle text-btnPrimaryDisabled bg-canvasBase'
+      : 'border border-muted text-btnPrimary bg-canvasBase focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:border-disabled disabled:bg-disabled disabled:text-btnPrimaryDisabled',
     secondary: loading
-      ? 'border border-subtle text-foreground-subtle'
-      : 'border border-muted text-basis focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:border-disabled disabled:bg-disabled disabled:text-disabled',
+      ? 'border border-subtle text-foreground-subtle bg-canvasBase'
+      : 'border border-muted text-basis bg-canvasBase focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:border-disabled disabled:bg-disabled disabled:text-disabled',
     danger: loading
-      ? 'border border-subtle text-btnDangerDisabled'
-      : 'border border-muted text-btnDanger focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:border-disabled disabled:bg-disabled disabled:text-btnDangerDisabled',
+      ? 'border border-subtle text-btnDangerDisabled bg-canvasBase'
+      : 'border border-muted text-btnDanger bg-canvasBase focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:border-disabled disabled:bg-disabled disabled:text-btnDangerDisabled',
   };
 
   const ghostButtonStyles = {
