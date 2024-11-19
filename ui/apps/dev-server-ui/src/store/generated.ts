@@ -1,5 +1,4 @@
 import { api } from './baseApi';
-
 export type Maybe<T> = T | null;
 export type InputMaybe<T> = Maybe<T>;
 export type Exact<T extends { [key: string]: unknown }> = { [K in keyof T]: T[K] };
@@ -76,7 +75,7 @@ export enum EventStatus {
   NoFunctions = 'NO_FUNCTIONS',
   PartiallyFailed = 'PARTIALLY_FAILED',
   Paused = 'PAUSED',
-  Running = 'RUNNING',
+  Running = 'RUNNING'
 }
 
 export type EventsQuery = {
@@ -110,7 +109,7 @@ export enum FunctionEventType {
   Cancelled = 'CANCELLED',
   Completed = 'COMPLETED',
   Failed = 'FAILED',
-  Started = 'STARTED',
+  Started = 'STARTED'
 }
 
 export type FunctionRun = {
@@ -136,6 +135,7 @@ export type FunctionRun = {
   workspace: Maybe<Workspace>;
 };
 
+
 export type FunctionRunHistoryItemOutputArgs = {
   id: Scalars['ULID'];
 };
@@ -152,7 +152,7 @@ export enum FunctionRunStatus {
   Completed = 'COMPLETED',
   Failed = 'FAILED',
   Queued = 'QUEUED',
-  Running = 'RUNNING',
+  Running = 'RUNNING'
 }
 
 export type FunctionRunV2 = {
@@ -191,7 +191,7 @@ export enum FunctionStatus {
   Cancelled = 'CANCELLED',
   Completed = 'COMPLETED',
   Failed = 'FAILED',
-  Running = 'RUNNING',
+  Running = 'RUNNING'
 }
 
 export type FunctionTrigger = {
@@ -202,7 +202,7 @@ export type FunctionTrigger = {
 
 export enum FunctionTriggerTypes {
   Cron = 'CRON',
-  Event = 'EVENT',
+  Event = 'EVENT'
 }
 
 export type FunctionVersion = {
@@ -220,7 +220,7 @@ export enum HistoryStepType {
   Run = 'Run',
   Send = 'Send',
   Sleep = 'Sleep',
-  Wait = 'Wait',
+  Wait = 'Wait'
 }
 
 export enum HistoryType {
@@ -237,7 +237,7 @@ export enum HistoryType {
   StepScheduled = 'StepScheduled',
   StepSleeping = 'StepSleeping',
   StepStarted = 'StepStarted',
-  StepWaiting = 'StepWaiting',
+  StepWaiting = 'StepWaiting'
 }
 
 export type InvokeStepInfo = {
@@ -261,21 +261,26 @@ export type Mutation = {
   updateApp: App;
 };
 
+
 export type MutationCancelRunArgs = {
   runID: Scalars['ULID'];
 };
+
 
 export type MutationCreateAppArgs = {
   input: CreateAppInput;
 };
 
+
 export type MutationDeleteAppArgs = {
   id: Scalars['String'];
 };
 
+
 export type MutationDeleteAppByNameArgs = {
   name: Scalars['String'];
 };
+
 
 export type MutationInvokeFunctionArgs = {
   data: InputMaybe<Scalars['Map']>;
@@ -283,10 +288,12 @@ export type MutationInvokeFunctionArgs = {
   user: InputMaybe<Scalars['Map']>;
 };
 
+
 export type MutationRerunArgs = {
   fromStep: InputMaybe<RerunFromStepInput>;
   runID: Scalars['ULID'];
 };
+
 
 export type MutationUpdateAppArgs = {
   input: UpdateAppInput;
@@ -319,29 +326,36 @@ export type Query = {
   stream: Array<StreamItem>;
 };
 
+
 export type QueryEventArgs = {
   query: EventQuery;
 };
+
 
 export type QueryEventsArgs = {
   query: EventsQuery;
 };
 
+
 export type QueryFunctionRunArgs = {
   query: FunctionRunQuery;
 };
+
 
 export type QueryRunArgs = {
   runID: Scalars['String'];
 };
 
+
 export type QueryRunTraceSpanOutputByIdArgs = {
   outputID: Scalars['String'];
 };
 
+
 export type QueryRunTriggerArgs = {
   runID: Scalars['String'];
 };
+
 
 export type QueryRunsArgs = {
   after: InputMaybe<Scalars['String']>;
@@ -349,6 +363,7 @@ export type QueryRunsArgs = {
   first?: Scalars['Int'];
   orderBy: Array<RunsV2OrderBy>;
 };
+
 
 export type QueryStreamArgs = {
   query: StreamQuery;
@@ -473,7 +488,7 @@ export enum RunTraceSpanStatus {
   Failed = 'FAILED',
   Queued = 'QUEUED',
   Running = 'RUNNING',
-  Waiting = 'WAITING',
+  Waiting = 'WAITING'
 }
 
 export type RunTraceTrigger = {
@@ -499,7 +514,7 @@ export type RunsFilterV2 = {
 
 export enum RunsOrderByDirection {
   Asc = 'ASC',
-  Desc = 'DESC',
+  Desc = 'DESC'
 }
 
 export type RunsV2Connection = {
@@ -517,7 +532,7 @@ export type RunsV2OrderBy = {
 export enum RunsV2OrderByField {
   EndedAt = 'ENDED_AT',
   QueuedAt = 'QUEUED_AT',
-  StartedAt = 'STARTED_AT',
+  StartedAt = 'STARTED_AT'
 }
 
 export type SleepStepInfo = {
@@ -550,7 +565,7 @@ export enum StepEventType {
   Failed = 'FAILED',
   Scheduled = 'SCHEDULED',
   Started = 'STARTED',
-  Waiting = 'WAITING',
+  Waiting = 'WAITING'
 }
 
 export type StepEventWait = {
@@ -566,7 +581,7 @@ export enum StepOp {
   Invoke = 'INVOKE',
   Run = 'RUN',
   Sleep = 'SLEEP',
-  WaitForEvent = 'WAIT_FOR_EVENT',
+  WaitForEvent = 'WAIT_FOR_EVENT'
 }
 
 export type StreamItem = {
@@ -588,7 +603,7 @@ export type StreamQuery = {
 
 export enum StreamType {
   Cron = 'CRON',
-  Event = 'EVENT',
+  Event = 'EVENT'
 }
 
 export type UpdateAppInput = {
@@ -614,188 +629,46 @@ export type GetEventQueryVariables = Exact<{
   id: Scalars['ID'];
 }>;
 
-export type GetEventQuery = {
-  __typename?: 'Query';
-  event: {
-    __typename?: 'Event';
-    id: any;
-    name: string | null;
-    createdAt: any | null;
-    status: EventStatus | null;
-    pendingRuns: number | null;
-    raw: string | null;
-    functionRuns: Array<{
-      __typename?: 'FunctionRun';
-      id: string;
-      status: FunctionRunStatus | null;
-      startedAt: any | null;
-      pendingSteps: number | null;
-      output: string | null;
-      function: { __typename?: 'Function'; name: string } | null;
-      waitingFor: {
-        __typename?: 'StepEventWait';
-        expiryTime: any;
-        eventName: string | null;
-        expression: string | null;
-      } | null;
-    }> | null;
-  } | null;
-};
+
+export type GetEventQuery = { __typename?: 'Query', event: { __typename?: 'Event', id: any, name: string | null, createdAt: any | null, status: EventStatus | null, pendingRuns: number | null, raw: string | null, functionRuns: Array<{ __typename?: 'FunctionRun', id: string, status: FunctionRunStatus | null, startedAt: any | null, pendingSteps: number | null, output: string | null, function: { __typename?: 'Function', name: string } | null, waitingFor: { __typename?: 'StepEventWait', expiryTime: any, eventName: string | null, expression: string | null } | null }> | null } | null };
 
 export type GetFunctionRunQueryVariables = Exact<{
   id: Scalars['ID'];
 }>;
 
-export type GetFunctionRunQuery = {
-  __typename?: 'Query';
-  functionRun: {
-    __typename?: 'FunctionRun';
-    id: string;
-    status: FunctionRunStatus | null;
-    startedAt: any | null;
-    finishedAt: any | null;
-    output: string | null;
-    pendingSteps: number | null;
-    batchID: any | null;
-    batchCreatedAt: any | null;
-    waitingFor: {
-      __typename?: 'StepEventWait';
-      expiryTime: any;
-      eventName: string | null;
-      expression: string | null;
-    } | null;
-    function: {
-      __typename?: 'Function';
-      name: string;
-      triggers: Array<{
-        __typename?: 'FunctionTrigger';
-        type: FunctionTriggerTypes;
-        value: string;
-      }> | null;
-    } | null;
-    event: { __typename?: 'Event'; id: any; raw: string | null } | null;
-    events: Array<{
-      __typename?: 'Event';
-      createdAt: any | null;
-      id: any;
-      name: string | null;
-      raw: string | null;
-    }>;
-    history: Array<{
-      __typename?: 'RunHistoryItem';
-      attempt: number;
-      createdAt: any;
-      functionVersion: number;
-      groupID: any | null;
-      id: any;
-      stepName: string | null;
-      type: HistoryType;
-      url: string | null;
-      cancel: {
-        __typename?: 'RunHistoryCancel';
-        eventID: any | null;
-        expression: string | null;
-        userID: any | null;
-      } | null;
-      sleep: { __typename?: 'RunHistorySleep'; until: any } | null;
-      waitForEvent: {
-        __typename?: 'RunHistoryWaitForEvent';
-        eventName: string;
-        expression: string | null;
-        timeout: any;
-      } | null;
-      waitResult: {
-        __typename?: 'RunHistoryWaitResult';
-        eventID: any | null;
-        timeout: boolean;
-      } | null;
-      invokeFunction: {
-        __typename?: 'RunHistoryInvokeFunction';
-        eventID: any;
-        functionID: string;
-        correlationID: string;
-        timeout: any;
-      } | null;
-      invokeFunctionResult: {
-        __typename?: 'RunHistoryInvokeFunctionResult';
-        eventID: any | null;
-        timeout: boolean;
-        runID: any | null;
-      } | null;
-    }>;
-  } | null;
-};
 
-export type GetFunctionsQueryVariables = Exact<{ [key: string]: never }>;
+export type GetFunctionRunQuery = { __typename?: 'Query', functionRun: { __typename?: 'FunctionRun', id: string, status: FunctionRunStatus | null, startedAt: any | null, finishedAt: any | null, output: string | null, pendingSteps: number | null, batchID: any | null, batchCreatedAt: any | null, waitingFor: { __typename?: 'StepEventWait', expiryTime: any, eventName: string | null, expression: string | null } | null, function: { __typename?: 'Function', name: string, triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null } | null, event: { __typename?: 'Event', id: any, raw: string | null } | null, events: Array<{ __typename?: 'Event', createdAt: any | null, id: any, name: string | null, raw: string | null }>, history: Array<{ __typename?: 'RunHistoryItem', attempt: number, createdAt: any, functionVersion: number, groupID: any | null, id: any, stepName: string | null, type: HistoryType, url: string | null, cancel: { __typename?: 'RunHistoryCancel', eventID: any | null, expression: string | null, userID: any | null } | null, sleep: { __typename?: 'RunHistorySleep', until: any } | null, waitForEvent: { __typename?: 'RunHistoryWaitForEvent', eventName: string, expression: string | null, timeout: any } | null, waitResult: { __typename?: 'RunHistoryWaitResult', eventID: any | null, timeout: boolean } | null, invokeFunction: { __typename?: 'RunHistoryInvokeFunction', eventID: any, functionID: string, correlationID: string, timeout: any } | null, invokeFunctionResult: { __typename?: 'RunHistoryInvokeFunctionResult', eventID: any | null, timeout: boolean, runID: any | null } | null }> } | null };
 
-export type GetFunctionsQuery = {
-  __typename?: 'Query';
-  functions: Array<{
-    __typename?: 'Function';
-    id: string;
-    slug: string;
-    name: string;
-    url: string;
-    triggers: Array<{
-      __typename?: 'FunctionTrigger';
-      type: FunctionTriggerTypes;
-      value: string;
-    }> | null;
-    app: { __typename?: 'App'; name: string };
-  }> | null;
-};
+export type GetFunctionsQueryVariables = Exact<{ [key: string]: never; }>;
 
-export type GetAppsQueryVariables = Exact<{ [key: string]: never }>;
 
-export type GetAppsQuery = {
-  __typename?: 'Query';
-  apps: Array<{
-    __typename?: 'App';
-    id: string;
-    name: string;
-    sdkLanguage: string;
-    sdkVersion: string;
-    framework: string | null;
-    url: string | null;
-    error: string | null;
-    connected: boolean;
-    functionCount: number;
-    autodiscovered: boolean;
-    functions: Array<{
-      __typename?: 'Function';
-      name: string;
-      id: string;
-      concurrency: number;
-      config: string;
-      slug: string;
-      url: string;
-    }>;
-  }>;
-};
+export type GetFunctionsQuery = { __typename?: 'Query', functions: Array<{ __typename?: 'Function', id: string, slug: string, name: string, url: string, triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null, app: { __typename?: 'App', name: string } }> | null };
+
+export type GetAppsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetAppsQuery = { __typename?: 'Query', apps: Array<{ __typename?: 'App', id: string, name: string, sdkLanguage: string, sdkVersion: string, framework: string | null, url: string | null, error: string | null, connected: boolean, functionCount: number, autodiscovered: boolean, functions: Array<{ __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string }> }> };
 
 export type CreateAppMutationVariables = Exact<{
   input: CreateAppInput;
 }>;
 
-export type CreateAppMutation = {
-  __typename?: 'Mutation';
-  createApp: { __typename?: 'App'; url: string | null };
-};
+
+export type CreateAppMutation = { __typename?: 'Mutation', createApp: { __typename?: 'App', url: string | null } };
 
 export type UpdateAppMutationVariables = Exact<{
   input: UpdateAppInput;
 }>;
 
-export type UpdateAppMutation = {
-  __typename?: 'Mutation';
-  updateApp: { __typename?: 'App'; url: string | null; id: string };
-};
+
+export type UpdateAppMutation = { __typename?: 'Mutation', updateApp: { __typename?: 'App', url: string | null, id: string } };
 
 export type DeleteAppMutationVariables = Exact<{
   id: Scalars['String'];
 }>;
 
-export type DeleteAppMutation = { __typename?: 'Mutation'; deleteApp: string };
+
+export type DeleteAppMutation = { __typename?: 'Mutation', deleteApp: string };
 
 export type GetTriggersStreamQueryVariables = Exact<{
   limit: Scalars['Int'];
@@ -804,62 +677,30 @@ export type GetTriggersStreamQueryVariables = Exact<{
   includeInternalEvents: Scalars['Boolean'];
 }>;
 
-export type GetTriggersStreamQuery = {
-  __typename?: 'Query';
-  stream: Array<{
-    __typename?: 'StreamItem';
-    createdAt: any;
-    id: string;
-    inBatch: boolean;
-    trigger: string;
-    type: StreamType;
-    runs: Array<{
-      __typename?: 'FunctionRun';
-      batchID: any | null;
-      id: string;
-      events: Array<{ __typename?: 'Event'; id: any }>;
-      function: { __typename?: 'Function'; name: string } | null;
-    } | null> | null;
-  }>;
-};
+
+export type GetTriggersStreamQuery = { __typename?: 'Query', stream: Array<{ __typename?: 'StreamItem', createdAt: any, id: string, inBatch: boolean, trigger: string, type: StreamType, runs: Array<{ __typename?: 'FunctionRun', batchID: any | null, id: string, events: Array<{ __typename?: 'Event', id: any }>, function: { __typename?: 'Function', name: string } | null } | null> | null }> };
 
 export type GetFunctionRunStatusQueryVariables = Exact<{
   id: Scalars['ID'];
 }>;
 
-export type GetFunctionRunStatusQuery = {
-  __typename?: 'Query';
-  functionRun: {
-    __typename?: 'FunctionRun';
-    id: string;
-    status: FunctionRunStatus | null;
-    function: { __typename?: 'Function'; name: string } | null;
-  } | null;
-};
+
+export type GetFunctionRunStatusQuery = { __typename?: 'Query', functionRun: { __typename?: 'FunctionRun', id: string, status: FunctionRunStatus | null, function: { __typename?: 'Function', name: string } | null } | null };
 
 export type GetFunctionRunOutputQueryVariables = Exact<{
   id: Scalars['ID'];
 }>;
 
-export type GetFunctionRunOutputQuery = {
-  __typename?: 'Query';
-  functionRun: {
-    __typename?: 'FunctionRun';
-    id: string;
-    status: FunctionRunStatus | null;
-    output: string | null;
-  } | null;
-};
+
+export type GetFunctionRunOutputQuery = { __typename?: 'Query', functionRun: { __typename?: 'FunctionRun', id: string, status: FunctionRunStatus | null, output: string | null } | null };
 
 export type GetHistoryItemOutputQueryVariables = Exact<{
   historyItemID: Scalars['ULID'];
   runID: Scalars['ID'];
 }>;
 
-export type GetHistoryItemOutputQuery = {
-  __typename?: 'Query';
-  functionRun: { __typename?: 'FunctionRun'; historyItemOutput: string | null } | null;
-};
+
+export type GetHistoryItemOutputQuery = { __typename?: 'Query', functionRun: { __typename?: 'FunctionRun', historyItemOutput: string | null } | null };
 
 export type InvokeFunctionMutationVariables = Exact<{
   functionSlug: Scalars['String'];
@@ -867,22 +708,22 @@ export type InvokeFunctionMutationVariables = Exact<{
   user: InputMaybe<Scalars['Map']>;
 }>;
 
-export type InvokeFunctionMutation = { __typename?: 'Mutation'; invokeFunction: boolean | null };
+
+export type InvokeFunctionMutation = { __typename?: 'Mutation', invokeFunction: boolean | null };
 
 export type CancelRunMutationVariables = Exact<{
   runID: Scalars['ULID'];
 }>;
 
-export type CancelRunMutation = {
-  __typename?: 'Mutation';
-  cancelRun: { __typename?: 'FunctionRun'; id: string };
-};
+
+export type CancelRunMutation = { __typename?: 'Mutation', cancelRun: { __typename?: 'FunctionRun', id: string } };
 
 export type RerunMutationVariables = Exact<{
   runID: Scalars['ULID'];
 }>;
 
-export type RerunMutation = { __typename?: 'Mutation'; rerun: any };
+
+export type RerunMutation = { __typename?: 'Mutation', rerun: any };
 
 export type GetRunsQueryVariables = Exact<{
   appIDs: InputMaybe<Array<Scalars['UUID']> | Scalars['UUID']>;
@@ -893,35 +734,8 @@ export type GetRunsQueryVariables = Exact<{
   celQuery?: InputMaybe<Scalars['String']>;
 }>;
 
-export type GetRunsQuery = {
-  __typename?: 'Query';
-  runs: {
-    __typename?: 'RunsV2Connection';
-    edges: Array<{
-      __typename?: 'FunctionRunV2Edge';
-      node: {
-        __typename?: 'FunctionRunV2';
-        cronSchedule: string | null;
-        eventName: string | null;
-        id: any;
-        isBatch: boolean;
-        queuedAt: any;
-        endedAt: any | null;
-        startedAt: any | null;
-        status: FunctionRunStatus;
-        app: { __typename?: 'App'; externalID: string; name: string };
-        function: { __typename?: 'Function'; name: string; slug: string };
-      };
-    }>;
-    pageInfo: {
-      __typename?: 'PageInfo';
-      hasNextPage: boolean;
-      hasPreviousPage: boolean;
-      startCursor: string | null;
-      endCursor: string | null;
-    };
-  };
-};
+
+export type GetRunsQuery = { __typename?: 'Query', runs: { __typename?: 'RunsV2Connection', edges: Array<{ __typename?: 'FunctionRunV2Edge', node: { __typename?: 'FunctionRunV2', cronSchedule: string | null, eventName: string | null, id: any, isBatch: boolean, queuedAt: any, endedAt: any | null, startedAt: any | null, status: FunctionRunStatus, app: { __typename?: 'App', externalID: string, name: string }, function: { __typename?: 'Function', name: string, slug: string } } }>, pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, hasPreviousPage: boolean, startCursor: string | null, endCursor: string | null } } };
 
 export type CountRunsQueryVariables = Exact<{
   startTime: Scalars['Time'];
@@ -929,206 +743,31 @@ export type CountRunsQueryVariables = Exact<{
   timeField: RunsV2OrderByField;
 }>;
 
-export type CountRunsQuery = {
-  __typename?: 'Query';
-  runs: { __typename?: 'RunsV2Connection'; totalCount: number };
-};
 
-export type TraceDetailsFragment = {
-  __typename?: 'RunTraceSpan';
-  name: string;
-  status: RunTraceSpanStatus;
-  attempts: number | null;
-  queuedAt: any;
-  startedAt: any | null;
-  endedAt: any | null;
-  isRoot: boolean;
-  outputID: string | null;
-  spanID: string;
-  stepID: string | null;
-  stepOp: StepOp | null;
-  stepInfo:
-    | {
-        __typename: 'InvokeStepInfo';
-        triggeringEventID: any;
-        functionID: string;
-        timeout: any;
-        returnEventID: any | null;
-        runID: any | null;
-        timedOut: boolean | null;
-      }
-    | { __typename: 'RunStepInfo'; type: string | null }
-    | { __typename: 'SleepStepInfo'; sleepUntil: any }
-    | {
-        __typename: 'WaitForEventStepInfo';
-        eventName: string;
-        expression: string | null;
-        timeout: any;
-        foundEventID: any | null;
-        timedOut: boolean | null;
-      }
-    | null;
-};
+export type CountRunsQuery = { __typename?: 'Query', runs: { __typename?: 'RunsV2Connection', totalCount: number } };
+
+export type TraceDetailsFragment = { __typename?: 'RunTraceSpan', name: string, status: RunTraceSpanStatus, attempts: number | null, queuedAt: any, startedAt: any | null, endedAt: any | null, isRoot: boolean, outputID: string | null, spanID: string, stepID: string | null, stepOp: StepOp | null, stepInfo: { __typename: 'InvokeStepInfo', triggeringEventID: any, functionID: string, timeout: any, returnEventID: any | null, runID: any | null, timedOut: boolean | null } | { __typename: 'RunStepInfo', type: string | null } | { __typename: 'SleepStepInfo', sleepUntil: any } | { __typename: 'WaitForEventStepInfo', eventName: string, expression: string | null, timeout: any, foundEventID: any | null, timedOut: boolean | null } | null };
 
 export type GetRunQueryVariables = Exact<{
   runID: Scalars['String'];
 }>;
 
-export type GetRunQuery = {
-  __typename?: 'Query';
-  run: {
-    __typename?: 'FunctionRunV2';
-    function: {
-      __typename?: 'Function';
-      id: string;
-      name: string;
-      slug: string;
-      app: { __typename?: 'App'; name: string };
-    };
-    trace: {
-      __typename?: 'RunTraceSpan';
-      name: string;
-      status: RunTraceSpanStatus;
-      attempts: number | null;
-      queuedAt: any;
-      startedAt: any | null;
-      endedAt: any | null;
-      isRoot: boolean;
-      outputID: string | null;
-      spanID: string;
-      stepID: string | null;
-      stepOp: StepOp | null;
-      childrenSpans: Array<{
-        __typename?: 'RunTraceSpan';
-        name: string;
-        status: RunTraceSpanStatus;
-        attempts: number | null;
-        queuedAt: any;
-        startedAt: any | null;
-        endedAt: any | null;
-        isRoot: boolean;
-        outputID: string | null;
-        spanID: string;
-        stepID: string | null;
-        stepOp: StepOp | null;
-        childrenSpans: Array<{
-          __typename?: 'RunTraceSpan';
-          name: string;
-          status: RunTraceSpanStatus;
-          attempts: number | null;
-          queuedAt: any;
-          startedAt: any | null;
-          endedAt: any | null;
-          isRoot: boolean;
-          outputID: string | null;
-          spanID: string;
-          stepID: string | null;
-          stepOp: StepOp | null;
-          stepInfo:
-            | {
-                __typename: 'InvokeStepInfo';
-                triggeringEventID: any;
-                functionID: string;
-                timeout: any;
-                returnEventID: any | null;
-                runID: any | null;
-                timedOut: boolean | null;
-              }
-            | { __typename: 'RunStepInfo'; type: string | null }
-            | { __typename: 'SleepStepInfo'; sleepUntil: any }
-            | {
-                __typename: 'WaitForEventStepInfo';
-                eventName: string;
-                expression: string | null;
-                timeout: any;
-                foundEventID: any | null;
-                timedOut: boolean | null;
-              }
-            | null;
-        }>;
-        stepInfo:
-          | {
-              __typename: 'InvokeStepInfo';
-              triggeringEventID: any;
-              functionID: string;
-              timeout: any;
-              returnEventID: any | null;
-              runID: any | null;
-              timedOut: boolean | null;
-            }
-          | { __typename: 'RunStepInfo'; type: string | null }
-          | { __typename: 'SleepStepInfo'; sleepUntil: any }
-          | {
-              __typename: 'WaitForEventStepInfo';
-              eventName: string;
-              expression: string | null;
-              timeout: any;
-              foundEventID: any | null;
-              timedOut: boolean | null;
-            }
-          | null;
-      }>;
-      stepInfo:
-        | {
-            __typename: 'InvokeStepInfo';
-            triggeringEventID: any;
-            functionID: string;
-            timeout: any;
-            returnEventID: any | null;
-            runID: any | null;
-            timedOut: boolean | null;
-          }
-        | { __typename: 'RunStepInfo'; type: string | null }
-        | { __typename: 'SleepStepInfo'; sleepUntil: any }
-        | {
-            __typename: 'WaitForEventStepInfo';
-            eventName: string;
-            expression: string | null;
-            timeout: any;
-            foundEventID: any | null;
-            timedOut: boolean | null;
-          }
-        | null;
-    } | null;
-  } | null;
-};
+
+export type GetRunQuery = { __typename?: 'Query', run: { __typename?: 'FunctionRunV2', function: { __typename?: 'Function', id: string, name: string, slug: string, app: { __typename?: 'App', name: string } }, trace: { __typename?: 'RunTraceSpan', name: string, status: RunTraceSpanStatus, attempts: number | null, queuedAt: any, startedAt: any | null, endedAt: any | null, isRoot: boolean, outputID: string | null, spanID: string, stepID: string | null, stepOp: StepOp | null, childrenSpans: Array<{ __typename?: 'RunTraceSpan', name: string, status: RunTraceSpanStatus, attempts: number | null, queuedAt: any, startedAt: any | null, endedAt: any | null, isRoot: boolean, outputID: string | null, spanID: string, stepID: string | null, stepOp: StepOp | null, childrenSpans: Array<{ __typename?: 'RunTraceSpan', name: string, status: RunTraceSpanStatus, attempts: number | null, queuedAt: any, startedAt: any | null, endedAt: any | null, isRoot: boolean, outputID: string | null, spanID: string, stepID: string | null, stepOp: StepOp | null, stepInfo: { __typename: 'InvokeStepInfo', triggeringEventID: any, functionID: string, timeout: any, returnEventID: any | null, runID: any | null, timedOut: boolean | null } | { __typename: 'RunStepInfo', type: string | null } | { __typename: 'SleepStepInfo', sleepUntil: any } | { __typename: 'WaitForEventStepInfo', eventName: string, expression: string | null, timeout: any, foundEventID: any | null, timedOut: boolean | null } | null }>, stepInfo: { __typename: 'InvokeStepInfo', triggeringEventID: any, functionID: string, timeout: any, returnEventID: any | null, runID: any | null, timedOut: boolean | null } | { __typename: 'RunStepInfo', type: string | null } | { __typename: 'SleepStepInfo', sleepUntil: any } | { __typename: 'WaitForEventStepInfo', eventName: string, expression: string | null, timeout: any, foundEventID: any | null, timedOut: boolean | null } | null }>, stepInfo: { __typename: 'InvokeStepInfo', triggeringEventID: any, functionID: string, timeout: any, returnEventID: any | null, runID: any | null, timedOut: boolean | null } | { __typename: 'RunStepInfo', type: string | null } | { __typename: 'SleepStepInfo', sleepUntil: any } | { __typename: 'WaitForEventStepInfo', eventName: string, expression: string | null, timeout: any, foundEventID: any | null, timedOut: boolean | null } | null } | null } | null };
 
 export type GetTraceResultQueryVariables = Exact<{
   traceID: Scalars['String'];
 }>;
 
-export type GetTraceResultQuery = {
-  __typename?: 'Query';
-  runTraceSpanOutputByID: {
-    __typename?: 'RunTraceSpanOutput';
-    input: any | null;
-    data: any | null;
-    error: {
-      __typename?: 'StepError';
-      message: string;
-      name: string | null;
-      stack: string | null;
-    } | null;
-  };
-};
+
+export type GetTraceResultQuery = { __typename?: 'Query', runTraceSpanOutputByID: { __typename?: 'RunTraceSpanOutput', input: any | null, data: any | null, error: { __typename?: 'StepError', message: string, name: string | null, stack: string | null } | null } };
 
 export type GetTriggerQueryVariables = Exact<{
   runID: Scalars['String'];
 }>;
 
-export type GetTriggerQuery = {
-  __typename?: 'Query';
-  runTrigger: {
-    __typename?: 'RunTraceTrigger';
-    IDs: Array<any>;
-    payloads: Array<any>;
-    timestamp: any;
-    eventName: string | null;
-    isBatch: boolean;
-    batchID: any | null;
-    cron: string | null;
-  };
-};
+
+export type GetTriggerQuery = { __typename?: 'Query', runTrigger: { __typename?: 'RunTraceTrigger', IDs: Array<any>, payloads: Array<any>, timestamp: any, eventName: string | null, isBatch: boolean, batchID: any | null, cron: string | null } };
 
 export const TraceDetailsFragmentDoc = `
     fragment TraceDetails on RunTraceSpan {
@@ -1497,106 +1136,65 @@ export const GetTriggerDocument = `
 const injectedRtkApi = api.injectEndpoints({
   endpoints: (build) => ({
     GetEvent: build.query<GetEventQuery, GetEventQueryVariables>({
-      query: (variables) => ({ document: GetEventDocument, variables }),
+      query: (variables) => ({ document: GetEventDocument, variables })
     }),
     GetFunctionRun: build.query<GetFunctionRunQuery, GetFunctionRunQueryVariables>({
-      query: (variables) => ({ document: GetFunctionRunDocument, variables }),
+      query: (variables) => ({ document: GetFunctionRunDocument, variables })
     }),
     GetFunctions: build.query<GetFunctionsQuery, GetFunctionsQueryVariables | void>({
-      query: (variables) => ({ document: GetFunctionsDocument, variables }),
+      query: (variables) => ({ document: GetFunctionsDocument, variables })
     }),
     GetApps: build.query<GetAppsQuery, GetAppsQueryVariables | void>({
-      query: (variables) => ({ document: GetAppsDocument, variables }),
+      query: (variables) => ({ document: GetAppsDocument, variables })
     }),
     CreateApp: build.mutation<CreateAppMutation, CreateAppMutationVariables>({
-      query: (variables) => ({ document: CreateAppDocument, variables }),
+      query: (variables) => ({ document: CreateAppDocument, variables })
     }),
     UpdateApp: build.mutation<UpdateAppMutation, UpdateAppMutationVariables>({
-      query: (variables) => ({ document: UpdateAppDocument, variables }),
+      query: (variables) => ({ document: UpdateAppDocument, variables })
     }),
     DeleteApp: build.mutation<DeleteAppMutation, DeleteAppMutationVariables>({
-      query: (variables) => ({ document: DeleteAppDocument, variables }),
+      query: (variables) => ({ document: DeleteAppDocument, variables })
     }),
     GetTriggersStream: build.query<GetTriggersStreamQuery, GetTriggersStreamQueryVariables>({
-      query: (variables) => ({ document: GetTriggersStreamDocument, variables }),
+      query: (variables) => ({ document: GetTriggersStreamDocument, variables })
     }),
-    GetFunctionRunStatus: build.query<
-      GetFunctionRunStatusQuery,
-      GetFunctionRunStatusQueryVariables
-    >({
-      query: (variables) => ({ document: GetFunctionRunStatusDocument, variables }),
+    GetFunctionRunStatus: build.query<GetFunctionRunStatusQuery, GetFunctionRunStatusQueryVariables>({
+      query: (variables) => ({ document: GetFunctionRunStatusDocument, variables })
     }),
-    GetFunctionRunOutput: build.query<
-      GetFunctionRunOutputQuery,
-      GetFunctionRunOutputQueryVariables
-    >({
-      query: (variables) => ({ document: GetFunctionRunOutputDocument, variables }),
+    GetFunctionRunOutput: build.query<GetFunctionRunOutputQuery, GetFunctionRunOutputQueryVariables>({
+      query: (variables) => ({ document: GetFunctionRunOutputDocument, variables })
     }),
-    GetHistoryItemOutput: build.query<
-      GetHistoryItemOutputQuery,
-      GetHistoryItemOutputQueryVariables
-    >({
-      query: (variables) => ({ document: GetHistoryItemOutputDocument, variables }),
+    GetHistoryItemOutput: build.query<GetHistoryItemOutputQuery, GetHistoryItemOutputQueryVariables>({
+      query: (variables) => ({ document: GetHistoryItemOutputDocument, variables })
     }),
     InvokeFunction: build.mutation<InvokeFunctionMutation, InvokeFunctionMutationVariables>({
-      query: (variables) => ({ document: InvokeFunctionDocument, variables }),
+      query: (variables) => ({ document: InvokeFunctionDocument, variables })
     }),
     CancelRun: build.mutation<CancelRunMutation, CancelRunMutationVariables>({
-      query: (variables) => ({ document: CancelRunDocument, variables }),
+      query: (variables) => ({ document: CancelRunDocument, variables })
     }),
     Rerun: build.mutation<RerunMutation, RerunMutationVariables>({
-      query: (variables) => ({ document: RerunDocument, variables }),
+      query: (variables) => ({ document: RerunDocument, variables })
     }),
     GetRuns: build.query<GetRunsQuery, GetRunsQueryVariables>({
-      query: (variables) => ({ document: GetRunsDocument, variables }),
+      query: (variables) => ({ document: GetRunsDocument, variables })
     }),
     CountRuns: build.query<CountRunsQuery, CountRunsQueryVariables>({
-      query: (variables) => ({ document: CountRunsDocument, variables }),
+      query: (variables) => ({ document: CountRunsDocument, variables })
     }),
     GetRun: build.query<GetRunQuery, GetRunQueryVariables>({
-      query: (variables) => ({ document: GetRunDocument, variables }),
+      query: (variables) => ({ document: GetRunDocument, variables })
     }),
     GetTraceResult: build.query<GetTraceResultQuery, GetTraceResultQueryVariables>({
-      query: (variables) => ({ document: GetTraceResultDocument, variables }),
+      query: (variables) => ({ document: GetTraceResultDocument, variables })
     }),
     GetTrigger: build.query<GetTriggerQuery, GetTriggerQueryVariables>({
-      query: (variables) => ({ document: GetTriggerDocument, variables }),
+      query: (variables) => ({ document: GetTriggerDocument, variables })
     }),
   }),
 });
 
 export { injectedRtkApi as api };
-export const {
-  useGetEventQuery,
-  useLazyGetEventQuery,
-  useGetFunctionRunQuery,
-  useLazyGetFunctionRunQuery,
-  useGetFunctionsQuery,
-  useLazyGetFunctionsQuery,
-  useGetAppsQuery,
-  useLazyGetAppsQuery,
-  useCreateAppMutation,
-  useUpdateAppMutation,
-  useDeleteAppMutation,
-  useGetTriggersStreamQuery,
-  useLazyGetTriggersStreamQuery,
-  useGetFunctionRunStatusQuery,
-  useLazyGetFunctionRunStatusQuery,
-  useGetFunctionRunOutputQuery,
-  useLazyGetFunctionRunOutputQuery,
-  useGetHistoryItemOutputQuery,
-  useLazyGetHistoryItemOutputQuery,
-  useInvokeFunctionMutation,
-  useCancelRunMutation,
-  useRerunMutation,
-  useGetRunsQuery,
-  useLazyGetRunsQuery,
-  useCountRunsQuery,
-  useLazyCountRunsQuery,
-  useGetRunQuery,
-  useLazyGetRunQuery,
-  useGetTraceResultQuery,
-  useLazyGetTraceResultQuery,
-  useGetTriggerQuery,
-  useLazyGetTriggerQuery,
-} = injectedRtkApi;
+export const { useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery, useGetFunctionRunStatusQuery, useLazyGetFunctionRunStatusQuery, useGetFunctionRunOutputQuery, useLazyGetFunctionRunOutputQuery, useGetHistoryItemOutputQuery, useLazyGetHistoryItemOutputQuery, useInvokeFunctionMutation, useCancelRunMutation, useRerunMutation, useGetRunsQuery, useLazyGetRunsQuery, useCountRunsQuery, useLazyCountRunsQuery, useGetRunQuery, useLazyGetRunQuery, useGetTraceResultQuery, useLazyGetTraceResultQuery, useGetTriggerQuery, useLazyGetTriggerQuery } = injectedRtkApi;
+

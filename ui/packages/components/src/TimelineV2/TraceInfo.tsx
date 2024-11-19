@@ -150,7 +150,13 @@ export function TraceInfo({ className, pathCreator, trace, result, aiOutput }: P
             {aiOutput && <AITrace aiOutput={aiOutput} />}
           </dl>
         </Card.Content>
-        {result && <RunResult className="border-subtle border-t" result={result} />}
+        {result && (
+          <RunResult
+            className="border-subtle border-t"
+            result={result}
+            stepAIEnabled={!!aiOutput}
+          />
+        )}
       </Card>
     </div>
   );

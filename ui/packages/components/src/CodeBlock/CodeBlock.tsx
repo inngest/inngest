@@ -48,7 +48,7 @@ interface CodeBlockProps {
   minLines?: number;
 }
 
-export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlockProps) {
+export function CodeBlock({ header, tab, actions = [], minLines = 0, className }: CodeBlockProps) {
   const [dark, setDark] = useState(isDark());
   const [editorHeight, setEditorHeight] = useState(0);
   const editorRef = useRef<MonacoEditorType>(null);
@@ -238,7 +238,7 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
     <>
       {monaco && (
         <>
-          <div className={cn('bg-canvasBase border-subtle border-b')}>
+          <div className={cn('bg-canvasBase border-subtle border-b', className)}>
             <div
               className={cn(
                 'flex items-center justify-between border-l-4 border-l-transparent',
