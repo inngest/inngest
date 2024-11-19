@@ -48,7 +48,8 @@ export function BillingBannerView({ entitlementUsage }: { entitlementUsage: Enti
       cta={
         <NewButton
           appearance="outlined"
-          href={pathCreator.billing({ ref: 'app-billing-banner' })}
+          // Temporary, send to plans page instead once its built
+          href={pathCreator.billing({ tab: 'usage', ref: 'app-billing-banner' })}
           kind="secondary"
           label="Upgrade plan"
         />
