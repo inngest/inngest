@@ -2,7 +2,6 @@ package connect
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -167,98 +166,4 @@ func (c *connectGatewaySvc) Stop(ctx context.Context) error {
 	// TODO Drain connections!
 
 	return nil
-}
-
-type connectRouterSvc struct {
-	logger *slog.Logger
-
-	stateManager state.StateManager
-	receiver     pubsub.RequestReceiver
-	dbcqrs       cqrs.Manager
-}
-
-func (c *connectRouterSvc) Name() string {
-	return "connect-router"
-}
-
-func (c *connectRouterSvc) Pre(ctx context.Context) error {
-	// Set up router-specific logger with info for correlations
-	c.logger = logger.StdlibLogger(ctx)
-
-	return nil
-}
-
-func (c *connectRouterSvc) Run(ctx context.Context) error {
-	go func() {
-		err := c.receiver.ReceiveExecutorMessages(ctx, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
-			log := c.logger.With("app_id", data.AppId, "req_id", data.RequestId)
-
-			appId, err := uuid.Parse(data.AppId)
-			if err != nil {
-				log.Error("could not parse app ID")
-				return
-			}
-
-			log.Debug("router received msg")
-
-			// TODO Should the router ack or the gateway itself?
-
-			// We need to add an idempotency key to ensure only one router instance processes the message
-			err = c.stateManager.SetRequestIdempotency(ctx, appId, data.RequestId)
-			if err != nil {
-				if errors.Is(err, state.ErrIdempotencyKeyExists) {
-					// Another connection was faster than us, we can ignore this message
-					return
-				}
-
-				// TODO Log error
-				return
-			}
-
-			// Now we're guaranteed to be the exclusive connection processing this message!
-
-			// TODO Resolve gateway
-			gatewayId := ""
-			if os.Getenv("CONNECT_TEST_GATEWAY_ID") != "" {
-				gatewayId = os.Getenv("CONNECT_TEST_GATEWAY_ID")
-			}
-
-			// TODO What if something goes wrong inbetween setting idempotency (claiming exclusivity) and forwarding the req?
-			// We'll potentially lose data here
-
-			// Forward message to the gateway
-			err = c.receiver.RouteExecutorRequest(ctx, gatewayId, appId, data)
-			if err != nil {
-				// TODO Should we retry? Log error?
-				log.Error("failed to route request to gateway", "err", err, "gateway_id", gatewayId)
-				return
-			}
-		})
-		if err != nil {
-			// TODO Log error, retry?
-			return
-		}
-	}()
-
-	// TODO Periodically ping random gateways via PubSub and only consider them active if they respond in time -> Multiple routers will do this
-
-	err := c.receiver.Wait(ctx)
-	if err != nil {
-		return fmt.Errorf("could not listen for pubsub messages: %w", err)
-	}
-
-	return nil
-
-}
-
-func (c *connectRouterSvc) Stop(ctx context.Context) error {
-	return nil
-}
-
-func newConnectRouter(stateManager state.StateManager, receiver pubsub.RequestReceiver, db cqrs.Manager) *connectRouterSvc {
-	return &connectRouterSvc{
-		stateManager: stateManager,
-		receiver:     receiver,
-		dbcqrs:       db,
-	}
 }
