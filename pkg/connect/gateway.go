@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -76,6 +77,15 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
+		var updateLock sync.Mutex
+		updateConnStatus := func(status connect.ConnectionStatus) error {
+			updateLock.Lock()
+			defer updateLock.Unlock()
+
+			conn.Status = status
+			return c.stateManager.UpsertConnection(ctx, conn)
+		}
+
 		var closeReason string
 		var closeReasonLock sync.Mutex
 
@@ -84,6 +94,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		// Once connection is established, we must make sure to update the state on any disconnect,
 		// regardless of whether it's permanent or temporary
 		defer func() {
+			// TODO Persist disconnected status in history for UI (show disconnected connections with reason)
 			err := c.stateManager.DeleteConnection(ctx, conn)
 			switch err {
 			case nil, state.ConnDeletedWithGroupErr:
@@ -153,6 +164,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				// If the context is canceled due to a shutdown or other reason, we need to close the connection
 				// and let the client know we're going away intentionally.
 				if ctx.Err() != nil {
+					// immediately stop routing messages to this connection
+					if err := updateConnStatus(connect.ConnectionStatus_CONNECTED); err != nil {
+						log.Error("could not update connection status after run loop context error", "err", err)
+					}
 					serr := &SocketError{
 						SysCode:    syscode.CodeConnectGatewayClosing,
 						StatusCode: websocket.StatusGoingAway,
@@ -165,6 +180,11 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				var msg connect.ConnectMessage
 				err := wsproto.Read(ctx, ws, &msg)
 				if err != nil {
+					// immediately stop routing messages to this connection
+					if err := updateConnStatus(connect.ConnectionStatus_CONNECTED); err != nil {
+						log.Error("could not update connection status after read error", "err", err)
+					}
+
 					closeErr := websocket.CloseError{}
 					if errors.As(err, &closeErr) {
 						// If client connection closed unexpectedly, we should store the reason, if set.
@@ -261,7 +281,7 @@ func (c *connectGatewaySvc) handleIncomingWebSocketMessage(ctx context.Context, 
 			}
 
 			// This will be sent exactly once, as the router selected this gateway to handle the request
-			err := c.receiver.AckMessage(ctx, appId, data.RequestId)
+			err := c.receiver.AckMessage(ctx, appId, data.RequestId, pubsub.AckSourceWorker)
 			if err != nil {
 				// This should never happen: Failing the ack means we will redeliver the same request even though
 				// the worker already started processing it.
@@ -313,8 +333,15 @@ func (c *connectGatewaySvc) receiveRouterMessages(ctx context.Context, appId uui
 
 		log.Debug("gateway received msg")
 
+		err := c.receiver.AckMessage(ctx, appId, data.RequestId, pubsub.AckSourceGateway)
+		if err != nil {
+			log.Error("failed to ack message", "err", err)
+			// TODO Log error, retry?
+			return
+		}
+
 		// Forward message to SDK!
-		err := wsproto.Write(ctx, ws, &connect.ConnectMessage{
+		err = wsproto.Write(ctx, ws, &connect.ConnectMessage{
 			Kind:    connect.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST,
 			Payload: rawBytes,
 		})
