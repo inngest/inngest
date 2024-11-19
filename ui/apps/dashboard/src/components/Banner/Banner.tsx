@@ -16,6 +16,7 @@ type SeveritySpecific = {
   iconClassName: string;
   wrapperClassName: string;
   linkClassName: string;
+  borderStyles: string;
 };
 
 const severityStyles = {
@@ -25,6 +26,7 @@ const severityStyles = {
     wrapperClassName: 'bg-error dark:bg-error/40 text-error',
     linkClassName:
       'text-error decoration-error hover:text-tertiary-2xIntense hover:decoration-tertiary-2xIntense',
+    borderStyles: 'border-tertiary-2xSubtle',
   },
   info: {
     icon: RiInformationLine,
@@ -32,6 +34,7 @@ const severityStyles = {
     wrapperClassName: 'bg-info dark:bg-info/40 text-info',
     linkClassName:
       'text-info decoration-info  hover:text-secondary-2xIntense hover:decoration-secondary-2xIntense',
+    borderStyles: 'border-secondary-2xSubtle',
   },
   success: {
     icon: RiCheckboxCircleLine,
@@ -39,6 +42,7 @@ const severityStyles = {
     wrapperClassName: 'bg-success dark:bg-success/40 text-success',
     linkClassName:
       'text-success decoration-success hover:text-primary-2xIntense hover:decoration-primary-2xIntense',
+    borderStyles: 'border-primary-2xSubtle',
   },
   warning: {
     icon: RiErrorWarningLine,
@@ -46,6 +50,7 @@ const severityStyles = {
     wrapperClassName: 'bg-warning dark:bg-warning/40 text-warning',
     linkClassName:
       'text-warning decoration-warning hover:text-accent-2xIntense hover:decoration-accent-2xIntense',
+    borderStyles: 'border-accent-2xSubtle',
   },
 } as const satisfies { [key in Severity]: SeveritySpecific };
 
@@ -76,9 +81,9 @@ type Props = {
   onDismiss?: () => void;
 
   /**
-   * Additional link CTA.
+   * Additional link or button CTA.
    */
-  link?: React.ReactNode;
+  cta?: React.ReactNode;
 };
 
 export function Banner({
@@ -87,7 +92,7 @@ export function Banner({
   onDismiss,
   severity = 'info',
   showIcon = true,
-  link,
+  cta,
 }: Props) {
   const Icon = severityStyles[severity].icon;
 
@@ -96,7 +101,7 @@ export function Banner({
       className={cn(
         className,
         severityStyles[severity].wrapperClassName,
-        'flex w-full items-center justify-between px-2 py-2 md:px-4 lg:px-8'
+        'flex w-full items-center justify-between px-4 py-2'
       )}
     >
       <div className="flex grow items-start gap-1 text-sm">
@@ -107,7 +112,7 @@ export function Banner({
         )}
         <span className="grow leading-6">{children}</span>
       </div>
-      {link}
+      {cta}
       {onDismiss && (
         <NewButton
           size="small"
@@ -135,3 +140,53 @@ function BannerLink({
 }
 
 Banner.Link = BannerLink;
+
+export function ContextualBanner({
+  title,
+  children,
+  className,
+  onDismiss,
+  severity = 'info',
+  cta,
+}: Omit<Props, 'showIcon'> & {
+  title: React.ReactNode | string;
+}) {
+  return (
+    <div
+      className={cn(className, severityStyles[severity].wrapperClassName, 'flex w-full flex-col ')}
+    >
+      <div
+        className={cn(
+          'flex grow items-center justify-between gap-1 border-b px-4 py-2',
+          severityStyles[severity].borderStyles
+        )}
+      >
+        <span className="grow text-sm leading-6">{title}</span>
+        {cta}
+        {onDismiss && (
+          <NewButton
+            size="small"
+            appearance="ghost"
+            onClick={onDismiss}
+            icon={<RiCloseLine className={cn('h-5 w-5', severityStyles[severity].iconClassName)} />}
+          />
+        )}
+      </div>
+
+      <div className="flex grow items-start gap-1 text-sm">
+        <span className="grow leading-6">{children}</span>
+      </div>
+    </div>
+  );
+}
+
+function ContextualList({ children, ...props }: React.PropsWithChildren) {
+  return (
+    <ul {...props} className="list-outside list-disc py-2 pl-6">
+      {children}
+    </ul>
+  );
+}
+
+ContextualBanner.Link = BannerLink;
+ContextualBanner.List = ContextualList;

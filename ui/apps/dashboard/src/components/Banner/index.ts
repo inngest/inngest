@@ -1,1 +1,1 @@
-export { Banner, type Severity } from './Banner';
+export { Banner, ContextualBanner, type Severity } from './Banner';
