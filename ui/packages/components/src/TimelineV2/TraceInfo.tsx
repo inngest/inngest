@@ -1,5 +1,7 @@
 import type { Route } from 'next';
 
+import { StepAITrace } from '../AI/AITrace';
+import type { ExperimentalAI } from '../AI/utils';
 import { Card } from '../Card';
 import {
   CodeElement,
@@ -22,9 +24,10 @@ type Props = {
   };
   trace: Trace;
   result?: Result;
+  aiOutput?: ExperimentalAI;
 };
 
-export function TraceInfo({ className, pathCreator, trace, result }: Props) {
+export function TraceInfo({ className, pathCreator, trace, result, aiOutput }: Props) {
   const delayText = formatMilliseconds(
     (toMaybeDate(trace.startedAt) ?? new Date()).getTime() - new Date(trace.queuedAt).getTime()
   );
@@ -143,6 +146,8 @@ export function TraceInfo({ className, pathCreator, trace, result }: Props) {
             </ElementWrapper>
 
             {stepKindInfo}
+
+            {aiOutput && <StepAITrace aiOutput={aiOutput} />}
           </dl>
         </Card.Content>
         {result && <RunResult className="border-subtle border-t" result={result} />}

@@ -10,9 +10,10 @@ type Props = {
     runPopout: (params: { runID: string }) => Route;
   };
   trace: Lazy<React.ComponentProps<typeof Trace>['trace']>;
+  stepAIEnabled?: boolean;
 };
 
-export function Timeline({ getResult, pathCreator, trace }: Props) {
+export function TimelineV2({ getResult, pathCreator, trace, stepAIEnabled = false }: Props) {
   if (!isLazyDone(trace)) {
     // TODO: Properly handle loading state
     return null;
@@ -31,6 +32,7 @@ export function Timeline({ getResult, pathCreator, trace }: Props) {
         minTime={minTime}
         pathCreator={pathCreator}
         trace={{ ...trace, childrenSpans: [], name: 'Run' }}
+        stepAIEnabled={stepAIEnabled}
       />
 
       {trace.childrenSpans?.map((child) => {
@@ -43,6 +45,7 @@ export function Timeline({ getResult, pathCreator, trace }: Props) {
             minTime={minTime}
             pathCreator={pathCreator}
             trace={child}
+            stepAIEnabled={stepAIEnabled}
           />
         );
       })}

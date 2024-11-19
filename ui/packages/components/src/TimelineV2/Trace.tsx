@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Route } from 'next';
 
+import { parseAIOutput } from '../AI/utils';
 import type { Result } from '../types/functionRun';
 import { cn } from '../utils/classNames';
 import { toMaybeDate } from '../utils/date';
@@ -20,6 +21,7 @@ type Props = {
     runPopout: (params: { runID: string }) => Route;
   };
   trace: Trace;
+  stepAIEnabled?: boolean;
 };
 
 export function Trace({
@@ -30,6 +32,7 @@ export function Trace({
   minTime,
   pathCreator,
   trace,
+  stepAIEnabled = false,
 }: Props) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [result, setResult] = useState<Result>();
@@ -63,6 +66,8 @@ export function Trace({
     spans = trace.childrenSpans;
   }
 
+  const aiOutput = stepAIEnabled && result?.data ? parseAIOutput(result.data) : undefined;
+
   return (
     <div
       className={cn(
@@ -86,6 +91,7 @@ export function Trace({
             isExpanded={isExpanded}
             onClickExpandToggle={() => setIsExpanded((prev) => !prev)}
             trace={trace}
+            aiOutput={aiOutput}
           />
         </div>
 
@@ -105,6 +111,7 @@ export function Trace({
             pathCreator={pathCreator}
             trace={trace}
             result={result}
+            aiOutput={aiOutput}
           />
 
           {trace.childrenSpans?.map((child, i) => {
@@ -118,6 +125,7 @@ export function Trace({
                     minTime={minTime}
                     pathCreator={pathCreator}
                     trace={child}
+                    stepAIEnabled={stepAIEnabled}
                   />
                 </div>
               </div>
