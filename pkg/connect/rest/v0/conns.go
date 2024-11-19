@@ -68,6 +68,29 @@ func (c *router) showConnectionsByEnv(w http.ResponseWriter, r *http.Request) {
 func (c *router) showConnectionsByApp(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	var envID uuid.UUID
+	switch c.Dev {
+	case true:
+		envID = consts.DevServerEnvId
+
+	case false:
+		// Expect UUID
+		param := chi.URLParam(r, "envID")
+		id, err := uuid.Parse(param)
+		if err != nil {
+			_ = publicerr.WriteHTTP(w, publicerr.Error{
+				Err:     err,
+				Message: "invalid environment ID",
+				Data: map[string]any{
+					"envID": param,
+				},
+				Status: http.StatusBadRequest,
+			})
+			return
+		}
+		envID = id
+	}
+
 	var appID uuid.UUID
 	{
 		param := chi.URLParam(r, "appID")
@@ -84,7 +107,7 @@ func (c *router) showConnectionsByApp(w http.ResponseWriter, r *http.Request) {
 		appID = id
 	}
 
-	conns, err := c.ConnectManager.GetConnectionsByAppID(ctx, appID)
+	conns, err := c.ConnectManager.GetConnectionsByAppID(ctx, envID, appID)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
 			Err:     err,
