@@ -353,11 +353,6 @@
   transform: scale(0.8);
   color: rgb(var(--toast-accent-color));
 }
-/* [data-sonner-toast] [data-icon] {
-  height: 14px !important;
-  width: 14px !important;
-  color: rgb(var(--toast-accent-color));
-} */
 [data-sonner-toast][data-type='success'] {
   --toast-accent-color: var(--color-primary-moderate);
 }

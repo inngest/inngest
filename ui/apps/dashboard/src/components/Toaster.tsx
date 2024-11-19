@@ -5,7 +5,6 @@ import { Toaster } from 'sonner';
 export default function ToasterWrapper() {
   return (
     <Toaster
-      duration={20_000}
       toastOptions={{
         // Ensure that the toast is clickable when there are overlays/modals
         className: 'pointer-events-auto drop-shadow-lg',
