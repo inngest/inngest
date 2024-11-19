@@ -142,8 +142,6 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		log.Debug("found app, connection is ready")
 
-		// TODO Persist connection state
-
 		eg := errgroup.Group{}
 
 		// Wait for relevant messages and forward them over the WebSocket connection
@@ -208,11 +206,29 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		})
 
+		// Let the worker know we're ready to receive messages
+		{
+			err = wsproto.Write(ctx, ws, &connect.ConnectMessage{
+				Kind: connect.GatewayMessageType_GATEWAY_CONNECTION_READY,
+			})
+			if err != nil {
+				c.logger.Error("could not send connection ready", "err", err)
+				closeWithConnectError(ws, &SocketError{
+					SysCode:    syscode.CodeConnectInternal,
+					StatusCode: websocket.StatusInternalError,
+					Msg:        "could not send gateway connection ready",
+				})
+
+				return
+			}
+		}
+
+		// TODO Update connection state to start receiving messages
+		// TODO Mark connection as ready to receive traffic unless we require manual client ready signal (optional)
+
 		if err := eg.Wait(); err != nil {
 			return
 		}
-
-		// TODO Mark connection as ready to receive traffic unless we require manual client ready signal (optional)
 	})
 }
 
