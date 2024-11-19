@@ -67,6 +67,13 @@ message GatewayExecutorRequestData {
 	bytes request_payload = 5;
 }
 
+message WorkerRequestAckData {
+	string request_id = 1;
+	string app_id = 2;
+	string function_slug = 3;
+	optional string step_id = 4;
+}
+
 enum SDKResponseStatus {
 	NOT_COMPLETED = 0;
 	DONE = 1;

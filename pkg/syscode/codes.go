@@ -16,13 +16,14 @@ const (
 	CodeBatchKeyExpressionInvalid = "batch_key_expression_invalid"
 
 	// Connect
-	CodeConnectWorkerHelloTimeout        = "connect_worker_hello_timeout"
-	CodeConnectWorkerHelloInvalidMsg     = "connect_worker_hello_invalid_msg"
-	CodeConnectWorkerHelloInvalidPayload = "connect_worker_hello_invalid_payload"
-	CodeConnectAuthFailed                = "connect_authentication_failed"
-	CodeConnectConnNotSaved              = "connect_connection_not_saved"
-	CodeConnectInternal                  = "connect_internal_error"
-	CodeConnectGatewayClosing            = "connect_gateway_closing"
-	CodeConnectRunInvalidMessage         = "connect_run_invalid_message"
-	CodeConnectInvalidFunctionConfig     = "connect_invalid_function_config"
+	CodeConnectWorkerHelloTimeout             = "connect_worker_hello_timeout"
+	CodeConnectWorkerHelloInvalidMsg          = "connect_worker_hello_invalid_msg"
+	CodeConnectWorkerHelloInvalidPayload      = "connect_worker_hello_invalid_payload"
+	CodeConnectAuthFailed                     = "connect_authentication_failed"
+	CodeConnectConnNotSaved                   = "connect_connection_not_saved"
+	CodeConnectInternal                       = "connect_internal_error"
+	CodeConnectGatewayClosing                 = "connect_gateway_closing"
+	CodeConnectRunInvalidMessage              = "connect_run_invalid_message"
+	CodeConnectInvalidFunctionConfig          = "connect_invalid_function_config"
+	CodeConnectWorkerRequestAckInvalidPayload = "connect_worker_request_ack_invalid_payload"
 )
