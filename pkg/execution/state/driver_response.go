@@ -74,6 +74,19 @@ func (g GeneratorOpcode) UserDefinedName() string {
 	return g.Name
 }
 
+// Get the stringified input of the step.
+func (g GeneratorOpcode) Input() (string, error) {
+	runOpts, _ := g.RunOpts()
+	if runOpts != nil && runOpts.Input != nil {
+		return string(runOpts.Input), nil
+	}
+
+	// Failure to unwrap run opts just means this isn't an op that can provide
+	// input, so ignore.
+	return "", nil
+
+}
+
 // Get the stringified output of the step.
 func (g GeneratorOpcode) Output() (string, error) {
 	// OpcodeStepError MUST always wrap the output in an "error"
@@ -104,6 +117,23 @@ func (g GeneratorOpcode) Output() (string, error) {
 // `StepError` being passed back from an SDK.
 func (g GeneratorOpcode) IsError() bool {
 	return g.Error != nil
+}
+
+func (g GeneratorOpcode) RunOpts() (*RunOpts, error) {
+	opts := &RunOpts{}
+	if err := opts.UnmarshalAny(g.Opts); err != nil {
+		return nil, err
+	}
+	return opts, nil
+}
+
+// Returns, if any, the type of a StepRun operation.
+func (g GeneratorOpcode) RunType() string {
+	opts, err := g.RunOpts()
+	if err != nil {
+		return ""
+	}
+	return opts.Type
 }
 
 func (g GeneratorOpcode) WaitForEventOpts() (*WaitForEventOpts, error) {
@@ -224,6 +254,36 @@ func (s *SleepOpts) UnmarshalAny(a any) error {
 		return err
 	}
 	*s = opts
+	return nil
+}
+
+type RunOpts struct {
+	Type  string          `json:"type,omitempty"`
+	Input json.RawMessage `json:"input"`
+}
+
+func (r *RunOpts) UnmarshalAny(a any) error {
+	opts := RunOpts{}
+	var mappedByt []byte
+	switch typ := a.(type) {
+	case []byte:
+		mappedByt = typ
+	default:
+		byt, err := json.Marshal(a)
+		if err != nil {
+			return err
+		}
+		mappedByt = byt
+	}
+	if err := json.Unmarshal(mappedByt, &opts); err != nil {
+		return err
+	}
+
+	if len(opts.Input) > 0 && opts.Input[0] != '[' {
+		return fmt.Errorf("input must be an array or undefined")
+	}
+
+	*r = opts
 	return nil
 }
 

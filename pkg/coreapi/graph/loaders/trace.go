@@ -196,11 +196,16 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 		EndedAt:      endedAt,
 		OutputID:     pb.OutputId,
 		StepOp:       stepOp,
+		StepID:       pb.StepId,
 	}
 
 	if pb.GetStepInfo() != nil {
 		// step info
 		switch v := pb.GetStepInfo().GetInfo().(type) {
+		case *rpbv2.StepInfo_Run:
+			span.StepInfo = models.RunStepInfo{
+				Type: v.Run.Type,
+			}
 		case *rpbv2.StepInfo_Sleep:
 			span.StepInfo = models.SleepStepInfo{
 				SleepUntil: v.Sleep.SleepUntil.AsTime(),

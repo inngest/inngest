@@ -400,6 +400,11 @@ type Mutater interface {
 	) error
 }
 
+type MemoizedStep struct {
+	ID   string `json:"id"`
+	Data any    `json:"data"`
+}
+
 // Input is the input for creating new state.  The required fields are Workflow,
 // Identifier and Input;  the rest of the data is stored within the state store as
 // metadata.
@@ -420,7 +425,11 @@ type Input struct {
 
 	// Steps allows users to specify pre-defined steps to run workflows from
 	// arbitrary points.
-	Steps map[string]any
+	Steps []MemoizedStep
+
+	// StepInputs allows users to specify pre-defined step inputs to run
+	// workflows from arbitrary points.
+	StepInputs []MemoizedStep
 
 	// Context is additional context for the run stored in metadata.
 	Context map[string]any

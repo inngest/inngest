@@ -3,17 +3,13 @@
 import { useMemo } from 'react';
 import { NewButton } from '@inngest/components/Button';
 
-import type { EntitlementUsageQuery } from '@/gql/graphql';
+import { type EntitlementUsage } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import { Banner } from '../Banner';
 import { useBooleanLocalStorage } from './localStorage';
 import { parseEntitlementUsage } from './parse';
 
-type Props = {
-  entitlementUsage: EntitlementUsageQuery['account']['entitlementUsage'];
-};
-
-export function BillingBannerView({ entitlementUsage }: Props) {
+export function BillingBannerView({ entitlementUsage }: { entitlementUsage: EntitlementUsage }) {
   const { bannerMessage, bannerSeverity, items } = parseEntitlementUsage(entitlementUsage);
 
   const isVisible = useBooleanLocalStorage('BillingBanner:visible', true);
@@ -55,7 +51,7 @@ export function BillingBannerView({ entitlementUsage }: Props) {
           </ul>
         </div>
 
-        <div className="flex items-center">
+        <div className="mr-2 flex items-center">
           <NewButton
             appearance="outlined"
             href={pathCreator.billing()}

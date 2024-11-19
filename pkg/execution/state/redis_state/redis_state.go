@@ -260,6 +260,22 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 		return nil, err
 	}
 
+	var stepsByt []byte
+	if len(input.Steps) > 0 {
+		stepsByt, err = json.Marshal(input.Steps)
+		if err != nil {
+			return nil, fmt.Errorf("error storing run state in redis when marshalling steps: %w", err)
+		}
+	}
+
+	var stepInputsByt []byte
+	if len(input.StepInputs) > 0 {
+		stepInputsByt, err = json.Marshal(input.StepInputs)
+		if err != nil {
+			return nil, fmt.Errorf("error storing run state in redis when marshalling step inputs: %w", err)
+		}
+	}
+
 	metadata := runMetadata{
 		Identifier:     input.Identifier,
 		Debugger:       input.Debugger,
@@ -269,21 +285,12 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 		Status:         enums.RunStatusScheduled,
 		SpanID:         input.SpanID,
 		EventSize:      len(events),
+		StateSize:      len(events) + len(stepsByt) + len(stepInputsByt),
+		StepCount:      len(input.Steps),
 	}
 	if input.RunType != nil {
 		metadata.RunType = *input.RunType
 	}
-
-	var stepsByt []byte
-	if len(input.Steps) > 0 {
-		stepsByt, err = json.Marshal(input.Steps)
-		if err != nil {
-			return nil, fmt.Errorf("error storing run state in redis: %w", err)
-		}
-	}
-
-	// Add total state size, including size of input steps.
-	metadata.StateSize = len(events) + len(stepsByt)
 
 	metadataByt, err := json.Marshal(metadata.Map())
 	if err != nil {
@@ -294,6 +301,7 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 		events,
 		metadataByt,
 		stepsByt,
+		stepInputsByt,
 	})
 	if err != nil {
 		return nil, err
@@ -306,6 +314,8 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 			fnRunState.kg.Events(ctx, isSharded, input.Identifier),
 			fnRunState.kg.RunMetadata(ctx, isSharded, input.Identifier.RunID),
 			fnRunState.kg.Actions(ctx, isSharded, input.Identifier),
+			fnRunState.kg.Stack(ctx, isSharded, input.Identifier.RunID),
+			fnRunState.kg.ActionInputs(ctx, isSharded, input.Identifier),
 		},
 		args,
 	).AsInt64()
@@ -313,7 +323,6 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 	if err != nil {
 		return nil, fmt.Errorf("error storing run state in redis: %w", err)
 	}
-
 	if status == 1 {
 		return nil, state.ErrIdentifierExists
 	}
@@ -521,6 +530,24 @@ func (m shardedMgr) LoadSteps(ctx context.Context, accountId uuid.UUID, fnID uui
 
 	r, isSharded := fnRunState.Client(ctx, accountId, runID)
 
+	// Load action inputs
+	inputMap, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Hgetall().Key(fnRunState.kg.ActionInputs(ctx, isSharded, v1id)).Build()
+	}).AsStrMap()
+	if err != nil {
+		return nil, fmt.Errorf("failed loading action inputs; %w", err)
+	}
+	for stepID, marshalled := range inputMap {
+		wrapper := map[string]json.RawMessage{
+			"input": json.RawMessage(marshalled),
+		}
+		wrappedData, err := json.Marshal(wrapper)
+		if err != nil {
+			return nil, fmt.Errorf("failed to wrap action input for \"%s\"; %w", stepID, err)
+		}
+		steps[stepID] = wrappedData
+	}
+
 	// Load the actions.  This is a map of step IDs to JSON-encoded results.
 	rmap, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
 		return client.B().Hgetall().Key(fnRunState.kg.Actions(ctx, isSharded, v1id)).Build()
@@ -531,6 +558,7 @@ func (m shardedMgr) LoadSteps(ctx context.Context, accountId uuid.UUID, fnID uui
 	for stepID, marshalled := range rmap {
 		steps[stepID] = json.RawMessage(marshalled)
 	}
+
 	return steps, nil
 }
 
@@ -580,21 +608,47 @@ func (m shardedMgr) Load(ctx context.Context, accountId uuid.UUID, runID ulid.UL
 		}
 	}
 
-	// Load the actions.  This is a map of step IDs to JSON-encoded results.
+	actions := []state.MemoizedStep{}
+
+	// Load action inputs
+	inputMap, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Hgetall().Key(fnRunState.kg.ActionInputs(ctx, isSharded, id)).Build()
+	}).AsStrMap()
+	if err != nil {
+		return nil, fmt.Errorf("failed loading action inputs; %w", err)
+	}
+	for stepID, marshalled := range inputMap {
+		wrapper := map[string]json.RawMessage{
+			"input": json.RawMessage(marshalled),
+		}
+		wrappedData, err := json.Marshal(wrapper)
+		if err != nil {
+			return nil, fmt.Errorf("failed to wrap action input for \"%s\"; %w", stepID, err)
+		}
+		actions = append(actions, state.MemoizedStep{
+			ID:   stepID,
+			Data: wrappedData,
+		})
+	}
+
+	// Load the actions
 	rmap, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
 		return client.B().Hgetall().Key(fnRunState.kg.Actions(ctx, isSharded, id)).Build()
 	}).AsStrMap()
 	if err != nil {
 		return nil, fmt.Errorf("failed loading actions; %w", err)
 	}
-	actions := map[string]any{}
+
 	for stepID, marshalled := range rmap {
 		var data any
 		err = json.Unmarshal([]byte(marshalled), &data)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal step \"%s\" with data \"%s\"; %w", stepID, marshalled, err)
 		}
-		actions[stepID] = data
+		actions = append(actions, state.MemoizedStep{
+			ID:   stepID,
+			Data: data,
+		})
 	}
 
 	meta := metadata.Metadata()

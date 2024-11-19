@@ -535,14 +535,22 @@ func (s *Span) TracerProvider() trace.TracerProvider {
 }
 
 func (s *Span) SetFnOutput(data any) {
-	s.setOutput(data, consts.OtelSysFunctionOutput)
+	s.setAttrData(data, consts.OtelSysFunctionOutput)
+}
+
+func (s *Span) SetStepInput(data any) {
+	s.setAttrData(data, consts.OtelSysStepInput)
 }
 
 func (s *Span) SetStepOutput(data any) {
-	s.setOutput(data, consts.OtelSysStepOutput)
+	s.setAttrData(data, consts.OtelSysStepOutput)
 }
 
-func (s *Span) setOutput(data any, key string) {
+func (s *Span) SetStepRunType(t string) {
+	s.SetAttributes(attribute.String(consts.OtelSysStepRunType, t))
+}
+
+func (s *Span) setAttrData(data any, key string) {
 	attr := []attribute.KeyValue{
 		attribute.Bool(key, true),
 	}

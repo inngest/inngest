@@ -5,13 +5,19 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/execution/state"
 )
 
 type CreateState struct {
 	Metadata Metadata
 	// Events contains a slice of JSON-encoded events.
 	Events []json.RawMessage
-	// XXX: You cannot start state with pre-existing steps yet.
+	// Steps allows users to specify pre-defined steps to run workflows from
+	// arbitrary points.
+	Steps []state.MemoizedStep
+	// StepInputs allows users to specify pre-defined step inputs to run
+	// workflows from arbitrary points.
+	StepInputs []state.MemoizedStep
 }
 
 type StateService interface {

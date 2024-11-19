@@ -359,6 +359,11 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 		}
 	}
 
+	var stepID *string
+	if attrStepID, ok := s.SpanAttributes[consts.OtelSysStepID]; ok && attrStepID != "" {
+		stepID = &attrStepID
+	}
+
 	return &rpbv2.RunSpan{
 		AccountId:    acctID.String(),
 		WorkspaceId:  wsID.String(),
@@ -374,6 +379,7 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 		StartedAt:    timestamppb.New(s.Timestamp),
 		EndedAt:      timestamppb.New(endedAt),
 		DurationMs:   dur,
+		StepId:       stepID,
 	}, false
 }
 
@@ -399,6 +405,16 @@ func (tb *runTree) processStepRunGroup(ctx context.Context, span *cqrs.Span, mod
 
 	stepOp := rpbv2.SpanStepOp_RUN
 	mod.StepOp = &stepOp
+
+	if v, ok := span.SpanAttributes[consts.OtelSysStepRunType]; ok {
+		mod.StepInfo = &rpbv2.StepInfo{
+			Info: &rpbv2.StepInfo_Run{
+				Run: &rpbv2.StepInfoRun{
+					Type: &v,
+				},
+			},
+		}
+	}
 
 	// not need to provide nesting if it's just itself and it's successful
 	if len(peers) == 1 && span.Status() == cqrs.SpanStatusOk {

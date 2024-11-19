@@ -12,9 +12,9 @@ export default function BillingCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className={cn('rounded-lg border border-slate-200 p-6', className)}>
+    <div className={cn('border-subtle rounded-md border px-6 py-4', className)}>
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-xl font-semibold">{heading}</h2>
+        <h2 className="text-muted">{heading}</h2>
         {actions}
       </div>
       {children}

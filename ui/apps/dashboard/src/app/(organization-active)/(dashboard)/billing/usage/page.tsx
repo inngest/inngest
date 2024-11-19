@@ -6,10 +6,8 @@ import { graphql } from '@/gql';
 import type { BillingPlan } from '@/gql/graphql';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { BillableStepUsage } from '../../settings/billing/BillableStepUsage/BillableStepUsage';
-import BillingInformation from '../../settings/billing/BillingInformation';
 import BillingPlanSelector from '../../settings/billing/BillingPlanSelector';
 import CurrentSubscription from '../../settings/billing/CurrentSubscription';
-import PaymentMethod from '../../settings/billing/PaymentMethod';
 import Payments from '../../settings/billing/Payments';
 import { isEnterprisePlan, transformPlan } from '../../settings/billing/utils';
 
@@ -78,7 +76,6 @@ export default function Billing() {
   }
 
   const currentPlan = data.account.plan || undefined;
-  const paymentMethod = data.account.paymentMethods?.[0] || null;
   const basePlans = [...data.plans, ENTERPRISE_PLAN];
   const subscription = data.account.subscription;
 
@@ -99,7 +96,7 @@ export default function Billing() {
 
   return (
     <>
-      <div className="mt-6 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
         <CurrentSubscription
           subscription={subscription || undefined}
           currentPlan={currentPlan || undefined}
@@ -121,17 +118,8 @@ export default function Billing() {
         <h2 id="payments" className="py-6 text-2xl font-semibold">
           Payments
         </h2>
-        <div className="mb-14 grid grid-cols-3 gap-2.5 border-t border-slate-200 pt-14">
-          <div className="col-span-2">
-            <Payments />
-          </div>
-          <div>
-            <BillingInformation
-              billingEmail={data.account.billingEmail}
-              accountName={data.account.name}
-            />
-            <PaymentMethod paymentMethod={paymentMethod} />
-          </div>
+        <div className="mb-14 border-t border-slate-200 pt-14">
+          <Payments />
         </div>
       </section>
     </>

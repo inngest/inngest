@@ -187,7 +187,7 @@ type ComplexityRoot struct {
 		DeleteApp       func(childComplexity int, id string) int
 		DeleteAppByName func(childComplexity int, name string) int
 		InvokeFunction  func(childComplexity int, data map[string]interface{}, functionSlug string, user map[string]interface{}) int
-		Rerun           func(childComplexity int, runID ulid.ULID) int
+		Rerun           func(childComplexity int, runID ulid.ULID, fromStep *models.RerunFromStepInput) int
 		UpdateApp       func(childComplexity int, input models.UpdateAppInput) int
 	}
 
@@ -274,6 +274,10 @@ type ComplexityRoot struct {
 		Timeout func(childComplexity int) int
 	}
 
+	RunStepInfo struct {
+		Type func(childComplexity int) int
+	}
+
 	RunTraceSpan struct {
 		AppID         func(childComplexity int) int
 		Attempts      func(childComplexity int) int
@@ -292,6 +296,7 @@ type ComplexityRoot struct {
 		SpanID        func(childComplexity int) int
 		StartedAt     func(childComplexity int) int
 		Status        func(childComplexity int) int
+		StepID        func(childComplexity int) int
 		StepInfo      func(childComplexity int) int
 		StepOp        func(childComplexity int) int
 		TraceID       func(childComplexity int) int
@@ -300,6 +305,7 @@ type ComplexityRoot struct {
 	RunTraceSpanOutput struct {
 		Data  func(childComplexity int) int
 		Error func(childComplexity int) int
+		Input func(childComplexity int) int
 	}
 
 	RunTraceTrigger struct {
@@ -417,7 +423,7 @@ type MutationResolver interface {
 	DeleteAppByName(ctx context.Context, name string) (bool, error)
 	InvokeFunction(ctx context.Context, data map[string]interface{}, functionSlug string, user map[string]interface{}) (*bool, error)
 	CancelRun(ctx context.Context, runID ulid.ULID) (*models.FunctionRun, error)
-	Rerun(ctx context.Context, runID ulid.ULID) (ulid.ULID, error)
+	Rerun(ctx context.Context, runID ulid.ULID, fromStep *models.RerunFromStepInput) (ulid.ULID, error)
 }
 type QueryResolver interface {
 	Apps(ctx context.Context) ([]*cqrs.App, error)
@@ -1172,7 +1178,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.Rerun(childComplexity, args["runID"].(ulid.ULID)), true
+		return e.complexity.Mutation.Rerun(childComplexity, args["runID"].(ulid.ULID), args["fromStep"].(*models.RerunFromStepInput)), true
 
 	case "Mutation.updateApp":
 		if e.complexity.Mutation.UpdateApp == nil {
@@ -1597,6 +1603,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunHistoryWaitResult.Timeout(childComplexity), true
 
+	case "RunStepInfo.type":
+		if e.complexity.RunStepInfo.Type == nil {
+			break
+		}
+
+		return e.complexity.RunStepInfo.Type(childComplexity), true
+
 	case "RunTraceSpan.appID":
 		if e.complexity.RunTraceSpan.AppID == nil {
 			break
@@ -1716,6 +1729,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunTraceSpan.Status(childComplexity), true
 
+	case "RunTraceSpan.stepID":
+		if e.complexity.RunTraceSpan.StepID == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.StepID(childComplexity), true
+
 	case "RunTraceSpan.stepInfo":
 		if e.complexity.RunTraceSpan.StepInfo == nil {
 			break
@@ -1750,6 +1770,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.RunTraceSpanOutput.Error(childComplexity), true
+
+	case "RunTraceSpanOutput.input":
+		if e.complexity.RunTraceSpanOutput.Input == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpanOutput.Input(childComplexity), true
 
 	case "RunTraceTrigger.batchID":
 		if e.complexity.RunTraceTrigger.BatchID == nil {
@@ -2024,6 +2051,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputEventsQuery,
 		ec.unmarshalInputFunctionRunQuery,
 		ec.unmarshalInputFunctionRunsQuery,
+		ec.unmarshalInputRerunFromStepInput,
 		ec.unmarshalInputRunsFilterV2,
 		ec.unmarshalInputRunsV2OrderBy,
 		ec.unmarshalInputStreamQuery,
@@ -2103,7 +2131,7 @@ type Mutation {
   ): Boolean
 
   cancelRun(runID: ULID!): FunctionRun!
-  rerun(runID: ULID!): ULID!
+  rerun(runID: ULID!, fromStep: RerunFromStepInput): ULID!
 }
 
 input CreateAppInput {
@@ -2113,6 +2141,11 @@ input CreateAppInput {
 input UpdateAppInput {
   id: String!
   url: String!
+}
+
+input RerunFromStepInput {
+  stepID: String!
+  input: Bytes
 }
 `, BuiltIn: false},
 	{Name: "../gql.query.graphql", Input: `type Query {
@@ -2571,7 +2604,7 @@ enum StepOp {
   WAIT_FOR_EVENT # wait for an event
 }
 
-union StepInfo = InvokeStepInfo | SleepStepInfo | WaitForEventStepInfo
+union StepInfo = InvokeStepInfo | SleepStepInfo | WaitForEventStepInfo | RunStepInfo
 
 type InvokeStepInfo {
   triggeringEventID: ULID!
@@ -2592,6 +2625,10 @@ type WaitForEventStepInfo {
   timeout: Time!
   foundEventID: ULID
   timedOut: Boolean
+}
+
+type RunStepInfo {
+  type: String
 }
 
 type RunTraceSpan {
@@ -2617,6 +2654,7 @@ type RunTraceSpan {
   endedAt: Time # the end time of the span, only present if it's ended
   childrenSpans: [RunTraceSpan!]! # the children spans of this span - invoke
   stepOp: StepOp # the operation this span represents; nil means it can't be attributed to a step yet
+  stepID: String # the ID of the step this span is associated with
   stepInfo: StepInfo # info about the step - use fragments to access appropriately
   # Nice-to-haves for navigating the trace
   isRoot: Boolean! # whether this span is the root span of the trace (shortcut for presence of rootspan)
@@ -2625,6 +2663,7 @@ type RunTraceSpan {
 }
 
 type RunTraceSpanOutput {
+  input: Bytes
   data: Bytes
   error: StepError
 }
@@ -2772,6 +2811,15 @@ func (ec *executionContext) field_Mutation_rerun_args(ctx context.Context, rawAr
 		}
 	}
 	args["runID"] = arg0
+	var arg1 *models.RerunFromStepInput
+	if tmp, ok := rawArgs["fromStep"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("fromStep"))
+		arg1, err = ec.unmarshalORerunFromStepInput2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRerunFromStepInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["fromStep"] = arg1
 	return args, nil
 }
 
@@ -6506,6 +6554,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 				return ec.fieldContext_RunTraceSpan_childrenSpans(ctx, field)
 			case "stepOp":
 				return ec.fieldContext_RunTraceSpan_stepOp(ctx, field)
+			case "stepID":
+				return ec.fieldContext_RunTraceSpan_stepID(ctx, field)
 			case "stepInfo":
 				return ec.fieldContext_RunTraceSpan_stepInfo(ctx, field)
 			case "isRoot":
@@ -7727,7 +7777,7 @@ func (ec *executionContext) _Mutation_rerun(ctx context.Context, field graphql.C
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().Rerun(rctx, fc.Args["runID"].(ulid.ULID))
+		return ec.resolvers.Mutation().Rerun(rctx, fc.Args["runID"].(ulid.ULID), fc.Args["fromStep"].(*models.RerunFromStepInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -8578,6 +8628,8 @@ func (ec *executionContext) fieldContext_Query_runTraceSpanOutputByID(ctx contex
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
+			case "input":
+				return ec.fieldContext_RunTraceSpanOutput_input(ctx, field)
 			case "data":
 				return ec.fieldContext_RunTraceSpanOutput_data(ctx, field)
 			case "error":
@@ -10513,6 +10565,47 @@ func (ec *executionContext) fieldContext_RunHistoryWaitResult_timeout(ctx contex
 	return fc, nil
 }
 
+func (ec *executionContext) _RunStepInfo_type(ctx context.Context, field graphql.CollectedField, obj *models.RunStepInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunStepInfo_type(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Type, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunStepInfo_type(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunStepInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _RunTraceSpan_appID(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_RunTraceSpan_appID(ctx, field)
 	if err != nil {
@@ -11223,6 +11316,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_childrenSpans(ctx context.
 				return ec.fieldContext_RunTraceSpan_childrenSpans(ctx, field)
 			case "stepOp":
 				return ec.fieldContext_RunTraceSpan_stepOp(ctx, field)
+			case "stepID":
+				return ec.fieldContext_RunTraceSpan_stepID(ctx, field)
 			case "stepInfo":
 				return ec.fieldContext_RunTraceSpan_stepInfo(ctx, field)
 			case "isRoot":
@@ -11274,6 +11369,47 @@ func (ec *executionContext) fieldContext_RunTraceSpan_stepOp(ctx context.Context
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type StepOp does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceSpan_stepID(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_stepID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.StepID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_stepID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -11473,6 +11609,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_parentSpan(ctx context.Con
 				return ec.fieldContext_RunTraceSpan_childrenSpans(ctx, field)
 			case "stepOp":
 				return ec.fieldContext_RunTraceSpan_stepOp(ctx, field)
+			case "stepID":
+				return ec.fieldContext_RunTraceSpan_stepID(ctx, field)
 			case "stepInfo":
 				return ec.fieldContext_RunTraceSpan_stepInfo(ctx, field)
 			case "isRoot":
@@ -11483,6 +11621,47 @@ func (ec *executionContext) fieldContext_RunTraceSpan_parentSpan(ctx context.Con
 				return ec.fieldContext_RunTraceSpan_parentSpan(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceSpanOutput_input(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpanOutput) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpanOutput_input(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Input, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOBytes2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpanOutput_input(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpanOutput",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Bytes does not have child fields")
 		},
 	}
 	return fc, nil
@@ -15250,6 +15429,42 @@ func (ec *executionContext) unmarshalInputFunctionRunsQuery(ctx context.Context,
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputRerunFromStepInput(ctx context.Context, obj interface{}) (models.RerunFromStepInput, error) {
+	var it models.RerunFromStepInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"stepID", "input"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "stepID":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("stepID"))
+			it.StepID, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "input":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+			it.Input, err = ec.unmarshalOBytes2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputRunsFilterV2(ctx context.Context, obj interface{}) (models.RunsFilterV2, error) {
 	var it models.RunsFilterV2
 	asMap := map[string]interface{}{}
@@ -15510,6 +15725,13 @@ func (ec *executionContext) _StepInfo(ctx context.Context, sel ast.SelectionSet,
 			return graphql.Null
 		}
 		return ec._WaitForEventStepInfo(ctx, sel, obj)
+	case models.RunStepInfo:
+		return ec._RunStepInfo(ctx, sel, &obj)
+	case *models.RunStepInfo:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._RunStepInfo(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -17325,6 +17547,31 @@ func (ec *executionContext) _RunHistoryWaitResult(ctx context.Context, sel ast.S
 	return out
 }
 
+var runStepInfoImplementors = []string{"RunStepInfo", "StepInfo"}
+
+func (ec *executionContext) _RunStepInfo(ctx context.Context, sel ast.SelectionSet, obj *models.RunStepInfo) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, runStepInfoImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RunStepInfo")
+		case "type":
+
+			out.Values[i] = ec._RunStepInfo_type(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var runTraceSpanImplementors = []string{"RunTraceSpan"}
 
 func (ec *executionContext) _RunTraceSpan(ctx context.Context, sel ast.SelectionSet, obj *models.RunTraceSpan) graphql.Marshaler {
@@ -17429,6 +17676,10 @@ func (ec *executionContext) _RunTraceSpan(ctx context.Context, sel ast.Selection
 
 			out.Values[i] = ec._RunTraceSpan_stepOp(ctx, field, obj)
 
+		case "stepID":
+
+			out.Values[i] = ec._RunTraceSpan_stepID(ctx, field, obj)
+
 		case "stepInfo":
 
 			out.Values[i] = ec._RunTraceSpan_stepInfo(ctx, field, obj)
@@ -17469,6 +17720,10 @@ func (ec *executionContext) _RunTraceSpanOutput(ctx context.Context, sel ast.Sel
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("RunTraceSpanOutput")
+		case "input":
+
+			out.Values[i] = ec._RunTraceSpanOutput_input(ctx, field, obj)
+
 		case "data":
 
 			out.Values[i] = ec._RunTraceSpanOutput_data(ctx, field, obj)
@@ -19765,6 +20020,14 @@ func (ec *executionContext) marshalOMap2map(ctx context.Context, sel ast.Selecti
 	}
 	res := graphql.MarshalMap(v)
 	return res
+}
+
+func (ec *executionContext) unmarshalORerunFromStepInput2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRerunFromStepInput(ctx context.Context, v interface{}) (*models.RerunFromStepInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputRerunFromStepInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalORunHistoryCancel2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋhistory_readerᚐRunHistoryCancel(ctx context.Context, sel ast.SelectionSet, v *history_reader.RunHistoryCancel) graphql.Marshaler {
