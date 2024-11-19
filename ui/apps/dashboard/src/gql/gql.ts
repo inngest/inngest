@@ -85,6 +85,7 @@ const documents = {
     "\n  query EntitlementUsage {\n    account {\n      id\n      entitlementUsage {\n        runCount {\n          current\n          limit\n          overageAllowed\n        }\n        stepCount {\n          current\n          limit\n          overageAllowed\n        }\n        accountConcurrencyLimitHits\n      }\n    }\n  }\n": types.EntitlementUsageDocument,
     "\n  query GetCurrentPlan {\n    account {\n      plan {\n        id\n        name\n        amount\n        billingPeriod\n        features\n      }\n      subscription {\n        nextInvoiceDate\n      }\n    }\n  }\n": types.GetCurrentPlanDocument,
     "\n  query GetBillingDetails {\n    account {\n      billingEmail\n      name\n      paymentMethods {\n        brand\n        last4\n        expMonth\n        expYear\n        createdAt\n        default\n      }\n    }\n  }\n": types.GetBillingDetailsDocument,
+    "\n  query GetPlans {\n    plans {\n      id\n      name\n      amount\n      billingPeriod\n      features\n    }\n  }\n": types.GetPlansDocument,
     "\n  mutation ArchiveEnvironment($id: ID!) {\n    archiveEnvironment(id: $id) {\n      id\n    }\n  }\n": types.ArchiveEnvironmentDocument,
     "\n  mutation UnarchiveEnvironment($id: ID!) {\n    unarchiveEnvironment(id: $id) {\n      id\n    }\n  }\n": types.UnarchiveEnvironmentDocument,
     "\n  mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {\n    disableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n": types.DisableEnvironmentAutoArchiveDocumentDocument,
@@ -436,6 +437,10 @@ export function graphql(source: "\n  query GetCurrentPlan {\n    account {\n    
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query GetBillingDetails {\n    account {\n      billingEmail\n      name\n      paymentMethods {\n        brand\n        last4\n        expMonth\n        expYear\n        createdAt\n        default\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetBillingDetails {\n    account {\n      billingEmail\n      name\n      paymentMethods {\n        brand\n        last4\n        expMonth\n        expYear\n        createdAt\n        default\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query GetPlans {\n    plans {\n      id\n      name\n      amount\n      billingPeriod\n      features\n    }\n  }\n"): (typeof documents)["\n  query GetPlans {\n    plans {\n      id\n      name\n      amount\n      billingPeriod\n      features\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

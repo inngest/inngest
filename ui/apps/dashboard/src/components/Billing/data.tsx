@@ -4,6 +4,7 @@ import {
   type EntitlementUsageQuery,
   type GetBillingDetailsQuery,
   type GetCurrentPlanQuery,
+  type GetPlansQuery,
 } from '@/gql/graphql';
 import graphqlAPI from '@/queries/graphqlAPI';
 
@@ -89,5 +90,27 @@ export const billingDetails = async () => {
   } catch (error) {
     console.error('Error fetching billing details:', error);
     throw new Error('Failed to fetch billing details');
+  }
+};
+
+export const plansDocument = graphql(`
+  query GetPlans {
+    plans {
+      id
+      name
+      amount
+      billingPeriod
+      features
+    }
+  }
+`);
+
+export const plans = async () => {
+  try {
+    const res = await graphqlAPI.request<GetPlansQuery>(plansDocument);
+    return res.plans;
+  } catch (error) {
+    console.error('Error fetching plans:', error);
+    throw new Error('Failed to fetch plans');
   }
 };
