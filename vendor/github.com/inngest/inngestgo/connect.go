@@ -171,6 +171,10 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 	for {
 		attempts++
 
+		if attempts == 5 {
+			return fmt.Errorf("could not establish connection after 5 attempts")
+		}
+
 		shouldReconnect, err := h.connect(ctx, connectionEstablishData{
 			signingKey:            auth.signingKey,
 			numCpuCores:           int32(numCpuCores),
@@ -223,9 +227,6 @@ type connectionEstablishData struct {
 }
 
 func (h *connectHandler) prepareConnection(ctx context.Context, data connectionEstablishData) (*websocket.Conn, bool, error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	connectTimeout, cancelConnectTimeout := context.WithTimeout(ctx, 10*time.Second)
 	defer cancelConnectTimeout()
 
@@ -233,10 +234,6 @@ func (h *connectHandler) prepareConnection(ctx context.Context, data connectionE
 	if err != nil {
 		return nil, false, fmt.Errorf("could not connect: %w", err)
 	}
-	defer func() {
-		// TODO Do we need to include a reason here? If we only use this for unexpected disconnects, probably not
-		_ = ws.CloseNow()
-	}()
 
 	// Connection ID is unique per connection, reconnections should get a new ID
 	h.connectionId = ulid.MustNew(ulid.Now(), rand.Reader)
@@ -352,10 +349,18 @@ func (h *connectHandler) sendBufferedMessages(ws *websocket.Conn) error {
 }
 
 func (h *connectHandler) connect(ctx context.Context, data connectionEstablishData) (reconnect bool, err error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	ws, reconnect, err := h.prepareConnection(ctx, data)
 	if err != nil {
 		return reconnect, fmt.Errorf("could not establish connection: %w", err)
 	}
+
+	defer func() {
+		// TODO Do we need to include a reason here? If we only use this for unexpected disconnects, probably not
+		_ = ws.CloseNow()
+	}()
 
 	// Send buffered but unsent messages if connection was re-established
 	if len(h.messageBuffer) > 0 {

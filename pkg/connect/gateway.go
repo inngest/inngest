@@ -160,7 +160,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		ch.log = ch.log.With("app_id", app.ID)
 
-		ch.log.Debug("found app, connection is ready")
+		ch.log.Debug("found app, preparing to receive messages")
 
 		eg := errgroup.Group{}
 
@@ -267,6 +267,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				return
 			}
 		}
+
+		ch.log.Debug("connection is ready")
 
 		if err := eg.Wait(); err != nil {
 			return
