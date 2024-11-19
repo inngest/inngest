@@ -115,6 +115,7 @@ export function RunDetailsV2(props: Props) {
               runID={runID}
               standalone={standalone}
               result={resultRes.data}
+              stepAIEnabled={props.stepAIEnabled}
             />
             {showError && (
               <ErrorCard

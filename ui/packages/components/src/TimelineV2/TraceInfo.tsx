@@ -1,6 +1,6 @@
 import type { Route } from 'next';
 
-import { StepAITrace } from '../AI/AITrace';
+import { AITrace } from '../AI/AITrace';
 import type { ExperimentalAI } from '../AI/utils';
 import { Card } from '../Card';
 import {
@@ -147,7 +147,7 @@ export function TraceInfo({ className, pathCreator, trace, result, aiOutput }: P
 
             {stepKindInfo}
 
-            {aiOutput && <StepAITrace aiOutput={aiOutput} />}
+            {aiOutput && <AITrace aiOutput={aiOutput} />}
           </dl>
         </Card.Content>
         {result && <RunResult className="border-subtle border-t" result={result} />}

@@ -1,4 +1,4 @@
-import { RiArrowRightSLine } from '@remixicon/react';
+import { RiArrowRightSLine, RiSparkling2Fill } from '@remixicon/react';
 
 import type { ExperimentalAI } from '../AI/utils';
 import { Badge } from '../Badge';
@@ -23,7 +23,7 @@ type Props = {
     status: string;
     stepOp?: string | null;
   };
-  aiOutput?: ExperimentalAI;
+  isAI?: boolean;
 };
 
 export function TraceHeading({
@@ -31,7 +31,7 @@ export function TraceHeading({
   isExpandable,
   onClickExpandToggle,
   trace,
-  aiOutput,
+  isAI,
 }: Props) {
   const isAttempt = trace.stepOp === 'RUN' && (trace.childrenSpans?.length ?? 0) === 0;
   let opCodeBadge;
@@ -89,9 +89,12 @@ export function TraceHeading({
       )}
 
       <div className="grow">
-        <div className="flex gap-2">
-          <span className="mt-1 h-fit self-start text-sm">{trace.name}</span>
-          <div>{aiOutput && <Pill kind="info">AI</Pill>}</div>
+        <div className="flex items-center justify-start gap-2">
+          {isAI && <RiSparkling2Fill className="text-primary-xIntense h-4 w-4" />}
+          <span className={`mt-1 h-fit self-start text-sm ${isAI && 'text-primary-xIntense'}`}>
+            {trace.name}
+          </span>
+
           <div className="h-8">{opCodeBadge}</div>
         </div>
         <TimeWithText trace={trace} />

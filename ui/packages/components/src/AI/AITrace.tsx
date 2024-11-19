@@ -1,7 +1,7 @@
 import { ElementWrapper, TextElement } from '../DetailsCard/Element';
 import { getAIInfo, type ExperimentalAI, type Value } from './utils';
 
-export const StepAITrace = ({ aiOutput }: { aiOutput?: ExperimentalAI }) => {
+export const AITrace = ({ aiOutput }: { aiOutput?: ExperimentalAI }) => {
   if (!aiOutput) {
     return null;
   }

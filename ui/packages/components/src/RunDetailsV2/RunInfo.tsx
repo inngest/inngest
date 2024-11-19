@@ -1,11 +1,12 @@
 import type { Route } from 'next';
 
+import { AITrace } from '../AI/AITrace';
+import { parseAIOutput } from '../AI/utils';
 import { CancelRunButton } from '../CancelRunButton';
 import { Card } from '../Card';
 import {
   ElementWrapper,
   IDElement,
-  LazyElementWrapper,
   LinkElement,
   OptimisticElementWrapper,
   TextElement,
@@ -34,6 +35,7 @@ type Props = {
   run: Lazy<Run>;
   runID: string;
   result?: Result;
+  stepAIEnabled?: boolean;
 };
 
 type Run = {
@@ -56,6 +58,12 @@ type Run = {
   };
 };
 
+const hasAIChildren = (trace: Run['trace']): boolean => {
+  return !!trace?.childrenSpans?.find(
+    (c?: any) => c?.stepInfo?.type === 'step.ai.wrap' || c?.stepInfo?.type === 'step.ai.infer'
+  );
+};
+
 export function RunInfo({
   cancelRun,
   className,
@@ -66,13 +74,18 @@ export function RunInfo({
   runID,
   standalone,
   result,
+  stepAIEnabled = false,
 }: Props) {
   let allowCancel = false;
   let isSuccess = false;
+  let isAI = false;
   if (isLazyDone(run)) {
     allowCancel = !Boolean(run.trace.endedAt);
     isSuccess = run.trace.status === 'COMPLETED';
+    isAI = hasAIChildren(run.trace);
   }
+
+  const aiOutput = isAI && stepAIEnabled && result?.data ? parseAIOutput(result.data) : undefined;
 
   return (
     <div className={cn('flex flex-col gap-5', className)}>
@@ -209,6 +222,7 @@ export function RunInfo({
                   return <TimeElement date={endedAt} />;
                 }}
               </OptimisticElementWrapper>
+              {aiOutput && <AITrace aiOutput={aiOutput} />}
             </dl>
           </div>
         </Card.Content>

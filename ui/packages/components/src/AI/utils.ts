@@ -22,11 +22,14 @@ export type ExperimentalAI = OpenAIOutput | VercelAIOutput | GoogleAIOutput;
 
 export const parseAIOutput = (output: string): ExperimentalAI | undefined => {
   try {
-    const data: ExperimentalAI = JSON.parse(output);
+    const data = JSON.parse(output);
 
     //
-    // a temporary hack to detect ai output until first class
-    // step.ai indicators are added
+    // run output is on body
+    if (data.body) {
+      return data.body;
+    }
+
     if (data.model || data.experimental_providerMetadata || data.response) {
       return data;
     }

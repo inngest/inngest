@@ -8,7 +8,7 @@ import { toMaybeDate } from '../utils/date';
 import { InlineSpans } from './InlineSpans';
 import { TraceHeading } from './TraceHeading';
 import { TraceInfo } from './TraceInfo';
-import type { Trace } from './types';
+import { isStepInfoRun, type Trace } from './types';
 import { createSpanWidths } from './utils';
 
 type Props = {
@@ -91,7 +91,11 @@ export function Trace({
             isExpanded={isExpanded}
             onClickExpandToggle={() => setIsExpanded((prev) => !prev)}
             trace={trace}
-            aiOutput={aiOutput}
+            isAI={
+              stepAIEnabled &&
+              isStepInfoRun(trace.stepInfo) &&
+              (trace.stepInfo.type === 'step.ai.wrap' || trace.stepInfo.type === 'step.ai.infer')
+            }
           />
         </div>
 
