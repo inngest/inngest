@@ -17,7 +17,6 @@ import (
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
@@ -88,7 +87,7 @@ func WithDev() gatewayOpt {
 	}
 }
 
-func NewConnectGatewayService(opts ...gatewayOpt) ([]service.Service, http.Handler) {
+func NewConnectGatewayService(opts ...gatewayOpt) (*connectGatewaySvc, *connectRouterSvc, http.Handler) {
 	gateway := &connectGatewaySvc{
 		Router:     chi.NewRouter(),
 		gatewayId:  ulid.MustNew(ulid.Now(), nil).String(),
@@ -104,7 +103,7 @@ func NewConnectGatewayService(opts ...gatewayOpt) ([]service.Service, http.Handl
 
 	router := newConnectRouter(gateway.stateManager, gateway.receiver, gateway.dbcqrs)
 
-	return []service.Service{gateway, router}, gateway.Handler()
+	return gateway, router, gateway.Handler()
 }
 
 func (c *connectGatewaySvc) Name() string {
@@ -256,7 +255,7 @@ func (c *connectRouterSvc) Stop(ctx context.Context) error {
 	return nil
 }
 
-func newConnectRouter(stateManager state.StateManager, receiver pubsub.RequestReceiver, db cqrs.Manager) service.Service {
+func newConnectRouter(stateManager state.StateManager, receiver pubsub.RequestReceiver, db cqrs.Manager) *connectRouterSvc {
 	return &connectRouterSvc{
 		stateManager: stateManager,
 		receiver:     receiver,
