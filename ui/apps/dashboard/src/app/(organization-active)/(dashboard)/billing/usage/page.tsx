@@ -8,7 +8,6 @@ import LoadingIcon from '@/icons/LoadingIcon';
 import { BillableStepUsage } from '../../settings/billing/BillableStepUsage/BillableStepUsage';
 import BillingPlanSelector from '../../settings/billing/BillingPlanSelector';
 import CurrentSubscription from '../../settings/billing/CurrentSubscription';
-import Payments from '../../settings/billing/Payments';
 import { isEnterprisePlan, transformPlan } from '../../settings/billing/utils';
 
 // This will move to the API as a custom plan at some point, for now we can hard code
@@ -113,15 +112,6 @@ export default function Billing() {
         isCurrentPlanEnterprise={isCurrentPlanEnterprise}
         onUpdate={() => refetch()}
       />
-
-      <section>
-        <h2 id="payments" className="py-6 text-2xl font-semibold">
-          Payments
-        </h2>
-        <div className="mb-14 border-t border-slate-200 pt-14">
-          <Payments />
-        </div>
-      </section>
     </>
   );
 }
