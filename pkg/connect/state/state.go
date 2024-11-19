@@ -24,7 +24,7 @@ type StateManager interface {
 
 type ConnectionManager interface {
 	GetConnectionsByEnvID(ctx context.Context, envID uuid.UUID) ([]*connpb.ConnMetadata, error)
-	GetConnectionsByAppID(ctx context.Context, appID uuid.UUID) ([]*connpb.ConnMetadata, error)
+	GetConnectionsByAppID(ctx context.Context, envId uuid.UUID, appID uuid.UUID) ([]*connpb.ConnMetadata, error)
 	GetConnectionsByGroupID(ctx context.Context, envID uuid.UUID, groupID string) ([]*connpb.ConnMetadata, error)
 	UpsertConnection(ctx context.Context, conn *Connection) error
 	DeleteConnection(ctx context.Context, conn *Connection) error
@@ -84,10 +84,11 @@ type WorkerGroup struct {
 
 // Connection have all the metadata assocaited with a worker connection
 type Connection struct {
-	Status  connpb.ConnectionStatus
-	Data    *connpb.WorkerConnectRequestData
-	Session *connpb.SessionDetails
-	Group   *WorkerGroup
+	Status    connpb.ConnectionStatus
+	Data      *connpb.WorkerConnectRequestData
+	Session   *connpb.SessionDetails
+	Group     *WorkerGroup
+	GatewayId string
 }
 
 // Sync attempts to sync the worker group configuration
@@ -111,12 +112,19 @@ func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager) 
 		envID = id
 	}
 
+	// The group is expected to exist in the state, as UpsertConnection also creates the group if it doesn't exist
 	group, err := groupManager.GetWorkerGroupByHash(ctx, envID, c.Group.Hash)
 	if err != nil {
 		return fmt.Errorf("error attempting to retrieve worker group: %w", err)
 	}
+	if group == nil {
+		return fmt.Errorf("worker group not found")
+	}
+
+	c.Group = group
+
 	// Don't attempt to sync if it's already sync'd
-	if group != nil && group.SyncID != nil && group.AppID != nil {
+	if group.SyncID != nil && group.AppID != nil {
 		return nil
 	}
 

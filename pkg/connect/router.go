@@ -14,7 +14,6 @@ import (
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"gonum.org/v1/gonum/stat/sampleuv"
 	"log/slog"
-	"os"
 )
 
 type connectRouterSvc struct {
@@ -44,11 +43,17 @@ func (c *connectRouterSvc) Pre(ctx context.Context) error {
 func (c *connectRouterSvc) Run(ctx context.Context) error {
 	go func() {
 		err := c.receiver.ReceiveExecutorMessages(ctx, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
-			log := c.logger.With("app_id", data.AppId, "req_id", data.RequestId)
+			log := c.logger.With("env_id", data.EnvId, "app_id", data.AppId, "req_id", data.RequestId)
 
 			appId, err := uuid.Parse(data.AppId)
 			if err != nil {
 				log.Error("could not parse app ID")
+				return
+			}
+
+			envId, err := uuid.Parse(data.EnvId)
+			if err != nil {
+				log.Error("could not parse env ID")
 				return
 			}
 
@@ -69,30 +74,28 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 					return
 				}
 
-				// TODO Log error
+				log.Error("could not store idempotency key", "err", err)
 				return
 			}
 
 			// Now we're guaranteed to be the exclusive connection processing this message!
 
-			c.stateManager.GetConnectionsByAppID(ctx, appId)
-
-			// TODO Resolve gateway
-			gatewayId := ""
-			if os.Getenv("CONNECT_TEST_GATEWAY_ID") != "" {
-				gatewayId = os.Getenv("CONNECT_TEST_GATEWAY_ID")
+			routeTo, err := c.getSuitableConnection(ctx, envId, appId, data.FunctionSlug)
+			if err != nil {
+				log.Error("could not retrieve suitable connection", "err", err)
+				return
 			}
+
+			log = log.With("gateway_id", routeTo.GatewayId, "conn_id", routeTo.Id, "group_hash", routeTo.GroupId)
 
 			// TODO What if something goes wrong inbetween setting idempotency (claiming exclusivity) and forwarding the req?
 			// We'll potentially lose data here
 
-			connId := ""
-
 			// Forward message to the gateway
-			err = c.receiver.RouteExecutorRequest(ctx, gatewayId, appId, connId, data)
+			err = c.receiver.RouteExecutorRequest(ctx, routeTo.GatewayId, appId, routeTo.Id, data)
 			if err != nil {
 				// TODO Should we retry? Log error?
-				log.Error("failed to route request to gateway", "err", err, "gateway_id", gatewayId)
+				log.Error("failed to route request to gateway", "err", err)
 				return
 			}
 		})
@@ -113,17 +116,36 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 
 }
 
-func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, appId uuid.UUID, fnSlug string) (*connect.ConnMetadata, error) {
-	conns, err := c.stateManager.GetConnectionsByAppID(ctx, appId)
+func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, envId uuid.UUID, appId uuid.UUID, fnSlug string) (*connect.ConnMetadata, error) {
+	conns, err := c.stateManager.GetConnectionsByAppID(ctx, envId, appId)
 	if err != nil {
 		return nil, fmt.Errorf("could not get connections by app ID: %w", err)
 	}
 
 	healthy := make([]*connect.ConnMetadata, 0, len(conns))
-	for i := range conns {
-		if conns[i].Status == connect.ConnectionStatus_READY {
-			healthy = append(healthy, conns[i])
+	for _, conn := range conns {
+		if conn.Status != connect.ConnectionStatus_READY {
+			continue
 		}
+
+		group, err := c.stateManager.GetWorkerGroupByHash(ctx, envId, conn.GroupId)
+		if err != nil {
+			return nil, fmt.Errorf("error attempting to retrieve worker group: %w", err)
+		}
+
+		var hasFn bool
+		for _, slug := range group.FunctionSlugs {
+			if slug == fnSlug {
+				hasFn = true
+				break
+			}
+		}
+
+		if !hasFn {
+			continue
+		}
+
+		healthy = append(healthy, conn)
 	}
 
 	if len(healthy) == 0 {
@@ -131,20 +153,19 @@ func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, appId uuid
 	}
 
 	weights := make([]float64, len(healthy))
-	for i, conn := range healthy {
-		weights[i] = 1.0
+	for i := range healthy {
+		// TODO Calculate weights based on factors like version
+		weights[i] = float64(10)
 	}
 
 	w := sampleuv.NewWeighted(weights, c.rnd)
-	result := make([]*connect.ConnMetadata, len(weights))
-	for n := range result {
-		idx, ok := w.Take()
-		if !ok && len(result) < len(weights)-1 {
-			return result, util.ErrWeightedSampleRead
-		}
-		result[n] = shuffleIdx[idx]
+	idx, ok := w.Take()
+	if !ok {
+		return nil, util.ErrWeightedSampleRead
 	}
+	chosen := healthy[idx]
 
+	return chosen, nil
 }
 
 func (c *connectRouterSvc) Stop(ctx context.Context) error {

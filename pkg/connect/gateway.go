@@ -473,10 +473,11 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 
 	conn := state.Connection{
 		// Mark initial status, not ready to receive messages yet
-		Status:  connect.ConnectionStatus_CONNECTED,
-		Data:    &initialMessageData,
-		Session: sessionDetails,
-		Group:   workerGroup,
+		Status:    connect.ConnectionStatus_CONNECTED,
+		Data:      &initialMessageData,
+		Session:   sessionDetails,
+		Group:     workerGroup,
+		GatewayId: c.gatewayId,
 	}
 
 	if err := c.stateManager.UpsertConnection(ctx, &conn); err != nil {
