@@ -13,9 +13,9 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
+	apiv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/cqrs"
-	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
@@ -119,13 +119,11 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 	c.Use(
 		middleware.Heartbeat("/health"),
 	)
-	c.Route("/v0", func(r chi.Router) {
-		r.Use(headers.ContentTypeJsonResponse())
-
-		r.Get("/envs/{envID}/conns", c.showConnectionsByEnv)
-		r.Get("/envs/{envID}/groups/{groupID}", c.showWorkerGroup)
-		r.Get("/apps/{appID}/conns", c.showConnectionsByApp)
-	})
+	c.Mount("/v0", apiv0.New(c, apiv0.Opts{
+		ConnectManager: c.stateManager,
+		GroupManager:   c.stateManager,
+		Dev:            c.dev,
+	}))
 
 	return nil
 }
