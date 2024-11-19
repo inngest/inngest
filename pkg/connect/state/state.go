@@ -117,14 +117,9 @@ func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager) 
 	if err != nil {
 		return fmt.Errorf("error attempting to retrieve worker group: %w", err)
 	}
-	if group == nil {
-		return fmt.Errorf("worker group not found")
-	}
-
-	c.Group = group
 
 	// Don't attempt to sync if it's already sync'd
-	if group.SyncID != nil && group.AppID != nil {
+	if group != nil && group.SyncID != nil && group.AppID != nil {
 		return nil
 	}
 
