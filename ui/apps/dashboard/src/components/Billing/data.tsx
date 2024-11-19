@@ -24,6 +24,9 @@ export const entitlementUsageDocument = graphql(`
         }
         accountConcurrencyLimitHits
       }
+      plan {
+        name
+      }
     }
   }
 `);
@@ -31,7 +34,15 @@ export const entitlementUsageDocument = graphql(`
 export const entitlementUsage = async () => {
   try {
     const res = await graphqlAPI.request<EntitlementUsageQuery>(entitlementUsageDocument);
-    return res.account.entitlementUsage;
+
+    // TODO: Replace this with a proper programmatic check. Relying on the plan
+    // name is fragile.
+    const isCustomPlan = (res.account.plan?.name ?? '').toLowerCase().includes('enterprise');
+
+    return {
+      ...res.account.entitlementUsage,
+      isCustomPlan,
+    };
   } catch (error) {
     console.error('Error fetching entitlement usage:', error);
     throw new Error('Failed to fetch entitlement usage');
