@@ -2,6 +2,7 @@ package connect
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -89,11 +90,8 @@ func WithDev() gatewayOpt {
 func NewConnectGatewayService(opts ...gatewayOpt) (*connectGatewaySvc, *connectRouterSvc, http.Handler) {
 	gateway := &connectGatewaySvc{
 		Router:     chi.NewRouter(),
-		gatewayId:  ulid.MustNew(ulid.Now(), nil).String(),
+		gatewayId:  ulid.MustNew(ulid.Now(), rand.Reader).String(),
 		lifecycles: []ConnectGatewayLifecycleListener{},
-	}
-	if os.Getenv("CONNECT_TEST_GATEWAY_ID") != "" {
-		gateway.gatewayId = os.Getenv("CONNECT_TEST_GATEWAY_ID")
 	}
 
 	for _, opt := range opts {

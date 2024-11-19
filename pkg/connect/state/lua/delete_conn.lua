@@ -15,7 +15,7 @@ local indexConnectionsByAppIdKey = KEYS[4]
 local connID = ARGV[1]
 local groupID = ARGV[2]
 
--- $include(helper/ends_with.lua)
+-- $include(ends_with.lua)
 
 -- Remove the connection from the map
 redis.call("HDEL", connKey, connID)

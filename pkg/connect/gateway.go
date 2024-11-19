@@ -77,6 +77,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
+		log := c.logger.With("account_id", conn.Data.AuthData.AccountId, "env_id", conn.Data.AuthData.EnvId, "conn_id", conn.Data.SessionId.ConnectionId)
+
 		var updateLock sync.Mutex
 		updateConnStatus := func(status connect.ConnectionStatus) error {
 			updateLock.Lock()
@@ -88,8 +90,6 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		var closeReason string
 		var closeReasonLock sync.Mutex
-
-		log := c.logger.With("account_id", conn.Data.AuthData.AccountId)
 
 		// Once connection is established, we must make sure to update the state on any disconnect,
 		// regardless of whether it's permanent or temporary
@@ -156,7 +156,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		eg := errgroup.Group{}
 
 		// Wait for relevant messages and forward them over the WebSocket connection
-		go c.receiveRouterMessages(ctx, app.ID, ws, log)
+		go c.receiveRouterMessages(ctx, app.ID, ws, log, conn)
 
 		// Run loop
 		eg.Go(func() error {
@@ -320,11 +320,11 @@ func (c *connectGatewaySvc) handleIncomingWebSocketMessage(ctx context.Context, 
 	return nil
 }
 
-func (c *connectGatewaySvc) receiveRouterMessages(ctx context.Context, appId uuid.UUID, ws *websocket.Conn, log *slog.Logger) {
+func (c *connectGatewaySvc) receiveRouterMessages(ctx context.Context, appId uuid.UUID, ws *websocket.Conn, log *slog.Logger, conn *state.Connection) {
 	// Receive execution-related messages for the app, forwarded by the router.
 	// The router selects only one gateway to handle a request from a pool of one or more workers (and thus WebSockets)
 	// running for each app.
-	err := c.receiver.ReceiveRoutedRequest(ctx, c.gatewayId, appId, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
+	err := c.receiver.ReceiveRoutedRequest(ctx, c.gatewayId, appId, conn.Session.SessionId.ConnectionId, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
 		log := log.With(
 			"req_id", data.RequestId,
 			"fn_slug", data.FunctionSlug,

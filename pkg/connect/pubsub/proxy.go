@@ -54,7 +54,7 @@ type RequestReceiver interface {
 
 	// ReceiveRouterMessages listens for incoming PubSub messages for a specific gateway and app and calls the provided callback.
 	// This is a blocking call which only stops once the context is canceled.
-	ReceiveRoutedRequest(ctx context.Context, gatewayId string, appId uuid.UUID, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error
+	ReceiveRoutedRequest(ctx context.Context, gatewayId string, appId uuid.UUID, connId string, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error
 
 	// AckMessage sends an acknowledgment for a specific request.
 	AckMessage(ctx context.Context, appId uuid.UUID, requestId string, source AckSource) error
@@ -309,8 +309,8 @@ func (i *redisPubSubConnector) subscribe(ctx context.Context, channel string, on
 
 // ReceiveExecutorMessages listens for incoming PubSub messages for a specific app and calls the provided callback.
 // This is a blocking call which only stops once the context is canceled.
-func (i *redisPubSubConnector) ReceiveRoutedRequest(ctx context.Context, gatewayId string, appId uuid.UUID, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error {
-	return i.subscribe(ctx, i.channelGatewayAppRequests(gatewayId, appId), func(msg string) {
+func (i *redisPubSubConnector) ReceiveRoutedRequest(ctx context.Context, gatewayId string, appId uuid.UUID, connId string, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error {
+	return i.subscribe(ctx, i.channelGatewayAppRequests(gatewayId, appId, connId), func(msg string) {
 		// TODO Test whether this works with marshaled Protobuf bytes
 		msgBytes := []byte(msg)
 

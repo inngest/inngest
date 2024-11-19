@@ -15,7 +15,7 @@ local groupID = ARGV[3]
 local workerGroup = ARGV[4]
 local isHealthy = tonumber(ARGV[5])
 
--- $include(helper/ends_with.lua)
+-- $include(ends_with.lua)
 
 -- Store the connection metadata in a map
 redis.call("HSET", connKey, connID, connMeta)
