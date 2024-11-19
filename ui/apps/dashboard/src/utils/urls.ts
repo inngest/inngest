@@ -45,8 +45,8 @@ export const pathCreator = {
   appSyncs({ envSlug, externalAppID }: { envSlug: string; externalAppID: string }): Route {
     return `/env/${envSlug}/apps/${encodeURIComponent(externalAppID)}/syncs` as Route;
   },
-  billing(): Route {
-    return '/billing' as Route;
+  billing({ ref, tab }: { ref?: string; tab?: string } = {}): Route {
+    return `/billing${tab ? `/${tab}` : ''}${ref ? `?ref=${ref}` : ''}` as Route;
   },
   createApp({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/apps/sync-new` as Route;
