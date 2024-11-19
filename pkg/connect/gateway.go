@@ -57,8 +57,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		}
 
 		ch := &connectionHandler{
-			svc: c,
-			log: c.logger,
+			svc:        c,
+			log:        c.logger,
+			ws:         ws,
+			updateLock: sync.Mutex{},
 		}
 
 		defer func() {
