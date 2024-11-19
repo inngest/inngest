@@ -1,7 +1,5 @@
 'use client';
 
-import { Link } from '@inngest/components/Link';
-
 import { Banner, type Severity } from '@/components/Banner';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { useSystemStatus } from './support/statusPage';
@@ -23,10 +21,12 @@ export default function IncidentBanner() {
   }
 
   return (
-    <Banner kind={severity}>
+    <Banner severity={severity}>
       {message} Please check the{' '}
       <span style={{ display: 'inline-flex' }}>
-        <Link href="https://status.inngest.com/">status page</Link>
+        <Banner.Link severity={severity} href="https://status.inngest.com/">
+          status page
+        </Banner.Link>
       </span>
     </Banner>
   );
