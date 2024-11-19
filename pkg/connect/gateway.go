@@ -223,8 +223,19 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}
 
-		// TODO Update connection state to start receiving messages
-		// TODO Mark connection as ready to receive traffic unless we require manual client ready signal (optional)
+		// Mark connection as ready to receive traffic unless we require manual client ready signal (optional)
+		conn.Status = connect.ConnectionStatus_READY
+		err = c.stateManager.UpsertConnection(ctx, conn)
+		if err != nil {
+			log.Error("could not update connection status", "err", err)
+			closeWithConnectError(ws, &SocketError{
+				SysCode:    syscode.CodeConnectInternal,
+				StatusCode: websocket.StatusInternalError,
+				Msg:        "could not update connection status",
+			})
+
+			return
+		}
 
 		if err := eg.Wait(); err != nil {
 			return
@@ -434,12 +445,14 @@ func (c *connectGatewaySvc) establishConnection(ctx context.Context, ws *websock
 	}
 
 	conn := state.Connection{
+		// Mark initial status, not ready to receive messages yet
+		Status:  connect.ConnectionStatus_CONNECTED,
 		Data:    &initialMessageData,
 		Session: sessionDetails,
 		Group:   workerGroup,
 	}
 
-	if err := c.stateManager.AddConnection(ctx, &conn); err != nil {
+	if err := c.stateManager.UpsertConnection(ctx, &conn); err != nil {
 		log.Error("adding connection state failed", "err", err)
 		return nil, &SocketError{
 			SysCode:    syscode.CodeConnectInternal,

@@ -89,15 +89,22 @@ message SDKResponse {
 	string sdk_version = 6;
 }
 
+enum ConnectionStatus {
+	CONNECTED = 0;
+	READY = 1;
+	DRAINING = 2;
+	DISCONNECTED = 3;
+}
 
 // Connection metadata
 message ConnMetadata {
 	string id = 1;
 	string instance_id = 2;
 	string group_id = 3;
-	string language = 4;
-	string version = 5;
-	SystemAttributes attributes = 8;
+	ConnectionStatus status = 4;
+	string language = 5;
+	string version = 6;
+	SystemAttributes attributes = 7;
 }
 
 message SystemAttributes {

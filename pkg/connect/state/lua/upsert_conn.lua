@@ -1,6 +1,6 @@
 --[[
 
-  Add connection to map
+  Upsert connection to map
 
 ]]
 

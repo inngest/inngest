@@ -26,7 +26,7 @@ type ConnectionManager interface {
 	GetConnectionsByEnvID(ctx context.Context, envID uuid.UUID) ([]*connpb.ConnMetadata, error)
 	GetConnectionsByAppID(ctx context.Context, appID uuid.UUID) ([]*connpb.ConnMetadata, error)
 	GetConnectionsByGroupID(ctx context.Context, envID uuid.UUID, groupID string) ([]*connpb.ConnMetadata, error)
-	AddConnection(ctx context.Context, conn *Connection) error
+	UpsertConnection(ctx context.Context, conn *Connection) error
 	DeleteConnection(ctx context.Context, conn *Connection) error
 }
 
@@ -84,6 +84,7 @@ type WorkerGroup struct {
 
 // Connection have all the metadata assocaited with a worker connection
 type Connection struct {
+	Status  connpb.ConnectionStatus
 	Data    *connpb.WorkerConnectRequestData
 	Session *connpb.SessionDetails
 	Group   *WorkerGroup

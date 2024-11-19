@@ -158,13 +158,14 @@ func (r *redisConnectionStateManager) GetConnectionsByGroupID(ctx context.Contex
 	return conns, nil
 }
 
-func (r *redisConnectionStateManager) AddConnection(ctx context.Context, conn *Connection) error {
+func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn *Connection) error {
 	envID := conn.Data.AuthData.GetEnvId()
 
 	groupID := conn.Group.Hash
 	meta := &connpb.ConnMetadata{
 		Id:         conn.Session.SessionId.ConnectionId,
 		InstanceId: conn.Session.SessionId.InstanceId,
+		Status:     conn.Status,
 		Language:   conn.Data.SdkLanguage,
 		Version:    conn.Data.SdkVersion,
 		GroupId:    groupID,
@@ -202,7 +203,7 @@ func (r *redisConnectionStateManager) AddConnection(ctx context.Context, conn *C
 		groupArg,
 	}
 
-	status, err := scripts["add_conn"].Exec(
+	status, err := scripts["upsert_conn"].Exec(
 		ctx,
 		r.client,
 		keys,
