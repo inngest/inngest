@@ -1,50 +1,89 @@
 'use client';
 
+import { useState } from 'react';
 import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
 
+import { NewButton } from './Button';
 import { CodeBlock } from './CodeBlock';
+import { RerunModal } from './Rerun/RerunModal';
 import type { Result } from './types/functionRun';
 
 type Props = {
   className?: string;
   result: Result;
+  runID: string;
+  rerunFromStep: (args: {
+    runID: string;
+    fromStep: { stepID: string; input: string };
+  }) => Promise<unknown>;
+  stepID?: string;
   isSuccess?: boolean;
   stepAIEnabled?: boolean;
 };
 
-export function RunResult({ className, result, isSuccess, stepAIEnabled = false }: Props) {
+export function RunResult({
+  className,
+  result,
+  isSuccess,
+  runID,
+  rerunFromStep,
+  stepID,
+  stepAIEnabled = false,
+}: Props) {
   const prettyInput = usePrettyJson(result.input ?? '') || (result.input ?? '');
   const prettyOutput = usePrettyJson(result.data ?? '') || (result.data ?? '');
+  const [rerunModalOpen, setRerunModalOpen] = useState(false);
 
   return stepAIEnabled ? (
-    <div className="flex flex-col">
+    <div className="flex flex-col overflow-hidden">
       <div className="border-b-subtle border-t-subtle bg-canvasBase border-primary-moderate h-11 w-full border-b border-l border-t px-6 py-3 text-sm font-normal leading-tight">
         Content
       </div>
-      <div className="flex h-full w-full flex-row">
-        {result.input && (
-          <CodeBlock
-            className="w-full"
-            header={{
-              title: 'Input',
-            }}
-            tab={{
-              content: prettyInput,
-            }}
-          />
-        )}
 
+      <div className="bg-canvasSubtle flex h-full w-full flex-row items-start">
+        {result.input && (
+          <div className="border-r-subtle flex min-h-[80%] w-full flex-col justify-between border-r">
+            <CodeBlock
+              header={{
+                title: 'Input',
+              }}
+              tab={{
+                content: prettyInput,
+              }}
+            />
+            <div className="flex h-[20%] align-bottom">
+              {runID && stepID && (
+                <>
+                  <NewButton
+                    className="m-2 w-40"
+                    label="Rerun with new prompt"
+                    onClick={() => setRerunModalOpen(true)}
+                  />
+                  <RerunModal
+                    open={rerunModalOpen}
+                    setOpen={setRerunModalOpen}
+                    runID={runID}
+                    stepID={stepID}
+                    input={prettyInput}
+                    rerunFromStep={rerunFromStep}
+                  />
+                </>
+              )}
+            </div>
+          </div>
+        )}
         {result.data && (
-          <CodeBlock
-            className="w-full"
-            header={{
-              title: 'Output',
-              status: isSuccess ? 'success' : undefined,
-            }}
-            tab={{
-              content: prettyOutput,
-            }}
-          />
+          <div className="h-full w-full">
+            <CodeBlock
+              header={{
+                title: 'Output',
+                status: isSuccess ? 'success' : undefined,
+              }}
+              tab={{
+                content: prettyOutput,
+              }}
+            />
+          </div>
         )}
       </div>
       {result.error && (

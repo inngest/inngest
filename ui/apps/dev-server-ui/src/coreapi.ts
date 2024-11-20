@@ -248,6 +248,12 @@ export const RERUN = gql`
   }
 `;
 
+export const RERUN_FROM_STEP = gql`
+  mutation RerunFromStep($runID: ULID!, $fromStep: RerunFromStepInput!) {
+    rerun(runID: $runID, fromStep: $fromStep)
+  }
+`;
+
 export const GET_RUNS = gql`
   query GetRuns(
     $appIDs: [UUID!]

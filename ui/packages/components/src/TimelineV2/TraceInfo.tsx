@@ -23,11 +23,24 @@ type Props = {
     runPopout: (params: { runID: string }) => Route;
   };
   trace: Trace;
+  runID: string;
   result?: Result;
   aiOutput?: ExperimentalAI;
+  rerunFromStep: (args: {
+    runID: string;
+    fromStep: { stepID: string; input: string };
+  }) => Promise<unknown>;
 };
 
-export function TraceInfo({ className, pathCreator, trace, result, aiOutput }: Props) {
+export function TraceInfo({
+  className,
+  pathCreator,
+  trace,
+  result,
+  runID,
+  rerunFromStep,
+  aiOutput,
+}: Props) {
   const delayText = formatMilliseconds(
     (toMaybeDate(trace.startedAt) ?? new Date()).getTime() - new Date(trace.queuedAt).getTime()
   );
@@ -155,6 +168,9 @@ export function TraceInfo({ className, pathCreator, trace, result, aiOutput }: P
             className="border-subtle border-t"
             result={result}
             stepAIEnabled={!!aiOutput}
+            rerunFromStep={rerunFromStep}
+            runID={runID}
+            stepID={trace.stepID ?? undefined}
           />
         )}
       </Card>

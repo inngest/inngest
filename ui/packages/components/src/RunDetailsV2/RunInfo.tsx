@@ -31,6 +31,10 @@ type Props = {
     runPopout: (params: { runID: string }) => Route;
   };
   rerun: (args: { fnID: string; runID: string }) => Promise<unknown>;
+  rerunFromStep: (args: {
+    runID: string;
+    fromStep: { stepID: string; input: string };
+  }) => Promise<unknown>;
   initialRunData?: InitialRunData;
   run: Lazy<Run>;
   runID: string;
@@ -69,6 +73,7 @@ export function RunInfo({
   className,
   pathCreator,
   rerun,
+  rerunFromStep,
   initialRunData,
   run,
   runID,
@@ -242,7 +247,13 @@ export function RunInfo({
             </div>
           ) : null)}
         {result && (
-          <RunResult className="border-muted border-t" result={result} isSuccess={isSuccess} />
+          <RunResult
+            className="border-muted border-t"
+            result={result}
+            runID={runID}
+            rerunFromStep={rerunFromStep}
+            isSuccess={isSuccess}
+          />
         )}
       </Card>
     </div>

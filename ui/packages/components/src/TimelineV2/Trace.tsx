@@ -21,7 +21,12 @@ type Props = {
     runPopout: (params: { runID: string }) => Route;
   };
   trace: Trace;
+  runID: string;
   stepAIEnabled?: boolean;
+  rerunFromStep: (args: {
+    runID: string;
+    fromStep: { stepID: string; input: string };
+  }) => Promise<unknown>;
 };
 
 export function Trace({
@@ -32,7 +37,9 @@ export function Trace({
   minTime,
   pathCreator,
   trace,
+  runID,
   stepAIEnabled = false,
+  rerunFromStep,
 }: Props) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [result, setResult] = useState<Result>();
@@ -115,7 +122,9 @@ export function Trace({
             pathCreator={pathCreator}
             trace={trace}
             result={result}
+            runID={runID}
             aiOutput={aiOutput}
+            rerunFromStep={rerunFromStep}
           />
 
           {trace.childrenSpans?.map((child, i) => {
@@ -129,7 +138,9 @@ export function Trace({
                     minTime={minTime}
                     pathCreator={pathCreator}
                     trace={child}
+                    runID={runID}
                     stepAIEnabled={stepAIEnabled}
+                    rerunFromStep={rerunFromStep}
                   />
                 </div>
               </div>
