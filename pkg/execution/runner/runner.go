@@ -596,13 +596,14 @@ func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
 
 	l.Trace().Msg("querying for pauses")
 
-	if ok, err := s.state.EventHasPauses(ctx, uuid.UUID{}, evt.GetEvent().Name); err == nil && !ok {
+	wsID := evt.GetWorkspaceID()
+	if ok, err := s.state.EventHasPauses(ctx, wsID, evt.GetEvent().Name); err == nil && !ok {
 		return nil
 	}
 
 	l.Trace().Msg("pauses found; handling")
 
-	iter, err := s.state.PausesByEvent(ctx, uuid.UUID{}, evt.GetEvent().Name)
+	iter, err := s.state.PausesByEvent(ctx, wsID, evt.GetEvent().Name)
 	if err != nil {
 		return fmt.Errorf("error finding event pauses: %w", err)
 	}
