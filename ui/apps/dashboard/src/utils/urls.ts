@@ -48,6 +48,15 @@ export const pathCreator = {
   billing(): Route {
     return '/billing' as Route;
   },
+  billingUsage(): Route {
+    return '/billing/usage' as Route;
+  },
+  billingPayments(): Route {
+    return '/billing/payments' as Route;
+  },
+  billingPlans(): Route {
+    return '/billing/plans' as Route;
+  },
   createApp({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/apps/sync-new` as Route;
   },
