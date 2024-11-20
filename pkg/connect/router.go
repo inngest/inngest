@@ -131,38 +131,14 @@ func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, envId uuid
 
 	healthy := make([]*connect.ConnMetadata, 0, len(conns))
 	for _, conn := range conns {
-		if conn.Status != connect.ConnectionStatus_READY {
-			continue
-		}
-
-		group, err := c.stateManager.GetWorkerGroupByHash(ctx, envId, conn.GroupId)
+		isHealthy, err := c.isHealthy(ctx, envId, appId, fnSlug, conn)
 		if err != nil {
-			return nil, fmt.Errorf("error attempting to retrieve worker group: %w", err)
+			return nil, err
 		}
 
-		var hasFn bool
-		for _, slug := range group.FunctionSlugs {
-			if slug == fnSlug {
-				hasFn = true
-				break
-			}
+		if isHealthy {
+			healthy = append(healthy, conn)
 		}
-
-		if !hasFn {
-			continue
-		}
-
-		// Ensure gateway is healthy
-		gw, err := c.stateManager.GetGateway(ctx, conn.GatewayId)
-		if err != nil {
-			continue
-		}
-
-		if gw.Status != state.GatewayStatusActive || gw.LastHeartbeat.Before(time.Now().Add(-2*GatewayHeartbeatInterval)) {
-			continue
-		}
-
-		healthy = append(healthy, conn)
 	}
 
 	if len(healthy) == 0 {
@@ -183,6 +159,60 @@ func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, envId uuid
 	chosen := healthy[idx]
 
 	return chosen, nil
+}
+
+func (c *connectRouterSvc) isHealthy(ctx context.Context, envId uuid.UUID, appId uuid.UUID, fnSlug string, conn *connect.ConnMetadata) (isHealthy bool, err error) {
+	defer func() {
+		if isHealthy {
+			return
+		}
+
+		// Clean up unhealthy connection
+		err = c.stateManager.DeleteConnection(context.Background(), envId, &appId, conn.GroupId, conn.Id)
+		if err != nil {
+			c.logger.Error("could not clean up inactive connection", "conn_id", conn.Id, "err", err)
+		}
+	}()
+
+	if conn.Status != connect.ConnectionStatus_READY {
+		return
+	}
+
+	group, err := c.stateManager.GetWorkerGroupByHash(ctx, envId, conn.GroupId)
+	if err != nil {
+		return
+	}
+
+	var hasFn bool
+	for _, slug := range group.FunctionSlugs {
+		if slug == fnSlug {
+			hasFn = true
+			break
+		}
+	}
+
+	if !hasFn {
+		return
+	}
+
+	// Ensure gateway is healthy
+	gw, err := c.stateManager.GetGateway(ctx, conn.GatewayId)
+	if err != nil {
+		return
+	}
+
+	if gw.Status != state.GatewayStatusActive || gw.LastHeartbeat.Before(time.Now().Add(-2*GatewayHeartbeatInterval)) {
+		// Clean up unhealthy gateway
+		err = c.stateManager.DeleteGateway(ctx, conn.GatewayId)
+		if err != nil {
+			c.logger.Error("could not clean up inactive gateway", "gateway_id", conn.GatewayId, "err", err)
+		}
+
+		return
+	}
+
+	isHealthy = true
+	return
 }
 
 func (c *connectRouterSvc) Stop(ctx context.Context) error {

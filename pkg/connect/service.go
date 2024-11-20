@@ -61,14 +61,21 @@ type connectGatewaySvc struct {
 
 	lifecycles []ConnectGatewayLifecycleListener
 
-	isDraining     bool
-	connectionSema sync.WaitGroup
-	drainListener  *drainListener
+	isDraining      bool
+	connectionSema  sync.WaitGroup
+	drainListener   *drainListener
+	stateUpdateLock sync.Mutex
 }
 
 type drainListener struct {
 	subscribers map[ulid.ULID]func()
 	lock        sync.Mutex
+}
+
+func newDrainListener() *drainListener {
+	return &drainListener{
+		subscribers: make(map[ulid.ULID]func()),
+	}
 }
 
 func WithGatewayAuthHandler(auth GatewayAuthHandler) gatewayOpt {
@@ -112,7 +119,7 @@ func NewConnectGatewayService(opts ...gatewayOpt) (*connectGatewaySvc, *connectR
 		Router:        chi.NewRouter(),
 		gatewayId:     ulid.MustNew(ulid.Now(), rand.Reader).String(),
 		lifecycles:    []ConnectGatewayLifecycleListener{},
-		drainListener: &drainListener{},
+		drainListener: newDrainListener(),
 	}
 
 	for _, opt := range opts {
@@ -193,6 +200,8 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 	go func() {
 		<-ctx.Done()
 
+		c.logger.Info("shutting down gateway")
+
 		err := c.DrainGateway()
 		if err != nil {
 			c.logger.Error(fmt.Sprintf("could not start draining gateway: %v", err))
@@ -235,6 +244,9 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 }
 
 func (c *connectGatewaySvc) updateGatewayState(status state.GatewayStatus) error {
+	c.stateUpdateLock.Lock()
+	defer c.stateUpdateLock.Unlock()
+
 	err := c.stateManager.UpsertGateway(context.Background(), &state.Gateway{
 		Id:            c.gatewayId,
 		Status:        status,
@@ -242,8 +254,12 @@ func (c *connectGatewaySvc) updateGatewayState(status state.GatewayStatus) error
 		Hostname:      c.hostname,
 	})
 	if err != nil {
+		c.logger.Error("failed to update gateway status in state", "status", status, "error", err)
+
 		return fmt.Errorf("could not upsert gateway: %w", err)
 	}
+
+	c.logger.Debug("updated gateway status in state", "status", status)
 
 	return nil
 }

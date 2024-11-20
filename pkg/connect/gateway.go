@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
+	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -101,6 +103,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					return
 				}
 
+				if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
+					return
+				}
+
 				ch.log.Error("could not send hello", "err", err)
 				closeWithConnectError(ws, &SocketError{
 					SysCode:    syscode.CodeConnectInternal,
@@ -129,8 +135,14 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			// If gateway is shutting down, we must immediately start the draining process
 			<-ctx.Done()
 
+			ch.log.Debug("context done, starting draining process")
+
 			// Prevent routing any more messages to this connection
 			err = ch.updateConnStatus(connect.ConnectionStatus_DRAINING)
+			if err != nil {
+				ch.log.Error("could not update connection status after context done", "err", err)
+			}
+
 			closeReason = "gateway-draining"
 		}()
 
@@ -140,7 +152,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			// This is a transactional operation, it should always complete regardless of context cancellation
 
 			// TODO Persist disconnected status in history for UI (show disconnected connections with reason)
-			err := c.stateManager.DeleteConnection(context.Background(), conn)
+			err := c.stateManager.DeleteConnection(context.Background(), conn.Group.EnvID, conn.Group.AppID, conn.Group.Hash, conn.Session.SessionId.ConnectionId)
 			switch err {
 			case nil, state.ConnDeletedWithGroupErr:
 				// no-op
@@ -219,6 +231,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				// If the context is canceled due to a shutdown or other reason, we need to close the connection
 				// and let the client know we're going away intentionally.
 				if ctx.Err() != nil {
+					ch.log.Debug("context canceled, stopping read loop")
+
 					// immediately stop routing messages to this connection
 					closeDraining(ws)
 					return err
@@ -234,6 +248,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 					closeErr := websocket.CloseError{}
 					if errors.As(err, &closeErr) {
+						ch.log.Error("connection closed with reason", "reason", closeErr.Reason)
+
 						// If client connection closed unexpectedly, we should store the reason, if set.
 						// If the reason is set, it may have been an intentional close, so the connection
 						// may not be re-established.
@@ -246,8 +262,14 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					// If the parent context timed out or got canceled, we should signal the client that we're going away,
 					// and it should reconnect to another gateway.
 					if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+						ch.log.Debug("context canceled or timed out by draining, closing connection")
 						closeDraining(ws)
 						return err
+					}
+
+					// connection was closed (this may not be expected but should not be logged as an error)
+					if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
+						return nil
 					}
 
 					ch.log.Error("failed to read websocket message", "err", err)
@@ -276,6 +298,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			if err != nil {
 				if ctx.Err() != nil {
 					closeDraining(ws)
+					return
+				}
+
+				if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
 					return
 				}
 
@@ -319,6 +345,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		ch.log.Debug("connection is ready")
 
 		if err := eg.Wait(); err != nil {
+			ch.log.Error("error in run loop", "err", err)
 			return
 		}
 	})
@@ -427,10 +454,20 @@ func (c *connectionHandler) receiveRouterMessages(ctx context.Context, appId uui
 
 		log.Debug("gateway received msg")
 
+		// Do not forward messages if the connection is already draining
+		if ctx.Done() != nil {
+			return
+		}
+
 		err := c.svc.receiver.AckMessage(ctx, appId, data.RequestId, pubsub.AckSourceGateway)
 		if err != nil {
 			log.Error("failed to ack message", "err", err)
 			// The executor will retry the message if it doesn't receive an ack
+			return
+		}
+
+		// Do not forward messages if the connection is already draining
+		if ctx.Done() != nil {
 			return
 		}
 
@@ -440,6 +477,10 @@ func (c *connectionHandler) receiveRouterMessages(ctx context.Context, appId uui
 			Payload: rawBytes,
 		})
 		if err != nil {
+			if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
+				return
+			}
+
 			log.Error("failed to forward message to worker", "err", err)
 
 			// The connection cannot be used, the next read loop will run into the connection error and close the connection.

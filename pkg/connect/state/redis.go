@@ -107,7 +107,7 @@ func (r redisConnectionStateManager) SetRequestIdempotency(ctx context.Context, 
 }
 
 func (r *redisConnectionStateManager) GetConnectionsByEnvID(ctx context.Context, envID uuid.UUID) ([]*connpb.ConnMetadata, error) {
-	key := r.connKey(envID.String())
+	key := r.connKey(envID)
 	cmd := r.client.B().Hvals().Key(key).Build()
 
 	res, err := r.client.Do(ctx, cmd).AsStrSlice()
@@ -128,7 +128,7 @@ func (r *redisConnectionStateManager) GetConnectionsByEnvID(ctx context.Context,
 }
 
 func (r *redisConnectionStateManager) GetConnectionsByAppID(ctx context.Context, envId uuid.UUID, appID uuid.UUID) ([]*connpb.ConnMetadata, error) {
-	key := r.connIndexByApp(envId.String(), &appID)
+	key := r.connIndexByApp(envId, &appID)
 
 	connIds, err := r.client.Do(ctx, r.client.B().Smembers().Key(key).Build()).AsStrSlice()
 	if err != nil {
@@ -139,7 +139,7 @@ func (r *redisConnectionStateManager) GetConnectionsByAppID(ctx context.Context,
 		return nil, nil
 	}
 
-	res, err := r.client.Do(ctx, r.client.B().Hmget().Key(r.connKey(envId.String())).Field(connIds...).Build()).AsStrSlice()
+	res, err := r.client.Do(ctx, r.client.B().Hmget().Key(r.connKey(envId)).Field(connIds...).Build()).AsStrSlice()
 	if err != nil {
 		return nil, err
 	}
@@ -158,8 +158,8 @@ func (r *redisConnectionStateManager) GetConnectionsByAppID(ctx context.Context,
 
 func (r *redisConnectionStateManager) GetConnectionsByGroupID(ctx context.Context, envID uuid.UUID, groupID string) ([]*connpb.ConnMetadata, error) {
 	keys := []string{
-		r.connKey(envID.String()),
-		r.groupIDKey(envID.String(), groupID),
+		r.connKey(envID),
+		r.groupIDKey(envID, groupID),
 	}
 	args := []string{}
 
@@ -186,7 +186,10 @@ func (r *redisConnectionStateManager) GetConnectionsByGroupID(ctx context.Contex
 }
 
 func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn *Connection) error {
-	envID := conn.Data.AuthData.GetEnvId()
+	envID, err := uuid.Parse(conn.Data.AuthData.GetEnvId())
+	if err != nil {
+		return fmt.Errorf("error parsing environment ID: %w", err)
+	}
 
 	groupID := conn.Group.Hash
 	meta := &connpb.ConnMetadata{
@@ -257,19 +260,16 @@ func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn
 	}
 }
 
-func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, conn *Connection) error {
-	envID := conn.Data.AuthData.GetEnvId()
-	groupID := conn.Group.Hash
-
+func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, envID uuid.UUID, appID *uuid.UUID, groupID string, connId string) error {
 	keys := []string{
 		r.connKey(envID),
 		r.groupKey(envID),
 		r.groupIDKey(envID, groupID),
-		r.connIndexByApp(envID, conn.Group.AppID),
+		r.connIndexByApp(envID, appID),
 	}
 
 	args := []string{
-		conn.Session.SessionId.ConnectionId,
+		connId,
 		groupID,
 	}
 
@@ -296,7 +296,7 @@ func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, conn
 }
 
 func (r *redisConnectionStateManager) GetWorkerGroupByHash(ctx context.Context, envID uuid.UUID, hash string) (*WorkerGroup, error) {
-	key := r.groupKey(envID.String())
+	key := r.groupKey(envID)
 	cmd := r.client.B().Hget().Key(key).Field(hash).Build()
 
 	byt, err := r.client.Do(ctx, cmd).AsBytes()
@@ -321,7 +321,7 @@ func (r *redisConnectionStateManager) UpdateWorkerGroup(ctx context.Context, env
 		return fmt.Errorf("error serializing worker group for update: %w", err)
 	}
 
-	key := r.groupKey(envID.String())
+	key := r.groupKey(envID)
 	cmd := r.client.B().Hset().Key(key).FieldValue().FieldValue(group.Hash, string(byt)).Build()
 
 	if err := r.client.Do(ctx, cmd).Error(); err != nil {
@@ -331,25 +331,25 @@ func (r *redisConnectionStateManager) UpdateWorkerGroup(ctx context.Context, env
 	return nil
 }
 
-func (r *redisConnectionStateManager) connKey(envID string) string {
+func (r *redisConnectionStateManager) connKey(envID uuid.UUID) string {
 	return fmt.Sprintf("{%s}:conns", envID)
 }
 
-func (r *redisConnectionStateManager) connIndexByApp(envID string, appId *uuid.UUID) string {
+func (r *redisConnectionStateManager) connIndexByApp(envID uuid.UUID, appId *uuid.UUID) string {
 	// For the initial connection upsert, the app won't be synced just yet, so we cannot update this index.
 	// We still need to provide a key with the same slot, otherwise Redis will complain
 	if appId == nil || *appId == uuid.Nil {
-		return fmt.Sprintf("{%s}:index_disabled", envID)
+		return fmt.Sprintf("{%s}:index_disabled", envID.String())
 	}
-	return fmt.Sprintf("{%s}:conns_appid:%s", envID, appId)
+	return fmt.Sprintf("{%s}:conns_appid:%s", envID.String(), appId.String())
 }
 
-func (r *redisConnectionStateManager) groupKey(envID string) string {
-	return fmt.Sprintf("{%s}:groups", envID)
+func (r *redisConnectionStateManager) groupKey(envID uuid.UUID) string {
+	return fmt.Sprintf("{%s}:groups", envID.String())
 }
 
-func (r *redisConnectionStateManager) groupIDKey(envID, groupID string) string {
-	return fmt.Sprintf("{%s}:groups:%s", envID, groupID)
+func (r *redisConnectionStateManager) groupIDKey(envID uuid.UUID, groupID string) string {
+	return fmt.Sprintf("{%s}:groups:%s", envID.String(), groupID)
 }
 
 // gatewaysHashKey returns the key for the global gateways hash.

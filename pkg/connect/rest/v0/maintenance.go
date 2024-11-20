@@ -7,15 +7,6 @@ import (
 )
 
 func (c *router) getGatewayState(w http.ResponseWriter, _ *http.Request) {
-	err := c.GatewayMaintenance.DrainGateway()
-	if err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Error{
-			Err:     err,
-			Message: err.Error(),
-			Status:  http.StatusInternalServerError,
-		})
-		return
-	}
 	state, err := c.GatewayMaintenance.GetState()
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
