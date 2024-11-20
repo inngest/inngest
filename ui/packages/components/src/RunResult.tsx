@@ -33,7 +33,6 @@ export function RunResult({
   const prettyInput = usePrettyJson(result.input ?? '') || (result.input ?? '');
   const prettyOutput = usePrettyJson(result.data ?? '') || (result.data ?? '');
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
-  console.log('stepAIEnabled', stepAIEnabled);
 
   return stepAIEnabled ? (
     <div className="flex flex-col">
