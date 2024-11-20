@@ -253,6 +253,7 @@ export function RunInfo({
             runID={runID}
             rerunFromStep={rerunFromStep}
             isSuccess={isSuccess}
+            stepAIEnabled={stepAIEnabled}
           />
         )}
       </Card>

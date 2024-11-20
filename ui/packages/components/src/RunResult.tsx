@@ -33,16 +33,18 @@ export function RunResult({
   const prettyInput = usePrettyJson(result.input ?? '') || (result.input ?? '');
   const prettyOutput = usePrettyJson(result.data ?? '') || (result.data ?? '');
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
+  console.log('stepAIEnabled', stepAIEnabled);
 
   return stepAIEnabled ? (
-    <div className="flex flex-col overflow-hidden">
-      <div className="border-b-subtle border-t-subtle bg-canvasBase border-primary-moderate h-11 w-full border-b border-l border-t px-6 py-3 text-sm font-normal leading-tight">
-        Content
-      </div>
-
-      <div className="bg-canvasSubtle flex h-full w-full flex-row items-start">
+    <div className="flex flex-col">
+      {result.input && (
+        <div className="bg-canvasBase border-l-primary-moderate border-subtle border-r-hidden h-11 w-full border border-l px-6 py-3 text-sm font-normal leading-tight">
+          Content
+        </div>
+      )}
+      <div className="bg-canvasSubtle flex">
         {result.input && (
-          <div className="border-r-subtle flex min-h-[80%] w-full flex-col justify-between border-r">
+          <div className="border-r-subtle flex w-full flex-col justify-between border-r">
             <CodeBlock
               header={{
                 title: 'Input',
@@ -51,29 +53,28 @@ export function RunResult({
                 content: prettyInput,
               }}
             />
-            <div className="flex h-[20%] align-bottom">
-              {runID && stepID && (
-                <>
-                  <NewButton
-                    className="m-2 w-40"
-                    label="Rerun with new prompt"
-                    onClick={() => setRerunModalOpen(true)}
-                  />
-                  <RerunModal
-                    open={rerunModalOpen}
-                    setOpen={setRerunModalOpen}
-                    runID={runID}
-                    stepID={stepID}
-                    input={prettyInput}
-                    rerunFromStep={rerunFromStep}
-                  />
-                </>
-              )}
-            </div>
+
+            {runID && stepID && (
+              <>
+                <NewButton
+                  className="m-2 w-40"
+                  label="Rerun with new prompt"
+                  onClick={() => setRerunModalOpen(true)}
+                />
+                <RerunModal
+                  open={rerunModalOpen}
+                  setOpen={setRerunModalOpen}
+                  runID={runID}
+                  stepID={stepID}
+                  input={prettyInput}
+                  rerunFromStep={rerunFromStep}
+                />
+              </>
+            )}
           </div>
         )}
         {result.data && (
-          <div className="h-full w-full">
+          <div className="w-full">
             <CodeBlock
               header={{
                 title: 'Output',
