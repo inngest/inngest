@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"gonum.org/v1/gonum/stat/sampleuv"
 	"log/slog"
+	"time"
 )
 
 type connectRouterSvc struct {
@@ -148,6 +149,16 @@ func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, envId uuid
 		}
 
 		if !hasFn {
+			continue
+		}
+
+		// Ensure gateway is healthy
+		gw, err := c.stateManager.GetGateway(ctx, conn.GatewayId)
+		if err != nil {
+			continue
+		}
+
+		if gw.Status != state.GatewayStatusActive || gw.LastHeartbeat.Before(time.Now().Add(-2*GatewayHeartbeatInterval)) {
 			continue
 		}
 

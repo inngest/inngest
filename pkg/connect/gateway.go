@@ -57,6 +57,9 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		ctx, cancel := context.WithCancel(c.runCtx)
 		defer cancel()
 
+		unsub := c.drainListener.OnDrain(cancel)
+		defer unsub()
+
 		ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 			Subprotocols: []string{
 				types.GatewaySubProtocol,

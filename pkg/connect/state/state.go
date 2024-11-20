@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -18,6 +19,7 @@ import (
 type StateManager interface {
 	ConnectionManager
 	WorkerGroupManager
+	GatewayManager
 
 	SetRequestIdempotency(ctx context.Context, appId uuid.UUID, requestId string) error
 }
@@ -33,6 +35,12 @@ type ConnectionManager interface {
 type WorkerGroupManager interface {
 	GetWorkerGroupByHash(ctx context.Context, envID uuid.UUID, hash string) (*WorkerGroup, error)
 	UpdateWorkerGroup(ctx context.Context, envID uuid.UUID, group *WorkerGroup) error
+}
+
+type GatewayManager interface {
+	UpsertGateway(ctx context.Context, gateway *Gateway) error
+	DeleteGateway(ctx context.Context, gatewayId string) error
+	GetGateway(ctx context.Context, gatewayId string) (*Gateway, error)
 }
 
 type AuthContext struct {
@@ -80,6 +88,22 @@ type WorkerGroup struct {
 
 	// used for syncing
 	SyncData SyncData `json:"-"`
+}
+
+type GatewayStatus string
+
+const (
+	GatewayStatusStarting GatewayStatus = "starting"
+	GatewayStatusActive   GatewayStatus = "active"
+	GatewayStatusDraining GatewayStatus = "draining"
+)
+
+type Gateway struct {
+	Id            string        `json:"id"`
+	Status        GatewayStatus `json:"status"`
+	LastHeartbeat time.Time     `json:"last_heartbeat"`
+
+	Hostname string `json:"hostname"`
 }
 
 // Connection have all the metadata assocaited with a worker connection

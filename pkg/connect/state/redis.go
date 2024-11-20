@@ -28,6 +28,7 @@ var (
 var (
 	ConnDeletedWithGroupErr = fmt.Errorf("group deleted with conn")
 	WorkerGroupNotFoundErr  = fmt.Errorf("worker group not found")
+	GatewayNotFoundErr      = fmt.Errorf("gateway not found")
 )
 
 func init() {
@@ -349,4 +350,61 @@ func (r *redisConnectionStateManager) groupKey(envID string) string {
 
 func (r *redisConnectionStateManager) groupIDKey(envID, groupID string) string {
 	return fmt.Sprintf("{%s}:groups:%s", envID, groupID)
+}
+
+// gatewaysHashKey returns the key for the global gateways hash.
+// Gateways are not scoped to any environment, so the Redis hash tag will be global.
+// This also means that gateways cannot be accessed in the same script as other environment-scoped keys.
+func (r *redisConnectionStateManager) gatewaysHashKey() string {
+	return fmt.Sprintf("{connect}:gateways")
+}
+
+func (r *redisConnectionStateManager) UpsertGateway(ctx context.Context, gateway *Gateway) error {
+	marshaled, err := json.Marshal(gateway)
+	if err != nil {
+		return fmt.Errorf("could not marshal gateway state: %w", err)
+	}
+
+	res := r.client.Do(
+		ctx,
+		r.client.B().Hset().Key(r.gatewaysHashKey()).FieldValue().FieldValue(gateway.Id, string(marshaled)).Build(),
+	)
+	if err := res.Error(); err != nil {
+		return fmt.Errorf("could not set gateway state: %w", err)
+	}
+
+	return nil
+}
+
+func (r *redisConnectionStateManager) DeleteGateway(ctx context.Context, gatewayId string) error {
+	res := r.client.Do(
+		ctx,
+		r.client.B().Hdel().Key(r.gatewaysHashKey()).Field(gatewayId).Build(),
+	)
+	if err := res.Error(); err != nil {
+		return fmt.Errorf("could not delete gateway state: %w", err)
+	}
+
+	return nil
+}
+
+func (r *redisConnectionStateManager) GetGateway(ctx context.Context, gatewayId string) (*Gateway, error) {
+	gatewayBytes, err := r.client.Do(
+		ctx,
+		r.client.B().Hget().Key(r.gatewaysHashKey()).Field(gatewayId).Build(),
+	).AsBytes()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return nil, GatewayNotFoundErr
+		}
+
+		return nil, fmt.Errorf("could not get gateway state: %w", err)
+	}
+
+	var gateway Gateway
+	if err := json.Unmarshal(gatewayBytes, &gateway); err != nil {
+		return nil, fmt.Errorf("could not unmarshal gateway state: %w", err)
+	}
+
+	return &gateway, nil
 }
