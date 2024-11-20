@@ -62,6 +62,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		ctx, cancel := context.WithCancel(c.runCtx)
 		defer cancel()
 
+		// When the gateway starts draining, cancel the connection context
 		unsub := c.drainListener.OnDrain(cancel)
 		defer unsub()
 
