@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -54,6 +55,9 @@ type connectGatewaySvc struct {
 	appLoader    ConnectAppLoader
 
 	lifecycles []ConnectGatewayLifecycleListener
+
+	isDraining     bool
+	connectionSema sync.WaitGroup
 }
 
 func WithGatewayAuthHandler(auth GatewayAuthHandler) gatewayOpt {
@@ -132,18 +136,28 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 func (c *connectGatewaySvc) Run(ctx context.Context) error {
 	c.runCtx = ctx
 
+	port := 8289
+	if v, err := strconv.Atoi(os.Getenv("CONNECT_GATEWAY_API_PORT")); err == nil && v > 0 {
+		port = v
+	}
+	addr := fmt.Sprintf(":%d", port)
+	server := &http.Server{
+		Addr:    addr,
+		Handler: c,
+	}
+
+	go func() {
+		<-ctx.Done()
+		c.isDraining = true
+		c.logger.Info("waiting for connections to drain")
+		c.connectionSema.Wait()
+		c.logger.Info("shutting down gateway api")
+		_ = server.Shutdown(ctx)
+	}()
+
 	eg, ctx := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {
-		port := 8289
-		if v, err := strconv.Atoi(os.Getenv("CONNECT_GATEWAY_API_PORT")); err == nil && v > 0 {
-			port = v
-		}
-		addr := fmt.Sprintf(":%d", port)
-		server := &http.Server{
-			Addr:    addr,
-			Handler: c,
-		}
 		c.logger.Info(fmt.Sprintf("starting gateway api at %s", addr))
 		return server.ListenAndServe()
 	})

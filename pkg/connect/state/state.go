@@ -190,7 +190,8 @@ func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager) 
 		c.Group.SyncID = syncReply.SyncID
 		c.Group.AppID = syncReply.AppID
 		// Update the worker group with the syncID so it's aware that it's already sync'd before
-		if err := groupManager.UpdateWorkerGroup(ctx, envID, c.Group); err != nil {
+		// Always update the worker group for consistency, even if the context is cancelled
+		if err := groupManager.UpdateWorkerGroup(context.Background(), envID, c.Group); err != nil {
 			return fmt.Errorf("error updating worker group: %w", err)
 		}
 	}
