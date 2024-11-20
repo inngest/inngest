@@ -356,7 +356,7 @@ func (r *redisConnectionStateManager) groupIDKey(envID uuid.UUID, groupID string
 // Gateways are not scoped to any environment, so the Redis hash tag will be global.
 // This also means that gateways cannot be accessed in the same script as other environment-scoped keys.
 func (r *redisConnectionStateManager) gatewaysHashKey() string {
-	return fmt.Sprintf("{connect}:gateways")
+	return "{connect}:gateways"
 }
 
 func (r *redisConnectionStateManager) UpsertGateway(ctx context.Context, gateway *Gateway) error {
