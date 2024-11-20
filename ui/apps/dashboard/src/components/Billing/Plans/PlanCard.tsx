@@ -1,8 +1,8 @@
-import { NewButton } from '@inngest/components/Button';
 import { RiCheckLine } from '@remixicon/react';
 
 import { processPlan } from '@/components/Billing/Plans/utils';
 import type { BillingPlan } from '@/gql/graphql';
+import UpgradeButton from './UpgradeButton';
 
 export function VerticalPlanCard({ plan }: { plan: BillingPlan }) {
   const transformedPlan = processPlan(plan);
@@ -15,7 +15,7 @@ export function VerticalPlanCard({ plan }: { plan: BillingPlan }) {
         {transformedPlan.billingPeriod}
       </div>
 
-      <NewButton className="my-8 w-full" label="Upgrade" />
+      <UpgradeButton plan={plan} />
       <hr className="mb-6" />
       <ul className="flex flex-col">
         {transformedPlan.features.map((feature, i) => (
@@ -42,7 +42,7 @@ export function HorizontalPlanCard({ plan }: { plan: BillingPlan }) {
     <div className="border-muted bg-canvasBase grid grid-cols-3 items-center gap-12 rounded-md border p-6">
       <div>
         <h4 className="text-basis mb-2 text-2xl font-medium">{transformedPlan.name}</h4>
-        <NewButton className="my-4 w-full" label="Upgrade" />
+        <UpgradeButton plan={plan} />
       </div>
 
       <div className="col-span-2 grid grid-cols-2 gap-8">

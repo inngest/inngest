@@ -1,7 +1,7 @@
 import { NewLink } from '@inngest/components/Link/Link';
 
 import { HorizontalPlanCard, VerticalPlanCard } from '@/components/Billing/Plans/PlanCard';
-import { currentPlan as getCurrentPlan, plans as getPlans } from '@/components/Billing/data';
+import { plans as getPlans } from '@/components/Billing/data';
 import type { BillingPlan } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 
@@ -20,9 +20,6 @@ const ENTERPRISE_PLAN: BillingPlan = {
 
 export default async function Page() {
   const plans = await getPlans();
-  const { plan: currentPlan } = await getCurrentPlan();
-
-  console.log(plans, currentPlan);
 
   return (
     <>
@@ -42,7 +39,7 @@ export default async function Page() {
           className="inline"
           target="_blank"
           size="small"
-          href={pathCreator.support({ ref: 'app-plans' })}
+          href={pathCreator.support({ ref: 'app-billing-plans-footer' })}
         >
           Contact us
         </NewLink>

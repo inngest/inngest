@@ -17,7 +17,11 @@ export default function PageTitle() {
   const pageTitle = routeTitles[pathname] || '';
   const cta =
     pathname === pathCreator.billingPlans() ? (
-      <NewLink target="_blank" size="small" href="https://www.inngest.com/pricing?ref=app-plans">
+      <NewLink
+        target="_blank"
+        size="small"
+        href="https://www.inngest.com/pricing?ref=app-billing-plans"
+      >
         View pricing page
       </NewLink>
     ) : null;
