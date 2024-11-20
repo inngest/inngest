@@ -14,4 +14,5 @@ const (
 	OpcodeSleep
 	OpcodeWaitForEvent
 	OpcodeInvokeFunction
+	OpcodeAIGateway // AI gateway inference call
 )
