@@ -6,8 +6,12 @@ option go_package = "github.com/inngest/inngest/proto/gen/connect/v1;connect";
 enum GatewayMessageType {
   GATEWAY_HELLO = 0;
   WORKER_CONNECT = 1;
-  GATEWAY_EXECUTOR_REQUEST = 2;
-  WORKER_REPLY = 3;
+  GATEWAY_CONNECTION_READY = 2;
+  GATEWAY_EXECUTOR_REQUEST = 3;
+  WORKER_READY = 4;
+  WORKER_REQUEST_ACK = 5;
+  WORKER_REPLY = 6;
+  WORKER_PAUSE = 7;
 }
 
 message ConnectMessage {
@@ -43,13 +47,14 @@ message WorkerConnectRequestData {
 	AuthData auth_data = 2;
 	string app_name = 3;
 	ConfigDetails config = 4;
+	bool worker_manual_readiness_ack = 5;
 
-	SystemAttributes system_attributes = 5;
-	optional string environment = 6;
-	string framework = 7;
-	optional string platform = 8;
-	string sdk_version = 9;
-	string sdk_language = 10;
+	SystemAttributes system_attributes = 6;
+	optional string environment = 7;
+	string framework = 8;
+	optional string platform = 9;
+	string sdk_version = 10;
+	string sdk_language = 11;
 }
 
 message GatewaySyncRequestData {
@@ -58,10 +63,18 @@ message GatewaySyncRequestData {
 
 message GatewayExecutorRequestData {
 	string request_id = 1;
+	string env_id = 2;
+	string app_id = 3;
+	string function_slug = 4;
+	optional string step_id = 5;
+	bytes request_payload = 6;
+}
+
+message WorkerRequestAckData {
+	string request_id = 1;
 	string app_id = 2;
 	string function_slug = 3;
 	optional string step_id = 4;
-	bytes request_payload = 5;
 }
 
 enum SDKResponseStatus {
@@ -79,14 +92,22 @@ message SDKResponse {
 	string sdk_version = 6;
 }
 
+enum ConnectionStatus {
+	CONNECTED = 0;
+	READY = 1;
+	DRAINING = 2;
+	DISCONNECTED = 3;
+}
 
 // Connection metadata
 message ConnMetadata {
 	string id = 1;
-	string instance_id = 2;
-	string group_id = 3;
-	string language = 4;
-	string version = 5;
+	string gateway_id = 2;
+	string instance_id = 3;
+	string group_id = 4;
+	ConnectionStatus status = 5;
+	string language = 6;
+	string version = 7;
 	SystemAttributes attributes = 8;
 }
 

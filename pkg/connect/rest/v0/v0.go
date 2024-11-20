@@ -35,6 +35,6 @@ func (a *router) setup() {
 
 		r.Get("/envs/{envID}/conns", a.showConnectionsByEnv)
 		r.Get("/envs/{envID}/groups/{groupID}", a.showWorkerGroup)
-		r.Get("/apps/{appID}/conns", a.showConnectionsByApp)
+		r.Get("/envs/{envID}/apps/{appID}/conns", a.showConnectionsByApp)
 	})
 }

@@ -24,9 +24,9 @@ type StateManager interface {
 
 type ConnectionManager interface {
 	GetConnectionsByEnvID(ctx context.Context, envID uuid.UUID) ([]*connpb.ConnMetadata, error)
-	GetConnectionsByAppID(ctx context.Context, appID uuid.UUID) ([]*connpb.ConnMetadata, error)
+	GetConnectionsByAppID(ctx context.Context, envId uuid.UUID, appID uuid.UUID) ([]*connpb.ConnMetadata, error)
 	GetConnectionsByGroupID(ctx context.Context, envID uuid.UUID, groupID string) ([]*connpb.ConnMetadata, error)
-	AddConnection(ctx context.Context, conn *Connection) error
+	UpsertConnection(ctx context.Context, conn *Connection) error
 	DeleteConnection(ctx context.Context, conn *Connection) error
 }
 
@@ -84,9 +84,11 @@ type WorkerGroup struct {
 
 // Connection have all the metadata assocaited with a worker connection
 type Connection struct {
-	Data    *connpb.WorkerConnectRequestData
-	Session *connpb.SessionDetails
-	Group   *WorkerGroup
+	Status    connpb.ConnectionStatus
+	Data      *connpb.WorkerConnectRequestData
+	Session   *connpb.SessionDetails
+	Group     *WorkerGroup
+	GatewayId string
 }
 
 // Sync attempts to sync the worker group configuration
@@ -110,12 +112,15 @@ func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager) 
 		envID = id
 	}
 
+	// The group is expected to exist in the state, as UpsertConnection also creates the group if it doesn't exist
 	group, err := groupManager.GetWorkerGroupByHash(ctx, envID, c.Group.Hash)
 	if err != nil {
 		return fmt.Errorf("error attempting to retrieve worker group: %w", err)
 	}
+
 	// Don't attempt to sync if it's already sync'd
 	if group != nil && group.SyncID != nil && group.AppID != nil {
+		c.Group = group
 		return nil
 	}
 
@@ -182,10 +187,10 @@ func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager) 
 
 	// Update the worker group to make sure it store the appropriate IDs
 	if syncReply.IsSuccess() {
-		group.SyncID = syncReply.SyncID
-		group.AppID = syncReply.AppID
+		c.Group.SyncID = syncReply.SyncID
+		c.Group.AppID = syncReply.AppID
 		// Update the worker group with the syncID so it's aware that it's already sync'd before
-		if err := groupManager.UpdateWorkerGroup(ctx, envID, group); err != nil {
+		if err := groupManager.UpdateWorkerGroup(ctx, envID, c.Group); err != nil {
 			return fmt.Errorf("error updating worker group: %w", err)
 		}
 	}

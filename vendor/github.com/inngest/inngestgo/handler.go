@@ -47,6 +47,8 @@ var (
 		TrustProbe: sdk.TrustProbeV1,
 		Connect:    sdk.ConnectV1,
 	}
+
+	defaultWorkerConcurrency = 1_000
 )
 
 // Register adds the given functions to the default handler for serving.  You must register all
@@ -119,6 +121,10 @@ type HandlerOpts struct {
 	// disallowed.
 	AllowInBandSync *bool
 
+	// WorkerConcurrency defines the number of goroutines available to handle
+	// connnect workloads. Defaults to 1000
+	WorkerConcurrency int
+
 	Dev *bool
 }
 
@@ -178,6 +184,13 @@ func (h HandlerOpts) IsInBandSyncAllowed() bool {
 	}
 
 	return false
+}
+
+func (h HandlerOpts) GetWorkerConcurrency() int {
+	if h.WorkerConcurrency == 0 {
+		return defaultWorkerConcurrency
+	}
+	return h.WorkerConcurrency
 }
 
 // Handler represents a handler which serves the Inngest API via HTTP.  This provides

@@ -425,7 +425,7 @@ func start(ctx context.Context, opts StartOpts) error {
 				EnvID:     consts.DevServerEnvId,
 			}, nil
 		}),
-		connect.WithDB(dbcqrs),
+		connect.WithAppLoader(dbcqrs),
 		connect.WithDev(),
 	)
 

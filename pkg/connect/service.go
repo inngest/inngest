@@ -2,7 +2,7 @@ package connect
 
 import (
 	"context"
-	"errors"
+	"crypto/rand"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -31,6 +31,11 @@ type AuthResponse struct {
 
 type GatewayAuthHandler func(context.Context, *connect.WorkerConnectRequestData) (*AuthResponse, error)
 
+type ConnectAppLoader interface {
+	// GetAppByName returns an app by name
+	GetAppByName(ctx context.Context, name string) (*cqrs.App, error)
+}
+
 type connectGatewaySvc struct {
 	chi.Router
 
@@ -46,7 +51,7 @@ type connectGatewaySvc struct {
 	auther       GatewayAuthHandler
 	stateManager state.StateManager
 	receiver     pubsub.RequestReceiver
-	dbcqrs       cqrs.Manager
+	appLoader    ConnectAppLoader
 
 	lifecycles []ConnectGatewayLifecycleListener
 }
@@ -69,9 +74,9 @@ func WithRequestReceiver(r pubsub.RequestReceiver) gatewayOpt {
 	}
 }
 
-func WithDB(m cqrs.Manager) gatewayOpt {
+func WithAppLoader(l ConnectAppLoader) gatewayOpt {
 	return func(svc *connectGatewaySvc) {
-		svc.dbcqrs = m
+		svc.appLoader = l
 	}
 }
 
@@ -90,18 +95,15 @@ func WithDev() gatewayOpt {
 func NewConnectGatewayService(opts ...gatewayOpt) (*connectGatewaySvc, *connectRouterSvc, http.Handler) {
 	gateway := &connectGatewaySvc{
 		Router:     chi.NewRouter(),
-		gatewayId:  ulid.MustNew(ulid.Now(), nil).String(),
+		gatewayId:  ulid.MustNew(ulid.Now(), rand.Reader).String(),
 		lifecycles: []ConnectGatewayLifecycleListener{},
-	}
-	if os.Getenv("CONNECT_TEST_GATEWAY_ID") != "" {
-		gateway.gatewayId = os.Getenv("CONNECT_TEST_GATEWAY_ID")
 	}
 
 	for _, opt := range opts {
 		opt(gateway)
 	}
 
-	router := newConnectRouter(gateway.stateManager, gateway.receiver, gateway.dbcqrs)
+	router := newConnectRouter(gateway.stateManager, gateway.receiver)
 
 	return gateway, router, gateway.Handler()
 }
@@ -167,98 +169,4 @@ func (c *connectGatewaySvc) Stop(ctx context.Context) error {
 	// TODO Drain connections!
 
 	return nil
-}
-
-type connectRouterSvc struct {
-	logger *slog.Logger
-
-	stateManager state.StateManager
-	receiver     pubsub.RequestReceiver
-	dbcqrs       cqrs.Manager
-}
-
-func (c *connectRouterSvc) Name() string {
-	return "connect-router"
-}
-
-func (c *connectRouterSvc) Pre(ctx context.Context) error {
-	// Set up router-specific logger with info for correlations
-	c.logger = logger.StdlibLogger(ctx)
-
-	return nil
-}
-
-func (c *connectRouterSvc) Run(ctx context.Context) error {
-	go func() {
-		err := c.receiver.ReceiveExecutorMessages(ctx, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
-			log := c.logger.With("app_id", data.AppId, "req_id", data.RequestId)
-
-			appId, err := uuid.Parse(data.AppId)
-			if err != nil {
-				log.Error("could not parse app ID")
-				return
-			}
-
-			log.Debug("router received msg")
-
-			// TODO Should the router ack or the gateway itself?
-
-			// We need to add an idempotency key to ensure only one router instance processes the message
-			err = c.stateManager.SetRequestIdempotency(ctx, appId, data.RequestId)
-			if err != nil {
-				if errors.Is(err, state.ErrIdempotencyKeyExists) {
-					// Another connection was faster than us, we can ignore this message
-					return
-				}
-
-				// TODO Log error
-				return
-			}
-
-			// Now we're guaranteed to be the exclusive connection processing this message!
-
-			// TODO Resolve gateway
-			gatewayId := ""
-			if os.Getenv("CONNECT_TEST_GATEWAY_ID") != "" {
-				gatewayId = os.Getenv("CONNECT_TEST_GATEWAY_ID")
-			}
-
-			// TODO What if something goes wrong inbetween setting idempotency (claiming exclusivity) and forwarding the req?
-			// We'll potentially lose data here
-
-			// Forward message to the gateway
-			err = c.receiver.RouteExecutorRequest(ctx, gatewayId, appId, data)
-			if err != nil {
-				// TODO Should we retry? Log error?
-				log.Error("failed to route request to gateway", "err", err, "gateway_id", gatewayId)
-				return
-			}
-		})
-		if err != nil {
-			// TODO Log error, retry?
-			return
-		}
-	}()
-
-	// TODO Periodically ping random gateways via PubSub and only consider them active if they respond in time -> Multiple routers will do this
-
-	err := c.receiver.Wait(ctx)
-	if err != nil {
-		return fmt.Errorf("could not listen for pubsub messages: %w", err)
-	}
-
-	return nil
-
-}
-
-func (c *connectRouterSvc) Stop(ctx context.Context) error {
-	return nil
-}
-
-func newConnectRouter(stateManager state.StateManager, receiver pubsub.RequestReceiver, db cqrs.Manager) *connectRouterSvc {
-	return &connectRouterSvc{
-		stateManager: stateManager,
-		receiver:     receiver,
-		dbcqrs:       db,
-	}
 }
