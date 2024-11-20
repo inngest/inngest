@@ -6,11 +6,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"log/slog"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/inngest/inngest/pkg/connect/pubsub"
+	"github.com/inngest/inngest/pkg/consts"
 
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
@@ -137,7 +139,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
-		app, err := c.appLoader.GetAppByName(ctx, conn.Data.AppName)
+		app, err := c.appLoader.GetAppByName(ctx, consts.DevServerEnvId, conn.Data.AppName)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			ch.log.Error("could not get app by name", "appName", conn.Data.AppName, "err", err)
 			closeWithConnectError(ws, &SocketError{

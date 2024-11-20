@@ -41,7 +41,7 @@ func (r *mutationResolver) CreateApp(ctx context.Context, input models.CreateApp
 	}
 
 	<-time.After(100 * time.Millisecond)
-	apps, err := r.Data.GetAllApps(ctx)
+	apps, err := r.Data.GetAllApps(ctx, consts.DevServerEnvId)
 	if err != nil {
 		return nil, err
 	}
