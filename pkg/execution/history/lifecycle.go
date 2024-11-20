@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
@@ -446,6 +447,19 @@ func (l lifecycle) OnStepFinished(
 			l.log.Error("execution lifecycle error", "lifecycle", "onStepFinished", "error", err)
 		}
 	}
+}
+
+func (l lifecycle) OnStepGatewayRequestFinished(
+	context.Context,
+	sv2.Metadata,
+	queue.Item,
+	inngest.Edge,
+	state.GeneratorOpcode,
+	// Resp is the HTTP response
+	*http.Response,
+	error,
+) {
+	// XXX: The tracing lifecycle has taken place over
 }
 
 func (l lifecycle) OnWaitForEvent(

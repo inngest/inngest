@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
@@ -582,6 +583,107 @@ func (l traceLifecycle) OnStepStarted(
 		// function run itself.
 		if item.Attempt == 0 {
 			span.SetAttributes(attribute.Bool(consts.OtelSysStepFirst, true))
+		}
+	}
+}
+
+func (l traceLifecycle) OnStepGatewayRequestFinished(
+	ctx context.Context,
+	md sv2.Metadata,
+	item queue.Item,
+	edge inngest.Edge,
+	// Opcode is the opcode for the offloaded request.  The Data field must be
+	// set with the length of the output.
+	op statev1.GeneratorOpcode,
+	// Resp is the HTTP response
+	resp *http.Response,
+	// runErr is non-nil on a non-2xx status code.
+	runErr error,
+) {
+	// reassign here to make sure we have the right traceID and such
+	ctx = l.extractTraceCtx(ctx, md, false)
+
+	spanID, err := item.SpanID()
+	if err != nil {
+		l.log.Error("error retrieving spanID", "meta", md, "error", err, "lifecycle", "OnStepFinished")
+		return
+	}
+	start, ok := redis_state.GetItemStart(ctx)
+	if !ok {
+		l.log.Warn("start time not available for item", "lifecycle", "OnStepFinished")
+		start = time.Now()
+	}
+	runID := md.ID.RunID
+
+	_, span := NewSpan(ctx,
+		WithScope(consts.OtelScopeExecution),
+		WithName(consts.OtelExecPlaceholder),
+		WithTimestamp(start),
+		WithSpanID(*spanID),
+		WithSpanAttributes(
+			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
+			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, md.ID.FunctionID.String()),
+			attribute.String(consts.OtelSysFunctionSlug, md.Config.FunctionSlug()),
+			attribute.Int(consts.OtelSysFunctionVersion, md.Config.FunctionVersion),
+			attribute.String(consts.OtelAttrSDKRunID, runID.String()),
+			attribute.Int(consts.OtelSysStepAttempt, item.Attempt),
+			attribute.Int(consts.OtelSysStepMaxAttempt, item.GetMaxAttempts()),
+			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
+			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeStepPlanned.String()),
+			attribute.String(consts.OtelSysStepStack, strings.Join(md.Stack, ",")),
+		),
+	)
+	// Common attrs.
+	span.SetName(op.UserDefinedName())
+	span.SetAttributes(
+		attribute.Int(consts.OtelSysStepStatusCode, resp.StatusCode),
+		attribute.Int(consts.OtelSysStepOutputSizeBytes, int(resp.ContentLength)),
+		attribute.String(consts.OtelSysStepID, op.ID),
+		attribute.String(consts.OtelSysStepDisplayName, op.UserDefinedName()),
+		attribute.String(consts.OtelSysStepOpcode, op.Op.String()),
+	)
+
+	defer span.End()
+
+	if item.RunInfo != nil {
+		span.SetAttributes(
+			attribute.Int64(consts.OtelSysDelaySystem, item.RunInfo.Latency.Milliseconds()),
+			attribute.Int64(consts.OtelSysDelaySojourn, item.RunInfo.SojournDelay.Milliseconds()),
+		)
+	}
+	if item.Attempt > 0 {
+		span.SetAttributes(attribute.Bool(consts.OtelSysStepRetry, true))
+	}
+	// first step
+	if edge.Incoming == inngest.TriggerName {
+		// NOTE:
+		// annotate the step as the first step of the function
+		// this way the delay associated with this run is directly correlated to the delay of the
+		// function run itself.
+		if item.Attempt == 0 {
+			span.SetAttributes(attribute.Bool(consts.OtelSysStepFirst, true))
+		}
+	}
+	if runErr == nil {
+		span.SetStepOutput(op.Data)
+		span.SetStatus(codes.Ok, string(op.Data))
+	} else {
+		span.SetStatus(codes.Error, runErr.Error())
+		span.SetStepOutput(runErr.Error())
+	}
+
+	if input, _ := op.Input(); input != "" {
+		span.SetStepInput(input)
+	}
+
+	// If we have AI calls, parse the input and output metadata directly.
+	switch op.Op {
+	case enums.OpcodeAIGateway:
+		req, _ := op.AIGatewayOpts()
+		if parsed, err := aigateway.ParseInput(ctx, req); err == nil {
+			span.SetAIRequestMetadata(parsed)
 		}
 	}
 }

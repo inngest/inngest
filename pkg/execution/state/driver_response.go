@@ -249,21 +249,23 @@ func (r *DriverResponse) IsTraceVisibleFunctionExecution() bool {
 	return r.StatusCode != 206
 }
 
-func (r *DriverResponse) UpdateOpcodeOutput(op GeneratorOpcode, to json.RawMessage) {
+func (r *DriverResponse) UpdateOpcodeOutput(op *GeneratorOpcode, to json.RawMessage) {
 	for n, o := range r.Generator {
 		if o.ID != op.ID {
 			continue
 		}
+		op.Data = to
 		r.Generator[n].Data = to
 	}
 }
 
 // UpdateOpcodeError updates an opcode's data and error to the given inputs.
-func (r *DriverResponse) UpdateOpcodeError(op GeneratorOpcode, err UserError) {
+func (r *DriverResponse) UpdateOpcodeError(op *GeneratorOpcode, err UserError) {
 	for n, o := range r.Generator {
 		if o.ID != op.ID {
 			continue
 		}
+		op.Error = &err
 		r.Generator[n].Error = &err
 	}
 }
