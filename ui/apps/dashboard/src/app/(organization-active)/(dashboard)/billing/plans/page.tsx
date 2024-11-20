@@ -1,8 +1,9 @@
-// 'use client'
+import { NewLink } from '@inngest/components/Link/Link';
 
 import { HorizontalPlanCard, VerticalPlanCard } from '@/components/Billing/Plans/PlanCard';
 import { currentPlan as getCurrentPlan, plans as getPlans } from '@/components/Billing/data';
 import type { BillingPlan } from '@/gql/graphql';
+import { pathCreator } from '@/utils/urls';
 
 // This will move to the API as a custom plan at some point, for now we can hard code
 const ENTERPRISE_PLAN: BillingPlan = {
@@ -25,14 +26,27 @@ export default async function Page() {
 
   return (
     <>
+      <p className="text-subtle mb-4">Available plans</p>
       <div className="mb-4 grid grid-cols-3 gap-4">
         {plans.map((plan) => {
           if (plan) {
-            return <VerticalPlanCard plan={plan} />;
+            return <VerticalPlanCard key={plan.id} plan={plan} />;
           }
         })}
       </div>
       <HorizontalPlanCard plan={ENTERPRISE_PLAN} />
+
+      <div className="mt-4 text-center text-sm">
+        Want to cancel your plan?{' '}
+        <NewLink
+          className="inline"
+          target="_blank"
+          size="small"
+          href={pathCreator.support({ ref: 'app-plans' })}
+        >
+          Contact us
+        </NewLink>
+      </div>
     </>
   );
 }

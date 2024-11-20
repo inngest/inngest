@@ -1,6 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import { NewLink } from '@inngest/components/Link/Link';
 
 import { pathCreator } from '@/utils/urls';
 
@@ -14,6 +15,17 @@ export default function PageTitle() {
     [pathCreator.billingPlans()]: 'Plans',
   };
   const pageTitle = routeTitles[pathname] || '';
+  const cta =
+    pathname === pathCreator.billingPlans() ? (
+      <NewLink target="_blank" size="small" href="https://www.inngest.com/pricing?ref=app-plans">
+        View pricing page
+      </NewLink>
+    ) : null;
 
-  return <h2 className="my-9 text-2xl">{pageTitle}</h2>;
+  return (
+    <div className="flex items-center justify-between">
+      <h2 className="my-9 text-2xl">{pageTitle}</h2>
+      {cta}
+    </div>
+  );
 }
