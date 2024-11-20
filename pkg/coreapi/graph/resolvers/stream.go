@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/oklog/ulid/v2"
@@ -67,7 +68,7 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 	fnsByID := map[ulid.ULID][]*models.FunctionRun{}
 	for _, fn := range fns {
 		run := models.MakeFunctionRun(fn)
-		_, err := r.Data.GetFunctionByInternalUUID(ctx, uuid.UUID{}, uuid.MustParse(run.FunctionID))
+		_, err := r.Data.GetFunctionByInternalUUID(ctx, consts.DevServerEnvId, uuid.MustParse(run.FunctionID))
 		if err == sql.ErrNoRows {
 			// Skip run since its function doesn't exist. This can happen when
 			// deleting a function or changing its ID.

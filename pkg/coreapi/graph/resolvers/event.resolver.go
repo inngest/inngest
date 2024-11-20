@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/oklog/ulid/v2"
@@ -12,10 +12,7 @@ import (
 
 // TODO Duplicate code. Move to field-level resolvers and add dataloaders.
 func (r *eventResolver) FunctionRuns(ctx context.Context, obj *models.Event) ([]*models.FunctionRun, error) {
-	accountID := uuid.UUID{}
-	workspaceID := uuid.UUID{}
-
-	runs, err := r.Data.GetFunctionRunsFromEvents(ctx, accountID, workspaceID, []ulid.ULID{obj.ID})
+	runs, err := r.Data.GetFunctionRunsFromEvents(ctx, consts.DevServerAccountId, consts.DevServerEnvId, []ulid.ULID{obj.ID})
 	if err != nil {
 		return nil, err
 	}
@@ -31,8 +28,7 @@ func (r *eventResolver) FunctionRuns(ctx context.Context, obj *models.Event) ([]
 }
 
 func (r *eventResolver) PendingRuns(ctx context.Context, obj *models.Event) (*int, error) {
-	accountID := uuid.UUID{}
-	state, err := r.Runner.Runs(ctx, accountID, obj.ID)
+	state, err := r.Runner.Runs(ctx, consts.DevServerAccountId, obj.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -49,8 +45,7 @@ func (r *eventResolver) PendingRuns(ctx context.Context, obj *models.Event) (*in
 }
 
 func (r *eventResolver) Status(ctx context.Context, obj *models.Event) (*models.EventStatus, error) {
-	accountID := uuid.UUID{}
-	state, err := r.Runner.Runs(ctx, accountID, obj.ID)
+	state, err := r.Runner.Runs(ctx, consts.DevServerAccountId, obj.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -116,8 +111,7 @@ func (r *eventResolver) Raw(ctx context.Context, obj *models.Event) (*string, er
 }
 
 func (r *eventResolver) TotalRuns(ctx context.Context, obj *models.Event) (*int, error) {
-	accountID := uuid.UUID{}
-	metadata, err := r.Runner.Runs(ctx, accountID, obj.ID)
+	metadata, err := r.Runner.Runs(ctx, consts.DevServerAccountId, obj.ID)
 	if err != nil {
 		return nil, err
 	}
