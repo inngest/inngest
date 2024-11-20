@@ -75,7 +75,7 @@ func (r *mutationResolver) DeleteAppByName(
 	ctx context.Context,
 	name string,
 ) (bool, error) {
-	apps, err := r.Data.GetApps(ctx)
+	apps, err := r.Data.GetApps(ctx, consts.DevServerEnvId)
 	if err != nil {
 		return false, err
 	}

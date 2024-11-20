@@ -216,7 +216,7 @@ func (w wrapper) InsertQueueSnapshotChunk(ctx context.Context, params cqrs.Inser
 //
 
 // GetApps returns apps that have not been deleted.
-func (w wrapper) GetApps(ctx context.Context) ([]*cqrs.App, error) {
+func (w wrapper) GetApps(ctx context.Context, envID uuid.UUID) ([]*cqrs.App, error) {
 	return copyInto(ctx, w.q.GetApps, []*cqrs.App{})
 }
 

@@ -11,7 +11,7 @@ import (
 )
 
 func (a queryResolver) Apps(ctx context.Context) ([]*cqrs.App, error) {
-	return a.Data.GetApps(ctx)
+	return a.Data.GetApps(ctx, consts.DevServerEnvId)
 }
 
 func (a appResolver) ID(ctx context.Context, obj *cqrs.App) (string, error) {

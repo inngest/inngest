@@ -296,7 +296,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 		}
 
 		urls := map[string]struct{}{}
-		if apps, err := d.Data.GetApps(ctx); err == nil {
+		if apps, err := d.Data.GetApps(ctx, consts.DevServerEnvId); err == nil {
 			for _, app := range apps {
 				// We've seen this URL.
 				urls[app.Url] = struct{}{}

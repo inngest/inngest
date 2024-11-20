@@ -31,7 +31,7 @@ type AppManager interface {
 
 type AppReader interface {
 	// GetApps returns apps that have not been deleted.
-	GetApps(ctx context.Context) ([]*App, error)
+	GetApps(ctx context.Context, envID uuid.UUID) ([]*App, error)
 	// GetAppByChecksum returns an app by checksum.
 	GetAppByChecksum(ctx context.Context, envID uuid.UUID, checksum string) (*App, error)
 	// GetAppByURL returns an app by URL
