@@ -4,7 +4,13 @@ import { processPlan } from '@/components/Billing/Plans/utils';
 import type { BillingPlan } from '@/gql/graphql';
 import UpgradeButton from './UpgradeButton';
 
-export function VerticalPlanCard({ plan }: { plan: BillingPlan }) {
+export function VerticalPlanCard({
+  plan,
+  currentPlan,
+}: {
+  plan: BillingPlan;
+  currentPlan: BillingPlan;
+}) {
   const transformedPlan = processPlan(plan);
   return (
     <div className="border-muted bg-canvasBase rounded-md border p-6">
@@ -15,7 +21,7 @@ export function VerticalPlanCard({ plan }: { plan: BillingPlan }) {
         {transformedPlan.billingPeriod}
       </div>
 
-      <UpgradeButton plan={plan} />
+      <UpgradeButton plan={plan} currentPlan={currentPlan} />
       <hr className="mb-6" />
       <ul className="flex flex-col">
         {transformedPlan.features.map((feature, i) => (
@@ -31,7 +37,13 @@ export function VerticalPlanCard({ plan }: { plan: BillingPlan }) {
   );
 }
 
-export function HorizontalPlanCard({ plan }: { plan: BillingPlan }) {
+export function HorizontalPlanCard({
+  plan,
+  currentPlan,
+}: {
+  plan: BillingPlan;
+  currentPlan: BillingPlan;
+}) {
   const transformedPlan = processPlan(plan);
   // Split features into two columns
   const halfwayIndex = Math.ceil(transformedPlan.features.length / 2);
@@ -42,7 +54,7 @@ export function HorizontalPlanCard({ plan }: { plan: BillingPlan }) {
     <div className="border-muted bg-canvasBase grid grid-cols-3 items-center gap-12 rounded-md border p-6">
       <div>
         <h4 className="text-basis mb-2 text-2xl font-medium">{transformedPlan.name}</h4>
-        <UpgradeButton plan={plan} />
+        <UpgradeButton plan={plan} currentPlan={currentPlan} />
       </div>
 
       <div className="col-span-2 grid grid-cols-2 gap-8">
