@@ -51,7 +51,6 @@ jobs:
           INNGEST_SIGNING_KEY: test
           API_URL: http://127.0.0.1:8288
           SDK_URL: http://127.0.0.1:3000/api/inngest
-          CONNECT_TEST_GATEWAY_ID: gw1
   golang:
     name: Go SDK Tests
     strategy:
@@ -78,4 +77,3 @@ jobs:
         env:
           INNGEST_SIGNING_KEY: 7468697320697320612074657374206b6579
           INNGEST_DEV: http://127.0.0.1:8288
-          CONNECT_TEST_GATEWAY_ID: gw1

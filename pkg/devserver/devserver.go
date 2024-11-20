@@ -416,7 +416,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
-	connectSvc, connectHandler := connect.NewConnectGatewayService(
+	connGateway, connRouter, connectHandler := connect.NewConnectGatewayService(
 		connect.WithConnectionStateManager(connectionManager),
 		connect.WithRequestReceiver(gatewayProxy),
 		connect.WithGatewayAuthHandler(func(ctx context.Context, data *connectproto.WorkerConnectRequestData) (*connect.AuthResponse, error) {
@@ -425,7 +425,7 @@ func start(ctx context.Context, opts StartOpts) error {
 				EnvID:     consts.DevServerEnvId,
 			}, nil
 		}),
-		connect.WithDB(dbcqrs),
+		connect.WithAppLoader(dbcqrs),
 		connect.WithDev(),
 	)
 
@@ -447,7 +447,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	})
 
 	svcs := []service.Service{ds, runner, executorSvc, ds.Apiservice}
-	svcs = append(svcs, connectSvc...)
+	svcs = append(svcs, connGateway, connRouter)
 	return service.StartAll(ctx, svcs...)
 }
 

@@ -48,8 +48,6 @@ func (r Request) MarshalJSON() ([]byte, error) {
 }
 
 func (r Request) HTTPRequest() (*http.Request, error) {
-
-
 	req, err := http.NewRequest(http.MethodPost, r.URL, bytes.NewReader(r.Body))
 	if err != nil {
 		return nil, err

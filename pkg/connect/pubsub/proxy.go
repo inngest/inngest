@@ -36,20 +36,28 @@ type RequestForwarder interface {
 	Proxy(ctx context.Context, appId uuid.UUID, data *connect.GatewayExecutorRequestData) (*connect.SDKResponse, error)
 }
 
+type AckSource string
+
+const (
+	AckSourceWorker  AckSource = "worker"
+	AckSourceGateway AckSource = "gateway"
+	AckSourceRouter  AckSource = "router"
+)
+
 type RequestReceiver interface {
 	// ReceiveExecutorMessages listens for incoming PubSub messages for the connect router.
 	// This is a blocking call which only stops once the context is canceled.
 	ReceiveExecutorMessages(ctx context.Context, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error
 
 	// RouteExecutorRequest forwards an executor request to the respective gateway
-	RouteExecutorRequest(ctx context.Context, gatewayId string, appId uuid.UUID, data *connect.GatewayExecutorRequestData) error
+	RouteExecutorRequest(ctx context.Context, gatewayId string, appId uuid.UUID, connId string, data *connect.GatewayExecutorRequestData) error
 
 	// ReceiveRouterMessages listens for incoming PubSub messages for a specific gateway and app and calls the provided callback.
 	// This is a blocking call which only stops once the context is canceled.
-	ReceiveRoutedRequest(ctx context.Context, gatewayId string, appId uuid.UUID, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error
+	ReceiveRoutedRequest(ctx context.Context, gatewayId string, appId uuid.UUID, connId string, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error
 
 	// AckMessage sends an acknowledgment for a specific request.
-	AckMessage(ctx context.Context, appId uuid.UUID, requestId string) error
+	AckMessage(ctx context.Context, appId uuid.UUID, requestId string, source AckSource) error
 
 	// NotifyExecutor sends a response to the executor for a specific request.
 	NotifyExecutor(ctx context.Context, appId uuid.UUID, resp *connect.SDKResponse) error
@@ -92,17 +100,43 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data 
 		return nil, fmt.Errorf("could not marshal executor request: %w", err)
 	}
 
-	// Await ack from gateway BEFORE response
-	ackErrChan := make(chan error)
-	var acked bool
+	// Await ack from router BEFORE response
+	routerAckErrChan := make(chan error)
+	var routerAcked bool
 	{
 		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		go func() {
-			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(appId, data.RequestId), func(msg string) {
-				acked = true
+			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(appId, data.RequestId, AckSourceRouter), func(msg string) {
+				routerAcked = true
 			}, true)
-			ackErrChan <- err
+			routerAckErrChan <- err
+		}()
+	}
+
+	gatewayAckErrChan := make(chan error)
+	var gatewayAcked bool
+	{
+		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		go func() {
+			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(appId, data.RequestId, AckSourceGateway), func(msg string) {
+				gatewayAcked = true
+			}, true)
+			gatewayAckErrChan <- err
+		}()
+	}
+
+	workerAckErrChan := make(chan error)
+	var workerAcked bool
+	{
+		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		go func() {
+			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(appId, data.RequestId, AckSourceWorker), func(msg string) {
+				workerAcked = true
+			}, true)
+			workerAckErrChan <- err
 		}()
 	}
 
@@ -132,16 +166,40 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data 
 
 	logger.StdlibLogger(ctx).Debug("published connect pubsub message", "channel", channelName, "request_id", data.RequestId)
 
-	// Sanity check: Ensure the gateway received the message using a request-specific ack channel (ack must come in before SDK response)
+	// Sanity check: Ensure the router received the message using a request-specific ack channel (ack must come in before SDK response)
 	{
-		err := <-ackErrChan
-		close(ackErrChan)
+		err := <-routerAckErrChan
+		close(routerAckErrChan)
 		if err != nil && !errors.Is(err, context.DeadlineExceeded) {
-			return nil, fmt.Errorf("could not receive executor request ack: %w", err)
+			return nil, fmt.Errorf("could not receive executor request ack by router: %w", err)
 		}
 
-		if !acked {
+		if !routerAcked {
+			return nil, fmt.Errorf("router did not ack in time")
+		}
+	}
+
+	{
+		err := <-gatewayAckErrChan
+		close(gatewayAckErrChan)
+		if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+			return nil, fmt.Errorf("could not receive executor request ack by gateway: %w", err)
+		}
+
+		if !gatewayAcked {
 			return nil, fmt.Errorf("gateway did not ack in time")
+		}
+	}
+
+	{
+		err := <-workerAckErrChan
+		close(workerAckErrChan)
+		if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+			return nil, fmt.Errorf("could not receive executor request ack by worker: %w", err)
+		}
+
+		if !workerAcked {
+			return nil, fmt.Errorf("worker did not ack in time")
 		}
 	}
 
@@ -163,13 +221,13 @@ func (i *redisPubSubConnector) channelExecutorRequests() string {
 	return "executor_requests"
 }
 
-// channelGatewayAppRequests returns the channel name for routed executor requests received by the gateway for a specific app.
-func (i *redisPubSubConnector) channelGatewayAppRequests(gatewayId string, appId uuid.UUID) string {
-	return fmt.Sprintf("app_requests:%s:%s", gatewayId, appId)
+// channelGatewayAppRequests returns the channel name for routed executor requests received by the gateway for a specific app and connection.
+func (i *redisPubSubConnector) channelGatewayAppRequests(gatewayId string, appId uuid.UUID, connId string) string {
+	return fmt.Sprintf("app_requests:%s:%s:%s", gatewayId, appId, connId)
 }
 
-func (i *redisPubSubConnector) channelAppRequestsAck(appId uuid.UUID, requestId string) string {
-	return fmt.Sprintf("app_requests_ack:%s:%s", appId, requestId)
+func (i *redisPubSubConnector) channelAppRequestsAck(appId uuid.UUID, requestId string, source AckSource) string {
+	return fmt.Sprintf("app_requests_ack:%s:%s:%s", appId, requestId, source)
 }
 
 func (i *redisPubSubConnector) channelAppRequestsReply(appId uuid.UUID, requestId string) string {
@@ -251,8 +309,8 @@ func (i *redisPubSubConnector) subscribe(ctx context.Context, channel string, on
 
 // ReceiveExecutorMessages listens for incoming PubSub messages for a specific app and calls the provided callback.
 // This is a blocking call which only stops once the context is canceled.
-func (i *redisPubSubConnector) ReceiveRoutedRequest(ctx context.Context, gatewayId string, appId uuid.UUID, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error {
-	return i.subscribe(ctx, i.channelGatewayAppRequests(gatewayId, appId), func(msg string) {
+func (i *redisPubSubConnector) ReceiveRoutedRequest(ctx context.Context, gatewayId string, appId uuid.UUID, connId string, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error {
+	return i.subscribe(ctx, i.channelGatewayAppRequests(gatewayId, appId, connId), func(msg string) {
 		// TODO Test whether this works with marshaled Protobuf bytes
 		msgBytes := []byte(msg)
 
@@ -371,12 +429,12 @@ func (i *redisPubSubConnector) NotifyExecutor(ctx context.Context, appId uuid.UU
 }
 
 // AckMessage sends an acknowledgment for a specific request.
-func (i *redisPubSubConnector) AckMessage(ctx context.Context, appId uuid.UUID, requestId string) error {
+func (i *redisPubSubConnector) AckMessage(ctx context.Context, appId uuid.UUID, requestId string, source AckSource) error {
 	err := i.client.Do(
 		ctx,
 		i.client.B().
 			Publish().
-			Channel(i.channelAppRequestsAck(appId, requestId)).
+			Channel(i.channelAppRequestsAck(appId, requestId, source)).
 			Message(time.Now().Format(time.RFC3339)).
 			Build()).
 		Error()
@@ -388,14 +446,14 @@ func (i *redisPubSubConnector) AckMessage(ctx context.Context, appId uuid.UUID, 
 }
 
 // RouteExecutorRequest forwards an executor request to the respective gateway
-func (i *redisPubSubConnector) RouteExecutorRequest(ctx context.Context, gatewayId string, appId uuid.UUID, data *connect.GatewayExecutorRequestData) error {
+func (i *redisPubSubConnector) RouteExecutorRequest(ctx context.Context, gatewayId string, appId uuid.UUID, connId string, data *connect.GatewayExecutorRequestData) error {
 	dataBytes, err := proto.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("could not marshal executor request: %w", err)
 	}
 
-	channelName := i.channelGatewayAppRequests(gatewayId, appId)
-	logger.StdlibLogger(ctx).Debug("forwarded connect request to gateway", "gateway_id", gatewayId, "channel", channelName, "request_id", data.RequestId)
+	channelName := i.channelGatewayAppRequests(gatewayId, appId, connId)
+	logger.StdlibLogger(ctx).Debug("forwarded connect request to gateway", "gateway_id", gatewayId, "channel", channelName, "request_id", data.RequestId, "conn_id", connId)
 	// TODO Test whether this works with marshaled Protobuf bytes
 	err = i.client.Do(ctx, i.client.B().Publish().Channel(channelName).Message(string(dataBytes)).Build()).Error()
 	if err != nil {

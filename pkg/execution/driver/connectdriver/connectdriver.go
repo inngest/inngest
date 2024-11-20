@@ -40,7 +40,7 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		return nil, err
 	}
 
-	return ProxyRequest(ctx, e.forwarder, s.ID.Tenant.AppID, httpdriver.Request{
+	return ProxyRequest(ctx, e.forwarder, s.ID.Tenant, httpdriver.Request{
 		WorkflowID: s.ID.FunctionID,
 		RunID:      s.ID.RunID,
 		URL:        *uri,
@@ -51,13 +51,14 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 }
 
 // ProxyRequest proxies the request to the SDK over a long-lived connection with the given input.
-func ProxyRequest(ctx context.Context, forwarder pubsub.RequestForwarder, appId uuid.UUID, r httpdriver.Request) (*state.DriverResponse, error) {
+func ProxyRequest(ctx context.Context, forwarder pubsub.RequestForwarder, tenant sv2.Tenant, r httpdriver.Request) (*state.DriverResponse, error) {
 	requestToForward := connect.GatewayExecutorRequestData{
 		// TODO Find out if we can supply this in a better way. We still use the URL concept a lot,
 		// even though this has no meaning in connect.
 		FunctionSlug:   r.URL.Query().Get("fnId"),
 		RequestPayload: r.Input,
-		AppId:          appId.String(),
+		AppId:          tenant.AppID.String(),
+		EnvId:          tenant.EnvID.String(),
 	}
 	// If we have a generator step name, ensure we add the step ID parameter
 	if r.Edge.IncomingGeneratorStep != "" {
@@ -66,7 +67,7 @@ func ProxyRequest(ctx context.Context, forwarder pubsub.RequestForwarder, appId 
 		requestToForward.StepId = &r.Edge.Incoming
 	}
 
-	resp, err := do(ctx, forwarder, appId, &requestToForward)
+	resp, err := do(ctx, forwarder, tenant.AppID, &requestToForward)
 	if err != nil {
 		return nil, err
 	}

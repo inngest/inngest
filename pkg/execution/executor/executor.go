@@ -865,28 +865,19 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	resp, err := e.run(ctx, &instance)
-	if resp != nil && err == nil {
-		// Now we have a response, update the run instance.  We need to do this as request
-		// offloads must mutate the response directly.
-		instance.resp = resp
-
-		// Handle the response properly, as long as hitting the SDK didn't return an error.
-		err = e.HandleResponse(ctx, &instance)
+	// Now we have a response, update the run instance.  We need to do this as request
+	// offloads must mutate the response directly.
+	instance.resp = resp
+	if resp == nil && err != nil {
+		for _, e := range e.lifecycles {
+			// OnStepFinished handles step success and step errors/failures.  It is
+			// currently the responsibility of the lifecycle manager to handle the differing
+			// step statuses when a step finishes.
+			go e.OnStepFinished(context.WithoutCancel(ctx), md, item, edge, resp, err)
+		}
+		return nil, err
 	}
-
-	// And, finally, call the StepFinished lifecycles.
-	//
-	// Before gateways and request offloading existed, the SDK would do all of the work,
-	// meaning that finishing the `.run` SDK call completes the step. Now that we have request
-	// offloading, it's unknown as to whether the step actually _finished_ or if we
-	// need to make an offloaded AI request and _then_ finish the step.
-	//
-	// For this reason, we need to handle the response and parse the generator outputs before
-	// marking the step as complete.
-	for _, e := range e.lifecycles {
-		go e.OnStepFinished(context.WithoutCancel(ctx), md, item, edge, resp, err)
-	}
-
+	err = e.HandleResponse(ctx, &instance)
 	return resp, err
 }
 
@@ -895,6 +886,16 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		"run_id", i.md.ID.RunID.String(),
 		"workflow_id", i.md.ID.FunctionID.String(),
 	)
+
+	for _, e := range e.lifecycles {
+		// OnStepFinished handles step success and step errors/failures.  It is
+		// currently the responsibility of the lifecycle manager to handle the differing
+		// step statuses when a step finishes.
+		//
+		// TODO (tonyhb): This should probably change, as each lifecycle listener has to
+		// do the same parsing & conditional checks.
+		go e.OnStepFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, i.resp, nil)
+	}
 
 	// Check for temporary failures.  The outputs of transient errors are not
 	// stored in the state store;  they're tracked via executor lifecycle methods
@@ -2147,6 +2148,10 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 	hr, output, _, err := httpdriver.ExecuteRequest(ctx, httpdriver.DefaultClient, req)
 	failure := err != nil || (hr != nil && hr.StatusCode > 299)
 
+	// Update the driver response appropriately for the trace lifecycles.
+	i.resp.StatusCode = hr.StatusCode
+	hr.ContentLength = int64(len(output))
+
 	// Handle errors individually, here.
 	if failure {
 		if len(output) == 0 {
@@ -2159,7 +2164,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		}
 
 		// Ensure the opcode is treated as an error when calling OnStepFinish.
-		i.resp.UpdateOpcodeError(gen, state.UserError{
+		i.resp.UpdateOpcodeError(&gen, state.UserError{
 			Name:    fmt.Sprintf("Error making AI request: %s", err),
 			Message: string(output),
 			Data:    output, // For golang's multiple returns.
@@ -2183,6 +2188,13 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		output, _ = json.Marshal(map[string]json.RawMessage{
 			"error": output,
 		})
+
+		for _, e := range e.lifecycles {
+			// OnStepFinished handles step success and step errors/failures.  It is
+			// currently the responsibility of the lifecycle manager to handle the differing
+			// step statuses when a step finishes.
+			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, hr, err)
+		}
 	} else {
 		// The response output is actually now the result of this AI call. We need
 		// to modify the opcode data so that accessing the step output is correct.
@@ -2196,7 +2208,14 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		if err != nil {
 			return fmt.Errorf("error wrapping ai result in map: %w", err)
 		}
-		i.resp.UpdateOpcodeOutput(gen, output)
+
+		i.resp.UpdateOpcodeOutput(&gen, output)
+		for _, e := range e.lifecycles {
+			// OnStepFinished handles step success and step errors/failures.  It is
+			// currently the responsibility of the lifecycle manager to handle the differing
+			// step statuses when a step finishes.
+			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, hr, nil)
+		}
 	}
 
 	// Save the output as the step result.

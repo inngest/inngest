@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inngest/inngest/pkg/connect"
+	"github.com/inngest/inngest/pkg/connect/rest"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
@@ -78,7 +78,7 @@ func TestEndToEnd(t *testing.T) {
 			resp, err := http.Get("http://127.0.0.1:8289/v0/envs/dev/conns")
 			a.NoError(err)
 
-			var reply connect.ShowConnsReply
+			var reply rest.ShowConnsReply
 			err = json.NewDecoder(resp.Body).Decode(&reply)
 			a.NoError(err)
 
@@ -99,7 +99,7 @@ func TestEndToEnd(t *testing.T) {
 			resp, err := http.Get(endpoint)
 			a.NoError(err)
 
-			var reply connect.ShowWorkerGroupReply
+			var reply rest.ShowWorkerGroupReply
 			a.NoError(json.NewDecoder(resp.Body).Decode(&reply))
 
 			a.True(reply.Data.Synced)
