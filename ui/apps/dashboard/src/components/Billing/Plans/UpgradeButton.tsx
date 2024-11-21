@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { NewButton } from '@inngest/components/Button';
+import { toast } from 'sonner';
 
 import CheckoutModal, {
   type CheckoutItem,
@@ -25,6 +27,7 @@ export default function UpgradeButton({
   currentPlan: BillingPlan;
   onPlanChange: () => void;
 }) {
+  const router = useRouter();
   const [checkoutData, setCheckoutData] = useState<{
     action: 'upgrade' | 'downgrade' | 'cancel';
     items: CheckoutItem[];
@@ -70,6 +73,8 @@ export default function UpgradeButton({
   const onChangePlanSuccess = () => {
     setCheckoutData(undefined);
     onPlanChange();
+    router.refresh();
+    toast.success(`Plan changed successfully`);
   };
 
   return (
