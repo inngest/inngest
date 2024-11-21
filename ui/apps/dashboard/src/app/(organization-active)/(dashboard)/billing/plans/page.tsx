@@ -24,6 +24,12 @@ export default async function Page() {
   const { plan: currentPlan } = await getCurrentPlan();
 
   if (!currentPlan) throw new Error('Failed to fetch current plan');
+
+  const refetchCurrentPlan = async () => {
+    'use server';
+    return await getCurrentPlan();
+  };
+
   const isLegacyPlan =
     !isEnterprisePlan(currentPlan) && !plans.some((plan) => plan && plan.name === currentPlan.name);
 
@@ -31,18 +37,33 @@ export default async function Page() {
     <>
       {isLegacyPlan && (
         <div className="mb-8">
-          <HorizontalPlanCard plan={currentPlan} currentPlan={currentPlan} />
+          <HorizontalPlanCard
+            plan={currentPlan}
+            currentPlan={currentPlan}
+            onPlanChange={refetchCurrentPlan}
+          />
         </div>
       )}
       <p className="text-subtle mb-4">Available plans</p>
       <div className="mb-4 grid grid-cols-3 gap-4">
         {plans.map((plan) => {
           if (plan) {
-            return <VerticalPlanCard key={plan.id} plan={plan} currentPlan={currentPlan} />;
+            return (
+              <VerticalPlanCard
+                key={plan.id}
+                plan={plan}
+                currentPlan={currentPlan}
+                onPlanChange={refetchCurrentPlan}
+              />
+            );
           }
         })}
       </div>
-      <HorizontalPlanCard plan={ENTERPRISE_PLAN} currentPlan={currentPlan} />
+      <HorizontalPlanCard
+        plan={ENTERPRISE_PLAN}
+        currentPlan={currentPlan}
+        onPlanChange={refetchCurrentPlan}
+      />
 
       <div className="mt-4 text-center text-sm">
         Want to cancel your plan?{' '}

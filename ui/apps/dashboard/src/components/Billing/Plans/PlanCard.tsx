@@ -7,9 +7,11 @@ import UpgradeButton from './UpgradeButton';
 export function VerticalPlanCard({
   plan,
   currentPlan,
+  onPlanChange,
 }: {
   plan: BillingPlan;
   currentPlan: BillingPlan;
+  onPlanChange: () => void;
 }) {
   const transformedPlan = processPlan(plan);
   return (
@@ -21,7 +23,7 @@ export function VerticalPlanCard({
         {transformedPlan.billingPeriod}
       </div>
 
-      <UpgradeButton plan={plan} currentPlan={currentPlan} />
+      <UpgradeButton plan={plan} currentPlan={currentPlan} onPlanChange={onPlanChange} />
       <hr className="mb-6" />
       <ul className="flex flex-col">
         {transformedPlan.features.map((feature, i) => (
@@ -40,9 +42,11 @@ export function VerticalPlanCard({
 export function HorizontalPlanCard({
   plan,
   currentPlan,
+  onPlanChange,
 }: {
   plan: BillingPlan;
   currentPlan: BillingPlan;
+  onPlanChange: () => void;
 }) {
   const transformedPlan = processPlan(plan);
   // Split features into two columns
@@ -54,7 +58,7 @@ export function HorizontalPlanCard({
     <div className="border-muted bg-canvasBase grid grid-cols-3 items-center gap-12 rounded-md border p-6">
       <div>
         <h4 className="text-basis mb-2 text-2xl font-medium">{transformedPlan.name}</h4>
-        <UpgradeButton plan={plan} currentPlan={currentPlan} />
+        <UpgradeButton plan={plan} currentPlan={currentPlan} onPlanChange={onPlanChange} />
       </div>
 
       <div className="col-span-2 grid grid-cols-2 gap-8">

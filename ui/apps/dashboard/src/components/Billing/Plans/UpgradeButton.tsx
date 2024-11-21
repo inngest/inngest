@@ -19,9 +19,11 @@ type ChangePlanArgs = {
 export default function UpgradeButton({
   plan,
   currentPlan,
+  onPlanChange,
 }: {
   plan: BillingPlan;
   currentPlan: BillingPlan;
+  onPlanChange: () => void;
 }) {
   const [checkoutData, setCheckoutData] = useState<{
     action: 'upgrade' | 'downgrade' | 'cancel';
@@ -67,7 +69,7 @@ export default function UpgradeButton({
 
   const onChangePlanSuccess = () => {
     setCheckoutData(undefined);
-    // OnUpdate(), to refresh plans page
+    onPlanChange();
   };
 
   return (
