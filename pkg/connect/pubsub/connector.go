@@ -27,3 +27,9 @@ func WithRedis(opt rueidis.ClientOption) ConnectorOpt {
 		return NewRedisPubSubConnector(rc), nil
 	}
 }
+
+func WithNoop() ConnectorOpt {
+	return func() (Connector, error) {
+		return noopConnector{}, nil
+	}
+}
