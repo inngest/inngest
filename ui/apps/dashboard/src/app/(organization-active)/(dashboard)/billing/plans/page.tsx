@@ -1,6 +1,7 @@
 import { NewLink } from '@inngest/components/Link/Link';
 
 import { HorizontalPlanCard, VerticalPlanCard } from '@/components/Billing/Plans/PlanCard';
+import { isEnterprisePlan } from '@/components/Billing/Plans/utils';
 import { currentPlan as getCurrentPlan, plans as getPlans } from '@/components/Billing/data';
 import type { BillingPlan } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
@@ -23,9 +24,16 @@ export default async function Page() {
   const { plan: currentPlan } = await getCurrentPlan();
 
   if (!currentPlan) throw new Error('Failed to fetch current plan');
+  const isLegacyPlan =
+    !isEnterprisePlan(currentPlan) && !plans.some((plan) => plan && plan.name === currentPlan.name);
 
   return (
     <>
+      {isLegacyPlan && (
+        <div className="mb-8">
+          <HorizontalPlanCard plan={currentPlan} currentPlan={currentPlan} />
+        </div>
+      )}
       <p className="text-subtle mb-4">Available plans</p>
       <div className="mb-4 grid grid-cols-3 gap-4">
         {plans.map((plan) => {

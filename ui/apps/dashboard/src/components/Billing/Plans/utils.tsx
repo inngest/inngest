@@ -78,7 +78,11 @@ function getFeatureDescriptions(planName: string, features: Record<string, any>)
       ];
 
     default:
-      return [];
+      return [
+        `${numberFormatter.format(features.runs)} runs/mo`,
+        `${numberFormatter.format(features.concurrency)}  concurrent steps`,
+        `${features.log_retention} day trace and history retention`,
+      ];
   }
 }
 
