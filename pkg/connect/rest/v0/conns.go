@@ -16,7 +16,6 @@ import (
 // showConnections retrieves the list of connections from the gateway state
 //
 // Provides query params to further filter the returned data
-//   - group_id
 //   - app_id
 func (c *router) showConnections(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -48,8 +47,8 @@ func (c *router) showConnections(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check appID query param
-	{
-		param := r.URL.Query().Get("app_id")
+	if param := r.URL.Query().Get("app_id"); param != "" {
+
 		id, err := uuid.Parse(param)
 		if err != nil {
 			_ = publicerr.WriteHTTP(w, publicerr.Error{
