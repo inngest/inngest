@@ -57,8 +57,7 @@ func (c *connectGatewaySvc) closeDraining(ws *websocket.Conn) {
 
 func (c *connectGatewaySvc) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Set the context as needed. Use of r.Context() is not recommended
-		// to avoid surprising behavior (see http.Hijacker).
+		// This context is canceled when the gateway is shutting down. There's no other deadline.
 		ctx, cancel := context.WithCancel(c.runCtx)
 		defer cancel()
 
@@ -75,6 +74,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
+		// Do not accept new connections if the gateway is draining
 		if c.isDraining {
 			c.closeDraining(ws)
 			return
@@ -89,10 +89,14 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		c.connectionSema.Add(1)
 		defer func() {
+			defer c.connectionSema.Done()
 			ch.log.Debug("Closing WebSocket connection")
 
+			if c.isDraining {
+				c.closeDraining(ws)
+				return
+			}
 			_ = ws.CloseNow()
-			c.connectionSema.Done()
 		}()
 
 		ch.log.Debug("WebSocket connection established, sending hello")
@@ -135,6 +139,9 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		var closeReason string
 		var closeReasonLock sync.Mutex
 
+		workerDrainedCtx, notifyWorkerDrained := context.WithCancel(context.Background())
+		defer notifyWorkerDrained()
+
 		go func() {
 			// If gateway is shutting down, we must immediately start the draining process
 			<-ctx.Done()
@@ -149,9 +156,28 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 			closeReason = "gateway-draining"
 
+			// Close WS connection once worker established another connection
+			defer func() {
+				_ = ws.CloseNow()
+			}()
+
 			// If the parent context timed out or got canceled, we should signal the client that we're going away,
 			// and it should reconnect to another gateway.
-			c.closeDraining(ws)
+			err := wsproto.Write(context.Background(), ws, &connect.ConnectMessage{
+				Kind: connect.GatewayMessageType_GATEWAY_CLOSING,
+			})
+			if err != nil {
+				return
+			}
+
+			select {
+			case <-workerDrainedCtx.Done():
+				ch.log.Debug("worker closed connection")
+			case <-time.After(5 * time.Second):
+				ch.log.Debug("reached timeout waiting for worker to close connection")
+				// On timeout, the gateway forcefully closes the connection
+				c.closeDraining(ws)
+			}
 		}()
 
 		// Once connection is established, we must make sure to update the state on any disconnect,
@@ -236,11 +262,6 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		// Run loop
 		eg.Go(func() error {
 			for {
-				if ctx.Err() != nil {
-					ch.log.Debug("context canceled, stopping read loop")
-					return err
-				}
-
 				// We already handle context cancellations in a goroutine above.
 				// If we timed out the read loop, the connection would be closed. This is bad because
 				// when draining, we still want to send a close frame to the client.
@@ -266,6 +287,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					}
 
 					// connection was closed (this may not be expected but should not be logged as an error)
+					// this is expected when the gateway is draining
 					if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
 						return nil
 					}
@@ -342,6 +364,11 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		ch.log.Debug("connection is ready")
 
+		// Connection was drained once it's closed by the worker (even if
+		// the connection broke unintentionally, we can stop waiting)
+		defer notifyWorkerDrained()
+
+		// The error group returns once the connection is closed
 		if err := eg.Wait(); err != nil {
 			ch.log.Error("error in run loop", "err", err)
 			return

@@ -12,6 +12,7 @@ enum GatewayMessageType {
   WORKER_REQUEST_ACK = 5;
   WORKER_REPLY = 6;
   WORKER_PAUSE = 7;
+  GATEWAY_CLOSING = 8;
 }
 
 message ConnectMessage {
