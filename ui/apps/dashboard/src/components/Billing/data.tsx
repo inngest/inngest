@@ -58,7 +58,23 @@ export const currentPlanDocument = graphql(`
         name
         amount
         billingPeriod
-        features
+        entitlements {
+          concurrency {
+            limit
+          }
+          eventSize {
+            limit
+          }
+          history {
+            limit
+          }
+          runCount {
+            limit
+          }
+          stepCount {
+            limit
+          }
+        }
       }
       subscription {
         nextInvoiceDate
@@ -111,7 +127,23 @@ export const plansDocument = graphql(`
       name
       amount
       billingPeriod
-      features
+      entitlements {
+        concurrency {
+          limit
+        }
+        eventSize {
+          limit
+        }
+        history {
+          limit
+        }
+        runCount {
+          limit
+        }
+        stepCount {
+          limit
+        }
+      }
     }
   }
 `);

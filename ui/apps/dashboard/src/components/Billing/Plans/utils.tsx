@@ -1,6 +1,10 @@
 import { getPeriodAbbreviation } from '@inngest/components/utils/date';
 
-import type { BillingPlan } from '@/gql/graphql';
+import type { BillingPlan, Entitlements } from '@/gql/graphql';
+
+export type Plan = Omit<BillingPlan, 'entitlements' | 'features'> & {
+  entitlements: Partial<Entitlements>;
+};
 
 export enum PlanNames {
   Free = 'Free Tier',
@@ -9,10 +13,10 @@ export enum PlanNames {
   Enterprise = 'Enterprise',
 }
 
-export function processPlan(plan: BillingPlan) {
-  const { name, amount, billingPeriod, features } = plan;
+export function processPlan(plan: Plan) {
+  const { name, amount, billingPeriod, entitlements } = plan;
 
-  const featureDescriptions = getFeatureDescriptions(name, features);
+  const featureDescriptions = getFeatureDescriptions(name, entitlements);
 
   return {
     name,
@@ -26,7 +30,7 @@ export function processPlan(plan: BillingPlan) {
   };
 }
 
-function getFeatureDescriptions(planName: string, features: Record<string, any>): string[] {
+function getFeatureDescriptions(planName: string, entitlements: Record<string, any>): string[] {
   const numberFormatter = new Intl.NumberFormat('en-US', {
     notation: 'compact',
     compactDisplay: 'short',
@@ -35,8 +39,8 @@ function getFeatureDescriptions(planName: string, features: Record<string, any>)
   switch (planName) {
     case PlanNames.Free:
       return [
-        `${numberFormatter.format(features.runs)} runs/mo free`,
-        `${numberFormatter.format(features.concurrency)} concurrent steps`,
+        `${numberFormatter.format(entitlements.runCount.limit)} runs/mo free`,
+        `${numberFormatter.format(entitlements.concurrency.limit)} concurrent steps`,
         'Unlimited branch and staging envs',
         'Logs, traces, and observability',
         'Basic alerting',
@@ -45,9 +49,9 @@ function getFeatureDescriptions(planName: string, features: Record<string, any>)
 
     case PlanNames.Basic:
       return [
-        `Starts at ${numberFormatter.format(features.runs)} runs/mo`,
-        `Starts at ${numberFormatter.format(features.concurrency)} concurrent steps`,
-        `${features.log_retention} day trace and history retention`,
+        `Starts at ${numberFormatter.format(entitlements.runCount.limit)} runs/mo`,
+        `Starts at ${numberFormatter.format(entitlements.concurrency.limit)} concurrent steps`,
+        `${entitlements.history.limit} day trace and history retention`,
         'Unlimited functions and apps',
         'No event rate limit',
         'Basic email and ticketing support',
@@ -55,9 +59,9 @@ function getFeatureDescriptions(planName: string, features: Record<string, any>)
 
     case PlanNames.Pro:
       return [
-        `Starts at ${numberFormatter.format(features.runs)} runs/mo`,
-        `Starts at ${numberFormatter.format(features.concurrency)} concurrent steps`,
-        `${features.log_retention} day trace and history retention`,
+        `Starts at ${numberFormatter.format(entitlements.runCount.limit)} runs/mo`,
+        `Starts at ${numberFormatter.format(entitlements.concurrency.limit)} concurrent steps`,
+        `${entitlements.history.limit} day trace and history retention`,
         'Granular metrics',
         'Increased scale and throughput',
         'Higher usage limits',
@@ -67,8 +71,8 @@ function getFeatureDescriptions(planName: string, features: Record<string, any>)
 
     case PlanNames.Enterprise:
       return [
-        `From 0-${numberFormatter.format(features.runs)} runs/mo`,
-        `From 200 - ${numberFormatter.format(features.concurrency)}  concurrent steps`,
+        `From 0-${numberFormatter.format(entitlements.runCount.limit)} runs/mo`,
+        `From 200 - ${numberFormatter.format(entitlements.concurrency.limit)}  concurrent steps`,
         'SAML, RBAC, and audit trails',
         'Exportable observability',
         'Dedicated infrastructure',
@@ -79,13 +83,13 @@ function getFeatureDescriptions(planName: string, features: Record<string, any>)
 
     default:
       return [
-        `${numberFormatter.format(features.runs)} runs/mo`,
-        `${numberFormatter.format(features.concurrency)}  concurrent steps`,
-        `${features.log_retention} day trace and history retention`,
+        `${numberFormatter.format(entitlements.runCount.limit)} runs/mo`,
+        `${numberFormatter.format(entitlements.concurrency.limit)}  concurrent steps`,
+        `${entitlements.history.limit} day trace and history retention`,
       ];
   }
 }
 
-export function isEnterprisePlan(plan: Partial<BillingPlan>): boolean {
+export function isEnterprisePlan(plan: Plan | Partial<BillingPlan>): boolean {
   return Boolean(plan.name?.match(/^Enterprise/i));
 }

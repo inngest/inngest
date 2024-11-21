@@ -1,21 +1,24 @@
 import { NewLink } from '@inngest/components/Link/Link';
 
 import { HorizontalPlanCard, VerticalPlanCard } from '@/components/Billing/Plans/PlanCard';
-import { isEnterprisePlan } from '@/components/Billing/Plans/utils';
+import { isEnterprisePlan, type Plan } from '@/components/Billing/Plans/utils';
 import { currentPlan as getCurrentPlan, plans as getPlans } from '@/components/Billing/data';
-import type { BillingPlan } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 
 // This will move to the API as a custom plan at some point, for now we can hard code
-const ENTERPRISE_PLAN: BillingPlan = {
+const ENTERPRISE_PLAN: Plan = {
   id: 'n/a',
   name: 'Enterprise',
   amount: Infinity,
   billingPeriod: 'month',
-  features: {
-    concurrency: 100000,
-    log_retention: 90,
-    runs: 100000000000,
+  entitlements: {
+    concurrency: { limit: 100000 },
+    history: {
+      limit: 90,
+    },
+    runCount: {
+      limit: 100000000000,
+    },
   },
 };
 

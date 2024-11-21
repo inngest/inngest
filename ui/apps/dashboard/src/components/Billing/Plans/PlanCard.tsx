@@ -1,7 +1,6 @@
 import { RiCheckLine } from '@remixicon/react';
 
-import { processPlan } from '@/components/Billing/Plans/utils';
-import type { BillingPlan } from '@/gql/graphql';
+import { processPlan, type Plan } from '@/components/Billing/Plans/utils';
 import UpgradeButton from './UpgradeButton';
 
 export function VerticalPlanCard({
@@ -9,8 +8,8 @@ export function VerticalPlanCard({
   currentPlan,
   onPlanChange,
 }: {
-  plan: BillingPlan;
-  currentPlan: BillingPlan;
+  plan: Plan;
+  currentPlan: Plan;
   onPlanChange: () => void;
 }) {
   const transformedPlan = processPlan(plan);
@@ -44,8 +43,8 @@ export function HorizontalPlanCard({
   currentPlan,
   onPlanChange,
 }: {
-  plan: BillingPlan;
-  currentPlan: BillingPlan;
+  plan: Plan;
+  currentPlan: Plan;
   onPlanChange: () => void;
 }) {
   const transformedPlan = processPlan(plan);
