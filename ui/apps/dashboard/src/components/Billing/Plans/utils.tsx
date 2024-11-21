@@ -86,6 +86,6 @@ function getFeatureDescriptions(planName: string, features: Record<string, any>)
   }
 }
 
-export function isEnterprisePlan(plan: BillingPlan): boolean {
-  return Boolean(plan.name.match(/^Enterprise/i));
+export function isEnterprisePlan(plan: Partial<BillingPlan>): boolean {
+  return Boolean(plan.name?.match(/^Enterprise/i));
 }
