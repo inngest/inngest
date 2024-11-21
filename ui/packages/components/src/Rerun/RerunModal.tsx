@@ -25,6 +25,18 @@ type RerunResult = {
   error?: unknown;
 };
 
+//
+// patching in support fo step.ai.infer input bodies
+const patchInput = (newInput: string) => {
+  try {
+    const parsed = JSON.parse(newInput);
+    return parsed instanceof Array ? JSON.stringify(parsed) : JSON.stringify([...[parsed]]);
+  } catch (e) {
+    console.warn('Unable to parse rerun input as JSON');
+    return newInput;
+  }
+};
+
 export const RerunModal = ({
   open,
   setOpen,
@@ -95,12 +107,13 @@ export const RerunModal = ({
           label="Rerun function"
           loading={rerunning}
           onClick={async () => {
-            console.log('newInput', newInput);
             setRerunning(true);
+
             const result = (await rerunFromStep({
               runID,
-              fromStep: { stepID, input: newInput },
+              fromStep: { stepID, input: patchInput(newInput) },
             })) as RerunResult;
+
             setRerunning(false);
 
             if (result?.error) {
