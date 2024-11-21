@@ -5,10 +5,8 @@ import { useRouter } from 'next/navigation';
 import { NewButton } from '@inngest/components/Button';
 import { toast } from 'sonner';
 
-import CheckoutModal, {
-  type CheckoutItem,
-} from '@/app/(organization-active)/(dashboard)/settings/billing/CheckoutModal';
-import ConfirmPlanChangeModal from '@/app/(organization-active)/(dashboard)/settings/billing/ConfirmPlanChangeModal';
+import CheckoutModal, { type CheckoutItem } from '@/components/Billing/Plans/CheckoutModal';
+import ConfirmPlanChangeModal from '@/components/Billing/Plans/ConfirmPlanChangeModal';
 import type { BillingPlan } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import { PlanNames, isEnterprisePlan } from './utils';

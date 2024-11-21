@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@inngest/components/Button';
-import { RiBankCardLine, RiErrorWarningLine } from '@remixicon/react';
+import { Alert } from '@inngest/components/Alert';
+import { NewButton } from '@inngest/components/Button';
+import { Modal } from '@inngest/components/Modal/Modal';
 import { capitalCase } from 'change-case';
 import { useMutation } from 'urql';
 
-import Modal from '@/components/Modal';
 import { graphql } from '@/gql';
 import { type CheckoutItem } from './CheckoutModal';
 
@@ -61,21 +61,18 @@ export default function ConfirmPlanChangeModal({
 
   return (
     <Modal className="flex min-w-[600px] max-w-xl flex-col gap-4" isOpen={true} onClose={onCancel}>
-      <header className="flex flex-row items-center gap-3">
-        <RiBankCardLine className="h-5 text-indigo-500" />
-        <h2 className="text-lg font-semibold">
-          {isCancellation ? (
-            <>Cancel Your Subscription</>
-          ) : (
-            <>
-              {capitalCase(action)} to {planName}
-            </>
-          )}
-        </h2>
-      </header>
+      <Modal.Header>
+        {isCancellation ? (
+          <>Cancel Your Subscription</>
+        ) : (
+          <>
+            {capitalCase(action)} to {planName}
+          </>
+        )}
+      </Modal.Header>
 
-      <div>
-        <p className="my-4">
+      <Modal.Body>
+        <p>
           {isCancellation
             ? `Please confirm before cancelling your plan. You will immediately lose the features of your current plan`
             : action === 'downgrade'
@@ -84,20 +81,14 @@ export default function ConfirmPlanChangeModal({
         </p>
         <p className="my-4 font-semibold">New monthly cost: ${amount / 100}</p>
         <div className="mt-6 flex flex-row justify-end">
-          <Button
-            kind="primary"
-            btnAction={handlePlanChange}
+          <NewButton
+            kind={isCancellation || action === 'downgrade' ? 'danger' : 'primary'}
+            onClick={handlePlanChange}
             label={`Confirm ${capitalCase(action)}`}
           />
         </div>
-      </div>
-      {/* TODO - Explore re-use alert from signing key page PR */}
-      {Boolean(error) && (
-        <div className="my-4 flex rounded-md border border-red-600 bg-red-100 p-4 text-sm text-red-600">
-          <RiErrorWarningLine className="mr-2 w-4 text-red-600" />
-          {error}
-        </div>
-      )}
+        {Boolean(error) && <Alert severity="error">{error}</Alert>}
+      </Modal.Body>
     </Modal>
   );
 }

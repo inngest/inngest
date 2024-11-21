@@ -68,8 +68,6 @@ const documents = {
     "\n  query UnattachedSync($syncID: ID!) {\n    sync: deploy(id: $syncID) {\n      commitAuthor\n      commitHash\n      commitMessage\n      commitRef\n      error\n      framework\n      id\n      lastSyncedAt\n      platform\n      repoURL\n      sdkLanguage\n      sdkVersion\n      status\n      removedFunctions: removedFunctions {\n        id\n        name\n        slug\n      }\n      syncedFunctions: deployedFunctions {\n        id\n        name\n        slug\n      }\n      url\n      vercelDeploymentID\n      vercelDeploymentURL\n      vercelProjectID\n      vercelProjectURL\n    }\n  }\n": types.UnattachedSyncDocument,
     "\n  query UnattachedSyncs($envID: ID!) {\n    environment: workspace(id: $envID) {\n      syncs: unattachedSyncs(first: 40) {\n        commitAuthor\n        commitHash\n        commitMessage\n        commitRef\n        framework\n        id\n        lastSyncedAt\n        platform\n        repoURL\n        sdkLanguage\n        sdkVersion\n        status\n        url\n        vercelDeploymentID\n        vercelDeploymentURL\n        vercelProjectID\n        vercelProjectURL\n      }\n    }\n  }\n": types.UnattachedSyncsDocument,
     "\n  query GetBillableSteps($month: Int!, $year: Int!) {\n    billableStepTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n": types.GetBillableStepsDocument,
-    "\n  mutation CreateStripeSubscription($input: StripeSubscriptionInput!) {\n    createStripeSubscription(input: $input) {\n      clientSecret\n      message\n    }\n  }\n": types.CreateStripeSubscriptionDocument,
-    "\n  mutation UpdatePlan($planID: ID!) {\n    updatePlan(to: $planID) {\n      plan {\n        id\n        name\n      }\n    }\n  }\n": types.UpdatePlanDocument,
     "\n  query GetSavedVercelProjects($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      savedVercelProjects: vercelApps {\n        id\n        originOverride\n        projectID\n        protectionBypassSecret\n        path\n        workspaceID\n        originOverride\n        protectionBypassSecret\n      }\n    }\n  }\n": types.GetSavedVercelProjectsDocument,
     "\n  mutation CreateVercelApp($input: CreateVercelAppInput!) {\n    createVercelApp(input: $input) {\n      success\n    }\n  }\n": types.CreateVercelAppDocument,
     "\n  mutation UpdateVercelApp($input: UpdateVercelAppInput!) {\n    updateVercelApp(input: $input) {\n      success\n    }\n  }\n": types.UpdateVercelAppDocument,
@@ -82,6 +80,8 @@ const documents = {
     "\n  mutation UpdateAccount($input: UpdateAccount!) {\n    account: updateAccount(input: $input) {\n      billingEmail\n      name\n    }\n  }\n": types.UpdateAccountDocument,
     "\n  mutation UpdatePaymentMethod($token: String!) {\n    updatePaymentMethod(token: $token) {\n      brand\n      last4\n      expMonth\n      expYear\n      createdAt\n      default\n    }\n  }\n": types.UpdatePaymentMethodDocument,
     "\n  query GetPaymentIntents {\n    account {\n      paymentIntents {\n        status\n        createdAt\n        amountLabel\n        description\n        invoiceURL\n      }\n    }\n  }\n": types.GetPaymentIntentsDocument,
+    "\n  mutation CreateStripeSubscription($input: StripeSubscriptionInput!) {\n    createStripeSubscription(input: $input) {\n      clientSecret\n      message\n    }\n  }\n": types.CreateStripeSubscriptionDocument,
+    "\n  mutation UpdatePlan($planID: ID!) {\n    updatePlan(to: $planID) {\n      plan {\n        id\n        name\n      }\n    }\n  }\n": types.UpdatePlanDocument,
     "\n  query EntitlementUsage {\n    account {\n      id\n      entitlementUsage {\n        runCount {\n          current\n          limit\n          overageAllowed\n        }\n        stepCount {\n          current\n          limit\n          overageAllowed\n        }\n        accountConcurrencyLimitHits\n      }\n      plan {\n        name\n      }\n    }\n  }\n": types.EntitlementUsageDocument,
     "\n  query GetCurrentPlan {\n    account {\n      plan {\n        id\n        name\n        amount\n        billingPeriod\n        features\n      }\n      subscription {\n        nextInvoiceDate\n      }\n    }\n  }\n": types.GetCurrentPlanDocument,
     "\n  query GetBillingDetails {\n    account {\n      billingEmail\n      name\n      paymentMethods {\n        brand\n        last4\n        expMonth\n        expYear\n        createdAt\n        default\n      }\n    }\n  }\n": types.GetBillingDetailsDocument,
@@ -372,14 +372,6 @@ export function graphql(source: "\n  query GetBillableSteps($month: Int!, $year:
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  mutation CreateStripeSubscription($input: StripeSubscriptionInput!) {\n    createStripeSubscription(input: $input) {\n      clientSecret\n      message\n    }\n  }\n"): (typeof documents)["\n  mutation CreateStripeSubscription($input: StripeSubscriptionInput!) {\n    createStripeSubscription(input: $input) {\n      clientSecret\n      message\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation UpdatePlan($planID: ID!) {\n    updatePlan(to: $planID) {\n      plan {\n        id\n        name\n      }\n    }\n  }\n"): (typeof documents)["\n  mutation UpdatePlan($planID: ID!) {\n    updatePlan(to: $planID) {\n      plan {\n        id\n        name\n      }\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
 export function graphql(source: "\n  query GetSavedVercelProjects($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      savedVercelProjects: vercelApps {\n        id\n        originOverride\n        projectID\n        protectionBypassSecret\n        path\n        workspaceID\n        originOverride\n        protectionBypassSecret\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetSavedVercelProjects($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      savedVercelProjects: vercelApps {\n        id\n        originOverride\n        projectID\n        protectionBypassSecret\n        path\n        workspaceID\n        originOverride\n        protectionBypassSecret\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
@@ -425,6 +417,14 @@ export function graphql(source: "\n  mutation UpdatePaymentMethod($token: String
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query GetPaymentIntents {\n    account {\n      paymentIntents {\n        status\n        createdAt\n        amountLabel\n        description\n        invoiceURL\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetPaymentIntents {\n    account {\n      paymentIntents {\n        status\n        createdAt\n        amountLabel\n        description\n        invoiceURL\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation CreateStripeSubscription($input: StripeSubscriptionInput!) {\n    createStripeSubscription(input: $input) {\n      clientSecret\n      message\n    }\n  }\n"): (typeof documents)["\n  mutation CreateStripeSubscription($input: StripeSubscriptionInput!) {\n    createStripeSubscription(input: $input) {\n      clientSecret\n      message\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation UpdatePlan($planID: ID!) {\n    updatePlan(to: $planID) {\n      plan {\n        id\n        name\n      }\n    }\n  }\n"): (typeof documents)["\n  mutation UpdatePlan($planID: ID!) {\n    updatePlan(to: $planID) {\n      plan {\n        id\n        name\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

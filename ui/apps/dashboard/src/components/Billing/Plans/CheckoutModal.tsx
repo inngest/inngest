@@ -2,13 +2,12 @@
 
 import { useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
-import { Button } from '@inngest/components/Button';
-import { RiBankCardLine, RiErrorWarningLine } from '@remixicon/react';
+import { NewButton } from '@inngest/components/Button';
+import { Modal } from '@inngest/components/Modal/Modal';
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { useMutation } from 'urql';
 
-import Modal from '@/components/Modal';
 import { graphql } from '@/gql';
 import { type StripeSubscriptionItemsInput } from '@/gql/graphql';
 
@@ -37,12 +36,9 @@ export default function CheckoutModal({ items, onCancel, onSuccess }: CheckoutMo
   const planName = items.map((item) => item.name).join(', ');
   return (
     <Modal className="flex min-w-[600px] max-w-xl flex-col gap-4" isOpen={true} onClose={onCancel}>
-      <header className="flex flex-row items-center gap-3">
-        <RiBankCardLine className="h-5 text-indigo-500" />
-        <h2 className="text-lg font-semibold">Upgrade to {planName}</h2>
-      </header>
+      <Modal.Header>Upgrade to {planName}</Modal.Header>
 
-      <div>
+      <Modal.Body>
         <Elements
           stripe={stripePromise}
           options={{
@@ -53,7 +49,7 @@ export default function CheckoutModal({ items, onCancel, onSuccess }: CheckoutMo
         >
           <CheckoutForm items={items} onSuccess={onSuccess} />
         </Elements>
-      </div>
+      </Modal.Body>
     </Modal>
   );
 }
@@ -133,28 +129,26 @@ function CheckoutForm({ items, onSuccess }: { items: CheckoutItem[]; onSuccess: 
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="min-h-[290px]">
+      <div className="mb-2 min-h-[290px]">
         <PaymentElement />
       </div>
-      <Alert severity="info">
+      <Alert severity="info" className="text-sm">
         All subscriptions are billed on the first of each month. You will be charged a pro-rated
         amount today for the remainder of the month.
       </Alert>
       <div className="mt-6 flex flex-row justify-end">
-        <Button
+        <NewButton
           type="submit"
           className="px-16"
           disabled={!stripe || loading}
-          btnAction={handleSubmit}
+          onClick={handleSubmit}
           label="Complete Upgrade"
         />
       </div>
-      {/* TODO - Explore re-use alert from signing key page PR */}
       {Boolean(error) && (
-        <div className="my-4 flex rounded-md border border-red-600 bg-red-100 p-4 text-sm text-red-600">
-          <RiErrorWarningLine className="mr-2 w-4 text-red-600" />
+        <Alert severity="error" className="text-sm">
           {error}
-        </div>
+        </Alert>
       )}
     </form>
   );
