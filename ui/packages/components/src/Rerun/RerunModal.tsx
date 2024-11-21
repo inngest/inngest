@@ -17,6 +17,14 @@ export type RerunModalType = {
     fromStep: { stepID: string; input: string };
   }) => Promise<unknown>;
 };
+
+type RerunResult = {
+  data?: {
+    rerun: Record<string, unknown>;
+  };
+  error?: unknown;
+};
+
 export const RerunModal = ({
   open,
   setOpen,
@@ -25,8 +33,9 @@ export const RerunModal = ({
   input,
   rerunFromStep,
 }: RerunModalType) => {
-  const [newInput, setNewInput] = useState('');
+  const [newInput, setNewInput] = useState(input);
   const router = useRouter();
+  const [rerunning, setRerunning] = useState(false);
 
   return (
     <Modal
@@ -84,10 +93,23 @@ export const RerunModal = ({
         />
         <NewButton
           label="Rerun function"
+          loading={rerunning}
           onClick={async () => {
-            const result = await rerunFromStep({ runID, fromStep: { stepID, input: newInput } });
-            if (result) {
-              router.push(`/run?runID=${result}`);
+            console.log('newInput', newInput);
+            setRerunning(true);
+            const result = (await rerunFromStep({
+              runID,
+              fromStep: { stepID, input: newInput },
+            })) as RerunResult;
+            setRerunning(false);
+
+            if (result?.error) {
+              console.error('rerun from step error', result.error);
+              throw new Error('Rerun failed, please try again later.');
+            }
+
+            if (result?.data?.rerun) {
+              router.push(`/run?runID=${result.data.rerun}`);
             }
           }}
         />

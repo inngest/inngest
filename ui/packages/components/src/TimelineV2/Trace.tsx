@@ -99,9 +99,10 @@ export function Trace({
             onClickExpandToggle={() => setIsExpanded((prev) => !prev)}
             trace={trace}
             isAI={
-              stepAIEnabled &&
-              isStepInfoRun(trace.stepInfo) &&
-              (trace.stepInfo.type === 'step.ai.wrap' || trace.stepInfo.type === 'step.ai.infer')
+              !!aiOutput ||
+              (stepAIEnabled &&
+                isStepInfoRun(trace.stepInfo) &&
+                (trace.stepInfo.type === 'step.ai.wrap' || trace.stepInfo.type === 'step.ai.infer'))
             }
           />
         </div>

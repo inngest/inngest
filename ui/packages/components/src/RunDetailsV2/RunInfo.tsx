@@ -84,13 +84,14 @@ export function RunInfo({
   let allowCancel = false;
   let isSuccess = false;
   let isAI = false;
+
   if (isLazyDone(run)) {
     allowCancel = !Boolean(run.trace.endedAt);
     isSuccess = run.trace.status === 'COMPLETED';
     isAI = hasAIChildren(run.trace);
   }
 
-  const aiOutput = isAI && stepAIEnabled && result?.data ? parseAIOutput(result.data) : undefined;
+  const aiOutput = stepAIEnabled && result?.data ? parseAIOutput(result.data) : undefined;
 
   return (
     <div className={cn('flex flex-col gap-5', className)}>

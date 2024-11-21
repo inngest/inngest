@@ -25,9 +25,17 @@ export const parseAIOutput = (output: string): ExperimentalAI | undefined => {
     const data = JSON.parse(output);
 
     //
-    // run output is on body
+    // infer run output is on body
+    // TODO: use proper trace infer indicator
     if (data.body) {
       return data.body;
+    }
+
+    //
+    // infer run step data is on data.data
+    // TODO: use proper trace infer indicator
+    if (data.data) {
+      return data.data;
     }
 
     if (data.model || data.experimental_providerMetadata || data.response) {
