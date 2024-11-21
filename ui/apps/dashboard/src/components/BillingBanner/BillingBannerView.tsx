@@ -54,7 +54,7 @@ export function BillingBannerView({ entitlementUsage }: { entitlementUsage: Enti
         <div className="mr-2 flex items-center">
           <NewButton
             appearance="outlined"
-            href={pathCreator.billing()}
+            href={pathCreator.billingPlans() + '?ref=app-billing-banner'}
             kind="secondary"
             label="Upgrade plan"
           />

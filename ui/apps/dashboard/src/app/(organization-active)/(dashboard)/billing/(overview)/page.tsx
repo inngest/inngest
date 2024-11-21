@@ -58,11 +58,10 @@ export default async function Page() {
           <p className="text-muted mb-1">Your plan</p>
           <div className="flex items-center justify-between">
             <p className="text-basis text-xl">{plan.plan?.name}</p>
-            {/* Temporarily send to usage, while there is no plans page */}
             <NewButton
               appearance="ghost"
               label="Change plan"
-              href="/billing/usage?ref=app-billing-overview"
+              href={pathCreator.billingPlans() + '?ref=app-billing-overview'}
             />
           </div>
           {entitlementUsage.runCount.limit !== null && <LimitBar data={runs} className="my-4" />}
@@ -76,7 +75,7 @@ export default async function Page() {
                   appearance="outlined"
                   kind="secondary"
                   label="Upgrade plan"
-                  href="/billing/usage?ref=app-billing-overview"
+                  href={pathCreator.billingPlans() + '?ref=app-billing-overview'}
                 />
               }
             >
