@@ -396,6 +396,22 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(appId uuid.UUID, msg 
 		}
 
 		return nil
+	case connect.GatewayMessageType_WORKER_HEARTBEAT:
+		if c.svc.isDraining {
+			return &ErrDraining
+		}
+
+		err := c.updateConnStatus(connect.ConnectionStatus_READY)
+		if err != nil {
+			// TODO Should we actually close the connection here?
+			return &SocketError{
+				SysCode:    syscode.CodeConnectInternal,
+				StatusCode: websocket.StatusInternalError,
+				Msg:        "could not update connection status",
+			}
+		}
+
+		return nil
 	case connect.GatewayMessageType_WORKER_PAUSE:
 		if c.svc.isDraining {
 			return &ErrDraining

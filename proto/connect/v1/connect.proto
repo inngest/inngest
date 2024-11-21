@@ -1,6 +1,8 @@
 syntax = "proto3";
 package connect.v1;
 
+import "google/protobuf/timestamp.proto";
+
 option go_package = "github.com/inngest/inngest/proto/gen/connect/v1;connect";
 
 enum GatewayMessageType {
@@ -12,7 +14,8 @@ enum GatewayMessageType {
   WORKER_REQUEST_ACK = 5;
   WORKER_REPLY = 6;
   WORKER_PAUSE = 7;
-  GATEWAY_CLOSING = 8;
+  WORKER_HEARTBEAT = 8;
+  GATEWAY_CLOSING = 9;
 }
 
 message ConnectMessage {
@@ -107,9 +110,10 @@ message ConnMetadata {
 	string instance_id = 3;
 	string group_id = 4;
 	ConnectionStatus status = 5;
-	string language = 6;
-	string version = 7;
-	SystemAttributes attributes = 8;
+	google.protobuf.Timestamp last_heartbeat_at = 6;
+	string language = 7;
+	string version = 8;
+	SystemAttributes attributes = 9;
 }
 
 message SystemAttributes {

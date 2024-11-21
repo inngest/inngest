@@ -24,7 +24,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const GatewayHeartbeatInterval = 5 * time.Second
+const (
+	GatewayHeartbeatInterval = 5 * time.Second
+	WorkerHeartbeatInterval  = 10 * time.Second
+)
 
 type gatewayOpt func(*connectGatewaySvc)
 
@@ -248,10 +251,10 @@ func (c *connectGatewaySvc) updateGatewayState(status state.GatewayStatus) error
 	defer c.stateUpdateLock.Unlock()
 
 	err := c.stateManager.UpsertGateway(context.Background(), &state.Gateway{
-		Id:            c.gatewayId,
-		Status:        status,
-		LastHeartbeat: time.Now(),
-		Hostname:      c.hostname,
+		Id:              c.gatewayId,
+		Status:          status,
+		LastHeartbeatAt: time.Now(),
+		Hostname:        c.hostname,
 	})
 	if err != nil {
 		c.logger.Error("failed to update gateway status in state", "status", status, "error", err)

@@ -99,9 +99,9 @@ const (
 )
 
 type Gateway struct {
-	Id            string        `json:"id"`
-	Status        GatewayStatus `json:"status"`
-	LastHeartbeat time.Time     `json:"last_heartbeat"`
+	Id              string        `json:"id"`
+	Status          GatewayStatus `json:"status"`
+	LastHeartbeatAt time.Time     `json:"last_heartbeat_at"`
 
 	Hostname string `json:"hostname"`
 }

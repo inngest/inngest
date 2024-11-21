@@ -178,6 +178,10 @@ func (c *connectRouterSvc) isHealthy(ctx context.Context, envId uuid.UUID, appId
 		return
 	}
 
+	if conn.LastHeartbeatAt.AsTime().Before(time.Now().Add(-2 * WorkerHeartbeatInterval)) {
+		return
+	}
+
 	group, err := c.stateManager.GetWorkerGroupByHash(ctx, envId, conn.GroupId)
 	if err != nil {
 		return
@@ -201,7 +205,7 @@ func (c *connectRouterSvc) isHealthy(ctx context.Context, envId uuid.UUID, appId
 		return
 	}
 
-	if gw.Status != state.GatewayStatusActive || gw.LastHeartbeat.Before(time.Now().Add(-2*GatewayHeartbeatInterval)) {
+	if gw.Status != state.GatewayStatusActive || gw.LastHeartbeatAt.Before(time.Now().Add(-2*GatewayHeartbeatInterval)) {
 		// Clean up unhealthy gateway
 		err = c.stateManager.DeleteGateway(ctx, conn.GatewayId)
 		if err != nil {

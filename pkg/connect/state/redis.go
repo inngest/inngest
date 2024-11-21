@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"io/fs"
 	"log/slog"
 	"regexp"
@@ -193,14 +194,15 @@ func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn
 
 	groupID := conn.Group.Hash
 	meta := &connpb.ConnMetadata{
-		Id:         conn.Session.SessionId.ConnectionId,
-		InstanceId: conn.Session.SessionId.InstanceId,
-		Status:     conn.Status,
-		Language:   conn.Data.SdkLanguage,
-		Version:    conn.Data.SdkVersion,
-		GroupId:    groupID,
-		Attributes: conn.Data.SystemAttributes,
-		GatewayId:  conn.GatewayId,
+		Id:              conn.Session.SessionId.ConnectionId,
+		InstanceId:      conn.Session.SessionId.InstanceId,
+		Status:          conn.Status,
+		Language:        conn.Data.SdkLanguage,
+		Version:         conn.Data.SdkVersion,
+		GroupId:         groupID,
+		Attributes:      conn.Data.SystemAttributes,
+		GatewayId:       conn.GatewayId,
+		LastHeartbeatAt: timestamppb.New(time.Now()),
 	}
 
 	isHealthy := "0"
