@@ -4,7 +4,7 @@ dev:
 
 .PHONY: run
 run:
-	CONNECT_TEST_GATEWAY_ID=dev LOG_LEVEL=debug go run ./cmd/main.go dev -v $(PARAMS)
+	LOG_LEVEL=debug go run ./cmd/main.go dev -v $(PARAMS)
 
 xgo:
 	xgo -pkg cmd -ldflags="-s -w" -out build/inngest -targets "linux/arm64,linux/amd64,darwin/arm64,darwin/amd64" .

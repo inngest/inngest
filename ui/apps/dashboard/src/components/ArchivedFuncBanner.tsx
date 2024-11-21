@@ -1,9 +1,10 @@
 'use client';
 
+import { Banner } from '@inngest/components/Banner';
+
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
-import { Banner } from './Banner';
 
 const Query = graphql(`
   query GetArchivedFuncBannerData($envID: ID!, $funcID: ID!) {
@@ -44,7 +45,7 @@ export function ArchivedFuncBanner({ funcID }: Props) {
   }
 
   return (
-    <Banner kind="warning">
+    <Banner severity="warning">
       <span className="font-semibold">Function is archived.</span> Unarchive it by enabling it in
       your app and resyncing.
     </Banner>

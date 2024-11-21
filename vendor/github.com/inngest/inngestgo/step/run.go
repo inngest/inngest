@@ -25,8 +25,6 @@ type response struct {
 
 // StepRun runs any code reliably, with retries, returning the resulting data.  If this
 // fails the function stops.
-//
-// TODO: Allow users to catch single step errors.
 func Run[T any](
 	ctx context.Context,
 	id string,
@@ -47,7 +45,6 @@ func Run[T any](
 		if err := json.Unmarshal(val, &unwrapped); err == nil {
 			// Check for step errors first.
 			if len(unwrapped.Error) > 0 {
-				// TODO: Unmrashal the error into a new StepError struct
 				err := errors.StepError{}
 				if err := json.Unmarshal(unwrapped.Error, &err); err != nil {
 					mgr.SetErr(fmt.Errorf("error unmarshalling error for step '%s': %w", id, err))

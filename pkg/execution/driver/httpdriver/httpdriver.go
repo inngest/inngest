@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/google/uuid"
@@ -262,16 +261,10 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 	// Add `traceparent` and `tracestate` headers to the request from `ctx`
 	itrace.UserTracer().Propagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
 
-	pre := time.Now()
-	resp, err := c.Do(req)
-	dur := time.Since(pre)
-	defer func() {
-		if resp != nil {
-			_ = resp.Body.Close()
-		}
-	}()
+	resp, byt, dur, err := ExecuteRequest(ctx, c, req)
 
-	if errors.Is(err, io.EOF) && resp == nil {
+	// Handle no response errors.
+	if errors.Is(err, ErrUnableToReach) {
 		log.From(ctx).
 			Warn().
 			Str("url", r.URL.String()).
@@ -279,40 +272,19 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 			Interface("edge	", r.Edge).
 			Int64("req_dur_ms", dur.Milliseconds()).
 			Msg("EOF writing request to SDK")
-		return nil, fmt.Errorf("Unable to reach SDK URL: %w", io.EOF)
+		return nil, err
 	}
-
-	if err != nil && !errors.Is(err, io.EOF) {
-		if urlErr, ok := err.(*url.Error); ok && urlErr.Err == context.DeadlineExceeded {
-			// This timed out.
-			return nil, context.DeadlineExceeded
-		}
-		if errors.Is(err, syscall.EPIPE) {
-			return nil, fmt.Errorf("Your server closed the request before finishing.")
-		}
-		if errors.Is(err, syscall.ECONNRESET) {
-			return nil, fmt.Errorf("Your server reset the request connection.")
-		}
-		// Unexpected EOFs are valid and returned from servers when chunked encoding may
-		// be invalid.  Handle any other error by returning immediately.
-		if !errors.Is(err, io.ErrUnexpectedEOF) {
-			return nil, fmt.Errorf("Error performing request to SDK URL: %w", err)
-		}
-		// If we get an unexpected EOF and the response is nil, error immediately.
-		if errors.Is(err, io.ErrUnexpectedEOF) && resp == nil {
-			return nil, fmt.Errorf("Invalid response from SDK server: Unexpected EOF ending response")
-		}
-	}
-
-	// Read 1 extra byte above the max so that we can check if the response is
-	// too large
-	byt, err := io.ReadAll(io.LimitReader(resp.Body, consts.MaxBodySize+1))
-	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %w", err)
+	if err != nil && len(byt) == 0 {
+		return nil, err
 	}
 
 	var sysErr *syscode.Error
-	if len(byt) > consts.MaxBodySize {
+	if errors.Is(err, ErrBodyTooLarge) {
+		// In this case, strangely, the actual reported error should be nil.  This
+		// has something to do with the DriverResponse.Err we return and should be
+		// refactored.
+		err = nil
+
 		sysErr = &syscode.Error{Code: syscode.CodeOutputTooLarge}
 
 		// Override the output so the user sees the syserrV in the UI rather

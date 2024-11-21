@@ -10,14 +10,18 @@ export default function PageTitle() {
 
   const routeTitles: { [key: string]: string } = {
     [pathCreator.billing()]: 'Overview',
-    [pathCreator.billingUsage()]: 'Usage',
-    [pathCreator.billingPayments()]: 'Payments',
-    [pathCreator.billingPlans()]: 'Plans',
+    [pathCreator.billing({ tab: 'usage' })]: 'Usage',
+    [pathCreator.billing({ tab: 'payments' })]: 'Payments',
+    [pathCreator.billing({ tab: 'plans' })]: 'Plans',
   };
   const pageTitle = routeTitles[pathname] || '';
   const cta =
-    pathname === pathCreator.billingPlans() ? (
-      <NewLink target="_blank" size="small" href={WEBSITE_PRICING_URL + '?ref=app-billing-plans'}>
+    pathname === pathCreator.billing({ tab: 'plans' }) ? (
+      <NewLink
+        target="_blank"
+        size="small"
+        href={WEBSITE_PRICING_URL + '?ref=app-billing-page-plans'}
+      >
         View pricing page
       </NewLink>
     ) : null;

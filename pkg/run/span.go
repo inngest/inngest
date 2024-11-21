@@ -546,6 +546,14 @@ func (s *Span) SetStepOutput(data any) {
 	s.setAttrData(data, consts.OtelSysStepOutput)
 }
 
+func (s *Span) SetAIRequestMetadata(data any) {
+	s.setAttrData(data, consts.OtelSysStepAIRequest)
+}
+
+func (s *Span) SetAIResponseMetadata(data any) {
+	s.setAttrData(data, consts.OtelSysStepAIResponse)
+}
+
 func (s *Span) SetStepRunType(t string) {
 	s.SetAttributes(attribute.String(consts.OtelSysStepRunType, t))
 }

@@ -57,6 +57,8 @@ const (
 	OtelSysStepFirst           = "sys.step.first"
 	OtelSysStepGroupID         = "sys.step.group.id"
 	OtelSysStepStack           = "sys.step.stack"
+	OtelSysStepAIRequest       = "sys.step.ai.req" // ai request metadata
+	OtelSysStepAIResponse      = "sys.step.ai.res" // ai response metadata
 	OtelSysStepRunType         = "sys.step.run.type"
 
 	OtelSysStepSleepEndAt = "sys.step.sleep.end"

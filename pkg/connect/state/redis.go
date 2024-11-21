@@ -27,6 +27,7 @@ var (
 
 var (
 	ConnDeletedWithGroupErr = fmt.Errorf("group deleted with conn")
+	WorkerGroupNotFoundErr  = fmt.Errorf("worker group not found")
 )
 
 func init() {
@@ -125,8 +126,33 @@ func (r *redisConnectionStateManager) GetConnectionsByEnvID(ctx context.Context,
 	return conns, nil
 }
 
-func (r *redisConnectionStateManager) GetConnectionsByAppID(ctx context.Context, appID uuid.UUID) ([]*connpb.ConnMetadata, error) {
-	return nil, notImplementedError
+func (r *redisConnectionStateManager) GetConnectionsByAppID(ctx context.Context, envId uuid.UUID, appID uuid.UUID) ([]*connpb.ConnMetadata, error) {
+	key := r.connIndexByApp(envId.String(), &appID)
+
+	connIds, err := r.client.Do(ctx, r.client.B().Smembers().Key(key).Build()).AsStrSlice()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(connIds) == 0 {
+		return nil, nil
+	}
+
+	res, err := r.client.Do(ctx, r.client.B().Hmget().Key(r.connKey(envId.String())).Field(connIds...).Build()).AsStrSlice()
+	if err != nil {
+		return nil, err
+	}
+
+	conns := []*connpb.ConnMetadata{}
+	for _, meta := range res {
+		var conn connpb.ConnMetadata
+		if err := json.Unmarshal([]byte(meta), &conn); err != nil {
+			return nil, err
+		}
+		conns = append(conns, &conn)
+	}
+
+	return conns, nil
 }
 
 func (r *redisConnectionStateManager) GetConnectionsByGroupID(ctx context.Context, envID uuid.UUID, groupID string) ([]*connpb.ConnMetadata, error) {
@@ -158,23 +184,31 @@ func (r *redisConnectionStateManager) GetConnectionsByGroupID(ctx context.Contex
 	return conns, nil
 }
 
-func (r *redisConnectionStateManager) AddConnection(ctx context.Context, conn *Connection) error {
+func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn *Connection) error {
 	envID := conn.Data.AuthData.GetEnvId()
 
 	groupID := conn.Group.Hash
 	meta := &connpb.ConnMetadata{
 		Id:         conn.Session.SessionId.ConnectionId,
 		InstanceId: conn.Session.SessionId.InstanceId,
+		Status:     conn.Status,
 		Language:   conn.Data.SdkLanguage,
 		Version:    conn.Data.SdkVersion,
 		GroupId:    groupID,
 		Attributes: conn.Data.SystemAttributes,
+		GatewayId:  conn.GatewayId,
+	}
+
+	isHealthy := "0"
+	if conn.Status == connpb.ConnectionStatus_READY {
+		isHealthy = "1"
 	}
 
 	keys := []string{
 		r.connKey(envID),
 		r.groupKey(envID),
 		r.groupIDKey(envID, groupID),
+		r.connIndexByApp(envID, conn.Group.AppID),
 	}
 
 	// NOTE: redis_state.StrSlice format the data in a non JSON way, not sure why
@@ -200,9 +234,10 @@ func (r *redisConnectionStateManager) AddConnection(ctx context.Context, conn *C
 		metaArg,
 		groupID,
 		groupArg,
+		isHealthy,
 	}
 
-	status, err := scripts["add_conn"].Exec(
+	status, err := scripts["upsert_conn"].Exec(
 		ctx,
 		r.client,
 		keys,
@@ -229,6 +264,7 @@ func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, conn
 		r.connKey(envID),
 		r.groupKey(envID),
 		r.groupIDKey(envID, groupID),
+		r.connIndexByApp(envID, conn.Group.AppID),
 	}
 
 	args := []string{
@@ -264,6 +300,9 @@ func (r *redisConnectionStateManager) GetWorkerGroupByHash(ctx context.Context, 
 
 	byt, err := r.client.Do(ctx, cmd).AsBytes()
 	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return nil, WorkerGroupNotFoundErr
+		}
 		return nil, fmt.Errorf("error retrieving worker group: %w", err)
 	}
 
@@ -293,6 +332,15 @@ func (r *redisConnectionStateManager) UpdateWorkerGroup(ctx context.Context, env
 
 func (r *redisConnectionStateManager) connKey(envID string) string {
 	return fmt.Sprintf("{%s}:conns", envID)
+}
+
+func (r *redisConnectionStateManager) connIndexByApp(envID string, appId *uuid.UUID) string {
+	// For the initial connection upsert, the app won't be synced just yet, so we cannot update this index.
+	// We still need to provide a key with the same slot, otherwise Redis will complain
+	if appId == nil || *appId == uuid.Nil {
+		return fmt.Sprintf("{%s}:index_disabled", envID)
+	}
+	return fmt.Sprintf("{%s}:conns_appid:%s", envID, appId)
 }
 
 func (r *redisConnectionStateManager) groupKey(envID string) string {

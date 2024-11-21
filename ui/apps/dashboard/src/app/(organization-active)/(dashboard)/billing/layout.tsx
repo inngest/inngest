@@ -20,15 +20,15 @@ export default async function BillingLayout({ children }: React.PropsWithChildre
             },
             {
               children: 'Usage',
-              href: pathCreator.billingUsage(),
+              href: pathCreator.billing({ tab: 'usage' }),
             },
             {
               children: 'Payments',
-              href: pathCreator.billingPayments(),
+              href: pathCreator.billing({ tab: 'payments' }),
             },
             {
               children: 'Plans',
-              href: pathCreator.billingPlans(),
+              href: pathCreator.billing({ tab: 'plans' }),
             },
           ]}
         />

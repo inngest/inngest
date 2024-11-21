@@ -35,7 +35,7 @@ require (
 	github.com/graph-gophers/dataloader v5.0.0+incompatible
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/inngest/expr v0.0.0-20241106234328-863dff7deec0
-	github.com/inngest/inngestgo v0.7.5-0.20241115224517-67a6d40322cf
+	github.com/inngest/inngestgo v0.7.5-0.20241121093025-4ee55e590fba
 	github.com/jedib0t/go-pretty/v6 v6.3.0
 	github.com/jinzhu/copier v0.3.5
 	github.com/jonboulle/clockwork v0.4.0
@@ -49,6 +49,7 @@ require (
 	github.com/redis/rueidis v1.0.14
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/rs/zerolog v1.26.1
+	github.com/sashabaranov/go-openai v1.35.6
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5

@@ -61,7 +61,7 @@ export default async function Page() {
             <NewButton
               appearance="ghost"
               label="Change plan"
-              href={pathCreator.billingPlans() + '?ref=app-billing-overview'}
+              href={pathCreator.billing({ tab: 'plans', ref: 'app-billing-page-overview' })}
             />
           </div>
           {entitlementUsage.runCount.limit !== null && <LimitBar data={runs} className="my-4" />}
@@ -75,7 +75,7 @@ export default async function Page() {
                   appearance="outlined"
                   kind="secondary"
                   label="Upgrade plan"
-                  href={pathCreator.billingPlans() + '?ref=app-billing-overview'}
+                  href={pathCreator.billing({ tab: 'plans', ref: 'app-billing-page-overview' })}
                 />
               }
             >

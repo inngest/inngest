@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"gonum.org/v1/gonum/stat/sampleuv"
@@ -570,7 +571,7 @@ func (q *queue) filterUnleasedAccounts(guaranteedCapacityMap map[string]Guarante
 	for n := range result {
 		idx, ok := w.Take()
 		if !ok && len(result) < len(weights)-1 {
-			return result, ErrWeightedSampleRead
+			return result, util.ErrWeightedSampleRead
 		}
 		result[n] = shuffleIdx[idx]
 	}
