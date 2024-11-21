@@ -45,6 +45,8 @@ export default function UpgradeButton({
   const isEnterpriseCard = cardPlanName === PlanNames.Enterprise;
   const isFreeCard = cardPlanName === PlanNames.Free;
 
+  const isLegacyPlan = !isEnterprisePlan(currentPlan) && !(currentPlan.name in PlanNames);
+
   const isActive =
     currentPlanName === cardPlanName || (cardPlanName === PlanNames.Enterprise && isEnterprise);
 
@@ -53,18 +55,21 @@ export default function UpgradeButton({
       // If the current plan is Enterprise, all non-Enterprise plans are lower
       return !isEnterprisePlan(plan);
     }
+    // For legacy plans, only Free Tier is a downgrade
+    if (isLegacyPlan) {
+      return isFreeCard;
+    }
     // For non-enterprise plans, compare the amounts
     return cardPlanAmount < currentPlanAmount;
   })();
 
-  let buttonLabel = 'Upgrade';
-  if (isActive) {
-    buttonLabel = 'My Plan';
-  } else if (isLowerPlan) {
-    buttonLabel = 'Downgrade';
-  } else if (isEnterpriseCard) {
-    buttonLabel = 'Get in touch';
-  }
+  const buttonLabel = isActive
+    ? 'My Plan'
+    : isEnterpriseCard
+    ? 'Get in touch'
+    : isLowerPlan
+    ? 'Downgrade'
+    : 'Upgrade';
 
   const onClickChangePlan = ({ item: { planID, name, amount }, action }: ChangePlanArgs) => {
     setCheckoutData({ items: [{ planID, name, quantity: 1, amount }], action });
