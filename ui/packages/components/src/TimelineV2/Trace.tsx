@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import type { Route } from 'next';
 
+import { parseAIOutput } from '../AI/utils';
 import type { Result } from '../types/functionRun';
 import { cn } from '../utils/classNames';
 import { toMaybeDate } from '../utils/date';
 import { InlineSpans } from './InlineSpans';
 import { TraceHeading } from './TraceHeading';
 import { TraceInfo } from './TraceInfo';
-import type { Trace } from './types';
+import { isStepInfoRun, type Trace } from './types';
 import { createSpanWidths } from './utils';
 
 type Props = {
@@ -20,6 +21,12 @@ type Props = {
     runPopout: (params: { runID: string }) => Route;
   };
   trace: Trace;
+  runID: string;
+  stepAIEnabled?: boolean;
+  rerunFromStep: (args: {
+    runID: string;
+    fromStep: { stepID: string; input: string };
+  }) => Promise<unknown>;
 };
 
 export function Trace({
@@ -30,6 +37,9 @@ export function Trace({
   minTime,
   pathCreator,
   trace,
+  runID,
+  stepAIEnabled = false,
+  rerunFromStep,
 }: Props) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [result, setResult] = useState<Result>();
@@ -63,6 +73,8 @@ export function Trace({
     spans = trace.childrenSpans;
   }
 
+  const aiOutput = stepAIEnabled && result?.data ? parseAIOutput(result.data) : undefined;
+
   return (
     <div
       className={cn(
@@ -86,6 +98,12 @@ export function Trace({
             isExpanded={isExpanded}
             onClickExpandToggle={() => setIsExpanded((prev) => !prev)}
             trace={trace}
+            isAI={
+              !!aiOutput ||
+              (stepAIEnabled &&
+                isStepInfoRun(trace.stepInfo) &&
+                (trace.stepInfo.type === 'step.ai.wrap' || trace.stepInfo.type === 'step.ai.infer'))
+            }
           />
         </div>
 
@@ -105,6 +123,9 @@ export function Trace({
             pathCreator={pathCreator}
             trace={trace}
             result={result}
+            runID={runID}
+            aiOutput={aiOutput}
+            rerunFromStep={rerunFromStep}
           />
 
           {trace.childrenSpans?.map((child, i) => {
@@ -118,6 +139,9 @@ export function Trace({
                     minTime={minTime}
                     pathCreator={pathCreator}
                     trace={child}
+                    runID={runID}
+                    stepAIEnabled={stepAIEnabled}
+                    rerunFromStep={rerunFromStep}
                   />
                 </div>
               </div>

@@ -1,1 +1,1 @@
-export { RunDetails } from './RunDetails';
+export { RunDetailsV2 } from './RunDetailsV2';

@@ -1,5 +1,7 @@
 import type { Route } from 'next';
 
+import { AITrace } from '../AI/AITrace';
+import type { ExperimentalAI } from '../AI/utils';
 import { Card } from '../Card';
 import {
   CodeElement,
@@ -21,10 +23,24 @@ type Props = {
     runPopout: (params: { runID: string }) => Route;
   };
   trace: Trace;
+  runID: string;
   result?: Result;
+  aiOutput?: ExperimentalAI;
+  rerunFromStep: (args: {
+    runID: string;
+    fromStep: { stepID: string; input: string };
+  }) => Promise<unknown>;
 };
 
-export function TraceInfo({ className, pathCreator, trace, result }: Props) {
+export function TraceInfo({
+  className,
+  pathCreator,
+  trace,
+  result,
+  runID,
+  rerunFromStep,
+  aiOutput,
+}: Props) {
   const delayText = formatMilliseconds(
     (toMaybeDate(trace.startedAt) ?? new Date()).getTime() - new Date(trace.queuedAt).getTime()
   );
@@ -143,9 +159,20 @@ export function TraceInfo({ className, pathCreator, trace, result }: Props) {
             </ElementWrapper>
 
             {stepKindInfo}
+
+            {aiOutput && <AITrace aiOutput={aiOutput} />}
           </dl>
         </Card.Content>
-        {result && <RunResult className="border-subtle border-t" result={result} />}
+        {result && (
+          <RunResult
+            className="border-subtle border-t"
+            result={result}
+            stepAIEnabled={!!aiOutput}
+            rerunFromStep={rerunFromStep}
+            runID={runID}
+            stepID={trace.stepID ?? undefined}
+          />
+        )}
       </Card>
     </div>
   );

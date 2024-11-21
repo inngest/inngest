@@ -26,6 +26,7 @@ import { useGetRun } from '@/hooks/useGetRun';
 import { useGetTraceResult } from '@/hooks/useGetTraceResult';
 import { useGetTrigger } from '@/hooks/useGetTrigger';
 import { useRerun } from '@/hooks/useRerun';
+import { useRerunFromStep } from '@/hooks/useRerunFromStep';
 import { client } from '@/store/baseApi';
 import {
   CountRunsDocument,
@@ -134,6 +135,7 @@ export default function Page() {
 
   const cancelRun = useCancelRun();
   const rerun = useRerun();
+  const rerunFromStep = useRerunFromStep();
   const getTraceResult = useGetTraceResult();
   const getTrigger = useGetTrigger();
   const getRun = useGetRun();
@@ -199,11 +201,13 @@ export default function Page() {
         getTraceResult={getTraceResult}
         getTrigger={getTrigger}
         rerun={rerun}
+        rerunFromStep={rerunFromStep}
         pathCreator={pathCreator}
         pollInterval={pollInterval}
         scope="env"
         totalCount={totalCount}
         hasSearchFlag={isSearchEnabled}
+        stepAIEnabled={true}
       />
     </>
   );

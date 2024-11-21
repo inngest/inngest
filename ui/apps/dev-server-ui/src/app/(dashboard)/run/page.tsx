@@ -1,6 +1,6 @@
 'use client';
 
-import { RunDetails } from '@inngest/components/RunDetailsV2/RunDetails';
+import { RunDetailsV2 } from '@inngest/components/RunDetailsV2/RunDetailsV2';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import { cn } from '@inngest/components/utils/classNames';
 
@@ -9,6 +9,7 @@ import { useGetRun } from '@/hooks/useGetRun';
 import { useGetTraceResult } from '@/hooks/useGetTraceResult';
 import { useGetTrigger } from '@/hooks/useGetTrigger';
 import { useRerun } from '@/hooks/useRerun';
+import { useRerunFromStep } from '@/hooks/useRerunFromStep';
 import { pathCreator } from '@/utils/pathCreator';
 
 export default function Page() {
@@ -18,6 +19,7 @@ export default function Page() {
   const getTraceResult = useGetTraceResult();
   const getTrigger = useGetTrigger();
   const rerun = useRerun();
+  const rerunFromStep = useRerunFromStep();
 
   if (!runID) {
     throw new Error('missing runID in search params');
@@ -25,7 +27,7 @@ export default function Page() {
 
   return (
     <div className={cn('bg-canvasBase overflow-y-auto pt-8')}>
-      <RunDetails
+      <RunDetailsV2
         pathCreator={pathCreator}
         standalone
         cancelRun={cancelRun}
@@ -34,7 +36,9 @@ export default function Page() {
         getTrigger={getTrigger}
         pollInterval={2500}
         rerun={rerun}
+        rerunFromStep={rerunFromStep}
         runID={runID}
+        stepAIEnabled={true}
       />
     </div>
   );
