@@ -79,6 +79,22 @@ type HandlerOpts struct {
 	// defaults to os.Getenv("INNGEST_SIGNING_KEY_FALLBACK").
 	SigningKeyFallback *string
 
+	// APIOrigin is the specified host to be used to make API calls
+	APIBaseURL *string
+
+	// EventAPIOrigin is the specified host to be used to send events to
+	EventAPIBaseURL *string
+
+	// ServeOrigin is the host to used for HTTP base function invoking.
+	// It's used to specify the host were the functions are hosted on sync.
+	// e.g. https://example.com
+	ServeOrigin *string
+
+	// ServePath is the path to use for HTTP base function invoking
+	// It's used to specify the path were the functions are hosted on sync.
+	// e.g. /api/inngest
+	ServePath *string
+
 	// Env is the branch environment to deploy to.  If nil, this uses
 	// os.Getenv("INNGEST_ENV").  This only deploys to branches if the
 	// signing key is a branch signing key.
@@ -153,6 +169,57 @@ func (h HandlerOpts) GetSigningKeyFallback() string {
 	return *h.SigningKeyFallback
 }
 
+// GetAPIOrigin returns the host to use for sending API requests
+func (h HandlerOpts) GetAPIBaseURL() string {
+	if h.isDev() {
+		return DevServerURL()
+	}
+
+	if h.APIBaseURL == nil {
+		base := os.Getenv("INNGEST_API_BASE_URL")
+		if base != "" {
+			return base
+		}
+
+		return defaultAPIOrigin
+	}
+
+	return *h.APIBaseURL
+}
+
+// GetEventAPIOrigin returns the host to use for sending events
+func (h HandlerOpts) GetEventAPIBaseURL() string {
+	if h.isDev() {
+		return DevServerURL()
+	}
+
+	if h.EventAPIBaseURL == nil {
+		origin := os.Getenv("INNGEST_EVENT_API_BASE_URL")
+		if origin != "" {
+			return origin
+		}
+		return defaultEventAPIOrigin
+	}
+
+	return *h.EventAPIBaseURL
+}
+
+// GetServeOrigin returns the host used for HTTP based executions
+func (h HandlerOpts) GetServeOrigin() string {
+	if h.ServeOrigin != nil {
+		return *h.ServeOrigin
+	}
+	return ""
+}
+
+// GetServePath returns the path used for HTTP based executions
+func (h HandlerOpts) GetServePath() string {
+	if h.ServePath != nil {
+		return *h.ServePath
+	}
+	return ""
+}
+
 // GetEnv returns the env defined within HandlerOpts, or the default
 // defined within INNGEST_ENV.
 //
@@ -191,6 +258,14 @@ func (h HandlerOpts) GetWorkerConcurrency() int {
 		return defaultWorkerConcurrency
 	}
 	return h.WorkerConcurrency
+}
+
+func (h HandlerOpts) isDev() bool {
+	if h.Dev != nil {
+		return *h.Dev
+	}
+
+	return IsDev()
 }
 
 // Handler represents a handler which serves the Inngest API via HTTP.  This provides
@@ -635,14 +710,6 @@ func (h *handler) url(r *http.Request) *url.URL {
 	}
 	u, _ := url.Parse(fmt.Sprintf("%s://%s%s", scheme, r.Host, r.RequestURI))
 	return u
-}
-
-func (h *handler) isDev() bool {
-	if h.Dev != nil {
-		return *h.Dev
-	}
-
-	return IsDev()
 }
 
 func createFunctionConfigs(
