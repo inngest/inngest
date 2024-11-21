@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { NewLink } from '@inngest/components/Link/Link';
 
-import { pathCreator } from '@/utils/urls';
+import { WEBSITE_PRICING_URL, pathCreator } from '@/utils/urls';
 
 export default function PageTitle() {
   const pathname = usePathname();
@@ -17,11 +17,7 @@ export default function PageTitle() {
   const pageTitle = routeTitles[pathname] || '';
   const cta =
     pathname === pathCreator.billingPlans() ? (
-      <NewLink
-        target="_blank"
-        size="small"
-        href="https://www.inngest.com/pricing?ref=app-billing-plans"
-      >
+      <NewLink target="_blank" size="small" href={WEBSITE_PRICING_URL + '?ref=app-billing-plans'}>
         View pricing page
       </NewLink>
     ) : null;
