@@ -236,7 +236,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*cqrs.Sync
 
 	defer func() {
 		isConnect := sql.NullBool{Valid: false}
-		if r.Capabilities.Connect == sdk.ConnectV1 && r.UseConnect {
+		if r.IsConnect() {
 			isConnect = sql.NullBool{
 				Bool:  true,
 				Valid: true,

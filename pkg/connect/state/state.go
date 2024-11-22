@@ -137,7 +137,7 @@ func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager) 
 	config := sdk.RegisterRequest{
 		V:          "1",
 		URL:        connURL.String(),
-		DeployType: "ping", // TODO: should allow 'connect' as an input
+		DeployType: sdk.DeployTypeConnect,
 		SDK:        sdkVersion,
 		AppName:    c.Data.GetAppName(),
 		Headers: sdk.Headers{
@@ -145,7 +145,6 @@ func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager) 
 			Platform: c.Data.GetPlatform(),
 		},
 		Capabilities: cap,
-		UseConnect:   true, // NOTE: probably not needed if `DeployType` can have `connect` as input?
 		Functions:    c.Group.SyncData.Functions,
 	}
 
