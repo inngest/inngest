@@ -23,10 +23,7 @@ type Props = {
   trace: Trace;
   runID: string;
   stepAIEnabled?: boolean;
-  rerunFromStep: (args: {
-    runID: string;
-    fromStep: { stepID: string; input: string };
-  }) => Promise<unknown>;
+  rerunFromStep: React.ComponentProps<typeof TraceInfo>['rerunFromStep'];
 };
 
 export function Trace({

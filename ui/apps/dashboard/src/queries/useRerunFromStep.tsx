@@ -1,3 +1,5 @@
+import type { RerunResult } from '@inngest/components/Rerun/RerunModal';
+
 type RerunFromStep = {
   runID: string;
   fromStep: { stepID: string; input: string };
@@ -15,8 +17,9 @@ export function useRerunFromStep(
   }: {
     runID: string;
     fromStep: { stepID: string; input: string };
-  }): Promise<void> => {
+  }): Promise<RerunResult> => {
     console.log('not yet implemented in the dashboard');
+    return { data: { rerun: {} } };
   };
 
   return rerunFromStep;

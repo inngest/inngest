@@ -31,10 +31,7 @@ type Props = {
     runPopout: (params: { runID: string }) => Route;
   };
   rerun: (args: { fnID: string; runID: string }) => Promise<unknown>;
-  rerunFromStep: (args: {
-    runID: string;
-    fromStep: { stepID: string; input: string };
-  }) => Promise<unknown>;
+  rerunFromStep: React.ComponentProps<typeof RunResult>['rerunFromStep'];
   initialRunData?: InitialRunData;
   run: Lazy<Run>;
   runID: string;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { RiCloseLine } from '@remixicon/react';
 
@@ -15,10 +15,10 @@ export type RerunModalType = {
   rerunFromStep: (args: {
     runID: string;
     fromStep: { stepID: string; input: string };
-  }) => Promise<unknown>;
+  }) => Promise<RerunResult>;
 };
 
-type RerunResult = {
+export type RerunResult = {
   data?: {
     rerun: Record<string, unknown>;
   };
@@ -48,13 +48,16 @@ export const RerunModal = ({
   const [newInput, setNewInput] = useState(input);
   const router = useRouter();
   const [rerunning, setRerunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setError(null);
+    }
+  }, [open]);
 
   return (
-    <Modal
-      className="flex max-w-[1200px] flex-col p-6"
-      isOpen={open}
-      onClose={() => setOpen(false)}
-    >
+    <Modal className="flex max-w-[1200px] flex-col p-6" isOpen={open} onClose={close}>
       <div className="mb-6 flex flex-row items-center justify-between gap-6">
         <div className="flex flex-col gap-2">
           <span className="text-basis text-xl">Rerun from step </span>
@@ -96,7 +99,8 @@ export const RerunModal = ({
           />
         </div>
       </div>
-      <div className="mt-6 flex flex-row justify-end gap-2">
+      <div className="mt-6 flex flex-row items-center justify-end gap-2">
+        <div>{error && <span className="text-error">{error}</span>}</div>
         <NewButton
           kind="secondary"
           appearance="ghost"
@@ -108,20 +112,20 @@ export const RerunModal = ({
           loading={rerunning}
           onClick={async () => {
             setRerunning(true);
+            setError(null);
 
-            const result = (await rerunFromStep({
+            const result = await rerunFromStep({
               runID,
               fromStep: { stepID, input: patchInput(newInput) },
-            })) as RerunResult;
+            });
 
-            setRerunning(false);
-
-            if (result?.error) {
+            if (result.error) {
               console.error('rerun from step error', result.error);
-              throw new Error('Rerun failed, please try again later.');
+              setError('Rerun failed, please try again later.');
+              setRerunning(false);
             }
 
-            if (result?.data?.rerun) {
+            if (result.data?.rerun) {
               router.push(`/run?runID=${result.data.rerun}`);
             }
           }}
