@@ -262,8 +262,6 @@ func (c *connectGatewaySvc) updateGatewayState(status state.GatewayStatus) error
 		return fmt.Errorf("could not upsert gateway: %w", err)
 	}
 
-	c.logger.Debug("updated gateway status in state", "status", status)
-
 	return nil
 }
 

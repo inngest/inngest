@@ -1,7 +1,10 @@
 package golang
 
 import (
+	"context"
 	"fmt"
+	"github.com/inngest/inngest/pkg/logger"
+	"log/slog"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -11,7 +14,6 @@ import (
 
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/slog"
 )
 
 const DEV_URL = "http://127.0.0.1:8288"
@@ -85,7 +87,7 @@ func NewSDKConnectHandler(t *testing.T, appID string, hopts ...opt) inngestgo.Ha
 
 	opts := inngestgo.HandlerOpts{
 		RegisterURL: inngestgo.StrPtr(fmt.Sprintf("%s/fn/register", DEV_URL)),
-		Logger:      slog.Default(),
+		Logger:      logger.StdlibLogger(context.Background()),
 	}
 
 	for _, o := range hopts {

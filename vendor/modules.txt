@@ -516,7 +516,7 @@ github.com/inconshreveable/mousetrap
 # github.com/inngest/expr v0.0.0-20241106234328-863dff7deec0
 ## explicit; go 1.23.2
 github.com/inngest/expr
-# github.com/inngest/inngestgo v0.7.5-0.20241122160041-518197e459ae
+# github.com/inngest/inngestgo v0.7.5-0.20241122162912-76bbde22ef73
 ## explicit; go 1.23.2
 github.com/inngest/inngestgo
 github.com/inngest/inngestgo/connect
@@ -956,9 +956,6 @@ golang.org/x/crypto/salsa20/salsa
 golang.org/x/exp/constraints
 golang.org/x/exp/rand
 golang.org/x/exp/slices
-golang.org/x/exp/slog
-golang.org/x/exp/slog/internal
-golang.org/x/exp/slog/internal/buffer
 # golang.org/x/mod v0.21.0
 ## explicit; go 1.22.0
 golang.org/x/mod/internal/lazyregexp

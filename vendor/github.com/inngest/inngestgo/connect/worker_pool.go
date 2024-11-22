@@ -19,7 +19,7 @@ type workerPool struct {
 	workerPoolMsgs chan workerPoolMsg
 }
 
-func NewWorkerPool(concurrency int, handler func(msg workerPoolMsg)) *workerPool {
+func NewWorkerPool(ctx context.Context, concurrency int, handler func(msg workerPoolMsg)) *workerPool {
 	wp := &workerPool{
 		// Should this use the same buffer size as the worker pool?
 		workerPoolMsgs: make(chan workerPoolMsg, concurrency),
@@ -27,14 +27,11 @@ func NewWorkerPool(concurrency int, handler func(msg workerPoolMsg)) *workerPool
 		inProgress:     sync.WaitGroup{},
 		handler:        handler,
 	}
+	for i := 0; i < wp.concurrency; i++ {
+		go wp.workerPool(ctx)
+	}
 
 	return wp
-}
-
-func (w *workerPool) Start(ctx context.Context) {
-	for i := 0; i < w.concurrency; i++ {
-		go w.workerPool(ctx)
-	}
 }
 
 func (w *workerPool) workerPool(ctx context.Context) {

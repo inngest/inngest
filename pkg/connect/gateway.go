@@ -497,7 +497,8 @@ func (c *connectionHandler) receiveRouterMessages(ctx context.Context, appId uui
 		log.Debug("gateway received msg")
 
 		// Do not forward messages if the connection is already draining
-		if ctx.Done() != nil {
+		if ctx.Err() != nil {
+			log.Warn("connection is draining, not forwarding message")
 			return
 		}
 
@@ -509,7 +510,8 @@ func (c *connectionHandler) receiveRouterMessages(ctx context.Context, appId uui
 		}
 
 		// Do not forward messages if the connection is already draining
-		if ctx.Done() != nil {
+		if ctx.Err() != nil {
+			log.Warn("acked message but connection is draining, not forwarding message")
 			return
 		}
 
@@ -529,6 +531,8 @@ func (c *connectionHandler) receiveRouterMessages(ctx context.Context, appId uui
 			// If the worker receives the message, it will send an ack through a new connection. Otherwise, the message will be redelivered.
 			return
 		}
+
+		log.Debug("forwarded message to worker")
 	})
 	if err != nil {
 		c.log.Error("failed to receive routed requests", "err", err)
