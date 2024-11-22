@@ -15,7 +15,7 @@ export type RerunModalType = {
   rerunFromStep: (args: {
     runID: string;
     fromStep: { stepID: string; input: string };
-  }) => Promise<unknown>;
+  }) => Promise<RerunResult>;
 };
 
 type RerunResult = {
@@ -114,10 +114,10 @@ export const RerunModal = ({
             setRerunning(true);
             setError(null);
 
-            const result = (await rerunFromStep({
+            const result = await rerunFromStep({
               runID,
               fromStep: { stepID, input: patchInput(newInput) },
-            })) as RerunResult;
+            });
 
             if (result?.error) {
               console.error('rerun from step error', result.error);

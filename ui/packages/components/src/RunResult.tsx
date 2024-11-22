@@ -12,10 +12,7 @@ type Props = {
   className?: string;
   result: Result;
   runID: string;
-  rerunFromStep: (args: {
-    runID: string;
-    fromStep: { stepID: string; input: string };
-  }) => Promise<unknown>;
+  rerunFromStep: React.ComponentProps<typeof RerunModal>['rerunFromStep'];
   stepID?: string;
   isSuccess?: boolean;
   stepAIEnabled?: boolean;
