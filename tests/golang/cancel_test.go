@@ -7,8 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/inngest"
-	// "github.com/inngest/inngest/tests/client"
+	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
 	"github.com/stretchr/testify/require"
@@ -16,17 +17,17 @@ import (
 
 type testCancelEvt inngestgo.GenericEvent[any, any]
 
-func TestCancelFunctions(t *testing.T) {
+func TestEventCancellation(t *testing.T) {
 	ctx := context.Background()
 
-	// c := client.New(t)
+	c := client.New(t)
 	h, server, registerFuncs := NewSDKHandler(t, "appc")
 	defer server.Close()
 
 	var (
 		runCounter   int32
 		runCancelled int32
-		// runID        string
+		runID        string
 	)
 
 	triggerEvtName := "test/fn-run"
@@ -42,7 +43,7 @@ func TestCancelFunctions(t *testing.T) {
 		inngestgo.EventTrigger(triggerEvtName, nil),
 		func(ctx context.Context, input inngestgo.Input[testCancelEvt]) (any, error) {
 			_, _ = step.Run(ctx, "do something", func(ctx context.Context) (any, error) {
-				// runID = input.InputCtx.RunID
+				runID = input.InputCtx.RunID
 				fmt.Println("HELLO")
 
 				atomic.AddInt32(&runCounter, 1)
@@ -103,5 +104,16 @@ func TestCancelFunctions(t *testing.T) {
 
 		require.Equal(t, int32(1), atomic.LoadInt32(&runCounter))
 		require.Equal(t, int32(1), atomic.LoadInt32(&runCancelled))
+	})
+
+	t.Run("trace run should have appropriate data", func(t *testing.T) {
+		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
+			Status:         models.FunctionStatusCancelled,
+			Timeout:        10 * time.Second,
+			Interval:       500 * time.Millisecond,
+			ChildSpanCount: 2,
+		})
+
+		require.Equal(t, models.RunTraceSpanStatusCancelled.String(), run.Trace.Status)
 	})
 }
