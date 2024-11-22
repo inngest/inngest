@@ -20,6 +20,7 @@ const (
 	InternalNamePrefix = "inngest/"
 	FnFailedName       = InternalNamePrefix + "function.failed"
 	FnFinishedName     = InternalNamePrefix + "function.finished"
+	FnCancelledName    = InternalNamePrefix + "function.cancelled"
 	// InvokeEventName is the event name used to invoke specific functions via an
 	// API.  Note that invoking functions still sends an event in the usual manner.
 	InvokeFnName = InternalNamePrefix + "function.invoked"
