@@ -66,7 +66,7 @@ func TestValidate(t *testing.T) {
 				},
 			}
 
-			err := f.Validate(context.Background(), false)
+			err := f.Validate(context.Background())
 			require.NotNil(t, err)
 			require.Contains(t, err.Error(), "Non-HTTP steps are not yet supported")
 		})
@@ -98,7 +98,7 @@ func TestValidate(t *testing.T) {
 				},
 			}
 
-			err := f.Validate(context.Background(), false)
+			err := f.Validate(context.Background())
 			require.NotNil(t, err)
 			require.Contains(t, err.Error(), "Invalid concurrency key")
 		})
@@ -115,7 +115,7 @@ func TestValidate(t *testing.T) {
 				},
 			}
 
-			err := f.Validate(context.Background(), false)
+			err := f.Validate(context.Background())
 			require.NotNil(t, err)
 			require.Contains(t, err.Error(), "Functions must contain one step")
 		})

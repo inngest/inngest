@@ -152,27 +152,28 @@ func (f RegisterRequest) Parse(ctx context.Context) ([]*inngest.Function, error)
 			continue
 		}
 
-		fn, ferr := sdkFn.Function(f.UseConnect)
+		fn, ferr := sdkFn.Function()
 		if ferr != nil {
 			err = multierror.Append(err, ferr)
 			continue
 		}
 		funcs[n] = fn
 
-		if ferr := fn.Validate(ctx, f.UseConnect); ferr != nil {
+		if ferr := fn.Validate(ctx); ferr != nil {
 			err = multierror.Append(err, ferr)
 		}
 
 		for n, step := range fn.Steps {
-			if !f.UseConnect {
-				uri, ferr := url.Parse(step.URI)
-				if ferr != nil {
-					err = multierror.Append(err, fmt.Errorf("Step '%s' has an invalid URI", step.ID))
-				}
-				if uri.Scheme != "http" && uri.Scheme != "https" {
-					err = multierror.Append(err, fmt.Errorf("Step '%s' has an invalid driver. Only HTTP drivers may be used with SDK functions.", step.ID))
-					continue
-				}
+			uri, ferr := url.Parse(step.URI)
+			if ferr != nil {
+				err = multierror.Append(err, fmt.Errorf("Step '%s' has an invalid URI", step.ID))
+			}
+			switch uri.Scheme {
+			case "http", "https", "ws", "wss":
+				// noop
+			default:
+				err = multierror.Append(err, fmt.Errorf("Step '%s' has an invalid driver. Only HTTP drivers may be used with SDK functions.", step.ID))
+				continue
 			}
 			fn.Steps[n] = step
 		}
