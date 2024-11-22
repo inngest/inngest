@@ -24,7 +24,7 @@ import (
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"github.com/inngest/inngestgo/internal/types"
 	"github.com/inngest/inngestgo/step"
-	"golang.org/x/exp/slog"
+	"log/slog"
 )
 
 var (
@@ -313,8 +313,6 @@ type handler struct {
 	funcs   []ServableFunction
 	// lock prevents reading the function maps while serving
 	l sync.RWMutex
-
-	useConnect bool
 }
 
 func (h *handler) SetOptions(opts HandlerOpts) Handler {
