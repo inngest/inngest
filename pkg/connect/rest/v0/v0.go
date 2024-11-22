@@ -40,9 +40,8 @@ func (a *router) setup() {
 		r.Use(middleware.Recoverer)
 		r.Use(headers.ContentTypeJsonResponse())
 
-		r.Get("/envs/{envID}/conns", a.showConnectionsByEnv)
+		r.Get("/envs/{envID}/conns", a.showConnections)
 		r.Get("/envs/{envID}/groups/{groupID}", a.showWorkerGroup)
-		r.Get("/envs/{envID}/apps/{appID}/conns", a.showConnectionsByApp)
 	})
 
 	a.Group(func(r chi.Router) {

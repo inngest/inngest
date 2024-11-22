@@ -201,7 +201,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*cqrs.Sync
 		return nil, publicerr.Wrap(err, 400, "Invalid request")
 	}
 
-	if app, err := a.devserver.Data.GetAppByChecksum(ctx, sum); err == nil {
+	if app, err := a.devserver.Data.GetAppByChecksum(ctx, consts.DevServerEnvId, sum); err == nil {
 		if !app.Error.Valid {
 			// Skip registration since the app was already successfully
 			// registered.
@@ -236,7 +236,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*cqrs.Sync
 
 	defer func() {
 		isConnect := sql.NullBool{Valid: false}
-		if r.Capabilities.Connect == sdk.ConnectV1 && r.UseConnect {
+		if r.IsConnect() {
 			isConnect = sql.NullBool{
 				Bool:  true,
 				Valid: true,
@@ -513,7 +513,7 @@ func (a devapi) RemoveApp(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	url := r.FormValue("url")
 
-	app, err := a.devserver.Data.GetAppByURL(ctx, url)
+	app, err := a.devserver.Data.GetAppByURL(ctx, consts.DevServerEnvId, url)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 404, "App not found: %s", url))
 		return

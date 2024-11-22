@@ -20,6 +20,12 @@ import (
 	"github.com/inngest/inngest/pkg/syscode"
 )
 
+func NewDriver(ctx context.Context, psf pubsub.RequestForwarder) driver.Driver {
+	return &executor{
+		forwarder: psf,
+	}
+}
+
 type executor struct {
 	forwarder pubsub.RequestForwarder
 }

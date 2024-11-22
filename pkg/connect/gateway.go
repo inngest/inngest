@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"io"
+
 	"log/slog"
 	"net"
 	"net/http"
@@ -224,7 +225,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
-		app, err := c.appLoader.GetAppByName(ctx, conn.Data.AppName)
+		app, err := c.appLoader.GetAppByName(ctx, conn.Group.EnvID, conn.Data.AppName)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			if ctx.Err() != nil {
 				c.closeDraining(ws)

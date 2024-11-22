@@ -7,6 +7,7 @@ export type Trace = {
   outputID: string | null;
   queuedAt: string;
   spanID: string;
+  stepID?: string | null;
   startedAt: string | null;
   status: string;
   stepInfo: StepInfoInvoke | StepInfoSleep | StepInfoWait | StepInfoRun | null;

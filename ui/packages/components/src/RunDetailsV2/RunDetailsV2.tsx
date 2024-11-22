@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { StatusCell } from '../Table';
 import { Trace } from '../TimelineV2';
-import { Timeline } from '../TimelineV2/Timeline';
+import { TimelineV2 } from '../TimelineV2/Timeline';
 import { TriggerDetails } from '../TriggerDetails';
 import type { Result } from '../types/functionRun';
 import { nullishToLazy } from '../utils/lazyLoad';
@@ -24,7 +24,9 @@ type Props = {
   pathCreator: React.ComponentProps<typeof RunInfo>['pathCreator'];
   pollInterval?: number;
   rerun: React.ComponentProps<typeof RunInfo>['rerun'];
+  rerunFromStep: React.ComponentProps<typeof RunInfo>['rerunFromStep'];
   runID: string;
+  stepAIEnabled?: boolean;
 };
 
 type Run = {
@@ -41,8 +43,9 @@ type Run = {
   trace: React.ComponentProps<typeof Trace>['trace'];
 };
 
-export function RunDetails(props: Props) {
-  const { getResult, getRun, getTrigger, pathCreator, rerun, runID, standalone } = props;
+export function RunDetailsV2(props: Props) {
+  const { getResult, getRun, getTrigger, pathCreator, rerun, rerunFromStep, runID, standalone } =
+    props;
   const [pollInterval, setPollInterval] = useState(props.pollInterval);
 
   const runRes = useQuery({
@@ -109,11 +112,13 @@ export function RunDetails(props: Props) {
               className="mb-4"
               pathCreator={pathCreator}
               rerun={rerun}
+              rerunFromStep={rerunFromStep}
               initialRunData={props.initialRunData}
               run={nullishToLazy(run)}
               runID={runID}
               standalone={standalone}
               result={resultRes.data}
+              stepAIEnabled={props.stepAIEnabled}
             />
             {showError && (
               <ErrorCard
@@ -123,7 +128,16 @@ export function RunDetails(props: Props) {
             )}
           </div>
 
-          {run && <Timeline getResult={getResult} pathCreator={pathCreator} trace={run.trace} />}
+          {run && (
+            <TimelineV2
+              getResult={getResult}
+              pathCreator={pathCreator}
+              runID={runID}
+              trace={run.trace}
+              stepAIEnabled={props.stepAIEnabled}
+              rerunFromStep={rerunFromStep}
+            />
+          )}
         </div>
 
         <TriggerDetails getTrigger={getTrigger} runID={runID} />

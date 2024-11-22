@@ -1,11 +1,12 @@
 import type { Route } from 'next';
 
+import { AITrace } from '../AI/AITrace';
+import { parseAIOutput } from '../AI/utils';
 import { CancelRunButton } from '../CancelRunButton';
 import { Card } from '../Card';
 import {
   ElementWrapper,
   IDElement,
-  LazyElementWrapper,
   LinkElement,
   OptimisticElementWrapper,
   TextElement,
@@ -30,10 +31,12 @@ type Props = {
     runPopout: (params: { runID: string }) => Route;
   };
   rerun: (args: { fnID: string; runID: string }) => Promise<unknown>;
+  rerunFromStep: React.ComponentProps<typeof RunResult>['rerunFromStep'];
   initialRunData?: InitialRunData;
   run: Lazy<Run>;
   runID: string;
   result?: Result;
+  stepAIEnabled?: boolean;
 };
 
 type Run = {
@@ -56,23 +59,36 @@ type Run = {
   };
 };
 
+const hasAIChildren = (trace: Run['trace']): boolean => {
+  return !!trace?.childrenSpans?.find(
+    (c?: any) => c?.stepInfo?.type === 'step.ai.wrap' || c?.stepInfo?.type === 'step.ai.infer'
+  );
+};
+
 export function RunInfo({
   cancelRun,
   className,
   pathCreator,
   rerun,
+  rerunFromStep,
   initialRunData,
   run,
   runID,
   standalone,
   result,
+  stepAIEnabled = false,
 }: Props) {
   let allowCancel = false;
   let isSuccess = false;
+  let isAI = false;
+
   if (isLazyDone(run)) {
     allowCancel = !Boolean(run.trace.endedAt);
     isSuccess = run.trace.status === 'COMPLETED';
+    isAI = hasAIChildren(run.trace);
   }
+
+  const aiOutput = stepAIEnabled && result?.data ? parseAIOutput(result.data) : undefined;
 
   return (
     <div className={cn('flex flex-col gap-5', className)}>
@@ -209,6 +225,7 @@ export function RunInfo({
                   return <TimeElement date={endedAt} />;
                 }}
               </OptimisticElementWrapper>
+              {aiOutput && <AITrace aiOutput={aiOutput} />}
             </dl>
           </div>
         </Card.Content>
@@ -228,7 +245,14 @@ export function RunInfo({
             </div>
           ) : null)}
         {result && (
-          <RunResult className="border-muted border-t" result={result} isSuccess={isSuccess} />
+          <RunResult
+            className="border-muted border-t"
+            result={result}
+            runID={runID}
+            rerunFromStep={rerunFromStep}
+            isSuccess={isSuccess}
+            stepAIEnabled={stepAIEnabled}
+          />
         )}
       </Card>
     </div>
