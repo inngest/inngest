@@ -18,7 +18,7 @@ export type RerunModalType = {
   }) => Promise<RerunResult>;
 };
 
-type RerunResult = {
+export type RerunResult = {
   data?: {
     rerun: Record<string, unknown>;
   };
@@ -119,13 +119,13 @@ export const RerunModal = ({
               fromStep: { stepID, input: patchInput(newInput) },
             });
 
-            if (result?.error) {
+            if (result.error) {
               console.error('rerun from step error', result.error);
               setError('Rerun failed, please try again later.');
               setRerunning(false);
             }
 
-            if (result?.data?.rerun) {
+            if (result.data?.rerun) {
               router.push(`/run?runID=${result.data.rerun}`);
             }
           }}
