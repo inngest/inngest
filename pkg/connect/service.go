@@ -33,7 +33,7 @@ type GatewayAuthHandler func(context.Context, *connect.WorkerConnectRequestData)
 
 type ConnectAppLoader interface {
 	// GetAppByName returns an app by name
-	GetAppByName(ctx context.Context, name string) (*cqrs.App, error)
+	GetAppByName(ctx context.Context, envID uuid.UUID, name string) (*cqrs.App, error)
 }
 
 type connectGatewaySvc struct {

@@ -20,6 +20,13 @@ var (
 	ErrNoFunctions = fmt.Errorf("No functions registered within your app")
 )
 
+type DeployType string
+
+const (
+	DeployTypePing    DeployType = "ping"
+	DeployTypeConnect DeployType = "connect"
+)
+
 type FromReadCloserOpts struct {
 	Env        string
 	ForceHTTPS bool
@@ -59,7 +66,7 @@ type RegisterRequest struct {
 	// DeployType represents how this was deployed, eg. via a ping.
 	// This allows us to change flows in the future, or support
 	// multiple registration flows within a single fetch response.
-	DeployType string `json:"deployType"`
+	DeployType DeployType `json:"deployType"`
 	// SDK represents the SDK language and version used for these
 	// functions, in the format: "js:v0.1.0"
 	SDK string `json:"sdk"`
@@ -81,9 +88,6 @@ type RegisterRequest struct {
 	checksum string
 
 	Capabilities Capabilities `json:"capabilities"`
-
-	// UseConnect specifies whether the SDK is expected to establish an outbound connection.
-	UseConnect bool `json:"useConnect"`
 }
 
 const (
@@ -132,6 +136,10 @@ func (f RegisterRequest) SDKVersion() string {
 	return ""
 }
 
+func (f RegisterRequest) IsConnect() bool {
+	return f.Capabilities.Connect == ConnectV1 && f.DeployType == DeployTypeConnect
+}
+
 // Parse parses the incoming
 func (f RegisterRequest) Parse(ctx context.Context) ([]*inngest.Function, error) {
 	// Ensure that there are no functions with the same ID.
@@ -152,27 +160,28 @@ func (f RegisterRequest) Parse(ctx context.Context) ([]*inngest.Function, error)
 			continue
 		}
 
-		fn, ferr := sdkFn.Function(f.UseConnect)
+		fn, ferr := sdkFn.Function()
 		if ferr != nil {
 			err = multierror.Append(err, ferr)
 			continue
 		}
 		funcs[n] = fn
 
-		if ferr := fn.Validate(ctx, f.UseConnect); ferr != nil {
+		if ferr := fn.Validate(ctx); ferr != nil {
 			err = multierror.Append(err, ferr)
 		}
 
 		for n, step := range fn.Steps {
-			if !f.UseConnect {
-				uri, ferr := url.Parse(step.URI)
-				if ferr != nil {
-					err = multierror.Append(err, fmt.Errorf("Step '%s' has an invalid URI", step.ID))
-				}
-				if uri.Scheme != "http" && uri.Scheme != "https" {
-					err = multierror.Append(err, fmt.Errorf("Step '%s' has an invalid driver. Only HTTP drivers may be used with SDK functions.", step.ID))
-					continue
-				}
+			uri, ferr := url.Parse(step.URI)
+			if ferr != nil {
+				err = multierror.Append(err, fmt.Errorf("Step '%s' has an invalid URI", step.ID))
+			}
+			switch uri.Scheme {
+			case "http", "https", "ws", "wss":
+				// noop
+			default:
+				err = multierror.Append(err, fmt.Errorf("Step '%s' has an invalid driver. Only HTTP drivers may be used with SDK functions.", step.ID))
+				continue
 			}
 			fn.Steps[n] = step
 		}

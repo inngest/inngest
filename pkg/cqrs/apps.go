@@ -31,15 +31,15 @@ type AppManager interface {
 
 type AppReader interface {
 	// GetApps returns apps that have not been deleted.
-	GetApps(ctx context.Context) ([]*App, error)
+	GetApps(ctx context.Context, envID uuid.UUID) ([]*App, error)
 	// GetAppByChecksum returns an app by checksum.
-	GetAppByChecksum(ctx context.Context, checksum string) (*App, error)
+	GetAppByChecksum(ctx context.Context, envID uuid.UUID, checksum string) (*App, error)
 	// GetAppByURL returns an app by URL
-	GetAppByURL(ctx context.Context, url string) (*App, error)
+	GetAppByURL(ctx context.Context, envID uuid.UUID, url string) (*App, error)
 	// GetAppByName returns an app by name
-	GetAppByName(ctx context.Context, name string) (*App, error)
+	GetAppByName(ctx context.Context, envID uuid.UUID, name string) (*App, error)
 	// GetAllApps returns all apps.
-	GetAllApps(ctx context.Context) ([]*App, error)
+	GetAllApps(ctx context.Context, envID uuid.UUID) ([]*App, error)
 
 	GetAppByID(ctx context.Context, id uuid.UUID) (*App, error)
 }

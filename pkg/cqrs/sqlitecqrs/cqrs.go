@@ -216,11 +216,11 @@ func (w wrapper) InsertQueueSnapshotChunk(ctx context.Context, params cqrs.Inser
 //
 
 // GetApps returns apps that have not been deleted.
-func (w wrapper) GetApps(ctx context.Context) ([]*cqrs.App, error) {
+func (w wrapper) GetApps(ctx context.Context, envID uuid.UUID) ([]*cqrs.App, error) {
 	return copyInto(ctx, w.q.GetApps, []*cqrs.App{})
 }
 
-func (w wrapper) GetAppByChecksum(ctx context.Context, checksum string) (*cqrs.App, error) {
+func (w wrapper) GetAppByChecksum(ctx context.Context, envID uuid.UUID, checksum string) (*cqrs.App, error) {
 	f := func(ctx context.Context) (*sqlc.App, error) {
 		return w.q.GetAppByChecksum(ctx, checksum)
 	}
@@ -234,7 +234,7 @@ func (w wrapper) GetAppByID(ctx context.Context, id uuid.UUID) (*cqrs.App, error
 	return copyInto(ctx, f, &cqrs.App{})
 }
 
-func (w wrapper) GetAppByURL(ctx context.Context, url string) (*cqrs.App, error) {
+func (w wrapper) GetAppByURL(ctx context.Context, envID uuid.UUID, url string) (*cqrs.App, error) {
 	// Normalize the URL before inserting into the DB.
 	url = util.NormalizeAppURL(url, forceHTTPS)
 
@@ -244,7 +244,7 @@ func (w wrapper) GetAppByURL(ctx context.Context, url string) (*cqrs.App, error)
 	return copyInto(ctx, f, &cqrs.App{})
 }
 
-func (w wrapper) GetAppByName(ctx context.Context, name string) (*cqrs.App, error) {
+func (w wrapper) GetAppByName(ctx context.Context, envID uuid.UUID, name string) (*cqrs.App, error) {
 	f := func(ctx context.Context) (*sqlc.App, error) {
 		return w.q.GetAppByName(ctx, name)
 	}
@@ -252,7 +252,7 @@ func (w wrapper) GetAppByName(ctx context.Context, name string) (*cqrs.App, erro
 }
 
 // GetAllApps returns all apps.
-func (w wrapper) GetAllApps(ctx context.Context) ([]*cqrs.App, error) {
+func (w wrapper) GetAllApps(ctx context.Context, envID uuid.UUID) ([]*cqrs.App, error) {
 	return copyInto(ctx, w.q.GetAllApps, []*cqrs.App{})
 }
 

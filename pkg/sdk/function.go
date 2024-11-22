@@ -60,7 +60,7 @@ type SDKFunction struct {
 	Steps map[string]SDKStep `json:"steps"`
 }
 
-func (s SDKFunction) Function(isConnect bool) (*inngest.Function, error) {
+func (s SDKFunction) Function() (*inngest.Function, error) {
 	f := inngest.Function{
 		Name:        s.Name,
 		Slug:        s.Slug,
@@ -92,7 +92,7 @@ func (s SDKFunction) Function(isConnect bool) (*inngest.Function, error) {
 
 	for _, step := range s.Steps {
 		url, ok := step.Runtime["url"].(string)
-		if !isConnect && !ok {
+		if !ok {
 			return nil, fmt.Errorf("No SDK URL provided for function '%s'", f.Name)
 		}
 
