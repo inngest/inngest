@@ -613,10 +613,15 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 
 	pathAndParams := r.URL.String()
 
+	deployType := sdk.DeployTypePing
+	if h.useConnect {
+		deployType = sdk.DeployTypeConnect
+	}
+
 	config := sdk.RegisterRequest{
 		URL:        fmt.Sprintf("%s://%s%s", scheme, host, pathAndParams),
 		V:          "1",
-		DeployType: "ping",
+		DeployType: deployType,
 		SDK:        HeaderValueSDK,
 		AppName:    h.appName,
 		Headers: sdk.Headers{
@@ -624,7 +629,6 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 			Platform: platform(),
 		},
 		Capabilities: capabilities,
-		UseConnect:   h.useConnect,
 	}
 
 	fns, err := createFunctionConfigs(h.appName, h.funcs, *h.url(r), false)
