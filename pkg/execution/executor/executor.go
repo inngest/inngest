@@ -1128,14 +1128,26 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 			Data:      data,
 		})
 
-		// Legacy - send inngest/function.failed, except for when the function has been cancelled.
-		if resp.Err != nil && !strings.Contains(*resp.Err, state.ErrFunctionCancelled.Error()) {
-			freshEvents = append(freshEvents, event.Event{
-				ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
-				Name:      event.FnFailedName,
-				Timestamp: now.UnixMilli(),
-				Data:      data,
-			})
+		if resp.Err != nil {
+			// Legacy - send inngest/function.failed, except for when the function has been cancelled.
+			if !strings.Contains(*resp.Err, state.ErrFunctionCancelled.Error()) {
+				freshEvents = append(freshEvents, event.Event{
+					ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
+					Name:      event.FnFailedName,
+					Timestamp: now.UnixMilli(),
+					Data:      data,
+				})
+			}
+
+			// Add function cancelled event
+			if *resp.Err == state.ErrFunctionCancelled.Error() {
+				freshEvents = append(freshEvents, event.Event{
+					ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
+					Name:      event.FnCancelledName,
+					Timestamp: now.UnixMilli(),
+					Data:      data,
+				})
+			}
 		}
 	}
 
