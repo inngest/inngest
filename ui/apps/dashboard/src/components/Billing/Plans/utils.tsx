@@ -3,7 +3,7 @@ import { getPeriodAbbreviation } from '@inngest/components/utils/date';
 import type { BillingPlan, Entitlements } from '@/gql/graphql';
 
 export type Plan = Omit<BillingPlan, 'entitlements' | 'features'> & {
-  entitlements: Partial<Entitlements>;
+  entitlements: Pick<Entitlements, 'concurrency' | 'runCount' | 'history'>;
 };
 
 export enum PlanNames {
@@ -30,16 +30,19 @@ export function processPlan(plan: Plan) {
   };
 }
 
-function getFeatureDescriptions(planName: string, entitlements: Record<string, any>): string[] {
+function getFeatureDescriptions(planName: string, entitlements: Plan['entitlements']): string[] {
   const numberFormatter = new Intl.NumberFormat('en-US', {
     notation: 'compact',
     compactDisplay: 'short',
   });
+  function safeNumberFormat(value: number | null): string {
+    return value !== null ? numberFormatter.format(value) : 'N/A';
+  }
 
   switch (planName) {
     case PlanNames.Free:
       return [
-        `${numberFormatter.format(entitlements.runCount.limit)} runs/mo free`,
+        `${safeNumberFormat(entitlements.runCount.limit)} runs/mo free`,
         `${numberFormatter.format(entitlements.concurrency.limit)} concurrent steps`,
         'Unlimited branch and staging envs',
         'Logs, traces, and observability',
@@ -49,7 +52,7 @@ function getFeatureDescriptions(planName: string, entitlements: Record<string, a
 
     case PlanNames.Basic:
       return [
-        `Starts at ${numberFormatter.format(entitlements.runCount.limit)} runs/mo`,
+        `Starts at ${safeNumberFormat(entitlements.runCount.limit)} runs/mo`,
         `Starts at ${numberFormatter.format(entitlements.concurrency.limit)} concurrent steps`,
         `${entitlements.history.limit} day trace and history retention`,
         'Unlimited functions and apps',
@@ -59,7 +62,7 @@ function getFeatureDescriptions(planName: string, entitlements: Record<string, a
 
     case PlanNames.Pro:
       return [
-        `Starts at ${numberFormatter.format(entitlements.runCount.limit)} runs/mo`,
+        `Starts at ${safeNumberFormat(entitlements.runCount.limit)} runs/mo`,
         `Starts at ${numberFormatter.format(entitlements.concurrency.limit)} concurrent steps`,
         `${entitlements.history.limit} day trace and history retention`,
         'Granular metrics',
@@ -71,7 +74,11 @@ function getFeatureDescriptions(planName: string, entitlements: Record<string, a
 
     case PlanNames.Enterprise:
       return [
-        `From 0-${numberFormatter.format(entitlements.runCount.limit)} runs/mo`,
+        `From 0-${
+          entitlements.runCount.limit !== null
+            ? `${numberFormatter.format(entitlements.runCount.limit)}`
+            : 'unlimited'
+        } runs/mo`,
         `From 200 - ${numberFormatter.format(entitlements.concurrency.limit)}  concurrent steps`,
         'SAML, RBAC, and audit trails',
         'Exportable observability',
@@ -83,7 +90,7 @@ function getFeatureDescriptions(planName: string, entitlements: Record<string, a
 
     default:
       return [
-        `${numberFormatter.format(entitlements.runCount.limit)} runs/mo`,
+        `${safeNumberFormat(entitlements.runCount.limit)} runs/mo`,
         `${numberFormatter.format(entitlements.concurrency.limit)}  concurrent steps`,
         `${entitlements.history.limit} day trace and history retention`,
       ];
