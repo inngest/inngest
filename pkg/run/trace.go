@@ -199,7 +199,7 @@ func (tb *runTree) ToRunSpan(ctx context.Context) (*rpbv2.RunSpan, error) {
 	return root, nil
 }
 
-func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan, bool, error) {
+func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (span *rpbv2.RunSpan, skipped bool, err error) {
 	res, skipped := tb.constructSpan(ctx, s)
 	if skipped {
 		return nil, skipped, nil
@@ -281,8 +281,6 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan,
 
 				return nil, false, fmt.Errorf("error grouping invoke: %w", err)
 			}
-		// case enums.OpcodeStepPlanned: // don't bother
-		// 	return nil, true, nil
 		default:
 			// execution spans
 			if s.ScopeName == consts.OtelScopeExecution {
