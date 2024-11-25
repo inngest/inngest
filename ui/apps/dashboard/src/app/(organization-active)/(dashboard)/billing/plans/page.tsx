@@ -48,11 +48,13 @@ export default async function Page() {
       )}
       <p className="text-subtle mb-4">Available plans</p>
       {isEnterprisePlan(currentPlan) && (
-        <HorizontalPlanCard
-          plan={ENTERPRISE_PLAN}
-          currentPlan={currentPlan}
-          onPlanChange={refetchCurrentPlan}
-        />
+        <div className="mb-4">
+          <HorizontalPlanCard
+            plan={ENTERPRISE_PLAN}
+            currentPlan={currentPlan}
+            onPlanChange={refetchCurrentPlan}
+          />
+        </div>
       )}
       <div className="mb-4 grid grid-cols-3 gap-4">
         {plans.map((plan) => {
