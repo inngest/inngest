@@ -887,15 +887,24 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		"workflow_id", i.md.ID.FunctionID.String(),
 	)
 
-	for _, e := range e.lifecycles {
-		// OnStepFinished handles step success and step errors/failures.  It is
-		// currently the responsibility of the lifecycle manager to handle the differing
+	// Run `OnStepFinished` lifecycle methods. This is usually run immediately
+	// using the response from SDKs, but deferring until after we've handled
+	// the response allows generator handlers (and other logic) to contribute
+	// to the status and output.
+	//
+	// This is necessary e.g. when a gateway is processed in-band and finds an
+	// error.
+	defer func() {
+		for _, e := range e.lifecycles {
+			// OnStepFinished handles step success and step errors/failures.  It is
+			// currently the responsibility of the lifecycle manager to handle the differing
 		// step statuses when a step finishes.
 		//
 		// TODO (tonyhb): This should probably change, as each lifecycle listener has to
-		// do the same parsing & conditional checks.
-		go e.OnStepFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, i.resp, nil)
-	}
+			// do the same parsing & conditional checks.
+			go e.OnStepFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, i.resp, nil)
+		}
+	}()
 
 	// Check for temporary failures.  The outputs of transient errors are not
 	// stored in the state store;  they're tracked via executor lifecycle methods
