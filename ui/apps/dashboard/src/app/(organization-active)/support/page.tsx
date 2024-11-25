@@ -10,7 +10,7 @@ import { RiArrowLeftLine, RiGithubFill } from '@remixicon/react';
 import { ThreadStatus, type ThreadPartsFragment } from '@team-plain/typescript-sdk';
 import { useQuery } from 'urql';
 
-import { isEnterprisePlan } from '@/app/(organization-active)/(dashboard)/settings/billing/utils';
+import { isEnterprisePlan } from '@/components/Billing/Plans/utils';
 import { graphql } from '@/gql';
 import LoadingIcon from '@/icons/LoadingIcon';
 import cn from '@/utils/cn';
