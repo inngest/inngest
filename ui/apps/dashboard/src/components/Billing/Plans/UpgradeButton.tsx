@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import CheckoutModal, { type CheckoutItem } from '@/components/Billing/Plans/CheckoutModal';
 import ConfirmPlanChangeModal from '@/components/Billing/Plans/ConfirmPlanChangeModal';
 import { pathCreator } from '@/utils/urls';
-import { PlanNames, isEnterprisePlan, type Plan } from './utils';
+import { PlanNames, isEnterprisePlan, isLegacyPlan, type Plan } from './utils';
 
 type ChangePlanArgs = {
   item: CheckoutItem;
@@ -42,7 +42,7 @@ export default function UpgradeButton({
   const isEnterpriseCard = cardPlanName === PlanNames.Enterprise;
   const isFreeCard = cardPlanName === PlanNames.Free;
 
-  const isLegacyPlan = !isEnterprisePlan(currentPlan) && !(currentPlan.name in PlanNames);
+  const isLegacy = isLegacyPlan(currentPlan);
 
   const isActive =
     currentPlanName === cardPlanName || (cardPlanName === PlanNames.Enterprise && isEnterprise);
@@ -53,7 +53,7 @@ export default function UpgradeButton({
       return !isEnterprisePlan(plan);
     }
     // For legacy plans, only Free Tier is a downgrade
-    if (isLegacyPlan) {
+    if (isLegacy) {
       return isFreeCard;
     }
     // For non-enterprise plans, compare the amounts
