@@ -29,9 +29,12 @@ const (
 
 func Connect(ctx context.Context, opts Opts, invoker FunctionInvoker, logger *slog.Logger) error {
 	ch := &connectHandler{
-		logger:  logger,
-		invoker: invoker,
-		opts:    opts,
+		logger:                 logger,
+		invoker:                invoker,
+		opts:                   opts,
+		notifyConnectDoneChan:  make(chan connectReport),
+		notifyConnectedChan:    make(chan struct{}),
+		initiateConnectionChan: make(chan struct{}),
 	}
 
 	wp := NewWorkerPool(ctx, opts.WorkerConcurrency, ch.processExecutorRequest)
@@ -91,6 +94,15 @@ type connectHandler struct {
 	hostsManager *hostsManager
 
 	workerPool *workerPool
+
+	// Notify when connect finishes (either with an error or because the context got canceled)
+	notifyConnectDoneChan chan connectReport
+
+	// Notify when connection is established
+	notifyConnectedChan chan struct{}
+
+	// Channel to imperatively initiate a connection
+	initiateConnectionChan chan struct{}
 }
 
 // authContext is wrapper for information related to authentication
@@ -127,15 +139,6 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 
 	h.hostsManager = newHostsManager(hosts)
 
-	// Notify when connect finishes (either with an error or because the context got canceled)
-	notifyConnectDoneChan := make(chan connectReport)
-
-	// Notify when connection is established
-	notifyConnectedChan := make(chan struct{})
-
-	// Channel to imperatively initiate a connection
-	initiateConnectionChan := make(chan struct{})
-
 	var attempts int
 
 	// We construct a connection loop, which will attempt to reconnect on failure
@@ -151,12 +154,12 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 				return nil
 
 			// Reset attempts when connection succeeded
-			case <-notifyConnectedChan:
+			case <-h.notifyConnectedChan:
 				attempts = 0
 				continue
 
 			// Handle connection done events
-			case msg := <-notifyConnectDoneChan:
+			case msg := <-h.notifyConnectDoneChan:
 				h.logger.Error("connect failed", "err", err, "reconnect", msg.reconnect)
 
 				if !msg.reconnect {
@@ -196,7 +199,7 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 				// continue to reconnect logic
 				h.logger.Debug("reconnecting", "attempts", attempts)
 
-			case <-initiateConnectionChan:
+			case <-h.initiateConnectionChan:
 			}
 
 			if attempts == 5 {
@@ -211,12 +214,12 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 				totalMem:              int64(totalMem),
 				marshaledFns:          marshaledFns,
 				marshaledCapabilities: marshaledCapabilities,
-			}, notifyConnectedChan, notifyConnectDoneChan)
+			})
 		}
 	})
 
 	// Initiate the first connection
-	initiateConnectionChan <- struct{}{}
+	h.initiateConnectionChan <- struct{}{}
 
 	// Wait until connection loop finishes
 	if err := eg.Wait(); err != nil {

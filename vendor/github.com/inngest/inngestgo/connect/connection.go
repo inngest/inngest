@@ -21,24 +21,24 @@ type connectReport struct {
 	err       error
 }
 
-func (h *connectHandler) connect(ctx context.Context, data connectionEstablishData, notifyConnectedChan chan struct{}, notifyConnectDoneChan chan connectReport) {
+func (h *connectHandler) connect(ctx context.Context, data connectionEstablishData) {
 	// Set up connection (including connect handshake protocol)
-	preparedConn, reconnect, err := h.prepareConnection(ctx, data)
+	preparedConn, err := h.prepareConnection(ctx, data)
 	if err != nil {
 		h.logger.Error("could not establish connection", "err", err)
 
-		notifyConnectDoneChan <- connectReport{
-			reconnect: reconnect,
+		h.notifyConnectDoneChan <- connectReport{
+			reconnect: shouldReconnect(err),
 			err:       fmt.Errorf("could not establish connection: %w", err),
 		}
 		return
 	}
 
 	// Notify that the connection was established
-	notifyConnectedChan <- struct{}{}
+	h.notifyConnectedChan <- struct{}{}
 
 	// Set up connection lifecycle logic (receiving messages, handling requests, etc.)
-	reconnect, err = h.handleConnection(ctx, data, preparedConn.ws, preparedConn.gatewayHost, notifyConnectedChan, notifyConnectDoneChan)
+	err = h.handleConnection(ctx, data, preparedConn.ws, preparedConn.gatewayHost)
 	if err != nil {
 		h.logger.Error("could not handle connection", "err", err)
 
@@ -47,17 +47,14 @@ func (h *connectHandler) connect(ctx context.Context, data connectionEstablishDa
 			return
 		}
 
-		notifyConnectDoneChan <- connectReport{
-			reconnect: reconnect,
+		h.notifyConnectDoneChan <- connectReport{
+			reconnect: shouldReconnect(err),
 			err:       fmt.Errorf("could not handle connection: %w", err),
 		}
 		return
 	}
 
-	notifyConnectDoneChan <- connectReport{
-		reconnect: reconnect,
-		err:       nil,
-	}
+	h.notifyConnectDoneChan <- connectReport{}
 }
 
 type connectionEstablishData struct {
@@ -69,13 +66,13 @@ type connectionEstablishData struct {
 	manualReadinessAck    bool
 }
 
-type preparedConnection struct {
+type connection struct {
 	ws           *websocket.Conn
 	gatewayHost  string
 	connectionId string
 }
 
-func (h *connectHandler) prepareConnection(ctx context.Context, data connectionEstablishData) (preparedConnection, bool, error) {
+func (h *connectHandler) prepareConnection(ctx context.Context, data connectionEstablishData) (connection, error) {
 	connectTimeout, cancelConnectTimeout := context.WithTimeout(ctx, 10*time.Second)
 	defer cancelConnectTimeout()
 
@@ -84,7 +81,7 @@ func (h *connectHandler) prepareConnection(ctx context.Context, data connectionE
 		// All gateways have been tried, reset the internal state to retry
 		h.hostsManager.resetGateways()
 
-		return preparedConnection{}, true, fmt.Errorf("no available gateway hosts")
+		return connection{}, reconnectError{fmt.Errorf("no available gateway hosts")}
 	}
 
 	// Establish WebSocket connection to one of the gateways
@@ -95,7 +92,7 @@ func (h *connectHandler) prepareConnection(ctx context.Context, data connectionE
 	})
 	if err != nil {
 		h.hostsManager.markUnreachableGateway(gatewayHost)
-		return preparedConnection{}, true, fmt.Errorf("could not connect to gateway: %w", err)
+		return connection{}, reconnectError{fmt.Errorf("could not connect to gateway: %w", err)}
 	}
 
 	// Connection ID is unique per connection, reconnections should get a new ID
@@ -103,15 +100,19 @@ func (h *connectHandler) prepareConnection(ctx context.Context, data connectionE
 
 	h.logger.Debug("websocket connection established", "gateway_host", gatewayHost)
 
-	reconnect, err := h.performConnectHandshake(ctx, connectionId.String(), ws, gatewayHost, data)
+	err = h.performConnectHandshake(ctx, connectionId.String(), ws, gatewayHost, data)
 	if err != nil {
-		return preparedConnection{}, reconnect, fmt.Errorf("could not perform connect handshake: %w", err)
+		return connection{}, reconnectError{fmt.Errorf("could not perform connect handshake: %w", err)}
 	}
 
-	return preparedConnection{ws, gatewayHost, connectionId.String()}, false, nil
+	return connection{
+		ws:           ws,
+		gatewayHost:  gatewayHost,
+		connectionId: connectionId.String(),
+	}, nil
 }
 
-func (h *connectHandler) handleConnection(ctx context.Context, data connectionEstablishData, ws *websocket.Conn, gatewayHost string, notifyConnectedChan chan struct{}, notifyConnectDoneChan chan connectReport) (reconnect bool, err error) {
+func (h *connectHandler) handleConnection(ctx context.Context, data connectionEstablishData, ws *websocket.Conn, gatewayHost string) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -130,9 +131,9 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 	// Send buffered but unsent messages if connection was re-established
 	if len(h.messageBuffer) > 0 {
 		h.logger.Debug("sending buffered messages", "count", len(h.messageBuffer))
-		err = h.sendBufferedMessages(ws)
+		err := h.sendBufferedMessages(ws)
 		if err != nil {
-			return true, fmt.Errorf("could not send buffered messages: %w", err)
+			return reconnectError{fmt.Errorf("could not send buffered messages: %w", err)}
 		}
 	}
 
@@ -159,7 +160,7 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 	eg.Go(func() error {
 		for {
 			var msg connectproto.ConnectMessage
-			err = wsproto.Read(context.Background(), ws, &msg)
+			err := wsproto.Read(context.Background(), ws, &msg)
 			if err != nil {
 				h.logger.Error("failed to read message", "err", err)
 
@@ -204,13 +205,13 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 			// Intercept connected signal and pass it to the main goroutine
 			notifyConnectedInterceptChan := make(chan struct{})
 			go func() {
-				<-notifyConnectedChan
+				<-h.notifyConnectedChan
 				notifyConnectedInterceptChan <- struct{}{}
 				doneWaiting()
 			}()
 
 			// Establish new connection and pass close reports back to the main goroutine
-			go h.connect(context.Background(), data, notifyConnectedInterceptChan, notifyConnectDoneChan)
+			go h.connect(context.Background(), data)
 
 			cancel()
 
@@ -222,7 +223,7 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 			}
 
 			// By returning, we will close the old connection
-			return false, errGatewayDraining
+			return errGatewayDraining
 		}
 
 		h.logger.Debug("read loop ended with error", "err", err)
@@ -233,17 +234,17 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 			h.logger.Error("connection closed with reason", "reason", cerr.Reason)
 
 			// Reconnect!
-			return true, fmt.Errorf("connection closed with reason %q: %w", cerr.Reason, cerr)
+			return reconnectError{fmt.Errorf("connection closed with reason %q: %w", cerr.Reason, cerr)}
 		}
 
 		// connection closed without reason
 		if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
 			h.logger.Error("failed to read message from gateway, lost connection unexpectedly", "err", err)
-			return true, fmt.Errorf("connection closed unexpectedly: %w", cerr)
+			return reconnectError{fmt.Errorf("connection closed unexpectedly: %w", cerr)}
 		}
 
 		// If this is not a worker shutdown, we should reconnect
-		return true, fmt.Errorf("connection closed unexpectedly: %w", ctx.Err())
+		return reconnectError{fmt.Errorf("connection closed unexpectedly: %w", ctx.Err())}
 	}
 
 	// Perform graceful shutdown routine (context was cancelled)
@@ -268,7 +269,7 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 	// Attempt to shut down connection if not already done
 	_ = ws.Close(websocket.StatusNormalClosure, connectproto.WorkerDisconnectReason_WORKER_SHUTDOWN.String())
 
-	return false, nil
+	return nil
 }
 
 func (h *connectHandler) withTemporaryConnection(data connectionEstablishData, handler func(ws *websocket.Conn) error) error {
@@ -284,7 +285,7 @@ func (h *connectHandler) withTemporaryConnection(data connectionEstablishData, h
 			return fmt.Errorf("could not establish connection after %d attempts", maxAttempts)
 		}
 
-		ws, _, err := h.prepareConnection(context.Background(), data)
+		ws, err := h.prepareConnection(context.Background(), data)
 		if err != nil {
 			attempts++
 			continue
