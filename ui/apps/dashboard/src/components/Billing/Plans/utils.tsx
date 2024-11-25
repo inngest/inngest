@@ -35,14 +35,13 @@ function getFeatureDescriptions(planName: string, entitlements: Plan['entitlemen
     notation: 'compact',
     compactDisplay: 'short',
   });
-  function safeNumberFormat(value: number | null): string {
-    return value !== null ? numberFormatter.format(value) : 'N/A';
-  }
 
   switch (planName) {
     case PlanNames.Free:
       return [
-        `${safeNumberFormat(entitlements.runCount.limit)} runs/mo free`,
+        ...(entitlements.runCount.limit
+          ? [`${numberFormatter.format(entitlements.runCount.limit)} runs/mo`]
+          : []),
         `${numberFormatter.format(entitlements.concurrency.limit)} concurrent steps`,
         'Unlimited branch and staging envs',
         'Logs, traces, and observability',
@@ -52,7 +51,9 @@ function getFeatureDescriptions(planName: string, entitlements: Plan['entitlemen
 
     case PlanNames.Basic:
       return [
-        `Starts at ${safeNumberFormat(entitlements.runCount.limit)} runs/mo`,
+        ...(entitlements.runCount.limit
+          ? [`Starts at ${numberFormatter.format(entitlements.runCount.limit)} runs/mo`]
+          : []),
         `Starts at ${numberFormatter.format(entitlements.concurrency.limit)} concurrent steps`,
         `${entitlements.history.limit} day trace and history retention`,
         'Unlimited functions and apps',
@@ -62,7 +63,9 @@ function getFeatureDescriptions(planName: string, entitlements: Plan['entitlemen
 
     case PlanNames.Pro:
       return [
-        `Starts at ${safeNumberFormat(entitlements.runCount.limit)} runs/mo`,
+        ...(entitlements.runCount.limit
+          ? [`Starts at ${numberFormatter.format(entitlements.runCount.limit)} runs/mo`]
+          : []),
         `Starts at ${numberFormatter.format(entitlements.concurrency.limit)} concurrent steps`,
         `${entitlements.history.limit} day trace and history retention`,
         'Granular metrics',
@@ -74,11 +77,9 @@ function getFeatureDescriptions(planName: string, entitlements: Plan['entitlemen
 
     case PlanNames.Enterprise:
       return [
-        `From 0-${
-          entitlements.runCount.limit !== null
-            ? `${numberFormatter.format(entitlements.runCount.limit)}`
-            : 'unlimited'
-        } runs/mo`,
+        ...(entitlements.runCount.limit
+          ? [`From 0-${numberFormatter.format(entitlements.runCount.limit)} runs/mo`]
+          : []),
         `From 200 - ${numberFormatter.format(entitlements.concurrency.limit)}  concurrent steps`,
         'SAML, RBAC, and audit trails',
         'Exportable observability',
@@ -90,7 +91,9 @@ function getFeatureDescriptions(planName: string, entitlements: Plan['entitlemen
 
     default:
       return [
-        `${safeNumberFormat(entitlements.runCount.limit)} runs/mo`,
+        ...(entitlements.runCount.limit
+          ? [`${numberFormatter.format(entitlements.runCount.limit)} runs/mo`]
+          : []),
         `${numberFormatter.format(entitlements.concurrency.limit)}  concurrent steps`,
         `${entitlements.history.limit} day trace and history retention`,
       ];
