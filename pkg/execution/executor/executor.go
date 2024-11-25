@@ -2185,11 +2185,13 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		}
 
 		// Ensure the opcode is treated as an error when calling OnStepFinish.
-		i.resp.UpdateOpcodeError(&gen, state.UserError{
-			Name:    fmt.Sprintf("Error making AI request: %s", err),
-			Message: string(output),
+		userLandErr := state.UserError{
+			Name:    "AIGatewayError",
+			Message: fmt.Sprintf("Error making AI request: %s", err),
 			Data:    output, // For golang's multiple returns.
-		})
+			Stack:   string(output),
+		}
+		i.resp.UpdateOpcodeError(&gen, userLandErr)
 
 		// And, finally, if this is retryable return an error which will be retried.
 		// Otherwise, we enqueue the next step directly so that the SDK can throw
