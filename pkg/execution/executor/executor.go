@@ -2208,8 +2208,9 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		//
 		// The actual error should be wrapped with an "error" so that it respects the
 		// error wrapping of step errors.
+		userLandErrByt, _ := json.Marshal(userLandErr)
 		output, _ = json.Marshal(map[string]json.RawMessage{
-			"error": output,
+			"error": userLandErrByt,
 		})
 
 		for _, e := range e.lifecycles {
