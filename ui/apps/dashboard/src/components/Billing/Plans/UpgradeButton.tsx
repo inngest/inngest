@@ -98,7 +98,7 @@ export default function UpgradeButton({
           });
         }}
       />
-      {isEnterprise && (
+      {isEnterprise && isEnterpriseCard && (
         <NewButton
           href={pathCreator.support({ ref: 'app-billing-plans-enterprise' })}
           label="Contact account manager"
