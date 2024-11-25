@@ -544,9 +544,17 @@ func (l traceLifecycle) OnStepStarted(
 	}
 	runID := md.ID.RunID
 
+	name := consts.OtelExecPlaceholder
+	// Check if this is a step planned from parallelism
+	if edge, _ := queue.GetEdge(item); edge != nil {
+		if edge.Edge.IncomingGeneratorStepName != "" {
+			name = edge.Edge.IncomingGeneratorStepName
+		}
+	}
+
 	_, span := NewSpan(ctx,
 		WithScope(consts.OtelScopeExecution),
-		WithName(consts.OtelExecPlaceholder),
+		WithName(name),
 		WithTimestamp(start),
 		WithSpanID(*spanID),
 		WithSpanAttributes(
