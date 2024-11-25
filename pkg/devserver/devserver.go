@@ -264,16 +264,13 @@ func start(ctx context.Context, opts StartOpts) error {
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq)
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
 
-	gatewayProxy := pubsub2.NewRedisPubSubConnector(connectRc)
-	connectionManager := connstate.NewRedisConnectionStateManager(connectRc)
+	connectPubSubRedis := createConnectPubSubRedis()
+	gatewayProxy, err := pubsub2.NewConnector(ctx, pubsub2.WithRedis(connectPubSubRedis, logger.StdlibLoggerWithCustomVarName(ctx, "CONNECT_PUBSUB_LOG_LEVEL"), true))
+	if err != nil {
+		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
+	}
 
-	go func() {
-		// set up PubSub manager, this is required for connect to work
-		err := gatewayProxy.Wait(ctx)
-		if err != nil {
-			logger.From(ctx).Error().Err(err).Msg("error waiting for pubsub messages")
-		}
-	}()
+	connectionManager := connstate.NewRedisConnectionStateManager(connectRc)
 
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
@@ -475,6 +472,15 @@ func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Clien
 		}
 	}()
 	return rc, nil
+}
+
+func createConnectPubSubRedis() rueidis.ClientOption {
+	r := miniredis.NewMiniRedis()
+	_ = r.Start()
+	return rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	}
 }
 
 func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleSendingEvent {

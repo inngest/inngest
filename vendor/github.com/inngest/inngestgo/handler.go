@@ -24,7 +24,7 @@ import (
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"github.com/inngest/inngestgo/internal/types"
 	"github.com/inngest/inngestgo/step"
-	"golang.org/x/exp/slog"
+	"log/slog"
 )
 
 var (
@@ -313,8 +313,6 @@ type handler struct {
 	funcs   []ServableFunction
 	// lock prevents reading the function maps while serving
 	l sync.RWMutex
-
-	useConnect bool
 }
 
 func (h *handler) SetOptions(opts HandlerOpts) Handler {
@@ -613,15 +611,10 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 
 	pathAndParams := r.URL.String()
 
-	deployType := sdk.DeployTypePing
-	if h.useConnect {
-		deployType = sdk.DeployTypeConnect
-	}
-
 	config := sdk.RegisterRequest{
 		URL:        fmt.Sprintf("%s://%s%s", scheme, host, pathAndParams),
 		V:          "1",
-		DeployType: deployType,
+		DeployType: sdk.DeployTypePing,
 		SDK:        HeaderValueSDK,
 		AppName:    h.appName,
 		Headers: sdk.Headers{
