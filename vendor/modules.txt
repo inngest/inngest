@@ -520,6 +520,7 @@ github.com/inngest/expr
 ## explicit; go 1.23.2
 github.com/inngest/inngestgo
 github.com/inngest/inngestgo/errors
+github.com/inngest/inngestgo/experimental/group
 github.com/inngest/inngestgo/internal/sdkrequest
 github.com/inngest/inngestgo/internal/types
 github.com/inngest/inngestgo/step
