@@ -90,6 +90,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		c.connectionSema.Add(1)
 		defer func() {
+			// This is deferred so we always update the semaphore
 			defer c.connectionSema.Done()
 			ch.log.Debug("Closing WebSocket connection")
 
