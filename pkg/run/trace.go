@@ -73,10 +73,12 @@ func NewRunTree(opts RunTreeOpts) (*runTree, error) {
 	}
 
 	for _, s := range opts.Spans {
-		// don't even bother
-		// if s.StepOpCode() == enums.OpcodeStepPlanned {
-		// 	continue
-		// }
+		// ignore parallelism planning spans
+		if s.StepOpCode() == enums.OpcodeStepPlanned {
+			if _, ok := s.SpanAttributes[consts.OtelSysStepPlan]; ok {
+				continue
+			}
+		}
 
 		if s.ScopeName == consts.OtelScopeFunction {
 			b.root = s
@@ -99,10 +101,12 @@ func NewRunTree(opts RunTreeOpts) (*runTree, error) {
 
 	// loop through again to construct parent/child relationship
 	for _, s := range opts.Spans {
-		// don't even bother
-		// if s.StepOpCode() == enums.OpcodeStepPlanned {
-		// 	continue
-		// }
+		// ignore parallelism planning spans
+		if s.StepOpCode() == enums.OpcodeStepPlanned {
+			if _, ok := s.SpanAttributes[consts.OtelSysStepPlan]; ok {
+				continue
+			}
+		}
 
 		if s.ParentSpanID != nil {
 			if parent, ok := b.spans[*s.ParentSpanID]; ok {

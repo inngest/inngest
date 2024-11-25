@@ -850,8 +850,12 @@ func (l traceLifecycle) OnStepFinished(
 			span.SetStepOutput(output)
 		} else {
 			// if it's not a step or function response that represents either a failed or a successful execution.
-			// Do not record discovery spans and cancel it.
-			_ = span.Cancel(ctx)
+
+			// annotate it as a planning step currently only used for parallelism, so we know
+			// we can ignore it when displaying on UI
+			span.SetAttributes(
+				attribute.Bool(consts.OtelSysStepPlan, true),
+			)
 		}
 	}
 }
