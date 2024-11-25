@@ -1,7 +1,7 @@
 import { NewLink } from '@inngest/components/Link/Link';
 
 import { HorizontalPlanCard, VerticalPlanCard } from '@/components/Billing/Plans/PlanCard';
-import { isEnterprisePlan, type Plan } from '@/components/Billing/Plans/utils';
+import { isEnterprisePlan, isLegacyPlan, type Plan } from '@/components/Billing/Plans/utils';
 import { currentPlan as getCurrentPlan, plans as getPlans } from '@/components/Billing/data';
 import { pathCreator } from '@/utils/urls';
 
@@ -33,12 +33,11 @@ export default async function Page() {
     return await getCurrentPlan();
   };
 
-  const isLegacyPlan =
-    !isEnterprisePlan(currentPlan) && !plans.some((plan) => plan && plan.name === currentPlan.name);
+  const isLegacy = isLegacyPlan(currentPlan);
 
   return (
     <>
-      {isLegacyPlan && (
+      {isLegacy && (
         <div className="mb-8">
           <HorizontalPlanCard
             plan={currentPlan}
@@ -48,6 +47,13 @@ export default async function Page() {
         </div>
       )}
       <p className="text-subtle mb-4">Available plans</p>
+      {isEnterprisePlan(currentPlan) && (
+        <HorizontalPlanCard
+          plan={ENTERPRISE_PLAN}
+          currentPlan={currentPlan}
+          onPlanChange={refetchCurrentPlan}
+        />
+      )}
       <div className="mb-4 grid grid-cols-3 gap-4">
         {plans.map((plan) => {
           if (plan) {
@@ -62,12 +68,13 @@ export default async function Page() {
           }
         })}
       </div>
-      <HorizontalPlanCard
-        plan={ENTERPRISE_PLAN}
-        currentPlan={currentPlan}
-        onPlanChange={refetchCurrentPlan}
-      />
-
+      {!isEnterprisePlan(currentPlan) && (
+        <HorizontalPlanCard
+          plan={ENTERPRISE_PLAN}
+          currentPlan={currentPlan}
+          onPlanChange={refetchCurrentPlan}
+        />
+      )}
       <div className="mt-4 text-center text-sm">
         Want to cancel your plan?{' '}
         <NewLink
