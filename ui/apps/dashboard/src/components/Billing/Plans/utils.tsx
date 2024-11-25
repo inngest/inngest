@@ -100,6 +100,25 @@ function getFeatureDescriptions(planName: string, entitlements: Plan['entitlemen
   }
 }
 
-export function isEnterprisePlan(plan: Plan | Partial<BillingPlan>): boolean {
-  return Boolean(plan.name?.match(/^Enterprise/i));
+export function isActive(
+  currentPlan: Plan | (Partial<BillingPlan> & { name: string }),
+  cardPlan: Plan | (Partial<BillingPlan> & { name: string })
+): boolean {
+  return (
+    currentPlan.name === cardPlan.name ||
+    (cardPlan.name === PlanNames.Enterprise && isEnterprisePlan(currentPlan))
+  );
+}
+
+// TODO: Return these from the API
+export function isEnterprisePlan(plan: Plan | (Partial<BillingPlan> & { name: string })): boolean {
+  return Boolean(plan.name.match(/^Enterprise/i));
+}
+
+export function isTrialPlan(plan: Plan | (Partial<BillingPlan> & { name: string })): boolean {
+  return Boolean(plan.name.match(/Trial/i));
+}
+
+export function isLegacyPlan(plan: Plan | (Partial<BillingPlan> & { name: string })): boolean {
+  return !isEnterprisePlan(plan) && !(plan.name in PlanNames);
 }
