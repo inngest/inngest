@@ -74,9 +74,9 @@ func NewRunTree(opts RunTreeOpts) (*runTree, error) {
 
 	for _, s := range opts.Spans {
 		// don't even bother
-		if s.StepOpCode() == enums.OpcodeStepPlanned {
-			continue
-		}
+		// if s.StepOpCode() == enums.OpcodeStepPlanned {
+		// 	continue
+		// }
 
 		if s.ScopeName == consts.OtelScopeFunction {
 			b.root = s
@@ -100,9 +100,9 @@ func NewRunTree(opts RunTreeOpts) (*runTree, error) {
 	// loop through again to construct parent/child relationship
 	for _, s := range opts.Spans {
 		// don't even bother
-		if s.StepOpCode() == enums.OpcodeStepPlanned {
-			continue
-		}
+		// if s.StepOpCode() == enums.OpcodeStepPlanned {
+		// 	continue
+		// }
 
 		if s.ParentSpanID != nil {
 			if parent, ok := b.spans[*s.ParentSpanID]; ok {
@@ -277,8 +277,8 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan,
 
 				return nil, false, fmt.Errorf("error grouping invoke: %w", err)
 			}
-		case enums.OpcodeStepPlanned: // don't bother
-			return nil, true, nil
+		// case enums.OpcodeStepPlanned: // don't bother
+		// 	return nil, true, nil
 		default:
 			// execution spans
 			if s.ScopeName == consts.OtelScopeExecution {
