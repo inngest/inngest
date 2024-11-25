@@ -1,6 +1,7 @@
+import { Pill } from '@inngest/components/Pill/Pill';
 import { RiCheckLine } from '@remixicon/react';
 
-import { processPlan, type Plan } from '@/components/Billing/Plans/utils';
+import { isActive, isTrialPlan, processPlan, type Plan } from '@/components/Billing/Plans/utils';
 import UpgradeButton from './UpgradeButton';
 
 export function VerticalPlanCard({
@@ -13,9 +14,14 @@ export function VerticalPlanCard({
   onPlanChange: () => void;
 }) {
   const transformedPlan = processPlan(plan);
+  const displayTrialPill = isActive(currentPlan, plan) && isTrialPlan(currentPlan);
+
   return (
     <div className="border-muted bg-canvasBase rounded-md border p-6">
-      <h4 className="text-basis mb-2 text-2xl font-medium">{transformedPlan.name}</h4>
+      <h4 className="text-basis mb-2 flex items-center gap-2 text-2xl font-medium">
+        {transformedPlan.name}
+        {displayTrialPill && <Pill>Trial</Pill>}
+      </h4>
       <div className="mb-1 text-xs font-bold uppercase">From</div>
       <div className="text-2xl">
         <span className="text-4xl font-medium">{transformedPlan.price}</span>/
@@ -48,6 +54,7 @@ export function HorizontalPlanCard({
   onPlanChange: () => void;
 }) {
   const transformedPlan = processPlan(plan);
+  const displayTrialPill = isActive(currentPlan, plan) && isTrialPlan(currentPlan);
   // Split features into two columns
   const halfwayIndex = Math.ceil(transformedPlan.features.length / 2);
   const firstColumn = transformedPlan.features.slice(0, halfwayIndex);
@@ -56,7 +63,10 @@ export function HorizontalPlanCard({
   return (
     <div className="border-muted bg-canvasBase grid grid-cols-3 items-center gap-12 rounded-md border p-6">
       <div>
-        <h4 className="text-basis mb-2 text-2xl font-medium">{transformedPlan.name}</h4>
+        <h4 className="text-basis mb-2 flex items-center gap-2 text-2xl font-medium">
+          {transformedPlan.name}
+          {displayTrialPill && <Pill>Trial</Pill>}
+        </h4>
         <UpgradeButton plan={plan} currentPlan={currentPlan} onPlanChange={onPlanChange} />
       </div>
 
