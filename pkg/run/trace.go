@@ -229,16 +229,17 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (span *rpbv2.Run
 		switch s.StepOpCode() {
 		case enums.OpcodeSleep:
 			if err := tb.processSleep(ctx, s, res); err != nil {
-				return nil, false, fmt.Errorf("error parsing invoke: %w", err)
+				return nil, false, fmt.Errorf("error parsing sleep: %w", err)
 			}
 		case enums.OpcodeWaitForEvent:
 			if err := tb.processWaitForEvent(ctx, s, res); err != nil {
-				return nil, false, fmt.Errorf("error parsing invoke: %w", err)
+				return nil, false, fmt.Errorf("error parsing wait for event: %w", err)
 			}
 		case enums.OpcodeInvokeFunction:
 			if err := tb.processInvoke(ctx, s, res); err != nil {
 				return nil, false, fmt.Errorf("error parsing invoke: %w", err)
 			}
+
 		}
 
 	// the rest are grouped executions
@@ -280,6 +281,13 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (span *rpbv2.Run
 				}
 
 				return nil, false, fmt.Errorf("error grouping invoke: %w", err)
+			}
+		case enums.OpcodeAIGateway:
+			if err := tb.processAIGateway(ctx, s, res); err != nil {
+				if err == ErrRedundantExecSpan {
+					return nil, true, nil // no-op
+				}
+				return nil, false, fmt.Errorf("error grouping AI gateway: %w", err)
 			}
 		default:
 			// execution spans
@@ -1252,4 +1260,21 @@ func hasFinished(rs *rpbv2.RunSpan) bool {
 
 func hasIdenticalChild(rs *rpbv2.RunSpan, s *cqrs.Span) bool {
 	return len(rs.Children) == 1 && rs.SpanId == s.SpanID && rs.Name == s.SpanName
+}
+
+func (tb *runTree) processAIGateway(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
+	defer tb.markProcessed(span)
+
+	stepOp := rpbv2.SpanStepOp_AI_GATEWAY
+	mod.StepOp = &stepOp
+
+	mod.Name = *span.StepDisplayName()
+
+	if hasFinished(mod) {
+		end := mod.StartedAt.AsTime().Add(span.Duration)
+		mod.DurationMs = span.DurationMS()
+		mod.EndedAt = timestamppb.New(end)
+	}
+
+	return nil
 }
