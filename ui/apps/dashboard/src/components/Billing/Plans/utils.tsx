@@ -2,7 +2,7 @@ import { getPeriodAbbreviation } from '@inngest/components/utils/date';
 
 import type { BillingPlan, Entitlements } from '@/gql/graphql';
 
-export type Plan = Omit<BillingPlan, 'entitlements' | 'features'> & {
+export type Plan = Omit<BillingPlan, 'entitlements' | 'features' | 'availableAddons'> & {
   entitlements: Pick<Entitlements, 'concurrency' | 'runCount' | 'history'>;
 };
 
