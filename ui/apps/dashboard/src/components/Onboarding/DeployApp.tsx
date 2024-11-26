@@ -285,56 +285,18 @@ export default function DeployApp() {
               Learn more about how to set a secret in Fly.io
             </NewLink>
           </p>
-          <CommandBlock.Wrapper>
-            <CommandBlock.Header className="flex items-center justify-between pr-4">
-              <CommandBlock.Tabs
-                tabs={[
-                  {
-                    title: 'Event key',
-                    content: `fly secrets set INNGEST_EVENT_KEY=${defaultEventKey}`,
-                    language: 'shell',
-                  },
-                ]}
-                activeTab="Event key"
-              />
-              <CommandBlock.CopyButton
-                content={`fly secrets set INNGEST_EVENT_KEY=${defaultEventKey}`}
-              />
-            </CommandBlock.Header>
-            <CommandBlock
-              currentTabContent={{
-                title: 'Event key',
-                content: `fly secrets set INNGEST_EVENT_KEY=${defaultEventKey}`,
-                language: 'shell',
-              }}
-            />
-          </CommandBlock.Wrapper>
-          <div className="mb-4" />
-          <CommandBlock.Wrapper>
-            <CommandBlock.Header className="flex items-center justify-between pr-4">
-              <CommandBlock.Tabs
-                tabs={[
-                  {
-                    title: 'Signing key',
-                    content: `fly secrets set INNGEST_SIGNING_KEY=${env.webhookSigningKey}`,
-                    language: 'shell',
-                  },
-                ]}
-                activeTab="Signing key"
-              />
-              <CommandBlock.CopyButton
-                content={`fly secrets set INNGEST_SIGNING_KEY=${env.webhookSigningKey}`}
-              />
-            </CommandBlock.Header>
-            <CommandBlock
-              currentTabContent={{
-                title: 'Signing key',
-                content: `fly secrets set INNGEST_SIGNING_KEY=${env.webhookSigningKey}`,
-                language: 'shell',
-              }}
-            />
-          </CommandBlock.Wrapper>
-          <div className="mb-4" />
+          <div className="text-basis mb-2 text-sm font-medium">Event key</div>
+          <Secret
+            kind="command"
+            secret={`fly secrets set INNGEST_EVENT_KEY=${defaultEventKey}`}
+            className="mb-4"
+          />
+          <div className="text-basis mb-2 text-sm font-medium">Signing key</div>
+          <Secret
+            kind="command"
+            secret={`fly secrets set INNGEST_SIGNING_KEY=${env.webhookSigningKey}`}
+            className="mb-6"
+          />
           <NewButton
             label="Next"
             onClick={() => {
