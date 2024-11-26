@@ -26,8 +26,6 @@ import { MetricsOverview } from './Overview';
 import { MetricsVolume } from './Volume';
 import { convertLookup } from './utils';
 
-export const CONCURRENCY_LIMIT_DEFAULT = 25;
-
 export type EntityType = {
   id: string;
   name: string;
@@ -142,8 +140,7 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
 
   const logRetention = Number(planData?.account.plan?.features.log_retention);
   const upgradeCutoff = subtractDuration(new Date(), { days: logRetention || 7 });
-  const concurrencyLimit =
-    accountConcurrencyLimitRes?.account.entitlements.concurrency.limit || CONCURRENCY_LIMIT_DEFAULT;
+  const concurrencyLimit = accountConcurrencyLimitRes?.account.entitlements.concurrency.limit;
 
   const envLookup = apps?.length !== 1 && !selectedApps?.length && !selectedFns?.length;
   const mappedFunctions = convertLookup(functions);
