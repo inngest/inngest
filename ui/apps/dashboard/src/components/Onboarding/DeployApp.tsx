@@ -35,6 +35,7 @@ export default function DeployApp() {
 
   const hasVercelIntegration = data.enabled;
   const vercelProjects = data.projects;
+  const enabledProjects = vercelProjects.filter((project) => project.isEnabled);
 
   return (
     <div className="text-subtle">
@@ -202,7 +203,7 @@ export default function DeployApp() {
             )}
             {hasVercelIntegration && (
               <p className="text-success my-4 text-sm">
-                {vercelProjects.length} project{vercelProjects.length === 1 ? '' : 's'} enabled
+                {enabledProjects.length} project{enabledProjects.length === 1 ? '' : 's'} enabled
                 successfully
               </p>
             )}
