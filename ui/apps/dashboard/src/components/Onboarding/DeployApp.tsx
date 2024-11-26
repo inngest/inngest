@@ -1,6 +1,5 @@
 import { useRouter } from 'next/navigation';
 import { NewButton } from '@inngest/components/Button';
-import CommandBlock from '@inngest/components/CodeBlock/CommandBlock';
 import { NewLink } from '@inngest/components/Link';
 import TabCards from '@inngest/components/TabCards/TabCards';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
