@@ -60,8 +60,10 @@ type Run = {
 };
 
 const hasAIChildren = (trace: Run['trace']): boolean => {
+  console.log({ trace });
+
   return !!trace?.childrenSpans?.find(
-    (c?: any) => c?.stepInfo?.type === 'step.ai.wrap' || c?.stepInfo?.type === 'step.ai.infer'
+    (c?: any) => c?.stepInfo?.type === 'step.ai.wrap' || c?.stepOp === 'AI_GATEWAY'
   );
 };
 
