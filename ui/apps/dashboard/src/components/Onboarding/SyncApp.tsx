@@ -231,12 +231,16 @@ export default function SyncApp() {
               <NewButton
                 kind="secondary"
                 appearance="outlined"
-                label="View Vercel dashboard"
+                label="Manage Vercel integration"
                 href={pathCreator.vercel()}
                 size="small"
                 onClick={() =>
                   tracking?.trackOnboardingAction(currentStepName, {
-                    metadata: { type: 'btn-click', label: 'view-dashboard', syncMethod: 'vercel' },
+                    metadata: {
+                      type: 'btn-click',
+                      label: 'view-integration',
+                      syncMethod: 'vercel',
+                    },
                   })
                 }
               />

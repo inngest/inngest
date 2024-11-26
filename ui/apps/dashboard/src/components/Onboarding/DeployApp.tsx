@@ -141,14 +141,14 @@ export default function DeployApp() {
                 <p className="text-basis">Vercel</p>
               </div>
               <NewButton
-                label="View Vercel Dashboard"
+                label="Manage Vercel integration"
                 kind="secondary"
                 appearance="outlined"
                 onClick={() => {
                   tracking?.trackOnboardingAction(currentStepName, {
                     metadata: {
                       type: 'btn-click',
-                      label: 'go-to-vercel',
+                      label: 'view-integration',
                       hostingProvider: 'vercel',
                     },
                   });
