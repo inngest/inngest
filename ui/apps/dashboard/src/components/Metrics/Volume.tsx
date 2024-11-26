@@ -9,7 +9,7 @@ import { useEnvironment } from '../Environments/environment-context';
 import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
 import { Backlog } from './Backlog';
 import { AccountConcurrency } from './Concurrency';
-import { CONCURRENCY_LIMIT_DEFAULT, type EntityLookup } from './Dashboard';
+import { type EntityLookup } from './Dashboard';
 import { Feedback } from './Feedback';
 import { RunsThrougput } from './RunsThroughput';
 import { SdkThroughput } from './SdkThroughput';
@@ -222,7 +222,7 @@ export const MetricsVolume = ({
   autoRefresh = false,
   entities,
   scope,
-  concurrencyLimit = CONCURRENCY_LIMIT_DEFAULT,
+  concurrencyLimit,
 }: MetricsFilters) => {
   const [volumeOpen, setVolumeOpen] = useState(true);
 

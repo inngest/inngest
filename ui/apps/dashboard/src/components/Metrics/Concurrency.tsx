@@ -13,14 +13,16 @@ const zeroID = '00000000-0000-0000-0000-000000000000';
 export const mapConcurrency = (
   { stepRunning: { metrics: runningMetrics } }: VolumeMetricsQuery['workspace'],
   entities: EntityLookup,
-  concurrencyLimit: number
+  concurrencyLimit?: number
 ) => {
   const dark = isDark();
 
   const metrics = {
     yAxis: {
       max: ({ max }: { max: number }) =>
-        max > concurrencyLimit ? max : concurrencyLimit + concurrencyLimit * 0.1,
+        concurrencyLimit !== undefined && max > concurrencyLimit
+          ? max
+          : (concurrencyLimit ?? max) + (concurrencyLimit ?? max) * 0.1,
     },
     xAxis: getXAxis(runningMetrics),
     series: [
@@ -80,7 +82,7 @@ export const AccountConcurrency = ({
 }: {
   workspace?: VolumeMetricsQuery['workspace'];
   entities: EntityLookup;
-  concurrencyLimit: number;
+  concurrencyLimit?: number;
 }) => {
   const chartOptions = workspace && mapConcurrency(workspace, entities, concurrencyLimit);
 
