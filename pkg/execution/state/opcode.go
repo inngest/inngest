@@ -5,11 +5,17 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/dateutil"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/xhit/go-str2duration/v2"
+)
+
+var (
+	ErrStepInputTooLarge  = fmt.Errorf("step input size is greater than the limit")
+	ErrStepOutputTooLarge = fmt.Errorf("step output size is greater than the limit")
 )
 
 type GeneratorOpcode struct {
@@ -34,6 +40,18 @@ type GeneratorOpcode struct {
 	Error *UserError `json:"error"`
 	// SDK versions < 3.?.? don't respond with the display name.
 	DisplayName *string `json:"displayName"`
+}
+
+func (g GeneratorOpcode) Validate() error {
+	if input, _ := g.Input(); input != "" && len(input) > consts.MaxStepInputSize {
+		return ErrStepOutputTooLarge
+	}
+
+	if output, _ := g.Output(); output != "" && len(output) > consts.MaxStepOutputSize {
+		return ErrStepOutputTooLarge
+	}
+
+	return nil
 }
 
 // Get the name of the step as defined in code by the user.

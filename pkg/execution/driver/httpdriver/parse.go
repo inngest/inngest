@@ -35,46 +35,57 @@ func ParseGenerator(ctx context.Context, byt []byte, noRetry bool) ([]*state.Gen
 	return generators, err
 }
 
-func parseGenerator(ctx context.Context, byt []byte, noRetry bool) ([]*state.GeneratorOpcode, error) {
-	// When we return a 206, we always expect that this is
-	// a generator function.  Users SHOULD NOT return a 206
-	// in any other circumstance.
+func parseGenerator(ctx context.Context, byt []byte, noRetry bool) (ops []*state.GeneratorOpcode, err error) {
+	// When we return a 206, we always expect that this is a generator
+	// function.  Users SHOULD NOT return a 206 in any other circumstance.
 	if len(byt) == 0 {
-		return nil, ErrEmptyResponse
+		err = ErrEmptyResponse
+		return
 	}
 
 	// Is this a slice of opcodes or a single opcode?  The SDK can return both:
-	// parallelism was added as an incremental improvement.  It would have been nice
-	// to always return an array and we can enfore this as an SDK requirement in V1+
+	// parallelism was added as an incremental improvement.  It would have been
+	// nice to always return an array and we can enfore this as an SDK
+	// requirement in V1+
 	switch byt[0] {
 	// 0.x.x SDKs return a single opcode.
 	case '{':
 		gen := &state.GeneratorOpcode{}
-		if err := json.Unmarshal(byt, gen); err != nil {
-			return nil, fmt.Errorf("error reading generator opcode response: %w", err)
+		if err = json.Unmarshal(byt, gen); err != nil {
+			err = fmt.Errorf("error reading generator opcode response: %w", err)
+			return
 		}
-		return []*state.GeneratorOpcode{gen}, nil
+		ops = append(ops, gen)
 	// 1.x.x+ SDKs return an array of opcodes.
 	case '[':
 		gen := []*state.GeneratorOpcode{}
-		if err := json.Unmarshal(byt, &gen); err != nil {
-			return nil, fmt.Errorf("error reading generator opcode response: %w", err)
+		if err = json.Unmarshal(byt, &gen); err != nil {
+			err = fmt.Errorf("error reading generator opcode response: %w", err)
+			return
 		}
-		// Normalize the response to always return at least an empty op code in the
-		// array. With this, a non-generator is represented as an empty array.
-		if len(gen) == 0 {
-			return []*state.GeneratorOpcode{
-				{Op: enums.OpcodeNone},
-			}, nil
-		}
-		return gen, nil
+		ops = append(ops, gen...)
 	}
 
-	// Finally, if the length of resp.Generator == 0 then this is implicitly an enums.OpcodeNone
-	// step.  This is added to reduce bandwidth across many calls.
-	return []*state.GeneratorOpcode{
-		{Op: enums.OpcodeNone},
-	}, nil
+	// Finally, if the length of resp.Generator == 0 then this is implicitly an
+	// enums.OpcodeNone step.  This is added to reduce bandwidth across many
+	// calls and normalize the response, such that a non-generator is
+	// represented as an empty array.
+	if len(ops) == 0 {
+		ops = append(ops, &state.GeneratorOpcode{
+			Op: enums.OpcodeNone,
+		})
+	}
+
+	// Check every op we've parsed, making sure it adheres to any limits we're
+	// enforcing
+	for _, op := range ops {
+		if err = op.Validate(); err != nil {
+			err = fmt.Errorf("error validating generator opcode %s: %w", op.ID, err)
+			return
+		}
+	}
+
+	return
 }
 
 func ParseStream(resp []byte) (*StreamResponse, error) {
