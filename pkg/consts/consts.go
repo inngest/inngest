@@ -1,8 +1,9 @@
 package consts
 
 import (
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -28,8 +29,14 @@ const (
 	// our system.
 	MaxFunctionTimeout = 2 * time.Hour
 
+	// MaxStepOutputSize is the maximum size of the output of a step.
+	MaxStepOutputSize = 1024 * 1024 * 4 // 4MB
+
+	// MaxStepInputSize is the maximum size of the input of a step.
+	MaxStepInputSize = 1024 * 1024 * 4 // 4MB
+
 	// MaxBodySize is the maximum payload size read on any HTTP response.
-	MaxBodySize = 1024 * 1024 * 4 // 4MB
+	MaxBodySize = MaxStepOutputSize + MaxStepInputSize
 
 	// DefaultMaxStateSizeLimit is the maximum number of bytes of output state per function run allowed.
 	DefaultMaxStateSizeLimit = 1024 * 1024 * 32 // 32MB
