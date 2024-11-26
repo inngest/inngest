@@ -173,6 +173,9 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 		case rpbv2.SpanStepOp_WAIT_FOR_EVENT:
 			op := models.StepOpWaitForEvent
 			stepOp = &op
+		case rpbv2.SpanStepOp_AI_GATEWAY:
+			op := models.StepOpAiGateway
+			stepOp = &op
 		}
 	}
 

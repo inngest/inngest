@@ -58,6 +58,7 @@ enum SpanStepOp {
   STEP = 4;
   STEP_ERROR = 5;
   NONE = 6;
+  AI_GATEWAY = 7;
 }
 
 message StepInfo {
