@@ -48,6 +48,7 @@ export type AwsMarketplaceSetupResponse = {
 
 export type Account = {
   __typename?: 'Account';
+  appliedAddons: AppliedAddons;
   billingEmail: Scalars['String'];
   createdAt: Scalars['Time'];
   entitlementUsage: EntitlementUsage;
@@ -67,6 +68,15 @@ export type Account = {
 
 export type AccountSearchArgs = {
   opts: SearchInput;
+};
+
+export type AddonMulti = {
+  __typename?: 'AddonMulti';
+  billingPeriod: Scalars['BillingPeriod'];
+  id: Scalars['ID'];
+  name: Scalars['String'];
+  price: Price;
+  quantityPer: Scalars['Int'];
 };
 
 export type App = {
@@ -130,6 +140,18 @@ export type AppCheckResult = {
   signingKeyStatus: SecretCheck;
 };
 
+export type AppliedAddonMulti = {
+  __typename?: 'AppliedAddonMulti';
+  addon: AddonMulti;
+  quantity: Scalars['Int'];
+};
+
+export type AppliedAddons = {
+  __typename?: 'AppliedAddons';
+  concurrency: Maybe<AppliedAddonMulti>;
+  users: Maybe<AppliedAddonMulti>;
+};
+
 export type ArchiveWorkflowInput = {
   archive: Scalars['Boolean'];
   workflowID: Scalars['ID'];
@@ -151,9 +173,16 @@ export type ArchivedEvent = {
   version: Scalars['String'];
 };
 
+export type AvailableAddons = {
+  __typename?: 'AvailableAddons';
+  concurrency: Maybe<AddonMulti>;
+  users: Maybe<AddonMulti>;
+};
+
 export type BillingPlan = {
   __typename?: 'BillingPlan';
   amount: Scalars['Int'];
+  availableAddons: AvailableAddons;
   billingPeriod: Scalars['BillingPeriod'];
   entitlements: Entitlements;
   features: Scalars['Map'];
@@ -371,6 +400,12 @@ export type EditWorkflowInput = {
   workflowID: Scalars['ID'];
 };
 
+export type EntitlementConcurrency = {
+  __typename?: 'EntitlementConcurrency';
+  limit: Scalars['Int'];
+  usage: Scalars['Int'];
+};
+
 export type EntitlementInt = {
   __typename?: 'EntitlementInt';
   limit: Scalars['Int'];
@@ -381,10 +416,19 @@ export type EntitlementNullableInt = {
   limit: Maybe<Scalars['Int']>;
 };
 
-export enum EntitlementScope {
-  Account = 'ACCOUNT',
-  Plan = 'PLAN'
-}
+export type EntitlementRunCount = {
+  __typename?: 'EntitlementRunCount';
+  limit: Maybe<Scalars['Int']>;
+  overageAllowed: Scalars['Boolean'];
+  usage: Scalars['Int'];
+};
+
+export type EntitlementStepCount = {
+  __typename?: 'EntitlementStepCount';
+  limit: Maybe<Scalars['Int']>;
+  overageAllowed: Scalars['Boolean'];
+  usage: Scalars['Int'];
+};
 
 export type EntitlementUsage = {
   __typename?: 'EntitlementUsage';
@@ -410,12 +454,13 @@ export type EntitlementUsageStepCount = {
 export type Entitlements = {
   __typename?: 'Entitlements';
   accountID: Maybe<Scalars['UUID']>;
-  concurrency: EntitlementInt;
+  concurrency: EntitlementConcurrency;
   eventSize: EntitlementInt;
   history: EntitlementInt;
   planID: Maybe<Scalars['UUID']>;
-  runCount: EntitlementNullableInt;
-  stepCount: EntitlementNullableInt;
+  runCount: EntitlementRunCount;
+  stepCount: EntitlementStepCount;
+  userCount: EntitlementNullableInt;
 };
 
 export type EnvEdge = {
@@ -1081,6 +1126,11 @@ export type PaymentMethod = {
   expMonth: Scalars['String'];
   expYear: Scalars['String'];
   last4: Scalars['String'];
+};
+
+export type Price = {
+  __typename?: 'Price';
+  usCents: Scalars['Int'];
 };
 
 export type Query = {
@@ -2518,7 +2568,7 @@ export type EntitlementUsageQuery = { __typename?: 'Query', account: { __typenam
 export type GetCurrentPlanQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetCurrentPlanQuery = { __typename?: 'Query', account: { __typename?: 'Account', plan: { __typename?: 'BillingPlan', id: string, name: string, amount: number, billingPeriod: unknown, entitlements: { __typename?: 'Entitlements', concurrency: { __typename?: 'EntitlementInt', limit: number }, eventSize: { __typename?: 'EntitlementInt', limit: number }, history: { __typename?: 'EntitlementInt', limit: number }, runCount: { __typename?: 'EntitlementNullableInt', limit: number | null }, stepCount: { __typename?: 'EntitlementNullableInt', limit: number | null } } } | null, subscription: { __typename?: 'BillingSubscription', nextInvoiceDate: string } | null } };
+export type GetCurrentPlanQuery = { __typename?: 'Query', account: { __typename?: 'Account', plan: { __typename?: 'BillingPlan', id: string, name: string, amount: number, billingPeriod: unknown, entitlements: { __typename?: 'Entitlements', concurrency: { __typename?: 'EntitlementConcurrency', limit: number }, eventSize: { __typename?: 'EntitlementInt', limit: number }, history: { __typename?: 'EntitlementInt', limit: number }, runCount: { __typename?: 'EntitlementRunCount', limit: number | null }, stepCount: { __typename?: 'EntitlementStepCount', limit: number | null } } } | null, subscription: { __typename?: 'BillingSubscription', nextInvoiceDate: string } | null } };
 
 export type GetBillingDetailsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -2528,7 +2578,7 @@ export type GetBillingDetailsQuery = { __typename?: 'Query', account: { __typena
 export type GetPlansQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetPlansQuery = { __typename?: 'Query', plans: Array<{ __typename?: 'BillingPlan', id: string, name: string, amount: number, billingPeriod: unknown, entitlements: { __typename?: 'Entitlements', concurrency: { __typename?: 'EntitlementInt', limit: number }, eventSize: { __typename?: 'EntitlementInt', limit: number }, history: { __typename?: 'EntitlementInt', limit: number }, runCount: { __typename?: 'EntitlementNullableInt', limit: number | null }, stepCount: { __typename?: 'EntitlementNullableInt', limit: number | null } } } | null> };
+export type GetPlansQuery = { __typename?: 'Query', plans: Array<{ __typename?: 'BillingPlan', id: string, name: string, amount: number, billingPeriod: unknown, entitlements: { __typename?: 'Entitlements', concurrency: { __typename?: 'EntitlementConcurrency', limit: number }, eventSize: { __typename?: 'EntitlementInt', limit: number }, history: { __typename?: 'EntitlementInt', limit: number }, runCount: { __typename?: 'EntitlementRunCount', limit: number | null }, stepCount: { __typename?: 'EntitlementStepCount', limit: number | null } } } | null> };
 
 export type ArchiveEnvironmentMutationVariables = Exact<{
   id: Scalars['ID'];
@@ -2633,7 +2683,7 @@ export type MetricsLookupsQuery = { __typename?: 'Query', envBySlug: { __typenam
 export type AccountConcurrencyLookupQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type AccountConcurrencyLookupQuery = { __typename?: 'Query', account: { __typename?: 'Account', entitlements: { __typename?: 'Entitlements', concurrency: { __typename?: 'EntitlementInt', limit: number } } } };
+export type AccountConcurrencyLookupQuery = { __typename?: 'Query', account: { __typename?: 'Account', entitlements: { __typename?: 'Entitlements', concurrency: { __typename?: 'EntitlementConcurrency', limit: number } } } };
 
 export type FunctionStatusMetricsQueryVariables = Exact<{
   workspaceId: Scalars['ID'];
