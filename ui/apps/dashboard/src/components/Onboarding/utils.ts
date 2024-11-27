@@ -11,3 +11,7 @@ export function getNextStepName(currentStepName: OnboardingSteps): OnboardingSte
 
   return nextStep ? nextStep.name : undefined;
 }
+
+export const ONBOARDING_VERCEL_NEXT_URL = encodeURIComponent(
+  'https://app.inngest.com/env/production/onboarding/deploy-app'
+);

@@ -7,6 +7,7 @@ import { IconCloudflare } from '@inngest/components/icons/platforms/Cloudflare';
 import { IconFlyIo } from '@inngest/components/icons/platforms/FlyIo';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { RiCheckboxCircleFill, RiCloudLine } from '@remixicon/react';
+import { useLocalStorage } from 'react-use';
 
 import { useVercelIntegration } from '@/app/(organization-active)/(dashboard)/settings/integrations/vercel/useVercelIntegration';
 import { Secret } from '@/components/Secret';
@@ -29,6 +30,10 @@ export default function DeployApp() {
   const defaultEventKey = res.data?.defaultKey.presharedKey || 'Unknown key';
   const { value: vercelFlowEnabled } = useBooleanFlag('onboarding-vercel-flow');
   const tracking = useOnboardingTracking();
+  const [_, setInstallingVercelFromOnboarding] = useLocalStorage(
+    'installingVercelFromOnboarding',
+    false
+  );
 
   const { data, fetching, error } = useVercelIntegration();
   if (error) console.error(error);
@@ -186,12 +191,8 @@ export default function DeployApp() {
                     tracking?.trackOnboardingAction(currentStepName, {
                       metadata: { type: 'btn-click', label: 'connect', hostingProvider: 'vercel' },
                     });
-                    const nextUrl = encodeURIComponent(
-                      'https://app.inngest.com/env/production/onboarding/deploy-app'
-                    );
-                    router.push(
-                      `https://vercel.com/integrations/inngest/new?onSuccessRedirectURL=${nextUrl}`
-                    );
+                    setInstallingVercelFromOnboarding(true);
+                    router.push(`https://vercel.com/integrations/inngest/new`);
                   }}
                   disabled={fetching}
                 />
