@@ -79,7 +79,7 @@ Open the Inngest Dev Server dashboard at http://localhost:8288:
 
 ![Screenshot of the Inngest dashboard served by the Inngest Dev Server](.github/assets/dashboard-screenshot-2024-09-23.png)
 
-Follow our [Next.js](https://www.inngest.com/docs/getting-started/nextjs-quick-start?ref=github-inngest-readme) or [Python](https://www.inngest.com/docs/getting-started/python-quick-start?ref=github-inngest-readme) quick start guides.
+Follow our [Next.js](https://www.inngest.com/docs/getting-started/nextjs-quick-start?ref=github-inngest-readme), [Node.js](https://www.inngest.com/docs/getting-started/nodejs-quick-start?ref=github-inngest-readme) or [Python](https://www.inngest.com/docs/getting-started/python-quick-start?ref=github-inngest-readme) quick start guides.
 
 ## SDKs
 
