@@ -10,7 +10,6 @@ import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { RiCheckboxCircleFill, RiCloseCircleFill, RiInputCursorMove } from '@remixicon/react';
 
-import { useVercelIntegration } from '@/app/(organization-active)/(dashboard)/settings/integrations/vercel/useVercelIntegration';
 import { type CodedError } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import { useBooleanFlag } from '../FeatureFlags/hooks';
