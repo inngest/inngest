@@ -3,7 +3,7 @@
 import StepsMenu from '@inngest/components/Steps/StepsMenu';
 import { RiDiscordLine, RiExternalLinkLine, RiMailLine } from '@remixicon/react';
 
-import { pathCreator } from '@/utils/urls';
+import { WEBSITE_CONTACT_URL, pathCreator } from '@/utils/urls';
 import { isValidStep, steps } from '../Onboarding/types';
 import { onboardingMenuStepContent } from './content';
 import useOnboardingStep from './useOnboardingStep';
@@ -46,18 +46,21 @@ const links = (
     <StepsMenu.Link
       iconBefore={<RiExternalLinkLine className="h-4 w-4" />}
       href="https://www.inngest.com/docs?ref=app-onboarding-menu"
+      target="_blank"
     >
       See documentation
     </StepsMenu.Link>
     <StepsMenu.Link
       iconBefore={<RiDiscordLine className="h-4 w-4" />}
       href="https://www.inngest.com/discord?ref=app-onboarding-menu"
+      target="_blank"
     >
       Join discord community
     </StepsMenu.Link>
     <StepsMenu.Link
       iconBefore={<RiMailLine className="h-4 w-4" />}
-      href={pathCreator.support({ ref: 'app-onboarding-menu' })}
+      href={WEBSITE_CONTACT_URL + '?ref=app-onboarding-menu'}
+      target="_blank"
     >
       Request a demo
     </StepsMenu.Link>
