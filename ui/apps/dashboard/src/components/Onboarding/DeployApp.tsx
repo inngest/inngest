@@ -41,7 +41,6 @@ export default function DeployApp() {
   const hasVercelIntegration = data.enabled;
   const vercelProjects = data.projects;
   const enabledProjects = vercelProjects.filter((project) => project.isEnabled);
-  const defaultTabValue = !fetching && hasVercelIntegration ? 'vercel' : 'all';
 
   return (
     <div className="text-subtle">
@@ -52,7 +51,7 @@ export default function DeployApp() {
       </p>
 
       <h4 className="mb-4 text-sm font-medium">Choosing hosting provider:</h4>
-      <TabCards defaultValue={defaultTabValue}>
+      <TabCards defaultValue="vercel">
         <TabCards.ButtonList>
           <TabCards.Button className="w-32" value="all">
             <div className="flex items-center gap-1.5">
@@ -133,7 +132,7 @@ export default function DeployApp() {
               tracking?.trackOnboardingAction(currentStepName, {
                 metadata: { type: 'btn-click', label: 'next', hostingProvider: 'all' },
               });
-              router.push(pathCreator.onboardingSteps({ step: nextStepName }));
+              router.push(pathCreator.onboardingSteps({ step: nextStepName }) + '?nonVercel=true');
             }}
           />
         </TabCards.Content>
@@ -229,9 +228,7 @@ export default function DeployApp() {
                   tracking?.trackOnboardingAction(currentStepName, {
                     metadata: { type: 'btn-click', label: 'next', hostingProvider: 'vercel' },
                   });
-                  router.push(
-                    pathCreator.onboardingSteps({ step: nextStepName }) + '?fromVercel=true'
-                  );
+                  router.push(pathCreator.onboardingSteps({ step: nextStepName }));
                 }}
               />
             )}
@@ -272,7 +269,7 @@ export default function DeployApp() {
               tracking?.trackOnboardingAction(currentStepName, {
                 metadata: { type: 'btn-click', label: 'next', hostingProvider: 'cloudflare' },
               });
-              router.push(pathCreator.onboardingSteps({ step: nextStepName }));
+              router.push(pathCreator.onboardingSteps({ step: nextStepName }) + '?nonVercel=true');
             }}
           />
         </TabCards.Content>
@@ -318,7 +315,7 @@ export default function DeployApp() {
               tracking?.trackOnboardingAction(currentStepName, {
                 metadata: { type: 'btn-click', label: 'next', hostingProvider: 'flyio' },
               });
-              router.push(pathCreator.onboardingSteps({ step: nextStepName }));
+              router.push(pathCreator.onboardingSteps({ step: nextStepName }) + '?nonVercel=true');
             }}
           />
         </TabCards.Content>
