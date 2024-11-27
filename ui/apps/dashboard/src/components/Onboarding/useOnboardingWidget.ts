@@ -14,8 +14,11 @@ const useOnboardingWidget = () => {
           setIsOpen(JSON.parse(savedPreference));
           return;
         }
-        const { apps, unattachedSyncs } = await getProdApps();
-        const hasAppsOrUnattachedSyncs = apps.length > 0 || unattachedSyncs.length > 0;
+        const result = await getProdApps();
+        const hasAppsOrUnattachedSyncs = result
+          ? result.apps.length > 0 || result.unattachedSyncs.length > 0
+          : // In case of data fetching error, we don't wanna fail the page
+            true;
         // Show widget by default when user doesn't have prod apps
         const defaultState = !hasAppsOrUnattachedSyncs;
         setIsOpen(defaultState);

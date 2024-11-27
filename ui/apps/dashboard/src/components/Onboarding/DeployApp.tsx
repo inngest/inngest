@@ -30,7 +30,7 @@ export default function DeployApp() {
   const defaultEventKey = res.data?.defaultKey.presharedKey || 'Unknown key';
   const { value: vercelFlowEnabled } = useBooleanFlag('onboarding-vercel-flow');
   const tracking = useOnboardingTracking();
-  const [_, setInstallingVercelFromOnboarding] = useLocalStorage(
+  const [, setInstallingVercelFromOnboarding] = useLocalStorage(
     'installingVercelFromOnboarding',
     false
   );

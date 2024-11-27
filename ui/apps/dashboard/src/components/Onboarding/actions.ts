@@ -79,7 +79,7 @@ export async function getProdApps() {
     return { apps, unattachedSyncs };
   } catch (error) {
     console.error('Error fetching production apps:', error);
-    return { apps: [], unattachedSyncs: [] };
+    return null;
   }
 }
 
