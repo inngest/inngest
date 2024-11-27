@@ -189,7 +189,9 @@ export default function DeployApp() {
                     const nextUrl = encodeURIComponent(
                       'https://app.inngest.com/env/production/onboarding/deploy-app'
                     );
-                    router.push(`https://vercel.com/integrations/inngest/new?next=${nextUrl}`);
+                    router.push(
+                      `https://vercel.com/integrations/inngest/new?onSuccessRedirectURL=${nextUrl}`
+                    );
                   }}
                   disabled={fetching}
                 />
