@@ -12,7 +12,7 @@ const ENTERPRISE_PLAN: Plan = {
   amount: Infinity,
   billingPeriod: 'month',
   entitlements: {
-    concurrency: { limit: 100000 },
+    concurrency: { limit: 100000, usage: 0 },
     history: {
       limit: 90,
     },
