@@ -46,7 +46,7 @@ export default function DeployApp() {
       </p>
 
       <h4 className="mb-4 text-sm font-medium">Choosing hosting provider:</h4>
-      <TabCards defaultValue="all">
+      <TabCards defaultValue={hasVercelIntegration ? 'vercel' : 'all'}>
         <TabCards.ButtonList>
           <TabCards.Button className="w-32" value="all">
             <div className="flex items-center gap-1.5">

@@ -10,6 +10,7 @@ import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { RiCheckboxCircleFill, RiCloseCircleFill, RiInputCursorMove } from '@remixicon/react';
 
+import { useVercelIntegration } from '@/app/(organization-active)/(dashboard)/settings/integrations/vercel/useVercelIntegration';
 import { type CodedError } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import { useBooleanFlag } from '../FeatureFlags/hooks';
@@ -38,6 +39,9 @@ export default function SyncApp() {
 
   const searchParams = useSearchParams();
   const fromVercel = searchParams.get('fromVercel') === 'true';
+  const { data } = useVercelIntegration();
+
+  const hasVercelIntegration = data.enabled;
 
   const loadVercelSyncs = async () => {
     try {
@@ -132,7 +136,7 @@ export default function SyncApp() {
       </p>
 
       <h4 className="mb-4 text-sm font-medium">Choose syncing method:</h4>
-      <TabCards defaultValue={fromVercel ? 'vercel' : 'manually'}>
+      <TabCards defaultValue={fromVercel || hasVercelIntegration ? 'vercel' : 'manually'}>
         <TabCards.ButtonList>
           <TabCards.Button className="w-36" value="manually">
             <div className="flex items-center gap-1.5">
