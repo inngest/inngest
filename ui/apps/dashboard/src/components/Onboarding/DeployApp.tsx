@@ -211,7 +211,7 @@ export default function DeployApp() {
               </p>
             )}
             {error && (
-              <Alert className="my-4" severity="error">
+              <Alert className="my-4 text-sm" severity="error">
                 {error.message}
               </Alert>
             )}

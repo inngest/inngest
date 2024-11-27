@@ -13,5 +13,5 @@ export function getNextStepName(currentStepName: OnboardingSteps): OnboardingSte
 }
 
 export const ONBOARDING_VERCEL_NEXT_URL = encodeURIComponent(
-  'https://app.inngest.com/env/production/onboarding/deploy-app'
+  `${process.env.NEXT_PUBLIC_APP_URL}/env/production/onboarding/deploy-app`
 );
