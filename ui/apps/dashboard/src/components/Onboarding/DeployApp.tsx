@@ -1,4 +1,5 @@
 import { useRouter } from 'next/navigation';
+import { Alert } from '@inngest/components/Alert/Alert';
 import { NewButton } from '@inngest/components/Button';
 import { NewLink } from '@inngest/components/Link';
 import TabCards from '@inngest/components/TabCards/TabCards';
@@ -36,11 +37,11 @@ export default function DeployApp() {
   );
 
   const { data, fetching, error } = useVercelIntegration();
-  if (error) console.error(error);
 
   const hasVercelIntegration = data.enabled;
   const vercelProjects = data.projects;
   const enabledProjects = vercelProjects.filter((project) => project.isEnabled);
+  const defaultTabValue = !fetching && hasVercelIntegration ? 'vercel' : 'all';
 
   return (
     <div className="text-subtle">
@@ -51,7 +52,7 @@ export default function DeployApp() {
       </p>
 
       <h4 className="mb-4 text-sm font-medium">Choosing hosting provider:</h4>
-      <TabCards defaultValue={fetching ? 'all' : hasVercelIntegration ? 'vercel' : 'all'}>
+      <TabCards defaultValue={defaultTabValue}>
         <TabCards.ButtonList>
           <TabCards.Button className="w-32" value="all">
             <div className="flex items-center gap-1.5">
@@ -209,6 +210,11 @@ export default function DeployApp() {
                 {enabledProjects.length} project{enabledProjects.length === 1 ? '' : 's'} enabled
                 successfully
               </p>
+            )}
+            {error && (
+              <Alert className="my-4" severity="error">
+                {error.message}
+              </Alert>
             )}
             {hasVercelIntegration && (
               <NewButton

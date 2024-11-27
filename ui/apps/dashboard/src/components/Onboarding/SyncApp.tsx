@@ -42,6 +42,7 @@ export default function SyncApp() {
   const { data, fetching } = useVercelIntegration();
 
   const hasVercelIntegration = data.enabled;
+  const defaultTabValue = (!fetching && hasVercelIntegration) || fromVercel ? 'vercel' : 'manually';
 
   const loadVercelSyncs = async () => {
     try {
@@ -136,9 +137,7 @@ export default function SyncApp() {
       </p>
 
       <h4 className="mb-4 text-sm font-medium">Choose syncing method:</h4>
-      <TabCards
-        defaultValue={fromVercel || (!fetching && hasVercelIntegration) ? 'vercel' : 'manually'}
-      >
+      <TabCards defaultValue={defaultTabValue}>
         <TabCards.ButtonList>
           <TabCards.Button className="w-36" value="manually">
             <div className="flex items-center gap-1.5">
