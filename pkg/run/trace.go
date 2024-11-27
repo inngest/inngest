@@ -283,7 +283,7 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (span *rpbv2.Run
 				return nil, false, fmt.Errorf("error grouping invoke: %w", err)
 			}
 		case enums.OpcodeAIGateway:
-			if err := tb.processAIGateway(ctx, s, res); err != nil {
+			if err := tb.processAIGatewayGroup(ctx, s, res); err != nil {
 				if err == ErrRedundantExecSpan {
 					return nil, true, nil // no-op
 				}
@@ -1260,6 +1260,90 @@ func hasFinished(rs *rpbv2.RunSpan) bool {
 
 func hasIdenticalChild(rs *rpbv2.RunSpan, s *cqrs.Span) bool {
 	return len(rs.Children) == 1 && rs.SpanId == s.SpanID && rs.Name == s.SpanName
+}
+
+func (tb *runTree) processAIGatewayGroup(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
+	group, err := tb.findGroup(span)
+	if err != nil {
+		return err
+	}
+
+	if len(group) == 1 {
+		return tb.processAIGateway(ctx, span, mod)
+	}
+
+	stepOp := rpbv2.SpanStepOp_AI_GATEWAY
+	mod.StepOp = &stepOp
+
+	var i int
+	// if there are more than one, that means this is not the first attempt to execute
+	for _, peer := range group {
+		if i == 0 {
+			mod.StartedAt = timestamppb.New(peer.Timestamp)
+		}
+
+		opcode := peer.StepOpCode()
+		if opcode == enums.OpcodeAIGateway && peer.ScopeName == consts.OtelScopeExecution {
+			// ignore this span since it's not needed
+			tb.markProcessed(peer)
+			continue
+		}
+
+		nested, skipped := tb.constructSpan(ctx, peer)
+		if skipped {
+			continue
+		}
+
+		status := toProtoStatus(peer)
+		if status == rpbv2.SpanStatus_RUNNING {
+			nested.EndedAt = nil
+		}
+
+		outputID, err := tb.outputID(nested)
+		if err != nil {
+			return err
+		}
+
+		nested.Status = status
+		nested.OutputId = &outputID
+
+		// process sleep span
+		if peer.StepOpCode() == enums.OpcodeAIGateway {
+			err := tb.processAIGateway(ctx, peer, nested)
+			switch err {
+			case nil: // no-op
+			case ErrRedundantExecSpan:
+				tb.markProcessed(peer)
+				continue
+			default:
+				return err
+			}
+
+			mod.Name = nested.Name
+			mod.OutputId = nil
+			mod.StepInfo = nested.StepInfo
+			mod.EndedAt = nested.EndedAt
+			mod.Status = nested.Status
+
+			if mod.EndedAt != nil {
+				dur := mod.EndedAt.AsTime().Sub(mod.StartedAt.AsTime())
+				mod.DurationMs = int64(dur / time.Millisecond)
+			}
+		}
+		nested.Name = fmt.Sprintf("Attempt %d", i)
+		mod.Children = append(mod.Children, nested)
+		tb.markProcessed(peer)
+		i++
+	}
+
+	// if the total number of children span end up with just one, it means
+	// redundant spans has been excluded, so it's basically the same span
+	// as the parent. We can discard it in this case
+	if hasFinished(mod) && hasIdenticalChild(mod, span) {
+		mod.Children = nil
+	}
+
+	return nil
 }
 
 func (tb *runTree) processAIGateway(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
