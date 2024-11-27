@@ -39,7 +39,7 @@ export default function SyncApp() {
 
   const searchParams = useSearchParams();
   const fromVercel = searchParams.get('fromVercel') === 'true';
-  const { data } = useVercelIntegration();
+  const { data, fetching } = useVercelIntegration();
 
   const hasVercelIntegration = data.enabled;
 
@@ -136,7 +136,9 @@ export default function SyncApp() {
       </p>
 
       <h4 className="mb-4 text-sm font-medium">Choose syncing method:</h4>
-      <TabCards defaultValue={fromVercel || hasVercelIntegration ? 'vercel' : 'manually'}>
+      <TabCards
+        defaultValue={fromVercel || (!fetching && hasVercelIntegration) ? 'vercel' : 'manually'}
+      >
         <TabCards.ButtonList>
           <TabCards.Button className="w-36" value="manually">
             <div className="flex items-center gap-1.5">
@@ -200,16 +202,33 @@ export default function SyncApp() {
           )}
           {error && <SyncFailure className="mb-3 mt-0 text-sm" error={error} />}
           {!app && (
-            <NewButton
-              loading={isLoading}
-              label="Sync app here"
-              onClick={() => {
-                tracking?.trackOnboardingAction(currentStepName, {
-                  metadata: { type: 'btn-click', label: 'sync', syncMethod: 'manual' },
-                });
-                handleSyncAppManually();
-              }}
-            />
+            <div className="flex items-center gap-2">
+              <NewButton
+                loading={isLoading}
+                label="Sync app here"
+                onClick={() => {
+                  tracking?.trackOnboardingAction(currentStepName, {
+                    metadata: { type: 'btn-click', label: 'sync', syncMethod: 'manual' },
+                  });
+                  handleSyncAppManually();
+                }}
+              />
+              <NewButton
+                appearance="outlined"
+                label="I already have an Inngest app"
+                onClick={() => {
+                  updateCompletedSteps(currentStepName, {
+                    metadata: {
+                      completionSource: 'manual',
+                    },
+                  });
+                  tracking?.trackOnboardingAction(currentStepName, {
+                    metadata: { type: 'btn-click', label: 'skip' },
+                  });
+                  router.push(pathCreator.onboardingSteps({ step: nextStepName }));
+                }}
+              />
+            </div>
           )}
           {app && (
             <NewButton
