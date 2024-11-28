@@ -248,6 +248,7 @@ type MetadataUpdate struct {
 	DisableImmediateExecution bool      `json:"disableImmediateExecution,omitempty"`
 	RequestVersion            int       `json:"rv"`
 	StartedAt                 time.Time `json:"sat"`
+	HasAI                     bool      `json:"hasAI,omitempty"`
 }
 
 // State represents the current state of a fn run.  It is data-structure

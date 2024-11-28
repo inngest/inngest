@@ -344,6 +344,7 @@ func (m shardedMgr) UpdateMetadata(ctx context.Context, accountID uuid.UUID, run
 		"0", // Force planning / disable immediate execution
 		strconv.Itoa(consts.RequestVersionUnknown), // Request version
 		"0", // start time default value
+		"0", // has AI default value
 	}
 	if md.DisableImmediateExecution {
 		input[0] = "1"
@@ -353,6 +354,9 @@ func (m shardedMgr) UpdateMetadata(ctx context.Context, accountID uuid.UUID, run
 	}
 	if !md.StartedAt.IsZero() {
 		input[2] = strconv.FormatInt(md.StartedAt.UnixMilli(), 10)
+	}
+	if md.HasAI {
+		input[3] = "1"
 	}
 
 	fnRunState := m.s.FunctionRunState()

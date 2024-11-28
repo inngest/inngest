@@ -27,6 +27,14 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 		return nil, fmt.Errorf("error retrieving runs: %w", err)
 	}
 
+	// Pretty print the runs as JSON
+	prettyJSON, err := json.MarshalIndent(runs, "", "    ")
+	if err != nil {
+		log.From(ctx).Error().Err(err).Msg("Failed to marshal runs to JSON")
+	} else {
+		fmt.Printf("Runs:\n%s\n", string(prettyJSON))
+	}
+
 	var (
 		scursor *string
 		ecursor *string

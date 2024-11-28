@@ -66,6 +66,18 @@ func (g GeneratorOpcode) UserDefinedName() string {
 	return g.Name
 }
 
+func (g GeneratorOpcode) HasAI() bool {
+	if g.Op == enums.OpcodeAIGateway {
+		return true
+	}
+
+	if g.RunType() == "step.ai.wrap" {
+		return true
+	}
+
+	return false
+}
+
 // Get the stringified input of the step, if `step.Run` was passed inputs
 // or if we're using request offloading.
 func (g GeneratorOpcode) Input() (string, error) {

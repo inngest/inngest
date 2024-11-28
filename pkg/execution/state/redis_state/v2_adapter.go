@@ -186,6 +186,7 @@ func (v v2) UpdateMetadata(ctx context.Context, id state.ID, mutation state.Muta
 		DisableImmediateExecution: mutation.ForceStepPlan,
 		RequestVersion:            mutation.RequestVersion,
 		StartedAt:                 mutation.StartedAt,
+		HasAI:                     mutation.HasAI,
 	})
 }
 

@@ -126,6 +126,20 @@ func (r DriverResponse) NextRetryAt() *time.Time {
 	return r.RetryAt
 }
 
+func (r DriverResponse) HasAI() bool {
+	if r.Generator == nil {
+		return false
+	}
+
+	for _, op := range r.Generator {
+		if op.HasAI() {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (r DriverResponse) Error() string {
 	if r.Err == nil {
 		return ""

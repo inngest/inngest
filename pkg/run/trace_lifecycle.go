@@ -210,6 +210,7 @@ func (l traceLifecycle) OnFunctionStarted(
 			attribute.String(consts.OtelSysIdempotencyKey, md.Config.Idempotency),
 			attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusRunning.ToCode()),
 			attribute.Bool(consts.OtelSysStepFirst, true),
+			attribute.Bool(consts.OtelSysFunctionHasAI, md.Config.HasAI),
 		),
 	)
 	defer span.End()
