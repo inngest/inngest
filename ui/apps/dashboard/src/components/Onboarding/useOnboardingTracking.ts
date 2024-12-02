@@ -15,8 +15,8 @@ export function useOnboardingStepCompletedTracking() {
     trackEvent({
       name: 'app/onboarding.step.completed',
       data: {
-        ...step,
-        ...metadata,
+        step,
+        metadata,
       },
       user: trackingUser,
       v: '2024-11-04.1',
