@@ -77,7 +77,11 @@ export default function OnboardingWidget({
                       onClick={(e) => {
                         e.preventDefault();
                         tracking?.trackOnboardingAction(undefined, {
-                          metadata: { totalStepsCompleted: totalStepsCompleted },
+                          metadata: {
+                            type: 'btn-click',
+                            label: 'close-widget',
+                            totalStepsCompleted: totalStepsCompleted,
+                          },
                         });
                         closeWidget();
                       }}
