@@ -14,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 
@@ -340,14 +339,6 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 
 func (m shardedMgr) UpdateMetadata(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, md state.MetadataUpdate) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "UpdateMetadata"), redis_telemetry.ScopeFnRunState)
-
-	// Pretty print metadata
-	prettyJSON, err := json.MarshalIndent(md, "", "    ")
-	if err != nil {
-		log.From(ctx).Error().Err(err).Msg("Failed to marshal metadata to JSON")
-	} else {
-		fmt.Printf("updating metadata:\n%s\n", string(prettyJSON))
-	}
 
 	input := []string{
 

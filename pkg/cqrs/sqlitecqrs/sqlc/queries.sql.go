@@ -1479,19 +1479,42 @@ func (q *Queries) InsertTrace(ctx context.Context, arg InsertTraceParams) error 
 }
 
 const insertTraceRun = `-- name: InsertTraceRun :exec
-INSERT OR REPLACE INTO trace_runs
-	(account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, batch_id, is_debounce, cron_schedule, has_ai)
-VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO trace_runs (
+    run_id, account_id, workspace_id, app_id, function_id, trace_id, 
+    queued_at, started_at, ended_at, status, source_id, trigger_ids, 
+    output, batch_id, is_debounce, cron_schedule, has_ai
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(run_id)
+DO UPDATE SET
+    account_id = excluded.account_id,
+    workspace_id = excluded.workspace_id,
+    app_id = excluded.app_id,
+    function_id = excluded.function_id,
+    trace_id = excluded.trace_id,
+    queued_at = excluded.queued_at,
+    started_at = excluded.started_at,
+    ended_at = excluded.ended_at,
+    status = excluded.status,
+    source_id = excluded.source_id,
+    trigger_ids = excluded.trigger_ids,
+    output = excluded.output,
+    batch_id = excluded.batch_id,
+    is_debounce = excluded.is_debounce,
+    cron_schedule = excluded.cron_schedule,
+    has_ai = CASE
+                 WHEN trace_runs.has_ai = 1 THEN 1
+                 ELSE excluded.has_ai
+             END
 `
 
 type InsertTraceRunParams struct {
+	RunID        ulid.ULID
 	AccountID    uuid.UUID
 	WorkspaceID  uuid.UUID
 	AppID        uuid.UUID
 	FunctionID   uuid.UUID
 	TraceID      []byte
-	RunID        ulid.ULID
 	QueuedAt     int64
 	StartedAt    int64
 	EndedAt      int64
@@ -1507,12 +1530,12 @@ type InsertTraceRunParams struct {
 
 func (q *Queries) InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) error {
 	_, err := q.db.ExecContext(ctx, insertTraceRun,
+		arg.RunID,
 		arg.AccountID,
 		arg.WorkspaceID,
 		arg.AppID,
 		arg.FunctionID,
 		arg.TraceID,
-		arg.RunID,
 		arg.QueuedAt,
 		arg.StartedAt,
 		arg.EndedAt,

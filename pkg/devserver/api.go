@@ -423,8 +423,10 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 
 				}
 
-				if _, ok := sattr[consts.OtelSysFunctionHasAI]; ok {
-					hasAI = true
+				if val, ok := sattr[consts.OtelSysFunctionHasAI]; ok {
+					if boolVal, err := strconv.ParseBool(val); err == nil && boolVal {
+						hasAI = true
+					}
 				}
 
 				evts := []cqrs.SpanEvent{}
