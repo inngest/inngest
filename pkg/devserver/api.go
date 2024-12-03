@@ -427,14 +427,6 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 					hasAI = true
 				}
 
-				// Pretty print span attributes as JSON
-				prettyJSON, err := json.MarshalIndent(sattr, "", "    ")
-				if err != nil {
-					log.From(ctx).Error().Err(err).Msg("Failed to marshal span attributes to JSON")
-				} else {
-					fmt.Printf("Span attributes:\n%s\n", string(prettyJSON))
-				}
-
 				evts := []cqrs.SpanEvent{}
 				for ei := 0; ei < span.Events().Len(); ei++ {
 					evt := span.Events().At(ei)
