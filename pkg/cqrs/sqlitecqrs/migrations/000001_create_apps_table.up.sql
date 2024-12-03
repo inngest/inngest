@@ -141,5 +141,6 @@ CREATE TABLE trace_runs (
 	output BLOB,
 	is_debounce BOOLEAN NOT NULL,
 	batch_id BLOB,
-	cron_schedule TEXT
+	cron_schedule TEXT,
+	has_ai BOOLEAN NOT NULL DEFAULT FALSE
 );

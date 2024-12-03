@@ -892,6 +892,7 @@ func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
 		TriggerIds:  []byte{},
 		Output:      run.Output,
 		IsDebounce:  run.IsDebounce,
+		HasAi:       run.HasAI,
 	}
 
 	if run.BatchID != nil {
@@ -1307,6 +1308,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			"batch_id",
 			"is_debounce",
 			"cron_schedule",
+			"has_ai",
 		).
 		Where(filter...).
 		Order(order...).
@@ -1339,6 +1341,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			&data.BatchID,
 			&data.IsDebounce,
 			&data.CronSchedule,
+			&data.HasAi,
 		)
 		if err != nil {
 			return nil, err
@@ -1421,6 +1424,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			IsBatch:      isBatch,
 			BatchID:      batchID,
 			IsDebounce:   data.IsDebounce,
+			HasAI:        data.HasAi,
 			CronSchedule: cron,
 			Cursor:       cursor,
 		})

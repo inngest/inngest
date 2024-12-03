@@ -379,6 +379,8 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	hasAI := false
+
 	traces, err := encoder.UnmarshalTraces(body)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
@@ -419,6 +421,18 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 				if err != nil {
 					log.From(ctx).Warn().Err(err).Interface("span attr", span.Attributes().AsRaw()).Msg("error parsing span attributes")
 
+				}
+
+				if _, ok := sattr["has_ai"]; ok {
+					hasAI = true
+				}
+
+				// Pretty print span attributes as JSON
+				prettyJSON, err := json.MarshalIndent(sattr, "", "    ")
+				if err != nil {
+					log.From(ctx).Error().Err(err).Msg("Failed to marshal span attributes to JSON")
+				} else {
+					fmt.Printf("Span attributes:\n%s\n", string(prettyJSON))
 				}
 
 				evts := []cqrs.SpanEvent{}
@@ -502,6 +516,7 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 
 	for _, r := range handler.TraceRuns() {
 		// log.From(ctx).Debug().Interface("run", r).Msg("trace run")
+		r.HasAI = hasAI
 		if err := a.devserver.Data.InsertTraceRun(ctx, r); err != nil {
 			log.From(ctx).Error().Err(err).Interface("trace run", r).Msg("error inserting trace run")
 		}

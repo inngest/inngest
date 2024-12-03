@@ -358,6 +358,7 @@ type FunctionRunV2 {
   output: Bytes
 
   trace: RunTraceSpan
+  hasAI: Boolean!
 }
 
 type RunsV2Connection {
@@ -389,7 +390,11 @@ enum StepOp {
   AI_GATEWAY
 }
 
-union StepInfo = InvokeStepInfo | SleepStepInfo | WaitForEventStepInfo | RunStepInfo
+union StepInfo =
+    InvokeStepInfo
+  | SleepStepInfo
+  | WaitForEventStepInfo
+  | RunStepInfo
 
 type InvokeStepInfo {
   triggeringEventID: ULID!
