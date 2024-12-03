@@ -6,6 +6,7 @@ import { CodeBlock } from '@inngest/components/CodeBlock/CodeBlock';
 import { parseCode } from '@inngest/components/InvokeButton/utils';
 import { NewLink } from '@inngest/components/Link';
 import { Select, type Option } from '@inngest/components/Select/Select';
+import { RiCheckboxCircleFill } from '@remixicon/react';
 import { toast } from 'sonner';
 
 import { pathCreator } from '@/utils/urls';
@@ -35,7 +36,7 @@ interface FunctionOption extends Option {
 
 export default function InvokeFn() {
   const currentStepName = OnboardingSteps.InvokeFn;
-  const { updateCompletedSteps } = useOnboardingStep();
+  const { updateCompletedSteps, lastCompletedStep } = useOnboardingStep();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const [functions, setFunctions] = useState<FunctionOption[]>([]);
@@ -44,6 +45,8 @@ export default function InvokeFn() {
   const [isFnInvoked, setIsFnInvoked] = useState(false);
   const router = useRouter();
   const tracking = useOnboardingTracking();
+
+  const isOnboardingCompleted = lastCompletedStep?.isFinalStep;
 
   const hasEventTrigger =
     selectedFunction?.current.triggers.some((trigger) => trigger.eventName) ?? false;
@@ -180,55 +183,67 @@ export default function InvokeFn() {
             <p className="text-sm">{error}</p>
           </Alert>
         )}
-        {!isFnInvoked ? (
-          <div className="mt-6 flex items-center gap-2">
+        <div className="mt-6 flex items-center justify-between">
+          {!isFnInvoked ? (
+            <div className="flex items-center gap-2">
+              <NewButton
+                label="Invoke test function"
+                disabled={!selectedFunction}
+                onClick={() => {
+                  tracking?.trackOnboardingAction(currentStepName, {
+                    metadata: {
+                      type: 'btn-click',
+                      label: 'invoke',
+                      invokedFunction: selectedFunction,
+                    },
+                  });
+                  handleInvokeFn();
+                }}
+              />
+              <NewButton
+                appearance="outlined"
+                label="Skip, take me to dashboard"
+                onClick={() => {
+                  updateCompletedSteps(currentStepName, {
+                    metadata: {
+                      completionSource: 'manual',
+                      invokedFunction: null,
+                    },
+                  });
+                  tracking?.trackOnboardingAction(currentStepName, {
+                    metadata: {
+                      type: 'btn-click',
+                      label: 'skip',
+                      invokedFunction: selectedFunction,
+                    },
+                  });
+                  router.push(pathCreator.apps({ envSlug: 'production' }));
+                }}
+              />
+            </div>
+          ) : (
             <NewButton
-              label="Invoke test function"
-              disabled={!selectedFunction}
+              label="Go to runs"
               onClick={() => {
                 tracking?.trackOnboardingAction(currentStepName, {
                   metadata: {
                     type: 'btn-click',
-                    label: 'invoke',
+                    label: 'go-to-runs',
                     invokedFunction: selectedFunction,
                   },
                 });
-                handleInvokeFn();
+                router.push(pathCreator.runs({ envSlug: 'production' }));
               }}
             />
-            <NewButton
-              appearance="outlined"
-              label="Skip, take me to dashboard"
-              onClick={() => {
-                updateCompletedSteps(currentStepName, {
-                  metadata: {
-                    completionSource: 'manual',
-                    invokedFunction: null,
-                  },
-                });
-                tracking?.trackOnboardingAction(currentStepName, {
-                  metadata: { type: 'btn-click', label: 'skip', invokedFunction: selectedFunction },
-                });
-                router.push(pathCreator.apps({ envSlug: 'production' }));
-              }}
-            />
-          </div>
-        ) : (
-          <NewButton
-            className="mt-6"
-            label="Go to runs"
-            onClick={() => {
-              tracking?.trackOnboardingAction(currentStepName, {
-                metadata: {
-                  type: 'btn-click',
-                  label: 'go-to-runs',
-                  invokedFunction: selectedFunction,
-                },
-              });
-              router.push(pathCreator.runs({ envSlug: 'production' }));
-            }}
-          />
-        )}
+          )}
+
+          {isOnboardingCompleted && (
+            <div className="text-success flex items-center gap-0.5 text-sm">
+              <RiCheckboxCircleFill className="h-4 w-4" />
+              Onboarding completed
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

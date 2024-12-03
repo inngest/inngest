@@ -578,6 +578,7 @@ export type StepEventWait = {
 export type StepInfo = InvokeStepInfo | RunStepInfo | SleepStepInfo | WaitForEventStepInfo;
 
 export enum StepOp {
+  AiGateway = 'AI_GATEWAY',
   Invoke = 'INVOKE',
   Run = 'RUN',
   Sleep = 'SLEEP',

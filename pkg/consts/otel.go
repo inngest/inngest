@@ -60,6 +60,7 @@ const (
 	OtelSysStepAIRequest       = "sys.step.ai.req" // ai request metadata
 	OtelSysStepAIResponse      = "sys.step.ai.res" // ai response metadata
 	OtelSysStepRunType         = "sys.step.run.type"
+	OtelSysStepPlan            = "sys.step.plan" // indicate this is a planning step
 
 	OtelSysStepSleepEndAt = "sys.step.sleep.end"
 

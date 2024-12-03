@@ -3,6 +3,7 @@ package golang
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -12,7 +13,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/slog"
 )
 
 func TestRedirect(t *testing.T) {

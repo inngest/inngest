@@ -7,9 +7,16 @@ import (
 	"github.com/inngest/inngest/pkg/headers"
 )
 
+type GatewayMaintenanceActions interface {
+	GetState() (*state.Gateway, error)
+	DrainGateway() error
+	ActivateGateway() error
+}
+
 type Opts struct {
-	ConnectManager state.ConnectionManager
-	GroupManager   state.WorkerGroupManager
+	ConnectManager     state.ConnectionManager
+	GroupManager       state.WorkerGroupManager
+	GatewayMaintenance GatewayMaintenanceActions
 
 	Dev bool
 }
@@ -35,5 +42,14 @@ func (a *router) setup() {
 
 		r.Get("/envs/{envID}/conns", a.showConnections)
 		r.Get("/envs/{envID}/groups/{groupID}", a.showWorkerGroup)
+	})
+
+	a.Group(func(r chi.Router) {
+		r.Use(middleware.Recoverer)
+		r.Use(headers.ContentTypeJsonResponse())
+
+		r.Get("/gateway", a.getGatewayState)
+		r.Post("/gateway/drain", a.drainGateway)
+		r.Post("/gateway/activate", a.activateGateway)
 	})
 }

@@ -44,7 +44,12 @@ type LoadingState = {
 
 async function fetchInitialData(): Promise<LoadingState> {
   try {
-    const { apps, unattachedSyncs } = await getProdApps();
+    const result = await getProdApps();
+    if (!result) {
+      // In case of data fetching error, we don't wanna fail the page here
+      return { hasProductionApps: true, isLoading: false };
+    }
+    const { apps, unattachedSyncs } = result;
     const hasAppsOrUnattachedSyncs = apps.length > 0 || unattachedSyncs.length > 0;
     return { hasProductionApps: hasAppsOrUnattachedSyncs, isLoading: false };
   } catch (error) {

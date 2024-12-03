@@ -29,15 +29,17 @@ export default function CommonVercelErrors() {
             </p>
           </AccordionList.Content>
         </AccordionList.Item>
-        <AccordionList.Item value="feature-branch">
+        <AccordionList.Item value="prod-app">
           <AccordionList.Trigger className="text-subtle text-sm">
-            Your app is on a feature branch
+            Your Inngest app isn&apos;t merged to production
           </AccordionList.Trigger>
 
           <AccordionList.Content className="text-subtle">
             <p>
-              Syncing may not happen if your app is on a feature branch. To fix this, use the manual
-              sync option to sync your app.
+              Only Vercel production deploys will show up in your Inngest production environment. If
+              your Inngest app is only set up on a Vercel preview, it will appear as an Inngest
+              branch preview. You can open a branch environment using the environment dropdown at
+              the top left of the dashboard.
             </p>
           </AccordionList.Content>
         </AccordionList.Item>

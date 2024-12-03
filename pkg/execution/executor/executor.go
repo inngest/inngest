@@ -2064,9 +2064,14 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 		// We do, though, want to store the incomin step ID name _without_ overriding
 		// the actual DAG step, though.
 		// Run the same action.
-		IncomingGeneratorStep: gen.ID,
-		Outgoing:              edge.Edge.Outgoing,
-		Incoming:              edge.Edge.Incoming,
+		IncomingGeneratorStep:     gen.ID,
+		IncomingGeneratorStepName: gen.Name,
+		Outgoing:                  edge.Edge.Outgoing,
+		Incoming:                  edge.Edge.Incoming,
+	}
+	// prefer DisplayName if available
+	if gen.DisplayName != nil {
+		nextEdge.IncomingGeneratorStepName = *gen.DisplayName
 	}
 
 	// Update the group ID in context;  we're scheduling a step, and we want

@@ -41,6 +41,10 @@ export function Trace({
   const [isExpanded, setIsExpanded] = useState(false);
   const [result, setResult] = useState<Result>();
 
+  const isAI =
+    (isStepInfoRun(trace.stepInfo) && trace.stepInfo.type === 'step.ai.wrap') ||
+    trace.stepOp === 'AI_GATEWAY';
+
   useEffect(() => {
     if (isExpanded && !result && trace.outputID) {
       getResult(trace.outputID).then((data) => {
@@ -95,12 +99,7 @@ export function Trace({
             isExpanded={isExpanded}
             onClickExpandToggle={() => setIsExpanded((prev) => !prev)}
             trace={trace}
-            isAI={
-              !!aiOutput ||
-              (stepAIEnabled &&
-                isStepInfoRun(trace.stepInfo) &&
-                (trace.stepInfo.type === 'step.ai.wrap' || trace.stepInfo.type === 'step.ai.infer'))
-            }
+            isAI={stepAIEnabled && isAI}
           />
         </div>
 

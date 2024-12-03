@@ -3,6 +3,7 @@ package golang
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -12,7 +13,6 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/slog"
 
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"

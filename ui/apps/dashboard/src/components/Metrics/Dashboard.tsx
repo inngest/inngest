@@ -21,12 +21,10 @@ import {
 import { useQuery } from 'urql';
 
 import { graphql } from '@/gql';
-import { GetBillingPlanDocument, MetricsScope, type GetBillingPlanQuery } from '@/gql/graphql';
+import { GetBillingPlanDocument, MetricsScope } from '@/gql/graphql';
 import { MetricsOverview } from './Overview';
 import { MetricsVolume } from './Volume';
 import { convertLookup } from './utils';
-
-export const CONCURRENCY_LIMIT_DEFAULT = 25;
 
 export type EntityType = {
   id: string;
@@ -89,10 +87,17 @@ const MetricsLookupDocument = graphql(`
   }
 `);
 
-const getConcurrencyLimit = (planData?: GetBillingPlanQuery) =>
-  Number(planData?.account.plan?.features.concurrency) ||
-  Number(planData?.plans.find((p) => p?.name === 'Free Tier')?.features.concurrency) ||
-  CONCURRENCY_LIMIT_DEFAULT;
+const AccountConcurrencyLookupDocument = graphql(`
+  query AccountConcurrencyLookup {
+    account {
+      entitlements {
+        concurrency {
+          limit
+        }
+      }
+    }
+  }
+`);
 
 export const Dashboard = ({ envSlug }: { envSlug: string }) => {
   const [selectedApps, setApps, removeApps] = useStringArraySearchParam('apps');
@@ -120,6 +125,10 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
     query: GetBillingPlanDocument,
   });
 
+  const [{ data: accountConcurrencyLimitRes }] = useQuery({
+    query: AccountConcurrencyLookupDocument,
+  });
+
   const apps = data?.envBySlug?.apps
     .filter(({ isArchived }) => isArchived === false)
     .map((app: { id: string; externalID: string }) => ({
@@ -131,7 +140,7 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
 
   const logRetention = Number(planData?.account.plan?.features.log_retention);
   const upgradeCutoff = subtractDuration(new Date(), { days: logRetention || 7 });
-  const concurrenyLimit = getConcurrencyLimit(planData);
+  const concurrencyLimit = accountConcurrencyLimitRes?.account.entitlements.concurrency.limit;
 
   const envLookup = apps?.length !== 1 && !selectedApps?.length && !selectedFns?.length;
   const mappedFunctions = convertLookup(functions);
@@ -202,7 +211,7 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
           autoRefresh={autoRefresh}
           entities={mappedEntities}
           scope={envLookup ? MetricsScope.App : MetricsScope.Fn}
-          concurrencyLimit={concurrenyLimit}
+          concurrencyLimit={concurrencyLimit}
         />
       </div>
     </div>

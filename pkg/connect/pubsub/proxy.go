@@ -6,11 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"google.golang.org/protobuf/proto"
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -74,15 +74,18 @@ type redisPubSubConnector struct {
 	subscribers     map[string]map[string]chan string
 	subscribersLock sync.RWMutex
 
+	logger *slog.Logger
+
 	RequestForwarder
 	RequestReceiver
 }
 
-func NewRedisPubSubConnector(client rueidis.Client) *redisPubSubConnector {
+func newRedisPubSubConnector(client rueidis.Client, logger *slog.Logger) *redisPubSubConnector {
 	return &redisPubSubConnector{
 		client:          client,
 		subscribers:     make(map[string]map[string]chan string),
 		subscribersLock: sync.RWMutex{},
+		logger:          logger,
 	}
 }
 
@@ -164,7 +167,7 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data 
 		return nil, fmt.Errorf("could not publish executor request: %w", err)
 	}
 
-	logger.StdlibLogger(ctx).Debug("published connect pubsub message", "channel", channelName, "request_id", data.RequestId)
+	i.logger.Debug("published connect pubsub message", "channel", channelName, "request_id", data.RequestId)
 
 	// Sanity check: Ensure the router received the message using a request-specific ack channel (ack must come in before SDK response)
 	{
@@ -268,10 +271,10 @@ func (i *redisPubSubConnector) subscribe(ctx context.Context, channel string, on
 		defer i.subscribersLock.Unlock()
 
 		close(msgs)
-		logger.StdlibLogger(ctx).Debug("connect pubsub removing in-memory subscription", "channel", channel, "sub_id", subId)
+		i.logger.Debug("connect pubsub removing in-memory subscription", "channel", channel, "sub_id", subId)
 		delete(i.subscribers[channel], subId)
 		if len(i.subscribers[channel]) == 0 {
-			logger.StdlibLogger(ctx).Debug("unsubscribing pubsub client from channel", "channel", channel)
+			i.logger.Debug("unsubscribing pubsub client from channel", "channel", channel)
 			delete(i.subscribers, channel)
 			i.pubSubClient.Do(ctx, i.pubSubClient.B().Unsubscribe().Channel(channel).Build())
 		}
@@ -300,7 +303,7 @@ func (i *redisPubSubConnector) subscribe(ctx context.Context, channel string, on
 	// If Redis client is not subscribed to channel already, send SUBSCRIBE command
 	if !redisSubscribed {
 		i.pubSubClient.Do(ctx, i.pubSubClient.B().Subscribe().Channel(channel).Build())
-		logger.StdlibLogger(ctx).Debug("connect pubsub client subscribed to channel", "channel", channel)
+		i.logger.Debug("connect pubsub client subscribed to channel", "channel", channel)
 	}
 
 	<-done
@@ -353,7 +356,7 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 	go func() {
 		<-ctx.Done()
 
-		logger.StdlibLogger(ctx).Debug("gracefully shutting down connect pubsub subscriber")
+		i.logger.Debug("gracefully shutting down connect pubsub subscriber")
 
 		i.subscribersLock.Lock()
 		defer i.subscribersLock.Unlock()
@@ -373,7 +376,7 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 
 	wait := c.SetPubSubHooks(rueidis.PubSubHooks{
 		OnMessage: func(m rueidis.PubSubMessage) {
-			logger.StdlibLogger(ctx).Debug("connect pubsub received message", "channel", m.Channel)
+			i.logger.Debug("connect pubsub received message", "channel", m.Channel)
 
 			// Run in another goroutine to avoid blocking `c`
 			go func() {
@@ -383,7 +386,7 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 
 				if len(subs) == 0 {
 					// This should not happen: In subscribe, we UNSUBSCRIBE once the last subscriber is removed
-					logger.StdlibLogger(ctx).Debug("no subscribers for connect pubsub channel", "channel", m.Channel)
+					i.logger.Debug("no subscribers for connect pubsub channel", "channel", m.Channel)
 					return
 				}
 
@@ -423,7 +426,7 @@ func (i *redisPubSubConnector) NotifyExecutor(ctx context.Context, appId uuid.UU
 		return fmt.Errorf("could not publish response: %w", err)
 	}
 
-	logger.StdlibLogger(ctx).Debug("sent connect pubsub reply", "channel", channelName)
+	i.logger.Debug("sent connect pubsub reply", "channel", channelName)
 
 	return nil
 }
@@ -453,7 +456,7 @@ func (i *redisPubSubConnector) RouteExecutorRequest(ctx context.Context, gateway
 	}
 
 	channelName := i.channelGatewayAppRequests(gatewayId, appId, connId)
-	logger.StdlibLogger(ctx).Debug("forwarded connect request to gateway", "gateway_id", gatewayId, "channel", channelName, "request_id", data.RequestId, "conn_id", connId)
+	i.logger.Debug("forwarded connect request to gateway", "gateway_id", gatewayId, "channel", channelName, "request_id", data.RequestId, "conn_id", connId)
 	// TODO Test whether this works with marshaled Protobuf bytes
 	err = i.client.Do(ctx, i.client.B().Publish().Channel(channelName).Message(string(dataBytes)).Build()).Error()
 	if err != nil {

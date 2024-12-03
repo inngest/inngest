@@ -139,6 +139,7 @@ export const GetVercelAppsOnboardingDocument = graphql(`
         id
         name
         externalID
+        isArchived
         latestSync {
           error
           id

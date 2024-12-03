@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -18,6 +19,7 @@ import (
 type StateManager interface {
 	ConnectionManager
 	WorkerGroupManager
+	GatewayManager
 
 	SetRequestIdempotency(ctx context.Context, appId uuid.UUID, requestId string) error
 }
@@ -27,12 +29,18 @@ type ConnectionManager interface {
 	GetConnectionsByAppID(ctx context.Context, envId uuid.UUID, appID uuid.UUID) ([]*connpb.ConnMetadata, error)
 	GetConnectionsByGroupID(ctx context.Context, envID uuid.UUID, groupID string) ([]*connpb.ConnMetadata, error)
 	UpsertConnection(ctx context.Context, conn *Connection) error
-	DeleteConnection(ctx context.Context, conn *Connection) error
+	DeleteConnection(ctx context.Context, envID uuid.UUID, appID *uuid.UUID, groupID string, connId string) error
 }
 
 type WorkerGroupManager interface {
 	GetWorkerGroupByHash(ctx context.Context, envID uuid.UUID, hash string) (*WorkerGroup, error)
 	UpdateWorkerGroup(ctx context.Context, envID uuid.UUID, group *WorkerGroup) error
+}
+
+type GatewayManager interface {
+	UpsertGateway(ctx context.Context, gateway *Gateway) error
+	DeleteGateway(ctx context.Context, gatewayId string) error
+	GetGateway(ctx context.Context, gatewayId string) (*Gateway, error)
 }
 
 type AuthContext struct {
@@ -80,6 +88,22 @@ type WorkerGroup struct {
 
 	// used for syncing
 	SyncData SyncData `json:"-"`
+}
+
+type GatewayStatus string
+
+const (
+	GatewayStatusStarting GatewayStatus = "starting"
+	GatewayStatusActive   GatewayStatus = "active"
+	GatewayStatusDraining GatewayStatus = "draining"
+)
+
+type Gateway struct {
+	Id              string        `json:"id"`
+	Status          GatewayStatus `json:"status"`
+	LastHeartbeatAt time.Time     `json:"last_heartbeat_at"`
+
+	Hostname string `json:"hostname"`
 }
 
 // Connection have all the metadata assocaited with a worker connection
@@ -189,7 +213,8 @@ func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager) 
 		c.Group.SyncID = syncReply.SyncID
 		c.Group.AppID = syncReply.AppID
 		// Update the worker group with the syncID so it's aware that it's already sync'd before
-		if err := groupManager.UpdateWorkerGroup(ctx, envID, c.Group); err != nil {
+		// Always update the worker group for consistency, even if the context is cancelled
+		if err := groupManager.UpdateWorkerGroup(context.Background(), envID, c.Group); err != nil {
 			return fmt.Errorf("error updating worker group: %w", err)
 		}
 	}

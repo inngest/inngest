@@ -544,9 +544,17 @@ func (l traceLifecycle) OnStepStarted(
 	}
 	runID := md.ID.RunID
 
+	name := consts.OtelExecPlaceholder
+	// Check if this is a step planned from parallelism
+	if edge, _ := queue.GetEdge(item); edge != nil {
+		if edge.Edge.IncomingGeneratorStepName != "" {
+			name = edge.Edge.IncomingGeneratorStepName
+		}
+	}
+
 	_, span := NewSpan(ctx,
 		WithScope(consts.OtelScopeExecution),
-		WithName(consts.OtelExecPlaceholder),
+		WithName(name),
 		WithTimestamp(start),
 		WithSpanID(*spanID),
 		WithSpanAttributes(
@@ -850,8 +858,12 @@ func (l traceLifecycle) OnStepFinished(
 			span.SetStepOutput(output)
 		} else {
 			// if it's not a step or function response that represents either a failed or a successful execution.
-			// Do not record discovery spans and cancel it.
-			_ = span.Cancel(ctx)
+
+			// annotate it as a planning step currently only used for parallelism, so we know
+			// we can ignore it when displaying on UI
+			span.SetAttributes(
+				attribute.Bool(consts.OtelSysStepPlan, true),
+			)
 		}
 	}
 }
