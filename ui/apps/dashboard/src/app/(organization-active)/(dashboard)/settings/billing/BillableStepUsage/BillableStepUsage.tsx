@@ -1,9 +1,7 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { Alert } from '@inngest/components/Alert';
-import { RiBarChart2Fill } from '@remixicon/react';
 import {
   Bar,
   BarChart,
@@ -20,9 +18,10 @@ import { useQuery } from 'urql';
 
 import { graphql } from '@/gql';
 import LoadingIcon from '@/icons/LoadingIcon';
-import { StepCounter } from './StepCounter';
 import { formatXAxis, formatYAxis, toLocaleUTCDateString } from './format';
 import { transformData } from './transformData';
+
+// import { Chart } from '@inngest/components/Chart/Chart';
 
 const GetBillableSteps = graphql(`
   query GetBillableSteps($month: Int!, $year: Int!) {
@@ -47,11 +46,11 @@ const dataKeys = {
 } as const;
 
 type Props = {
-  // Step count included in the plan.
   includedStepCountLimit?: number;
+  selectedPeriod: 'current' | 'previous';
 };
 
-export function BillableStepUsage({ includedStepCountLimit }: Props) {
+export function BillableStepUsage({ includedStepCountLimit, selectedPeriod }: Props) {
   const currentMonthIndex = new Date().getUTCMonth();
   const options = {
     previous: {
@@ -64,7 +63,6 @@ export function BillableStepUsage({ includedStepCountLimit }: Props) {
     },
   };
 
-  const [selectedPeriod, setSelectedPeriod] = useState<'previous' | 'current'>('current');
   const [{ data, fetching }] = useQuery({
     query: GetBillableSteps,
     variables: {
@@ -95,30 +93,11 @@ export function BillableStepUsage({ includedStepCountLimit }: Props) {
   }
 
   const monthData = data.billableStepTimeSeries[0]?.data || [];
-  const { additionalStepCount, series, totalStepCount } = transformData(
-    monthData,
-    includedStepCountLimit
-  );
+  const { series } = transformData(monthData, includedStepCountLimit);
 
   return (
     <div className="text-slate-800">
-      <div className="mb-4 flex items-center justify-end gap-x-8">
-        <div className="flex text-lg text-slate-600">
-          <RiBarChart2Fill className="mr-2 w-5" />
-          <span className="font-medium">Function Usage</span>
-        </div>
-
-        <div className="flex-grow" />
-
-        <StepCounter count={includedStepCountLimit} title="Plan-included steps" />
-        <StepCounter
-          count={additionalStepCount}
-          numberClassName="text-indigo-500"
-          title="Additional steps"
-        />
-        <StepCounter count={totalStepCount} title="Total steps" />
-      </div>
-
+      {/* <Chart option={{series: series, yAxis: {}}}></Chart> */}
       <div>
         <ResponsiveContainer height={228}>
           <BarChart data={series}>
@@ -145,23 +124,6 @@ export function BillableStepUsage({ includedStepCountLimit }: Props) {
               content={({ payload = [] }) => {
                 return (
                   <div className="mt-4 flex items-center">
-                    <select
-                      className="font-regular shadow-outline-secondary-light inline-flex flex-shrink-0 items-center justify-center gap-1 overflow-hidden rounded-[6px] bg-white text-sm font-medium text-slate-700 transition-all"
-                      onChange={(event) => {
-                        const { value } = event.target;
-                        if (value !== 'previous' && value !== 'current') {
-                          throw new Error(`invalid value: ${value}`);
-                        }
-
-                        setSelectedPeriod(value);
-                      }}
-                      value={selectedPeriod}
-                    >
-                      <option value="current">This Month</option>
-
-                      <option value="previous">Previous Month</option>
-                    </select>
-
                     <div className="flex-grow" />
 
                     {payload.map((entry) => {

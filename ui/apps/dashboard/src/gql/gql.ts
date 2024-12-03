@@ -15,7 +15,7 @@ import type { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-
 const documents = {
     "\n  mutation SetUpAccount {\n    setUpAccount {\n      account {\n        id\n      }\n    }\n  }\n": types.SetUpAccountDocument,
     "\n  mutation CreateUser {\n    createUser {\n      user {\n        id\n      }\n    }\n  }\n": types.CreateUserDocument,
-    "\n  query GetBillingInfo {\n    account {\n      plan {\n        id\n        features\n      }\n    }\n  }\n": types.GetBillingInfoDocument,
+    "\n  query GetBillingInfo {\n    account {\n      entitlements {\n        stepCount {\n          usage\n          limit\n        }\n        runCount {\n          usage\n          limit\n        }\n      }\n    }\n  }\n": types.GetBillingInfoDocument,
     "\n  mutation CreateEnvironment($name: String!) {\n    createWorkspace(input: { name: $name }) {\n      id\n    }\n  }\n": types.CreateEnvironmentDocument,
     "\n  mutation AchiveApp($appID: UUID!) {\n    archiveApp(id: $appID) {\n      id\n    }\n  }\n": types.AchiveAppDocument,
     "\n  mutation UnachiveApp($appID: UUID!) {\n    unarchiveApp(id: $appID) {\n      id\n    }\n  }\n": types.UnachiveAppDocument,
@@ -161,7 +161,7 @@ export function graphql(source: "\n  mutation CreateUser {\n    createUser {\n  
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  query GetBillingInfo {\n    account {\n      plan {\n        id\n        features\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetBillingInfo {\n    account {\n      plan {\n        id\n        features\n      }\n    }\n  }\n"];
+export function graphql(source: "\n  query GetBillingInfo {\n    account {\n      entitlements {\n        stepCount {\n          usage\n          limit\n        }\n        runCount {\n          usage\n          limit\n        }\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetBillingInfo {\n    account {\n      entitlements {\n        stepCount {\n          usage\n          limit\n        }\n        runCount {\n          usage\n          limit\n        }\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
