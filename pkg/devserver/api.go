@@ -423,7 +423,7 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 
 				}
 
-				if _, ok := sattr["has_ai"]; ok {
+				if _, ok := sattr[consts.OtelSysFunctionHasAI]; ok {
 					hasAI = true
 				}
 
