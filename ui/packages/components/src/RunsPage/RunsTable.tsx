@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiSortAsc, RiSortDesc } from '@remixicon/react';
+import { RiSortAsc, RiSortDesc, RiSparkling2Fill } from '@remixicon/react';
 import {
   flexRender,
   getCoreRowModel,
@@ -38,6 +38,11 @@ export default function RunsTable({
   scope,
 }: RunsTableProps) {
   const columns = useScopedColumns(scope);
+
+  console.log(
+    'has ai',
+    data.map((row) => row.hasAI)
+  );
 
   // Manually track expanded rows because getIsExpanded seems to be index-based,
   // which means polling can shift the expanded row. We may be able to switch

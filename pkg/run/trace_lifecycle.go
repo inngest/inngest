@@ -3,6 +3,7 @@ package run
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -19,6 +20,7 @@ import (
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/inngest/log"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/oklog/ulid/v2"
@@ -190,6 +192,14 @@ func (l traceLifecycle) OnFunctionStarted(
 	evtIDs := make([]string, len(md.Config.EventIDs))
 	for i, e := range md.Config.EventIDs {
 		evtIDs[i] = e.String()
+	}
+
+	// Pretty print metadata
+	prettyJSON, err := json.MarshalIndent(md, "", "    ")
+	if err != nil {
+		log.From(ctx).Error().Err(err).Msg("Failed to marshal metadata to JSON")
+	} else {
+		fmt.Printf("getting metadata:\n%s\n", string(prettyJSON))
 	}
 
 	// (re)Construct function span to force update the end time
