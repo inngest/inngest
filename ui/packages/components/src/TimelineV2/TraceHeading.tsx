@@ -95,7 +95,7 @@ export function TraceHeading({
             {trace.name}
           </span>
 
-          <div className="h-8">{opCodeBadge}</div>
+          {!isAI && <div className="h-8">{opCodeBadge}</div>}
         </div>
         <TimeWithText trace={trace} />
       </div>

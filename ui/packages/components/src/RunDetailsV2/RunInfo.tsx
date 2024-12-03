@@ -59,12 +59,6 @@ type Run = {
   };
 };
 
-const hasAIChildren = (trace: Run['trace']): boolean => {
-  return !!trace?.childrenSpans?.find(
-    (c?: any) => c?.stepInfo?.type === 'step.ai.wrap' || c?.stepInfo?.type === 'step.ai.infer'
-  );
-};
-
 export function RunInfo({
   cancelRun,
   className,
@@ -80,12 +74,10 @@ export function RunInfo({
 }: Props) {
   let allowCancel = false;
   let isSuccess = false;
-  let isAI = false;
 
   if (isLazyDone(run)) {
     allowCancel = !Boolean(run.trace.endedAt);
     isSuccess = run.trace.status === 'COMPLETED';
-    isAI = hasAIChildren(run.trace);
   }
 
   const aiOutput = stepAIEnabled && result?.data ? parseAIOutput(result.data) : undefined;

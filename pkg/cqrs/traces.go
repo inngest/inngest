@@ -135,6 +135,8 @@ func (s *Span) StepOpCode() enums.Opcode {
 			return enums.OpcodeWaitForEvent
 		case enums.OpcodeStepPlanned.String():
 			return enums.OpcodeStepPlanned
+		case enums.OpcodeAIGateway.String():
+			return enums.OpcodeAIGateway
 		}
 	}
 

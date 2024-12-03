@@ -2599,9 +2599,10 @@ enum RunTraceSpanStatus {
 
 enum StepOp {
   INVOKE # invoke another function
-  RUN # run a function
+  RUN # run a step
   SLEEP # sleep for a duration
   WAIT_FOR_EVENT # wait for an event
+  AI_GATEWAY
 }
 
 union StepInfo = InvokeStepInfo | SleepStepInfo | WaitForEventStepInfo | RunStepInfo
