@@ -9,14 +9,14 @@ import (
 	"github.com/google/cel-go/common/operators"
 	"github.com/ohler55/ojg/jp"
 	"github.com/tidwall/btree"
-	"golang.org/x/sync/errgroup"
 )
 
-func newNumberMatcher() MatchingEngine {
+func newNumberMatcher(concurrency int64) MatchingEngine {
 	return &numbers{
 		lock: &sync.RWMutex{},
 
-		paths: map[string]struct{}{},
+		paths:       map[string]struct{}{},
+		concurrency: concurrency,
 
 		exact: btree.NewMap[float64, []*StoredExpressionPart](64),
 		gt:    btree.NewMap[float64, []*StoredExpressionPart](64),
@@ -33,20 +33,23 @@ type numbers struct {
 	exact *btree.Map[float64, []*StoredExpressionPart]
 	gt    *btree.Map[float64, []*StoredExpressionPart]
 	lt    *btree.Map[float64, []*StoredExpressionPart]
+
+	concurrency int64
 }
 
 func (n numbers) Type() EngineType {
 	return EngineTypeBTree
 }
 
-func (n *numbers) Match(ctx context.Context, input map[string]any) ([]*StoredExpressionPart, error) {
+func (n *numbers) Match(ctx context.Context, input map[string]any) (matched []*StoredExpressionPart, err error) {
 	l := &sync.Mutex{}
-	found := []*StoredExpressionPart{}
-	eg := errgroup.Group{}
+	matched = []*StoredExpressionPart{}
+
+	pool := newErrPool(errPoolOpts{concurrency: n.concurrency})
 
 	for item := range n.paths {
 		path := item
-		eg.Go(func() error {
+		pool.Go(func() error {
 			x, err := jp.ParseString(path)
 			if err != nil {
 				return err
@@ -72,28 +75,27 @@ func (n *numbers) Match(ctx context.Context, input map[string]any) ([]*StoredExp
 
 			// This matches null, nil (as null), and any non-null items.
 			l.Lock()
-			found = append(found, n.Search(ctx, path, val)...)
+			found := n.Search(ctx, path, val)
+			matched = append(matched, found...)
 			l.Unlock()
 
 			return nil
 		})
 	}
 
-	err := eg.Wait()
-
-	return found, err
+	return matched, pool.Wait()
 }
 
 // Search returns all ExpressionParts which match the given input, ignoring the variable name
 // entirely.
-func (n *numbers) Search(ctx context.Context, variable string, input any) []*StoredExpressionPart {
+func (n *numbers) Search(ctx context.Context, variable string, input any) (matched []*StoredExpressionPart) {
 	n.lock.RLock()
 	defer n.lock.RUnlock()
 
-	var (
-		val   float64
-		found = []*StoredExpressionPart{}
-	)
+	// initialize matched
+	matched = []*StoredExpressionPart{}
+
+	var val float64
 
 	switch v := input.(type) {
 	case int:
@@ -114,7 +116,7 @@ func (n *numbers) Search(ctx context.Context, variable string, input any) []*Sto
 				continue
 			}
 			// This is a candidatre.
-			found = append(found, m)
+			matched = append(matched, m)
 		}
 	}
 
@@ -130,7 +132,7 @@ func (n *numbers) Search(ctx context.Context, variable string, input any) []*Sto
 				continue
 			}
 			// This is a candidatre.
-			found = append(found, m)
+			matched = append(matched, m)
 		}
 		return true
 	})
@@ -147,12 +149,12 @@ func (n *numbers) Search(ctx context.Context, variable string, input any) []*Sto
 				continue
 			}
 			// This is a candidatre.
-			found = append(found, m)
+			matched = append(matched, m)
 		}
 		return true
 	})
 
-	return found
+	return matched
 }
 
 func (n *numbers) Add(ctx context.Context, p ExpressionPart) error {

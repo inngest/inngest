@@ -383,12 +383,12 @@ enum RunTraceSpanStatus {
 
 enum StepOp {
   INVOKE # invoke another function
-  RUN # run a function
+  RUN # run a step
   SLEEP # sleep for a duration
   WAIT_FOR_EVENT # wait for an event
 }
 
-union StepInfo = InvokeStepInfo | SleepStepInfo | WaitForEventStepInfo
+union StepInfo = InvokeStepInfo | SleepStepInfo | WaitForEventStepInfo | RunStepInfo
 
 type InvokeStepInfo {
   triggeringEventID: ULID!
@@ -409,6 +409,10 @@ type WaitForEventStepInfo {
   timeout: Time!
   foundEventID: ULID
   timedOut: Boolean
+}
+
+type RunStepInfo {
+  type: String
 }
 
 type RunTraceSpan {
@@ -434,6 +438,7 @@ type RunTraceSpan {
   endedAt: Time # the end time of the span, only present if it's ended
   childrenSpans: [RunTraceSpan!]! # the children spans of this span - invoke
   stepOp: StepOp # the operation this span represents; nil means it can't be attributed to a step yet
+  stepID: String # the ID of the step this span is associated with
   stepInfo: StepInfo # info about the step - use fragments to access appropriately
   # Nice-to-haves for navigating the trace
   isRoot: Boolean! # whether this span is the root span of the trace (shortcut for presence of rootspan)
@@ -442,6 +447,7 @@ type RunTraceSpan {
 }
 
 type RunTraceSpanOutput {
+  input: Bytes
   data: Bytes
   error: StepError
 }

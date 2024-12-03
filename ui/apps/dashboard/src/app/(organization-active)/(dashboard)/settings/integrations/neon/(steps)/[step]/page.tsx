@@ -18,7 +18,7 @@ export default function NeonStep({ params: { step } }: { params: { step: string 
 
   function handleLostCredentials() {
     toast.error('Lost credentials. Going back to the first step.');
-    router.push(pathCreator.neonIntegrationStep({ step: firstStep }));
+    router.push(pathCreator.pgIntegrationStep({ integration: 'neon', step: firstStep }));
   }
 
   if (step === IntegrationSteps.Authorize) {
@@ -29,6 +29,7 @@ export default function NeonStep({ params: { step } }: { params: { step: string 
           setCredentials(value);
           setStepsCompleted(IntegrationSteps.Authorize);
         }}
+        integration="neon"
         // @ts-ignore for now
         verifyCredentials={verifyCredentials}
       />
@@ -39,6 +40,7 @@ export default function NeonStep({ params: { step } }: { params: { step: string 
         onSuccess={() => {
           setStepsCompleted(IntegrationSteps.FormatWal);
         }}
+        integration="neon"
         // @ts-ignore for now
         verifyLogicalReplication={verifyLogicalReplication}
         savedCredentials={credentials}
@@ -51,6 +53,7 @@ export default function NeonStep({ params: { step } }: { params: { step: string 
         onSuccess={() => {
           setStepsCompleted(IntegrationSteps.ConnectDb);
         }}
+        integration="neon"
         // @ts-ignore for now
         verifyAutoSetup={verifyAutoSetup}
         savedCredentials={credentials}

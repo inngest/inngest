@@ -938,9 +938,16 @@ func (w wrapper) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*stat
 	if err != nil {
 		return nil, err
 	}
+
+	app, err := w.GetAppByID(ctx, fn.AppID)
+	if err != nil {
+		return nil, err
+	}
+
 	return &state.ExecutorFunction{
-		Function: def,
-		Paused:   false, // dev server does not support pausing
+		Function:     def,
+		Paused:       false, // dev server does not support pausing
+		AppIsConnect: app.IsConnect.Bool,
 	}, nil
 }
 
@@ -1090,11 +1097,11 @@ func (w wrapper) InsertQueueSnapshotChunk(ctx context.Context, params cqrs.Inser
 //
 
 // GetApps returns apps that have not been deleted.
-func (w wrapper) GetApps(ctx context.Context) ([]*cqrs.App, error) {
+func (w wrapper) GetApps(ctx context.Context, envID uuid.UUID) ([]*cqrs.App, error) {
 	return copyInto(ctx, w.q.GetApps, []*cqrs.App{})
 }
 
-func (w wrapper) GetAppByChecksum(ctx context.Context, checksum string) (*cqrs.App, error) {
+func (w wrapper) GetAppByChecksum(ctx context.Context, envID uuid.UUID, checksum string) (*cqrs.App, error) {
 	f := func(ctx context.Context) (*sqlc.App, error) {
 		return w.q.GetAppByChecksum(ctx, checksum)
 	}
@@ -1108,7 +1115,7 @@ func (w wrapper) GetAppByID(ctx context.Context, id uuid.UUID) (*cqrs.App, error
 	return copyInto(ctx, f, &cqrs.App{})
 }
 
-func (w wrapper) GetAppByURL(ctx context.Context, url string) (*cqrs.App, error) {
+func (w wrapper) GetAppByURL(ctx context.Context, envID uuid.UUID, url string) (*cqrs.App, error) {
 	// Normalize the URL before inserting into the DB.
 	url = util.NormalizeAppURL(url, forceHTTPS)
 
@@ -1118,8 +1125,15 @@ func (w wrapper) GetAppByURL(ctx context.Context, url string) (*cqrs.App, error)
 	return copyInto(ctx, f, &cqrs.App{})
 }
 
+func (w wrapper) GetAppByName(ctx context.Context, envID uuid.UUID, name string) (*cqrs.App, error) {
+	f := func(ctx context.Context) (*sqlc.App, error) {
+		return w.q.GetAppByName(ctx, name)
+	}
+	return copyInto(ctx, f, &cqrs.App{})
+}
+
 // GetAllApps returns all apps.
-func (w wrapper) GetAllApps(ctx context.Context) ([]*cqrs.App, error) {
+func (w wrapper) GetAllApps(ctx context.Context, envID uuid.UUID) ([]*cqrs.App, error) {
 	return copyInto(ctx, w.q.GetAllApps, []*cqrs.App{})
 }
 
@@ -1941,25 +1955,45 @@ func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*
 			return nil, fmt.Errorf("error parsing span outputs: %w", err)
 		}
 
-		for _, evt := range evts {
-			_, isFnOutput := evt.Attributes[consts.OtelSysFunctionOutput]
-			_, isStepOutput := evt.Attributes[consts.OtelSysStepOutput]
-			if isFnOutput || isStepOutput {
-				var isError bool
-				switch strings.ToUpper(s.StatusCode) {
-				case "ERROR", "STATUS_CODE_ERROR":
-					isError = true
-				}
+		var (
+			input      []byte
+			spanOutput *cqrs.SpanOutput
+		)
 
-				return &cqrs.SpanOutput{
-					Data:             []byte(evt.Name),
-					Timestamp:        evt.Timestamp,
-					Attributes:       evt.Attributes,
-					IsError:          isError,
-					IsFunctionOutput: isFnOutput,
-					IsStepOutput:     isStepOutput,
-				}, nil
+		for _, evt := range evts {
+			if spanOutput == nil {
+				_, isFnOutput := evt.Attributes[consts.OtelSysFunctionOutput]
+				_, isStepOutput := evt.Attributes[consts.OtelSysStepOutput]
+				if isFnOutput || isStepOutput {
+					var isError bool
+					switch strings.ToUpper(s.StatusCode) {
+					case "ERROR", "STATUS_CODE_ERROR":
+						isError = true
+					}
+
+					spanOutput = &cqrs.SpanOutput{
+						Data:             []byte(evt.Name),
+						Timestamp:        evt.Timestamp,
+						Attributes:       evt.Attributes,
+						IsError:          isError,
+						IsFunctionOutput: isFnOutput,
+						IsStepOutput:     isStepOutput,
+					}
+				}
 			}
+
+			if _, isInput := evt.Attributes[consts.OtelSysStepInput]; isInput && input == nil {
+				input = []byte(evt.Name)
+			}
+
+			if spanOutput != nil && input != nil {
+				break
+			}
+		}
+
+		if spanOutput != nil {
+			spanOutput.Input = input
+			return spanOutput, nil
 		}
 	}
 

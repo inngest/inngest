@@ -1,0 +1,1 @@
+ALTER TABLE apps ADD COLUMN is_connect BOOLEAN;

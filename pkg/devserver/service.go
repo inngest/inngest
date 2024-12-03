@@ -215,8 +215,12 @@ func (d *devserver) Stop(ctx context.Context) error {
 	return nil
 }
 
+func (d *devserver) HasPersistence() bool {
+	return d.singleNodeServiceOpts != nil && d.singleNodeServiceOpts.PersistenceInterval != nil
+}
+
 func (d *devserver) startPersistenceRoutine(ctx context.Context) {
-	if !d.IsSingleNodeService() {
+	if !d.HasPersistence() {
 		return
 	}
 
@@ -292,7 +296,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 		}
 
 		urls := map[string]struct{}{}
-		if apps, err := d.Data.GetApps(ctx); err == nil {
+		if apps, err := d.Data.GetApps(ctx, consts.DevServerEnvId); err == nil {
 			for _, app := range apps {
 				// We've seen this URL.
 				urls[app.Url] = struct{}{}

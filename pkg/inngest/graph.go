@@ -18,6 +18,9 @@ type Edge struct {
 	//
 	// We cannot use "Incoming" here as the incoming name still needs to tbe the generator.
 	IncomingGeneratorStep string `json:"gen,omitempty"`
+	// IncomingGeneratorStepName is the name from step planned. it should be empty for
+	// other cases
+	IncomingGeneratorStepName string `json:"gen_name,omitempty"`
 	// Outgoing is the name of the generator step or step that last ran.
 	Outgoing string `json:"outgoing"`
 }

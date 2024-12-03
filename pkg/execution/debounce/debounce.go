@@ -125,6 +125,7 @@ type Debouncer interface {
 	Debounce(ctx context.Context, d DebounceItem, fn inngest.Function) error
 	GetDebounceItem(ctx context.Context, debounceID ulid.ULID) (*DebounceItem, error)
 	DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID) error
+	StartExecution(ctx context.Context, d DebounceItem, fn inngest.Function, debounceID ulid.ULID) error
 }
 
 func NewRedisDebouncer(d *redis_state.DebounceClient, defaultQueueShard redis_state.QueueShard, q redis_state.QueueManager) Debouncer {
@@ -170,6 +171,39 @@ func (d debouncer) GetDebounceItem(ctx context.Context, debounceID ulid.ULID) (*
 		return nil, fmt.Errorf("error unmarshalling debounce item: %w", err)
 	}
 	return di, nil
+}
+
+// StartExecution swaps out the underlying pointer of the debounce
+func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn inngest.Function, debounceID ulid.ULID) error {
+	dkey, err := d.debounceKey(ctx, di, fn)
+	if err != nil {
+		return err
+	}
+
+	newDebounceID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	keys := []string{d.d.KeyGenerator().DebouncePointer(ctx, fn.ID, dkey)}
+	args := []string{
+		newDebounceID.String(),
+		debounceID.String(),
+	}
+
+	res, err := scripts["start"].Exec(
+		ctx,
+		d.d.Client(),
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return err
+	}
+
+	switch res {
+	case 0, 1:
+		return nil
+	default:
+		return fmt.Errorf("invalid status returned when starting debounce: %d", res)
+	}
 }
 
 // Debounce debounces a given function with the given DebounceItem.
@@ -343,7 +377,10 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 		// Do nothing.
 		return nil
 	case -3:
-		return ErrDebounceNotFound
+		// The item is not found with the debounceID
+		// enqueue a new item
+		qi := d.queueItem(ctx, di, debounceID)
+		return d.q.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second), queue.EnqueueOpts{})
 	default:
 		// Debounces should have a maximum timeout;  updating the debounce returns
 		// the timeout to use.

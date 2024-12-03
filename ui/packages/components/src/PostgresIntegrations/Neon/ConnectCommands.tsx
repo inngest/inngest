@@ -32,7 +32,7 @@ export const AccessCommand = () => (
     tabs={[
       {
         title: 'Access command',
-        content: `GRANT USAGE ON SCHEMA public TO replication_user;\n\GRANT SELECT ON ALL TABLES IN SCHEMA public TO replication_user;\n\ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO replication_user;`,
+        content: `GRANT USAGE ON SCHEMA public TO inngest;\n\GRANT SELECT ON ALL TABLES IN SCHEMA public TO inngest;\n\ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO inngest;`,
         language: 'sql',
       },
     ]}
@@ -67,7 +67,7 @@ export const AlterTableReplicationCommandTwo = () => (
   <PostgresCommandBlock
     tabs={[
       {
-        title: 'Alter table - Default',
+        title: 'Create publication',
         content: 'CREATE PUBLICATION inngest FOR ALL TABLES;',
         language: 'sql',
       },

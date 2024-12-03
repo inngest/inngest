@@ -3,7 +3,6 @@ import { MetricsIcon } from '@inngest/components/icons/sections/Metrics';
 import { RunsIcon } from '@inngest/components/icons/sections/Runs';
 
 import type { Environment as EnvType } from '@/utils/environments';
-import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { getNavRoute } from './Navigation';
 
 export default function Monitor({
@@ -13,8 +12,6 @@ export default function Monitor({
   activeEnv: EnvType;
   collapsed: boolean;
 }) {
-  const { isReady: metricsIsReady, value: metricsEnabled } = useBooleanFlag('metrics-dashboard');
-
   return (
     <div className={`flex w-full flex-col  ${collapsed ? 'mt-2' : 'mt-5'}`}>
       {collapsed ? (
@@ -27,8 +24,6 @@ export default function Monitor({
         collapsed={collapsed}
         text="Metrics"
         icon={<MetricsIcon className="h-18px w-[18px]" />}
-        comingSoon={!metricsIsReady || !metricsEnabled}
-        beta={metricsIsReady && metricsEnabled}
       />
       <MenuItem
         href={getNavRoute(activeEnv, 'runs')}

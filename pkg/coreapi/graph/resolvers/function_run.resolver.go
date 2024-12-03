@@ -265,6 +265,7 @@ func (r *mutationResolver) CancelRun(
 func (r *mutationResolver) Rerun(
 	ctx context.Context,
 	runID ulid.ULID,
+	fromStep *models.RerunFromStepInput,
 ) (ulid.ULID, error) {
 	zero := ulid.ULID{}
 	accountID := uuid.New()
@@ -312,6 +313,21 @@ func (r *mutationResolver) Rerun(
 	)
 	defer span.End()
 
+	var fromStepReq *execution.ScheduleRequestFromStep
+	if fromStep != nil {
+		fromStepReq = &execution.ScheduleRequestFromStep{
+			StepID: fromStep.StepID,
+		}
+
+		if fromStep.Input != nil {
+			if len(*fromStep.Input) == 0 || (*fromStep.Input)[0] != '[' {
+				return zero, fmt.Errorf("input is not a valid JSON array")
+			}
+
+			fromStepReq.Input = json.RawMessage(*fromStep.Input)
+		}
+	}
+
 	identifier, err := r.Executor.Schedule(ctx, execution.ScheduleRequest{
 		Function: *fn,
 		AppID:    fnCQRS.AppID,
@@ -323,6 +339,7 @@ func (r *mutationResolver) Rerun(
 		},
 		OriginalRunID: &fnrun.RunID,
 		AccountID:     consts.DevServerAccountId,
+		FromStep:      fromStepReq,
 	})
 	if err != nil {
 		return zero, err

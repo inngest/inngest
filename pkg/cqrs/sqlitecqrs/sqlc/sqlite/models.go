@@ -25,6 +25,7 @@ type App struct {
 	CreatedAt   time.Time
 	ArchivedAt  sql.NullTime
 	Url         string
+	IsConnect   sql.NullBool
 }
 
 type Event struct {

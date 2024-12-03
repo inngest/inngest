@@ -29,13 +29,14 @@ func TestTimeoutStart(t *testing.T) {
 	)
 
 	trigger := "test/timeouts-start"
+	timeoutStart := 3 * time.Second
 
 	a := inngestgo.CreateFunction(
 		inngestgo.FunctionOpts{
 			Name:        "fn concurrency",
 			Concurrency: []inngest.Concurrency{{Limit: 1}},
 			Timeouts: &inngestgo.Timeouts{
-				Start: 3 * time.Second,
+				Start: &timeoutStart,
 			},
 		},
 		inngestgo.EventTrigger(trigger, nil),
@@ -82,13 +83,15 @@ func TestTimeoutFinish(t *testing.T) {
 		)
 
 		trigger := "test/timeouts-finish"
+		timeoutStart := 1 * time.Second
+		timeoutFinish := 3 * time.Second
 
 		a := inngestgo.CreateFunction(
 			inngestgo.FunctionOpts{
 				Name: "timeouts-finish",
 				Timeouts: &inngestgo.Timeouts{
-					Start:  1 * time.Second,
-					Finish: 3 * time.Second,
+					Start:  &timeoutStart,
+					Finish: &timeoutFinish,
 				},
 			},
 			inngestgo.EventTrigger(trigger, nil),

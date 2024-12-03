@@ -1,4 +1,4 @@
-import RunsPage from './Runs';
+import DashboardRuns from './Runs';
 
 type RunLayoutProps = {
   children: React.ReactNode;
@@ -10,7 +10,7 @@ type RunLayoutProps = {
 export default function RunLayout({ children, params }: RunLayoutProps) {
   return (
     <>
-      <RunsPage params={params} />
+      <DashboardRuns params={params} />
       {children}
     </>
   );

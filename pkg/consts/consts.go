@@ -1,8 +1,9 @@
 package consts
 
 import (
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -28,8 +29,14 @@ const (
 	// our system.
 	MaxFunctionTimeout = 2 * time.Hour
 
+	// MaxStepOutputSize is the maximum size of the output of a step.
+	MaxStepOutputSize = 1024 * 1024 * 4 // 4MB
+
+	// MaxStepInputSize is the maximum size of the input of a step.
+	MaxStepInputSize = 1024 * 1024 * 4 // 4MB
+
 	// MaxBodySize is the maximum payload size read on any HTTP response.
-	MaxBodySize = 1024 * 1024 * 4 // 4MB
+	MaxBodySize = MaxStepOutputSize + MaxStepInputSize
 
 	// DefaultMaxStateSizeLimit is the maximum number of bytes of output state per function run allowed.
 	DefaultMaxStateSizeLimit = 1024 * 1024 * 32 // 32MB
@@ -128,4 +135,5 @@ const (
 var (
 	// DevServerAccountId is the fixed account ID used internally in the dev server.
 	DevServerAccountId = uuid.MustParse("72d87f98-871b-5b9f-a9f1-e9e2ef0a8f55")
+	DevServerEnvId     = uuid.MustParse("b711b20a-fecc-4183-b3d5-65da9028d1d1")
 )

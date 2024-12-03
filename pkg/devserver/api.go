@@ -154,6 +154,8 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	ctx := r.Context()
 
+	logger.StdlibLogger(ctx).Debug("received register request")
+
 	expectedServerKind := r.Header.Get(headers.HeaderKeyExpectedServerKind)
 	if expectedServerKind != "" && expectedServerKind != a.devserver.Opts.Config.GetServerKind() {
 		a.err(ctx, w, 400, fmt.Errorf("Expected server kind %s, got %s", a.devserver.Opts.Config.GetServerKind(), expectedServerKind))
@@ -170,7 +172,8 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := a.register(ctx, req); err != nil {
+	reply, err := a.register(ctx, req)
+	if err != nil {
 		logger.From(ctx).Warn().Msgf("Error registering functions:\n%s", err)
 		_ = publicerr.WriteHTTP(w, err)
 		return
@@ -183,20 +186,26 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, _ = w.Write([]byte(`{"ok":true}`))
-}
-
-func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error) {
-	sum, err := r.Checksum()
+	resp, err := json.Marshal(reply)
 	if err != nil {
-		return publicerr.Wrap(err, 400, "Invalid request")
+		_ = publicerr.WriteHTTP(w, err)
+		return
 	}
 
-	if app, err := a.devserver.Data.GetAppByChecksum(ctx, sum); err == nil {
+	_, _ = w.Write(resp)
+}
+
+func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*cqrs.SyncReply, error) {
+	sum, err := r.Checksum()
+	if err != nil {
+		return nil, publicerr.Wrap(err, 400, "Invalid request")
+	}
+
+	if app, err := a.devserver.Data.GetAppByChecksum(ctx, consts.DevServerEnvId, sum); err == nil {
 		if !app.Error.Valid {
 			// Skip registration since the app was already successfully
 			// registered.
-			return nil
+			return &cqrs.SyncReply{OK: true}, nil
 		}
 
 		// Clear app error.
@@ -208,10 +217,11 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 			},
 		)
 		if err != nil {
-			return publicerr.Wrap(err, 500, "Error updating app error")
+			return nil, publicerr.Wrap(err, 500, "Error updating app error")
 		}
 	}
 
+	syncID := uuid.New()
 	// Attempt to get the existing app by URL, and delete it if possible.
 	// We're going to recreate it below.
 	//
@@ -221,10 +231,18 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 
 	tx, err := a.devserver.Data.WithTx(ctx)
 	if err != nil {
-		return publicerr.Wrap(err, 500, "Error starting registration tx")
+		return nil, publicerr.Wrap(err, 500, "Error starting registration tx")
 	}
 
 	defer func() {
+		isConnect := sql.NullBool{Valid: false}
+		if r.IsConnect() {
+			isConnect = sql.NullBool{
+				Bool:  true,
+				Valid: true,
+			}
+		}
+
 		appParams := cqrs.UpsertAppParams{
 			// Use a deterministic ID for the app in dev.
 			ID:          appID,
@@ -235,8 +253,9 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 				String: r.Framework,
 				Valid:  r.Framework != "",
 			},
-			Url:      r.URL,
-			Checksum: sum,
+			Url:       r.URL,
+			Checksum:  sum,
+			IsConnect: isConnect,
 		}
 
 		// We want to save an app at the end, after handling each error.
@@ -254,7 +273,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 	}()
 
 	// Get a list of all functions
-	existing, _ := tx.GetFunctionsByAppInternalID(ctx, uuid.UUID{}, appID)
+	existing, _ := tx.GetFunctionsByAppInternalID(ctx, consts.DevServerEnvId, appID)
 	// And get a list of functions that we've upserted.  We'll delete all existing functions not in
 	// this set.
 	seen := map[uuid.UUID]struct{}{}
@@ -263,7 +282,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 	// signing key and warn if the user has an invalid key.
 	funcs, err := r.Parse(ctx)
 	if err != nil && err != sdk.ErrNoFunctions {
-		return publicerr.Wrap(err, 400, "At least one function is invalid")
+		return nil, publicerr.Wrap(err, 400, "At least one function is invalid")
 	}
 
 	// For each function,
@@ -276,17 +295,17 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 
 		config, err := json.Marshal(fn)
 		if err != nil {
-			return publicerr.Wrap(err, 500, "Error marshalling function")
+			return nil, publicerr.Wrap(err, 500, "Error marshalling function")
 		}
 
-		if _, err := tx.GetFunctionByInternalUUID(ctx, uuid.UUID{}, fn.ID); err == nil {
+		if _, err := tx.GetFunctionByInternalUUID(ctx, consts.DevServerEnvId, fn.ID); err == nil {
 			// Update the function config.
 			_, err = tx.UpdateFunctionConfig(ctx, cqrs.UpdateFunctionConfigParams{
 				ID:     fn.ID,
 				Config: string(config),
 			})
 			if err != nil {
-				return publicerr.Wrap(err, 500, "Error updating function config")
+				return nil, publicerr.Wrap(err, 500, "Error updating function config")
 			}
 			continue
 		}
@@ -301,8 +320,15 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		})
 		if err != nil {
 			err = fmt.Errorf("Function %s is invalid: %w", fn.Slug, err)
-			return publicerr.Wrap(err, 500, "Error saving function")
+			return nil, publicerr.Wrap(err, 500, "Error saving function")
 		}
+	}
+
+	reply := &cqrs.SyncReply{
+		OK:       true,
+		Modified: true,
+		AppID:    &appID,
+		SyncID:   &syncID,
 	}
 
 	// Remove all unseen functions.
@@ -313,13 +339,13 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		}
 	}
 	if len(deletes) == 0 {
-		return nil
+		return reply, nil
 	}
 
 	if err = tx.DeleteFunctionsByIDs(ctx, deletes); err != nil {
-		return publicerr.Wrap(err, 500, "Error deleting removed function")
+		return nil, publicerr.Wrap(err, 500, "Error deleting removed function")
 	}
-	return nil
+	return reply, nil
 }
 
 func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
@@ -487,7 +513,7 @@ func (a devapi) RemoveApp(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	url := r.FormValue("url")
 
-	app, err := a.devserver.Data.GetAppByURL(ctx, url)
+	app, err := a.devserver.Data.GetAppByURL(ctx, consts.DevServerEnvId, url)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 404, "App not found: %s", url))
 		return

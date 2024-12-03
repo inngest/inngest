@@ -21,14 +21,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
-	"github.com/jonboulle/clockwork"
-	"github.com/oklog/ulid/v2"
-	"github.com/redis/rueidis"
-	"github.com/rs/zerolog"
-	"golang.org/x/sync/semaphore"
-	"gonum.org/v1/gonum/stat/sampleuv"
-	"lukechampine.com/frand"
-
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/consts"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -37,6 +29,12 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/jonboulle/clockwork"
+	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
+	"github.com/rs/zerolog"
+	"golang.org/x/sync/semaphore"
+	"gonum.org/v1/gonum/stat/sampleuv"
 )
 
 const (
@@ -116,7 +114,6 @@ var (
 	ErrQueuePeekMaxExceedsLimits     = fmt.Errorf("peek exceeded the maximum limit of %d", AbsoluteQueuePeekMax)
 	ErrPriorityTooLow                = fmt.Errorf("priority is too low")
 	ErrPriorityTooHigh               = fmt.Errorf("priority is too high")
-	ErrWeightedSampleRead            = fmt.Errorf("error reading from weighted sample")
 	ErrPartitionNotFound             = fmt.Errorf("partition not found")
 	ErrPartitionAlreadyLeased        = fmt.Errorf("partition already leased")
 	ErrPartitionPeekMaxExceedsLimits = fmt.Errorf("peek exceeded the maximum limit of %d", PartitionPeekMax)
@@ -145,12 +142,12 @@ var (
 )
 
 var (
-	rnd *frandRNG
+	rnd *util.FrandRNG
 )
 
 func init() {
 	// For weighted shuffles generate a new rand.
-	rnd = &frandRNG{RNG: frand.New(), lock: &sync.Mutex{}}
+	rnd = util.NewFrandRNG()
 }
 
 type QueueManager interface {
@@ -2803,7 +2800,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	for n := range result {
 		idx, ok := w.Take()
 		if !ok {
-			return nil, ErrWeightedSampleRead
+			return nil, util.ErrWeightedSampleRead
 		}
 		result[n] = items[idx]
 	}
@@ -2886,7 +2883,7 @@ func (q *queue) accountPeek(ctx context.Context, sequential bool, until time.Tim
 	for n := range result {
 		idx, ok := w.Take()
 		if !ok {
-			return nil, ErrWeightedSampleRead
+			return nil, util.ErrWeightedSampleRead
 		}
 		result[n] = items[idx]
 	}
@@ -3470,44 +3467,6 @@ func (q *queue) readFnMetadata(ctx context.Context, fnID uuid.UUID) (*FnMetadata
 		return nil, fmt.Errorf("error reading function metadata: %w", err)
 	}
 	return &retv, nil
-}
-
-// frandRNG is a fast crypto-secure prng which uses a mutex to guard
-// parallel reads.  It also implements the x/exp/rand.Source interface
-// by adding a Seed() method which does nothing.
-type frandRNG struct {
-	*frand.RNG
-	lock *sync.Mutex
-}
-
-func (f *frandRNG) Read(b []byte) (int, error) {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	return f.RNG.Read(b)
-}
-
-func (f *frandRNG) Uint64() uint64 {
-	return f.Uint64n(math.MaxUint64)
-}
-
-func (f *frandRNG) Uint64n(n uint64) uint64 {
-	// sampled.Take calls Uint64n, which must be guarded by a lock in order
-	// to be thread-safe.
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	return f.RNG.Uint64n(n)
-}
-
-func (f *frandRNG) Float64() float64 {
-	// sampled.Take also calls Float64, which must be guarded by a lock in order
-	// to be thread-safe.
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	return f.RNG.Float64()
-}
-
-func (f *frandRNG) Seed(seed uint64) {
-	// Do nothing.
 }
 
 func newLeaseDenyList() *leaseDenies {

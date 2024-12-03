@@ -321,6 +321,9 @@ func (c *Client) RunTraces(ctx context.Context, runID string) (*RunV2, error) {
 					foundEventID
 					timedOut
 				}
+				... on RunStepInfo {
+					type
+				}
 			}
 		}
 	`

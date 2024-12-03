@@ -10,7 +10,8 @@ CREATE TABLE apps (
 	checksum VARCHAR NOT NULL,
 	created_at TIMESTAMP NOT NULL,
 	archived_at TIMESTAMP,
-	url VARCHAR NOT NULL
+	url VARCHAR NOT NULL,
+    is_connect BOOLEAN
 );
 
 CREATE TABLE events (

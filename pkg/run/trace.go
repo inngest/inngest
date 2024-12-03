@@ -73,9 +73,11 @@ func NewRunTree(opts RunTreeOpts) (*runTree, error) {
 	}
 
 	for _, s := range opts.Spans {
-		// don't even bother
+		// ignore parallelism planning spans
 		if s.StepOpCode() == enums.OpcodeStepPlanned {
-			continue
+			if _, ok := s.SpanAttributes[consts.OtelSysStepPlan]; ok {
+				continue
+			}
 		}
 
 		if s.ScopeName == consts.OtelScopeFunction {
@@ -99,9 +101,11 @@ func NewRunTree(opts RunTreeOpts) (*runTree, error) {
 
 	// loop through again to construct parent/child relationship
 	for _, s := range opts.Spans {
-		// don't even bother
+		// ignore parallelism planning spans
 		if s.StepOpCode() == enums.OpcodeStepPlanned {
-			continue
+			if _, ok := s.SpanAttributes[consts.OtelSysStepPlan]; ok {
+				continue
+			}
 		}
 
 		if s.ParentSpanID != nil {
@@ -195,7 +199,7 @@ func (tb *runTree) ToRunSpan(ctx context.Context) (*rpbv2.RunSpan, error) {
 	return root, nil
 }
 
-func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan, bool, error) {
+func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (span *rpbv2.RunSpan, skipped bool, err error) {
 	res, skipped := tb.constructSpan(ctx, s)
 	if skipped {
 		return nil, skipped, nil
@@ -277,8 +281,6 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan,
 
 				return nil, false, fmt.Errorf("error grouping invoke: %w", err)
 			}
-		case enums.OpcodeStepPlanned: // don't bother
-			return nil, true, nil
 		default:
 			// execution spans
 			if s.ScopeName == consts.OtelScopeExecution {
@@ -359,6 +361,11 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 		}
 	}
 
+	var stepID *string
+	if attrStepID, ok := s.SpanAttributes[consts.OtelSysStepID]; ok && attrStepID != "" {
+		stepID = &attrStepID
+	}
+
 	return &rpbv2.RunSpan{
 		AccountId:    acctID.String(),
 		WorkspaceId:  wsID.String(),
@@ -374,6 +381,7 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 		StartedAt:    timestamppb.New(s.Timestamp),
 		EndedAt:      timestamppb.New(endedAt),
 		DurationMs:   dur,
+		StepId:       stepID,
 	}, false
 }
 
@@ -399,6 +407,16 @@ func (tb *runTree) processStepRunGroup(ctx context.Context, span *cqrs.Span, mod
 
 	stepOp := rpbv2.SpanStepOp_RUN
 	mod.StepOp = &stepOp
+
+	if v, ok := span.SpanAttributes[consts.OtelSysStepRunType]; ok {
+		mod.StepInfo = &rpbv2.StepInfo{
+			Info: &rpbv2.StepInfo_Run{
+				Run: &rpbv2.StepInfoRun{
+					Type: &v,
+				},
+			},
+		}
+	}
 
 	// not need to provide nesting if it's just itself and it's successful
 	if len(peers) == 1 && span.Status() == cqrs.SpanStatusOk {

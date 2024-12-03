@@ -11,6 +11,8 @@ import { RiCheckboxCircleFill, RiExternalLinkLine } from '@remixicon/react';
 import { pathCreator } from '@/utils/urls';
 import { OnboardingSteps } from '../Onboarding/types';
 import useOnboardingStep from './useOnboardingStep';
+import { useOnboardingTracking } from './useOnboardingTracking';
+import { getNextStepName } from './utils';
 
 const tabs = [
   {
@@ -31,11 +33,14 @@ const tabs = [
 ];
 
 export default function CreateApp() {
-  const { updateLastCompletedStep } = useOnboardingStep();
+  const currentStepName = OnboardingSteps.CreateApp;
+  const nextStepName = getNextStepName(currentStepName);
+  const { updateCompletedSteps } = useOnboardingStep();
   const [activeTab, setActiveTab] = useState(tabs[0]?.title || '');
   const currentTabContent = tabs.find((tab) => tab.title === activeTab) || tabs[0];
   const router = useRouter();
   const { isRunning: devServerIsRunning } = useDevServer(2500);
+  const tracking = useOnboardingTracking();
 
   return (
     <div className="text-subtle">
@@ -95,6 +100,11 @@ export default function CreateApp() {
               href="http://localhost:8288"
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() =>
+                tracking?.trackOnboardingAction(currentStepName, {
+                  metadata: { type: 'btn-click', label: 'open-dev-server' },
+                })
+              }
             />
           ) : (
             <div className="text-link flex items-center gap-1.5 text-sm">
@@ -107,18 +117,32 @@ export default function CreateApp() {
       <div className="flex items-center gap-2">
         <NewButton
           label="Next"
+          disabled={!devServerIsRunning}
           onClick={() => {
-            updateLastCompletedStep(OnboardingSteps.CreateApp);
-            router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.DeployApp }));
+            updateCompletedSteps(currentStepName, {
+              metadata: {
+                completionSource: 'manual',
+              },
+            });
+            tracking?.trackOnboardingAction(currentStepName, {
+              metadata: { type: 'btn-click', label: 'next' },
+            });
+            router.push(pathCreator.onboardingSteps({ step: nextStepName }));
           }}
         />
-        {/* TODO: add tracking */}
         <NewButton
           appearance="outlined"
           label="I already have an Inngest app"
           onClick={() => {
-            updateLastCompletedStep(OnboardingSteps.CreateApp);
-            router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.DeployApp }));
+            updateCompletedSteps(currentStepName, {
+              metadata: {
+                completionSource: 'manual',
+              },
+            });
+            tracking?.trackOnboardingAction(currentStepName, {
+              metadata: { type: 'btn-click', label: 'skip' },
+            });
+            router.push(pathCreator.onboardingSteps({ step: nextStepName }));
           }}
         />
       </div>

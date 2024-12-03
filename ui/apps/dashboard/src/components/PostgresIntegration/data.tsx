@@ -27,13 +27,21 @@ export const PostgresIntegrations = async () => {
 
     const integrations = response.environment.cdcConnections;
 
-    return integrations.map((integration) => ({
-      id: integration.id,
-      name: integration.name,
-      slug: 'neon',
-      projects: [],
-      enabled: integration.status === 'RUNNING' || integration.status === 'SETUP_COMPLETE',
-    }));
+    console.log(integrations);
+
+    return integrations.map((integration) => {
+      // The DB name has a prefix, eg "Neon-" or "Supabase-" which is the slug.  This dictates which
+      // "integration" (postgres host) was used to set up the connection.
+      const slug = (integration.name.split('-')[0] || '').toLowerCase();
+
+      return {
+        id: integration.id,
+        name: integration.name,
+        slug,
+        projects: [],
+        enabled: integration.status === 'RUNNING' || integration.status === 'SETUP_COMPLETE',
+      };
+    });
   } catch (error) {
     return [];
   }

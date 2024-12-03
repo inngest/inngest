@@ -248,6 +248,12 @@ export const RERUN = gql`
   }
 `;
 
+export const RERUN_FROM_STEP = gql`
+  mutation RerunFromStep($runID: ULID!, $fromStep: RerunFromStepInput!) {
+    rerun(runID: $runID, fromStep: $fromStep)
+  }
+`;
+
 export const GET_RUNS = gql`
   query GetRuns(
     $appIDs: [UUID!]
@@ -324,6 +330,7 @@ export const TRACE_DETAILS_FRAGMENT = gql`
     isRoot
     outputID
     spanID
+    stepID
     stepOp
     stepInfo {
       __typename
@@ -344,6 +351,9 @@ export const TRACE_DETAILS_FRAGMENT = gql`
         timeout
         foundEventID
         timedOut
+      }
+      ... on RunStepInfo {
+        type
       }
     }
   }
@@ -376,6 +386,7 @@ export const GET_RUN = gql`
 export const GET_TRACE_RESULT = gql`
   query GetTraceResult($traceID: String!) {
     runTraceSpanOutputByID(outputID: $traceID) {
+      input
       data
       error {
         message

@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _OpcodeName = "NoneStepStepRunStepErrorStepPlannedSleepWaitForEventInvokeFunction"
+const _OpcodeName = "NoneStepStepRunStepErrorStepPlannedSleepWaitForEventInvokeFunctionAIGateway"
 
-var _OpcodeIndex = [...]uint8{0, 4, 8, 15, 24, 35, 40, 52, 66}
+var _OpcodeIndex = [...]uint8{0, 4, 8, 15, 24, 35, 40, 52, 66, 75}
 
-const _OpcodeLowerName = "nonestepsteprunsteperrorstepplannedsleepwaitforeventinvokefunction"
+const _OpcodeLowerName = "nonestepsteprunsteperrorstepplannedsleepwaitforeventinvokefunctionaigateway"
 
 func (i Opcode) String() string {
 	if i < 0 || i >= Opcode(len(_OpcodeIndex)-1) {
@@ -33,9 +33,10 @@ func _OpcodeNoOp() {
 	_ = x[OpcodeSleep-(5)]
 	_ = x[OpcodeWaitForEvent-(6)]
 	_ = x[OpcodeInvokeFunction-(7)]
+	_ = x[OpcodeAIGateway-(8)]
 }
 
-var _OpcodeValues = []Opcode{OpcodeNone, OpcodeStep, OpcodeStepRun, OpcodeStepError, OpcodeStepPlanned, OpcodeSleep, OpcodeWaitForEvent, OpcodeInvokeFunction}
+var _OpcodeValues = []Opcode{OpcodeNone, OpcodeStep, OpcodeStepRun, OpcodeStepError, OpcodeStepPlanned, OpcodeSleep, OpcodeWaitForEvent, OpcodeInvokeFunction, OpcodeAIGateway}
 
 var _OpcodeNameToValueMap = map[string]Opcode{
 	_OpcodeName[0:4]:        OpcodeNone,
@@ -54,6 +55,8 @@ var _OpcodeNameToValueMap = map[string]Opcode{
 	_OpcodeLowerName[40:52]: OpcodeWaitForEvent,
 	_OpcodeName[52:66]:      OpcodeInvokeFunction,
 	_OpcodeLowerName[52:66]: OpcodeInvokeFunction,
+	_OpcodeName[66:75]:      OpcodeAIGateway,
+	_OpcodeLowerName[66:75]: OpcodeAIGateway,
 }
 
 var _OpcodeNames = []string{
@@ -65,6 +68,7 @@ var _OpcodeNames = []string{
 	_OpcodeName[35:40],
 	_OpcodeName[40:52],
 	_OpcodeName[52:66],
+	_OpcodeName[66:75],
 }
 
 // OpcodeString retrieves an enum value from the enum constants string name.

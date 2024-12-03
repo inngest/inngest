@@ -8,7 +8,7 @@ export default function Layout({
   return (
     <div className="text-subtle my-12 grid grid-cols-3">
       <main className="col-span-2 mx-20">
-        <PageHeader step={step} />
+        <PageHeader step={step} integration="neon" />
         {children}
       </main>
       <StepsMenu step={step} />

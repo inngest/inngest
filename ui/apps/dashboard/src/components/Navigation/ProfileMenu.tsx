@@ -13,6 +13,8 @@ import {
   RiUserLine,
 } from '@remixicon/react';
 
+import { pathCreator } from '@/utils/urls';
+
 export const ProfileMenu = ({ children }: { children: ReactNode }) => {
   return (
     <Listbox>
@@ -41,7 +43,7 @@ export const ProfileMenu = ({ children }: { children: ReactNode }) => {
               </div>
             </Listbox.Option>
           </Link>
-          <Link href="/settings/billing" scroll={false}>
+          <Link href={pathCreator.billing()} scroll={false}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="billing"

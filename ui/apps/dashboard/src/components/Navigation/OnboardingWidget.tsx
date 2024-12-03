@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { NewButton } from '@inngest/components/Button';
 import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import SegmentedProgressBar from '@inngest/components/ProgressBar/SegmentedProgressBar';
@@ -6,11 +7,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Too
 import { RiBookReadLine, RiCheckboxCircleFill, RiCloseLine } from '@remixicon/react';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
-import { EnvironmentType } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import { onboardingWidgetContent } from '../Onboarding/content';
-import { STEPS_ORDER } from '../Onboarding/types';
+import { OnboardingSteps, steps } from '../Onboarding/types';
 import useOnboardingStep from '../Onboarding/useOnboardingStep';
+import { useOnboardingTracking } from '../Onboarding/useOnboardingTracking';
 
 export default function OnboardingWidget({
   collapsed,
@@ -19,15 +20,14 @@ export default function OnboardingWidget({
   collapsed: boolean;
   closeWidget: () => void;
 }) {
+  const router = useRouter();
   const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
-  const { lastCompletedStep, isFinalStep, nextStep } = useOnboardingStep();
-  const segmentsCompleted = lastCompletedStep ? STEPS_ORDER.indexOf(lastCompletedStep) + 1 : 0;
+  const { lastCompletedStep, nextStep, totalStepsCompleted } = useOnboardingStep();
+  const tracking = useOnboardingTracking();
 
-  const stepContent = isFinalStep
-    ? onboardingWidgetContent.step['success']
-    : lastCompletedStep
-    ? onboardingWidgetContent.step[lastCompletedStep]
-    : onboardingWidgetContent.step[STEPS_ORDER[0]!];
+  const stepContent = lastCompletedStep?.isFinalStep
+    ? onboardingWidgetContent.step.success
+    : onboardingWidgetContent.step[nextStep?.name || OnboardingSteps.CreateApp];
 
   if (!onboardingFlow) return;
   return (
@@ -35,8 +35,8 @@ export default function OnboardingWidget({
       {collapsed && (
         <MenuItem
           href={pathCreator.onboardingSteps({
-            envSlug: EnvironmentType.Production.toLowerCase(),
-            step: nextStep,
+            step: nextStep ? nextStep.name : lastCompletedStep?.name,
+            ref: 'app-onboarding-widget',
           })}
           className="border-muted border"
           collapsed={collapsed}
@@ -48,8 +48,8 @@ export default function OnboardingWidget({
       {!collapsed && (
         <Link
           href={pathCreator.onboardingSteps({
-            envSlug: EnvironmentType.Production.toLowerCase(),
-            step: nextStep,
+            step: nextStep ? nextStep.name : lastCompletedStep?.name,
+            ref: 'app-onboarding-widget',
           })}
           className="text-basis bg-canvasBase hover:bg-canvasSubtle border-subtle mb-5 block rounded border p-3 leading-tight"
         >
@@ -58,10 +58,12 @@ export default function OnboardingWidget({
               <div className="flex items-center justify-between">
                 <p
                   className={`${
-                    isFinalStep && 'text-success'
+                    lastCompletedStep?.isFinalStep && 'text-success'
                   } flex items-center gap-0.5 font-medium`}
                 >
-                  {isFinalStep && <RiCheckboxCircleFill className="text-success h-5 w-5" />}
+                  {lastCompletedStep?.isFinalStep && (
+                    <RiCheckboxCircleFill className="text-success h-5 w-5" />
+                  )}
                   {stepContent.title}
                 </p>
                 <Tooltip>
@@ -72,7 +74,17 @@ export default function OnboardingWidget({
                       appearance="ghost"
                       size="small"
                       className="hover:bg-canvasBase"
-                      onClick={() => closeWidget()}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        tracking?.trackOnboardingAction(undefined, {
+                          metadata: {
+                            type: 'btn-click',
+                            label: 'close-widget',
+                            totalStepsCompleted: totalStepsCompleted,
+                          },
+                        });
+                        closeWidget();
+                      }}
                     />
                   </TooltipTrigger>
                   <TooltipContent side="right" className="dark max-w-40">
@@ -82,10 +94,10 @@ export default function OnboardingWidget({
               </div>
               <p className="text-subtle text-sm">{stepContent.description}</p>
             </div>
-            {!isFinalStep && (
+            {!lastCompletedStep?.isFinalStep && (
               <SegmentedProgressBar
-                segmentsCompleted={segmentsCompleted}
-                segments={STEPS_ORDER.length}
+                segmentsCompleted={totalStepsCompleted}
+                segments={steps.length}
               />
             )}
             {stepContent.eta && (
@@ -96,7 +108,10 @@ export default function OnboardingWidget({
                 appearance="outlined"
                 className="hover:bg-canvasBase w-full text-sm"
                 label={stepContent.cta}
-                href="/settings/billing"
+                onClick={(e) => {
+                  e.preventDefault();
+                  router.push(pathCreator.billing() + '?ref=app-onboarding-widget');
+                }}
               />
             )}
           </div>

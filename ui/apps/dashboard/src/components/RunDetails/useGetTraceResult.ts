@@ -43,7 +43,10 @@ export function useGetTraceResult(): (traceID: string) => Promise<Result> {
       if (!res.data) {
         throw new Error('no data returned');
       }
-      return res.data.workspace.runTraceSpanOutputByID;
+      return {
+        input: null, // TODO Parse input
+        ...res.data.workspace.runTraceSpanOutputByID,
+      };
     },
     [client, envID]
   );

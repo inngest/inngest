@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/devserver/discovery"
 )
 
 func (a queryResolver) Apps(ctx context.Context) ([]*cqrs.App, error) {
-	return a.Data.GetApps(ctx)
+	return a.Data.GetApps(ctx, consts.DevServerEnvId)
 }
 
 func (a appResolver) ID(ctx context.Context, obj *cqrs.App) (string, error) {
@@ -56,7 +56,7 @@ func (a appResolver) Functions(ctx context.Context, obj *cqrs.App) ([]*models.Fu
 		return nil, fmt.Errorf("no app defined")
 	}
 	// Local dev doesn't have a workspace ID.
-	funcs, err := a.Data.GetFunctionsByAppInternalID(ctx, uuid.UUID{}, obj.ID)
+	funcs, err := a.Data.GetFunctionsByAppInternalID(ctx, consts.DevServerEnvId, obj.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func (a appResolver) Autodiscovered(ctx context.Context, obj *cqrs.App) (bool, e
 }
 
 func (a appResolver) FunctionCount(ctx context.Context, obj *cqrs.App) (int, error) {
-	funcs, err := a.Data.GetFunctionsByAppInternalID(ctx, uuid.UUID{}, obj.ID)
+	funcs, err := a.Data.GetFunctionsByAppInternalID(ctx, consts.DevServerEnvId, obj.ID)
 	if err != nil {
 		return 0, err
 	}

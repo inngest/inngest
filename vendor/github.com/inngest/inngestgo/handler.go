@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,11 +20,11 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/sdk"
-	"github.com/inngest/inngestgo/errors"
+	sdkerrors "github.com/inngest/inngestgo/errors"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"github.com/inngest/inngestgo/internal/types"
 	"github.com/inngest/inngestgo/step"
-	"golang.org/x/exp/slog"
+	"log/slog"
 )
 
 var (
@@ -44,7 +45,10 @@ var (
 	capabilities = sdk.Capabilities{
 		InBandSync: sdk.InBandSyncV1,
 		TrustProbe: sdk.TrustProbeV1,
+		Connect:    sdk.ConnectV1,
 	}
+
+	defaultWorkerConcurrency = 1_000
 )
 
 // Register adds the given functions to the default handler for serving.  You must register all
@@ -56,6 +60,10 @@ func Register(funcs ...ServableFunction) {
 // Serve serves all registered functions within the default handler.
 func Serve(w http.ResponseWriter, r *http.Request) {
 	DefaultHandler.ServeHTTP(w, r)
+}
+
+func Connect(ctx context.Context) error {
+	return DefaultHandler.Connect(ctx)
 }
 
 type HandlerOpts struct {
@@ -71,6 +79,22 @@ type HandlerOpts struct {
 	// defaults to os.Getenv("INNGEST_SIGNING_KEY_FALLBACK").
 	SigningKeyFallback *string
 
+	// APIOrigin is the specified host to be used to make API calls
+	APIBaseURL *string
+
+	// EventAPIOrigin is the specified host to be used to send events to
+	EventAPIBaseURL *string
+
+	// ServeOrigin is the host to used for HTTP base function invoking.
+	// It's used to specify the host were the functions are hosted on sync.
+	// e.g. https://example.com
+	ServeOrigin *string
+
+	// ServePath is the path to use for HTTP base function invoking
+	// It's used to specify the path were the functions are hosted on sync.
+	// e.g. /api/inngest
+	ServePath *string
+
 	// Env is the branch environment to deploy to.  If nil, this uses
 	// os.Getenv("INNGEST_ENV").  This only deploys to branches if the
 	// signing key is a branch signing key.
@@ -81,6 +105,22 @@ type HandlerOpts struct {
 	//
 	// This only needs to be set when self hosting.
 	RegisterURL *string
+
+	// ConnectURLs are the URLs to use for establishing outbound connections.  If nil
+	// this defaults to Inngest's Connect endpoint.
+	//
+	// This only needs to be set when self hosting.
+	ConnectURLs []string
+
+	// InstanceId represents a stable identifier to be used for identifying connected SDKs.
+	// This can be a hostname or other identifier that remains stable across restarts.
+	//
+	// If nil, this defaults to the current machine's hostname.
+	InstanceId *string
+
+	// BuildId supplies an application version identifier. This should change
+	// whenever code within one of your Inngest function or any dependency thereof changes.
+	BuildId *string
 
 	// MaxBodySize is the max body size to read for incoming invoke requests
 	MaxBodySize int
@@ -96,6 +136,12 @@ type HandlerOpts struct {
 	// AllowInBandSync allows in-band syncs to occur. If nil, in-band syncs are
 	// disallowed.
 	AllowInBandSync *bool
+
+	// WorkerConcurrency defines the number of goroutines available to handle
+	// connnect workloads. Defaults to 1000
+	WorkerConcurrency int
+
+	Dev *bool
 }
 
 // GetSigningKey returns the signing key defined within HandlerOpts, or the default
@@ -121,6 +167,57 @@ func (h HandlerOpts) GetSigningKeyFallback() string {
 		return os.Getenv("INNGEST_SIGNING_KEY_FALLBACK")
 	}
 	return *h.SigningKeyFallback
+}
+
+// GetAPIOrigin returns the host to use for sending API requests
+func (h HandlerOpts) GetAPIBaseURL() string {
+	if h.isDev() {
+		return DevServerURL()
+	}
+
+	if h.APIBaseURL == nil {
+		base := os.Getenv("INNGEST_API_BASE_URL")
+		if base != "" {
+			return base
+		}
+
+		return defaultAPIOrigin
+	}
+
+	return *h.APIBaseURL
+}
+
+// GetEventAPIOrigin returns the host to use for sending events
+func (h HandlerOpts) GetEventAPIBaseURL() string {
+	if h.isDev() {
+		return DevServerURL()
+	}
+
+	if h.EventAPIBaseURL == nil {
+		origin := os.Getenv("INNGEST_EVENT_API_BASE_URL")
+		if origin != "" {
+			return origin
+		}
+		return defaultEventAPIOrigin
+	}
+
+	return *h.EventAPIBaseURL
+}
+
+// GetServeOrigin returns the host used for HTTP based executions
+func (h HandlerOpts) GetServeOrigin() string {
+	if h.ServeOrigin != nil {
+		return *h.ServeOrigin
+	}
+	return ""
+}
+
+// GetServePath returns the path used for HTTP based executions
+func (h HandlerOpts) GetServePath() string {
+	if h.ServePath != nil {
+		return *h.ServePath
+	}
+	return ""
 }
 
 // GetEnv returns the env defined within HandlerOpts, or the default
@@ -156,6 +253,21 @@ func (h HandlerOpts) IsInBandSyncAllowed() bool {
 	return false
 }
 
+func (h HandlerOpts) GetWorkerConcurrency() int {
+	if h.WorkerConcurrency == 0 {
+		return defaultWorkerConcurrency
+	}
+	return h.WorkerConcurrency
+}
+
+func (h HandlerOpts) isDev() bool {
+	if h.Dev != nil {
+		return *h.Dev
+	}
+
+	return IsDev()
+}
+
 // Handler represents a handler which serves the Inngest API via HTTP.  This provides
 // function registration to Inngest, plus the invocation of registered functions via
 // an HTTP POST.
@@ -172,6 +284,9 @@ type Handler interface {
 	// Register registers the given functions with the handler, allowing them to
 	// be invoked by Inngest.
 	Register(...ServableFunction)
+
+	// Connect establishes an outbound connection to Inngest
+	Connect(ctx context.Context) error
 }
 
 // NewHandler returns a new Handler for serving Inngest functions.
@@ -256,7 +371,23 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		probe := r.URL.Query().Get("probe")
 		if probe == "trust" {
-			h.trust(r.Context(), w, r)
+			err := h.trust(r.Context(), w, r)
+			if err != nil {
+				var perr publicerr.Error
+				if !errors.As(err, &perr) {
+					perr = publicerr.Error{
+						Err:     err,
+						Message: err.Error(),
+						Status:  500,
+					}
+				}
+
+				if perr.Status == 0 {
+					perr.Status = http.StatusInternalServerError
+				}
+
+				_ = publicerr.WriteHTTP(w, perr)
+			}
 			return
 		}
 
@@ -287,15 +418,22 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // all functions and automatically allows all functions to immediately be triggered
 // by incoming events or schedules.
 func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
+	var syncKind string
 	var err error
 	if r.Header.Get(HeaderKeySyncKind) == SyncKindInBand && h.IsInBandSyncAllowed() {
+		syncKind = SyncKindInBand
 		err = h.inBandSync(w, r)
 	} else {
+		syncKind = SyncKindOutOfBand
 		err = h.outOfBandSync(w, r)
 	}
 
 	if err != nil {
-		h.Logger.Error("out-of-band sync error", "error", err)
+		h.Logger.Error(
+			"sync error",
+			"error", err,
+			"syncKind", syncKind,
+		)
 	}
 	return err
 }
@@ -332,7 +470,7 @@ func (h *handler) inBandSync(
 	defer r.Body.Close()
 
 	var sig string
-	if !IsDev() {
+	if !h.isDev() {
 		if sig = r.Header.Get(HeaderKeySignature); sig == "" {
 			return publicerr.Error{
 				Err:    fmt.Errorf("missing %s header", HeaderKeySignature),
@@ -359,6 +497,7 @@ func (h *handler) inBandSync(
 		h.GetSigningKey(),
 		h.GetSigningKeyFallback(),
 		reqByt,
+		h.isDev(),
 	)
 	if err != nil {
 		return publicerr.Error{
@@ -400,7 +539,7 @@ func (h *handler) inBandSync(
 		appURL = h.URL
 	}
 
-	fns, err := createFunctionConfigs(h.appName, h.funcs, *appURL)
+	fns, err := createFunctionConfigs(h.appName, h.funcs, *appURL, false)
 	if err != nil {
 		return fmt.Errorf("error creating function configs: %w", err)
 	}
@@ -475,7 +614,7 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 	config := sdk.RegisterRequest{
 		URL:        fmt.Sprintf("%s://%s%s", scheme, host, pathAndParams),
 		V:          "1",
-		DeployType: "ping",
+		DeployType: sdk.DeployTypePing,
 		SDK:        HeaderValueSDK,
 		AppName:    h.appName,
 		Headers: sdk.Headers{
@@ -485,14 +624,14 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 		Capabilities: capabilities,
 	}
 
-	fns, err := createFunctionConfigs(h.appName, h.funcs, *h.url(r))
+	fns, err := createFunctionConfigs(h.appName, h.funcs, *h.url(r), false)
 	if err != nil {
 		return fmt.Errorf("error creating function configs: %w", err)
 	}
 	config.Functions = fns
 
 	registerURL := fmt.Sprintf("%s/fn/register", defaultAPIOrigin)
-	if IsDev() {
+	if h.isDev() {
 		// TODO: Check if dev server is up.  If not, error.  We can't deploy to production.
 		registerURL = fmt.Sprintf("%s/fn/register", DevServerURL())
 	}
@@ -574,11 +713,12 @@ func createFunctionConfigs(
 	appName string,
 	fns []ServableFunction,
 	appURL url.URL,
+	isConnect bool,
 ) ([]sdk.SDKFunction, error) {
 	if appName == "" {
 		return nil, fmt.Errorf("missing app name")
 	}
-	if appURL == (url.URL{}) {
+	if !isConnect && appURL == (url.URL{}) {
 		return nil, fmt.Errorf("missing URL")
 	}
 
@@ -607,7 +747,7 @@ func createFunctionConfigs(
 			Triggers:    inngest.MultipleTriggers{},
 			RateLimit:   fn.Config().GetRateLimit(),
 			Cancel:      fn.Config().Cancel,
-			Timeouts:    (*inngest.Timeouts)(fn.Config().Timeouts),
+			Timeouts:    fn.Config().GetTimeouts(),
 			Throttle:    (*inngest.Throttle)(fn.Config().Throttle),
 			Steps: map[string]sdk.SDKStep{
 				"step": {
@@ -675,7 +815,7 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	var sig string
 	defer r.Body.Close()
 
-	if !IsDev() {
+	if !h.isDev() {
 		if sig = r.Header.Get(HeaderKeySignature); sig == "" {
 			return publicerr.Error{
 				Message: "unauthorized",
@@ -703,6 +843,7 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 		h.GetSigningKey(),
 		h.GetSigningKeyFallback(),
 		byt,
+		h.isDev(),
 	); !valid {
 		h.Logger.Error("unauthorized inngest invoke request", "error", err)
 		return publicerr.Error{
@@ -777,12 +918,12 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	streamCancel()
 
 	// NOTE: When triggering step errors, we should have an OpcodeStepError
-	// within ops alongside an error.  We can safely ignore that error, as its
-	// onyl used for checking wither the step used a NoRetryError or RetryAtError
+	// within ops alongside an error.  We can safely ignore that error, as it's
+	// only used for checking whether the step used a NoRetryError or RetryAtError
 	//
 	// For that reason, we check those values first.
-	noRetry := errors.IsNoRetryError(err)
-	retryAt := errors.GetRetryAtTime(err)
+	noRetry := sdkerrors.IsNoRetryError(err)
+	retryAt := sdkerrors.GetRetryAtTime(err)
 	if len(ops) == 1 && ops[0].Op == enums.OpcodeStepError {
 		// Now we've handled error types we can ignore step
 		// errors safely.
@@ -797,7 +938,7 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	// 	if err != nil {
 	// 	     return err
 	// 	}
-	if errors.IsStepError(err) {
+	if sdkerrors.IsStepError(err) {
 		err = fmt.Errorf("Unhandled step error: %s", err)
 		noRetry = true
 	}
@@ -885,7 +1026,7 @@ func (h *handler) createInsecureInspection(
 	authenticationSucceeded *bool,
 ) (*insecureInspection, error) {
 	mode := "cloud"
-	if IsDev() {
+	if h.isDev() {
 		mode = "dev"
 	}
 
@@ -903,7 +1044,7 @@ func (h *handler) createInsecureInspection(
 func (h *handler) createSecureInspection() (*secureInspection, error) {
 	apiOrigin := defaultAPIOrigin
 	eventAPIOrigin := defaultEventAPIOrigin
-	if IsDev() {
+	if h.isDev() {
 		apiOrigin = DevServerURL()
 		eventAPIOrigin = DevServerURL()
 	}
@@ -984,6 +1125,7 @@ func (h *handler) inspect(w http.ResponseWriter, r *http.Request) error {
 			h.GetSigningKey(),
 			h.GetSigningKeyFallback(),
 			[]byte{},
+			h.isDev(),
 		)
 		if valid {
 			inspection, err := h.createSecureInspection()
@@ -1020,15 +1162,19 @@ func (h *handler) trust(
 	ctx context.Context,
 	w http.ResponseWriter,
 	r *http.Request,
-) {
+) error {
+	if h.isDev() {
+		w.WriteHeader(200)
+		return nil
+	}
+
 	w.Header().Add("Content-Type", "application/json")
 	sig := r.Header.Get(HeaderKeySignature)
 	if sig == "" {
-		_ = publicerr.WriteHTTP(w, publicerr.Error{
+		return publicerr.Error{
 			Message: fmt.Sprintf("missing %s header", HeaderKeySignature),
 			Status:  401,
-		})
-		return
+		}
 	}
 
 	max := h.HandlerOpts.MaxBodySize
@@ -1038,10 +1184,10 @@ func (h *handler) trust(
 	byt, err := io.ReadAll(http.MaxBytesReader(w, r.Body, int64(max)))
 	if err != nil {
 		h.Logger.Error("error decoding function request", "error", err)
-		_ = publicerr.WriteHTTP(w, publicerr.Error{
+		return publicerr.Error{
 			Message: fmt.Sprintf("error decoding function request: %s", err),
-		})
-		return
+			Status:  400,
+		}
 	}
 
 	valid, key, err := ValidateRequestSignature(
@@ -1050,31 +1196,32 @@ func (h *handler) trust(
 		h.GetSigningKey(),
 		h.GetSigningKeyFallback(),
 		byt,
+		h.isDev(),
 	)
 	if err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Error{
+		return publicerr.Error{
 			Message: fmt.Sprintf("error validating signature: %s", err),
-		})
-		return
+			Status:  401,
+		}
 	}
 	if !valid {
-		_ = publicerr.WriteHTTP(w, publicerr.Error{
+		return publicerr.Error{
 			Message: "invalid signature",
 			Status:  401,
-		})
-		return
+		}
 	}
 
 	byt, err = json.Marshal(trustProbeResponse{})
 	if err != nil {
-		_ = publicerr.WriteHTTP(w, err)
-		return
+		return err
 	}
 
 	resSig, err := signWithoutJCS(time.Now(), []byte(key), byt)
 	if err != nil {
-		_ = publicerr.WriteHTTP(w, err)
-		return
+		return publicerr.Error{
+			Message: fmt.Sprintf("error signing response: %s", err),
+			Status:  500,
+		}
 	}
 
 	w.Header().Add("X-Inngest-Signature", resSig)
@@ -1083,6 +1230,8 @@ func (h *handler) trust(
 	if err != nil {
 		h.Logger.Error("error writing trust probe response", "error", err)
 	}
+
+	return nil
 }
 
 type StreamResponse struct {

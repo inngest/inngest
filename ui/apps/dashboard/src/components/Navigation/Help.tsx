@@ -15,14 +15,13 @@ import {
 
 import { useSystemStatus } from '@/app/(organization-active)/support/statusPage';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
-import { EnvironmentType } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import useOnboardingStep from '../Onboarding/useOnboardingStep';
 import SystemStatusIcon from './SystemStatusIcon';
 
 export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget: () => void }) => {
   const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
-  const { nextStep } = useOnboardingStep();
+  const { nextStep, lastCompletedStep } = useOnboardingStep();
   const status = useSystemStatus();
 
   return (
@@ -108,8 +107,8 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
               <hr />
               <Link
                 href={pathCreator.onboardingSteps({
-                  envSlug: EnvironmentType.Production.toLowerCase(),
-                  step: nextStep,
+                  step: nextStep ? nextStep.name : lastCompletedStep?.name,
+                  ref: 'app-navbar-help',
                 })}
                 onClick={() => showWidget()}
               >

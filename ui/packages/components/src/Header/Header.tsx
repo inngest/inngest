@@ -16,6 +16,7 @@ export type HeaderType = {
   action?: React.ReactNode;
   className?: string;
   backNav?: boolean;
+  loading?: boolean;
 };
 
 export const Header = ({
@@ -25,9 +26,10 @@ export const Header = ({
   action,
   className = '',
   backNav = false,
+  loading,
 }: HeaderType) => {
   return (
-    <div className="border-subtle sticky top-0 z-[100] flex flex-col justify-start border-b">
+    <div className="border-subtle sticky top-0 z-50 flex flex-col justify-start border-b">
       <div
         className={`bg-canvasBase flex h-[52px] flex-row items-center justify-between px-3 ${className}`}
       >
@@ -38,6 +40,9 @@ export const Header = ({
         </div>
         <div>{action}</div>
       </div>
+      {loading && (
+        <span className="bg-secondary-xSubtle animate-underline absolute bottom-0 left-0 h-px w-0" />
+      )}
       {tabs && (
         <div className="bg-canvasBase flex flex-row items-center justify-start space-x-3 px-4">
           {tabs.map(({ href, children, exactRouteMatch }) => (

@@ -234,28 +234,33 @@ func (r *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID str
 		return nil, fmt.Errorf("error parsing span identifier: %w", err)
 	}
 
-	output, err := r.Data.GetSpanOutput(ctx, *id)
+	spanData, err := r.Data.GetSpanOutput(ctx, *id)
 	if err != nil {
 		return nil, err
 	}
 
 	resp := models.RunTraceSpanOutput{}
-	if output.IsError {
+	if spanData.IsError {
 		var stepErr models.StepError
-		err := json.Unmarshal(output.Data, &stepErr)
+		err := json.Unmarshal(spanData.Data, &stepErr)
 		if err != nil {
 			log.From(ctx).Error().Err(err).Msg("error deserializing step error")
 		}
 
 		if stepErr.Message == "" {
-			stack := string(output.Data)
+			stack := string(spanData.Data)
 			stepErr.Stack = &stack
 		}
 
 		resp.Error = &stepErr
 	} else {
-		d := string(output.Data)
+		d := string(spanData.Data)
 		resp.Data = &d
+	}
+
+	if len(spanData.Input) > 0 {
+		input := string(spanData.Input)
+		resp.Input = &input
 	}
 
 	return &resp, nil

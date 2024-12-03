@@ -5,7 +5,7 @@ import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 
 export const Back = ({ className }: { className?: string }) => {
   return (
-    <OptionalTooltip tooltip="Back to environment" side="bottom">
+    <OptionalTooltip tooltip="Back to environment" side="right">
       <NewButton
         kind="secondary"
         appearance="outlined"

@@ -23,7 +23,7 @@ import { useLocalStorage } from 'react-use';
 
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
-import { RunDetails } from '../RunDetailsV2';
+import { RunDetailsV2 } from '../RunDetailsV2';
 import {
   useBatchedSearchParams,
   useSearchParam,
@@ -46,22 +46,23 @@ const CodeSearch = dynamic(() => import('@inngest/components/CodeSearch/CodeSear
 });
 
 type Props = {
-  cancelRun: React.ComponentProps<typeof RunDetails>['cancelRun'];
+  cancelRun: React.ComponentProps<typeof RunDetailsV2>['cancelRun'];
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
   features: Pick<Features, 'history'>;
-  getRun: React.ComponentProps<typeof RunDetails>['getRun'];
-  getTraceResult: React.ComponentProps<typeof RunDetails>['getResult'];
-  getTrigger: React.ComponentProps<typeof RunDetails>['getTrigger'];
+  getRun: React.ComponentProps<typeof RunDetailsV2>['getRun'];
+  getTraceResult: React.ComponentProps<typeof RunDetailsV2>['getResult'];
+  getTrigger: React.ComponentProps<typeof RunDetailsV2>['getTrigger'];
   hasMore: boolean;
   isLoadingInitial: boolean;
   isLoadingMore: boolean;
   onRefresh?: () => void;
   onScroll: UIEventHandler<HTMLDivElement>;
   onScrollToTop: () => void;
-  pathCreator: React.ComponentProps<typeof RunDetails>['pathCreator'];
+  pathCreator: React.ComponentProps<typeof RunDetailsV2>['pathCreator'];
   pollInterval?: number;
-  rerun: React.ComponentProps<typeof RunDetails>['rerun'];
+  rerun: React.ComponentProps<typeof RunDetailsV2>['rerun'];
+  rerunFromStep: React.ComponentProps<typeof RunDetailsV2>['rerunFromStep'];
   apps?: Option[];
   functions?: Option[];
   functionIsPaused?: boolean;
@@ -69,6 +70,7 @@ type Props = {
   totalCount: number | undefined;
   temporaryAlert?: React.ReactElement;
   hasSearchFlag?: boolean;
+  stepAIEnabled?: boolean;
 };
 
 export function RunsPage({
@@ -78,6 +80,7 @@ export function RunsPage({
   getTraceResult,
   getTrigger,
   rerun,
+  rerunFromStep,
   data,
   features,
   hasMore,
@@ -95,6 +98,7 @@ export function RunsPage({
   totalCount,
   temporaryAlert,
   hasSearchFlag = false,
+  stepAIEnabled = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useScopedColumns(scope);
@@ -241,7 +245,7 @@ export function RunsPage({
     (rowData: Run) => {
       return (
         <div className="border-subtle border-l-4 pb-6">
-          <RunDetails
+          <RunDetailsV2
             cancelRun={cancelRun}
             getResult={getTraceResult}
             getRun={getRun}
@@ -250,8 +254,10 @@ export function RunsPage({
             pathCreator={pathCreator}
             pollInterval={pollInterval}
             rerun={rerun}
+            rerunFromStep={rerunFromStep}
             runID={rowData.id}
             standalone={false}
+            stepAIEnabled={stepAIEnabled}
           />
         </div>
       );
@@ -280,9 +286,9 @@ export function RunsPage({
     pollInterval && pollInterval < 1000 ? isLoadingInitial : isLoadingMore || isLoadingInitial;
 
   return (
-    <main className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-auto">
-      <div className="bg-canvasBase border-subtle sticky top-0 z-10 flex flex-col border-b px-3">
-        <div className="flex h-[58px] items-center justify-between gap-2">
+    <main className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
+      <div className="bg-canvasBase sticky top-0 z-10 flex flex-col">
+        <div className="border-subtle flex h-[58px] items-center justify-between gap-2 border-b px-3">
           <div className="flex items-center gap-2">
             <SelectGroup>
               <TimeFieldFilter
@@ -357,8 +363,7 @@ export function RunsPage({
             />
           </div>
         </div>
-      </div>
-      <>
+
         {hasSearchFlag && showSearch && (
           <>
             <div className="bg-codeEditor flex items-center justify-between px-4 pt-4">
@@ -382,7 +387,8 @@ export function RunsPage({
             />
           </>
         )}
-      </>
+      </div>
+
       <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
         <RunsTable
           data={data}

@@ -62,6 +62,8 @@ func (v v2) Create(ctx context.Context, s state.CreateState) error {
 		EventBatchData: batchData,
 		Context:        s.Metadata.Config.Context,
 		SpanID:         s.Metadata.Config.SpanID,
+		Steps:          s.Steps,
+		StepInputs:     s.StepInputs,
 	})
 	return err
 }

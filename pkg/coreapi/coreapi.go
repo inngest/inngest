@@ -6,14 +6,13 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
-
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/apiutil"
 	"github.com/inngest/inngest/pkg/coreapi/generated"
 	loader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
@@ -152,10 +151,8 @@ func (a CoreAPI) GetActions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accountId := uuid.UUID{}
-
 	// Find this run
-	state, err := a.state.Load(ctx, accountId, *runID)
+	state, err := a.state.Load(ctx, consts.DevServerAccountId, *runID)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
 			Status:  410,
@@ -188,10 +185,8 @@ func (a CoreAPI) GetEventBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accountId := uuid.UUID{}
-
 	// Find this run
-	state, err := a.state.Load(ctx, accountId, *runID)
+	state, err := a.state.Load(ctx, consts.DevServerAccountId, *runID)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
 			Status:  410,
@@ -231,9 +226,7 @@ func (a CoreAPI) CancelRun(w http.ResponseWriter, r *http.Request) {
 		Str("run_id", runID.String()).
 		Msg("cancelling function")
 
-	accountId := uuid.UUID{}
-
-	if err := apiutil.CancelRun(ctx, a.state, accountId, *runID); err != nil {
+	if err := apiutil.CancelRun(ctx, a.state, consts.DevServerAccountId, *runID); err != nil {
 		_ = publicerr.WriteHTTP(w, err)
 		return
 	}
