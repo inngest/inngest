@@ -1,9 +1,18 @@
 import { getPeriodAbbreviation } from '@inngest/components/utils/date';
 
-import type { BillingPlan, Entitlements } from '@/gql/graphql';
+import type {
+  BillingPlan,
+  EntitlementConcurrency,
+  EntitlementInt,
+  EntitlementRunCount,
+} from '@/gql/graphql';
 
 export type Plan = Omit<BillingPlan, 'entitlements' | 'features' | 'availableAddons'> & {
-  entitlements: Pick<Entitlements, 'concurrency' | 'runCount' | 'history'>;
+  entitlements: {
+    concurrency: Pick<EntitlementConcurrency, 'limit'>;
+    runCount: Pick<EntitlementRunCount, 'limit'>;
+    history: Pick<EntitlementInt, 'limit'>;
+  };
 };
 
 export enum PlanNames {

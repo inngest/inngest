@@ -1,6 +1,6 @@
 import { useRouter } from 'next/navigation';
+import { Alert } from '@inngest/components/Alert/Alert';
 import { NewButton } from '@inngest/components/Button';
-import CommandBlock from '@inngest/components/CodeBlock/CommandBlock';
 import { NewLink } from '@inngest/components/Link';
 import TabCards from '@inngest/components/TabCards/TabCards';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
@@ -8,6 +8,7 @@ import { IconCloudflare } from '@inngest/components/icons/platforms/Cloudflare';
 import { IconFlyIo } from '@inngest/components/icons/platforms/FlyIo';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { RiCheckboxCircleFill, RiCloudLine } from '@remixicon/react';
+import { useLocalStorage } from 'react-use';
 
 import { useVercelIntegration } from '@/app/(organization-active)/(dashboard)/settings/integrations/vercel/useVercelIntegration';
 import { Secret } from '@/components/Secret';
@@ -30,12 +31,16 @@ export default function DeployApp() {
   const defaultEventKey = res.data?.defaultKey.presharedKey || 'Unknown key';
   const { value: vercelFlowEnabled } = useBooleanFlag('onboarding-vercel-flow');
   const tracking = useOnboardingTracking();
+  const [, setInstallingVercelFromOnboarding] = useLocalStorage(
+    'installingVercelFromOnboarding',
+    false
+  );
 
   const { data, fetching, error } = useVercelIntegration();
-  if (error) console.error(error);
 
   const hasVercelIntegration = data.enabled;
   const vercelProjects = data.projects;
+  const enabledProjects = vercelProjects.filter((project) => project.isEnabled);
 
   return (
     <div className="text-subtle">
@@ -46,7 +51,7 @@ export default function DeployApp() {
       </p>
 
       <h4 className="mb-4 text-sm font-medium">Choosing hosting provider:</h4>
-      <TabCards defaultValue="all">
+      <TabCards defaultValue="vercel">
         <TabCards.ButtonList>
           <TabCards.Button className="w-32" value="all">
             <div className="flex items-center gap-1.5">
@@ -127,7 +132,7 @@ export default function DeployApp() {
               tracking?.trackOnboardingAction(currentStepName, {
                 metadata: { type: 'btn-click', label: 'next', hostingProvider: 'all' },
               });
-              router.push(pathCreator.onboardingSteps({ step: nextStepName }));
+              router.push(pathCreator.onboardingSteps({ step: nextStepName }) + '?nonVercel=true');
             }}
           />
         </TabCards.Content>
@@ -141,14 +146,14 @@ export default function DeployApp() {
                 <p className="text-basis">Vercel</p>
               </div>
               <NewButton
-                label="View Vercel Dashboard"
+                label="Manage Vercel integration"
                 kind="secondary"
                 appearance="outlined"
                 onClick={() => {
                   tracking?.trackOnboardingAction(currentStepName, {
                     metadata: {
                       type: 'btn-click',
-                      label: 'go-to-vercel',
+                      label: 'view-integration',
                       hostingProvider: 'vercel',
                     },
                   });
@@ -186,10 +191,8 @@ export default function DeployApp() {
                     tracking?.trackOnboardingAction(currentStepName, {
                       metadata: { type: 'btn-click', label: 'connect', hostingProvider: 'vercel' },
                     });
-                    const nextUrl = encodeURIComponent(
-                      'https://app.inngest.com/env/production/onboarding/deploy-app'
-                    );
-                    router.push(`https://vercel.com/integrations/inngest/new?next=${nextUrl}`);
+                    setInstallingVercelFromOnboarding(true);
+                    router.push(`https://vercel.com/integrations/inngest/new`);
                   }}
                   disabled={fetching}
                 />
@@ -203,9 +206,14 @@ export default function DeployApp() {
             )}
             {hasVercelIntegration && (
               <p className="text-success my-4 text-sm">
-                {vercelProjects.length} project{vercelProjects.length === 1 ? '' : 's'} enabled
+                {enabledProjects.length} project{enabledProjects.length === 1 ? '' : 's'} enabled
                 successfully
               </p>
+            )}
+            {error && (
+              <Alert className="my-4 text-sm" severity="error">
+                {error.message}
+              </Alert>
             )}
             {hasVercelIntegration && (
               <NewButton
@@ -220,9 +228,7 @@ export default function DeployApp() {
                   tracking?.trackOnboardingAction(currentStepName, {
                     metadata: { type: 'btn-click', label: 'next', hostingProvider: 'vercel' },
                   });
-                  router.push(
-                    pathCreator.onboardingSteps({ step: nextStepName }) + '?fromVercel=true'
-                  );
+                  router.push(pathCreator.onboardingSteps({ step: nextStepName }));
                 }}
               />
             )}
@@ -263,7 +269,7 @@ export default function DeployApp() {
               tracking?.trackOnboardingAction(currentStepName, {
                 metadata: { type: 'btn-click', label: 'next', hostingProvider: 'cloudflare' },
               });
-              router.push(pathCreator.onboardingSteps({ step: nextStepName }));
+              router.push(pathCreator.onboardingSteps({ step: nextStepName }) + '?nonVercel=true');
             }}
           />
         </TabCards.Content>
@@ -285,56 +291,18 @@ export default function DeployApp() {
               Learn more about how to set a secret in Fly.io
             </NewLink>
           </p>
-          <CommandBlock.Wrapper>
-            <CommandBlock.Header className="flex items-center justify-between pr-4">
-              <CommandBlock.Tabs
-                tabs={[
-                  {
-                    title: 'Event key',
-                    content: `fly secrets set INNGEST_EVENT_KEY=${defaultEventKey}`,
-                    language: 'shell',
-                  },
-                ]}
-                activeTab="Event key"
-              />
-              <CommandBlock.CopyButton
-                content={`fly secrets set INNGEST_EVENT_KEY=${defaultEventKey}`}
-              />
-            </CommandBlock.Header>
-            <CommandBlock
-              currentTabContent={{
-                title: 'Event key',
-                content: `fly secrets set INNGEST_EVENT_KEY=${defaultEventKey}`,
-                language: 'shell',
-              }}
-            />
-          </CommandBlock.Wrapper>
-          <div className="mb-4" />
-          <CommandBlock.Wrapper>
-            <CommandBlock.Header className="flex items-center justify-between pr-4">
-              <CommandBlock.Tabs
-                tabs={[
-                  {
-                    title: 'Signing key',
-                    content: `fly secrets set INNGEST_SIGNING_KEY=${env.webhookSigningKey}`,
-                    language: 'shell',
-                  },
-                ]}
-                activeTab="Signing key"
-              />
-              <CommandBlock.CopyButton
-                content={`fly secrets set INNGEST_SIGNING_KEY=${env.webhookSigningKey}`}
-              />
-            </CommandBlock.Header>
-            <CommandBlock
-              currentTabContent={{
-                title: 'Signing key',
-                content: `fly secrets set INNGEST_SIGNING_KEY=${env.webhookSigningKey}`,
-                language: 'shell',
-              }}
-            />
-          </CommandBlock.Wrapper>
-          <div className="mb-4" />
+          <div className="text-basis mb-2 text-sm font-medium">Event key</div>
+          <Secret
+            kind="command"
+            secret={`fly secrets set INNGEST_EVENT_KEY=${defaultEventKey}`}
+            className="mb-4"
+          />
+          <div className="text-basis mb-2 text-sm font-medium">Signing key</div>
+          <Secret
+            kind="command"
+            secret={`fly secrets set INNGEST_SIGNING_KEY=${env.webhookSigningKey}`}
+            className="mb-6"
+          />
           <NewButton
             label="Next"
             onClick={() => {
@@ -347,7 +315,7 @@ export default function DeployApp() {
               tracking?.trackOnboardingAction(currentStepName, {
                 metadata: { type: 'btn-click', label: 'next', hostingProvider: 'flyio' },
               });
-              router.push(pathCreator.onboardingSteps({ step: nextStepName }));
+              router.push(pathCreator.onboardingSteps({ step: nextStepName }) + '?nonVercel=true');
             }}
           />
         </TabCards.Content>

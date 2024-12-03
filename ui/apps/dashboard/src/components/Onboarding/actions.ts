@@ -79,7 +79,7 @@ export async function getProdApps() {
     return { apps, unattachedSyncs };
   } catch (error) {
     console.error('Error fetching production apps:', error);
-    return { apps: [], unattachedSyncs: [] };
+    return null;
   }
 }
 
@@ -93,8 +93,10 @@ export async function getVercelSyncs(): Promise<VercelSyncsResponse> {
     const response = await getVercelApps();
     const syncs = response.environment;
 
-    // Filter apps to only include those with latestSync.platform === "vercel"
-    const vercelApps = syncs.apps.filter((app) => app.latestSync?.platform === 'vercel');
+    // Filter apps to only include those with latestSync.platform === "vercel", that are active
+    const vercelApps = syncs.apps.filter(
+      (app) => app.latestSync?.platform === 'vercel' && !app.isArchived
+    );
 
     // Filter unattachedSyncs to only include those with a vercelDeploymentURL
     const unattachedSyncs = syncs.unattachedSyncs.filter((sync) => sync.vercelDeploymentURL);
