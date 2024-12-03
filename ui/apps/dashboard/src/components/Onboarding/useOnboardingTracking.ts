@@ -13,10 +13,10 @@ export function useOnboardingStepCompletedTracking() {
     metadata: Record<string, any> = {}
   ) => {
     trackEvent({
-      name: 'onboarding/step.completed',
+      name: 'app/onboarding.step.completed',
       data: {
-        ...step,
-        ...metadata,
+        step,
+        metadata,
       },
       user: trackingUser,
       v: '2024-11-04.1',
@@ -38,7 +38,7 @@ export function useOnboardingTracking() {
     const step = steps.find((s) => s.name === stepName);
 
     trackEvent({
-      name: 'onboarding/action',
+      name: 'app/onboarding.action',
       data: {
         step,
         lastCompletedStep: lastCompletedStep,

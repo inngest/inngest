@@ -12,8 +12,12 @@ import {
   RiCloseLine,
   RiInformationLine,
 } from '@remixicon/react';
+import { useLocalStorage } from 'react-use';
 
 import Input from '@/components/Forms/Input';
+import { OnboardingSteps } from '@/components/Onboarding/types';
+import useOnboardingStep from '@/components/Onboarding/useOnboardingStep';
+import { ONBOARDING_VERCEL_NEXT_URL } from '@/components/Onboarding/utils';
 import type VercelIntegration from '../../../settings/integrations/vercel/VercelIntegration';
 import useUpdateVercelIntegration from '../../../settings/integrations/vercel/useUpdateVercelIntegration';
 import type { VercelCallbackProps } from './page';
@@ -30,6 +34,11 @@ export default function Connect({
   const [page, setPage] = useState(1);
   const start = (page - 1) * PAGE_SIZE;
   const [custom, setCustom] = useState<string[]>([]);
+  const { updateCompletedSteps } = useOnboardingStep();
+  const [installingVercelFromOnboarding, setInstallingVercelFromOnboarding] = useLocalStorage(
+    'installingVercelFromOnboarding',
+    false
+  );
 
   const updateVercelIntegration = useUpdateVercelIntegration(integrations);
 
@@ -48,9 +57,19 @@ export default function Connect({
       projects,
     });
     setSaving(false);
+    updateCompletedSteps(OnboardingSteps.DeployApp, {
+      metadata: {
+        completionSource: 'automatic',
+        hostingProvider: 'vercel',
+      },
+    });
+
     router.push(
-      `/integrations/vercel/callback/success?onSuccessRedirectURL=${searchParams.next}&source=${searchParams.source}` as Route
+      `/integrations/vercel/callback/success?onSuccessRedirectURL=${
+        installingVercelFromOnboarding ? ONBOARDING_VERCEL_NEXT_URL : searchParams.next
+      }&source=${searchParams.source}` as Route
     );
+    setInstallingVercelFromOnboarding(false);
   };
 
   return (
