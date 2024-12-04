@@ -1349,6 +1349,21 @@ func (tb *runTree) processAIGatewayGroup(ctx context.Context, span *cqrs.Span, m
 func (tb *runTree) processAIGateway(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
 	defer tb.markProcessed(span)
 
+	ident := &cqrs.SpanIdentifier{
+		AccountID:   tb.acctID,
+		WorkspaceID: tb.wsID,
+		AppID:       tb.appID,
+		FunctionID:  tb.fnID,
+		TraceID:     span.TraceID,
+		SpanID:      span.SpanID,
+	}
+	outputID, err := ident.Encode()
+	if err != nil {
+		return err
+	}
+
+	mod.OutputId = &outputID
+
 	stepOp := rpbv2.SpanStepOp_AI_GATEWAY
 	mod.StepOp = &stepOp
 
