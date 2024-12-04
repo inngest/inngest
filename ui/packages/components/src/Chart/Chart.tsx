@@ -11,7 +11,7 @@ import {
   type SetOptionOpts,
 } from 'echarts';
 
-export type { LegendComponentOption, LineSeriesOption };
+export type { LegendComponentOption, LineSeriesOption, EChartsOption };
 
 export interface ChartProps {
   option: EChartsOption;

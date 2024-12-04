@@ -114,6 +114,7 @@ export default function Billing() {
         <BillableStepUsage
           selectedPeriod={selectedPeriod.id}
           includedStepCountLimit={currentLimit}
+          type={currentPage}
         />
       )}
     </div>

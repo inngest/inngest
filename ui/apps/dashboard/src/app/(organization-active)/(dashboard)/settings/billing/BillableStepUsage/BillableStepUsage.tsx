@@ -2,26 +2,12 @@
 
 import Link from 'next/link';
 import { Alert } from '@inngest/components/Alert';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
-import colors from 'tailwindcss/colors';
+import { Chart } from '@inngest/components/Chart/Chart';
 import { useQuery } from 'urql';
 
 import { graphql } from '@/gql';
 import LoadingIcon from '@/icons/LoadingIcon';
-import { formatXAxis, formatYAxis, toLocaleUTCDateString } from './format';
-import { transformData } from './transformData';
-
-// import { Chart } from '@inngest/components/Chart/Chart';
+import { createChartOptions } from './transformData';
 
 const GetBillableSteps = graphql(`
   query GetBillableSteps($month: Int!, $year: Int!) {
@@ -34,23 +20,13 @@ const GetBillableSteps = graphql(`
   }
 `);
 
-const dataKeys = {
-  additionalStepCount: {
-    key: 'additionalStepCount',
-    title: 'Additional steps',
-  },
-  includedStepCount: {
-    key: 'includedStepCount',
-    title: 'Plan-included steps',
-  },
-} as const;
-
 type Props = {
   includedStepCountLimit?: number;
   selectedPeriod: 'current' | 'previous';
+  type: string;
 };
 
-export function BillableStepUsage({ includedStepCountLimit, selectedPeriod }: Props) {
+export function BillableStepUsage({ includedStepCountLimit, selectedPeriod, type }: Props) {
   const currentMonthIndex = new Date().getUTCMonth();
   const options = {
     previous: {
@@ -93,105 +69,16 @@ export function BillableStepUsage({ includedStepCountLimit, selectedPeriod }: Pr
   }
 
   const monthData = data.billableStepTimeSeries[0]?.data || [];
-  const { series } = transformData(monthData, includedStepCountLimit);
+  const chartOption = createChartOptions(monthData, includedStepCountLimit, type);
 
   return (
-    <div className="text-slate-800">
-      {/* <Chart option={{series: series, yAxis: {}}}></Chart> */}
-      <div>
-        <ResponsiveContainer height={228}>
-          <BarChart data={series}>
-            <CartesianGrid strokeDasharray="10 4" vertical={false} stroke="rgb(226, 232, 240)" />
-
-            <Tooltip
-              wrapperStyle={{ outline: 'none' }}
-              formatter={(value) => {
-                return value.toLocaleString();
-              }}
-              labelFormatter={(value: unknown) => {
-                // Should be impossible, but "value" isn't typed so it's good to
-                // check.
-                if (!(value instanceof Date)) {
-                  return 'Unknown';
-                }
-
-                return toLocaleUTCDateString(value);
-              }}
-            />
-
-            <Legend
-              align="right"
-              content={({ payload = [] }) => {
-                return (
-                  <div className="mt-4 flex items-center">
-                    <div className="flex-grow" />
-
-                    {payload.map((entry) => {
-                      return (
-                        <div className="ml-4 flex items-center" key={entry.value}>
-                          <span
-                            className="mr-2 h-4 w-4 rounded"
-                            style={{ backgroundColor: entry.color }}
-                          />
-                          <span className="text-sm font-medium text-slate-600">{entry.value}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              }}
-            />
-
-            <XAxis
-              dataKey="time"
-              tick={{ fontSize: 14 }}
-              tickFormatter={formatXAxis}
-              tickLine={false}
-            />
-            <YAxis
-              axisLine={false}
-              tick={{ fontSize: 14 }}
-              tickFormatter={formatYAxis}
-              tickLine={false}
-            />
-
-            <Bar
-              dataKey={dataKeys.includedStepCount.key}
-              fill={colors.slate['600']}
-              name={dataKeys.includedStepCount.title}
-              radius={3}
-              stackId="slot"
-            >
-              {series.map((entry, i) => {
-                let radius: number[] | undefined = [3, 3, 0, 0];
-
-                // We don't want to round the bar if there's another bar on top
-                // of it.
-                if (entry[dataKeys.additionalStepCount.key] > 0) {
-                  radius = undefined;
-                }
-
-                return (
-                  <Cell
-                    key={`cell-${i}`}
-                    // @ts-expect-error Prop type says it can't accept number[]
-                    // but it actually can.
-                    radius={radius}
-                  />
-                );
-              })}
-            </Bar>
-
-            <Bar
-              dataKey={dataKeys.additionalStepCount.key}
-              fill={colors.indigo['500']}
-              name={dataKeys.additionalStepCount.title}
-              radius={[3, 3, 0, 0]}
-              stackId="slot"
-            />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+    <div>
+      <Chart
+        option={chartOption}
+        settings={{ notMerge: true }}
+        theme="light"
+        className="h-[297px] w-full"
+      />
     </div>
   );
 }

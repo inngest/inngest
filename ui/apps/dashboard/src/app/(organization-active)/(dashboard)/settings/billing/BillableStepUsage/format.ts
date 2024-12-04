@@ -6,18 +6,18 @@ export function formatXAxis(value: unknown): string {
 
   const dayOfMonth = value.getUTCDate();
 
-  // Only show every 7 days starting with 1 (1, 8, 15, etc.).
-  if ((dayOfMonth - 1) % 7 !== 0) {
+  // Only show every 3 days starting with 1 (1, 3, 5, etc.).
+  if (dayOfMonth % 2 === 0) {
     return '';
   }
 
-  let suffix = '';
-  if (dayOfMonth === 1) {
+  let suffix = 'th';
+  if (dayOfMonth % 10 === 1 && dayOfMonth !== 11) {
     suffix = 'st';
-  } else if ([8, 15, 29].includes(dayOfMonth)) {
-    suffix = 'th';
-  } else if (dayOfMonth === 22) {
+  } else if (dayOfMonth % 10 === 2 && dayOfMonth !== 12) {
     suffix = 'nd';
+  } else if (dayOfMonth % 10 === 3 && dayOfMonth !== 13) {
+    suffix = 'rd';
   }
 
   return `${dayOfMonth}${suffix}`;
