@@ -39,11 +39,6 @@ export default function RunsTable({
 }: RunsTableProps) {
   const columns = useScopedColumns(scope);
 
-  console.log(
-    'has ai',
-    data.map((row) => row.hasAI)
-  );
-
   // Manually track expanded rows because getIsExpanded seems to be index-based,
   // which means polling can shift the expanded row. We may be able to switch
   // back to getIsExpanded when we replace polling with websockets

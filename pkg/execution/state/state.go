@@ -233,6 +233,7 @@ type Metadata struct {
 
 	// SpanID is the spanID used for this function run.
 	SpanID string `json:"sid"`
+	HasAI  bool   `json:"hasAI,omitempty"`
 }
 
 func (md *Metadata) GetSpanID() (*trace.SpanID, error) {

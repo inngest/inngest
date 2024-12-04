@@ -642,7 +642,6 @@ func (l traceLifecycle) OnStepGatewayRequestFinished(
 			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
 			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeStepPlanned.String()),
 			attribute.String(consts.OtelSysStepStack, strings.Join(md.Stack, ",")),
-			attribute.Bool(consts.OtelSysFunctionHasAI, md.Config.HasAI),
 		),
 	)
 	// Common attrs.

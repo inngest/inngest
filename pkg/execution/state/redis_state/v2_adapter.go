@@ -164,6 +164,7 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 			CustomConcurrencyKeys: md.Identifier.CustomConcurrencyKeys,
 			Context:               md.Context,
 			ForceStepPlan:         md.DisableImmediateExecution,
+			HasAI:                 md.HasAI,
 		}),
 		Stack: stack,
 		Metrics: state.RunMetrics{

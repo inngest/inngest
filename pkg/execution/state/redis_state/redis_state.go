@@ -1621,6 +1621,13 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 			m.DisableImmediateExecution = true
 		}
 	}
+
+	if val, ok := data["hasAI"]; ok {
+		if val == "true" || val == "1" {
+			m.HasAI = true
+		}
+	}
+
 	if val, ok := data["sid"]; ok {
 		m.SpanID = val
 	}
@@ -1750,6 +1757,7 @@ type runMetadata struct {
 	DisableImmediateExecution bool           `json:"die,omitempty"`
 	SpanID                    string         `json:"sid"`
 	StartedAt                 int64          `json:"sat,omitempty"`
+	HasAI                     bool           `json:"hasAI,omitempty"`
 }
 
 func (r runMetadata) Map() map[string]any {
@@ -1764,6 +1772,7 @@ func (r runMetadata) Map() map[string]any {
 		"die":      r.DisableImmediateExecution,
 		"sid":      r.SpanID,
 		"sat":      r.StartedAt,
+		"hasAI":    r.HasAI,
 	}
 }
 
@@ -1777,6 +1786,7 @@ func (r runMetadata) Metadata() state.Metadata {
 		Context:                   r.Context,
 		DisableImmediateExecution: r.DisableImmediateExecution,
 		SpanID:                    r.SpanID,
+		HasAI:                     r.HasAI,
 	}
 	// 0 != time.IsZero
 	// only convert to time if runMetadata's StartedAt is > 0
