@@ -2,8 +2,10 @@ import { useMemo } from 'react';
 import { IDCell, PillCell, StatusCell, TextCell, TimeCell } from '@inngest/components/Table';
 import { type FunctionRunStatus } from '@inngest/components/types/functionRun';
 import { formatMilliseconds } from '@inngest/components/utils/date';
+import { RiSparkling2Fill } from '@remixicon/react';
 import { createColumnHelper } from '@tanstack/react-table';
 
+import { AICell } from '../Table/Cell';
 import type { Run, ViewScope } from './types';
 
 const columnHelper = createColumnHelper<Run>();
@@ -61,6 +63,10 @@ const columns = [
   columnHelper.display({
     cell: (props) => {
       const data = props.row.original;
+
+      if (data.hasAI) {
+        return <AICell>{data.eventName}</AICell>;
+      }
 
       if (data.isBatch) {
         return <TextCell>Batch</TextCell>;
