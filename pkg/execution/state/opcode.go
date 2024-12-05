@@ -66,6 +66,7 @@ func (g GeneratorOpcode) UserDefinedName() string {
 	return g.Name
 }
 
+// HasAI checks if this op is related to AI.
 func (g GeneratorOpcode) HasAI() bool {
 	if g.Op == enums.OpcodeAIGateway {
 		return true
