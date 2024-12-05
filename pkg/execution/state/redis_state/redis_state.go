@@ -341,7 +341,6 @@ func (m shardedMgr) UpdateMetadata(ctx context.Context, accountID uuid.UUID, run
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "UpdateMetadata"), redis_telemetry.ScopeFnRunState)
 
 	input := []string{
-
 		"0", // Force planning / disable immediate execution
 		strconv.Itoa(consts.RequestVersionUnknown), // Request version
 		"0", // start time default value
