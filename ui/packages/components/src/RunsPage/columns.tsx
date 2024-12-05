@@ -64,10 +64,6 @@ const columns = [
     cell: (props) => {
       const data = props.row.original;
 
-      if (data.hasAI) {
-        return <AICell>{data.eventName}</AICell>;
-      }
-
       if (data.isBatch) {
         return <TextCell>Batch</TextCell>;
       }
@@ -87,6 +83,11 @@ const columns = [
   }),
   columnHelper.accessor('function', {
     cell: (info) => {
+      const data = info.row.original;
+
+      if (data.hasAI) {
+        return <AICell>{info.getValue().name}</AICell>;
+      }
       return (
         <div className="flex items-center text-nowrap">
           <TextCell>{info.getValue().name}</TextCell>

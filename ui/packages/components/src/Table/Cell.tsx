@@ -18,7 +18,7 @@ export function TextCell({ children }: React.PropsWithChildren) {
 
 export function AICell({ children }: React.PropsWithChildren) {
   return (
-    <div className={cn(cellStyles, 'flex items-center gap-2')}>
+    <div className={cn(cellStyles, 'text-primary-xIntense flex items-center gap-2')}>
       <RiSparkling2Fill className="h-4 w-4" />
       {children}
     </div>
