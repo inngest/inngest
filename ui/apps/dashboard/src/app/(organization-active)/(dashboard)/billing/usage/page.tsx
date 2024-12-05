@@ -5,9 +5,9 @@ import { Select, type Option } from '@inngest/components/Select/Select';
 import ToggleGroup from '@inngest/components/ToggleGroup/ToggleGroup';
 import { useQuery } from 'urql';
 
+import { BillableUsageChart } from '@/components/Billing/Usage/BillableUsageChart';
 import UsageMetadata from '@/components/Billing/Usage/Metadata';
 import { graphql } from '@/gql';
-import { BillableStepUsage } from '../../settings/billing/BillableStepUsage/BillableStepUsage';
 
 const GetBillingInfoDocument = graphql(`
   query GetBillingInfo {
@@ -111,7 +111,7 @@ export default function Billing() {
         />
       </dl>
       {isStepPage && (
-        <BillableStepUsage
+        <BillableUsageChart
           selectedPeriod={selectedPeriod.id}
           includedStepCountLimit={currentLimit}
           type={currentPage}

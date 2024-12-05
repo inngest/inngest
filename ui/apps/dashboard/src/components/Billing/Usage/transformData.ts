@@ -5,7 +5,7 @@ import { isDark } from '@inngest/components/utils/theme';
 import resolveConfig from 'tailwindcss/resolveConfig';
 
 import { type TimeSeries } from '@/gql/graphql';
-import tailwindConfig from '../../../../../../../tailwind.config';
+import tailwindConfig from '../../../../tailwind.config';
 
 const {
   theme: { textColor, colors, borderColor },
