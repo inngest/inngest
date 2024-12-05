@@ -6,7 +6,6 @@ import { Chart } from '@inngest/components/Chart/Chart';
 import { useQuery } from 'urql';
 
 import { graphql } from '@/gql';
-import LoadingIcon from '@/icons/LoadingIcon';
 import { createChartOptions } from './transformData';
 
 const GetBillableSteps = graphql(`
@@ -47,14 +46,7 @@ export function BillableStepUsage({ includedStepCountLimit, selectedPeriod, type
     },
   });
 
-  if (fetching) {
-    return (
-      <div className="flex h-full min-h-[297px] w-full items-center justify-center overflow-hidden">
-        <LoadingIcon />
-      </div>
-    );
-  }
-  if (!data) {
+  if (!data && !fetching) {
     return (
       <div className="flex h-full min-h-[297px] w-full items-center justify-center overflow-hidden">
         <Alert severity="warning">
@@ -68,7 +60,7 @@ export function BillableStepUsage({ includedStepCountLimit, selectedPeriod, type
     );
   }
 
-  const monthData = data.billableStepTimeSeries[0]?.data || [];
+  const monthData = data?.billableStepTimeSeries[0]?.data || [];
   const chartOption = createChartOptions(monthData, includedStepCountLimit, type);
 
   return (
@@ -78,6 +70,7 @@ export function BillableStepUsage({ includedStepCountLimit, selectedPeriod, type
         settings={{ notMerge: true }}
         theme="light"
         className="h-[297px] w-full"
+        loading={fetching}
       />
     </div>
   );

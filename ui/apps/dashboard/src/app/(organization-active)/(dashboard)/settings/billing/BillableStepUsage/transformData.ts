@@ -1,14 +1,14 @@
 import { type ChartProps } from '@inngest/components/Chart/Chart';
 import { resolveColor } from '@inngest/components/utils/colors';
+import { format } from '@inngest/components/utils/date';
 import { isDark } from '@inngest/components/utils/theme';
 import resolveConfig from 'tailwindcss/resolveConfig';
 
 import { type TimeSeries } from '@/gql/graphql';
 import tailwindConfig from '../../../../../../../tailwind.config';
-import { formatXAxis } from './format';
 
 const {
-  theme: { colors },
+  theme: { textColor, colors, borderColor },
 } = resolveConfig(tailwindConfig);
 
 type ChartPoint = {
@@ -56,7 +56,7 @@ function transformChartData(
     });
   }
 
-  const categories = series.map((item) => formatXAxis(item.time));
+  const categories = series.map((item) => item.time.toISOString());
   const includedValues = series.map((item) => item.includedCount);
   const additionalValues = series.map((item) => item.additionalCount);
   const additionalCount = Math.max(0, cumulativeCount - includedStepCountLimit);
@@ -103,24 +103,52 @@ export function createChartOptions(
       icon: 'circle',
       itemWidth: 10,
       itemHeight: 10,
-      textStyle: { fontSize: '12px' },
+      textStyle: { fontSize: '12px', color: resolveColor(textColor.subtle, dark) },
       data: [datasetNames.additionalCount, datasetNames.includedCount],
     },
     xAxis: {
       data: categories,
+      boundaryGap: true,
       axisTick: {
         alignWithLabel: true,
+        length: 2,
+        lineStyle: { color: resolveColor(borderColor.contrast, dark) },
       },
-      nameGap: 40,
-      nameTextStyle: {
+      axisLine: {
+        lineStyle: { color: resolveColor(borderColor.contrast, dark) },
+      },
+      axisLabel: {
         fontSize: 11,
         fontWeight: 500,
+        color: resolveColor(textColor.subtle, dark),
+        margin: 10,
+        interval: 1, // Show day 1, 3, 5...
+        formatter: function (value: string) {
+          return format(new Date(value), 'do'); // Show days as ordinal numbers
+        },
       },
     },
-    yAxis: {},
+    yAxis: {
+      axisLabel: {
+        fontSize: 10,
+        fontWeight: 400,
+        color: resolveColor(textColor.subtle, dark),
+        verticalAlign: 'bottom',
+        formatter: function (value: number) {
+          if (value >= 1000) {
+            return `${value / 1000}k`;
+          }
+
+          return value.toString();
+        },
+      },
+      splitLine: {
+        lineStyle: { color: resolveColor(borderColor.subtle, dark) },
+      },
+    },
     grid: {
       top: '10%',
-      left: '1%',
+      left: '0%',
       right: '0%',
       bottom: '15%',
       containLabel: true,
