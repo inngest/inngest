@@ -87,8 +87,8 @@ export function createChartOptions(
   );
 
   const datasetNames = {
-    additionalCount: `Additional ${type}`,
-    includedCount: `Plan-included ${type}`,
+    additionalCount: `Additional ${type}s`,
+    includedCount: `Plan-included ${type}s`,
   };
 
   return {
@@ -104,7 +104,7 @@ export function createChartOptions(
       itemWidth: 10,
       itemHeight: 10,
       textStyle: { fontSize: '12px', color: resolveColor(textColor.subtle, dark) },
-      data: [datasetNames.additionalCount, datasetNames.includedCount],
+      data: [datasetNames.includedCount, datasetNames.additionalCount],
     },
     xAxis: {
       data: categories,
