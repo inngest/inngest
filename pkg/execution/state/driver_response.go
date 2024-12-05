@@ -126,6 +126,7 @@ func (r DriverResponse) NextRetryAt() *time.Time {
 	return r.RetryAt
 }
 
+// HasAI checks if any ops in the response are related to AI.
 func (r DriverResponse) HasAI() bool {
 	if r.Generator == nil {
 		return false
