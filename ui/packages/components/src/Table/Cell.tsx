@@ -2,6 +2,7 @@ import { RunStatusDot } from '@inngest/components/FunctionRunStatusIcons/RunStat
 import { Pill, PillContent, type PillContentProps } from '@inngest/components/Pill';
 import { Time } from '@inngest/components/Time';
 import { cn } from '@inngest/components/utils/classNames';
+import { RiSparkling2Fill } from '@remixicon/react';
 
 import { getStatusTextClass } from '../statusClasses';
 
@@ -13,6 +14,15 @@ export function IDCell({ children }: React.PropsWithChildren) {
 
 export function TextCell({ children }: React.PropsWithChildren) {
   return <p className={cn(cellStyles, 'font-medium')}>{children}</p>;
+}
+
+export function AICell({ children }: React.PropsWithChildren) {
+  return (
+    <div className={cn(cellStyles, 'text-primary-xIntense flex items-center gap-2')}>
+      <RiSparkling2Fill className="h-4 w-4" />
+      {children}
+    </div>
+  );
 }
 
 export function PillCell({ children, type }: PillContentProps) {

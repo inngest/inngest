@@ -292,6 +292,7 @@ export const GET_RUNS = gql`
           endedAt
           startedAt
           status
+          hasAI
         }
       }
       pageInfo {

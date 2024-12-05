@@ -737,6 +737,7 @@ func (l traceLifecycle) OnStepFinished(
 			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
 			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeStepPlanned.String()),
 			attribute.String(consts.OtelSysStepStack, strings.Join(md.Stack, ",")),
+			attribute.Bool(consts.OtelSysFunctionHasAI, md.Config.HasAI),
 		),
 	)
 	defer span.End()

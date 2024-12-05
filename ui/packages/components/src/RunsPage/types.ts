@@ -21,4 +21,5 @@ export type Run = {
   queuedAt: string;
   endedAt: string | null;
   startedAt: string | null;
+  hasAI?: boolean;
 };

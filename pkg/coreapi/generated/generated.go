@@ -140,6 +140,7 @@ type ComplexityRoot struct {
 		EventName      func(childComplexity int) int
 		Function       func(childComplexity int) int
 		FunctionID     func(childComplexity int) int
+		HasAi          func(childComplexity int) int
 		ID             func(childComplexity int) int
 		IsBatch        func(childComplexity int) int
 		Output         func(childComplexity int) int
@@ -918,6 +919,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FunctionRunV2.FunctionID(childComplexity), true
+
+	case "FunctionRunV2.hasAI":
+		if e.complexity.FunctionRunV2.HasAi == nil {
+			break
+		}
+
+		return e.complexity.FunctionRunV2.HasAi(childComplexity), true
 
 	case "FunctionRunV2.id":
 		if e.complexity.FunctionRunV2.ID == nil {
@@ -2574,6 +2582,7 @@ type FunctionRunV2 {
   output: Bytes
 
   trace: RunTraceSpan
+  hasAI: Boolean!
 }
 
 type RunsV2Connection {
@@ -2605,7 +2614,11 @@ enum StepOp {
   AI_GATEWAY
 }
 
-union StepInfo = InvokeStepInfo | SleepStepInfo | WaitForEventStepInfo | RunStepInfo
+union StepInfo =
+    InvokeStepInfo
+  | SleepStepInfo
+  | WaitForEventStepInfo
+  | RunStepInfo
 
 type InvokeStepInfo {
   triggeringEventID: ULID!
@@ -6572,6 +6585,50 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 	return fc, nil
 }
 
+func (ec *executionContext) _FunctionRunV2_hasAI(ctx context.Context, field graphql.CollectedField, obj *models.FunctionRunV2) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionRunV2_hasAI(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.HasAi, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionRunV2_hasAI(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionRunV2",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _FunctionRunV2Edge_node(ctx context.Context, field graphql.CollectedField, obj *models.FunctionRunV2Edge) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_FunctionRunV2Edge_node(ctx, field)
 	if err != nil {
@@ -6647,6 +6704,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2Edge_node(ctx context.Cont
 				return ec.fieldContext_FunctionRunV2_output(ctx, field)
 			case "trace":
 				return ec.fieldContext_FunctionRunV2_trace(ctx, field)
+			case "hasAI":
+				return ec.fieldContext_FunctionRunV2_hasAI(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRunV2", field.Name)
 		},
@@ -8572,6 +8631,8 @@ func (ec *executionContext) fieldContext_Query_run(ctx context.Context, field gr
 				return ec.fieldContext_FunctionRunV2_output(ctx, field)
 			case "trace":
 				return ec.fieldContext_FunctionRunV2_trace(ctx, field)
+			case "hasAI":
+				return ec.fieldContext_FunctionRunV2_hasAI(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRunV2", field.Name)
 		},
@@ -16581,6 +16642,13 @@ func (ec *executionContext) _FunctionRunV2(ctx context.Context, sel ast.Selectio
 				return innerFunc(ctx)
 
 			})
+		case "hasAI":
+
+			out.Values[i] = ec._FunctionRunV2_hasAI(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
