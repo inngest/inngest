@@ -34,7 +34,7 @@ const GetBillingInfoDocument = graphql(`
 
 type Period = Option & { id: 'current' | 'previous' };
 
-const options: Period[] = [
+const options = [
   {
     id: 'current',
     name: 'This month',
@@ -43,7 +43,7 @@ const options: Period[] = [
     id: 'previous',
     name: 'Last month',
   },
-];
+] as const satisfies Readonly<Period[]>;
 
 export default function Billing({
   searchParams: { previous },
@@ -55,9 +55,7 @@ export default function Billing({
   });
 
   const [currentPage, setCurrentPage] = useState('step');
-  const [selectedPeriod, setSelectedPeriod] = useState<Period>(
-    previous ? options[1]! : options[0]!
-  );
+  const [selectedPeriod, setSelectedPeriod] = useState<Period>(previous ? options[1] : options[0]);
 
   const stepCount = data?.account.entitlements.stepCount || { usage: 0, limit: 0 };
   const runCount = data?.account.entitlements.runCount || { usage: 0, limit: 0 };
@@ -98,10 +96,10 @@ export default function Billing({
           </Select.Button>
           <Select.Options>
             <Link href={pathCreator.billing({ tab: 'usage' })}>
-              <Select.Option option={options[0]!}>{options[0]!.name}</Select.Option>
+              <Select.Option option={options[0]}>{options[0].name}</Select.Option>
             </Link>
             <Link href={pathCreator.billing({ tab: 'usage' }) + '?previous=true'}>
-              <Select.Option option={options[1]!}>{options[1]!.name}</Select.Option>
+              <Select.Option option={options[1]}>{options[1].name}</Select.Option>
             </Link>
           </Select.Options>
         </Select>
