@@ -76,8 +76,10 @@ export default function Billing({
           defaultValue={currentPage}
           size="small"
           onValueChange={setCurrentPage}
+          disabled
         >
-          <ToggleGroup.Item value="run">Run</ToggleGroup.Item>
+          {/* Disable until we have the chart data for both months */}
+          {/* <ToggleGroup.Item value="run">Run</ToggleGroup.Item> */}
           <ToggleGroup.Item value="step">Step</ToggleGroup.Item>
         </ToggleGroup>
         <Select
