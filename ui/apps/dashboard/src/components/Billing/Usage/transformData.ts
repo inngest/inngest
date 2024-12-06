@@ -160,8 +160,8 @@ export function createChartOptions(
         type: 'bar',
         stack: 'x',
         itemStyle: { color: resolveColor(colors.secondary.moderate, dark, '#2389F1') },
-        barWidth: '100%',
-        barGap: '-100%',
+        barWidth: '98%',
+        barGap: '-98%',
       },
       {
         name: datasetNames.additionalCount,
@@ -169,8 +169,8 @@ export function createChartOptions(
         type: 'bar',
         stack: 'y',
         itemStyle: { color: resolveColor(colors.accent.subtle, dark, '#EC9923') },
-        barWidth: '100%',
-        barGap: '-100%',
+        barWidth: '98%',
+        barGap: '-98%',
       },
     ],
   };
