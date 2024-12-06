@@ -103,7 +103,7 @@ export function createChartOptions(
       icon: 'circle',
       itemWidth: 10,
       itemHeight: 10,
-      textStyle: { fontSize: '12px', color: resolveColor(textColor.subtle, dark) },
+      textStyle: { fontSize: '12px', color: resolveColor(textColor.subtle, dark, '#4B4B4B') },
       data: [datasetNames.includedCount, datasetNames.additionalCount],
     },
     xAxis: {
@@ -112,15 +112,15 @@ export function createChartOptions(
       axisTick: {
         alignWithLabel: true,
         length: 2,
-        lineStyle: { color: resolveColor(borderColor.contrast, dark) },
+        lineStyle: { color: resolveColor(borderColor.contrast, dark, '#242424') },
       },
       axisLine: {
-        lineStyle: { color: resolveColor(borderColor.contrast, dark) },
+        lineStyle: { color: resolveColor(borderColor.contrast, dark, '#242424') },
       },
       axisLabel: {
         fontSize: 11,
         fontWeight: 500,
-        color: resolveColor(textColor.subtle, dark),
+        color: resolveColor(textColor.subtle, dark, '#4B4B4B'),
         margin: 10,
         interval: 1, // Show day 1, 3, 5...
         formatter: function (value: string) {
@@ -132,7 +132,7 @@ export function createChartOptions(
       axisLabel: {
         fontSize: 10,
         fontWeight: 400,
-        color: resolveColor(textColor.subtle, dark),
+        color: resolveColor(textColor.subtle, dark, '#4B4B4B'),
         verticalAlign: 'bottom',
         formatter: function (value: number) {
           if (value >= 1000) {
@@ -143,7 +143,7 @@ export function createChartOptions(
         },
       },
       splitLine: {
-        lineStyle: { color: resolveColor(borderColor.subtle, dark) },
+        lineStyle: { color: resolveColor(borderColor.subtle, dark, '#E2E2E2') },
       },
     },
     grid: {
