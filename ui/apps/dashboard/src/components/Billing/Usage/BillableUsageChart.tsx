@@ -3,21 +3,9 @@
 import Link from 'next/link';
 import { Alert } from '@inngest/components/Alert';
 import { Chart } from '@inngest/components/Chart/Chart';
-import { useQuery } from 'urql';
 
-import { graphql } from '@/gql';
 import { createChartOptions } from './transformData';
-
-const GetBillableSteps = graphql(`
-  query GetBillableSteps($month: Int!, $year: Int!) {
-    billableStepTimeSeries(timeOptions: { month: $month, year: $year }) {
-      data {
-        time
-        value
-      }
-    }
-  }
-`);
+import useGetBillableSteps from './useGetBillableSteps';
 
 type Props = {
   includedStepCountLimit?: number;
@@ -30,27 +18,11 @@ export default function BillableUsageChart({
   selectedPeriod,
   type,
 }: Props) {
-  const currentMonthIndex = new Date().getUTCMonth();
-  const options = {
-    previous: {
-      month: currentMonthIndex === 0 ? 12 : currentMonthIndex,
-      year: currentMonthIndex === 0 ? new Date().getUTCFullYear() - 1 : new Date().getUTCFullYear(),
-    },
-    current: {
-      month: currentMonthIndex + 1,
-      year: new Date().getUTCFullYear(),
-    },
-  };
-
-  const [{ data, fetching }] = useQuery({
-    query: GetBillableSteps,
-    variables: {
-      month: options[selectedPeriod].month,
-      year: options[selectedPeriod].year,
-    },
+  const { data, fetching } = useGetBillableSteps({
+    selectedPeriod: selectedPeriod,
   });
 
-  if (!data && !fetching) {
+  if (data.length === 0 && !fetching) {
     return (
       <div className="flex h-full min-h-[297px] w-full items-center justify-center overflow-hidden">
         <Alert severity="warning">
@@ -64,8 +36,7 @@ export default function BillableUsageChart({
     );
   }
 
-  const monthData = data?.billableStepTimeSeries[0]?.data || [];
-  const chartOption = createChartOptions(monthData, includedStepCountLimit, type);
+  const chartOption = createChartOptions(data, includedStepCountLimit, type);
 
   return (
     <div>

@@ -1,19 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Select, type Option } from '@inngest/components/Select/Select';
 import ToggleGroup from '@inngest/components/ToggleGroup/ToggleGroup';
 import { useQuery } from 'urql';
 
+import BillableUsageChart from '@/components/Billing/Usage/BillableUsageChart';
 import UsageMetadata from '@/components/Billing/Usage/Metadata';
+import useGetBillableSteps from '@/components/Billing/Usage/useGetBillableSteps';
 import { graphql } from '@/gql';
 import { pathCreator } from '@/utils/urls';
-
-const BillableUsageChart = dynamic(() => import('@/components/Billing/Usage/BillableUsageChart'), {
-  ssr: false,
-});
 
 const GetBillingInfoDocument = graphql(`
   query GetBillingInfo {
@@ -57,10 +54,20 @@ export default function Billing({
   const [currentPage, setCurrentPage] = useState('step');
   const [selectedPeriod, setSelectedPeriod] = useState<Period>(previous ? options[1] : options[0]);
 
+  // Get timeseries to temporarily grab the total usage for previous month, since we don't have history usage on entitlements
+  const { data: billableData, fetching: fetchingBillableData } = useGetBillableSteps({
+    selectedPeriod: selectedPeriod.id,
+  });
+
   const stepCount = data?.account.entitlements.stepCount || { usage: 0, limit: 0 };
   const runCount = data?.account.entitlements.runCount || { usage: 0, limit: 0 };
   const isStepPage = currentPage === 'step';
-  const currentUsage = isStepPage ? stepCount.usage : runCount.usage;
+  const currentUsage = (() => {
+    if (selectedPeriod.id === 'previous' && billableData.length) {
+      return billableData.reduce((sum, point) => sum + (point.value || 0), 0);
+    }
+    return isStepPage ? stepCount.usage : runCount.usage;
+  })();
   const currentLimit = isStepPage ? stepCount.limit ?? Infinity : runCount.limit ?? Infinity;
   const additionalUsage = Math.max(0, currentUsage - currentLimit);
 
@@ -76,8 +83,10 @@ export default function Billing({
           defaultValue={currentPage}
           size="small"
           onValueChange={setCurrentPage}
+          disabled
         >
-          <ToggleGroup.Item value="run">Run</ToggleGroup.Item>
+          {/* Disable until we have the chart data for both months */}
+          {/* <ToggleGroup.Item value="run">Run</ToggleGroup.Item> */}
           <ToggleGroup.Item value="step">Step</ToggleGroup.Item>
         </ToggleGroup>
         <Select
@@ -119,7 +128,7 @@ export default function Billing({
         />
         <UsageMetadata
           className="justify-self-end"
-          fetching={fetching}
+          fetching={fetching || fetchingBillableData}
           title={`Total ${currentPage}s`}
           value={new Intl.NumberFormat().format(currentUsage)}
         />
