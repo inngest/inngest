@@ -1,13 +1,19 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { Select, type Option } from '@inngest/components/Select/Select';
 import ToggleGroup from '@inngest/components/ToggleGroup/ToggleGroup';
 import { useQuery } from 'urql';
 
-import { BillableUsageChart } from '@/components/Billing/Usage/BillableUsageChart';
 import UsageMetadata from '@/components/Billing/Usage/Metadata';
 import { graphql } from '@/gql';
+import { pathCreator } from '@/utils/urls';
+
+const BillableUsageChart = dynamic(() => import('@/components/Billing/Usage/BillableUsageChart'), {
+  ssr: false,
+});
 
 const GetBillingInfoDocument = graphql(`
   query GetBillingInfo {
@@ -39,13 +45,19 @@ const options: Period[] = [
   },
 ];
 
-export default function Billing() {
+export default function Billing({
+  searchParams: { previous },
+}: {
+  searchParams: { previous: boolean };
+}) {
   const [{ data, fetching }] = useQuery({
     query: GetBillingInfoDocument,
   });
 
   const [currentPage, setCurrentPage] = useState('step');
-  const [selectedPeriod, setSelectedPeriod] = useState<Period>(options[0]!);
+  const [selectedPeriod, setSelectedPeriod] = useState<Period>(
+    previous ? options[1]! : options[0]!
+  );
 
   const stepCount = data?.account.entitlements.stepCount || { usage: 0, limit: 0 };
   const runCount = data?.account.entitlements.runCount || { usage: 0, limit: 0 };
@@ -85,8 +97,12 @@ export default function Billing() {
             <div className="text-basis text-sm font-medium">{selectedPeriod.name}</div>
           </Select.Button>
           <Select.Options>
-            <Select.Option option={options[0]!}>{options[0]!.name}</Select.Option>
-            <Select.Option option={options[1]!}>{options[1]!.name}</Select.Option>
+            <Link href={pathCreator.billing({ tab: 'usage' })}>
+              <Select.Option option={options[0]!}>{options[0]!.name}</Select.Option>
+            </Link>
+            <Link href={pathCreator.billing({ tab: 'usage' }) + '?previous=true'}>
+              <Select.Option option={options[1]!}>{options[1]!.name}</Select.Option>
+            </Link>
           </Select.Options>
         </Select>
       </div>

@@ -25,7 +25,11 @@ type Props = {
   type: string;
 };
 
-export function BillableUsageChart({ includedStepCountLimit, selectedPeriod, type }: Props) {
+export default function BillableUsageChart({
+  includedStepCountLimit,
+  selectedPeriod,
+  type,
+}: Props) {
   const currentMonthIndex = new Date().getUTCMonth();
   const options = {
     previous: {
