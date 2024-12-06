@@ -52,7 +52,7 @@ func ExecuteRequest(ctx context.Context, c HTTPDoer, req *http.Request) (*http.R
 
 	// Read 1 extra byte above the max so that we can check if the response is
 	// too large
-	byt, err := io.ReadAll(io.LimitReader(resp.Body, consts.MaxBodySize+1))
+	byt, err := io.ReadAll(io.LimitReader(resp.Body, consts.MaxSDKResponseBodySize+1))
 	if err != nil {
 		return resp, nil, dur, fmt.Errorf("error reading response body: %w", err)
 	}
@@ -83,7 +83,7 @@ func ExecuteRequest(ctx context.Context, c HTTPDoer, req *http.Request) (*http.R
 		}
 	}
 
-	if len(byt) > consts.MaxBodySize {
+	if len(byt) > consts.MaxSDKResponseBodySize {
 		return resp, byt, dur, ErrBodyTooLarge
 	}
 

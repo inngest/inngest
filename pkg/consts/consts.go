@@ -35,8 +35,13 @@ const (
 	// MaxStepInputSize is the maximum size of the input of a step.
 	MaxStepInputSize = 1024 * 1024 * 4 // 4MB
 
-	// MaxBodySize is the maximum payload size read on any HTTP response.
-	MaxBodySize = MaxStepOutputSize + MaxStepInputSize
+	// MaxSDKResponseBodySize is the maximum payload size in the response from
+	// the SDK.
+	MaxSDKResponseBodySize = MaxStepOutputSize + MaxStepInputSize
+
+	// MaxSDKRequestBodySize is the maximum payload size in the request to the
+	// SDK.
+	MaxSDKRequestBodySize = 1024 * 1024 * 4 // 4MB
 
 	// DefaultMaxStateSizeLimit is the maximum number of bytes of output state per function run allowed.
 	DefaultMaxStateSizeLimit = 1024 * 1024 * 32 // 32MB

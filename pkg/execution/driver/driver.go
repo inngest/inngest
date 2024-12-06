@@ -81,7 +81,7 @@ func MarshalV1(
 	}
 
 	// Ensure that we're not sending data that's too large to the SDK.
-	if md.Metrics.StateSize <= (consts.MaxBodySize - 1024) {
+	if md.Metrics.StateSize <= (consts.MaxSDKRequestBodySize - 1024) {
 		// Load the actual function state here.
 		steps, err := sl.LoadSteps(ctx, md.ID)
 		if err != nil {
@@ -146,7 +146,7 @@ func MarshalV1(
 	// And here, to double check, ensure that the length isn't excessive once again.
 	// This is because, as Jack points out, for backcompat we send both events and the
 	// first event.  We also may have incorrect state sizes for runs before this is tracked.
-	if len(j) > consts.MaxBodySize {
+	if len(j) > consts.MaxSDKRequestBodySize {
 		req.Events = []map[string]any{}
 		req.Actions = map[string]any{}
 		req.UseAPI = true
