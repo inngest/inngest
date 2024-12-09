@@ -22,7 +22,7 @@ export function usePlanFeatures() {
 
   if (res.data) {
     const features: Features = {
-      history: res.data.account.plan?.entitlements.history.limit || 1,
+      history: res.data.account.plan?.entitlements.history.limit || 7,
     };
 
     return {

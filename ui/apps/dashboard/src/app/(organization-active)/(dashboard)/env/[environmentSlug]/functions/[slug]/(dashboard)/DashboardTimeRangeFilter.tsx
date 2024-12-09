@@ -106,7 +106,7 @@ export default function DashboardTimeRangeFilter({
     query: GetBillingPlanDocument,
   });
 
-  const logRetention = data?.account.plan?.entitlements.history.limit || 1;
+  const logRetention = data?.account.plan?.entitlements.history.limit || 7;
 
   let plans: ReturnType<typeof transformPlans> | undefined;
   if (data?.plans) {

@@ -112,7 +112,7 @@ export default function TimeRangeFilter({
     query: GetBillingPlanDocument,
   });
 
-  const logRetention = data?.account.plan?.entitlements.history.limit || 1;
+  const logRetention = data?.account.plan?.entitlements.history.limit || 7;
 
   let plans: Plan[] | undefined;
   if (data?.plans) {
