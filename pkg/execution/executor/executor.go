@@ -1246,7 +1246,7 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 	// Use the aggregator for all funciton finished events, if there are more than
 	// 50 waiting.  It only takes a few milliseconds to iterate and handle less
 	// than 50;  anything more runs the risk of running slow.
-	if iter.Count() > 50 {
+	if iter.Count() > consts.AggregatePauseThreshold {
 		aggRes, err := e.handleAggregatePauses(ctx, evt)
 		if err != nil {
 			log.From(ctx).Error().Err(err).Msg("error handling aggregate pauses")
@@ -1380,6 +1380,9 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 
 	evtID := evt.GetInternalID()
 	evals, count, err := e.exprAggregator.EvaluateAsyncEvent(ctx, evt)
+	if err != nil {
+		log.Error("error evaluating async event", "error", err)
+	}
 
 	// We only want to return an error if we have no evaluations. Since we
 	// evaluate multiple expressions, a returned error means that at least one

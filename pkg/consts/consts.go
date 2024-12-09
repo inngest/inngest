@@ -135,6 +135,9 @@ const (
 	PauseExpiredDeletionGracePeriod = time.Second * 10
 
 	DefaultQueueShardName = "default"
+
+	// Minimum number of pauses before using the aggregate pause handler.
+	AggregatePauseThreshold = 50
 )
 
 var (

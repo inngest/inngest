@@ -435,10 +435,9 @@ func TestManyWaitInvalidExpressions(t *testing.T) {
 	registerFuncs()
 
 	// Trigger enough function runs to cause us to use the "aggregate pauses"
-	// code path. At the time of this comment, that threshold is 50 so we'll
-	// double it to be safe.
+	// code path.
 	var badEvents []any
-	for i := 0; i < 100; i++ {
+	for i := 0; i < consts.AggregatePauseThreshold+1; i++ {
 		badEvents = append(badEvents, event.Event{
 			Data: map[string]any{"bad": true},
 			Name: evtName,
