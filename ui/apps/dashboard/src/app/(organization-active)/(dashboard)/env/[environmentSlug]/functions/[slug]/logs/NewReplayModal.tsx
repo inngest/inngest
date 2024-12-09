@@ -28,13 +28,21 @@ const GetBillingPlanDocument = graphql(`
       plan {
         id
         name
-        features
+        entitlements {
+          history {
+            limit
+          }
+        }
       }
     }
 
     plans {
       name
-      features
+      entitlements {
+        history {
+          limit
+        }
+      }
     }
   }
 `);
@@ -110,8 +118,8 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
     query: GetBillingPlanDocument,
   });
 
-  const logRetention = Number(planData?.account.plan?.features.log_retention);
-  const upgradeCutoff = subtractDuration(new Date(), { days: logRetention || 7 });
+  const logRetention = planData?.account.plan?.entitlements.history.limit || 1;
+  const upgradeCutoff = subtractDuration(new Date(), { days: logRetention });
 
   const { data, isLoading } = useSkippableGraphQLQuery({
     query: GetReplayRunCountsDocument,
