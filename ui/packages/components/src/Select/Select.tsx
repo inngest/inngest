@@ -11,6 +11,7 @@ type SelectProps = {
   isLabelVisible?: boolean;
   children: React.ReactNode;
   className?: string;
+  size?: 'small' | 'medium';
 };
 
 export type Option = {
@@ -67,16 +68,18 @@ type ButtonProps = {
   isLabelVisible?: boolean;
   className?: string;
   as: React.ElementType;
+  size?: 'small' | 'medium';
 };
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ children, isLabelVisible, className, as: Component }, ref) => {
+  ({ children, isLabelVisible, className, as: Component, size = 'medium' }, ref) => {
     return (
       <Component
         ref={ref}
         className={cn(
           !isLabelVisible && 'rounded-l-[5px]',
-          'bg-surfaceBase text-basis flex h-10 w-full items-center justify-between rounded-r-[5px] px-2',
+          size === 'small' ? 'h-[30px]' : 'h-[38px]',
+          'bg-surfaceBase text-basis flex w-full items-center justify-between rounded-r-[5px] px-2',
           className
         )}
       >

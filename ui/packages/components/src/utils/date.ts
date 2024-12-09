@@ -21,6 +21,7 @@ export {
   isValid,
   lightFormat,
   sub,
+  format,
 };
 
 export const DURATION_STRING_REGEX = /^[1-9]\d*[smMhdwy]$/;

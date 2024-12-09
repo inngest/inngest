@@ -233,6 +233,7 @@ type Metadata struct {
 
 	// SpanID is the spanID used for this function run.
 	SpanID string `json:"sid"`
+	HasAI  bool   `json:"hasAI,omitempty"`
 }
 
 func (md *Metadata) GetSpanID() (*trace.SpanID, error) {
@@ -248,6 +249,7 @@ type MetadataUpdate struct {
 	DisableImmediateExecution bool      `json:"disableImmediateExecution,omitempty"`
 	RequestVersion            int       `json:"rv"`
 	StartedAt                 time.Time `json:"sat"`
+	HasAI                     bool      `json:"hasAI,omitempty"`
 }
 
 // State represents the current state of a fn run.  It is data-structure

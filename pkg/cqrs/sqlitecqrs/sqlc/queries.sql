@@ -205,10 +205,33 @@ VALUES
 	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: InsertTraceRun :exec
-INSERT OR REPLACE INTO trace_runs
-	(account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, batch_id, is_debounce, cron_schedule)
-VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO trace_runs (
+    run_id, account_id, workspace_id, app_id, function_id, trace_id, 
+    queued_at, started_at, ended_at, status, source_id, trigger_ids, 
+    output, batch_id, is_debounce, cron_schedule, has_ai
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(run_id)
+DO UPDATE SET
+    account_id = excluded.account_id,
+    workspace_id = excluded.workspace_id,
+    app_id = excluded.app_id,
+    function_id = excluded.function_id,
+    trace_id = excluded.trace_id,
+    queued_at = excluded.queued_at,
+    started_at = excluded.started_at,
+    ended_at = excluded.ended_at,
+    status = excluded.status,
+    source_id = excluded.source_id,
+    trigger_ids = excluded.trigger_ids,
+    output = excluded.output,
+    batch_id = excluded.batch_id,
+    is_debounce = excluded.is_debounce,
+    cron_schedule = excluded.cron_schedule,
+    has_ai = CASE
+                 WHEN trace_runs.has_ai = 1 THEN 1
+                 ELSE excluded.has_ai
+             END;
 
 -- name: GetTraceRun :one
 SELECT * FROM trace_runs WHERE run_id = @run_id;

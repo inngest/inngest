@@ -27,7 +27,7 @@ export default function PageTitle() {
     ) : null;
 
   return (
-    <div className="flex items-center justify-between">
+    <div className="text-basis flex items-center justify-between">
       <h2 className="my-9 text-2xl">{pageTitle}</h2>
       {cta}
     </div>

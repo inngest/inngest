@@ -1810,6 +1810,16 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 				update.ForceStepPlan = true
 			}
 		}
+		if resp.HasAI() {
+			if update == nil {
+				update = &sv2.MutableConfig{
+					ForceStepPlan:  i.md.Config.ForceStepPlan,
+					RequestVersion: resp.RequestVersion,
+					StartedAt:      i.md.Config.StartedAt,
+				}
+			}
+			update.HasAI = true
+		}
 		if update != nil {
 			if err := e.smv2.UpdateMetadata(ctx, i.md.ID, *update); err != nil {
 				return fmt.Errorf("error updating function metadata: %w", err)

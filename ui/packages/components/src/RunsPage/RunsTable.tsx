@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiSortAsc, RiSortDesc } from '@remixicon/react';
+import { RiSortAsc, RiSortDesc, RiSparkling2Fill } from '@remixicon/react';
 import {
   flexRender,
   getCoreRowModel,

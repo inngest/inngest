@@ -124,6 +124,7 @@ type FunctionRunV2 struct {
 	CronSchedule   *string           `json:"cronSchedule,omitempty"`
 	Output         *string           `json:"output,omitempty"`
 	Trace          *RunTraceSpan     `json:"trace,omitempty"`
+	HasAi          bool              `json:"hasAI"`
 }
 
 type FunctionRunV2Edge struct {
