@@ -118,7 +118,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
     query: GetBillingPlanDocument,
   });
 
-  const logRetention = planData?.account.plan?.entitlements.history.limit || 1;
+  const logRetention = planData?.account.plan?.entitlements.history.limit || 7;
   const upgradeCutoff = subtractDuration(new Date(), { days: logRetention });
 
   const { data, isLoading } = useSkippableGraphQLQuery({
