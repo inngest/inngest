@@ -1380,7 +1380,11 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 
 	evtID := evt.GetInternalID()
 	evals, count, err := e.exprAggregator.EvaluateAsyncEvent(ctx, evt)
-	if err != nil {
+
+	// We only want to return an error if we have no evaluations. Since we
+	// evaluate multiple expressions, a returned error means that at least one
+	// expression errored -- not that all expressions errored.
+	if err != nil && len(evals) == 0 {
 		return execution.HandlePauseResult{count, 0}, err
 	}
 
