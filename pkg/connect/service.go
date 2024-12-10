@@ -95,6 +95,10 @@ type connectGatewaySvc struct {
 	stateUpdateLock sync.Mutex
 }
 
+func (c *connectGatewaySvc) MaintenanceAPI() http.Handler {
+	return c.maintenanceApi
+}
+
 func (c *connectGatewaySvc) IsDraining() bool {
 	return c.isDraining
 }
@@ -147,12 +151,6 @@ func WithLifeCycles(lifecycles []ConnectGatewayLifecycleListener) gatewayOpt {
 func WithDev() gatewayOpt {
 	return func(svc *connectGatewaySvc) {
 		svc.dev = true
-	}
-}
-
-func WithMaintenanceApiPort(port int) gatewayOpt {
-	return func(svc *connectGatewaySvc) {
-		svc.maintenanceApiPort = &port
 	}
 }
 
@@ -240,21 +238,6 @@ func (c *connectGatewaySvc) heartbeat(ctx context.Context) {
 
 func (c *connectGatewaySvc) Run(ctx context.Context) error {
 	c.runCtx = ctx
-
-	if c.maintenanceApiPort != nil {
-		maintenanceAddr := fmt.Sprintf(":%d", *c.maintenanceApiPort)
-		maintenanceServer := &http.Server{
-			Addr:    maintenanceAddr,
-			Handler: c.maintenanceApi,
-		}
-
-		go func() {
-			err := maintenanceServer.ListenAndServe()
-			if err != nil {
-				c.logger.Error(fmt.Sprintf("could not start maintenance server: %v", err))
-			}
-		}()
-	}
 
 	port := 8289
 	if v, err := strconv.Atoi(os.Getenv("CONNECT_GATEWAY_API_PORT")); err == nil && v > 0 {
