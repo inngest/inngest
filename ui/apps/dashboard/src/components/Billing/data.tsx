@@ -25,6 +25,13 @@ export const entitlementUsageDocument = graphql(`
         }
         concurrency {
           usage
+          limit
+        }
+        eventSize {
+          limit
+        }
+        userCount {
+          limit
         }
       }
       plan {
