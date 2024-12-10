@@ -4,7 +4,7 @@ import { graphql } from '@/gql';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const query = graphql(`
-  query GetFeatureEntitlements {
+  query GetPlanEntitlements {
     account {
       plan {
         entitlements {
