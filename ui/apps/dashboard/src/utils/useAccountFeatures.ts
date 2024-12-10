@@ -4,25 +4,23 @@ import { graphql } from '@/gql';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const query = graphql(`
-  query GetPlanEntitlements {
+  query GetAccountEntitlements {
     account {
-      plan {
-        entitlements {
-          history {
-            limit
-          }
+      entitlements {
+        history {
+          limit
         }
       }
     }
   }
 `);
 
-export function usePlanFeatures() {
+export function useAccountFeatures() {
   const res = useGraphQLQuery({ query, variables: {} });
 
   if (res.data) {
     const features: Features = {
-      history: res.data.account.plan?.entitlements.history.limit || 7,
+      history: res.data.account.entitlements.history.limit || 7,
     };
 
     return {
