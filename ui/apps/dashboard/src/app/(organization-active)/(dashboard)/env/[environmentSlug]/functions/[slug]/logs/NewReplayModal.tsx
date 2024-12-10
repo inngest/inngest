@@ -22,8 +22,8 @@ import { graphql } from '@/gql';
 import { ReplayRunStatus } from '@/gql/graphql';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 
-const GetBillingPlanDocument = graphql(`
-  query GetBillingPlan {
+const GetAccountEntitlementsDocument = graphql(`
+  query GetAccountEntitlements {
     account {
       entitlements {
         history {
@@ -102,7 +102,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
   const environment = useEnvironment();
 
   const [{ data: planData }] = useQuery({
-    query: GetBillingPlanDocument,
+    query: GetAccountEntitlementsDocument,
   });
 
   const logRetention = planData?.account.entitlements.history.limit || 7;

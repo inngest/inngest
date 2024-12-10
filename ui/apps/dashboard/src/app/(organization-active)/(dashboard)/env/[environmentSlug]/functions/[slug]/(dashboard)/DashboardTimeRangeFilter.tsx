@@ -64,8 +64,8 @@ export function getTimeRangeByKey(key: string): TimeRange | undefined {
   return timeRanges.find((timeRange) => timeRange.key === key);
 }
 
-const GetBillingPlanDocument = graphql(`
-  query GetBillingPlan {
+const GetAccountEntitlementsDocument = graphql(`
+  query GetAccountEntitlements {
     account {
       entitlements {
         history {
@@ -87,7 +87,7 @@ export default function DashboardTimeRangeFilter({
   onTimeRangeChange,
 }: DashboardTimeRangeFilterProps) {
   const [{ data }] = useQuery({
-    query: GetBillingPlanDocument,
+    query: GetAccountEntitlementsDocument,
   });
 
   const logRetention = data?.account.entitlements.history.limit || 7;

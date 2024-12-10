@@ -71,8 +71,8 @@ const timeRangeOptions: TimeRangeOption[] = [
 
 export const defaultTimeRange = timeRangeOptions[1]!.value;
 
-const GetBillingPlanDocument = graphql(`
-  query GetBillingPlan {
+const GetAccountEntitlementsDocument = graphql(`
+  query GetAccountEntitlements {
     account {
       entitlements {
         history {
@@ -97,7 +97,7 @@ export default function TimeRangeFilter({
   onTimeRangeChange,
 }: TimeRangeFilterProps) {
   const [{ data }] = useQuery({
-    query: GetBillingPlanDocument,
+    query: GetAccountEntitlementsDocument,
   });
 
   const logRetention = data?.account.entitlements.history.limit || 7;

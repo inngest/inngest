@@ -21,7 +21,7 @@ import {
 import { useQuery } from 'urql';
 
 import { graphql } from '@/gql';
-import { GetBillingPlanDocument, MetricsScope } from '@/gql/graphql';
+import { GetAccountEntitlementsDocument, MetricsScope } from '@/gql/graphql';
 import { MetricsOverview } from './Overview';
 import { MetricsVolume } from './Volume';
 import { convertLookup } from './utils';
@@ -121,8 +121,8 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
     variables: { envSlug, page, pageSize },
   });
 
-  const [{ data: planData }] = useQuery({
-    query: GetBillingPlanDocument,
+  const [{ data: accountData }] = useQuery({
+    query: GetAccountEntitlementsDocument,
   });
 
   const [{ data: accountConcurrencyLimitRes }] = useQuery({
@@ -138,7 +138,7 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
 
   const functions = data?.envBySlug?.workflows.data;
 
-  const logRetention = planData?.account.entitlements.history.limit || 7;
+  const logRetention = accountData?.account.entitlements.history.limit || 7;
   const upgradeCutoff = subtractDuration(new Date(), { days: logRetention });
   const concurrencyLimit = accountConcurrencyLimitRes?.account.entitlements.concurrency.limit;
 
