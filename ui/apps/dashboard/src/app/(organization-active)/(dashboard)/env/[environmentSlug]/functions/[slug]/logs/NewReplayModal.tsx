@@ -22,19 +22,14 @@ import { graphql } from '@/gql';
 import { ReplayRunStatus } from '@/gql/graphql';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 
-const GetBillingPlanDocument = graphql(`
-  query GetBillingPlan {
+const GetAccountEntitlementsDocument = graphql(`
+  query GetAccountEntitlements {
     account {
-      plan {
-        id
-        name
-        features
+      entitlements {
+        history {
+          limit
+        }
       }
-    }
-
-    plans {
-      name
-      features
     }
   }
 `);
@@ -107,11 +102,11 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
   const environment = useEnvironment();
 
   const [{ data: planData }] = useQuery({
-    query: GetBillingPlanDocument,
+    query: GetAccountEntitlementsDocument,
   });
 
-  const logRetention = Number(planData?.account.plan?.features.log_retention);
-  const upgradeCutoff = subtractDuration(new Date(), { days: logRetention || 7 });
+  const logRetention = planData?.account.entitlements.history.limit || 7;
+  const upgradeCutoff = subtractDuration(new Date(), { days: logRetention });
 
   const { data, isLoading } = useSkippableGraphQLQuery({
     query: GetReplayRunCountsDocument,

@@ -2,12 +2,13 @@
 
 import { Fragment } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
+import { Pill } from '@inngest/components/Pill/Pill';
 import { RiArrowDownSLine } from '@remixicon/react';
 import { useQuery } from 'urql';
 
 import GroupButton from '@/components/GroupButton/GroupButton';
 import { graphql } from '@/gql';
-import { FunctionRunTimeField, type GetBillingPlanQuery } from '@/gql/graphql';
+import { FunctionRunTimeField } from '@/gql/graphql';
 
 // export type TimeField = 'startedAt' | 'endedAt';
 export const defaultTimeField = FunctionRunTimeField.StartedAt;
@@ -70,19 +71,14 @@ const timeRangeOptions: TimeRangeOption[] = [
 
 export const defaultTimeRange = timeRangeOptions[1]!.value;
 
-const GetBillingPlanDocument = graphql(`
-  query GetBillingPlan {
+const GetAccountEntitlementsDocument = graphql(`
+  query GetAccountEntitlements {
     account {
-      plan {
-        id
-        name
-        features
+      entitlements {
+        history {
+          limit
+        }
       }
-    }
-
-    plans {
-      name
-      features
     }
   }
 `);
@@ -101,20 +97,10 @@ export default function TimeRangeFilter({
   onTimeRangeChange,
 }: TimeRangeFilterProps) {
   const [{ data }] = useQuery({
-    query: GetBillingPlanDocument,
+    query: GetAccountEntitlementsDocument,
   });
 
-  // Since "features" is a map, we can't be 100% sure that there's a log
-  // retention value. So default to 7 days.
-  let logRetention = 7;
-  if (typeof data?.account.plan?.features.log_retention === 'number') {
-    logRetention = data.account.plan.features.log_retention;
-  }
-
-  let plans: Plan[] | undefined;
-  if (data?.plans) {
-    plans = transformPlans(data.plans);
-  }
+  const logRetention = data?.account.entitlements.history.limit || 7;
 
   const selectedTimeRangeOption = timeRangeOptions.find(
     (option) => option.value === selectedTimeRange
@@ -154,11 +140,6 @@ export default function TimeRangeFilter({
                   const isPlanSufficient = timeRange.daysAgo <= logRetention;
                   const label = getTimeRangeLabel(timeRange);
 
-                  let minimumPlanName: string | undefined = undefined;
-                  if (plans) {
-                    minimumPlanName = getMinimumPlanForLogRetention(plans, timeRange.daysAgo);
-                  }
-
                   return (
                     <Listbox.Option
                       key={label}
@@ -167,10 +148,10 @@ export default function TimeRangeFilter({
                       disabled={!isPlanSufficient}
                     >
                       {label}{' '}
-                      {!isPlanSufficient && minimumPlanName && (
-                        <span className="inline-flex items-center rounded px-[5px] py-0.5 text-[12px] font-semibold leading-tight text-indigo-500 ring-1 ring-inset ring-indigo-300">
-                          {minimumPlanName} Plan
-                        </span>
+                      {!isPlanSufficient && (
+                        <Pill kind="primary" appearance="outlined">
+                          Upgrade Plan
+                        </Pill>
                       )}
                     </Listbox.Option>
                   );
@@ -201,46 +182,4 @@ function getTimeRangeLabel(timeRangeOption: TimeRangeOption): string {
   }
 
   return `${timeRangeOption.daysAgo} Days`;
-}
-
-export function getMinimumPlanForLogRetention(
-  plans: Plan[],
-  logRetention: number
-): string | undefined {
-  // Sort plans by ascending log retention. This is needed because we'll need to
-  // find the "lowest" plan that supports the specified log retention.
-  plans = [...plans].sort((a, b) => {
-    return a.logRetention - b.logRetention;
-  });
-
-  for (const plan of plans) {
-    if (plan.logRetention >= logRetention) {
-      return plan.name;
-    }
-  }
-
-  // TODO: This probably shouldn't be hardcoded.
-  return 'Enterprise';
-}
-
-type Plan = {
-  name: string;
-  logRetention: number;
-};
-
-export function transformPlans(plans: GetBillingPlanQuery['plans']): Plan[] {
-  const newPlans: Plan[] = [];
-
-  for (const plan of plans) {
-    if (!plan || typeof plan.features.log_retention !== 'number') {
-      continue;
-    }
-
-    newPlans.push({
-      name: plan.name,
-      logRetention: plan.features.log_retention,
-    });
-  }
-
-  return newPlans;
 }

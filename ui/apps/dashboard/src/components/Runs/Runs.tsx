@@ -20,7 +20,7 @@ import { useCancelRun } from '@/queries/useCancelRun';
 import { useRerun } from '@/queries/useRerun';
 import { useRerunFromStep } from '@/queries/useRerunFromStep';
 import { pathCreator } from '@/utils/urls';
-import { usePlanFeatures } from '@/utils/usePlanFeatures';
+import { useAccountFeatures } from '@/utils/useAccountFeatures';
 import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { AppFilterDocument, CountRunsDocument, GetRunsDocument } from './queries';
 import { isBeforeRunsMigration, parseRunsData, toRunStatuses, toTimeField } from './utils';
@@ -88,7 +88,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   const getTraceResult = useGetTraceResult();
   const getTrigger = useGetTrigger();
   const getRun = useGetRun();
-  const features = usePlanFeatures();
+  const features = useAccountFeatures();
 
   const internalPathCreator = useMemo(() => {
     return {

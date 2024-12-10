@@ -341,12 +341,12 @@ export function RunsPage({
             {hasSearchFlag && (
               <NewButton
                 icon={<RiSearchLine />}
+                size="large"
                 iconSide="left"
                 appearance="outlined"
                 label={showSearch ? 'Hide search' : 'Show search'}
                 onClick={() => setShowSearch((prev) => !prev)}
                 className={cn(
-                  'h-[42px]',
                   search
                     ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
                     : ''
