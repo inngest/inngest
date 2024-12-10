@@ -413,7 +413,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
-	connGateway, connRouter, connectHandler := connect.NewConnectGatewayService(
+	connGateway := connect.NewConnectGatewayService(
 		connect.WithConnectionStateManager(connectionManager),
 		connect.WithRequestReceiver(gatewayProxy),
 		connect.WithGatewayAuthHandler(func(ctx context.Context, data *connectproto.WorkerConnectRequestData) (*connect.AuthResponse, error) {
@@ -425,6 +425,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		connect.WithAppLoader(dbcqrs),
 		connect.WithDev(),
 	)
+	connRouter := connect.NewConnectMessageRouterService(connectionManager, gatewayProxy)
 
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
@@ -438,7 +439,6 @@ func start(ctx context.Context, opts StartOpts) error {
 			{At: "/", Router: devAPI},
 			{At: "/v0", Router: core.Router},
 			{At: "/debug", Handler: middleware.Profiler()},
-			{At: "/connect", Handler: connectHandler},
 		},
 		LocalEventKeys: opts.EventKeys,
 	})

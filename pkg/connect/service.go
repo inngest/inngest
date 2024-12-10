@@ -12,10 +12,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
-	apiv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/logger"
@@ -44,7 +42,10 @@ type ConnectAppLoader interface {
 }
 
 type connectGatewaySvc struct {
-	chi.Router
+	maintenanceApiPort *int
+
+	gatewayRoutes  chi.Router
+	maintenanceApi chi.Router
 
 	// gatewayId is a unique identifier, generated each time the service is started.
 	// This should be used to uniquely identify the gateway instance when sending messages and routing requests.
@@ -117,9 +118,14 @@ func WithDev() gatewayOpt {
 	}
 }
 
-func NewConnectGatewayService(opts ...gatewayOpt) (*connectGatewaySvc, *connectRouterSvc, http.Handler) {
+func WithMaintenanceApiPort(port int) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.maintenanceApiPort = &port
+	}
+}
+
+func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 	gateway := &connectGatewaySvc{
-		Router:        chi.NewRouter(),
 		gatewayId:     ulid.MustNew(ulid.Now(), rand.Reader).String(),
 		lifecycles:    []ConnectGatewayLifecycleListener{},
 		drainListener: newDrainListener(),
@@ -129,9 +135,7 @@ func NewConnectGatewayService(opts ...gatewayOpt) (*connectGatewaySvc, *connectR
 		opt(gateway)
 	}
 
-	router := newConnectRouter(gateway.stateManager, gateway.receiver)
-
-	return gateway, router, gateway.Handler()
+	return gateway
 }
 
 func (c *connectGatewaySvc) Name() string {
@@ -148,16 +152,30 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 	}
 	c.hostname = hostname
 
-	// Setup REST endpoint
-	c.Use(
-		middleware.Heartbeat("/health"),
-	)
-	c.Mount("/v0", apiv0.New(c, apiv0.Opts{
-		ConnectManager:     c.stateManager,
-		GroupManager:       c.stateManager,
-		Dev:                c.dev,
-		GatewayMaintenance: c,
-	}))
+	readinessHandler := func(writer http.ResponseWriter, request *http.Request) {
+		if c.isDraining {
+			writer.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+
+		writer.WriteHeader(http.StatusOK)
+	}
+
+	c.gatewayRoutes = chi.NewRouter().Group(func(r chi.Router) {
+		// WebSocket endpoint
+		r.Handle("/connect", c.Handler())
+
+		// Readiness must be served to traffic port for load balancer health checks
+		r.Get("/ready", readinessHandler)
+	})
+
+	c.maintenanceApi = newMaintenanceApi(c)
+	c.maintenanceApi.Get("/ready", readinessHandler)
+	c.maintenanceApi.Get("/healthy", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("."))
+	})
 
 	if err := c.updateGatewayState(state.GatewayStatusStarting); err != nil {
 		return fmt.Errorf("could not set initial gateway state: %w", err)
@@ -190,6 +208,21 @@ func (c *connectGatewaySvc) heartbeat(ctx context.Context) {
 func (c *connectGatewaySvc) Run(ctx context.Context) error {
 	c.runCtx = ctx
 
+	if c.maintenanceApiPort != nil {
+		maintenanceAddr := fmt.Sprintf(":%d", *c.maintenanceApiPort)
+		maintenanceServer := &http.Server{
+			Addr:    maintenanceAddr,
+			Handler: c.maintenanceApi,
+		}
+
+		go func() {
+			err := maintenanceServer.ListenAndServe()
+			if err != nil {
+				c.logger.Error(fmt.Sprintf("could not start maintenance server: %v", err))
+			}
+		}()
+	}
+
 	port := 8289
 	if v, err := strconv.Atoi(os.Getenv("CONNECT_GATEWAY_API_PORT")); err == nil && v > 0 {
 		port = v
@@ -197,7 +230,7 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 	addr := fmt.Sprintf(":%d", port)
 	server := &http.Server{
 		Addr:    addr,
-		Handler: c,
+		Handler: c.gatewayRoutes,
 	}
 
 	go func() {
