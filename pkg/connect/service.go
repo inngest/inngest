@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -41,6 +42,29 @@ type ConnectAppLoader interface {
 	GetAppByName(ctx context.Context, envID uuid.UUID, name string) (*cqrs.App, error)
 }
 
+type connectionCounter struct {
+	count  uint64
+	waiter sync.WaitGroup
+}
+
+func (c *connectionCounter) Add() {
+	c.waiter.Add(1)
+	atomic.AddUint64(&c.count, 1)
+}
+
+func (c *connectionCounter) Done() {
+	atomic.AddUint64(&c.count, ^uint64(0))
+	c.waiter.Done()
+}
+
+func (c *connectionCounter) Count() uint64 {
+	return atomic.LoadUint64(&c.count)
+}
+
+func (c *connectionCounter) Wait() {
+	c.waiter.Wait()
+}
+
 type connectGatewaySvc struct {
 	maintenanceApiPort *int
 
@@ -66,9 +90,17 @@ type connectGatewaySvc struct {
 	lifecycles []ConnectGatewayLifecycleListener
 
 	isDraining      bool
-	connectionSema  sync.WaitGroup
+	connectionCount connectionCounter
 	drainListener   *drainListener
 	stateUpdateLock sync.Mutex
+}
+
+func (c *connectGatewaySvc) IsDraining() bool {
+	return c.isDraining
+}
+
+func (c *connectGatewaySvc) IsDrained() bool {
+	return c.connectionCount.Count() == 0
 }
 
 type drainListener struct {
@@ -124,6 +156,12 @@ func WithMaintenanceApiPort(port int) gatewayOpt {
 	}
 }
 
+func WithStartAsDraining(isDraining bool) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.isDraining = isDraining
+	}
+}
+
 func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 	gateway := &connectGatewaySvc{
 		gatewayId:     ulid.MustNew(ulid.Now(), rand.Reader).String(),
@@ -171,11 +209,6 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 
 	c.maintenanceApi = newMaintenanceApi(c)
 	c.maintenanceApi.Get("/ready", readinessHandler)
-	c.maintenanceApi.Get("/healthy", func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Content-Type", "text/plain")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("."))
-	})
 
 	if err := c.updateGatewayState(state.GatewayStatusStarting); err != nil {
 		return fmt.Errorf("could not set initial gateway state: %w", err)
@@ -244,7 +277,7 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 		}
 
 		c.logger.Info("waiting for connections to drain")
-		c.connectionSema.Wait()
+		c.connectionCount.Wait()
 		c.logger.Info("shutting down gateway api")
 		_ = server.Shutdown(ctx)
 	}()
@@ -268,9 +301,11 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 		return nil
 	})
 
-	err := c.updateGatewayState(state.GatewayStatusActive)
-	if err != nil {
-		return fmt.Errorf("could not update gateway state: %w", err)
+	if !c.isDraining {
+		err := c.updateGatewayState(state.GatewayStatusActive)
+		if err != nil {
+			return fmt.Errorf("could not update gateway state: %w", err)
+		}
 	}
 
 	// Periodically report current status

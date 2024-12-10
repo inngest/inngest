@@ -11,6 +11,8 @@ import (
 )
 
 type GatewayMaintenanceActions interface {
+	IsDraining() bool
+	IsDrained() bool
 	GetState() (*state.Gateway, error)
 	DrainGateway() error
 	ActivateGateway() error
@@ -35,8 +37,29 @@ func (m *maintenanceApi) setup() {
 		r.Use(middleware.Recoverer)
 		r.Use(headers.ContentTypeJsonResponse())
 
+		r.Get("/healthy", func(w http.ResponseWriter, req *http.Request) {
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("."))
+		})
+		r.Get("/ready", func(w http.ResponseWriter, req *http.Request) {
+			if m.GatewayMaintenance.IsDraining() {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+		})
 		r.Get("/gateway", m.getGatewayState)
+
 		r.Post("/drain", m.drainGateway)
+		r.Get("/drained", func(w http.ResponseWriter, req *http.Request) {
+			if m.GatewayMaintenance.IsDrained() {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			w.WriteHeader(http.StatusTooEarly)
+		})
+		
 		r.Post("/activate", m.activateGateway)
 	})
 }
