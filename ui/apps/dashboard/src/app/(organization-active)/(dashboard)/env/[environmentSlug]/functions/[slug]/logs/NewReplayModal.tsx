@@ -25,19 +25,6 @@ import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 const GetBillingPlanDocument = graphql(`
   query GetBillingPlan {
     account {
-      plan {
-        id
-        name
-        entitlements {
-          history {
-            limit
-          }
-        }
-      }
-    }
-
-    plans {
-      name
       entitlements {
         history {
           limit
@@ -118,7 +105,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
     query: GetBillingPlanDocument,
   });
 
-  const logRetention = planData?.account.plan?.entitlements.history.limit || 7;
+  const logRetention = planData?.account.entitlements.history.limit || 7;
   const upgradeCutoff = subtractDuration(new Date(), { days: logRetention });
 
   const { data, isLoading } = useSkippableGraphQLQuery({
