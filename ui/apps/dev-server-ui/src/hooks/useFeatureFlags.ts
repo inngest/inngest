@@ -12,7 +12,7 @@ export function useFeatureFlags() {
   useEffect(() => {
     async function fetchFeatureFlags() {
       try {
-        const response = await fetch('http://localhost:8288/dev');
+        const response = await fetch('/dev');
         if (!response.ok) {
           throw new Error('Failed to fetch feature flags');
         }
