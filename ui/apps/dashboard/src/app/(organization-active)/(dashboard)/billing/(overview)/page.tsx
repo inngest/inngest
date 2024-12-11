@@ -70,7 +70,11 @@ export default async function Page() {
           <div className="border-subtle mb-6 border" />
           <AddOn
             title="Event Size"
-            value={entitlementUsage.eventSize.limit}
+            value={
+              entitlementUsage.eventSize.limit >= 1024
+                ? `${(entitlementUsage.eventSize.limit / 1024).toFixed(2)} MB`
+                : `${entitlementUsage.eventSize.limit} KB`
+            }
             canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             tooltipContent="The maximum size for a single event"
           />
@@ -82,7 +86,9 @@ export default async function Page() {
           />
           <AddOn
             title="Log history"
-            value={entitlementUsage.history.limit}
+            value={`${entitlementUsage.history.limit} day${
+              entitlementUsage.history.limit === 1 ? '' : 's'
+            }`}
             canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             tooltipContent="Tracing for every function run"
           />
