@@ -765,7 +765,7 @@ func (l traceLifecycle) OnStepFinished(
 
 	if runErr != nil {
 		span.SetStatus(codes.Error, runErr.Error())
-		span.SetStepOutput(runErr.Error())
+		span.SetStepOutput(runErr)
 		return
 	}
 

@@ -887,6 +887,48 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		"workflow_id", i.md.ID.FunctionID.String(),
 	)
 
+	// This is a success, which means either a generator or a function result.
+	if i.resp.Err == nil && len(i.resp.Generator) > 0 {
+		// Handle generator responses then return.
+		if serr := e.HandleGeneratorResponse(ctx, i, i.resp); serr != nil {
+
+			// If this is an error compiling async expressions, fail the function.
+			shouldFailEarly := errors.Is(serr, &expressions.CompileError{}) || errors.Is(serr, state.ErrStateOverflowed) || errors.Is(serr, state.ErrFunctionOverflowed)
+
+			if shouldFailEarly {
+				var gracefulErr *state.WrappedStandardError
+				if hasGracefulErr := errors.As(serr, &gracefulErr); hasGracefulErr {
+					serialized := gracefulErr.Serialize(execution.StateErrorKey)
+					i.resp.Output = serialized
+					i.resp.Err = &gracefulErr.StandardError.Name
+
+					// Immediately fail the function.
+					i.resp.NoRetry = true
+
+					// This is required to get old history to look correct.
+					// Without it, the function run will have no output. We can
+					// probably delete this when we fully remove old history.
+					i.resp.Generator = []*state.GeneratorOpcode{}
+				}
+
+				for _, e := range e.lifecycles {
+					go e.OnStepFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, i.resp, serr)
+				}
+
+				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
+					l.Error("error running finish handler", "error", err)
+				}
+
+				// Can be reached multiple times for parallel discovery steps
+				for _, e := range e.lifecycles {
+					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
+				}
+
+				return nil
+			}
+		}
+	}
+
 	for _, e := range e.lifecycles {
 		// OnStepFinished handles step success and step errors/failures.  It is
 		// currently the responsibility of the lifecycle manager to handle the differing
@@ -945,46 +987,16 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		}
 	}
 
-	// This is a success, which means either a generator or a function result.
-	if len(i.resp.Generator) > 0 {
-		// Handle generator responses then return.
-		if serr := e.HandleGeneratorResponse(ctx, i, i.resp); serr != nil {
-
-			// If this is an error compiling async expressions, fail the function.
-			shouldFailEarly := errors.Is(serr, &expressions.CompileError{}) || errors.Is(serr, state.ErrStateOverflowed) || errors.Is(serr, state.ErrFunctionOverflowed)
-
-			if shouldFailEarly {
-				var gracefulErr *state.WrappedStandardError
-				if hasGracefulErr := errors.As(serr, &gracefulErr); hasGracefulErr {
-					serialized := gracefulErr.Serialize(execution.StateErrorKey)
-					i.resp.Output = nil
-					i.resp.Err = &serialized
-				}
-
-				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
-					l.Error("error running finish handler", "error", err)
-				}
-
-				// Can be reached multiple times for parallel discovery steps
-				for _, e := range e.lifecycles {
-					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
-				}
-
-				return nil
-			}
-			return fmt.Errorf("error handling generator response: %w", serr)
+	if len(i.resp.Generator) == 0 {
+		// This is the function result.
+		if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
+			l.Error("error running finish handler", "error", err)
 		}
-		return nil
-	}
 
-	// This is the function result.
-	if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
-		l.Error("error running finish handler", "error", err)
-	}
-
-	// Can be reached multiple times for parallel discovery steps
-	for _, e := range e.lifecycles {
-		go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
+		// Can be reached multiple times for parallel discovery steps
+		for _, e := range e.lifecycles {
+			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
+		}
 	}
 
 	return nil
@@ -2418,6 +2430,17 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 	if err != nil {
 		return fmt.Errorf("unable to parse wait for event opts: %w", err)
 	}
+
+	err = expressions.Validate(ctx, *opts.If)
+	if err != nil {
+		return state.WrapInStandardError(
+			err,
+			"InvalidExpression",
+			"Wait for event expression is invalid",
+			err.Error(),
+		)
+	}
+
 	expires, err := opts.Expires()
 	if err != nil {
 		return fmt.Errorf("unable to parse wait for event expires: %w", err)
