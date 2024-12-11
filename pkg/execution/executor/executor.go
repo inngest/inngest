@@ -949,6 +949,10 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 	if len(i.resp.Generator) > 0 {
 		// Handle generator responses then return.
 		if serr := e.HandleGeneratorResponse(ctx, i, i.resp); serr != nil {
+			// If we errored then we must update the response with the error. If
+			// we don't, the run status might be completed.
+			errMsg := serr.Error()
+			i.resp.Err = &errMsg
 
 			// If this is an error compiling async expressions, fail the function.
 			shouldFailEarly := errors.Is(serr, &expressions.CompileError{}) || errors.Is(serr, state.ErrStateOverflowed) || errors.Is(serr, state.ErrFunctionOverflowed)
@@ -956,9 +960,15 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 			if shouldFailEarly {
 				var gracefulErr *state.WrappedStandardError
 				if hasGracefulErr := errors.As(serr, &gracefulErr); hasGracefulErr {
-					serialized := gracefulErr.Serialize(execution.StateErrorKey)
-					i.resp.Output = nil
-					i.resp.Err = &serialized
+					i.resp.Output = gracefulErr.StandardError
+					i.resp.Err = &gracefulErr.StandardError.Name
+					i.resp.NoRetry = true
+				}
+
+				// For some reason this is necessary. Without it, the function
+				// output is the last successful step output.
+				for _, e := range e.lifecycles {
+					go e.OnStepFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, i.resp, serr)
 				}
 
 				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
@@ -2418,6 +2428,17 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 	if err != nil {
 		return fmt.Errorf("unable to parse wait for event opts: %w", err)
 	}
+
+	err = expressions.Validate(ctx, *opts.If)
+	if err != nil {
+		return state.WrapInStandardError(
+			err,
+			"InvalidExpression",
+			"Wait for event expression is invalid",
+			err.Error(),
+		)
+	}
+
 	expires, err := opts.Expires()
 	if err != nil {
 		return fmt.Errorf("unable to parse wait for event expires: %w", err)
