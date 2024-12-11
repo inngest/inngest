@@ -2,6 +2,7 @@ import { Alert } from '@inngest/components/Alert/Alert';
 import { NewButton } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
 
+import AddOn from '@/components/Billing/Addons/AddonListItem';
 import BillingInformation from '@/components/Billing/BillingDetails/BillingInformation';
 import PaymentMethod from '@/components/Billing/BillingDetails/PaymentMethod';
 import { LimitBar, type Data } from '@/components/Billing/LimitBar';
@@ -66,6 +67,32 @@ export default async function Page() {
           </div>
           {entitlementUsage.runCount.limit !== null && <LimitBar data={runs} className="my-4" />}
           <LimitBar data={steps} className="mb-6" />
+          <div className="border-subtle mb-6 border" />
+          <AddOn
+            title="Event Size"
+            value={entitlementUsage.eventSize.limit}
+            canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
+            tooltipContent="The maximum size for a single event"
+          />
+          <AddOn
+            title="Concurrency"
+            value={entitlementUsage.concurrency.limit}
+            canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
+            tooltipContent="Maximum concurrently executing steps"
+          />
+          <AddOn
+            title="Log history"
+            value={entitlementUsage.history.limit}
+            canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
+            tooltipContent="Tracing for every function run"
+          />
+          {entitlementUsage.isCustomPlan && (
+            <AddOn
+              title="Dedicated execution capacity"
+              canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
+              tooltipContent="Dedicated Inngest infrastructure for low latency, high throughput execution"
+            />
+          )}
           {!overageAllowed && (
             <Alert
               severity="info"
