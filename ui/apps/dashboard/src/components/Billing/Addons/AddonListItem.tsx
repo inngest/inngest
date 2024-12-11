@@ -18,7 +18,7 @@ export default function AddOn({
   tooltipContent?: string | React.ReactNode;
 }) {
   return (
-    <div className="mb-6 flex items-start justify-between text-right">
+    <div className="mb-6 flex items-center justify-between">
       <div>
         <p className="text-subtle mb-1 flex items-center gap-1 text-xs font-medium">
           {title}
@@ -27,14 +27,16 @@ export default function AddOn({
               <TooltipTrigger>
                 <RiInformationLine className="text-light h-4 w-4" />
               </TooltipTrigger>
-              <TooltipContent className="whitespace-pre-line">{tooltipContent}</TooltipContent>
+              <TooltipContent className="whitespace-pre-line text-left">
+                {tooltipContent}
+              </TooltipContent>
             </Tooltip>
           )}
         </p>
         {description && <p className="text-subtle mb-2 text-xs italic">{description}</p>}
       </div>
       <div>
-        {value && <p className="text-basis pr-3 text-sm font-medium">{value}</p>}
+        {value && <p className="text-basis pr-3 text-right text-sm font-medium">{value}</p>}
         <NewButton
           appearance="ghost"
           label={canIncreaseLimitInCurrentPlan ? 'Contact us' : 'Upgrade'}

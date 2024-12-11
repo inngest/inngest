@@ -93,7 +93,7 @@ export default async function Page() {
                 : `${entitlementUsage.eventSize.limit} KB`
             }
             canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
-            tooltipContent="The maximum size for a single event"
+            description="The maximum size for a single event"
           />
           <AddOn
             title="Concurrency"
@@ -110,13 +110,11 @@ export default async function Page() {
             canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             description="View and search function run traces and metrics"
           />
-          {entitlementUsage.isCustomPlan && (
-            <AddOn
-              title="Dedicated execution capacity"
-              canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
-              description="Dedicated infrastructure for the lowest latency and highest throughput"
-            />
-          )}
+          <AddOn
+            title="Dedicated execution capacity"
+            canIncreaseLimitInCurrentPlan
+            description="Dedicated infrastructure for the lowest latency and highest throughput"
+          />
           <div className="flex flex-col items-center gap-2">
             <p>Custom needs?</p>
             <NewButton
