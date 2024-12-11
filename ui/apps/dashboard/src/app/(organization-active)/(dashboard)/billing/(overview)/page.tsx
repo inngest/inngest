@@ -55,6 +55,23 @@ export default async function Page() {
   return (
     <div className="grid grid-cols-3 gap-4">
       <Card className="col-span-2">
+        {!overageAllowed && (
+          <Alert
+            severity="info"
+            className="flex items-center justify-between text-sm"
+            link={
+              <NewButton
+                appearance="outlined"
+                kind="secondary"
+                label="Upgrade plan"
+                href={pathCreator.billing({ tab: 'plans', ref: 'app-billing-page-overview' })}
+              />
+            }
+          >
+            For usage beyond the limits of this plan, upgrade to a new plan.
+          </Alert>
+        )}
+
         <Card.Content>
           <p className="text-muted mb-1">Your plan</p>
           <div className="flex items-center justify-between">
@@ -98,22 +115,6 @@ export default async function Page() {
               canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
               tooltipContent="Dedicated Inngest infrastructure for low latency, high throughput execution"
             />
-          )}
-          {!overageAllowed && (
-            <Alert
-              severity="info"
-              className="mb-6 flex items-center justify-between text-sm"
-              link={
-                <NewButton
-                  appearance="outlined"
-                  kind="secondary"
-                  label="Upgrade plan"
-                  href={pathCreator.billing({ tab: 'plans', ref: 'app-billing-page-overview' })}
-                />
-              }
-            >
-              For usage beyond the limits of this plan, upgrade to a new plan.
-            </Alert>
           )}
           <div className="flex flex-col items-center gap-2">
             <p>Custom needs?</p>
