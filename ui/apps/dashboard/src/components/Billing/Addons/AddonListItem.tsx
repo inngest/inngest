@@ -37,7 +37,7 @@ export default function AddOn({
         {value && <p className="text-basis pr-3 text-sm font-medium">{value}</p>}
         <NewButton
           appearance="ghost"
-          label={canIncreaseLimitInCurrentPlan ? 'Contact for more' : 'Upgrade for more'}
+          label={canIncreaseLimitInCurrentPlan ? 'Contact us' : 'Upgrade'}
           href={
             canIncreaseLimitInCurrentPlan
               ? pathCreator.support({

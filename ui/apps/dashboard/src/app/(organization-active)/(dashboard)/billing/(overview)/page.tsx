@@ -99,7 +99,8 @@ export default async function Page() {
             title="Concurrency"
             value={entitlementUsage.concurrency.limit}
             canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
-            tooltipContent="Maximum concurrently executing steps"
+            description="Maximum concurrently executing steps"
+            tooltipContent="Functions actively sleeping and waiting for events are not counted"
           />
           <AddOn
             title="Log history"
@@ -107,13 +108,13 @@ export default async function Page() {
               entitlementUsage.history.limit === 1 ? '' : 's'
             }`}
             canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
-            tooltipContent="Tracing for every function run"
+            description="View and search function run traces and metrics"
           />
           {entitlementUsage.isCustomPlan && (
             <AddOn
               title="Dedicated execution capacity"
               canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
-              tooltipContent="Dedicated Inngest infrastructure for low latency, high throughput execution"
+              description="Dedicated infrastructure for the lowest latency and highest throughput"
             />
           )}
           <div className="flex flex-col items-center gap-2">
