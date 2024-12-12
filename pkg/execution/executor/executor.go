@@ -986,7 +986,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		}
 	}
 
-	if len(i.resp.Generator) == 0 {
+	if i.resp.IsFunctionResult() {
 		// This is the function result.
 		if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
 			l.Error("error running finish handler", "error", err)

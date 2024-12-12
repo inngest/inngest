@@ -290,10 +290,10 @@ func (r *DriverResponse) UpdateOpcodeError(op *GeneratorOpcode, err UserError) {
 func (r *DriverResponse) IsFunctionResult() bool {
 	for _, op := range r.Generator {
 		if op.Op != enums.OpcodeNone {
-			return true
+			return false
 		}
 	}
-	return false
+	return true
 }
 
 type WrappedStandardError struct {
