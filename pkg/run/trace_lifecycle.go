@@ -690,8 +690,13 @@ func (l traceLifecycle) OnStepGatewayRequestFinished(
 	switch op.Op {
 	case enums.OpcodeAIGateway:
 		req, _ := op.AIGatewayOpts()
+		// Parse the request
 		if parsed, err := aigateway.ParseInput(ctx, req); err == nil {
 			span.SetAIRequestMetadata(parsed)
+		}
+		// And parse the response.
+		if parsed, err := aigateway.ParseOutput(ctx, req.Format, op.Data); err == nil {
+			span.SetAIResponseMetadata(parsed)
 		}
 	}
 }
