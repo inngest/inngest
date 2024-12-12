@@ -38,9 +38,15 @@ const GetFunctionsUsageDocument = graphql(`
 `);
 
 const GetFunctionsDocument = graphql(`
-  query GetFunctions($environmentID: ID!, $page: Int, $archived: Boolean, $pageSize: Int) {
+  query GetFunctions(
+    $environmentID: ID!
+    $page: Int
+    $archived: Boolean
+    $search: String
+    $pageSize: Int
+  ) {
     workspace(id: $environmentID) {
-      workflows(archived: $archived) @paginated(perPage: $pageSize, page: $page) {
+      workflows(archived: $archived, search: $search) @paginated(perPage: $pageSize, page: $page) {
         page {
           page
           perPage
@@ -68,10 +74,12 @@ const GetFunctionsDocument = graphql(`
 
 export function useFunctionsPage({
   archived,
+  search,
   envID,
   page,
 }: {
   archived: boolean;
+  search: string;
   envID: string;
   page: number;
 }) {
@@ -80,6 +88,7 @@ export function useFunctionsPage({
     query: GetFunctionsDocument,
     variables: {
       archived,
+      search,
       environmentID: envID,
       page,
       pageSize,
