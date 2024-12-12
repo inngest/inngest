@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/liushuangls/go-anthropic/v2"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -37,9 +38,10 @@ type ParsedInferenceResponse struct {
 	ID         string            `json:"id"`
 	TokensIn   int32             `json:"tokens_in"`
 	TokensOut  int32             `json:"tokens_out"`
-	StopReason string            `json:"stop_reason"`
-	Tools      []ToolUseResponse `json:"tools"`
+	StopReason string            `json:"stop_reason,omitempty"`
+	Tools      []ToolUseResponse `json:"tools,omitempty"`
 	// XXX: We do not yet extract content, just like we do not yet extract prompts.
+	Error string `json:"error,omitempty"`
 }
 
 type Choice struct {
@@ -139,6 +141,49 @@ func ParseInput(ctx context.Context, req Request) (ParsedInferenceRequest, error
 
 func ParseOutput(ctx context.Context, format string, response []byte) (ParsedInferenceResponse, error) {
 	switch format {
+	case FormatAnthropic:
+		r := anthropic.MessagesResponse{}
+		err := json.Unmarshal(response, &r)
+		if err != nil {
+			return ParsedInferenceResponse{}, fmt.Errorf("error parsing openai response: %w", err)
+		}
+
+		if r.Type == anthropic.MessagesResponseTypeError {
+			r := anthropic.ErrorResponse{}
+			err := json.Unmarshal(response, &r)
+			if err != nil {
+				return ParsedInferenceResponse{Error: "anthropic API error"}, fmt.Errorf("error parsing openai response: %w", err)
+			}
+			msg := "anthropic API error"
+			if r.Error != nil {
+				msg = string(r.Error.Type)
+			}
+			return ParsedInferenceResponse{
+				Error: msg,
+			}, fmt.Errorf("anthropic api error: %s", msg)
+		}
+
+		tools := []ToolUseResponse{}
+		for _, m := range r.Content {
+			switch m.Type {
+			case "text":
+				// ignore, for now
+			case "tool_use":
+				tools = append(tools, ToolUseResponse{
+					ID:        m.ID,
+					Name:      m.Name,
+					Arguments: string(m.Input),
+				})
+			}
+		}
+
+		return ParsedInferenceResponse{
+			ID:         r.ID,
+			TokensIn:   int32(r.Usage.InputTokens),
+			TokensOut:  int32(r.Usage.OutputTokens),
+			StopReason: string(r.StopReason),
+			Tools:      tools,
+		}, nil
 	case FormatOpenAIChat:
 		fallthrough
 	default:
