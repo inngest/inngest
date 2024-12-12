@@ -887,8 +887,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		"workflow_id", i.md.ID.FunctionID.String(),
 	)
 
-	// This is a success, which means either a generator or a function result.
-	if i.resp.Err == nil && len(i.resp.Generator) > 0 {
+	if i.resp.Err == nil && !i.resp.IsFunctionResult() {
 		// Handle generator responses then return.
 		if serr := e.HandleGeneratorResponse(ctx, i, i.resp); serr != nil {
 
@@ -2431,14 +2430,16 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		return fmt.Errorf("unable to parse wait for event opts: %w", err)
 	}
 
-	err = expressions.Validate(ctx, *opts.If)
-	if err != nil {
-		return state.WrapInStandardError(
-			err,
-			"InvalidExpression",
-			"Wait for event expression is invalid",
-			err.Error(),
-		)
+	if opts.If != nil {
+		err = expressions.Validate(ctx, *opts.If)
+		if err != nil {
+			return state.WrapInStandardError(
+				err,
+				"InvalidExpression",
+				"Wait for event expression is invalid",
+				err.Error(),
+			)
+		}
 	}
 
 	expires, err := opts.Expires()
