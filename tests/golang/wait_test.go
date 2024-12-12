@@ -377,3 +377,104 @@ func TestWaitInvalidExpressionSyntaxError(t *testing.T) {
 	run := c.WaitForRunStatus(ctx, t, "FAILED", &runID)
 	assert.Equal(t, "{\"error\":{\"error\":\"CompileError: Could not compile expression\",\"name\":\"CompileError\",\"message\":\"Could not compile expression\",\"stack\":\"ERROR: \\u003cinput\\u003e:1:21: Syntax error: token recognition error at: '= '\\n | event.data.userId === async.data.userId\\n | ....................^\"}}", run.Output)
 }
+
+func TestManyWaitInvalidExpressions(t *testing.T) {
+	// This test ensures that valid expressions can match even when there are
+	// many invalid expressions.
+	//
+	// We created this test because aggregate pause processing did not support
+	// partial failures: if any expression was invalid then the valid
+	// expressions were skipped.
+
+	ctx := context.Background()
+	r := require.New(t)
+
+	appID := ulid.MustNew(ulid.Now(), nil).String()
+	h, server, registerFuncs := NewSDKHandler(t, appID)
+	defer server.Close()
+
+	type eventData struct {
+		Bad bool `json:"bad"`
+	}
+
+	var counter int32
+	var done bool
+	evtName := "my-event"
+	fn := inngestgo.CreateFunction(
+		inngestgo.FunctionOpts{
+			Name: "main-fn",
+		},
+		inngestgo.EventTrigger(evtName, nil),
+		func(
+			ctx context.Context,
+			input inngestgo.Input[inngestgo.GenericEvent[eventData, any]],
+		) (any, error) {
+			atomic.AddInt32(&counter, 1)
+
+			exp := "async.data.name == 'Alice'"
+			if input.Event.Data.Bad {
+				exp = "invalid"
+			}
+
+			_, _ = step.WaitForEvent[any](
+				ctx,
+				"wait",
+				step.WaitForEventOpts{
+					If:      inngestgo.StrPtr(exp),
+					Name:    "match-event",
+					Timeout: time.Minute,
+				},
+			)
+
+			done = true
+			return nil, nil
+		},
+	)
+
+	h.Register(fn)
+	registerFuncs()
+
+	// Trigger enough function runs to cause us to use the "aggregate pauses"
+	// code path.
+	var badEvents []any
+	for i := 0; i < consts.AggregatePauseThreshold+1; i++ {
+		badEvents = append(badEvents, event.Event{
+			Data: map[string]any{"bad": true},
+			Name: evtName,
+		})
+	}
+	_, err := inngestgo.SendMany(ctx, badEvents)
+	r.NoError(err)
+	r.EventuallyWithT(func(ct *assert.CollectT) {
+		a := assert.New(ct)
+		a.EqualValues(len(badEvents), atomic.LoadInt32(&counter))
+	}, 20*time.Second, 100*time.Millisecond)
+
+	// Trigger a function run with a valid expression that should match.
+	_, err = inngestgo.Send(ctx, &event.Event{
+		Data: map[string]any{"bad": false},
+		Name: evtName,
+	})
+	r.NoError(err)
+	r.EventuallyWithT(func(ct *assert.CollectT) {
+		a := assert.New(ct)
+		a.EqualValues(len(badEvents)+1, atomic.LoadInt32(&counter))
+	}, 10*time.Second, 100*time.Millisecond)
+
+	// Arbitrary sleep to ensure all the waitForEvents are processed.
+	<-time.After(time.Second)
+
+	// Send an event that should match the valid expression.
+	_, err = inngestgo.Send(ctx, &event.Event{
+		Data: map[string]any{"name": "Alice"},
+		Name: "match-event",
+	})
+	r.NoError(err)
+
+	// Ensure we made it past the waitForEvent in the valid expression function
+	// run.
+	r.EventuallyWithT(func(ct *assert.CollectT) {
+		a := assert.New(ct)
+		a.True(done)
+	}, 5*time.Second, 100*time.Millisecond)
+}

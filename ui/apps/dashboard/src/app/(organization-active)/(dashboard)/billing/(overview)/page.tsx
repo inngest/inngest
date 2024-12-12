@@ -25,7 +25,7 @@ export default async function Page() {
         ? 'Additional usage incurred at additional charge.'
         : ''
     }`,
-    current: entitlementUsage.runCount.current || 0,
+    current: entitlementUsage.runCount.usage || 0,
     limit: entitlementUsage.runCount.limit || null,
     overageAllowed: entitlementUsage.runCount.overageAllowed,
   };
@@ -37,7 +37,7 @@ export default async function Page() {
         ? 'Additional usage incurred at additional charge. Additional runs include 5 steps per run.'
         : ''
     }`,
-    current: entitlementUsage.stepCount.current || 0,
+    current: entitlementUsage.stepCount.usage || 0,
     limit: entitlementUsage.stepCount.limit || null,
     overageAllowed: entitlementUsage.stepCount.overageAllowed,
   };

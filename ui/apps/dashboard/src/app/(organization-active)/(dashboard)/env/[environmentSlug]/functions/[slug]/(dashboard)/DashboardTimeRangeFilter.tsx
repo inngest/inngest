@@ -1,14 +1,11 @@
 import { Fragment } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
+import { Pill } from '@inngest/components/Pill/Pill';
 import { RiArrowDownSLine } from '@remixicon/react';
 import dayjs from 'dayjs';
 import { useQuery } from 'urql';
 
-import {
-  getMinimumPlanForLogRetention,
-  transformPlans,
-  type TimeRange,
-} from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
+import { type TimeRange } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
 import { graphql } from '@/gql';
 
 const currentTime = new Date();
@@ -67,19 +64,14 @@ export function getTimeRangeByKey(key: string): TimeRange | undefined {
   return timeRanges.find((timeRange) => timeRange.key === key);
 }
 
-const GetBillingPlanDocument = graphql(`
-  query GetBillingPlan {
+const GetAccountEntitlementsDocument = graphql(`
+  query GetAccountEntitlements {
     account {
-      plan {
-        id
-        name
-        features
+      entitlements {
+        history {
+          limit
+        }
       }
-    }
-
-    plans {
-      name
-      features
     }
   }
 `);
@@ -95,20 +87,10 @@ export default function DashboardTimeRangeFilter({
   onTimeRangeChange,
 }: DashboardTimeRangeFilterProps) {
   const [{ data }] = useQuery({
-    query: GetBillingPlanDocument,
+    query: GetAccountEntitlementsDocument,
   });
 
-  // Since "features" is a map, we can't be 100% sure that there's a log
-  // retention value. So default to 7 days.
-  let logRetention = 7;
-  if (typeof data?.account.plan?.features.log_retention === 'number') {
-    logRetention = data.account.plan.features.log_retention;
-  }
-
-  let plans: ReturnType<typeof transformPlans> | undefined;
-  if (data?.plans) {
-    plans = transformPlans(data.plans);
-  }
+  const logRetention = data?.account.entitlements.history.limit || 7;
 
   return (
     <Listbox value={selectedTimeRange} onChange={onTimeRangeChange}>
@@ -136,10 +118,6 @@ export default function DashboardTimeRangeFilter({
                   );
 
                   const isPlanSufficient = timeRangeStartInDaysAgo <= logRetention;
-                  let minimumPlanName: string | undefined = undefined;
-                  if (plans) {
-                    minimumPlanName = getMinimumPlanForLogRetention(plans, timeRangeStartInDaysAgo);
-                  }
 
                   return (
                     <Listbox.Option
@@ -149,10 +127,10 @@ export default function DashboardTimeRangeFilter({
                       disabled={!isPlanSufficient}
                     >
                       {getTimeRangeLabel(timeRange)}{' '}
-                      {!isPlanSufficient && minimumPlanName && (
-                        <span className="inline-flex items-center rounded px-[5px] py-0.5 text-[12px] font-semibold leading-tight text-indigo-500 ring-1 ring-inset ring-indigo-300">
-                          {minimumPlanName} Plan
-                        </span>
+                      {!isPlanSufficient && (
+                        <Pill kind="primary" appearance="outlined">
+                          Upgrade Plan
+                        </Pill>
                       )}
                     </Listbox.Option>
                   );

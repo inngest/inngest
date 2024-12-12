@@ -12,18 +12,27 @@ export const entitlementUsageDocument = graphql(`
   query EntitlementUsage {
     account {
       id
-      entitlementUsage {
+      entitlements {
         runCount {
-          current
+          usage
           limit
           overageAllowed
         }
         stepCount {
-          current
+          usage
           limit
           overageAllowed
         }
-        accountConcurrencyLimitHits
+        concurrency {
+          usage
+          limit
+        }
+        eventSize {
+          limit
+        }
+        userCount {
+          limit
+        }
       }
       plan {
         name
@@ -41,7 +50,7 @@ export const entitlementUsage = async () => {
     const isCustomPlan = (res.account.plan?.name ?? '').toLowerCase().includes('enterprise');
 
     return {
-      ...res.account.entitlementUsage,
+      ...res.account.entitlements,
       isCustomPlan,
     };
   } catch (error) {
