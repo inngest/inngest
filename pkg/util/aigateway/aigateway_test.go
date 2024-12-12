@@ -2,5 +2,5 @@ package aigateway
 
 import "testing"
 
-func TestParse(t *testing.T) {
+func TestParseInput(t *testing.T) {
 }

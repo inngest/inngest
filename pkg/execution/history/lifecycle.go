@@ -459,7 +459,7 @@ func (l lifecycle) OnStepGatewayRequestFinished(
 	*http.Response,
 	error,
 ) {
-	// XXX: The tracing lifecycle has taken place over
+	// XXX: The tracing lifecycle has taken place over this, and this is not used.
 }
 
 func (l lifecycle) OnWaitForEvent(
