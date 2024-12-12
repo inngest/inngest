@@ -19,6 +19,7 @@ export default async function Page() {
   const plan = await getCurrentPlan();
   const billing = await getBillingDetails();
 
+  const legacyNoRunsPlan = entitlementUsage.runCount.limit === null;
   const runs: Data = {
     title: 'Runs',
     description: `A single durable function execution. ${
@@ -34,8 +35,10 @@ export default async function Page() {
   const steps: Data = {
     title: 'Steps',
     description: `An individual step in durable functions. ${
-      entitlementUsage.runCount.overageAllowed
+      entitlementUsage.runCount.overageAllowed && !legacyNoRunsPlan
         ? 'Additional usage incurred at additional charge. Additional runs include 5 steps per run.'
+        : entitlementUsage.runCount.overageAllowed
+        ? 'Additional usage incurred at additional charge.'
         : ''
     }`,
     current: entitlementUsage.stepCount.usage || 0,
@@ -82,7 +85,7 @@ export default async function Page() {
               href={pathCreator.billing({ tab: 'plans', ref: 'app-billing-page-overview' })}
             />
           </div>
-          {entitlementUsage.runCount.limit !== null && <LimitBar data={runs} className="my-4" />}
+          {!legacyNoRunsPlan && <LimitBar data={runs} className="my-4" />}
           <LimitBar data={steps} className="mb-6" />
           <div className="border-subtle mb-6 border" />
           <AddOn
