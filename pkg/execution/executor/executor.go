@@ -925,6 +925,8 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 
 				return nil
 			}
+
+			return fmt.Errorf("error handling generator response: %w", serr)
 		}
 	}
 
@@ -970,20 +972,17 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		//
 		// TODO: Improve this.
 
-		// Check if this step permanently failed.  If so, the function is a failure.
-		if !i.resp.Retryable() {
-			// TODO: Refactor state input
-			if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
-				l.Error("error running finish handler", "error", err)
-			}
-
-			// Can be reached multiple times for parallel discovery steps
-			for _, e := range e.lifecycles {
-				go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
-			}
-
-			return i.resp
+		// TODO: Refactor state input
+		if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
+			l.Error("error running finish handler", "error", err)
 		}
+
+		// Can be reached multiple times for parallel discovery steps
+		for _, e := range e.lifecycles {
+			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
+		}
+
+		return i.resp
 	}
 
 	if i.resp.IsFunctionResult() {
