@@ -61,14 +61,7 @@ export default function FilterEvents({ keyID, filter }: FilterEventsProps) {
 
   function handleCodeChange(name: 'events' | 'ips', code: string) {
     const trimmedValue = code.trim();
-    const nextValueEmpty = { ...newFilter, [name]: null };
     const nextValueFull = { ...newFilter, [name]: trimmedValue.split('\n') };
-
-    if (trimmedValue === '') {
-      setNewFilter(nextValueEmpty);
-      validateSubmit(nextValueEmpty);
-      return;
-    }
 
     setNewFilter(nextValueFull);
     validateSubmit(nextValueFull);
