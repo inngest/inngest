@@ -133,8 +133,18 @@ function CheckoutForm({ items, onSuccess }: { items: CheckoutItem[]; onSuccess: 
         <PaymentElement />
       </div>
       <Alert severity="info" className="text-sm">
-        All subscriptions are billed on the first of each month. You will be charged a pro-rated
-        amount today for the remainder of the month.
+        <p>Subscriptions are billed on the 1st of each month.</p>
+        <ul className="list-inside list-disc">
+          <li>
+            When upgrading, you will be charged a prorated amount for the remaining days of the
+            month based on the new plan.
+          </li>
+          <li>
+            If you switch from one paid plan to another, you will be reimbursed for any unused time
+            from your previous plan, calculated on a prorated basis.
+          </li>
+          <li>Additional usage is calculated and billed at the end of the month.</li>
+        </ul>
       </Alert>
       <div className="mt-6 flex flex-row justify-end">
         <NewButton
