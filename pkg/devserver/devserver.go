@@ -21,6 +21,7 @@ import (
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/connect"
 	pubsub2 "github.com/inngest/inngest/pkg/connect/pubsub"
+	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
 	connstate "github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi"
@@ -408,6 +409,11 @@ func start(ctx context.Context, opts StartOpts) error {
 		EventHandler:  ds.HandleEvent,
 		Executor:      ds.Executor,
 		HistoryReader: memory_reader.NewReader(),
+		ConnectOpts: connectv0.Opts{
+			ConnectManager: connectionManager,
+			GroupManager:   connectionManager,
+			Dev:            true,
+		},
 	})
 	if err != nil {
 		return err
