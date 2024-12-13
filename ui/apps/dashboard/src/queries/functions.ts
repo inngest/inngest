@@ -25,6 +25,18 @@ const GetFunctionsUsageDocument = graphql(`
               count
             }
           }
+          dailyCompleted: usage(opts: { period: "hour", range: "day" }, event: "completed") {
+            total
+            data {
+              count
+            }
+          }
+          dailyCancelled: usage(opts: { period: "hour", range: "day" }, event: "cancelled") {
+            total
+            data {
+              count
+            }
+          }
           dailyFailures: usage(opts: { period: "hour", range: "day" }, event: "errored") {
             total
             data {
@@ -233,6 +245,22 @@ const GetFunctionUsageDocument = graphql(`
             count
           }
         }
+        dailyCancelled: usage(opts: { from: $startTime, to: $endTime }, event: "cancelled") {
+          period
+          total
+          data {
+            slot
+            count
+          }
+        }
+        dailyCompleted: usage(opts: { from: $startTime, to: $endTime }, event: "completed") {
+          period
+          total
+          data {
+            slot
+            count
+          }
+        }
         dailyFailures: usage(opts: { from: $startTime, to: $endTime }, event: "errored") {
           period
           total
@@ -275,14 +303,14 @@ export async function getFunctionUsagesPage(args: {
     ...res,
     data: {
       functions: res.data.workspace.workflows.data.map((fn) => {
-        const dailyStartCount = fn.dailyStarts.total;
         const dailyFailureCount = fn.dailyFailures.total;
+        const dailyFinishedCount =
+          fn.dailyCompleted.total + fn.dailyCancelled.total + dailyFailureCount;
 
         // Calculates the daily failure rate percentage and rounds it up to 2 decimal places
-        const failureRate =
-          dailyStartCount === 0
-            ? 0
-            : Math.round((dailyFailureCount / dailyStartCount) * 10000) / 100;
+        const failureRate = dailyFinishedCount
+          ? Math.round((dailyFailureCount / dailyFinishedCount) * 10000) / 100
+          : 0;
 
         // Creates an array of objects containing the start and failure count for each usage slot (1 hour)
         const slots = fn.dailyStarts.data.map((usageSlot, index) => ({
@@ -292,7 +320,7 @@ export async function getFunctionUsagesPage(args: {
 
         const usage = {
           slots,
-          total: dailyStartCount,
+          total: dailyFinishedCount,
         };
 
         return {
@@ -341,16 +369,22 @@ export const useFunctionUsage = ({
 
   // Combine usage arrays into single array
   let usage: UsageItem[] = [];
-  const starts = data?.workspace.workflow?.dailyStarts;
-  const failures = data?.workspace.workflow?.dailyFailures;
-  if (starts && failures) {
-    usage = starts.data.map((d, idx) => {
-      const failureCount = failures.data[idx]?.count || 0;
+
+  const completed = data?.workspace.workflow?.dailyCompleted;
+  const cancelled = data?.workspace.workflow?.dailyCancelled;
+  const failed = data?.workspace.workflow?.dailyFailures;
+
+  if (completed && cancelled && failed) {
+    usage = completed.data.map((d, idx) => {
+      const failureCount = failed.data[idx]?.count || 0;
+      const finishedCount =
+        (completed.data[idx]?.count || 0) + (cancelled.data[idx]?.count || 0) + failureCount;
+
       return {
         name: d.slot,
         values: {
-          totalRuns: d.count,
-          successes: d.count - failureCount,
+          totalRuns: finishedCount,
+          successes: finishedCount - failureCount,
           failures: failureCount,
         },
       };
