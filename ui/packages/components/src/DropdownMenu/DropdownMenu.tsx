@@ -22,7 +22,7 @@ export const DropdownMenuContent = forwardRef<
         align="start"
         sideOffset={props.sideOffset ?? 14}
         className={cn(
-          'shadow-outline-primary-light min-w-[220px] rounded-md bg-white p-2 dark:bg-slate-700',
+          'shadow-outline-primary-light bg-canvasBase min-w-[220px] rounded-md p-2',
           props.className
         )}
       >
@@ -43,7 +43,7 @@ export const DropdownMenuItem = forwardRef<
       {...props}
       ref={forwardedRef}
       className={cn(
-        'flex select-none items-center gap-2 rounded-md p-2 text-sm text-slate-700 hover:bg-slate-100',
+        'text-basis hover:bg-canvasMuted flex select-none items-center gap-2 rounded-md p-2 text-sm',
         props.className
       )}
     >
