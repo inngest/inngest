@@ -4,6 +4,7 @@ import { Button } from '@inngest/components/Button';
 import { CodeLine } from '@inngest/components/CodeLine';
 import { Link } from '@inngest/components/Link/Link';
 import { AlertModal } from '@inngest/components/Modal';
+import useDebounce from '@inngest/components/hooks/useDebounce';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { IconStatusCancelled } from '@inngest/components/icons/status/Cancelled';
 import { IconStatusCompleted } from '@inngest/components/icons/status/Completed';
@@ -13,7 +14,6 @@ import { RiArrowDownSLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
 import AppCardHeader from '@/components/App/AppCardHeader';
-import useDebounce from '@/hooks/useDebounce';
 import {
   useDeleteAppMutation,
   useUpdateAppMutation,
