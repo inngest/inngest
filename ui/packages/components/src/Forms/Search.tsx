@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { forwardRef } from 'react';
 import { RiCloseFill, RiSearchLine } from '@remixicon/react';
 
 import { cn } from '../utils/classNames';
@@ -18,7 +18,7 @@ export const Search = forwardRef<HTMLInputElement, SearchProps>(
     }
     return (
       <div className="relative">
-        <RiSearchLine className="absolute bottom-0 left-2 top-0 my-auto h-4 w-4 text-[rgb(var(--color-border-muted))]" />
+        <RiSearchLine className="text-muted absolute bottom-0 left-2 top-0 my-auto h-4 w-4" />
         <Input
           ref={ref}
           type="search"
@@ -32,7 +32,7 @@ export const Search = forwardRef<HTMLInputElement, SearchProps>(
         />
         <button
           className={cn(
-            'absolute bottom-0 right-2 top-0 my-auto text-[rgb(var(--color-border-muted))] hover:text-[rgb(var(--color-border-contrast))]',
+            'text-muted hover:text-basis absolute bottom-0 right-2 top-0 my-auto',
             value.length ? 'block' : 'hidden'
           )}
           onClick={clearInput}
