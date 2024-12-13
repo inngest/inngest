@@ -12,7 +12,7 @@ export function useFeatureFlags() {
   useEffect(() => {
     async function fetchFeatureFlags() {
       try {
-        const response = await fetch('http://localhost:8288/dev');
+        const response = await fetch(createDevServerURL('/dev'));
         if (!response.ok) {
           throw new Error('Failed to fetch feature flags');
         }
@@ -29,4 +29,16 @@ export function useFeatureFlags() {
   }, []);
 
   return { featureFlags, loading, error };
+}
+
+/**
+ * Creates a Dev Server URL from a path. If Dev Server host is unknown, it
+ * returns the path.
+ */
+function createDevServerURL(path: string) {
+  const host = process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (!host) {
+    return path;
+  }
+  return new URL(path, host).toString();
 }

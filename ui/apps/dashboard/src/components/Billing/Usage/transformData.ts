@@ -1,6 +1,5 @@
 import { type ChartProps } from '@inngest/components/Chart/Chart';
 import { resolveColor } from '@inngest/components/utils/colors';
-import { format } from '@inngest/components/utils/date';
 import { isDark } from '@inngest/components/utils/theme';
 import resolveConfig from 'tailwindcss/resolveConfig';
 
@@ -124,7 +123,10 @@ export function createChartOptions(
         margin: 10,
         interval: 1, // Show day 1, 3, 5...
         formatter: function (value: string) {
-          return format(new Date(value), 'do'); // Show days as ordinal numbers
+          const day = new Date(value).getUTCDate(); // Extract day in UTC
+          const suffixes = ['th', 'st', 'nd', 'rd'];
+          const suffix = suffixes[day % 10 <= 3 && Math.floor(day / 10) !== 1 ? day % 10 : 0];
+          return `${day}${suffix}`;
         },
       },
     },

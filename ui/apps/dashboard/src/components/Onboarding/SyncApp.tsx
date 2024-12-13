@@ -181,7 +181,7 @@ export default function SyncApp() {
             onChange={(e) => setInputValue(e.target.value)}
           />
           {app && (
-            <div className="border-subtle flex items-center justify-between rounded-md border p-3">
+            <div className="border-subtle mb-4 flex items-center justify-between rounded-md border p-3">
               <div className="flex items-center gap-1.5">
                 <div className="bg-contrast border-muted flex h-9 w-9 items-center justify-center rounded border">
                   <AppsIcon className="text-onContrast h-4 w-4" />

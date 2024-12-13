@@ -37,7 +37,7 @@ export default async function EventLayout({
             children: 'Logs',
           },
         ]}
-        action={<SendEventButton eventName={eventName} newIANav={true} />}
+        action={<SendEventButton eventName={eventName} />}
       />
 
       {children}

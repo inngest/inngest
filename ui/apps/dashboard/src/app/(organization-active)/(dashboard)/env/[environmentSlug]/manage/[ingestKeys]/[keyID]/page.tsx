@@ -95,7 +95,7 @@ export default function Keys({ params: { ingestKeys, keyID } }: KeyDetailsProps)
   }
 
   return (
-    <div className="m-6 divide-y divide-slate-100">
+    <div className="divide-subtle m-6 divide-y">
       <Provider initialState={key}>
         <div className="pb-8">
           <div className="mb-8 flex items-center gap-1">
@@ -132,7 +132,7 @@ export default function Keys({ params: { ingestKeys, keyID } }: KeyDetailsProps)
               onClose={() => setIsEditKeyNameModalVisible(false)}
             />
             {key.source === SOURCE_INTEGRATION && (
-              <span className="ml-8 text-sm text-slate-400">Created via integration</span>
+              <span className="text-subtle ml-8 text-sm">Created via integration</span>
             )}
           </div>
           <div className="w-3/5">
