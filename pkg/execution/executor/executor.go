@@ -887,6 +887,10 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		"workflow_id", i.md.ID.FunctionID.String(),
 	)
 
+	for _, e := range e.lifecycles {
+		go e.OnStepFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, i.resp, nil)
+	}
+
 	if i.resp.Err == nil && !i.resp.IsFunctionResult() {
 		// Handle generator responses then return.
 		if serr := e.HandleGeneratorResponse(ctx, i, i.resp); serr != nil {
@@ -909,10 +913,6 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 					i.resp.Generator = []*state.GeneratorOpcode{}
 				}
 
-				for _, e := range e.lifecycles {
-					go e.OnStepFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, i.resp, serr)
-				}
-
 				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
 					l.Error("error running finish handler", "error", err)
 				}
@@ -925,22 +925,8 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 				return nil
 			}
 
-			for _, e := range e.lifecycles {
-				go e.OnStepFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, i.resp, serr)
-			}
-
 			return fmt.Errorf("error handling generator response: %w", serr)
 		}
-	}
-
-	for _, e := range e.lifecycles {
-		// OnStepFinished handles step success and step errors/failures.  It is
-		// currently the responsibility of the lifecycle manager to handle the differing
-		// step statuses when a step finishes.
-		//
-		// TODO (tonyhb): This should probably change, as each lifecycle listener has to
-		// do the same parsing & conditional checks.
-		go e.OnStepFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, i.resp, nil)
 	}
 
 	// Check for temporary failures.  The outputs of transient errors are not
