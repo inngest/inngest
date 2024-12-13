@@ -30,6 +30,9 @@ export const entitlementUsageDocument = graphql(`
         eventSize {
           limit
         }
+        history {
+          limit
+        }
         userCount {
           limit
         }

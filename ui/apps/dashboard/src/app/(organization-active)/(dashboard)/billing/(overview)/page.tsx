@@ -2,6 +2,7 @@ import { Alert } from '@inngest/components/Alert/Alert';
 import { NewButton } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
 
+import AddOn from '@/components/Billing/Addons/AddonListItem';
 import BillingInformation from '@/components/Billing/BillingDetails/BillingInformation';
 import PaymentMethod from '@/components/Billing/BillingDetails/PaymentMethod';
 import { LimitBar, type Data } from '@/components/Billing/LimitBar';
@@ -18,6 +19,7 @@ export default async function Page() {
   const plan = await getCurrentPlan();
   const billing = await getBillingDetails();
 
+  const legacyNoRunsPlan = entitlementUsage.runCount.limit === null;
   const runs: Data = {
     title: 'Runs',
     description: `A single durable function execution. ${
@@ -33,8 +35,10 @@ export default async function Page() {
   const steps: Data = {
     title: 'Steps',
     description: `An individual step in durable functions. ${
-      entitlementUsage.runCount.overageAllowed
+      entitlementUsage.runCount.overageAllowed && !legacyNoRunsPlan
         ? 'Additional usage incurred at additional charge. Additional runs include 5 steps per run.'
+        : entitlementUsage.runCount.overageAllowed
+        ? 'Additional usage incurred at additional charge.'
         : ''
     }`,
     current: entitlementUsage.stepCount.usage || 0,
@@ -54,6 +58,23 @@ export default async function Page() {
   return (
     <div className="grid grid-cols-3 gap-4">
       <Card className="col-span-2">
+        {!overageAllowed && (
+          <Alert
+            severity="info"
+            className="flex items-center justify-between text-sm"
+            link={
+              <NewButton
+                appearance="outlined"
+                kind="secondary"
+                label="Upgrade plan"
+                href={pathCreator.billing({ tab: 'plans', ref: 'app-billing-page-overview' })}
+              />
+            }
+          >
+            For usage beyond the limits of this plan, upgrade to a new plan.
+          </Alert>
+        )}
+
         <Card.Content>
           <p className="text-muted mb-1">Your plan</p>
           <div className="flex items-center justify-between">
@@ -64,24 +85,39 @@ export default async function Page() {
               href={pathCreator.billing({ tab: 'plans', ref: 'app-billing-page-overview' })}
             />
           </div>
-          {entitlementUsage.runCount.limit !== null && <LimitBar data={runs} className="my-4" />}
+          {!legacyNoRunsPlan && <LimitBar data={runs} className="my-4" />}
           <LimitBar data={steps} className="mb-6" />
-          {!overageAllowed && (
-            <Alert
-              severity="info"
-              className="mb-6 flex items-center justify-between text-sm"
-              link={
-                <NewButton
-                  appearance="outlined"
-                  kind="secondary"
-                  label="Upgrade plan"
-                  href={pathCreator.billing({ tab: 'plans', ref: 'app-billing-page-overview' })}
-                />
-              }
-            >
-              For usage beyond the limits of this plan, upgrade to a new plan.
-            </Alert>
-          )}
+          <div className="border-subtle mb-6 border" />
+          <AddOn
+            title="Event Size"
+            value={
+              entitlementUsage.eventSize.limit >= 1024
+                ? `${(entitlementUsage.eventSize.limit / 1024).toFixed(2)} MB`
+                : `${entitlementUsage.eventSize.limit} KB`
+            }
+            canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
+            description="The maximum size for a single event"
+          />
+          <AddOn
+            title="Concurrency"
+            value={entitlementUsage.concurrency.limit}
+            canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
+            description="Maximum concurrently executing steps"
+            tooltipContent="Functions actively sleeping and waiting for events are not counted"
+          />
+          <AddOn
+            title="Log history"
+            value={`${entitlementUsage.history.limit} day${
+              entitlementUsage.history.limit === 1 ? '' : 's'
+            }`}
+            canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
+            description="View and search function run traces and metrics"
+          />
+          <AddOn
+            title="Dedicated execution capacity"
+            canIncreaseLimitInCurrentPlan
+            description="Dedicated infrastructure for the lowest latency and highest throughput"
+          />
           <div className="flex flex-col items-center gap-2">
             <p>Custom needs?</p>
             <NewButton
