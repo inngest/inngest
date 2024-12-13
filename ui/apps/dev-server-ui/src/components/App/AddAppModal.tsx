@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal';
+import useDebounce from '@inngest/components/hooks/useDebounce';
 import { RiErrorWarningLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
 import Input from '@/components/Form/Input';
-import useDebounce from '@/hooks/useDebounce';
 import { useCreateAppMutation } from '@/store/generated';
 import isValidUrl from '@/utils/urlValidation';
 

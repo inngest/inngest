@@ -9,6 +9,7 @@ import { InvokeButton } from '@inngest/components/InvokeButton';
 import { NewLink } from '@inngest/components/Link/Link';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { Table } from '@inngest/components/Table';
+import useDebounce from '@inngest/components/hooks/useDebounce';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import {
   createColumnHelper,
@@ -21,7 +22,6 @@ import { toast } from 'sonner';
 
 import SearchInput from '@/components/SearchInput/SearchInput';
 import Skeleton from '@/components/Skeleton';
-import useDebounce from '@/hooks/useDebounce';
 import {
   FunctionTriggerTypes,
   useGetFunctionsQuery,
