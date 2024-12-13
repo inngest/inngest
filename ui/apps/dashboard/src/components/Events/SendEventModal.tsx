@@ -277,11 +277,11 @@ export function SendEventModal({
               <Tab.Panel
                 key={tabLabel}
                 as="form"
-                className="rounded-md bg-slate-900"
+                className="border-subtle text-basis rounded-md border"
                 onSubmit={submitAction}
               >
-                <header className="bg bg-slate-910 flex items-center justify-between rounded-t-md p-2">
-                  <h3 className="px-2 text-white">{tabTitle}</h3>
+                <header className="flex items-center justify-between rounded-t-md p-2">
+                  <h3 className="px-2">{tabTitle}</h3>
                   <NewButton
                     type="submit"
                     disabled={!submitButtonEnabled}
@@ -289,12 +289,12 @@ export function SendEventModal({
                     kind="primary"
                   />
                 </header>
-                <div className="w-full overflow-auto p-4">
+                <div className="bg-codeEditor w-full overflow-auto rounded-b-md p-4">
                   <CodeEditor
                     language={codeLanguage}
                     initialCode={initialCode}
                     name="code"
-                    className="h-80 w-[640px] bg-slate-900"
+                    className="h-80 w-[640px]"
                     onCodeChange={serializeData}
                   />
                 </div>

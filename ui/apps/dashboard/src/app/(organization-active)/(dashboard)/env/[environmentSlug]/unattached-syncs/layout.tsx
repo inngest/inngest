@@ -7,7 +7,7 @@ export default function Layout({ children }: React.PropsWithChildren) {
     <>
       <Header breadcrumb={[{ text: 'Unattached Syncs', href: '/env' }]} />
 
-      <div className="no-scrollbar overflow-y-scroll p-6">{children}</div>
+      <div className="no-scrollbar h-full overflow-y-scroll">{children}</div>
     </>
   );
 }

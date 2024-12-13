@@ -89,6 +89,9 @@ export default {
       outlineColor: {
         error: 'rgb(var(--color-border-error) / <alpha-value>)',
       },
+      divideColor: {
+        subtle: 'rgb(var(--color-border-subtle) / <alpha-value>)',
+      },
       backgroundColor: {
         canvasBase: 'rgb(var(--color-background-canvas-base) / <alpha-value>)',
         canvasSubtle: 'rgb(var(--color-background-canvas-subtle) / <alpha-value>)',
@@ -146,6 +149,9 @@ export default {
         codeKeyword: 'rgb(var(--color-foreground-code-keyword) / <alpha-value>)',
         codeEntityNameFunction:
           'rgb(var(--color-foreground-code-entityNameFunction) / <alpha-value>)',
+      },
+      caretColor: {
+        basis: 'rgb(var(--color-foreground-base) / <alpha-value>)',
       },
       textDecorationColor: {
         link: 'rgb(var(--color-foreground-link) / <alpha-value>)',
