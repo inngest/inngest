@@ -424,6 +424,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		}),
 		connect.WithAppLoader(dbcqrs),
 		connect.WithDev(),
+		connect.WithGatewayPublicPort(8289),
 	)
 	connRouter := connect.NewConnectMessageRouterService(connectionManager, gatewayProxy)
 

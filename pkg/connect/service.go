@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -67,6 +66,7 @@ func (c *connectionCounter) Wait() {
 
 type connectGatewaySvc struct {
 	maintenanceApiPort *int
+	gatewayPublicPort  int
 
 	gatewayRoutes  chi.Router
 	maintenanceApi chi.Router
@@ -160,11 +160,18 @@ func WithStartAsDraining(isDraining bool) gatewayOpt {
 	}
 }
 
+func WithGatewayPublicPort(port int) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.gatewayPublicPort = port
+	}
+}
+
 func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 	gateway := &connectGatewaySvc{
-		gatewayId:     ulid.MustNew(ulid.Now(), rand.Reader).String(),
-		lifecycles:    []ConnectGatewayLifecycleListener{},
-		drainListener: newDrainListener(),
+		gatewayId:         ulid.MustNew(ulid.Now(), rand.Reader).String(),
+		lifecycles:        []ConnectGatewayLifecycleListener{},
+		drainListener:     newDrainListener(),
+		gatewayPublicPort: 8080,
 	}
 
 	for _, opt := range opts {
@@ -239,11 +246,7 @@ func (c *connectGatewaySvc) heartbeat(ctx context.Context) {
 func (c *connectGatewaySvc) Run(ctx context.Context) error {
 	c.runCtx = ctx
 
-	port := 8289
-	if v, err := strconv.Atoi(os.Getenv("CONNECT_GATEWAY_API_PORT")); err == nil && v > 0 {
-		port = v
-	}
-	addr := fmt.Sprintf(":%d", port)
+	addr := fmt.Sprintf(":%d", c.gatewayPublicPort)
 	server := &http.Server{
 		Addr:    addr,
 		Handler: c.gatewayRoutes,
