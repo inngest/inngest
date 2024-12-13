@@ -65,8 +65,7 @@ func (c *connectionCounter) Wait() {
 }
 
 type connectGatewaySvc struct {
-	maintenanceApiPort *int
-	gatewayPublicPort  int
+	gatewayPublicPort int
 
 	gatewayRoutes  chi.Router
 	maintenanceApi chi.Router
@@ -178,6 +177,26 @@ func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 		opt(gateway)
 	}
 
+	readinessHandler := func(writer http.ResponseWriter, request *http.Request) {
+		if gateway.isDraining {
+			writer.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+
+		writer.WriteHeader(http.StatusOK)
+	}
+
+	gateway.gatewayRoutes = chi.NewRouter().Group(func(r chi.Router) {
+		// WebSocket endpoint
+		r.Handle("/connect", gateway.Handler())
+
+		// Readiness must be served to traffic port for load balancer health checks
+		r.Get("/ready", readinessHandler)
+	})
+
+	gateway.maintenanceApi = newMaintenanceApi(gateway)
+	gateway.maintenanceApi.Get("/ready", readinessHandler)
+
 	return gateway
 }
 
@@ -194,26 +213,6 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 		return fmt.Errorf("could not get hostname: %w", err)
 	}
 	c.hostname = hostname
-
-	readinessHandler := func(writer http.ResponseWriter, request *http.Request) {
-		if c.isDraining {
-			writer.WriteHeader(http.StatusServiceUnavailable)
-			return
-		}
-
-		writer.WriteHeader(http.StatusOK)
-	}
-
-	c.gatewayRoutes = chi.NewRouter().Group(func(r chi.Router) {
-		// WebSocket endpoint
-		r.Handle("/connect", c.Handler())
-
-		// Readiness must be served to traffic port for load balancer health checks
-		r.Get("/ready", readinessHandler)
-	})
-
-	c.maintenanceApi = newMaintenanceApi(c)
-	c.maintenanceApi.Get("/ready", readinessHandler)
 
 	if err := c.updateGatewayState(state.GatewayStatusStarting); err != nil {
 		return fmt.Errorf("could not set initial gateway state: %w", err)
