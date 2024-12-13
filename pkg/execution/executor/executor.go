@@ -890,7 +890,6 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 	if i.resp.Err == nil && !i.resp.IsFunctionResult() {
 		// Handle generator responses then return.
 		if serr := e.HandleGeneratorResponse(ctx, i, i.resp); serr != nil {
-
 			// If this is an error compiling async expressions, fail the function.
 			shouldFailEarly := errors.Is(serr, &expressions.CompileError{}) || errors.Is(serr, state.ErrStateOverflowed) || errors.Is(serr, state.ErrFunctionOverflowed)
 
@@ -924,6 +923,10 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 				}
 
 				return nil
+			}
+
+			for _, e := range e.lifecycles {
+				go e.OnStepFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, i.resp, serr)
 			}
 
 			return fmt.Errorf("error handling generator response: %w", serr)
