@@ -88,10 +88,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			updateLock: sync.Mutex{},
 		}
 
-		c.connectionSema.Add(1)
+		c.connectionCount.Add()
 		defer func() {
 			// This is deferred so we always update the semaphore
-			defer c.connectionSema.Done()
+			defer c.connectionCount.Done()
 			ch.log.Debug("Closing WebSocket connection")
 
 			if c.isDraining {

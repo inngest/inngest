@@ -21,6 +21,7 @@ import (
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/connect"
 	pubsub2 "github.com/inngest/inngest/pkg/connect/pubsub"
+	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
 	connstate "github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi"
@@ -408,12 +409,17 @@ func start(ctx context.Context, opts StartOpts) error {
 		EventHandler:  ds.HandleEvent,
 		Executor:      ds.Executor,
 		HistoryReader: memory_reader.NewReader(),
+		ConnectOpts: connectv0.Opts{
+			ConnectManager: connectionManager,
+			GroupManager:   connectionManager,
+			Dev:            true,
+		},
 	})
 	if err != nil {
 		return err
 	}
 
-	connGateway, connRouter, connectHandler := connect.NewConnectGatewayService(
+	connGateway := connect.NewConnectGatewayService(
 		connect.WithConnectionStateManager(connectionManager),
 		connect.WithRequestReceiver(gatewayProxy),
 		connect.WithGatewayAuthHandler(func(ctx context.Context, data *connectproto.WorkerConnectRequestData) (*connect.AuthResponse, error) {
@@ -424,7 +430,9 @@ func start(ctx context.Context, opts StartOpts) error {
 		}),
 		connect.WithAppLoader(dbcqrs),
 		connect.WithDev(),
+		connect.WithGatewayPublicPort(8289),
 	)
+	connRouter := connect.NewConnectMessageRouterService(connectionManager, gatewayProxy)
 
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
@@ -438,7 +446,6 @@ func start(ctx context.Context, opts StartOpts) error {
 			{At: "/", Router: devAPI},
 			{At: "/v0", Router: core.Router},
 			{At: "/debug", Handler: middleware.Profiler()},
-			{At: "/connect", Handler: connectHandler},
 		},
 		LocalEventKeys: opts.EventKeys,
 	})

@@ -7,15 +7,13 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
-	apiv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/logger"
@@ -43,8 +41,34 @@ type ConnectAppLoader interface {
 	GetAppByName(ctx context.Context, envID uuid.UUID, name string) (*cqrs.App, error)
 }
 
+type connectionCounter struct {
+	count  uint64
+	waiter sync.WaitGroup
+}
+
+func (c *connectionCounter) Add() {
+	c.waiter.Add(1)
+	atomic.AddUint64(&c.count, 1)
+}
+
+func (c *connectionCounter) Done() {
+	atomic.AddUint64(&c.count, ^uint64(0))
+	c.waiter.Done()
+}
+
+func (c *connectionCounter) Count() uint64 {
+	return atomic.LoadUint64(&c.count)
+}
+
+func (c *connectionCounter) Wait() {
+	c.waiter.Wait()
+}
+
 type connectGatewaySvc struct {
-	chi.Router
+	gatewayPublicPort int
+
+	gatewayRoutes  chi.Router
+	maintenanceApi chi.Router
 
 	// gatewayId is a unique identifier, generated each time the service is started.
 	// This should be used to uniquely identify the gateway instance when sending messages and routing requests.
@@ -65,9 +89,21 @@ type connectGatewaySvc struct {
 	lifecycles []ConnectGatewayLifecycleListener
 
 	isDraining      bool
-	connectionSema  sync.WaitGroup
+	connectionCount connectionCounter
 	drainListener   *drainListener
 	stateUpdateLock sync.Mutex
+}
+
+func (c *connectGatewaySvc) MaintenanceAPI() http.Handler {
+	return c.maintenanceApi
+}
+
+func (c *connectGatewaySvc) IsDraining() bool {
+	return c.isDraining
+}
+
+func (c *connectGatewaySvc) IsDrained() bool {
+	return c.connectionCount.Count() == 0
 }
 
 type drainListener struct {
@@ -117,21 +153,62 @@ func WithDev() gatewayOpt {
 	}
 }
 
-func NewConnectGatewayService(opts ...gatewayOpt) (*connectGatewaySvc, *connectRouterSvc, http.Handler) {
+func WithStartAsDraining(isDraining bool) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.isDraining = isDraining
+	}
+}
+
+func WithGatewayPublicPort(port int) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.gatewayPublicPort = port
+	}
+}
+
+func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 	gateway := &connectGatewaySvc{
-		Router:        chi.NewRouter(),
-		gatewayId:     ulid.MustNew(ulid.Now(), rand.Reader).String(),
-		lifecycles:    []ConnectGatewayLifecycleListener{},
-		drainListener: newDrainListener(),
+		gatewayId:         ulid.MustNew(ulid.Now(), rand.Reader).String(),
+		lifecycles:        []ConnectGatewayLifecycleListener{},
+		drainListener:     newDrainListener(),
+		gatewayPublicPort: 8080,
 	}
 
 	for _, opt := range opts {
 		opt(gateway)
 	}
 
-	router := newConnectRouter(gateway.stateManager, gateway.receiver)
+	readinessHandler := func(writer http.ResponseWriter, request *http.Request) {
+		if gateway.isDraining {
+			writer.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
 
-	return gateway, router, gateway.Handler()
+		writer.WriteHeader(http.StatusOK)
+	}
+
+	gateway.gatewayRoutes = chi.NewRouter().Group(func(r chi.Router) {
+		// This is the v0 gateway connect API, which exposes the connect WebSocket endpoint handler
+		v0Router := chi.NewRouter()
+
+		// WebSocket endpoint
+		v0Router.Handle("/connect", gateway.Handler())
+
+		// Debug endpoint
+		v0Router.Get("/", func(writer http.ResponseWriter, request *http.Request) {
+			writer.WriteHeader(http.StatusOK)
+			_, _ = writer.Write([]byte("."))
+		})
+
+		r.Mount("/v0", v0Router)
+
+		// Readiness must be served to traffic port for load balancer health checks
+		r.Get("/ready", readinessHandler)
+	})
+
+	gateway.maintenanceApi = newMaintenanceApi(gateway)
+	gateway.maintenanceApi.Get("/ready", readinessHandler)
+
+	return gateway
 }
 
 func (c *connectGatewaySvc) Name() string {
@@ -147,17 +224,6 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 		return fmt.Errorf("could not get hostname: %w", err)
 	}
 	c.hostname = hostname
-
-	// Setup REST endpoint
-	c.Use(
-		middleware.Heartbeat("/health"),
-	)
-	c.Mount("/v0", apiv0.New(c, apiv0.Opts{
-		ConnectManager:     c.stateManager,
-		GroupManager:       c.stateManager,
-		Dev:                c.dev,
-		GatewayMaintenance: c,
-	}))
 
 	if err := c.updateGatewayState(state.GatewayStatusStarting); err != nil {
 		return fmt.Errorf("could not set initial gateway state: %w", err)
@@ -190,14 +256,10 @@ func (c *connectGatewaySvc) heartbeat(ctx context.Context) {
 func (c *connectGatewaySvc) Run(ctx context.Context) error {
 	c.runCtx = ctx
 
-	port := 8289
-	if v, err := strconv.Atoi(os.Getenv("CONNECT_GATEWAY_API_PORT")); err == nil && v > 0 {
-		port = v
-	}
-	addr := fmt.Sprintf(":%d", port)
+	addr := fmt.Sprintf(":%d", c.gatewayPublicPort)
 	server := &http.Server{
 		Addr:    addr,
-		Handler: c,
+		Handler: c.gatewayRoutes,
 	}
 
 	go func() {
@@ -211,7 +273,7 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 		}
 
 		c.logger.Info("waiting for connections to drain")
-		c.connectionSema.Wait()
+		c.connectionCount.Wait()
 		c.logger.Info("shutting down gateway api")
 		_ = server.Shutdown(ctx)
 	}()
@@ -235,9 +297,11 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 		return nil
 	})
 
-	err := c.updateGatewayState(state.GatewayStatusActive)
-	if err != nil {
-		return fmt.Errorf("could not update gateway state: %w", err)
+	if !c.isDraining {
+		err := c.updateGatewayState(state.GatewayStatusActive)
+		if err != nil {
+			return fmt.Errorf("could not update gateway state: %w", err)
+		}
 	}
 
 	// Periodically report current status
