@@ -10,7 +10,7 @@ import (
 type Opts struct {
 	ConnectManager state.ConnectionManager
 	GroupManager   state.WorkerGroupManager
- 
+
 	Dev bool
 }
 
@@ -19,6 +19,9 @@ type router struct {
 	Opts
 }
 
+// New creates a v0 connect REST API, which exposes connection states, history, and more.
+// This does not include the actual connect endpoint, nor does it include internal operations
+// for rolling out the connect gateway service.
 func New(r chi.Router, opts Opts) *router {
 	api := &router{
 		Router: r,

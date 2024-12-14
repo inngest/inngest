@@ -89,7 +89,7 @@ func NewSDKConnectHandler(t *testing.T, appID string, hopts ...opt) inngestgo.Ha
 		RegisterURL: inngestgo.StrPtr(fmt.Sprintf("%s/fn/register", DEV_URL)),
 		Logger:      logger.StdlibLogger(context.Background()),
 		ConnectURLs: []string{
-			"ws://127.0.0.1:8289/connect",
+			"ws://127.0.0.1:8289/v0/connect",
 		},
 	}
 

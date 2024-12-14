@@ -187,8 +187,19 @@ func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 	}
 
 	gateway.gatewayRoutes = chi.NewRouter().Group(func(r chi.Router) {
+		// This is the v0 gateway connect API, which exposes the connect WebSocket endpoint handler
+		v0Router := chi.NewRouter()
+
 		// WebSocket endpoint
-		r.Handle("/connect", gateway.Handler())
+		v0Router.Handle("/connect", gateway.Handler())
+
+		// Debug endpoint
+		v0Router.Get("/", func(writer http.ResponseWriter, request *http.Request) {
+			writer.WriteHeader(http.StatusOK)
+			_, _ = writer.Write([]byte("."))
+		})
+
+		r.Mount("/v0", v0Router)
 
 		// Readiness must be served to traffic port for load balancer health checks
 		r.Get("/ready", readinessHandler)
