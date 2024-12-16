@@ -91,8 +91,8 @@ export default function Billing({
           }}
           disabled={legacyNoRunsPlan}
         >
-          {!legacyNoRunsPlan && <ToggleGroup.Item value="run">Run</ToggleGroup.Item>}
           <ToggleGroup.Item value="step">Step</ToggleGroup.Item>
+          {!legacyNoRunsPlan && !fetching && <ToggleGroup.Item value="run">Run</ToggleGroup.Item>}
         </ToggleGroup>
         <Select
           onChange={(value: Option) => {
