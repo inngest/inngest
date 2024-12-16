@@ -201,13 +201,13 @@ func (f RegisterRequest) Parse(ctx context.Context) ([]*inngest.Function, error)
 }
 
 func (f *RegisterRequest) normalize(forceHTTPS bool) error {
-	f.URL = util.NormalizeAppURL(f.URL, forceHTTPS)
+	f.URL = util.NormalizeAppURL(f.URL, forceHTTPS, f.DeployType == DeployTypeConnect)
 
 	for _, fn := range f.Functions {
 		for _, step := range fn.Steps {
 			if rawStepURL, ok := step.Runtime["url"]; ok {
 				if stepURL, ok := rawStepURL.(string); ok {
-					step.Runtime["url"] = util.NormalizeAppURL(stepURL, forceHTTPS)
+					step.Runtime["url"] = util.NormalizeAppURL(stepURL, forceHTTPS, f.DeployType == DeployTypeConnect)
 				}
 			}
 		}
