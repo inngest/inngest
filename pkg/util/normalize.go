@@ -9,7 +9,7 @@ import (
 
 // NormalizeAppURL normalizes localhost and 127.0.0.1 as the same string.  This
 // ensures that we don't add duplicate apps.
-func NormalizeAppURL(u string, forceHTTPS bool, isWebSocket bool) string {
+func NormalizeAppURL(u string, forceHTTPS bool) string {
 	parsed, err := url.Parse(u)
 	if err != nil {
 		return u
@@ -18,6 +18,7 @@ func NormalizeAppURL(u string, forceHTTPS bool, isWebSocket bool) string {
 	parsed = stripDeployID(*parsed)
 
 	if forceHTTPS {
+		isWebSocket := strings.HasPrefix(parsed.Scheme, "ws")
 		parsed.Scheme = "https"
 		if isWebSocket {
 			parsed.Scheme = "wss"
