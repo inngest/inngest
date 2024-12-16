@@ -81,6 +81,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
+		var closed bool
+
 		ch := &connectionHandler{
 			svc:        c,
 			log:        c.logger,
@@ -99,6 +101,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				return
 			}
 			_ = ws.CloseNow()
+			closed = true
 		}()
 
 		ch.log.Debug("WebSocket connection established, sending hello")
@@ -145,9 +148,17 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		defer notifyWorkerDrained()
 
 		go func() {
-			// If gateway is shutting down, we must immediately start the draining process
+			// This is call in two cases
+			// - Connection was closed by the worker, and we already ran all defer actions
+			// - Gateway is draining/shutting down and the parent context was canceled
 			<-ctx.Done()
 
+			// If the connection is already closed, we don't have to drain
+			if closed {
+				return
+			}
+
+			// If gateway is shutting down, we must immediately start the draining process
 			ch.log.Debug("context done, starting draining process")
 
 			// Prevent routing any more messages to this connection
@@ -271,7 +282,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				err := wsproto.Read(context.Background(), ws, &msg)
 				if err != nil {
 					// immediately stop routing messages to this connection
-					if err := ch.updateConnStatus(connect.ConnectionStatus_DRAINING); err != nil {
+					if err := ch.updateConnStatus(connect.ConnectionStatus_DISCONNECTING); err != nil {
 						ch.log.Error("could not update connection status after read error", "err", err)
 					}
 
