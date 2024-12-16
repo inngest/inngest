@@ -140,7 +140,7 @@ function CheckoutForm({ items, onSuccess }: { items: CheckoutItem[]; onSuccess: 
             month based on the new plan.
           </li>
           <li>
-            If you switch from one paid plan to another, you will be reimbursed for any unused time
+            If you switch from one paid plan to another, you will be credited for any unused time
             from your previous plan, calculated on a prorated basis.
           </li>
           <li>Additional usage is calculated and billed at the end of the month.</li>

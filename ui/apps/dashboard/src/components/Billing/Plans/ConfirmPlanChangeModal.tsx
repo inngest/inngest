@@ -83,7 +83,7 @@ export default function ConfirmPlanChangeModal({
                 <b>immediately</b>.
               </li>
               <li>
-                You will be reimbursed for any unused time from your current plan, calculated on a
+                You will be credited for any unused time from your current plan, calculated on a
                 prorated basis.
               </li>
             </ul>
@@ -99,7 +99,7 @@ export default function ConfirmPlanChangeModal({
                 <b>immediately</b>.
               </li>
               <li>
-                You will be reimbursed for any unused time from your current plan, calculated on a
+                You will be credited for any unused time from your current plan, calculated on a
                 prorated basis.
               </li>
             </ul>
