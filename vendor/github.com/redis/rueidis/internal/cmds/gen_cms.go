@@ -4,7 +4,7 @@ package cmds
 
 import "strconv"
 
-type CmsIncrby Completed
+type CmsIncrby Incomplete
 
 func (b Builder) CmsIncrby() (c CmsIncrby) {
 	c = CmsIncrby{cs: get(), ks: b.ks}
@@ -22,7 +22,7 @@ func (c CmsIncrby) Key(key string) CmsIncrbyKey {
 	return (CmsIncrbyKey)(c)
 }
 
-type CmsIncrbyItemsIncrement Completed
+type CmsIncrbyItemsIncrement Incomplete
 
 func (c CmsIncrbyItemsIncrement) Item(item string) CmsIncrbyItemsItem {
 	c.cs.s = append(c.cs.s, item)
@@ -31,27 +31,27 @@ func (c CmsIncrbyItemsIncrement) Item(item string) CmsIncrbyItemsItem {
 
 func (c CmsIncrbyItemsIncrement) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CmsIncrbyItemsItem Completed
+type CmsIncrbyItemsItem Incomplete
 
 func (c CmsIncrbyItemsItem) Increment(increment int64) CmsIncrbyItemsIncrement {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(increment, 10))
 	return (CmsIncrbyItemsIncrement)(c)
 }
 
-type CmsIncrbyKey Completed
+type CmsIncrbyKey Incomplete
 
 func (c CmsIncrbyKey) Item(item string) CmsIncrbyItemsItem {
 	c.cs.s = append(c.cs.s, item)
 	return (CmsIncrbyItemsItem)(c)
 }
 
-type CmsInfo Completed
+type CmsInfo Incomplete
 
 func (b Builder) CmsInfo() (c CmsInfo) {
-	c = CmsInfo{cs: get(), ks: b.ks, cf: readonly}
+	c = CmsInfo{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "CMS.INFO")
 	return c
 }
@@ -66,19 +66,19 @@ func (c CmsInfo) Key(key string) CmsInfoKey {
 	return (CmsInfoKey)(c)
 }
 
-type CmsInfoKey Completed
+type CmsInfoKey Incomplete
 
 func (c CmsInfoKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c CmsInfoKey) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CmsInitbydim Completed
+type CmsInitbydim Incomplete
 
 func (b Builder) CmsInitbydim() (c CmsInitbydim) {
 	c = CmsInitbydim{cs: get(), ks: b.ks}
@@ -96,28 +96,28 @@ func (c CmsInitbydim) Key(key string) CmsInitbydimKey {
 	return (CmsInitbydimKey)(c)
 }
 
-type CmsInitbydimDepth Completed
+type CmsInitbydimDepth Incomplete
 
 func (c CmsInitbydimDepth) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CmsInitbydimKey Completed
+type CmsInitbydimKey Incomplete
 
 func (c CmsInitbydimKey) Width(width int64) CmsInitbydimWidth {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(width, 10))
 	return (CmsInitbydimWidth)(c)
 }
 
-type CmsInitbydimWidth Completed
+type CmsInitbydimWidth Incomplete
 
 func (c CmsInitbydimWidth) Depth(depth int64) CmsInitbydimDepth {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(depth, 10))
 	return (CmsInitbydimDepth)(c)
 }
 
-type CmsInitbyprob Completed
+type CmsInitbyprob Incomplete
 
 func (b Builder) CmsInitbyprob() (c CmsInitbyprob) {
 	c = CmsInitbyprob{cs: get(), ks: b.ks}
@@ -135,28 +135,28 @@ func (c CmsInitbyprob) Key(key string) CmsInitbyprobKey {
 	return (CmsInitbyprobKey)(c)
 }
 
-type CmsInitbyprobError Completed
+type CmsInitbyprobError Incomplete
 
 func (c CmsInitbyprobError) Probability(probability float64) CmsInitbyprobProbability {
 	c.cs.s = append(c.cs.s, strconv.FormatFloat(probability, 'f', -1, 64))
 	return (CmsInitbyprobProbability)(c)
 }
 
-type CmsInitbyprobKey Completed
+type CmsInitbyprobKey Incomplete
 
 func (c CmsInitbyprobKey) Error(error float64) CmsInitbyprobError {
 	c.cs.s = append(c.cs.s, strconv.FormatFloat(error, 'f', -1, 64))
 	return (CmsInitbyprobError)(c)
 }
 
-type CmsInitbyprobProbability Completed
+type CmsInitbyprobProbability Incomplete
 
 func (c CmsInitbyprobProbability) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CmsMerge Completed
+type CmsMerge Incomplete
 
 func (b Builder) CmsMerge() (c CmsMerge) {
 	c = CmsMerge{cs: get(), ks: b.ks}
@@ -174,14 +174,14 @@ func (c CmsMerge) Destination(destination string) CmsMergeDestination {
 	return (CmsMergeDestination)(c)
 }
 
-type CmsMergeDestination Completed
+type CmsMergeDestination Incomplete
 
 func (c CmsMergeDestination) Numkeys(numkeys int64) CmsMergeNumkeys {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(numkeys, 10))
 	return (CmsMergeNumkeys)(c)
 }
 
-type CmsMergeNumkeys Completed
+type CmsMergeNumkeys Incomplete
 
 func (c CmsMergeNumkeys) Source(source ...string) CmsMergeSource {
 	if c.ks&NoSlot == NoSlot {
@@ -198,7 +198,7 @@ func (c CmsMergeNumkeys) Source(source ...string) CmsMergeSource {
 	return (CmsMergeSource)(c)
 }
 
-type CmsMergeSource Completed
+type CmsMergeSource Incomplete
 
 func (c CmsMergeSource) Source(source ...string) CmsMergeSource {
 	if c.ks&NoSlot == NoSlot {
@@ -222,10 +222,10 @@ func (c CmsMergeSource) Weights() CmsMergeWeightWeights {
 
 func (c CmsMergeSource) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CmsMergeWeightWeight Completed
+type CmsMergeWeightWeight Incomplete
 
 func (c CmsMergeWeightWeight) Weight(weight ...float64) CmsMergeWeightWeight {
 	for _, n := range weight {
@@ -236,10 +236,10 @@ func (c CmsMergeWeightWeight) Weight(weight ...float64) CmsMergeWeightWeight {
 
 func (c CmsMergeWeightWeight) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CmsMergeWeightWeights Completed
+type CmsMergeWeightWeights Incomplete
 
 func (c CmsMergeWeightWeights) Weight(weight ...float64) CmsMergeWeightWeight {
 	for _, n := range weight {
@@ -248,10 +248,10 @@ func (c CmsMergeWeightWeights) Weight(weight ...float64) CmsMergeWeightWeight {
 	return (CmsMergeWeightWeight)(c)
 }
 
-type CmsQuery Completed
+type CmsQuery Incomplete
 
 func (b Builder) CmsQuery() (c CmsQuery) {
-	c = CmsQuery{cs: get(), ks: b.ks, cf: readonly}
+	c = CmsQuery{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "CMS.QUERY")
 	return c
 }
@@ -266,7 +266,7 @@ func (c CmsQuery) Key(key string) CmsQueryKey {
 	return (CmsQueryKey)(c)
 }
 
-type CmsQueryItem Completed
+type CmsQueryItem Incomplete
 
 func (c CmsQueryItem) Item(item ...string) CmsQueryItem {
 	c.cs.s = append(c.cs.s, item...)
@@ -275,15 +275,15 @@ func (c CmsQueryItem) Item(item ...string) CmsQueryItem {
 
 func (c CmsQueryItem) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c CmsQueryItem) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CmsQueryKey Completed
+type CmsQueryKey Incomplete
 
 func (c CmsQueryKey) Item(item ...string) CmsQueryItem {
 	c.cs.s = append(c.cs.s, item...)

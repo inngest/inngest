@@ -4,10 +4,10 @@ package cmds
 
 import "strconv"
 
-type AiModelexecute Completed
+type AiModelexecute Incomplete
 
 func (b Builder) AiModelexecute() (c AiModelexecute) {
-	c = AiModelexecute{cs: get(), ks: b.ks, cf: readonly}
+	c = AiModelexecute{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "AI.MODELEXECUTE")
 	return c
 }
@@ -22,7 +22,7 @@ func (c AiModelexecute) Key(key string) AiModelexecuteKey {
 	return (AiModelexecuteKey)(c)
 }
 
-type AiModelexecuteInputsInput Completed
+type AiModelexecuteInputsInput Incomplete
 
 func (c AiModelexecuteInputsInput) Input(input ...string) AiModelexecuteInputsInput {
 	c.cs.s = append(c.cs.s, input...)
@@ -34,21 +34,21 @@ func (c AiModelexecuteInputsInput) Outputs(outputCount int64) AiModelexecuteOutp
 	return (AiModelexecuteOutputsOutputs)(c)
 }
 
-type AiModelexecuteInputsInputs Completed
+type AiModelexecuteInputsInputs Incomplete
 
 func (c AiModelexecuteInputsInputs) Input(input ...string) AiModelexecuteInputsInput {
 	c.cs.s = append(c.cs.s, input...)
 	return (AiModelexecuteInputsInput)(c)
 }
 
-type AiModelexecuteKey Completed
+type AiModelexecuteKey Incomplete
 
 func (c AiModelexecuteKey) Inputs(inputCount int64) AiModelexecuteInputsInputs {
 	c.cs.s = append(c.cs.s, "INPUTS", strconv.FormatInt(inputCount, 10))
 	return (AiModelexecuteInputsInputs)(c)
 }
 
-type AiModelexecuteOutputsOutput Completed
+type AiModelexecuteOutputsOutput Incomplete
 
 func (c AiModelexecuteOutputsOutput) Output(output ...string) AiModelexecuteOutputsOutput {
 	c.cs.s = append(c.cs.s, output...)
@@ -62,34 +62,34 @@ func (c AiModelexecuteOutputsOutput) Timeout(timeout int64) AiModelexecuteTimeou
 
 func (c AiModelexecuteOutputsOutput) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c AiModelexecuteOutputsOutput) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiModelexecuteOutputsOutputs Completed
+type AiModelexecuteOutputsOutputs Incomplete
 
 func (c AiModelexecuteOutputsOutputs) Output(output ...string) AiModelexecuteOutputsOutput {
 	c.cs.s = append(c.cs.s, output...)
 	return (AiModelexecuteOutputsOutput)(c)
 }
 
-type AiModelexecuteTimeout Completed
+type AiModelexecuteTimeout Incomplete
 
 func (c AiModelexecuteTimeout) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c AiModelexecuteTimeout) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiScriptexecute Completed
+type AiScriptexecute Incomplete
 
 func (b Builder) AiScriptexecute() (c AiScriptexecute) {
 	c = AiScriptexecute{cs: get(), ks: b.ks}
@@ -107,7 +107,7 @@ func (c AiScriptexecute) Key(key string) AiScriptexecuteKey {
 	return (AiScriptexecuteKey)(c)
 }
 
-type AiScriptexecuteArgsArg Completed
+type AiScriptexecuteArgsArg Incomplete
 
 func (c AiScriptexecuteArgsArg) Arg(arg ...string) AiScriptexecuteArgsArg {
 	c.cs.s = append(c.cs.s, arg...)
@@ -126,17 +126,17 @@ func (c AiScriptexecuteArgsArg) Timeout(timeout int64) AiScriptexecuteTimeout {
 
 func (c AiScriptexecuteArgsArg) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiScriptexecuteArgsArgs Completed
+type AiScriptexecuteArgsArgs Incomplete
 
 func (c AiScriptexecuteArgsArgs) Arg(arg ...string) AiScriptexecuteArgsArg {
 	c.cs.s = append(c.cs.s, arg...)
 	return (AiScriptexecuteArgsArg)(c)
 }
 
-type AiScriptexecuteFunction Completed
+type AiScriptexecuteFunction Incomplete
 
 func (c AiScriptexecuteFunction) Keys(keyCount int64) AiScriptexecuteKeysKeys {
 	c.cs.s = append(c.cs.s, "KEYS", strconv.FormatInt(keyCount, 10))
@@ -165,10 +165,10 @@ func (c AiScriptexecuteFunction) Timeout(timeout int64) AiScriptexecuteTimeout {
 
 func (c AiScriptexecuteFunction) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiScriptexecuteInputsInput Completed
+type AiScriptexecuteInputsInput Incomplete
 
 func (c AiScriptexecuteInputsInput) Input(input ...string) AiScriptexecuteInputsInput {
 	c.cs.s = append(c.cs.s, input...)
@@ -192,24 +192,24 @@ func (c AiScriptexecuteInputsInput) Timeout(timeout int64) AiScriptexecuteTimeou
 
 func (c AiScriptexecuteInputsInput) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiScriptexecuteInputsInputs Completed
+type AiScriptexecuteInputsInputs Incomplete
 
 func (c AiScriptexecuteInputsInputs) Input(input ...string) AiScriptexecuteInputsInput {
 	c.cs.s = append(c.cs.s, input...)
 	return (AiScriptexecuteInputsInput)(c)
 }
 
-type AiScriptexecuteKey Completed
+type AiScriptexecuteKey Incomplete
 
 func (c AiScriptexecuteKey) Function(function string) AiScriptexecuteFunction {
 	c.cs.s = append(c.cs.s, function)
 	return (AiScriptexecuteFunction)(c)
 }
 
-type AiScriptexecuteKeysKey Completed
+type AiScriptexecuteKeysKey Incomplete
 
 func (c AiScriptexecuteKeysKey) Key(key ...string) AiScriptexecuteKeysKey {
 	c.cs.s = append(c.cs.s, key...)
@@ -238,17 +238,17 @@ func (c AiScriptexecuteKeysKey) Timeout(timeout int64) AiScriptexecuteTimeout {
 
 func (c AiScriptexecuteKeysKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiScriptexecuteKeysKeys Completed
+type AiScriptexecuteKeysKeys Incomplete
 
 func (c AiScriptexecuteKeysKeys) Key(key ...string) AiScriptexecuteKeysKey {
 	c.cs.s = append(c.cs.s, key...)
 	return (AiScriptexecuteKeysKey)(c)
 }
 
-type AiScriptexecuteOutputsOutput Completed
+type AiScriptexecuteOutputsOutput Incomplete
 
 func (c AiScriptexecuteOutputsOutput) Output(output ...string) AiScriptexecuteOutputsOutput {
 	c.cs.s = append(c.cs.s, output...)
@@ -262,19 +262,19 @@ func (c AiScriptexecuteOutputsOutput) Timeout(timeout int64) AiScriptexecuteTime
 
 func (c AiScriptexecuteOutputsOutput) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiScriptexecuteOutputsOutputs Completed
+type AiScriptexecuteOutputsOutputs Incomplete
 
 func (c AiScriptexecuteOutputsOutputs) Output(output ...string) AiScriptexecuteOutputsOutput {
 	c.cs.s = append(c.cs.s, output...)
 	return (AiScriptexecuteOutputsOutput)(c)
 }
 
-type AiScriptexecuteTimeout Completed
+type AiScriptexecuteTimeout Incomplete
 
 func (c AiScriptexecuteTimeout) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }

@@ -4,10 +4,10 @@ package cmds
 
 import "strconv"
 
-type Bitcount Completed
+type Bitcount Incomplete
 
 func (b Builder) Bitcount() (c Bitcount) {
-	c = Bitcount{cs: get(), ks: b.ks, cf: readonly}
+	c = Bitcount{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "BITCOUNT")
 	return c
 }
@@ -22,7 +22,7 @@ func (c Bitcount) Key(key string) BitcountKey {
 	return (BitcountKey)(c)
 }
 
-type BitcountIndexEnd Completed
+type BitcountIndexEnd Incomplete
 
 func (c BitcountIndexEnd) Byte() BitcountIndexIndexUnitByte {
 	c.cs.s = append(c.cs.s, "BYTE")
@@ -36,46 +36,46 @@ func (c BitcountIndexEnd) Bit() BitcountIndexIndexUnitBit {
 
 func (c BitcountIndexEnd) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c BitcountIndexEnd) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BitcountIndexIndexUnitBit Completed
+type BitcountIndexIndexUnitBit Incomplete
 
 func (c BitcountIndexIndexUnitBit) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c BitcountIndexIndexUnitBit) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BitcountIndexIndexUnitByte Completed
+type BitcountIndexIndexUnitByte Incomplete
 
 func (c BitcountIndexIndexUnitByte) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c BitcountIndexIndexUnitByte) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BitcountIndexStart Completed
+type BitcountIndexStart Incomplete
 
 func (c BitcountIndexStart) End(end int64) BitcountIndexEnd {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(end, 10))
 	return (BitcountIndexEnd)(c)
 }
 
-type BitcountKey Completed
+type BitcountKey Incomplete
 
 func (c BitcountKey) Start(start int64) BitcountIndexStart {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(start, 10))
@@ -84,15 +84,15 @@ func (c BitcountKey) Start(start int64) BitcountIndexStart {
 
 func (c BitcountKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c BitcountKey) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Bitfield Completed
+type Bitfield Incomplete
 
 func (b Builder) Bitfield() (c Bitfield) {
 	c = Bitfield{cs: get(), ks: b.ks}
@@ -110,7 +110,7 @@ func (c Bitfield) Key(key string) BitfieldKey {
 	return (BitfieldKey)(c)
 }
 
-type BitfieldKey Completed
+type BitfieldKey Incomplete
 
 func (c BitfieldKey) Get(encoding string, offset int64) BitfieldOperationGet {
 	c.cs.s = append(c.cs.s, "GET", encoding, strconv.FormatInt(offset, 10))
@@ -144,10 +144,10 @@ func (c BitfieldKey) Incrby(encoding string, offset int64, increment int64) Bitf
 
 func (c BitfieldKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BitfieldOperationGet Completed
+type BitfieldOperationGet Incomplete
 
 func (c BitfieldOperationGet) OverflowWrap() BitfieldOperationWriteOverflowWrap {
 	c.cs.s = append(c.cs.s, "OVERFLOW", "WRAP")
@@ -174,7 +174,17 @@ func (c BitfieldOperationGet) Incrby(encoding string, offset int64, increment in
 	return (BitfieldOperationWriteSetIncrby)(c)
 }
 
-type BitfieldOperationWriteOverflowFail Completed
+func (c BitfieldOperationGet) Get(encoding string, offset int64) BitfieldOperationGet {
+	c.cs.s = append(c.cs.s, "GET", encoding, strconv.FormatInt(offset, 10))
+	return c
+}
+
+func (c BitfieldOperationGet) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type BitfieldOperationWriteOverflowFail Incomplete
 
 func (c BitfieldOperationWriteOverflowFail) Set(encoding string, offset int64, value int64) BitfieldOperationWriteSetSet {
 	c.cs.s = append(c.cs.s, "SET", encoding, strconv.FormatInt(offset, 10), strconv.FormatInt(value, 10))
@@ -186,7 +196,7 @@ func (c BitfieldOperationWriteOverflowFail) Incrby(encoding string, offset int64
 	return (BitfieldOperationWriteSetIncrby)(c)
 }
 
-type BitfieldOperationWriteOverflowSat Completed
+type BitfieldOperationWriteOverflowSat Incomplete
 
 func (c BitfieldOperationWriteOverflowSat) Set(encoding string, offset int64, value int64) BitfieldOperationWriteSetSet {
 	c.cs.s = append(c.cs.s, "SET", encoding, strconv.FormatInt(offset, 10), strconv.FormatInt(value, 10))
@@ -198,7 +208,7 @@ func (c BitfieldOperationWriteOverflowSat) Incrby(encoding string, offset int64,
 	return (BitfieldOperationWriteSetIncrby)(c)
 }
 
-type BitfieldOperationWriteOverflowWrap Completed
+type BitfieldOperationWriteOverflowWrap Incomplete
 
 func (c BitfieldOperationWriteOverflowWrap) Set(encoding string, offset int64, value int64) BitfieldOperationWriteSetSet {
 	c.cs.s = append(c.cs.s, "SET", encoding, strconv.FormatInt(offset, 10), strconv.FormatInt(value, 10))
@@ -210,7 +220,7 @@ func (c BitfieldOperationWriteOverflowWrap) Incrby(encoding string, offset int64
 	return (BitfieldOperationWriteSetIncrby)(c)
 }
 
-type BitfieldOperationWriteSetIncrby Completed
+type BitfieldOperationWriteSetIncrby Incomplete
 
 func (c BitfieldOperationWriteSetIncrby) Get(encoding string, offset int64) BitfieldOperationGet {
 	c.cs.s = append(c.cs.s, "GET", encoding, strconv.FormatInt(offset, 10))
@@ -244,10 +254,10 @@ func (c BitfieldOperationWriteSetIncrby) Incrby(encoding string, offset int64, i
 
 func (c BitfieldOperationWriteSetIncrby) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BitfieldOperationWriteSetSet Completed
+type BitfieldOperationWriteSetSet Incomplete
 
 func (c BitfieldOperationWriteSetSet) Incrby(encoding string, offset int64, increment int64) BitfieldOperationWriteSetIncrby {
 	c.cs.s = append(c.cs.s, "INCRBY", encoding, strconv.FormatInt(offset, 10), strconv.FormatInt(increment, 10))
@@ -281,13 +291,13 @@ func (c BitfieldOperationWriteSetSet) Set(encoding string, offset int64, value i
 
 func (c BitfieldOperationWriteSetSet) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BitfieldRo Completed
+type BitfieldRo Incomplete
 
 func (b Builder) BitfieldRo() (c BitfieldRo) {
-	c = BitfieldRo{cs: get(), ks: b.ks, cf: readonly}
+	c = BitfieldRo{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "BITFIELD_RO")
 	return c
 }
@@ -302,7 +312,7 @@ func (c BitfieldRo) Key(key string) BitfieldRoKey {
 	return (BitfieldRoKey)(c)
 }
 
-type BitfieldRoGet Completed
+type BitfieldRoGet Incomplete
 
 func (c BitfieldRoGet) Get(encoding string, offset int64) BitfieldRoGet {
 	c.cs.s = append(c.cs.s, "GET", encoding, strconv.FormatInt(offset, 10))
@@ -311,15 +321,15 @@ func (c BitfieldRoGet) Get(encoding string, offset int64) BitfieldRoGet {
 
 func (c BitfieldRoGet) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c BitfieldRoGet) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BitfieldRoKey Completed
+type BitfieldRoKey Incomplete
 
 func (c BitfieldRoKey) Get() BitfieldRoGet {
 	return (BitfieldRoGet)(c)
@@ -327,15 +337,15 @@ func (c BitfieldRoKey) Get() BitfieldRoGet {
 
 func (c BitfieldRoKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c BitfieldRoKey) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Bitop Completed
+type Bitop Incomplete
 
 func (b Builder) Bitop() (c Bitop) {
 	c = Bitop{cs: get(), ks: b.ks}
@@ -363,7 +373,7 @@ func (c Bitop) Not() BitopOperationNot {
 	return (BitopOperationNot)(c)
 }
 
-type BitopDestkey Completed
+type BitopDestkey Incomplete
 
 func (c BitopDestkey) Key(key ...string) BitopKey {
 	if c.ks&NoSlot == NoSlot {
@@ -380,7 +390,7 @@ func (c BitopDestkey) Key(key ...string) BitopKey {
 	return (BitopKey)(c)
 }
 
-type BitopKey Completed
+type BitopKey Incomplete
 
 func (c BitopKey) Key(key ...string) BitopKey {
 	if c.ks&NoSlot == NoSlot {
@@ -399,10 +409,10 @@ func (c BitopKey) Key(key ...string) BitopKey {
 
 func (c BitopKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BitopOperationAnd Completed
+type BitopOperationAnd Incomplete
 
 func (c BitopOperationAnd) Destkey(destkey string) BitopDestkey {
 	if c.ks&NoSlot == NoSlot {
@@ -414,7 +424,7 @@ func (c BitopOperationAnd) Destkey(destkey string) BitopDestkey {
 	return (BitopDestkey)(c)
 }
 
-type BitopOperationNot Completed
+type BitopOperationNot Incomplete
 
 func (c BitopOperationNot) Destkey(destkey string) BitopDestkey {
 	if c.ks&NoSlot == NoSlot {
@@ -426,7 +436,7 @@ func (c BitopOperationNot) Destkey(destkey string) BitopDestkey {
 	return (BitopDestkey)(c)
 }
 
-type BitopOperationOr Completed
+type BitopOperationOr Incomplete
 
 func (c BitopOperationOr) Destkey(destkey string) BitopDestkey {
 	if c.ks&NoSlot == NoSlot {
@@ -438,7 +448,7 @@ func (c BitopOperationOr) Destkey(destkey string) BitopDestkey {
 	return (BitopDestkey)(c)
 }
 
-type BitopOperationXor Completed
+type BitopOperationXor Incomplete
 
 func (c BitopOperationXor) Destkey(destkey string) BitopDestkey {
 	if c.ks&NoSlot == NoSlot {
@@ -450,10 +460,10 @@ func (c BitopOperationXor) Destkey(destkey string) BitopDestkey {
 	return (BitopDestkey)(c)
 }
 
-type Bitpos Completed
+type Bitpos Incomplete
 
 func (b Builder) Bitpos() (c Bitpos) {
-	c = Bitpos{cs: get(), ks: b.ks, cf: readonly}
+	c = Bitpos{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "BITPOS")
 	return c
 }
@@ -468,7 +478,7 @@ func (c Bitpos) Key(key string) BitposKey {
 	return (BitposKey)(c)
 }
 
-type BitposBit Completed
+type BitposBit Incomplete
 
 func (c BitposBit) Start(start int64) BitposIndexStart {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(start, 10))
@@ -477,15 +487,15 @@ func (c BitposBit) Start(start int64) BitposIndexStart {
 
 func (c BitposBit) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c BitposBit) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BitposIndexEndIndexEnd Completed
+type BitposIndexEndIndexEnd Incomplete
 
 func (c BitposIndexEndIndexEnd) Byte() BitposIndexEndIndexIndexUnitByte {
 	c.cs.s = append(c.cs.s, "BYTE")
@@ -499,39 +509,39 @@ func (c BitposIndexEndIndexEnd) Bit() BitposIndexEndIndexIndexUnitBit {
 
 func (c BitposIndexEndIndexEnd) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c BitposIndexEndIndexEnd) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BitposIndexEndIndexIndexUnitBit Completed
+type BitposIndexEndIndexIndexUnitBit Incomplete
 
 func (c BitposIndexEndIndexIndexUnitBit) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c BitposIndexEndIndexIndexUnitBit) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BitposIndexEndIndexIndexUnitByte Completed
+type BitposIndexEndIndexIndexUnitByte Incomplete
 
 func (c BitposIndexEndIndexIndexUnitByte) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c BitposIndexEndIndexIndexUnitByte) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BitposIndexStart Completed
+type BitposIndexStart Incomplete
 
 func (c BitposIndexStart) End(end int64) BitposIndexEndIndexEnd {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(end, 10))
@@ -540,25 +550,25 @@ func (c BitposIndexStart) End(end int64) BitposIndexEndIndexEnd {
 
 func (c BitposIndexStart) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c BitposIndexStart) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BitposKey Completed
+type BitposKey Incomplete
 
 func (c BitposKey) Bit(bit int64) BitposBit {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bit, 10))
 	return (BitposBit)(c)
 }
 
-type Getbit Completed
+type Getbit Incomplete
 
 func (b Builder) Getbit() (c Getbit) {
-	c = Getbit{cs: get(), ks: b.ks, cf: readonly}
+	c = Getbit{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "GETBIT")
 	return c
 }
@@ -573,26 +583,26 @@ func (c Getbit) Key(key string) GetbitKey {
 	return (GetbitKey)(c)
 }
 
-type GetbitKey Completed
+type GetbitKey Incomplete
 
 func (c GetbitKey) Offset(offset int64) GetbitOffset {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(offset, 10))
 	return (GetbitOffset)(c)
 }
 
-type GetbitOffset Completed
+type GetbitOffset Incomplete
 
 func (c GetbitOffset) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c GetbitOffset) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Setbit Completed
+type Setbit Incomplete
 
 func (b Builder) Setbit() (c Setbit) {
 	c = Setbit{cs: get(), ks: b.ks}
@@ -610,23 +620,23 @@ func (c Setbit) Key(key string) SetbitKey {
 	return (SetbitKey)(c)
 }
 
-type SetbitKey Completed
+type SetbitKey Incomplete
 
 func (c SetbitKey) Offset(offset int64) SetbitOffset {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(offset, 10))
 	return (SetbitOffset)(c)
 }
 
-type SetbitOffset Completed
+type SetbitOffset Incomplete
 
 func (c SetbitOffset) Value(value int64) SetbitValue {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(value, 10))
 	return (SetbitValue)(c)
 }
 
-type SetbitValue Completed
+type SetbitValue Incomplete
 
 func (c SetbitValue) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }

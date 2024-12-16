@@ -4,7 +4,7 @@ package cmds
 
 import "strconv"
 
-type CfAdd Completed
+type CfAdd Incomplete
 
 func (b Builder) CfAdd() (c CfAdd) {
 	c = CfAdd{cs: get(), ks: b.ks}
@@ -22,21 +22,21 @@ func (c CfAdd) Key(key string) CfAddKey {
 	return (CfAddKey)(c)
 }
 
-type CfAddItem Completed
+type CfAddItem Incomplete
 
 func (c CfAddItem) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CfAddKey Completed
+type CfAddKey Incomplete
 
 func (c CfAddKey) Item(item string) CfAddItem {
 	c.cs.s = append(c.cs.s, item)
 	return (CfAddItem)(c)
 }
 
-type CfAddnx Completed
+type CfAddnx Incomplete
 
 func (b Builder) CfAddnx() (c CfAddnx) {
 	c = CfAddnx{cs: get(), ks: b.ks}
@@ -54,24 +54,24 @@ func (c CfAddnx) Key(key string) CfAddnxKey {
 	return (CfAddnxKey)(c)
 }
 
-type CfAddnxItem Completed
+type CfAddnxItem Incomplete
 
 func (c CfAddnxItem) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CfAddnxKey Completed
+type CfAddnxKey Incomplete
 
 func (c CfAddnxKey) Item(item string) CfAddnxItem {
 	c.cs.s = append(c.cs.s, item)
 	return (CfAddnxItem)(c)
 }
 
-type CfCount Completed
+type CfCount Incomplete
 
 func (b Builder) CfCount() (c CfCount) {
-	c = CfCount{cs: get(), ks: b.ks, cf: readonly}
+	c = CfCount{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "CF.COUNT")
 	return c
 }
@@ -86,26 +86,26 @@ func (c CfCount) Key(key string) CfCountKey {
 	return (CfCountKey)(c)
 }
 
-type CfCountItem Completed
+type CfCountItem Incomplete
 
 func (c CfCountItem) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c CfCountItem) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CfCountKey Completed
+type CfCountKey Incomplete
 
 func (c CfCountKey) Item(item string) CfCountItem {
 	c.cs.s = append(c.cs.s, item)
 	return (CfCountItem)(c)
 }
 
-type CfDel Completed
+type CfDel Incomplete
 
 func (b Builder) CfDel() (c CfDel) {
 	c = CfDel{cs: get(), ks: b.ks}
@@ -123,24 +123,24 @@ func (c CfDel) Key(key string) CfDelKey {
 	return (CfDelKey)(c)
 }
 
-type CfDelItem Completed
+type CfDelItem Incomplete
 
 func (c CfDelItem) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CfDelKey Completed
+type CfDelKey Incomplete
 
 func (c CfDelKey) Item(item string) CfDelItem {
 	c.cs.s = append(c.cs.s, item)
 	return (CfDelItem)(c)
 }
 
-type CfExists Completed
+type CfExists Incomplete
 
 func (b Builder) CfExists() (c CfExists) {
-	c = CfExists{cs: get(), ks: b.ks, cf: readonly}
+	c = CfExists{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "CF.EXISTS")
 	return c
 }
@@ -155,29 +155,29 @@ func (c CfExists) Key(key string) CfExistsKey {
 	return (CfExistsKey)(c)
 }
 
-type CfExistsItem Completed
+type CfExistsItem Incomplete
 
 func (c CfExistsItem) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c CfExistsItem) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CfExistsKey Completed
+type CfExistsKey Incomplete
 
 func (c CfExistsKey) Item(item string) CfExistsItem {
 	c.cs.s = append(c.cs.s, item)
 	return (CfExistsItem)(c)
 }
 
-type CfInfo Completed
+type CfInfo Incomplete
 
 func (b Builder) CfInfo() (c CfInfo) {
-	c = CfInfo{cs: get(), ks: b.ks, cf: readonly}
+	c = CfInfo{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "CF.INFO")
 	return c
 }
@@ -192,19 +192,19 @@ func (c CfInfo) Key(key string) CfInfoKey {
 	return (CfInfoKey)(c)
 }
 
-type CfInfoKey Completed
+type CfInfoKey Incomplete
 
 func (c CfInfoKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c CfInfoKey) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CfInsert Completed
+type CfInsert Incomplete
 
 func (b Builder) CfInsert() (c CfInsert) {
 	c = CfInsert{cs: get(), ks: b.ks}
@@ -222,7 +222,7 @@ func (c CfInsert) Key(key string) CfInsertKey {
 	return (CfInsertKey)(c)
 }
 
-type CfInsertCapacity Completed
+type CfInsertCapacity Incomplete
 
 func (c CfInsertCapacity) Nocreate() CfInsertNocreate {
 	c.cs.s = append(c.cs.s, "NOCREATE")
@@ -234,7 +234,7 @@ func (c CfInsertCapacity) Items() CfInsertItems {
 	return (CfInsertItems)(c)
 }
 
-type CfInsertItem Completed
+type CfInsertItem Incomplete
 
 func (c CfInsertItem) Item(item ...string) CfInsertItem {
 	c.cs.s = append(c.cs.s, item...)
@@ -243,17 +243,17 @@ func (c CfInsertItem) Item(item ...string) CfInsertItem {
 
 func (c CfInsertItem) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CfInsertItems Completed
+type CfInsertItems Incomplete
 
 func (c CfInsertItems) Item(item ...string) CfInsertItem {
 	c.cs.s = append(c.cs.s, item...)
 	return (CfInsertItem)(c)
 }
 
-type CfInsertKey Completed
+type CfInsertKey Incomplete
 
 func (c CfInsertKey) Capacity(capacity int64) CfInsertCapacity {
 	c.cs.s = append(c.cs.s, "CAPACITY", strconv.FormatInt(capacity, 10))
@@ -270,14 +270,14 @@ func (c CfInsertKey) Items() CfInsertItems {
 	return (CfInsertItems)(c)
 }
 
-type CfInsertNocreate Completed
+type CfInsertNocreate Incomplete
 
 func (c CfInsertNocreate) Items() CfInsertItems {
 	c.cs.s = append(c.cs.s, "ITEMS")
 	return (CfInsertItems)(c)
 }
 
-type CfInsertnx Completed
+type CfInsertnx Incomplete
 
 func (b Builder) CfInsertnx() (c CfInsertnx) {
 	c = CfInsertnx{cs: get(), ks: b.ks}
@@ -295,7 +295,7 @@ func (c CfInsertnx) Key(key string) CfInsertnxKey {
 	return (CfInsertnxKey)(c)
 }
 
-type CfInsertnxCapacity Completed
+type CfInsertnxCapacity Incomplete
 
 func (c CfInsertnxCapacity) Nocreate() CfInsertnxNocreate {
 	c.cs.s = append(c.cs.s, "NOCREATE")
@@ -307,7 +307,7 @@ func (c CfInsertnxCapacity) Items() CfInsertnxItems {
 	return (CfInsertnxItems)(c)
 }
 
-type CfInsertnxItem Completed
+type CfInsertnxItem Incomplete
 
 func (c CfInsertnxItem) Item(item ...string) CfInsertnxItem {
 	c.cs.s = append(c.cs.s, item...)
@@ -316,17 +316,17 @@ func (c CfInsertnxItem) Item(item ...string) CfInsertnxItem {
 
 func (c CfInsertnxItem) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CfInsertnxItems Completed
+type CfInsertnxItems Incomplete
 
 func (c CfInsertnxItems) Item(item ...string) CfInsertnxItem {
 	c.cs.s = append(c.cs.s, item...)
 	return (CfInsertnxItem)(c)
 }
 
-type CfInsertnxKey Completed
+type CfInsertnxKey Incomplete
 
 func (c CfInsertnxKey) Capacity(capacity int64) CfInsertnxCapacity {
 	c.cs.s = append(c.cs.s, "CAPACITY", strconv.FormatInt(capacity, 10))
@@ -343,14 +343,14 @@ func (c CfInsertnxKey) Items() CfInsertnxItems {
 	return (CfInsertnxItems)(c)
 }
 
-type CfInsertnxNocreate Completed
+type CfInsertnxNocreate Incomplete
 
 func (c CfInsertnxNocreate) Items() CfInsertnxItems {
 	c.cs.s = append(c.cs.s, "ITEMS")
 	return (CfInsertnxItems)(c)
 }
 
-type CfLoadchunk Completed
+type CfLoadchunk Incomplete
 
 func (b Builder) CfLoadchunk() (c CfLoadchunk) {
 	c = CfLoadchunk{cs: get(), ks: b.ks}
@@ -368,28 +368,28 @@ func (c CfLoadchunk) Key(key string) CfLoadchunkKey {
 	return (CfLoadchunkKey)(c)
 }
 
-type CfLoadchunkData Completed
+type CfLoadchunkData Incomplete
 
 func (c CfLoadchunkData) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CfLoadchunkIterator Completed
+type CfLoadchunkIterator Incomplete
 
 func (c CfLoadchunkIterator) Data(data string) CfLoadchunkData {
 	c.cs.s = append(c.cs.s, data)
 	return (CfLoadchunkData)(c)
 }
 
-type CfLoadchunkKey Completed
+type CfLoadchunkKey Incomplete
 
 func (c CfLoadchunkKey) Iterator(iterator int64) CfLoadchunkIterator {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(iterator, 10))
 	return (CfLoadchunkIterator)(c)
 }
 
-type CfMexists Completed
+type CfMexists Incomplete
 
 func (b Builder) CfMexists() (c CfMexists) {
 	c = CfMexists{cs: get(), ks: b.ks}
@@ -407,7 +407,7 @@ func (c CfMexists) Key(key string) CfMexistsKey {
 	return (CfMexistsKey)(c)
 }
 
-type CfMexistsItem Completed
+type CfMexistsItem Incomplete
 
 func (c CfMexistsItem) Item(item ...string) CfMexistsItem {
 	c.cs.s = append(c.cs.s, item...)
@@ -416,17 +416,17 @@ func (c CfMexistsItem) Item(item ...string) CfMexistsItem {
 
 func (c CfMexistsItem) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CfMexistsKey Completed
+type CfMexistsKey Incomplete
 
 func (c CfMexistsKey) Item(item ...string) CfMexistsItem {
 	c.cs.s = append(c.cs.s, item...)
 	return (CfMexistsItem)(c)
 }
 
-type CfReserve Completed
+type CfReserve Incomplete
 
 func (b Builder) CfReserve() (c CfReserve) {
 	c = CfReserve{cs: get(), ks: b.ks}
@@ -444,7 +444,7 @@ func (c CfReserve) Key(key string) CfReserveKey {
 	return (CfReserveKey)(c)
 }
 
-type CfReserveBucketsize Completed
+type CfReserveBucketsize Incomplete
 
 func (c CfReserveBucketsize) Maxiterations(maxiterations int64) CfReserveMaxiterations {
 	c.cs.s = append(c.cs.s, "MAXITERATIONS", strconv.FormatInt(maxiterations, 10))
@@ -458,10 +458,10 @@ func (c CfReserveBucketsize) Expansion(expansion int64) CfReserveExpansion {
 
 func (c CfReserveBucketsize) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CfReserveCapacity Completed
+type CfReserveCapacity Incomplete
 
 func (c CfReserveCapacity) Bucketsize(bucketsize int64) CfReserveBucketsize {
 	c.cs.s = append(c.cs.s, "BUCKETSIZE", strconv.FormatInt(bucketsize, 10))
@@ -480,24 +480,24 @@ func (c CfReserveCapacity) Expansion(expansion int64) CfReserveExpansion {
 
 func (c CfReserveCapacity) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CfReserveExpansion Completed
+type CfReserveExpansion Incomplete
 
 func (c CfReserveExpansion) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CfReserveKey Completed
+type CfReserveKey Incomplete
 
 func (c CfReserveKey) Capacity(capacity int64) CfReserveCapacity {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(capacity, 10))
 	return (CfReserveCapacity)(c)
 }
 
-type CfReserveMaxiterations Completed
+type CfReserveMaxiterations Incomplete
 
 func (c CfReserveMaxiterations) Expansion(expansion int64) CfReserveExpansion {
 	c.cs.s = append(c.cs.s, "EXPANSION", strconv.FormatInt(expansion, 10))
@@ -506,13 +506,13 @@ func (c CfReserveMaxiterations) Expansion(expansion int64) CfReserveExpansion {
 
 func (c CfReserveMaxiterations) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CfScandump Completed
+type CfScandump Incomplete
 
 func (b Builder) CfScandump() (c CfScandump) {
-	c = CfScandump{cs: get(), ks: b.ks, cf: readonly}
+	c = CfScandump{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "CF.SCANDUMP")
 	return c
 }
@@ -527,14 +527,14 @@ func (c CfScandump) Key(key string) CfScandumpKey {
 	return (CfScandumpKey)(c)
 }
 
-type CfScandumpIterator Completed
+type CfScandumpIterator Incomplete
 
 func (c CfScandumpIterator) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CfScandumpKey Completed
+type CfScandumpKey Incomplete
 
 func (c CfScandumpKey) Iterator(iterator int64) CfScandumpIterator {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(iterator, 10))

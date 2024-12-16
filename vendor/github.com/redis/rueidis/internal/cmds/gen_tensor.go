@@ -4,10 +4,10 @@ package cmds
 
 import "strconv"
 
-type AiTensorget Completed
+type AiTensorget Incomplete
 
 func (b Builder) AiTensorget() (c AiTensorget) {
-	c = AiTensorget{cs: get(), ks: b.ks, cf: readonly}
+	c = AiTensorget{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "AI.TENSORGET")
 	return c
 }
@@ -22,38 +22,38 @@ func (c AiTensorget) Key(key string) AiTensorgetKey {
 	return (AiTensorgetKey)(c)
 }
 
-type AiTensorgetFormatBlob Completed
+type AiTensorgetFormatBlob Incomplete
 
 func (c AiTensorgetFormatBlob) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c AiTensorgetFormatBlob) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiTensorgetFormatValues Completed
+type AiTensorgetFormatValues Incomplete
 
 func (c AiTensorgetFormatValues) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c AiTensorgetFormatValues) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiTensorgetKey Completed
+type AiTensorgetKey Incomplete
 
 func (c AiTensorgetKey) Meta() AiTensorgetMeta {
 	c.cs.s = append(c.cs.s, "META")
 	return (AiTensorgetMeta)(c)
 }
 
-type AiTensorgetMeta Completed
+type AiTensorgetMeta Incomplete
 
 func (c AiTensorgetMeta) Blob() AiTensorgetFormatBlob {
 	c.cs.s = append(c.cs.s, "BLOB")
@@ -67,15 +67,15 @@ func (c AiTensorgetMeta) Values() AiTensorgetFormatValues {
 
 func (c AiTensorgetMeta) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c AiTensorgetMeta) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiTensorset Completed
+type AiTensorset Incomplete
 
 func (b Builder) AiTensorset() (c AiTensorset) {
 	c = AiTensorset{cs: get(), ks: b.ks}
@@ -93,7 +93,7 @@ func (c AiTensorset) Key(key string) AiTensorsetKey {
 	return (AiTensorsetKey)(c)
 }
 
-type AiTensorsetBlob Completed
+type AiTensorsetBlob Incomplete
 
 func (c AiTensorsetBlob) Values(value ...string) AiTensorsetValues {
 	c.cs.s = append(c.cs.s, "VALUES")
@@ -103,10 +103,10 @@ func (c AiTensorsetBlob) Values(value ...string) AiTensorsetValues {
 
 func (c AiTensorsetBlob) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiTensorsetKey Completed
+type AiTensorsetKey Incomplete
 
 func (c AiTensorsetKey) Float() AiTensorsetTypeFloat {
 	c.cs.s = append(c.cs.s, "FLOAT")
@@ -158,7 +158,7 @@ func (c AiTensorsetKey) Bool() AiTensorsetTypeBool {
 	return (AiTensorsetTypeBool)(c)
 }
 
-type AiTensorsetShape Completed
+type AiTensorsetShape Incomplete
 
 func (c AiTensorsetShape) Shape(shape ...int64) AiTensorsetShape {
 	for _, n := range shape {
@@ -180,10 +180,10 @@ func (c AiTensorsetShape) Values(value ...string) AiTensorsetValues {
 
 func (c AiTensorsetShape) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiTensorsetTypeBool Completed
+type AiTensorsetTypeBool Incomplete
 
 func (c AiTensorsetTypeBool) Shape(shape ...int64) AiTensorsetShape {
 	for _, n := range shape {
@@ -192,7 +192,7 @@ func (c AiTensorsetTypeBool) Shape(shape ...int64) AiTensorsetShape {
 	return (AiTensorsetShape)(c)
 }
 
-type AiTensorsetTypeDouble Completed
+type AiTensorsetTypeDouble Incomplete
 
 func (c AiTensorsetTypeDouble) Shape(shape ...int64) AiTensorsetShape {
 	for _, n := range shape {
@@ -201,7 +201,7 @@ func (c AiTensorsetTypeDouble) Shape(shape ...int64) AiTensorsetShape {
 	return (AiTensorsetShape)(c)
 }
 
-type AiTensorsetTypeFloat Completed
+type AiTensorsetTypeFloat Incomplete
 
 func (c AiTensorsetTypeFloat) Shape(shape ...int64) AiTensorsetShape {
 	for _, n := range shape {
@@ -210,7 +210,7 @@ func (c AiTensorsetTypeFloat) Shape(shape ...int64) AiTensorsetShape {
 	return (AiTensorsetShape)(c)
 }
 
-type AiTensorsetTypeInt16 Completed
+type AiTensorsetTypeInt16 Incomplete
 
 func (c AiTensorsetTypeInt16) Shape(shape ...int64) AiTensorsetShape {
 	for _, n := range shape {
@@ -219,7 +219,7 @@ func (c AiTensorsetTypeInt16) Shape(shape ...int64) AiTensorsetShape {
 	return (AiTensorsetShape)(c)
 }
 
-type AiTensorsetTypeInt32 Completed
+type AiTensorsetTypeInt32 Incomplete
 
 func (c AiTensorsetTypeInt32) Shape(shape ...int64) AiTensorsetShape {
 	for _, n := range shape {
@@ -228,7 +228,7 @@ func (c AiTensorsetTypeInt32) Shape(shape ...int64) AiTensorsetShape {
 	return (AiTensorsetShape)(c)
 }
 
-type AiTensorsetTypeInt64 Completed
+type AiTensorsetTypeInt64 Incomplete
 
 func (c AiTensorsetTypeInt64) Shape(shape ...int64) AiTensorsetShape {
 	for _, n := range shape {
@@ -237,7 +237,7 @@ func (c AiTensorsetTypeInt64) Shape(shape ...int64) AiTensorsetShape {
 	return (AiTensorsetShape)(c)
 }
 
-type AiTensorsetTypeInt8 Completed
+type AiTensorsetTypeInt8 Incomplete
 
 func (c AiTensorsetTypeInt8) Shape(shape ...int64) AiTensorsetShape {
 	for _, n := range shape {
@@ -246,7 +246,7 @@ func (c AiTensorsetTypeInt8) Shape(shape ...int64) AiTensorsetShape {
 	return (AiTensorsetShape)(c)
 }
 
-type AiTensorsetTypeString Completed
+type AiTensorsetTypeString Incomplete
 
 func (c AiTensorsetTypeString) Shape(shape ...int64) AiTensorsetShape {
 	for _, n := range shape {
@@ -255,7 +255,7 @@ func (c AiTensorsetTypeString) Shape(shape ...int64) AiTensorsetShape {
 	return (AiTensorsetShape)(c)
 }
 
-type AiTensorsetTypeUint16 Completed
+type AiTensorsetTypeUint16 Incomplete
 
 func (c AiTensorsetTypeUint16) Shape(shape ...int64) AiTensorsetShape {
 	for _, n := range shape {
@@ -264,7 +264,7 @@ func (c AiTensorsetTypeUint16) Shape(shape ...int64) AiTensorsetShape {
 	return (AiTensorsetShape)(c)
 }
 
-type AiTensorsetTypeUint8 Completed
+type AiTensorsetTypeUint8 Incomplete
 
 func (c AiTensorsetTypeUint8) Shape(shape ...int64) AiTensorsetShape {
 	for _, n := range shape {
@@ -273,7 +273,7 @@ func (c AiTensorsetTypeUint8) Shape(shape ...int64) AiTensorsetShape {
 	return (AiTensorsetShape)(c)
 }
 
-type AiTensorsetValues Completed
+type AiTensorsetValues Incomplete
 
 func (c AiTensorsetValues) Values(value ...string) AiTensorsetValues {
 	c.cs.s = append(c.cs.s, "VALUES")
@@ -283,5 +283,5 @@ func (c AiTensorsetValues) Values(value ...string) AiTensorsetValues {
 
 func (c AiTensorsetValues) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
