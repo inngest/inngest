@@ -4,7 +4,6 @@ import React, { useCallback, useState } from 'react';
 import { Header } from '@inngest/components/Header/Header';
 import { InvokeModal } from '@inngest/components/InvokeButton';
 import { Pill } from '@inngest/components/Pill';
-import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { RiPauseCircleLine } from '@remixicon/react';
 import { useMutation } from 'urql';
 
@@ -124,6 +123,7 @@ export default function FunctionLayout({
             </Pill>
           )
         }
+        loading={fetching}
         action={
           <div className="flex flex-row items-center justify-end">
             <ActionsMenu
@@ -163,7 +163,6 @@ export default function FunctionLayout({
             : []),
         ]}
       />
-      {fetching && <Skeleton className="h-36 w-full" />}
       {children}
     </>
   );
