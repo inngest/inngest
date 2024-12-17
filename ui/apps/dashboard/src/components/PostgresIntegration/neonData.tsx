@@ -72,7 +72,7 @@ const deleteConnDocument = graphql(`
 export const deleteConn = async (id: string) => {
   const environment = await getProductionEnvironment();
 
-  return await graphqlAPI.request<{ cdcDelete: DeleteResponse }>(deleteConnDocument, {
+  return await graphqlAPI.request<{ cdcDelete: DeleteResponse }>(deleteConnDocument as any, {
     envID: environment.id,
     id: id,
   });
