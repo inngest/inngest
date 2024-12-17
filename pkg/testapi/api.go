@@ -94,6 +94,11 @@ func (t *TestAPI) GetQueueSize(w http.ResponseWriter, r *http.Request) {
 	marshaled, err := json.Marshal(map[string]any{
 		"count": count,
 	})
+	if err != nil {
+		w.WriteHeader(500)
+		_, _ = w.Write([]byte("Internal server error"))
+		return
+	}
 
 	_, _ = w.Write(marshaled)
 }

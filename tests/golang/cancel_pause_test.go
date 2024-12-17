@@ -144,8 +144,6 @@ func TestPauseCancelFunction(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, http.StatusOK, resp.StatusCode)
-
-		return
 	}
 
 	// Ensure that the runs are actually cancelled in the queue
@@ -165,8 +163,6 @@ func TestPauseCancelFunction(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, http.StatusOK, resp.StatusCode)
-
-		return
 	}
 
 	evt := inngestgo.Event{
