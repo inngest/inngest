@@ -186,7 +186,9 @@ func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager) 
 	req.Header.Set(headers.HeaderUserAgent, sdkVersion)
 
 	// Use sync token returned by initial Connect API handshake
-	req.Header.Set(headers.HeaderAuthorization, fmt.Sprintf("Bearer %s", c.Group.SyncData.SyncToken))
+	if c.Group.SyncData.SyncToken != "" {
+		req.Header.Set(headers.HeaderAuthorization, fmt.Sprintf("Bearer %s", c.Group.SyncData.SyncToken))
+	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
