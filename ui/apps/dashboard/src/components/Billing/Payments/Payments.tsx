@@ -82,7 +82,8 @@ export default function Payments() {
   const [{ data, fetching }] = useQuery({
     query: GetPaymentIntentsDocument,
   });
-  const payments = data?.account.paymentIntents || [];
+
+  const payments = useMemo(() => data?.account.paymentIntents || [], [data]);
 
   const tableColumns = useMemo(
     () =>
@@ -116,7 +117,7 @@ export default function Payments() {
         url: payment.invoiceURL,
       })
     );
-  }, [fetching, data]);
+  }, [fetching, payments]);
 
   return (
     <main
