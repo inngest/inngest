@@ -2,10 +2,10 @@
 
 package cmds
 
-type Psubscribe Completed
+type Psubscribe Incomplete
 
 func (b Builder) Psubscribe() (c Psubscribe) {
-	c = Psubscribe{cs: get(), ks: b.ks, cf: noRetTag}
+	c = Psubscribe{cs: get(), ks: b.ks, cf: int16(noRetTag)}
 	c.cs.s = append(c.cs.s, "PSUBSCRIBE")
 	return c
 }
@@ -15,7 +15,7 @@ func (c Psubscribe) Pattern(pattern ...string) PsubscribePattern {
 	return (PsubscribePattern)(c)
 }
 
-type PsubscribePattern Completed
+type PsubscribePattern Incomplete
 
 func (c PsubscribePattern) Pattern(pattern ...string) PsubscribePattern {
 	c.cs.s = append(c.cs.s, pattern...)
@@ -24,10 +24,10 @@ func (c PsubscribePattern) Pattern(pattern ...string) PsubscribePattern {
 
 func (c PsubscribePattern) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Publish Completed
+type Publish Incomplete
 
 func (b Builder) Publish() (c Publish) {
 	c = Publish{cs: get(), ks: b.ks}
@@ -40,24 +40,24 @@ func (c Publish) Channel(channel string) PublishChannel {
 	return (PublishChannel)(c)
 }
 
-type PublishChannel Completed
+type PublishChannel Incomplete
 
 func (c PublishChannel) Message(message string) PublishMessage {
 	c.cs.s = append(c.cs.s, message)
 	return (PublishMessage)(c)
 }
 
-type PublishMessage Completed
+type PublishMessage Incomplete
 
 func (c PublishMessage) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type PubsubChannels Completed
+type PubsubChannels Incomplete
 
 func (b Builder) PubsubChannels() (c PubsubChannels) {
-	c = PubsubChannels{cs: get(), ks: b.ks, cf: readonly}
+	c = PubsubChannels{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "PUBSUB", "CHANNELS")
 	return c
 }
@@ -69,46 +69,46 @@ func (c PubsubChannels) Pattern(pattern string) PubsubChannelsPattern {
 
 func (c PubsubChannels) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type PubsubChannelsPattern Completed
+type PubsubChannelsPattern Incomplete
 
 func (c PubsubChannelsPattern) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type PubsubHelp Completed
+type PubsubHelp Incomplete
 
 func (b Builder) PubsubHelp() (c PubsubHelp) {
-	c = PubsubHelp{cs: get(), ks: b.ks, cf: readonly}
+	c = PubsubHelp{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "PUBSUB", "HELP")
 	return c
 }
 
 func (c PubsubHelp) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type PubsubNumpat Completed
+type PubsubNumpat Incomplete
 
 func (b Builder) PubsubNumpat() (c PubsubNumpat) {
-	c = PubsubNumpat{cs: get(), ks: b.ks, cf: readonly}
+	c = PubsubNumpat{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "PUBSUB", "NUMPAT")
 	return c
 }
 
 func (c PubsubNumpat) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type PubsubNumsub Completed
+type PubsubNumsub Incomplete
 
 func (b Builder) PubsubNumsub() (c PubsubNumsub) {
-	c = PubsubNumsub{cs: get(), ks: b.ks, cf: readonly}
+	c = PubsubNumsub{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "PUBSUB", "NUMSUB")
 	return c
 }
@@ -120,10 +120,10 @@ func (c PubsubNumsub) Channel(channel ...string) PubsubNumsubChannel {
 
 func (c PubsubNumsub) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type PubsubNumsubChannel Completed
+type PubsubNumsubChannel Incomplete
 
 func (c PubsubNumsubChannel) Channel(channel ...string) PubsubNumsubChannel {
 	c.cs.s = append(c.cs.s, channel...)
@@ -132,10 +132,10 @@ func (c PubsubNumsubChannel) Channel(channel ...string) PubsubNumsubChannel {
 
 func (c PubsubNumsubChannel) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type PubsubShardchannels Completed
+type PubsubShardchannels Incomplete
 
 func (b Builder) PubsubShardchannels() (c PubsubShardchannels) {
 	c = PubsubShardchannels{cs: get(), ks: b.ks}
@@ -150,17 +150,17 @@ func (c PubsubShardchannels) Pattern(pattern string) PubsubShardchannelsPattern 
 
 func (c PubsubShardchannels) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type PubsubShardchannelsPattern Completed
+type PubsubShardchannelsPattern Incomplete
 
 func (c PubsubShardchannelsPattern) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type PubsubShardnumsub Completed
+type PubsubShardnumsub Incomplete
 
 func (b Builder) PubsubShardnumsub() (c PubsubShardnumsub) {
 	c = PubsubShardnumsub{cs: get(), ks: b.ks}
@@ -175,10 +175,10 @@ func (c PubsubShardnumsub) Channel(channel ...string) PubsubShardnumsubChannel {
 
 func (c PubsubShardnumsub) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type PubsubShardnumsubChannel Completed
+type PubsubShardnumsubChannel Incomplete
 
 func (c PubsubShardnumsubChannel) Channel(channel ...string) PubsubShardnumsubChannel {
 	c.cs.s = append(c.cs.s, channel...)
@@ -187,13 +187,13 @@ func (c PubsubShardnumsubChannel) Channel(channel ...string) PubsubShardnumsubCh
 
 func (c PubsubShardnumsubChannel) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Punsubscribe Completed
+type Punsubscribe Incomplete
 
 func (b Builder) Punsubscribe() (c Punsubscribe) {
-	c = Punsubscribe{cs: get(), ks: b.ks, cf: noRetTag}
+	c = Punsubscribe{cs: get(), ks: b.ks, cf: int16(noRetTag)}
 	c.cs.s = append(c.cs.s, "PUNSUBSCRIBE")
 	return c
 }
@@ -205,10 +205,10 @@ func (c Punsubscribe) Pattern(pattern ...string) PunsubscribePattern {
 
 func (c Punsubscribe) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type PunsubscribePattern Completed
+type PunsubscribePattern Incomplete
 
 func (c PunsubscribePattern) Pattern(pattern ...string) PunsubscribePattern {
 	c.cs.s = append(c.cs.s, pattern...)
@@ -217,10 +217,10 @@ func (c PunsubscribePattern) Pattern(pattern ...string) PunsubscribePattern {
 
 func (c PunsubscribePattern) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Spublish Completed
+type Spublish Incomplete
 
 func (b Builder) Spublish() (c Spublish) {
 	c = Spublish{cs: get(), ks: b.ks}
@@ -238,24 +238,24 @@ func (c Spublish) Channel(channel string) SpublishChannel {
 	return (SpublishChannel)(c)
 }
 
-type SpublishChannel Completed
+type SpublishChannel Incomplete
 
 func (c SpublishChannel) Message(message string) SpublishMessage {
 	c.cs.s = append(c.cs.s, message)
 	return (SpublishMessage)(c)
 }
 
-type SpublishMessage Completed
+type SpublishMessage Incomplete
 
 func (c SpublishMessage) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Ssubscribe Completed
+type Ssubscribe Incomplete
 
 func (b Builder) Ssubscribe() (c Ssubscribe) {
-	c = Ssubscribe{cs: get(), ks: b.ks, cf: noRetTag}
+	c = Ssubscribe{cs: get(), ks: b.ks, cf: int16(noRetTag)}
 	c.cs.s = append(c.cs.s, "SSUBSCRIBE")
 	return c
 }
@@ -275,7 +275,7 @@ func (c Ssubscribe) Channel(channel ...string) SsubscribeChannel {
 	return (SsubscribeChannel)(c)
 }
 
-type SsubscribeChannel Completed
+type SsubscribeChannel Incomplete
 
 func (c SsubscribeChannel) Channel(channel ...string) SsubscribeChannel {
 	if c.ks&NoSlot == NoSlot {
@@ -294,13 +294,13 @@ func (c SsubscribeChannel) Channel(channel ...string) SsubscribeChannel {
 
 func (c SsubscribeChannel) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Subscribe Completed
+type Subscribe Incomplete
 
 func (b Builder) Subscribe() (c Subscribe) {
-	c = Subscribe{cs: get(), ks: b.ks, cf: noRetTag}
+	c = Subscribe{cs: get(), ks: b.ks, cf: int16(noRetTag)}
 	c.cs.s = append(c.cs.s, "SUBSCRIBE")
 	return c
 }
@@ -310,7 +310,7 @@ func (c Subscribe) Channel(channel ...string) SubscribeChannel {
 	return (SubscribeChannel)(c)
 }
 
-type SubscribeChannel Completed
+type SubscribeChannel Incomplete
 
 func (c SubscribeChannel) Channel(channel ...string) SubscribeChannel {
 	c.cs.s = append(c.cs.s, channel...)
@@ -319,13 +319,13 @@ func (c SubscribeChannel) Channel(channel ...string) SubscribeChannel {
 
 func (c SubscribeChannel) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Sunsubscribe Completed
+type Sunsubscribe Incomplete
 
 func (b Builder) Sunsubscribe() (c Sunsubscribe) {
-	c = Sunsubscribe{cs: get(), ks: b.ks, cf: noRetTag}
+	c = Sunsubscribe{cs: get(), ks: b.ks, cf: int16(noRetTag)}
 	c.cs.s = append(c.cs.s, "SUNSUBSCRIBE")
 	return c
 }
@@ -347,10 +347,10 @@ func (c Sunsubscribe) Channel(channel ...string) SunsubscribeChannel {
 
 func (c Sunsubscribe) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SunsubscribeChannel Completed
+type SunsubscribeChannel Incomplete
 
 func (c SunsubscribeChannel) Channel(channel ...string) SunsubscribeChannel {
 	if c.ks&NoSlot == NoSlot {
@@ -369,13 +369,13 @@ func (c SunsubscribeChannel) Channel(channel ...string) SunsubscribeChannel {
 
 func (c SunsubscribeChannel) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Unsubscribe Completed
+type Unsubscribe Incomplete
 
 func (b Builder) Unsubscribe() (c Unsubscribe) {
-	c = Unsubscribe{cs: get(), ks: b.ks, cf: noRetTag}
+	c = Unsubscribe{cs: get(), ks: b.ks, cf: int16(noRetTag)}
 	c.cs.s = append(c.cs.s, "UNSUBSCRIBE")
 	return c
 }
@@ -387,10 +387,10 @@ func (c Unsubscribe) Channel(channel ...string) UnsubscribeChannel {
 
 func (c Unsubscribe) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type UnsubscribeChannel Completed
+type UnsubscribeChannel Incomplete
 
 func (c UnsubscribeChannel) Channel(channel ...string) UnsubscribeChannel {
 	c.cs.s = append(c.cs.s, channel...)
@@ -399,5 +399,5 @@ func (c UnsubscribeChannel) Channel(channel ...string) UnsubscribeChannel {
 
 func (c UnsubscribeChannel) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }

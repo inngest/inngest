@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/inngest/inngest/pkg/enums"
 	"time"
+
+	"github.com/inngest/inngest/pkg/enums"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/coocood/freecache"
@@ -436,18 +437,16 @@ func connectToOrCreateRedis(redisURI string) (rueidis.Client, error) {
 		return createInmemoryRedisConnection()
 	}
 
-	url := redisURI
-	// strip the redis:// prefix if we have one; connection fails with it
-	if len(url) > 8 && url[:8] == "redis://" {
-		url = url[8:]
+	opt, err := rueidis.ParseURL(redisURI)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing redis uri: %w", err)
 	}
 
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:       []string{url},
-		DisableCache:      true,
-		BlockingPoolSize:  1,
-		ForceSingleClient: true,
-	})
+	// Set default overrides
+	opt.DisableCache = true
+	opt.BlockingPoolSize = 1
+
+	rc, err := rueidis.NewClient(opt)
 	if err != nil {
 		return nil, fmt.Errorf("error creating redis client: %w", err)
 	}

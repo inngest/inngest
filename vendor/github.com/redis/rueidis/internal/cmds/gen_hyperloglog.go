@@ -2,7 +2,7 @@
 
 package cmds
 
-type Pfadd Completed
+type Pfadd Incomplete
 
 func (b Builder) Pfadd() (c Pfadd) {
 	c = Pfadd{cs: get(), ks: b.ks}
@@ -20,7 +20,7 @@ func (c Pfadd) Key(key string) PfaddKey {
 	return (PfaddKey)(c)
 }
 
-type PfaddElement Completed
+type PfaddElement Incomplete
 
 func (c PfaddElement) Element(element ...string) PfaddElement {
 	c.cs.s = append(c.cs.s, element...)
@@ -29,10 +29,10 @@ func (c PfaddElement) Element(element ...string) PfaddElement {
 
 func (c PfaddElement) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type PfaddKey Completed
+type PfaddKey Incomplete
 
 func (c PfaddKey) Element(element ...string) PfaddElement {
 	c.cs.s = append(c.cs.s, element...)
@@ -41,13 +41,13 @@ func (c PfaddKey) Element(element ...string) PfaddElement {
 
 func (c PfaddKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Pfcount Completed
+type Pfcount Incomplete
 
 func (b Builder) Pfcount() (c Pfcount) {
-	c = Pfcount{cs: get(), ks: b.ks, cf: readonly}
+	c = Pfcount{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "PFCOUNT")
 	return c
 }
@@ -67,7 +67,7 @@ func (c Pfcount) Key(key ...string) PfcountKey {
 	return (PfcountKey)(c)
 }
 
-type PfcountKey Completed
+type PfcountKey Incomplete
 
 func (c PfcountKey) Key(key ...string) PfcountKey {
 	if c.ks&NoSlot == NoSlot {
@@ -86,10 +86,10 @@ func (c PfcountKey) Key(key ...string) PfcountKey {
 
 func (c PfcountKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Pfmerge Completed
+type Pfmerge Incomplete
 
 func (b Builder) Pfmerge() (c Pfmerge) {
 	c = Pfmerge{cs: get(), ks: b.ks}
@@ -107,7 +107,7 @@ func (c Pfmerge) Destkey(destkey string) PfmergeDestkey {
 	return (PfmergeDestkey)(c)
 }
 
-type PfmergeDestkey Completed
+type PfmergeDestkey Incomplete
 
 func (c PfmergeDestkey) Sourcekey(sourcekey ...string) PfmergeSourcekey {
 	if c.ks&NoSlot == NoSlot {
@@ -126,10 +126,10 @@ func (c PfmergeDestkey) Sourcekey(sourcekey ...string) PfmergeSourcekey {
 
 func (c PfmergeDestkey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type PfmergeSourcekey Completed
+type PfmergeSourcekey Incomplete
 
 func (c PfmergeSourcekey) Sourcekey(sourcekey ...string) PfmergeSourcekey {
 	if c.ks&NoSlot == NoSlot {
@@ -148,5 +148,5 @@ func (c PfmergeSourcekey) Sourcekey(sourcekey ...string) PfmergeSourcekey {
 
 func (c PfmergeSourcekey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }

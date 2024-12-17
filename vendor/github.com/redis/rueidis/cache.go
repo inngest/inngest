@@ -60,9 +60,9 @@ func NewSimpleCacheAdapter(store SimpleCache) CacheStore {
 }
 
 type adapter struct {
-	mu      sync.RWMutex
 	store   SimpleCache
 	flights map[string]map[string]CacheEntry
+	mu      sync.RWMutex
 }
 
 func (a *adapter) Flight(key, cmd string, ttl time.Duration, now time.Time) (RedisMessage, CacheEntry) {
