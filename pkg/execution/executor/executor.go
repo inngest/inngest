@@ -2257,9 +2257,9 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		return err
 	}
 
-	// TODO: If auto-call is supported and a tool is provided, auto-call invokes
-	// before scheduling the next step.
-	// if !failure {}
+	// XXX: If auto-call is supported and a tool is provided, auto-call invokes
+	// before scheduling the next step.  This can only happen if the tool is an
+	// invoke.  We do not support this yet.
 
 	// XXX: Remove once deprecated from history.
 	groupID := uuid.New().String()
