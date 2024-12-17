@@ -187,11 +187,6 @@ func (r *redisConnectionStateManager) GetConnectionsByGroupID(ctx context.Contex
 }
 
 func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn *Connection) error {
-	envID, err := uuid.Parse(conn.Data.AuthData.GetEnvId())
-	if err != nil {
-		return fmt.Errorf("error parsing environment ID: %w", err)
-	}
-
 	groupID := conn.Group.Hash
 	meta := &connpb.ConnMetadata{
 		Id:              conn.Session.SessionId.ConnectionId,
@@ -211,10 +206,10 @@ func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn
 	}
 
 	keys := []string{
-		r.connKey(envID),
-		r.groupKey(envID),
-		r.groupIDKey(envID, groupID),
-		r.connIndexByApp(envID, conn.Group.AppID),
+		r.connKey(conn.EnvID),
+		r.groupKey(conn.EnvID),
+		r.groupIDKey(conn.EnvID, groupID),
+		r.connIndexByApp(conn.EnvID, conn.Group.AppID),
 	}
 
 	// NOTE: redis_state.StrSlice format the data in a non JSON way, not sure why

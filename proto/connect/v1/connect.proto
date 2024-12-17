@@ -42,6 +42,7 @@ message ConfigDetails {
 
 message AuthData {
 	string session_token = 1;
+	string sync_token = 2;
 }
 
 message WorkerConnectRequestData {

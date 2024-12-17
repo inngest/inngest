@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"github.com/inngest/inngest/pkg/connect/auth"
 	"log/slog"
 	"net/http"
 	"os"
@@ -17,7 +18,6 @@ import (
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
 )
@@ -72,7 +72,7 @@ type connectGatewaySvc struct {
 
 	runCtx context.Context
 
-	auther       GatewayAuthHandler
+	auther       auth.Handler
 	stateManager state.StateManager
 	receiver     pubsub.RequestReceiver
 	appLoader    ConnectAppLoader
@@ -110,7 +110,7 @@ func newDrainListener() *drainListener {
 	}
 }
 
-func WithGatewayAuthHandler(auth GatewayAuthHandler) gatewayOpt {
+func WithGatewayAuthHandler(auth auth.Handler) gatewayOpt {
 	return func(c *connectGatewaySvc) {
 		c.auther = auth
 	}

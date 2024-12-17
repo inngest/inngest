@@ -144,4 +144,6 @@ var (
 	// DevServerAccountId is the fixed account ID used internally in the dev server.
 	DevServerAccountId = uuid.MustParse("72d87f98-871b-5b9f-a9f1-e9e2ef0a8f55")
 	DevServerEnvId     = uuid.MustParse("b711b20a-fecc-4183-b3d5-65da9028d1d1")
+
+	DevServerConnectJwtSecret = []byte("this-does-not-need-to-be-secret")
 )

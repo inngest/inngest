@@ -91,11 +91,19 @@ func SignSessionToken(jwtSecret []byte, accountId uuid.UUID, envId uuid.UUID, ex
 
 func NewJWTAuthHandler(jwtSecret []byte) Handler {
 	return func(ctx context.Context, data *connect.WorkerConnectRequestData) (*Response, error) {
-		if data.AuthData.get
+		token := data.AuthData.GetSessionToken()
+		if token == "" {
+			return nil, nil
+		}
+
+		verified, err := VerifySessionToken(jwtSecret, token)
+		if err != nil {
+			return nil, nil
+		}
 
 		return &Response{
-			AccountID: uuid.UUID{},
-			EnvID:     uuid.UUID{},
+			AccountID: verified.AccountID,
+			EnvID:     verified.EnvID,
 		}, nil
 	}
 }

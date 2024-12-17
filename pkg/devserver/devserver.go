@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/connect/auth"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
@@ -51,7 +52,6 @@ import (
 	"github.com/inngest/inngest/pkg/service"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
-	connectproto "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/sync/errgroup"
@@ -422,12 +422,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	connGateway := connect.NewConnectGatewayService(
 		connect.WithConnectionStateManager(connectionManager),
 		connect.WithRequestReceiver(gatewayProxy),
-		connect.WithGatewayAuthHandler(func(ctx context.Context, data *connectproto.WorkerConnectRequestData) (*connect.AuthResponse, error) {
-			return &connect.AuthResponse{
-				AccountID: consts.DevServerAccountId,
-				EnvID:     consts.DevServerEnvId,
-			}, nil
-		}),
+		connect.WithGatewayAuthHandler(auth.NewJWTAuthHandler(consts.DevServerConnectJwtSecret)),
 		connect.WithAppLoader(dbcqrs),
 		connect.WithDev(),
 		connect.WithGatewayPublicPort(8289),
