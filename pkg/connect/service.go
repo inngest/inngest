@@ -29,13 +29,6 @@ const (
 
 type gatewayOpt func(*connectGatewaySvc)
 
-type AuthResponse struct {
-	AccountID uuid.UUID
-	EnvID     uuid.UUID
-}
-
-type GatewayAuthHandler func(context.Context, *connect.WorkerConnectRequestData) (*AuthResponse, error)
-
 type ConnectAppLoader interface {
 	// GetAppByName returns an app by name
 	GetAppByName(ctx context.Context, envID uuid.UUID, name string) (*cqrs.App, error)
