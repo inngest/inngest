@@ -1,6 +1,6 @@
 import 'server-only';
 import { graphql } from '@/gql';
-import { type CdcConnectionInput, type CdcSetupResponse } from '@/gql/graphql';
+import { type CdcConnectionInput, type CdcSetupResponse, type DeleteResponse } from '@/gql/graphql';
 import graphqlAPI from '@/queries/graphqlAPI';
 import { getProductionEnvironment } from '@/queries/server-only/getEnvironment';
 
@@ -58,5 +58,22 @@ export const testAutoSetup = async (input: CdcConnectionInput) => {
   return await graphqlAPI.request<{ cdcAutoSetup: CdcSetupResponse }>(testAutoSetupDocument, {
     envID: environment.id,
     input: input,
+  });
+};
+
+const deleteConnDocument = graphql(`
+  mutation cdcDelete($envID: UUID!, $id: UUID!) {
+    cdcDelete(envID: $envID, id: $id) {
+      ids
+    }
+  }
+`);
+
+export const deleteConn = async (id: string) => {
+  const environment = await getProductionEnvironment();
+
+  return await graphqlAPI.request<{ cdcDelete: DeleteResponse }>(deleteConnDocument, {
+    envID: environment.id,
+    id: id,
   });
 };

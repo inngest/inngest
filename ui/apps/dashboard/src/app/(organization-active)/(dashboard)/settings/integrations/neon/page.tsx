@@ -3,6 +3,7 @@ import IntegrationsPage from '@inngest/components/PostgresIntegrations/Integrati
 import { neonIntegrationPageContent } from '@inngest/components/PostgresIntegrations/Neon/neonContent';
 
 import { PostgresIntegrations } from '@/components/PostgresIntegration/data';
+import { deleteConn } from '@/components/PostgresIntegration/neonData';
 
 export default async function Page() {
   const postgresIntegrations = await PostgresIntegrations();
@@ -12,5 +13,16 @@ export default async function Page() {
     redirect('/settings/integrations/neon/connect');
   }
 
-  return <IntegrationsPage publications={[neonConnection]} content={neonIntegrationPageContent} />;
+  const onDelete = async () => {
+    await deleteConn(neonConnection.id);
+    redirect('/settings/integrations/neon');
+  };
+
+  return (
+    <IntegrationsPage
+      publications={[neonConnection]}
+      content={neonIntegrationPageContent}
+      onDelete={onDelete}
+    />
+  );
 }
