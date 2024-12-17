@@ -22,6 +22,8 @@ const ENTERPRISE_PLAN: Plan = {
   },
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function Page() {
   const plans = await getPlans();
   const { plan: currentPlan } = await getCurrentPlan();
