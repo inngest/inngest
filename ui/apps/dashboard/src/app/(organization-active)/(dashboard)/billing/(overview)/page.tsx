@@ -14,6 +14,8 @@ import {
 import { day } from '@/utils/date';
 import { pathCreator } from '@/utils/urls';
 
+export const dynamic = 'force-dynamic';
+
 export default async function Page() {
   const entitlementUsage = await getEntitlementUsage();
   const plan = await getCurrentPlan();
