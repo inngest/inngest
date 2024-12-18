@@ -290,6 +290,7 @@ func (l traceLifecycle) OnFunctionFinished(
 			attribute.String(consts.OtelSysEventIDs, strings.Join(evtIDs, ",")),
 			attribute.String(consts.OtelSysIdempotencyKey, md.Config.Idempotency),
 			attribute.Bool(consts.OtelSysStepFirst, true),
+			attribute.Bool(consts.OtelSysFunctionHasAI, md.Config.HasAI),
 		),
 	)
 	defer span.End()
