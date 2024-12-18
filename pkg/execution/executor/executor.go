@@ -1054,6 +1054,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 		// Find all items for the current function run.
 		jobs, err := q.RunJobs(
 			ctx,
+			queueShard.Name,
 			md.ID.Tenant.EnvID,
 			md.ID.FunctionID,
 			md.ID.RunID,
