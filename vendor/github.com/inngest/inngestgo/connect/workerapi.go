@@ -12,12 +12,14 @@ import (
 
 type workerApiClient struct {
 	client     http.Client
+	env        *string
 	apiBaseUrl string
 }
 
-func newWorkerApiClient(apiBaseUrl string) *workerApiClient {
+func newWorkerApiClient(apiBaseUrl string, env *string) *workerApiClient {
 	return &workerApiClient{
 		apiBaseUrl: apiBaseUrl,
+		env:        env,
 	}
 }
 
@@ -34,6 +36,10 @@ func (a *workerApiClient) start(ctx context.Context, hashedSigningKey []byte, re
 
 	httpReq.Header.Set("Content-Type", "application/protobuf")
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", string(hashedSigningKey)))
+
+	if a.env != nil {
+		httpReq.Header.Add("X-Inngest-Env", *a.env)
+	}
 
 	httpRes, err := a.client.Do(httpReq)
 	if err != nil {

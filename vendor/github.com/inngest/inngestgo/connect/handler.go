@@ -34,7 +34,7 @@ func Connect(ctx context.Context, opts Opts, invoker FunctionInvoker, logger *sl
 		notifyConnectDoneChan:  make(chan connectReport),
 		notifyConnectedChan:    make(chan struct{}),
 		initiateConnectionChan: make(chan struct{}),
-		apiClient:              newWorkerApiClient(opts.APIBaseUrl),
+		apiClient:              newWorkerApiClient(opts.APIBaseUrl, opts.Env),
 	}
 
 	wp := NewWorkerPool(ctx, opts.WorkerConcurrency, ch.processExecutorRequest)

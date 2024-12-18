@@ -23,7 +23,9 @@ func (a *router) start(w http.ResponseWriter, r *http.Request) {
 		hashedSigningKey = hashedSigningKey[7:]
 	}
 
-	res, err := a.RequestAuther.AuthenticateRequest(ctx, hashedSigningKey)
+	envOverride := r.Header.Get("X-Inngest-Env")
+
+	res, err := a.RequestAuther.AuthenticateRequest(ctx, hashedSigningKey, envOverride)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "authentication failed"))
 		return

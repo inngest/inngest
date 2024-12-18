@@ -21,7 +21,7 @@ type Opts struct {
 }
 
 type RequestAuther interface {
-	AuthenticateRequest(ctx context.Context, hashedSigningKey string) (*auth.Response, error)
+	AuthenticateRequest(ctx context.Context, hashedSigningKey string, env string) (*auth.Response, error)
 }
 
 type ConnectGatewayRetriever interface {

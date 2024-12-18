@@ -629,7 +629,7 @@ func (d *devserver) importRedisSnapshot(ctx context.Context) (imported bool, err
 	return
 }
 
-func (d *devserver) AuthenticateRequest(_ context.Context, _ string) (*auth.Response, error) {
+func (d *devserver) AuthenticateRequest(_ context.Context, _, _ string) (*auth.Response, error) {
 	return &auth.Response{
 		AccountID: consts.DevServerAccountId,
 		EnvID:     consts.DevServerEnvId,
