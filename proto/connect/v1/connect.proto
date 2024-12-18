@@ -134,3 +134,10 @@ message ConnGroup {
 enum WorkerDisconnectReason {
 	WORKER_SHUTDOWN = 0;
 }
+
+message StartResponse {
+	string gateway_endpoint = 1;
+	string gateway_group = 2;
+	string session_token = 3;
+	string sync_token = 4;
+}

@@ -62,7 +62,19 @@ func VerifySessionToken(jwtSecret []byte, tokenString string) (*Response, error)
 	}, nil
 }
 
-func SignSessionToken(jwtSecret []byte, accountId uuid.UUID, envId uuid.UUID, expireAfter time.Duration) (string, error) {
+type jwtSessionTokenSigner struct {
+	jwtSecret []byte
+}
+
+func (j jwtSessionTokenSigner) SignSessionToken(accountId uuid.UUID, envId uuid.UUID, expireAfter time.Duration) (string, error) {
+	return signSessionToken(j.jwtSecret, accountId, envId, expireAfter)
+}
+
+func NewJWTSessionTokenSigner(jwtSecret []byte) SessionTokenSigner {
+	return &jwtSessionTokenSigner{jwtSecret: jwtSecret}
+}
+
+func signSessionToken(jwtSecret []byte, accountId uuid.UUID, envId uuid.UUID, expireAfter time.Duration) (string, error) {
 	now := time.Now()
 
 	id, err := ulid.New(ulid.Now(), rand.Reader)

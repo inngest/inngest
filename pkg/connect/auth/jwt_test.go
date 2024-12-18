@@ -13,7 +13,7 @@ func TestSessionToken(t *testing.T) {
 	secret := []byte("this-is-a-very-strong-secret")
 
 	t.Run("should accept valid token", func(t *testing.T) {
-		created, err := SignSessionToken(secret, accountId, envId, DefaultExpiry)
+		created, err := signSessionToken(secret, accountId, envId, DefaultExpiry)
 		require.NoError(t, err)
 
 		response, err := VerifySessionToken(secret, created)
@@ -24,7 +24,7 @@ func TestSessionToken(t *testing.T) {
 	})
 
 	t.Run("should reject expired token", func(t *testing.T) {
-		created, err := SignSessionToken(secret, accountId, envId, time.Millisecond)
+		created, err := signSessionToken(secret, accountId, envId, time.Millisecond)
 		require.NoError(t, err)
 
 		<-time.After(time.Millisecond * 5)
@@ -39,7 +39,7 @@ func TestSessionToken(t *testing.T) {
 	t.Run("should reject token with invalid sig", func(t *testing.T) {
 		secretForged := []byte("this-is-the-wrong-secret")
 
-		created, err := SignSessionToken(secretForged, accountId, envId, DefaultExpiry)
+		created, err := signSessionToken(secretForged, accountId, envId, DefaultExpiry)
 		require.NoError(t, err)
 
 		response, err := VerifySessionToken(secret, created)
