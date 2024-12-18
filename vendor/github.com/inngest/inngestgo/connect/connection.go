@@ -112,6 +112,8 @@ func (h *connectHandler) prepareConnection(ctx context.Context, data connectionE
 		return connection{}, reconnectError{fmt.Errorf("could not start connection: %w", err)}
 	}
 
+	h.logger.Debug("handshake successful", "gateway_endpoint", startRes.GetGatewayEndpoint(), "gateway_group", startRes.GetGatewayGroup())
+
 	gatewayHost := startRes.GetGatewayEndpoint()
 
 	// Establish WebSocket connection to one of the gateways
