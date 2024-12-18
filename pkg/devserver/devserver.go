@@ -416,7 +416,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			GroupManager:            connectionManager,
 			Signer:                  auth.NewJWTSessionTokenSigner(consts.DevServerConnectJwtSecret),
 			RequestAuther:           ds,
-			ConnectGatewayRetriever: nil,
+			ConnectGatewayRetriever: ds,
 			Dev:                     true,
 		},
 	})

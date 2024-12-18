@@ -18,7 +18,6 @@ import (
 	"log/slog"
 	"os"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
 )
@@ -35,6 +34,7 @@ func Connect(ctx context.Context, opts Opts, invoker FunctionInvoker, logger *sl
 		notifyConnectDoneChan:  make(chan connectReport),
 		notifyConnectedChan:    make(chan struct{}),
 		initiateConnectionChan: make(chan struct{}),
+		apiClient:              newWorkerApiClient(opts.APIBaseUrl),
 	}
 
 	wp := NewWorkerPool(ctx, opts.WorkerConcurrency, ch.processExecutorRequest)
@@ -71,7 +71,6 @@ type Opts struct {
 	APIBaseUrl   string
 	IsDev        bool
 	DevServerUrl string
-	ConnectUrls  []string
 
 	InstanceId *string
 	BuildId    *string
@@ -91,8 +90,6 @@ type connectHandler struct {
 	messageBuffer     []*connectproto.ConnectMessage
 	messageBufferLock sync.Mutex
 
-	hostsManager *hostsManager
-
 	workerPool *workerPool
 
 	// Notify when connect finishes (either with an error or because the context got canceled)
@@ -103,6 +100,8 @@ type connectHandler struct {
 
 	// Channel to imperatively initiate a connection
 	initiateConnectionChan chan struct{}
+
+	apiClient *workerApiClient
 }
 
 // authContext is wrapper for information related to authentication
@@ -131,13 +130,6 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to serialize connect config: %w", err)
 	}
-
-	hosts := h.connectURLs()
-	if len(hosts) == 0 {
-		return fmt.Errorf("no connect URLs provided")
-	}
-
-	h.hostsManager = newHostsManager(hosts)
 
 	var attempts int
 
@@ -303,18 +295,6 @@ func (h *connectHandler) processExecutorRequest(msg workerPoolMsg) {
 
 		// TODO If error is not connection-related, should we retry? Send the buffered message?
 	}
-}
-
-func (h *connectHandler) connectURLs() []string {
-	if len(h.opts.ConnectUrls) > 0 {
-		return h.opts.ConnectUrls
-	}
-
-	if h.opts.IsDev {
-		return []string{fmt.Sprintf("%s/connect", strings.Replace(h.opts.DevServerUrl, "http", "ws", 1))}
-	}
-
-	return nil
 }
 
 func (h *connectHandler) instanceId() string {

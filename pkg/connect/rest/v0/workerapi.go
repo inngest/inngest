@@ -29,16 +29,18 @@ func (a *router) start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	byt, err := io.ReadAll(io.LimitReader(r.Body, 500*1024))
+	byt, err := io.ReadAll(io.LimitReader(r.Body, 1024*1024))
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "could not read request body"))
 		return
 	}
 
 	reqBody := &connect.StartRequest{}
-	if err := proto.Unmarshal(byt, reqBody); err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "could not unmarshal request"))
-		return
+	if len(byt) > 0 {
+		if err := proto.Unmarshal(byt, reqBody); err != nil {
+			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "could not unmarshal request"))
+			return
+		}
 	}
 
 	token, err := a.Signer.SignSessionToken(res.AccountID, res.EnvID, auth.DefaultExpiry)
