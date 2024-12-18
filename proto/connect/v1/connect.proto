@@ -37,7 +37,6 @@ message SessionDetails {
 message ConfigDetails {
 	bytes capabilities = 1;
 	bytes functions = 2;
-	string api_origin = 3;
 }
 
 message AuthData {

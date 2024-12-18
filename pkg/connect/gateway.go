@@ -212,7 +212,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}()
 
-		err = conn.Sync(ctx, c.stateManager)
+		err = conn.Sync(ctx, c.stateManager, c.apiBaseUrl)
 		if err != nil {
 			if ctx.Err() != nil {
 				c.closeDraining(ws)

@@ -76,6 +76,7 @@ type connectGatewaySvc struct {
 	stateManager state.StateManager
 	receiver     pubsub.RequestReceiver
 	appLoader    ConnectAppLoader
+	apiBaseUrl   string
 
 	hostname string
 
@@ -155,6 +156,12 @@ func WithStartAsDraining(isDraining bool) gatewayOpt {
 func WithGatewayPublicPort(port int) gatewayOpt {
 	return func(svc *connectGatewaySvc) {
 		svc.gatewayPublicPort = port
+	}
+}
+
+func WithApiBaseUrl(url string) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.apiBaseUrl = url
 	}
 }
 

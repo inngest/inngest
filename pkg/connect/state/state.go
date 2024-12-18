@@ -125,7 +125,7 @@ type Connection struct {
 // this should be dedupped when there's a large number of workers coming up at once
 // so it doesn't attempt to sync multiple times prior to the worker group getting
 // a response
-func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager) error {
+func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager, apiBaseUrl string) error {
 	if c.Group == nil {
 		return fmt.Errorf("worker group is required for syncing")
 	}
@@ -168,7 +168,7 @@ func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager) 
 
 	// NOTE: pick this up via SDK
 	// technically it should only be accessible to the system that's the gateway is associated with
-	registerURL := fmt.Sprintf("%s/fn/register", c.Data.Config.ApiOrigin)
+	registerURL := fmt.Sprintf("%s/fn/register", apiBaseUrl)
 
 	byt, err := json.Marshal(config)
 	if err != nil {

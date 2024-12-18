@@ -429,6 +429,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		connect.WithAppLoader(dbcqrs),
 		connect.WithDev(),
 		connect.WithGatewayPublicPort(8289),
+		connect.WithApiBaseUrl(fmt.Sprintf("http://127.0.0.1:%d", opts.Config.EventAPI.Port)),
 	)
 	connRouter := connect.NewConnectMessageRouterService(connectionManager, gatewayProxy)
 
