@@ -1,1 +1,1 @@
-ALTER TABLE apps DROP COLUMN is_connect;
+ALTER TABLE apps DROP COLUMN app_type;
