@@ -6,14 +6,13 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/auth"
-	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/headers"
 	"net/url"
 )
 
 type Opts struct {
-	ConnectManager          state.ConnectionManager
-	GroupManager            state.WorkerGroupManager
+	//ConnectManager          state.ConnectionManager
+	//GroupManager            state.WorkerGroupManager
 	Signer                  auth.SessionTokenSigner
 	RequestAuther           RequestAuther
 	ConnectGatewayRetriever ConnectGatewayRetriever
@@ -55,13 +54,19 @@ func New(r chi.Router, opts Opts) *router {
 }
 
 func (a *router) setup() {
+	// Connect API
 	a.Group(func(r chi.Router) {
 		r.Use(middleware.Recoverer)
 		r.Use(headers.ContentTypeJsonResponse())
 
-		r.Get("/envs/{envID}/conns", a.showConnections)
-		r.Get("/envs/{envID}/groups/{groupID}", a.showWorkerGroup)
+		// TODO Implement connection history routes
+		//r.Get("/envs/{envID}/conns", a.showConnections)
+		//r.Get("/envs/{envID}/groups/{groupID}", a.showWorkerGroup)
 
+	})
+
+	// Worker API
+	a.Group(func(r chi.Router) {
 		r.Post("/start", a.start)
 	})
 }
