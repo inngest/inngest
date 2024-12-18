@@ -8,8 +8,10 @@ import { type IntegrationPageContent } from './types';
 export default function IntegrationPage({
   content,
   publications,
+  onDelete,
 }: {
   content: IntegrationPageContent;
+  onDelete: () => void;
   // TO DO: change this format
   publications: {
     id: string;
@@ -63,17 +65,15 @@ export default function IntegrationPage({
       <div className="border-muted border-t py-7">
         <div className="flex items-center gap-2">
           <p>Remove {content.title} integration</p>
-          <Pill>Coming soon</Pill>
         </div>
         <p className="text-subtle mb-6 mt-3 text-sm">
           Permanently remove the {content.title} integration from Inngest
         </p>
         <NewButton
-          disabled
           appearance="solid"
           kind="danger"
           label={`Remove ${content.title}`}
-          title="coming soon"
+          onClick={onDelete}
         />
       </div>
     </div>
