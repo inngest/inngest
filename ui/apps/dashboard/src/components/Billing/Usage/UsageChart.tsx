@@ -5,21 +5,18 @@ import { Alert } from '@inngest/components/Alert';
 import { Chart } from '@inngest/components/Chart/Chart';
 
 import { createChartOptions } from './transformData';
-import useGetBillableSteps from './useGetBillableSteps';
+import useGetUsageChartData from './useGetUsageChartData';
 
 type Props = {
-  includedStepCountLimit?: number;
+  includedCountLimit?: number;
   selectedPeriod: 'current' | 'previous';
-  type: string;
+  type: 'run' | 'step';
 };
 
-export default function BillableUsageChart({
-  includedStepCountLimit,
-  selectedPeriod,
-  type,
-}: Props) {
-  const { data, fetching } = useGetBillableSteps({
+export default function BillableUsageChart({ includedCountLimit, selectedPeriod, type }: Props) {
+  const { data, fetching } = useGetUsageChartData({
     selectedPeriod: selectedPeriod,
+    type: type,
   });
 
   if (data.length === 0 && !fetching) {
@@ -36,7 +33,7 @@ export default function BillableUsageChart({
     );
   }
 
-  const chartOption = createChartOptions(data, includedStepCountLimit, type);
+  const chartOption = createChartOptions(data, includedCountLimit, type);
 
   return (
     <div>

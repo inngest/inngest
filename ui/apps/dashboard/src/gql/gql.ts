@@ -81,7 +81,8 @@ const documents = {
     "\n  query GetPaymentIntents {\n    account {\n      paymentIntents {\n        status\n        createdAt\n        amountLabel\n        description\n        invoiceURL\n      }\n    }\n  }\n": types.GetPaymentIntentsDocument,
     "\n  mutation CreateStripeSubscription($input: StripeSubscriptionInput!) {\n    createStripeSubscription(input: $input) {\n      clientSecret\n      message\n    }\n  }\n": types.CreateStripeSubscriptionDocument,
     "\n  mutation UpdatePlan($planID: ID!) {\n    updatePlan(to: $planID) {\n      plan {\n        id\n        name\n      }\n    }\n  }\n": types.UpdatePlanDocument,
-    "\n  query GetBillableSteps($month: Int!, $year: Int!) {\n    billableStepTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n": types.GetBillableStepsDocument,
+    "\n  query GetBillableSteps($month: Int!, $year: Int!) {\n    usage: billableStepTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n": types.GetBillableStepsDocument,
+    "\n  query GetBillableRuns($month: Int!, $year: Int!) {\n    usage: runCountTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n": types.GetBillableRunsDocument,
     "\n  query EntitlementUsage {\n    account {\n      id\n      entitlements {\n        runCount {\n          usage\n          limit\n          overageAllowed\n        }\n        stepCount {\n          usage\n          limit\n          overageAllowed\n        }\n        concurrency {\n          usage\n          limit\n        }\n        eventSize {\n          limit\n        }\n        history {\n          limit\n        }\n        userCount {\n          limit\n        }\n      }\n      plan {\n        name\n      }\n    }\n  }\n": types.EntitlementUsageDocument,
     "\n  query GetCurrentPlan {\n    account {\n      plan {\n        id\n        name\n        amount\n        billingPeriod\n        entitlements {\n          concurrency {\n            limit\n          }\n          eventSize {\n            limit\n          }\n          history {\n            limit\n          }\n          runCount {\n            limit\n          }\n          stepCount {\n            limit\n          }\n        }\n      }\n      subscription {\n        nextInvoiceDate\n      }\n    }\n  }\n": types.GetCurrentPlanDocument,
     "\n  query GetBillingDetails {\n    account {\n      billingEmail\n      name\n      paymentMethods {\n        brand\n        last4\n        expMonth\n        expYear\n        createdAt\n        default\n      }\n    }\n  }\n": types.GetBillingDetailsDocument,
@@ -113,6 +114,7 @@ const documents = {
     "\n  mutation testCredentials($input: CDCConnectionInput!, $envID: UUID!) {\n    cdcTestCredentials(input: $input, envID: $envID) {\n      steps\n      error\n    }\n  }\n": types.TestCredentialsDocument,
     "\n  mutation testReplication($input: CDCConnectionInput!, $envID: UUID!) {\n    cdcTestLogicalReplication(input: $input, envID: $envID) {\n      steps\n      error\n    }\n  }\n": types.TestReplicationDocument,
     "\n  mutation testAutoSetup($input: CDCConnectionInput!, $envID: UUID!) {\n    cdcAutoSetup(input: $input, envID: $envID) {\n      steps\n      error\n    }\n  }\n": types.TestAutoSetupDocument,
+    "\n  mutation cdcDelete($envID: UUID!, $id: UUID!) {\n    cdcDelete(envID: $envID, id: $id) {\n      ids\n    }\n  }\n": types.CdcDeleteDocument,
     "\n  fragment TraceDetails on RunTraceSpan {\n    name\n    status\n    attempts\n    queuedAt\n    startedAt\n    endedAt\n    isRoot\n    outputID\n    spanID\n    stepOp\n    stepInfo {\n      __typename\n      ... on InvokeStepInfo {\n        triggeringEventID\n        functionID\n        timeout\n        returnEventID\n        runID\n        timedOut\n      }\n      ... on SleepStepInfo {\n        sleepUntil\n      }\n      ... on WaitForEventStepInfo {\n        eventName\n        expression\n        timeout\n        foundEventID\n        timedOut\n      }\n    }\n  }\n": types.TraceDetailsFragmentDoc,
     "\n  query GetRunTrace($envID: ID!, $runID: String!) {\n    workspace(id: $envID) {\n      run(runID: $runID) {\n        function {\n          app {\n            name\n            externalID\n          }\n          id\n          name\n          slug\n        }\n        trace {\n          ...TraceDetails\n          childrenSpans {\n            ...TraceDetails\n            childrenSpans {\n              ...TraceDetails\n            }\n          }\n        }\n      }\n    }\n  }\n": types.GetRunTraceDocument,
     "\n  query TraceResult($envID: ID!, $traceID: String!) {\n    workspace(id: $envID) {\n      runTraceSpanOutputByID(outputID: $traceID) {\n        data\n        error {\n          message\n          name\n          stack\n        }\n      }\n    }\n  }\n": types.TraceResultDocument,
@@ -424,7 +426,11 @@ export function graphql(source: "\n  mutation UpdatePlan($planID: ID!) {\n    up
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  query GetBillableSteps($month: Int!, $year: Int!) {\n    billableStepTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetBillableSteps($month: Int!, $year: Int!) {\n    billableStepTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n"];
+export function graphql(source: "\n  query GetBillableSteps($month: Int!, $year: Int!) {\n    usage: billableStepTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetBillableSteps($month: Int!, $year: Int!) {\n    usage: billableStepTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query GetBillableRuns($month: Int!, $year: Int!) {\n    usage: runCountTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetBillableRuns($month: Int!, $year: Int!) {\n    usage: runCountTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -549,6 +555,10 @@ export function graphql(source: "\n  mutation testReplication($input: CDCConnect
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation testAutoSetup($input: CDCConnectionInput!, $envID: UUID!) {\n    cdcAutoSetup(input: $input, envID: $envID) {\n      steps\n      error\n    }\n  }\n"): (typeof documents)["\n  mutation testAutoSetup($input: CDCConnectionInput!, $envID: UUID!) {\n    cdcAutoSetup(input: $input, envID: $envID) {\n      steps\n      error\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation cdcDelete($envID: UUID!, $id: UUID!) {\n    cdcDelete(envID: $envID, id: $id) {\n      ids\n    }\n  }\n"): (typeof documents)["\n  mutation cdcDelete($envID: UUID!, $id: UUID!) {\n    cdcDelete(envID: $envID, id: $id) {\n      ids\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
