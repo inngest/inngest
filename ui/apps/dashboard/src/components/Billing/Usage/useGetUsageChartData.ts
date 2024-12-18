@@ -1,15 +1,11 @@
 import { useQuery } from 'urql';
 
 import { graphql } from '@/gql';
-import {
-  type GetBillableRunsQuery,
-  type GetBillableStepsQuery,
-  type TimeSeriesPoint,
-} from '@/gql/graphql';
+import { type GetBillableRunsQuery, type GetBillableStepsQuery } from '@/gql/graphql';
 
 const GetBillableSteps = graphql(`
   query GetBillableSteps($month: Int!, $year: Int!) {
-    billableStepTimeSeries(timeOptions: { month: $month, year: $year }) {
+    usage: billableStepTimeSeries(timeOptions: { month: $month, year: $year }) {
       data {
         time
         value
@@ -20,7 +16,7 @@ const GetBillableSteps = graphql(`
 
 const GetBillableRuns = graphql(`
   query GetBillableRuns($month: Int!, $year: Int!) {
-    runCountTimeSeries(timeOptions: { month: $month, year: $year }) {
+    usage: runCountTimeSeries(timeOptions: { month: $month, year: $year }) {
       data {
         time
         value
@@ -59,16 +55,8 @@ export default function useGetUsageChartData({
     },
   });
 
-  let usageData: Array<TimeSeriesPoint> = [];
-
-  if (type === 'step' && data && 'billableStepTimeSeries' in data) {
-    usageData = data.billableStepTimeSeries[0]?.data || [];
-  } else if (type === 'run' && data && 'runCountTimeSeries' in data) {
-    usageData = data.runCountTimeSeries[0]?.data || [];
-  }
-
   return {
-    data: usageData,
+    data: data?.usage[0]?.data || [],
     fetching,
   };
 }
