@@ -1,10 +1,11 @@
 import { useQuery } from 'urql';
 
 import { graphql } from '@/gql';
+import { type GetBillableRunsQuery, type GetBillableStepsQuery } from '@/gql/graphql';
 
 const GetBillableSteps = graphql(`
   query GetBillableSteps($month: Int!, $year: Int!) {
-    billableStepTimeSeries(timeOptions: { month: $month, year: $year }) {
+    usage: billableStepTimeSeries(timeOptions: { month: $month, year: $year }) {
       data {
         time
         value
@@ -13,12 +14,26 @@ const GetBillableSteps = graphql(`
   }
 `);
 
-export default function useGetBillableSteps({
+const GetBillableRuns = graphql(`
+  query GetBillableRuns($month: Int!, $year: Int!) {
+    usage: runCountTimeSeries(timeOptions: { month: $month, year: $year }) {
+      data {
+        time
+        value
+      }
+    }
+  }
+`);
+
+export default function useGetUsageChartData({
   selectedPeriod,
+  type,
 }: {
   selectedPeriod: 'current' | 'previous';
+  type: 'run' | 'step';
 }) {
   const currentMonthIndex = new Date().getUTCMonth();
+
   const options = {
     previous: {
       month: currentMonthIndex === 0 ? 12 : currentMonthIndex,
@@ -30,8 +45,10 @@ export default function useGetBillableSteps({
     },
   };
 
-  const [{ data, fetching }] = useQuery({
-    query: GetBillableSteps,
+  const query = type === 'step' ? GetBillableSteps : GetBillableRuns;
+
+  const [{ data, fetching }] = useQuery<GetBillableStepsQuery | GetBillableRunsQuery>({
+    query,
     variables: {
       month: options[selectedPeriod].month,
       year: options[selectedPeriod].year,
@@ -39,7 +56,7 @@ export default function useGetBillableSteps({
   });
 
   return {
-    data: data?.billableStepTimeSeries[0]?.data || [],
+    data: data?.usage[0]?.data || [],
     fetching,
   };
 }

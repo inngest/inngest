@@ -6,9 +6,9 @@ import { Select, type Option } from '@inngest/components/Select/Select';
 import ToggleGroup from '@inngest/components/ToggleGroup/ToggleGroup';
 import { useQuery } from 'urql';
 
-import BillableUsageChart from '@/components/Billing/Usage/BillableUsageChart';
 import UsageMetadata from '@/components/Billing/Usage/Metadata';
-import useGetBillableSteps from '@/components/Billing/Usage/useGetBillableSteps';
+import UsageChart from '@/components/Billing/Usage/UsageChart';
+import useGetUsageChartData from '@/components/Billing/Usage/useGetUsageChartData';
 import { graphql } from '@/gql';
 import { pathCreator } from '@/utils/urls';
 
@@ -51,16 +51,18 @@ export default function Billing({
     query: GetBillingInfoDocument,
   });
 
-  const [currentPage, setCurrentPage] = useState('step');
+  const [currentPage, setCurrentPage] = useState<'run' | 'step'>('step');
   const [selectedPeriod, setSelectedPeriod] = useState<Period>(previous ? options[1] : options[0]);
 
   // Get timeseries to temporarily grab the total usage for previous month, since we don't have history usage on entitlements
-  const { data: billableData, fetching: fetchingBillableData } = useGetBillableSteps({
+  const { data: billableData, fetching: fetchingBillableData } = useGetUsageChartData({
     selectedPeriod: selectedPeriod.id,
+    type: currentPage,
   });
 
   const stepCount = data?.account.entitlements.stepCount || { usage: 0, limit: 0 };
   const runCount = data?.account.entitlements.runCount || { usage: 0, limit: 0 };
+  const legacyNoRunsPlan = data?.account.entitlements.runCount.limit === null;
   const isStepPage = currentPage === 'step';
   const currentUsage = (() => {
     if (selectedPeriod.id === 'previous' && billableData.length) {
@@ -82,12 +84,15 @@ export default function Billing({
           type="single"
           defaultValue={currentPage}
           size="small"
-          onValueChange={setCurrentPage}
-          disabled
+          onValueChange={(value) => {
+            if (value === 'run' || value === 'step') {
+              setCurrentPage(value);
+            }
+          }}
+          disabled={legacyNoRunsPlan}
         >
-          {/* Disable until we have the chart data for both months */}
-          {/* <ToggleGroup.Item value="run">Run</ToggleGroup.Item> */}
           <ToggleGroup.Item value="step">Step</ToggleGroup.Item>
+          {!legacyNoRunsPlan && !fetching && <ToggleGroup.Item value="run">Run</ToggleGroup.Item>}
         </ToggleGroup>
         <Select
           onChange={(value: Option) => {
@@ -133,13 +138,11 @@ export default function Billing({
           value={new Intl.NumberFormat().format(currentUsage)}
         />
       </dl>
-      {isStepPage && (
-        <BillableUsageChart
-          selectedPeriod={selectedPeriod.id}
-          includedStepCountLimit={currentLimit}
-          type={currentPage}
-        />
-      )}
+      <UsageChart
+        selectedPeriod={selectedPeriod.id}
+        includedCountLimit={currentLimit}
+        type={currentPage}
+      />
     </div>
   );
 }
