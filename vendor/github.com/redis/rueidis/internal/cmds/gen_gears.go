@@ -2,7 +2,7 @@
 
 package cmds
 
-type RgAbortexecution Completed
+type RgAbortexecution Incomplete
 
 func (b Builder) RgAbortexecution() (c RgAbortexecution) {
 	c = RgAbortexecution{cs: get(), ks: b.ks}
@@ -15,14 +15,14 @@ func (c RgAbortexecution) Id(id string) RgAbortexecutionId {
 	return (RgAbortexecutionId)(c)
 }
 
-type RgAbortexecutionId Completed
+type RgAbortexecutionId Incomplete
 
 func (c RgAbortexecutionId) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RgConfigget Completed
+type RgConfigget Incomplete
 
 func (b Builder) RgConfigget() (c RgConfigget) {
 	c = RgConfigget{cs: get(), ks: b.ks}
@@ -35,7 +35,7 @@ func (c RgConfigget) Key(key ...string) RgConfiggetKey {
 	return (RgConfiggetKey)(c)
 }
 
-type RgConfiggetKey Completed
+type RgConfiggetKey Incomplete
 
 func (c RgConfiggetKey) Key(key ...string) RgConfiggetKey {
 	c.cs.s = append(c.cs.s, key...)
@@ -44,10 +44,10 @@ func (c RgConfiggetKey) Key(key ...string) RgConfiggetKey {
 
 func (c RgConfiggetKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RgConfigset Completed
+type RgConfigset Incomplete
 
 func (b Builder) RgConfigset() (c RgConfigset) {
 	c = RgConfigset{cs: get(), ks: b.ks}
@@ -59,7 +59,7 @@ func (c RgConfigset) KeyValue() RgConfigsetKeyValue {
 	return (RgConfigsetKeyValue)(c)
 }
 
-type RgConfigsetKeyValue Completed
+type RgConfigsetKeyValue Incomplete
 
 func (c RgConfigsetKeyValue) KeyValue(key string, value string) RgConfigsetKeyValue {
 	c.cs.s = append(c.cs.s, key, value)
@@ -68,10 +68,10 @@ func (c RgConfigsetKeyValue) KeyValue(key string, value string) RgConfigsetKeyVa
 
 func (c RgConfigsetKeyValue) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RgDropexecution Completed
+type RgDropexecution Incomplete
 
 func (b Builder) RgDropexecution() (c RgDropexecution) {
 	c = RgDropexecution{cs: get(), ks: b.ks}
@@ -84,14 +84,14 @@ func (c RgDropexecution) Id(id string) RgDropexecutionId {
 	return (RgDropexecutionId)(c)
 }
 
-type RgDropexecutionId Completed
+type RgDropexecutionId Incomplete
 
 func (c RgDropexecutionId) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RgDumpexecutions Completed
+type RgDumpexecutions Incomplete
 
 func (b Builder) RgDumpexecutions() (c RgDumpexecutions) {
 	c = RgDumpexecutions{cs: get(), ks: b.ks}
@@ -101,10 +101,10 @@ func (b Builder) RgDumpexecutions() (c RgDumpexecutions) {
 
 func (c RgDumpexecutions) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RgDumpregistrations Completed
+type RgDumpregistrations Incomplete
 
 func (b Builder) RgDumpregistrations() (c RgDumpregistrations) {
 	c = RgDumpregistrations{cs: get(), ks: b.ks}
@@ -114,10 +114,10 @@ func (b Builder) RgDumpregistrations() (c RgDumpregistrations) {
 
 func (c RgDumpregistrations) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RgGetexecution Completed
+type RgGetexecution Incomplete
 
 func (b Builder) RgGetexecution() (c RgGetexecution) {
 	c = RgGetexecution{cs: get(), ks: b.ks}
@@ -130,7 +130,7 @@ func (c RgGetexecution) Id(id string) RgGetexecutionId {
 	return (RgGetexecutionId)(c)
 }
 
-type RgGetexecutionId Completed
+type RgGetexecutionId Incomplete
 
 func (c RgGetexecutionId) Shard() RgGetexecutionModeShard {
 	c.cs.s = append(c.cs.s, "SHARD")
@@ -144,24 +144,24 @@ func (c RgGetexecutionId) Cluster() RgGetexecutionModeCluster {
 
 func (c RgGetexecutionId) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RgGetexecutionModeCluster Completed
+type RgGetexecutionModeCluster Incomplete
 
 func (c RgGetexecutionModeCluster) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RgGetexecutionModeShard Completed
+type RgGetexecutionModeShard Incomplete
 
 func (c RgGetexecutionModeShard) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RgGetresults Completed
+type RgGetresults Incomplete
 
 func (b Builder) RgGetresults() (c RgGetresults) {
 	c = RgGetresults{cs: get(), ks: b.ks}
@@ -174,14 +174,14 @@ func (c RgGetresults) Id(id string) RgGetresultsId {
 	return (RgGetresultsId)(c)
 }
 
-type RgGetresultsId Completed
+type RgGetresultsId Incomplete
 
 func (c RgGetresultsId) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RgGetresultsblocking Completed
+type RgGetresultsblocking Incomplete
 
 func (b Builder) RgGetresultsblocking() (c RgGetresultsblocking) {
 	c = RgGetresultsblocking{cs: get(), ks: b.ks}
@@ -194,14 +194,14 @@ func (c RgGetresultsblocking) Id(id string) RgGetresultsblockingId {
 	return (RgGetresultsblockingId)(c)
 }
 
-type RgGetresultsblockingId Completed
+type RgGetresultsblockingId Incomplete
 
 func (c RgGetresultsblockingId) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RgInfocluster Completed
+type RgInfocluster Incomplete
 
 func (b Builder) RgInfocluster() (c RgInfocluster) {
 	c = RgInfocluster{cs: get(), ks: b.ks}
@@ -211,10 +211,10 @@ func (b Builder) RgInfocluster() (c RgInfocluster) {
 
 func (c RgInfocluster) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RgPydumpreqs Completed
+type RgPydumpreqs Incomplete
 
 func (b Builder) RgPydumpreqs() (c RgPydumpreqs) {
 	c = RgPydumpreqs{cs: get(), ks: b.ks}
@@ -224,10 +224,10 @@ func (b Builder) RgPydumpreqs() (c RgPydumpreqs) {
 
 func (c RgPydumpreqs) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RgPyexecute Completed
+type RgPyexecute Incomplete
 
 func (b Builder) RgPyexecute() (c RgPyexecute) {
 	c = RgPyexecute{cs: get(), ks: b.ks}
@@ -240,7 +240,7 @@ func (c RgPyexecute) Function(function string) RgPyexecuteFunction {
 	return (RgPyexecuteFunction)(c)
 }
 
-type RgPyexecuteDescription Completed
+type RgPyexecuteDescription Incomplete
 
 func (c RgPyexecuteDescription) Upgrade() RgPyexecuteUpgrade {
 	c.cs.s = append(c.cs.s, "UPGRADE")
@@ -260,10 +260,10 @@ func (c RgPyexecuteDescription) Requirements(requirement ...string) RgPyexecuteR
 
 func (c RgPyexecuteDescription) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RgPyexecuteFunction Completed
+type RgPyexecuteFunction Incomplete
 
 func (c RgPyexecuteFunction) Unblocking() RgPyexecuteUnblocking {
 	c.cs.s = append(c.cs.s, "UNBLOCKING")
@@ -298,10 +298,10 @@ func (c RgPyexecuteFunction) Requirements(requirement ...string) RgPyexecuteRequ
 
 func (c RgPyexecuteFunction) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RgPyexecuteId Completed
+type RgPyexecuteId Incomplete
 
 func (c RgPyexecuteId) Description(description string) RgPyexecuteDescription {
 	c.cs.s = append(c.cs.s, "DESCRIPTION", description)
@@ -326,10 +326,10 @@ func (c RgPyexecuteId) Requirements(requirement ...string) RgPyexecuteRequiremen
 
 func (c RgPyexecuteId) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RgPyexecuteReplaceWith Completed
+type RgPyexecuteReplaceWith Incomplete
 
 func (c RgPyexecuteReplaceWith) Requirements(requirement ...string) RgPyexecuteRequirementsRequirements {
 	c.cs.s = append(c.cs.s, "REQUIREMENTS")
@@ -339,10 +339,10 @@ func (c RgPyexecuteReplaceWith) Requirements(requirement ...string) RgPyexecuteR
 
 func (c RgPyexecuteReplaceWith) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RgPyexecuteRequirementsRequirements Completed
+type RgPyexecuteRequirementsRequirements Incomplete
 
 func (c RgPyexecuteRequirementsRequirements) Requirements(requirement ...string) RgPyexecuteRequirementsRequirements {
 	c.cs.s = append(c.cs.s, "REQUIREMENTS")
@@ -352,10 +352,10 @@ func (c RgPyexecuteRequirementsRequirements) Requirements(requirement ...string)
 
 func (c RgPyexecuteRequirementsRequirements) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RgPyexecuteUnblocking Completed
+type RgPyexecuteUnblocking Incomplete
 
 func (c RgPyexecuteUnblocking) Id(id string) RgPyexecuteId {
 	c.cs.s = append(c.cs.s, "ID", id)
@@ -385,10 +385,10 @@ func (c RgPyexecuteUnblocking) Requirements(requirement ...string) RgPyexecuteRe
 
 func (c RgPyexecuteUnblocking) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RgPyexecuteUpgrade Completed
+type RgPyexecuteUpgrade Incomplete
 
 func (c RgPyexecuteUpgrade) ReplaceWith(replaceWith string) RgPyexecuteReplaceWith {
 	c.cs.s = append(c.cs.s, "REPLACE_WITH", replaceWith)
@@ -403,10 +403,10 @@ func (c RgPyexecuteUpgrade) Requirements(requirement ...string) RgPyexecuteRequi
 
 func (c RgPyexecuteUpgrade) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RgPystats Completed
+type RgPystats Incomplete
 
 func (b Builder) RgPystats() (c RgPystats) {
 	c = RgPystats{cs: get(), ks: b.ks}
@@ -416,10 +416,10 @@ func (b Builder) RgPystats() (c RgPystats) {
 
 func (c RgPystats) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RgRefreshcluster Completed
+type RgRefreshcluster Incomplete
 
 func (b Builder) RgRefreshcluster() (c RgRefreshcluster) {
 	c = RgRefreshcluster{cs: get(), ks: b.ks}
@@ -429,10 +429,10 @@ func (b Builder) RgRefreshcluster() (c RgRefreshcluster) {
 
 func (c RgRefreshcluster) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RgTrigger Completed
+type RgTrigger Incomplete
 
 func (b Builder) RgTrigger() (c RgTrigger) {
 	c = RgTrigger{cs: get(), ks: b.ks}
@@ -445,7 +445,7 @@ func (c RgTrigger) Trigger(trigger string) RgTriggerTrigger {
 	return (RgTriggerTrigger)(c)
 }
 
-type RgTriggerArgument Completed
+type RgTriggerArgument Incomplete
 
 func (c RgTriggerArgument) Argument(argument ...string) RgTriggerArgument {
 	c.cs.s = append(c.cs.s, argument...)
@@ -454,17 +454,17 @@ func (c RgTriggerArgument) Argument(argument ...string) RgTriggerArgument {
 
 func (c RgTriggerArgument) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RgTriggerTrigger Completed
+type RgTriggerTrigger Incomplete
 
 func (c RgTriggerTrigger) Argument(argument ...string) RgTriggerArgument {
 	c.cs.s = append(c.cs.s, argument...)
 	return (RgTriggerArgument)(c)
 }
 
-type RgUnregister Completed
+type RgUnregister Incomplete
 
 func (b Builder) RgUnregister() (c RgUnregister) {
 	c = RgUnregister{cs: get(), ks: b.ks}
@@ -477,9 +477,9 @@ func (c RgUnregister) Id(id string) RgUnregisterId {
 	return (RgUnregisterId)(c)
 }
 
-type RgUnregisterId Completed
+type RgUnregisterId Incomplete
 
 func (c RgUnregisterId) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }

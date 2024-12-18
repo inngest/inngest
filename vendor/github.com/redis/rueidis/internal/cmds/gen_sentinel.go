@@ -2,7 +2,7 @@
 
 package cmds
 
-type SentinelFailover Completed
+type SentinelFailover Incomplete
 
 func (b Builder) SentinelFailover() (c SentinelFailover) {
 	c = SentinelFailover{cs: get(), ks: b.ks}
@@ -15,14 +15,14 @@ func (c SentinelFailover) Master(master string) SentinelFailoverMaster {
 	return (SentinelFailoverMaster)(c)
 }
 
-type SentinelFailoverMaster Completed
+type SentinelFailoverMaster Incomplete
 
 func (c SentinelFailoverMaster) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SentinelGetMasterAddrByName Completed
+type SentinelGetMasterAddrByName Incomplete
 
 func (b Builder) SentinelGetMasterAddrByName() (c SentinelGetMasterAddrByName) {
 	c = SentinelGetMasterAddrByName{cs: get(), ks: b.ks}
@@ -35,14 +35,14 @@ func (c SentinelGetMasterAddrByName) Master(master string) SentinelGetMasterAddr
 	return (SentinelGetMasterAddrByNameMaster)(c)
 }
 
-type SentinelGetMasterAddrByNameMaster Completed
+type SentinelGetMasterAddrByNameMaster Incomplete
 
 func (c SentinelGetMasterAddrByNameMaster) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SentinelReplicas Completed
+type SentinelReplicas Incomplete
 
 func (b Builder) SentinelReplicas() (c SentinelReplicas) {
 	c = SentinelReplicas{cs: get(), ks: b.ks}
@@ -55,14 +55,14 @@ func (c SentinelReplicas) Master(master string) SentinelReplicasMaster {
 	return (SentinelReplicasMaster)(c)
 }
 
-type SentinelReplicasMaster Completed
+type SentinelReplicasMaster Incomplete
 
 func (c SentinelReplicasMaster) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SentinelSentinels Completed
+type SentinelSentinels Incomplete
 
 func (b Builder) SentinelSentinels() (c SentinelSentinels) {
 	c = SentinelSentinels{cs: get(), ks: b.ks}
@@ -75,9 +75,9 @@ func (c SentinelSentinels) Master(master string) SentinelSentinelsMaster {
 	return (SentinelSentinelsMaster)(c)
 }
 
-type SentinelSentinelsMaster Completed
+type SentinelSentinelsMaster Incomplete
 
 func (c SentinelSentinelsMaster) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }

@@ -100,7 +100,8 @@ enum ConnectionStatus {
 	CONNECTED = 0;
 	READY = 1;
 	DRAINING = 2;
-	DISCONNECTED = 3;
+	DISCONNECTING = 3;
+	DISCONNECTED = 4;
 }
 
 // Connection metadata

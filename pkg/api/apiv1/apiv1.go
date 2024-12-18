@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/headers"
 )
 
@@ -37,6 +38,8 @@ type Opts struct {
 	JobQueueReader queue.JobQueueReader
 	// CancellationReadWriter reads and writes cancellations to/from a backing store.
 	CancellationReadWriter cqrs.CancellationReadWriter
+	// QueueShardSelector determines the queue shard to use
+	QueueShardSelector redis_state.ShardSelector
 }
 
 // AddRoutes adds a new API handler to the given router.

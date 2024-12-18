@@ -1054,6 +1054,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 		// Find all items for the current function run.
 		jobs, err := q.RunJobs(
 			ctx,
+			queueShard.Name,
 			md.ID.Tenant.EnvID,
 			md.ID.FunctionID,
 			md.ID.RunID,
@@ -2257,9 +2258,9 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		return err
 	}
 
-	// TODO: If auto-call is supported and a tool is provided, auto-call invokes
-	// before scheduling the next step.
-	// if !failure {}
+	// XXX: If auto-call is supported and a tool is provided, auto-call invokes
+	// before scheduling the next step.  This can only happen if the tool is an
+	// invoke.  We do not support this yet.
 
 	// XXX: Remove once deprecated from history.
 	groupID := uuid.New().String()

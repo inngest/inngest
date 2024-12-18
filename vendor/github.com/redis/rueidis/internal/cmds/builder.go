@@ -50,14 +50,9 @@ func get() *CommandSlice {
 	return pool.Get().(*CommandSlice)
 }
 
-func Put(cs *CommandSlice) {
-	for i := range cs.s {
-		cs.s[i] = ""
-	}
-	cs.s = cs.s[:0]
-	cs.l = -1
-	cs.r = 0
-	pool.Put(cs)
+// PutCompletedForce recycles the Completed regardless of the c.cs.r
+func PutCompletedForce(c Completed) {
+	Put(c.cs)
 }
 
 // PutCompleted recycles the Completed

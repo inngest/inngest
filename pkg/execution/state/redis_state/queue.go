@@ -1171,19 +1171,24 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 }
 
 // RunJobs returns a list of jobs that are due to run for a given run ID.
-func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]osqueue.JobResponse, error) {
+func (q *queue) RunJobs(ctx context.Context, queueShardName string, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]osqueue.JobResponse, error) {
 	if limit > 1000 || limit <= 0 {
 		limit = 1000
 	}
 
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for RunJobs: %s", q.primaryQueueShard.Kind)
+	shard, ok := q.queueShardClients[queueShardName]
+	if !ok {
+		return nil, fmt.Errorf("queue shard %s not found", queueShardName)
+	}
+
+	if shard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for RunJobs: %s", shard.Kind)
 	}
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RunJobs"), redis_telemetry.ScopeQueue)
 
-	cmd := q.primaryQueueShard.RedisClient.unshardedRc.B().Zscan().Key(q.primaryQueueShard.RedisClient.kg.RunIndex(runID)).Cursor(uint64(offset)).Count(limit).Build()
-	jobIDs, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).AsScanEntry()
+	cmd := shard.RedisClient.unshardedRc.B().Zscan().Key(shard.RedisClient.kg.RunIndex(runID)).Cursor(uint64(offset)).Count(limit).Build()
+	jobIDs, err := shard.RedisClient.unshardedRc.Do(ctx, cmd).AsScanEntry()
 	if err != nil {
 		return nil, fmt.Errorf("error reading index: %w", err)
 	}
@@ -1193,7 +1198,7 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 	}
 
 	// Get all job items.
-	jsonItems, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, q.primaryQueueShard.RedisClient.unshardedRc.B().Hmget().Key(q.primaryQueueShard.RedisClient.kg.QueueItem()).Field(jobIDs.Elements...).Build()).AsStrSlice()
+	jsonItems, err := shard.RedisClient.unshardedRc.Do(ctx, shard.RedisClient.unshardedRc.B().Hmget().Key(shard.RedisClient.kg.QueueItem()).Field(jobIDs.Elements...).Build()).AsStrSlice()
 	if err != nil {
 		return nil, fmt.Errorf("error reading jobs: %w", err)
 	}
@@ -1211,8 +1216,8 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 		if qi.Data.Identifier.WorkspaceID != workspaceID {
 			continue
 		}
-		cmd := q.primaryQueueShard.RedisClient.unshardedRc.B().Zrank().Key(q.primaryQueueShard.RedisClient.kg.FnQueueSet(workflowID.String())).Member(qi.ID).Build()
-		pos, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).AsInt64()
+		cmd := shard.RedisClient.unshardedRc.B().Zrank().Key(shard.RedisClient.kg.FnQueueSet(workflowID.String())).Member(qi.ID).Build()
+		pos, err := shard.RedisClient.unshardedRc.Do(ctx, cmd).AsInt64()
 		if !rueidis.IsRedisNil(err) && err != nil {
 			return nil, fmt.Errorf("error reading queue position: %w", err)
 		}

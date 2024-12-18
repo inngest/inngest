@@ -139,7 +139,7 @@ func (d *devserver) HasEventKeys() bool {
 
 func (d *devserver) Pre(ctx context.Context) error {
 	// Import Redis if we can and have persistence enabled
-	if d.IsSingleNodeService() {
+	if d.HasRedisSnapshotsEnabled() {
 		_, _ = d.importRedisSnapshot(ctx)
 	}
 
@@ -208,19 +208,21 @@ func (d *devserver) Run(ctx context.Context) error {
 }
 
 func (d *devserver) Stop(ctx context.Context) error {
-	if d.IsSingleNodeService() {
+	if d.HasRedisSnapshotsEnabled() {
 		return d.exportRedisSnapshot(ctx)
 	}
 
 	return nil
 }
 
-func (d *devserver) HasPersistence() bool {
+// HasRedisSnapshotsEnabled returns true if Redis is persisted via snapshots to the database.
+// External redis-servers do not require snapshots.
+func (d *devserver) HasRedisSnapshotsEnabled() bool {
 	return d.singleNodeServiceOpts != nil && d.singleNodeServiceOpts.PersistenceInterval != nil
 }
 
 func (d *devserver) startPersistenceRoutine(ctx context.Context) {
-	if !d.HasPersistence() {
+	if !d.HasRedisSnapshotsEnabled() {
 		return
 	}
 

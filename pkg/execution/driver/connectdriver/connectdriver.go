@@ -3,6 +3,7 @@ package connectdriver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
@@ -44,6 +45,10 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 	uri, err := url.Parse(step.URI)
 	if err != nil {
 		return nil, err
+	}
+
+	if e.forwarder == nil {
+		return nil, fmt.Errorf("missing connect request forwarder")
 	}
 
 	return ProxyRequest(ctx, e.forwarder, s.ID.Tenant, httpdriver.Request{
