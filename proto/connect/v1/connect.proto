@@ -141,3 +141,7 @@ message StartResponse {
 	string session_token = 3;
 	string sync_token = 4;
 }
+
+message StartRequest {
+	repeated string exclude_gateways = 1;
+}

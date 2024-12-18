@@ -26,7 +26,15 @@ type RequestAuther interface {
 }
 
 type ConnectGatewayRetriever interface {
-	RetrieveGateway(ctx context.Context, accountId uuid.UUID, envId uuid.UUID) (string, *url.URL, error)
+	// RetrieveGateway retrieves a gateway to use for a new worker connection.
+	//
+	// Callers can optionally pass exclude with a slice of gateway group names to ignore, in case the worker
+	// attempts to reconnect to a different gateway group to avoid repeated connection failures. This may
+	// be used, but is not mandatory. For example, if no other gateway groups are available, the implementation
+	// may still return a gateway from an excluded group.
+	//
+	// On a successful request, the gateway group name and URL are returned.
+	RetrieveGateway(ctx context.Context, accountId uuid.UUID, envId uuid.UUID, exclude []string) (string, *url.URL, error)
 }
 
 type router struct {
