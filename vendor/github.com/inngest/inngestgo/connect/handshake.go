@@ -48,12 +48,6 @@ func (h *connectHandler) performConnectHandshake(ctx context.Context, connection
 
 	// Send connect message
 	{
-
-		apiOrigin := h.opts.APIBaseUrl
-		if h.opts.IsDev {
-			apiOrigin = h.opts.DevServerUrl
-		}
-
 		data, err := proto.Marshal(&connectproto.WorkerConnectRequestData{
 			SessionId: &connectproto.SessionIdentifier{
 				BuildId:      h.opts.BuildId,
@@ -68,7 +62,6 @@ func (h *connectHandler) performConnectHandshake(ctx context.Context, connection
 			Config: &connectproto.ConfigDetails{
 				Capabilities: data.marshaledCapabilities,
 				Functions:    data.marshaledFns,
-				ApiOrigin:    apiOrigin,
 			},
 			SystemAttributes: &connectproto.SystemAttributes{
 				CpuCores: data.numCpuCores,
