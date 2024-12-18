@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/inngest/inngest/pkg/connect/auth"
+	"github.com/inngest/inngest/pkg/testapi"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
@@ -387,12 +388,13 @@ func start(ctx context.Context, opts StartOpts) error {
 		caching := apiv1.NewCacheMiddleware(cache)
 
 		apiv1.AddRoutes(r, apiv1.Opts{
-			CachingMiddleware: caching,
-			EventReader:       ds.Data,
-			FunctionReader:    ds.Data,
-			FunctionRunReader: ds.Data,
-			JobQueueReader:    ds.Queue.(queue.JobQueueReader),
-			Executor:          ds.Executor,
+			CachingMiddleware:  caching,
+			EventReader:        ds.Data,
+			FunctionReader:     ds.Data,
+			FunctionRunReader:  ds.Data,
+			JobQueueReader:     ds.Queue.(queue.JobQueueReader),
+			Executor:           ds.Executor,
+			QueueShardSelector: shardSelector,
 		})
 	})
 
@@ -435,13 +437,25 @@ func start(ctx context.Context, opts StartOpts) error {
 	//
 	// Merge the dev server API (for handling files & registration) with the data
 	// API into the event API router.
+
+	mounts := []api.Mount{
+		{At: "/", Router: devAPI},
+		{At: "/v0", Router: core.Router},
+		{At: "/debug", Handler: middleware.Profiler()},
+	}
+
+	if testapi.ShouldEnable() {
+		mounts = append(mounts, api.Mount{At: "/test", Handler: testapi.New(testapi.Options{
+			QueueShardSelector: shardSelector,
+			Queue:              rq,
+			Executor:           exec,
+			StateManager:       smv2,
+		})})
+	}
+
 	ds.Apiservice = api.NewService(api.APIServiceOptions{
-		Config: ds.Opts.Config,
-		Mounts: []api.Mount{
-			{At: "/", Router: devAPI},
-			{At: "/v0", Router: core.Router},
-			{At: "/debug", Handler: middleware.Profiler()},
-		},
+		Config:         ds.Opts.Config,
+		Mounts:         mounts,
 		LocalEventKeys: opts.EventKeys,
 	})
 

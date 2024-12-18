@@ -4,7 +4,7 @@ package cmds
 
 import "strconv"
 
-type Copy Completed
+type Copy Incomplete
 
 func (b Builder) Copy() (c Copy) {
 	c = Copy{cs: get(), ks: b.ks}
@@ -22,7 +22,7 @@ func (c Copy) Source(source string) CopySource {
 	return (CopySource)(c)
 }
 
-type CopyDb Completed
+type CopyDb Incomplete
 
 func (c CopyDb) Replace() CopyReplace {
 	c.cs.s = append(c.cs.s, "REPLACE")
@@ -31,10 +31,10 @@ func (c CopyDb) Replace() CopyReplace {
 
 func (c CopyDb) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CopyDestination Completed
+type CopyDestination Incomplete
 
 func (c CopyDestination) Db(destinationDb int64) CopyDb {
 	c.cs.s = append(c.cs.s, "DB", strconv.FormatInt(destinationDb, 10))
@@ -48,17 +48,17 @@ func (c CopyDestination) Replace() CopyReplace {
 
 func (c CopyDestination) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CopyReplace Completed
+type CopyReplace Incomplete
 
 func (c CopyReplace) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CopySource Completed
+type CopySource Incomplete
 
 func (c CopySource) Destination(destination string) CopyDestination {
 	if c.ks&NoSlot == NoSlot {
@@ -70,7 +70,7 @@ func (c CopySource) Destination(destination string) CopyDestination {
 	return (CopyDestination)(c)
 }
 
-type Del Completed
+type Del Incomplete
 
 func (b Builder) Del() (c Del) {
 	c = Del{cs: get(), ks: b.ks}
@@ -93,7 +93,7 @@ func (c Del) Key(key ...string) DelKey {
 	return (DelKey)(c)
 }
 
-type DelKey Completed
+type DelKey Incomplete
 
 func (c DelKey) Key(key ...string) DelKey {
 	if c.ks&NoSlot == NoSlot {
@@ -112,13 +112,13 @@ func (c DelKey) Key(key ...string) DelKey {
 
 func (c DelKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Dump Completed
+type Dump Incomplete
 
 func (b Builder) Dump() (c Dump) {
-	c = Dump{cs: get(), ks: b.ks, cf: readonly}
+	c = Dump{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "DUMP")
 	return c
 }
@@ -133,17 +133,17 @@ func (c Dump) Key(key string) DumpKey {
 	return (DumpKey)(c)
 }
 
-type DumpKey Completed
+type DumpKey Incomplete
 
 func (c DumpKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Exists Completed
+type Exists Incomplete
 
 func (b Builder) Exists() (c Exists) {
-	c = Exists{cs: get(), ks: b.ks, cf: readonly}
+	c = Exists{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "EXISTS")
 	return c
 }
@@ -163,7 +163,7 @@ func (c Exists) Key(key ...string) ExistsKey {
 	return (ExistsKey)(c)
 }
 
-type ExistsKey Completed
+type ExistsKey Incomplete
 
 func (c ExistsKey) Key(key ...string) ExistsKey {
 	if c.ks&NoSlot == NoSlot {
@@ -182,10 +182,10 @@ func (c ExistsKey) Key(key ...string) ExistsKey {
 
 func (c ExistsKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Expire Completed
+type Expire Incomplete
 
 func (b Builder) Expire() (c Expire) {
 	c = Expire{cs: get(), ks: b.ks}
@@ -203,42 +203,42 @@ func (c Expire) Key(key string) ExpireKey {
 	return (ExpireKey)(c)
 }
 
-type ExpireConditionGt Completed
+type ExpireConditionGt Incomplete
 
 func (c ExpireConditionGt) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ExpireConditionLt Completed
+type ExpireConditionLt Incomplete
 
 func (c ExpireConditionLt) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ExpireConditionNx Completed
+type ExpireConditionNx Incomplete
 
 func (c ExpireConditionNx) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ExpireConditionXx Completed
+type ExpireConditionXx Incomplete
 
 func (c ExpireConditionXx) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ExpireKey Completed
+type ExpireKey Incomplete
 
 func (c ExpireKey) Seconds(seconds int64) ExpireSeconds {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(seconds, 10))
 	return (ExpireSeconds)(c)
 }
 
-type ExpireSeconds Completed
+type ExpireSeconds Incomplete
 
 func (c ExpireSeconds) Nx() ExpireConditionNx {
 	c.cs.s = append(c.cs.s, "NX")
@@ -262,10 +262,10 @@ func (c ExpireSeconds) Lt() ExpireConditionLt {
 
 func (c ExpireSeconds) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Expireat Completed
+type Expireat Incomplete
 
 func (b Builder) Expireat() (c Expireat) {
 	c = Expireat{cs: get(), ks: b.ks}
@@ -283,42 +283,42 @@ func (c Expireat) Key(key string) ExpireatKey {
 	return (ExpireatKey)(c)
 }
 
-type ExpireatConditionGt Completed
+type ExpireatConditionGt Incomplete
 
 func (c ExpireatConditionGt) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ExpireatConditionLt Completed
+type ExpireatConditionLt Incomplete
 
 func (c ExpireatConditionLt) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ExpireatConditionNx Completed
+type ExpireatConditionNx Incomplete
 
 func (c ExpireatConditionNx) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ExpireatConditionXx Completed
+type ExpireatConditionXx Incomplete
 
 func (c ExpireatConditionXx) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ExpireatKey Completed
+type ExpireatKey Incomplete
 
 func (c ExpireatKey) Timestamp(timestamp int64) ExpireatTimestamp {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(timestamp, 10))
 	return (ExpireatTimestamp)(c)
 }
 
-type ExpireatTimestamp Completed
+type ExpireatTimestamp Incomplete
 
 func (c ExpireatTimestamp) Nx() ExpireatConditionNx {
 	c.cs.s = append(c.cs.s, "NX")
@@ -342,13 +342,13 @@ func (c ExpireatTimestamp) Lt() ExpireatConditionLt {
 
 func (c ExpireatTimestamp) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Expiretime Completed
+type Expiretime Incomplete
 
 func (b Builder) Expiretime() (c Expiretime) {
-	c = Expiretime{cs: get(), ks: b.ks, cf: readonly}
+	c = Expiretime{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "EXPIRETIME")
 	return c
 }
@@ -363,22 +363,22 @@ func (c Expiretime) Key(key string) ExpiretimeKey {
 	return (ExpiretimeKey)(c)
 }
 
-type ExpiretimeKey Completed
+type ExpiretimeKey Incomplete
 
 func (c ExpiretimeKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ExpiretimeKey) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Keys Completed
+type Keys Incomplete
 
 func (b Builder) Keys() (c Keys) {
-	c = Keys{cs: get(), ks: b.ks, cf: readonly}
+	c = Keys{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "KEYS")
 	return c
 }
@@ -388,17 +388,17 @@ func (c Keys) Pattern(pattern string) KeysPattern {
 	return (KeysPattern)(c)
 }
 
-type KeysPattern Completed
+type KeysPattern Incomplete
 
 func (c KeysPattern) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Migrate Completed
+type Migrate Incomplete
 
 func (b Builder) Migrate() (c Migrate) {
-	c = Migrate{cs: get(), ks: b.ks, cf: blockTag}
+	c = Migrate{cs: get(), ks: b.ks, cf: int16(blockTag)}
 	c.cs.s = append(c.cs.s, "MIGRATE")
 	return c
 }
@@ -408,7 +408,7 @@ func (c Migrate) Host(host string) MigrateHost {
 	return (MigrateHost)(c)
 }
 
-type MigrateAuthAuth Completed
+type MigrateAuthAuth Incomplete
 
 func (c MigrateAuthAuth) Auth2(username string, password string) MigrateAuthAuth2 {
 	c.cs.s = append(c.cs.s, "AUTH2", username, password)
@@ -433,10 +433,10 @@ func (c MigrateAuthAuth) Keys(key ...string) MigrateKeys {
 
 func (c MigrateAuthAuth) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type MigrateAuthAuth2 Completed
+type MigrateAuthAuth2 Incomplete
 
 func (c MigrateAuthAuth2) Keys(key ...string) MigrateKeys {
 	if c.ks&NoSlot == NoSlot {
@@ -456,10 +456,10 @@ func (c MigrateAuthAuth2) Keys(key ...string) MigrateKeys {
 
 func (c MigrateAuthAuth2) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type MigrateCopy Completed
+type MigrateCopy Incomplete
 
 func (c MigrateCopy) Replace() MigrateReplace {
 	c.cs.s = append(c.cs.s, "REPLACE")
@@ -494,31 +494,31 @@ func (c MigrateCopy) Keys(key ...string) MigrateKeys {
 
 func (c MigrateCopy) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type MigrateDestinationDb Completed
+type MigrateDestinationDb Incomplete
 
 func (c MigrateDestinationDb) Timeout(timeout int64) MigrateTimeout {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(timeout, 10))
 	return (MigrateTimeout)(c)
 }
 
-type MigrateHost Completed
+type MigrateHost Incomplete
 
 func (c MigrateHost) Port(port int64) MigratePort {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(port, 10))
 	return (MigratePort)(c)
 }
 
-type MigrateKey Completed
+type MigrateKey Incomplete
 
 func (c MigrateKey) DestinationDb(destinationDb int64) MigrateDestinationDb {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(destinationDb, 10))
 	return (MigrateDestinationDb)(c)
 }
 
-type MigrateKeys Completed
+type MigrateKeys Incomplete
 
 func (c MigrateKeys) Keys(key ...string) MigrateKeys {
 	if c.ks&NoSlot == NoSlot {
@@ -538,10 +538,10 @@ func (c MigrateKeys) Keys(key ...string) MigrateKeys {
 
 func (c MigrateKeys) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type MigratePort Completed
+type MigratePort Incomplete
 
 func (c MigratePort) Key(key string) MigrateKey {
 	if c.ks&NoSlot == NoSlot {
@@ -553,7 +553,7 @@ func (c MigratePort) Key(key string) MigrateKey {
 	return (MigrateKey)(c)
 }
 
-type MigrateReplace Completed
+type MigrateReplace Incomplete
 
 func (c MigrateReplace) Auth(password string) MigrateAuthAuth {
 	c.cs.s = append(c.cs.s, "AUTH", password)
@@ -583,10 +583,10 @@ func (c MigrateReplace) Keys(key ...string) MigrateKeys {
 
 func (c MigrateReplace) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type MigrateTimeout Completed
+type MigrateTimeout Incomplete
 
 func (c MigrateTimeout) Copy() MigrateCopy {
 	c.cs.s = append(c.cs.s, "COPY")
@@ -626,10 +626,10 @@ func (c MigrateTimeout) Keys(key ...string) MigrateKeys {
 
 func (c MigrateTimeout) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Move Completed
+type Move Incomplete
 
 func (b Builder) Move() (c Move) {
 	c = Move{cs: get(), ks: b.ks}
@@ -647,24 +647,24 @@ func (c Move) Key(key string) MoveKey {
 	return (MoveKey)(c)
 }
 
-type MoveDb Completed
+type MoveDb Incomplete
 
 func (c MoveDb) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type MoveKey Completed
+type MoveKey Incomplete
 
 func (c MoveKey) Db(db int64) MoveDb {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(db, 10))
 	return (MoveDb)(c)
 }
 
-type ObjectEncoding Completed
+type ObjectEncoding Incomplete
 
 func (b Builder) ObjectEncoding() (c ObjectEncoding) {
-	c = ObjectEncoding{cs: get(), ks: b.ks, cf: readonly}
+	c = ObjectEncoding{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "OBJECT", "ENCODING")
 	return c
 }
@@ -679,17 +679,17 @@ func (c ObjectEncoding) Key(key string) ObjectEncodingKey {
 	return (ObjectEncodingKey)(c)
 }
 
-type ObjectEncodingKey Completed
+type ObjectEncodingKey Incomplete
 
 func (c ObjectEncodingKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ObjectFreq Completed
+type ObjectFreq Incomplete
 
 func (b Builder) ObjectFreq() (c ObjectFreq) {
-	c = ObjectFreq{cs: get(), ks: b.ks, cf: readonly}
+	c = ObjectFreq{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "OBJECT", "FREQ")
 	return c
 }
@@ -704,30 +704,30 @@ func (c ObjectFreq) Key(key string) ObjectFreqKey {
 	return (ObjectFreqKey)(c)
 }
 
-type ObjectFreqKey Completed
+type ObjectFreqKey Incomplete
 
 func (c ObjectFreqKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ObjectHelp Completed
+type ObjectHelp Incomplete
 
 func (b Builder) ObjectHelp() (c ObjectHelp) {
-	c = ObjectHelp{cs: get(), ks: b.ks, cf: readonly}
+	c = ObjectHelp{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "OBJECT", "HELP")
 	return c
 }
 
 func (c ObjectHelp) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ObjectIdletime Completed
+type ObjectIdletime Incomplete
 
 func (b Builder) ObjectIdletime() (c ObjectIdletime) {
-	c = ObjectIdletime{cs: get(), ks: b.ks, cf: readonly}
+	c = ObjectIdletime{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "OBJECT", "IDLETIME")
 	return c
 }
@@ -742,17 +742,17 @@ func (c ObjectIdletime) Key(key string) ObjectIdletimeKey {
 	return (ObjectIdletimeKey)(c)
 }
 
-type ObjectIdletimeKey Completed
+type ObjectIdletimeKey Incomplete
 
 func (c ObjectIdletimeKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ObjectRefcount Completed
+type ObjectRefcount Incomplete
 
 func (b Builder) ObjectRefcount() (c ObjectRefcount) {
-	c = ObjectRefcount{cs: get(), ks: b.ks, cf: readonly}
+	c = ObjectRefcount{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "OBJECT", "REFCOUNT")
 	return c
 }
@@ -767,14 +767,14 @@ func (c ObjectRefcount) Key(key string) ObjectRefcountKey {
 	return (ObjectRefcountKey)(c)
 }
 
-type ObjectRefcountKey Completed
+type ObjectRefcountKey Incomplete
 
 func (c ObjectRefcountKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Persist Completed
+type Persist Incomplete
 
 func (b Builder) Persist() (c Persist) {
 	c = Persist{cs: get(), ks: b.ks}
@@ -792,14 +792,14 @@ func (c Persist) Key(key string) PersistKey {
 	return (PersistKey)(c)
 }
 
-type PersistKey Completed
+type PersistKey Incomplete
 
 func (c PersistKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Pexpire Completed
+type Pexpire Incomplete
 
 func (b Builder) Pexpire() (c Pexpire) {
 	c = Pexpire{cs: get(), ks: b.ks}
@@ -817,42 +817,42 @@ func (c Pexpire) Key(key string) PexpireKey {
 	return (PexpireKey)(c)
 }
 
-type PexpireConditionGt Completed
+type PexpireConditionGt Incomplete
 
 func (c PexpireConditionGt) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type PexpireConditionLt Completed
+type PexpireConditionLt Incomplete
 
 func (c PexpireConditionLt) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type PexpireConditionNx Completed
+type PexpireConditionNx Incomplete
 
 func (c PexpireConditionNx) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type PexpireConditionXx Completed
+type PexpireConditionXx Incomplete
 
 func (c PexpireConditionXx) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type PexpireKey Completed
+type PexpireKey Incomplete
 
 func (c PexpireKey) Milliseconds(milliseconds int64) PexpireMilliseconds {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(milliseconds, 10))
 	return (PexpireMilliseconds)(c)
 }
 
-type PexpireMilliseconds Completed
+type PexpireMilliseconds Incomplete
 
 func (c PexpireMilliseconds) Nx() PexpireConditionNx {
 	c.cs.s = append(c.cs.s, "NX")
@@ -876,10 +876,10 @@ func (c PexpireMilliseconds) Lt() PexpireConditionLt {
 
 func (c PexpireMilliseconds) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Pexpireat Completed
+type Pexpireat Incomplete
 
 func (b Builder) Pexpireat() (c Pexpireat) {
 	c = Pexpireat{cs: get(), ks: b.ks}
@@ -897,42 +897,42 @@ func (c Pexpireat) Key(key string) PexpireatKey {
 	return (PexpireatKey)(c)
 }
 
-type PexpireatConditionGt Completed
+type PexpireatConditionGt Incomplete
 
 func (c PexpireatConditionGt) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type PexpireatConditionLt Completed
+type PexpireatConditionLt Incomplete
 
 func (c PexpireatConditionLt) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type PexpireatConditionNx Completed
+type PexpireatConditionNx Incomplete
 
 func (c PexpireatConditionNx) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type PexpireatConditionXx Completed
+type PexpireatConditionXx Incomplete
 
 func (c PexpireatConditionXx) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type PexpireatKey Completed
+type PexpireatKey Incomplete
 
 func (c PexpireatKey) MillisecondsTimestamp(millisecondsTimestamp int64) PexpireatMillisecondsTimestamp {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(millisecondsTimestamp, 10))
 	return (PexpireatMillisecondsTimestamp)(c)
 }
 
-type PexpireatMillisecondsTimestamp Completed
+type PexpireatMillisecondsTimestamp Incomplete
 
 func (c PexpireatMillisecondsTimestamp) Nx() PexpireatConditionNx {
 	c.cs.s = append(c.cs.s, "NX")
@@ -956,13 +956,13 @@ func (c PexpireatMillisecondsTimestamp) Lt() PexpireatConditionLt {
 
 func (c PexpireatMillisecondsTimestamp) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Pexpiretime Completed
+type Pexpiretime Incomplete
 
 func (b Builder) Pexpiretime() (c Pexpiretime) {
-	c = Pexpiretime{cs: get(), ks: b.ks, cf: readonly}
+	c = Pexpiretime{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "PEXPIRETIME")
 	return c
 }
@@ -977,22 +977,22 @@ func (c Pexpiretime) Key(key string) PexpiretimeKey {
 	return (PexpiretimeKey)(c)
 }
 
-type PexpiretimeKey Completed
+type PexpiretimeKey Incomplete
 
 func (c PexpiretimeKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c PexpiretimeKey) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Pttl Completed
+type Pttl Incomplete
 
 func (b Builder) Pttl() (c Pttl) {
-	c = Pttl{cs: get(), ks: b.ks, cf: readonly}
+	c = Pttl{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "PTTL")
 	return c
 }
@@ -1007,32 +1007,32 @@ func (c Pttl) Key(key string) PttlKey {
 	return (PttlKey)(c)
 }
 
-type PttlKey Completed
+type PttlKey Incomplete
 
 func (c PttlKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c PttlKey) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Randomkey Completed
+type Randomkey Incomplete
 
 func (b Builder) Randomkey() (c Randomkey) {
-	c = Randomkey{cs: get(), ks: b.ks, cf: readonly}
+	c = Randomkey{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "RANDOMKEY")
 	return c
 }
 
 func (c Randomkey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Rename Completed
+type Rename Incomplete
 
 func (b Builder) Rename() (c Rename) {
 	c = Rename{cs: get(), ks: b.ks}
@@ -1050,7 +1050,7 @@ func (c Rename) Key(key string) RenameKey {
 	return (RenameKey)(c)
 }
 
-type RenameKey Completed
+type RenameKey Incomplete
 
 func (c RenameKey) Newkey(newkey string) RenameNewkey {
 	if c.ks&NoSlot == NoSlot {
@@ -1062,14 +1062,14 @@ func (c RenameKey) Newkey(newkey string) RenameNewkey {
 	return (RenameNewkey)(c)
 }
 
-type RenameNewkey Completed
+type RenameNewkey Incomplete
 
 func (c RenameNewkey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Renamenx Completed
+type Renamenx Incomplete
 
 func (b Builder) Renamenx() (c Renamenx) {
 	c = Renamenx{cs: get(), ks: b.ks}
@@ -1087,7 +1087,7 @@ func (c Renamenx) Key(key string) RenamenxKey {
 	return (RenamenxKey)(c)
 }
 
-type RenamenxKey Completed
+type RenamenxKey Incomplete
 
 func (c RenamenxKey) Newkey(newkey string) RenamenxNewkey {
 	if c.ks&NoSlot == NoSlot {
@@ -1099,14 +1099,14 @@ func (c RenamenxKey) Newkey(newkey string) RenamenxNewkey {
 	return (RenamenxNewkey)(c)
 }
 
-type RenamenxNewkey Completed
+type RenamenxNewkey Incomplete
 
 func (c RenamenxNewkey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Restore Completed
+type Restore Incomplete
 
 func (b Builder) Restore() (c Restore) {
 	c = Restore{cs: get(), ks: b.ks}
@@ -1124,7 +1124,7 @@ func (c Restore) Key(key string) RestoreKey {
 	return (RestoreKey)(c)
 }
 
-type RestoreAbsttl Completed
+type RestoreAbsttl Incomplete
 
 func (c RestoreAbsttl) Idletime(seconds int64) RestoreIdletime {
 	c.cs.s = append(c.cs.s, "IDLETIME", strconv.FormatInt(seconds, 10))
@@ -1138,17 +1138,17 @@ func (c RestoreAbsttl) Freq(frequency int64) RestoreFreq {
 
 func (c RestoreAbsttl) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RestoreFreq Completed
+type RestoreFreq Incomplete
 
 func (c RestoreFreq) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RestoreIdletime Completed
+type RestoreIdletime Incomplete
 
 func (c RestoreIdletime) Freq(frequency int64) RestoreFreq {
 	c.cs.s = append(c.cs.s, "FREQ", strconv.FormatInt(frequency, 10))
@@ -1157,17 +1157,17 @@ func (c RestoreIdletime) Freq(frequency int64) RestoreFreq {
 
 func (c RestoreIdletime) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RestoreKey Completed
+type RestoreKey Incomplete
 
 func (c RestoreKey) Ttl(ttl int64) RestoreTtl {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(ttl, 10))
 	return (RestoreTtl)(c)
 }
 
-type RestoreReplace Completed
+type RestoreReplace Incomplete
 
 func (c RestoreReplace) Absttl() RestoreAbsttl {
 	c.cs.s = append(c.cs.s, "ABSTTL")
@@ -1186,10 +1186,10 @@ func (c RestoreReplace) Freq(frequency int64) RestoreFreq {
 
 func (c RestoreReplace) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RestoreSerializedValue Completed
+type RestoreSerializedValue Incomplete
 
 func (c RestoreSerializedValue) Replace() RestoreReplace {
 	c.cs.s = append(c.cs.s, "REPLACE")
@@ -1213,20 +1213,20 @@ func (c RestoreSerializedValue) Freq(frequency int64) RestoreFreq {
 
 func (c RestoreSerializedValue) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type RestoreTtl Completed
+type RestoreTtl Incomplete
 
 func (c RestoreTtl) SerializedValue(serializedValue string) RestoreSerializedValue {
 	c.cs.s = append(c.cs.s, serializedValue)
 	return (RestoreSerializedValue)(c)
 }
 
-type Scan Completed
+type Scan Incomplete
 
 func (b Builder) Scan() (c Scan) {
-	c = Scan{cs: get(), ks: b.ks, cf: readonly}
+	c = Scan{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "SCAN")
 	return c
 }
@@ -1236,7 +1236,7 @@ func (c Scan) Cursor(cursor uint64) ScanCursor {
 	return (ScanCursor)(c)
 }
 
-type ScanCount Completed
+type ScanCount Incomplete
 
 func (c ScanCount) Type(typ string) ScanType {
 	c.cs.s = append(c.cs.s, "TYPE", typ)
@@ -1245,10 +1245,10 @@ func (c ScanCount) Type(typ string) ScanType {
 
 func (c ScanCount) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ScanCursor Completed
+type ScanCursor Incomplete
 
 func (c ScanCursor) Match(pattern string) ScanMatch {
 	c.cs.s = append(c.cs.s, "MATCH", pattern)
@@ -1267,10 +1267,10 @@ func (c ScanCursor) Type(typ string) ScanType {
 
 func (c ScanCursor) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ScanMatch Completed
+type ScanMatch Incomplete
 
 func (c ScanMatch) Count(count int64) ScanCount {
 	c.cs.s = append(c.cs.s, "COUNT", strconv.FormatInt(count, 10))
@@ -1284,17 +1284,17 @@ func (c ScanMatch) Type(typ string) ScanType {
 
 func (c ScanMatch) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ScanType Completed
+type ScanType Incomplete
 
 func (c ScanType) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Sort Completed
+type Sort Incomplete
 
 func (b Builder) Sort() (c Sort) {
 	c = Sort{cs: get(), ks: b.ks}
@@ -1312,7 +1312,7 @@ func (c Sort) Key(key string) SortKey {
 	return (SortKey)(c)
 }
 
-type SortBy Completed
+type SortBy Incomplete
 
 func (c SortBy) Limit(offset int64, count int64) SortLimit {
 	c.cs.s = append(c.cs.s, "LIMIT", strconv.FormatInt(offset, 10), strconv.FormatInt(count, 10))
@@ -1350,10 +1350,10 @@ func (c SortBy) Store(destination string) SortStore {
 
 func (c SortBy) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SortGet Completed
+type SortGet Incomplete
 
 func (c SortGet) Get(pattern string) SortGet {
 	c.cs.s = append(c.cs.s, "GET", pattern)
@@ -1387,10 +1387,10 @@ func (c SortGet) Store(destination string) SortStore {
 
 func (c SortGet) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SortKey Completed
+type SortKey Incomplete
 
 func (c SortKey) By(pattern string) SortBy {
 	c.cs.s = append(c.cs.s, "BY", pattern)
@@ -1433,10 +1433,10 @@ func (c SortKey) Store(destination string) SortStore {
 
 func (c SortKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SortLimit Completed
+type SortLimit Incomplete
 
 func (c SortLimit) Get() SortGet {
 	return (SortGet)(c)
@@ -1469,10 +1469,10 @@ func (c SortLimit) Store(destination string) SortStore {
 
 func (c SortLimit) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SortOrderAsc Completed
+type SortOrderAsc Incomplete
 
 func (c SortOrderAsc) Alpha() SortSortingAlpha {
 	c.cs.s = append(c.cs.s, "ALPHA")
@@ -1491,10 +1491,10 @@ func (c SortOrderAsc) Store(destination string) SortStore {
 
 func (c SortOrderAsc) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SortOrderDesc Completed
+type SortOrderDesc Incomplete
 
 func (c SortOrderDesc) Alpha() SortSortingAlpha {
 	c.cs.s = append(c.cs.s, "ALPHA")
@@ -1513,13 +1513,13 @@ func (c SortOrderDesc) Store(destination string) SortStore {
 
 func (c SortOrderDesc) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SortRo Completed
+type SortRo Incomplete
 
 func (b Builder) SortRo() (c SortRo) {
-	c = SortRo{cs: get(), ks: b.ks, cf: readonly}
+	c = SortRo{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "SORT_RO")
 	return c
 }
@@ -1534,7 +1534,7 @@ func (c SortRo) Key(key string) SortRoKey {
 	return (SortRoKey)(c)
 }
 
-type SortRoBy Completed
+type SortRoBy Incomplete
 
 func (c SortRoBy) Limit(offset int64, count int64) SortRoLimit {
 	c.cs.s = append(c.cs.s, "LIMIT", strconv.FormatInt(offset, 10), strconv.FormatInt(count, 10))
@@ -1562,15 +1562,15 @@ func (c SortRoBy) Alpha() SortRoSortingAlpha {
 
 func (c SortRoBy) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c SortRoBy) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SortRoGet Completed
+type SortRoGet Incomplete
 
 func (c SortRoGet) Get(pattern string) SortRoGet {
 	c.cs.s = append(c.cs.s, "GET", pattern)
@@ -1594,15 +1594,15 @@ func (c SortRoGet) Alpha() SortRoSortingAlpha {
 
 func (c SortRoGet) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c SortRoGet) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SortRoKey Completed
+type SortRoKey Incomplete
 
 func (c SortRoKey) By(pattern string) SortRoBy {
 	c.cs.s = append(c.cs.s, "BY", pattern)
@@ -1635,15 +1635,15 @@ func (c SortRoKey) Alpha() SortRoSortingAlpha {
 
 func (c SortRoKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c SortRoKey) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SortRoLimit Completed
+type SortRoLimit Incomplete
 
 func (c SortRoLimit) Get() SortRoGet {
 	return (SortRoGet)(c)
@@ -1666,15 +1666,15 @@ func (c SortRoLimit) Alpha() SortRoSortingAlpha {
 
 func (c SortRoLimit) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c SortRoLimit) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SortRoOrderAsc Completed
+type SortRoOrderAsc Incomplete
 
 func (c SortRoOrderAsc) Alpha() SortRoSortingAlpha {
 	c.cs.s = append(c.cs.s, "ALPHA")
@@ -1683,15 +1683,15 @@ func (c SortRoOrderAsc) Alpha() SortRoSortingAlpha {
 
 func (c SortRoOrderAsc) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c SortRoOrderAsc) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SortRoOrderDesc Completed
+type SortRoOrderDesc Incomplete
 
 func (c SortRoOrderDesc) Alpha() SortRoSortingAlpha {
 	c.cs.s = append(c.cs.s, "ALPHA")
@@ -1700,27 +1700,27 @@ func (c SortRoOrderDesc) Alpha() SortRoSortingAlpha {
 
 func (c SortRoOrderDesc) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c SortRoOrderDesc) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SortRoSortingAlpha Completed
+type SortRoSortingAlpha Incomplete
 
 func (c SortRoSortingAlpha) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c SortRoSortingAlpha) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SortSortingAlpha Completed
+type SortSortingAlpha Incomplete
 
 func (c SortSortingAlpha) Store(destination string) SortStore {
 	if c.ks&NoSlot == NoSlot {
@@ -1734,20 +1734,20 @@ func (c SortSortingAlpha) Store(destination string) SortStore {
 
 func (c SortSortingAlpha) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SortStore Completed
+type SortStore Incomplete
 
 func (c SortStore) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Touch Completed
+type Touch Incomplete
 
 func (b Builder) Touch() (c Touch) {
-	c = Touch{cs: get(), ks: b.ks, cf: readonly}
+	c = Touch{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "TOUCH")
 	return c
 }
@@ -1767,7 +1767,7 @@ func (c Touch) Key(key ...string) TouchKey {
 	return (TouchKey)(c)
 }
 
-type TouchKey Completed
+type TouchKey Incomplete
 
 func (c TouchKey) Key(key ...string) TouchKey {
 	if c.ks&NoSlot == NoSlot {
@@ -1786,13 +1786,13 @@ func (c TouchKey) Key(key ...string) TouchKey {
 
 func (c TouchKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Ttl Completed
+type Ttl Incomplete
 
 func (b Builder) Ttl() (c Ttl) {
-	c = Ttl{cs: get(), ks: b.ks, cf: readonly}
+	c = Ttl{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "TTL")
 	return c
 }
@@ -1807,22 +1807,22 @@ func (c Ttl) Key(key string) TtlKey {
 	return (TtlKey)(c)
 }
 
-type TtlKey Completed
+type TtlKey Incomplete
 
 func (c TtlKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c TtlKey) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Type Completed
+type Type Incomplete
 
 func (b Builder) Type() (c Type) {
-	c = Type{cs: get(), ks: b.ks, cf: readonly}
+	c = Type{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "TYPE")
 	return c
 }
@@ -1837,19 +1837,19 @@ func (c Type) Key(key string) TypeKey {
 	return (TypeKey)(c)
 }
 
-type TypeKey Completed
+type TypeKey Incomplete
 
 func (c TypeKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c TypeKey) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Unlink Completed
+type Unlink Incomplete
 
 func (b Builder) Unlink() (c Unlink) {
 	c = Unlink{cs: get(), ks: b.ks}
@@ -1872,7 +1872,7 @@ func (c Unlink) Key(key ...string) UnlinkKey {
 	return (UnlinkKey)(c)
 }
 
-type UnlinkKey Completed
+type UnlinkKey Incomplete
 
 func (c UnlinkKey) Key(key ...string) UnlinkKey {
 	if c.ks&NoSlot == NoSlot {
@@ -1891,13 +1891,13 @@ func (c UnlinkKey) Key(key ...string) UnlinkKey {
 
 func (c UnlinkKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Wait Completed
+type Wait Incomplete
 
 func (b Builder) Wait() (c Wait) {
-	c = Wait{cs: get(), ks: b.ks, cf: blockTag}
+	c = Wait{cs: get(), ks: b.ks, cf: int16(blockTag)}
 	c.cs.s = append(c.cs.s, "WAIT")
 	return c
 }
@@ -1907,24 +1907,24 @@ func (c Wait) Numreplicas(numreplicas int64) WaitNumreplicas {
 	return (WaitNumreplicas)(c)
 }
 
-type WaitNumreplicas Completed
+type WaitNumreplicas Incomplete
 
 func (c WaitNumreplicas) Timeout(timeout int64) WaitTimeout {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(timeout, 10))
 	return (WaitTimeout)(c)
 }
 
-type WaitTimeout Completed
+type WaitTimeout Incomplete
 
 func (c WaitTimeout) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Waitaof Completed
+type Waitaof Incomplete
 
 func (b Builder) Waitaof() (c Waitaof) {
-	c = Waitaof{cs: get(), ks: b.ks, cf: blockTag}
+	c = Waitaof{cs: get(), ks: b.ks, cf: int16(blockTag)}
 	c.cs.s = append(c.cs.s, "WAITAOF")
 	return c
 }
@@ -1934,23 +1934,23 @@ func (c Waitaof) Numlocal(numlocal int64) WaitaofNumlocal {
 	return (WaitaofNumlocal)(c)
 }
 
-type WaitaofNumlocal Completed
+type WaitaofNumlocal Incomplete
 
 func (c WaitaofNumlocal) Numreplicas(numreplicas int64) WaitaofNumreplicas {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(numreplicas, 10))
 	return (WaitaofNumreplicas)(c)
 }
 
-type WaitaofNumreplicas Completed
+type WaitaofNumreplicas Incomplete
 
 func (c WaitaofNumreplicas) Timeout(timeout int64) WaitaofTimeout {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(timeout, 10))
 	return (WaitaofTimeout)(c)
 }
 
-type WaitaofTimeout Completed
+type WaitaofTimeout Incomplete
 
 func (c WaitaofTimeout) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }

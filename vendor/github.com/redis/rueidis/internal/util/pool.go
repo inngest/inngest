@@ -2,7 +2,6 @@ package util
 
 import (
 	"sync"
-	"sync/atomic"
 )
 
 type Container interface {
@@ -11,23 +10,19 @@ type Container interface {
 }
 
 func NewPool[T Container](fn func(capacity int) T) *Pool[T] {
-	p := &Pool[T]{fn: fn}
-	p.sp.New = func() any {
-		return fn(int(atomic.LoadUint32(&p.ca)))
-	}
-	return p
+	return &Pool[T]{fn: fn}
 }
 
 type Pool[T Container] struct {
 	sp sync.Pool
 	fn func(capacity int) T
-	ca uint32
 }
 
 func (p *Pool[T]) Get(length, capacity int) T {
-	atomic.StoreUint32(&p.ca, uint32(capacity))
-	s := p.sp.Get().(T)
-	if s.Capacity() < capacity {
+	s, ok := p.sp.Get().(T)
+	if !ok {
+		s = p.fn(capacity)
+	} else if s.Capacity() < capacity {
 		p.sp.Put(s)
 		s = p.fn(capacity)
 	}
@@ -36,5 +31,6 @@ func (p *Pool[T]) Get(length, capacity int) T {
 }
 
 func (p *Pool[T]) Put(s T) {
+	s.ResetLen(0)
 	p.sp.Put(s)
 }

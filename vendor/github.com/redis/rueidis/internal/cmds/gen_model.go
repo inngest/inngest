@@ -4,7 +4,7 @@ package cmds
 
 import "strconv"
 
-type AiModeldel Completed
+type AiModeldel Incomplete
 
 func (b Builder) AiModeldel() (c AiModeldel) {
 	c = AiModeldel{cs: get(), ks: b.ks}
@@ -22,17 +22,17 @@ func (c AiModeldel) Key(key string) AiModeldelKey {
 	return (AiModeldelKey)(c)
 }
 
-type AiModeldelKey Completed
+type AiModeldelKey Incomplete
 
 func (c AiModeldelKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiModelget Completed
+type AiModelget Incomplete
 
 func (b Builder) AiModelget() (c AiModelget) {
-	c = AiModelget{cs: get(), ks: b.ks, cf: readonly}
+	c = AiModelget{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "AI.MODELGET")
 	return c
 }
@@ -47,19 +47,19 @@ func (c AiModelget) Key(key string) AiModelgetKey {
 	return (AiModelgetKey)(c)
 }
 
-type AiModelgetBlob Completed
+type AiModelgetBlob Incomplete
 
 func (c AiModelgetBlob) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c AiModelgetBlob) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiModelgetKey Completed
+type AiModelgetKey Incomplete
 
 func (c AiModelgetKey) Meta() AiModelgetMeta {
 	c.cs.s = append(c.cs.s, "META")
@@ -73,15 +73,15 @@ func (c AiModelgetKey) Blob() AiModelgetBlob {
 
 func (c AiModelgetKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c AiModelgetKey) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiModelgetMeta Completed
+type AiModelgetMeta Incomplete
 
 func (c AiModelgetMeta) Blob() AiModelgetBlob {
 	c.cs.s = append(c.cs.s, "BLOB")
@@ -90,15 +90,15 @@ func (c AiModelgetMeta) Blob() AiModelgetBlob {
 
 func (c AiModelgetMeta) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c AiModelgetMeta) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiModelstore Completed
+type AiModelstore Incomplete
 
 func (b Builder) AiModelstore() (c AiModelstore) {
 	c = AiModelstore{cs: get(), ks: b.ks}
@@ -116,7 +116,7 @@ func (c AiModelstore) Key(key string) AiModelstoreKey {
 	return (AiModelstoreKey)(c)
 }
 
-type AiModelstoreBackendOnnx Completed
+type AiModelstoreBackendOnnx Incomplete
 
 func (c AiModelstoreBackendOnnx) Cpu() AiModelstoreDeviceCpu {
 	c.cs.s = append(c.cs.s, "CPU")
@@ -128,7 +128,7 @@ func (c AiModelstoreBackendOnnx) Gpu() AiModelstoreDeviceGpu {
 	return (AiModelstoreDeviceGpu)(c)
 }
 
-type AiModelstoreBackendTf Completed
+type AiModelstoreBackendTf Incomplete
 
 func (c AiModelstoreBackendTf) Cpu() AiModelstoreDeviceCpu {
 	c.cs.s = append(c.cs.s, "CPU")
@@ -140,7 +140,7 @@ func (c AiModelstoreBackendTf) Gpu() AiModelstoreDeviceGpu {
 	return (AiModelstoreDeviceGpu)(c)
 }
 
-type AiModelstoreBackendTorch Completed
+type AiModelstoreBackendTorch Incomplete
 
 func (c AiModelstoreBackendTorch) Cpu() AiModelstoreDeviceCpu {
 	c.cs.s = append(c.cs.s, "CPU")
@@ -152,7 +152,7 @@ func (c AiModelstoreBackendTorch) Gpu() AiModelstoreDeviceGpu {
 	return (AiModelstoreDeviceGpu)(c)
 }
 
-type AiModelstoreBatchsize Completed
+type AiModelstoreBatchsize Incomplete
 
 func (c AiModelstoreBatchsize) Minbatchsize(minbatchsize int64) AiModelstoreMinbatchsize {
 	c.cs.s = append(c.cs.s, "MINBATCHSIZE", strconv.FormatInt(minbatchsize, 10))
@@ -181,17 +181,17 @@ func (c AiModelstoreBatchsize) Blob(blob string) AiModelstoreBlob {
 
 func (c AiModelstoreBatchsize) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiModelstoreBlob Completed
+type AiModelstoreBlob Incomplete
 
 func (c AiModelstoreBlob) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiModelstoreDeviceCpu Completed
+type AiModelstoreDeviceCpu Incomplete
 
 func (c AiModelstoreDeviceCpu) Tag(tag string) AiModelstoreTag {
 	c.cs.s = append(c.cs.s, "TAG", tag)
@@ -230,10 +230,10 @@ func (c AiModelstoreDeviceCpu) Blob(blob string) AiModelstoreBlob {
 
 func (c AiModelstoreDeviceCpu) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiModelstoreDeviceGpu Completed
+type AiModelstoreDeviceGpu Incomplete
 
 func (c AiModelstoreDeviceGpu) Tag(tag string) AiModelstoreTag {
 	c.cs.s = append(c.cs.s, "TAG", tag)
@@ -272,10 +272,10 @@ func (c AiModelstoreDeviceGpu) Blob(blob string) AiModelstoreBlob {
 
 func (c AiModelstoreDeviceGpu) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiModelstoreInputsInput Completed
+type AiModelstoreInputsInput Incomplete
 
 func (c AiModelstoreInputsInput) Input(input ...string) AiModelstoreInputsInput {
 	c.cs.s = append(c.cs.s, input...)
@@ -294,17 +294,17 @@ func (c AiModelstoreInputsInput) Blob(blob string) AiModelstoreBlob {
 
 func (c AiModelstoreInputsInput) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiModelstoreInputsInputs Completed
+type AiModelstoreInputsInputs Incomplete
 
 func (c AiModelstoreInputsInputs) Input(input ...string) AiModelstoreInputsInput {
 	c.cs.s = append(c.cs.s, input...)
 	return (AiModelstoreInputsInput)(c)
 }
 
-type AiModelstoreKey Completed
+type AiModelstoreKey Incomplete
 
 func (c AiModelstoreKey) Tf() AiModelstoreBackendTf {
 	c.cs.s = append(c.cs.s, "TF")
@@ -321,7 +321,7 @@ func (c AiModelstoreKey) Onnx() AiModelstoreBackendOnnx {
 	return (AiModelstoreBackendOnnx)(c)
 }
 
-type AiModelstoreMinbatchsize Completed
+type AiModelstoreMinbatchsize Incomplete
 
 func (c AiModelstoreMinbatchsize) Minbatchtimeout(minbatchtimeout int64) AiModelstoreMinbatchtimeout {
 	c.cs.s = append(c.cs.s, "MINBATCHTIMEOUT", strconv.FormatInt(minbatchtimeout, 10))
@@ -345,10 +345,10 @@ func (c AiModelstoreMinbatchsize) Blob(blob string) AiModelstoreBlob {
 
 func (c AiModelstoreMinbatchsize) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiModelstoreMinbatchtimeout Completed
+type AiModelstoreMinbatchtimeout Incomplete
 
 func (c AiModelstoreMinbatchtimeout) Inputs(inputCount int64) AiModelstoreInputsInputs {
 	c.cs.s = append(c.cs.s, "INPUTS", strconv.FormatInt(inputCount, 10))
@@ -367,10 +367,10 @@ func (c AiModelstoreMinbatchtimeout) Blob(blob string) AiModelstoreBlob {
 
 func (c AiModelstoreMinbatchtimeout) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiModelstoreOutputsOutput Completed
+type AiModelstoreOutputsOutput Incomplete
 
 func (c AiModelstoreOutputsOutput) Output(output ...string) AiModelstoreOutputsOutput {
 	c.cs.s = append(c.cs.s, output...)
@@ -384,17 +384,17 @@ func (c AiModelstoreOutputsOutput) Blob(blob string) AiModelstoreBlob {
 
 func (c AiModelstoreOutputsOutput) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiModelstoreOutputsOutputs Completed
+type AiModelstoreOutputsOutputs Incomplete
 
 func (c AiModelstoreOutputsOutputs) Output(output ...string) AiModelstoreOutputsOutput {
 	c.cs.s = append(c.cs.s, output...)
 	return (AiModelstoreOutputsOutput)(c)
 }
 
-type AiModelstoreTag Completed
+type AiModelstoreTag Incomplete
 
 func (c AiModelstoreTag) Batchsize(batchsize int64) AiModelstoreBatchsize {
 	c.cs.s = append(c.cs.s, "BATCHSIZE", strconv.FormatInt(batchsize, 10))
@@ -428,5 +428,5 @@ func (c AiModelstoreTag) Blob(blob string) AiModelstoreBlob {
 
 func (c AiModelstoreTag) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }

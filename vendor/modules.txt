@@ -555,6 +555,9 @@ github.com/kballard/go-shellquote
 github.com/klauspost/compress/flate
 # github.com/lib/pq v1.10.6
 ## explicit; go 1.13
+# github.com/liushuangls/go-anthropic/v2 v2.12.2
+## explicit; go 1.21
+github.com/liushuangls/go-anthropic/v2
 # github.com/lucasb-eyer/go-colorful v1.2.0
 ## explicit; go 1.12
 github.com/lucasb-eyer/go-colorful
@@ -661,11 +664,13 @@ github.com/prometheus/procfs/internal/util
 github.com/protocolbuffers/txtpbfmt/ast
 github.com/protocolbuffers/txtpbfmt/parser
 github.com/protocolbuffers/txtpbfmt/unquote
-# github.com/redis/rueidis v1.0.14
-## explicit; go 1.20
+# github.com/redis/rueidis v1.0.51
+## explicit; go 1.21
 github.com/redis/rueidis
 github.com/redis/rueidis/internal/cmds
 github.com/redis/rueidis/internal/util
+# github.com/redis/rueidis/rueidiscompat v1.0.51
+## explicit; go 1.21
 github.com/redis/rueidis/rueidiscompat
 # github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec
 ## explicit; go 1.12
@@ -973,7 +978,7 @@ golang.org/x/net/http2/hpack
 golang.org/x/net/idna
 golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
-# golang.org/x/oauth2 v0.22.0
+# golang.org/x/oauth2 v0.24.0
 ## explicit; go 1.18
 golang.org/x/oauth2
 golang.org/x/oauth2/authhandler

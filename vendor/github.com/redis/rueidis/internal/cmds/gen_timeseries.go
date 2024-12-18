@@ -4,7 +4,7 @@ package cmds
 
 import "strconv"
 
-type TsAdd Completed
+type TsAdd Incomplete
 
 func (b Builder) TsAdd() (c TsAdd) {
 	c = TsAdd{cs: get(), ks: b.ks}
@@ -22,10 +22,10 @@ func (c TsAdd) Key(key string) TsAddKey {
 	return (TsAddKey)(c)
 }
 
-type TsAddChunkSize Completed
+type TsAddChunkSize Incomplete
 
 func (c TsAddChunkSize) OnDuplicateBlock() TsAddOnDuplicateBlock {
-	c.cf = blockTag
+	c.cf |= int16(blockTag)
 	c.cs.s = append(c.cs.s, "ON_DUPLICATE", "BLOCK")
 	return (TsAddOnDuplicateBlock)(c)
 }
@@ -62,10 +62,10 @@ func (c TsAddChunkSize) Labels() TsAddLabels {
 
 func (c TsAddChunkSize) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsAddEncodingCompressed Completed
+type TsAddEncodingCompressed Incomplete
 
 func (c TsAddEncodingCompressed) ChunkSize(size int64) TsAddChunkSize {
 	c.cs.s = append(c.cs.s, "CHUNK_SIZE", strconv.FormatInt(size, 10))
@@ -73,7 +73,7 @@ func (c TsAddEncodingCompressed) ChunkSize(size int64) TsAddChunkSize {
 }
 
 func (c TsAddEncodingCompressed) OnDuplicateBlock() TsAddOnDuplicateBlock {
-	c.cf = blockTag
+	c.cf |= int16(blockTag)
 	c.cs.s = append(c.cs.s, "ON_DUPLICATE", "BLOCK")
 	return (TsAddOnDuplicateBlock)(c)
 }
@@ -110,10 +110,10 @@ func (c TsAddEncodingCompressed) Labels() TsAddLabels {
 
 func (c TsAddEncodingCompressed) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsAddEncodingUncompressed Completed
+type TsAddEncodingUncompressed Incomplete
 
 func (c TsAddEncodingUncompressed) ChunkSize(size int64) TsAddChunkSize {
 	c.cs.s = append(c.cs.s, "CHUNK_SIZE", strconv.FormatInt(size, 10))
@@ -121,7 +121,7 @@ func (c TsAddEncodingUncompressed) ChunkSize(size int64) TsAddChunkSize {
 }
 
 func (c TsAddEncodingUncompressed) OnDuplicateBlock() TsAddOnDuplicateBlock {
-	c.cf = blockTag
+	c.cf |= int16(blockTag)
 	c.cs.s = append(c.cs.s, "ON_DUPLICATE", "BLOCK")
 	return (TsAddOnDuplicateBlock)(c)
 }
@@ -158,17 +158,17 @@ func (c TsAddEncodingUncompressed) Labels() TsAddLabels {
 
 func (c TsAddEncodingUncompressed) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsAddKey Completed
+type TsAddKey Incomplete
 
-func (c TsAddKey) Timestamp(timestamp int64) TsAddTimestamp {
-	c.cs.s = append(c.cs.s, strconv.FormatInt(timestamp, 10))
+func (c TsAddKey) Timestamp(timestamp string) TsAddTimestamp {
+	c.cs.s = append(c.cs.s, timestamp)
 	return (TsAddTimestamp)(c)
 }
 
-type TsAddLabels Completed
+type TsAddLabels Incomplete
 
 func (c TsAddLabels) Labels(label string, value string) TsAddLabels {
 	c.cs.s = append(c.cs.s, label, value)
@@ -177,10 +177,10 @@ func (c TsAddLabels) Labels(label string, value string) TsAddLabels {
 
 func (c TsAddLabels) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsAddOnDuplicateBlock Completed
+type TsAddOnDuplicateBlock Incomplete
 
 func (c TsAddOnDuplicateBlock) Labels() TsAddLabels {
 	c.cs.s = append(c.cs.s, "LABELS")
@@ -189,10 +189,10 @@ func (c TsAddOnDuplicateBlock) Labels() TsAddLabels {
 
 func (c TsAddOnDuplicateBlock) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsAddOnDuplicateFirst Completed
+type TsAddOnDuplicateFirst Incomplete
 
 func (c TsAddOnDuplicateFirst) Labels() TsAddLabels {
 	c.cs.s = append(c.cs.s, "LABELS")
@@ -201,10 +201,10 @@ func (c TsAddOnDuplicateFirst) Labels() TsAddLabels {
 
 func (c TsAddOnDuplicateFirst) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsAddOnDuplicateLast Completed
+type TsAddOnDuplicateLast Incomplete
 
 func (c TsAddOnDuplicateLast) Labels() TsAddLabels {
 	c.cs.s = append(c.cs.s, "LABELS")
@@ -213,10 +213,10 @@ func (c TsAddOnDuplicateLast) Labels() TsAddLabels {
 
 func (c TsAddOnDuplicateLast) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsAddOnDuplicateMax Completed
+type TsAddOnDuplicateMax Incomplete
 
 func (c TsAddOnDuplicateMax) Labels() TsAddLabels {
 	c.cs.s = append(c.cs.s, "LABELS")
@@ -225,10 +225,10 @@ func (c TsAddOnDuplicateMax) Labels() TsAddLabels {
 
 func (c TsAddOnDuplicateMax) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsAddOnDuplicateMin Completed
+type TsAddOnDuplicateMin Incomplete
 
 func (c TsAddOnDuplicateMin) Labels() TsAddLabels {
 	c.cs.s = append(c.cs.s, "LABELS")
@@ -237,10 +237,10 @@ func (c TsAddOnDuplicateMin) Labels() TsAddLabels {
 
 func (c TsAddOnDuplicateMin) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsAddOnDuplicateSum Completed
+type TsAddOnDuplicateSum Incomplete
 
 func (c TsAddOnDuplicateSum) Labels() TsAddLabels {
 	c.cs.s = append(c.cs.s, "LABELS")
@@ -249,10 +249,10 @@ func (c TsAddOnDuplicateSum) Labels() TsAddLabels {
 
 func (c TsAddOnDuplicateSum) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsAddRetention Completed
+type TsAddRetention Incomplete
 
 func (c TsAddRetention) EncodingUncompressed() TsAddEncodingUncompressed {
 	c.cs.s = append(c.cs.s, "ENCODING", "UNCOMPRESSED")
@@ -270,7 +270,7 @@ func (c TsAddRetention) ChunkSize(size int64) TsAddChunkSize {
 }
 
 func (c TsAddRetention) OnDuplicateBlock() TsAddOnDuplicateBlock {
-	c.cf = blockTag
+	c.cf |= int16(blockTag)
 	c.cs.s = append(c.cs.s, "ON_DUPLICATE", "BLOCK")
 	return (TsAddOnDuplicateBlock)(c)
 }
@@ -307,17 +307,17 @@ func (c TsAddRetention) Labels() TsAddLabels {
 
 func (c TsAddRetention) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsAddTimestamp Completed
+type TsAddTimestamp Incomplete
 
 func (c TsAddTimestamp) Value(value float64) TsAddValue {
 	c.cs.s = append(c.cs.s, strconv.FormatFloat(value, 'f', -1, 64))
 	return (TsAddValue)(c)
 }
 
-type TsAddValue Completed
+type TsAddValue Incomplete
 
 func (c TsAddValue) Retention(retentionperiod int64) TsAddRetention {
 	c.cs.s = append(c.cs.s, "RETENTION", strconv.FormatInt(retentionperiod, 10))
@@ -340,7 +340,7 @@ func (c TsAddValue) ChunkSize(size int64) TsAddChunkSize {
 }
 
 func (c TsAddValue) OnDuplicateBlock() TsAddOnDuplicateBlock {
-	c.cf = blockTag
+	c.cf |= int16(blockTag)
 	c.cs.s = append(c.cs.s, "ON_DUPLICATE", "BLOCK")
 	return (TsAddOnDuplicateBlock)(c)
 }
@@ -377,10 +377,10 @@ func (c TsAddValue) Labels() TsAddLabels {
 
 func (c TsAddValue) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsAlter Completed
+type TsAlter Incomplete
 
 func (b Builder) TsAlter() (c TsAlter) {
 	c = TsAlter{cs: get(), ks: b.ks}
@@ -398,10 +398,10 @@ func (c TsAlter) Key(key string) TsAlterKey {
 	return (TsAlterKey)(c)
 }
 
-type TsAlterChunkSize Completed
+type TsAlterChunkSize Incomplete
 
 func (c TsAlterChunkSize) DuplicatePolicyBlock() TsAlterDuplicatePolicyBlock {
-	c.cf = blockTag
+	c.cf |= int16(blockTag)
 	c.cs.s = append(c.cs.s, "DUPLICATE_POLICY", "BLOCK")
 	return (TsAlterDuplicatePolicyBlock)(c)
 }
@@ -438,10 +438,10 @@ func (c TsAlterChunkSize) Labels() TsAlterLabels {
 
 func (c TsAlterChunkSize) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsAlterDuplicatePolicyBlock Completed
+type TsAlterDuplicatePolicyBlock Incomplete
 
 func (c TsAlterDuplicatePolicyBlock) Labels() TsAlterLabels {
 	c.cs.s = append(c.cs.s, "LABELS")
@@ -450,10 +450,10 @@ func (c TsAlterDuplicatePolicyBlock) Labels() TsAlterLabels {
 
 func (c TsAlterDuplicatePolicyBlock) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsAlterDuplicatePolicyFirst Completed
+type TsAlterDuplicatePolicyFirst Incomplete
 
 func (c TsAlterDuplicatePolicyFirst) Labels() TsAlterLabels {
 	c.cs.s = append(c.cs.s, "LABELS")
@@ -462,10 +462,10 @@ func (c TsAlterDuplicatePolicyFirst) Labels() TsAlterLabels {
 
 func (c TsAlterDuplicatePolicyFirst) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsAlterDuplicatePolicyLast Completed
+type TsAlterDuplicatePolicyLast Incomplete
 
 func (c TsAlterDuplicatePolicyLast) Labels() TsAlterLabels {
 	c.cs.s = append(c.cs.s, "LABELS")
@@ -474,10 +474,10 @@ func (c TsAlterDuplicatePolicyLast) Labels() TsAlterLabels {
 
 func (c TsAlterDuplicatePolicyLast) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsAlterDuplicatePolicyMax Completed
+type TsAlterDuplicatePolicyMax Incomplete
 
 func (c TsAlterDuplicatePolicyMax) Labels() TsAlterLabels {
 	c.cs.s = append(c.cs.s, "LABELS")
@@ -486,10 +486,10 @@ func (c TsAlterDuplicatePolicyMax) Labels() TsAlterLabels {
 
 func (c TsAlterDuplicatePolicyMax) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsAlterDuplicatePolicyMin Completed
+type TsAlterDuplicatePolicyMin Incomplete
 
 func (c TsAlterDuplicatePolicyMin) Labels() TsAlterLabels {
 	c.cs.s = append(c.cs.s, "LABELS")
@@ -498,10 +498,10 @@ func (c TsAlterDuplicatePolicyMin) Labels() TsAlterLabels {
 
 func (c TsAlterDuplicatePolicyMin) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsAlterDuplicatePolicySum Completed
+type TsAlterDuplicatePolicySum Incomplete
 
 func (c TsAlterDuplicatePolicySum) Labels() TsAlterLabels {
 	c.cs.s = append(c.cs.s, "LABELS")
@@ -510,10 +510,10 @@ func (c TsAlterDuplicatePolicySum) Labels() TsAlterLabels {
 
 func (c TsAlterDuplicatePolicySum) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsAlterKey Completed
+type TsAlterKey Incomplete
 
 func (c TsAlterKey) Retention(retentionperiod int64) TsAlterRetention {
 	c.cs.s = append(c.cs.s, "RETENTION", strconv.FormatInt(retentionperiod, 10))
@@ -526,7 +526,7 @@ func (c TsAlterKey) ChunkSize(size int64) TsAlterChunkSize {
 }
 
 func (c TsAlterKey) DuplicatePolicyBlock() TsAlterDuplicatePolicyBlock {
-	c.cf = blockTag
+	c.cf |= int16(blockTag)
 	c.cs.s = append(c.cs.s, "DUPLICATE_POLICY", "BLOCK")
 	return (TsAlterDuplicatePolicyBlock)(c)
 }
@@ -563,10 +563,10 @@ func (c TsAlterKey) Labels() TsAlterLabels {
 
 func (c TsAlterKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsAlterLabels Completed
+type TsAlterLabels Incomplete
 
 func (c TsAlterLabels) Labels(label string, value string) TsAlterLabels {
 	c.cs.s = append(c.cs.s, label, value)
@@ -575,10 +575,10 @@ func (c TsAlterLabels) Labels(label string, value string) TsAlterLabels {
 
 func (c TsAlterLabels) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsAlterRetention Completed
+type TsAlterRetention Incomplete
 
 func (c TsAlterRetention) ChunkSize(size int64) TsAlterChunkSize {
 	c.cs.s = append(c.cs.s, "CHUNK_SIZE", strconv.FormatInt(size, 10))
@@ -586,7 +586,7 @@ func (c TsAlterRetention) ChunkSize(size int64) TsAlterChunkSize {
 }
 
 func (c TsAlterRetention) DuplicatePolicyBlock() TsAlterDuplicatePolicyBlock {
-	c.cf = blockTag
+	c.cf |= int16(blockTag)
 	c.cs.s = append(c.cs.s, "DUPLICATE_POLICY", "BLOCK")
 	return (TsAlterDuplicatePolicyBlock)(c)
 }
@@ -623,10 +623,10 @@ func (c TsAlterRetention) Labels() TsAlterLabels {
 
 func (c TsAlterRetention) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsCreate Completed
+type TsCreate Incomplete
 
 func (b Builder) TsCreate() (c TsCreate) {
 	c = TsCreate{cs: get(), ks: b.ks}
@@ -644,10 +644,10 @@ func (c TsCreate) Key(key string) TsCreateKey {
 	return (TsCreateKey)(c)
 }
 
-type TsCreateChunkSize Completed
+type TsCreateChunkSize Incomplete
 
 func (c TsCreateChunkSize) DuplicatePolicyBlock() TsCreateDuplicatePolicyBlock {
-	c.cf = blockTag
+	c.cf |= int16(blockTag)
 	c.cs.s = append(c.cs.s, "DUPLICATE_POLICY", "BLOCK")
 	return (TsCreateDuplicatePolicyBlock)(c)
 }
@@ -684,10 +684,10 @@ func (c TsCreateChunkSize) Labels() TsCreateLabels {
 
 func (c TsCreateChunkSize) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsCreateDuplicatePolicyBlock Completed
+type TsCreateDuplicatePolicyBlock Incomplete
 
 func (c TsCreateDuplicatePolicyBlock) Labels() TsCreateLabels {
 	c.cs.s = append(c.cs.s, "LABELS")
@@ -696,10 +696,10 @@ func (c TsCreateDuplicatePolicyBlock) Labels() TsCreateLabels {
 
 func (c TsCreateDuplicatePolicyBlock) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsCreateDuplicatePolicyFirst Completed
+type TsCreateDuplicatePolicyFirst Incomplete
 
 func (c TsCreateDuplicatePolicyFirst) Labels() TsCreateLabels {
 	c.cs.s = append(c.cs.s, "LABELS")
@@ -708,10 +708,10 @@ func (c TsCreateDuplicatePolicyFirst) Labels() TsCreateLabels {
 
 func (c TsCreateDuplicatePolicyFirst) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsCreateDuplicatePolicyLast Completed
+type TsCreateDuplicatePolicyLast Incomplete
 
 func (c TsCreateDuplicatePolicyLast) Labels() TsCreateLabels {
 	c.cs.s = append(c.cs.s, "LABELS")
@@ -720,10 +720,10 @@ func (c TsCreateDuplicatePolicyLast) Labels() TsCreateLabels {
 
 func (c TsCreateDuplicatePolicyLast) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsCreateDuplicatePolicyMax Completed
+type TsCreateDuplicatePolicyMax Incomplete
 
 func (c TsCreateDuplicatePolicyMax) Labels() TsCreateLabels {
 	c.cs.s = append(c.cs.s, "LABELS")
@@ -732,10 +732,10 @@ func (c TsCreateDuplicatePolicyMax) Labels() TsCreateLabels {
 
 func (c TsCreateDuplicatePolicyMax) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsCreateDuplicatePolicyMin Completed
+type TsCreateDuplicatePolicyMin Incomplete
 
 func (c TsCreateDuplicatePolicyMin) Labels() TsCreateLabels {
 	c.cs.s = append(c.cs.s, "LABELS")
@@ -744,10 +744,10 @@ func (c TsCreateDuplicatePolicyMin) Labels() TsCreateLabels {
 
 func (c TsCreateDuplicatePolicyMin) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsCreateDuplicatePolicySum Completed
+type TsCreateDuplicatePolicySum Incomplete
 
 func (c TsCreateDuplicatePolicySum) Labels() TsCreateLabels {
 	c.cs.s = append(c.cs.s, "LABELS")
@@ -756,10 +756,10 @@ func (c TsCreateDuplicatePolicySum) Labels() TsCreateLabels {
 
 func (c TsCreateDuplicatePolicySum) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsCreateEncodingCompressed Completed
+type TsCreateEncodingCompressed Incomplete
 
 func (c TsCreateEncodingCompressed) ChunkSize(size int64) TsCreateChunkSize {
 	c.cs.s = append(c.cs.s, "CHUNK_SIZE", strconv.FormatInt(size, 10))
@@ -767,7 +767,7 @@ func (c TsCreateEncodingCompressed) ChunkSize(size int64) TsCreateChunkSize {
 }
 
 func (c TsCreateEncodingCompressed) DuplicatePolicyBlock() TsCreateDuplicatePolicyBlock {
-	c.cf = blockTag
+	c.cf |= int16(blockTag)
 	c.cs.s = append(c.cs.s, "DUPLICATE_POLICY", "BLOCK")
 	return (TsCreateDuplicatePolicyBlock)(c)
 }
@@ -804,10 +804,10 @@ func (c TsCreateEncodingCompressed) Labels() TsCreateLabels {
 
 func (c TsCreateEncodingCompressed) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsCreateEncodingUncompressed Completed
+type TsCreateEncodingUncompressed Incomplete
 
 func (c TsCreateEncodingUncompressed) ChunkSize(size int64) TsCreateChunkSize {
 	c.cs.s = append(c.cs.s, "CHUNK_SIZE", strconv.FormatInt(size, 10))
@@ -815,7 +815,7 @@ func (c TsCreateEncodingUncompressed) ChunkSize(size int64) TsCreateChunkSize {
 }
 
 func (c TsCreateEncodingUncompressed) DuplicatePolicyBlock() TsCreateDuplicatePolicyBlock {
-	c.cf = blockTag
+	c.cf |= int16(blockTag)
 	c.cs.s = append(c.cs.s, "DUPLICATE_POLICY", "BLOCK")
 	return (TsCreateDuplicatePolicyBlock)(c)
 }
@@ -852,10 +852,10 @@ func (c TsCreateEncodingUncompressed) Labels() TsCreateLabels {
 
 func (c TsCreateEncodingUncompressed) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsCreateKey Completed
+type TsCreateKey Incomplete
 
 func (c TsCreateKey) Retention(retentionperiod int64) TsCreateRetention {
 	c.cs.s = append(c.cs.s, "RETENTION", strconv.FormatInt(retentionperiod, 10))
@@ -878,7 +878,7 @@ func (c TsCreateKey) ChunkSize(size int64) TsCreateChunkSize {
 }
 
 func (c TsCreateKey) DuplicatePolicyBlock() TsCreateDuplicatePolicyBlock {
-	c.cf = blockTag
+	c.cf |= int16(blockTag)
 	c.cs.s = append(c.cs.s, "DUPLICATE_POLICY", "BLOCK")
 	return (TsCreateDuplicatePolicyBlock)(c)
 }
@@ -915,10 +915,10 @@ func (c TsCreateKey) Labels() TsCreateLabels {
 
 func (c TsCreateKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsCreateLabels Completed
+type TsCreateLabels Incomplete
 
 func (c TsCreateLabels) Labels(label string, value string) TsCreateLabels {
 	c.cs.s = append(c.cs.s, label, value)
@@ -927,10 +927,10 @@ func (c TsCreateLabels) Labels(label string, value string) TsCreateLabels {
 
 func (c TsCreateLabels) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsCreateRetention Completed
+type TsCreateRetention Incomplete
 
 func (c TsCreateRetention) EncodingUncompressed() TsCreateEncodingUncompressed {
 	c.cs.s = append(c.cs.s, "ENCODING", "UNCOMPRESSED")
@@ -948,7 +948,7 @@ func (c TsCreateRetention) ChunkSize(size int64) TsCreateChunkSize {
 }
 
 func (c TsCreateRetention) DuplicatePolicyBlock() TsCreateDuplicatePolicyBlock {
-	c.cf = blockTag
+	c.cf |= int16(blockTag)
 	c.cs.s = append(c.cs.s, "DUPLICATE_POLICY", "BLOCK")
 	return (TsCreateDuplicatePolicyBlock)(c)
 }
@@ -985,10 +985,10 @@ func (c TsCreateRetention) Labels() TsCreateLabels {
 
 func (c TsCreateRetention) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsCreaterule Completed
+type TsCreaterule Incomplete
 
 func (b Builder) TsCreaterule() (c TsCreaterule) {
 	c = TsCreaterule{cs: get(), ks: b.ks}
@@ -1006,105 +1006,105 @@ func (c TsCreaterule) Sourcekey(sourcekey string) TsCreateruleSourcekey {
 	return (TsCreateruleSourcekey)(c)
 }
 
-type TsCreateruleAggregationAvg Completed
+type TsCreateruleAggregationAvg Incomplete
 
 func (c TsCreateruleAggregationAvg) Bucketduration(bucketduration int64) TsCreateruleBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsCreateruleBucketduration)(c)
 }
 
-type TsCreateruleAggregationCount Completed
+type TsCreateruleAggregationCount Incomplete
 
 func (c TsCreateruleAggregationCount) Bucketduration(bucketduration int64) TsCreateruleBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsCreateruleBucketduration)(c)
 }
 
-type TsCreateruleAggregationFirst Completed
+type TsCreateruleAggregationFirst Incomplete
 
 func (c TsCreateruleAggregationFirst) Bucketduration(bucketduration int64) TsCreateruleBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsCreateruleBucketduration)(c)
 }
 
-type TsCreateruleAggregationLast Completed
+type TsCreateruleAggregationLast Incomplete
 
 func (c TsCreateruleAggregationLast) Bucketduration(bucketduration int64) TsCreateruleBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsCreateruleBucketduration)(c)
 }
 
-type TsCreateruleAggregationMax Completed
+type TsCreateruleAggregationMax Incomplete
 
 func (c TsCreateruleAggregationMax) Bucketduration(bucketduration int64) TsCreateruleBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsCreateruleBucketduration)(c)
 }
 
-type TsCreateruleAggregationMin Completed
+type TsCreateruleAggregationMin Incomplete
 
 func (c TsCreateruleAggregationMin) Bucketduration(bucketduration int64) TsCreateruleBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsCreateruleBucketduration)(c)
 }
 
-type TsCreateruleAggregationRange Completed
+type TsCreateruleAggregationRange Incomplete
 
 func (c TsCreateruleAggregationRange) Bucketduration(bucketduration int64) TsCreateruleBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsCreateruleBucketduration)(c)
 }
 
-type TsCreateruleAggregationStdP Completed
+type TsCreateruleAggregationStdP Incomplete
 
 func (c TsCreateruleAggregationStdP) Bucketduration(bucketduration int64) TsCreateruleBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsCreateruleBucketduration)(c)
 }
 
-type TsCreateruleAggregationStdS Completed
+type TsCreateruleAggregationStdS Incomplete
 
 func (c TsCreateruleAggregationStdS) Bucketduration(bucketduration int64) TsCreateruleBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsCreateruleBucketduration)(c)
 }
 
-type TsCreateruleAggregationSum Completed
+type TsCreateruleAggregationSum Incomplete
 
 func (c TsCreateruleAggregationSum) Bucketduration(bucketduration int64) TsCreateruleBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsCreateruleBucketduration)(c)
 }
 
-type TsCreateruleAggregationTwa Completed
+type TsCreateruleAggregationTwa Incomplete
 
 func (c TsCreateruleAggregationTwa) Bucketduration(bucketduration int64) TsCreateruleBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsCreateruleBucketduration)(c)
 }
 
-type TsCreateruleAggregationVarP Completed
+type TsCreateruleAggregationVarP Incomplete
 
 func (c TsCreateruleAggregationVarP) Bucketduration(bucketduration int64) TsCreateruleBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsCreateruleBucketduration)(c)
 }
 
-type TsCreateruleAggregationVarS Completed
+type TsCreateruleAggregationVarS Incomplete
 
 func (c TsCreateruleAggregationVarS) Bucketduration(bucketduration int64) TsCreateruleBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsCreateruleBucketduration)(c)
 }
 
-type TsCreateruleAligntimestamp Completed
+type TsCreateruleAligntimestamp Incomplete
 
 func (c TsCreateruleAligntimestamp) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsCreateruleBucketduration Completed
+type TsCreateruleBucketduration Incomplete
 
 func (c TsCreateruleBucketduration) Aligntimestamp(aligntimestamp int64) TsCreateruleAligntimestamp {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(aligntimestamp, 10))
@@ -1113,10 +1113,10 @@ func (c TsCreateruleBucketduration) Aligntimestamp(aligntimestamp int64) TsCreat
 
 func (c TsCreateruleBucketduration) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsCreateruleDestkey Completed
+type TsCreateruleDestkey Incomplete
 
 func (c TsCreateruleDestkey) AggregationAvg() TsCreateruleAggregationAvg {
 	c.cs.s = append(c.cs.s, "AGGREGATION", "AVG")
@@ -1183,7 +1183,7 @@ func (c TsCreateruleDestkey) AggregationTwa() TsCreateruleAggregationTwa {
 	return (TsCreateruleAggregationTwa)(c)
 }
 
-type TsCreateruleSourcekey Completed
+type TsCreateruleSourcekey Incomplete
 
 func (c TsCreateruleSourcekey) Destkey(destkey string) TsCreateruleDestkey {
 	if c.ks&NoSlot == NoSlot {
@@ -1195,7 +1195,7 @@ func (c TsCreateruleSourcekey) Destkey(destkey string) TsCreateruleDestkey {
 	return (TsCreateruleDestkey)(c)
 }
 
-type TsDecrby Completed
+type TsDecrby Incomplete
 
 func (b Builder) TsDecrby() (c TsDecrby) {
 	c = TsDecrby{cs: get(), ks: b.ks}
@@ -1213,7 +1213,7 @@ func (c TsDecrby) Key(key string) TsDecrbyKey {
 	return (TsDecrbyKey)(c)
 }
 
-type TsDecrbyChunkSize Completed
+type TsDecrbyChunkSize Incomplete
 
 func (c TsDecrbyChunkSize) Labels() TsDecrbyLabels {
 	c.cs.s = append(c.cs.s, "LABELS")
@@ -1222,17 +1222,17 @@ func (c TsDecrbyChunkSize) Labels() TsDecrbyLabels {
 
 func (c TsDecrbyChunkSize) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsDecrbyKey Completed
+type TsDecrbyKey Incomplete
 
 func (c TsDecrbyKey) Value(value float64) TsDecrbyValue {
 	c.cs.s = append(c.cs.s, strconv.FormatFloat(value, 'f', -1, 64))
 	return (TsDecrbyValue)(c)
 }
 
-type TsDecrbyLabels Completed
+type TsDecrbyLabels Incomplete
 
 func (c TsDecrbyLabels) Labels(label string, value string) TsDecrbyLabels {
 	c.cs.s = append(c.cs.s, label, value)
@@ -1241,10 +1241,10 @@ func (c TsDecrbyLabels) Labels(label string, value string) TsDecrbyLabels {
 
 func (c TsDecrbyLabels) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsDecrbyRetention Completed
+type TsDecrbyRetention Incomplete
 
 func (c TsDecrbyRetention) Uncompressed() TsDecrbyUncompressed {
 	c.cs.s = append(c.cs.s, "UNCOMPRESSED")
@@ -1263,10 +1263,10 @@ func (c TsDecrbyRetention) Labels() TsDecrbyLabels {
 
 func (c TsDecrbyRetention) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsDecrbyTimestamp Completed
+type TsDecrbyTimestamp Incomplete
 
 func (c TsDecrbyTimestamp) Retention(retentionperiod int64) TsDecrbyRetention {
 	c.cs.s = append(c.cs.s, "RETENTION", strconv.FormatInt(retentionperiod, 10))
@@ -1290,10 +1290,10 @@ func (c TsDecrbyTimestamp) Labels() TsDecrbyLabels {
 
 func (c TsDecrbyTimestamp) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsDecrbyUncompressed Completed
+type TsDecrbyUncompressed Incomplete
 
 func (c TsDecrbyUncompressed) ChunkSize(size int64) TsDecrbyChunkSize {
 	c.cs.s = append(c.cs.s, "CHUNK_SIZE", strconv.FormatInt(size, 10))
@@ -1307,13 +1307,13 @@ func (c TsDecrbyUncompressed) Labels() TsDecrbyLabels {
 
 func (c TsDecrbyUncompressed) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsDecrbyValue Completed
+type TsDecrbyValue Incomplete
 
-func (c TsDecrbyValue) Timestamp(timestamp int64) TsDecrbyTimestamp {
-	c.cs.s = append(c.cs.s, "TIMESTAMP", strconv.FormatInt(timestamp, 10))
+func (c TsDecrbyValue) Timestamp(timestamp string) TsDecrbyTimestamp {
+	c.cs.s = append(c.cs.s, "TIMESTAMP", timestamp)
 	return (TsDecrbyTimestamp)(c)
 }
 
@@ -1339,10 +1339,10 @@ func (c TsDecrbyValue) Labels() TsDecrbyLabels {
 
 func (c TsDecrbyValue) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsDel Completed
+type TsDel Incomplete
 
 func (b Builder) TsDel() (c TsDel) {
 	c = TsDel{cs: get(), ks: b.ks}
@@ -1360,28 +1360,28 @@ func (c TsDel) Key(key string) TsDelKey {
 	return (TsDelKey)(c)
 }
 
-type TsDelFromTimestamp Completed
+type TsDelFromTimestamp Incomplete
 
 func (c TsDelFromTimestamp) ToTimestamp(toTimestamp int64) TsDelToTimestamp {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(toTimestamp, 10))
 	return (TsDelToTimestamp)(c)
 }
 
-type TsDelKey Completed
+type TsDelKey Incomplete
 
 func (c TsDelKey) FromTimestamp(fromTimestamp int64) TsDelFromTimestamp {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(fromTimestamp, 10))
 	return (TsDelFromTimestamp)(c)
 }
 
-type TsDelToTimestamp Completed
+type TsDelToTimestamp Incomplete
 
 func (c TsDelToTimestamp) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsDeleterule Completed
+type TsDeleterule Incomplete
 
 func (b Builder) TsDeleterule() (c TsDeleterule) {
 	c = TsDeleterule{cs: get(), ks: b.ks}
@@ -1399,14 +1399,14 @@ func (c TsDeleterule) Sourcekey(sourcekey string) TsDeleteruleSourcekey {
 	return (TsDeleteruleSourcekey)(c)
 }
 
-type TsDeleteruleDestkey Completed
+type TsDeleteruleDestkey Incomplete
 
 func (c TsDeleteruleDestkey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsDeleteruleSourcekey Completed
+type TsDeleteruleSourcekey Incomplete
 
 func (c TsDeleteruleSourcekey) Destkey(destkey string) TsDeleteruleDestkey {
 	if c.ks&NoSlot == NoSlot {
@@ -1418,10 +1418,10 @@ func (c TsDeleteruleSourcekey) Destkey(destkey string) TsDeleteruleDestkey {
 	return (TsDeleteruleDestkey)(c)
 }
 
-type TsGet Completed
+type TsGet Incomplete
 
 func (b Builder) TsGet() (c TsGet) {
-	c = TsGet{cs: get(), ks: b.ks, cf: readonly}
+	c = TsGet{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "TS.GET")
 	return c
 }
@@ -1436,7 +1436,7 @@ func (c TsGet) Key(key string) TsGetKey {
 	return (TsGetKey)(c)
 }
 
-type TsGetKey Completed
+type TsGetKey Incomplete
 
 func (c TsGetKey) Latest() TsGetLatest {
 	c.cs.s = append(c.cs.s, "LATEST")
@@ -1445,17 +1445,17 @@ func (c TsGetKey) Latest() TsGetLatest {
 
 func (c TsGetKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsGetLatest Completed
+type TsGetLatest Incomplete
 
 func (c TsGetLatest) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsIncrby Completed
+type TsIncrby Incomplete
 
 func (b Builder) TsIncrby() (c TsIncrby) {
 	c = TsIncrby{cs: get(), ks: b.ks}
@@ -1473,7 +1473,7 @@ func (c TsIncrby) Key(key string) TsIncrbyKey {
 	return (TsIncrbyKey)(c)
 }
 
-type TsIncrbyChunkSize Completed
+type TsIncrbyChunkSize Incomplete
 
 func (c TsIncrbyChunkSize) Labels() TsIncrbyLabels {
 	c.cs.s = append(c.cs.s, "LABELS")
@@ -1482,17 +1482,17 @@ func (c TsIncrbyChunkSize) Labels() TsIncrbyLabels {
 
 func (c TsIncrbyChunkSize) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsIncrbyKey Completed
+type TsIncrbyKey Incomplete
 
 func (c TsIncrbyKey) Value(value float64) TsIncrbyValue {
 	c.cs.s = append(c.cs.s, strconv.FormatFloat(value, 'f', -1, 64))
 	return (TsIncrbyValue)(c)
 }
 
-type TsIncrbyLabels Completed
+type TsIncrbyLabels Incomplete
 
 func (c TsIncrbyLabels) Labels(label string, value string) TsIncrbyLabels {
 	c.cs.s = append(c.cs.s, label, value)
@@ -1501,10 +1501,10 @@ func (c TsIncrbyLabels) Labels(label string, value string) TsIncrbyLabels {
 
 func (c TsIncrbyLabels) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsIncrbyRetention Completed
+type TsIncrbyRetention Incomplete
 
 func (c TsIncrbyRetention) Uncompressed() TsIncrbyUncompressed {
 	c.cs.s = append(c.cs.s, "UNCOMPRESSED")
@@ -1523,10 +1523,10 @@ func (c TsIncrbyRetention) Labels() TsIncrbyLabels {
 
 func (c TsIncrbyRetention) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsIncrbyTimestamp Completed
+type TsIncrbyTimestamp Incomplete
 
 func (c TsIncrbyTimestamp) Retention(retentionperiod int64) TsIncrbyRetention {
 	c.cs.s = append(c.cs.s, "RETENTION", strconv.FormatInt(retentionperiod, 10))
@@ -1550,10 +1550,10 @@ func (c TsIncrbyTimestamp) Labels() TsIncrbyLabels {
 
 func (c TsIncrbyTimestamp) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsIncrbyUncompressed Completed
+type TsIncrbyUncompressed Incomplete
 
 func (c TsIncrbyUncompressed) ChunkSize(size int64) TsIncrbyChunkSize {
 	c.cs.s = append(c.cs.s, "CHUNK_SIZE", strconv.FormatInt(size, 10))
@@ -1567,13 +1567,13 @@ func (c TsIncrbyUncompressed) Labels() TsIncrbyLabels {
 
 func (c TsIncrbyUncompressed) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsIncrbyValue Completed
+type TsIncrbyValue Incomplete
 
-func (c TsIncrbyValue) Timestamp(timestamp int64) TsIncrbyTimestamp {
-	c.cs.s = append(c.cs.s, "TIMESTAMP", strconv.FormatInt(timestamp, 10))
+func (c TsIncrbyValue) Timestamp(timestamp string) TsIncrbyTimestamp {
+	c.cs.s = append(c.cs.s, "TIMESTAMP", timestamp)
 	return (TsIncrbyTimestamp)(c)
 }
 
@@ -1599,13 +1599,13 @@ func (c TsIncrbyValue) Labels() TsIncrbyLabels {
 
 func (c TsIncrbyValue) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsInfo Completed
+type TsInfo Incomplete
 
 func (b Builder) TsInfo() (c TsInfo) {
-	c = TsInfo{cs: get(), ks: b.ks, cf: readonly}
+	c = TsInfo{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "TS.INFO")
 	return c
 }
@@ -1620,14 +1620,14 @@ func (c TsInfo) Key(key string) TsInfoKey {
 	return (TsInfoKey)(c)
 }
 
-type TsInfoDebug Completed
+type TsInfoDebug Incomplete
 
 func (c TsInfoDebug) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsInfoKey Completed
+type TsInfoKey Incomplete
 
 func (c TsInfoKey) Debug(debug string) TsInfoDebug {
 	c.cs.s = append(c.cs.s, debug)
@@ -1636,10 +1636,10 @@ func (c TsInfoKey) Debug(debug string) TsInfoDebug {
 
 func (c TsInfoKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsMadd Completed
+type TsMadd Incomplete
 
 func (b Builder) TsMadd() (c TsMadd) {
 	c = TsMadd{cs: get(), ks: b.ks}
@@ -1651,7 +1651,7 @@ func (c TsMadd) KeyTimestampValue() TsMaddKeyTimestampValue {
 	return (TsMaddKeyTimestampValue)(c)
 }
 
-type TsMaddKeyTimestampValue Completed
+type TsMaddKeyTimestampValue Incomplete
 
 func (c TsMaddKeyTimestampValue) KeyTimestampValue(key string, timestamp int64, value float64) TsMaddKeyTimestampValue {
 	if c.ks&NoSlot == NoSlot {
@@ -1665,10 +1665,10 @@ func (c TsMaddKeyTimestampValue) KeyTimestampValue(key string, timestamp int64, 
 
 func (c TsMaddKeyTimestampValue) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsMget Completed
+type TsMget Incomplete
 
 func (b Builder) TsMget() (c TsMget) {
 	c = TsMget{cs: get(), ks: b.ks}
@@ -1698,7 +1698,7 @@ func (c TsMget) Filter(filter ...string) TsMgetFilter {
 	return (TsMgetFilter)(c)
 }
 
-type TsMgetFilter Completed
+type TsMgetFilter Incomplete
 
 func (c TsMgetFilter) Filter(filter ...string) TsMgetFilter {
 	c.cs.s = append(c.cs.s, "FILTER")
@@ -1708,10 +1708,10 @@ func (c TsMgetFilter) Filter(filter ...string) TsMgetFilter {
 
 func (c TsMgetFilter) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsMgetLatest Completed
+type TsMgetLatest Incomplete
 
 func (c TsMgetLatest) Withlabels() TsMgetWithlabels {
 	c.cs.s = append(c.cs.s, "WITHLABELS")
@@ -1730,7 +1730,7 @@ func (c TsMgetLatest) Filter(filter ...string) TsMgetFilter {
 	return (TsMgetFilter)(c)
 }
 
-type TsMgetSelectedLabels Completed
+type TsMgetSelectedLabels Incomplete
 
 func (c TsMgetSelectedLabels) Filter(filter ...string) TsMgetFilter {
 	c.cs.s = append(c.cs.s, "FILTER")
@@ -1738,7 +1738,7 @@ func (c TsMgetSelectedLabels) Filter(filter ...string) TsMgetFilter {
 	return (TsMgetFilter)(c)
 }
 
-type TsMgetWithlabels Completed
+type TsMgetWithlabels Incomplete
 
 func (c TsMgetWithlabels) Filter(filter ...string) TsMgetFilter {
 	c.cs.s = append(c.cs.s, "FILTER")
@@ -1746,7 +1746,7 @@ func (c TsMgetWithlabels) Filter(filter ...string) TsMgetFilter {
 	return (TsMgetFilter)(c)
 }
 
-type TsMrange Completed
+type TsMrange Incomplete
 
 func (b Builder) TsMrange() (c TsMrange) {
 	c = TsMrange{cs: get(), ks: b.ks}
@@ -1754,103 +1754,103 @@ func (b Builder) TsMrange() (c TsMrange) {
 	return c
 }
 
-func (c TsMrange) Fromtimestamp(fromtimestamp int64) TsMrangeFromtimestamp {
-	c.cs.s = append(c.cs.s, strconv.FormatInt(fromtimestamp, 10))
+func (c TsMrange) Fromtimestamp(fromtimestamp string) TsMrangeFromtimestamp {
+	c.cs.s = append(c.cs.s, fromtimestamp)
 	return (TsMrangeFromtimestamp)(c)
 }
 
-type TsMrangeAggregationAggregationAvg Completed
+type TsMrangeAggregationAggregationAvg Incomplete
 
 func (c TsMrangeAggregationAggregationAvg) Bucketduration(bucketduration int64) TsMrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrangeAggregationBucketduration)(c)
 }
 
-type TsMrangeAggregationAggregationCount Completed
+type TsMrangeAggregationAggregationCount Incomplete
 
 func (c TsMrangeAggregationAggregationCount) Bucketduration(bucketduration int64) TsMrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrangeAggregationBucketduration)(c)
 }
 
-type TsMrangeAggregationAggregationFirst Completed
+type TsMrangeAggregationAggregationFirst Incomplete
 
 func (c TsMrangeAggregationAggregationFirst) Bucketduration(bucketduration int64) TsMrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrangeAggregationBucketduration)(c)
 }
 
-type TsMrangeAggregationAggregationLast Completed
+type TsMrangeAggregationAggregationLast Incomplete
 
 func (c TsMrangeAggregationAggregationLast) Bucketduration(bucketduration int64) TsMrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrangeAggregationBucketduration)(c)
 }
 
-type TsMrangeAggregationAggregationMax Completed
+type TsMrangeAggregationAggregationMax Incomplete
 
 func (c TsMrangeAggregationAggregationMax) Bucketduration(bucketduration int64) TsMrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrangeAggregationBucketduration)(c)
 }
 
-type TsMrangeAggregationAggregationMin Completed
+type TsMrangeAggregationAggregationMin Incomplete
 
 func (c TsMrangeAggregationAggregationMin) Bucketduration(bucketduration int64) TsMrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrangeAggregationBucketduration)(c)
 }
 
-type TsMrangeAggregationAggregationRange Completed
+type TsMrangeAggregationAggregationRange Incomplete
 
 func (c TsMrangeAggregationAggregationRange) Bucketduration(bucketduration int64) TsMrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrangeAggregationBucketduration)(c)
 }
 
-type TsMrangeAggregationAggregationStdP Completed
+type TsMrangeAggregationAggregationStdP Incomplete
 
 func (c TsMrangeAggregationAggregationStdP) Bucketduration(bucketduration int64) TsMrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrangeAggregationBucketduration)(c)
 }
 
-type TsMrangeAggregationAggregationStdS Completed
+type TsMrangeAggregationAggregationStdS Incomplete
 
 func (c TsMrangeAggregationAggregationStdS) Bucketduration(bucketduration int64) TsMrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrangeAggregationBucketduration)(c)
 }
 
-type TsMrangeAggregationAggregationSum Completed
+type TsMrangeAggregationAggregationSum Incomplete
 
 func (c TsMrangeAggregationAggregationSum) Bucketduration(bucketduration int64) TsMrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrangeAggregationBucketduration)(c)
 }
 
-type TsMrangeAggregationAggregationTwa Completed
+type TsMrangeAggregationAggregationTwa Incomplete
 
 func (c TsMrangeAggregationAggregationTwa) Bucketduration(bucketduration int64) TsMrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrangeAggregationBucketduration)(c)
 }
 
-type TsMrangeAggregationAggregationVarP Completed
+type TsMrangeAggregationAggregationVarP Incomplete
 
 func (c TsMrangeAggregationAggregationVarP) Bucketduration(bucketduration int64) TsMrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrangeAggregationBucketduration)(c)
 }
 
-type TsMrangeAggregationAggregationVarS Completed
+type TsMrangeAggregationAggregationVarS Incomplete
 
 func (c TsMrangeAggregationAggregationVarS) Bucketduration(bucketduration int64) TsMrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrangeAggregationBucketduration)(c)
 }
 
-type TsMrangeAggregationBucketduration Completed
+type TsMrangeAggregationBucketduration Incomplete
 
 func (c TsMrangeAggregationBucketduration) Buckettimestamp(buckettimestamp string) TsMrangeAggregationBuckettimestamp {
 	c.cs.s = append(c.cs.s, "BUCKETTIMESTAMP", buckettimestamp)
@@ -1868,7 +1868,7 @@ func (c TsMrangeAggregationBucketduration) Filter(filter ...string) TsMrangeFilt
 	return (TsMrangeFilter)(c)
 }
 
-type TsMrangeAggregationBuckettimestamp Completed
+type TsMrangeAggregationBuckettimestamp Incomplete
 
 func (c TsMrangeAggregationBuckettimestamp) Empty() TsMrangeAggregationEmpty {
 	c.cs.s = append(c.cs.s, "EMPTY")
@@ -1881,7 +1881,7 @@ func (c TsMrangeAggregationBuckettimestamp) Filter(filter ...string) TsMrangeFil
 	return (TsMrangeFilter)(c)
 }
 
-type TsMrangeAggregationEmpty Completed
+type TsMrangeAggregationEmpty Incomplete
 
 func (c TsMrangeAggregationEmpty) Filter(filter ...string) TsMrangeFilter {
 	c.cs.s = append(c.cs.s, "FILTER")
@@ -1889,7 +1889,7 @@ func (c TsMrangeAggregationEmpty) Filter(filter ...string) TsMrangeFilter {
 	return (TsMrangeFilter)(c)
 }
 
-type TsMrangeAlign Completed
+type TsMrangeAlign Incomplete
 
 func (c TsMrangeAlign) AggregationAvg() TsMrangeAggregationAggregationAvg {
 	c.cs.s = append(c.cs.s, "AGGREGATION", "AVG")
@@ -1962,7 +1962,7 @@ func (c TsMrangeAlign) Filter(filter ...string) TsMrangeFilter {
 	return (TsMrangeFilter)(c)
 }
 
-type TsMrangeCount Completed
+type TsMrangeCount Incomplete
 
 func (c TsMrangeCount) Align(value string) TsMrangeAlign {
 	c.cs.s = append(c.cs.s, "ALIGN", value)
@@ -2040,7 +2040,7 @@ func (c TsMrangeCount) Filter(filter ...string) TsMrangeFilter {
 	return (TsMrangeFilter)(c)
 }
 
-type TsMrangeFilter Completed
+type TsMrangeFilter Incomplete
 
 func (c TsMrangeFilter) Filter(filter ...string) TsMrangeFilter {
 	c.cs.s = append(c.cs.s, "FILTER")
@@ -2055,10 +2055,10 @@ func (c TsMrangeFilter) Groupby(label string, reduce string, reducer string) TsM
 
 func (c TsMrangeFilter) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsMrangeFilterByTs Completed
+type TsMrangeFilterByTs Incomplete
 
 func (c TsMrangeFilterByTs) FilterByTs(timestamp ...int64) TsMrangeFilterByTs {
 	c.cs.s = append(c.cs.s, "FILTER_BY_TS")
@@ -2165,7 +2165,7 @@ func (c TsMrangeFilterByTs) Filter(filter ...string) TsMrangeFilter {
 	return (TsMrangeFilter)(c)
 }
 
-type TsMrangeFilterByValue Completed
+type TsMrangeFilterByValue Incomplete
 
 func (c TsMrangeFilterByValue) Withlabels() TsMrangeWithlabels {
 	c.cs.s = append(c.cs.s, "WITHLABELS")
@@ -2259,21 +2259,21 @@ func (c TsMrangeFilterByValue) Filter(filter ...string) TsMrangeFilter {
 	return (TsMrangeFilter)(c)
 }
 
-type TsMrangeFromtimestamp Completed
+type TsMrangeFromtimestamp Incomplete
 
-func (c TsMrangeFromtimestamp) Totimestamp(totimestamp int64) TsMrangeTotimestamp {
-	c.cs.s = append(c.cs.s, strconv.FormatInt(totimestamp, 10))
+func (c TsMrangeFromtimestamp) Totimestamp(totimestamp string) TsMrangeTotimestamp {
+	c.cs.s = append(c.cs.s, totimestamp)
 	return (TsMrangeTotimestamp)(c)
 }
 
-type TsMrangeGroupby Completed
+type TsMrangeGroupby Incomplete
 
 func (c TsMrangeGroupby) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsMrangeLatest Completed
+type TsMrangeLatest Incomplete
 
 func (c TsMrangeLatest) FilterByTs(timestamp ...int64) TsMrangeFilterByTs {
 	c.cs.s = append(c.cs.s, "FILTER_BY_TS")
@@ -2380,7 +2380,7 @@ func (c TsMrangeLatest) Filter(filter ...string) TsMrangeFilter {
 	return (TsMrangeFilter)(c)
 }
 
-type TsMrangeSelectedLabels Completed
+type TsMrangeSelectedLabels Incomplete
 
 func (c TsMrangeSelectedLabels) Count(count int64) TsMrangeCount {
 	c.cs.s = append(c.cs.s, "COUNT", strconv.FormatInt(count, 10))
@@ -2463,7 +2463,7 @@ func (c TsMrangeSelectedLabels) Filter(filter ...string) TsMrangeFilter {
 	return (TsMrangeFilter)(c)
 }
 
-type TsMrangeTotimestamp Completed
+type TsMrangeTotimestamp Incomplete
 
 func (c TsMrangeTotimestamp) Latest() TsMrangeLatest {
 	c.cs.s = append(c.cs.s, "LATEST")
@@ -2575,7 +2575,7 @@ func (c TsMrangeTotimestamp) Filter(filter ...string) TsMrangeFilter {
 	return (TsMrangeFilter)(c)
 }
 
-type TsMrangeWithlabels Completed
+type TsMrangeWithlabels Incomplete
 
 func (c TsMrangeWithlabels) Count(count int64) TsMrangeCount {
 	c.cs.s = append(c.cs.s, "COUNT", strconv.FormatInt(count, 10))
@@ -2658,7 +2658,7 @@ func (c TsMrangeWithlabels) Filter(filter ...string) TsMrangeFilter {
 	return (TsMrangeFilter)(c)
 }
 
-type TsMrevrange Completed
+type TsMrevrange Incomplete
 
 func (b Builder) TsMrevrange() (c TsMrevrange) {
 	c = TsMrevrange{cs: get(), ks: b.ks}
@@ -2666,103 +2666,103 @@ func (b Builder) TsMrevrange() (c TsMrevrange) {
 	return c
 }
 
-func (c TsMrevrange) Fromtimestamp(fromtimestamp int64) TsMrevrangeFromtimestamp {
-	c.cs.s = append(c.cs.s, strconv.FormatInt(fromtimestamp, 10))
+func (c TsMrevrange) Fromtimestamp(fromtimestamp string) TsMrevrangeFromtimestamp {
+	c.cs.s = append(c.cs.s, fromtimestamp)
 	return (TsMrevrangeFromtimestamp)(c)
 }
 
-type TsMrevrangeAggregationAggregationAvg Completed
+type TsMrevrangeAggregationAggregationAvg Incomplete
 
 func (c TsMrevrangeAggregationAggregationAvg) Bucketduration(bucketduration int64) TsMrevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrevrangeAggregationBucketduration)(c)
 }
 
-type TsMrevrangeAggregationAggregationCount Completed
+type TsMrevrangeAggregationAggregationCount Incomplete
 
 func (c TsMrevrangeAggregationAggregationCount) Bucketduration(bucketduration int64) TsMrevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrevrangeAggregationBucketduration)(c)
 }
 
-type TsMrevrangeAggregationAggregationFirst Completed
+type TsMrevrangeAggregationAggregationFirst Incomplete
 
 func (c TsMrevrangeAggregationAggregationFirst) Bucketduration(bucketduration int64) TsMrevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrevrangeAggregationBucketduration)(c)
 }
 
-type TsMrevrangeAggregationAggregationLast Completed
+type TsMrevrangeAggregationAggregationLast Incomplete
 
 func (c TsMrevrangeAggregationAggregationLast) Bucketduration(bucketduration int64) TsMrevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrevrangeAggregationBucketduration)(c)
 }
 
-type TsMrevrangeAggregationAggregationMax Completed
+type TsMrevrangeAggregationAggregationMax Incomplete
 
 func (c TsMrevrangeAggregationAggregationMax) Bucketduration(bucketduration int64) TsMrevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrevrangeAggregationBucketduration)(c)
 }
 
-type TsMrevrangeAggregationAggregationMin Completed
+type TsMrevrangeAggregationAggregationMin Incomplete
 
 func (c TsMrevrangeAggregationAggregationMin) Bucketduration(bucketduration int64) TsMrevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrevrangeAggregationBucketduration)(c)
 }
 
-type TsMrevrangeAggregationAggregationRange Completed
+type TsMrevrangeAggregationAggregationRange Incomplete
 
 func (c TsMrevrangeAggregationAggregationRange) Bucketduration(bucketduration int64) TsMrevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrevrangeAggregationBucketduration)(c)
 }
 
-type TsMrevrangeAggregationAggregationStdP Completed
+type TsMrevrangeAggregationAggregationStdP Incomplete
 
 func (c TsMrevrangeAggregationAggregationStdP) Bucketduration(bucketduration int64) TsMrevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrevrangeAggregationBucketduration)(c)
 }
 
-type TsMrevrangeAggregationAggregationStdS Completed
+type TsMrevrangeAggregationAggregationStdS Incomplete
 
 func (c TsMrevrangeAggregationAggregationStdS) Bucketduration(bucketduration int64) TsMrevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrevrangeAggregationBucketduration)(c)
 }
 
-type TsMrevrangeAggregationAggregationSum Completed
+type TsMrevrangeAggregationAggregationSum Incomplete
 
 func (c TsMrevrangeAggregationAggregationSum) Bucketduration(bucketduration int64) TsMrevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrevrangeAggregationBucketduration)(c)
 }
 
-type TsMrevrangeAggregationAggregationTwa Completed
+type TsMrevrangeAggregationAggregationTwa Incomplete
 
 func (c TsMrevrangeAggregationAggregationTwa) Bucketduration(bucketduration int64) TsMrevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrevrangeAggregationBucketduration)(c)
 }
 
-type TsMrevrangeAggregationAggregationVarP Completed
+type TsMrevrangeAggregationAggregationVarP Incomplete
 
 func (c TsMrevrangeAggregationAggregationVarP) Bucketduration(bucketduration int64) TsMrevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrevrangeAggregationBucketduration)(c)
 }
 
-type TsMrevrangeAggregationAggregationVarS Completed
+type TsMrevrangeAggregationAggregationVarS Incomplete
 
 func (c TsMrevrangeAggregationAggregationVarS) Bucketduration(bucketduration int64) TsMrevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsMrevrangeAggregationBucketduration)(c)
 }
 
-type TsMrevrangeAggregationBucketduration Completed
+type TsMrevrangeAggregationBucketduration Incomplete
 
 func (c TsMrevrangeAggregationBucketduration) Buckettimestamp(buckettimestamp string) TsMrevrangeAggregationBuckettimestamp {
 	c.cs.s = append(c.cs.s, "BUCKETTIMESTAMP", buckettimestamp)
@@ -2780,7 +2780,7 @@ func (c TsMrevrangeAggregationBucketduration) Filter(filter ...string) TsMrevran
 	return (TsMrevrangeFilter)(c)
 }
 
-type TsMrevrangeAggregationBuckettimestamp Completed
+type TsMrevrangeAggregationBuckettimestamp Incomplete
 
 func (c TsMrevrangeAggregationBuckettimestamp) Empty() TsMrevrangeAggregationEmpty {
 	c.cs.s = append(c.cs.s, "EMPTY")
@@ -2793,7 +2793,7 @@ func (c TsMrevrangeAggregationBuckettimestamp) Filter(filter ...string) TsMrevra
 	return (TsMrevrangeFilter)(c)
 }
 
-type TsMrevrangeAggregationEmpty Completed
+type TsMrevrangeAggregationEmpty Incomplete
 
 func (c TsMrevrangeAggregationEmpty) Filter(filter ...string) TsMrevrangeFilter {
 	c.cs.s = append(c.cs.s, "FILTER")
@@ -2801,7 +2801,7 @@ func (c TsMrevrangeAggregationEmpty) Filter(filter ...string) TsMrevrangeFilter 
 	return (TsMrevrangeFilter)(c)
 }
 
-type TsMrevrangeAlign Completed
+type TsMrevrangeAlign Incomplete
 
 func (c TsMrevrangeAlign) AggregationAvg() TsMrevrangeAggregationAggregationAvg {
 	c.cs.s = append(c.cs.s, "AGGREGATION", "AVG")
@@ -2874,7 +2874,7 @@ func (c TsMrevrangeAlign) Filter(filter ...string) TsMrevrangeFilter {
 	return (TsMrevrangeFilter)(c)
 }
 
-type TsMrevrangeCount Completed
+type TsMrevrangeCount Incomplete
 
 func (c TsMrevrangeCount) Align(value string) TsMrevrangeAlign {
 	c.cs.s = append(c.cs.s, "ALIGN", value)
@@ -2952,7 +2952,7 @@ func (c TsMrevrangeCount) Filter(filter ...string) TsMrevrangeFilter {
 	return (TsMrevrangeFilter)(c)
 }
 
-type TsMrevrangeFilter Completed
+type TsMrevrangeFilter Incomplete
 
 func (c TsMrevrangeFilter) Filter(filter ...string) TsMrevrangeFilter {
 	c.cs.s = append(c.cs.s, "FILTER")
@@ -2967,10 +2967,10 @@ func (c TsMrevrangeFilter) Groupby(label string, reduce string, reducer string) 
 
 func (c TsMrevrangeFilter) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsMrevrangeFilterByTs Completed
+type TsMrevrangeFilterByTs Incomplete
 
 func (c TsMrevrangeFilterByTs) FilterByTs(timestamp ...int64) TsMrevrangeFilterByTs {
 	c.cs.s = append(c.cs.s, "FILTER_BY_TS")
@@ -3077,7 +3077,7 @@ func (c TsMrevrangeFilterByTs) Filter(filter ...string) TsMrevrangeFilter {
 	return (TsMrevrangeFilter)(c)
 }
 
-type TsMrevrangeFilterByValue Completed
+type TsMrevrangeFilterByValue Incomplete
 
 func (c TsMrevrangeFilterByValue) Withlabels() TsMrevrangeWithlabels {
 	c.cs.s = append(c.cs.s, "WITHLABELS")
@@ -3171,21 +3171,21 @@ func (c TsMrevrangeFilterByValue) Filter(filter ...string) TsMrevrangeFilter {
 	return (TsMrevrangeFilter)(c)
 }
 
-type TsMrevrangeFromtimestamp Completed
+type TsMrevrangeFromtimestamp Incomplete
 
-func (c TsMrevrangeFromtimestamp) Totimestamp(totimestamp int64) TsMrevrangeTotimestamp {
-	c.cs.s = append(c.cs.s, strconv.FormatInt(totimestamp, 10))
+func (c TsMrevrangeFromtimestamp) Totimestamp(totimestamp string) TsMrevrangeTotimestamp {
+	c.cs.s = append(c.cs.s, totimestamp)
 	return (TsMrevrangeTotimestamp)(c)
 }
 
-type TsMrevrangeGroupby Completed
+type TsMrevrangeGroupby Incomplete
 
 func (c TsMrevrangeGroupby) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsMrevrangeLatest Completed
+type TsMrevrangeLatest Incomplete
 
 func (c TsMrevrangeLatest) FilterByTs(timestamp ...int64) TsMrevrangeFilterByTs {
 	c.cs.s = append(c.cs.s, "FILTER_BY_TS")
@@ -3292,7 +3292,7 @@ func (c TsMrevrangeLatest) Filter(filter ...string) TsMrevrangeFilter {
 	return (TsMrevrangeFilter)(c)
 }
 
-type TsMrevrangeSelectedLabels Completed
+type TsMrevrangeSelectedLabels Incomplete
 
 func (c TsMrevrangeSelectedLabels) Count(count int64) TsMrevrangeCount {
 	c.cs.s = append(c.cs.s, "COUNT", strconv.FormatInt(count, 10))
@@ -3375,7 +3375,7 @@ func (c TsMrevrangeSelectedLabels) Filter(filter ...string) TsMrevrangeFilter {
 	return (TsMrevrangeFilter)(c)
 }
 
-type TsMrevrangeTotimestamp Completed
+type TsMrevrangeTotimestamp Incomplete
 
 func (c TsMrevrangeTotimestamp) Latest() TsMrevrangeLatest {
 	c.cs.s = append(c.cs.s, "LATEST")
@@ -3487,7 +3487,7 @@ func (c TsMrevrangeTotimestamp) Filter(filter ...string) TsMrevrangeFilter {
 	return (TsMrevrangeFilter)(c)
 }
 
-type TsMrevrangeWithlabels Completed
+type TsMrevrangeWithlabels Incomplete
 
 func (c TsMrevrangeWithlabels) Count(count int64) TsMrevrangeCount {
 	c.cs.s = append(c.cs.s, "COUNT", strconv.FormatInt(count, 10))
@@ -3570,10 +3570,10 @@ func (c TsMrevrangeWithlabels) Filter(filter ...string) TsMrevrangeFilter {
 	return (TsMrevrangeFilter)(c)
 }
 
-type TsQueryindex Completed
+type TsQueryindex Incomplete
 
 func (b Builder) TsQueryindex() (c TsQueryindex) {
-	c = TsQueryindex{cs: get(), ks: b.ks, cf: readonly}
+	c = TsQueryindex{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "TS.QUERYINDEX")
 	return c
 }
@@ -3583,7 +3583,7 @@ func (c TsQueryindex) Filter(filter ...string) TsQueryindexFilter {
 	return (TsQueryindexFilter)(c)
 }
 
-type TsQueryindexFilter Completed
+type TsQueryindexFilter Incomplete
 
 func (c TsQueryindexFilter) Filter(filter ...string) TsQueryindexFilter {
 	c.cs.s = append(c.cs.s, filter...)
@@ -3592,13 +3592,13 @@ func (c TsQueryindexFilter) Filter(filter ...string) TsQueryindexFilter {
 
 func (c TsQueryindexFilter) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsRange Completed
+type TsRange Incomplete
 
 func (b Builder) TsRange() (c TsRange) {
-	c = TsRange{cs: get(), ks: b.ks, cf: readonly}
+	c = TsRange{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "TS.RANGE")
 	return c
 }
@@ -3613,98 +3613,98 @@ func (c TsRange) Key(key string) TsRangeKey {
 	return (TsRangeKey)(c)
 }
 
-type TsRangeAggregationAggregationAvg Completed
+type TsRangeAggregationAggregationAvg Incomplete
 
 func (c TsRangeAggregationAggregationAvg) Bucketduration(bucketduration int64) TsRangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRangeAggregationBucketduration)(c)
 }
 
-type TsRangeAggregationAggregationCount Completed
+type TsRangeAggregationAggregationCount Incomplete
 
 func (c TsRangeAggregationAggregationCount) Bucketduration(bucketduration int64) TsRangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRangeAggregationBucketduration)(c)
 }
 
-type TsRangeAggregationAggregationFirst Completed
+type TsRangeAggregationAggregationFirst Incomplete
 
 func (c TsRangeAggregationAggregationFirst) Bucketduration(bucketduration int64) TsRangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRangeAggregationBucketduration)(c)
 }
 
-type TsRangeAggregationAggregationLast Completed
+type TsRangeAggregationAggregationLast Incomplete
 
 func (c TsRangeAggregationAggregationLast) Bucketduration(bucketduration int64) TsRangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRangeAggregationBucketduration)(c)
 }
 
-type TsRangeAggregationAggregationMax Completed
+type TsRangeAggregationAggregationMax Incomplete
 
 func (c TsRangeAggregationAggregationMax) Bucketduration(bucketduration int64) TsRangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRangeAggregationBucketduration)(c)
 }
 
-type TsRangeAggregationAggregationMin Completed
+type TsRangeAggregationAggregationMin Incomplete
 
 func (c TsRangeAggregationAggregationMin) Bucketduration(bucketduration int64) TsRangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRangeAggregationBucketduration)(c)
 }
 
-type TsRangeAggregationAggregationRange Completed
+type TsRangeAggregationAggregationRange Incomplete
 
 func (c TsRangeAggregationAggregationRange) Bucketduration(bucketduration int64) TsRangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRangeAggregationBucketduration)(c)
 }
 
-type TsRangeAggregationAggregationStdP Completed
+type TsRangeAggregationAggregationStdP Incomplete
 
 func (c TsRangeAggregationAggregationStdP) Bucketduration(bucketduration int64) TsRangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRangeAggregationBucketduration)(c)
 }
 
-type TsRangeAggregationAggregationStdS Completed
+type TsRangeAggregationAggregationStdS Incomplete
 
 func (c TsRangeAggregationAggregationStdS) Bucketduration(bucketduration int64) TsRangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRangeAggregationBucketduration)(c)
 }
 
-type TsRangeAggregationAggregationSum Completed
+type TsRangeAggregationAggregationSum Incomplete
 
 func (c TsRangeAggregationAggregationSum) Bucketduration(bucketduration int64) TsRangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRangeAggregationBucketduration)(c)
 }
 
-type TsRangeAggregationAggregationTwa Completed
+type TsRangeAggregationAggregationTwa Incomplete
 
 func (c TsRangeAggregationAggregationTwa) Bucketduration(bucketduration int64) TsRangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRangeAggregationBucketduration)(c)
 }
 
-type TsRangeAggregationAggregationVarP Completed
+type TsRangeAggregationAggregationVarP Incomplete
 
 func (c TsRangeAggregationAggregationVarP) Bucketduration(bucketduration int64) TsRangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRangeAggregationBucketduration)(c)
 }
 
-type TsRangeAggregationAggregationVarS Completed
+type TsRangeAggregationAggregationVarS Incomplete
 
 func (c TsRangeAggregationAggregationVarS) Bucketduration(bucketduration int64) TsRangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRangeAggregationBucketduration)(c)
 }
 
-type TsRangeAggregationBucketduration Completed
+type TsRangeAggregationBucketduration Incomplete
 
 func (c TsRangeAggregationBucketduration) Buckettimestamp(buckettimestamp string) TsRangeAggregationBuckettimestamp {
 	c.cs.s = append(c.cs.s, "BUCKETTIMESTAMP", buckettimestamp)
@@ -3718,10 +3718,10 @@ func (c TsRangeAggregationBucketduration) Empty() TsRangeAggregationEmpty {
 
 func (c TsRangeAggregationBucketduration) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsRangeAggregationBuckettimestamp Completed
+type TsRangeAggregationBuckettimestamp Incomplete
 
 func (c TsRangeAggregationBuckettimestamp) Empty() TsRangeAggregationEmpty {
 	c.cs.s = append(c.cs.s, "EMPTY")
@@ -3730,17 +3730,17 @@ func (c TsRangeAggregationBuckettimestamp) Empty() TsRangeAggregationEmpty {
 
 func (c TsRangeAggregationBuckettimestamp) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsRangeAggregationEmpty Completed
+type TsRangeAggregationEmpty Incomplete
 
 func (c TsRangeAggregationEmpty) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsRangeAlign Completed
+type TsRangeAlign Incomplete
 
 func (c TsRangeAlign) AggregationAvg() TsRangeAggregationAggregationAvg {
 	c.cs.s = append(c.cs.s, "AGGREGATION", "AVG")
@@ -3809,10 +3809,10 @@ func (c TsRangeAlign) AggregationTwa() TsRangeAggregationAggregationTwa {
 
 func (c TsRangeAlign) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsRangeCount Completed
+type TsRangeCount Incomplete
 
 func (c TsRangeCount) Align(value string) TsRangeAlign {
 	c.cs.s = append(c.cs.s, "ALIGN", value)
@@ -3886,10 +3886,10 @@ func (c TsRangeCount) AggregationTwa() TsRangeAggregationAggregationTwa {
 
 func (c TsRangeCount) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsRangeFilterByTs Completed
+type TsRangeFilterByTs Incomplete
 
 func (c TsRangeFilterByTs) FilterByTs(timestamp ...int64) TsRangeFilterByTs {
 	c.cs.s = append(c.cs.s, "FILTER_BY_TS")
@@ -3981,10 +3981,10 @@ func (c TsRangeFilterByTs) AggregationTwa() TsRangeAggregationAggregationTwa {
 
 func (c TsRangeFilterByTs) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsRangeFilterByValue Completed
+type TsRangeFilterByValue Incomplete
 
 func (c TsRangeFilterByValue) Count(count int64) TsRangeCount {
 	c.cs.s = append(c.cs.s, "COUNT", strconv.FormatInt(count, 10))
@@ -4063,24 +4063,24 @@ func (c TsRangeFilterByValue) AggregationTwa() TsRangeAggregationAggregationTwa 
 
 func (c TsRangeFilterByValue) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsRangeFromtimestamp Completed
+type TsRangeFromtimestamp Incomplete
 
-func (c TsRangeFromtimestamp) Totimestamp(totimestamp int64) TsRangeTotimestamp {
-	c.cs.s = append(c.cs.s, strconv.FormatInt(totimestamp, 10))
+func (c TsRangeFromtimestamp) Totimestamp(totimestamp string) TsRangeTotimestamp {
+	c.cs.s = append(c.cs.s, totimestamp)
 	return (TsRangeTotimestamp)(c)
 }
 
-type TsRangeKey Completed
+type TsRangeKey Incomplete
 
-func (c TsRangeKey) Fromtimestamp(fromtimestamp int64) TsRangeFromtimestamp {
-	c.cs.s = append(c.cs.s, strconv.FormatInt(fromtimestamp, 10))
+func (c TsRangeKey) Fromtimestamp(fromtimestamp string) TsRangeFromtimestamp {
+	c.cs.s = append(c.cs.s, fromtimestamp)
 	return (TsRangeFromtimestamp)(c)
 }
 
-type TsRangeLatest Completed
+type TsRangeLatest Incomplete
 
 func (c TsRangeLatest) FilterByTs(timestamp ...int64) TsRangeFilterByTs {
 	c.cs.s = append(c.cs.s, "FILTER_BY_TS")
@@ -4172,10 +4172,10 @@ func (c TsRangeLatest) AggregationTwa() TsRangeAggregationAggregationTwa {
 
 func (c TsRangeLatest) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsRangeTotimestamp Completed
+type TsRangeTotimestamp Incomplete
 
 func (c TsRangeTotimestamp) Latest() TsRangeLatest {
 	c.cs.s = append(c.cs.s, "LATEST")
@@ -4272,13 +4272,13 @@ func (c TsRangeTotimestamp) AggregationTwa() TsRangeAggregationAggregationTwa {
 
 func (c TsRangeTotimestamp) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsRevrange Completed
+type TsRevrange Incomplete
 
 func (b Builder) TsRevrange() (c TsRevrange) {
-	c = TsRevrange{cs: get(), ks: b.ks, cf: readonly}
+	c = TsRevrange{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "TS.REVRANGE")
 	return c
 }
@@ -4293,98 +4293,98 @@ func (c TsRevrange) Key(key string) TsRevrangeKey {
 	return (TsRevrangeKey)(c)
 }
 
-type TsRevrangeAggregationAggregationAvg Completed
+type TsRevrangeAggregationAggregationAvg Incomplete
 
 func (c TsRevrangeAggregationAggregationAvg) Bucketduration(bucketduration int64) TsRevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRevrangeAggregationBucketduration)(c)
 }
 
-type TsRevrangeAggregationAggregationCount Completed
+type TsRevrangeAggregationAggregationCount Incomplete
 
 func (c TsRevrangeAggregationAggregationCount) Bucketduration(bucketduration int64) TsRevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRevrangeAggregationBucketduration)(c)
 }
 
-type TsRevrangeAggregationAggregationFirst Completed
+type TsRevrangeAggregationAggregationFirst Incomplete
 
 func (c TsRevrangeAggregationAggregationFirst) Bucketduration(bucketduration int64) TsRevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRevrangeAggregationBucketduration)(c)
 }
 
-type TsRevrangeAggregationAggregationLast Completed
+type TsRevrangeAggregationAggregationLast Incomplete
 
 func (c TsRevrangeAggregationAggregationLast) Bucketduration(bucketduration int64) TsRevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRevrangeAggregationBucketduration)(c)
 }
 
-type TsRevrangeAggregationAggregationMax Completed
+type TsRevrangeAggregationAggregationMax Incomplete
 
 func (c TsRevrangeAggregationAggregationMax) Bucketduration(bucketduration int64) TsRevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRevrangeAggregationBucketduration)(c)
 }
 
-type TsRevrangeAggregationAggregationMin Completed
+type TsRevrangeAggregationAggregationMin Incomplete
 
 func (c TsRevrangeAggregationAggregationMin) Bucketduration(bucketduration int64) TsRevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRevrangeAggregationBucketduration)(c)
 }
 
-type TsRevrangeAggregationAggregationRange Completed
+type TsRevrangeAggregationAggregationRange Incomplete
 
 func (c TsRevrangeAggregationAggregationRange) Bucketduration(bucketduration int64) TsRevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRevrangeAggregationBucketduration)(c)
 }
 
-type TsRevrangeAggregationAggregationStdP Completed
+type TsRevrangeAggregationAggregationStdP Incomplete
 
 func (c TsRevrangeAggregationAggregationStdP) Bucketduration(bucketduration int64) TsRevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRevrangeAggregationBucketduration)(c)
 }
 
-type TsRevrangeAggregationAggregationStdS Completed
+type TsRevrangeAggregationAggregationStdS Incomplete
 
 func (c TsRevrangeAggregationAggregationStdS) Bucketduration(bucketduration int64) TsRevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRevrangeAggregationBucketduration)(c)
 }
 
-type TsRevrangeAggregationAggregationSum Completed
+type TsRevrangeAggregationAggregationSum Incomplete
 
 func (c TsRevrangeAggregationAggregationSum) Bucketduration(bucketduration int64) TsRevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRevrangeAggregationBucketduration)(c)
 }
 
-type TsRevrangeAggregationAggregationTwa Completed
+type TsRevrangeAggregationAggregationTwa Incomplete
 
 func (c TsRevrangeAggregationAggregationTwa) Bucketduration(bucketduration int64) TsRevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRevrangeAggregationBucketduration)(c)
 }
 
-type TsRevrangeAggregationAggregationVarP Completed
+type TsRevrangeAggregationAggregationVarP Incomplete
 
 func (c TsRevrangeAggregationAggregationVarP) Bucketduration(bucketduration int64) TsRevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRevrangeAggregationBucketduration)(c)
 }
 
-type TsRevrangeAggregationAggregationVarS Completed
+type TsRevrangeAggregationAggregationVarS Incomplete
 
 func (c TsRevrangeAggregationAggregationVarS) Bucketduration(bucketduration int64) TsRevrangeAggregationBucketduration {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(bucketduration, 10))
 	return (TsRevrangeAggregationBucketduration)(c)
 }
 
-type TsRevrangeAggregationBucketduration Completed
+type TsRevrangeAggregationBucketduration Incomplete
 
 func (c TsRevrangeAggregationBucketduration) Buckettimestamp(buckettimestamp string) TsRevrangeAggregationBuckettimestamp {
 	c.cs.s = append(c.cs.s, "BUCKETTIMESTAMP", buckettimestamp)
@@ -4398,10 +4398,10 @@ func (c TsRevrangeAggregationBucketduration) Empty() TsRevrangeAggregationEmpty 
 
 func (c TsRevrangeAggregationBucketduration) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsRevrangeAggregationBuckettimestamp Completed
+type TsRevrangeAggregationBuckettimestamp Incomplete
 
 func (c TsRevrangeAggregationBuckettimestamp) Empty() TsRevrangeAggregationEmpty {
 	c.cs.s = append(c.cs.s, "EMPTY")
@@ -4410,17 +4410,17 @@ func (c TsRevrangeAggregationBuckettimestamp) Empty() TsRevrangeAggregationEmpty
 
 func (c TsRevrangeAggregationBuckettimestamp) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsRevrangeAggregationEmpty Completed
+type TsRevrangeAggregationEmpty Incomplete
 
 func (c TsRevrangeAggregationEmpty) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsRevrangeAlign Completed
+type TsRevrangeAlign Incomplete
 
 func (c TsRevrangeAlign) AggregationAvg() TsRevrangeAggregationAggregationAvg {
 	c.cs.s = append(c.cs.s, "AGGREGATION", "AVG")
@@ -4489,10 +4489,10 @@ func (c TsRevrangeAlign) AggregationTwa() TsRevrangeAggregationAggregationTwa {
 
 func (c TsRevrangeAlign) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsRevrangeCount Completed
+type TsRevrangeCount Incomplete
 
 func (c TsRevrangeCount) Align(value string) TsRevrangeAlign {
 	c.cs.s = append(c.cs.s, "ALIGN", value)
@@ -4566,10 +4566,10 @@ func (c TsRevrangeCount) AggregationTwa() TsRevrangeAggregationAggregationTwa {
 
 func (c TsRevrangeCount) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsRevrangeFilterByTs Completed
+type TsRevrangeFilterByTs Incomplete
 
 func (c TsRevrangeFilterByTs) FilterByTs(timestamp ...int64) TsRevrangeFilterByTs {
 	c.cs.s = append(c.cs.s, "FILTER_BY_TS")
@@ -4661,10 +4661,10 @@ func (c TsRevrangeFilterByTs) AggregationTwa() TsRevrangeAggregationAggregationT
 
 func (c TsRevrangeFilterByTs) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsRevrangeFilterByValue Completed
+type TsRevrangeFilterByValue Incomplete
 
 func (c TsRevrangeFilterByValue) Count(count int64) TsRevrangeCount {
 	c.cs.s = append(c.cs.s, "COUNT", strconv.FormatInt(count, 10))
@@ -4743,24 +4743,24 @@ func (c TsRevrangeFilterByValue) AggregationTwa() TsRevrangeAggregationAggregati
 
 func (c TsRevrangeFilterByValue) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsRevrangeFromtimestamp Completed
+type TsRevrangeFromtimestamp Incomplete
 
-func (c TsRevrangeFromtimestamp) Totimestamp(totimestamp int64) TsRevrangeTotimestamp {
-	c.cs.s = append(c.cs.s, strconv.FormatInt(totimestamp, 10))
+func (c TsRevrangeFromtimestamp) Totimestamp(totimestamp string) TsRevrangeTotimestamp {
+	c.cs.s = append(c.cs.s, totimestamp)
 	return (TsRevrangeTotimestamp)(c)
 }
 
-type TsRevrangeKey Completed
+type TsRevrangeKey Incomplete
 
-func (c TsRevrangeKey) Fromtimestamp(fromtimestamp int64) TsRevrangeFromtimestamp {
-	c.cs.s = append(c.cs.s, strconv.FormatInt(fromtimestamp, 10))
+func (c TsRevrangeKey) Fromtimestamp(fromtimestamp string) TsRevrangeFromtimestamp {
+	c.cs.s = append(c.cs.s, fromtimestamp)
 	return (TsRevrangeFromtimestamp)(c)
 }
 
-type TsRevrangeLatest Completed
+type TsRevrangeLatest Incomplete
 
 func (c TsRevrangeLatest) FilterByTs(timestamp ...int64) TsRevrangeFilterByTs {
 	c.cs.s = append(c.cs.s, "FILTER_BY_TS")
@@ -4852,10 +4852,10 @@ func (c TsRevrangeLatest) AggregationTwa() TsRevrangeAggregationAggregationTwa {
 
 func (c TsRevrangeLatest) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TsRevrangeTotimestamp Completed
+type TsRevrangeTotimestamp Incomplete
 
 func (c TsRevrangeTotimestamp) Latest() TsRevrangeLatest {
 	c.cs.s = append(c.cs.s, "LATEST")
@@ -4952,5 +4952,5 @@ func (c TsRevrangeTotimestamp) AggregationTwa() TsRevrangeAggregationAggregation
 
 func (c TsRevrangeTotimestamp) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }

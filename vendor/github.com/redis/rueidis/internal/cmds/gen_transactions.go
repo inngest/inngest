@@ -2,7 +2,7 @@
 
 package cmds
 
-type Discard Completed
+type Discard Incomplete
 
 func (b Builder) Discard() (c Discard) {
 	c = Discard{cs: get(), ks: b.ks}
@@ -12,10 +12,10 @@ func (b Builder) Discard() (c Discard) {
 
 func (c Discard) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Exec Completed
+type Exec Incomplete
 
 func (b Builder) Exec() (c Exec) {
 	c = Exec{cs: get(), ks: b.ks}
@@ -25,10 +25,10 @@ func (b Builder) Exec() (c Exec) {
 
 func (c Exec) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Multi Completed
+type Multi Incomplete
 
 func (b Builder) Multi() (c Multi) {
 	c = Multi{cs: get(), ks: b.ks}
@@ -38,10 +38,10 @@ func (b Builder) Multi() (c Multi) {
 
 func (c Multi) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Unwatch Completed
+type Unwatch Incomplete
 
 func (b Builder) Unwatch() (c Unwatch) {
 	c = Unwatch{cs: get(), ks: b.ks}
@@ -51,10 +51,10 @@ func (b Builder) Unwatch() (c Unwatch) {
 
 func (c Unwatch) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Watch Completed
+type Watch Incomplete
 
 func (b Builder) Watch() (c Watch) {
 	c = Watch{cs: get(), ks: b.ks}
@@ -77,7 +77,7 @@ func (c Watch) Key(key ...string) WatchKey {
 	return (WatchKey)(c)
 }
 
-type WatchKey Completed
+type WatchKey Incomplete
 
 func (c WatchKey) Key(key ...string) WatchKey {
 	if c.ks&NoSlot == NoSlot {
@@ -96,5 +96,5 @@ func (c WatchKey) Key(key ...string) WatchKey {
 
 func (c WatchKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }

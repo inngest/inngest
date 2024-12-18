@@ -4,10 +4,10 @@ package cmds
 
 import "strconv"
 
-type Bzmpop Completed
+type Bzmpop Incomplete
 
 func (b Builder) Bzmpop() (c Bzmpop) {
-	c = Bzmpop{cs: get(), ks: b.ks, cf: blockTag}
+	c = Bzmpop{cs: get(), ks: b.ks, cf: int16(blockTag)}
 	c.cs.s = append(c.cs.s, "BZMPOP")
 	return c
 }
@@ -17,14 +17,14 @@ func (c Bzmpop) Timeout(timeout float64) BzmpopTimeout {
 	return (BzmpopTimeout)(c)
 }
 
-type BzmpopCount Completed
+type BzmpopCount Incomplete
 
 func (c BzmpopCount) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BzmpopKey Completed
+type BzmpopKey Incomplete
 
 func (c BzmpopKey) Key(key ...string) BzmpopKey {
 	if c.ks&NoSlot == NoSlot {
@@ -51,7 +51,7 @@ func (c BzmpopKey) Max() BzmpopWhereMax {
 	return (BzmpopWhereMax)(c)
 }
 
-type BzmpopNumkeys Completed
+type BzmpopNumkeys Incomplete
 
 func (c BzmpopNumkeys) Key(key ...string) BzmpopKey {
 	if c.ks&NoSlot == NoSlot {
@@ -68,14 +68,14 @@ func (c BzmpopNumkeys) Key(key ...string) BzmpopKey {
 	return (BzmpopKey)(c)
 }
 
-type BzmpopTimeout Completed
+type BzmpopTimeout Incomplete
 
 func (c BzmpopTimeout) Numkeys(numkeys int64) BzmpopNumkeys {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(numkeys, 10))
 	return (BzmpopNumkeys)(c)
 }
 
-type BzmpopWhereMax Completed
+type BzmpopWhereMax Incomplete
 
 func (c BzmpopWhereMax) Count(count int64) BzmpopCount {
 	c.cs.s = append(c.cs.s, "COUNT", strconv.FormatInt(count, 10))
@@ -84,10 +84,10 @@ func (c BzmpopWhereMax) Count(count int64) BzmpopCount {
 
 func (c BzmpopWhereMax) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BzmpopWhereMin Completed
+type BzmpopWhereMin Incomplete
 
 func (c BzmpopWhereMin) Count(count int64) BzmpopCount {
 	c.cs.s = append(c.cs.s, "COUNT", strconv.FormatInt(count, 10))
@@ -96,13 +96,13 @@ func (c BzmpopWhereMin) Count(count int64) BzmpopCount {
 
 func (c BzmpopWhereMin) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Bzpopmax Completed
+type Bzpopmax Incomplete
 
 func (b Builder) Bzpopmax() (c Bzpopmax) {
-	c = Bzpopmax{cs: get(), ks: b.ks, cf: blockTag}
+	c = Bzpopmax{cs: get(), ks: b.ks, cf: int16(blockTag)}
 	c.cs.s = append(c.cs.s, "BZPOPMAX")
 	return c
 }
@@ -122,7 +122,7 @@ func (c Bzpopmax) Key(key ...string) BzpopmaxKey {
 	return (BzpopmaxKey)(c)
 }
 
-type BzpopmaxKey Completed
+type BzpopmaxKey Incomplete
 
 func (c BzpopmaxKey) Key(key ...string) BzpopmaxKey {
 	if c.ks&NoSlot == NoSlot {
@@ -144,17 +144,17 @@ func (c BzpopmaxKey) Timeout(timeout float64) BzpopmaxTimeout {
 	return (BzpopmaxTimeout)(c)
 }
 
-type BzpopmaxTimeout Completed
+type BzpopmaxTimeout Incomplete
 
 func (c BzpopmaxTimeout) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Bzpopmin Completed
+type Bzpopmin Incomplete
 
 func (b Builder) Bzpopmin() (c Bzpopmin) {
-	c = Bzpopmin{cs: get(), ks: b.ks, cf: blockTag}
+	c = Bzpopmin{cs: get(), ks: b.ks, cf: int16(blockTag)}
 	c.cs.s = append(c.cs.s, "BZPOPMIN")
 	return c
 }
@@ -174,7 +174,7 @@ func (c Bzpopmin) Key(key ...string) BzpopminKey {
 	return (BzpopminKey)(c)
 }
 
-type BzpopminKey Completed
+type BzpopminKey Incomplete
 
 func (c BzpopminKey) Key(key ...string) BzpopminKey {
 	if c.ks&NoSlot == NoSlot {
@@ -196,14 +196,14 @@ func (c BzpopminKey) Timeout(timeout float64) BzpopminTimeout {
 	return (BzpopminTimeout)(c)
 }
 
-type BzpopminTimeout Completed
+type BzpopminTimeout Incomplete
 
 func (c BzpopminTimeout) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Zadd Completed
+type Zadd Incomplete
 
 func (b Builder) Zadd() (c Zadd) {
 	c = Zadd{cs: get(), ks: b.ks}
@@ -221,7 +221,7 @@ func (c Zadd) Key(key string) ZaddKey {
 	return (ZaddKey)(c)
 }
 
-type ZaddChangeCh Completed
+type ZaddChangeCh Incomplete
 
 func (c ZaddChangeCh) Incr() ZaddIncrementIncr {
 	c.cs.s = append(c.cs.s, "INCR")
@@ -232,7 +232,7 @@ func (c ZaddChangeCh) ScoreMember() ZaddScoreMember {
 	return (ZaddScoreMember)(c)
 }
 
-type ZaddComparisonGt Completed
+type ZaddComparisonGt Incomplete
 
 func (c ZaddComparisonGt) Ch() ZaddChangeCh {
 	c.cs.s = append(c.cs.s, "CH")
@@ -248,7 +248,7 @@ func (c ZaddComparisonGt) ScoreMember() ZaddScoreMember {
 	return (ZaddScoreMember)(c)
 }
 
-type ZaddComparisonLt Completed
+type ZaddComparisonLt Incomplete
 
 func (c ZaddComparisonLt) Ch() ZaddChangeCh {
 	c.cs.s = append(c.cs.s, "CH")
@@ -264,7 +264,7 @@ func (c ZaddComparisonLt) ScoreMember() ZaddScoreMember {
 	return (ZaddScoreMember)(c)
 }
 
-type ZaddConditionNx Completed
+type ZaddConditionNx Incomplete
 
 func (c ZaddConditionNx) Gt() ZaddComparisonGt {
 	c.cs.s = append(c.cs.s, "GT")
@@ -290,7 +290,7 @@ func (c ZaddConditionNx) ScoreMember() ZaddScoreMember {
 	return (ZaddScoreMember)(c)
 }
 
-type ZaddConditionXx Completed
+type ZaddConditionXx Incomplete
 
 func (c ZaddConditionXx) Gt() ZaddComparisonGt {
 	c.cs.s = append(c.cs.s, "GT")
@@ -316,13 +316,13 @@ func (c ZaddConditionXx) ScoreMember() ZaddScoreMember {
 	return (ZaddScoreMember)(c)
 }
 
-type ZaddIncrementIncr Completed
+type ZaddIncrementIncr Incomplete
 
 func (c ZaddIncrementIncr) ScoreMember() ZaddScoreMember {
 	return (ZaddScoreMember)(c)
 }
 
-type ZaddKey Completed
+type ZaddKey Incomplete
 
 func (c ZaddKey) Nx() ZaddConditionNx {
 	c.cs.s = append(c.cs.s, "NX")
@@ -358,7 +358,7 @@ func (c ZaddKey) ScoreMember() ZaddScoreMember {
 	return (ZaddScoreMember)(c)
 }
 
-type ZaddScoreMember Completed
+type ZaddScoreMember Incomplete
 
 func (c ZaddScoreMember) ScoreMember(score float64, member string) ZaddScoreMember {
 	c.cs.s = append(c.cs.s, strconv.FormatFloat(score, 'f', -1, 64), member)
@@ -367,13 +367,13 @@ func (c ZaddScoreMember) ScoreMember(score float64, member string) ZaddScoreMemb
 
 func (c ZaddScoreMember) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Zcard Completed
+type Zcard Incomplete
 
 func (b Builder) Zcard() (c Zcard) {
-	c = Zcard{cs: get(), ks: b.ks, cf: readonly}
+	c = Zcard{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "ZCARD")
 	return c
 }
@@ -388,22 +388,22 @@ func (c Zcard) Key(key string) ZcardKey {
 	return (ZcardKey)(c)
 }
 
-type ZcardKey Completed
+type ZcardKey Incomplete
 
 func (c ZcardKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZcardKey) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Zcount Completed
+type Zcount Incomplete
 
 func (b Builder) Zcount() (c Zcount) {
-	c = Zcount{cs: get(), ks: b.ks, cf: readonly}
+	c = Zcount{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "ZCOUNT")
 	return c
 }
@@ -418,36 +418,36 @@ func (c Zcount) Key(key string) ZcountKey {
 	return (ZcountKey)(c)
 }
 
-type ZcountKey Completed
+type ZcountKey Incomplete
 
 func (c ZcountKey) Min(min string) ZcountMin {
 	c.cs.s = append(c.cs.s, min)
 	return (ZcountMin)(c)
 }
 
-type ZcountMax Completed
+type ZcountMax Incomplete
 
 func (c ZcountMax) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZcountMax) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZcountMin Completed
+type ZcountMin Incomplete
 
 func (c ZcountMin) Max(max string) ZcountMax {
 	c.cs.s = append(c.cs.s, max)
 	return (ZcountMax)(c)
 }
 
-type Zdiff Completed
+type Zdiff Incomplete
 
 func (b Builder) Zdiff() (c Zdiff) {
-	c = Zdiff{cs: get(), ks: b.ks, cf: readonly}
+	c = Zdiff{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "ZDIFF")
 	return c
 }
@@ -457,7 +457,7 @@ func (c Zdiff) Numkeys(numkeys int64) ZdiffNumkeys {
 	return (ZdiffNumkeys)(c)
 }
 
-type ZdiffKey Completed
+type ZdiffKey Incomplete
 
 func (c ZdiffKey) Key(key ...string) ZdiffKey {
 	if c.ks&NoSlot == NoSlot {
@@ -481,10 +481,10 @@ func (c ZdiffKey) Withscores() ZdiffWithscores {
 
 func (c ZdiffKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZdiffNumkeys Completed
+type ZdiffNumkeys Incomplete
 
 func (c ZdiffNumkeys) Key(key ...string) ZdiffKey {
 	if c.ks&NoSlot == NoSlot {
@@ -501,14 +501,14 @@ func (c ZdiffNumkeys) Key(key ...string) ZdiffKey {
 	return (ZdiffKey)(c)
 }
 
-type ZdiffWithscores Completed
+type ZdiffWithscores Incomplete
 
 func (c ZdiffWithscores) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Zdiffstore Completed
+type Zdiffstore Incomplete
 
 func (b Builder) Zdiffstore() (c Zdiffstore) {
 	c = Zdiffstore{cs: get(), ks: b.ks}
@@ -526,14 +526,14 @@ func (c Zdiffstore) Destination(destination string) ZdiffstoreDestination {
 	return (ZdiffstoreDestination)(c)
 }
 
-type ZdiffstoreDestination Completed
+type ZdiffstoreDestination Incomplete
 
 func (c ZdiffstoreDestination) Numkeys(numkeys int64) ZdiffstoreNumkeys {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(numkeys, 10))
 	return (ZdiffstoreNumkeys)(c)
 }
 
-type ZdiffstoreKey Completed
+type ZdiffstoreKey Incomplete
 
 func (c ZdiffstoreKey) Key(key ...string) ZdiffstoreKey {
 	if c.ks&NoSlot == NoSlot {
@@ -552,10 +552,10 @@ func (c ZdiffstoreKey) Key(key ...string) ZdiffstoreKey {
 
 func (c ZdiffstoreKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZdiffstoreNumkeys Completed
+type ZdiffstoreNumkeys Incomplete
 
 func (c ZdiffstoreNumkeys) Key(key ...string) ZdiffstoreKey {
 	if c.ks&NoSlot == NoSlot {
@@ -572,7 +572,7 @@ func (c ZdiffstoreNumkeys) Key(key ...string) ZdiffstoreKey {
 	return (ZdiffstoreKey)(c)
 }
 
-type Zincrby Completed
+type Zincrby Incomplete
 
 func (b Builder) Zincrby() (c Zincrby) {
 	c = Zincrby{cs: get(), ks: b.ks}
@@ -590,31 +590,31 @@ func (c Zincrby) Key(key string) ZincrbyKey {
 	return (ZincrbyKey)(c)
 }
 
-type ZincrbyIncrement Completed
+type ZincrbyIncrement Incomplete
 
 func (c ZincrbyIncrement) Member(member string) ZincrbyMember {
 	c.cs.s = append(c.cs.s, member)
 	return (ZincrbyMember)(c)
 }
 
-type ZincrbyKey Completed
+type ZincrbyKey Incomplete
 
 func (c ZincrbyKey) Increment(increment float64) ZincrbyIncrement {
 	c.cs.s = append(c.cs.s, strconv.FormatFloat(increment, 'f', -1, 64))
 	return (ZincrbyIncrement)(c)
 }
 
-type ZincrbyMember Completed
+type ZincrbyMember Incomplete
 
 func (c ZincrbyMember) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Zinter Completed
+type Zinter Incomplete
 
 func (b Builder) Zinter() (c Zinter) {
-	c = Zinter{cs: get(), ks: b.ks, cf: readonly}
+	c = Zinter{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "ZINTER")
 	return c
 }
@@ -624,7 +624,7 @@ func (c Zinter) Numkeys(numkeys int64) ZinterNumkeys {
 	return (ZinterNumkeys)(c)
 }
 
-type ZinterAggregateMax Completed
+type ZinterAggregateMax Incomplete
 
 func (c ZinterAggregateMax) Withscores() ZinterWithscores {
 	c.cs.s = append(c.cs.s, "WITHSCORES")
@@ -633,10 +633,10 @@ func (c ZinterAggregateMax) Withscores() ZinterWithscores {
 
 func (c ZinterAggregateMax) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZinterAggregateMin Completed
+type ZinterAggregateMin Incomplete
 
 func (c ZinterAggregateMin) Withscores() ZinterWithscores {
 	c.cs.s = append(c.cs.s, "WITHSCORES")
@@ -645,10 +645,10 @@ func (c ZinterAggregateMin) Withscores() ZinterWithscores {
 
 func (c ZinterAggregateMin) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZinterAggregateSum Completed
+type ZinterAggregateSum Incomplete
 
 func (c ZinterAggregateSum) Withscores() ZinterWithscores {
 	c.cs.s = append(c.cs.s, "WITHSCORES")
@@ -657,10 +657,10 @@ func (c ZinterAggregateSum) Withscores() ZinterWithscores {
 
 func (c ZinterAggregateSum) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZinterKey Completed
+type ZinterKey Incomplete
 
 func (c ZinterKey) Key(key ...string) ZinterKey {
 	if c.ks&NoSlot == NoSlot {
@@ -707,10 +707,10 @@ func (c ZinterKey) Withscores() ZinterWithscores {
 
 func (c ZinterKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZinterNumkeys Completed
+type ZinterNumkeys Incomplete
 
 func (c ZinterNumkeys) Key(key ...string) ZinterKey {
 	if c.ks&NoSlot == NoSlot {
@@ -727,7 +727,7 @@ func (c ZinterNumkeys) Key(key ...string) ZinterKey {
 	return (ZinterKey)(c)
 }
 
-type ZinterWeights Completed
+type ZinterWeights Incomplete
 
 func (c ZinterWeights) Weights(weight ...int64) ZinterWeights {
 	c.cs.s = append(c.cs.s, "WEIGHTS")
@@ -759,20 +759,20 @@ func (c ZinterWeights) Withscores() ZinterWithscores {
 
 func (c ZinterWeights) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZinterWithscores Completed
+type ZinterWithscores Incomplete
 
 func (c ZinterWithscores) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Zintercard Completed
+type Zintercard Incomplete
 
 func (b Builder) Zintercard() (c Zintercard) {
-	c = Zintercard{cs: get(), ks: b.ks, cf: readonly}
+	c = Zintercard{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "ZINTERCARD")
 	return c
 }
@@ -782,7 +782,7 @@ func (c Zintercard) Numkeys(numkeys int64) ZintercardNumkeys {
 	return (ZintercardNumkeys)(c)
 }
 
-type ZintercardKey Completed
+type ZintercardKey Incomplete
 
 func (c ZintercardKey) Key(key ...string) ZintercardKey {
 	if c.ks&NoSlot == NoSlot {
@@ -806,17 +806,17 @@ func (c ZintercardKey) Limit(limit int64) ZintercardLimit {
 
 func (c ZintercardKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZintercardLimit Completed
+type ZintercardLimit Incomplete
 
 func (c ZintercardLimit) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZintercardNumkeys Completed
+type ZintercardNumkeys Incomplete
 
 func (c ZintercardNumkeys) Key(key ...string) ZintercardKey {
 	if c.ks&NoSlot == NoSlot {
@@ -833,7 +833,7 @@ func (c ZintercardNumkeys) Key(key ...string) ZintercardKey {
 	return (ZintercardKey)(c)
 }
 
-type Zinterstore Completed
+type Zinterstore Incomplete
 
 func (b Builder) Zinterstore() (c Zinterstore) {
 	c = Zinterstore{cs: get(), ks: b.ks}
@@ -851,35 +851,35 @@ func (c Zinterstore) Destination(destination string) ZinterstoreDestination {
 	return (ZinterstoreDestination)(c)
 }
 
-type ZinterstoreAggregateMax Completed
+type ZinterstoreAggregateMax Incomplete
 
 func (c ZinterstoreAggregateMax) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZinterstoreAggregateMin Completed
+type ZinterstoreAggregateMin Incomplete
 
 func (c ZinterstoreAggregateMin) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZinterstoreAggregateSum Completed
+type ZinterstoreAggregateSum Incomplete
 
 func (c ZinterstoreAggregateSum) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZinterstoreDestination Completed
+type ZinterstoreDestination Incomplete
 
 func (c ZinterstoreDestination) Numkeys(numkeys int64) ZinterstoreNumkeys {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(numkeys, 10))
 	return (ZinterstoreNumkeys)(c)
 }
 
-type ZinterstoreKey Completed
+type ZinterstoreKey Incomplete
 
 func (c ZinterstoreKey) Key(key ...string) ZinterstoreKey {
 	if c.ks&NoSlot == NoSlot {
@@ -921,10 +921,10 @@ func (c ZinterstoreKey) AggregateMax() ZinterstoreAggregateMax {
 
 func (c ZinterstoreKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZinterstoreNumkeys Completed
+type ZinterstoreNumkeys Incomplete
 
 func (c ZinterstoreNumkeys) Key(key ...string) ZinterstoreKey {
 	if c.ks&NoSlot == NoSlot {
@@ -941,7 +941,7 @@ func (c ZinterstoreNumkeys) Key(key ...string) ZinterstoreKey {
 	return (ZinterstoreKey)(c)
 }
 
-type ZinterstoreWeights Completed
+type ZinterstoreWeights Incomplete
 
 func (c ZinterstoreWeights) Weights(weight ...int64) ZinterstoreWeights {
 	c.cs.s = append(c.cs.s, "WEIGHTS")
@@ -968,13 +968,13 @@ func (c ZinterstoreWeights) AggregateMax() ZinterstoreAggregateMax {
 
 func (c ZinterstoreWeights) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Zlexcount Completed
+type Zlexcount Incomplete
 
 func (b Builder) Zlexcount() (c Zlexcount) {
-	c = Zlexcount{cs: get(), ks: b.ks, cf: readonly}
+	c = Zlexcount{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "ZLEXCOUNT")
 	return c
 }
@@ -989,33 +989,33 @@ func (c Zlexcount) Key(key string) ZlexcountKey {
 	return (ZlexcountKey)(c)
 }
 
-type ZlexcountKey Completed
+type ZlexcountKey Incomplete
 
 func (c ZlexcountKey) Min(min string) ZlexcountMin {
 	c.cs.s = append(c.cs.s, min)
 	return (ZlexcountMin)(c)
 }
 
-type ZlexcountMax Completed
+type ZlexcountMax Incomplete
 
 func (c ZlexcountMax) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZlexcountMax) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZlexcountMin Completed
+type ZlexcountMin Incomplete
 
 func (c ZlexcountMin) Max(max string) ZlexcountMax {
 	c.cs.s = append(c.cs.s, max)
 	return (ZlexcountMax)(c)
 }
 
-type Zmpop Completed
+type Zmpop Incomplete
 
 func (b Builder) Zmpop() (c Zmpop) {
 	c = Zmpop{cs: get(), ks: b.ks}
@@ -1028,14 +1028,14 @@ func (c Zmpop) Numkeys(numkeys int64) ZmpopNumkeys {
 	return (ZmpopNumkeys)(c)
 }
 
-type ZmpopCount Completed
+type ZmpopCount Incomplete
 
 func (c ZmpopCount) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZmpopKey Completed
+type ZmpopKey Incomplete
 
 func (c ZmpopKey) Key(key ...string) ZmpopKey {
 	if c.ks&NoSlot == NoSlot {
@@ -1062,7 +1062,7 @@ func (c ZmpopKey) Max() ZmpopWhereMax {
 	return (ZmpopWhereMax)(c)
 }
 
-type ZmpopNumkeys Completed
+type ZmpopNumkeys Incomplete
 
 func (c ZmpopNumkeys) Key(key ...string) ZmpopKey {
 	if c.ks&NoSlot == NoSlot {
@@ -1079,7 +1079,7 @@ func (c ZmpopNumkeys) Key(key ...string) ZmpopKey {
 	return (ZmpopKey)(c)
 }
 
-type ZmpopWhereMax Completed
+type ZmpopWhereMax Incomplete
 
 func (c ZmpopWhereMax) Count(count int64) ZmpopCount {
 	c.cs.s = append(c.cs.s, "COUNT", strconv.FormatInt(count, 10))
@@ -1088,10 +1088,10 @@ func (c ZmpopWhereMax) Count(count int64) ZmpopCount {
 
 func (c ZmpopWhereMax) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZmpopWhereMin Completed
+type ZmpopWhereMin Incomplete
 
 func (c ZmpopWhereMin) Count(count int64) ZmpopCount {
 	c.cs.s = append(c.cs.s, "COUNT", strconv.FormatInt(count, 10))
@@ -1100,13 +1100,13 @@ func (c ZmpopWhereMin) Count(count int64) ZmpopCount {
 
 func (c ZmpopWhereMin) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Zmscore Completed
+type Zmscore Incomplete
 
 func (b Builder) Zmscore() (c Zmscore) {
-	c = Zmscore{cs: get(), ks: b.ks, cf: readonly}
+	c = Zmscore{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "ZMSCORE")
 	return c
 }
@@ -1121,14 +1121,14 @@ func (c Zmscore) Key(key string) ZmscoreKey {
 	return (ZmscoreKey)(c)
 }
 
-type ZmscoreKey Completed
+type ZmscoreKey Incomplete
 
 func (c ZmscoreKey) Member(member ...string) ZmscoreMember {
 	c.cs.s = append(c.cs.s, member...)
 	return (ZmscoreMember)(c)
 }
 
-type ZmscoreMember Completed
+type ZmscoreMember Incomplete
 
 func (c ZmscoreMember) Member(member ...string) ZmscoreMember {
 	c.cs.s = append(c.cs.s, member...)
@@ -1137,15 +1137,15 @@ func (c ZmscoreMember) Member(member ...string) ZmscoreMember {
 
 func (c ZmscoreMember) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZmscoreMember) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Zpopmax Completed
+type Zpopmax Incomplete
 
 func (b Builder) Zpopmax() (c Zpopmax) {
 	c = Zpopmax{cs: get(), ks: b.ks}
@@ -1163,14 +1163,14 @@ func (c Zpopmax) Key(key string) ZpopmaxKey {
 	return (ZpopmaxKey)(c)
 }
 
-type ZpopmaxCount Completed
+type ZpopmaxCount Incomplete
 
 func (c ZpopmaxCount) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZpopmaxKey Completed
+type ZpopmaxKey Incomplete
 
 func (c ZpopmaxKey) Count(count int64) ZpopmaxCount {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(count, 10))
@@ -1179,10 +1179,10 @@ func (c ZpopmaxKey) Count(count int64) ZpopmaxCount {
 
 func (c ZpopmaxKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Zpopmin Completed
+type Zpopmin Incomplete
 
 func (b Builder) Zpopmin() (c Zpopmin) {
 	c = Zpopmin{cs: get(), ks: b.ks}
@@ -1200,14 +1200,14 @@ func (c Zpopmin) Key(key string) ZpopminKey {
 	return (ZpopminKey)(c)
 }
 
-type ZpopminCount Completed
+type ZpopminCount Incomplete
 
 func (c ZpopminCount) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZpopminKey Completed
+type ZpopminKey Incomplete
 
 func (c ZpopminKey) Count(count int64) ZpopminCount {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(count, 10))
@@ -1216,13 +1216,13 @@ func (c ZpopminKey) Count(count int64) ZpopminCount {
 
 func (c ZpopminKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Zrandmember Completed
+type Zrandmember Incomplete
 
 func (b Builder) Zrandmember() (c Zrandmember) {
-	c = Zrandmember{cs: get(), ks: b.ks, cf: readonly}
+	c = Zrandmember{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "ZRANDMEMBER")
 	return c
 }
@@ -1237,7 +1237,7 @@ func (c Zrandmember) Key(key string) ZrandmemberKey {
 	return (ZrandmemberKey)(c)
 }
 
-type ZrandmemberKey Completed
+type ZrandmemberKey Incomplete
 
 func (c ZrandmemberKey) Count(count int64) ZrandmemberOptionsCount {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(count, 10))
@@ -1246,10 +1246,10 @@ func (c ZrandmemberKey) Count(count int64) ZrandmemberOptionsCount {
 
 func (c ZrandmemberKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZrandmemberOptionsCount Completed
+type ZrandmemberOptionsCount Incomplete
 
 func (c ZrandmemberOptionsCount) Withscores() ZrandmemberOptionsWithscores {
 	c.cs.s = append(c.cs.s, "WITHSCORES")
@@ -1258,20 +1258,20 @@ func (c ZrandmemberOptionsCount) Withscores() ZrandmemberOptionsWithscores {
 
 func (c ZrandmemberOptionsCount) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZrandmemberOptionsWithscores Completed
+type ZrandmemberOptionsWithscores Incomplete
 
 func (c ZrandmemberOptionsWithscores) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Zrange Completed
+type Zrange Incomplete
 
 func (b Builder) Zrange() (c Zrange) {
-	c = Zrange{cs: get(), ks: b.ks, cf: readonly}
+	c = Zrange{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "ZRANGE")
 	return c
 }
@@ -1286,14 +1286,14 @@ func (c Zrange) Key(key string) ZrangeKey {
 	return (ZrangeKey)(c)
 }
 
-type ZrangeKey Completed
+type ZrangeKey Incomplete
 
 func (c ZrangeKey) Min(min string) ZrangeMin {
 	c.cs.s = append(c.cs.s, min)
 	return (ZrangeMin)(c)
 }
 
-type ZrangeLimit Completed
+type ZrangeLimit Incomplete
 
 func (c ZrangeLimit) Withscores() ZrangeWithscores {
 	c.cs.s = append(c.cs.s, "WITHSCORES")
@@ -1302,15 +1302,15 @@ func (c ZrangeLimit) Withscores() ZrangeWithscores {
 
 func (c ZrangeLimit) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZrangeLimit) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZrangeMax Completed
+type ZrangeMax Incomplete
 
 func (c ZrangeMax) Byscore() ZrangeSortbyByscore {
 	c.cs.s = append(c.cs.s, "BYSCORE")
@@ -1339,22 +1339,22 @@ func (c ZrangeMax) Withscores() ZrangeWithscores {
 
 func (c ZrangeMax) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZrangeMax) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZrangeMin Completed
+type ZrangeMin Incomplete
 
 func (c ZrangeMin) Max(max string) ZrangeMax {
 	c.cs.s = append(c.cs.s, max)
 	return (ZrangeMax)(c)
 }
 
-type ZrangeRev Completed
+type ZrangeRev Incomplete
 
 func (c ZrangeRev) Limit(offset int64, count int64) ZrangeLimit {
 	c.cs.s = append(c.cs.s, "LIMIT", strconv.FormatInt(offset, 10), strconv.FormatInt(count, 10))
@@ -1368,15 +1368,15 @@ func (c ZrangeRev) Withscores() ZrangeWithscores {
 
 func (c ZrangeRev) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZrangeRev) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZrangeSortbyBylex Completed
+type ZrangeSortbyBylex Incomplete
 
 func (c ZrangeSortbyBylex) Rev() ZrangeRev {
 	c.cs.s = append(c.cs.s, "REV")
@@ -1395,15 +1395,15 @@ func (c ZrangeSortbyBylex) Withscores() ZrangeWithscores {
 
 func (c ZrangeSortbyBylex) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZrangeSortbyBylex) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZrangeSortbyByscore Completed
+type ZrangeSortbyByscore Incomplete
 
 func (c ZrangeSortbyByscore) Rev() ZrangeRev {
 	c.cs.s = append(c.cs.s, "REV")
@@ -1422,30 +1422,30 @@ func (c ZrangeSortbyByscore) Withscores() ZrangeWithscores {
 
 func (c ZrangeSortbyByscore) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZrangeSortbyByscore) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZrangeWithscores Completed
+type ZrangeWithscores Incomplete
 
 func (c ZrangeWithscores) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZrangeWithscores) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Zrangebylex Completed
+type Zrangebylex Incomplete
 
 func (b Builder) Zrangebylex() (c Zrangebylex) {
-	c = Zrangebylex{cs: get(), ks: b.ks, cf: readonly}
+	c = Zrangebylex{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "ZRANGEBYLEX")
 	return c
 }
@@ -1460,26 +1460,26 @@ func (c Zrangebylex) Key(key string) ZrangebylexKey {
 	return (ZrangebylexKey)(c)
 }
 
-type ZrangebylexKey Completed
+type ZrangebylexKey Incomplete
 
 func (c ZrangebylexKey) Min(min string) ZrangebylexMin {
 	c.cs.s = append(c.cs.s, min)
 	return (ZrangebylexMin)(c)
 }
 
-type ZrangebylexLimit Completed
+type ZrangebylexLimit Incomplete
 
 func (c ZrangebylexLimit) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZrangebylexLimit) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZrangebylexMax Completed
+type ZrangebylexMax Incomplete
 
 func (c ZrangebylexMax) Limit(offset int64, count int64) ZrangebylexLimit {
 	c.cs.s = append(c.cs.s, "LIMIT", strconv.FormatInt(offset, 10), strconv.FormatInt(count, 10))
@@ -1488,25 +1488,25 @@ func (c ZrangebylexMax) Limit(offset int64, count int64) ZrangebylexLimit {
 
 func (c ZrangebylexMax) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZrangebylexMax) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZrangebylexMin Completed
+type ZrangebylexMin Incomplete
 
 func (c ZrangebylexMin) Max(max string) ZrangebylexMax {
 	c.cs.s = append(c.cs.s, max)
 	return (ZrangebylexMax)(c)
 }
 
-type Zrangebyscore Completed
+type Zrangebyscore Incomplete
 
 func (b Builder) Zrangebyscore() (c Zrangebyscore) {
-	c = Zrangebyscore{cs: get(), ks: b.ks, cf: readonly}
+	c = Zrangebyscore{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "ZRANGEBYSCORE")
 	return c
 }
@@ -1521,26 +1521,26 @@ func (c Zrangebyscore) Key(key string) ZrangebyscoreKey {
 	return (ZrangebyscoreKey)(c)
 }
 
-type ZrangebyscoreKey Completed
+type ZrangebyscoreKey Incomplete
 
 func (c ZrangebyscoreKey) Min(min string) ZrangebyscoreMin {
 	c.cs.s = append(c.cs.s, min)
 	return (ZrangebyscoreMin)(c)
 }
 
-type ZrangebyscoreLimit Completed
+type ZrangebyscoreLimit Incomplete
 
 func (c ZrangebyscoreLimit) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZrangebyscoreLimit) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZrangebyscoreMax Completed
+type ZrangebyscoreMax Incomplete
 
 func (c ZrangebyscoreMax) Withscores() ZrangebyscoreWithscores {
 	c.cs.s = append(c.cs.s, "WITHSCORES")
@@ -1554,22 +1554,22 @@ func (c ZrangebyscoreMax) Limit(offset int64, count int64) ZrangebyscoreLimit {
 
 func (c ZrangebyscoreMax) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZrangebyscoreMax) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZrangebyscoreMin Completed
+type ZrangebyscoreMin Incomplete
 
 func (c ZrangebyscoreMin) Max(max string) ZrangebyscoreMax {
 	c.cs.s = append(c.cs.s, max)
 	return (ZrangebyscoreMax)(c)
 }
 
-type ZrangebyscoreWithscores Completed
+type ZrangebyscoreWithscores Incomplete
 
 func (c ZrangebyscoreWithscores) Limit(offset int64, count int64) ZrangebyscoreLimit {
 	c.cs.s = append(c.cs.s, "LIMIT", strconv.FormatInt(offset, 10), strconv.FormatInt(count, 10))
@@ -1578,15 +1578,15 @@ func (c ZrangebyscoreWithscores) Limit(offset int64, count int64) ZrangebyscoreL
 
 func (c ZrangebyscoreWithscores) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZrangebyscoreWithscores) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Zrangestore Completed
+type Zrangestore Incomplete
 
 func (b Builder) Zrangestore() (c Zrangestore) {
 	c = Zrangestore{cs: get(), ks: b.ks}
@@ -1604,7 +1604,7 @@ func (c Zrangestore) Dst(dst string) ZrangestoreDst {
 	return (ZrangestoreDst)(c)
 }
 
-type ZrangestoreDst Completed
+type ZrangestoreDst Incomplete
 
 func (c ZrangestoreDst) Src(src string) ZrangestoreSrc {
 	if c.ks&NoSlot == NoSlot {
@@ -1616,14 +1616,14 @@ func (c ZrangestoreDst) Src(src string) ZrangestoreSrc {
 	return (ZrangestoreSrc)(c)
 }
 
-type ZrangestoreLimit Completed
+type ZrangestoreLimit Incomplete
 
 func (c ZrangestoreLimit) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZrangestoreMax Completed
+type ZrangestoreMax Incomplete
 
 func (c ZrangestoreMax) Byscore() ZrangestoreSortbyByscore {
 	c.cs.s = append(c.cs.s, "BYSCORE")
@@ -1647,17 +1647,17 @@ func (c ZrangestoreMax) Limit(offset int64, count int64) ZrangestoreLimit {
 
 func (c ZrangestoreMax) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZrangestoreMin Completed
+type ZrangestoreMin Incomplete
 
 func (c ZrangestoreMin) Max(max string) ZrangestoreMax {
 	c.cs.s = append(c.cs.s, max)
 	return (ZrangestoreMax)(c)
 }
 
-type ZrangestoreRev Completed
+type ZrangestoreRev Incomplete
 
 func (c ZrangestoreRev) Limit(offset int64, count int64) ZrangestoreLimit {
 	c.cs.s = append(c.cs.s, "LIMIT", strconv.FormatInt(offset, 10), strconv.FormatInt(count, 10))
@@ -1666,10 +1666,10 @@ func (c ZrangestoreRev) Limit(offset int64, count int64) ZrangestoreLimit {
 
 func (c ZrangestoreRev) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZrangestoreSortbyBylex Completed
+type ZrangestoreSortbyBylex Incomplete
 
 func (c ZrangestoreSortbyBylex) Rev() ZrangestoreRev {
 	c.cs.s = append(c.cs.s, "REV")
@@ -1683,10 +1683,10 @@ func (c ZrangestoreSortbyBylex) Limit(offset int64, count int64) ZrangestoreLimi
 
 func (c ZrangestoreSortbyBylex) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZrangestoreSortbyByscore Completed
+type ZrangestoreSortbyByscore Incomplete
 
 func (c ZrangestoreSortbyByscore) Rev() ZrangestoreRev {
 	c.cs.s = append(c.cs.s, "REV")
@@ -1700,20 +1700,20 @@ func (c ZrangestoreSortbyByscore) Limit(offset int64, count int64) ZrangestoreLi
 
 func (c ZrangestoreSortbyByscore) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZrangestoreSrc Completed
+type ZrangestoreSrc Incomplete
 
 func (c ZrangestoreSrc) Min(min string) ZrangestoreMin {
 	c.cs.s = append(c.cs.s, min)
 	return (ZrangestoreMin)(c)
 }
 
-type Zrank Completed
+type Zrank Incomplete
 
 func (b Builder) Zrank() (c Zrank) {
-	c = Zrank{cs: get(), ks: b.ks, cf: readonly}
+	c = Zrank{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "ZRANK")
 	return c
 }
@@ -1728,14 +1728,14 @@ func (c Zrank) Key(key string) ZrankKey {
 	return (ZrankKey)(c)
 }
 
-type ZrankKey Completed
+type ZrankKey Incomplete
 
 func (c ZrankKey) Member(member string) ZrankMember {
 	c.cs.s = append(c.cs.s, member)
 	return (ZrankMember)(c)
 }
 
-type ZrankMember Completed
+type ZrankMember Incomplete
 
 func (c ZrankMember) Withscore() ZrankWithscore {
 	c.cs.s = append(c.cs.s, "WITHSCORE")
@@ -1744,27 +1744,27 @@ func (c ZrankMember) Withscore() ZrankWithscore {
 
 func (c ZrankMember) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZrankMember) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZrankWithscore Completed
+type ZrankWithscore Incomplete
 
 func (c ZrankWithscore) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZrankWithscore) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Zrem Completed
+type Zrem Incomplete
 
 func (b Builder) Zrem() (c Zrem) {
 	c = Zrem{cs: get(), ks: b.ks}
@@ -1782,14 +1782,14 @@ func (c Zrem) Key(key string) ZremKey {
 	return (ZremKey)(c)
 }
 
-type ZremKey Completed
+type ZremKey Incomplete
 
 func (c ZremKey) Member(member ...string) ZremMember {
 	c.cs.s = append(c.cs.s, member...)
 	return (ZremMember)(c)
 }
 
-type ZremMember Completed
+type ZremMember Incomplete
 
 func (c ZremMember) Member(member ...string) ZremMember {
 	c.cs.s = append(c.cs.s, member...)
@@ -1798,10 +1798,10 @@ func (c ZremMember) Member(member ...string) ZremMember {
 
 func (c ZremMember) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Zremrangebylex Completed
+type Zremrangebylex Incomplete
 
 func (b Builder) Zremrangebylex() (c Zremrangebylex) {
 	c = Zremrangebylex{cs: get(), ks: b.ks}
@@ -1819,28 +1819,28 @@ func (c Zremrangebylex) Key(key string) ZremrangebylexKey {
 	return (ZremrangebylexKey)(c)
 }
 
-type ZremrangebylexKey Completed
+type ZremrangebylexKey Incomplete
 
 func (c ZremrangebylexKey) Min(min string) ZremrangebylexMin {
 	c.cs.s = append(c.cs.s, min)
 	return (ZremrangebylexMin)(c)
 }
 
-type ZremrangebylexMax Completed
+type ZremrangebylexMax Incomplete
 
 func (c ZremrangebylexMax) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZremrangebylexMin Completed
+type ZremrangebylexMin Incomplete
 
 func (c ZremrangebylexMin) Max(max string) ZremrangebylexMax {
 	c.cs.s = append(c.cs.s, max)
 	return (ZremrangebylexMax)(c)
 }
 
-type Zremrangebyrank Completed
+type Zremrangebyrank Incomplete
 
 func (b Builder) Zremrangebyrank() (c Zremrangebyrank) {
 	c = Zremrangebyrank{cs: get(), ks: b.ks}
@@ -1858,28 +1858,28 @@ func (c Zremrangebyrank) Key(key string) ZremrangebyrankKey {
 	return (ZremrangebyrankKey)(c)
 }
 
-type ZremrangebyrankKey Completed
+type ZremrangebyrankKey Incomplete
 
 func (c ZremrangebyrankKey) Start(start int64) ZremrangebyrankStart {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(start, 10))
 	return (ZremrangebyrankStart)(c)
 }
 
-type ZremrangebyrankStart Completed
+type ZremrangebyrankStart Incomplete
 
 func (c ZremrangebyrankStart) Stop(stop int64) ZremrangebyrankStop {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(stop, 10))
 	return (ZremrangebyrankStop)(c)
 }
 
-type ZremrangebyrankStop Completed
+type ZremrangebyrankStop Incomplete
 
 func (c ZremrangebyrankStop) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Zremrangebyscore Completed
+type Zremrangebyscore Incomplete
 
 func (b Builder) Zremrangebyscore() (c Zremrangebyscore) {
 	c = Zremrangebyscore{cs: get(), ks: b.ks}
@@ -1897,31 +1897,31 @@ func (c Zremrangebyscore) Key(key string) ZremrangebyscoreKey {
 	return (ZremrangebyscoreKey)(c)
 }
 
-type ZremrangebyscoreKey Completed
+type ZremrangebyscoreKey Incomplete
 
 func (c ZremrangebyscoreKey) Min(min string) ZremrangebyscoreMin {
 	c.cs.s = append(c.cs.s, min)
 	return (ZremrangebyscoreMin)(c)
 }
 
-type ZremrangebyscoreMax Completed
+type ZremrangebyscoreMax Incomplete
 
 func (c ZremrangebyscoreMax) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZremrangebyscoreMin Completed
+type ZremrangebyscoreMin Incomplete
 
 func (c ZremrangebyscoreMin) Max(max string) ZremrangebyscoreMax {
 	c.cs.s = append(c.cs.s, max)
 	return (ZremrangebyscoreMax)(c)
 }
 
-type Zrevrange Completed
+type Zrevrange Incomplete
 
 func (b Builder) Zrevrange() (c Zrevrange) {
-	c = Zrevrange{cs: get(), ks: b.ks, cf: readonly}
+	c = Zrevrange{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "ZREVRANGE")
 	return c
 }
@@ -1936,21 +1936,21 @@ func (c Zrevrange) Key(key string) ZrevrangeKey {
 	return (ZrevrangeKey)(c)
 }
 
-type ZrevrangeKey Completed
+type ZrevrangeKey Incomplete
 
 func (c ZrevrangeKey) Start(start int64) ZrevrangeStart {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(start, 10))
 	return (ZrevrangeStart)(c)
 }
 
-type ZrevrangeStart Completed
+type ZrevrangeStart Incomplete
 
 func (c ZrevrangeStart) Stop(stop int64) ZrevrangeStop {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(stop, 10))
 	return (ZrevrangeStop)(c)
 }
 
-type ZrevrangeStop Completed
+type ZrevrangeStop Incomplete
 
 func (c ZrevrangeStop) Withscores() ZrevrangeWithscores {
 	c.cs.s = append(c.cs.s, "WITHSCORES")
@@ -1959,30 +1959,30 @@ func (c ZrevrangeStop) Withscores() ZrevrangeWithscores {
 
 func (c ZrevrangeStop) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZrevrangeStop) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZrevrangeWithscores Completed
+type ZrevrangeWithscores Incomplete
 
 func (c ZrevrangeWithscores) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZrevrangeWithscores) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Zrevrangebylex Completed
+type Zrevrangebylex Incomplete
 
 func (b Builder) Zrevrangebylex() (c Zrevrangebylex) {
-	c = Zrevrangebylex{cs: get(), ks: b.ks, cf: readonly}
+	c = Zrevrangebylex{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "ZREVRANGEBYLEX")
 	return c
 }
@@ -1997,33 +1997,33 @@ func (c Zrevrangebylex) Key(key string) ZrevrangebylexKey {
 	return (ZrevrangebylexKey)(c)
 }
 
-type ZrevrangebylexKey Completed
+type ZrevrangebylexKey Incomplete
 
 func (c ZrevrangebylexKey) Max(max string) ZrevrangebylexMax {
 	c.cs.s = append(c.cs.s, max)
 	return (ZrevrangebylexMax)(c)
 }
 
-type ZrevrangebylexLimit Completed
+type ZrevrangebylexLimit Incomplete
 
 func (c ZrevrangebylexLimit) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZrevrangebylexLimit) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZrevrangebylexMax Completed
+type ZrevrangebylexMax Incomplete
 
 func (c ZrevrangebylexMax) Min(min string) ZrevrangebylexMin {
 	c.cs.s = append(c.cs.s, min)
 	return (ZrevrangebylexMin)(c)
 }
 
-type ZrevrangebylexMin Completed
+type ZrevrangebylexMin Incomplete
 
 func (c ZrevrangebylexMin) Limit(offset int64, count int64) ZrevrangebylexLimit {
 	c.cs.s = append(c.cs.s, "LIMIT", strconv.FormatInt(offset, 10), strconv.FormatInt(count, 10))
@@ -2032,18 +2032,18 @@ func (c ZrevrangebylexMin) Limit(offset int64, count int64) ZrevrangebylexLimit 
 
 func (c ZrevrangebylexMin) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZrevrangebylexMin) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Zrevrangebyscore Completed
+type Zrevrangebyscore Incomplete
 
 func (b Builder) Zrevrangebyscore() (c Zrevrangebyscore) {
-	c = Zrevrangebyscore{cs: get(), ks: b.ks, cf: readonly}
+	c = Zrevrangebyscore{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "ZREVRANGEBYSCORE")
 	return c
 }
@@ -2058,33 +2058,33 @@ func (c Zrevrangebyscore) Key(key string) ZrevrangebyscoreKey {
 	return (ZrevrangebyscoreKey)(c)
 }
 
-type ZrevrangebyscoreKey Completed
+type ZrevrangebyscoreKey Incomplete
 
 func (c ZrevrangebyscoreKey) Max(max string) ZrevrangebyscoreMax {
 	c.cs.s = append(c.cs.s, max)
 	return (ZrevrangebyscoreMax)(c)
 }
 
-type ZrevrangebyscoreLimit Completed
+type ZrevrangebyscoreLimit Incomplete
 
 func (c ZrevrangebyscoreLimit) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZrevrangebyscoreLimit) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZrevrangebyscoreMax Completed
+type ZrevrangebyscoreMax Incomplete
 
 func (c ZrevrangebyscoreMax) Min(min string) ZrevrangebyscoreMin {
 	c.cs.s = append(c.cs.s, min)
 	return (ZrevrangebyscoreMin)(c)
 }
 
-type ZrevrangebyscoreMin Completed
+type ZrevrangebyscoreMin Incomplete
 
 func (c ZrevrangebyscoreMin) Withscores() ZrevrangebyscoreWithscores {
 	c.cs.s = append(c.cs.s, "WITHSCORES")
@@ -2098,15 +2098,15 @@ func (c ZrevrangebyscoreMin) Limit(offset int64, count int64) ZrevrangebyscoreLi
 
 func (c ZrevrangebyscoreMin) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZrevrangebyscoreMin) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZrevrangebyscoreWithscores Completed
+type ZrevrangebyscoreWithscores Incomplete
 
 func (c ZrevrangebyscoreWithscores) Limit(offset int64, count int64) ZrevrangebyscoreLimit {
 	c.cs.s = append(c.cs.s, "LIMIT", strconv.FormatInt(offset, 10), strconv.FormatInt(count, 10))
@@ -2115,18 +2115,18 @@ func (c ZrevrangebyscoreWithscores) Limit(offset int64, count int64) Zrevrangeby
 
 func (c ZrevrangebyscoreWithscores) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZrevrangebyscoreWithscores) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Zrevrank Completed
+type Zrevrank Incomplete
 
 func (b Builder) Zrevrank() (c Zrevrank) {
-	c = Zrevrank{cs: get(), ks: b.ks, cf: readonly}
+	c = Zrevrank{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "ZREVRANK")
 	return c
 }
@@ -2141,14 +2141,14 @@ func (c Zrevrank) Key(key string) ZrevrankKey {
 	return (ZrevrankKey)(c)
 }
 
-type ZrevrankKey Completed
+type ZrevrankKey Incomplete
 
 func (c ZrevrankKey) Member(member string) ZrevrankMember {
 	c.cs.s = append(c.cs.s, member)
 	return (ZrevrankMember)(c)
 }
 
-type ZrevrankMember Completed
+type ZrevrankMember Incomplete
 
 func (c ZrevrankMember) Withscore() ZrevrankWithscore {
 	c.cs.s = append(c.cs.s, "WITHSCORE")
@@ -2157,30 +2157,30 @@ func (c ZrevrankMember) Withscore() ZrevrankWithscore {
 
 func (c ZrevrankMember) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZrevrankMember) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZrevrankWithscore Completed
+type ZrevrankWithscore Incomplete
 
 func (c ZrevrankWithscore) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZrevrankWithscore) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Zscan Completed
+type Zscan Incomplete
 
 func (b Builder) Zscan() (c Zscan) {
-	c = Zscan{cs: get(), ks: b.ks, cf: readonly}
+	c = Zscan{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "ZSCAN")
 	return c
 }
@@ -2195,14 +2195,19 @@ func (c Zscan) Key(key string) ZscanKey {
 	return (ZscanKey)(c)
 }
 
-type ZscanCount Completed
+type ZscanCount Incomplete
+
+func (c ZscanCount) Noscores() ZscanNoscores {
+	c.cs.s = append(c.cs.s, "NOSCORES")
+	return (ZscanNoscores)(c)
+}
 
 func (c ZscanCount) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZscanCursor Completed
+type ZscanCursor Incomplete
 
 func (c ZscanCursor) Match(pattern string) ZscanMatch {
 	c.cs.s = append(c.cs.s, "MATCH", pattern)
@@ -2214,34 +2219,51 @@ func (c ZscanCursor) Count(count int64) ZscanCount {
 	return (ZscanCount)(c)
 }
 
-func (c ZscanCursor) Build() Completed {
-	c.cs.Build()
-	return Completed(c)
+func (c ZscanCursor) Noscores() ZscanNoscores {
+	c.cs.s = append(c.cs.s, "NOSCORES")
+	return (ZscanNoscores)(c)
 }
 
-type ZscanKey Completed
+func (c ZscanCursor) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type ZscanKey Incomplete
 
 func (c ZscanKey) Cursor(cursor uint64) ZscanCursor {
 	c.cs.s = append(c.cs.s, strconv.FormatUint(cursor, 10))
 	return (ZscanCursor)(c)
 }
 
-type ZscanMatch Completed
+type ZscanMatch Incomplete
 
 func (c ZscanMatch) Count(count int64) ZscanCount {
 	c.cs.s = append(c.cs.s, "COUNT", strconv.FormatInt(count, 10))
 	return (ZscanCount)(c)
 }
 
-func (c ZscanMatch) Build() Completed {
-	c.cs.Build()
-	return Completed(c)
+func (c ZscanMatch) Noscores() ZscanNoscores {
+	c.cs.s = append(c.cs.s, "NOSCORES")
+	return (ZscanNoscores)(c)
 }
 
-type Zscore Completed
+func (c ZscanMatch) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type ZscanNoscores Incomplete
+
+func (c ZscanNoscores) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type Zscore Incomplete
 
 func (b Builder) Zscore() (c Zscore) {
-	c = Zscore{cs: get(), ks: b.ks, cf: readonly}
+	c = Zscore{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "ZSCORE")
 	return c
 }
@@ -2256,29 +2278,29 @@ func (c Zscore) Key(key string) ZscoreKey {
 	return (ZscoreKey)(c)
 }
 
-type ZscoreKey Completed
+type ZscoreKey Incomplete
 
 func (c ZscoreKey) Member(member string) ZscoreMember {
 	c.cs.s = append(c.cs.s, member)
 	return (ZscoreMember)(c)
 }
 
-type ZscoreMember Completed
+type ZscoreMember Incomplete
 
 func (c ZscoreMember) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ZscoreMember) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Zunion Completed
+type Zunion Incomplete
 
 func (b Builder) Zunion() (c Zunion) {
-	c = Zunion{cs: get(), ks: b.ks, cf: readonly}
+	c = Zunion{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "ZUNION")
 	return c
 }
@@ -2288,7 +2310,7 @@ func (c Zunion) Numkeys(numkeys int64) ZunionNumkeys {
 	return (ZunionNumkeys)(c)
 }
 
-type ZunionAggregateMax Completed
+type ZunionAggregateMax Incomplete
 
 func (c ZunionAggregateMax) Withscores() ZunionWithscores {
 	c.cs.s = append(c.cs.s, "WITHSCORES")
@@ -2297,10 +2319,10 @@ func (c ZunionAggregateMax) Withscores() ZunionWithscores {
 
 func (c ZunionAggregateMax) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZunionAggregateMin Completed
+type ZunionAggregateMin Incomplete
 
 func (c ZunionAggregateMin) Withscores() ZunionWithscores {
 	c.cs.s = append(c.cs.s, "WITHSCORES")
@@ -2309,10 +2331,10 @@ func (c ZunionAggregateMin) Withscores() ZunionWithscores {
 
 func (c ZunionAggregateMin) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZunionAggregateSum Completed
+type ZunionAggregateSum Incomplete
 
 func (c ZunionAggregateSum) Withscores() ZunionWithscores {
 	c.cs.s = append(c.cs.s, "WITHSCORES")
@@ -2321,10 +2343,10 @@ func (c ZunionAggregateSum) Withscores() ZunionWithscores {
 
 func (c ZunionAggregateSum) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZunionKey Completed
+type ZunionKey Incomplete
 
 func (c ZunionKey) Key(key ...string) ZunionKey {
 	if c.ks&NoSlot == NoSlot {
@@ -2371,10 +2393,10 @@ func (c ZunionKey) Withscores() ZunionWithscores {
 
 func (c ZunionKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZunionNumkeys Completed
+type ZunionNumkeys Incomplete
 
 func (c ZunionNumkeys) Key(key ...string) ZunionKey {
 	if c.ks&NoSlot == NoSlot {
@@ -2391,7 +2413,7 @@ func (c ZunionNumkeys) Key(key ...string) ZunionKey {
 	return (ZunionKey)(c)
 }
 
-type ZunionWeights Completed
+type ZunionWeights Incomplete
 
 func (c ZunionWeights) Weights(weight ...int64) ZunionWeights {
 	c.cs.s = append(c.cs.s, "WEIGHTS")
@@ -2423,17 +2445,17 @@ func (c ZunionWeights) Withscores() ZunionWithscores {
 
 func (c ZunionWeights) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZunionWithscores Completed
+type ZunionWithscores Incomplete
 
 func (c ZunionWithscores) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Zunionstore Completed
+type Zunionstore Incomplete
 
 func (b Builder) Zunionstore() (c Zunionstore) {
 	c = Zunionstore{cs: get(), ks: b.ks}
@@ -2451,35 +2473,35 @@ func (c Zunionstore) Destination(destination string) ZunionstoreDestination {
 	return (ZunionstoreDestination)(c)
 }
 
-type ZunionstoreAggregateMax Completed
+type ZunionstoreAggregateMax Incomplete
 
 func (c ZunionstoreAggregateMax) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZunionstoreAggregateMin Completed
+type ZunionstoreAggregateMin Incomplete
 
 func (c ZunionstoreAggregateMin) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZunionstoreAggregateSum Completed
+type ZunionstoreAggregateSum Incomplete
 
 func (c ZunionstoreAggregateSum) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZunionstoreDestination Completed
+type ZunionstoreDestination Incomplete
 
 func (c ZunionstoreDestination) Numkeys(numkeys int64) ZunionstoreNumkeys {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(numkeys, 10))
 	return (ZunionstoreNumkeys)(c)
 }
 
-type ZunionstoreKey Completed
+type ZunionstoreKey Incomplete
 
 func (c ZunionstoreKey) Key(key ...string) ZunionstoreKey {
 	if c.ks&NoSlot == NoSlot {
@@ -2521,10 +2543,10 @@ func (c ZunionstoreKey) AggregateMax() ZunionstoreAggregateMax {
 
 func (c ZunionstoreKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ZunionstoreNumkeys Completed
+type ZunionstoreNumkeys Incomplete
 
 func (c ZunionstoreNumkeys) Key(key ...string) ZunionstoreKey {
 	if c.ks&NoSlot == NoSlot {
@@ -2541,7 +2563,7 @@ func (c ZunionstoreNumkeys) Key(key ...string) ZunionstoreKey {
 	return (ZunionstoreKey)(c)
 }
 
-type ZunionstoreWeights Completed
+type ZunionstoreWeights Incomplete
 
 func (c ZunionstoreWeights) Weights(weight ...int64) ZunionstoreWeights {
 	c.cs.s = append(c.cs.s, "WEIGHTS")
@@ -2568,5 +2590,5 @@ func (c ZunionstoreWeights) AggregateMax() ZunionstoreAggregateMax {
 
 func (c ZunionstoreWeights) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }

@@ -4,7 +4,7 @@ package cmds
 
 import "strconv"
 
-type BfAdd Completed
+type BfAdd Incomplete
 
 func (b Builder) BfAdd() (c BfAdd) {
 	c = BfAdd{cs: get(), ks: b.ks}
@@ -22,21 +22,21 @@ func (c BfAdd) Key(key string) BfAddKey {
 	return (BfAddKey)(c)
 }
 
-type BfAddItem Completed
+type BfAddItem Incomplete
 
 func (c BfAddItem) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BfAddKey Completed
+type BfAddKey Incomplete
 
 func (c BfAddKey) Item(item string) BfAddItem {
 	c.cs.s = append(c.cs.s, item)
 	return (BfAddItem)(c)
 }
 
-type BfCard Completed
+type BfCard Incomplete
 
 func (b Builder) BfCard() (c BfCard) {
 	c = BfCard{cs: get(), ks: b.ks}
@@ -54,17 +54,17 @@ func (c BfCard) Key(key string) BfCardKey {
 	return (BfCardKey)(c)
 }
 
-type BfCardKey Completed
+type BfCardKey Incomplete
 
 func (c BfCardKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BfExists Completed
+type BfExists Incomplete
 
 func (b Builder) BfExists() (c BfExists) {
-	c = BfExists{cs: get(), ks: b.ks, cf: readonly}
+	c = BfExists{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "BF.EXISTS")
 	return c
 }
@@ -79,29 +79,29 @@ func (c BfExists) Key(key string) BfExistsKey {
 	return (BfExistsKey)(c)
 }
 
-type BfExistsItem Completed
+type BfExistsItem Incomplete
 
 func (c BfExistsItem) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c BfExistsItem) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BfExistsKey Completed
+type BfExistsKey Incomplete
 
 func (c BfExistsKey) Item(item string) BfExistsItem {
 	c.cs.s = append(c.cs.s, item)
 	return (BfExistsItem)(c)
 }
 
-type BfInfo Completed
+type BfInfo Incomplete
 
 func (b Builder) BfInfo() (c BfInfo) {
-	c = BfInfo{cs: get(), ks: b.ks, cf: readonly}
+	c = BfInfo{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "BF.INFO")
 	return c
 }
@@ -116,7 +116,7 @@ func (c BfInfo) Key(key string) BfInfoKey {
 	return (BfInfoKey)(c)
 }
 
-type BfInfoKey Completed
+type BfInfoKey Incomplete
 
 func (c BfInfoKey) Capacity() BfInfoSingleValueCapacity {
 	c.cs.s = append(c.cs.s, "CAPACITY")
@@ -145,75 +145,75 @@ func (c BfInfoKey) Expansion() BfInfoSingleValueExpansion {
 
 func (c BfInfoKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c BfInfoKey) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BfInfoSingleValueCapacity Completed
+type BfInfoSingleValueCapacity Incomplete
 
 func (c BfInfoSingleValueCapacity) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c BfInfoSingleValueCapacity) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BfInfoSingleValueExpansion Completed
+type BfInfoSingleValueExpansion Incomplete
 
 func (c BfInfoSingleValueExpansion) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c BfInfoSingleValueExpansion) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BfInfoSingleValueFilters Completed
+type BfInfoSingleValueFilters Incomplete
 
 func (c BfInfoSingleValueFilters) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c BfInfoSingleValueFilters) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BfInfoSingleValueItems Completed
+type BfInfoSingleValueItems Incomplete
 
 func (c BfInfoSingleValueItems) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c BfInfoSingleValueItems) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BfInfoSingleValueSize Completed
+type BfInfoSingleValueSize Incomplete
 
 func (c BfInfoSingleValueSize) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c BfInfoSingleValueSize) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BfInsert Completed
+type BfInsert Incomplete
 
 func (b Builder) BfInsert() (c BfInsert) {
 	c = BfInsert{cs: get(), ks: b.ks}
@@ -231,7 +231,7 @@ func (c BfInsert) Key(key string) BfInsertKey {
 	return (BfInsertKey)(c)
 }
 
-type BfInsertCapacity Completed
+type BfInsertCapacity Incomplete
 
 func (c BfInsertCapacity) Error(error float64) BfInsertError {
 	c.cs.s = append(c.cs.s, "ERROR", strconv.FormatFloat(error, 'f', -1, 64))
@@ -258,7 +258,7 @@ func (c BfInsertCapacity) Items() BfInsertItems {
 	return (BfInsertItems)(c)
 }
 
-type BfInsertError Completed
+type BfInsertError Incomplete
 
 func (c BfInsertError) Expansion(expansion int64) BfInsertExpansion {
 	c.cs.s = append(c.cs.s, "EXPANSION", strconv.FormatInt(expansion, 10))
@@ -280,7 +280,7 @@ func (c BfInsertError) Items() BfInsertItems {
 	return (BfInsertItems)(c)
 }
 
-type BfInsertExpansion Completed
+type BfInsertExpansion Incomplete
 
 func (c BfInsertExpansion) Nocreate() BfInsertNocreate {
 	c.cs.s = append(c.cs.s, "NOCREATE")
@@ -297,7 +297,7 @@ func (c BfInsertExpansion) Items() BfInsertItems {
 	return (BfInsertItems)(c)
 }
 
-type BfInsertItem Completed
+type BfInsertItem Incomplete
 
 func (c BfInsertItem) Item(item ...string) BfInsertItem {
 	c.cs.s = append(c.cs.s, item...)
@@ -306,17 +306,17 @@ func (c BfInsertItem) Item(item ...string) BfInsertItem {
 
 func (c BfInsertItem) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BfInsertItems Completed
+type BfInsertItems Incomplete
 
 func (c BfInsertItems) Item(item ...string) BfInsertItem {
 	c.cs.s = append(c.cs.s, item...)
 	return (BfInsertItem)(c)
 }
 
-type BfInsertKey Completed
+type BfInsertKey Incomplete
 
 func (c BfInsertKey) Capacity(capacity int64) BfInsertCapacity {
 	c.cs.s = append(c.cs.s, "CAPACITY", strconv.FormatInt(capacity, 10))
@@ -348,7 +348,7 @@ func (c BfInsertKey) Items() BfInsertItems {
 	return (BfInsertItems)(c)
 }
 
-type BfInsertNocreate Completed
+type BfInsertNocreate Incomplete
 
 func (c BfInsertNocreate) Nonscaling() BfInsertNonscaling {
 	c.cs.s = append(c.cs.s, "NONSCALING")
@@ -360,14 +360,14 @@ func (c BfInsertNocreate) Items() BfInsertItems {
 	return (BfInsertItems)(c)
 }
 
-type BfInsertNonscaling Completed
+type BfInsertNonscaling Incomplete
 
 func (c BfInsertNonscaling) Items() BfInsertItems {
 	c.cs.s = append(c.cs.s, "ITEMS")
 	return (BfInsertItems)(c)
 }
 
-type BfLoadchunk Completed
+type BfLoadchunk Incomplete
 
 func (b Builder) BfLoadchunk() (c BfLoadchunk) {
 	c = BfLoadchunk{cs: get(), ks: b.ks}
@@ -385,28 +385,28 @@ func (c BfLoadchunk) Key(key string) BfLoadchunkKey {
 	return (BfLoadchunkKey)(c)
 }
 
-type BfLoadchunkData Completed
+type BfLoadchunkData Incomplete
 
 func (c BfLoadchunkData) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BfLoadchunkIterator Completed
+type BfLoadchunkIterator Incomplete
 
 func (c BfLoadchunkIterator) Data(data string) BfLoadchunkData {
 	c.cs.s = append(c.cs.s, data)
 	return (BfLoadchunkData)(c)
 }
 
-type BfLoadchunkKey Completed
+type BfLoadchunkKey Incomplete
 
 func (c BfLoadchunkKey) Iterator(iterator int64) BfLoadchunkIterator {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(iterator, 10))
 	return (BfLoadchunkIterator)(c)
 }
 
-type BfMadd Completed
+type BfMadd Incomplete
 
 func (b Builder) BfMadd() (c BfMadd) {
 	c = BfMadd{cs: get(), ks: b.ks}
@@ -424,7 +424,7 @@ func (c BfMadd) Key(key string) BfMaddKey {
 	return (BfMaddKey)(c)
 }
 
-type BfMaddItem Completed
+type BfMaddItem Incomplete
 
 func (c BfMaddItem) Item(item ...string) BfMaddItem {
 	c.cs.s = append(c.cs.s, item...)
@@ -433,20 +433,20 @@ func (c BfMaddItem) Item(item ...string) BfMaddItem {
 
 func (c BfMaddItem) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BfMaddKey Completed
+type BfMaddKey Incomplete
 
 func (c BfMaddKey) Item(item ...string) BfMaddItem {
 	c.cs.s = append(c.cs.s, item...)
 	return (BfMaddItem)(c)
 }
 
-type BfMexists Completed
+type BfMexists Incomplete
 
 func (b Builder) BfMexists() (c BfMexists) {
-	c = BfMexists{cs: get(), ks: b.ks, cf: readonly}
+	c = BfMexists{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "BF.MEXISTS")
 	return c
 }
@@ -461,7 +461,7 @@ func (c BfMexists) Key(key string) BfMexistsKey {
 	return (BfMexistsKey)(c)
 }
 
-type BfMexistsItem Completed
+type BfMexistsItem Incomplete
 
 func (c BfMexistsItem) Item(item ...string) BfMexistsItem {
 	c.cs.s = append(c.cs.s, item...)
@@ -470,17 +470,17 @@ func (c BfMexistsItem) Item(item ...string) BfMexistsItem {
 
 func (c BfMexistsItem) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BfMexistsKey Completed
+type BfMexistsKey Incomplete
 
 func (c BfMexistsKey) Item(item ...string) BfMexistsItem {
 	c.cs.s = append(c.cs.s, item...)
 	return (BfMexistsItem)(c)
 }
 
-type BfReserve Completed
+type BfReserve Incomplete
 
 func (b Builder) BfReserve() (c BfReserve) {
 	c = BfReserve{cs: get(), ks: b.ks}
@@ -498,7 +498,7 @@ func (c BfReserve) Key(key string) BfReserveKey {
 	return (BfReserveKey)(c)
 }
 
-type BfReserveCapacity Completed
+type BfReserveCapacity Incomplete
 
 func (c BfReserveCapacity) Expansion(expansion int64) BfReserveExpansion {
 	c.cs.s = append(c.cs.s, "EXPANSION", strconv.FormatInt(expansion, 10))
@@ -512,17 +512,17 @@ func (c BfReserveCapacity) Nonscaling() BfReserveNonscaling {
 
 func (c BfReserveCapacity) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BfReserveErrorRate Completed
+type BfReserveErrorRate Incomplete
 
 func (c BfReserveErrorRate) Capacity(capacity int64) BfReserveCapacity {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(capacity, 10))
 	return (BfReserveCapacity)(c)
 }
 
-type BfReserveExpansion Completed
+type BfReserveExpansion Incomplete
 
 func (c BfReserveExpansion) Nonscaling() BfReserveNonscaling {
 	c.cs.s = append(c.cs.s, "NONSCALING")
@@ -531,27 +531,27 @@ func (c BfReserveExpansion) Nonscaling() BfReserveNonscaling {
 
 func (c BfReserveExpansion) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BfReserveKey Completed
+type BfReserveKey Incomplete
 
 func (c BfReserveKey) ErrorRate(errorRate float64) BfReserveErrorRate {
 	c.cs.s = append(c.cs.s, strconv.FormatFloat(errorRate, 'f', -1, 64))
 	return (BfReserveErrorRate)(c)
 }
 
-type BfReserveNonscaling Completed
+type BfReserveNonscaling Incomplete
 
 func (c BfReserveNonscaling) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BfScandump Completed
+type BfScandump Incomplete
 
 func (b Builder) BfScandump() (c BfScandump) {
-	c = BfScandump{cs: get(), ks: b.ks, cf: readonly}
+	c = BfScandump{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "BF.SCANDUMP")
 	return c
 }
@@ -566,14 +566,14 @@ func (c BfScandump) Key(key string) BfScandumpKey {
 	return (BfScandumpKey)(c)
 }
 
-type BfScandumpIterator Completed
+type BfScandumpIterator Incomplete
 
 func (c BfScandumpIterator) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BfScandumpKey Completed
+type BfScandumpKey Incomplete
 
 func (c BfScandumpKey) Iterator(iterator int64) BfScandumpIterator {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(iterator, 10))
