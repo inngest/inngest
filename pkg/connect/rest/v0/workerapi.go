@@ -31,6 +31,11 @@ func (a *router) start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if res == nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Errorf(401, "authentication failed"))
+		return
+	}
+
 	byt, err := io.ReadAll(io.LimitReader(r.Body, 1024*1024))
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "could not read request body"))
