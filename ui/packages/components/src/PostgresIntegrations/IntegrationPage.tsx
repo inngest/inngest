@@ -1,3 +1,5 @@
+'use client';
+
 import { useRouter } from 'next/navigation';
 import { NewButton } from '@inngest/components/Button/index';
 import { Card } from '@inngest/components/Card/Card';
