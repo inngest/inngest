@@ -18,7 +18,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   //
   // don't render until we have the nav collapsed state to avoid jank
   return (
-    <div className="no-scrollbar fixed z-50 flex h-screen w-full flex-row justify-start overflow-y-scroll overscroll-y-none">
+    <div className="no-scrollbar text-basis fixed z-50 flex h-screen w-full flex-row justify-start overflow-y-scroll overscroll-y-none">
       {collapsed === undefined ? null : (
         <>
           <SideBar collapsed={collapsed} setCollapsed={setCollapsed} />
