@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/testapi"
 	"time"
 
@@ -52,7 +53,6 @@ import (
 	"github.com/inngest/inngest/pkg/service"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
-	connectproto "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/sync/errgroup"
@@ -412,9 +412,12 @@ func start(ctx context.Context, opts StartOpts) error {
 		Executor:      ds.Executor,
 		HistoryReader: memory_reader.NewReader(),
 		ConnectOpts: connectv0.Opts{
-			ConnectManager: connectionManager,
-			GroupManager:   connectionManager,
-			Dev:            true,
+			GroupManager:            connectionManager,
+			ConnectManager:          connectionManager,
+			Signer:                  auth.NewJWTSessionTokenSigner(consts.DevServerConnectJwtSecret),
+			RequestAuther:           ds,
+			ConnectGatewayRetriever: ds,
+			Dev:                     true,
 		},
 	})
 	if err != nil {
@@ -424,15 +427,11 @@ func start(ctx context.Context, opts StartOpts) error {
 	connGateway := connect.NewConnectGatewayService(
 		connect.WithConnectionStateManager(connectionManager),
 		connect.WithRequestReceiver(gatewayProxy),
-		connect.WithGatewayAuthHandler(func(ctx context.Context, data *connectproto.WorkerConnectRequestData) (*connect.AuthResponse, error) {
-			return &connect.AuthResponse{
-				AccountID: consts.DevServerAccountId,
-				EnvID:     consts.DevServerEnvId,
-			}, nil
-		}),
+		connect.WithGatewayAuthHandler(auth.NewJWTAuthHandler(consts.DevServerConnectJwtSecret)),
 		connect.WithAppLoader(dbcqrs),
 		connect.WithDev(),
 		connect.WithGatewayPublicPort(8289),
+		connect.WithApiBaseUrl(fmt.Sprintf("http://127.0.0.1:%d", opts.Config.EventAPI.Port)),
 	)
 	connRouter := connect.NewConnectMessageRouterService(connectionManager, gatewayProxy)
 

@@ -54,7 +54,6 @@ func (h *handler) Connect(ctx context.Context) error {
 		APIBaseUrl:               h.GetAPIBaseURL(),
 		IsDev:                    h.isDev(),
 		DevServerUrl:             DevServerURL(),
-		ConnectUrls:              h.ConnectURLs,
 		InstanceId:               h.InstanceId,
 		BuildId:                  h.BuildId,
 		Platform:                 Ptr(platform()),

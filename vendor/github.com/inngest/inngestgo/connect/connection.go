@@ -24,11 +24,18 @@ type connectReport struct {
 type connectOpt func(opts *connectOpts)
 type connectOpts struct {
 	notifyConnectedChan chan struct{}
+	excludeGateways     []string
 }
 
 func withNotifyConnectedChan(ch chan struct{}) connectOpt {
 	return func(opts *connectOpts) {
 		opts.notifyConnectedChan = ch
+	}
+}
+
+func withExcludeGateways(exclude ...string) connectOpt {
+	return func(opts *connectOpts) {
+		opts.excludeGateways = exclude
 	}
 }
 
@@ -39,7 +46,7 @@ func (h *connectHandler) connect(ctx context.Context, data connectionEstablishDa
 	}
 
 	// Set up connection (including connect handshake protocol)
-	preparedConn, err := h.prepareConnection(ctx, data)
+	preparedConn, err := h.prepareConnection(ctx, data, o.excludeGateways)
 	if err != nil {
 		h.logger.Error("could not establish connection", "err", err)
 
@@ -60,7 +67,7 @@ func (h *connectHandler) connect(ctx context.Context, data connectionEstablishDa
 	}
 
 	// Set up connection lifecycle logic (receiving messages, handling requests, etc.)
-	err = h.handleConnection(ctx, data, preparedConn.ws, preparedConn.gatewayHost)
+	err = h.handleConnection(ctx, data, preparedConn.ws, preparedConn.gatewayGroupName)
 	if err != nil {
 		h.logger.Error("could not handle connection", "err", err)
 
@@ -89,22 +96,25 @@ type connectionEstablishData struct {
 }
 
 type connection struct {
-	ws           *websocket.Conn
-	gatewayHost  string
-	connectionId string
+	ws               *websocket.Conn
+	gatewayGroupName string
+	connectionId     string
 }
 
-func (h *connectHandler) prepareConnection(ctx context.Context, data connectionEstablishData) (connection, error) {
+func (h *connectHandler) prepareConnection(ctx context.Context, data connectionEstablishData, excludeGateways []string) (connection, error) {
 	connectTimeout, cancelConnectTimeout := context.WithTimeout(ctx, 10*time.Second)
 	defer cancelConnectTimeout()
 
-	gatewayHost := h.hostsManager.pickAvailableGateway()
-	if gatewayHost == "" {
-		// All gateways have been tried, reset the internal state to retry
-		h.hostsManager.resetGateways()
-
-		return connection{}, reconnectError{fmt.Errorf("no available gateway hosts")}
+	startRes, err := h.apiClient.start(ctx, data.hashedSigningKey, &connectproto.StartRequest{
+		ExcludeGateways: excludeGateways,
+	})
+	if err != nil {
+		return connection{}, reconnectError{fmt.Errorf("could not start connection: %w", err)}
 	}
+
+	h.logger.Debug("handshake successful", "gateway_endpoint", startRes.GetGatewayEndpoint(), "gateway_group", startRes.GetGatewayGroup())
+
+	gatewayHost := startRes.GetGatewayEndpoint()
 
 	// Establish WebSocket connection to one of the gateways
 	ws, _, err := websocket.Dial(connectTimeout, gatewayHost, &websocket.DialOptions{
@@ -113,7 +123,6 @@ func (h *connectHandler) prepareConnection(ctx context.Context, data connectionE
 		},
 	})
 	if err != nil {
-		h.hostsManager.markUnreachableGateway(gatewayHost)
 		return connection{}, reconnectError{fmt.Errorf("could not connect to gateway: %w", err)}
 	}
 
@@ -122,19 +131,19 @@ func (h *connectHandler) prepareConnection(ctx context.Context, data connectionE
 
 	h.logger.Debug("websocket connection established", "gateway_host", gatewayHost)
 
-	err = h.performConnectHandshake(ctx, connectionId.String(), ws, gatewayHost, data)
+	err = h.performConnectHandshake(ctx, connectionId.String(), ws, startRes, data)
 	if err != nil {
 		return connection{}, reconnectError{fmt.Errorf("could not perform connect handshake: %w", err)}
 	}
 
 	return connection{
-		ws:           ws,
-		gatewayHost:  gatewayHost,
-		connectionId: connectionId.String(),
+		ws:               ws,
+		gatewayGroupName: startRes.GetGatewayGroup(),
+		connectionId:     connectionId.String(),
 	}, nil
 }
 
-func (h *connectHandler) handleConnection(ctx context.Context, data connectionEstablishData, ws *websocket.Conn, gatewayHost string) error {
+func (h *connectHandler) handleConnection(ctx context.Context, data connectionEstablishData, ws *websocket.Conn, gatewayGroupName string) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -217,8 +226,6 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 	// - Worker shutdown, parent context got cancelled
 	if err := eg.Wait(); err != nil && ctx.Err() == nil {
 		if errors.Is(err, errGatewayDraining) {
-			h.hostsManager.markDrainingGateway(gatewayHost)
-
 			// Gateway is draining and will not accept new connections.
 			// We must reconnect to a different gateway, only then can we close the old connection.
 			waitUntilConnected, doneWaiting := context.WithTimeout(context.Background(), 10*time.Second)
@@ -232,7 +239,7 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 			}()
 
 			// Establish new connection, notify the routine above when the new connection is established
-			go h.connect(context.Background(), data, withNotifyConnectedChan(notifyConnectedChan))
+			go h.connect(context.Background(), data, withNotifyConnectedChan(notifyConnectedChan), withExcludeGateways(gatewayGroupName))
 
 			// Wait until the new connection is established before closing the old one
 			<-waitUntilConnected.Done()
@@ -303,7 +310,7 @@ func (h *connectHandler) withTemporaryConnection(data connectionEstablishData, h
 			return fmt.Errorf("could not establish connection after %d attempts", maxAttempts)
 		}
 
-		ws, err := h.prepareConnection(context.Background(), data)
+		ws, err := h.prepareConnection(context.Background(), data, nil)
 		if err != nil {
 			attempts++
 			continue

@@ -28,7 +28,7 @@ func shouldReconnect(err error) bool {
 	return errors.Is(err, reconnectError{})
 }
 
-func (h *connectHandler) performConnectHandshake(ctx context.Context, connectionId string, ws *websocket.Conn, gatewayHost string, data connectionEstablishData) error {
+func (h *connectHandler) performConnectHandshake(ctx context.Context, connectionId string, ws *websocket.Conn, startResponse *connectproto.StartResponse, data connectionEstablishData) error {
 	// Wait for gateway hello message
 	{
 		initialMessageTimeout, cancelInitialTimeout := context.WithTimeout(ctx, 5*time.Second)
@@ -36,12 +36,10 @@ func (h *connectHandler) performConnectHandshake(ctx context.Context, connection
 		var helloMessage connectproto.ConnectMessage
 		err := wsproto.Read(initialMessageTimeout, ws, &helloMessage)
 		if err != nil {
-			h.hostsManager.markUnreachableGateway(gatewayHost)
 			return reconnectError{fmt.Errorf("did not receive gateway hello message: %w", err)}
 		}
 
 		if helloMessage.Kind != connectproto.GatewayMessageType_GATEWAY_HELLO {
-			h.hostsManager.markUnreachableGateway(gatewayHost)
 			return reconnectError{fmt.Errorf("expected gateway hello message, got %s", helloMessage.Kind)}
 		}
 
@@ -50,12 +48,6 @@ func (h *connectHandler) performConnectHandshake(ctx context.Context, connection
 
 	// Send connect message
 	{
-
-		apiOrigin := h.opts.APIBaseUrl
-		if h.opts.IsDev {
-			apiOrigin = h.opts.DevServerUrl
-		}
-
 		data, err := proto.Marshal(&connectproto.WorkerConnectRequestData{
 			SessionId: &connectproto.SessionIdentifier{
 				BuildId:      h.opts.BuildId,
@@ -63,13 +55,13 @@ func (h *connectHandler) performConnectHandshake(ctx context.Context, connection
 				ConnectionId: connectionId,
 			},
 			AuthData: &connectproto.AuthData{
-				HashedSigningKey: data.hashedSigningKey,
+				SessionToken: startResponse.GetSessionToken(),
+				SyncToken:    startResponse.GetSyncToken(),
 			},
 			AppName: h.opts.AppName,
 			Config: &connectproto.ConfigDetails{
 				Capabilities: data.marshaledCapabilities,
 				Functions:    data.marshaledFns,
-				ApiOrigin:    apiOrigin,
 			},
 			SystemAttributes: &connectproto.SystemAttributes{
 				CpuCores: data.numCpuCores,

@@ -6,9 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"io"
-
 	"log/slog"
 	"net"
 	"net/http"
@@ -18,6 +16,8 @@ import (
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
 	"github.com/gowebpki/jcs"
+	"github.com/inngest/inngest/pkg/connect/auth"
+	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/connect/types"
 	"github.com/inngest/inngest/pkg/connect/wsproto"
@@ -139,7 +139,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
-		ch.log = ch.log.With("account_id", conn.Data.AuthData.AccountId, "env_id", conn.Data.AuthData.EnvId, "conn_id", conn.Data.SessionId.ConnectionId)
+		ch.log = ch.log.With("account_id", conn.AccountID, "env_id", conn.EnvID, "conn_id", conn.Data.SessionId.ConnectionId)
 
 		var closeReason string
 		var closeReasonLock sync.Mutex
@@ -212,7 +212,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}()
 
-		err = conn.Sync(ctx, c.stateManager)
+		err = conn.Sync(ctx, c.stateManager, c.apiBaseUrl)
 		if err != nil {
 			if ctx.Err() != nil {
 				c.closeDraining(ws)
@@ -608,7 +608,7 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 		}
 	}
 
-	var authResp *AuthResponse
+	var authResp *auth.Response
 	{
 		// Run auth, add to distributed state
 		authResp, err = c.svc.auther(ctx, &initialMessageData)
@@ -634,13 +634,10 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 			}
 		}
 
-		initialMessageData.AuthData.AccountId = authResp.AccountID.String()
-		initialMessageData.AuthData.EnvId = authResp.EnvID.String()
-
 		c.log.Debug("SDK successfully authenticated", "authResp", authResp)
 	}
 
-	log := c.log.With("account_id", initialMessageData.AuthData.AccountId)
+	log := c.log.With("account_id", authResp.AccountID, "env_id", authResp.EnvID)
 
 	var functionHash []byte
 	{
@@ -678,11 +675,17 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 	}
 
 	conn := state.Connection{
+		AccountID: authResp.AccountID,
+		EnvID:     authResp.EnvID,
+
 		// Mark initial status, not ready to receive messages yet
-		Status:    connect.ConnectionStatus_CONNECTED,
-		Data:      &initialMessageData,
-		Session:   sessionDetails,
-		Group:     workerGroup,
+		Status: connect.ConnectionStatus_CONNECTED,
+
+		Data:    &initialMessageData,
+		Session: sessionDetails,
+		Group:   workerGroup,
+
+		// Used for routing messages to the correct gateway
 		GatewayId: c.svc.gatewayId,
 	}
 
