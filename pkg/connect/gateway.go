@@ -327,9 +327,16 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					})
 				}
 
+				tags := map[string]any{
+					"kind": msg.Kind.String(),
+				}
+				for k, v := range additionalMetricsTags {
+					tags[k] = v
+				}
+
 				metrics.IncrConnectGatewayReceivedWorkerMessageCounter(ctx, 1, metrics.CounterOpt{
 					PkgName: pkgName,
-					Tags:    additionalMetricsTags,
+					Tags:    tags,
 				})
 
 				serr := ch.handleIncomingWebSocketMessage(app.ID, &msg)
