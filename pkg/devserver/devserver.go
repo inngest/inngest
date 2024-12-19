@@ -412,6 +412,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		Executor:      ds.Executor,
 		HistoryReader: memory_reader.NewReader(),
 		ConnectOpts: connectv0.Opts{
+			GroupManager:            connectionManager,
+			ConnectManager:          connectionManager,
 			Signer:                  auth.NewJWTSessionTokenSigner(consts.DevServerConnectJwtSecret),
 			RequestAuther:           ds,
 			ConnectGatewayRetriever: ds,
