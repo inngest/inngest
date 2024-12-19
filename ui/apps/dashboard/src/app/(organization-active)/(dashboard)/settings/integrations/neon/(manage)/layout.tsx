@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 
 import { PostgresIntegrations } from '@/components/PostgresIntegration/data';
-import Page from './page';
+import Manage from './manage';
 
 export default async function Layout() {
   const postgresIntegrations = await PostgresIntegrations();
@@ -11,5 +11,5 @@ export default async function Layout() {
     redirect('/settings/integrations/neon/connect');
   }
 
-  return <Page publication={neonConnection} />;
+  return <Manage publication={neonConnection} />;
 }
