@@ -4,11 +4,12 @@ import { useMemo } from 'react';
 import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
 import { NewLink } from '@inngest/components/Link';
-import { IconApp } from '@inngest/components/icons/App';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
+import { RiInformationLine } from '@remixicon/react';
 
 import AddAppButton from '@/components/App/AddAppButton';
 import AppCard from '@/components/App/AppCard';
+import AppFAQ from '@/components/App/AppFAQ';
 import { useInfoQuery } from '@/store/devApi';
 import { useGetAppsQuery } from '@/store/generated';
 
@@ -37,7 +38,7 @@ export default function AppList() {
             action={
               <NewLink
                 arrowOnHover
-                className="text-sm"
+                size="small"
                 href="https://www.inngest.com/docs/local-development#connecting-apps-to-the-dev-server"
               >
                 Go to specific ports.
@@ -50,7 +51,7 @@ export default function AppList() {
             {info?.isDiscoveryEnabled ? (
               <p className="text-btnPrimary flex items-center gap-2 text-sm leading-tight">
                 <IconSpinner className="fill-btnPrimary" />
-                Auto-detecting Apps
+                Auto-detecting apps
               </p>
             ) : null}
             <AddAppButton />
@@ -58,14 +59,51 @@ export default function AppList() {
         }
       />
 
-      <div className="px-10 py-6">
-        <div className="mb-4 flex items-center gap-3">
-          <IconApp />
-          <p className="text-subtle">
-            {numberOfSyncedApps} / {apps.length} Apps Synced
+      <div className="mx-auto my-12 w-4/5 max-w-7xl">
+        <h2 className="mb-1 text-xl">Synced Apps</h2>
+        <p className="text-muted text-sm">
+          Synced Inngest apps appear below. Apps will sync automatically if auto-discovery is
+          enabled, or you can sync them manually. {''}
+          <NewLink
+            target="_blank"
+            size="small"
+            className="inline"
+            href="https://www.inngest.com/docs/local-development#connecting-apps-to-the-dev-server"
+          >
+            Learn more.
+          </NewLink>
+        </p>
+        <div className="bg-surfaceSubtle my-4 mb-4 flex items-center justify-between gap-1 rounded p-4">
+          <p className="text-subtle text-sm">
+            {numberOfSyncedApps} / {apps.length} apps synced
           </p>
+          <div className="flex items-center gap-2">
+            {info?.isDiscoveryEnabled ? (
+              <p className="text-btnPrimary flex items-center gap-2 text-sm leading-tight">
+                <IconSpinner className="fill-btnPrimary" />
+                Auto-detecting apps
+              </p>
+            ) : null}
+            <AddAppButton secondary />
+          </div>
         </div>
-        <div className="grid min-h-max grid-cols-1 gap-6 md:grid-cols-2">{memoizedAppCards}</div>
+        {info?.isDiscoveryEnabled && (
+          <div className="text-light flex items-center gap-1">
+            <RiInformationLine className="h-4 w-4" />
+            <p className="text-sm">
+              Auto-detection is enabled on common ports. You can use the{' '}
+              <code className="bg-canvasSubtle text-codeDelimiterBracketJson rounded-sm px-1.5 py-0.5 text-xs">
+                --no-discovery
+              </code>{' '}
+              flag in your CLI to disable it.
+            </p>
+          </div>
+        )}
+
+        <div className="grid min-h-max grid-cols-1 gap-6 py-6 md:grid-cols-2">
+          {memoizedAppCards}
+        </div>
+        <AppFAQ />
       </div>
     </div>
   );
