@@ -110,3 +110,30 @@ func GaugeSpanExporterBuffer(ctx context.Context, val int64, opts GaugeOpt) {
 		Tags:        opts.Tags,
 	})
 }
+
+func GaugeConnectGatewayActiveConnections(ctx context.Context, val int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, val, GaugeOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway_active_connections",
+		Description: "The number of active connections on a connect gateway",
+		Tags:        opts.Tags,
+	})
+}
+
+func GaugeConnectActiveGateway(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_active_gateway_total",
+		Description: "Total number of active connect gateways",
+		Tags:        opts.Tags,
+	})
+}
+
+func GaugeConnectDrainingGateway(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_draining_gateway_total",
+		Description: "Total number of draining connect gateways",
+		Tags:        opts.Tags,
+	})
+}

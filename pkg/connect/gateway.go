@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"io"
 	"log/slog"
 	"net"
@@ -25,6 +26,10 @@ import (
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
+)
+
+const (
+	pkgName = "connect.gateway"
 )
 
 func (c *connectGatewaySvc) closeWithConnectError(ws *websocket.Conn, serr *SocketError) {
@@ -74,6 +79,13 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		if err != nil {
 			return
 		}
+
+		additionalMetricsTags := c.metricsTags()
+
+		metrics.IncrConnectGatewayReceiveConnectionAttemptCounter(ctx, 1, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    additionalMetricsTags,
+		})
 
 		// Do not accept new connections if the gateway is draining
 		if c.isDraining {
@@ -315,6 +327,11 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					})
 				}
 
+				metrics.IncrConnectGatewayReceivedWorkerMessageCounter(ctx, 1, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags:    additionalMetricsTags,
+				})
+
 				serr := ch.handleIncomingWebSocketMessage(app.ID, &msg)
 				if serr != nil {
 					c.closeWithConnectError(ws, serr)
@@ -376,6 +393,11 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		}
 
 		ch.log.Debug("connection is ready")
+
+		metrics.IncrConnectGatewayConnectionSuccessCounter(ctx, 1, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    additionalMetricsTags,
+		})
 
 		// Connection was drained once it's closed by the worker (even if
 		// the connection broke unintentionally, we can stop waiting)
@@ -496,6 +518,8 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(appId uuid.UUID, msg 
 }
 
 func (c *connectionHandler) receiveRouterMessages(ctx context.Context, appId uuid.UUID) {
+	additionalMetricsTags := c.svc.metricsTags()
+
 	// Receive execution-related messages for the app, forwarded by the router.
 	// The router selects only one gateway to handle a request from a pool of one or more workers (and thus WebSockets)
 	// running for each app.
@@ -507,6 +531,11 @@ func (c *connectionHandler) receiveRouterMessages(ctx context.Context, appId uui
 		)
 
 		log.Debug("gateway received msg")
+
+		metrics.IncrConnectGatewayReceivedRouterPubSubMessageCounter(ctx, 1, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    additionalMetricsTags,
+		})
 
 		// Do not forward messages if the connection is already draining
 		if ctx.Err() != nil {

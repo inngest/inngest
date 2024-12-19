@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"github.com/inngest/inngest/pkg/connect/auth"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"log/slog"
 	"net/http"
 	"os"
@@ -23,8 +24,9 @@ import (
 )
 
 const (
-	GatewayHeartbeatInterval = 5 * time.Second
-	WorkerHeartbeatInterval  = 10 * time.Second
+	GatewayHeartbeatInterval  = 5 * time.Second
+	GatewayInstrumentInterval = 20 * time.Second
+	WorkerHeartbeatInterval   = 10 * time.Second
 )
 
 type gatewayOpt func(*connectGatewaySvc)
@@ -79,6 +81,9 @@ type connectGatewaySvc struct {
 	apiBaseUrl   string
 
 	hostname string
+
+	// groupName specifies the name of the deployment group in case this gateway is one of many replicas.
+	groupName string
 
 	lifecycles []ConnectGatewayLifecycleListener
 
@@ -162,6 +167,12 @@ func WithGatewayPublicPort(port int) gatewayOpt {
 func WithApiBaseUrl(url string) gatewayOpt {
 	return func(svc *connectGatewaySvc) {
 		svc.apiBaseUrl = url
+	}
+}
+
+func WithGroupName(groupName string) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.groupName = groupName
 	}
 }
 
@@ -249,6 +260,56 @@ func (c *connectGatewaySvc) heartbeat(ctx context.Context) {
 			if err != nil {
 				c.logger.Error(fmt.Sprintf("could not update gateway state: %v", err))
 			}
+		}
+	}
+}
+
+func (c *connectGatewaySvc) metricsTags() map[string]any {
+	additionalTags := map[string]any{
+		"gateway_id": c.gatewayId,
+	}
+	if c.groupName != "" {
+		additionalTags["group_name"] = c.groupName
+	}
+
+	return additionalTags
+}
+
+func (c *connectGatewaySvc) instrument(ctx context.Context) {
+	instrumentTicker := time.NewTicker(GatewayInstrumentInterval)
+	defer instrumentTicker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-instrumentTicker.C:
+		}
+
+		additionalTags := c.metricsTags()
+
+		metrics.GaugeConnectGatewayActiveConnections(ctx, int64(c.connectionCount.Count()), metrics.GaugeOpt{
+			PkgName: pkgName,
+			Tags:    additionalTags,
+		})
+
+		if c.isDraining {
+			metrics.GaugeConnectDrainingGateway(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    additionalTags,
+			})
+			metrics.GaugeConnectActiveGateway(ctx, 0, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    additionalTags,
+			})
+		} else {
+			metrics.GaugeConnectActiveGateway(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    additionalTags,
+			})
+			metrics.GaugeConnectDrainingGateway(ctx, 0, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    additionalTags,
+			})
 		}
 	}
 }
