@@ -7,24 +7,16 @@ import { NewLink } from '@inngest/components/Link/Link';
 import { Pill } from '@inngest/components/Pill/Pill';
 import { toast } from 'sonner';
 
-import { type IntegrationPageContent } from './types';
-
-export type Publication = {
-  id: string;
-  name: string;
-  slug: string;
-  projects: never[];
-  enabled: boolean;
-};
+import { type IntegrationPageContent, type Publication } from './types';
 
 export default function IntegrationPage({
   content,
-  publication,
+  publications,
   onDelete,
 }: {
   content: IntegrationPageContent;
   onDelete: (id: string) => Promise<{ success: boolean; error: string | null }>;
-  publication: Publication;
+  publications: Publication[];
 }) {
   const router = useRouter();
 
@@ -49,26 +41,29 @@ export default function IntegrationPage({
           </NewLink>
         </div>
       </div>
-      <Card
-        className="my-9"
-        accentPosition="left"
-        accentColor={publication.enabled ? 'bg-primary-intense' : 'bg-surfaceMuted'}
-      >
-        <Card.Content className="p-6">
-          <div className="flex flex-row items-center justify-between">
-            <div className="flex flex-col">
-              <div>
-                <Pill appearance="solid" kind={publication.enabled ? 'primary' : 'default'}>
-                  {publication.enabled ? 'Active' : 'Disabled'}
-                </Pill>
-              </div>
-              <div className="mt-4 flex flex-row items-center justify-start">
-                <div className="text-basis text-lg font-medium">{publication.name}</div>
+      {publications.map((p, i) => (
+        <Card
+          key={`${content.title}-publications-${i}`}
+          className="my-9"
+          accentPosition="left"
+          accentColor={p.enabled ? 'bg-primary-intense' : 'bg-surfaceMuted'}
+        >
+          <Card.Content className="p-6">
+            <div className="flex flex-row items-center justify-between">
+              <div className="flex flex-col">
+                <div>
+                  <Pill appearance="solid" kind={p.enabled ? 'primary' : 'default'}>
+                    {p.enabled ? 'Active' : 'Disabled'}
+                  </Pill>
+                </div>
+                <div className="mt-4 flex flex-row items-center justify-start">
+                  <div className="text-basis text-lg font-medium">{p.name}</div>
+                </div>
               </div>
             </div>
-          </div>
-        </Card.Content>
-      </Card>
+          </Card.Content>
+        </Card>
+      ))}
 
       <div className="border-muted border-t py-7">
         <div className="flex items-center gap-2">
@@ -82,7 +77,12 @@ export default function IntegrationPage({
           kind="danger"
           label={`Remove ${content.title}`}
           onClick={async () => {
-            const { success, error } = await onDelete(publication.id);
+            if (!publications || !publications[0]) {
+              console.error('no neon cdc connection to remove');
+              return;
+            }
+
+            const { success, error } = await onDelete(publications[0].id);
             if (success) {
               successRedirect();
             }

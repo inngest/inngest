@@ -9,7 +9,7 @@ import { deleteConnection } from '../actions';
 export default function Manage({ publication }: { publication: Publication }) {
   return (
     <IntegrationsPage
-      publication={publication}
+      publications={[publication]}
       content={neonIntegrationPageContent}
       onDelete={deleteConnection}
     />
