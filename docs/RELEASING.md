@@ -30,4 +30,4 @@ npx inngest-cli@beta dev
 
 ## GitHub action
 
-The entire release action is configured in [release.yml](.github/workflows/release.yml).
+The entire release action is configured in [release.yml](/.github/workflows/release.yml).
