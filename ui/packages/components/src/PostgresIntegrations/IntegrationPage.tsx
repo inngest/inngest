@@ -1,9 +1,13 @@
+'use client';
+
+import { useRouter } from 'next/navigation';
 import { NewButton } from '@inngest/components/Button/index';
 import { Card } from '@inngest/components/Card/Card';
 import { NewLink } from '@inngest/components/Link/Link';
 import { Pill } from '@inngest/components/Pill/Pill';
+import { toast } from 'sonner';
 
-import { type IntegrationPageContent } from './types';
+import { type IntegrationPageContent, type Publication } from './types';
 
 export default function IntegrationPage({
   content,
@@ -11,16 +15,15 @@ export default function IntegrationPage({
   onDelete,
 }: {
   content: IntegrationPageContent;
-  onDelete: () => void;
-  // TO DO: change this format
-  publications: {
-    id: string;
-    name: string;
-    slug: string;
-    projects: never[];
-    enabled: boolean;
-  }[];
+  onDelete: (id: string) => Promise<{ success: boolean; error: string | null }>;
+  publications: Publication[];
 }) {
+  const router = useRouter();
+
+  const successRedirect = () => {
+    router.push('/settings/integrations');
+  };
+
   return (
     <div className="mx-auto mt-6 flex w-[800px] flex-col p-8">
       <div className="flex flex-col">
@@ -73,7 +76,20 @@ export default function IntegrationPage({
           appearance="solid"
           kind="danger"
           label={`Remove ${content.title}`}
-          onClick={onDelete}
+          onClick={async () => {
+            if (!publications || !publications[0]) {
+              console.error('no neon cdc connection to remove');
+              return;
+            }
+
+            const { success, error } = await onDelete(publications[0].id);
+            if (success) {
+              successRedirect();
+            }
+            if (error) {
+              toast.error(error);
+            }
+          }}
         />
       </div>
     </div>
