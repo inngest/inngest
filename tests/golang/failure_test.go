@@ -270,11 +270,8 @@ func TestNonSDKJSON(t *testing.T) {
 			timeout := time.Now().Add(5 * time.Second)
 			for {
 				resp, err := http.DefaultClient.Do(req)
-				if err != nil {
-					return err
-				}
-				if resp.StatusCode == http.StatusOK {
-					return nil
+				if err == nil && resp.StatusCode == http.StatusOK {
+					continue
 				}
 				if time.Now().After(timeout) {
 					return fmt.Errorf("timeout waiting for sync")
