@@ -56,6 +56,7 @@ type Run = {
     queuedAt: string;
     startedAt: string | null;
     status: string;
+    stepID?: string | null;
   };
 };
 
@@ -74,10 +75,12 @@ export function RunInfo({
 }: Props) {
   let allowCancel = false;
   let isSuccess = false;
+  let stepID = null;
 
   if (isLazyDone(run)) {
     allowCancel = !Boolean(run.trace.endedAt);
     isSuccess = run.trace.status === 'COMPLETED';
+    stepID = run.trace.stepID;
   }
 
   const aiOutput = stepAIEnabled && result?.data ? parseAIOutput(result.data) : undefined;
@@ -241,6 +244,7 @@ export function RunInfo({
             className="border-muted border-t"
             result={result}
             runID={runID}
+            stepID={stepID}
             rerunFromStep={rerunFromStep}
             isSuccess={isSuccess}
             stepAIEnabled={stepAIEnabled}

@@ -13,7 +13,7 @@ type Props = {
   result: Result;
   runID: string;
   rerunFromStep: React.ComponentProps<typeof RerunModal>['rerunFromStep'];
-  stepID?: string;
+  stepID?: string | null;
   isSuccess?: boolean;
   stepAIEnabled?: boolean;
 };
