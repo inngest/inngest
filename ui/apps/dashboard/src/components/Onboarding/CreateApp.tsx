@@ -45,8 +45,8 @@ export default function CreateApp() {
   return (
     <div className="text-subtle">
       <p className="mb-6 text-sm">
-        Inngest “App” is a group of functions served on a single endpoint or server. The first step
-        is to create your app and functions, serve it, and test it locally with the Inngest Dev
+        An Inngest "App" is a group of functions served on a single endpoint or server. The first
+        step is to create your app and functions, serve it, and test it locally with the Inngest Dev
         Server.
       </p>
       <p className="mb-6 text-sm">
@@ -75,7 +75,7 @@ export default function CreateApp() {
         <div className="flex items-center justify-between gap-2 p-4">
           <div>
             <div className="mb-1 flex items-center gap-1">
-              <p className=" text-basis text-base font-medium">Dev Server UI</p>
+              <p className=" text-basis text-base font-medium">Dev Server</p>
               {devServerIsRunning && (
                 <div className="text-success flex items-center gap-0.5 text-sm">
                   <RiCheckboxCircleFill className="h-4 w-4" />
