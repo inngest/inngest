@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/tests/client"
@@ -21,7 +22,8 @@ func TestEventCancellation(t *testing.T) {
 	ctx := context.Background()
 
 	c := client.New(t)
-	h, server, registerFuncs := NewSDKHandler(t, "appc")
+	appName := uuid.New().String()
+	h, server, registerFuncs := NewSDKHandler(t, appName)
 	defer server.Close()
 
 	var (
@@ -30,8 +32,8 @@ func TestEventCancellation(t *testing.T) {
 		runID        string
 	)
 
-	triggerEvtName := "test/fn-run"
-	cancelEvtName := "cancel-test-cancel"
+	triggerEvtName := uuid.New().String()
+	cancelEvtName := uuid.New().String()
 
 	a := inngestgo.CreateFunction(
 		inngestgo.FunctionOpts{

@@ -39,7 +39,7 @@ func TestPauseCancelFunction(t *testing.T) {
 		runID        string
 	)
 
-	triggerEvtName := "test/fn-run"
+	triggerEvtName := uuid.New().String()
 
 	a := inngestgo.CreateFunction(
 		inngestgo.FunctionOpts{
