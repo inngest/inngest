@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -96,16 +97,18 @@ func TestEventCancellation(t *testing.T) {
 	})
 
 	t.Run("should cancel run", func(t *testing.T) {
+		r := require.New(t)
 		_, err := inngestgo.Send(ctx, inngestgo.Event{
 			Name: cancelEvtName,
 			Data: map[string]any{"cancel": 1},
 		})
-		require.NoError(t, err)
+		r.NoError(err)
 
-		<-time.After(5 * time.Second)
-
-		require.Equal(t, int32(1), atomic.LoadInt32(&runCounter))
-		require.Equal(t, int32(1), atomic.LoadInt32(&runCancelled))
+		r.EventuallyWithT(func(t *assert.CollectT) {
+			a := assert.New(t)
+			a.Equal(int32(1), atomic.LoadInt32(&runCounter))
+			a.Equal(int32(1), atomic.LoadInt32(&runCancelled))
+		}, 10*time.Second, 1*time.Second)
 	})
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
