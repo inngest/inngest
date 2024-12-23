@@ -62,7 +62,7 @@ export function AppCardContent({ app, pill, actions }: CardContentProps) {
           detail={<div className="lowercase first-letter:capitalize">{app.syncMethod}</div>}
         />
         <Description term="SDK version" detail={app.sdkVersion?.trim() ? app.sdkVersion : '-'} />
-        <Description term="Language" detail={app.language?.trim() ? app.language : '-'} />
+        <Description term="Language" detail={app.sdkLanguage?.trim() ? app.sdkLanguage : '-'} />
       </div>
     </div>
   );

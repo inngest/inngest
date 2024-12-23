@@ -15,13 +15,24 @@ const getAppCardContent = ({ app }: { app: GetAppsQuery['apps'][number] }) => {
     ? 'No functions found'
     : null;
 
-  const footerHeader = !app.connected
-    ? app.error === 'unreachable'
-      ? `The Inngest Dev Server can't find your application.`
-      : `Error: ${app.error}`
-    : app.functionCount === 0
-    ? 'There are currently no functions registered at this URL.'
-    : `${app.functionCount} functions found`;
+  const footerHeader = !app.connected ? (
+    app.error === 'unreachable' ? (
+      `The Inngest Dev Server can't find your application.`
+    ) : (
+      `Error: ${app.error}`
+    )
+  ) : app.functionCount === 0 ? (
+    'There are currently no functions registered at this URL.'
+  ) : (
+    <div className="flex w-full items-center justify-between">
+      <span>
+        {app.functionCount} {app.functionCount === 1 ? 'function' : 'functions'} found
+      </span>
+      <NewLink size="small" href="/functions" arrowOnHover>
+        View functions
+      </NewLink>
+    </div>
+  );
 
   const footerContent = !app.connected ? (
     <>
@@ -47,12 +58,12 @@ const getAppCardContent = ({ app }: { app: GetAppsQuery['apps'][number] }) => {
       </NewLink>
     </>
   ) : (
-    <ul className="columns-2">
+    <ul className="divide-subtle divide-y">
       {[...app.functions]
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((func) => {
           return (
-            <li key={func.id} className="text-subtle py-1">
+            <li key={func.id} className="text-subtle py-2">
               {func.name}
             </li>
           );

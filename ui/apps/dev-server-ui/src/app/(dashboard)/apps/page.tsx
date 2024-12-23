@@ -32,7 +32,7 @@ export default function AppList() {
           <AppCard.Content
             app={{
               ...app,
-              name: !app.name ? 'Syncing...' : app.connected ? `Syncing to ${app.name}` : app.name,
+              name: !app.name ? 'Syncing...' : !app.connected ? `Syncing to ${app.name}` : app.name,
               syncMethod: 'SERVERLESS',
             }}
             pill={

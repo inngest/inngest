@@ -3,7 +3,7 @@ export type App = {
   name: string;
   sdkVersion: string;
   framework: string | null;
-  language?: string;
+  sdkLanguage?: string;
   syncMethod?: SyncMethod;
   lastSyncedAt?: Date;
   url: string | null;
