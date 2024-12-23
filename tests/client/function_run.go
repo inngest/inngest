@@ -444,7 +444,9 @@ func (c *Client) ExpectSpanErrorOutput(
 		a.Contains(output.Error.Message, msg)
 	}
 	if stack != "" {
-		a.NotNil(output.Error.Stack)
+		if !a.NotNil(output.Error.Stack) {
+			return
+		}
 		a.Contains(output.Error.Stack, stack)
 	}
 }
