@@ -19,14 +19,19 @@ export default function AppFAQ() {
               <AccordionList.Trigger>What does “syncing an app” mean?</AccordionList.Trigger>
               <AccordionList.Content>
                 <p>
-                  To integrate your code hosted on another platform with Inngest, you need to inform
-                  Inngest about the location of your app and functions.
+                  Your Inngest functions are defined and execute within your application. To enable
+                  Inngest to fetch your function configuration and invoke functions, it must be able
+                  to reach your app "Syncing" tells Inngest where your app is running.
                 </p>
                 <p>
-                  For example, imagine that your serve() handler is located at /api/inngest, and
-                  your domain is myapp.com. In this scenario, you will need to sync your app to
-                  inform Inngest that your apps and functions are hosted at
-                  https://myapp.com/api/inngest.
+                  Syncing an app works by providing Inngest with the URL of your application's
+                  <code>serve()</code> handler endpoint, typically at <code><your-hostname>/api/inngest</code>.
+                  When you sync an app, Inngest reads the configuration of your app and functions 
+                  and stores the URL to send future invocation requests.
+                </p>
+                <p>
+                  As your functions may change, it is necessary to sync your app whenever it changes. 
+                  The Inngest Dev Server does this by polling for changes every 5 seconds by default.
                 </p>
               </AccordionList.Content>
             </AccordionList.Item>
