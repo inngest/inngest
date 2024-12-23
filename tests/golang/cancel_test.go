@@ -68,7 +68,10 @@ func TestEventCancellation(t *testing.T) {
 		inngestgo.FunctionOpts{Name: "handle-cancel"},
 		inngestgo.EventTrigger(
 			"inngest/function.cancelled",
-			inngestgo.StrPtr("event.data.function_id == 'appc-test-cancel'"),
+			inngestgo.StrPtr(fmt.Sprintf(
+				"event.data.function_id == '%s-test-cancel'",
+				appName,
+			)),
 		),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			fmt.Println("CANCELLED")
