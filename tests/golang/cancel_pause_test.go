@@ -5,19 +5,21 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/consts"
-	"github.com/oklog/ulid/v2"
 	"net/http"
 	"net/url"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
+	"github.com/oklog/ulid/v2"
+
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -174,12 +176,14 @@ func TestPauseCancelFunction(t *testing.T) {
 	_, err := inngestgo.Send(ctx, evt)
 	require.NoError(t, err)
 
-	<-time.After(3 * time.Second)
-
 	t.Run("check run", func(t *testing.T) {
-		require.Equal(t, int32(1), atomic.LoadInt32(&runCounter))
-		require.Equal(t, int32(0), atomic.LoadInt32(&runCancelled))
-		require.Equal(t, getQueueSize(consts.DevServerAccountId, uuid.MustParse(fnId)), 1)
+		r := require.New(t)
+		r.EventuallyWithT(func(t *assert.CollectT) {
+			a := assert.New(t)
+			a.Equal(int32(1), atomic.LoadInt32(&runCounter))
+			a.Equal(int32(0), atomic.LoadInt32(&runCancelled))
+			a.Equal(1, getQueueSize(consts.DevServerAccountId, uuid.MustParse(fnId)))
+		}, 10*time.Second, 1*time.Second)
 	})
 
 	t.Run("should cancel run", func(t *testing.T) {
