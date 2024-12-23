@@ -7,7 +7,7 @@ import { Info } from '@inngest/components/Info/Info';
 import { NewLink } from '@inngest/components/Link';
 import { Pill } from '@inngest/components/Pill/Pill';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
-import { RiInformationLine } from '@remixicon/react';
+import { RiExternalLinkLine, RiInformationLine } from '@remixicon/react';
 
 import AddAppButton from '@/components/App/AddAppButton';
 import AppActions from '@/components/App/AppActions';
@@ -45,7 +45,7 @@ export default function AppList() {
                   )}
                   {app.autodiscovered && (
                     <Pill appearance="outlined" kind="default">
-                      Autodetected
+                      Auto-detected
                     </Pill>
                   )}
                 </>
@@ -70,11 +70,11 @@ export default function AppList() {
             text="This is a list of all apps. We auto-detect apps that you have defined in specific ports."
             action={
               <NewLink
-                arrowOnHover
+                iconAfter={<RiExternalLinkLine className="h-4 w-4" />}
                 size="small"
                 href="https://www.inngest.com/docs/local-development#connecting-apps-to-the-dev-server"
               >
-                Go to specific ports.
+                Go to specific ports
               </NewLink>
             }
           />
@@ -103,7 +103,7 @@ export default function AppList() {
             className="inline"
             href="https://www.inngest.com/docs/local-development#connecting-apps-to-the-dev-server"
           >
-            Learn more.
+            Learn more
           </NewLink>
         </p>
         <div className="bg-surfaceSubtle my-4 mb-4 flex items-center justify-between gap-1 rounded p-4">
