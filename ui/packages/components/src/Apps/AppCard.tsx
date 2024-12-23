@@ -1,4 +1,5 @@
 import type React from 'react';
+import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
 import { Time } from '@inngest/components/Time';
 
 import { type App } from '../types/app';
@@ -7,18 +8,24 @@ import { cn } from '../utils/classNames';
 type CardKind = 'default' | 'warning' | 'primary' | 'error' | 'info';
 
 const kindStyles = {
-  primary: 'bg-primary-moderate',
-  error: 'bg-tertiary-moderate',
-  warning: 'bg-accent-moderate',
-  default: 'bg-surfaceSubtle',
-  info: 'bg-secondary-moderate',
+  primary: {
+    background: 'bg-primary-moderate',
+    text: 'text-primary-moderate',
+  },
+  error: { background: 'bg-tertiary-moderate', text: 'text-tertiary-moderate' },
+  warning: { background: 'bg-accent-moderate', text: 'text-accent-moderate' },
+  default: { background: 'bg-surfaceSubtle', text: 'text-surfaceSubtle' },
+  info: { background: 'bg-secondary-moderate', text: 'text-secondary-moderate' },
 };
 
 export function AppCard({ kind, children }: React.PropsWithChildren<{ kind: CardKind }>) {
   return (
-    <div className="border-subtle bg-canvasBase relative max-w-3xl rounded border">
+    <div className="border-subtle bg-canvasBase relative rounded border">
       <div
-        className={cn('absolute bottom-0 left-0 top-0 w-1 rounded-l-[0.2rem]', kindStyles[kind])}
+        className={cn(
+          'absolute bottom-0 left-0 top-0 w-1 rounded-l-[0.2rem]',
+          kindStyles[kind].background
+        )}
       />
       {children}
     </div>
@@ -49,9 +56,13 @@ export function AppCardContent({ app, pill, actions }: CardContentProps) {
         {app.lastSyncedAt && (
           <Description term="Last synced at" detail={<Time value={app.lastSyncedAt} />} />
         )}
-        <Description term="Sync method" detail={app.syncMethod} />
-        <Description term="SDK version" detail={app.sdkVersion} />
-        <Description term="Language" detail={app.language} />
+        <Description
+          className=""
+          term="Sync method"
+          detail={<div className="lowercase first-letter:capitalize">{app.syncMethod}</div>}
+        />
+        <Description term="SDK version" detail={app.sdkVersion?.trim() ? app.sdkVersion : '-'} />
+        <Description term="Language" detail={app.language?.trim() ? app.language : '-'} />
       </div>
     </div>
   );
@@ -69,7 +80,31 @@ function Description({
   return (
     <div className={className}>
       <dt className="text-light pb-1 text-sm">{term}</dt>
-      <dd className="text-subtle text-sm">{detail ?? ''}</dd>
+      <dd className="text-subtle text-sm">{detail}</dd>
     </div>
   );
 }
+
+type CardFooterProps = {
+  kind: CardKind;
+  header: React.ReactNode;
+  content: React.ReactNode;
+};
+
+export function AppCardFooter({ kind, header, content }: CardFooterProps) {
+  return (
+    <AccordionList type="multiple" defaultValue={[]} className="rounded-t-none border-0 border-t">
+      <AccordionList.Item value="description">
+        <AccordionList.Trigger
+          className={cn(' text-sm data-[state=open]:border-0', kindStyles[kind].text)}
+        >
+          {header}
+        </AccordionList.Trigger>
+        <AccordionList.Content className="px-9">{content}</AccordionList.Content>
+      </AccordionList.Item>
+    </AccordionList>
+  );
+}
+
+AppCard.Content = AppCardContent;
+AppCard.Footer = AppCardFooter;

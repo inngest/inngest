@@ -4,7 +4,7 @@ export type App = {
   sdkVersion: string;
   framework: string | null;
   language?: string;
-  syncMethod: SyncMethod;
+  syncMethod?: SyncMethod;
   lastSyncedAt?: Date;
   url: string | null;
 };

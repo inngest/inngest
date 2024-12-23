@@ -1,14 +1,17 @@
 'use client';
 
 import { useMemo } from 'react';
+import { AppCard } from '@inngest/components/Apps/AppCard';
 import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
 import { NewLink } from '@inngest/components/Link';
+import { Pill } from '@inngest/components/Pill/Pill';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { RiInformationLine } from '@remixicon/react';
 
 import AddAppButton from '@/components/App/AddAppButton';
-import AppCard from '@/components/App/AppCard';
+import AppActions from '@/components/App/AppActions';
+import getAppCardContent from '@/components/App/AppCardContent';
 import AppFAQ from '@/components/App/AppFAQ';
 import { useInfoQuery } from '@/store/devApi';
 import { useGetAppsQuery } from '@/store/generated';
@@ -22,7 +25,37 @@ export default function AppList() {
 
   const memoizedAppCards = useMemo(() => {
     return apps.map((app) => {
-      return <AppCard key={app?.id} app={app} />;
+      const { appKind, status, footerHeader, footerContent } = getAppCardContent({ app });
+
+      return (
+        <AppCard key={app?.id} kind={appKind}>
+          <AppCard.Content
+            app={{
+              ...app,
+              name: !app.name ? 'Syncing...' : app.connected ? `Syncing to ${app.name}` : app.name,
+              syncMethod: 'SERVERLESS',
+            }}
+            pill={
+              status || app.autodiscovered ? (
+                <>
+                  {status && (
+                    <Pill appearance="outlined" kind={appKind}>
+                      {status}
+                    </Pill>
+                  )}
+                  {app.autodiscovered && (
+                    <Pill appearance="outlined" kind="default">
+                      Autodetected
+                    </Pill>
+                  )}
+                </>
+              ) : null
+            }
+            actions={!app.autodiscovered ? <AppActions id={app.id} name={app.name} /> : null}
+          />
+          <AppCard.Footer kind={appKind} header={footerHeader} content={footerContent} />
+        </AppCard>
+      );
     });
   }, [apps]);
 
@@ -100,9 +133,7 @@ export default function AppList() {
           </div>
         )}
 
-        <div className="grid min-h-max grid-cols-1 gap-6 py-6 md:grid-cols-2">
-          {memoizedAppCards}
-        </div>
+        <div className="my-6 flex w-full flex-col gap-10">{memoizedAppCards}</div>
         <AppFAQ />
       </div>
     </div>
