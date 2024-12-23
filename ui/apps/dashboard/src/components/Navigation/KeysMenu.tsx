@@ -39,7 +39,7 @@ export default function KeysMenu({
               className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="signingKeys"
             >
-              Signing Keys
+              Signing keys
             </Listbox.Option>
           </Link>
         </Listbox.Options>
