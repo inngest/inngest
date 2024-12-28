@@ -22,6 +22,7 @@ func NewStateInstance(
 	events []map[string]any,
 	actions []MemoizedStep,
 	stack []string,
+	kv map[string]any,
 ) State {
 	return &memstate{
 		identifier: id,
@@ -29,6 +30,7 @@ func NewStateInstance(
 		events:     events,
 		actions:    actions,
 		stack:      stack,
+		kv:         kv,
 	}
 }
 
@@ -45,6 +47,8 @@ type memstate struct {
 
 	// Actions stores a map of all output from each individual action
 	actions []MemoizedStep
+
+	kv map[string]any
 
 	// errors stores a map of action errors
 	errors map[string]error
@@ -76,6 +80,10 @@ func (s memstate) Event() map[string]any {
 
 func (s memstate) Events() []map[string]any {
 	return s.events
+}
+
+func (s memstate) KV() map[string]any {
+	return s.kv
 }
 
 func (s memstate) Actions() map[string]any {

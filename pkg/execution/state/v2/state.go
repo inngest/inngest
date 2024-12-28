@@ -16,6 +16,8 @@ type State struct {
 	Events []json.RawMessage
 	// Steps stores all step inputs/outputs.
 	Steps map[string]json.RawMessage
+	// KV represents key values for the given state.
+	KV map[string]any
 }
 
 // OpID is the hashed ID for a single step.  This is currently a SHA1

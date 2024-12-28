@@ -8,9 +8,11 @@ import (
 )
 
 type SDKRequest struct {
-	Event   map[string]any     `json:"event"`
-	Events  []map[string]any   `json:"events"`
-	Actions map[string]any     `json:"steps"`
+	Event   map[string]any   `json:"event"`
+	Events  []map[string]any `json:"events"`
+	Actions map[string]any   `json:"steps"`
+	// KV represents the run's key-value set.
+	KV      map[string]any     `json:"kv"`
 	Context *SDKRequestContext `json:"ctx"`
 	// Version indicates the version used to manage the SDK request context.
 	//

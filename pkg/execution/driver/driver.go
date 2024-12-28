@@ -63,6 +63,7 @@ func MarshalV1(
 		Event:   evts[0],
 		Events:  evts,
 		Actions: map[string]any{},
+		KV:      map[string]any{},
 		Context: &SDKRequestContext{
 			UseAPI:     true,
 			FunctionID: md.ID.FunctionID,
@@ -131,6 +132,16 @@ func MarshalV1(
 			// it's a memoized step input.
 			if bytes.HasPrefix(rawData, []byte(`{"input"`)) {
 				req.Actions[stepId] = rawData
+			}
+		}
+
+		// Load the KV if there's at least one key set.  We store this
+		// within metadata such that we can skip this request if there are no
+		// key values set for functions - many functions do not use KVs directly.
+		if md.Config.UsesKV {
+			req.KV, err = sl.LoadKV(ctx, md.ID)
+			if err != nil {
+				return nil, err
 			}
 		}
 

@@ -106,6 +106,10 @@ type Config struct {
 	// Idempotency represents an optional idempotency key.  This must be an
 	// xxhash64 hashed string.
 	Idempotency string
+	// UsesKV represents whether this function uses key-values.  Tracking this
+	// allows us to skip requesting key-values for each SDK operation if the KV
+	// storage isn't used for the function run.
+	UsesKV bool
 	// HasAI indicates if the function has AI steps
 	HasAI bool
 	// ReplayID stores the ID of the replay, if this identifier belongs to a replay.

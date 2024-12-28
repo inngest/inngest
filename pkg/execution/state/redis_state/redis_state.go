@@ -287,6 +287,7 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 		EventSize:      len(events),
 		StateSize:      len(events) + len(stepsByt) + len(stepInputsByt),
 		StepCount:      len(input.Steps),
+		UsesKV:         len(input.KV) > 0,
 	}
 	if input.RunType != nil {
 		metadata.RunType = *input.RunType
@@ -297,11 +298,17 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 		return nil, fmt.Errorf("error storing run state in redis: %w", err)
 	}
 
+	// Ensure that the input KV is always fully formed.
+	if input.KV == nil {
+		input.KV = map[string]any{}
+	}
+
 	args, err := StrSlice([]any{
 		events,
 		metadataByt,
 		stepsByt,
 		stepInputsByt,
+		input.KV,
 	})
 	if err != nil {
 		return nil, err
@@ -316,6 +323,7 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 			fnRunState.kg.Actions(ctx, isSharded, input.Identifier),
 			fnRunState.kg.Stack(ctx, isSharded, input.Identifier.RunID),
 			fnRunState.kg.ActionInputs(ctx, isSharded, input.Identifier),
+			fnRunState.kg.KV(ctx, isSharded, input.Identifier.RunID),
 		},
 		args,
 	).AsInt64()
@@ -333,6 +341,7 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 			input.EventBatchData,
 			input.Steps,
 			make([]string, 0),
+			input.KV,
 		),
 		nil
 }
@@ -571,7 +580,6 @@ func (m shardedMgr) Load(ctx context.Context, accountId uuid.UUID, runID ulid.UL
 
 	fnRunState := m.s.FunctionRunState()
 
-	// XXX: Use a pipeliner to improve speed.
 	metadata, err := m.metadata(ctx, accountId, runID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load metadata; %w", err)
@@ -657,12 +665,30 @@ func (m shardedMgr) Load(ctx context.Context, accountId uuid.UUID, runID ulid.UL
 
 	meta := metadata.Metadata()
 
+	// Load KV, if the state uses KF
+	kv := map[string]any{}
+	if meta.UsesKV {
+		kvmap, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+			return client.B().Hgetall().Key(fnRunState.kg.KV(ctx, isSharded, runID)).Build()
+		}).AsStrMap()
+		if err != nil {
+			return nil, fmt.Errorf("failed loading run kv: %w", err)
+		}
+		for k, v := range kvmap {
+			var unknown any
+			if err = json.Unmarshal([]byte(v), &unknown); err != nil {
+				return nil, fmt.Errorf("failed unmarshalling run kv '%s': %w", k, err)
+			}
+			kv[k] = unknown
+		}
+	}
+
 	stack, err := m.stack(ctx, id.AccountID, id.RunID)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching stack: %w", err)
 	}
 
-	return state.NewStateInstance(id, meta, events, actions, stack), nil
+	return state.NewStateInstance(id, meta, events, actions, stack, kv), nil
 }
 
 func (m shardedMgr) stack(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) ([]string, error) {
@@ -733,6 +759,10 @@ func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID
 		return state.ErrDuplicateResponse
 	}
 	return nil
+}
+
+func (m shardedMgr) SaveKV(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, key string, value any) error {
+	return fmt.Errorf("not implemented")
 }
 
 func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) error {
@@ -1627,6 +1657,12 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 		}
 	}
 
+	if val, ok := data["usesKV"]; ok {
+		if val == "true" || val == "1" {
+			m.UsesKV = true
+		}
+	}
+
 	if val, ok := data["sid"]; ok {
 		m.SpanID = val
 	}
@@ -1757,6 +1793,7 @@ type runMetadata struct {
 	SpanID                    string         `json:"sid"`
 	StartedAt                 int64          `json:"sat,omitempty"`
 	HasAI                     bool           `json:"hasAI,omitempty"`
+	UsesKV                    bool           `json:"usesKV,omitempty"`
 }
 
 func (r runMetadata) Map() map[string]any {
@@ -1772,6 +1809,7 @@ func (r runMetadata) Map() map[string]any {
 		"sid":      r.SpanID,
 		"sat":      r.StartedAt,
 		"hasAI":    r.HasAI,
+		"usesKV":   r.UsesKV,
 	}
 }
 
@@ -1786,6 +1824,7 @@ func (r runMetadata) Metadata() state.Metadata {
 		DisableImmediateExecution: r.DisableImmediateExecution,
 		SpanID:                    r.SpanID,
 		HasAI:                     r.HasAI,
+		UsesKV:                    r.UsesKV,
 	}
 	// 0 != time.IsZero
 	// only convert to time if runMetadata's StartedAt is > 0

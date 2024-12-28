@@ -129,6 +129,11 @@ func checkNew(t *testing.T, m state.Manager) {
 
 	evt := input.Map()
 	batch := []map[string]any{input.Map()}
+	kv := map[string]any{
+		"key_str":   "ok",
+		"key_float": 1.6,
+		"key_bool":  true,
+	}
 
 	init := state.Input{
 		Identifier:     id,
@@ -137,6 +142,7 @@ func checkNew(t *testing.T, m state.Manager) {
 			"some": "data",
 			"true": true,
 		},
+		KV: kv,
 	}
 
 	s, err := m.New(ctx, init)
@@ -152,6 +158,10 @@ func checkNew(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 
 	require.EqualValues(t, input.Map(), loaded.Event(), "Loaded event does not match input")
+	require.EqualValues(t, kv, loaded.KV())
+
+	// This uses the KV store.
+	require.EqualValues(t, true, loaded.Metadata().UsesKV)
 }
 
 func checkExists(t *testing.T, m state.Manager) {
