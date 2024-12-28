@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -101,6 +102,7 @@ func CheckState(t *testing.T, gen Generator) {
 		"PauseByID":                        checkPauseByID,
 		"PausesByID":                       checkPausesByID,
 		"Idempotency":                      checkIdempotency,
+		"SaveKV":                           checkSaveKV,
 		"SetStatus":                        checkSetStatus,
 		"Cancel":                           checkCancel,
 		"Cancel/AlreadyCompleted":          checkCancel_completed,
@@ -1430,6 +1432,47 @@ func checkIdempotency(t *testing.T, m state.Manager) {
 	wg.Wait()
 	assert.Equal(t, int32(1), atomic.LoadInt32(&okCount), "Must have saved the run ID once")
 	assert.Equal(t, int32(99), atomic.LoadInt32(&errCount), "Must have errored 99 times when the run ID exists")
+}
+
+func checkSaveKV(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	id := state.Identifier{
+		WorkflowID: w.ID,
+		RunID:      runID,
+		Key:        runID.String(),
+	}
+
+	kv := map[string]any{
+		"key_str":   "ok",
+		"key_float": 1.6,
+		"key_bool":  true,
+	}
+
+	init := state.Input{
+		Identifier:     id,
+		EventBatchData: []map[string]any{input.Map()},
+		KV:             kv,
+	}
+
+	s, err := m.New(ctx, init)
+	require.NoError(t, err)
+	require.EqualValues(t, enums.RunStatusScheduled, s.Metadata().Status, "Status is not Scheduled")
+
+	err = m.SaveKV(ctx, consts.DevServerAccountId, runID, "key_new", 1.25)
+	require.NoError(t, err)
+
+	err = m.SaveKV(ctx, consts.DevServerAccountId, runID, "key_str", "updated")
+	require.NoError(t, err)
+
+	loaded, err := m.Load(ctx, s.Identifier().AccountID, s.RunID())
+	require.NoError(t, err)
+	require.NotEqual(t, loaded.KV(), kv)
+
+	kv["key_str"] = "updated"
+	kv["key_new"] = 1.25
+	require.Equal(t, loaded.KV(), kv)
+
 }
 
 func checkSetStatus(t *testing.T, m state.Manager) {

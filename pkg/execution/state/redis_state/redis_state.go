@@ -762,7 +762,31 @@ func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID
 }
 
 func (m shardedMgr) SaveKV(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, key string, value any) error {
-	return fmt.Errorf("not implemented")
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SaveResponse"), redis_telemetry.ScopeFnRunState)
+	stateClient := m.s.FunctionRunState()
+	r, isSharded := stateClient.Client(ctx, accountID, runID)
+	keys := []string{
+		stateClient.kg.RunMetadata(ctx, isSharded, runID),
+		stateClient.kg.KV(ctx, isSharded, runID),
+	}
+
+	// Value is always JSON encoded so that we can grab the correct types from the value.
+	byt, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+
+	args, _ := StrSlice([]any{key, string(byt)})
+	_, err = retriableScripts["saveKV"].Exec(
+		redis_telemetry.WithScriptName(ctx, "saveKV"),
+		r,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error saving kv: %w", err)
+	}
+	return nil
 }
 
 func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) error {
