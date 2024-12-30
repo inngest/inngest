@@ -1,4 +1,3 @@
-import type { RerunResult } from '@inngest/components/Rerun/RerunModal';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
@@ -14,16 +13,10 @@ type RerunFromStep = {
   fromStep: { stepID: string; input: string };
 };
 
-export function useRerunFromStep({ runID, fromStep }: RerunFromStep) {
+export function useRerunFromStep() {
   const [, rerunMutation] = useMutation(rerun);
 
-  const rerunFromStep = async ({
-    runID,
-    fromStep,
-  }: {
-    runID: string;
-    fromStep: { stepID: string; input: string };
-  }): Promise<RerunResult> => {
+  const rerunFromStep = async ({ runID, fromStep }: RerunFromStep) => {
     const result = await rerunMutation({
       runID,
       fromStep: {
@@ -31,7 +24,8 @@ export function useRerunFromStep({ runID, fromStep }: RerunFromStep) {
         input: fromStep.input,
       },
     });
-    return { data: { rerun: { id: result.data?.rerun || '' } } };
+
+    return result;
   };
 
   return rerunFromStep;
