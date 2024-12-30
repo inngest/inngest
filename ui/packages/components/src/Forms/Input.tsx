@@ -46,7 +46,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             ${sizeStyles[inngestSize]}
             ${
               props.readOnly &&
-              'cursor-not-allowed border-transparent shadow-transparent outline-transparent	'
+              'bg-disabled text-disabled cursor-not-allowed border-transparent	shadow-transparent outline-transparent'
             }
             ${props.error && 'outline-error'}
             ${className}`)}

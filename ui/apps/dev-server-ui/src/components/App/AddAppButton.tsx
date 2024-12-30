@@ -1,18 +1,19 @@
 import { useState } from 'react';
-import { Button, NewButton } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import { RiAddLine } from '@remixicon/react';
 
 import AddAppModal from '@/components/App/AddAppModal';
 
-export default function AddAppButton() {
+export default function AddAppButton({ secondary }: { secondary?: boolean }) {
   const [isAddAppModalVisible, setAddAppModalVisible] = useState(false);
 
   return (
     <>
       <NewButton
-        kind="primary"
-        label="Sync new app"
-        icon={<RiAddLine />}
+        kind={secondary ? 'secondary' : 'primary'}
+        label={secondary ? 'I want to sync manually' : 'Sync new app'}
+        appearance={secondary ? 'outlined' : 'solid'}
+        icon={secondary ? null : <RiAddLine />}
         iconSide="left"
         onClick={() => setAddAppModalVisible(true)}
       />

@@ -2,7 +2,6 @@
 
 import { forwardRef } from 'react';
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
-import { RiCheckLine, RiSubtractLine } from '@remixicon/react';
 
 import { cn } from '../utils/classNames';
 
@@ -22,7 +21,7 @@ export const DropdownMenuContent = forwardRef<
         align="start"
         sideOffset={props.sideOffset ?? 14}
         className={cn(
-          'shadow-outline-primary-light bg-canvasBase min-w-[220px] rounded-md p-2',
+          'shadow-outline-primary-light bg-canvasBase min-w-[220px] rounded p-2',
           props.className
         )}
       >
@@ -43,7 +42,7 @@ export const DropdownMenuItem = forwardRef<
       {...props}
       ref={forwardedRef}
       className={cn(
-        'text-basis hover:bg-canvasMuted flex select-none items-center gap-2 rounded-md p-2 text-sm',
+        'text-muted hover:bg-canvasSubtle flex select-none items-center gap-2 rounded-md p-2 text-sm',
         props.className
       )}
     >
@@ -51,38 +50,3 @@ export const DropdownMenuItem = forwardRef<
     </DropdownMenuPrimitive.Item>
   );
 });
-
-export const DropdownMenuGroup = DropdownMenuPrimitive.Group;
-
-export const DropdownMenuCheckboxItem = forwardRef<
-  React.ElementRef<typeof DropdownMenuPrimitive.CheckboxItem>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.CheckboxItem>
->(({ children, ...props }, forwardedRef) => {
-  return (
-    <DropdownMenuPrimitive.CheckboxItem {...props} ref={forwardedRef}>
-      {children}
-      <DropdownMenuPrimitive.ItemIndicator>
-        {props.checked === 'indeterminate' && <RiSubtractLine />}
-        {props.checked === true && <RiCheckLine />}
-      </DropdownMenuPrimitive.ItemIndicator>
-    </DropdownMenuPrimitive.CheckboxItem>
-  );
-});
-
-export const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup;
-
-export const DropdownMenuRadioItem = forwardRef<
-  React.ElementRef<typeof DropdownMenuPrimitive.RadioItem>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.RadioItem>
->(({ children, ...props }, forwardedRef) => {
-  return (
-    <DropdownMenuPrimitive.RadioItem {...props} ref={forwardedRef}>
-      {children}
-      <DropdownMenuPrimitive.ItemIndicator>
-        <RiCheckLine />
-      </DropdownMenuPrimitive.ItemIndicator>
-    </DropdownMenuPrimitive.RadioItem>
-  );
-});
-
-export const DropdownMenuSeparator = DropdownMenuPrimitive.Separator;

@@ -1,11 +1,10 @@
 'use client';
 
-import type { ReactNode } from 'react';
 import { cn } from '@inngest/components/utils/classNames';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { AnimatePresence, motion } from 'framer-motion';
 
-import { Button } from '../Button';
+import { NewButton, type ButtonKind } from '../Button';
 
 type AlertModalProps = {
   children?: React.ReactNode;
@@ -18,8 +17,7 @@ type AlertModalProps = {
   onSubmit: () => void | Promise<void>;
   confirmButtonLabel?: string | React.ReactNode;
   cancelButtonLabel?: string | React.ReactNode;
-  confirmButtonKind?: 'default' | 'primary' | 'success' | 'danger';
-  cancelButtonKind?: 'default' | 'primary' | 'success' | 'danger';
+  confirmButtonKind?: ButtonKind;
 };
 
 export function AlertModal({
@@ -34,7 +32,6 @@ export function AlertModal({
   confirmButtonLabel = 'Yes',
   cancelButtonLabel = 'No',
   confirmButtonKind = 'danger',
-  cancelButtonKind = 'default',
 }: AlertModalProps) {
   let container = null;
   if (globalThis.document) {
@@ -47,7 +44,7 @@ export function AlertModal({
         <AlertDialog.Portal container={container}>
           <AlertDialog.Overlay asChild>
             <div
-              className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-[2px] transition-opacity dark:bg-[#04060C]/90"
+              className="fixed inset-0 z-[100] backdrop-blur backdrop-invert-[10%] transition-opacity"
               aria-hidden="true"
             />
           </AlertDialog.Overlay>
@@ -70,35 +67,35 @@ export function AlertModal({
               <AlertDialog.Content
                 className={cn(
                   className,
-                  'dark:bg-slate-910 transform overflow-hidden rounded-lg bg-white shadow-xl transition-all'
+                  'bg-canvasBase transform overflow-hidden rounded-lg shadow-xl transition-all'
                 )}
               >
                 {(title || description) && (
-                  <div className="dark:bg-slate-910 border-b border-slate-200 bg-slate-900 p-6 dark:border-slate-800">
-                    <AlertDialog.Title className="dark:bg-slate-910 bg-slate-900 text-xl font-semibold text-white">
+                  <div className="border-subtle bg-canvasBase border-b p-6">
+                    <AlertDialog.Title className="text-basis text-xl font-semibold">
                       {title}
                     </AlertDialog.Title>
-                    <AlertDialog.Description className="text-sm text-slate-500 dark:font-medium dark:text-slate-400">
+                    <AlertDialog.Description className="text-subtle text-sm">
                       {description}
                     </AlertDialog.Description>
                   </div>
                 )}
                 {children}
-                <div className="flex justify-end gap-2 p-6 dark:border-slate-800">
+                <div className="flex justify-end gap-2 p-6">
                   <AlertDialog.Cancel asChild>
-                    <Button
+                    <NewButton
                       appearance="outlined"
+                      kind="secondary"
                       disabled={isLoading}
-                      kind={cancelButtonKind}
                       label={cancelButtonLabel}
                     />
                   </AlertDialog.Cancel>
-                  <Button
+                  <NewButton
                     disabled={isLoading}
                     kind={confirmButtonKind}
                     label={confirmButtonLabel}
                     loading={isLoading}
-                    btnAction={async () => {
+                    onClick={async () => {
                       try {
                         await onSubmit();
                         onClose();
