@@ -82,10 +82,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 
   const cancelRun = useCancelRun({ envID: env.id });
   const rerun = useRerun({ envID: env.id, envSlug: env.slug });
-  const rerunFromStep = useRerunFromStep({
-    runID: 'runID',
-    fromStep: { stepID: 'stepID', input: 'input' },
-  });
+  const rerunFromStep = useRerunFromStep();
   const getTraceResult = useGetTraceResult();
   const getTrigger = useGetTrigger();
   const getRun = useGetRun();
