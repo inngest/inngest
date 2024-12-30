@@ -20,7 +20,7 @@ export type RerunModalType = {
 
 export type RerunResult = {
   data?: {
-    rerun: Record<string, unknown>;
+    rerun: unknown;
   };
   error?: unknown;
 };
