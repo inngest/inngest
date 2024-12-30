@@ -135,6 +135,7 @@ const documents = {
     "\n  query GetProductionWorkspace {\n    defaultEnv {\n      id\n      name\n      slug\n      parentID\n      test\n      type\n      createdAt\n      lastDeployedAt\n      isArchived\n      isAutoArchiveEnabled\n      webhookSigningKey\n    }\n  }\n": types.GetProductionWorkspaceDocument,
     "\n  mutation CancelRun($envID: UUID!, $runID: ULID!) {\n    cancelRun(envID: $envID, runID: $runID) {\n      id\n    }\n  }\n": types.CancelRunDocument,
     "\n  query GetEventKeysForBlankSlate($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      ingestKeys(filter: { source: \"key\" }) {\n        name\n        presharedKey\n        createdAt\n      }\n    }\n  }\n": types.GetEventKeysForBlankSlateDocument,
+    "\n  mutation Rerun($runID: ULID!, $fromStep: RerunFromStepInput) {\n    rerun(runID: $runID, fromStep: $fromStep)\n  }\n": types.RerunDocument,
 };
 
 /**
@@ -639,6 +640,10 @@ export function graphql(source: "\n  mutation CancelRun($envID: UUID!, $runID: U
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query GetEventKeysForBlankSlate($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      ingestKeys(filter: { source: \"key\" }) {\n        name\n        presharedKey\n        createdAt\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetEventKeysForBlankSlate($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      ingestKeys(filter: { source: \"key\" }) {\n        name\n        presharedKey\n        createdAt\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation Rerun($runID: ULID!, $fromStep: RerunFromStepInput) {\n    rerun(runID: $runID, fromStep: $fromStep)\n  }\n"): (typeof documents)["\n  mutation Rerun($runID: ULID!, $fromStep: RerunFromStepInput) {\n    rerun(runID: $runID, fromStep: $fromStep)\n  }\n"];
 
 export function graphql(source: string) {
   return (documents as any)[source] ?? {};
