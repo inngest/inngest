@@ -45,9 +45,9 @@ export default function CreateApp() {
   return (
     <div className="text-subtle">
       <p className="mb-6 text-sm">
-        An Inngest "App" is a group of functions served on a single endpoint or server. The first
-        step is to create your app and functions, serve it, and test it locally with the Inngest Dev
-        Server.
+        An Inngest &quot;App&quot; is a group of functions served on a single endpoint or server.
+        The first step is to create your app and functions, serve it, and test it locally with the
+        Inngest Dev Server.
       </p>
       <p className="mb-6 text-sm">
         The Dev Server will guide you through setup and help you build and test functions end to
