@@ -1472,6 +1472,7 @@ func checkSaveKV(t *testing.T, m state.Manager) {
 	kv["key_str"] = "updated"
 	kv["key_new"] = 1.25
 	require.Equal(t, loaded.KV(), kv)
+	require.Equal(t, loaded.Metadata().UsesKV, true)
 
 }
 

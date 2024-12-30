@@ -15,4 +15,5 @@ const (
 	OpcodeWaitForEvent
 	OpcodeInvokeFunction
 	OpcodeAIGateway // AI gateway inference call
+	OpcodeIterator  // Iterator, stepless.
 )

@@ -1910,6 +1910,8 @@ func (e *executor) handleGenerator(ctx context.Context, i *runInstance, gen stat
 		return e.handleGeneratorInvokeFunction(ctx, i, gen, edge)
 	case enums.OpcodeAIGateway:
 		return e.handleGeneratorAIGateway(ctx, i, gen, edge)
+	case enums.OpcodeIterator:
+		return e.handleGeneratorIterator(ctx, i, gen, edge)
 	}
 
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
@@ -2298,6 +2300,27 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 	}
 
 	return err
+}
+
+func (e *executor) handleGeneratorIterator(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	iter, err := gen.IteratorOpts()
+	if err != nil {
+		return fmt.Errorf("error inspecting iterator opts: %w", err)
+	}
+
+	value := strconv.Itoa(iter.Index)
+	if iter.Done {
+		// Update the KV to mark the iterator as done.
+		value = "done"
+	}
+
+	if err := e.smv2.SaveKV(ctx, i.md.ID, gen.ID, value); err != nil {
+		return fmt.Errorf("error saving kv state for iterator: %w", err)
+	}
+
+	// TODO: Enqueue another step for the iterator
+
+	return fmt.Errorf("not implemented")
 }
 
 func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
