@@ -21,10 +21,6 @@
   box-shadow: none !important;
 }
 
-.dark #modals {
-  @apply text-sm text-slate-400;
-}
-
 .monaco-editor .overflow-guard {
   @apply rounded-b-lg;
 }

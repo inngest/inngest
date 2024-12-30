@@ -2,10 +2,10 @@
 
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import { Code } from '@inngest/components/Code';
 import { CodeLine } from '@inngest/components/CodeLine';
-import { Link } from '@inngest/components/Link';
+import { NewLink } from '@inngest/components/Link';
 import * as Tabs from '@radix-ui/react-tabs';
 import { RiLoopLeftLine } from '@remixicon/react';
 
@@ -58,7 +58,7 @@ export default function Page({ params: { environmentSlug } }: Props) {
             <ManualSync appsURL={APPS_URL} />
           </Tabs.Content>
           <Tabs.Content value="tab2">
-            <div className="border-b border-slate-200 p-8">
+            <div className="border-subtle border-b p-8">
               <p>
                 To integrate your code hosted on another platform with Inngest, you need to inform
                 Inngest about the location of your app and functions.
@@ -71,18 +71,21 @@ export default function Page({ params: { environmentSlug } }: Props) {
               </p>
             </div>
             <div className="flex items-center justify-between px-8 py-6">
-              <Link href="https://www.inngest.com/docs/apps/cloud">View Docs</Link>
+              <NewLink href="https://www.inngest.com/docs/apps/cloud" size="small">
+                View Docs
+              </NewLink>
               <div className="flex items-center gap-3">
-                <Button
+                <NewButton
                   label="Cancel"
-                  btnAction={() => {
+                  onClick={() => {
                     router.push(APPS_URL);
                   }}
                   appearance="outlined"
+                  kind="secondary"
                 />
-                <Button
-                  label="Go To Vercel Configuration"
-                  btnAction={() => {
+                <NewButton
+                  label="Go to Vercel configuration"
+                  onClick={() => {
                     router.push('/settings/integrations/vercel' as Route);
                   }}
                   kind="primary"
@@ -91,7 +94,7 @@ export default function Page({ params: { environmentSlug } }: Props) {
             </div>
           </Tabs.Content>
           <Tabs.Content value="tab3">
-            <div className="border-b border-slate-200 p-8">
+            <div className="border-subtle border-b p-8">
               <p>
                 To integrate your code hosted on another platform with Inngest, you need to inform
                 Inngest about the location of your app and functions.
@@ -99,12 +102,12 @@ export default function Page({ params: { environmentSlug } }: Props) {
               <br />
               <p>
                 For example, imagine that your <Code>serve()</Code> handler (
-                <Link
-                  showIcon={false}
+                <NewLink
+                  size="small"
                   href="https://www.inngest.com/docs/reference/serve#how-the-serve-api-handler-works"
                 >
                   see docs
-                </Link>
+                </NewLink>
                 ) is located at /api/inngest, and your domain is myapp.com. In this scenario,
                 you&apos;ll need to inform Inngest that your apps and functions are hosted at
                 https://myapp.com/api/inngest.
@@ -121,11 +124,13 @@ export default function Page({ params: { environmentSlug } }: Props) {
               <CodeLine code="curl -X PUT https://<your-app>.com/api/inngest" className="mt-6" />
             </div>
             <div className="flex items-center justify-between px-8 py-6">
-              <Link href="https://www.inngest.com/docs/apps/cloud">View Docs</Link>
+              <NewLink href="https://www.inngest.com/docs/apps/cloud" size="small">
+                View Docs
+              </NewLink>
               <div className="flex items-center gap-3">
-                <Button
+                <NewButton
                   label="Done"
-                  btnAction={() => {
+                  onClick={() => {
                     router.push(APPS_URL);
                   }}
                   kind="primary"

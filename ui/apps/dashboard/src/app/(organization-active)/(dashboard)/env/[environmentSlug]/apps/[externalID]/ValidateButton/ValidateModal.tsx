@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal';
 
 import Input from '@/components/Forms/Input';
@@ -88,7 +88,7 @@ export function ValidateModal(props: Props) {
               }}
             />
           </div>
-          <Button btnAction={check} disabled={isLoading} kind="primary" label="Retry" />
+          <NewButton onClick={check} disabled={isLoading} kind="primary" label="Retry" />
         </div>
 
         <hr className="border-subtle my-4" />
@@ -113,7 +113,13 @@ export function ValidateModal(props: Props) {
       </Modal.Body>
 
       <Modal.Footer className="flex justify-end gap-2">
-        <Button appearance="outlined" btnAction={onClose} disabled={isLoading} label="Close" />
+        <NewButton
+          appearance="outlined"
+          kind="secondary"
+          onClick={onClose}
+          disabled={isLoading}
+          label="Close"
+        />
       </Modal.Footer>
     </Modal>
   );

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 
 import { EnvironmentType } from '@/gql/graphql';
 import { EnvironmentArchiveModal } from './EnvironmentArchiveModal';
@@ -27,9 +27,9 @@ export function EnvironmentArchiveButton({ env }: Props) {
 
   return (
     <>
-      <Button
+      <NewButton
         appearance="outlined"
-        btnAction={() => setIsModalOpen(true)}
+        onClick={() => setIsModalOpen(true)}
         kind="danger"
         label={label}
       />

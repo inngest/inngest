@@ -16,12 +16,18 @@ export function Pill({
   href,
   kind = 'default',
   appearance = 'solid',
+  flatSide,
 }: {
   children: React.ReactNode;
   className?: string;
   href?: Route | UrlObject;
   appearance?: PillAppearance;
   kind?: PillKind;
+  /**
+   * Use this when you want one of the sides to be flat. The other sides will be
+   * rounded.
+   */
+  flatSide?: 'left' | 'right';
 }) {
   const pillColors = getPillColors({ kind, appearance, clickable: !!href });
   const classNames = cn(
@@ -29,6 +35,12 @@ export function Pill({
     pillColors,
     className
   );
+  let roundedClasses = 'rounded-2xl';
+  if (flatSide === 'left') {
+    roundedClasses = 'rounded-r-2xl';
+  } else if (flatSide === 'right') {
+    roundedClasses = 'rounded-l-2xl';
+  }
 
   if (href) {
     return (
@@ -38,7 +50,7 @@ export function Pill({
     );
   }
 
-  return <span className={cn('rounded-2xl', classNames)}>{children}</span>;
+  return <span className={cn(roundedClasses, classNames)}>{children}</span>;
 }
 
 export type PillContentProps = {

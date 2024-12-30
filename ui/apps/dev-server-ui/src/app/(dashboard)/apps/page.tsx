@@ -106,7 +106,7 @@ export default function AppList() {
             Learn more
           </NewLink>
         </p>
-        <div className="bg-surfaceSubtle my-4 mb-4 flex items-center justify-between gap-1 rounded p-4">
+        <div className="bg-disabled my-4 mb-4 flex items-center justify-between gap-1 rounded p-4">
           <p className="text-subtle text-sm">
             {numberOfSyncedApps} / {apps.length} apps synced
           </p>

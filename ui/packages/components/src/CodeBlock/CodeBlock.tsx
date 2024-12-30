@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
-import { Button, NewButton } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import { CopyButton } from '@inngest/components/CopyButton';
 import { maxRenderedOutputSizeBytes } from '@inngest/components/constants';
 import { useCopyToClipboard } from '@inngest/components/hooks/useCopyToClipboard';
@@ -308,11 +308,12 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
               <>
                 <Alert severity="warning">Output size is too large to render {`( > 1MB )`}</Alert>
                 <div className="flex h-24 items-center justify-center	">
-                  <Button
+                  <NewButton
                     label="Download Raw"
                     icon={<RiDownload2Line />}
-                    btnAction={() => downloadJson({ content: content })}
+                    onClick={() => downloadJson({ content: content })}
                     appearance="outlined"
+                    kind="secondary"
                   />
                 </div>
               </>

@@ -92,9 +92,11 @@ function Header({
 }: React.PropsWithChildren<{ description?: React.ReactNode }>) {
   return (
     <div className="bg-canvasBase border-subtle border-b p-6">
-      <Dialog.Title className="text-basis text-xlfont-semibold">{children}</Dialog.Title>
+      <Dialog.Title className="text-basis text-xl">{children}</Dialog.Title>
 
-      {description && <Dialog.Description className="">{description}</Dialog.Description>}
+      {description && (
+        <Dialog.Description className="text-subtle pt-1">{description}</Dialog.Description>
+      )}
     </div>
   );
 }

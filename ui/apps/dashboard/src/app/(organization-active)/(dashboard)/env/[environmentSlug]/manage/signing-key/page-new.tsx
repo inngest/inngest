@@ -45,7 +45,7 @@ export default function Page() {
         <div className="mb-8">
           <h1 className="mb-2 text-2xl">Signing keys</h1>
 
-          <p className="mb-8 text-sm text-slate-500">
+          <p className="text-muted mb-8 text-sm">
             Signing keys are secrets used for secure communication between Inngest and your apps.
             <Link
               internalNavigation={false}

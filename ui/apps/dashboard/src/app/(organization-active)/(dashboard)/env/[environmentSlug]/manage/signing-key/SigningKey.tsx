@@ -1,5 +1,5 @@
-import { Badge } from '@inngest/components/Badge';
 import { Card } from '@inngest/components/Card';
+import { Pill } from '@inngest/components/Pill';
 import { Time } from '@inngest/components/Time';
 import { RiStarFill } from '@remixicon/react';
 
@@ -39,10 +39,10 @@ export function SigningKey({ signingKey }: Props) {
   let pill = null;
   if (signingKey.createdAt > new Date(Date.now() - 24 * 60 * 60 * 1000)) {
     pill = (
-      <Badge className="border-0 bg-amber-100">
-        <RiStarFill className="text-amber-600" size={16} />
-        <span className="text-amber-600">New</span>
-      </Badge>
+      <Pill kind="warning">
+        <RiStarFill size={16} className="pr-1" />
+        <span>New</span>
+      </Pill>
     );
   }
 

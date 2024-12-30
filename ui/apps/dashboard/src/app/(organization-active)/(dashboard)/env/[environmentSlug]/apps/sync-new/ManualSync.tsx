@@ -3,15 +3,15 @@
 import { useMemo, useState } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import { Code } from '@inngest/components/Code';
-import { Link } from '@inngest/components/Link';
+import { Input } from '@inngest/components/Forms/Input';
+import { NewLink } from '@inngest/components/Link';
 import { useLocalStorage } from 'react-use';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
 import type { CodedError } from '@/codedError';
-import Input from '@/components/Forms/Input';
 import { Secret } from '@/components/Secret';
 import { SyncFailure } from '@/components/SyncFailure';
 import { graphql } from '@/gql';
@@ -109,7 +109,7 @@ export default function ManualSync({ appsURL }: Props) {
 
   return (
     <>
-      <div className="border-b border-slate-200 p-8">
+      <div className="border-subtle border-b p-8">
         <p>
           To integrate your code hosted on another platform with Inngest, you need to inform Inngest
           about the location of your app and functions.
@@ -117,12 +117,13 @@ export default function ManualSync({ appsURL }: Props) {
         <br />
         <p>
           For example, imagine that your <Code>serve()</Code> handler (
-          <Link
-            showIcon={false}
+          <NewLink
+            size="small"
+            className="inline-flex"
             href="https://www.inngest.com/docs/reference/serve#how-the-serve-api-handler-works"
           >
             see docs
-          </Link>
+          </NewLink>
           ) is located at /api/inngest, and your domain is myapp.com. In this scenario, you&apos;ll
           need to inform Inngest that your apps and functions are hosted at
           https://myapp.com/api/inngest.
@@ -139,8 +140,8 @@ export default function ManualSync({ appsURL }: Props) {
 
         <Secret className="my-6" kind="event-key" secret={env.webhookSigningKey} />
 
-        <div className="border-t border-slate-200">
-          <label htmlFor="url" className="my-2 block text-slate-500">
+        <div className="border-subtle border-t">
+          <label htmlFor="url" className="text-muted my-2 block">
             App URL
           </label>
           <Input
@@ -148,24 +149,28 @@ export default function ManualSync({ appsURL }: Props) {
             name="url"
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            className="w-full"
           />
 
           {failure && !isSyncing && <SyncFailure error={failure} />}
         </div>
       </div>
       <div className="flex items-center justify-between px-8 py-6">
-        <Link href="https://www.inngest.com/docs/apps/cloud">View Docs</Link>
+        <NewLink href="https://www.inngest.com/docs/apps/cloud" size="small">
+          View Docs
+        </NewLink>
         <div className="flex items-center gap-3">
-          <Button
+          <NewButton
             label="Cancel"
-            btnAction={() => {
+            kind="secondary"
+            onClick={() => {
               router.push(appsURL);
             }}
             appearance="outlined"
           />
-          <Button
-            label="Sync App"
-            btnAction={onSync}
+          <NewButton
+            label="Sync app"
+            onClick={onSync}
             kind="primary"
             disabled={disabled}
             loading={isSyncing}

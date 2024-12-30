@@ -160,6 +160,9 @@ export default {
       placeholderColor: {
         disabled: 'rgb(var(--color-foreground-disabled) / <alpha-value>)',
       },
+      gradientColorStops: {
+        canvasMuted: 'rgb(var(--color-background-canvas-muted) / <alpha-value>)',
+      },
       fill: {
         // temporary tooltip token
         tooltipArrow: 'rgb(var(--color-background-canvas-base) / <alpha-value>)',

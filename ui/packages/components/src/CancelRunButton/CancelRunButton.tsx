@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, NewButton } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import { IconStatusCancelled } from '@inngest/components/icons/status/Cancelled';
 
 import { CancelRunModal } from './CancelRunModal';

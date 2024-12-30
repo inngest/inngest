@@ -64,7 +64,7 @@ const buildTabs = ({
     {
       tabLabel: 'JSON Editor',
       tabTitle: 'Send Custom JSON',
-      submitButtonLabel: 'Send Event',
+      submitButtonLabel: 'Send event',
       submitButtonEnabled: Boolean(eventKey),
       submitAction: sendEventAction,
       codeLanguage: 'json',

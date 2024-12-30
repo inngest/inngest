@@ -23,7 +23,7 @@ export default function SendEventButton({ eventName }: SendEventButtonProps) {
           disabled={isArchived}
           onClick={() => setIsModalVisible(true)}
           kind="primary"
-          label="Send Event"
+          label="Send event"
         />
       </OptionalTooltip>
 

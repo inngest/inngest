@@ -1,5 +1,6 @@
-import { Button } from '@inngest/components/Button';
-import { Link } from '@inngest/components/Link/Link';
+import { NewButton } from '@inngest/components/Button';
+import { NewLink } from '@inngest/components/Link/Link';
+import { RiExternalLinkLine } from '@remixicon/react';
 
 interface BlankSlateProps {
   imageUrl?: string;
@@ -14,7 +15,7 @@ interface BlankSlateProps {
 
 export function BlankSlate({ imageUrl, title, subtitle, button, link }: BlankSlateProps) {
   return (
-    <div className="flex h-full w-full items-center justify-center text-white">
+    <div className="text-basis flex h-full w-full items-center justify-center">
       <div className="flex max-w-[24rem] flex-col items-center justify-center space-y-3 text-center">
         {imageUrl ? (
           <div className="mb-4 w-48">
@@ -22,15 +23,19 @@ export function BlankSlate({ imageUrl, title, subtitle, button, link }: BlankSla
           </div>
         ) : null}
 
-        {title ? <div className="text-lg font-semibold">{title}</div> : null}
+        {title ? <div className="text-lg">{title}</div> : null}
         {subtitle ? <div>{subtitle}</div> : null}
 
         {link ? (
-          <Link href={link.url}>
+          <NewLink
+            href={link.url}
+            size="small"
+            iconAfter={<RiExternalLinkLine className="h-4 w-4" />}
+          >
             <div>{link.text}</div>
-          </Link>
+          </NewLink>
         ) : button ? (
-          <Button btnAction={button.onClick} label={button.text} />
+          <NewButton onClick={button.onClick} label={button.text} />
         ) : null}
       </div>
     </div>

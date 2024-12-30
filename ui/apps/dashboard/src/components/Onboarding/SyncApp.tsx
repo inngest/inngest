@@ -175,7 +175,7 @@ export default function SyncApp() {
             </Alert.Link>
           </Alert>
           <Input
-            className={`${error && 'outline-error'} my-3 `}
+            className={`${error && 'outline-error'} my-3 w-full`}
             placeholder="https://myapp.com/api/inngest"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}

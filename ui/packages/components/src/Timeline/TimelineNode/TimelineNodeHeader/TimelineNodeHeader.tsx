@@ -1,4 +1,4 @@
-import { Badge } from '@inngest/components/Badge';
+import { Pill } from '@inngest/components/Pill';
 
 type Props = {
   icon: React.ReactNode;
@@ -16,11 +16,7 @@ export function TimelineNodeHeader({ icon, badge, title, metadata }: Props) {
       <div className="text-light mr-2 flex flex-1 items-start gap-2 leading-8">
         <div className="flex h-8 items-center gap-2">
           {icon}
-          {badge && (
-            <Badge kind="solid" className="bg-canvasBase text-subtle">
-              {badge}
-            </Badge>
-          )}
+          {badge && <Pill>{badge}</Pill>}
         </div>
         <p className="align-top leading-8">{title}</p>
       </div>

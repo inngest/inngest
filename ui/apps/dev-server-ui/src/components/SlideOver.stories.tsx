@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import type { Meta, StoryObj } from '@storybook/react';
 
 import SlideOver from './SlideOver';
@@ -22,7 +22,7 @@ const SlideOverWithHooks = (props) => {
   const [isOpen, setIsOpen] = useState(false);
   return (
     <>
-      <Button label="Open SlideOver" btnAction={() => setIsOpen(true)} />
+      <NewButton label="Open SlideOver" onClick={() => setIsOpen(true)} />
       {isOpen && (
         <SlideOver onClose={() => setIsOpen(false)}>
           <p className="p-6 text-white">This is the body of the SlideOver</p>

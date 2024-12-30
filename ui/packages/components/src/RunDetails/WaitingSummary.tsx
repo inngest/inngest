@@ -32,9 +32,9 @@ export function WaitingSummary({ history }: Props) {
             className={i < waits.length - 1 ? 'mb-4' : undefined}
             key={wait.groupID}
           >
-            <Card.Header className="bg-white dark:bg-slate-800/40">Waiting for event</Card.Header>
+            <Card.Header>Waiting for event</Card.Header>
 
-            <Card.Content className="bg-white dark:bg-slate-800/40">
+            <Card.Content>
               <MetadataItem
                 label="Event Name"
                 value={

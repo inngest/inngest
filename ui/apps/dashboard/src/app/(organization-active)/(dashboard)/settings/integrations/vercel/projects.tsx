@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Badge } from '@inngest/components/Badge/Badge';
 import { NewButton } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
 import { Link } from '@inngest/components/Link/Link';
+import { Pill } from '@inngest/components/Pill';
 import { Select } from '@inngest/components/Select/Select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiInformationLine, RiRefreshLine } from '@remixicon/react';
@@ -89,16 +89,9 @@ export default function VercelProjects({ integration }: { integration: VercelInt
               <div className="flex flex-row items-center justify-between">
                 <div className="flex flex-col">
                   <div>
-                    <Badge
-                      kind="solid"
-                      className={`h-6 ${
-                        p.isEnabled
-                          ? 'bg-primary-intense text-onContrast'
-                          : 'bg-disabled text-muted'
-                      }`}
-                    >
+                    <Pill kind={p.isEnabled ? 'primary' : 'default'} className="h-6">
                       {p.isEnabled ? 'enabled' : 'disabled'}
-                    </Badge>
+                    </Pill>
                   </div>
                   <div className="mt-4 flex flex-row items-center justify-start">
                     <div className="text-basis text-xl font-medium">{p.name}</div>
