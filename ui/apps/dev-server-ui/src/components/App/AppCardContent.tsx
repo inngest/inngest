@@ -1,4 +1,3 @@
-import { CodeLine } from '@inngest/components/CodeLine';
 import { NewLink } from '@inngest/components/Link/Link';
 import { type AppKind } from '@inngest/components/types/app';
 import { RiExternalLinkLine } from '@remixicon/react';
@@ -47,14 +46,13 @@ const getAppCardContent = ({ app }: { app: GetAppsQuery['apps'][number] }) => {
       <p className="text-subtle pb-4">
         Ensure you have created a function and are exporting it correctly from your serve() command.
       </p>
-      <CodeLine code="serve(client, [list_of_fns]);" className="mb-4" />
       <NewLink
         size="small"
         target="_blank"
-        href="https://www.inngest.com/docs/functions?ref=dev-app"
+        href="https://www.inngest.com/docs/learn/serving-inngest-functions?ref=dev-app"
         iconAfter={<RiExternalLinkLine className="h-4 w-4" />}
       >
-        How to write a function
+        How to serve functions
       </NewLink>
     </>
   ) : (
