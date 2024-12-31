@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { Input } from '@inngest/components/Forms/Input';
 import { RiArrowRightLine } from '@remixicon/react';
 import slugify from '@sindresorhus/slugify';
 import { capitalCase } from 'change-case';
 import { useMutation } from 'urql';
 
-import Input from '@/components/Forms/Input';
 import { graphql } from '@/gql';
 import WebhookIcon from '@/icons/webhookIcon.svg';
 import { useDefaultEnvironment } from '@/queries';

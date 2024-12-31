@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
+import { Input } from '@inngest/components/Forms/Input';
 import { Link } from '@inngest/components/Link';
 import { Modal } from '@inngest/components/Modal';
 import { Switch, SwitchLabel, SwitchWrapper } from '@inngest/components/Switch';
@@ -11,7 +12,6 @@ import { useMutation } from 'urql';
 
 import type { CodedError } from '@/codedError';
 import { useEnvironment } from '@/components/Environments/environment-context';
-import Input from '@/components/Forms/Input';
 import { SyncFailure } from '@/components/SyncFailure/SyncFailure';
 import { graphql } from '@/gql';
 
@@ -131,7 +131,7 @@ export default function ResyncModal({ appExternalID, isOpen, onClose, url, platf
             onChange={(e) => {
               setOverrideValue(e.target.value);
             }}
-            readonly={!isURLOverridden}
+            readOnly={!isURLOverridden}
             className={cn(!isURLOverridden && 'bg-slate-200')}
           />
         </div>

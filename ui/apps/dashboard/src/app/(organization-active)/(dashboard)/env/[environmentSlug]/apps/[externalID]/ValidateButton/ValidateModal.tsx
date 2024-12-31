@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
+import { Input } from '@inngest/components/Forms/Input';
 import { Modal } from '@inngest/components/Modal';
 
-import Input from '@/components/Forms/Input';
 import { type AppCheckResult } from '@/gql/graphql';
 import { AccordionCard } from './AccordionCard';
 import { Checks } from './Checks';

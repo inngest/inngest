@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button/index';
 import { Card } from '@inngest/components/Card/Card';
 import { Checkbox } from '@inngest/components/Checkbox/Checkbox';
+import { Input } from '@inngest/components/Forms/Input';
 import {
   RiArrowLeftSLine,
   RiArrowRightSLine,
@@ -14,7 +15,6 @@ import {
 } from '@remixicon/react';
 import { useLocalStorage } from 'react-use';
 
-import Input from '@/components/Forms/Input';
 import { OnboardingSteps } from '@/components/Onboarding/types';
 import useOnboardingStep from '@/components/Onboarding/useOnboardingStep';
 import { ONBOARDING_VERCEL_NEXT_URL } from '@/components/Onboarding/utils';
@@ -107,7 +107,6 @@ export default function Connect({
                     required={true}
                     placeholder="Add custom path"
                     className="h-10 w-96"
-                    showError={false}
                     onChange={(e) => setPath(p.id, e.target.value)}
                   />
                   <Button
