@@ -1,5 +1,5 @@
 import type { Route } from 'next';
-import { NewLink } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/Link';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 
 import VercelConnect from './connect';
@@ -39,9 +39,9 @@ export default async function VercelCallbackPage({ searchParams }: VercelCallbac
       <div className="text-muted mb-7 text-base">
         Select the Vercel projects that have Inngest functions. You can optionally specify server
         route other than the default <span className="font-semibold">(`/api/inngest`)</span>.{' '}
-        <NewLink size="medium" href={'/create-organization/set-up' as Route}>
+        <Link size="medium" href={'/create-organization/set-up' as Route}>
           Learn more
-        </NewLink>
+        </Link>
       </div>
       <VercelConnect searchParams={searchParams} integrations={vercelIntegration} />
     </div>

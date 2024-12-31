@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import { Code } from '@inngest/components/Code';
 import { Input } from '@inngest/components/Forms/Input';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import { useLocalStorage } from 'react-use';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
@@ -117,13 +117,13 @@ export default function ManualSync({ appsURL }: Props) {
         <br />
         <p>
           For example, imagine that your <Code>serve()</Code> handler (
-          <NewLink
+          <Link
             size="small"
             className="inline-flex"
             href="https://www.inngest.com/docs/reference/serve#how-the-serve-api-handler-works"
           >
             see docs
-          </NewLink>
+          </Link>
           ) is located at /api/inngest, and your domain is myapp.com. In this scenario, you&apos;ll
           need to inform Inngest that your apps and functions are hosted at
           https://myapp.com/api/inngest.
@@ -156,9 +156,9 @@ export default function ManualSync({ appsURL }: Props) {
         </div>
       </div>
       <div className="flex items-center justify-between px-8 py-6">
-        <NewLink href="https://www.inngest.com/docs/apps/cloud" size="small">
+        <Link href="https://www.inngest.com/docs/apps/cloud" size="small">
           View Docs
-        </NewLink>
+        </Link>
         <div className="flex items-center gap-3">
           <Button
             label="Cancel"

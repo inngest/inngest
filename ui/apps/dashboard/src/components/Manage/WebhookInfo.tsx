@@ -1,4 +1,4 @@
-import { NewLink } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/Link';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiQuestionLine } from '@remixicon/react';
 
@@ -15,9 +15,9 @@ export const WebhookInfo = () => (
       <div className="border-subtle border-b px-4 py-2 ">Sources for events for developers.</div>
 
       <div className="px-4 py-2">
-        <NewLink href={'https://www.inngest.com/docs/platform/webhooks'} target="_blank">
+        <Link href={'https://www.inngest.com/docs/platform/webhooks'} target="_blank">
           Learn how create a webhook
-        </NewLink>
+        </Link>
       </div>
     </TooltipContent>
   </Tooltip>

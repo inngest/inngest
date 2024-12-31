@@ -1,7 +1,7 @@
 import { useRouter } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
 import { Button } from '@inngest/components/Button';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import TabCards from '@inngest/components/TabCards/TabCards';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { IconCloudflare } from '@inngest/components/icons/platforms/Cloudflare';
@@ -90,14 +90,14 @@ export default function DeployApp() {
           <p className="mb-6 text-sm">
             These variables are compatible with any platform or runtime, including Docker,
             Kubernetes, and others.{' '}
-            <NewLink
+            <Link
               size="small"
               href="https://www.inngest.com/docs/events/creating-an-event-key?ref=app-onboarding-deploy-app"
               className="inline-block"
               target="_blank"
             >
               Learn more about adding keys
-            </NewLink>
+            </Link>
           </p>
           <div className="text-basis text-sm font-medium">Event key</div>
           <p className="mb-2 text-sm">
@@ -164,14 +164,14 @@ export default function DeployApp() {
             <p className="mb-4 text-sm">
               The Vercel integration enables you to host your Inngest functions on the Vercel
               platform and automatically syncs them every time you deploy code.{' '}
-              <NewLink
+              <Link
                 size="small"
                 href="https://www.inngest.com/docs/deploy/vercel?ref=app-onboarding-deploy-app"
                 className="inline-block"
                 target="_blank"
               >
                 Read our Vercel documentation
-              </NewLink>
+              </Link>
             </p>
             <div className="border-subtle divide-subtle mb-4 divide-y border text-sm">
               <div className="flex items-center gap-2 px-3 py-2">
@@ -244,14 +244,14 @@ export default function DeployApp() {
           <p className="mb-4 text-sm">
             You can configure the environment variables on Cloudflare using Wrangler or through
             their dashboard.{' '}
-            <NewLink
+            <Link
               size="small"
               href="https://developers.cloudflare.com/workers/configuration/environment-variables/"
               className="inline-block"
               target="_blank"
             >
               Learn more about how to define the variables
-            </NewLink>
+            </Link>
           </p>
           <div className="text-basis mb-2 text-sm font-medium">Event key</div>
           <Secret kind="event-key" secret={defaultEventKey} className="mb-4" />
@@ -282,14 +282,14 @@ export default function DeployApp() {
           </div>
           <p className="mb-4 text-sm">
             You can configure the environment variables on Fly.io by adding the values below.{' '}
-            <NewLink
+            <Link
               size="small"
               href="https://fly.io/docs/rails/the-basics/configuration/"
               className="inline-block"
               target="_blank"
             >
               Learn more about how to set a secret in Fly.io
-            </NewLink>
+            </Link>
           </p>
           <div className="text-basis mb-2 text-sm font-medium">Event key</div>
           <Secret

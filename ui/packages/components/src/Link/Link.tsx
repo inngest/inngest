@@ -1,5 +1,5 @@
 import type { HTMLAttributeAnchorTarget } from 'react';
-import NextLink, { type LinkProps } from 'next/link';
+import NextLink, { type LinkProps as NextLinkProps } from 'next/link';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowRightLine } from '@remixicon/react';
 
@@ -15,9 +15,9 @@ type CustomLinkProps = {
   target?: HTMLAttributeAnchorTarget | undefined;
 };
 
-export type NewLinkProps = CustomLinkProps & LinkProps;
+export type LinkProps = CustomLinkProps & NextLinkProps;
 
-export function NewLink({
+export function Link({
   href,
   className,
   size = 'small',
@@ -26,7 +26,7 @@ export function NewLink({
   children,
   arrowOnHover,
   ...props
-}: React.PropsWithChildren<NewLinkProps>) {
+}: React.PropsWithChildren<LinkProps>) {
   return (
     <NextLink
       className={cn(

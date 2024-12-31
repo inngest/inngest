@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { type Route } from 'next';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { type Trigger } from '@inngest/components/types/trigger';
@@ -123,14 +123,14 @@ function createColumns(environmentSlug: string) {
                   : 'bg-primary-moderate'
               )}
             />
-            <NewLink
+            <Link
               key="name"
               href={`/env/${environmentSlug}/functions/${encodeURIComponent(slug)}` as Route}
               arrowOnHover
               className="w-full px-2 py-3 text-sm font-medium"
             >
               {name}
-            </NewLink>
+            </Link>
           </div>
         );
       },

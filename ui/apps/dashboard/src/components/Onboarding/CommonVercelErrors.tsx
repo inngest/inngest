@@ -1,5 +1,5 @@
 import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 
 export default function CommonVercelErrors() {
   return (
@@ -18,14 +18,14 @@ export default function CommonVercelErrors() {
             <p>
               Inngest may not be able to communicate with your application by default. The sync can
               fail if the deployment protection key isn&apos;t bypassed.{' '}
-              <NewLink
+              <Link
                 className="inline"
                 size="small"
                 target="_blank"
                 href="https://www.inngest.com/docs/deploy/vercel#bypassing-deployment-protection?ref=app-onboarding-sync-app"
               >
                 Learn how to bypass it
-              </NewLink>
+              </Link>
             </p>
           </AccordionList.Content>
         </AccordionList.Item>

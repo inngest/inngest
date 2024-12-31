@@ -3,7 +3,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
 import CommandBlock from '@inngest/components/CodeBlock/CommandBlock';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { useDevServer } from '@inngest/components/utils/useDevServer';
 import { RiCheckboxCircleFill, RiExternalLinkLine } from '@remixicon/react';
@@ -52,14 +52,14 @@ export default function CreateApp() {
       <p className="mb-6 text-sm">
         The Dev Server will guide you through setup and help you build and test functions end to
         end.{' '}
-        <NewLink
+        <Link
           className="inline-block"
           size="small"
           target="_blank"
           href="https://www.inngest.com/docs/local-development?ref=app-onboarding-create-app"
         >
           Learn more about local development
-        </NewLink>
+        </Link>
       </p>
       <p className="mb-2 text-sm">
         Run the following CLI command on your machine to get the Inngest Dev Server started locally:

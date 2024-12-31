@@ -3,7 +3,7 @@
 import { Alert } from '@inngest/components/Alert';
 import { Card } from '@inngest/components/Card';
 import { InlineCode } from '@inngest/components/InlineCode';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import LoadingIcon from '@/icons/LoadingIcon';
@@ -47,12 +47,12 @@ export default function Page() {
 
           <p className="text-muted mb-8 text-sm">
             Signing keys are secrets used for secure communication between Inngest and your apps.
-            <NewLink
+            <Link
               target="_blank"
               href="https://www.inngest.com/docs/security#signing-keys-and-sdk-security"
             >
               Learn More
-            </NewLink>
+            </Link>
           </p>
 
           <SigningKey signingKey={activeKey} />

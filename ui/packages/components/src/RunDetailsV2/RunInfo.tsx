@@ -12,7 +12,7 @@ import {
   TextElement,
   TimeElement,
 } from '../DetailsCard/Element';
-import { NewLink } from '../Link';
+import { Link } from '../Link';
 import { RerunButton } from '../RerunButtonV2';
 import { RunResult } from '../RunResult';
 import type { Run as InitialRunData } from '../RunsPage/types';
@@ -88,7 +88,7 @@ export function RunInfo({
         <Card.Header className="h-11 flex-row items-center gap-2">
           <div className="text-basis flex grow items-center gap-2">
             Run details{' '}
-            {!standalone && <NewLink size="medium" href={pathCreator.runPopout({ runID })} />}
+            {!standalone && <Link size="medium" href={pathCreator.runPopout({ runID })} />}
           </div>
 
           <CancelRunButton disabled={!allowCancel} onClick={cancelRun} />

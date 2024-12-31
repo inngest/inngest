@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ContentCard } from '@inngest/components/ContentCard';
 import { EventDetails } from '@inngest/components/EventDetails';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import { RunDetails } from '@inngest/components/RunDetails';
 import type { NavigateToRunFn } from '@inngest/components/Timeline/Timeline';
 import { cn } from '@inngest/components/utils/classNames';
@@ -109,9 +109,9 @@ export default function StreamDetails() {
     });
 
     return (
-      <NewLink size="small" arrowOnHover href={`/stream/trigger?${runParams.toString()}`}>
+      <Link size="small" arrowOnHover href={`/stream/trigger?${runParams.toString()}`}>
         Go to run
-      </NewLink>
+      </Link>
     );
   };
 

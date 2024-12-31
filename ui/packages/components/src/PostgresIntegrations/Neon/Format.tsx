@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/types';
 import { parseConnectionString } from '@inngest/components/PostgresIntegrations/utils';
 
@@ -71,12 +71,12 @@ export default function NeonFormat({
         reverted. Enabling logical replication also restarts all computes in your Neon project,
         meaning active connections will be dropped and have to reconnect.
       </p>
-      <NewLink
+      <Link
         size="small"
         href="https://neon.tech/docs/guides/logical-replication-concepts#write-ahead-log-wal"
       >
         Learn more about WAL level
-      </NewLink>
+      </Link>
 
       <div className="my-6">
         <p className="mb-3">To enable logical replication in Neon:</p>

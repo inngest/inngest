@@ -1,4 +1,4 @@
-import { NewLink } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/Link';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiQuestionLine } from '@remixicon/react';
 
@@ -17,9 +17,9 @@ export const EventKeyInfo = () => (
       </div>
 
       <div className="px-4 py-2">
-        <NewLink href={'https://www.inngest.com/docs/events/creating-an-event-key'} target="_blank">
+        <Link href={'https://www.inngest.com/docs/events/creating-an-event-key'} target="_blank">
           Learn more
-        </NewLink>
+        </Link>
       </div>
     </TooltipContent>
   </Tooltip>

@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { EventDetails } from '@inngest/components/EventDetails';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import { RunDetails } from '@inngest/components/RunDetails';
 import { useParsedHistory } from '@inngest/components/hooks/useParsedHistory';
 import { IconCloudArrowDown } from '@inngest/components/icons/CloudArrowDown';
@@ -70,7 +70,7 @@ export function StreamDetails({
 
   const navigateToRun: NavigateToRunFn = (opts) => {
     return (
-      <NewLink
+      <Link
         arrowOnHover
         href={
           `/env/${environment.slug}/functions/${encodeURIComponent(opts.fnID)}/logs/${
@@ -79,7 +79,7 @@ export function StreamDetails({
         }
       >
         Go to run
-      </NewLink>
+      </Link>
     );
   };
 

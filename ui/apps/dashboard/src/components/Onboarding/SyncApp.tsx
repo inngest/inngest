@@ -3,7 +3,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
 import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import TabCards from '@inngest/components/TabCards/TabCards';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
@@ -121,14 +121,14 @@ export default function SyncApp() {
       <p className="mb-6 text-sm">
         Since your code is hosted on another platform, you need to register where your functions are
         hosted with Inngest.{' '}
-        <NewLink
+        <Link
           className="inline-block"
           size="small"
           href="https://www.inngest.com/docs/apps/cloud?ref=app-onboarding-sync-app"
           target="_blank"
         >
           Learn more about syncs
-        </NewLink>
+        </Link>
       </p>
 
       <h4 className="mb-4 text-sm font-medium">Choose syncing method:</h4>

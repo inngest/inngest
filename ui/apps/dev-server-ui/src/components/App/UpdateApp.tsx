@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Input } from '@inngest/components/Forms/Input';
-import { NewLink } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/Link';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { cn } from '@inngest/components/utils/classNames';
@@ -62,14 +62,14 @@ export default function UpdateApp({ app }: { app: GetAppsQuery['apps'][number] }
         />
         {isLoading && <IconSpinner className="absolute right-2 top-1/3" />}
       </div>
-      <NewLink
+      <Link
         size="small"
         target="_blank"
         href="https://www.inngest.com/docs/sdk/serve?ref=dev-app"
         iconAfter={<RiExternalLinkLine className="h-4 w-4" />}
       >
         Syncing to the Dev Server
-      </NewLink>
+      </Link>
     </form>
   );
 }

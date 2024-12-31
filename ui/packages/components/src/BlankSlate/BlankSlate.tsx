@@ -1,5 +1,5 @@
 import { Button } from '@inngest/components/Button';
-import { NewLink } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/Link';
 import { RiExternalLinkLine } from '@remixicon/react';
 
 interface BlankSlateProps {
@@ -27,13 +27,9 @@ export function BlankSlate({ imageUrl, title, subtitle, button, link }: BlankSla
         {subtitle ? <div>{subtitle}</div> : null}
 
         {link ? (
-          <NewLink
-            href={link.url}
-            size="small"
-            iconAfter={<RiExternalLinkLine className="h-4 w-4" />}
-          >
+          <Link href={link.url} size="small" iconAfter={<RiExternalLinkLine className="h-4 w-4" />}>
             <div>{link.text}</div>
-          </NewLink>
+          </Link>
         ) : button ? (
           <Button onClick={button.onClick} label={button.text} />
         ) : null}

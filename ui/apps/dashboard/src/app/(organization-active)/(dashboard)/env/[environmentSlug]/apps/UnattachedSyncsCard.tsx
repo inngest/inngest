@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { NewLink as InngestLink } from '@inngest/components/Link';
+import { Link as InngestLink } from '@inngest/components/Link';
 import { Time } from '@inngest/components/Time';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowRightSLine } from '@remixicon/react';

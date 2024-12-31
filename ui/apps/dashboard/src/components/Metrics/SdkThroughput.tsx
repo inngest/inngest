@@ -1,6 +1,6 @@
 import { Chart } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
-import { NewLink } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/Link';
 
 import type { MetricsData, ScopedMetric, VolumeMetricsQuery } from '@/gql/graphql';
 import type { EntityLookup } from './Dashboard';
@@ -66,13 +66,13 @@ export const SdkThroughput = ({ workspace }: { workspace?: VolumeMetricsQuery['w
           <Info
             text="Total number of requests to Inngest SDKs from functions in your apps."
             action={
-              <NewLink
+              <Link
                 arrowOnHover
                 className="text-sm"
                 href="https://www.inngest.com/docs/sdk/overview"
               >
                 Learn more about SDK throughput.
-              </NewLink>
+              </Link>
             }
           />
         </div>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
-import { NewLink } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/Link';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiAddLine, RiQuestionLine } from '@remixicon/react';
 
@@ -31,9 +31,9 @@ const AppInfo = () => (
       </div>
 
       <div className="px-4 py-2">
-        <NewLink href="https://www.inngest.com/docs/apps" target="_blank">
+        <Link href="https://www.inngest.com/docs/apps" target="_blank">
           Learn how apps work
-        </NewLink>
+        </Link>
       </div>
     </TooltipContent>
   </Tooltip>

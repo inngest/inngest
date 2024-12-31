@@ -1,4 +1,4 @@
-import { NewLink } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/Link';
 import { type AppKind } from '@inngest/components/types/app';
 import { RiExternalLinkLine } from '@remixicon/react';
 
@@ -27,9 +27,9 @@ const getAppCardContent = ({ app }: { app: GetAppsQuery['apps'][number] }) => {
       <span>
         {app.functionCount} {app.functionCount === 1 ? 'function' : 'functions'} found
       </span>
-      <NewLink size="small" href="/functions" arrowOnHover>
+      <Link size="small" href="/functions" arrowOnHover>
         View functions
-      </NewLink>
+      </Link>
     </div>
   );
 
@@ -46,14 +46,14 @@ const getAppCardContent = ({ app }: { app: GetAppsQuery['apps'][number] }) => {
       <p className="text-subtle pb-4">
         Ensure you have created a function and are exporting it correctly from your serve() command.
       </p>
-      <NewLink
+      <Link
         size="small"
         target="_blank"
         href="https://www.inngest.com/docs/learn/serving-inngest-functions?ref=dev-app"
         iconAfter={<RiExternalLinkLine className="h-4 w-4" />}
       >
         How to serve functions
-      </NewLink>
+      </Link>
     </>
   ) : (
     <ul className="divide-subtle divide-y">

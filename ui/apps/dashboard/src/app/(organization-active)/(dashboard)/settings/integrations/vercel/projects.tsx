@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
-import { NewLink } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/Link';
 import { Pill } from '@inngest/components/Pill';
 import { Select } from '@inngest/components/Select/Select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
@@ -110,12 +110,12 @@ export default function VercelProjects({ integration }: { integration: VercelInt
                               default.
                             </div>
                             <div className="bg-disabled w-full px-4 py-2">
-                              <NewLink
+                              <Link
                                 target="_blank"
                                 href="https://www.inngest.com/docs/deploy/vercel#bypassing-deployment-protection"
                               >
                                 Learn more
-                              </NewLink>
+                              </Link>
                             </div>
                           </div>
                         </TooltipContent>

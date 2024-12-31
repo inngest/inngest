@@ -1,4 +1,4 @@
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
@@ -36,9 +36,9 @@ export function useRerun({ envID, envSlug }: { envID: string; envSlug: string })
 
       // Give user a link to the new run
       toast.success(
-        <NewLink href={pathCreator.runPopout({ envSlug, runID: newRunID })} target="_blank">
+        <Link href={pathCreator.runPopout({ envSlug, runID: newRunID })} target="_blank">
           Successfully queued rerun
-        </NewLink>
+        </Link>
       );
     } catch (e) {
       toast.error('Failed to queue rerun');

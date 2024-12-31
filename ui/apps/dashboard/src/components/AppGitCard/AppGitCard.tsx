@@ -1,5 +1,5 @@
 import type { Route } from 'next';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import { cn } from '@inngest/components/utils/classNames';
 
 import { CardItem } from '../AppInfoCard/CardItem';
@@ -25,9 +25,9 @@ export function AppGitCard({ className, sync }: Props) {
   if (commitHash) {
     if (repoURL) {
       commitHashValue = (
-        <NewLink href={`${repoURL}/commit/${commitHash}` as Route} target="_blank" size="medium">
+        <Link href={`${repoURL}/commit/${commitHash}` as Route} target="_blank" size="medium">
           <span className="truncate">{commitHash.substring(0, 7)}</span>
-        </NewLink>
+        </Link>
       );
     } else {
       commitHashValue = commitHash.substring(0, 7);
@@ -40,9 +40,9 @@ export function AppGitCard({ className, sync }: Props) {
   if (commitRef) {
     if (repoURL) {
       commitRefValue = (
-        <NewLink href={`${repoURL}/tree/${commitRef}` as Route} target="_blank" size="medium">
+        <Link href={`${repoURL}/tree/${commitRef}` as Route} target="_blank" size="medium">
           <span className="truncate">{commitRef}</span>
-        </NewLink>
+        </Link>
       );
     } else {
       commitRefValue = commitRef;
@@ -54,9 +54,9 @@ export function AppGitCard({ className, sync }: Props) {
   let repositoryValue;
   if (repoURL) {
     repositoryValue = (
-      <NewLink href={repoURL as Route} target="_blank" size="medium">
+      <Link href={repoURL as Route} target="_blank" size="medium">
         <span className="truncate">{repoURL}</span>
-      </NewLink>
+      </Link>
     );
   } else {
     repositoryValue = '-';

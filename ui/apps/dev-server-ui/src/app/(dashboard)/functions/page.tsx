@@ -6,7 +6,7 @@ import { BlankSlate } from '@inngest/components/BlankSlate';
 import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
 import { InvokeButton } from '@inngest/components/InvokeButton';
-import { NewLink } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/Link';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { Table } from '@inngest/components/Table';
@@ -166,13 +166,13 @@ export default function FunctionList() {
           <Info
             text="List of all function in the development environment."
             action={
-              <NewLink
+              <Link
                 arrowOnHover
                 className="text-sm"
                 href={'https://www.inngest.com/docs/functions'}
               >
                 Learn how to create a function
-              </NewLink>
+              </Link>
             }
           />
         }

@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { AppCard } from '@inngest/components/Apps/AppCard';
 import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import { Pill } from '@inngest/components/Pill/Pill';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { RiExternalLinkLine, RiInformationLine } from '@remixicon/react';
@@ -69,13 +69,13 @@ export default function AppList() {
           <Info
             text="This is a list of all apps. We auto-detect apps that you have defined in specific ports."
             action={
-              <NewLink
+              <Link
                 iconAfter={<RiExternalLinkLine className="h-4 w-4" />}
                 size="small"
                 href="https://www.inngest.com/docs/local-development#connecting-apps-to-the-dev-server"
               >
                 Go to specific ports
-              </NewLink>
+              </Link>
             }
           />
         }
@@ -97,14 +97,14 @@ export default function AppList() {
         <p className="text-muted text-sm">
           Synced Inngest apps appear below. Apps will sync automatically if auto-discovery is
           enabled, or you can sync them manually. {''}
-          <NewLink
+          <Link
             target="_blank"
             size="small"
             className="inline"
             href="https://www.inngest.com/docs/local-development#connecting-apps-to-the-dev-server"
           >
             Learn more
-          </NewLink>
+          </Link>
         </p>
         <div className="bg-disabled my-4 mb-4 flex items-center justify-between gap-1 rounded p-4">
           <p className="text-subtle text-sm">

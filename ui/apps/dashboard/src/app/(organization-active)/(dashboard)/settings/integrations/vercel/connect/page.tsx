@@ -1,6 +1,6 @@
 import { Alert } from '@inngest/components/Alert/Alert';
 import { Button } from '@inngest/components/Button';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 
 export default function VercelConnect() {
@@ -15,9 +15,9 @@ export default function VercelConnect() {
       <div className="text-muted mb-7 w-full text-base font-normal">
         This integration enables you to host your Inngest functions on the Vercel platform and
         automatically sync them every time you deploy code.{' '}
-        <NewLink target="_blank" size="medium" href="https://www.inngest.com/docs/deploy/vercel">
+        <Link target="_blank" size="medium" href="https://www.inngest.com/docs/deploy/vercel">
           Read documentation
-        </NewLink>
+        </Link>
       </div>
       <div className="mb-7">
         <Alert severity="info">

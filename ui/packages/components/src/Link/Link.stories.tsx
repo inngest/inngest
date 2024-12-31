@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react';
 
-import { NewLink } from './Link';
+import { Link } from './Link';
 
 const meta = {
   title: 'Components/Link',
-  component: NewLink,
+  component: Link,
   parameters: {
     layout: 'centered',
     docs: {
@@ -20,11 +20,11 @@ const meta = {
     },
   },
   tags: ['autodocs'],
-} satisfies Meta<typeof NewLink>;
+} satisfies Meta<typeof Link>;
 
 export default meta;
 
-type Story = StoryObj<typeof NewLink>;
+type Story = StoryObj<typeof Link>;
 
 export const ArrowOnHover: Story = {
   args: {

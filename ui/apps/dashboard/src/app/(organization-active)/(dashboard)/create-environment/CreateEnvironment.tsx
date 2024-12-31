@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
@@ -67,12 +67,12 @@ export default function CreateEnvironment({}) {
           <li>You can create as many environments as you need.</li>
         </ul>
         <p className="mt-4 max-w-[600px] text-sm">
-          <NewLink
+          <Link
             size="small"
             href="https://www.inngest.com/docs/platform/environments#custom-environments"
           >
             Read the docs to learn more
-          </NewLink>
+          </Link>
         </p>
       </div>
       <form onSubmit={handleSubmit} className="my-8 flex flex-row items-start gap-4">

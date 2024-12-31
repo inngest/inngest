@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { type Route } from 'next';
 import { Button } from '@inngest/components/Button';
 import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcons';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import { Table } from '@inngest/components/Table';
 import { Time } from '@inngest/components/Time';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
@@ -69,7 +69,7 @@ function createColumns({
       header: () => <span>ID</span>,
       cell: (props) => {
         return (
-          <NewLink
+          <Link
             className="leading-7"
             arrowOnHover
             //@ts-ignore
@@ -81,7 +81,7 @@ function createColumns({
             }
           >
             {props.getValue()}
-          </NewLink>
+          </Link>
         );
       },
     }),

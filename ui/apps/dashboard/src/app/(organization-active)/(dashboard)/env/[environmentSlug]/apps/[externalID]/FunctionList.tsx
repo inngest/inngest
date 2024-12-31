@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { type Route } from 'next';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { Table } from '@inngest/components/Table';
 import type { Function } from '@inngest/components/types/function';
@@ -51,7 +51,7 @@ function useColumns({ envSlug }: { envSlug: string }) {
 
         return (
           <div className="flex items-center">
-            <NewLink
+            <Link
               arrowOnHover
               size="medium"
               className="w-full text-sm font-medium"
@@ -60,7 +60,7 @@ function useColumns({ envSlug }: { envSlug: string }) {
               }
             >
               {name}
-            </NewLink>
+            </Link>
           </div>
         );
       },

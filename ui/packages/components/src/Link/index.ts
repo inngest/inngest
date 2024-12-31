@@ -1,2 +1,2 @@
-export { NewLink, type NewLinkProps, defaultLinkStyles } from './Link';
+export { Link, type LinkProps, defaultLinkStyles } from './Link';
 export { OptionalLink } from './OptionalLink';

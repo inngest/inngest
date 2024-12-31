@@ -2,7 +2,7 @@
 
 import React, { useMemo, useRef } from 'react';
 import { Alert } from '@inngest/components/Alert/Alert';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import { ReplayStatusIcon } from '@inngest/components/ReplayStatusIcon';
 import { Table } from '@inngest/components/Table';
 import { Time } from '@inngest/components/Time';
@@ -155,13 +155,9 @@ export function ReplayList({ functionSlug }: Props) {
       blankState={
         <p>
           You have no replays for this function.{' '}
-          <NewLink
-            target="_blank"
-            className="inline"
-            href="https://inngest.com/docs/platform/replay"
-          >
+          <Link target="_blank" className="inline" href="https://inngest.com/docs/platform/replay">
             Learn about Replay
-          </NewLink>
+          </Link>
         </p>
       }
     />

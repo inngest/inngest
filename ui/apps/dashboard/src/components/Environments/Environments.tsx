@@ -1,9 +1,9 @@
 'use client';
 
 import { type Route } from 'next';
-import Link from 'next/link';
+import NextLink from 'next/link';
 import { Button } from '@inngest/components/Button';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 
 import Toaster from '@/components/Toaster';
 import LoadingIcon from '@/icons/LoadingIcon';
@@ -41,7 +41,7 @@ export default function Environments() {
           This is where you&apos;ll deploy all of your production apps.
         </p>
 
-        <Link
+        <NextLink
           href={process.env.NEXT_PUBLIC_HOME_PATH as Route}
           className="bg-surfaceMuted hover:bg-surfaceMuted/80 mt-4 flex items-center justify-between rounded-lg px-4 py-4"
         >
@@ -49,7 +49,7 @@ export default function Environments() {
             <span className="bg-primary-moderate block h-2 w-2 rounded-full" />
             Production
           </h3>
-        </Link>
+        </NextLink>
 
         {Boolean(branchParent) && (
           <div className="border-subtle mt-12 border-t pt-8">
@@ -94,7 +94,7 @@ export default function Environments() {
                   />
                 </div>
               </div>
-              <Link
+              <NextLink
                 href={`/env/${env.slug}/functions` as Route}
                 className="hover:bg-canvasMuted border-subtle bg-canvasBase mt-8 flex cursor-pointer items-center justify-between rounded-lg border px-4 py-3"
               >
@@ -102,7 +102,7 @@ export default function Environments() {
                   <span className="bg-primary-moderate block h-2 w-2 rounded-full" />
                   {env.name}
                 </h3>
-              </Link>
+              </NextLink>
             </div>
           ))}
 
@@ -115,13 +115,13 @@ export default function Environments() {
           </div>
           <p className="text-muted mt-2 text-sm">
             Create a shared, non-production environment like staging, QA, or canary.{' '}
-            <NewLink
+            <Link
               size="small"
               className="inline-flex"
               href="https://www.inngest.com/docs/platform/environments#custom-environments"
             >
               Read the docs to learn more
-            </NewLink>
+            </Link>
           </p>
         </div>
       </div>

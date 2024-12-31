@@ -5,7 +5,7 @@ import { type Route } from 'next';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { Button } from '@inngest/components/Button';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import { Pill } from '@inngest/components/Pill/Pill';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowLeftLine, RiGithubFill } from '@remixicon/react';
@@ -128,14 +128,14 @@ export default function Page() {
               <p>
                 Enterprise plans include live chat support including dedicated Slack channel and
                 support SLAs. To chat with someone about our enterprise plans,{' '}
-                <NewLink
+                <Link
                   size="medium"
                   target="_blank"
                   href="https://inngest.com/contact"
                   className="inline"
                 >
                   fill out the form here
-                </NewLink>
+                </Link>
                 .
               </p>
             )}
@@ -144,23 +144,23 @@ export default function Page() {
           <SupportChannel title="Community">
             <p>
               Chat with other developers and the Inngest team in our{' '}
-              <NewLink
+              <Link
                 target="_blank"
                 href="https://www.inngest.com/discord"
                 className="inline-flex"
                 size="medium"
               >
                 Discord community
-              </NewLink>
+              </Link>
               . Search for topics and questions in our{' '}
-              <NewLink
+              <Link
                 href="https://discord.com/channels/842170679536517141/1051516534029291581"
                 className="inline-flex"
                 target="_blank"
                 size="medium"
               >
                 #help-forum
-              </NewLink>{' '}
+              </Link>{' '}
               channel or submit your own question.
             </p>
             <Button

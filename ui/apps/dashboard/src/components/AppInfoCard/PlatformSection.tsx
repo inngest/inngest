@@ -1,5 +1,5 @@
 import type { Route } from 'next';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 
 import { PlatformInfo } from '@/components/PlatformInfo';
 import { CardItem } from './CardItem';
@@ -24,9 +24,9 @@ export function PlatformSection({ sync }: Props) {
   let deploymentValue;
   if (vercelDeploymentID && vercelDeploymentURL) {
     deploymentValue = (
-      <NewLink href={vercelDeploymentURL as Route} target="_blank" size="medium">
+      <Link href={vercelDeploymentURL as Route} target="_blank" size="medium">
         <span className="truncate">{vercelDeploymentID}</span>
-      </NewLink>
+      </Link>
     );
   } else {
     deploymentValue = '-';
@@ -35,9 +35,9 @@ export function PlatformSection({ sync }: Props) {
   let projectValue;
   if (vercelProjectID && vercelProjectURL) {
     projectValue = (
-      <NewLink href={vercelProjectURL as Route} target="_blank" size="medium">
+      <Link href={vercelProjectURL as Route} target="_blank" size="medium">
         <span className="truncate">{vercelProjectID}</span>
-      </NewLink>
+      </Link>
     );
   } else {
     projectValue = '-';
