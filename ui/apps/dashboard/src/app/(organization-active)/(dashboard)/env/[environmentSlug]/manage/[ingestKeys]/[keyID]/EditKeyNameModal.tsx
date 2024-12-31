@@ -2,11 +2,11 @@
 
 import { useContext, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
+import { Input } from '@inngest/components/Forms/Input';
 import { Modal } from '@inngest/components/Modal';
 import { toast } from 'sonner';
 
-import Input from '@/components/Forms/Input';
 import useManagePageTerminology from '../useManagePageTerminology';
 import { Context } from './Context';
 
@@ -55,18 +55,19 @@ export default function EditKeyModal({ keyID, keyName, isOpen, onClose }: EditKe
       title={`Edit the ${currentContent?.name} Name`}
       footer={
         <div className="flex justify-end gap-2">
-          <Button
+          <NewButton
             appearance="outlined"
             label="Cancel"
-            btnAction={() => {
+            kind="secondary"
+            onClick={() => {
               onClose();
             }}
           />
-          <Button
+          <NewButton
             kind="primary"
             label="Save"
             loading={fetching}
-            btnAction={(e) => {
+            onClick={(e) => {
               handleSubmit(e);
               onClose();
             }}

@@ -67,7 +67,7 @@ export function AlertModal({
               <AlertDialog.Content
                 className={cn(
                   className,
-                  'bg-canvasBase transform overflow-hidden rounded-lg shadow-xl transition-all'
+                  'bg-canvasBase text-basis transform overflow-hidden rounded-lg shadow-xl transition-all'
                 )}
               >
                 {(title || description) && (

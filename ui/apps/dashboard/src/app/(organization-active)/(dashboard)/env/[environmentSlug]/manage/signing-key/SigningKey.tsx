@@ -20,13 +20,13 @@ type Props = {
 };
 
 export function SigningKey({ signingKey }: Props) {
-  let accentColor = 'bg-emerald-600';
+  let accentColor = 'bg-primary-moderate';
   let controls = null;
   let description = null;
   let title = 'Current key';
 
   if (!signingKey.isActive) {
-    accentColor = 'bg-amber-400';
+    accentColor = 'bg-accent-moderate';
     controls = (
       <div className="flex gap-2">
         <DeleteSigningKeyButton signingKeyID={signingKey.id} />
@@ -51,19 +51,19 @@ export function SigningKey({ signingKey }: Props) {
       <Card.Content className="px-4 py-0">
         <div className="py-4">
           <div className="flex">
-            <div className="flex grow items-center gap-2 font-medium text-slate-950">
+            <div className="flex grow items-center gap-2 font-medium">
               {title}
               {pill}
             </div>
             {controls && <div>{controls}</div>}
           </div>
-          <p className="text-sm text-slate-500">{description}</p>
+          <p className="text-subtle text-sm">{description}</p>
         </div>
 
         <Secret className="mb-4" kind="signing-key" secret={signingKey.decryptedValue} />
       </Card.Content>
 
-      <Card.Footer className="flex text-sm text-slate-500">
+      <Card.Footer className="text-subtle flex text-sm">
         <span className="grow">
           Created at <Time value={signingKey.createdAt} />
         </span>

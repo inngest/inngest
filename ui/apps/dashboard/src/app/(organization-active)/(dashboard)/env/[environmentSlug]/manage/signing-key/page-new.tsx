@@ -3,7 +3,7 @@
 import { Alert } from '@inngest/components/Alert';
 import { Card } from '@inngest/components/Card';
 import { InlineCode } from '@inngest/components/InlineCode';
-import { Link } from '@inngest/components/Link';
+import { NewLink } from '@inngest/components/Link';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import LoadingIcon from '@/icons/LoadingIcon';
@@ -41,18 +41,18 @@ export default function Page() {
 
   return (
     <div className="my-8 flex items-center justify-center">
-      <div className="w-full max-w-[800px] divide-y">
+      <div className="divide-subtle w-full max-w-[800px] divide-y">
         <div className="mb-8">
           <h1 className="mb-2 text-2xl">Signing keys</h1>
 
           <p className="text-muted mb-8 text-sm">
             Signing keys are secrets used for secure communication between Inngest and your apps.
-            <Link
-              internalNavigation={false}
+            <NewLink
+              target="_blank"
               href="https://www.inngest.com/docs/security#signing-keys-and-sdk-security"
             >
               Learn More
-            </Link>
+            </NewLink>
           </p>
 
           <SigningKey signingKey={activeKey} />
@@ -67,7 +67,7 @@ export default function Page() {
         <div>
           <h2 className="mb-2 mt-4 text-xl">Rotation</h2>
 
-          <div className="mb-8 text-sm text-slate-500">
+          <div className="text-subtle mb-8 text-sm">
             Create a new signing key and update environment variables in your app: set{' '}
             <InlineCode value="INNGEST_SIGNING_KEY" /> to the value of the{' '}
             <span className="font-bold">new key</span> and{' '}
@@ -82,7 +82,7 @@ export default function Page() {
                 <div className="grow">
                   <p className="mb-2 font-medium">Rotate key</p>
 
-                  <p className="text-sm text-slate-500">
+                  <p className="text-subtle text-sm">
                     This action replaces the <span className="font-bold">current key</span> with the{' '}
                     <span className="font-bold">new key</span>, permanently deleting the current
                     key.
@@ -92,15 +92,16 @@ export default function Page() {
                 <RotateSigningKeyButton disabled={inactiveKeys.length === 0} envID={env.id} />
               </div>
 
-              <Alert severity="warning">
-                <p className="mb-2">
+              <Alert severity="warning" className="text-sm">
+                <p>
                   Rotation may cause downtime if your SDK does not meet the minimum version.
-                  <Link
-                    internalNavigation={false}
+                  <Alert.Link
+                    severity="warning"
+                    target="_blank"
                     href="https://www.inngest.com/docs/security#rotation"
                   >
                     Learn More
-                  </Link>
+                  </Alert.Link>
                 </p>
               </Alert>
             </Card.Content>

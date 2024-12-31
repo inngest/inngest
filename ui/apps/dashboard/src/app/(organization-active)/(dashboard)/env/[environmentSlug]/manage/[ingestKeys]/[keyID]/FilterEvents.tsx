@@ -108,7 +108,7 @@ export default function FilterEvents({ keyID, filter }: FilterEventsProps) {
         </FilterEditor>
       </div>
       <div className="flex justify-end">
-        <NewButton disabled={isDisabled} type="submit" label="Save Filter Changes" />
+        <NewButton disabled={isDisabled} type="submit" label="Save filter changes" />
       </div>
     </form>
   );

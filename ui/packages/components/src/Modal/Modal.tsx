@@ -79,7 +79,7 @@ export function Modal({
 }
 
 function Body({ children }: React.PropsWithChildren<{}>) {
-  return <div className="m-6">{children}</div>;
+  return <div className="text-basis m-6">{children}</div>;
 }
 
 function Footer({ children, className }: React.PropsWithChildren<{ className?: string }>) {

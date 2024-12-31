@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import { RiAddLine } from '@remixicon/react';
 import { useMutation } from 'urql';
 
@@ -23,11 +23,12 @@ export function CreateSigningKeyButton({ disabled, envID }: Props) {
   const [, createSigningKey] = useMutation(Mutation);
 
   return (
-    <Button
-      btnAction={() => createSigningKey({ envID })}
+    <NewButton
+      onClick={() => createSigningKey({ envID })}
       disabled={disabled}
       kind="primary"
       icon={<RiAddLine />}
+      iconSide="left"
       label="Create new signing key"
     />
   );

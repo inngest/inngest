@@ -3,8 +3,8 @@
 import { useContext, useEffect, useState } from 'react';
 import type { Route } from 'next';
 import { usePathname, useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
-import { Link } from '@inngest/components/Link';
+import { NewButton } from '@inngest/components/Button';
+import { NewLink } from '@inngest/components/Link';
 import { toast } from 'sonner';
 
 import DashboardCodeBlock from '@/components/DashboardCodeBlock/DashboardCodeBlock';
@@ -152,25 +152,27 @@ export default function TransformEvents({ keyID, metadata }: FilterEventsProps) 
 
   return (
     <form className="pt-3" onSubmit={handleSubmit} id="save-transform">
-      <div className="flex">
+      <div className="flex justify-between">
         <div>
           <h2 className="pb-1 text-lg font-semibold">Transform Event</h2>
-          <p className="mb-6 text-sm text-slate-700">
+          <p className="text-subtle mb-6 text-sm">
             An optional JavaScript transform used to alter incoming events into our{' '}
-            <Link
+            <NewLink
               className="inline-flex"
               href="https://www.inngest.com/docs/events/event-format-and-structure"
+              target="_blank"
             >
               event format
-            </Link>
+            </NewLink>
             .
           </p>
         </div>
-        <Button
+        <NewButton
           href={'https://www.inngest.com/docs/events/event-format-and-structure' as Route}
           appearance="outlined"
+          kind="secondary"
           className="ml-auto"
-          label="Read Documentation"
+          label="Read documentation"
         />
       </div>
       <div className="mb-6">
@@ -189,7 +191,7 @@ export default function TransformEvents({ keyID, metadata }: FilterEventsProps) 
       <div className="mb-5 flex gap-5">
         <div className="w-6/12">
           <h2 className="pb-1 text-lg font-semibold">Incoming Event JSON</h2>
-          <p className="mb-6 text-sm text-slate-700">
+          <p className="text-subtle mb-6 text-sm">
             Paste the incoming JSON payload here to test your transform.
           </p>
           <DashboardCodeBlock
@@ -206,7 +208,7 @@ export default function TransformEvents({ keyID, metadata }: FilterEventsProps) 
         </div>
         <div className="w-6/12">
           <h2 className="pb-1 text-lg font-semibold">Transformed Event</h2>
-          <p className="mb-6 text-sm text-slate-700">Preview the transformed JSON payload here.</p>
+          <p className="text-subtle mb-6 text-sm">Preview the transformed JSON payload here.</p>
           <DashboardCodeBlock
             header={{
               title: 'Payload',
@@ -219,11 +221,11 @@ export default function TransformEvents({ keyID, metadata }: FilterEventsProps) 
         </div>
       </div>
       <div className="mb-8 flex justify-end">
-        <Button
+        <NewButton
           kind="primary"
           disabled={isDisabled}
           type="submit"
-          label="Save Transform Changes"
+          label="Save transform changes"
           form="save-transform"
         />
       </div>

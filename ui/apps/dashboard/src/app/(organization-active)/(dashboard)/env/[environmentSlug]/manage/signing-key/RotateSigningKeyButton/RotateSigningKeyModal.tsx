@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
-import { NewButton } from '@inngest/components/Button';
 import { InlineCode } from '@inngest/components/InlineCode';
-import { Modal } from '@inngest/components/Modal';
+import { AlertModal } from '@inngest/components/Modal';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
@@ -61,33 +60,31 @@ export function RotateSigningKeyModal(props: Props) {
   }
 
   return (
-    <Modal className="w-full max-w-3xl" isOpen={isOpen} onClose={onClose}>
-      <Modal.Header>Rotate key</Modal.Header>
-
-      <Modal.Body>
+    <AlertModal
+      className="w-full max-w-3xl"
+      isOpen={isOpen}
+      onClose={onClose}
+      onSubmit={onConfirm}
+      title="Rotate key"
+      isLoading={isFetching}
+      confirmButtonLabel="Rotate"
+    >
+      <div className="p-6">
         <p className="mb-4">
           Before rotating, ensure that all of your apps have the correct{' '}
           <InlineCode value="INNGEST_SIGNING_KEY" /> and{' '}
           <InlineCode value="INNGEST_SIGNING_KEY_FALLBACK" /> environment variables.
         </p>
 
-        <Alert severity="warning">
+        <Alert severity="warning" className="text-sm">
           This will permanently delete and replace the current key. It is irreversible.
         </Alert>
-      </Modal.Body>
-
-      <Modal.Footer>
         {error && (
-          <Alert className="mb-6" severity="error">
+          <Alert className="mb-6 text-sm" severity="error">
             {error}
           </Alert>
         )}
-
-        <div className="flex justify-end gap-2">
-          <NewButton label="Close" appearance="outlined" kind="secondary" onClick={onClose} />
-          <NewButton onClick={onConfirm} disabled={isFetching} kind="danger" label="Rotate" />
-        </div>
-      </Modal.Footer>
-    </Modal>
+      </div>
+    </AlertModal>
   );
 }
