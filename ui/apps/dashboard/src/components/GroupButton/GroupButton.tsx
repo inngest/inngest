@@ -23,16 +23,15 @@ export default function GroupButton<T extends Options>({
   selectedOption,
   className,
 }: GroupButtonProps<T>) {
-  const groupStyles = cn('flex items-center gap-1 rounded-lg bg-slate-50 p-1', className);
+  const groupStyles = cn('flex items-center gap-1 rounded-lg bg-canvasSubtle p-1', className);
 
   return (
     <div className={groupStyles} role="radiogroup" aria-label={title}>
       {options.map((option) => {
         const isSelected = option.id === selectedOption;
         const classNames = cn(
-          'text-slate-400 hover:bg-slate-100 hover:text-indigo-500 font-medium px-3 py-1 rounded text-sm cursor-pointer',
-          isSelected &&
-            'bg-white shadow-outline-secondary-light text-slate-700 cursor-default hover:bg-white hover:text-slate-700'
+          'text-subtle hover:bg-canvasMuted border border-transparent hover:text-success font-medium px-3 py-1 rounded text-sm cursor-pointer',
+          isSelected && 'bg-canvasBase border-muted text-basis cursor-default hover:bg-canvasBase'
         );
 
         return (

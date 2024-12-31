@@ -118,7 +118,7 @@ export function FrameworkInfo({ framework }: Props) {
 
   return (
     <span className="flex items-center">
-      {Icon && <Icon className="text-slate-subtle mr-1 shrink-0" size={20} />}
+      {Icon && <Icon className="text-subtle mr-1 shrink-0" size={20} />}
       <span className="truncate">{text}</span>
     </span>
   );

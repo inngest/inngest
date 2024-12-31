@@ -25,7 +25,7 @@ import { VercelDeploymentProtection, type VercelIntegration } from './VercelInte
 //     onSubmit={onConfirm}
 //     title="Confirm disable"
 //   >
-//     <p className="px-6 pb-0 pt-4 dark:text-white">
+//     <p className="px-6 pb-0 pt-4">
 //       Are you sure you want to disable Vercel Integration?
 //     </p>
 //   </AlertModal>
@@ -56,7 +56,7 @@ export default function VercelProjects({ integration }: { integration: VercelInt
             className="text-muted bg-canvasBase ml-4 h-6 rounded-sm text-xs leading-tight"
           >
             <Select.Button className="rounded-0 h-4">
-              <span className="text-slate- text-basis pr-2 text-xs leading-tight first-letter:capitalize">
+              <span className="text-basis pr-2 text-xs leading-tight first-letter:capitalize">
                 {filter}
               </span>
             </Select.Button>
@@ -138,9 +138,9 @@ export default function VercelProjects({ integration }: { integration: VercelInt
           </Card>
         ))}
 
-      {/* <div className="mt-10 flex flex-col gap-4 border-t border-slate-200 py-7">
-        <div className="text-lg font-medium text-gray-900">Disable Vercel integration</div>
-        <div className="text-base font-normal leading-snug text-slate-600">
+      {/* <div className="mt-10 flex flex-col gap-4 border-t border-subtle py-7">
+        <div className="text-lg font-medium">Disable Vercel integration</div>
+        <div className="text-base font-normal leading-snug text-subtle">
           This action disables API key and stops webhooks.
         </div>
         <div>
