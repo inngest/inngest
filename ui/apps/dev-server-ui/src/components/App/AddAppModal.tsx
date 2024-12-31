@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
 import { Modal } from '@inngest/components/Modal';
 import useDebounce from '@inngest/components/hooks/useDebounce';
@@ -89,8 +89,8 @@ export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
         </form>
       </Modal.Body>
       <Modal.Footer className="flex justify-end gap-2">
-        <NewButton label="Cancel" kind="secondary" appearance="outlined" onClick={onClose} />
-        <NewButton
+        <Button label="Cancel" kind="secondary" appearance="outlined" onClick={onClose} />
+        <Button
           disabled={isDisabled || isUrlInvalid}
           label="Sync App"
           type="submit"

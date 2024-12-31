@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal';
 import { FONT, LINE_HEIGHT, createColors, createRules } from '@inngest/components/utils/monaco';
 import { isDark } from '@inngest/components/utils/theme';
@@ -223,8 +223,8 @@ export default function SendEventModal({ data, isOpen, onClose }: SendEventModal
         </div>
       </Modal.Body>
       <Modal.Footer className="flex justify-end gap-2">
-        <NewButton kind="secondary" label="Cancel" appearance="outlined" onClick={onClose} />
-        <NewButton
+        <Button kind="secondary" label="Cancel" appearance="outlined" onClick={onClose} />
+        <Button
           kind="primary"
           disabled={sendEventState.isLoading}
           label="Send event"

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import NextLink from 'next/link';
 import { useParams } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
-import { NewButton } from '@inngest/components/Button/index';
+import { Button } from '@inngest/components/Button/index';
 import { Link } from '@inngest/components/Link/Link';
 import { Switch, SwitchLabel, SwitchWrapper } from '@inngest/components/Switch/Switch';
 import { RiAddLine, RiArrowRightSLine, RiDeleteBinLine, RiInformationLine } from '@remixicon/react';
@@ -230,7 +230,7 @@ export default function VercelConfigure() {
                     </div>
 
                     {paths.length > 1 && (
-                      <NewButton
+                      <Button
                         kind="danger"
                         appearance="outlined"
                         icon={<RiDeleteBinLine className="h-5 w-5" />}
@@ -242,7 +242,7 @@ export default function VercelConfigure() {
                   </div>
                 ))}
                 <div>
-                  <NewButton
+                  <Button
                     appearance="outlined"
                     icon={<RiAddLine className="mr-1" />}
                     iconSide="left"
@@ -305,7 +305,7 @@ export default function VercelConfigure() {
           )}
 
           <div className="mt-6 flex flex-row items-center justify-start">
-            <NewButton
+            <Button
               label="Save configuration"
               disabled={!project.updated}
               onClick={submit}

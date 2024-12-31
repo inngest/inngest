@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BlankSlate } from '@inngest/components/BlankSlate';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
 import { Pill, PillContent } from '@inngest/components/Pill';
 import { Table } from '@inngest/components/Table';
@@ -229,13 +229,13 @@ export default function Stream() {
         breadcrumb={[{ text: 'Stream' }]}
         action={
           <div className="flex justify-end gap-1 py-2">
-            <NewButton
+            <Button
               kind="secondary"
               appearance="outlined"
               label={`${showInternalEvents ? 'Hide' : 'Show'} internal events`}
               onClick={() => setShowInternalEvents((prev) => !prev)}
             />
-            <NewButton
+            <Button
               kind="secondary"
               appearance="outlined"
               label={freezeStream ? 'Enable auto-refresh' : 'Disable auto-refresh'}
@@ -293,7 +293,7 @@ export default function Stream() {
       </div>
       {tableScrollTopPosition > 0 && (
         <span className="absolute bottom-5 right-5 animate-bounce">
-          <NewButton
+          <Button
             kind="secondary"
             onClick={scrollToTop}
             icon={<RiArrowDownSLine className="rotate-180" />}

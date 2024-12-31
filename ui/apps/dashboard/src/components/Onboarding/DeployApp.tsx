@@ -1,6 +1,6 @@
 import { useRouter } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { NewLink } from '@inngest/components/Link';
 import TabCards from '@inngest/components/TabCards/TabCards';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
@@ -117,7 +117,7 @@ export default function DeployApp() {
             is used for authenticating requests between Inngest and your app
           </p>
           <Secret kind="signing-key" secret={env.webhookSigningKey} className="mb-6" />
-          <NewButton
+          <Button
             label="Next"
             onClick={() => {
               updateCompletedSteps(currentStepName, {
@@ -145,7 +145,7 @@ export default function DeployApp() {
                 </div>
                 <p className="text-basis">Vercel</p>
               </div>
-              <NewButton
+              <Button
                 label="Manage Vercel integration"
                 kind="secondary"
                 appearance="outlined"
@@ -185,7 +185,7 @@ export default function DeployApp() {
             </div>
             {!hasVercelIntegration && (
               <div className="flex items-center justify-between">
-                <NewButton
+                <Button
                   label="Connect Inngest to Vercel"
                   onClick={() => {
                     tracking?.trackOnboardingAction(currentStepName, {
@@ -216,7 +216,7 @@ export default function DeployApp() {
               </Alert>
             )}
             {hasVercelIntegration && (
-              <NewButton
+              <Button
                 label="Next"
                 onClick={() => {
                   updateCompletedSteps(currentStepName, {
@@ -257,7 +257,7 @@ export default function DeployApp() {
           <Secret kind="event-key" secret={defaultEventKey} className="mb-4" />
           <div className="text-basis mb-2 text-sm font-medium">Signing key</div>
           <Secret kind="signing-key" secret={env.webhookSigningKey} className="mb-6" />
-          <NewButton
+          <Button
             label="Next"
             onClick={() => {
               updateCompletedSteps(currentStepName, {
@@ -303,7 +303,7 @@ export default function DeployApp() {
             secret={`fly secrets set INNGEST_SIGNING_KEY=${env.webhookSigningKey}`}
             className="mb-6"
           />
-          <NewButton
+          <Button
             label="Next"
             onClick={() => {
               updateCompletedSteps(currentStepName, {

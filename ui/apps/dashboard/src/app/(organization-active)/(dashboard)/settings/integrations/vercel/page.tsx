@@ -1,6 +1,6 @@
 import type { Route } from 'next';
 import NextLink from 'next/link';
-import { NewButton } from '@inngest/components/Button/index';
+import { Button } from '@inngest/components/Button/index';
 import { Link } from '@inngest/components/Link/Link';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { RiArrowRightSLine, RiExternalLinkLine } from '@remixicon/react';
@@ -37,7 +37,7 @@ export default async function VercelIntegrationPage() {
         </div>
 
         <div className="place-self-start">
-          <NewButton
+          <Button
             appearance="outlined"
             kind="secondary"
             href={'https://vercel.com/integrations/inngest' as Route}

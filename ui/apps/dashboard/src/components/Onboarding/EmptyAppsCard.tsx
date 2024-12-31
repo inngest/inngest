@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 
 import { pathCreator } from '@/utils/urls';
@@ -24,7 +24,7 @@ export default function EmptyAppsCard() {
           Inngest Dev Server.
         </p>
       </div>
-      <NewButton
+      <Button
         label="Take me to onboarding"
         onClick={() =>
           router.push(

@@ -1,4 +1,4 @@
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { NewLink } from '@inngest/components/Link/Link';
 import { RiExternalLinkLine } from '@remixicon/react';
 
@@ -35,7 +35,7 @@ export function BlankSlate({ imageUrl, title, subtitle, button, link }: BlankSla
             <div>{link.text}</div>
           </NewLink>
         ) : button ? (
-          <NewButton onClick={button.onClick} label={button.text} />
+          <Button onClick={button.onClick} label={button.text} />
         ) : null}
       </div>
     </div>

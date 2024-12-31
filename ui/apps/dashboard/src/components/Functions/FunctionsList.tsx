@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Search } from '@inngest/components/Forms/Search';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 
@@ -53,7 +53,7 @@ export const FunctionList = ({ envSlug, archived }: FunctionListProps) => {
 
       {hasMore !== false && (
         <div className="flex w-full justify-center py-2.5">
-          <NewButton
+          <Button
             loading={isLoading}
             appearance="outlined"
             kind="secondary"

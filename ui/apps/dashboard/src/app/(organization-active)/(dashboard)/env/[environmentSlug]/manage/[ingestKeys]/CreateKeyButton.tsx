@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
 import { Modal } from '@inngest/components/Modal';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
@@ -79,7 +79,7 @@ export default function CreateKeyButton() {
       <OptionalTooltip
         tooltip={environment.isArchived && 'Cannot create key. Environment is archived'}
       >
-        <NewButton
+        <Button
           icon={<RiAddLine />}
           onClick={() => setModalOpen(true)}
           disabled={environment.isArchived}
@@ -95,7 +95,7 @@ export default function CreateKeyButton() {
         title={`Create a New ${currentContent.name}`}
         footer={
           <div className="flex justify-end gap-2">
-            <NewButton
+            <Button
               appearance="outlined"
               kind="secondary"
               label="Cancel"
@@ -103,7 +103,7 @@ export default function CreateKeyButton() {
                 setModalOpen(false);
               }}
             />
-            <NewButton
+            <Button
               kind="primary"
               label="Create"
               loading={fetching}

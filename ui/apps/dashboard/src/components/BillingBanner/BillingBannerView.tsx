@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { ContextualBanner } from '@inngest/components/Banner';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 
 import { type EntitlementUsageQuery } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
@@ -50,7 +50,7 @@ export function BillingBannerView({
       onDismiss={onDismiss}
       title={bannerMessage}
       cta={
-        <NewButton
+        <Button
           appearance="outlined"
           href={pathCreator.billing({ tab: 'plans', ref: 'app-billing-banner' })}
           kind="secondary"

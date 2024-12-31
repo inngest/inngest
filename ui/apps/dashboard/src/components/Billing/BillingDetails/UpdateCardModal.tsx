@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Alert } from '@inngest/components/Alert/Alert';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal/Modal';
 import { CardElement, Elements, useElements, useStripe } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
@@ -108,7 +108,7 @@ function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
         <CardElement options={{}} />
       </div>
       <div className="mt-6 flex flex-row justify-end">
-        <NewButton
+        <Button
           type="submit"
           className="px-16"
           disabled={!stripe || loading}

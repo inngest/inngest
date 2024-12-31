@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
-import { NewButton } from '@inngest/components/Button';
-import { NewLink } from '@inngest/components/Link';
+import { Button } from '@inngest/components/Button';
 import { parseConnectionString } from '@inngest/components/PostgresIntegrations/utils';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { RiCheckboxCircleFill, RiCloseCircleFill } from '@remixicon/react';
@@ -237,16 +236,12 @@ export default function Connect({
       </div>
 
       {isVerified ? (
-        <NewButton
+        <Button
           label="Connected. See your integration"
           href={`/settings/integrations/${integration}`}
         />
       ) : (
-        <NewButton
-          label="Complete setup automatically"
-          onClick={handleVerify}
-          loading={isVerifying}
-        />
+        <Button label="Complete setup automatically" onClick={handleVerify} loading={isVerifying} />
       )}
       {error && <p className="text-error mt-4 text-sm">{error}</p>}
     </>

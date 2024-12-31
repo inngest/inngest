@@ -1,5 +1,5 @@
 import { Alert } from '@inngest/components/Alert';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 
 export default function ApprovalDialog({
   title,
@@ -28,7 +28,7 @@ export default function ApprovalDialog({
       </div>
       <div className="mx-auto max-w-xl">{description}</div>
       <div className="my-12 flex justify-center gap-6">
-        <NewButton
+        <Button
           onClick={onCancel}
           appearance="outlined"
           kind="secondary"
@@ -36,7 +36,7 @@ export default function ApprovalDialog({
           disabled={isLoading}
           label="Cancel"
         />
-        <NewButton
+        <Button
           onClick={onApprove}
           kind="primary"
           size="large"

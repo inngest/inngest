@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { RiContractRightFill, RiExpandLeftFill } from '@remixicon/react';
@@ -158,7 +158,7 @@ export function TriggerDetails({ className, getTrigger, runID }: Props) {
               <Card.Header className="h-11 flex-row items-center gap-2">
                 <div className="text-basis flex grow items-center gap-2">Trigger details</div>
                 <Collapsible.Trigger asChild>
-                  <NewButton size="large" appearance="ghost" icon={<RiContractRightFill />} />
+                  <Button size="large" appearance="ghost" icon={<RiContractRightFill />} />
                 </Collapsible.Trigger>
               </Card.Header>
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
 import { NewLink } from '@inngest/components/Link';
 import TabCards from '@inngest/components/TabCards/TabCards';
@@ -197,7 +197,7 @@ export default function SyncApp() {
           {error && <SyncFailure className="mb-3 mt-0 text-sm" error={error} />}
           {!app && (
             <div className="flex items-center gap-2">
-              <NewButton
+              <Button
                 loading={isLoading}
                 label="Sync app here"
                 onClick={() => {
@@ -207,7 +207,7 @@ export default function SyncApp() {
                   handleSyncAppManually();
                 }}
               />
-              <NewButton
+              <Button
                 appearance="outlined"
                 label="I already have an Inngest app"
                 onClick={() => {
@@ -225,7 +225,7 @@ export default function SyncApp() {
             </div>
           )}
           {app && (
-            <NewButton
+            <Button
               label="Next"
               onClick={() => {
                 tracking?.trackOnboardingAction(currentStepName, {
@@ -245,7 +245,7 @@ export default function SyncApp() {
                 </div>
                 <p className="text-basis">Vercel</p>
               </div>
-              <NewButton
+              <Button
                 kind="secondary"
                 appearance="outlined"
                 label="Manage Vercel integration"
@@ -314,7 +314,7 @@ export default function SyncApp() {
                 )}
               </>
             )}
-            <NewButton
+            <Button
               disabled={!hasSuccessfulSync}
               label="Next"
               onClick={() => {

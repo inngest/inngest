@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Error as ErrorElement } from '@inngest/components/Error/Error';
 import * as Sentry from '@sentry/nextjs';
 
@@ -24,7 +24,7 @@ export default function UserSetupError({ error }: UserSetupErrorProps) {
     <ErrorElement
       message="Failed to set up your user"
       button={
-        <NewButton
+        <Button
           label="Contact Support"
           appearance="outlined"
           onClick={() => {

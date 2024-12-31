@@ -1,4 +1,4 @@
-import { NewButton } from '@inngest/components/Button/index';
+import { Button } from '@inngest/components/Button/index';
 import { Card } from '@inngest/components/Card/Card';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { RiCheckLine, RiInformationLine } from '@remixicon/react';
@@ -53,7 +53,7 @@ export default async function SuccessPage({ searchParams }: SuccessProps) {
           </div>
         </div>
         <div>
-          <NewButton
+          <Button
             kind="primary"
             appearance="solid"
             size="medium"

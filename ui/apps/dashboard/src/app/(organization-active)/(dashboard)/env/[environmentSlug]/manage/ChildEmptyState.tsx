@@ -1,7 +1,7 @@
 'use client';
 
 import type { Route } from 'next';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 
 import { staticSlugs } from '@/utils/environments';
 
@@ -18,7 +18,7 @@ export default function ChildEmptyState() {
             your events to the correct branch.
           </p>
           <div className="border-subtle mt-6 flex items-center gap-2 border-t py-4">
-            <NewButton
+            <Button
               kind="primary"
               href={`/env/${staticSlugs.branch}/manage/keys` as Route}
               label="Manage"

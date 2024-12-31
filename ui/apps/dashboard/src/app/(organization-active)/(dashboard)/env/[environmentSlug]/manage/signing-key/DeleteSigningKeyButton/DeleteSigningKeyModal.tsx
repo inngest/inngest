@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal';
 import { useMutation } from 'urql';
 
@@ -79,8 +79,8 @@ export function DeleteSigningKeyModal(props: Props) {
         )}
 
         <div className="flex justify-end gap-2">
-          <NewButton label="Close" appearance="outlined" kind="secondary" onClick={onClose} />
-          <NewButton
+          <Button label="Close" appearance="outlined" kind="secondary" onClick={onClose} />
+          <Button
             onClick={onConfirm}
             disabled={isFetching}
             kind="danger"

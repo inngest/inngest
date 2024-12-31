@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useUser } from '@clerk/nextjs';
-import { NewButton } from '@inngest/components/Button/index';
+import { Button } from '@inngest/components/Button/index';
 import { NewLink } from '@inngest/components/Link';
 import { isAfter, sub } from '@inngest/components/utils/date';
 import { RiCloseLine } from '@remixicon/react';
@@ -38,7 +38,7 @@ export default function NewUser() {
       <div className="bg-canvasBase border-subtle absolute bottom-0 right-0 mb-6 mr-4 w-[430px] rounded border">
         <div className="gap-x flex flex-row items-center justify-between p-3">
           <div className="text-sm leading-tight">Got a few minutes?</div>
-          <NewButton
+          <Button
             icon={<RiCloseLine className="text-subtle h-5 w-5" />}
             kind="secondary"
             appearance="ghost"

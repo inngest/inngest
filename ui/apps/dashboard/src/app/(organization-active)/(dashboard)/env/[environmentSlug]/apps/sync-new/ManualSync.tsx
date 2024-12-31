@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Code } from '@inngest/components/Code';
 import { Input } from '@inngest/components/Forms/Input';
 import { NewLink } from '@inngest/components/Link';
@@ -160,7 +160,7 @@ export default function ManualSync({ appsURL }: Props) {
           View Docs
         </NewLink>
         <div className="flex items-center gap-3">
-          <NewButton
+          <Button
             label="Cancel"
             kind="secondary"
             onClick={() => {
@@ -168,7 +168,7 @@ export default function ManualSync({ appsURL }: Props) {
             }}
             appearance="outlined"
           />
-          <NewButton
+          <Button
             label="Sync app"
             onClick={onSync}
             kind="primary"

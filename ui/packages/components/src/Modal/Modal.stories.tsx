@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import type { Meta, StoryObj } from '@storybook/react';
 
 import { Modal } from './Modal';
@@ -22,7 +22,7 @@ const ModalWithHooks = (props) => {
   const [isOpen, setIsOpen] = useState(false);
   return (
     <>
-      <NewButton label="Open Modal" onClick={() => setIsOpen(true)} />
+      <Button label="Open Modal" onClick={() => setIsOpen(true)} />
       <Modal {...props} isOpen={isOpen} onClose={() => setIsOpen(false)}>
         <p className="p-6 text-slate-400">This is the body of the modal</p>
       </Modal>

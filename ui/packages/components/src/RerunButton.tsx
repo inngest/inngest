@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { RiLoopLeftLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
@@ -26,7 +26,7 @@ export function RerunButton(props: Props) {
   }
 
   return (
-    <NewButton
+    <Button
       onClick={onClick}
       disabled={isLoading}
       icon={<RiLoopLeftLine />}

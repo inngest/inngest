@@ -1,4 +1,4 @@
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { CodeBlock, type CodeBlockAction } from '@inngest/components/CodeBlock';
 import { ContentCard } from '@inngest/components/ContentCard';
 import { FuncCard } from '@inngest/components/FuncCard';
@@ -131,7 +131,7 @@ export function EventDetails({
           {!isInternalEvent && onReplayEvent && SendEventButton && (
             <>
               <div className="flex items-center gap-1">
-                <NewButton
+                <Button
                   label="Replay"
                   kind="secondary"
                   appearance="outlined"

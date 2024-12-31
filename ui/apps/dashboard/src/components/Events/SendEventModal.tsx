@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal/Modal';
 import TabCards from '@inngest/components/TabCards/TabCards';
 import ky from 'ky';
@@ -273,7 +273,7 @@ export function SendEventModal({
                   <form onSubmit={submitAction}>
                     <header className="flex items-center justify-between rounded-t-md p-2">
                       <h3 className="px-2">{tabTitle}</h3>
-                      <NewButton
+                      <Button
                         type="submit"
                         disabled={!submitButtonEnabled}
                         label={submitButtonLabel}
@@ -297,7 +297,7 @@ export function SendEventModal({
         </TabCards>
       </Modal.Body>
       <Modal.Footer className="flex justify-end gap-2">
-        <NewButton kind="secondary" label="Close modal" appearance="outlined" onClick={onClose} />
+        <Button kind="secondary" label="Close modal" appearance="outlined" onClick={onClose} />
       </Modal.Footer>
     </Modal>
   );

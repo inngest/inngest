@@ -1,4 +1,4 @@
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Chart } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
 import { NewLink } from '@inngest/components/Link/Link';
@@ -60,7 +60,7 @@ export const FailedFunctions = ({
             }
           />
         </div>
-        <NewButton
+        <Button
           size="small"
           kind="secondary"
           appearance="outlined"

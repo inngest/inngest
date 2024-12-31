@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { useOrganization, useUser } from '@clerk/nextjs';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { IconEvent } from '@inngest/components/icons/Event';
@@ -257,7 +257,7 @@ export default function Search({ collapsed }: { collapsed: boolean }) {
       {collapsed ? null : (
         <Tooltip>
           <TooltipTrigger asChild>
-            <NewButton
+            <Button
               kind="secondary"
               appearance="outlined"
               size="medium"

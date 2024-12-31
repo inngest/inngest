@@ -3,7 +3,7 @@
 import { type Route } from 'next';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Time } from '@inngest/components/Time';
 import { useQuery } from 'urql';
 
@@ -131,7 +131,7 @@ export function EventLogsPage({
 
       {isLoadMoreVisible && (
         <div className="mb-8 flex justify-center">
-          <NewButton
+          <Button
             className="mt-4"
             onClick={() => onLoadMore(lastEvent.id)}
             appearance="outlined"

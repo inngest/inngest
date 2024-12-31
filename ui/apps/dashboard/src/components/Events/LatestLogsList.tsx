@@ -1,6 +1,6 @@
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Pill } from '@inngest/components/Pill';
 import { IDCell, TimeCell } from '@inngest/components/Table/Cell';
 import { RiKey2Fill } from '@remixicon/react';
@@ -53,7 +53,7 @@ export default function LatestLogsList({ environmentSlug, eventName }: LatestLog
     <>
       <header className="flex items-center justify-between gap-3 py-3 pl-4 pr-2">
         <h1 className="text-basis font-medium">Latest</h1>
-        <NewButton
+        <Button
           appearance="outlined"
           kind="secondary"
           href={`/env/${environmentSlug}/events/${encodeURIComponent(eventName)}/logs` as Route}

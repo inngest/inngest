@@ -2,7 +2,7 @@
 
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card';
 import { InlineCode } from '@inngest/components/InlineCode';
 import { RiErrorWarningLine } from '@remixicon/react';
@@ -62,13 +62,13 @@ export default function EventListNotFound() {
             </div>
 
             <div className="mt-6 flex items-center gap-2">
-              <NewButton
+              <Button
                 kind="primary"
                 href={pathCreator.apps({ envSlug: environment.slug })}
                 label="Sync Your App"
               />
               <div className="flex gap-2 pl-2">
-                <NewButton
+                <Button
                   appearance="outlined"
                   href={
                     'https://www.inngest.com/docs/deploy/vercel?ref=app-onboarding-events' as Route
@@ -78,7 +78,7 @@ export default function EventListNotFound() {
                   icon={<VercelLogomark className="-ml-0.5" />}
                   label="Vercel Integration"
                 />
-                <NewButton
+                <Button
                   appearance="outlined"
                   target="_blank"
                   href={'https://www.inngest.com/docs/events?ref=app-onboarding-events' as Route}
@@ -102,7 +102,7 @@ export default function EventListNotFound() {
               environment. Your events will show up on this page when they are received.
             </p>
             <div className="mt-6 flex items-center gap-2">
-              <NewButton
+              <Button
                 appearance="outlined"
                 kind="secondary"
                 target="_blank"

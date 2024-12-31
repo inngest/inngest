@@ -2,7 +2,7 @@
 
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Code } from '@inngest/components/Code';
 import { CodeLine } from '@inngest/components/CodeLine';
 import { NewLink } from '@inngest/components/Link';
@@ -75,7 +75,7 @@ export default function Page({ params: { environmentSlug } }: Props) {
                 View Docs
               </NewLink>
               <div className="flex items-center gap-3">
-                <NewButton
+                <Button
                   label="Cancel"
                   onClick={() => {
                     router.push(APPS_URL);
@@ -83,7 +83,7 @@ export default function Page({ params: { environmentSlug } }: Props) {
                   appearance="outlined"
                   kind="secondary"
                 />
-                <NewButton
+                <Button
                   label="Go to Vercel configuration"
                   onClick={() => {
                     router.push('/settings/integrations/vercel' as Route);
@@ -128,7 +128,7 @@ export default function Page({ params: { environmentSlug } }: Props) {
                 View Docs
               </NewLink>
               <div className="flex items-center gap-3">
-                <NewButton
+                <Button
                   label="Done"
                   onClick={() => {
                     router.push(APPS_URL);

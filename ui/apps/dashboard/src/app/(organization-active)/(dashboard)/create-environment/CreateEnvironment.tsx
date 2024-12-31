@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
 import { NewLink } from '@inngest/components/Link';
 import { toast } from 'sonner';
@@ -84,7 +84,7 @@ export default function CreateEnvironment({}) {
           required
           error={error}
         />
-        <NewButton kind="primary" type="submit" disabled={isDisabled} label="Create environment" />
+        <Button kind="primary" type="submit" disabled={isDisabled} label="Create environment" />
       </form>
     </div>
   );

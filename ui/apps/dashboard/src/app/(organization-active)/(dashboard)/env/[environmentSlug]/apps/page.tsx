@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
 import { NewLink } from '@inngest/components/Link/Link';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
@@ -91,7 +91,7 @@ export default function AppsPage({
         infoIcon={<AppInfo />}
         action={
           (!isArchived || displayOnboarding) && (
-            <NewButton
+            <Button
               kind="primary"
               label="Sync new app"
               href={pathCreator.createApp({ envSlug })}

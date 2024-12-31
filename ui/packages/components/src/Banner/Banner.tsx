@@ -1,4 +1,4 @@
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { NewLink, type NewLinkProps } from '@inngest/components/Link';
 import { cn } from '@inngest/components/utils/classNames';
 import {
@@ -114,7 +114,7 @@ export function Banner({
       </div>
       {cta}
       {onDismiss && (
-        <NewButton
+        <Button
           size="small"
           appearance="ghost"
           onClick={onDismiss}
@@ -164,7 +164,7 @@ export function ContextualBanner({
         <span className="grow text-sm leading-6">{title}</span>
         {cta}
         {onDismiss && (
-          <NewButton
+          <Button
             size="small"
             appearance="ghost"
             onClick={onDismiss}

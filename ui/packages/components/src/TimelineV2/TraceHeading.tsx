@@ -1,6 +1,6 @@
 import { RiArrowRightSLine, RiSparkling2Fill } from '@remixicon/react';
 
-import { NewButton } from '../Button';
+import { Button } from '../Button';
 import { Pill } from '../Pill';
 import { Time } from '../Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
@@ -71,7 +71,7 @@ export function TraceHeading({
   return (
     <div className="text-basis flex w-72 gap-2">
       {isExpandable && (
-        <NewButton
+        <Button
           onClick={onClickExpandToggle}
           className={cn('flex-none', isExpanded && 'border border-transparent')}
           kind={isExpanded ? 'primary' : 'secondary'}

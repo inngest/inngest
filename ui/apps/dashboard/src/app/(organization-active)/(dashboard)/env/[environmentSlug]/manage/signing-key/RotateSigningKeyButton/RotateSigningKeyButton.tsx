@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 
 import { RotateSigningKeyModal } from './RotateSigningKeyModal';
 
@@ -15,7 +15,7 @@ export function RotateSigningKeyButton({ disabled, envID }: Props) {
 
   return (
     <>
-      <NewButton
+      <Button
         onClick={() => setIsModalOpen(true)}
         disabled={disabled}
         kind="danger"

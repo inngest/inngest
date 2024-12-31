@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { IDCell, TimeCell } from '@inngest/components/Table/Cell';
 import { useQuery } from 'urql';
 
@@ -82,7 +82,7 @@ export default function LatestFailedFunctionRuns({
     <div>
       <header className="flex items-center justify-between gap-3 py-3">
         <h1 className="text-basis font-medium">Latest Failed Runs</h1>
-        <NewButton
+        <Button
           appearance="outlined"
           kind="secondary"
           href={

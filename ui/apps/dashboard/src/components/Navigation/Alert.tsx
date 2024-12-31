@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
 import { RiCloseLine } from '@remixicon/react';
 
@@ -25,7 +25,7 @@ export const Alert = () => {
       <div className="text-info bg-info border-secondary-2xSubtle mb-5 rounded border py-3 pl-3 pr-2 text-xs leading-tight">
         <div className="gap-x flex flex-row items-start justify-between">
           <div>We&apos;ve reimagined our information architecture for better navigation.</div>
-          <NewButton
+          <Button
             icon={<RiCloseLine className="text-link" />}
             kind="secondary"
             appearance="ghost"

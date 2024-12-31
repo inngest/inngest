@@ -1,4 +1,4 @@
-import { NewButton } from '../Button';
+import { Button } from '../Button';
 import { NewLink } from '../Link';
 import { STEPS_ORDER, type ConnectPostgresIntegrationContent } from './types';
 
@@ -59,7 +59,7 @@ export default function ConnectPage({
         })}
       </div>
       <div>
-        <NewButton label="Start installation" onClick={onStartInstallation} />
+        <Button label="Start installation" onClick={onStartInstallation} />
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Listbox } from '@headlessui/react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { RiEqualizer2Line } from '@remixicon/react';
 
 import type { Environment as EnvType } from '@/utils/environments';
@@ -17,7 +17,7 @@ export default function KeysMenu({
   return (
     <Listbox>
       <Listbox.Button as="div">
-        <NewButton
+        <Button
           kind="secondary"
           appearance={collapsed ? 'ghost' : 'outlined'}
           size="medium"

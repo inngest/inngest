@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import type { Meta, StoryObj } from '@storybook/react';
 
 import { AlertModal } from './AlertModal';
@@ -22,7 +22,7 @@ const ModalWithHooks = (props) => {
   const [isOpen, setIsOpen] = useState(false);
   return (
     <>
-      <NewButton label="Delete" onClick={() => setIsOpen(true)} />
+      <Button label="Delete" onClick={() => setIsOpen(true)} />
       <AlertModal {...props} isOpen={isOpen} onClose={() => setIsOpen(false)} onSubmit={() => {}} />
     </>
   );

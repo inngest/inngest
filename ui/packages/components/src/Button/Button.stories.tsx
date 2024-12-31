@@ -1,11 +1,11 @@
 import { IconFunction } from '@inngest/components/icons/Function';
 import type { Meta, StoryObj } from '@storybook/react';
 
-import { NewButton } from './index';
+import { Button } from './index';
 
 const meta = {
   title: 'Components/Button',
-  component: NewButton,
+  component: Button,
   parameters: {
     layout: 'centered',
   },
@@ -23,11 +23,11 @@ const meta = {
       control: { type: 'select' },
     },
   },
-} satisfies Meta<typeof NewButton>;
+} satisfies Meta<typeof Button>;
 
 export default meta;
 
-type Story = StoryObj<typeof NewButton>;
+type Story = StoryObj<typeof Button>;
 
 export const PrimarySolid: Story = {
   args: {

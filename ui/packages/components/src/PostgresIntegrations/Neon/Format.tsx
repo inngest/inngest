@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { NewLink } from '@inngest/components/Link';
 import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/types';
 import { parseConnectionString } from '@inngest/components/PostgresIntegrations/utils';
@@ -96,12 +96,12 @@ export default function NeonFormat({
       </div>
 
       {isVerified ? (
-        <NewButton
+        <Button
           label="Next"
           href={`/settings/integrations/${integration}/${IntegrationSteps.ConnectDb}`}
         />
       ) : (
-        <NewButton
+        <Button
           label="Verify logical replication is enabled"
           onClick={handleVerify}
           loading={isVerifying}

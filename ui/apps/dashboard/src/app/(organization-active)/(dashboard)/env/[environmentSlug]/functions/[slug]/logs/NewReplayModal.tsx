@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { RangePicker } from '@inngest/components/DatePicker';
 import { Input } from '@inngest/components/Forms/Input';
 import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcons';
@@ -308,14 +308,14 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
             </div>
           )}
           <div className="flex gap-2">
-            <NewButton
+            <Button
               type="button"
               appearance="outlined"
               kind="secondary"
               label="Cancel"
               onClick={onClose}
             />
-            <NewButton
+            <Button
               label="Replay Function"
               kind="primary"
               type="submit"

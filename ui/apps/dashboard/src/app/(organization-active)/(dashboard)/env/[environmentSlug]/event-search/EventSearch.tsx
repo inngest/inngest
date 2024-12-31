@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
@@ -85,7 +85,7 @@ export function EventSearch() {
               required
               type="text"
             />
-            <NewButton kind="primary" type="submit" loading={fetching} label="Search" />
+            <Button kind="primary" type="submit" loading={fetching} label="Search" />
           </div>
         </form>
         <div className="m-4 flex gap-1">

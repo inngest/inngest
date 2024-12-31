@@ -3,7 +3,7 @@
 import { useContext, useEffect, useState } from 'react';
 import type { Route } from 'next';
 import { usePathname, useRouter } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { NewLink } from '@inngest/components/Link';
 import { toast } from 'sonner';
 
@@ -167,7 +167,7 @@ export default function TransformEvents({ keyID, metadata }: FilterEventsProps) 
             .
           </p>
         </div>
-        <NewButton
+        <Button
           href={'https://www.inngest.com/docs/events/event-format-and-structure' as Route}
           appearance="outlined"
           kind="secondary"
@@ -221,7 +221,7 @@ export default function TransformEvents({ keyID, metadata }: FilterEventsProps) 
         </div>
       </div>
       <div className="mb-8 flex justify-end">
-        <NewButton
+        <Button
           kind="primary"
           disabled={isDisabled}
           type="submit"

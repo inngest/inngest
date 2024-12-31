@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { RiAddLine } from '@remixicon/react';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -48,7 +48,7 @@ export function Apps({ isArchived = false }: Props) {
         {!hasApps && !isArchived && (
           <EmptyAppCard className="mb-4">
             <div className="items-center md:items-start">
-              <NewButton
+              <Button
                 className="mt-4"
                 kind="primary"
                 label="Sync app"

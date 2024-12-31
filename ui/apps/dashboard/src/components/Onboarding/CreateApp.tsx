@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
 import CommandBlock from '@inngest/components/CodeBlock/CommandBlock';
 import { NewLink } from '@inngest/components/Link';
@@ -92,7 +92,7 @@ export default function CreateApp() {
             </p>
           </div>
           {devServerIsRunning ? (
-            <NewButton
+            <Button
               icon={<RiExternalLinkLine />}
               iconSide="left"
               appearance="outlined"
@@ -115,7 +115,7 @@ export default function CreateApp() {
         </div>
       </Card>
       <div className="flex items-center gap-2">
-        <NewButton
+        <Button
           label="Next"
           disabled={!devServerIsRunning}
           onClick={() => {
@@ -130,7 +130,7 @@ export default function CreateApp() {
             router.push(pathCreator.onboardingSteps({ step: nextStepName }));
           }}
         />
-        <NewButton
+        <Button
           appearance="outlined"
           label="I already have an Inngest app"
           onClick={() => {

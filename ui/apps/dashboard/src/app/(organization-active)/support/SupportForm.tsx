@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useOrganization, useUser } from '@clerk/nextjs';
 import { Alert } from '@inngest/components/Alert';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Textarea } from '@inngest/components/Forms/Textarea';
 import { Pill } from '@inngest/components/Pill/Pill';
 import * as Sentry from '@sentry/nextjs';
@@ -166,7 +166,7 @@ export function SupportForm({
           />
         </label>
       )}
-      <NewButton type="submit" disabled={isFetching} label="Create Support Ticket" kind="primary" />
+      <Button type="submit" disabled={isFetching} label="Create Support Ticket" kind="primary" />
       {result.message && <Alert severity={result.ok ? 'info' : 'error'}>{result.message}</Alert>}
       <p className="mt-4 text-sm">
         {isPaid ? (

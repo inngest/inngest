@@ -2,7 +2,7 @@
 
 import { type Route } from 'next';
 import Link from 'next/link';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { NewLink } from '@inngest/components/Link';
 
 import Toaster from '@/components/Toaster';
@@ -33,8 +33,8 @@ export default function Environments() {
         <div className="mb-4 flex w-full items-center  justify-between">
           <h2 className="text-lg font-medium">Production Environment</h2>
           <div className="flex items-center gap-2">
-            <NewButton href="/env/production/manage" appearance="outlined" label="Manage" />
-            <NewButton href={`/env/production/apps` as Route} kind="primary" label="Go to apps" />
+            <Button href="/env/production/manage" appearance="outlined" label="Manage" />
+            <Button href={`/env/production/apps` as Route} kind="primary" label="Go to apps" />
           </div>
         </div>
         <p className="text-muted mt-2 max-w-[400px] text-sm">
@@ -56,14 +56,14 @@ export default function Environments() {
             <div className="mb-8 flex w-full items-center justify-between">
               <h2 className="text-lg font-medium">Branch Environments</h2>
               <div className="flex items-center gap-2">
-                <NewButton
+                <Button
                   href={`/env/${branchParent?.slug}/manage`}
                   appearance="outlined"
                   label="Manage"
                 />
 
                 {/* Here we don't link to the modal since the /deploy empty state has more info on branch envs */}
-                <NewButton
+                <Button
                   href={`/env/${branchParent?.slug || 'branch'}/apps` as Route}
                   kind="primary"
                   label="Sync new app"
@@ -83,15 +83,11 @@ export default function Environments() {
               <div className="mb-4 flex w-full items-center  justify-between">
                 <h2 className="text-lg font-medium">{env.name}</h2>
                 <div className="flex items-center gap-2">
-                  <NewButton
-                    href={`/env/${env.slug}/manage`}
-                    appearance="outlined"
-                    label="Manage"
-                  />
+                  <Button href={`/env/${env.slug}/manage`} appearance="outlined" label="Manage" />
 
                   <EnvironmentArchiveButton env={env} />
 
-                  <NewButton
+                  <Button
                     href={`/env/${env.slug}/apps` as Route}
                     kind="primary"
                     label="Go to apps"
@@ -114,7 +110,7 @@ export default function Environments() {
           <div className="mb-4 flex w-full items-center  justify-between">
             <h2 className="text-lg font-medium">Create an environment</h2>
             <div className="flex items-center gap-2">
-              <NewButton href="create-environment" kind="primary" label="Create environment" />
+              <Button href="create-environment" kind="primary" label="Create environment" />
             </div>
           </div>
           <p className="text-muted mt-2 text-sm">

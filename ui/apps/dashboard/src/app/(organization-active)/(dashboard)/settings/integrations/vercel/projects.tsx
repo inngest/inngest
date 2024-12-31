@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
 import { Link } from '@inngest/components/Link/Link';
 import { Pill } from '@inngest/components/Pill';
@@ -42,7 +42,7 @@ export default function VercelProjects({ integration }: { integration: VercelInt
           Projects (<span className="mx-[2px]">{projects.length}</span>)
         </div>
         <div className="text-btnPrimary flex cursor-pointer flex-row items-center justify-between text-xs">
-          <NewButton
+          <Button
             appearance="ghost"
             icon={<RiRefreshLine className="h-4 w-4" />}
             iconSide="left"
@@ -124,7 +124,7 @@ export default function VercelProjects({ integration }: { integration: VercelInt
                   </div>
                 </div>
                 <div>
-                  <NewButton
+                  <Button
                     appearance="outlined"
                     label="Configure"
                     href={`/settings/integrations/vercel/configure/${encodeURIComponent(p.id)}`}
@@ -151,7 +151,7 @@ export default function VercelProjects({ integration }: { integration: VercelInt
               }}
             />
           )}
-          <NewButton
+          <Button
             kind="danger"
             appearance="outlined"
             label="Disable Vercel"

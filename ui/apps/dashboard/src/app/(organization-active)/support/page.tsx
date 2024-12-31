@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { type Route } from 'next';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { NewLink } from '@inngest/components/Link';
 import { Pill } from '@inngest/components/Pill/Pill';
 import { RiArrowLeftLine, RiGithubFill } from '@remixicon/react';
@@ -51,7 +51,7 @@ export default function Page() {
     <div className="h-full overflow-y-scroll">
       <div className="mx-auto max-w-screen-xl px-6">
         <div className="my-4 inline-block">
-          <NewButton
+          <Button
             href={process.env.NEXT_PUBLIC_HOME_PATH as Route}
             size="small"
             appearance="outlined"
@@ -91,12 +91,12 @@ export default function Page() {
               <>
                 <p>Sign in or sign up for an account to create a ticket.</p>
                 <div className="flex gap-2">
-                  <NewButton
+                  <Button
                     kind="primary"
                     href={`${process.env.NEXT_PUBLIC_SIGN_IN_PATH}?ref=support` as Route}
                     label="Sign In"
                   />
-                  <NewButton
+                  <Button
                     kind="primary"
                     href={`${process.env.NEXT_PUBLIC_SIGN_UP_PATH}?ref=support` as Route}
                     label="Sign Up"
@@ -163,7 +163,7 @@ export default function Page() {
               </NewLink>{' '}
               channel or submit your own question.
             </p>
-            <NewButton
+            <Button
               kind="primary"
               href="https://www.inngest.com/discord"
               target="_blank"
@@ -174,7 +174,7 @@ export default function Page() {
             <p>File an issue in our open source repos on Github:</p>
             <div>
               <p className="mb-2 text-sm font-medium">Inngest CLI + Dev Server</p>
-              <NewButton
+              <Button
                 appearance="outlined"
                 kind="secondary"
                 href="https://github.com/inngest/inngest/issues"
@@ -186,7 +186,7 @@ export default function Page() {
             </div>
             <div>
               <p className="mb-2 text-sm font-medium">SDKs</p>
-              <NewButton
+              <Button
                 appearance="outlined"
                 kind="secondary"
                 href="https://github.com/inngest/inngest-js/issues"

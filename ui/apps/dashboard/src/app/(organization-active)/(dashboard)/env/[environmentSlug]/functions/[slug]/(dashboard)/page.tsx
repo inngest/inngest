@@ -3,7 +3,7 @@
 import type { Route } from 'next';
 import Link from 'next/link';
 import { Alert } from '@inngest/components/Alert';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Time } from '@inngest/components/Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { useCron } from '@inngest/components/hooks/useCron';
@@ -158,7 +158,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                   <div className="bg-canvasBase my-6 overflow-scroll rounded p-2">
                     {error.toString()}
                   </div>
-                  <NewButton
+                  <Button
                     onClick={
                       // Attempt to recover by trying to re-render the segment
                       () => resetError()

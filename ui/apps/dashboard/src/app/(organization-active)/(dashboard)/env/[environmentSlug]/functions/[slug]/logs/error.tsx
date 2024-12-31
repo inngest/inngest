@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Error as ErrorElement } from '@inngest/components/Error/Error';
 import { RiLoopLeftLine } from '@remixicon/react';
 import * as Sentry from '@sentry/nextjs';
@@ -20,7 +20,7 @@ export default function FunctionRunsError({ error, reset }: FunctionRunsErrorPro
     <ErrorElement
       message="Failed to load log"
       button={
-        <NewButton
+        <Button
           label="Reload"
           appearance="outlined"
           iconSide="right"

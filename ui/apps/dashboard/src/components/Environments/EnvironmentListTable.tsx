@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Switch } from '@inngest/components/Switch';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
@@ -203,7 +203,7 @@ function TableRow(props: { env: Environment }) {
       </td>
 
       <td className="px-4">
-        <NewButton
+        <Button
           href={pathCreator.apps({ envSlug: slug })}
           kind="primary"
           appearance="outlined"

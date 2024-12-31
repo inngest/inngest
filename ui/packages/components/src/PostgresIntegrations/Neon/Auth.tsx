@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
 import { NewLink } from '@inngest/components/Link';
 import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/types';
@@ -98,14 +98,14 @@ export default function NeonAuth({
                 error={error}
               />
             </div>
-            <NewButton label="Verify" onClick={handleVerify} loading={isVerifying} />
+            <Button label="Verify" onClick={handleVerify} loading={isVerifying} />
           </div>
         </label>
         {isVerified && (
           <p className="text-success mt-1 text-sm">Credentials verified successfully!</p>
         )}
       </form>
-      <NewButton
+      <Button
         label="Next"
         href={`/settings/integrations/${integration}/${nextStep}`}
         disabled={!isVerified}

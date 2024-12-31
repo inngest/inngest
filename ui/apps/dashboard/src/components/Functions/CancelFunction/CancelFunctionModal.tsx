@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { RangePicker } from '@inngest/components/DatePicker';
 import { Input } from '@inngest/components/Forms/Input';
 import { Modal } from '@inngest/components/Modal';
@@ -139,14 +139,14 @@ export function CancelFunctionModal(props: Props) {
           <FooterMessage count={countRes.data} />
         </div>
 
-        <NewButton
+        <Button
           appearance="outlined"
           disabled={isCreating}
           kind="secondary"
           label="Close"
           onClick={onClose}
         />
-        <NewButton
+        <Button
           disabled={isCreating || !timeRange || (countRes.data ?? 0) === 0}
           kind="danger"
           label="Submit"

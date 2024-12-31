@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { RiAddLine } from '@remixicon/react';
 
 import AddAppModal from '@/components/App/AddAppModal';
@@ -9,7 +9,7 @@ export default function AddAppButton({ secondary }: { secondary?: boolean }) {
 
   return (
     <>
-      <NewButton
+      <Button
         kind={secondary ? 'secondary' : 'primary'}
         label={secondary ? 'I want to sync manually' : 'Sync new app'}
         appearance={secondary ? 'outlined' : 'solid'}

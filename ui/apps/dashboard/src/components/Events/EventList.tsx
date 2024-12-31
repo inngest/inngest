@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { cn } from '@inngest/components/utils/classNames';
@@ -157,12 +157,7 @@ function EventTypesListPaginationPage({
       {isLastLoadedPage && hasNextPage && (
         <tr>
           <td colSpan={3} className="py-2.5 text-center">
-            <NewButton
-              appearance="outlined"
-              kind="secondary"
-              onClick={onLoadMore}
-              label="Load More"
-            />
+            <Button appearance="outlined" kind="secondary" onClick={onLoadMore} label="Load More" />
           </td>
         </tr>
       )}

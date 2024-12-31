@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { MetadataGrid } from '@inngest/components/Metadata';
 import { OutputCard } from '@inngest/components/OutputCard';
 import { renderStepMetadata } from '@inngest/components/RunDetails/stepMetadataRenderer';
@@ -62,7 +62,7 @@ export function TimelineNode({ getOutput, node, children, isAttempt, navigateToR
             onClick={() => toggleItem(value)}
             className="bg-canvasBase hover:bg-canvasSubtle group"
           >
-            <NewButton
+            <Button
               className="group"
               appearance="outlined"
               kind="secondary"

@@ -1,4 +1,4 @@
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiInformationLine } from '@remixicon/react';
 
@@ -37,7 +37,7 @@ export default function AddOn({
       </div>
       <div>
         {value && <p className="text-basis pr-3 text-right text-sm font-medium">{value}</p>}
-        <NewButton
+        <Button
           appearance="ghost"
           label={canIncreaseLimitInCurrentPlan ? 'Contact us' : 'Upgrade'}
           href={

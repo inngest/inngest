@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { CodeBlock } from '@inngest/components/CodeBlock/CodeBlock';
 import { parseCode } from '@inngest/components/InvokeButton/utils';
 import { NewLink } from '@inngest/components/Link';
@@ -186,7 +186,7 @@ export default function InvokeFn() {
         <div className="mt-6 flex items-center justify-between">
           {!isFnInvoked ? (
             <div className="flex items-center gap-2">
-              <NewButton
+              <Button
                 label="Invoke test function"
                 disabled={!selectedFunction}
                 onClick={() => {
@@ -200,7 +200,7 @@ export default function InvokeFn() {
                   handleInvokeFn();
                 }}
               />
-              <NewButton
+              <Button
                 appearance="outlined"
                 label="Skip, take me to dashboard"
                 onClick={() => {
@@ -222,7 +222,7 @@ export default function InvokeFn() {
               />
             </div>
           ) : (
-            <NewButton
+            <Button
               label="Go to runs"
               onClick={() => {
                 tracking?.trackOnboardingAction(currentStepName, {
