@@ -1,9 +1,6 @@
 import { useCallback } from 'react';
-import { Link } from '@inngest/components/Link';
-import { toast } from 'sonner';
 
-import { useRerunFromStepMutation, useRerunMutation } from '@/store/generated';
-import { pathCreator } from '@/utils/pathCreator';
+import { useRerunFromStepMutation } from '@/store/generated';
 
 export function useRerunFromStep() {
   const [rerunFromStep] = useRerunFromStepMutation();

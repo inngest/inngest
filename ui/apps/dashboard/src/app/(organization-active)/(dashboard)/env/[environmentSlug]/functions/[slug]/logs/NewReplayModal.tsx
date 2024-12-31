@@ -6,7 +6,7 @@ import { Button } from '@inngest/components/Button';
 import { RangePicker } from '@inngest/components/DatePicker';
 import { Input } from '@inngest/components/Forms/Input';
 import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcons';
-import { Link } from '@inngest/components/Link';
+import { NewLink } from '@inngest/components/Link';
 import { Modal } from '@inngest/components/Modal';
 import { IconReplay } from '@inngest/components/icons/Replay';
 import { subtractDuration } from '@inngest/components/utils/date';
@@ -288,7 +288,9 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
               function states will not be reused during the replay. The <code>event.user</code>{' '}
               object will be empty for all runs in the replay.
             </p>
-            <Link href="https://inngest.com/docs/platform/replay">Learn more about replay</Link>
+            <NewLink target="_blank" href="https://inngest.com/docs/platform/replay">
+              Learn more about replay
+            </NewLink>
           </div>
         </div>
         <div className="border-subtle flex items-center justify-between gap-2 border-t px-5 py-4">

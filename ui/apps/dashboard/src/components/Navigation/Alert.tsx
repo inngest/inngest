@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@inngest/components/Button';
-import { Link } from '@inngest/components/Link';
+import { NewLink } from '@inngest/components/Link';
 import { RiCloseLine } from '@remixicon/react';
 
 const ALERT_NAME = 'inngest-dismissIAAlert';
@@ -34,12 +34,12 @@ export const Alert = () => {
             onClick={() => dismiss()}
           />
         </div>
-        <Link
+        <NewLink
           href=" https://www.inngest.com/blog/reimagining-information-architecture"
           className="mt-4"
         >
           Read about the redesign
-        </Link>
+        </NewLink>
       </div>
     )
   );

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Link } from '@inngest/components/Link';
+import { NewLink } from '@inngest/components/Link';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
@@ -59,13 +59,13 @@ export default function Page() {
         setError(
           <>
             {cleanError}.{' '}
-            <Link internalNavigation className="inline-flex" href="/support">
+            <NewLink size="medium" className="inline-flex" href="/support">
               Contact support
-            </Link>{' '}
+            </NewLink>{' '}
             or{' '}
-            <Link internalNavigation className="inline-flex" href={pathCreator.billing()}>
+            <NewLink size="medium" className="inline-flex" href={pathCreator.billing()}>
               manage billing
-            </Link>
+            </NewLink>
             .
           </>
         );

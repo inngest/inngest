@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useMemo, useRef } from 'react';
-import { Link } from '@inngest/components/Link';
+import { Alert } from '@inngest/components/Alert/Alert';
+import { NewLink } from '@inngest/components/Link';
 import { ReplayStatusIcon } from '@inngest/components/ReplayStatusIcon';
 import { Table } from '@inngest/components/Table';
 import { Time } from '@inngest/components/Time';
 import type { Replay } from '@inngest/components/types/replay';
-import { RiErrorWarningLine } from '@remixicon/react';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 
@@ -140,14 +140,7 @@ export function ReplayList({ functionSlug }: Props) {
     }) ?? [];
 
   if (error) {
-    return (
-      <div className="flex h-full w-full flex-col items-center justify-center gap-5">
-        <div className="inline-flex items-center gap-2 text-red-600">
-          <RiErrorWarningLine className="h-4 w-4" />
-          <h2 className="text-sm">Could not load replays</h2>
-        </div>
-      </div>
-    );
+    return <Alert severity="error">Could not load replays</Alert>;
   }
 
   return (
@@ -162,9 +155,13 @@ export function ReplayList({ functionSlug }: Props) {
       blankState={
         <p>
           You have no replays for this function.{' '}
-          <Link className="inline-flex" href="https://inngest.com/docs/platform/replay">
+          <NewLink
+            target="_blank"
+            className="inline"
+            href="https://inngest.com/docs/platform/replay"
+          >
             Learn about Replay
-          </Link>
+          </NewLink>
         </p>
       }
     />

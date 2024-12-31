@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
-import { Link } from '@inngest/components/Link';
+import { NewLink } from '@inngest/components/Link';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { cn } from '@inngest/components/utils/classNames';
 
@@ -111,13 +111,13 @@ function EventTypesListPaginationPage({
           <tr className="hover:bg-canvasSubtle/50" key={event.name}>
             <td className="w-96 whitespace-nowrap">
               <div className="flex items-center gap-2.5 pl-2">
-                <Link
+                <NewLink
                   href={pathCreator.eventType({ envSlug: env.slug, eventName: event.name })}
-                  internalNavigation
+                  arrowOnHover
                   className="w-full px-2 py-3 text-sm font-medium"
                 >
                   {event.name}
-                </Link>
+                </NewLink>
               </div>
             </td>
             <td className="space-x-2 whitespace-nowrap px-2">

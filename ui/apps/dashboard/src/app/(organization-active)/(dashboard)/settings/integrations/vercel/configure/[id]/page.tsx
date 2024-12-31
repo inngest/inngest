@@ -274,7 +274,7 @@ export default function VercelConfigure() {
                       project.ssoProtection?.deploymentType ===
                         VercelDeploymentProtection.Disabled && 'border-subtle bg-disabled'
                     }`}
-                    readonly={
+                    readOnly={
                       project.ssoProtection?.deploymentType === VercelDeploymentProtection.Disabled
                     }
                     onChange={({ target: { value } }) =>

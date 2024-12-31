@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { Link } from '@inngest/components/Link';
+import { NewLink } from '@inngest/components/Link';
 import { toast } from 'sonner';
 
 import { useRerunMutation } from '@/store/generated';
@@ -24,9 +24,9 @@ export function useRerun() {
 
         // Give user a link to the new run
         toast.success(
-          <Link href={pathCreator.runPopout({ runID: newRunID })} internalNavigation={false}>
+          <NewLink href={pathCreator.runPopout({ runID: newRunID })} target="_blank">
             Successfully queued rerun
-          </Link>
+          </NewLink>
         );
       } catch (e) {
         toast.error('Failed to queue rerun');

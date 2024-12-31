@@ -1,7 +1,7 @@
 'use client';
 
 import { type Route } from 'next';
-import { Link } from '@inngest/components/Link';
+import { NewLink } from '@inngest/components/Link';
 import { TextClickToCopy } from '@inngest/components/Text';
 import { Time } from '@inngest/components/Time';
 import { cn } from '@inngest/components/utils/classNames';
@@ -61,13 +61,12 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
           </span>
           {linkToSyncs && <Time value={sync.lastSyncedAt} />}
           {!linkToSyncs && (
-            <Link
+            <NewLink
               href={`/env/${env.slug}/apps/${encodeURIComponent(app.externalID)}/syncs` as Route}
-              showIcon={false}
-              internalNavigation
+              size="medium"
             >
               <Time value={sync.lastSyncedAt} />
-            </Link>
+            </NewLink>
           )}
         </div>
       );

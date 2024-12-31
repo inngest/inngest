@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { type Route } from 'next';
-import { Link } from '@inngest/components/Link';
+import { NewLink } from '@inngest/components/Link';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { Table } from '@inngest/components/Table';
 import type { Function } from '@inngest/components/types/function';
@@ -51,15 +51,16 @@ function useColumns({ envSlug }: { envSlug: string }) {
 
         return (
           <div className="flex items-center">
-            <Link
-              internalNavigation
+            <NewLink
+              arrowOnHover
+              size="medium"
               className="w-full text-sm font-medium"
               href={
                 `/env/${envSlug}/functions/${encodeURIComponent(info.row.original.slug)}` as Route
               }
             >
               {name}
-            </Link>
+            </NewLink>
           </div>
         );
       },
