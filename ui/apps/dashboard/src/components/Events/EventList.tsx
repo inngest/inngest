@@ -28,7 +28,7 @@ export const EventList = () => {
       <table className="border-subtle relative w-full border-b">
         <thead className="shadow-subtle sticky top-0 z-10 shadow-[0_1px_0]">
           <tr className="h-12">
-            {['Event Name', 'Functions', 'Volume (24hr)'].map((heading, index) => (
+            {['Event Name', 'Functions', 'Volume (24hr)'].map((heading) => (
               <th
                 key={heading}
                 scope="col"

@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@inngest/components/Button';
-import { RiBankCardLine, RiErrorWarningLine } from '@remixicon/react';
+import { Alert } from '@inngest/components/Alert/Alert';
+import { NewButton } from '@inngest/components/Button';
+import { Modal } from '@inngest/components/Modal/Modal';
 import { CardElement, Elements, useElements, useStripe } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { useMutation } from 'urql';
 
-import Modal from '@/components/Modal';
 import { graphql } from '@/gql';
 
 type CheckoutModalProps = {
@@ -22,12 +22,8 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY 
 export default function CheckoutModal({ onCancel, onSuccess }: CheckoutModalProps) {
   return (
     <Modal className="flex min-w-[600px] max-w-xl flex-col gap-4" isOpen={true} onClose={onCancel}>
-      <header className="flex flex-row items-center gap-3">
-        <RiBankCardLine className="h-5 text-indigo-500" />
-        <h2 className="text-lg font-semibold">Update your payment method</h2>
-      </header>
-
-      <div>
+      <Modal.Header>Update your payment method</Modal.Header>
+      <Modal.Body>
         <Elements
           stripe={stripePromise}
           options={{
@@ -37,7 +33,7 @@ export default function CheckoutModal({ onCancel, onSuccess }: CheckoutModalProp
         >
           <CheckoutForm onSuccess={onSuccess} />
         </Elements>
-      </div>
+      </Modal.Body>
     </Modal>
   );
 }
@@ -112,21 +108,19 @@ function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
         <CardElement options={{}} />
       </div>
       <div className="mt-6 flex flex-row justify-end">
-        <Button
+        <NewButton
           type="submit"
           className="px-16"
           disabled={!stripe || loading}
-          btnAction={handleSubmit}
+          onClick={handleSubmit}
           kind="primary"
           label="Change Payment Method"
         />
       </div>
-      {/* TODO - Explore re-use alert from signing key page PR */}
       {Boolean(error) && (
-        <div className="my-4 flex rounded-md border border-red-600 bg-red-100 p-4 text-sm text-red-600">
-          <RiErrorWarningLine className="mr-2 w-4 text-red-600" />
+        <Alert severity="error" className="my-4 text-sm">
           {error}
-        </div>
+        </Alert>
       )}
     </form>
   );

@@ -249,7 +249,7 @@ export function SendEventModal({
               ))}
             </TabCards.ButtonList>
           </div>
-          {true && (
+          {!hasEventKey && (
             <Alert severity="warning" className="mb-2 text-sm">
               There are no Event Keys for this environment. Please create an Event Key in{' '}
               <Link href={pathCreator.keys({ envSlug: environment.slug })} className="underline">
