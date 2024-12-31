@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react';
 
-import { Link } from './Link';
+import { NewLink } from './Link';
 
 const meta = {
   title: 'Components/Link',
-  component: Link,
+  component: NewLink,
   parameters: {
     layout: 'centered',
     docs: {
@@ -20,16 +20,16 @@ const meta = {
     },
   },
   tags: ['autodocs'],
-} satisfies Meta<typeof Link>;
+} satisfies Meta<typeof NewLink>;
 
 export default meta;
 
-type Story = StoryObj<typeof Link>;
+type Story = StoryObj<typeof NewLink>;
 
-export const InternalNavigation: Story = {
+export const ArrowOnHover: Story = {
   args: {
     children: <p>This is a link to inside the app</p>,
-    internalNavigation: true,
+    arrowOnHover: true,
     href: '/app',
   },
   parameters: {
@@ -41,10 +41,10 @@ export const InternalNavigation: Story = {
   },
 };
 
-export const ExternalNavigation: Story = {
+export const MediumLink: Story = {
   args: {
     children: <p>This is a link to outside the app</p>,
-    internalNavigation: false,
+    size: 'medium',
     href: 'inngest.com',
   },
   parameters: {
