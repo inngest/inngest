@@ -13,7 +13,7 @@ import type { Event } from '@inngest/components/types/event';
 import type { Function } from '@inngest/components/types/function';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
 import type { FunctionVersion } from '@inngest/components/types/functionVersion';
-import { classNames } from '@inngest/components/utils/classNames';
+import { cn } from '@inngest/components/utils/classNames';
 import { type RawHistoryItem } from '@inngest/components/utils/historyParser';
 import { devServerURL, useDevServer } from '@inngest/components/utils/useDevServer';
 import type { NavigateToRunFn } from 'node_modules/@inngest/components/src/Timeline/Timeline';
@@ -106,10 +106,7 @@ export function StreamDetails({
 
   return (
     <div
-      className={classNames(
-        'dark grid h-full text-white',
-        hasEventDetails ? 'grid-cols-2' : 'grid-cols-1'
-      )}
+      className={cn('text-basis dark grid h-full', hasEventDetails ? 'grid-cols-2' : 'grid-cols-1')}
     >
       {hasEventDetails && (
         <EventDetails

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { classNames } from '@inngest/components/utils/classNames';
+import { cn } from '@inngest/components/utils/classNames';
 import * as Dialog from '@radix-ui/react-dialog';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -48,7 +48,7 @@ export function SlideOver({ children, onClose, size = 'large' }: SlideOverProps)
               />
             </Dialog.Overlay>
             {/* Content container */}
-            <div className={classNames(size === 'small' ? 'w-2/5' : 'w-4/5', 'fixed inset-0 z-50')}>
+            <div className={cn(size === 'small' ? 'w-2/5' : 'w-4/5', 'fixed inset-0 z-50')}>
               <motion.div
                 className="flex h-full w-screen items-center justify-end"
                 initial={{ x: '100%' }}
@@ -61,7 +61,7 @@ export function SlideOver({ children, onClose, size = 'large' }: SlideOverProps)
               >
                 <Dialog.Content
                   onOpenAutoFocus={(event: Event) => event.preventDefault()}
-                  className={classNames(
+                  className={cn(
                     size === 'small' ? 'w-2/5' : 'w-4/5',
                     'bg-canvasBase flex h-full flex-col shadow-xl'
                   )}
