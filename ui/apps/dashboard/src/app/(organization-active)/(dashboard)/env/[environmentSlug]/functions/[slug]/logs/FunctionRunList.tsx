@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { type Route } from 'next';
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcons';
 import { Link } from '@inngest/components/Link';
 import { Table } from '@inngest/components/Table';
@@ -213,11 +213,12 @@ export default function FunctionRunList({
       />
       {hasNextPage && aggregatedFunctionRuns.length > 0 && (
         <div className="flex justify-center pt-4">
-          <Button
+          <NewButton
             label="Load More"
             appearance="outlined"
+            kind="secondary"
             loading={fetching}
-            btnAction={() => endCursor && setPageCursors([...pageCursors, endCursor])}
+            onClick={() => endCursor && setPageCursors([...pageCursors, endCursor])}
           />
         </div>
       )}

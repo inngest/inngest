@@ -3,7 +3,7 @@
 import { type Route } from 'next';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import { Time } from '@inngest/components/Time';
 import { useQuery } from 'urql';
 
@@ -73,7 +73,7 @@ export function EventLogsPage({
   if (!eventType) {
     return (
       <div className="flex h-full w-full items-center justify-center">
-        <h2 className="text-sm font-semibold text-gray-900">Event type not found</h2>
+        <h2 className="text-sm font-semibold">Event type not found</h2>
       </div>
     );
   }
@@ -85,7 +85,7 @@ export function EventLogsPage({
     if (isFirstPage) {
       return (
         <div className="flex h-full w-full items-center justify-center">
-          <h2 className="text-sm font-semibold text-gray-900">No events yet</h2>
+          <h2 className="text-sm font-semibold">No events yet</h2>
         </div>
       );
     }
@@ -107,25 +107,22 @@ export function EventLogsPage({
         const isActive = pathname === eventPathname;
 
         return (
-          <li key={event.id}>
+          <li key={event.id} className="text-basis">
             <Link
               href={eventPathname as Route}
               className={cn(
-                'flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100',
-                isActive && 'bg-slate-100'
+                'hover:bg-canvasMuted flex items-center gap-3 px-3 py-2.5',
+                isActive && 'bg-canvasSubtle'
               )}
             >
               <div className="flex min-w-0 flex-col gap-1">
                 <Time
-                  className="truncate text-sm font-semibold text-slate-800"
+                  className="truncate text-sm"
                   format="relative"
                   value={new Date(event.receivedAt)}
                 />
 
-                <Time
-                  className="runcate text-sm text-slate-400"
-                  value={new Date(event.receivedAt)}
-                />
+                <Time className="text-subtle truncate text-sm" value={new Date(event.receivedAt)} />
               </div>
             </Link>
           </li>
@@ -134,10 +131,11 @@ export function EventLogsPage({
 
       {isLoadMoreVisible && (
         <div className="mb-8 flex justify-center">
-          <Button
+          <NewButton
             className="mt-4"
-            btnAction={() => onLoadMore(lastEvent.id)}
+            onClick={() => onLoadMore(lastEvent.id)}
             appearance="outlined"
+            kind="secondary"
             label="Load More"
           />
         </div>

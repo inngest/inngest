@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import { defaultLinkStyles } from '@inngest/components/Link';
 import type { Function } from '@inngest/components/types/function';
 import { cn } from '@inngest/components/utils/classNames';
@@ -63,9 +63,10 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
               asChild
               onClick={() => setIsSyncedFunctionsCardOpen(!isSyncedFunctionsCardOpen)}
             >
-              <Button
+              <NewButton
                 className="group"
                 appearance="outlined"
+                kind="secondary"
                 icon={
                   <RiArrowDownSLine className="transform-90 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
                 }
@@ -113,9 +114,10 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
               asChild
               onClick={() => setIsRemovedFunctionsCardOpen(!isRemovedFunctionsCardOpen)}
             >
-              <Button
+              <NewButton
                 className="group"
                 appearance="outlined"
+                kind="secondary"
                 icon={
                   <RiArrowDownSLine className="transform-90 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
                 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
 import { Modal } from '@inngest/components/Modal';
 import { Switch, SwitchLabel, SwitchWrapper } from '@inngest/components/Switch';
@@ -163,9 +163,15 @@ export default function ResyncModal({ appExternalID, isOpen, onClose, url, platf
       </div>
 
       <div className="flex justify-end gap-2 p-6">
-        <Button appearance="outlined" btnAction={onClose} disabled={isSyncing} label="Cancel" />
+        <NewButton
+          appearance="outlined"
+          kind="secondary"
+          onClick={onClose}
+          disabled={isSyncing}
+          label="Cancel"
+        />
 
-        <Button btnAction={onSync} disabled={isSyncing} kind="primary" label="Resync App" />
+        <NewButton onClick={onSync} disabled={isSyncing} kind="primary" label="Resync App" />
       </div>
     </Modal>
   );

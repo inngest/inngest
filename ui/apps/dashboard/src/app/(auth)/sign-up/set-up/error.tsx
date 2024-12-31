@@ -3,8 +3,8 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
-import { Button } from '@inngest/components/Button';
-import { RiErrorWarningLine } from '@remixicon/react';
+import { NewButton } from '@inngest/components/Button';
+import { Error as ErrorElement } from '@inngest/components/Error/Error';
 import * as Sentry from '@sentry/nextjs';
 
 type UserSetupErrorProps = {
@@ -21,18 +21,17 @@ export default function UserSetupError({ error }: UserSetupErrorProps) {
   }, [error]);
 
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-5">
-      <div className="inline-flex items-center gap-2 text-red-600">
-        <RiErrorWarningLine className="h-4 w-4" />
-        <h2 className="text-sm">Failed to set up your user</h2>
-      </div>
-      <Button
-        label="Contact Support"
-        appearance="outlined"
-        btnAction={() => {
-          signOut(() => router.push('/support'));
-        }}
-      />
-    </div>
+    <ErrorElement
+      message="Failed to set up your user"
+      button={
+        <NewButton
+          label="Contact Support"
+          appearance="outlined"
+          onClick={() => {
+            signOut(() => router.push('/support'));
+          }}
+        />
+      }
+    />
   );
 }
