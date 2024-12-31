@@ -1,5 +1,5 @@
 import { InlineCode } from '@inngest/components/InlineCode';
-import { Link, type LinkProps } from '@inngest/components/Link';
+import { NewLink, type NewLinkProps } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
 import { cn } from '@inngest/components/utils/classNames';
@@ -98,11 +98,11 @@ export function TimeElement({ date }: { date: Date }) {
   );
 }
 
-export function LinkElement({ children, href, ...props }: LinkProps) {
+export function LinkElement({ children, href, ...props }: React.PropsWithChildren<NewLinkProps>) {
   return (
-    <Link href={href} {...props}>
+    <NewLink href={href} {...props}>
       {children}
-    </Link>
+    </NewLink>
   );
 }
 

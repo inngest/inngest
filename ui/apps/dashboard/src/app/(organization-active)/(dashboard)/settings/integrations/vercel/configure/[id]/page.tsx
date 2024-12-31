@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
 import { Button } from '@inngest/components/Button/index';
 import { Input } from '@inngest/components/Forms/Input';
-import { Link } from '@inngest/components/Link/Link';
+import { NewLink } from '@inngest/components/Link/Link';
 import { Switch, SwitchLabel, SwitchWrapper } from '@inngest/components/Switch/Switch';
 import { RiAddLine, RiArrowRightSLine, RiDeleteBinLine, RiInformationLine } from '@remixicon/react';
 import { toast } from 'sonner';
@@ -265,9 +265,13 @@ export default function VercelConfigure() {
                   <div className="text-basis text-lg font-medium">Deployment protection key</div>
                   <div className="text-muted text-base font-normal">
                     Used to bypass deployment protection.{' '}
-                    <Link href="https://www.inngest.com/docs/deploy/vercel#bypassing-deployment-protection">
+                    <NewLink
+                      size="medium"
+                      target="_blank"
+                      href="https://www.inngest.com/docs/deploy/vercel#bypassing-deployment-protection"
+                    >
                       Learn more
-                    </Link>
+                    </NewLink>
                   </div>
                   <Input
                     className={`text-basis mt-4 h-10 px-2 py-2 text-base ${

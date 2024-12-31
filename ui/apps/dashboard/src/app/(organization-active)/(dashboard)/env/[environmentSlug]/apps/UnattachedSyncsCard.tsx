@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Link as InngestLink } from '@inngest/components/Link';
+import { NewLink as InngestLink } from '@inngest/components/Link';
 import { Time } from '@inngest/components/Time';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowRightSLine } from '@remixicon/react';
@@ -43,11 +43,7 @@ export function UnattachedSyncsCard({ className, envSlug, latestSyncTime }: Prop
             className="col-span-2"
             detail={
               <div className="flex gap-2">
-                <InngestLink
-                  internalNavigation
-                  showIcon={false}
-                  href={pathCreator.unattachedSyncs({ envSlug })}
-                >
+                <InngestLink size="medium" href={pathCreator.unattachedSyncs({ envSlug })}>
                   <Time value={latestSyncTime} />
                 </InngestLink>
               </div>

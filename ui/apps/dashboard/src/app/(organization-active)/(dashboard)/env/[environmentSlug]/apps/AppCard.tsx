@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { Link as InngestLink } from '@inngest/components/Link';
+import { NewLink as InngestLink } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
 import { cn } from '@inngest/components/utils/classNames';
@@ -71,7 +71,7 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
       </Link>
       <div className="flex h-56 flex-1 flex-col">
         {app.latestSync?.error && (
-          <div className="bg-red-100 px-8 py-2 text-red-800">{app.latestSync.error}</div>
+          <div className="text-error bg-error px-8 py-2">{app.latestSync.error}</div>
         )}
 
         <div className={cn(cardRightPanelStyles, 'h-full')}>
@@ -84,8 +84,7 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
                   <div className="flex items-center gap-2">
                     <SyncStatusPill status={app.latestSync.status} />
                     <InngestLink
-                      internalNavigation
-                      showIcon={false}
+                      size="medium"
                       href={pathCreator.appSyncs({ envSlug, externalAppID: app.externalID })}
                     >
                       <Time value={app.latestSync.lastSyncedAt} />
