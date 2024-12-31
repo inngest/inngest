@@ -1,10 +1,9 @@
 'use client';
 
 import { useEffect } from 'react';
-import { Button } from '@inngest/components/Button';
-import { Error as ErrorElement } from '@inngest/components/Error/Error';
-import { RiLoopLeftLine } from '@remixicon/react';
 import * as Sentry from '@sentry/nextjs';
+
+import { FatalError } from '@/components/FatalError';
 
 type EventLogsErrorPops = {
   error: Error & { digest?: string };
@@ -16,18 +15,5 @@ export default function EventLogsError({ error, reset }: EventLogsErrorPops) {
     Sentry.captureException(error);
   }, [error]);
 
-  return (
-    <ErrorElement
-      message="Failed to load logs for event"
-      button={
-        <Button
-          label="Reload"
-          appearance="outlined"
-          iconSide="right"
-          icon={<RiLoopLeftLine />}
-          onClick={() => reset()}
-        />
-      }
-    />
-  );
+  return <FatalError error={error} reset={reset} />;
 }
