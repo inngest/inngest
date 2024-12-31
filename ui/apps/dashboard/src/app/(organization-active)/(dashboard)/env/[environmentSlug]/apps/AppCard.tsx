@@ -134,7 +134,7 @@ export function EmptyAppCard({
 }) {
   return (
     <div className={cn(cardWrapperStyles, className)}>
-      <div className={cn(cardLeftPanelStyles, 'bg-slate-910 items-center overflow-hidden')}>
+      <div className={cn(cardLeftPanelStyles, 'items-center overflow-hidden bg-black')}>
         <Image src={AppDiagramImage} alt="App diagram" className="object-none md:object-fill" />
       </div>
       <div className={cn(cardRightPanelStyles, 'flex-1')}>
@@ -148,11 +148,11 @@ export function EmptyAppCard({
         </p>
         <ol className="mt-3 flex flex-col gap-3">
           <li className="flex items-center gap-2">
-            <span className="h-6 w-6 rounded-full bg-slate-400 text-center text-white">1</span>
+            <span className="bg-canvasSubtle text-basis h-6 w-6 rounded-full text-center">1</span>
             <span className="flex-1">Deploy your code to your hosted platform of choice.</span>
           </li>
           <li className="flex items-center gap-2">
-            <span className="h-6 w-6 rounded-full bg-slate-400 text-center text-white">2</span>
+            <span className="bg-canvasSubtle text-basis h-6 w-6 rounded-full text-center">2</span>
             <span className="flex-1">Sync with Inngest.</span>
           </li>
         </ol>

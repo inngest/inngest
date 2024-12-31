@@ -10,7 +10,6 @@ import {
   getButtonColors,
   getButtonSizeStyles,
   getIconSizeStyles,
-  getKeyColor,
   getSpinnerStyles,
 } from './buttonStyles';
 
@@ -104,7 +103,6 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     const buttonSizes = getButtonSizeStyles({ size, icon, label });
     const spinnerStyles = getSpinnerStyles({ kind, appearance });
     const iconSizes = getIconSizeStyles({ size });
-    const keyColor = getKeyColor({ kind, appearance });
 
     const iconElement = React.isValidElement(icon)
       ? React.cloneElement(icon as React.ReactElement, {
@@ -128,23 +126,6 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         {icon && iconSide === 'right' && (
           <span className={cn(size === 'small' ? 'pl-1' : 'pl-1.5')}>{iconElement}</span>
         )}
-        {/* {keys && (
-          <kbd className="ml-auto flex items-center gap-1">
-            {keys.map((key, i) => (
-              <kbd
-                key={i}
-                className={cn(
-                  disabled
-                    ? 'bg-slate-200 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
-                    : keyColor,
-                  'ml-auto flex h-6 w-6 items-center justify-center rounded font-sans text-xs'
-                )}
-              >
-                {key}
-              </kbd>
-            ))}
-          </kbd>
-        )} */}
       </>
     );
 
