@@ -4,8 +4,7 @@ import type { UrlObject } from 'url';
 import type { Route } from 'next';
 import Link from 'next/link';
 import { Menu } from '@headlessui/react';
-
-import cn from '@/utils/cn';
+import { cn } from '@inngest/components/utils/classNames';
 
 export type DropdownItemComponentProps = {
   className: string;

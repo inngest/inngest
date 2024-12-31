@@ -4,10 +4,10 @@ import { type Route } from 'next';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Time } from '@inngest/components/Time';
+import { cn } from '@inngest/components/utils/classNames';
 import { RiTimeLine } from '@remixicon/react';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import cn from '@/utils/cn';
 import { getManageKey } from '@/utils/urls';
 
 type KeysListItemProps = {

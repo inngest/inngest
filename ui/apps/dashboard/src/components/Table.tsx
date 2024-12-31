@@ -1,4 +1,4 @@
-import cn from '@/utils/cn';
+import { cn } from '@inngest/components/utils/classNames';
 
 type Row = Record<string, any>;
 

@@ -5,11 +5,11 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import { Time } from '@inngest/components/Time';
+import { cn } from '@inngest/components/utils/classNames';
 import { useQuery } from 'urql';
 
 import { graphql } from '@/gql';
 import LoadingIcon from '@/icons/LoadingIcon';
-import cn from '@/utils/cn';
 
 const perPage = 50;
 

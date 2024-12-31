@@ -7,6 +7,7 @@ import { usePathname, useRouter, useSelectedLayoutSegments } from 'next/navigati
 import { Listbox } from '@headlessui/react';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
+import { cn } from '@inngest/components/utils/classNames';
 import {
   RiCloudFill,
   RiCloudLine,
@@ -16,7 +17,6 @@ import {
 } from '@remixicon/react';
 
 import { useEnvironments } from '@/queries';
-import cn from '@/utils/cn';
 import {
   EnvironmentType,
   getDefaultEnvironment,

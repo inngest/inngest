@@ -3,10 +3,10 @@
 import { notFound } from 'next/navigation';
 import { EventDetails } from '@inngest/components/EventDetails';
 import { RunDetails } from '@inngest/components/RunDetails';
+import { cn } from '@inngest/components/utils/classNames';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
-import cn from '@/utils/cn';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { StreamDetails } from './StreamDetails';
 

@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Switch } from '@inngest/components/Switch';
+import { cn } from '@inngest/components/utils/classNames';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
-import cn from '@/utils/cn';
 import { type Environment } from '@/utils/environments';
 import { notNullish } from '@/utils/typeGuards';
 import { pathCreator } from '@/utils/urls';

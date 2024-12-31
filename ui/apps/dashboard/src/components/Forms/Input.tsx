@@ -1,6 +1,5 @@
 import { forwardRef, type HTMLAttributes } from 'react';
-
-import cn from '@/utils/cn';
+import { cn } from '@inngest/components/utils/classNames';
 
 type InputProps = {
   defaultValue?: HTMLAttributes<HTMLInputElement>['defaultValue'];

@@ -2,9 +2,8 @@
 
 import { Fragment } from 'react';
 import { Menu, Transition } from '@headlessui/react';
+import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowDownSLine } from '@remixicon/react';
-
-import cn from '@/utils/cn';
 
 const contextButtonStyles = {
   light:

@@ -3,12 +3,12 @@
 import { Fragment, useRef } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
 import { getStatusBackgroundClass, getStatusBorderClass } from '@inngest/components/statusClasses';
+import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowDownSLine, RiCloseLine } from '@remixicon/react';
 import { noCase } from 'change-case';
 import { titleCase } from 'title-case';
 
 import { FunctionRunStatus } from '@/gql/graphql';
-import cn from '@/utils/cn';
 import getOrderedEnumValues from '@/utils/getOrderedEnumValues';
 
 const orderedStatuses = getOrderedEnumValues(FunctionRunStatus, [
