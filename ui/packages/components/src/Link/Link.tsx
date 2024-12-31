@@ -22,7 +22,7 @@ export type NewLinkProps = CustomLinkProps & LinkProps;
 export function NewLink({
   href,
   className,
-  size = 'medium',
+  size = 'small',
   iconBefore,
   iconAfter,
   children,

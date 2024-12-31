@@ -153,7 +153,7 @@
     --color-border-success: var(--color-matcha-700);
     --color-border-error: var(--color-ruby-600);
     --color-border-warning: var(--color-honey-600);
-    --color-border-info: var(--color-purplehaze-700);
+    --color-border-info: var(--color-breeze-700);
 
     --color-primary-3xSubtle: var(--color-matcha-100);
     --color-primary-2xSubtle: var(--color-matcha-200);
@@ -258,7 +258,7 @@
     --color-border-success: var(--color-matcha-500);
     --color-border-error: var(--color-ruby-300);
     --color-border-warning: var(--color-honey-300);
-    --color-border-info: var(--color-purplehaze-300);
+    --color-border-info: var(--color-breeze-300);
 
     --color-primary-3xSubtle: var(--color-matcha-900);
     --color-primary-2xSubtle: var(--color-matcha-800);

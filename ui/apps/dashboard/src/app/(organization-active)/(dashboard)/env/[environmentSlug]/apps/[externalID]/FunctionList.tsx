@@ -63,7 +63,7 @@ function useColumns({ envSlug }: { envSlug: string }) {
           </div>
         );
       },
-      header: 'Function Name',
+      header: 'Function name',
     }),
     columnHelper.accessor('triggers', {
       cell: (props) => {

@@ -2,7 +2,7 @@
 
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card';
 import { InlineCode } from '@inngest/components/InlineCode';
 import { RiErrorWarningLine } from '@remixicon/react';
@@ -20,13 +20,13 @@ export default function EventListNotFound() {
   const key = res.data?.defaultKey.presharedKey;
 
   return (
-    <div className="h-full w-full overflow-y-scroll py-16">
+    <div className="text-basis h-full w-full overflow-y-scroll py-16">
       <div className="mx-auto flex w-[640px] flex-col gap-4">
         <div className="text-center">
-          <h3 className="mb-4 flex items-center justify-center gap-1 rounded-lg border border-indigo-100 bg-indigo-50 py-2.5 text-lg font-semibold text-indigo-500">
-            <RiErrorWarningLine className="mt-0.5 h-5 w-5 text-indigo-700" />
+          <h3 className="border-info bg-info text-info mb-4 flex items-center justify-center gap-1 rounded-lg border py-2.5 text-lg font-semibold">
+            <RiErrorWarningLine className="text-info h-5 w-5" />
             <span>
-              No Events <span className="font-medium text-indigo-900">received in</span>{' '}
+              No Events <span className="text-info font-normal">received in</span>{' '}
               {environment.name}
             </span>
           </h3>
@@ -36,7 +36,7 @@ export default function EventListNotFound() {
           <Card.Content>
             <div>
               <h3 className="mb-2 flex items-center text-xl font-medium">
-                <span className="mr-2 inline-flex h-6 w-6  items-center justify-center rounded-full bg-slate-700 text-center text-sm text-white">
+                <span className="bg-canvasMuted mr-2 inline-flex h-6  w-6 items-center justify-center rounded-full text-center text-sm">
                   1
                 </span>
                 Send your events
@@ -62,13 +62,13 @@ export default function EventListNotFound() {
             </div>
 
             <div className="mt-6 flex items-center gap-2">
-              <Button
+              <NewButton
                 kind="primary"
                 href={pathCreator.apps({ envSlug: environment.slug })}
                 label="Sync Your App"
               />
               <div className="flex gap-2 pl-2">
-                <Button
+                <NewButton
                   appearance="outlined"
                   href={
                     'https://www.inngest.com/docs/deploy/vercel?ref=app-onboarding-events' as Route
@@ -78,7 +78,7 @@ export default function EventListNotFound() {
                   icon={<VercelLogomark className="-ml-0.5" />}
                   label="Vercel Integration"
                 />
-                <Button
+                <NewButton
                   appearance="outlined"
                   target="_blank"
                   href={'https://www.inngest.com/docs/events?ref=app-onboarding-events' as Route}
@@ -91,21 +91,22 @@ export default function EventListNotFound() {
 
         <Card>
           <Card.Content>
-            <h3 className="flex items-center text-xl font-semibold text-slate-800">
-              <span className="mr-2 inline-flex h-6 w-6  items-center justify-center rounded-full bg-slate-800 text-center text-sm text-white">
+            <h3 className="flex items-center text-xl font-medium">
+              <span className="bg-canvasMuted mr-2 inline-flex h-6  w-6 items-center justify-center rounded-full text-center text-sm">
                 2
               </span>
               Trigger Functions With Events
             </h3>
-            <p className="mt-2 text-sm font-medium text-slate-500">
+            <p className="mt-2 text-sm">
               After registering your functions, you can trigger them with events sent to this
               environment. Your events will show up on this page when they are received.
             </p>
             <div className="mt-6 flex items-center gap-2">
-              <Button
+              <NewButton
                 appearance="outlined"
+                kind="secondary"
                 target="_blank"
-                btnAction={() => router.refresh()}
+                onClick={() => router.refresh()}
                 label="Refresh page to check for events"
               />
             </div>

@@ -17,9 +17,7 @@ export const EventInfo = () => (
       </div>
 
       <div className="px-4 py-2">
-        <Link href={'https://www.inngest.com/docs/events'} className="text-md">
-          Learn how events work
-        </Link>
+        <Link href={'https://www.inngest.com/docs/events'}>Learn how events work</Link>
       </div>
     </TooltipContent>
   </Tooltip>
