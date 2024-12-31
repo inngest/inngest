@@ -2,7 +2,7 @@ import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
 
 export default function AppFAQ() {
   return (
-    <AccordionList className="divide-y- rounded-none border-0" type="multiple" defaultValue={[]}>
+    <AccordionList className="rounded-none border-0" type="multiple" defaultValue={[]}>
       <AccordionList.Item value="FAQ">
         <AccordionList.Trigger className="text-muted text-sm data-[state=open]:border-0">
           NEED HELP SETTING UP YOUR APP?

@@ -52,7 +52,7 @@ export default function LatestLogsList({ environmentSlug, eventName }: LatestLog
   return (
     <>
       <header className="flex items-center justify-between gap-3 py-3 pl-4 pr-2">
-        <h1 className="text-basis font-semibold">Latest</h1>
+        <h1 className="text-basis font-medium">Latest</h1>
         <NewButton
           appearance="outlined"
           kind="secondary"

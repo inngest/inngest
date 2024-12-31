@@ -168,6 +168,8 @@ export default {
         tooltipArrow: 'rgb(var(--color-background-canvas-base) / <alpha-value>)',
         onContrast: 'rgb(var(--color-foreground-onContrast) / <alpha-value>)',
         subtle: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
+        muted: 'rgb(var(--color-foreground-muted) / <alpha-value>)',
+        disabled: 'rgb(var(--color-foreground-disabled) / <alpha-value>)',
         alwaysWhite: 'rgb(var(--color-foreground-alwaysWhite) / <alpha-value>)',
         btnPrimary: 'rgb(var(--color-foreground-btn-primary) / <alpha-value>)',
         btnDanger: 'rgb(var(--color-foreground-btn-danger) / <alpha-value>)',

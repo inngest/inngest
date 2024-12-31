@@ -43,9 +43,9 @@ export default function Environments() {
 
         <Link
           href={process.env.NEXT_PUBLIC_HOME_PATH as Route}
-          className="bg-contrast hover:bg-contrast/80 mt-4 flex items-center justify-between rounded-lg px-4 py-4"
+          className="bg-surfaceMuted hover:bg-surfaceMuted/80 mt-4 flex items-center justify-between rounded-lg px-4 py-4"
         >
-          <h3 className="text-onContrast flex items-center gap-2 text-sm font-medium tracking-wide">
+          <h3 className="flex items-center gap-2 text-sm font-medium tracking-wide">
             <span className="bg-primary-moderate block h-2 w-2 rounded-full" />
             Production
           </h3>

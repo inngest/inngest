@@ -115,17 +115,21 @@ export function CancelFunctionModal(props: Props) {
             />
           </div>
 
-          <Alert severity="info">
+          <Alert severity="info" className="text-sm">
             This action will affect only queued and running function runs. All affected function
             runs will immediately cancel, but their status may not update immediately.
           </Alert>
 
           {countRes.error && (
-            <Alert severity="error">Failed to query run count: {countRes.error.message}</Alert>
+            <Alert severity="error" className="text-sm">
+              Failed to query run count: {countRes.error.message}
+            </Alert>
           )}
 
           {creationError && (
-            <Alert severity="error">Failed to create cancellation: {creationError.message}</Alert>
+            <Alert severity="error" className="text-sm">
+              Failed to create cancellation: {creationError.message}
+            </Alert>
           )}
         </div>
       </Modal.Body>

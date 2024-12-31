@@ -291,7 +291,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
             <Link href="https://inngest.com/docs/platform/replay">Learn more about replay</Link>
           </div>
         </div>
-        <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-5 py-4">
+        <div className="border-subtle flex items-center justify-between gap-2 border-t px-5 py-4">
           {!timeRange && <p></p>}
           {timeRange && !isLoading && (
             <div className="flex items-center gap-2">

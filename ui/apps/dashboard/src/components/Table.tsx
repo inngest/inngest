@@ -19,9 +19,9 @@ export default function Table<T extends Row>({
   empty = 'No results',
 }: TableProps<T>) {
   return (
-    <div className="w-full overflow-hidden rounded-lg border border-slate-200">
-      <table className="w-full table-fixed divide-y divide-slate-200 bg-white text-sm text-slate-500">
-        <thead className="h-full text-left">
+    <div className="border-subtle w-full overflow-hidden rounded-lg border">
+      <table className="divide-subtle bg-canvasBase text-basis w-full table-fixed divide-y text-sm">
+        <thead className="text-muted h-full text-left">
           <tr>
             {columns.map((column, idx) => (
               <th key={idx} className={cn('p-3 font-semibold', column.className)} scope="col">
@@ -30,7 +30,7 @@ export default function Table<T extends Row>({
             ))}
           </tr>
         </thead>
-        <tbody className="h-full divide-y divide-slate-200 text-slate-900">
+        <tbody className="divide-subtle h-full divide-y">
           {data.length ? (
             data.map((row, idx) => (
               <tr className="truncate" key={`tr-${idx}`}>

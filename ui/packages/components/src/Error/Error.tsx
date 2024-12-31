@@ -4,13 +4,14 @@ import { NewLink } from '@inngest/components/Link/Link';
 //
 // A thin wrapper around Alert for a standard error + contact support message
 export const Error = ({ message }: { message: string }) => (
-  <Alert severity="error" className="mb-4 inline w-full">
-    {message} If the problem persists, contact support
+  <Alert severity="error" className="mb-4 w-full">
+    {message} If the problem persists,
     <NewLink
       href="/support"
+      size="medium"
       className="text-error decoration-error hover:decoration-error ml-1 inline"
     >
-      here
+      contact support
     </NewLink>
     .
   </Alert>

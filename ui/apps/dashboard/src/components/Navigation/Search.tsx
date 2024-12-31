@@ -193,17 +193,15 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
           value={search}
           onValueChange={setSearch}
           className={cn(
-            search && 'border-b border-slate-200 focus:border-slate-200',
-            'w-[656px] border-0 px-3 py-3 placeholder-slate-500 outline-none focus:ring-0'
+            search && 'border-subtle focus:border-subtle border-b',
+            'placeholder-disabled w-[656px] border-0 px-3 py-3 outline-none focus:ring-0'
           )}
         />
         {search && (
-          <Command.List className="px-3 py-3 text-slate-600">
+          <Command.List className="text-subtle px-3 py-3">
             {isLoading && <Command.Loading>Searching...</Command.Loading>}
             {!isLoading && globalResults && (
-              <Command.Group
-                heading={<div className="pb-2 text-xs text-slate-500">Navigate To</div>}
-              >
+              <Command.Group heading={<div className="text-muted pb-2 text-xs">Navigate To</div>}>
                 <Command.Item
                   onSelect={() => {
                     router.push(searchResult.href as Route);
@@ -211,7 +209,7 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
                   }}
                   key={globalResults.env.id}
                   value={globalResults.env.name}
-                  className="group flex cursor-pointer items-center rounded-md px-3 py-3 data-[selected]:bg-slate-100"
+                  className="data-[selected]:bg-canvasSubtle/50 group flex cursor-pointer items-center rounded-md px-3 py-3"
                 >
                   <div className="flex items-center gap-2 truncate">
                     {searchResult.icon}
@@ -219,9 +217,9 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
                   </div>
                   <kbd
                     aria-label="press enter to jump to page"
-                    className="ml-auto hidden rounded bg-slate-200 p-1.5 text-white group-data-[selected]:block"
+                    className="bg-subtle ml-auto hidden rounded p-1.5 group-data-[selected]:block"
                   >
-                    <RiArrowGoForwardLine className="h-3 w-3 rotate-180 text-slate-600" />
+                    <RiArrowGoForwardLine className="text-subtle h-3 w-3 rotate-180" />
                   </kbd>
                 </Command.Item>
               </Command.Group>

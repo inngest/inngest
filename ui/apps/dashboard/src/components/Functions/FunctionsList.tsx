@@ -31,7 +31,7 @@ export const FunctionList = ({ envSlug, archived }: FunctionListProps) => {
   }
 
   return (
-    <div className="bg-canvasBase flex min-h-0 flex-1 flex-col divide-y">
+    <div className="bg-canvasBase divide-subtle flex min-h-0 flex-1 flex-col divide-y">
       <div className="mx-4 my-1 flex h-10 flex-row items-center justify-start">
         <StatusMenu archived={!!archived} envSlug={envSlug} />
         {isSearchEnabled && (

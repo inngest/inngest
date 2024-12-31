@@ -81,7 +81,7 @@ export default function LatestFailedFunctionRuns({
   return (
     <div>
       <header className="flex items-center justify-between gap-3 py-3">
-        <h1 className="text-basis font-semibold">Latest Failed Runs</h1>
+        <h1 className="text-basis font-medium">Latest Failed Runs</h1>
         <NewButton
           appearance="outlined"
           kind="secondary"
