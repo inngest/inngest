@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import { RiAddLine } from '@remixicon/react';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -48,18 +48,19 @@ export function Apps({ isArchived = false }: Props) {
         {!hasApps && !isArchived && (
           <EmptyAppCard className="mb-4">
             <div className="items-center md:items-start">
-              <Button
+              <NewButton
                 className="mt-4"
                 kind="primary"
-                label="Sync App"
-                btnAction={() => router.push(pathCreator.createApp({ envSlug: env.slug }))}
+                label="Sync app"
+                onClick={() => router.push(pathCreator.createApp({ envSlug: env.slug }))}
                 icon={<RiAddLine />}
+                iconSide="left"
               />
             </div>
           </EmptyAppCard>
         )}
         {!hasApps && isArchived && (
-          <p className="rounded-lg bg-slate-500 p-4 text-center text-white">No archived apps</p>
+          <p className="bg-surfaceSubtle text-basis rounded-lg p-4 text-center">No archived apps</p>
         )}
         {sortedApps.map((app) => {
           return (

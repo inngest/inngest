@@ -98,7 +98,6 @@ const columns = [
         <InvokeButton
           disabled={false}
           doesFunctionAcceptPayload={doesFunctionAcceptPayload}
-          btnAppearance="outlined"
           btnAction={async ({ data, user }) => {
             await invokeFunction({
               data,

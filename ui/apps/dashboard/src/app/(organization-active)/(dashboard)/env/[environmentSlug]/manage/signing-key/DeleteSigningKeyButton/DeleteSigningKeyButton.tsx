@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import { RiDeleteBin2Line } from '@remixicon/react';
 
 import { DeleteSigningKeyModal } from './DeleteSigningKeyModal';
@@ -15,14 +15,13 @@ export function DeleteSigningKeyButton({ signingKeyID }: Props) {
 
   return (
     <>
-      <Button
+      <NewButton
         appearance="outlined"
         aria-label="Delete"
-        btnAction={() => setIsModalOpen(true)}
+        onClick={() => setIsModalOpen(true)}
         icon={<RiDeleteBin2Line />}
         kind="danger"
         size="small"
-        tooltip="Delete"
       />
 
       <DeleteSigningKeyModal

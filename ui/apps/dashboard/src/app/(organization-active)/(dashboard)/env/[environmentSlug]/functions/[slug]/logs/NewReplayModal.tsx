@@ -17,7 +17,6 @@ import { ulid } from 'ulid';
 import { useMutation, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import Placeholder from '@/components/Placeholder';
 import { graphql } from '@/gql';
 import { ReplayRunStatus } from '@/gql/graphql';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
@@ -267,14 +266,14 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
                   {timeRange && (
                     <p aria-label={`Number of ${label} runs`} className="text-muted text-sm">
                       {isLoading ? (
-                        <Placeholder className="top-px inline-flex h-3 w-3 bg-slate-200" />
+                        <span>Loading</span>
                       ) : (
                         count.toLocaleString(undefined, {
                           notation: 'compact',
                           compactDisplay: 'short',
                         })
                       )}{' '}
-                      runs
+                      runs {isLoading ? '...' : undefined}
                     </p>
                   )}
                 </ToggleGroup.Item>
@@ -294,19 +293,15 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
         </div>
         <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-5 py-4">
           {!timeRange && <p></p>}
-          {timeRange && (
+          {timeRange && !isLoading && (
             <div className="flex items-center gap-2">
               <p className="text-muted inline-flex items-center gap-1.5 text-sm">
                 <RiInformationLine className="h-5 w-5" />A total of{' '}
                 <span className="font-bold">
-                  {isLoading ? (
-                    <Placeholder className="top-px inline-flex h-4 w-4 bg-slate-200" />
-                  ) : (
-                    selectedRunsCount.toLocaleString(undefined, {
-                      notation: 'compact',
-                      compactDisplay: 'short',
-                    })
-                  )}
+                  {selectedRunsCount.toLocaleString(undefined, {
+                    notation: 'compact',
+                    compactDisplay: 'short',
+                  })}
                 </span>
                 runs will be replayed.
               </p>

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import NextLink from 'next/link';
 import { useParams } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
-import { Button } from '@inngest/components/Button/Button';
 import { NewButton } from '@inngest/components/Button/index';
 import { Link } from '@inngest/components/Link/Link';
 import { Switch, SwitchLabel, SwitchWrapper } from '@inngest/components/Switch/Switch';
@@ -231,10 +230,11 @@ export default function VercelConfigure() {
                     </div>
 
                     {paths.length > 1 && (
-                      <Button
+                      <NewButton
                         kind="danger"
                         appearance="outlined"
                         icon={<RiDeleteBinLine className="h-5 w-5" />}
+                        iconSide="left"
                         className="h-10 w-10"
                         onClick={() => setPaths(paths.filter((_, n) => n !== i))}
                       />

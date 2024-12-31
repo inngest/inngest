@@ -36,7 +36,7 @@ export function UnattachedSyncsCard({ className, envSlug, latestSyncTime }: Prop
       </Link>
       <div className={cardRightPanelStyles}>
         <dl className="grid grid-cols-2 gap-4 min-[900px]:grid-cols-3">
-          <p className="col-span-2 md:col-span-3">
+          <p className="text-basis col-span-2 md:col-span-3">
             Unattached syncs are failed syncs that could not be associated with an app.
           </p>
           <Description
