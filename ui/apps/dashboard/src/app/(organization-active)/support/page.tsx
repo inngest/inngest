@@ -278,7 +278,7 @@ function SupportTickets({ isSignedIn }: { isSignedIn?: boolean }) {
             </div>
           ))
         ) : (
-          <div className="px-2 py-2">'No open tickets'</div>
+          <div className="px-2 py-2">No open tickets</div>
         )}
       </div>
     </div>

@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { NewButton } from '@inngest/components/Button';
 import { Error as ErrorElement } from '@inngest/components/Error/Error';
-import { RiErrorWarningLine, RiLoopLeftLine } from '@remixicon/react';
+import { RiLoopLeftLine } from '@remixicon/react';
 import * as Sentry from '@sentry/nextjs';
 
 type VercelIntegrationErrorProps = {
