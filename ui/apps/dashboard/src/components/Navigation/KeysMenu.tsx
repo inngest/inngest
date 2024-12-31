@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import NextLink from 'next/link';
 import { Listbox } from '@headlessui/react';
 import { Button } from '@inngest/components/Button';
 import { RiEqualizer2Line } from '@remixicon/react';
@@ -26,22 +26,22 @@ export default function KeysMenu({
       </Listbox.Button>
       <div className="relative">
         <Listbox.Options className="bg-canvasBase absolute left-0 z-50 ml-1 w-[137px] gap-y-0.5 rounded border shadow">
-          <Link href={`/env/${activeEnv.slug}/manage/keys`} prefetch={true}>
+          <NextLink href={`/env/${activeEnv.slug}/manage/keys`} prefetch={true}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="eventKeys"
             >
               Event keys
             </Listbox.Option>
-          </Link>
-          <Link href={`/env/${activeEnv.slug}/manage/signing-key`} prefetch={true}>
+          </NextLink>
+          <NextLink href={`/env/${activeEnv.slug}/manage/signing-key`} prefetch={true}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="signingKeys"
             >
               Signing keys
             </Listbox.Option>
-          </Link>
+          </NextLink>
         </Listbox.Options>
       </div>
     </Listbox>

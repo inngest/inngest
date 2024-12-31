@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import Link from 'next/link';
+import NextLink from 'next/link';
 import { Button } from '@inngest/components/Button';
 import { defaultLinkStyles } from '@inngest/components/Link';
 import type { Function } from '@inngest/components/types/function';
@@ -80,7 +80,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                   const isLast = i === syncedFunctions.length - 1;
 
                   return (
-                    <Link
+                    <NextLink
                       href={pathCreator.function({ envSlug: env.slug, functionSlug: fn.slug })}
                       key={fn.id}
                     >
@@ -94,7 +94,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                         {fn.name}
                         <RiArrowRightLine className="h-3 w-3 -translate-x-3 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
                       </div>
-                    </Link>
+                    </NextLink>
                   );
                 })}
               </CollapsibleCardContent>
@@ -130,7 +130,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                 const isLast = i === removedFunctions.length - 1;
 
                 return (
-                  <Link
+                  <NextLink
                     href={pathCreator.function({ envSlug: env.slug, functionSlug: fn.slug })}
                     key={fn.id}
                   >
@@ -144,7 +144,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                       {fn.name}
                       <RiArrowRightLine className="h-3 w-3 -translate-x-3 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
                     </div>
-                  </Link>
+                  </NextLink>
                 );
               })}
 

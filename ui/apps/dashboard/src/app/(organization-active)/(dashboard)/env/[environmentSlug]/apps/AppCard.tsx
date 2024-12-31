@@ -1,8 +1,8 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link';
-import { Link as InngestLink } from '@inngest/components/Link';
+import NextLink from 'next/link';
+import { Link } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
 import { cn } from '@inngest/components/utils/classNames';
@@ -47,7 +47,7 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
   const latestSyncURL = app.latestSync?.url?.replace(/^https:\/\//, '').replace(/\?.+$/, '');
   return (
     <div className={cn(cardWrapperStyles, className)}>
-      <Link
+      <NextLink
         href={pathCreator.app({ envSlug, externalAppID: app.externalID })}
         className={cn(cardLeftPanelStyles, 'hover:bg-canvasMuted transition-colors duration-300')}
       >
@@ -68,7 +68,7 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
             </dd>
           </dl>
         )}
-      </Link>
+      </NextLink>
       <div className="flex h-56 flex-1 flex-col">
         {app.latestSync?.error && (
           <div className="text-error bg-error px-8 py-2">{app.latestSync.error}</div>
@@ -83,12 +83,12 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
                 app.latestSync && (
                   <div className="flex items-center gap-2">
                     <SyncStatusPill status={app.latestSync.status} />
-                    <InngestLink
+                    <Link
                       size="medium"
                       href={pathCreator.appSyncs({ envSlug, externalAppID: app.externalID })}
                     >
                       <Time value={app.latestSync.lastSyncedAt} />
-                    </InngestLink>
+                    </Link>
                   </div>
                 )
               }

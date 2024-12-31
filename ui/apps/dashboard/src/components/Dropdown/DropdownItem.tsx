@@ -2,7 +2,7 @@
 
 import type { UrlObject } from 'url';
 import type { Route } from 'next';
-import Link from 'next/link';
+import NextLink from 'next/link';
 import { Menu } from '@headlessui/react';
 import { cn } from '@inngest/components/utils/classNames';
 
@@ -51,9 +51,9 @@ export default function DropdownItem<PassedHref extends string>({
 
   return (
     <Menu.Item>
-      <Link href={href} target={target} rel={rel} className={className}>
+      <NextLink href={href} target={target} rel={rel} className={className}>
         {children}
-      </Link>
+      </NextLink>
     </Menu.Item>
   );
 }

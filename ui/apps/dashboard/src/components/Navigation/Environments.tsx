@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { type Route } from 'next';
-import Link from 'next/link';
+import NextLink from 'next/link';
 import { usePathname, useRouter, useSelectedLayoutSegments } from 'next/navigation';
 import { Listbox } from '@headlessui/react';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
@@ -195,25 +195,25 @@ export default function EnvironmentSelectMenu({
                   <EnvironmentItem key={env.id} environment={env} variant="compact" />
                 ))
               ) : (
-                <Link
+                <NextLink
                   href="/env"
                   className="bg-canvasBase hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal"
                 >
                   <RiLoopLeftLine className="h-3 w-3" />
                   Sync a branch
-                </Link>
+                </NextLink>
               )}
             </div>
 
             <div>
-              <Link
+              <NextLink
                 prefetch={true}
                 href="/env"
                 className="hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-2 whitespace-nowrap px-3 text-[13px] font-normal"
               >
                 <RiCloudFill className="h-3 w-3" />
                 View All Environments
-              </Link>
+              </NextLink>
             </div>
           </Listbox.Options>
         </div>

@@ -1,6 +1,6 @@
 import type { UrlObject } from 'url';
 import type { Route } from 'next';
-import Link from 'next/link';
+import NextLink from 'next/link';
 import { IconApp } from '@inngest/components/icons/App';
 import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
@@ -44,9 +44,9 @@ export function Pill({
 
   if (href) {
     return (
-      <Link href={href} className={cn('rounded', classNames)}>
+      <NextLink href={href} className={cn('rounded', classNames)}>
         {children}
-      </Link>
+      </NextLink>
     );
   }
 

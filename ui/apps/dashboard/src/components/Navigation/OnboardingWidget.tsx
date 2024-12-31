@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import NextLink from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import { MenuItem } from '@inngest/components/Menu/MenuItem';
@@ -46,7 +46,7 @@ export default function OnboardingWidget({
       )}
 
       {!collapsed && (
-        <Link
+        <NextLink
           href={pathCreator.onboardingSteps({
             step: nextStep ? nextStep.name : lastCompletedStep?.name,
             ref: 'app-onboarding-widget',
@@ -115,7 +115,7 @@ export default function OnboardingWidget({
               />
             )}
           </div>
-        </Link>
+        </NextLink>
       )}
     </>
   );

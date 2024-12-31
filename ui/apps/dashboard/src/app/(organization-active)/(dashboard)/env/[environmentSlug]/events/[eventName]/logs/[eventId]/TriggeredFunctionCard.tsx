@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import NextLink from 'next/link';
 import { Time } from '@inngest/components/Time';
 import { IconFunction } from '@inngest/components/icons/Function';
 import { IconStatusCancelled } from '@inngest/components/icons/status/Cancelled';
@@ -86,7 +86,7 @@ export default async function TriggeredFunctionCard({
       : pathCreator.runPopout({ envSlug: environmentSlug, runID: function_.run.id });
 
   return (
-    <Link href={url} className="flex items-center rounded-lg border bg-white p-5 shadow">
+    <NextLink href={url} className="flex items-center rounded-lg border bg-white p-5 shadow">
       <div className="flex-1">
         <div className="flex items-center gap-1.5">
           <IconFunction className="h-4 w-4 text-slate-500" />
@@ -110,6 +110,6 @@ export default async function TriggeredFunctionCard({
       <div className="shrink-0">
         <RiArrowRightSLine className="h-5 w-5 text-slate-400" />
       </div>
-    </Link>
+    </NextLink>
   );
 }

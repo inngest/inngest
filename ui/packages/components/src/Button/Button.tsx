@@ -1,7 +1,7 @@
 import type { UrlObject } from 'url';
 import React, { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import type { Route } from 'next';
-import Link, { type LinkProps } from 'next/link';
+import NextLink, { type LinkProps as NextLinkProps } from 'next/link';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 
@@ -40,12 +40,12 @@ type LinkWrapperProps = {
   target?: string;
   prefetch?: boolean;
   scroll?: boolean;
-} & Omit<LinkProps, 'href'>;
+} & Omit<NextLinkProps, 'href'>;
 
 export const LinkWrapper = forwardRef<HTMLAnchorElement, LinkWrapperProps>(
   ({ children, href, target, prefetch = false, scroll = true, ...props }, ref) =>
     href ? (
-      <Link
+      <NextLink
         href={href as Route}
         target={target}
         prefetch={prefetch}
@@ -54,7 +54,7 @@ export const LinkWrapper = forwardRef<HTMLAnchorElement, LinkWrapperProps>(
         {...props}
       >
         {children}
-      </Link>
+      </NextLink>
     ) : (
       children
     )

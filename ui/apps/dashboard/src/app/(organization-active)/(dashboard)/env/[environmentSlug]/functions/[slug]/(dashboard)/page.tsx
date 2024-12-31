@@ -1,7 +1,7 @@
 'use client';
 
 import type { Route } from 'next';
-import Link from 'next/link';
+import NextLink from 'next/link';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Time } from '@inngest/components/Time';
@@ -172,7 +172,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
           >
             <div className="flex flex-col gap-10">
               <Block title="App">
-                <Link
+                <NextLink
                   href={appRoute}
                   className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded border p-4"
                 >
@@ -189,13 +189,13 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                     </div>
                     <RiArrowRightSLine className="h-5" />
                   </div>
-                </Link>
+                </NextLink>
               </Block>
               <Block title="Triggers">
                 <div className="space-y-3">
                   {triggers.map((trigger) =>
                     trigger.eventName ? (
-                      <Link
+                      <NextLink
                         key={trigger.eventName}
                         href={`/env/${params.environmentSlug}/events/${encodeURIComponent(
                           trigger.eventName
@@ -226,7 +226,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                           </div>
                           <RiArrowRightSLine className="h-5" />
                         </div>
-                      </Link>
+                      </NextLink>
                     ) : trigger.schedule ? (
                       <ScheduleTrigger
                         key={trigger.schedule}
@@ -243,7 +243,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                     <div className="space-y-3">
                       {function_.configuration.cancellations.map((cancellation) => {
                         return (
-                          <Link
+                          <NextLink
                             key={cancellation.event}
                             href={`/env/${params.environmentSlug}/events/${encodeURIComponent(
                               cancellation.event
@@ -282,7 +282,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                               </div>
                               <RiArrowRightSLine className="h-5" />
                             </div>
-                          </Link>
+                          </NextLink>
                         );
                       })}
                     </div>
@@ -291,7 +291,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
               {function_.failureHandler && (
                 <Block title="Failure Handler">
                   <div className="space-y-3">
-                    <Link
+                    <NextLink
                       href={`/env/${params.environmentSlug}/functions/${encodeURIComponent(
                         function_.failureHandler.slug
                       )}`}
@@ -306,7 +306,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                         </div>
                         <RiArrowRightSLine className="h-5" />
                       </div>
-                    </Link>
+                    </NextLink>
                   </div>
                 </Block>
               )}

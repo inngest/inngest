@@ -1,5 +1,5 @@
 import { type Metadata } from 'next';
-import Link from 'next/link';
+import NextLink from 'next/link';
 import { SignIn } from '@clerk/nextjs';
 import { Alert } from '@inngest/components/Alert';
 
@@ -48,9 +48,9 @@ export default function SignInPage({ searchParams }: SignInPageProps) {
                 : searchParams.error}
             </p>
             <p className="mt-2">
-              <Link href="/support" className="underline">
+              <NextLink href="/support" className="underline">
                 Contact support
-              </Link>{' '}
+              </NextLink>{' '}
               if this problem persists.
             </p>
           </Alert>

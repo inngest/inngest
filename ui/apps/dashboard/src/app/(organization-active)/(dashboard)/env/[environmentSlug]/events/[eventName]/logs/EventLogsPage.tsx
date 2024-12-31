@@ -1,7 +1,7 @@
 'use client';
 
 import { type Route } from 'next';
-import Link from 'next/link';
+import NextLink from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import { Time } from '@inngest/components/Time';
@@ -108,7 +108,7 @@ export function EventLogsPage({
 
         return (
           <li key={event.id} className="text-basis">
-            <Link
+            <NextLink
               href={eventPathname as Route}
               className={cn(
                 'hover:bg-canvasMuted flex items-center gap-3 px-3 py-2.5',
@@ -124,7 +124,7 @@ export function EventLogsPage({
 
                 <Time className="text-subtle truncate text-sm" value={new Date(event.receivedAt)} />
               </div>
-            </Link>
+            </NextLink>
           </li>
         );
       })}

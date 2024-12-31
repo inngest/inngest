@@ -1,5 +1,5 @@
 import React from 'react';
-import Link from 'next/link';
+import NextLink from 'next/link';
 import { Time } from '@inngest/components/Time';
 import { IconFunction } from '@inngest/components/icons/Function';
 import { IconStatusCancelled } from '@inngest/components/icons/status/Cancelled';
@@ -65,7 +65,7 @@ export default async function SkippedFunctionCard({
   }
 
   return (
-    <Link
+    <NextLink
       href={`/env/${environmentSlug}/functions/${encodeURIComponent(function_.slug)}`}
       className="flex items-center rounded-lg border bg-white p-5 shadow"
     >
@@ -88,6 +88,6 @@ export default async function SkippedFunctionCard({
       <div className="shrink-0">
         <RiArrowRightSLine className="h-5 w-5 text-slate-400" />
       </div>
-    </Link>
+    </NextLink>
   );
 }

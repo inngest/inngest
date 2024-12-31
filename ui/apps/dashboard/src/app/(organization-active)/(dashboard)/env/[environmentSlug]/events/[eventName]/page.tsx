@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import NextLink from 'next/link';
 import { Alert } from '@inngest/components/Alert';
 import { Time } from '@inngest/components/Time';
 import { IconFunction } from '@inngest/components/icons/Function';
@@ -63,7 +63,7 @@ export default function EventDashboard({ params }: EventDashboardProps) {
         <Block title="Triggered Functions">
           {eventType && eventType.workflows.length > 0
             ? eventType.workflows.map((w) => (
-                <Link
+                <NextLink
                   href={`/env/${params.environmentSlug}/functions/${encodeURIComponent(w.slug)}`}
                   key={w.id}
                   className="border-subtle bg-canvasBase hover:bg-canvasMuted mb-4 block overflow-hidden rounded border"
@@ -85,7 +85,7 @@ export default function EventDashboard({ params }: EventDashboardProps) {
                     </div>
                     <RiArrowRightSLine className="h-5" />
                   </div>
-                </Link>
+                </NextLink>
               ))
             : !fetching && (
                 <p className="my-4 text-sm leading-6">No functions triggered by this event.</p>

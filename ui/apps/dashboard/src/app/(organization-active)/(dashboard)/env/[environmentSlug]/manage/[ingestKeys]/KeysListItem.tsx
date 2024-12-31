@@ -1,7 +1,7 @@
 'use client';
 
 import { type Route } from 'next';
-import Link from 'next/link';
+import NextLink from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Time } from '@inngest/components/Time';
 import { cn } from '@inngest/components/utils/classNames';
@@ -48,7 +48,7 @@ export default function KeysListItem({ list }: KeysListItemProps) {
 
         return (
           <li key={key.id} className="border-subtle text-basis border-b">
-            <Link
+            <NextLink
               href={eventPathname as Route}
               className={cn('hover:bg-canvasMuted block px-4 py-3', isActive && 'bg-canvasSubtle')}
             >
@@ -62,7 +62,7 @@ export default function KeysListItem({ list }: KeysListItemProps) {
                   value={new Date(key.createdAt)}
                 />
               </div>
-            </Link>
+            </NextLink>
           </li>
         );
       })}
