@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { useOrganization, useUser } from '@clerk/nextjs';
 import { Alert } from '@inngest/components/Alert';
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import { Textarea } from '@inngest/components/Forms/Textarea';
+import { Pill } from '@inngest/components/Pill/Pill';
 import * as Sentry from '@sentry/nextjs';
 
 import { type RequestBody } from '@/app/(organization-active)/api/support-tickets/route';
@@ -52,9 +53,9 @@ export function SupportForm({
       <>
         {o.label}{' '}
         {o.enterpriseOnly ? (
-          <Label text="Enterprise Plan" />
+          <Pill>Enterprise Plan</Pill>
         ) : o.paidOnly ? (
-          <Label text="All Paid Plans" />
+          <Pill>All Paid Plans</Pill>
         ) : null}
       </>
     ),
@@ -165,7 +166,7 @@ export function SupportForm({
           />
         </label>
       )}
-      <Button type="submit" disabled={isFetching} label="Create Support Ticket" kind="primary" />
+      <NewButton type="submit" disabled={isFetching} label="Create Support Ticket" kind="primary" />
       {result.message && <Alert severity={result.ok ? 'info' : 'error'}>{result.message}</Alert>}
       <p className="mt-4 text-sm">
         {isPaid ? (
@@ -180,13 +181,5 @@ export function SupportForm({
         )}
       </p>
     </form>
-  );
-}
-
-function Label({ text }: { text: string }) {
-  return (
-    <span className="ml-1 inline-flex items-center rounded px-[5px] py-0.5 text-[12px] font-semibold leading-tight text-indigo-500 ring-1 ring-inset ring-indigo-300">
-      {text}
-    </span>
   );
 }
