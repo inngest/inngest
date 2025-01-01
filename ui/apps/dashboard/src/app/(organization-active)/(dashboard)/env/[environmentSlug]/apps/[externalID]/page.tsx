@@ -51,9 +51,8 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
             appearance="outlined"
             kind="secondary"
             href={`/env/${env.slug}/apps/${encodeURIComponent(externalID)}/syncs`}
-          >
-            See all syncs
-          </Button>
+            label="See all syncs"
+          />
         </div>
 
         {appRes.data.latestSync?.error && (

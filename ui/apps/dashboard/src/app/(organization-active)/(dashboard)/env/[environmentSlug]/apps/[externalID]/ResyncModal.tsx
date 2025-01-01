@@ -105,7 +105,7 @@ export default function ResyncModal({ appExternalID, isOpen, onClose, url, platf
         </div>
       }
     >
-      <div className="border-b border-slate-200 px-6">
+      <div className="border-subtle border-b px-6">
         {platform === 'vercel' && !failure && (
           <Alert className="my-6" severity="info" showIcon={false}>
             Vercel generates a unique URL for each deployment (
@@ -121,9 +121,9 @@ export default function ResyncModal({ appExternalID, isOpen, onClose, url, platf
           configuration to Inngest.
         </p>
 
-        <p className="my-6">The URL where you serve Inngest functions:</p>
+        <p className="mb-2">The URL where you serve Inngest functions:</p>
 
-        <div className="my-6 flex-1">
+        <div className="mb-6 flex-1">
           <Input
             placeholder="https://example.com/api/inngest"
             name="url"
@@ -132,7 +132,7 @@ export default function ResyncModal({ appExternalID, isOpen, onClose, url, platf
               setOverrideValue(e.target.value);
             }}
             readOnly={!isURLOverridden}
-            className={cn(!isURLOverridden && 'bg-slate-200')}
+            className={cn(!isURLOverridden && 'bg-disabled')}
           />
         </div>
         <div className="mb-6">
@@ -148,9 +148,13 @@ export default function ResyncModal({ appExternalID, isOpen, onClose, url, platf
             <SwitchLabel htmlFor="override">Override Input</SwitchLabel>
           </SwitchWrapper>
           {isURLOverridden && !failure && (
-            <p className="pl-[50px] pt-1 font-semibold text-yellow-700">
+            <p className="text-warning pl-[50px] pt-1">
               Please ensure that your app ID (
-              <Link className="inline" href="https://www.inngest.com/docs/apps#apps-in-sdk">
+              <Link
+                size="medium"
+                className="inline"
+                href="https://www.inngest.com/docs/apps#apps-in-sdk"
+              >
                 docs
               </Link>
               ) is not changed before resyncing. Changing the app ID will result in the creation of

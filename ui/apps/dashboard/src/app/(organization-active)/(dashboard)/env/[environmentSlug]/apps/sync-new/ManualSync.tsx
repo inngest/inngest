@@ -12,11 +12,11 @@ import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
 import type { CodedError } from '@/codedError';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { Secret } from '@/components/Secret';
 import { SyncFailure } from '@/components/SyncFailure';
 import { graphql } from '@/gql';
 import { pathCreator } from '@/utils/urls';
-import { useEnvironment } from '../../../../../../../components/Environments/environment-context';
 
 const SyncNewAppDocument = graphql(`
   mutation SyncNewApp($appURL: String!, $envID: UUID!) {
@@ -109,54 +109,52 @@ export default function ManualSync({ appsURL }: Props) {
 
   return (
     <>
-      <div className="border-subtle border-b p-8">
-        <p>
-          To integrate your code hosted on another platform with Inngest, you need to inform Inngest
-          about the location of your app and functions.
-        </p>
-        <br />
-        <p>
-          For example, imagine that your <Code>serve()</Code> handler (
-          <Link
-            size="small"
-            className="inline-flex"
-            href="https://www.inngest.com/docs/reference/serve#how-the-serve-api-handler-works"
-          >
-            see docs
-          </Link>
-          ) is located at /api/inngest, and your domain is myapp.com. In this scenario, you&apos;ll
-          need to inform Inngest that your apps and functions are hosted at
-          https://myapp.com/api/inngest.
-        </p>
-        <br />
-        <p>
-          After you&apos;ve set up the serve API and deployed your code,{' '}
-          <span className="font-semibold">
-            enter the URL of your project&apos;s serve endpoint to sync your app with Inngest
-          </span>
-          . Verify that you assigned the signing key below to the <Code>INNGEST_SIGNING_KEY</Code>{' '}
-          environment variable:
-        </p>
+      <p>
+        To integrate your code hosted on another platform with Inngest, you need to inform Inngest
+        about the location of your app and functions.
+      </p>
+      <br />
+      <p>
+        For example, imagine that your <Code>serve()</Code> handler (
+        <Link
+          size="small"
+          className="inline-flex"
+          href="https://www.inngest.com/docs/reference/serve#how-the-serve-api-handler-works"
+        >
+          see docs
+        </Link>
+        ) is located at /api/inngest, and your domain is myapp.com. In this scenario, you&apos;ll
+        need to inform Inngest that your apps and functions are hosted at
+        https://myapp.com/api/inngest.
+      </p>
+      <br />
+      <p>
+        After you&apos;ve set up the serve API and deployed your code,{' '}
+        <span className="font-semibold">
+          enter the URL of your project&apos;s serve endpoint to sync your app with Inngest
+        </span>
+        . Verify that you assigned the signing key below to the <Code>INNGEST_SIGNING_KEY</Code>{' '}
+        environment variable:
+      </p>
 
-        <Secret className="my-6" kind="event-key" secret={env.webhookSigningKey} />
+      <Secret className="my-6" kind="event-key" secret={env.webhookSigningKey} />
 
-        <div className="border-subtle border-t">
-          <label htmlFor="url" className="text-muted my-2 block">
-            App URL
-          </label>
-          <Input
-            placeholder="https://example.com/api/inngest"
-            name="url"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            className="w-full"
-          />
+      <div className="border-subtle border-t">
+        <label htmlFor="url" className="text-muted my-2 block">
+          App URL
+        </label>
+        <Input
+          placeholder="https://example.com/api/inngest"
+          name="url"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          className="w-full"
+        />
 
-          {failure && !isSyncing && <SyncFailure error={failure} />}
-        </div>
+        {failure && !isSyncing && <SyncFailure error={failure} />}
       </div>
-      <div className="flex items-center justify-between px-8 py-6">
-        <Link href="https://www.inngest.com/docs/apps/cloud" size="small">
+      <div className="flex items-center justify-between pt-6">
+        <Link href="https://www.inngest.com/docs/apps/cloud" target="_blank" size="small">
           View Docs
         </Link>
         <div className="flex items-center gap-3">
