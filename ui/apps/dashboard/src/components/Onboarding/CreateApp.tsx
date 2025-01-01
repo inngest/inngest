@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
+import { InlineCode } from '@inngest/components/Code';
 import CommandBlock from '@inngest/components/CodeBlock/CommandBlock';
 import { Link } from '@inngest/components/Link';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
@@ -84,11 +85,8 @@ export default function CreateApp() {
               )}
             </div>
             <p className="text-sm">
-              Open the Dev Server at{' '}
-              <code className="text-basis bg-canvasMuted rounded-sm px-1.5 py-0.5 text-xs">
-                http://localhost:8288
-              </code>{' '}
-              and follow the guide to create your app.
+              Open the Dev Server at <InlineCode>http://localhost:8288</InlineCode> and follow the
+              guide to create your app.
             </p>
           </div>
           {devServerIsRunning ? (

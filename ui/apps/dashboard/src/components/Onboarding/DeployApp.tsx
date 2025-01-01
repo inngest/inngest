@@ -1,6 +1,7 @@
 import { useRouter } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
 import { Button } from '@inngest/components/Button';
+import { InlineCode } from '@inngest/components/Code/InlineCode';
 import { Link } from '@inngest/components/Link';
 import TabCards from '@inngest/components/TabCards/TabCards';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
@@ -101,20 +102,14 @@ export default function DeployApp() {
           </p>
           <div className="text-basis text-sm font-medium">Event key</div>
           <p className="mb-2 text-sm">
-            The{' '}
-            <code className="text-basis bg-canvasMuted rounded-sm px-1.5 py-0.5 text-xs">
-              INNGEST_EVENT_KEY
-            </code>{' '}
-            is used for sending events and invoking functions
+            The <InlineCode>INNGEST_EVENT_KEY</InlineCode> is used for sending events and invoking
+            functions
           </p>
           <Secret kind="event-key" secret={defaultEventKey} className="mb-4" />
           <div className="text-basis text-sm font-medium">Signing key</div>
           <p className="mb-2 text-sm">
-            The{' '}
-            <code className="text-basis bg-canvasMuted rounded-sm px-1.5 py-0.5 text-xs">
-              INNGEST_SIGNING_KEY
-            </code>{' '}
-            is used for authenticating requests between Inngest and your app
+            The <InlineCode>INNGEST_SIGNING_KEY</InlineCode> is used for authenticating requests
+            between Inngest and your app
           </p>
           <Secret kind="signing-key" secret={env.webhookSigningKey} className="mb-6" />
           <Button

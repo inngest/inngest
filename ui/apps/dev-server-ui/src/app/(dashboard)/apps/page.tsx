@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { AppCard } from '@inngest/components/Apps/AppCard';
+import { InlineCode } from '@inngest/components/Code';
 import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link';
@@ -125,10 +126,7 @@ export default function AppList() {
             <RiInformationLine className="h-4 w-4" />
             <p className="text-sm">
               Auto-detection is enabled on common ports. You can use the{' '}
-              <code className="bg-canvasSubtle text-codeDelimiterBracketJson rounded-sm px-1.5 py-0.5 text-xs">
-                --no-discovery
-              </code>{' '}
-              flag in your CLI to disable it.
+              <InlineCode>--no-discovery</InlineCode> flag in your CLI to disable it.
             </p>
           </div>
         )}

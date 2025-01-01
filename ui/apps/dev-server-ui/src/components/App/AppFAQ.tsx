@@ -1,5 +1,5 @@
 import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
-import { InlineCode } from '@inngest/components/InlineCode';
+import { InlineCode } from '@inngest/components/Code';
 
 export default function AppFAQ() {
   return (
@@ -26,8 +26,8 @@ export default function AppFAQ() {
                 </p>
                 <p className="mb-2">
                   Syncing an app works by providing Inngest with the URL of your application's{' '}
-                  <InlineCode value="serve()" /> handler endpoint, typically at{' '}
-                  <InlineCode value="&lt;your-hostname&gt;/api/inngest" />. When you sync an app,
+                  <InlineCode>serve()</InlineCode> handler endpoint, typically at{' '}
+                  <InlineCode>&lt;your-hostname&gt;/api/inngest</InlineCode>. When you sync an app,
                   Inngest reads the configuration of your app and functions and stores the URL to
                   send future invocation requests.
                 </p>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
-import { InlineCode } from '@inngest/components/InlineCode';
+import { InlineCode } from '@inngest/components/Code';
 import { AlertModal } from '@inngest/components/Modal';
 import { useMutation } from 'urql';
 
@@ -72,8 +72,8 @@ export function RotateSigningKeyModal(props: Props) {
       <div className="p-6">
         <p className="mb-4">
           Before rotating, ensure that all of your apps have the correct{' '}
-          <InlineCode value="INNGEST_SIGNING_KEY" /> and{' '}
-          <InlineCode value="INNGEST_SIGNING_KEY_FALLBACK" /> environment variables.
+          <InlineCode>INNGEST_SIGNING_KEY</InlineCode> and{' '}
+          <InlineCode>INNGEST_SIGNING_KEY_FALLBACK</InlineCode> environment variables.
         </p>
 
         <Alert severity="warning" className="text-sm">

@@ -2,7 +2,7 @@
 
 import { Alert } from '@inngest/components/Alert';
 import { Card } from '@inngest/components/Card';
-import { InlineCode } from '@inngest/components/InlineCode';
+import { InlineCode } from '@inngest/components/Code';
 import { Link } from '@inngest/components/Link';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -69,9 +69,9 @@ export default function Page() {
 
           <div className="text-subtle mb-8 text-sm">
             Create a new signing key and update environment variables in your app: set{' '}
-            <InlineCode value="INNGEST_SIGNING_KEY" /> to the value of the{' '}
+            <InlineCode>INNGEST_SIGNING_KEY</InlineCode> to the value of the{' '}
             <span className="font-bold">new key</span> and{' '}
-            <InlineCode value="INNGEST_SIGNING_KEY_FALLBACK" /> to the value of the{' '}
+            <InlineCode>INNGEST_SIGNING_KEY_FALLBACK</InlineCode> to the value of the{' '}
             <span className="font-bold">current key</span>. Deploy your apps and then click the{' '}
             <span className="font-bold">Rotate key</span> button.
           </div>

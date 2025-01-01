@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
+import { InlineCode } from '@inngest/components/Code';
 import { Link } from '@inngest/components/Link';
 import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/types';
 import { parseConnectionString } from '@inngest/components/PostgresIntegrations/utils';
@@ -62,14 +63,12 @@ export default function NeonFormat({
   return (
     <>
       <p className="text-sm">
-        Enabling logical replication modifies the Postgres{' '}
-        <code className="text-accent-xIntense text-xs">wal_level</code> configuration parameter,
-        changing it from <code className="text-accent-xIntense text-xs">replica</code> to{' '}
-        <code className="text-accent-xIntense text-xs">logical</code> for all databases in your Neon
-        project. Once the <code className="text-accent-xIntense text-xs">wal_level</code> setting is
-        changed to <code className="text-accent-xIntense text-xs">logical</code>, it cannot be
-        reverted. Enabling logical replication also restarts all computes in your Neon project,
-        meaning active connections will be dropped and have to reconnect.
+        Enabling logical replication modifies the Postgres <InlineCode>wal_level</InlineCode>{' '}
+        configuration parameter, changing it from <InlineCode>replica</InlineCode> to{' '}
+        <InlineCode>logical</InlineCode> for all databases in your Neon project. Once the{' '}
+        <InlineCode>wal_level</InlineCode> setting is changed to <InlineCode>logical</InlineCode>,
+        it cannot be reverted. Enabling logical replication also restarts all computes in your Neon
+        project, meaning active connections will be dropped and have to reconnect.
       </p>
       <Link
         size="small"

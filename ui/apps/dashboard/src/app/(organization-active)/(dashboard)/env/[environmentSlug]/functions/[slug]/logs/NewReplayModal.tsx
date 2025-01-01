@@ -3,10 +3,10 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
+import { InlineCode } from '@inngest/components/Code';
 import { RangePicker } from '@inngest/components/DatePicker';
 import { Input } from '@inngest/components/Forms/Input';
 import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcons';
-import { InlineCode } from '@inngest/components/InlineCode';
 import { Link } from '@inngest/components/Link';
 import { Modal } from '@inngest/components/Modal';
 import { IconReplay } from '@inngest/components/icons/Replay';
@@ -287,7 +287,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
             <p>
               Note: Replayed functions are re-run from the beginning. Previously run steps and
               function states will not be reused during the replay. The{' '}
-              <InlineCode value="event.user" /> object will be empty for all runs in the replay.
+              <InlineCode>event.user</InlineCode> object will be empty for all runs in the replay.
             </p>
             <Link target="_blank" href="https://inngest.com/docs/platform/replay">
               Learn more about replay

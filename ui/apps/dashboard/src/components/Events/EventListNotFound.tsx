@@ -4,7 +4,7 @@ import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card';
-import { InlineCode } from '@inngest/components/InlineCode';
+import { InlineCode } from '@inngest/components/Code';
 import { RiErrorWarningLine } from '@remixicon/react';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -49,12 +49,12 @@ export default function EventListNotFound() {
               <h4 className="mb-2 text-base font-semibold">Event Key</h4>
               <p className="mb-2 text-sm tracking-wide">
                 An Event Key let&apos;s your application send events to Inngest with{' '}
-                <InlineCode value="inngest.send(...)" />.
+                <InlineCode>inngest.send(...)</InlineCode>.
               </p>
               <p className="mb-4 text-sm tracking-wide">
-                We recommend adding your event key as the <InlineCode value="INNGEST_EVENT_KEY" />.
-                environment variable in your application. Your platform may support setting this in
-                an <InlineCode value=".env" />. file or you may need to set it manually on your
+                We recommend adding your event key as the <InlineCode>INNGEST_EVENT_KEY</InlineCode>
+                . environment variable in your application. Your platform may support setting this
+                in an <InlineCode>.env</InlineCode>. file or you may need to set it manually on your
                 platform.
               </p>
 

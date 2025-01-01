@@ -23,7 +23,7 @@ export function FunctionList({ envSlug, functions }: Props) {
 
   return (
     <main
-      className="border-muted min-h-0 overflow-y-auto rounded-lg border [&>table]:border-b-0"
+      className="border-muted mb-8 min-h-0 overflow-y-auto rounded-lg border [&>table]:border-b-0"
       ref={tableContainerRef}
     >
       <Table

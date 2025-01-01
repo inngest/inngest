@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
-import { Code } from '@inngest/components/Code';
+import { InlineCode } from '@inngest/components/Code';
 import { Input } from '@inngest/components/Forms/Input';
 import { Link } from '@inngest/components/Link';
 import { useLocalStorage } from 'react-use';
@@ -115,7 +115,7 @@ export default function ManualSync({ appsURL }: Props) {
       </p>
       <br />
       <p>
-        For example, imagine that your <Code>serve()</Code> handler (
+        For example, imagine that your <InlineCode>serve()</InlineCode> handler (
         <Link
           size="small"
           className="inline-flex"
