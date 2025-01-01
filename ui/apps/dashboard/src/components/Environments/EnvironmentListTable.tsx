@@ -1,9 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@inngest/components/DropdownMenu';
 import { Switch } from '@inngest/components/Switch';
 import { cn } from '@inngest/components/utils/classNames';
+import { RiMore2Line } from '@remixicon/react';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
@@ -60,17 +68,13 @@ export default function EnvironmentListTable({ envs }: { envs: Environment[] }) 
             Auto Archive
           </th>
 
-          <th scope="col" className="text-muted w-0 whitespace-nowrap pl-4 text-sm font-semibold">
-            Manual Archive
-          </th>
-
           <th scope="col" className="w-0 pr-4"></th>
         </tr>
       </thead>
       <tbody className="divide-subtle divide-y px-4 py-3">
         {envs.length === 0 ? (
           <tr>
-            <td colSpan={5} className="text-basis px-4 py-4 text-center text-sm">
+            <td colSpan={4} className="text-basis px-4 py-3 text-center text-sm">
               There are no branch environments
             </td>
           </tr>
@@ -78,7 +82,7 @@ export default function EnvironmentListTable({ envs }: { envs: Environment[] }) 
           visibleEnvs.map((env, i) => <TableRow env={env} key={i} />)
         ) : (
           <tr>
-            <td colSpan={5} className="text-basis px-4 py-4 text-center text-sm">
+            <td colSpan={4} className="text-basis px-4 py-3 text-center text-sm">
               There are no more branch environments
             </td>
           </tr>
@@ -87,7 +91,7 @@ export default function EnvironmentListTable({ envs }: { envs: Environment[] }) 
       {pages.length > 1 && (
         <tfoot className="border-subtle border-t">
           <tr>
-            <td colSpan={5} className="px-4 py-1 text-center">
+            <td colSpan={4} className="px-4 py-1 text-center">
               {pages.map((_, idx) => (
                 <button
                   key={idx}
@@ -106,6 +110,7 @@ export default function EnvironmentListTable({ envs }: { envs: Environment[] }) 
 }
 
 function TableRow(props: { env: Environment }) {
+  const router = useRouter();
   // Use an internal env object for optimistic updating.
   const [env, setEnv] = useState(props.env);
   useEffect(() => {
@@ -173,7 +178,7 @@ function TableRow(props: { env: Environment }) {
 
   return (
     <tr className="hover:bg-canvasMuted">
-      <td className="max-w-80 px-4 py-4">
+      <td className="max-w-80 px-4 py-3">
         <h3 className="text-basis flex items-center gap-2 break-all text-sm">{name}</h3>
       </td>
       <td>
@@ -187,6 +192,7 @@ function TableRow(props: { env: Environment }) {
         {notNullish(isAutoArchiveEnabled) && (
           <Switch
             checked={isAutoArchiveEnabled}
+            className="block"
             disabled={isModifying || env.isArchived}
             onClick={() => onClickAutoArchive(id, !isAutoArchiveEnabled)}
             title={
@@ -198,17 +204,20 @@ function TableRow(props: { env: Environment }) {
         )}
       </td>
 
-      <td className="pl-4">
-        <EnvironmentArchiveButton env={env} />
-      </td>
-
       <td className="px-4">
-        <Button
-          href={pathCreator.apps({ envSlug: slug })}
-          kind="primary"
-          appearance="outlined"
-          label="Apps"
-        />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button kind="secondary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="z-50">
+            <DropdownMenuItem asChild>
+              <EnvironmentArchiveButton env={env} />
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => router.push(pathCreator.apps({ envSlug: slug }))}>
+              Go to apps
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </td>
     </tr>
   );

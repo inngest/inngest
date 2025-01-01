@@ -28,10 +28,11 @@ export function EnvironmentArchiveButton({ env }: Props) {
   return (
     <>
       <Button
-        appearance="outlined"
+        appearance="ghost"
         onClick={() => setIsModalOpen(true)}
         kind="danger"
         label={label}
+        className="hover:bg-canvasSubtle flex w-full select-none items-center justify-start rounded-md p-2 text-sm"
       />
 
       <EnvironmentArchiveModal
