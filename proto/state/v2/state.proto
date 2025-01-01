@@ -129,7 +129,17 @@ message LoadStateResponse {
   Metadata           metadata = 1;
   repeated bytes     events   = 2;
   map<string, bytes> steps    = 3;
+  map<string, bytes> kv       = 4;
 }
+
+message LoadKVRequest {
+  ID id = 1;
+}
+
+message LoadKVResponse {
+  map<string, bytes> kv = 1;
+}
+
 
 service RunService {
   rpc Create(CreateStateRequest) returns (CreateStateResponse) {}
@@ -141,5 +151,6 @@ service RunService {
   rpc LoadMetadata(LoadMetadataRequest) returns (LoadMetadataResponse) {}
   rpc LoadEvents(LoadEventsRequest) returns (LoadEventsResponse) {}
   rpc LoadSteps(LoadStepsRequest) returns (LoadStepsResponse) {}
+  rpc LoadKV(LoadKVRequest) returns (LoadKVResponse) {}
   rpc LoadState(LoadStateRequest) returns (LoadStateResponse) {}
 }

@@ -50,6 +50,8 @@ const (
 	RunServiceLoadEventsProcedure = "/state.v2.RunService/LoadEvents"
 	// RunServiceLoadStepsProcedure is the fully-qualified name of the RunService's LoadSteps RPC.
 	RunServiceLoadStepsProcedure = "/state.v2.RunService/LoadSteps"
+	// RunServiceLoadKVProcedure is the fully-qualified name of the RunService's LoadKV RPC.
+	RunServiceLoadKVProcedure = "/state.v2.RunService/LoadKV"
 	// RunServiceLoadStateProcedure is the fully-qualified name of the RunService's LoadState RPC.
 	RunServiceLoadStateProcedure = "/state.v2.RunService/LoadState"
 )
@@ -65,6 +67,7 @@ var (
 	runServiceLoadMetadataMethodDescriptor   = runServiceServiceDescriptor.Methods().ByName("LoadMetadata")
 	runServiceLoadEventsMethodDescriptor     = runServiceServiceDescriptor.Methods().ByName("LoadEvents")
 	runServiceLoadStepsMethodDescriptor      = runServiceServiceDescriptor.Methods().ByName("LoadSteps")
+	runServiceLoadKVMethodDescriptor         = runServiceServiceDescriptor.Methods().ByName("LoadKV")
 	runServiceLoadStateMethodDescriptor      = runServiceServiceDescriptor.Methods().ByName("LoadState")
 )
 
@@ -78,6 +81,7 @@ type RunServiceClient interface {
 	LoadMetadata(context.Context, *connect.Request[v2.LoadMetadataRequest]) (*connect.Response[v2.LoadMetadataResponse], error)
 	LoadEvents(context.Context, *connect.Request[v2.LoadEventsRequest]) (*connect.Response[v2.LoadEventsResponse], error)
 	LoadSteps(context.Context, *connect.Request[v2.LoadStepsRequest]) (*connect.Response[v2.LoadStepsResponse], error)
+	LoadKV(context.Context, *connect.Request[v2.LoadKVRequest]) (*connect.Response[v2.LoadKVResponse], error)
 	LoadState(context.Context, *connect.Request[v2.LoadStateRequest]) (*connect.Response[v2.LoadStateResponse], error)
 }
 
@@ -139,6 +143,12 @@ func NewRunServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(runServiceLoadStepsMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		loadKV: connect.NewClient[v2.LoadKVRequest, v2.LoadKVResponse](
+			httpClient,
+			baseURL+RunServiceLoadKVProcedure,
+			connect.WithSchema(runServiceLoadKVMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		loadState: connect.NewClient[v2.LoadStateRequest, v2.LoadStateResponse](
 			httpClient,
 			baseURL+RunServiceLoadStateProcedure,
@@ -158,6 +168,7 @@ type runServiceClient struct {
 	loadMetadata   *connect.Client[v2.LoadMetadataRequest, v2.LoadMetadataResponse]
 	loadEvents     *connect.Client[v2.LoadEventsRequest, v2.LoadEventsResponse]
 	loadSteps      *connect.Client[v2.LoadStepsRequest, v2.LoadStepsResponse]
+	loadKV         *connect.Client[v2.LoadKVRequest, v2.LoadKVResponse]
 	loadState      *connect.Client[v2.LoadStateRequest, v2.LoadStateResponse]
 }
 
@@ -201,6 +212,11 @@ func (c *runServiceClient) LoadSteps(ctx context.Context, req *connect.Request[v
 	return c.loadSteps.CallUnary(ctx, req)
 }
 
+// LoadKV calls state.v2.RunService.LoadKV.
+func (c *runServiceClient) LoadKV(ctx context.Context, req *connect.Request[v2.LoadKVRequest]) (*connect.Response[v2.LoadKVResponse], error) {
+	return c.loadKV.CallUnary(ctx, req)
+}
+
 // LoadState calls state.v2.RunService.LoadState.
 func (c *runServiceClient) LoadState(ctx context.Context, req *connect.Request[v2.LoadStateRequest]) (*connect.Response[v2.LoadStateResponse], error) {
 	return c.loadState.CallUnary(ctx, req)
@@ -216,6 +232,7 @@ type RunServiceHandler interface {
 	LoadMetadata(context.Context, *connect.Request[v2.LoadMetadataRequest]) (*connect.Response[v2.LoadMetadataResponse], error)
 	LoadEvents(context.Context, *connect.Request[v2.LoadEventsRequest]) (*connect.Response[v2.LoadEventsResponse], error)
 	LoadSteps(context.Context, *connect.Request[v2.LoadStepsRequest]) (*connect.Response[v2.LoadStepsResponse], error)
+	LoadKV(context.Context, *connect.Request[v2.LoadKVRequest]) (*connect.Response[v2.LoadKVResponse], error)
 	LoadState(context.Context, *connect.Request[v2.LoadStateRequest]) (*connect.Response[v2.LoadStateResponse], error)
 }
 
@@ -273,6 +290,12 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(runServiceLoadStepsMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	runServiceLoadKVHandler := connect.NewUnaryHandler(
+		RunServiceLoadKVProcedure,
+		svc.LoadKV,
+		connect.WithSchema(runServiceLoadKVMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	runServiceLoadStateHandler := connect.NewUnaryHandler(
 		RunServiceLoadStateProcedure,
 		svc.LoadState,
@@ -297,6 +320,8 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 			runServiceLoadEventsHandler.ServeHTTP(w, r)
 		case RunServiceLoadStepsProcedure:
 			runServiceLoadStepsHandler.ServeHTTP(w, r)
+		case RunServiceLoadKVProcedure:
+			runServiceLoadKVHandler.ServeHTTP(w, r)
 		case RunServiceLoadStateProcedure:
 			runServiceLoadStateHandler.ServeHTTP(w, r)
 		default:
@@ -338,6 +363,10 @@ func (UnimplementedRunServiceHandler) LoadEvents(context.Context, *connect.Reque
 
 func (UnimplementedRunServiceHandler) LoadSteps(context.Context, *connect.Request[v2.LoadStepsRequest]) (*connect.Response[v2.LoadStepsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.LoadSteps is not implemented"))
+}
+
+func (UnimplementedRunServiceHandler) LoadKV(context.Context, *connect.Request[v2.LoadKVRequest]) (*connect.Response[v2.LoadKVResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.LoadKV is not implemented"))
 }
 
 func (UnimplementedRunServiceHandler) LoadState(context.Context, *connect.Request[v2.LoadStateRequest]) (*connect.Response[v2.LoadStateResponse], error) {
