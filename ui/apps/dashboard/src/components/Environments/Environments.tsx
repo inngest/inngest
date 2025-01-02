@@ -57,7 +57,7 @@ export default function Environments() {
             <DropdownMenuTrigger asChild>
               <Button kind="secondary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="z-50">
+            <DropdownMenuContent>
               <DropdownMenuItem onSelect={() => router.push('/env/production/manage')}>
                 Manage
               </DropdownMenuItem>
@@ -82,7 +82,7 @@ export default function Environments() {
                       icon={<RiMore2Line />}
                     />
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="z-50">
+                  <DropdownMenuContent>
                     <DropdownMenuItem
                       onSelect={() => router.push(`/env/${branchParent?.slug}/manage`)}
                     >
@@ -130,7 +130,7 @@ export default function Environments() {
                         icon={<RiMore2Line />}
                       />
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="z-50">
+                    <DropdownMenuContent>
                       <DropdownMenuItem onSelect={() => router.push(`/env/${env.slug}/manage`)}>
                         Manage
                       </DropdownMenuItem>

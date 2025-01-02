@@ -104,7 +104,7 @@ export default function Keys({ params: { ingestKeys, keyID } }: KeyDetailsProps)
               <DropdownMenuTrigger className="data-[state=open]:before:bg-canvasSubtle relative data-[state=open]:before:absolute data-[state=open]:before:-bottom-3 data-[state=open]:before:left-0 data-[state=open]:before:h-6 data-[state=open]:before:w-6 data-[state=open]:before:rounded-full">
                 <RiMore2Line className="absolute -top-2 left-1 h-4 w-4" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="z-50">
+              <DropdownMenuContent>
                 <DropdownMenuItem onSelect={() => setIsEditKeyNameModalVisible(true)}>
                   <RiPencilLine className="h-4 w-4" />
                   Edit Name

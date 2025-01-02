@@ -36,7 +36,7 @@ export default function AppActions({ id, name }: { id: string; name: string }) {
         <DropdownMenuTrigger asChild>
           <Button kind="secondary" appearance="ghost" size="medium" icon={<RiMore2Line />} />
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="z-50">
+        <DropdownMenuContent>
           <DropdownMenuItem className="text-error" onSelect={() => setIsAlertModalOpen(true)}>
             <RiDeleteBinLine className="h-4 w-4" />
             Delete

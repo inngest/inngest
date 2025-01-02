@@ -209,7 +209,7 @@ function TableRow(props: { env: Environment }) {
           <DropdownMenuTrigger asChild>
             <Button kind="secondary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="z-50">
+          <DropdownMenuContent>
             <DropdownMenuItem asChild>
               <EnvironmentArchiveButton env={env} />
             </DropdownMenuItem>
