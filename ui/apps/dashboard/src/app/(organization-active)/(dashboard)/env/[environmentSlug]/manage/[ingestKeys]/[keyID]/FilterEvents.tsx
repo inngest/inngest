@@ -2,7 +2,7 @@
 
 import { useContext, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import ToggleGroup from '@inngest/components/ToggleGroup/ToggleGroup';
 import { toast } from 'sonner';
 
@@ -108,7 +108,7 @@ export default function FilterEvents({ keyID, filter }: FilterEventsProps) {
         </FilterEditor>
       </div>
       <div className="flex justify-end">
-        <NewButton disabled={isDisabled} type="submit" label="Save Filter Changes" />
+        <Button disabled={isDisabled} type="submit" label="Save filter changes" />
       </div>
     </form>
   );

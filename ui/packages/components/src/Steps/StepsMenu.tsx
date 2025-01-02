@@ -1,6 +1,6 @@
 import type { Route } from 'next';
-import Link from 'next/link';
-import { NewLink, type NewLinkProps } from '@inngest/components/Link';
+import NextLink from 'next/link';
+import { Link, type LinkProps } from '@inngest/components/Link';
 import { RiCheckboxCircleFill, type RemixiconComponentType } from '@remixicon/react';
 
 import { cn } from '../utils/classNames';
@@ -83,19 +83,19 @@ function StepMenuItem({
     </li>
   );
 
-  return isDisabled ? content : <Link href={url}>{content}</Link>;
+  return isDisabled ? content : <NextLink href={url}>{content}</NextLink>;
 }
 
-function StepLink({ children, href, ...props }: React.PropsWithChildren<NewLinkProps>) {
+function StepLink({ children, href, ...props }: React.PropsWithChildren<LinkProps>) {
   return (
-    <NewLink
+    <Link
       className="text-subtle hover:decoration-subtle mx-1.5 my-1"
       href={href}
       size="small"
       {...props}
     >
       {children}
-    </NewLink>
+    </Link>
   );
 }
 

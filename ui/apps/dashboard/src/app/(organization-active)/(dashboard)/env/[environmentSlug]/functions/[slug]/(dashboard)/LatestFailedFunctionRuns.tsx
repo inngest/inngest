@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
-import { Time } from '@inngest/components/Time';
+import { IDCell, TimeCell } from '@inngest/components/Table/Cell';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -80,20 +80,20 @@ export default function LatestFailedFunctionRuns({
 
   return (
     <div>
-      <header className="flex items-center gap-3 py-3">
-        <h1 className="font-semibold text-slate-700">Latest Failed Runs</h1>
+      <header className="flex items-center justify-between gap-3 py-3">
+        <h1 className="text-basis font-medium">Latest Failed Runs</h1>
         <Button
-          className="ml-auto"
           appearance="outlined"
+          kind="secondary"
           href={
             `/env/${environmentSlug}/functions/${encodeURIComponent(functionSlug)}/runs` as Route
           }
-          label="View All Runs"
+          label="View all runs"
         />
       </header>
-      <div className="rounded-md border border-slate-200 text-sm text-slate-500">
-        <table className="w-full table-fixed divide-y divide-slate-200 rounded-lg bg-white">
-          <thead className="h-full text-left">
+      <div className="border-subtle text-basis bg-canvasBase rounded-md border text-sm ">
+        <table className="divide-subtle w-full table-fixed divide-y rounded-lg">
+          <thead className="text-muted h-full text-left">
             <tr>
               <th className="p-4 font-semibold" scope="col">
                 Occurred at
@@ -103,7 +103,7 @@ export default function LatestFailedFunctionRuns({
               </th>
             </tr>
           </thead>
-          <tbody className="h-full divide-y divide-slate-200">
+          <tbody className="divide-subtle h-full divide-y">
             {!failedFunctionRuns && isFetchingFailedFunctionRuns && (
               <tr>
                 <td className="p-4 text-center" colSpan={3}>
@@ -116,7 +116,7 @@ export default function LatestFailedFunctionRuns({
                   if (!functionRun) {
                     return (
                       <tr key={index} className="opacity-50">
-                        <td colSpan={2} className="p-4 text-center font-semibold text-slate-700">
+                        <td colSpan={2} className="p-4 text-center font-semibold">
                           Error: could not load function run
                         </td>
                       </tr>
@@ -132,23 +132,21 @@ export default function LatestFailedFunctionRuns({
                   return (
                     <tr
                       key={functionRun.id}
-                      className="cursor-pointer truncate transition-all hover:bg-slate-100"
+                      className="hover:bg-canvasSubtle/50 cursor-pointer truncate transition-all"
                       onClick={() =>
                         router.push(
                           pathCreator.runPopout({ envSlug: environmentSlug, runID: functionRun.id })
                         )
                       }
                     >
-                      <td className="p-4">
-                        <Time
-                          className="inline-flex min-w-[112px] pr-6 font-semibold text-slate-700"
-                          format="relative"
-                          value={new Date(functionRun.endedAt)}
-                        />
+                      <td className="flex items-center gap-6 p-4">
+                        <TimeCell format="relative" date={new Date(functionRun.endedAt)} />
 
-                        <Time value={new Date(functionRun.endedAt)} />
+                        <TimeCell date={new Date(functionRun.endedAt)} />
                       </td>
-                      <td className="font-mono text-xs font-medium">{functionRun.id}</td>
+                      <td>
+                        <IDCell>{functionRun.id}</IDCell>
+                      </td>
                     </tr>
                   );
                 })

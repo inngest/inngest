@@ -3,11 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
+import { Input } from '@inngest/components/Forms/Input';
 import { Link } from '@inngest/components/Link';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
-import Input from '@/components/Forms/Input';
 import { graphql } from '@/gql';
 
 const CreateEnvironmentDocument = graphql(`
@@ -46,16 +46,16 @@ export default function CreateEnvironment({}) {
   }
 
   return (
-    <>
-      <h2 className="text-lg font-medium text-slate-800">Create an Environment</h2>
-      <p className="my-4 max-w-[600px] text-sm font-medium text-slate-600">
+    <div className="my-8">
+      <h2 className="mb-2 text-2xl">Create an Environment</h2>
+      <p className="text-muted max-w-[600px] text-sm">
         Create a shared, non-production environment like staging, QA, or canary.
       </p>
-      <div className="my-4 rounded-lg bg-slate-50 px-6 py-4">
-        <p className="mb-4 max-w-[600px] text-sm font-medium text-slate-600">
+      <div className="bg-canvasSubtle my-6 rounded-lg px-6 py-4">
+        <p className="mb-4 max-w-[600px] text-sm">
           Some key things to know about custom environments:
         </p>
-        <ul className="ml-8 flex list-disc flex-col gap-2 text-sm font-medium text-slate-600">
+        <ul className="ml-8 flex list-disc flex-col gap-2 text-sm">
           <li>
             Each environment has its own keys, event history, and functions. All data is isolated
             within each environment.
@@ -66,8 +66,11 @@ export default function CreateEnvironment({}) {
           </li>
           <li>You can create as many environments as you need.</li>
         </ul>
-        <p className="mt-4 max-w-[600px] text-sm font-medium text-slate-600">
-          <Link href="https://www.inngest.com/docs/platform/environments#custom-environments">
+        <p className="mt-4 max-w-[600px] text-sm">
+          <Link
+            size="small"
+            href="https://www.inngest.com/docs/platform/environments#custom-environments"
+          >
             Read the docs to learn more
           </Link>
         </p>
@@ -81,16 +84,8 @@ export default function CreateEnvironment({}) {
           required
           error={error}
         />
-        <Button kind="primary" type="submit" disabled={isDisabled} label="Create Environment" />
+        <Button kind="primary" type="submit" disabled={isDisabled} label="Create environment" />
       </form>
-      <div className="mt-16 flex">
-        <Button
-          href="/env"
-          kind="default"
-          appearance="outlined"
-          label="← Back to all environments"
-        />
-      </div>
-    </>
+    </div>
   );
 }

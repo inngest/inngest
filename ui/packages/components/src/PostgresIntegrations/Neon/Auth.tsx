@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/types';
 import { parseConnectionString } from '@inngest/components/PostgresIntegrations/utils';
 import { cn } from '@inngest/components/utils/classNames';
@@ -80,9 +80,9 @@ export default function NeonAuth({
   return (
     <>
       <p className="pb-1 text-sm">{intro}</p>
-      <NewLink size="small" href={credsLink} target="_blank">
+      <Link size="small" href={credsLink} target="_blank">
         Learn more about postgres credentials.
-      </NewLink>
+      </Link>
       <form
         className={cn('pt-6', isVerified || error ? 'pb-2' : 'pb-8')}
         onSubmit={(e) => e.preventDefault()}
@@ -98,14 +98,14 @@ export default function NeonAuth({
                 error={error}
               />
             </div>
-            <NewButton label="Verify" onClick={handleVerify} loading={isVerifying} />
+            <Button label="Verify" onClick={handleVerify} loading={isVerifying} />
           </div>
         </label>
         {isVerified && (
           <p className="text-success mt-1 text-sm">Credentials verified successfully!</p>
         )}
       </form>
-      <NewButton
+      <Button
         label="Next"
         href={`/settings/integrations/${integration}/${nextStep}`}
         disabled={!isVerified}

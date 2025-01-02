@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BlankSlate } from '@inngest/components/BlankSlate';
-import { Button, NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
 import { Pill, PillContent } from '@inngest/components/Pill';
 import { Table } from '@inngest/components/Table';
@@ -23,13 +23,11 @@ import {
 } from '@/store/generated';
 import FunctionRunList from './FunctionRunList';
 
-// import OutputList from './OutputList';
-
 const columnHelper = createColumnHelper<StreamItem>();
 
 const columns = [
   columnHelper.accessor('createdAt', {
-    header: () => <span>Queued At</span>,
+    header: () => <span>Queued at</span>,
     cell: (props) => (
       <time dateTime={fullDate(new Date(props.getValue()))} suppressHydrationWarning={true}>
         {fullDate(new Date(props.getValue()))}
@@ -65,11 +63,6 @@ const columns = [
     size: 350,
     minSize: 350,
   }),
-  // columnHelper.accessor((row) => row.runs, {
-  //   id: 'output',
-  //   cell: (props) => <OutputList functionRuns={props.row.original.runs} />,
-  //   header: () => <span>Output</span>,
-  // }),
 ];
 
 export default function Stream() {
@@ -236,20 +229,20 @@ export default function Stream() {
         breadcrumb={[{ text: 'Stream' }]}
         action={
           <div className="flex justify-end gap-1 py-2">
-            <NewButton
+            <Button
               kind="secondary"
               appearance="outlined"
-              label={`${showInternalEvents ? 'Hide' : 'Show'} Internal Events`}
+              label={`${showInternalEvents ? 'Hide' : 'Show'} internal events`}
               onClick={() => setShowInternalEvents((prev) => !prev)}
             />
-            <NewButton
+            <Button
               kind="secondary"
               appearance="outlined"
               label={freezeStream ? 'Enable auto-refresh' : 'Disable auto-refresh'}
               onClick={() => setFreezeStream((prev) => !prev)}
             />
             <SendEventButton
-              label="Test Event"
+              label="Test event"
               data={JSON.stringify({
                 name: '',
                 data: {},
@@ -291,7 +284,7 @@ export default function Stream() {
               subtitle="Read our documentation to learn how to send events to Inngest."
               imageUrl="/images/no-events.png"
               link={{
-                text: 'Sending Events',
+                text: 'Sending events',
                 url: 'https://www.inngest.com/docs/events',
               }}
             />
@@ -300,7 +293,11 @@ export default function Stream() {
       </div>
       {tableScrollTopPosition > 0 && (
         <span className="absolute bottom-5 right-5 animate-bounce">
-          <Button btnAction={scrollToTop} icon={<RiArrowDownSLine className="rotate-180" />} />
+          <Button
+            kind="secondary"
+            onClick={scrollToTop}
+            icon={<RiArrowDownSLine className="rotate-180" />}
+          />
         </span>
       )}
     </div>

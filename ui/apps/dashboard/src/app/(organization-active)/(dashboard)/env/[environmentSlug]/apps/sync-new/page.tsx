@@ -3,11 +3,11 @@
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
-import { Code } from '@inngest/components/Code';
 import { CodeLine } from '@inngest/components/CodeLine';
 import { Link } from '@inngest/components/Link';
-import * as Tabs from '@radix-ui/react-tabs';
-import { RiLoopLeftLine } from '@remixicon/react';
+import TabCards from '@inngest/components/TabCards/TabCards';
+import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
+import { RiCodeLine, RiInputCursorMove } from '@remixicon/react';
 
 import { setSkipCacheSearchParam } from '@/utils/urls';
 import ManualSync from './ManualSync';
@@ -23,93 +23,76 @@ export default function Page({ params: { environmentSlug } }: Props) {
   const APPS_URL = setSkipCacheSearchParam(`/env/${environmentSlug}/apps`) as Route;
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-100">
-      <section className="mx-auto mt-16 max-w-screen-md overflow-hidden rounded-lg">
-        <header className="bg-slate-940 px-8 pb-3 pt-6 text-white">
-          <div className="flex items-center gap-4 pb-4">
-            <RiLoopLeftLine className="h-6 w-6" />
-            <h2 className="text-xl">Sync App</h2>
-          </div>
-          <p>Provide the location of your app.</p>
-        </header>
+    <div className="bg-canvasBase text-basis h-full overflow-y-auto">
+      <section className="mx-auto mt-16 max-w-screen-md text-sm">
+        <h2 className="text-basis mb-4 text-xl">Sync your app to Inngest</h2>
+        <p className="mb-6 text-sm">
+          Since your code is hosted on another platform, you need to register where your functions
+          are hosted with Inngest.{' '}
+          <Link
+            className="inline-block"
+            size="small"
+            href="https://www.inngest.com/docs/apps/cloud?ref=app-onboarding-sync-app"
+            target="_blank"
+          >
+            Learn more about syncs
+          </Link>
+        </p>
 
-        <Tabs.Root defaultValue="tab1" className="bg-white">
-          <Tabs.List className="bg-slate-900 pb-2 pl-6 pt-4 text-slate-400">
-            <Tabs.Trigger
-              className="px-4 hover:text-white data-[state=active]:text-white"
-              value="tab1"
-            >
-              Manual Sync
-            </Tabs.Trigger>
-            <Tabs.Trigger
-              className="px-4 hover:text-white data-[state=active]:text-white"
-              value="tab2"
-            >
-              Vercel Integration
-            </Tabs.Trigger>
-            <Tabs.Trigger
-              className="px-4 hover:text-white data-[state=active]:text-white"
-              value="tab3"
-            >
-              Curl Command
-            </Tabs.Trigger>
-          </Tabs.List>
-          <Tabs.Content value="tab1">
+        <h4 className="mb-4 text-sm font-medium">Choose syncing method:</h4>
+        <TabCards defaultValue="tab1">
+          <TabCards.ButtonList>
+            <TabCards.Button className="w-36" value="tab1">
+              <div className="flex items-center gap-1.5">
+                <RiInputCursorMove className="h-5 w-5" /> Sync manually
+              </div>
+            </TabCards.Button>
+            <TabCards.Button className="w-36" value="tab2">
+              <div className="flex items-center gap-1.5">
+                <IconVercel className="h-4 w-4" /> Sync with Vercel
+              </div>
+            </TabCards.Button>
+            <TabCards.Button className="w-36" value="tab3">
+              <div className="flex items-center gap-1.5">
+                <RiCodeLine className="h-5 w-5" /> Curl command
+              </div>
+            </TabCards.Button>
+          </TabCards.ButtonList>
+
+          <TabCards.Content value="tab1">
             <ManualSync appsURL={APPS_URL} />
-          </Tabs.Content>
-          <Tabs.Content value="tab2">
-            <div className="border-b border-slate-200 p-8">
-              <p>
-                To integrate your code hosted on another platform with Inngest, you need to inform
-                Inngest about the location of your app and functions.
-              </p>
-              <br />
-              <p>
-                Inngest enables you to host your apps on Vercel using their serverless functions
-                platform. By using Inngest&apos;s official Vercel integration, your apps will be
-                synced automatically.
-              </p>
-            </div>
-            <div className="flex items-center justify-between px-8 py-6">
-              <Link href="https://www.inngest.com/docs/apps/cloud">View Docs</Link>
+          </TabCards.Content>
+          <TabCards.Content value="tab2">
+            <p>
+              Inngest enables you to host your apps on Vercel using their serverless functions
+              platform. By using Inngest&apos;s official Vercel integration, your apps will be
+              synced automatically.
+            </p>
+            <div className="flex items-center justify-between pt-6">
+              <Link href="https://www.inngest.com/docs/apps/cloud" target="_blank" size="small">
+                View Docs
+              </Link>
               <div className="flex items-center gap-3">
                 <Button
                   label="Cancel"
-                  btnAction={() => {
+                  onClick={() => {
                     router.push(APPS_URL);
                   }}
                   appearance="outlined"
+                  kind="secondary"
                 />
                 <Button
-                  label="Go To Vercel Configuration"
-                  btnAction={() => {
+                  label="Go to Vercel configuration"
+                  onClick={() => {
                     router.push('/settings/integrations/vercel' as Route);
                   }}
                   kind="primary"
                 />
               </div>
             </div>
-          </Tabs.Content>
-          <Tabs.Content value="tab3">
-            <div className="border-b border-slate-200 p-8">
-              <p>
-                To integrate your code hosted on another platform with Inngest, you need to inform
-                Inngest about the location of your app and functions.
-              </p>
-              <br />
-              <p>
-                For example, imagine that your <Code>serve()</Code> handler (
-                <Link
-                  showIcon={false}
-                  href="https://www.inngest.com/docs/reference/serve#how-the-serve-api-handler-works"
-                >
-                  see docs
-                </Link>
-                ) is located at /api/inngest, and your domain is myapp.com. In this scenario,
-                you&apos;ll need to inform Inngest that your apps and functions are hosted at
-                https://myapp.com/api/inngest.
-              </p>
-              <br />
+          </TabCards.Content>
+          <TabCards.Content value="tab3">
+            <div className="">
               <p>
                 You can sync from your machine or automate this within a CI/CD pipeline.
                 <span className="font-semibold">
@@ -120,20 +103,22 @@ export default function Page({ params: { environmentSlug } }: Props) {
               </p>
               <CodeLine code="curl -X PUT https://<your-app>.com/api/inngest" className="mt-6" />
             </div>
-            <div className="flex items-center justify-between px-8 py-6">
-              <Link href="https://www.inngest.com/docs/apps/cloud">View Docs</Link>
+            <div className="flex items-center justify-between pt-6">
+              <Link href="https://www.inngest.com/docs/apps/cloud" target="_blank" size="small">
+                View Docs
+              </Link>
               <div className="flex items-center gap-3">
                 <Button
                   label="Done"
-                  btnAction={() => {
+                  onClick={() => {
                     router.push(APPS_URL);
                   }}
                   kind="primary"
                 />
               </div>
             </div>
-          </Tabs.Content>
-        </Tabs.Root>
+          </TabCards.Content>
+        </TabCards>
       </section>
     </div>
   );

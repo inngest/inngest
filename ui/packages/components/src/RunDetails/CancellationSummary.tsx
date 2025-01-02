@@ -17,9 +17,9 @@ export function CancellationSummary({ history }: Props) {
 
   return (
     <Card accentColor="bg-status-cancelled">
-      <Card.Header className="bg-white dark:bg-slate-800/40">Cancelled</Card.Header>
+      <Card.Header>Cancelled</Card.Header>
 
-      <Card.Content className="bg-white dark:bg-slate-800/40">
+      <Card.Content>
         {/* TODO: Make this a link */}
         <MetadataItem
           label="Event ID"

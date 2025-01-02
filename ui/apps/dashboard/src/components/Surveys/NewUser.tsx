@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useUser } from '@clerk/nextjs';
-import { NewButton } from '@inngest/components/Button/index';
-import { NewLink } from '@inngest/components/Link';
+import { Button } from '@inngest/components/Button/index';
+import { Link } from '@inngest/components/Link';
 import { isAfter, sub } from '@inngest/components/utils/date';
 import { RiCloseLine } from '@remixicon/react';
 
@@ -38,7 +38,7 @@ export default function NewUser() {
       <div className="bg-canvasBase border-subtle absolute bottom-0 right-0 mb-6 mr-4 w-[430px] rounded border">
         <div className="gap-x flex flex-row items-center justify-between p-3">
           <div className="text-sm leading-tight">Got a few minutes?</div>
-          <NewButton
+          <Button
             icon={<RiCloseLine className="text-subtle h-5 w-5" />}
             kind="secondary"
             appearance="ghost"
@@ -53,9 +53,9 @@ export default function NewUser() {
           completion, you will be entered into a drawing for an Amazon gift card.
         </div>
         <div className="border-subtle border-t px-3 py-2">
-          <NewLink href="https://t.maze.co/282304348" arrowOnHover={true} target="_blank">
+          <Link href="https://t.maze.co/282304348" arrowOnHover={true} target="_blank">
             Take survey
-          </NewLink>
+          </Link>
         </div>
       </div>
     )

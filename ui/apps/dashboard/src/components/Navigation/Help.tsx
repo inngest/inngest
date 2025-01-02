@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import NextLink from 'next/link';
 import { Listbox } from '@headlessui/react';
 import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import {
@@ -35,7 +35,7 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
       </Listbox.Button>
       <div className="relative">
         <Listbox.Options className="bg-canvasBase absolute -right-48 bottom-0 z-50 ml-8 w-[199px] gap-y-0.5 rounded border shadow ring-0 focus:outline-none">
-          <Link href="https://www.inngest.com/docs?ref=support-center" target="_blank">
+          <NextLink href="https://www.inngest.com/docs?ref=support-center" target="_blank">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="docs"
@@ -45,8 +45,8 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
                 <div>Inngest Documentation</div>
               </div>
             </Listbox.Option>
-          </Link>
-          <Link href="/support" target="_blank">
+          </NextLink>
+          <NextLink href="/support" target="_blank">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="support"
@@ -56,8 +56,8 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
                 <div>Support</div>
               </div>
             </Listbox.Option>
-          </Link>
-          <Link href="https://www.inngest.com/discord" target="_blank">
+          </NextLink>
+          <NextLink href="https://www.inngest.com/discord" target="_blank">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 my-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="discord"
@@ -67,9 +67,9 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
                 <div>Join Discord</div>
               </div>
             </Listbox.Option>
-          </Link>
+          </NextLink>
           <hr />
-          <Link href="https://roadmap.inngest.com/roadmap" target="_blank">
+          <NextLink href="https://roadmap.inngest.com/roadmap" target="_blank">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="roadmap"
@@ -79,8 +79,8 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
                 <div>Inngest Roadmap</div>
               </div>
             </Listbox.Option>
-          </Link>
-          <Link href="/support" target="_blank">
+          </NextLink>
+          <NextLink href="/support" target="_blank">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="status"
@@ -90,8 +90,8 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
                 <div>Status</div>
               </div>
             </Listbox.Option>
-          </Link>
-          <Link href="https://roadmap.inngest.com/changelog" target="_blank">
+          </NextLink>
+          <NextLink href="https://roadmap.inngest.com/changelog" target="_blank">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="releaseNotes"
@@ -101,11 +101,11 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
                 <div>Release Notes</div>
               </div>
             </Listbox.Option>
-          </Link>
+          </NextLink>
           {onboardingFlow && (
             <>
               <hr />
-              <Link
+              <NextLink
                 href={pathCreator.onboardingSteps({
                   step: nextStep ? nextStep.name : lastCompletedStep?.name,
                   ref: 'app-navbar-help',
@@ -121,7 +121,7 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
                     <div>Show onboarding guide</div>
                   </div>
                 </Listbox.Option>
-              </Link>
+              </NextLink>
             </>
           )}
         </Listbox.Options>

@@ -1,7 +1,7 @@
 'use client';
 
 import { Listbox } from '@headlessui/react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { RiArchive2Line, RiFirstAidKitLine, RiMore2Line } from '@remixicon/react';
 
@@ -23,7 +23,7 @@ export const ActionsMenu = ({
   return (
     <Listbox>
       <Listbox.Button as="div">
-        <NewButton kind="primary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
+        <Button kind="primary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
       </Listbox.Button>
       <div className="relative">
         <Listbox.Options className="bg-canvasBase absolute right-1 top-5 z-50 w-[170px] gap-y-0.5 rounded border shadow">
@@ -34,7 +34,7 @@ export const ActionsMenu = ({
             <OptionalTooltip
               tooltip={disableValidate && 'No syncs. App health check not available.'}
             >
-              <NewButton
+              <Button
                 disabled={disableValidate}
                 appearance="ghost"
                 kind="secondary"
@@ -58,7 +58,7 @@ export const ActionsMenu = ({
               <OptionalTooltip
                 tooltip={disableArchive && 'Parent app is archived. Archive action not available.'}
               >
-                <NewButton
+                <Button
                   appearance="ghost"
                   kind="danger"
                   size="medium"

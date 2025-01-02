@@ -23,7 +23,7 @@ export function FunctionList({ envSlug, functions }: Props) {
 
   return (
     <main
-      className="border-muted min-h-0 overflow-y-auto rounded-lg border [&>table]:border-b-0"
+      className="border-muted mb-8 min-h-0 overflow-y-auto rounded-lg border [&>table]:border-b-0"
       ref={tableContainerRef}
     >
       <Table
@@ -52,7 +52,8 @@ function useColumns({ envSlug }: { envSlug: string }) {
         return (
           <div className="flex items-center">
             <Link
-              internalNavigation
+              arrowOnHover
+              size="medium"
               className="w-full text-sm font-medium"
               href={
                 `/env/${envSlug}/functions/${encodeURIComponent(info.row.original.slug)}` as Route
@@ -63,7 +64,7 @@ function useColumns({ envSlug }: { envSlug: string }) {
           </div>
         );
       },
-      header: 'Function Name',
+      header: 'Function name',
     }),
     columnHelper.accessor('triggers', {
       cell: (props) => {

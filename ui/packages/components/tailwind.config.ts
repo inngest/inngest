@@ -160,11 +160,17 @@ export default {
       placeholderColor: {
         disabled: 'rgb(var(--color-foreground-disabled) / <alpha-value>)',
       },
+      gradientColorStops: {
+        canvasMuted: 'rgb(var(--color-background-canvas-muted) / <alpha-value>)',
+      },
       fill: {
         // temporary tooltip token
         tooltipArrow: 'rgb(var(--color-background-canvas-base) / <alpha-value>)',
         onContrast: 'rgb(var(--color-foreground-onContrast) / <alpha-value>)',
+        basis: 'rgb(var(--color-foreground-base) / <alpha-value>)',
         subtle: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
+        muted: 'rgb(var(--color-foreground-muted) / <alpha-value>)',
+        disabled: 'rgb(var(--color-foreground-disabled) / <alpha-value>)',
         alwaysWhite: 'rgb(var(--color-foreground-alwaysWhite) / <alpha-value>)',
         btnPrimary: 'rgb(var(--color-foreground-btn-primary) / <alpha-value>)',
         btnDanger: 'rgb(var(--color-foreground-btn-danger) / <alpha-value>)',

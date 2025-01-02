@@ -2,7 +2,7 @@ import { forwardRef } from 'react';
 import { Combobox, Listbox, type ComboboxInputProps } from '@headlessui/react';
 import { RiArrowDownSLine } from '@remixicon/react';
 
-import { NewButton as InngestButton } from '../Button';
+import { Button as InngestButton } from '../Button';
 import { Checkbox } from '../Checkbox';
 import { cn } from '../utils/classNames';
 

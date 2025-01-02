@@ -1,6 +1,6 @@
 'use client';
 
-import { Link } from '@inngest/components/Link/Link';
+import { Button } from '@inngest/components/Button/Button';
 
 import { AppGitCard } from '@/components/AppGitCard/AppGitCard';
 import { AppInfoCard } from '@/components/AppInfoCard';
@@ -47,12 +47,12 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
           <div className="flex flex-col">
             <div className="text-basis text-2xl leading-tight">{appRes.data.name}</div>
           </div>
-          <Link
-            internalNavigation={true}
+          <Button
+            appearance="outlined"
+            kind="secondary"
             href={`/env/${env.slug}/apps/${encodeURIComponent(externalID)}/syncs`}
-          >
-            See all syncs
-          </Link>
+            label="See all syncs"
+          />
         </div>
 
         {appRes.data.latestSync?.error && (

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { CodeBlock } from '@inngest/components/CodeBlock/CodeBlock';
 import { parseCode } from '@inngest/components/InvokeButton/utils';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import { Select, type Option } from '@inngest/components/Select/Select';
 import { RiCheckboxCircleFill } from '@remixicon/react';
 import { toast } from 'sonner';
@@ -115,14 +115,14 @@ export default function InvokeFn() {
       <p className="mb-6 text-sm">
         You can send a test event and see your function in action. You will be able to access all
         our monitoring and debugging features.{' '}
-        <NewLink
+        <Link
           className="inline-block"
           size="small"
           href="https://www.inngest.com/docs/features/events-triggers?ref=app-onboarding-invoke-fn"
           target="_blank"
         >
           Read more
-        </NewLink>
+        </Link>
       </p>
       <div className="border-subtle my-6 rounded-md border px-6 py-4">
         <p className="text-muted mb-2 text-sm font-medium">Select function to test:</p>
@@ -186,7 +186,7 @@ export default function InvokeFn() {
         <div className="mt-6 flex items-center justify-between">
           {!isFnInvoked ? (
             <div className="flex items-center gap-2">
-              <NewButton
+              <Button
                 label="Invoke test function"
                 disabled={!selectedFunction}
                 onClick={() => {
@@ -200,7 +200,7 @@ export default function InvokeFn() {
                   handleInvokeFn();
                 }}
               />
-              <NewButton
+              <Button
                 appearance="outlined"
                 label="Skip, take me to dashboard"
                 onClick={() => {
@@ -222,7 +222,7 @@ export default function InvokeFn() {
               />
             </div>
           ) : (
-            <NewButton
+            <Button
               label="Go to runs"
               onClick={() => {
                 tracking?.trackOnboardingAction(currentStepName, {

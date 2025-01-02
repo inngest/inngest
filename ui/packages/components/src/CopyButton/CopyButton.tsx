@@ -1,4 +1,4 @@
-import { NewButton as Button } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { RiCheckLine, RiFileCopy2Line } from '@remixicon/react';
 
 type ButtonCopyProps = {

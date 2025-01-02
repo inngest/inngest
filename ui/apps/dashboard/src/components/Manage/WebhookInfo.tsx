@@ -10,12 +10,12 @@ export const WebhookInfo = () => (
     <TooltipContent
       side="right"
       sideOffset={2}
-      className="border-muted text-muted text-md mt-6 flex flex-col rounded-lg border p-0"
+      className="border-muted text-muted mt-6 flex flex-col rounded-lg border p-0 text-sm"
     >
-      <div className="border-b px-4 py-2 ">Sources for events for developers.</div>
+      <div className="border-subtle border-b px-4 py-2 ">Sources for events for developers.</div>
 
       <div className="px-4 py-2">
-        <Link href={'https://www.inngest.com/docs/platform/webhooks'} className="text-md">
+        <Link href={'https://www.inngest.com/docs/platform/webhooks'} target="_blank">
           Learn how create a webhook
         </Link>
       </div>

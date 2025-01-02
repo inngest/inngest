@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,7 +34,7 @@ export default function AppActions({ id, name }: { id: string; name: string }) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <NewButton kind="secondary" appearance="ghost" size="medium" icon={<RiMore2Line />} />
+          <Button kind="secondary" appearance="ghost" size="medium" icon={<RiMore2Line />} />
         </DropdownMenuTrigger>
         <DropdownMenuContent className="z-50">
           <DropdownMenuItem className="text-error" onSelect={() => setIsAlertModalOpen(true)}>

@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
-import { NewLink } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/Link';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiAddLine, RiQuestionLine } from '@remixicon/react';
 
@@ -24,14 +24,16 @@ const AppInfo = () => (
     <TooltipContent
       side="right"
       sideOffset={2}
-      className="border-muted text-muted text-md mt-6 flex flex-col rounded-lg border p-0 text-sm"
+      className="border-muted text-muted mt-6 flex flex-col rounded-lg border p-0 text-sm"
     >
-      <div className="border-b px-4 py-2 ">Apps map directly to your products or services.</div>
+      <div className="border-subtle border-b px-4 py-2 ">
+        Apps map directly to your products or services.
+      </div>
 
       <div className="px-4 py-2">
-        <NewLink href="https://www.inngest.com/docs/apps" size="small">
+        <Link href="https://www.inngest.com/docs/apps" target="_blank">
           Learn how apps work
-        </NewLink>
+        </Link>
       </div>
     </TooltipContent>
   </Tooltip>
@@ -89,7 +91,7 @@ export default function AppsPage({
         infoIcon={<AppInfo />}
         action={
           (!isArchived || displayOnboarding) && (
-            <NewButton
+            <Button
               kind="primary"
               label="Sync new app"
               href={pathCreator.createApp({ envSlug })}

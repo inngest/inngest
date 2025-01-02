@@ -5,11 +5,6 @@ import { Trace } from './Trace';
 const meta = {
   title: 'Components/Trace',
   component: Trace,
-  parameters: {
-    themes: {
-      themeOverride: 'light',
-    },
-  },
 } satisfies Meta<typeof Trace>;
 
 export default meta;

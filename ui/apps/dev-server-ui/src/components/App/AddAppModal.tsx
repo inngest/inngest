@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
+import { Input } from '@inngest/components/Forms/Input';
 import { Modal } from '@inngest/components/Modal';
 import useDebounce from '@inngest/components/hooks/useDebounce';
-import { RiErrorWarningLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
-import Input from '@/components/Form/Input';
 import { useCreateAppMutation } from '@/store/generated';
 import isValidUrl from '@/utils/urlValidation';
 
@@ -18,7 +17,7 @@ export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
   const [inputUrl, setInputUrl] = useState('');
   const [isUrlInvalid, setUrlInvalid] = useState(false);
   const [isDisabled, setDisabled] = useState(true);
-  const [_createApp, createAppState] = useCreateAppMutation();
+  const [_createApp] = useCreateAppMutation();
 
   const debouncedRequest = useDebounce(() => {
     if (isValidUrl(inputUrl)) {
@@ -67,36 +66,30 @@ export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose}>
+    <Modal isOpen={isOpen} onClose={onClose} className="min-w-[500px]">
       <Modal.Header description="Sync your Inngest application to the Dev Server">
         Sync App
       </Modal.Header>
       <Modal.Body>
         <form id="add-app" onSubmit={handleSubmit}>
           <div>
-            <label htmlFor="addAppUrlModal" className="text-sm font-semibold text-white">
-              App URL
-              <span className="block pb-4 text-sm text-slate-500">The URL of your application</span>
+            <label htmlFor="addAppUrlModal" className="text-basis text-sm">
+              Insert the URL of your application:
             </label>
             <Input
+              className="mt-2 w-full"
               id="addAppUrlModal"
               value={inputUrl}
               placeholder="http://localhost:3000/api/inngest"
               onChange={handleChange}
               onKeyDown={handleKeyDown}
-              isInvalid={isUrlInvalid}
+              error={isUrlInvalid && inputUrl.length > 0 ? 'Please enter a valid URL' : undefined}
             />
           </div>
-          {isUrlInvalid && inputUrl.length > 0 && (
-            <p className="flex items-center gap-2 bg-rose-600/50 px-6 py-2 text-sm text-white">
-              <RiErrorWarningLine />
-              Please enter a valid URL
-            </p>
-          )}
         </form>
       </Modal.Body>
       <Modal.Footer className="flex justify-end gap-2">
-        <Button label="Cancel" appearance="outlined" btnAction={onClose} />
+        <Button label="Cancel" kind="secondary" appearance="outlined" onClick={onClose} />
         <Button
           disabled={isDisabled || isUrlInvalid}
           label="Sync App"

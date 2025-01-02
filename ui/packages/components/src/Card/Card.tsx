@@ -31,13 +31,7 @@ export function Card({ accentColor, accentPosition = 'top', children, className 
   }
 
   return (
-    <div
-      className={cn(
-        'dark:bg-slate-910 w-full overflow-hidden rounded-md dark:shadow',
-        wrapperClass,
-        className
-      )}
-    >
+    <div className={cn('bg-canvasBase w-full overflow-hidden rounded-md', wrapperClass, className)}>
       {accentColor && <div className={cn('p-0.5', accentClass, accentColor)} />}
       <div className={cn('border-muted w-full grow overflow-hidden border', contentClass)}>
         {children}

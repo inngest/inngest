@@ -1,7 +1,7 @@
 'use client';
 
 import { Listbox } from '@headlessui/react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { IconReplay } from '@inngest/components/icons/Replay';
 import {
@@ -39,7 +39,7 @@ export const ActionsMenu = ({
       {({ open }) => (
         <>
           <Listbox.Button as="div">
-            <NewButton
+            <Button
               kind="primary"
               appearance="solid"
               size="medium"
@@ -61,7 +61,7 @@ export const ActionsMenu = ({
                     `Invoke not available, function is ${archived ? 'archived' : 'paused'}.`
                   }
                 >
-                  <NewButton
+                  <Button
                     onClick={showInvoke}
                     disabled={archived || paused}
                     appearance="ghost"
@@ -82,7 +82,7 @@ export const ActionsMenu = ({
                 value="pause"
               >
                 <OptionalTooltip tooltip={archived && 'Pause not available, function is archived.'}>
-                  <NewButton
+                  <Button
                     onClick={showPause}
                     disabled={archived}
                     appearance="ghost"
@@ -113,7 +113,7 @@ export const ActionsMenu = ({
                     `Replay not available, function is ${archived ? 'archived' : 'paused'}.`
                   }
                 >
-                  <NewButton
+                  <Button
                     onClick={showReplay}
                     disabled={archived || paused}
                     appearance="ghost"
@@ -133,7 +133,7 @@ export const ActionsMenu = ({
                   className="m-2 flex h-8 cursor-pointer items-center text-[13px]"
                   value="cancel"
                 >
-                  <NewButton
+                  <Button
                     onClick={showCancel}
                     appearance="ghost"
                     kind="danger"

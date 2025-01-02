@@ -3,10 +3,10 @@
 import { notFound } from 'next/navigation';
 import { EventDetails } from '@inngest/components/EventDetails';
 import { RunDetails } from '@inngest/components/RunDetails';
+import { cn } from '@inngest/components/utils/classNames';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
-import cn from '@/utils/cn';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { StreamDetails } from './StreamDetails';
 
@@ -114,7 +114,7 @@ export default function FunctionRunDetailsLayout({ params }: FunctionRunDetailsL
   }
   if (res.isLoading) {
     return (
-      <div className={cn('dark grid h-full text-white', 'grid-cols-2')}>
+      <div className={cn('text-basis dark grid h-full', 'grid-cols-2')}>
         <EventDetails loading />
         <RunDetails loading />
       </div>

@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import TabCards from '@inngest/components/TabCards/TabCards';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
@@ -121,14 +121,14 @@ export default function SyncApp() {
       <p className="mb-6 text-sm">
         Since your code is hosted on another platform, you need to register where your functions are
         hosted with Inngest.{' '}
-        <NewLink
+        <Link
           className="inline-block"
           size="small"
           href="https://www.inngest.com/docs/apps/cloud?ref=app-onboarding-sync-app"
           target="_blank"
         >
           Learn more about syncs
-        </NewLink>
+        </Link>
       </p>
 
       <h4 className="mb-4 text-sm font-medium">Choose syncing method:</h4>
@@ -175,7 +175,7 @@ export default function SyncApp() {
             </Alert.Link>
           </Alert>
           <Input
-            className={`${error && 'outline-error'} my-3 `}
+            className={`${error && 'outline-error'} my-3 w-full`}
             placeholder="https://myapp.com/api/inngest"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
@@ -197,7 +197,7 @@ export default function SyncApp() {
           {error && <SyncFailure className="mb-3 mt-0 text-sm" error={error} />}
           {!app && (
             <div className="flex items-center gap-2">
-              <NewButton
+              <Button
                 loading={isLoading}
                 label="Sync app here"
                 onClick={() => {
@@ -207,7 +207,7 @@ export default function SyncApp() {
                   handleSyncAppManually();
                 }}
               />
-              <NewButton
+              <Button
                 appearance="outlined"
                 label="I already have an Inngest app"
                 onClick={() => {
@@ -225,7 +225,7 @@ export default function SyncApp() {
             </div>
           )}
           {app && (
-            <NewButton
+            <Button
               label="Next"
               onClick={() => {
                 tracking?.trackOnboardingAction(currentStepName, {
@@ -245,7 +245,7 @@ export default function SyncApp() {
                 </div>
                 <p className="text-basis">Vercel</p>
               </div>
-              <NewButton
+              <Button
                 kind="secondary"
                 appearance="outlined"
                 label="Manage Vercel integration"
@@ -314,7 +314,7 @@ export default function SyncApp() {
                 )}
               </>
             )}
-            <NewButton
+            <Button
               disabled={!hasSuccessfulSync}
               label="Next"
               onClick={() => {

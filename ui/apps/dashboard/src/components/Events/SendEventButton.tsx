@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -19,11 +19,11 @@ export default function SendEventButton({ eventName }: SendEventButtonProps) {
   return (
     <>
       <OptionalTooltip tooltip={isArchived && 'Cannot send events. Environment is archived'}>
-        <NewButton
+        <Button
           disabled={isArchived}
           onClick={() => setIsModalVisible(true)}
           kind="primary"
-          label="Send Event"
+          label="Send event"
         />
       </OptionalTooltip>
 

@@ -1,6 +1,6 @@
 import type { Route } from 'next';
 import { Link } from '@inngest/components/Link';
-import { classNames } from '@inngest/components/utils/classNames';
+import { cn } from '@inngest/components/utils/classNames';
 
 import { CardItem } from '../AppInfoCard/CardItem';
 
@@ -25,7 +25,7 @@ export function AppGitCard({ className, sync }: Props) {
   if (commitHash) {
     if (repoURL) {
       commitHashValue = (
-        <Link href={`${repoURL}/commit/${commitHash}` as Route} internalNavigation={false}>
+        <Link href={`${repoURL}/commit/${commitHash}` as Route} target="_blank" size="medium">
           <span className="truncate">{commitHash.substring(0, 7)}</span>
         </Link>
       );
@@ -40,7 +40,7 @@ export function AppGitCard({ className, sync }: Props) {
   if (commitRef) {
     if (repoURL) {
       commitRefValue = (
-        <Link href={`${repoURL}/tree/${commitRef}` as Route} internalNavigation={false}>
+        <Link href={`${repoURL}/tree/${commitRef}` as Route} target="_blank" size="medium">
           <span className="truncate">{commitRef}</span>
         </Link>
       );
@@ -54,7 +54,7 @@ export function AppGitCard({ className, sync }: Props) {
   let repositoryValue;
   if (repoURL) {
     repositoryValue = (
-      <Link href={repoURL as Route} internalNavigation={false}>
+      <Link href={repoURL as Route} target="_blank" size="medium">
         <span className="truncate">{repoURL}</span>
       </Link>
     );
@@ -63,10 +63,8 @@ export function AppGitCard({ className, sync }: Props) {
   }
 
   return (
-    <div
-      className={classNames('border-muted overflow-hidden rounded-lg border bg-white', className)}
-    >
-      <div className="border-muted border-b px-6 py-3 text-sm font-medium text-slate-600">
+    <div className={cn('border-muted bg-canvasBase overflow-hidden rounded-lg border', className)}>
+      <div className="border-muted text-basis border-b px-6 py-3 text-sm font-medium">
         Commit Information
       </div>
 

@@ -1,4 +1,4 @@
-import { Tooltip, TooltipArrow, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 
 import { Pill } from './Pill';
 
@@ -25,7 +25,6 @@ export function HorizontalPillList({ pills, alwaysVisibleCount }: FunctionsCellC
 
           <TooltipContent sideOffset={5} className="p-3">
             <div className="flex flex-col gap-2">{hiddenPills}</div>
-            <TooltipArrow className="fill-white dark:fill-slate-800" />
           </TooltipContent>
         </Tooltip>
       </div>

@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState, type UIEventHandler } from 'react';
 import dynamic from 'next/dynamic';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
 import { Pill } from '@inngest/components/Pill';
@@ -339,7 +339,7 @@ export function RunsPage({
               />
             )}
             {hasSearchFlag && (
-              <NewButton
+              <Button
                 icon={<RiSearchLine />}
                 size="large"
                 iconSide="left"
@@ -371,7 +371,7 @@ export function RunsPage({
                 <p className="text-subtle text-sm">Search your runs by using a CEL query</p>
                 <Pill kind="primary">Beta</Pill>
               </div>
-              <NewButton
+              <Button
                 appearance="outlined"
                 label="Read the docs"
                 icon={<RiArrowRightUpLine />}
@@ -401,7 +401,7 @@ export function RunsPage({
         {!hasMore && data.length > 1 && (
           <div className="flex flex-col items-center pt-8">
             <p className="text-muted">No additional runs found.</p>
-            <NewButton
+            <Button
               label="Back to top"
               kind="primary"
               appearance="ghost"
@@ -411,7 +411,7 @@ export function RunsPage({
         )}
         {onRefresh && (
           <div className="flex flex-col items-center pt-2">
-            <NewButton
+            <Button
               kind="secondary"
               appearance="outlined"
               label="Refresh runs"

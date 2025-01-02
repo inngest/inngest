@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { capitalCase } from 'change-case';
 
 import BillingCard from './BillingCard';
@@ -34,7 +34,7 @@ export default function PaymentMethod({
       heading="Payment Method"
       className="mb-3"
       actions={
-        <NewButton
+        <Button
           appearance="ghost"
           kind="primary"
           onClick={() => setIsEditing(true)}
