@@ -176,6 +176,9 @@ export default {
         btnDanger: 'rgb(var(--color-foreground-btn-danger) / <alpha-value>)',
         link: 'rgb(var(--color-foreground-link) / <alpha-value>)',
       },
+      stroke: {
+        disabled: 'rgb(var(--color-border-disabled) / <alpha-value>)',
+      },
       gridTemplateColumns: {
         dashboard: '1fr 1fr 1fr 432px',
       },

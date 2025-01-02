@@ -129,7 +129,7 @@ export default function SimpleLineChart({
             </div>
           ) : (
             <LineChart data={flattenData} margin={{ top: 16, bottom: 16 }} barCategoryGap={8}>
-              <CartesianGrid strokeDasharray="0" vertical={false} className="fill-disabled" />
+              <CartesianGrid strokeDasharray="0" vertical={false} className="stroke-disabled" />
               <XAxis
                 allowDecimals={false}
                 dataKey="name"

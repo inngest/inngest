@@ -131,7 +131,7 @@ export default function StackedBarChart({
                 bottom: 16,
               }}
             >
-              <CartesianGrid strokeDasharray="0" vertical={false} className="fill-disabled" />
+              <CartesianGrid strokeDasharray="0" vertical={false} className="stroke-disabled" />
               <XAxis
                 allowDecimals={false}
                 dataKey="name"
