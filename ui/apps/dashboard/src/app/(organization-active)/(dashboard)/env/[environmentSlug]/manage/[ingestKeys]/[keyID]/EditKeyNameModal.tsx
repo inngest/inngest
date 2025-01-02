@@ -3,10 +3,10 @@
 import { useContext, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
+import { Input } from '@inngest/components/Forms/Input';
 import { Modal } from '@inngest/components/Modal';
 import { toast } from 'sonner';
 
-import Input from '@/components/Forms/Input';
 import useManagePageTerminology from '../useManagePageTerminology';
 import { Context } from './Context';
 
@@ -58,7 +58,8 @@ export default function EditKeyModal({ keyID, keyName, isOpen, onClose }: EditKe
           <Button
             appearance="outlined"
             label="Cancel"
-            btnAction={() => {
+            kind="secondary"
+            onClick={() => {
               onClose();
             }}
           />
@@ -66,7 +67,7 @@ export default function EditKeyModal({ keyID, keyName, isOpen, onClose }: EditKe
             kind="primary"
             label="Save"
             loading={fetching}
-            btnAction={(e) => {
+            onClick={(e) => {
               handleSubmit(e);
               onClose();
             }}

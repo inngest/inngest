@@ -1,5 +1,5 @@
-import { NewButton } from '../Button';
-import { NewLink } from '../Link';
+import { Button } from '../Button';
+import { Link } from '../Link';
 import { STEPS_ORDER, type ConnectPostgresIntegrationContent } from './types';
 
 export default function ConnectPage({
@@ -26,9 +26,9 @@ export default function ConnectPage({
         <p className="text-subtle text-sm">
           {description}
           {url && (
-            <NewLink size="small" className="ml-1 inline-block" href={url}>
+            <Link size="small" className="ml-1 inline-block" href={url}>
               Read documentation
-            </NewLink>
+            </Link>
           )}
         </p>
       </div>
@@ -59,7 +59,7 @@ export default function ConnectPage({
         })}
       </div>
       <div>
-        <NewButton label="Start installation" onClick={onStartInstallation} />
+        <Button label="Start installation" onClick={onStartInstallation} />
       </div>
     </div>
   );

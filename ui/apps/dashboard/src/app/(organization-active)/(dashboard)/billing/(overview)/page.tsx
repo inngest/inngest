@@ -1,5 +1,5 @@
 import { Alert } from '@inngest/components/Alert/Alert';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
 
 import AddOn from '@/components/Billing/Addons/AddonListItem';
@@ -65,7 +65,7 @@ export default async function Page() {
             severity="info"
             className="flex items-center justify-between text-sm"
             link={
-              <NewButton
+              <Button
                 appearance="outlined"
                 kind="secondary"
                 label="Upgrade plan"
@@ -81,7 +81,7 @@ export default async function Page() {
           <p className="text-muted mb-1">Your plan</p>
           <div className="flex items-center justify-between">
             <p className="text-basis text-xl">{plan.plan?.name}</p>
-            <NewButton
+            <Button
               appearance="ghost"
               label="Change plan"
               href={pathCreator.billing({ tab: 'plans', ref: 'app-billing-page-overview' })}
@@ -122,7 +122,7 @@ export default async function Page() {
           />
           <div className="flex flex-col items-center gap-2">
             <p>Custom needs?</p>
-            <NewButton
+            <Button
               appearance="outlined"
               label="Chat with a product expert"
               href={pathCreator.support({ ref: 'app-billing-overview' })}

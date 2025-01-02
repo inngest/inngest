@@ -4,7 +4,7 @@ import { cn } from '@inngest/components/utils/classNames';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { AnimatePresence, motion } from 'framer-motion';
 
-import { NewButton, type ButtonKind } from '../Button';
+import { Button, type ButtonKind } from '../Button';
 
 type AlertModalProps = {
   children?: React.ReactNode;
@@ -67,7 +67,7 @@ export function AlertModal({
               <AlertDialog.Content
                 className={cn(
                   className,
-                  'bg-canvasBase transform overflow-hidden rounded-lg shadow-xl transition-all'
+                  'bg-canvasBase text-basis transform overflow-hidden rounded-lg shadow-xl transition-all'
                 )}
               >
                 {(title || description) && (
@@ -83,14 +83,14 @@ export function AlertModal({
                 {children}
                 <div className="flex justify-end gap-2 p-6">
                   <AlertDialog.Cancel asChild>
-                    <NewButton
+                    <Button
                       appearance="outlined"
                       kind="secondary"
                       disabled={isLoading}
                       label={cancelButtonLabel}
                     />
                   </AlertDialog.Cancel>
-                  <NewButton
+                  <Button
                     disabled={isLoading}
                     kind={confirmButtonKind}
                     label={confirmButtonLabel}

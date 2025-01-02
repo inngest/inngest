@@ -1,7 +1,7 @@
 'use client';
 
 import { Listbox } from '@headlessui/react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { RiSettingsLine } from '@remixicon/react';
 
 import { Switch } from '../Switch';
@@ -21,7 +21,7 @@ export const RunsActionMenu = ({
     <div>
       <Listbox>
         <Listbox.Button as="div">
-          <NewButton
+          <Button
             kind="secondary"
             appearance="outlined"
             size="medium"

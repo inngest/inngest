@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
-import { Button, NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { CopyButton } from '@inngest/components/CopyButton';
 import { maxRenderedOutputSizeBytes } from '@inngest/components/constants';
 import { useCopyToClipboard } from '@inngest/components/hooks/useCopyToClipboard';
@@ -258,7 +258,7 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
               {!isOutputTooLarge && (
                 <div className="mr-4 flex items-center gap-2 py-2">
                   {actions.map(({ label, title, icon, onClick, disabled }, idx) => (
-                    <NewButton
+                    <Button
                       key={idx}
                       icon={icon}
                       onClick={onClick}
@@ -278,7 +278,7 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
                     handleCopyClick={handleCopyClick}
                     appearance="outlined"
                   />
-                  <NewButton
+                  <Button
                     icon={isWordWrap ? <IconOverflowText /> : <IconWrapText />}
                     onClick={handleWrapText}
                     size="small"
@@ -288,7 +288,7 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
                     appearance="outlined"
                     kind="secondary"
                   />
-                  <NewButton
+                  <Button
                     onClick={handleFullHeight}
                     size="small"
                     icon={isFullHeight ? <IconShrinkText /> : <IconExpandText />}
@@ -311,8 +311,9 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
                   <Button
                     label="Download Raw"
                     icon={<RiDownload2Line />}
-                    btnAction={() => downloadJson({ content: content })}
+                    onClick={() => downloadJson({ content: content })}
                     appearance="outlined"
+                    kind="secondary"
                   />
                 </div>
               </>

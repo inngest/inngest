@@ -63,8 +63,7 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
           {!linkToSyncs && (
             <Link
               href={`/env/${env.slug}/apps/${encodeURIComponent(app.externalID)}/syncs` as Route}
-              showIcon={false}
-              internalNavigation
+              size="medium"
             >
               <Time value={sync.lastSyncedAt} />
             </Link>

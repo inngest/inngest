@@ -1,6 +1,6 @@
-import Link from 'next/link';
+import NextLink from 'next/link';
 import { useRouter } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import SegmentedProgressBar from '@inngest/components/ProgressBar/SegmentedProgressBar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
@@ -46,7 +46,7 @@ export default function OnboardingWidget({
       )}
 
       {!collapsed && (
-        <Link
+        <NextLink
           href={pathCreator.onboardingSteps({
             step: nextStep ? nextStep.name : lastCompletedStep?.name,
             ref: 'app-onboarding-widget',
@@ -68,7 +68,7 @@ export default function OnboardingWidget({
                 </p>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <NewButton
+                    <Button
                       icon={<RiCloseLine className="text-subtle" />}
                       kind="secondary"
                       appearance="ghost"
@@ -104,7 +104,7 @@ export default function OnboardingWidget({
               <p className="text-light text-[10px] font-medium uppercase">{stepContent.eta}</p>
             )}
             {stepContent.cta && (
-              <NewButton
+              <Button
                 appearance="outlined"
                 className="hover:bg-canvasBase w-full text-sm"
                 label={stepContent.cta}
@@ -115,7 +115,7 @@ export default function OnboardingWidget({
               />
             )}
           </div>
-        </Link>
+        </NextLink>
       )}
     </>
   );

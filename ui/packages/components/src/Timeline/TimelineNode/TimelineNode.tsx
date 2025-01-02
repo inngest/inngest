@@ -64,6 +64,8 @@ export function TimelineNode({ getOutput, node, children, isAttempt, navigateToR
           >
             <Button
               className="group"
+              appearance="outlined"
+              kind="secondary"
               icon={
                 <RiArrowDownSLine className="transform-90 bg-canvasBase group-hover:bg-canvasSubtle text-subtle transition-transform duration-500 group-data-[state=open]:-rotate-180" />
               }

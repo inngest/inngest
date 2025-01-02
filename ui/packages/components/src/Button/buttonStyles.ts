@@ -59,22 +59,6 @@ export const getButtonColors = ({ kind, appearance, loading }: ButtonColorParams
   }
 };
 
-export const getKeyColor = ({ appearance, kind }: ButtonColorParams) => {
-  const defaultKeyStyles = {
-    primary: 'bg-indigo-500/80',
-    secondary: 'bg-emerald-600/80',
-    danger: 'bg-rose-700/80',
-  };
-  if (appearance === 'solid' && kind === 'primary') {
-    return 'bg-slate-900';
-  } else if (appearance === 'solid') {
-    return 'bg-slate-800/20';
-  } else if (appearance === 'outlined') {
-    return `text-white ${defaultKeyStyles[kind]}`;
-  }
-  return defaultKeyStyles[kind];
-};
-
 export const getButtonSizeStyles = ({ size, icon, label }: ButtonSizeStyleParams) => {
   const iconOnlySizeStyles = {
     small: 'h-6 p-1.5',

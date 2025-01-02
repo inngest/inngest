@@ -1,8 +1,9 @@
 import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
+import { InlineCode } from '@inngest/components/Code';
 
 export default function AppFAQ() {
   return (
-    <AccordionList className="divide-y- rounded-none border-0" type="multiple" defaultValue={[]}>
+    <AccordionList className="rounded-none border-0" type="multiple" defaultValue={[]}>
       <AccordionList.Item value="FAQ">
         <AccordionList.Trigger className="text-muted text-sm data-[state=open]:border-0">
           NEED HELP SETTING UP YOUR APP?
@@ -25,10 +26,10 @@ export default function AppFAQ() {
                 </p>
                 <p className="mb-2">
                   Syncing an app works by providing Inngest with the URL of your application's{' '}
-                  <code>serve()</code> handler endpoint, typically at{' '}
-                  <code>&lt;your-hostname&gt;/api/inngest</code>. When you sync an app, Inngest
-                  reads the configuration of your app and functions and stores the URL to send
-                  future invocation requests.
+                  <InlineCode>serve()</InlineCode> handler endpoint, typically at{' '}
+                  <InlineCode>&lt;your-hostname&gt;/api/inngest</InlineCode>. When you sync an app,
+                  Inngest reads the configuration of your app and functions and stores the URL to
+                  send future invocation requests.
                 </p>
                 <p>
                   As your functions may change, it is necessary to sync your app whenever it

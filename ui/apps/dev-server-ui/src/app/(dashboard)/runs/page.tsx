@@ -168,7 +168,7 @@ export default function Page() {
         action={
           <div className="flex flex-row items-center gap-x-1">
             <SendEventButton
-              label="Send Test Event"
+              label="Send test event"
               data={JSON.stringify({
                 name: '',
                 data: {},

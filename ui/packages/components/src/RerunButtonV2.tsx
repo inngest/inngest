@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 
 type Props = {
   disabled?: boolean;
@@ -20,7 +20,7 @@ export function RerunButton(props: Props) {
   }
 
   return (
-    <NewButton
+    <Button
       onClick={onClick}
       disabled={props.disabled}
       loading={isLoading}

@@ -22,9 +22,9 @@ const ModalWithHooks = (props) => {
   const [isOpen, setIsOpen] = useState(false);
   return (
     <>
-      <Button label="Open Modal" btnAction={() => setIsOpen(true)} />
+      <Button label="Open Modal" onClick={() => setIsOpen(true)} />
       <Modal {...props} isOpen={isOpen} onClose={() => setIsOpen(false)}>
-        <p className="p-6 text-slate-400">This is the body of the modal</p>
+        <p className="text-basis p-6">This is the body of the modal</p>
       </Modal>
     </>
   );

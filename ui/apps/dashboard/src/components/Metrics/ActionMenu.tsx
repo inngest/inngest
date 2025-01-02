@@ -1,7 +1,7 @@
 'use client';
 
 import { Listbox } from '@headlessui/react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Switch } from '@inngest/components/Switch';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import { RiSettingsLine } from '@remixicon/react';
@@ -14,7 +14,7 @@ export const MetricsActionMenu = () => {
   return (
     <Listbox>
       <Listbox.Button as="div">
-        <NewButton
+        <Button
           kind="secondary"
           appearance="outlined"
           size="medium"
