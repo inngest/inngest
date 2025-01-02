@@ -66,7 +66,7 @@ export default function EventDashboard({ params }: EventDashboardProps) {
                 <NextLink
                   href={`/env/${params.environmentSlug}/functions/${encodeURIComponent(w.slug)}`}
                   key={w.id}
-                  className="border-subtle bg-canvasBase hover:bg-canvasMuted mb-4 block overflow-hidden rounded border"
+                  className="border-subtle bg-canvasBase hover:bg-canvasMuted mb-4 block overflow-hidden rounded border p-4"
                 >
                   <div className="flex min-w-0 items-center">
                     <div className="min-w-0 flex-1">
