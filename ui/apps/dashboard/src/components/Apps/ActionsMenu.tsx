@@ -1,7 +1,12 @@
 'use client';
 
-import { Listbox } from '@headlessui/react';
 import { Button } from '@inngest/components/Button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@inngest/components/DropdownMenu/DropdownMenu';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { RiArchive2Line, RiFirstAidKitLine, RiMore2Line } from '@remixicon/react';
 
@@ -21,58 +26,48 @@ export const ActionsMenu = ({
   disableValidate = false,
 }: AppActions) => {
   return (
-    <Listbox>
-      <Listbox.Button as="div">
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
         <Button kind="primary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
-      </Listbox.Button>
-      <div className="relative">
-        <Listbox.Options className="bg-canvasBase absolute right-1 top-5 z-50 w-[170px] gap-y-0.5 rounded border shadow">
-          <Listbox.Option
-            className="text-muted mx-2 mt-2 flex h-8 cursor-pointer items-center justify-start text-[13px]"
-            value="eventKeys"
-          >
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="bottom" align="end">
+        <DropdownMenuItem>
+          <OptionalTooltip tooltip={disableValidate && 'No syncs. App health check not available.'}>
+            <Button
+              disabled={disableValidate}
+              appearance="ghost"
+              kind="secondary"
+              size="small"
+              icon={<RiFirstAidKitLine className="h-4 w-4" />}
+              iconSide="left"
+              label="Check app health"
+              className={`text-muted m-0 w-full justify-start ${
+                disableValidate && 'cursor-not-allowed'
+              }`}
+              onClick={showValidate}
+            />
+          </OptionalTooltip>
+        </DropdownMenuItem>
+
+        {!isArchived && (
+          <DropdownMenuItem>
             <OptionalTooltip
-              tooltip={disableValidate && 'No syncs. App health check not available.'}
+              tooltip={disableArchive && 'Parent app is archived. Archive action not available.'}
             >
               <Button
-                disabled={disableValidate}
                 appearance="ghost"
-                kind="secondary"
-                size="medium"
-                icon={<RiFirstAidKitLine className="h-4 w-4" />}
+                kind="danger"
+                size="small"
+                icon={<RiArchive2Line className="h-4 w-4" />}
                 iconSide="left"
-                label="Check app health"
-                className={`text-muted m-0 w-full justify-start ${
-                  disableValidate && 'cursor-not-allowed'
-                }`}
-                onClick={showValidate}
+                label={'Archive app'}
+                className="m-0 w-full justify-start"
+                onClick={showArchive}
               />
             </OptionalTooltip>
-          </Listbox.Option>
-
-          {!isArchived && (
-            <Listbox.Option
-              className="m-2 flex h-8 cursor-pointer items-center text-[13px]"
-              value="signingKeys"
-            >
-              <OptionalTooltip
-                tooltip={disableArchive && 'Parent app is archived. Archive action not available.'}
-              >
-                <Button
-                  appearance="ghost"
-                  kind="danger"
-                  size="medium"
-                  icon={<RiArchive2Line className="h-4 w-4" />}
-                  iconSide="left"
-                  label={'Archive app'}
-                  className="m-0 w-full justify-start"
-                  onClick={showArchive}
-                />
-              </OptionalTooltip>
-            </Listbox.Option>
-          )}
-        </Listbox.Options>
-      </div>
-    </Listbox>
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };

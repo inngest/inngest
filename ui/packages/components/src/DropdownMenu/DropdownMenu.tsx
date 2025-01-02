@@ -18,10 +18,11 @@ export const DropdownMenuContent = forwardRef<
         {...props}
         ref={forwardedRef}
         onCloseAutoFocus={(event) => event.preventDefault()}
-        align="start"
-        sideOffset={props.sideOffset ?? 14}
+        align={props.align ?? 'start'}
+        collisionPadding={8}
+        sideOffset={props.sideOffset ?? 8}
         className={cn(
-          'shadow-outline-primary-light bg-canvasBase min-w-[220px] rounded p-2',
+          'shadow-primary bg-canvasBase border-muted z-50 min-w-fit rounded-md border p-0.5',
           props.className
         )}
       >
