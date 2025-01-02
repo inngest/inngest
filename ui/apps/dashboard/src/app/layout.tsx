@@ -112,7 +112,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             profileSection__organizationDanger: 'border-0 !flex-row-reverse !justify-between',
             profileSection__profile: 'border-0',
             profileSection__danger:
-              'border-0 !flex-row-reverse !justify-between items-baseline mb-0',
+              'border-0 !flex-row-reverse !justify-between items-baseline !my-0',
             profileSectionItem__danger: 'p-0',
             profileSectionTitle: 'pt-6',
             profileSectionHeader: 'text-sm text-muted font-medium mt-0 pt-0',
