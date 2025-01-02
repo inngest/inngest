@@ -2,7 +2,7 @@ import { useQuery, type UseQueryResponse } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
-import type { GetEventTypesQuery } from '@/gql/graphql';
+import type { GetEventTypesQuery, GetEventTypesVolumeQuery } from '@/gql/graphql';
 
 const GetEventTypesDocument = graphql(`
   query GetEventTypes($environmentID: ID!, $page: Int) {
@@ -15,6 +15,22 @@ const GetEventTypesDocument = graphql(`
             slug
             name
           }
+        }
+        page {
+          page
+          totalPages
+        }
+      }
+    }
+  }
+`);
+
+const GetEventTypesVolumeDocument = graphql(`
+  query GetEventTypesVolume($environmentID: ID!, $page: Int) {
+    workspace(id: $environmentID) {
+      events @paginated(perPage: 50, page: $page) {
+        data {
+          name
           dailyVolume: usage(opts: { period: "hour", range: "day" }) {
             total
             data {
@@ -41,6 +57,20 @@ export const useEventTypes = ({
   const env = useEnvironment();
   const [result, refetch] = useQuery({
     query: GetEventTypesDocument,
+    variables: {
+      environmentID: env.id,
+      page,
+    },
+  });
+  return [{ ...result, fetching: result.fetching }, refetch];
+};
+
+export const useEventTypesVolume = ({
+  page = 0,
+}: UseEventTypesParams): UseQueryResponse<GetEventTypesVolumeQuery, { page?: number }> => {
+  const env = useEnvironment();
+  const [result, refetch] = useQuery({
+    query: GetEventTypesVolumeDocument,
     variables: {
       environmentID: env.id,
       page,
