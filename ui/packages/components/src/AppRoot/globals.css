@@ -5,13 +5,13 @@
 @layer components {
   /* sign-in flow custom bg */
   .mesh-gradient {
-    background-color: hsla(240, 100%, 72%, 1);
-    background-image: radial-gradient(at 62% 96%, hsla(191, 100%, 59%, 0.85) 0px, transparent 50%),
-      radial-gradient(at 48% 9%, hsla(275, 100%, 69%, 1) 0px, transparent 50%),
-      radial-gradient(at 8% 11%, hsla(240, 100%, 69%, 1) 0px, transparent 50%),
-      radial-gradient(at 3% 93%, hsla(0, 78%, 70%, 0.6) 0px, transparent 50%),
-      radial-gradient(at 89% 26%, hsla(266, 100%, 57%, 1) 0px, transparent 50%),
-      radial-gradient(at 84% 79%, hsla(240, 100%, 70%, 1) 0px, transparent 50%);
+    background-color: rgb(2, 2, 2);
+    background-image: radial-gradient(at 62% 96%, rgba(2, 117, 177, 0.8) 0px, transparent 50%),
+      radial-gradient(at 48% 9%, rgba(21, 158, 136, 0.8) 0px, transparent 50%),
+      radial-gradient(at 8% 11%, rgb(2, 2, 2) 0px, transparent 50%),
+      radial-gradient(at 3% 93%, rgba(102, 189, 139, 0.8) 0px, transparent 50%),
+      radial-gradient(at 89% 26%, rgba(45, 159, 101, 0.8) 0px, transparent 50%),
+      radial-gradient(at 84% 79%, rgb(2, 2, 2) 0px, transparent 50%);
   }
 }
 

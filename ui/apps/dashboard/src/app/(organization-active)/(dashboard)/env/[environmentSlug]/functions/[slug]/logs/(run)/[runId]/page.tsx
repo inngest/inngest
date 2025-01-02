@@ -114,7 +114,7 @@ export default function FunctionRunDetailsLayout({ params }: FunctionRunDetailsL
   }
   if (res.isLoading) {
     return (
-      <div className={cn('dark grid h-full text-white', 'grid-cols-2')}>
+      <div className={cn('text-basis dark grid h-full', 'grid-cols-2')}>
         <EventDetails loading />
         <RunDetails loading />
       </div>

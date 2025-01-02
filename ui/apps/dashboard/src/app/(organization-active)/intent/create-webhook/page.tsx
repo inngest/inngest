@@ -151,7 +151,7 @@ export default function Page() {
               </pre>
             )}
             <button
-              className="text-sm text-indigo-500"
+              className="text-muted text-sm"
               onClick={() => {
                 setEditing(!isEditing);
                 if (customPrefix === '') {
@@ -166,8 +166,8 @@ export default function Page() {
       }
       graphic={
         <>
-          <RiArrowRightLine className="w-16 text-indigo-400" />
-          <WebhookIcon className="w-16 text-indigo-400" />
+          <RiArrowRightLine className="text-muted w-16" />
+          <WebhookIcon className="text-muted w-16" />
         </>
       }
       isLoading={loading}
