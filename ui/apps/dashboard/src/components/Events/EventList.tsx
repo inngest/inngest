@@ -9,7 +9,6 @@ import { cn } from '@inngest/components/utils/classNames';
 
 import MiniStackedBarChart from '@/components/Charts/MiniStackedBarChart';
 import { useEnvironment } from '@/components/Environments/environment-context';
-import LoadingIcon from '@/icons/LoadingIcon';
 import { useEventTypes, useEventTypesVolume } from '@/queries';
 import { pathCreator } from '@/utils/urls';
 import EventListNotFound from './EventListNotFound';
