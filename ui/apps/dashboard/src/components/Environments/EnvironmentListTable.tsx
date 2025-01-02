@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
 import { Switch } from '@inngest/components/Switch';
+import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiMore2Line } from '@remixicon/react';
 import { toast } from 'sonner';
@@ -19,7 +20,7 @@ import { graphql } from '@/gql';
 import { type Environment } from '@/utils/environments';
 import { notNullish } from '@/utils/typeGuards';
 import { pathCreator } from '@/utils/urls';
-import { EnvironmentArchiveButton } from './EnvironmentArchiveButton';
+import { EnvironmentArchiveDropdownItem } from './EnvironmentArchiveDropdownItem';
 
 const DisableEnvironmentAutoArchiveDocument = graphql(`
   mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {
@@ -210,12 +211,11 @@ function TableRow(props: { env: Environment }) {
             <Button kind="secondary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
           </DropdownMenuTrigger>
           <DropdownMenuContent>
-            <DropdownMenuItem asChild>
-              <EnvironmentArchiveButton env={env} />
-            </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => router.push(pathCreator.apps({ envSlug: slug }))}>
+              <AppsIcon className="h-4 w-4" />
               Go to apps
             </DropdownMenuItem>
+            <EnvironmentArchiveDropdownItem env={env} />
           </DropdownMenuContent>
         </DropdownMenu>
       </td>

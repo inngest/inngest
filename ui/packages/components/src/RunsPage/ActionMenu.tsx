@@ -36,7 +36,7 @@ export const RunsActionMenu = ({
         </DropdownMenuTrigger>
 
         <DropdownMenuContent>
-          <DropdownMenuItem>
+          <DropdownMenuItem className="hover:bg-canvasBase">
             <div className="flex flex-col">
               <div className="text-basis text-sm">Auto Refresh</div>
               <div className="text-basis text-xs">

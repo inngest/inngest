@@ -45,93 +45,52 @@ export const ActionsMenu = ({
           kind="primary"
           appearance="solid"
           size="medium"
-          icon={<RiArrowDownSLine />}
+          icon={
+            <RiArrowDownSLine className="transform-90 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
+          }
           iconSide="right"
           label="All actions"
-          className="text-sm"
+          className="group text-sm"
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem>
+        <DropdownMenuItem onSelect={showInvoke} disabled={archived || paused}>
           <OptionalTooltip
             tooltip={
               (archived || paused) &&
               `Invoke not available, function is ${archived ? 'archived' : 'paused'}.`
             }
           >
-            <Button
-              onClick={showInvoke}
-              disabled={archived || paused}
-              appearance="ghost"
-              kind="secondary"
-              size="small"
-              icon={<RiFlashlightFill className="h-4 w-4" />}
-              iconSide="left"
-              label="Invoke"
-              className={`text-muted m-0 w-full justify-start text-sm ${
-                (archived || paused) && 'cursor-not-allowed'
-              }`}
-            />
+            <RiFlashlightFill className="h-4 w-4" />
+            Invoke
           </OptionalTooltip>
         </DropdownMenuItem>
 
-        <DropdownMenuItem>
+        <DropdownMenuItem onSelect={showPause} disabled={archived}>
           <OptionalTooltip tooltip={archived && 'Pause not available, function is archived.'}>
-            <Button
-              onClick={showPause}
-              disabled={archived}
-              appearance="ghost"
-              kind="secondary"
-              size="small"
-              icon={
-                paused ? (
-                  <RiPlayCircleLine className="h-4 w-4" />
-                ) : (
-                  <RiPauseCircleLine className="h-4 w-4" />
-                )
-              }
-              iconSide="left"
-              label={paused ? 'Resume' : 'Pause'}
-              className={`text-muted m-0 w-full justify-start text-sm ${
-                archived && 'cursor-not-allowed'
-              }`}
-            />
+            {paused ? (
+              <RiPlayCircleLine className="h-4 w-4" />
+            ) : (
+              <RiPauseCircleLine className="h-4 w-4" />
+            )}
+            {paused ? 'Resume' : 'Pause'}
           </OptionalTooltip>
         </DropdownMenuItem>
-        <DropdownMenuItem>
+        <DropdownMenuItem onSelect={showReplay} disabled={archived || paused}>
           <OptionalTooltip
             tooltip={
               (archived || paused) &&
               `Replay not available, function is ${archived ? 'archived' : 'paused'}.`
             }
           >
-            <Button
-              onClick={showReplay}
-              disabled={archived || paused}
-              appearance="ghost"
-              kind="secondary"
-              size="small"
-              icon={<IconReplay className="h-4 w-4" />}
-              iconSide="left"
-              label="Replay"
-              className={`text-muted m-0 w-full justify-start text-sm ${
-                (archived || paused) && 'cursor-not-allowed'
-              }`}
-            />
+            <IconReplay className="h-4 w-4" />
+            Replay
           </OptionalTooltip>
         </DropdownMenuItem>
         {cancelEnabled && (
-          <DropdownMenuItem>
-            <Button
-              onClick={showCancel}
-              appearance="ghost"
-              kind="danger"
-              size="small"
-              icon={<RiCloseCircleLine className="h-4 w-4" />}
-              iconSide="left"
-              label="Bulk Cancel"
-              className="m-0 w-full justify-start text-sm"
-            />
+          <DropdownMenuItem onSelect={showCancel} className="text-error">
+            <RiCloseCircleLine className="h-4 w-4" />
+            Bulk Cancel
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>
