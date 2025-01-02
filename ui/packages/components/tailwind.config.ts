@@ -189,15 +189,6 @@ export default {
       },
       boxShadow: {
         primary: '0 4px 4px 0 rgba(0,0,0,0.25)',
-        // old box-shadows:
-        'outline-primary-light':
-          'inset 0 1px 0 0 rgba(255, 255, 255, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 1px 3px rgba(0, 0, 0, 0.2)',
-        'outline-primary-dark':
-          '0 0 0 0.5px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 1px 3px rgba(0, 0, 0, 0.2)',
-        'outline-secondary-dark':
-          '0 0 0 0.5px rgba(0, 0, 0, 0.3), inset 0 1px 0 0 rgba(255, 255, 255, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.01), 0 1px 3px rgba(0, 0, 0, 0.15)',
-        'outline-secondary-light':
-          '0 0 0 0.5px rgba(0, 0, 0, 0.15), inset 0 1px 0 0 rgba(255, 255, 255, 0.8), inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 1px 3px rgba(0, 0, 0, 0.15)',
         floating: '0 0 0 0.5px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(255, 255, 255, 0.15)',
       },
       outlineOffset: {
