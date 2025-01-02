@@ -81,15 +81,7 @@ function EventTypesListPaginationPage({
   const isFirstPage = page === 1;
 
   if (isFetchingEvents) {
-    return (
-      <tr>
-        <td colSpan={3} className="h-56">
-          <div className="relative flex items-center justify-center">
-            <LoadingIcon />
-          </div>
-        </td>
-      </tr>
-    );
+    return <LoadingTableRows count={6} />;
   }
 
   if (isFirstPage && events.length === 0) {
@@ -179,7 +171,25 @@ function EventTypesListPaginationPage({
 function Shimmer({ className }: { className?: string }) {
   return (
     <div className={`flex ${className}`}>
-      <Skeleton className="block h-5 w-full" />
+      <Skeleton className="block h-3 w-full" />
     </div>
   );
+}
+
+function LoadingTableRows({ count = 6 }: { count?: number }) {
+  return new Array(count).fill(0).map((_, idx) => (
+    <tr key={idx} className="h-[46.5px]">
+      <td className="w-96">
+        <Shimmer className="max-w-52 px-4" />
+      </td>
+      <td className="space-x-2 px-2">
+        <Shimmer className="max-w-36 px-2" />
+      </td>
+      <td className="w-60 py-1 pl-2 pr-6">
+        <div className="flex w-56 items-center justify-end gap-2">
+          <Shimmer className="w-[212px] px-2.5" />
+        </div>
+      </td>
+    </tr>
+  ));
 }
