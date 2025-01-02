@@ -1,7 +1,12 @@
 'use client';
 
-import { Listbox } from '@headlessui/react';
 import { Button } from '@inngest/components/Button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@inngest/components/DropdownMenu/DropdownMenu';
 import { Switch } from '@inngest/components/Switch';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import { RiSettingsLine } from '@remixicon/react';
@@ -12,8 +17,8 @@ export const MetricsActionMenu = () => {
   const [autoRefresh, setAutoRefresh, removeAutoRefresh] = useSearchParam('autoRefresh');
 
   return (
-    <Listbox>
-      <Listbox.Button as="div">
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
         <Button
           kind="secondary"
           appearance="outlined"
@@ -21,13 +26,10 @@ export const MetricsActionMenu = () => {
           icon={<RiSettingsLine />}
           className="text-sm"
         />
-      </Listbox.Button>
+      </DropdownMenuTrigger>
       <div className="relative">
-        <Listbox.Options className="bg-canvasBase border-subtle shadow-tooltip absolute right-1 top-1 z-50 h-[52px] w-[247px] gap-y-0.5 rounded border shadow-2xl">
-          <Listbox.Option
-            className="text-subtle mx-2 mt-2 flex cursor-pointer flex-row items-center justify-between text-[13px]"
-            value="toggleAutoRefresh"
-          >
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem className="hover:bg-canvasBase">
             <div className="flex flex-col">
               <div className="text-basis text-sm">Auto Refresh</div>
               <div className="text-basis text-xs">
@@ -46,9 +48,9 @@ export const MetricsActionMenu = () => {
                 }
               }}
             />
-          </Listbox.Option>
-        </Listbox.Options>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
       </div>
-    </Listbox>
+    </DropdownMenu>
   );
 };

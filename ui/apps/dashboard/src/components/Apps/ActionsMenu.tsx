@@ -30,7 +30,7 @@ export const ActionsMenu = ({
       <DropdownMenuTrigger asChild>
         <Button kind="primary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="bottom" align="end">
+      <DropdownMenuContent align="end">
         <DropdownMenuItem>
           <OptionalTooltip tooltip={disableValidate && 'No syncs. App health check not available.'}>
             <Button
