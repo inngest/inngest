@@ -194,11 +194,11 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
           onValueChange={setSearch}
           className={cn(
             search && 'border-subtle focus:border-subtle border-b',
-            'placeholder-disabled w-[656px] border-0 px-3 py-3 outline-none focus:ring-0'
+            'placeholder-disabled bg-canvasBase w-[656px] border-0 px-3 py-3 outline-none focus:ring-0'
           )}
         />
         {search && (
-          <Command.List className="text-subtle px-3 py-3">
+          <Command.List className="text-subtle bg-canvasBase px-3 py-3">
             {isLoading && <Command.Loading>Searching...</Command.Loading>}
             {!isLoading && globalResults && (
               <Command.Group heading={<div className="text-muted pb-2 text-xs">Navigate To</div>}>
