@@ -23,7 +23,7 @@ export default function Mange({ collapsed }: { collapsed: boolean }) {
         href="/apps"
         collapsed={collapsed}
         text="Apps"
-        icon={<AppsIcon className="h-18px w-[18px]" />}
+        icon={<AppsIcon className="h-[18px] w-[18px]" />}
         error={hasSyncingError}
       />
 
@@ -31,7 +31,7 @@ export default function Mange({ collapsed }: { collapsed: boolean }) {
         href="/functions"
         collapsed={collapsed}
         text="Functions"
-        icon={<FunctionsIcon className="h-18px w-[18px]" />}
+        icon={<FunctionsIcon className="h-[18px] w-[18px]" />}
       />
     </div>
   );
