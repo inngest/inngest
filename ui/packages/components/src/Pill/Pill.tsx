@@ -1,9 +1,9 @@
 import type { UrlObject } from 'url';
 import type { Route } from 'next';
 import NextLink from 'next/link';
-import { IconFunction } from '@inngest/components/icons/Function';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
+import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiTimeLine } from '@remixicon/react';
 
@@ -63,7 +63,7 @@ export function PillContent({ children, type }: PillContentProps) {
     <div className="flex items-center gap-2 truncate">
       {type === 'EVENT' && <EventsIcon className="text-subtle h-4 w-4" />}
       {type === 'CRON' && <RiTimeLine className="text-subtle h-4 w-4" />}
-      {type === 'FUNCTION' && <IconFunction className="text-subtle h-4 w-4" />}
+      {type === 'FUNCTION' && <FunctionsIcon className="text-subtle h-4 w-4" />}
       {type === 'APP' && <AppsIcon className="text-subtle h-4 w-4" />}
       {children}
     </div>

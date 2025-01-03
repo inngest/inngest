@@ -7,8 +7,8 @@ import { useOrganization, useUser } from '@clerk/nextjs';
 import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
-import { IconFunction } from '@inngest/components/icons/Function';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
+import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowGoForwardLine } from '@remixicon/react';
 import { Command } from 'cmdk';
@@ -170,7 +170,7 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
       type: 'function',
       href: url,
       name: functionResults.name || '',
-      icon: <IconFunction className="w-4" />,
+      icon: <FunctionsIcon className="w-4" />,
     };
   } else if (globalResults?.value.__typename === 'ArchivedEvent') {
     searchResult = {
@@ -179,7 +179,7 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
         globalResults.value.id
       }`,
       name: globalResults.value.name,
-      icon: <EventsIcon className="w-5" />,
+      icon: <EventsIcon className="w-4" />,
     };
   }
 

@@ -1,6 +1,6 @@
 import NextLink from 'next/link';
 import { Time } from '@inngest/components/Time';
-import { IconFunction } from '@inngest/components/icons/Function';
+import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { IconStatusCancelled } from '@inngest/components/icons/status/Cancelled';
 import { IconStatusCompleted } from '@inngest/components/icons/status/Completed';
 import { IconStatusFailed } from '@inngest/components/icons/status/Failed';
@@ -89,7 +89,7 @@ export default async function TriggeredFunctionCard({
     <NextLink href={url} className="bg-canvasBase flex items-center rounded-lg border p-5 shadow">
       <div className="flex-1">
         <div className="flex items-center gap-1.5">
-          <IconFunction className="text-subtle h-4 w-4" />
+          <FunctionsIcon className="text-subtle h-4 w-4" />
           <h4 className="font-medium">{function_.name}</h4>
         </div>
         <dl>

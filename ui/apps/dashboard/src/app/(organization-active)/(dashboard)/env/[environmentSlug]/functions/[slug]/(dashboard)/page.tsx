@@ -8,8 +8,8 @@ import { Time } from '@inngest/components/Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { useCron } from '@inngest/components/hooks/useCron';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
-import { IconFunction } from '@inngest/components/icons/Function';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
+import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowRightSLine, RiTimeLine } from '@remixicon/react';
 import { ErrorBoundary } from '@sentry/nextjs';
@@ -205,7 +205,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                         <div className="flex min-w-0 items-center">
                           <div className="min-w-0 flex-1 space-y-1">
                             <div className="flex min-w-0 items-center">
-                              <IconEvent className="text-subtle w-8 shrink-0 pr-2" />
+                              <EventsIcon className="text-subtle w-8 shrink-0 pr-2" />
                               <p className="truncate font-medium">{trigger.eventName}</p>
                             </div>
                             <dl className="text-xs">
@@ -253,7 +253,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                             <div className="flex min-w-0 items-center">
                               <div className="min-w-0 flex-1 space-y-1">
                                 <div className="flex min-w-0 items-center">
-                                  <IconEvent className="text-subtle w-8 shrink-0 pr-2" />
+                                  <EventsIcon className="text-subtle w-8 shrink-0 pr-2" />
                                   <p className="truncate font-medium">{cancellation.event}</p>
                                 </div>
                                 <dl className="text-xs">
@@ -300,7 +300,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                       <div className="flex min-w-0 items-center">
                         <div className="min-w-0 flex-1">
                           <div className="flex min-w-0 items-center">
-                            <IconFunction className="text-subtle w-8 shrink-0 pr-2" />
+                            <FunctionsIcon className="text-subtle w-8 shrink-0 pr-2" />
                             <p className="truncate font-medium">{function_.failureHandler.name}</p>
                           </div>
                         </div>
