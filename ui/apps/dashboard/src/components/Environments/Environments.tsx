@@ -10,13 +10,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
-import { RiMore2Line } from '@remixicon/react';
+import { AppsIcon } from '@inngest/components/icons/sections/Apps';
+import { RiAddLine, RiMore2Line, RiSettingsLine } from '@remixicon/react';
 
 import Toaster from '@/components/Toaster';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useEnvironments } from '@/queries';
 import { EnvironmentType } from '@/utils/environments';
-import { EnvironmentArchiveButton } from './EnvironmentArchiveButton';
+import { EnvironmentArchiveDropdownItem } from './EnvironmentArchiveDropdownItem';
 import EnvironmentListTable from './EnvironmentListTable';
 
 export default function Environments() {
@@ -57,11 +58,13 @@ export default function Environments() {
             <DropdownMenuTrigger asChild>
               <Button kind="secondary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="z-50">
+            <DropdownMenuContent>
               <DropdownMenuItem onSelect={() => router.push('/env/production/manage')}>
+                <RiSettingsLine className="h-4 w-4" />
                 Manage
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => router.push('/env/production/apps')}>
+                <AppsIcon className="h-4 w-4" />
                 Go to apps
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -82,16 +85,18 @@ export default function Environments() {
                       icon={<RiMore2Line />}
                     />
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="z-50">
+                  <DropdownMenuContent>
                     <DropdownMenuItem
                       onSelect={() => router.push(`/env/${branchParent?.slug}/manage`)}
                     >
+                      <RiSettingsLine className="h-4 w-4" />
                       Manage
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-success"
                       onSelect={() => router.push(`/env/${branchParent?.slug || 'branch'}/apps`)}
                     >
+                      <RiAddLine className="h-4 w-4" />
                       Sync new app
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -130,19 +135,17 @@ export default function Environments() {
                         icon={<RiMore2Line />}
                       />
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="z-50">
+                    <DropdownMenuContent>
                       <DropdownMenuItem onSelect={() => router.push(`/env/${env.slug}/manage`)}>
+                        <RiSettingsLine className="h-4 w-4" />
                         Manage
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-success" asChild>
-                        <EnvironmentArchiveButton env={env} />
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-success"
-                        onSelect={() => router.push(`/env/${env.slug}/apps`)}
-                      >
+
+                      <DropdownMenuItem onSelect={() => router.push(`/env/${env.slug}/apps`)}>
+                        <AppsIcon className="h-4 w-4" />
                         Go to apps
                       </DropdownMenuItem>
+                      <EnvironmentArchiveDropdownItem env={env} />
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </NextLink>

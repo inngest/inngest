@@ -34,7 +34,7 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
         />
       </Listbox.Button>
       <div className="relative">
-        <Listbox.Options className="bg-canvasBase absolute -right-48 bottom-0 z-50 ml-8 w-[199px] gap-y-0.5 rounded border shadow ring-0 focus:outline-none">
+        <Listbox.Options className="bg-canvasBase border-muted shadow-primary absolute -right-48 bottom-0 z-50 ml-8 w-[199px] gap-y-0.5 rounded border ring-0 focus:outline-none">
           <NextLink href="https://www.inngest.com/docs?ref=support-center" target="_blank">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"

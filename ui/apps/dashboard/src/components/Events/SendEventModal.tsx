@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import NextLink from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
@@ -252,12 +251,9 @@ export function SendEventModal({
           {!hasEventKey && (
             <Alert severity="warning" className="mb-2 text-sm">
               There are no Event Keys for this environment. Please create an Event Key in{' '}
-              <NextLink
-                href={pathCreator.keys({ envSlug: environment.slug })}
-                className="underline"
-              >
+              <Alert.Link href={pathCreator.keys({ envSlug: environment.slug })} severity="warning">
                 the Manage tab
-              </NextLink>{' '}
+              </Alert.Link>{' '}
               first.
             </Alert>
           )}

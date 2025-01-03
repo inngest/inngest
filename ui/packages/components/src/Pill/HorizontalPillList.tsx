@@ -15,11 +15,11 @@ export function HorizontalPillList({ pills, alwaysVisibleCount }: FunctionsCellC
     const alwaysVisiblePills = pills.slice(0, alwaysVisibleCount);
 
     return (
-      <div className="flex items-center">
+      <div className="flex items-center gap-1">
         {alwaysVisiblePills}
 
         <Tooltip delayDuration={0}>
-          <TooltipTrigger className="cursor-default">
+          <TooltipTrigger className="flex cursor-default">
             <Pill className="px-2.5 align-middle">+{hiddenPills.length}</Pill>
           </TooltipTrigger>
 
@@ -31,5 +31,5 @@ export function HorizontalPillList({ pills, alwaysVisibleCount }: FunctionsCellC
     );
   }
 
-  return <>{pills}</>;
+  return <div className="flex items-center gap-1">{pills}</div>;
 }

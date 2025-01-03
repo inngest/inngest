@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { notFound } from 'next/navigation';
+import { Button } from '@inngest/components/Button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -98,18 +99,27 @@ export default function Keys({ params: { ingestKeys, keyID } }: KeyDetailsProps)
     <div className="divide-subtle m-6 divide-y">
       <Provider initialState={key}>
         <div className="pb-8">
-          <div className="mb-8 flex items-center gap-1">
+          <div className="mb-8 flex items-center gap-2">
             <h2 className="text-lg font-semibold">{key.name}</h2>
+            {/* TO DO: move this to the Header as ActionsMenu */}
             <DropdownMenu>
-              <DropdownMenuTrigger className="data-[state=open]:before:bg-canvasSubtle relative data-[state=open]:before:absolute data-[state=open]:before:-bottom-3 data-[state=open]:before:left-0 data-[state=open]:before:h-6 data-[state=open]:before:w-6 data-[state=open]:before:rounded-full">
-                <RiMore2Line className="absolute -top-2 left-1 h-4 w-4" />
+              <DropdownMenuTrigger asChild>
+                <Button
+                  kind="secondary"
+                  appearance="outlined"
+                  size="medium"
+                  icon={<RiMore2Line />}
+                />
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="z-50">
+              <DropdownMenuContent>
                 <DropdownMenuItem onSelect={() => setIsEditKeyNameModalVisible(true)}>
                   <RiPencilLine className="h-4 w-4" />
-                  Edit Name
+                  Edit name
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setIsDeleteKeyModalVisible(true)}>
+                <DropdownMenuItem
+                  onSelect={() => setIsDeleteKeyModalVisible(true)}
+                  className="text-error"
+                >
                   <RiDeleteBinLine className="h-4 w-4" />
                   Delete
                 </DropdownMenuItem>

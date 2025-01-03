@@ -36,7 +36,7 @@ export default function IntegrationPage({
 
         <div className="text-subtle text-sm">
           Manage your {content.title} integration from this page.{' '}
-          <Link className="inline-block" size="small" href={content.url}>
+          <Link className="inline-block" size="small" href={content.url} target="_blank">
             Read documentation
           </Link>
         </div>

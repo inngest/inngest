@@ -1,4 +1,4 @@
-import { IconFunction } from '@inngest/components/icons/Function';
+import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import type { Meta, StoryObj } from '@storybook/react';
 
 import { Button } from './index';
@@ -19,7 +19,7 @@ const meta = {
       control: { type: 'select' },
     },
     icon: {
-      options: [null, <IconFunction />],
+      options: [null, <FunctionsIcon />],
       control: { type: 'select' },
     },
   },
@@ -39,7 +39,7 @@ export const PrimarySolidWithIcon: Story = {
   args: {
     kind: 'primary',
     appearance: 'solid',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     iconSide: 'left',
   },
 };
@@ -47,7 +47,7 @@ export const PrimarySolidOnlyIcon: Story = {
   args: {
     kind: 'primary',
     appearance: 'solid',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     label: null,
   },
 };
@@ -55,7 +55,7 @@ export const PrimarySolidLoading: Story = {
   args: {
     kind: 'primary',
     appearance: 'solid',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     loading: true,
     label: 'Loading...',
   },
@@ -84,7 +84,7 @@ export const PrimaryOutlinedWithIcon: Story = {
   args: {
     kind: 'primary',
     appearance: 'outlined',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     iconSide: 'left',
   },
 };
@@ -92,7 +92,7 @@ export const PrimaryOutlinedOnlyIcon: Story = {
   args: {
     kind: 'primary',
     appearance: 'outlined',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     label: null,
   },
 };
@@ -100,7 +100,7 @@ export const PrimaryOutlinedLoading: Story = {
   args: {
     kind: 'primary',
     appearance: 'outlined',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     loading: true,
     label: 'Loading...',
   },
@@ -131,7 +131,7 @@ export const PrimaryGhostWithIcon: Story = {
   args: {
     kind: 'primary',
     appearance: 'ghost',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     iconSide: 'left',
   },
 };
@@ -139,7 +139,7 @@ export const PrimaryGhostOnlyIcon: Story = {
   args: {
     kind: 'primary',
     appearance: 'ghost',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     label: null,
   },
 };
@@ -147,7 +147,7 @@ export const PrimaryGhostLoading: Story = {
   args: {
     kind: 'primary',
     appearance: 'ghost',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     loading: true,
     label: 'Loading...',
   },
@@ -178,7 +178,7 @@ export const SecondaryOutlinedWithIcon: Story = {
   args: {
     kind: 'secondary',
     appearance: 'outlined',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     iconSide: 'left',
   },
 };
@@ -186,7 +186,7 @@ export const SecondaryOutlinedOnlyIcon: Story = {
   args: {
     kind: 'secondary',
     appearance: 'outlined',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     label: null,
   },
 };
@@ -194,7 +194,7 @@ export const SecondaryOutlinedLoading: Story = {
   args: {
     kind: 'secondary',
     appearance: 'outlined',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     loading: true,
     label: 'Loading...',
   },
@@ -223,7 +223,7 @@ export const SecondaryGhostWithIcon: Story = {
   args: {
     kind: 'secondary',
     appearance: 'ghost',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     iconSide: 'left',
   },
 };
@@ -231,7 +231,7 @@ export const SecondaryGhostOnlyIcon: Story = {
   args: {
     kind: 'secondary',
     appearance: 'ghost',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     label: null,
   },
 };
@@ -239,7 +239,7 @@ export const SecondaryGhostLoading: Story = {
   args: {
     kind: 'secondary',
     appearance: 'ghost',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     loading: true,
     label: 'Loading...',
   },
@@ -270,7 +270,7 @@ export const DangerSolidWithIcon: Story = {
   args: {
     kind: 'danger',
     appearance: 'solid',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     iconSide: 'left',
   },
 };
@@ -278,7 +278,7 @@ export const DangerSolidOnlyIcon: Story = {
   args: {
     kind: 'danger',
     appearance: 'solid',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     label: null,
   },
 };
@@ -286,7 +286,7 @@ export const DangerSolidLoading: Story = {
   args: {
     kind: 'danger',
     appearance: 'solid',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     loading: true,
     label: 'Loading...',
   },
@@ -315,7 +315,7 @@ export const DangerOutlinedWithIcon: Story = {
   args: {
     kind: 'danger',
     appearance: 'outlined',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     iconSide: 'left',
   },
 };
@@ -323,7 +323,7 @@ export const DangerOutlinedOnlyIcon: Story = {
   args: {
     kind: 'danger',
     appearance: 'outlined',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     label: null,
   },
 };
@@ -331,7 +331,7 @@ export const DangerOutlinedLoading: Story = {
   args: {
     kind: 'danger',
     appearance: 'outlined',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     loading: true,
     label: 'Loading...',
   },
@@ -360,7 +360,7 @@ export const DangerGhostWithIcon: Story = {
   args: {
     kind: 'danger',
     appearance: 'ghost',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     iconSide: 'left',
   },
 };
@@ -368,7 +368,7 @@ export const DangerGhostOnlyIcon: Story = {
   args: {
     kind: 'danger',
     appearance: 'ghost',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     label: null,
   },
 };
@@ -376,7 +376,7 @@ export const DangerGhostLoading: Story = {
   args: {
     kind: 'danger',
     appearance: 'ghost',
-    icon: <IconFunction />,
+    icon: <FunctionsIcon />,
     loading: true,
     label: 'Loading...',
   },

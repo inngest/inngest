@@ -88,7 +88,7 @@ export default function LatestLogsList({ environmentSlug, eventName }: LatestLog
               {orderedList && orderedList.length > 0
                 ? orderedList.map((e) => (
                     <tr
-                      className="truncate"
+                      className="hover:bg-canvasSubtle/50 cursor-pointer truncate transition-all"
                       key={e.id}
                       onClick={() =>
                         router.push(

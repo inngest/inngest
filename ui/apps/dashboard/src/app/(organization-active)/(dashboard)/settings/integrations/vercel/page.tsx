@@ -29,7 +29,11 @@ export default async function VercelIntegrationPage() {
             <div className="text-basis mb-2 text-xl font-medium leading-7">Vercel</div>
             <div className="text-muted mb-7 text-base">
               You can manage all your projects on this page.{' '}
-              <Link size="medium" href={'https://www.inngest.com/docs/deploy/vercel' as Route}>
+              <Link
+                size="medium"
+                href={'https://www.inngest.com/docs/deploy/vercel' as Route}
+                target="_blank"
+              >
                 Learn more
               </Link>
             </div>

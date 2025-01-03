@@ -7,8 +7,8 @@ import { useOrganization, useUser } from '@clerk/nextjs';
 import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
-import { IconEvent } from '@inngest/components/icons/Event';
-import { IconFunction } from '@inngest/components/icons/Function';
+import { EventsIcon } from '@inngest/components/icons/sections/Events';
+import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowGoForwardLine } from '@remixicon/react';
 import { Command } from 'cmdk';
@@ -170,7 +170,7 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
       type: 'function',
       href: url,
       name: functionResults.name || '',
-      icon: <IconFunction className="w-4" />,
+      icon: <FunctionsIcon className="w-4" />,
     };
   } else if (globalResults?.value.__typename === 'ArchivedEvent') {
     searchResult = {
@@ -179,7 +179,7 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
         globalResults.value.id
       }`,
       name: globalResults.value.name,
-      icon: <IconEvent className="w-5" />,
+      icon: <EventsIcon className="w-4" />,
     };
   }
 
@@ -194,11 +194,11 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
           onValueChange={setSearch}
           className={cn(
             search && 'border-subtle focus:border-subtle border-b',
-            'placeholder-disabled w-[656px] border-0 px-3 py-3 outline-none focus:ring-0'
+            'placeholder-disabled bg-canvasBase w-[656px] border-0 px-3 py-3 outline-none focus:ring-0'
           )}
         />
         {search && (
-          <Command.List className="text-subtle px-3 py-3">
+          <Command.List className="text-subtle bg-canvasBase px-3 py-3">
             {isLoading && <Command.Loading>Searching...</Command.Loading>}
             {!isLoading && globalResults && (
               <Command.Group heading={<div className="text-muted pb-2 text-xs">Navigate To</div>}>

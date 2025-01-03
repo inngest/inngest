@@ -3,7 +3,7 @@
 import NextLink from 'next/link';
 import { Alert } from '@inngest/components/Alert';
 import { Time } from '@inngest/components/Time';
-import { IconFunction } from '@inngest/components/icons/Function';
+import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { RiArrowRightSLine } from '@remixicon/react';
 
 import Block from '@/components/Block';
@@ -66,12 +66,12 @@ export default function EventDashboard({ params }: EventDashboardProps) {
                 <NextLink
                   href={`/env/${params.environmentSlug}/functions/${encodeURIComponent(w.slug)}`}
                   key={w.id}
-                  className="border-subtle bg-canvasBase hover:bg-canvasMuted mb-4 block overflow-hidden rounded border"
+                  className="border-subtle bg-canvasBase hover:bg-canvasMuted mb-4 block overflow-hidden rounded border p-4"
                 >
                   <div className="flex min-w-0 items-center">
                     <div className="min-w-0 flex-1">
                       <div className="flex min-w-0 items-center">
-                        <IconFunction className="h-5 w-5 pr-2" />
+                        <FunctionsIcon className="h-5 w-5 pr-2" />
                         <p className="truncate font-medium">{w.name}</p>
                       </div>
 

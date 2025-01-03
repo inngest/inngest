@@ -1,4 +1,4 @@
-import { IconEvent } from '@inngest/components/icons/Event';
+import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { cn } from '@inngest/components/utils/classNames';
 
 interface ContentCardProps {
@@ -33,7 +33,7 @@ export function ContentCard({
         <div className="flex items-center justify-between leading-7">
           {title ? (
             <div className="flex flex-1 items-center gap-2">
-              {type === 'event' && <IconEvent className="text-basis" />}
+              {type === 'event' && <EventsIcon className="text-basis h-4 w-4" />}
               {type !== 'event' && icon}
               <h1 className="text-basis flex-1 text-base">{title}</h1>
             </div>

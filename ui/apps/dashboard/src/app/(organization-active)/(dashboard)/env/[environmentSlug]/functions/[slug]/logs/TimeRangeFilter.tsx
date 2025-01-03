@@ -132,7 +132,7 @@ export default function TimeRangeFilter({
               leaveFrom="opacity-100"
               leaveTo="opacity-0"
             >
-              <Listbox.Options className="border-muted bg-surfaceBase absolute left-0 z-10 mt-[5px] w-52 origin-top-left overflow-hidden rounded-md border py-1 drop-shadow-lg focus:outline-none">
+              <Listbox.Options className="border-muted bg-surfaceBase shadow-primary absolute left-0 z-10 mt-[5px] w-52 origin-top-left overflow-hidden rounded-md border py-1 focus:outline-none">
                 <GroupButton
                   className="mx-2 mb-1 grid grid-flow-col justify-stretch"
                   handleClick={onTimeFieldChange}

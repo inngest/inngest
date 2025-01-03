@@ -67,7 +67,7 @@ const columns = [
       const requiresConfirmation = props.row.original.status === 'requires_confirmation';
       if (url) {
         return (
-          <Link href={url as Route} size="small">
+          <Link href={url as Route} size="small" target="_blank">
             {requiresConfirmation ? 'Pay invoice' : 'View invoice'}
           </Link>
         );
