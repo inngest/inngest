@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
-import { Link } from '@inngest/components/Link';
 import { Modal } from '@inngest/components/Modal';
 import { Switch, SwitchLabel, SwitchWrapper } from '@inngest/components/Switch';
 import { cn } from '@inngest/components/utils/classNames';
