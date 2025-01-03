@@ -109,7 +109,11 @@ export default function ResyncModal({ appExternalID, isOpen, onClose, url, platf
         {platform === 'vercel' && !failure && (
           <Alert className="my-6" severity="info" showIcon={false}>
             Vercel generates a unique URL for each deployment (
-            <Link className="inline" href="https://vercel.com/docs/deployments/generated-urls">
+            <Link
+              className="inline"
+              href="https://vercel.com/docs/deployments/generated-urls"
+              target="_blank"
+            >
               see docs
             </Link>
             ). Please confirm that you are using the correct URL if you choose a deployment&apos;s

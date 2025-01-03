@@ -26,7 +26,7 @@ export default function ConnectPage({
         <p className="text-subtle text-sm">
           {description}
           {url && (
-            <Link size="small" className="ml-1 inline-block" href={url}>
+            <Link size="small" className="ml-1 inline-block" href={url} target="_blank">
               Read documentation
             </Link>
           )}
