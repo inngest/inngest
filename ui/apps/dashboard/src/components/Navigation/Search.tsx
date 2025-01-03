@@ -7,8 +7,8 @@ import { useOrganization, useUser } from '@clerk/nextjs';
 import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
-import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
+import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowGoForwardLine } from '@remixicon/react';
 import { Command } from 'cmdk';
@@ -179,7 +179,7 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
         globalResults.value.id
       }`,
       name: globalResults.value.name,
-      icon: <IconEvent className="w-5" />,
+      icon: <EventsIcon className="w-5" />,
     };
   }
 
