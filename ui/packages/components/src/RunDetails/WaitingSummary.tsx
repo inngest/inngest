@@ -39,7 +39,7 @@ export function WaitingSummary({ history }: Props) {
                 label="Event Name"
                 value={
                   <>
-                    <EventsIcon className="inline-bloc h-4 w-4" /> {config.eventName}
+                    <EventsIcon className="inline-block h-4 w-4" /> {config.eventName}
                   </>
                 }
               />
