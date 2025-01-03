@@ -36,7 +36,7 @@ export const DropdownMenuContent = forwardRef<
         collisionPadding={8}
         sideOffset={props.sideOffset ?? 8}
         className={cn(
-          'shadow-primary bg-canvasBase border-muted z-50 min-w-fit rounded-md border p-0.5 [&>*:not(:last-child)]:mb-0.5',
+          'shadow-primary bg-canvasBase border-muted z-50 min-w-40 rounded-md border p-0.5 [&>*:not(:last-child)]:mb-0.5',
           props.className
         )}
       >
