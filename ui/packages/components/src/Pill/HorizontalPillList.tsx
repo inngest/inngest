@@ -31,5 +31,5 @@ export function HorizontalPillList({ pills, alwaysVisibleCount }: FunctionsCellC
     );
   }
 
-  return <div className="flex items-center">{pills}</div>;
+  return <div className="flex items-center gap-1">{pills}</div>;
 }
