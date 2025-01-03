@@ -119,6 +119,9 @@ github.com/99designs/gqlgen/plugin/federation/fieldset
 github.com/99designs/gqlgen/plugin/modelgen
 github.com/99designs/gqlgen/plugin/resolvergen
 github.com/99designs/gqlgen/plugin/servergen
+# github.com/MauriceGit/skiplist v0.0.0-20211105230623-77f5c8d3e145
+## explicit
+github.com/MauriceGit/skiplist
 # github.com/VividCortex/ewma v1.2.0
 ## explicit; go 1.12
 github.com/VividCortex/ewma
