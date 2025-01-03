@@ -8,7 +8,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Too
 import { RiAddLine, RiQuestionLine } from '@remixicon/react';
 
 import { StatusMenu } from '@/components/Apps/StatusMenu';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import EmptyAppsCard from '@/components/Onboarding/EmptyAppsCard';
 import { getProdApps } from '@/components/Onboarding/actions';
 import { staticSlugs } from '@/utils/environments';
@@ -73,7 +72,6 @@ export default function AppsPage({
   });
 
   const isArchived = archived === 'true';
-  const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
 
   useEffect(() => {
     fetchInitialData().then((data) => {
@@ -81,8 +79,7 @@ export default function AppsPage({
     });
   }, []);
 
-  const displayOnboarding =
-    envSlug === staticSlugs.production && onboardingFlow && !hasProductionApps;
+  const displayOnboarding = envSlug === staticSlugs.production && !hasProductionApps;
 
   return (
     <>
