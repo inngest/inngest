@@ -109,13 +109,14 @@ export default function ResyncModal({ appExternalID, isOpen, onClose, url, platf
         {platform === 'vercel' && !failure && (
           <Alert className="my-6" severity="info" showIcon={false}>
             Vercel generates a unique URL for each deployment (
-            <Link
+            <Alert.Link
+              severity="info"
               className="inline"
               href="https://vercel.com/docs/deployments/generated-urls"
               target="_blank"
             >
               see docs
-            </Link>
+            </Alert.Link>
             ). Please confirm that you are using the correct URL if you choose a deployment&apos;s
             generated URL instead of a static domain for your app.
           </Alert>
@@ -154,13 +155,14 @@ export default function ResyncModal({ appExternalID, isOpen, onClose, url, platf
           {isURLOverridden && !failure && (
             <p className="text-warning pl-[50px] pt-1">
               Please ensure that your app ID (
-              <Link
+              <Alert.Link
+                severity="warning"
                 size="medium"
                 className="inline"
                 href="https://www.inngest.com/docs/apps#apps-in-sdk"
               >
                 docs
-              </Link>
+              </Alert.Link>
               ) is not changed before resyncing. Changing the app ID will result in the creation of
               a new app in this environment.
             </p>
