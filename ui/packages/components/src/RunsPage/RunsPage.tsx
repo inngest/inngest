@@ -69,7 +69,6 @@ type Props = {
   scope: ViewScope;
   totalCount: number | undefined;
   temporaryAlert?: React.ReactElement;
-  hasSearchFlag?: boolean;
   stepAIEnabled?: boolean;
 };
 
@@ -97,7 +96,6 @@ export function RunsPage({
   scope,
   totalCount,
   temporaryAlert,
-  hasSearchFlag = false,
   stepAIEnabled = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -338,21 +336,20 @@ export function RunsPage({
                 entities={functions}
               />
             )}
-            {hasSearchFlag && (
-              <Button
-                icon={<RiSearchLine />}
-                size="large"
-                iconSide="left"
-                appearance="outlined"
-                label={showSearch ? 'Hide search' : 'Show search'}
-                onClick={() => setShowSearch((prev) => !prev)}
-                className={cn(
-                  search
-                    ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
-                    : ''
-                )}
-              />
-            )}
+
+            <Button
+              icon={<RiSearchLine />}
+              size="large"
+              iconSide="left"
+              appearance="outlined"
+              label={showSearch ? 'Hide search' : 'Show search'}
+              onClick={() => setShowSearch((prev) => !prev)}
+              className={cn(
+                search
+                  ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
+                  : ''
+              )}
+            />
             <TotalCount totalCount={totalCount} />
           </div>
           <div className="flex items-center gap-2">
@@ -364,7 +361,7 @@ export function RunsPage({
           </div>
         </div>
 
-        {hasSearchFlag && showSearch && (
+        {showSearch && (
           <>
             <div className="bg-codeEditor flex items-center justify-between px-4 pt-4">
               <div className="flex items-center gap-2">
