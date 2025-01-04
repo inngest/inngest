@@ -24,10 +24,14 @@ type Opts struct {
 	// CachingMiddleware caches API responses, if the handler specifies
 	// a max-age.
 	CachingMiddleware CachingMiddleware
-	// WorkspaceFinder returns the authenticated workspace given the current context.
+
+	// AuthFinder returns the authenticated account & workspace IDs given the current context.
 	AuthFinder AuthFinder
 	// Executor is required to cancel and manage function executions.
 	Executor execution.Executor
+	// CancelExecutor is a service capable of creating and initiating a cancellation.
+	CancelExecutor CancelExecutorService
+
 	// EventReader allows reading of events from storage.
 	EventReader EventReader
 	// FunctionReader reads functions from a backing store.
@@ -36,7 +40,7 @@ type Opts struct {
 	FunctionRunReader cqrs.APIV1FunctionRunReader
 	// JobQueueReader reads information around a function run's job queues.
 	JobQueueReader queue.JobQueueReader
-	// CancellationReadWriter reads and writes cancellations to/from a backing store.
+	// CancellationReadWriter reads/writes cancellation records in a backing store.
 	CancellationReadWriter cqrs.CancellationReadWriter
 	// QueueShardSelector determines the queue shard to use
 	QueueShardSelector redis_state.ShardSelector
