@@ -33,7 +33,7 @@ func (s subMemory) WriteMessage(m Message) error {
 	return s.writer(m)
 }
 
-func (s subMemory) SendKeepalive() error {
+func (s subMemory) SendKeepalive(m Message) error {
 	return nil
 }
 

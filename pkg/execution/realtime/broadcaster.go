@@ -228,7 +228,7 @@ func (b *broadcaster) keepalive(ctx context.Context, subID uuid.UUID) {
 		}
 		b.l.RUnlock()
 
-		err := sub.WriteMessage(Message{
+		err := sub.SendKeepalive(Message{
 			Kind:      MessageKindPing,
 			CreatedAt: time.Now(),
 		})

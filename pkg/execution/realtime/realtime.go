@@ -105,7 +105,7 @@ type Subscription interface {
 	// 30 seconds - this is not implementation specific.
 	//
 	// If SendKeepalive fails consecutively, the subscription will be closed.
-	SendKeepalive() error
+	SendKeepalive(m Message) error
 
 	// Writer allows the writing of messages to the particular subscription.  This is
 	// implementation agnostic;  messages may be written via websockets or HTTP connections
