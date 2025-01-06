@@ -20,7 +20,9 @@ var (
 
 	ShutdownGracePeriod = time.Minute * 5
 	MaxWriteAttempts    = 3
-	WriteRetryInterval  = 5 * time.Second
+	MaxKeepaliveErrors  = 3
+	WriteRetryInterval  = 3 * time.Second
+	KeepaliveInterval   = 15 * time.Second
 )
 
 // NewInProcessBroadcaster is a single broadcaster which is used for in-memory, in-process
@@ -89,15 +91,16 @@ func (b *broadcaster) Subscribe(ctx context.Context, s Subscription, topics []To
 		}
 		b.subs[s.ID()] = as
 		// This is the first time we've seen a subscription.  Send
-		// keepalives every 30 seconds to ensure that the connection
+		// keepalives after an interval to ensure that the connection
 		// remains open during periods of inactivity.
-		//
-		// TODO: Implement above.
+		go b.keepalive(ctx, s.ID())
 	}
 
 	return nil
 }
 
+// CloseSubscription shuts down a subscription, removing it from all topics and removing the subscription
+// from the subscription map.
 func (b *broadcaster) CloseSubscription(ctx context.Context, subscriptionID uuid.UUID) error {
 	b.l.Lock()
 	defer b.l.Unlock()
@@ -193,15 +196,63 @@ func (b *broadcaster) publishTo(ctx context.Context, s Subscription, m Message) 
 	// If this failed to write, attempt to resend the message until
 	// max attempts pass.
 	go func() {
+		var err error
 		for att := 1; att < MaxWriteAttempts; att++ {
 			<-time.After(WriteRetryInterval)
-			if err := s.WriteMessage(m); err == nil {
+			if err = s.WriteMessage(m); err == nil {
 				return
 			}
 		}
-		// TODO: Log an error that this subscription failed, and handle
-		// marking the subscription as failing.
+		logger.StdlibLogger(ctx).Warn(
+			"error publishing to subscription",
+			"error", err,
+			"subscription_id", s.ID(),
+			"protocol", s.Protocol(),
+		)
+		// TODO: mark the subscription as failing.  If the subscription
+		// continues to fail, ensure we close the subscription.
 	}()
+}
+
+// keepalive sends keepalives to the subscription within a specific interval, ensuring
+// that the connection is active.
+func (b *broadcaster) keepalive(ctx context.Context, subID uuid.UUID) {
+	errCount := 0
+
+	for {
+		// ensure the subscription ID exists, else it has been closed.
+		b.l.RLock()
+		sub, ok := b.subs[subID]
+		if !ok {
+			return
+		}
+		b.l.RUnlock()
+
+		err := sub.WriteMessage(Message{
+			Kind:      MessageKindPing,
+			CreatedAt: time.Now(),
+		})
+		if err == nil {
+			// reset the error count on success.
+			errCount = 0
+		}
+		if err != nil {
+			errCount += 1
+		}
+		if errCount == MaxKeepaliveErrors {
+			// Close this subscription and quit.
+			logger.StdlibLogger(ctx).Warn(
+				"max failed keepalives reached",
+				"error", err,
+				"subscription_id", subID,
+				"protocol", sub.Protocol(),
+			)
+			_ = b.CloseSubscription(ctx, subID)
+			return
+		}
+
+		<-time.After(KeepaliveInterval)
+	}
 }
 
 // activesub represents an active subscription with interest in one or

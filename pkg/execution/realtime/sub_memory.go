@@ -24,6 +24,10 @@ func (s subMemory) ID() uuid.UUID {
 	return s.id
 }
 
+func (s subMemory) Protocol() string {
+	return "memory"
+}
+
 func (s subMemory) WriteMessage(m Message) error {
 	atomic.AddInt32(&s.calls, 1)
 	return s.writer(m)

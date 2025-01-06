@@ -29,6 +29,10 @@ const (
 	MessageKindData = MessageKind("data")
 	// MessageKindEvent represents event data
 	MessageKindEvent = MessageKind("event")
+	// MessageKindPing is a message kind sent as a keepalive.
+	MessageKindPing = MessageKind("ping")
+	// MessageKindPong is a message kind replied to a keepalive, if the conn is bi-di.
+	MessageKindPong = MessageKind("pong")
 	// MessageKindClosing is a message kind sent when the server is closing the
 	// realtime connection.  The subscriber should attempt to reconnect immediately,
 	// as the broadcaster will stop broadcasting on the current connection within 5
@@ -91,6 +95,9 @@ type Broadcaster interface {
 type Subscription interface {
 	// ID returns a unique ID for the given subscription
 	ID() uuid.UUID
+
+	// Protocol is the name of the protocol/implementation
+	Protocol() string
 
 	// SendKeepalive is called by the broadcaster to keep the current connection alive.  This
 	// may be a noop, depending on the implementation.  Note that keepalives are sent every
