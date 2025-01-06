@@ -102,11 +102,15 @@ func TestBroadcaster(t *testing.T) {
 
 			b.Publish(ctx, msg)
 
+			l.Lock()
 			require.Equal(t, 0, len(messages))
+			l.Unlock()
 
 			<-time.After(WriteRetryInterval + (5 * time.Millisecond))
 
+			l.Lock()
 			require.Equal(t, 1, len(messages))
+			l.Unlock()
 			require.Equal(t, msg, messages[0])
 		})
 	})
