@@ -12,7 +12,7 @@ export default function EventLogsLayout({ children, params }: EventLogsLayoutPro
       <div className="border-muted w-80 flex-shrink-0 overflow-y-auto border-r">
         <EventLogs eventName={decodeURIComponent(params.eventName)} />
       </div>
-      <div className="min-w-0 flex-1 bg-slate-50">{children}</div>
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
 }

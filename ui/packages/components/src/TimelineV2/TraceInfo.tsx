@@ -70,11 +70,7 @@ export function TraceInfo({
       <>
         <ElementWrapper label="Run">
           {trace.stepInfo.runID ? (
-            <LinkElement
-              href={pathCreator.runPopout({ runID: trace.stepInfo.runID })}
-              internalNavigation
-              showIcon={false}
-            >
+            <LinkElement href={pathCreator.runPopout({ runID: trace.stepInfo.runID })}>
               {trace.stepInfo.runID}
             </LinkElement>
           ) : (

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal/Modal';
 import { capitalCase } from 'change-case';
 import { useMutation } from 'urql';
@@ -109,7 +109,7 @@ export default function ConfirmPlanChangeModal({
         )}
         <p className="my-4 font-semibold">New monthly cost: ${amount / 100}</p>
         <div className="mt-6 flex flex-row justify-end">
-          <NewButton
+          <Button
             kind={isCancellation || action === 'downgrade' ? 'danger' : 'primary'}
             onClick={handlePlanChange}
             label={`Confirm ${capitalCase(action)}`}

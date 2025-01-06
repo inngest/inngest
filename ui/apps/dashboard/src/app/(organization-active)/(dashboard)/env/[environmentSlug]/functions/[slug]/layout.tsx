@@ -47,6 +47,7 @@ export default function FunctionLayout({
   const env = useEnvironment();
 
   const isBulkCancellationEnabled = useBooleanFlag('bulk-cancellation-ui');
+  const isOldRunsPageEnabled = useBooleanFlag('old-runs-page');
 
   const fn = data?.workspace.workflow;
   const { isArchived = false, isPaused } = fn ?? {};
@@ -143,15 +144,19 @@ export default function FunctionLayout({
             exactRouteMatch: true,
           },
           { children: 'Runs', href: `/env/${environmentSlug}/functions/${slug}/runs` },
-          {
-            children: (
-              <div className="m-0 flex flex-row items-center justify-start space-x-1 p-0">
-                <div>Old runs</div>
-                <Pill kind="info">Legacy</Pill>
-              </div>
-            ),
-            href: `/env/${environmentSlug}/functions/${slug}/logs`,
-          },
+          ...(isOldRunsPageEnabled.isReady && isOldRunsPageEnabled.value
+            ? [
+                {
+                  children: (
+                    <div className="m-0 flex flex-row items-center justify-start space-x-1 p-0">
+                      <div>Old runs</div>
+                      <Pill kind="info">Legacy</Pill>
+                    </div>
+                  ),
+                  href: `/env/${environmentSlug}/functions/${slug}/logs`,
+                },
+              ]
+            : []),
           { children: 'Replay history', href: `/env/${environmentSlug}/functions/${slug}/replay` },
           ...(isBulkCancellationEnabled.isReady && isBulkCancellationEnabled.value
             ? [

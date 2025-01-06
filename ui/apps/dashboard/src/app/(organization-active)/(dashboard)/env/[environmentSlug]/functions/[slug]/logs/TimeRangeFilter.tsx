@@ -112,13 +112,18 @@ export default function TimeRangeFilter({
         <>
           <Listbox.Label className="sr-only">Filter by time</Listbox.Label>
           <div className="relative">
-            <Listbox.Button className="shadow-outline-secondary-light group inline-flex items-center gap-1 rounded-[6px] bg-slate-50 px-3 py-[5px] text-sm font-medium text-slate-800 hover:bg-slate-100 focus:outline-indigo-500">
-              <p>
-                {getTimeFieldLabel(selectedTimeField)} in Last{' '}
-                {selectedTimeRangeOption ? getTimeRangeLabel(selectedTimeRangeOption) : ''}
-              </p>
-              <RiArrowDownSLine className="h-4 w-4" aria-hidden="true" />
-            </Listbox.Button>
+            <div className=" border-muted bg-surfaceBase flex items-center rounded-md border text-sm">
+              <Listbox.Button className="text-basis group flex h-[38px] w-full items-center justify-between rounded-r-[5px] px-2">
+                <p>
+                  {getTimeFieldLabel(selectedTimeField)} in Last{' '}
+                  {selectedTimeRangeOption ? getTimeRangeLabel(selectedTimeRangeOption) : ''}
+                </p>
+                <RiArrowDownSLine
+                  className="ui-open:-rotate-180 text-muted h-4 w-4 transition-transform duration-500"
+                  aria-hidden="true"
+                />
+              </Listbox.Button>
+            </div>
 
             <Transition
               show={open}
@@ -127,9 +132,9 @@ export default function TimeRangeFilter({
               leaveFrom="opacity-100"
               leaveTo="opacity-0"
             >
-              <Listbox.Options className="shadow-floating absolute left-0 z-10 mt-[5px] w-52 origin-top-left overflow-hidden rounded-md  bg-white/95 py-[9px] ring-1 ring-black/5 backdrop-blur-[3px] focus:outline-none">
+              <Listbox.Options className="border-muted bg-surfaceBase shadow-primary absolute left-0 z-10 mt-[5px] w-52 origin-top-left overflow-hidden rounded-md border py-1 focus:outline-none">
                 <GroupButton
-                  className="mx-2 grid grid-flow-col justify-stretch"
+                  className="mx-2 mb-1 grid grid-flow-col justify-stretch"
                   handleClick={onTimeFieldChange}
                   options={fieldOptions}
                   selectedOption={selectedTimeField}
@@ -143,7 +148,7 @@ export default function TimeRangeFilter({
                   return (
                     <Listbox.Option
                       key={label}
-                      className="ui-selected:bg-indigo-100 ui-disabled:text-slate-400 ui-selected:text-indigo-700 flex cursor-pointer select-none items-center justify-between px-3.5 py-1 text-sm font-medium text-slate-800 hover:bg-slate-100 focus:outline-none"
+                      className="ui-selected:bg-canvasSubtle ui-disabled:text-disabled ui-selected:text-primary-moderate text-basis ui-active:bg-canvasSubtle/50 flex cursor-pointer select-none items-center justify-between px-3.5 py-1 text-sm focus:outline-none"
                       value={timeRange.value}
                       disabled={!isPlanSufficient}
                     >

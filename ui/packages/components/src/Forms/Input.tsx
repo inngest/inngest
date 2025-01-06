@@ -42,11 +42,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         <div className="flex">
           <input
             ref={ref}
-            className={cn(`bg-canvasBase border-muted placeholder-disabled text-basis outline-primary-moderate border text-sm leading-none outline-2 transition-all focus:outline
+            className={cn(`bg-canvasBase border-muted placeholder-disabled text-basis outline-primary-moderate w-full border text-sm leading-none outline-2 transition-all focus:outline
             ${sizeStyles[inngestSize]}
             ${
               props.readOnly &&
-              'cursor-not-allowed border-transparent shadow-transparent outline-transparent	'
+              'bg-disabled text-disabled cursor-not-allowed border-transparent	shadow-transparent outline-transparent'
             }
             ${props.error && 'outline-error'}
             ${className}`)}

@@ -1,6 +1,6 @@
 import { Chart } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
-import { NewLink } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/Link';
 
 import type { VolumeMetricsQuery } from '@/gql/graphql';
 import type { EntityLookup } from './Dashboard';
@@ -25,14 +25,14 @@ export const Backlog = ({
           <Info
             text="Total number of function runs and steps pending to be processed in your environment, app or function."
             action={
-              <NewLink
+              <Link
                 arrowOnHover
                 className="text-sm"
                 href="https://www.inngest.com/docs/platform/monitor/observability-metrics#backlog"
                 target="_new"
               >
                 Learn more about backlog.
-              </NewLink>
+              </Link>
             }
           />
         </div>

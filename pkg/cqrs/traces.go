@@ -224,6 +224,8 @@ type TraceReader interface {
 	GetTraceSpansByRun(ctx context.Context, id TraceRunIdentifier) ([]*Span, error)
 	// GetSpanOutput retrieves the output for the specified span
 	GetSpanOutput(ctx context.Context, id SpanIdentifier) (*SpanOutput, error)
+	// GetSpanStack retrieves the step stack for the specified span
+	GetSpanStack(ctx context.Context, id SpanIdentifier) ([]string, error)
 }
 
 type GetTraceRunOpt struct {

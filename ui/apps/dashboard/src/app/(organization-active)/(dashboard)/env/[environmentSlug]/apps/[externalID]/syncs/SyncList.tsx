@@ -2,7 +2,7 @@
 
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
-import { IconFunction } from '@inngest/components/icons/Function';
+import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { cn } from '@inngest/components/utils/classNames';
 
 import { SyncStatusPill } from '@/components/SyncStatusPill';
@@ -85,7 +85,7 @@ export function SyncList({
                 >
                   {sync.syncedFunctions.length > 0 && (
                     <>
-                      <IconFunction className="text-muted" />
+                      <FunctionsIcon className="text-mute h-4 w-4" />
                       {sync.syncedFunctions.length}
                     </>
                   )}

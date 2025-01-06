@@ -40,17 +40,17 @@ export const onboardingMenuStepContent: OnboardingMenuContent = {
   title: 'Explore onboarding guide',
   step: {
     [OnboardingSteps.CreateApp]: {
-      title: 'Create Inngest app',
+      title: 'Create an Inngest app',
       description: 'Start building in local development',
       icon: AppsIcon,
     },
     [OnboardingSteps.DeployApp]: {
-      title: 'Deploy Inngest app',
+      title: 'Deploy your Inngest app',
       description: 'Host your app on any platform or infra',
       icon: RiSendPlaneLine,
     },
     [OnboardingSteps.SyncApp]: {
-      title: 'Sync app to Inngest',
+      title: 'Sync your app to Inngest',
       description: 'Tell Inngest where your app is running',
       icon: RiLoopRightLine,
     },

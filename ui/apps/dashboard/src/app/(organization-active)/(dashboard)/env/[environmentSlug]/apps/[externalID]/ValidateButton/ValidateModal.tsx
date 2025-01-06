@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
+import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
+import { Input } from '@inngest/components/Forms/Input';
 import { Modal } from '@inngest/components/Modal';
 
-import Input from '@/components/Forms/Input';
 import { type AppCheckResult } from '@/gql/graphql';
-import { AccordionCard } from './AccordionCard';
 import { Checks } from './Checks';
 import { ConfigDetail } from './ConfigDetail';
 import { HTTPInfo } from './HTTPInfo';
@@ -88,32 +88,47 @@ export function ValidateModal(props: Props) {
               }}
             />
           </div>
-          <Button btnAction={check} disabled={isLoading} kind="primary" label="Retry" />
+          <Button onClick={check} disabled={isLoading} kind="primary" label="Retry" />
         </div>
 
         <hr className="border-subtle my-4" />
 
-        {error && !isLoading && <Alert severity="error">{error.message}</Alert>}
+        {error && !isLoading && (
+          <Alert severity="error" className="text-sm">
+            {error.message}
+          </Alert>
+        )}
 
         {data && (
           <div>
             <Checks appInfo={data} />
 
-            <AccordionCard>
-              <AccordionCard.Item header="SDK configuration" value="config">
-                <ConfigDetail data={data} />
-              </AccordionCard.Item>
-
-              <AccordionCard.Item header="HTTP response" value="http">
-                <HTTPInfo data={data} />
-              </AccordionCard.Item>
-            </AccordionCard>
+            <AccordionList type="multiple" defaultValue={[]}>
+              <AccordionList.Item value="config">
+                <AccordionList.Trigger className="text-sm">SDK configuration</AccordionList.Trigger>
+                <AccordionList.Content className="px-9">
+                  <ConfigDetail data={data} />
+                </AccordionList.Content>
+              </AccordionList.Item>
+              <AccordionList.Item value="http">
+                <AccordionList.Trigger className="text-sm">HTTP response</AccordionList.Trigger>
+                <AccordionList.Content className="px-9">
+                  <HTTPInfo data={data} />
+                </AccordionList.Content>
+              </AccordionList.Item>
+            </AccordionList>
           </div>
         )}
       </Modal.Body>
 
       <Modal.Footer className="flex justify-end gap-2">
-        <Button appearance="outlined" btnAction={onClose} disabled={isLoading} label="Close" />
+        <Button
+          appearance="outlined"
+          kind="secondary"
+          onClick={onClose}
+          disabled={isLoading}
+          label="Close"
+        />
       </Modal.Footer>
     </Modal>
   );

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@inngest/components/Button';
+import { DropdownMenuItem } from '@inngest/components/DropdownMenu';
+import { RiArchive2Line } from '@remixicon/react';
 
 import { EnvironmentType } from '@/gql/graphql';
 import { EnvironmentArchiveModal } from './EnvironmentArchiveModal';
@@ -10,7 +11,7 @@ type Props = {
   env: { id: string; isArchived: boolean; name: string; type: EnvironmentType };
 };
 
-export function EnvironmentArchiveButton({ env }: Props) {
+export function EnvironmentArchiveDropdownItem({ env }: Props) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Need to store local state since the mutations don't invalidate the cache,
@@ -27,12 +28,13 @@ export function EnvironmentArchiveButton({ env }: Props) {
 
   return (
     <>
-      <Button
-        appearance="outlined"
-        btnAction={() => setIsModalOpen(true)}
-        kind="danger"
-        label={label}
-      />
+      <DropdownMenuItem
+        onSelect={() => setIsModalOpen(true)}
+        className={!isArchived ? 'text-error' : undefined}
+      >
+        <RiArchive2Line className="h-4 w-4" />
+        {label}
+      </DropdownMenuItem>
 
       <EnvironmentArchiveModal
         envID={env.id}

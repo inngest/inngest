@@ -1,11 +1,11 @@
 'use client';
 
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { RiExpandUpDownLine } from '@remixicon/react';
 
 export const EnvironmentMenu = ({ collapsed }: { collapsed: boolean }) => {
   return (
-    <NewButton
+    <Button
       disabled={true}
       kind="secondary"
       appearance="outlined"

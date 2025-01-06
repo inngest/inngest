@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { Alert } from '@inngest/components/Alert';
 import { Chart } from '@inngest/components/Chart/Chart';
 
@@ -24,9 +23,9 @@ export default function BillableUsageChart({ includedCountLimit, selectedPeriod,
       <div className="flex h-full min-h-[297px] w-full items-center justify-center overflow-hidden">
         <Alert severity="warning">
           Failed to load usage data. Please{' '}
-          <Link href="/support" className="underline">
+          <Alert.Link severity="warning" href="/support">
             contact support
-          </Link>{' '}
+          </Alert.Link>{' '}
           if this does not resolve.
         </Alert>
       </div>

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useOrganization, useUser } from '@clerk/nextjs';
+import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import { useQuery } from 'urql';
 
 import NewReplayButton from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/NewReplayButton';
@@ -10,7 +11,6 @@ import { ClientFeatureFlag } from '@/components/FeatureFlags/ClientFeatureFlag';
 import { graphql } from '@/gql';
 import { FunctionRunStatus, FunctionRunTimeField } from '@/gql/graphql';
 import FunctionRunList from './FunctionRunList';
-import StatusFilter from './StatusFilter';
 import TimeRangeFilter, {
   defaultTimeField,
   defaultTimeRange,
@@ -126,6 +126,7 @@ export default function DashboardRuns({ params }: RunsPageProps) {
         <div className="gap flex items-center gap-1.5">
           <StatusFilter
             selectedStatuses={selectedStatuses}
+            // @ts-ignore
             onStatusesChange={handleStatusesChange}
             functionIsPaused={functionIsPaused}
           />
@@ -136,7 +137,7 @@ export default function DashboardRuns({ params }: RunsPageProps) {
             onTimeRangeChange={handleTimeRangeChange}
           />
           {functionRunsCount !== undefined && (
-            <p className="text-sm font-semibold text-slate-900">{functionRunsCount} Runs</p>
+            <p className="text-sm font-semibold">{functionRunsCount} Runs</p>
           )}
         </div>
         <ClientFeatureFlag flag="function-replay">

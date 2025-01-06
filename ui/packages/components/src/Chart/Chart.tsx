@@ -17,7 +17,7 @@ import resolveConfig from 'tailwindcss/resolveConfig';
 import tailwindConfig from '../../tailwind.config';
 
 const {
-  theme: { textColor, colors, backgroundColor },
+  theme: { textColor, colors },
 } = resolveConfig(tailwindConfig);
 
 export type { LegendComponentOption, LineSeriesOption, EChartsOption };

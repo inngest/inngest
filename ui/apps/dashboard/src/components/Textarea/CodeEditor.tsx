@@ -1,7 +1,7 @@
 import { useId, useRef, useState } from 'react';
+import { cn } from '@inngest/components/utils/classNames';
 
 import SyntaxHighlighter from '@/components/SyntaxHighlighter';
-import cn from '@/utils/cn';
 
 type CodeEditorProps = {
   language: string;

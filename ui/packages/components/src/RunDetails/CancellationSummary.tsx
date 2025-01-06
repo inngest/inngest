@@ -2,7 +2,7 @@
 
 import { Card } from '@inngest/components/Card';
 import { MetadataItem } from '@inngest/components/Metadata';
-import { IconEvent } from '@inngest/components/icons/Event';
+import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import type { HistoryParser } from '@inngest/components/utils/historyParser';
 
 type Props = {
@@ -17,15 +17,15 @@ export function CancellationSummary({ history }: Props) {
 
   return (
     <Card accentColor="bg-status-cancelled">
-      <Card.Header className="bg-white dark:bg-slate-800/40">Cancelled</Card.Header>
+      <Card.Header>Cancelled</Card.Header>
 
-      <Card.Content className="bg-white dark:bg-slate-800/40">
+      <Card.Content>
         {/* TODO: Make this a link */}
         <MetadataItem
           label="Event ID"
           value={
             <>
-              <IconEvent className="inline-block" /> {cancellation.eventID}
+              <EventsIcon className="inline-block h-4 w-4" /> {cancellation.eventID}
             </>
           }
         />

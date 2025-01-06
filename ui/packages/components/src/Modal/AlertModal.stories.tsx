@@ -22,7 +22,7 @@ const ModalWithHooks = (props) => {
   const [isOpen, setIsOpen] = useState(false);
   return (
     <>
-      <Button label="Delete" btnAction={() => setIsOpen(true)} />
+      <Button label="Delete" onClick={() => setIsOpen(true)} />
       <AlertModal {...props} isOpen={isOpen} onClose={() => setIsOpen(false)} onSubmit={() => {}} />
     </>
   );

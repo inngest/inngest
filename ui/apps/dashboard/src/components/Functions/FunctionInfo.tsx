@@ -10,14 +10,14 @@ export const FunctionInfo = () => (
     <TooltipContent
       side="right"
       sideOffset={2}
-      className="border-muted text-muted text-md mt-6 flex flex-col rounded-lg border p-0"
+      className="border-muted text-muted mt-6 flex flex-col rounded-lg border p-0 text-sm"
     >
-      <div className="border-b px-4 py-2 ">
+      <div className="border-subtle border-b px-4 py-2 ">
         List of all Inngest functions in the current environment.
       </div>
 
       <div className="px-4 py-2">
-        <Link href={'https://www.inngest.com/docs/functions'} className="text-md">
+        <Link href={'https://www.inngest.com/docs/functions'} target="_blank">
           Learn how to create a function
         </Link>
       </div>
