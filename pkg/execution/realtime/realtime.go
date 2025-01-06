@@ -91,7 +91,8 @@ type Broadcaster interface {
 	Close(context.Context) error
 }
 
-// Subscription represents a subscription to a specific set of channels.
+// Subscription represents a subscription to a specific set of channels, via a given protocol.
+// This may be backed by websockets, server-sent-events, and so on.
 type Subscription interface {
 	// ID returns a unique ID for the given subscription
 	ID() uuid.UUID
