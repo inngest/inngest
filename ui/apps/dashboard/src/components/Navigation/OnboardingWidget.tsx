@@ -6,7 +6,6 @@ import SegmentedProgressBar from '@inngest/components/ProgressBar/SegmentedProgr
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiBookReadLine, RiCheckboxCircleFill, RiCloseLine } from '@remixicon/react';
 
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { pathCreator } from '@/utils/urls';
 import { onboardingWidgetContent } from '../Onboarding/content';
 import { OnboardingSteps, steps } from '../Onboarding/types';
@@ -21,7 +20,6 @@ export default function OnboardingWidget({
   closeWidget: () => void;
 }) {
   const router = useRouter();
-  const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
   const { lastCompletedStep, nextStep, totalStepsCompleted } = useOnboardingStep();
   const tracking = useOnboardingTracking();
 
@@ -29,7 +27,6 @@ export default function OnboardingWidget({
     ? onboardingWidgetContent.step.success
     : onboardingWidgetContent.step[nextStep?.name || OnboardingSteps.CreateApp];
 
-  if (!onboardingFlow) return;
   return (
     <>
       {collapsed && (

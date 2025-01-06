@@ -116,7 +116,6 @@ const INTEGRATIONS: Integration[] = [
 ];
 
 export default function IntegrationsList({ integrations }: { integrations: VercelIntegration[] }) {
-  const { value: postgressIntegration } = useBooleanFlag('postgres-integration');
   const { value: supabaseIntegration } = useBooleanFlag('supabase-integration');
 
   console.log('main integrations', integrations);
@@ -129,7 +128,6 @@ export default function IntegrationsList({ integrations }: { integrations: Verce
       <div className="mb-7 w-full text-2xl font-medium">All integrations</div>
       <div className="grid w-[800px] grid-cols-2 gap-6">
         {INTEGRATIONS.map((i: Integration, n) => {
-          if (i.title === 'Neon' && !postgressIntegration) return;
           if (i.title === 'Supabase' && !supabaseIntegration) return;
 
           const integrationData = getIntegrationData(i.slug);

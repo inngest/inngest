@@ -14,13 +14,11 @@ import {
 } from '@remixicon/react';
 
 import { useSystemStatus } from '@/app/(organization-active)/support/statusPage';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { pathCreator } from '@/utils/urls';
 import useOnboardingStep from '../Onboarding/useOnboardingStep';
 import SystemStatusIcon from './SystemStatusIcon';
 
 export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget: () => void }) => {
-  const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
   const { nextStep, lastCompletedStep } = useOnboardingStep();
   const status = useSystemStatus();
 
@@ -102,28 +100,24 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
               </div>
             </Listbox.Option>
           </NextLink>
-          {onboardingFlow && (
-            <>
-              <hr />
-              <NextLink
-                href={pathCreator.onboardingSteps({
-                  step: nextStep ? nextStep.name : lastCompletedStep?.name,
-                  ref: 'app-navbar-help',
-                })}
-                onClick={() => showWidget()}
-              >
-                <Listbox.Option
-                  className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
-                  value="onboardingGuide"
-                >
-                  <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                    <RiBookReadLine className="text-muted mr-2 h-4 w-4" />
-                    <div>Show onboarding guide</div>
-                  </div>
-                </Listbox.Option>
-              </NextLink>
-            </>
-          )}
+          <hr />
+          <NextLink
+            href={pathCreator.onboardingSteps({
+              step: nextStep ? nextStep.name : lastCompletedStep?.name,
+              ref: 'app-navbar-help',
+            })}
+            onClick={() => showWidget()}
+          >
+            <Listbox.Option
+              className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              value="onboardingGuide"
+            >
+              <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
+                <RiBookReadLine className="text-muted mr-2 h-4 w-4" />
+                <div>Show onboarding guide</div>
+              </div>
+            </Listbox.Option>
+          </NextLink>
         </Listbox.Options>
       </div>
     </Listbox>
