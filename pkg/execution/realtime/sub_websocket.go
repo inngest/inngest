@@ -2,7 +2,6 @@ package realtime
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/google/uuid"
 )
@@ -10,8 +9,7 @@ import (
 // SubscriptionWS represents a websocket subscription
 type SubscriptionWS struct {
 	id uuid.UUID
-	// conn represents the underlying websocket connection
-	conn io.Writer
+	// TODO
 }
 
 func (s SubscriptionWS) ID() uuid.UUID {

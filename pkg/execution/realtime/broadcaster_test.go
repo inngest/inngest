@@ -89,7 +89,8 @@ func TestBroadcaster(t *testing.T) {
 			sub := NewInmemorySubscription(id, func(m Message) error {
 				if failed {
 					failed = false
-					appender(m)
+					err := appender(m)
+					require.NoError(t, err)
 					return nil
 				}
 				failed = true
