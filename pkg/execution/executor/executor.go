@@ -27,6 +27,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -299,6 +300,10 @@ type executor struct {
 	cancellationChecker cancellation.Checker
 
 	lifecycles []execution.LifecycleListener
+
+	// rtpub represents teh realtime publisher used to broadcast notifications
+	// on run execution.
+	rtpub realtime.Publisher
 
 	// steplimit finds step limits for a given run.
 	steplimit func(sv2.ID) int
@@ -1961,6 +1966,10 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error scheduling step queue item", "error", err)
+		return err
+	}
 
 	for _, l := range e.lifecycles {
 		// We can't specify step name here since that will result in the
@@ -1969,7 +1978,17 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		go l.OnStepScheduled(ctx, i.md, nextItem, stepName)
 	}
 
-	return err
+	// Ensure we publish the step outputs to any publishers connected.  This broadcasts the
+	// step output to any realtime subscribers.
+	if e.rtpub != nil {
+		e.rtpub.Publish(ctx, realtime.Message{
+			Kind:       realtime.MessageKindStep,
+			Data:       gen.Data,
+			TopicNames: broadcastTopics(gen.DisplayName),
+		})
+	}
+
+	return nil
 }
 
 func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
@@ -2766,4 +2785,11 @@ func extractTraceCtx(ctx context.Context, md sv2.Metadata) context.Context {
 	}
 
 	return ctx
+}
+
+func broadcastTopics(displayName *string) []string {
+	if displayName == nil {
+		return nil
+	}
+	return []string{*displayName}
 }
