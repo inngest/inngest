@@ -54,39 +54,38 @@ export const ActionsMenu = ({
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={showInvoke} disabled={archived || paused}>
-          <OptionalTooltip
-            tooltip={
-              (archived || paused) &&
-              `Invoke not available, function is ${archived ? 'archived' : 'paused'}.`
-            }
-          >
+        <OptionalTooltip
+          tooltip={
+            (archived || paused) &&
+            `Invoke not available, function is ${archived ? 'archived' : 'paused'}.`
+          }
+        >
+          <DropdownMenuItem onSelect={showInvoke} disabled={archived || paused}>
             <RiFlashlightFill className="h-4 w-4" />
             Invoke
-          </OptionalTooltip>
-        </DropdownMenuItem>
-
-        <DropdownMenuItem onSelect={showPause} disabled={archived}>
-          <OptionalTooltip tooltip={archived && 'Pause not available, function is archived.'}>
+          </DropdownMenuItem>
+        </OptionalTooltip>
+        <OptionalTooltip tooltip={archived && 'Pause not available, function is archived.'}>
+          <DropdownMenuItem onSelect={showPause} disabled={archived}>
             {paused ? (
               <RiPlayCircleLine className="h-4 w-4" />
             ) : (
               <RiPauseCircleLine className="h-4 w-4" />
             )}
             {paused ? 'Resume' : 'Pause'}
-          </OptionalTooltip>
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={showReplay} disabled={archived || paused}>
-          <OptionalTooltip
-            tooltip={
-              (archived || paused) &&
-              `Replay not available, function is ${archived ? 'archived' : 'paused'}.`
-            }
-          >
+          </DropdownMenuItem>
+        </OptionalTooltip>
+        <OptionalTooltip
+          tooltip={
+            (archived || paused) &&
+            `Replay not available, function is ${archived ? 'archived' : 'paused'}.`
+          }
+        >
+          <DropdownMenuItem onSelect={showReplay} disabled={archived || paused}>
             <IconReplay className="h-4 w-4" />
             Replay
-          </OptionalTooltip>
-        </DropdownMenuItem>
+          </DropdownMenuItem>
+        </OptionalTooltip>
         {cancelEnabled && (
           <DropdownMenuItem onSelect={showCancel} className="text-error">
             <RiCloseCircleLine className="h-4 w-4" />
