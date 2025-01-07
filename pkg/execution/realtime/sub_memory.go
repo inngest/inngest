@@ -30,7 +30,10 @@ func (s subMemory) Protocol() string {
 
 func (s subMemory) WriteMessage(m Message) error {
 	atomic.AddInt32(&s.calls, 1)
-	return s.writer(m)
+	if s.writer != nil {
+		return s.writer(m)
+	}
+	return nil
 }
 
 func (s subMemory) SendKeepalive(m Message) error {

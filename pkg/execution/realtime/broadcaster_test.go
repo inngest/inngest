@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -140,5 +141,55 @@ func TestBroadcaster(t *testing.T) {
 			l.Unlock()
 			require.Equal(t, msg, messages[0])
 		})
+	})
+}
+
+// TestBroadcasterConds ensures that the sync.Cond mechanisms work for subscribing and
+// unsubscribing
+func TestBroadcasterConds(t *testing.T) {
+	t.Run("single subscriber", func(t *testing.T) {
+		var (
+			ctx = context.Background()
+			b   = NewInProcessBroadcaster().(*broadcaster)
+			sub = NewInmemorySubscription(uuid.New(), nil)
+			msg = Message{
+				Kind:  MessageKindRun,
+				Data:  "output",
+				RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+			}
+			unsubCalled int32
+			wg          sync.WaitGroup
+		)
+
+		wg.Add(1)
+		err := b.subscribe(
+			ctx,
+			sub,
+			msg.Topics(),
+			func(ctx context.Context, topic Topic) {
+				require.Nil(t, ctx.Err())
+				require.Equal(t, msg.Topics()[0], topic)
+
+				// We should have a closed ctx
+				<-time.After(20 * time.Millisecond)
+
+				require.NotNil(t, ctx.Err(), "expected ctx to be cancelled")
+				wg.Done()
+			},
+			func(ctx context.Context, t Topic) {
+				atomic.AddInt32(&unsubCalled, 1)
+			},
+		)
+
+		<-time.After(10 * time.Millisecond)
+
+		require.NoError(t, err)
+		err = b.Unsubscribe(ctx, sub.ID(), msg.Topics())
+		require.NoError(t, err)
+
+		require.Eventually(t, func() bool {
+			return atomic.LoadInt32(&unsubCalled) >= int32(1)
+		}, time.Second, time.Millisecond, "unsubscribe should be called")
+		wg.Wait()
 	})
 }

@@ -78,7 +78,7 @@ func (b *broadcaster) subscribe(
 	s Subscription,
 	topics []Topic,
 	onSubscribe func(ctx context.Context, t Topic),
-	onUnsubscribe func(t Topic),
+	onUnsubscribe func(ctx context.Context, t Topic),
 ) error {
 	if atomic.LoadInt32(&b.closing) == 1 {
 		return ErrBroadcasterClosed
@@ -147,7 +147,7 @@ func (b *broadcaster) setupCond(
 	s Subscription,
 	t Topic,
 	onSubscribe func(ctx context.Context, t Topic),
-	onUnsubscribe func(t Topic),
+	onUnsubscribe func(ctx context.Context, t Topic),
 ) {
 	cond, ok := b.conds[s.ID().String()+t.String()]
 	if !ok {
@@ -166,12 +166,14 @@ func (b *broadcaster) setupCond(
 		// the context.
 		cancel()
 		if onUnsubscribe != nil {
-			onUnsubscribe(t)
+			// NOTE: this uses the parent context that isn't cancelled via unsubscribe.
+			// The context may be cancelled via a parent call, eg. SIGINT.
+			go onUnsubscribe(ctx, t)
 		}
 	}(t)
 
 	if onSubscribe != nil {
-		onSubscribe(rctx, t)
+		go onSubscribe(rctx, t)
 	}
 }
 

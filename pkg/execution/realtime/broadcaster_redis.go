@@ -54,7 +54,7 @@ func (b *redisBroadcaster) Subscribe(ctx context.Context, s Subscription, topics
 				"subscription_id", s.ID(),
 			)
 		},
-		func(t Topic) {
+		func(ctx context.Context, t Topic) {
 			logger.StdlibLogger(ctx).Debug(
 				"unsubscribed from realtime redis pubsub",
 				"topic", t,
