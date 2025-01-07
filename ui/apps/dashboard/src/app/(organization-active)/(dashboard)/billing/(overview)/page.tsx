@@ -6,6 +6,7 @@ import AddOn from '@/components/Billing/Addons/AddonListItem';
 import BillingInformation from '@/components/Billing/BillingDetails/BillingInformation';
 import PaymentMethod from '@/components/Billing/BillingDetails/PaymentMethod';
 import { LimitBar, type Data } from '@/components/Billing/LimitBar';
+import { PlanNames } from '@/components/Billing/Plans/utils';
 import {
   billingDetails as getBillingDetails,
   currentPlan as getCurrentPlan,
@@ -59,6 +60,8 @@ export default async function Page() {
     entitlementUsage.runCount.overageAllowed || entitlementUsage.stepCount.overageAllowed;
 
   const paymentMethod = billing.paymentMethods?.[0] || null;
+  const isFreePlan = plan.plan?.name === PlanNames.Free;
+
   return (
     <div className="grid grid-cols-3 gap-4">
       <Card className="col-span-2">
@@ -110,12 +113,24 @@ export default async function Page() {
             tooltipContent="Functions actively sleeping and waiting for events are not counted"
           />
           <AddOn
+            title="Users"
+            value={`${entitlementUsage.userCount.usage}/${entitlementUsage.userCount.limit}`}
+            canIncreaseLimitInCurrentPlan={!isFreePlan}
+            description="Maximum number of users"
+          />
+          <AddOn
             title="Log history"
             value={`${entitlementUsage.history.limit} day${
               entitlementUsage.history.limit === 1 ? '' : 's'
             }`}
             canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             description="View and search function run traces and metrics"
+          />
+          <AddOn
+            title="HIPAA"
+            value={entitlementUsage.hipaa.enabled ? 'Enabled' : 'Not enabled'}
+            canIncreaseLimitInCurrentPlan
+            description="Sign BAAs for healthcare services"
           />
           <AddOn
             title="Dedicated execution capacity"
