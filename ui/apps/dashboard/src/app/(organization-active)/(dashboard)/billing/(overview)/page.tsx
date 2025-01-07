@@ -24,7 +24,7 @@ export default async function Page() {
   const legacyNoRunsPlan = entitlementUsage.runCount.limit === null;
   const runs: Data = {
     title: 'Runs',
-    description: `A single durable function execution. ${
+    description: `${
       entitlementUsage.runCount.overageAllowed
         ? 'Additional usage incurred at additional charge.'
         : ''
@@ -32,11 +32,12 @@ export default async function Page() {
     current: entitlementUsage.runCount.usage || 0,
     limit: entitlementUsage.runCount.limit || null,
     overageAllowed: entitlementUsage.runCount.overageAllowed,
+    tooltipContent: 'A single durable function execution.',
   };
 
   const steps: Data = {
     title: 'Steps',
-    description: `An individual step in durable functions. ${
+    description: `${
       entitlementUsage.runCount.overageAllowed && !legacyNoRunsPlan
         ? 'Additional usage incurred at additional charge. Additional runs include 5 steps per run.'
         : entitlementUsage.runCount.overageAllowed
@@ -46,6 +47,7 @@ export default async function Page() {
     current: entitlementUsage.stepCount.usage || 0,
     limit: entitlementUsage.stepCount.limit || null,
     overageAllowed: entitlementUsage.stepCount.overageAllowed,
+    tooltipContent: 'An individual step in durable functions.',
   };
 
   const nextInvoiceDate = plan.subscription?.nextInvoiceDate
@@ -120,8 +122,8 @@ export default async function Page() {
             canIncreaseLimitInCurrentPlan
             description="Dedicated infrastructure for the lowest latency and highest throughput"
           />
-          <div className="flex flex-col items-center gap-2">
-            <p>Custom needs?</p>
+          <div className="flex flex-col items-center gap-2 pt-6">
+            <p className="text-muted text-xs">Custom needs?</p>
             <Button
               appearance="outlined"
               label="Chat with a product expert"
