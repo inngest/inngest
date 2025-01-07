@@ -33,7 +33,7 @@ export default function AddOn({
             </Tooltip>
           )}
         </p>
-        {description && <p className="text-subtle mb-0.5 text-sm italic">{description}</p>}
+        {description && <p className="text-muted mb-0.5 text-sm italic">{description}</p>}
         {value && <p className="text-basis pr-3 text-sm font-medium">{value}</p>}
       </div>
       <div>

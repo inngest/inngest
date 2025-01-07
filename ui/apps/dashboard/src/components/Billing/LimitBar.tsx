@@ -30,7 +30,7 @@ export async function LimitBar({ data, className }: { data: Data; className?: st
           </Tooltip>
         )}
       </div>
-      <p className="text-subtle mb-2 text-sm italic">{description}</p>
+      <p className="text-muted mb-2 text-sm italic">{description}</p>
       <ProgressBar value={current} limit={limit} overageAllowed={overageAllowed} />
       <div className="mt-1 text-left">
         <span
