@@ -2,6 +2,7 @@ import type React from 'react';
 import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
 import { Time } from '@inngest/components/Time';
 
+import { Card } from '../Card';
 import { type App } from '../types/app';
 import { cn } from '../utils/classNames';
 
@@ -20,15 +21,9 @@ const kindStyles = {
 
 export function AppCard({ kind, children }: React.PropsWithChildren<{ kind: CardKind }>) {
   return (
-    <div className="border-subtle bg-canvasBase relative rounded border">
-      <div
-        className={cn(
-          'absolute bottom-0 left-0 top-0 w-1 rounded-l-[0.2rem]',
-          kindStyles[kind].background
-        )}
-      />
+    <Card accentColor={kindStyles[kind].background} accentPosition="left">
       {children}
-    </div>
+    </Card>
   );
 }
 
@@ -57,7 +52,6 @@ export function AppCardContent({ app, pill, actions }: CardContentProps) {
           <Description term="Last synced at" detail={<Time value={app.lastSyncedAt} />} />
         )}
         <Description
-          className=""
           term="Sync method"
           detail={<div className="lowercase first-letter:capitalize">{app.syncMethod}</div>}
         />
