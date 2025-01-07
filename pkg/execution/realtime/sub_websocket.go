@@ -130,6 +130,8 @@ func (s SubscriptionWS) poll(ctx context.Context) error {
 
 			// TODO: Reply with successful subscribe msg
 			continue
+		case MessageKindUnsubscribe:
+			// TODO: Unsub from the given topics.
 		}
 	}
 }

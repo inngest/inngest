@@ -28,6 +28,10 @@ var (
 // NewInProcessBroadcaster is a single broadcaster which is used for in-memory, in-process
 // publishing.
 func NewInProcessBroadcaster() Broadcaster {
+	return newBroadcaster()
+}
+
+func newBroadcaster() *broadcaster {
 	return &broadcaster{
 		closing: 0,
 		subs:    map[uuid.UUID]*activesub{},

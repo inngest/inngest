@@ -23,9 +23,11 @@ const (
 //
 // The messages pass from executors (calling .Publish) to gateways (susbcribed to redis pub/sub via
 // .Subscribe calls), being sent to all interested subscribers.
-func NewRedisBroadcaster() Broadcaster {
-	// TODO
-	return nil
+func NewRedisBroadcaster(rc rueidis.Client) Broadcaster {
+	return &redisBroadcaster{
+		broadcaster: newBroadcaster(),
+		c:           rc,
+	}
 }
 
 type redisBroadcaster struct {
