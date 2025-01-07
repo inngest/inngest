@@ -14,6 +14,20 @@ const (
 	redisRetryInterval   = 2 * time.Second
 )
 
+// NewRedisBroadcaster implements a decentralized broadcaster that allows publishing and fanout of
+// messages from any internal service to clients connected via separate gateways.
+//
+// Publishers, such as the executor, can instantiate a Redis broadcaster to publish messages on any
+// topic.  Gateways can instantiate broadcasters connected to the same Redis instance to forward
+// messages to any connected subscribers.
+//
+// The messages pass from executors (calling .Publish) to gateways (susbcribed to redis pub/sub via
+// .Subscribe calls), being sent to all interested subscribers.
+func NewRedisBroadcaster() Broadcaster {
+	// TODO
+	return nil
+}
+
 type redisBroadcaster struct {
 	// embed a broadcaster for in-memory mamangement.
 	*broadcaster
