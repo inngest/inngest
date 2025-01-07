@@ -31,8 +31,10 @@ const (
 	MessageKindEvent = MessageKind("event")
 	// MessageKindPing is a message kind sent as a keepalive.
 	MessageKindPing = MessageKind("ping")
-	// MessageKindPong is a message kind replied to a keepalive, if the conn is bi-di.
-	MessageKindPong = MessageKind("pong")
+	// MessageKindSubscribe is a message kind that subscribes to a new set of topics,
+	// given a valid JWT embedding the topics directly.
+	MessageKindSubscribe = MessageKind("subscribe")
+
 	// MessageKindClosing is a message kind sent when the server is closing the
 	// realtime connection.  The subscriber should attempt to reconnect immediately,
 	// as the broadcaster will stop broadcasting on the current connection within 5
@@ -129,17 +131,16 @@ type Subscription interface {
 // Each message is published to one or more topics.
 type Topic struct {
 	// Kind represents the topic kind, ie. whether this topic is for events or run data.
-	Kind TopicKind
+	Kind TopicKind `json:"kind"`
 	// RunID represents the run that this topic represents, if this is a
 	// topic for a run.
-	RunID ulid.ULID
+	RunID ulid.ULID `json:"run_id"`
 	// EnvID represents the environment ID that this topic is subscribed to.  This
 	// must always be present for both run and event topics.
-	EnvID uuid.UUID
+	EnvID uuid.UUID `json:"env_id"`
 	// Name represents a topic name, such as "$step", "$result", "step-name",
 	// or eg. "api/event.name".
-	Name string
-
+	Name string `json:"name"`
 	// TODO: Implement event pub/sub and realtime message filtering.
 	// Expression is used to filter messages such as events, eg "event.data.value > 500".
 	// Expression *string

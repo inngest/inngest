@@ -212,9 +212,7 @@ func (b *broadcaster) Unsubscribe(ctx context.Context, subID uuid.UUID, topics [
 
 		// Signal to all conds that the topic has been unsubscribed.
 		if cond, ok := b.conds[subID.String()+t.String()]; ok {
-			cond.L.Lock()
 			cond.Broadcast()
-			cond.L.Unlock()
 		}
 	}
 
