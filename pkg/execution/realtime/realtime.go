@@ -169,6 +169,8 @@ type Message struct {
 	FnSlug string `json:"fn_slug,omitempty,omitzero"`
 	// RunID is the run ID that this message is related to.
 	RunID ulid.ULID `json:"run_id,omitempty,omitzero"`
+	// EnvID is the environment ID that the message belongs to.
+	EnvID uuid.UUID `json:"env_id,omitempty,omitzero"`
 	// CreatedAt is the time that this message was created.
 	CreatedAt time.Time `json:"created_at"`
 	// TopicNames represents the custom channels that this message should be broadcast
@@ -190,12 +192,14 @@ func (m Message) Topics() []Topic {
 			Kind:  TopicKindRun,
 			Name:  TopicNameStep,
 			RunID: m.RunID,
+			EnvID: m.EnvID,
 		}
 
 		for n, v := range m.TopicNames {
 			topics[n+1] = Topic{
 				Kind:  TopicKindRun,
 				RunID: m.RunID,
+				EnvID: m.EnvID,
 				Name:  v,
 			}
 		}
@@ -211,12 +215,14 @@ func (m Message) Topics() []Topic {
 			Kind:  TopicKindRun,
 			Name:  TopicNameRun,
 			RunID: m.RunID,
+			EnvID: m.EnvID,
 		}
 
 		for n, v := range m.TopicNames {
 			topics[n+1] = Topic{
 				Kind:  TopicKindRun,
 				RunID: m.RunID,
+				EnvID: m.EnvID,
 				Name:  v,
 			}
 		}
@@ -230,6 +236,7 @@ func (m Message) Topics() []Topic {
 		topics[n+1] = Topic{
 			Kind:  TopicKindRun,
 			RunID: m.RunID,
+			EnvID: m.EnvID,
 			Name:  v,
 		}
 	}

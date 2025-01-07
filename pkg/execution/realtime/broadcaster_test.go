@@ -52,6 +52,14 @@ func TestBroadcaster(t *testing.T) {
 			b.Publish(ctx, msg)
 			require.Equal(t, 1, len(messages))
 			require.Equal(t, msg, messages[0])
+
+			t.Run("subscribing twice on the same sub ID only sends one message", func(t *testing.T) {
+				err := b.Subscribe(ctx, sub, msg.Topics())
+				require.NoError(t, err)
+
+				b.Publish(ctx, msg)
+				require.Equal(t, 2, len(messages))
+			})
 		})
 
 		t.Run("removed subscription", func(t *testing.T) {
@@ -59,11 +67,12 @@ func TestBroadcaster(t *testing.T) {
 			require.NoError(t, err)
 
 			b.Publish(ctx, msg)
-			require.Equal(t, 1, len(messages))
+			require.Equal(t, 2, len(messages))
 			require.Equal(t, msg, messages[0])
 		})
 
 		t.Run("unsubscribing", func(t *testing.T) {
+			b = NewInProcessBroadcaster()
 			messages = []Message{}
 
 			err := b.Subscribe(ctx, sub, msg.Topics())
@@ -75,6 +84,7 @@ func TestBroadcaster(t *testing.T) {
 
 			b.Unsubscribe(ctx, sub.ID(), msg.Topics())
 			b.Publish(ctx, msg)
+
 			// No change in count
 			require.Equal(t, 1, len(messages))
 			require.Equal(t, msg, messages[0])

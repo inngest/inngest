@@ -33,6 +33,7 @@ func NewInProcessBroadcaster() Broadcaster {
 		subs:    map[uuid.UUID]*activesub{},
 		topics:  map[string]topicsub{},
 		l:       &sync.RWMutex{},
+		conds:   map[string]*sync.Cond{},
 	}
 }
 
@@ -59,9 +60,26 @@ type broadcaster struct {
 	topics map[string]topicsub
 
 	l *sync.RWMutex
+	// conds is a map of subscriptionID-topic hashes to a sync.Cond, allowing
+	// us to
+	conds map[string]*sync.Cond
 }
 
 func (b *broadcaster) Subscribe(ctx context.Context, s Subscription, topics []Topic) error {
+	return b.subscribe(ctx, s, topics, nil, nil)
+}
+
+// subscribe ensures that a given Subscription is subscribed to the provided topics.
+// The onSubscribe callback is called when the subscription starts for eahc topic, and the
+// onUnsubscribe callback is called when the subscription ends, eg. when Close or Unsubscribe
+// is called on another thread.
+func (b *broadcaster) subscribe(
+	ctx context.Context,
+	s Subscription,
+	topics []Topic,
+	onSubscribe func(ctx context.Context, t Topic),
+	onUnsubscribe func(t Topic),
+) error {
 	if atomic.LoadInt32(&b.closing) == 1 {
 		return ErrBroadcasterClosed
 	}
@@ -80,6 +98,12 @@ func (b *broadcaster) Subscribe(ctx context.Context, s Subscription, topics []To
 		}
 		subs.subscriptions.Insert(skiplistSub{s})
 		b.topics[str] = subs
+
+		// For each topic, create a new context which is cancelled when Unsubscribe or Close is called.
+		//
+		// We manage closing of channels via sync.Cond calls, which broadcast to many blocked
+		// goroutines allowing them to continue.
+		b.setupCond(ctx, s, t, onSubscribe, onUnsubscribe)
 	}
 
 	if as, ok := b.subs[s.ID()]; ok {
@@ -95,6 +119,43 @@ func (b *broadcaster) Subscribe(ctx context.Context, s Subscription, topics []To
 	}
 
 	return nil
+}
+
+// setupCond sets up a new sync.Cond, ensuring that any goroutines waiting for
+// the topic to be unsubscribe are unblocked at the same time.
+//
+// NOTE: this must be called with the broadcast lock held.k held.
+func (b *broadcaster) setupCond(
+	ctx context.Context,
+	s Subscription,
+	t Topic,
+	onSubscribe func(ctx context.Context, t Topic),
+	onUnsubscribe func(t Topic),
+) {
+	cond, ok := b.conds[s.ID().String()+t.String()]
+	if !ok {
+		cond = sync.NewCond(&sync.Mutex{})
+		b.conds[s.ID().String()+t.String()] = cond
+	}
+
+	rctx, cancel := context.WithCancel(ctx)
+
+	go func(t Topic) {
+		cond.L.Lock()
+		cond.Wait()
+		cond.L.Unlock()
+
+		// We've received a notification that this topic has been unsubscribed, so cancel
+		// the context.
+		cancel()
+		if onUnsubscribe != nil {
+			onUnsubscribe(t)
+		}
+	}(t)
+
+	if onSubscribe != nil {
+		onSubscribe(rctx, t)
+	}
 }
 
 func (b *broadcaster) Unsubscribe(ctx context.Context, subID uuid.UUID, topics []Topic) error {
@@ -129,6 +190,13 @@ func (b *broadcaster) Unsubscribe(ctx context.Context, subID uuid.UUID, topics [
 		// Remove this from the subscription list
 		subs.subscriptions.Delete(skiplistSub{as.Subscription})
 		delete(as.Topics, str)
+
+		// Signal to all conds that the topic has been unsubscribed.
+		if cond, ok := b.conds[subID.String()+t.String()]; ok {
+			cond.L.Lock()
+			cond.Broadcast()
+			cond.L.Unlock()
+		}
 	}
 
 	return nil

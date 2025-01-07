@@ -1985,6 +1985,10 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 			Kind:       realtime.MessageKindStep,
 			Data:       gen.Data,
 			TopicNames: broadcastTopics(gen.DisplayName),
+			EnvID:      i.md.ID.Tenant.EnvID,
+			FnID:       i.md.ID.FunctionID,
+			FnSlug:     i.f.GetSlug(),
+			RunID:      i.md.ID.RunID,
 		})
 	}
 
