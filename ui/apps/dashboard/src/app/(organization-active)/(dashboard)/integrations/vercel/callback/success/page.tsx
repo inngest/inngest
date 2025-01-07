@@ -1,4 +1,4 @@
-import { NewButton } from '@inngest/components/Button/index';
+import { Button } from '@inngest/components/Button/index';
 import { Card } from '@inngest/components/Card/Card';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { RiCheckLine, RiInformationLine } from '@remixicon/react';
@@ -37,7 +37,7 @@ export default async function SuccessPage({ searchParams }: SuccessProps) {
             </div>
             <div className="flex h-[72px] flex-row items-start justify-start p-4">
               <div className="bg-primary-moderate mr-3 mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-[50%]">
-                <RiCheckLine size={12} className="text-white" />
+                <RiCheckLine size={12} className="text-alwaysWhite" />
               </div>
               <div className="text-muted text-base">
                 The next time you deploy your project to Vercel your functions will automatically
@@ -53,7 +53,7 @@ export default async function SuccessPage({ searchParams }: SuccessProps) {
           </div>
         </div>
         <div>
-          <NewButton
+          <Button
             kind="primary"
             appearance="solid"
             size="medium"

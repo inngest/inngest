@@ -38,7 +38,7 @@ export function SelectInput<T extends string>(props: SelectProps<T>) {
       onValueChange={props.onChange}
       required={props.required}
     >
-      <Select.Trigger className="border-muted flex items-center justify-between rounded-lg border bg-white px-3 py-1.5 text-sm leading-none outline-2 outline-offset-2 outline-indigo-500 transition-all focus:outline data-[placeholder]:text-slate-500">
+      <Select.Trigger className="border-muted bg-canvasBase outline-primary-moderate data-[placeholder]:text-light flex items-center justify-between rounded-lg border px-3 py-1.5 text-sm leading-none outline-2 outline-offset-2 transition-all focus:outline">
         <Select.Value placeholder={props.placeholder} />
         <Select.Icon className="">
           <RiArrowDownSLine className="h-5" />
@@ -46,7 +46,7 @@ export function SelectInput<T extends string>(props: SelectProps<T>) {
       </Select.Trigger>
 
       <Select.Content
-        className="border-muted z-10 w-[var(--radix-select-trigger-width)] rounded-lg border bg-white py-1 text-sm leading-none shadow outline-2 outline-offset-2 outline-indigo-500 transition-all focus:outline"
+        className="border-muted bg-canvasBase outline-primary-moderate z-10 w-[var(--radix-select-trigger-width)] rounded-lg border py-1 text-sm leading-none shadow outline-2 outline-offset-2 transition-all focus:outline"
         position="popper"
         sideOffset={8}
       >
@@ -57,18 +57,16 @@ export function SelectInput<T extends string>(props: SelectProps<T>) {
                 value={opt.value}
                 key={opt.value}
                 disabled={opt.disabled}
-                className="flex cursor-pointer flex-col gap-2 px-3 py-2 font-medium outline-none hover:bg-slate-100 hover:text-indigo-500 hover:outline-none data-[disabled]:cursor-not-allowed data-[disabled]:text-slate-500 data-[disabled]:hover:bg-slate-50"
+                className="hover:bg-canvasSubtle hover:text-primary-moderate data-[disabled]:text-disabled flex cursor-pointer flex-col gap-2 px-3 py-2 font-medium outline-none hover:outline-none data-[disabled]:cursor-not-allowed"
               >
                 <span className="flex flex-row items-center">
                   <Select.ItemText>{opt.label}</Select.ItemText>
                   <Select.ItemIndicator>
-                    <RiCheckLine className="ml-2 h-4 text-indigo-500" />
+                    <RiCheckLine className="text-primary-moderate ml-2 h-4" />
                   </Select.ItemIndicator>
                 </span>
                 {opt.description && (
-                  <span className="block text-xs font-normal text-slate-500">
-                    {opt.description}
-                  </span>
+                  <span className="text-subtle block text-xs font-normal">{opt.description}</span>
                 )}
               </Select.Item>
             );

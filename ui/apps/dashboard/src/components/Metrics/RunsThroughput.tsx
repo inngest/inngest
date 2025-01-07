@@ -1,6 +1,6 @@
 import { Chart } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
-import { NewLink } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/Link';
 
 import type { VolumeMetricsQuery } from '@/gql/graphql';
 import type { EntityLookup } from './Dashboard';
@@ -26,14 +26,14 @@ export const RunsThrougput = ({
           <Info
             text="Total number of runs processed your env, app or function."
             action={
-              <NewLink
+              <Link
                 arrowOnHover
                 className="text-sm"
                 href="https://www.inngest.com/docs/platform/monitor/observability-metrics#total-runs-throughput"
                 target="_new"
               >
                 Learn more about runs throughput.
-              </NewLink>
+              </Link>
             }
           />
         </div>

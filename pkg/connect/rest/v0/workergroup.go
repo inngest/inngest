@@ -2,13 +2,12 @@ package v0
 
 import (
 	"encoding/json"
-	"net/http"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/rest"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/publicerr"
+	"net/http"
 )
 
 func (c *router) showWorkerGroup(w http.ResponseWriter, r *http.Request) {

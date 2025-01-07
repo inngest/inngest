@@ -33,10 +33,10 @@ export function PillCell({ children, type }: PillContentProps) {
   );
 }
 
-export function TimeCell({ date }: { date: Date | string }) {
+export function TimeCell({ date, format }: { date: Date | string; format?: 'relative' }) {
   return (
     <span className={cn(cellStyles, 'font-medium')}>
-      <Time value={date} />
+      <Time value={date} format={format} />
     </span>
   );
 }

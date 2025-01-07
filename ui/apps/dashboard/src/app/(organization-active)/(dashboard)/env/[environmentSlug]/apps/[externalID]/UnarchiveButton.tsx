@@ -1,4 +1,4 @@
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { RiArchive2Line } from '@remixicon/react';
 
 type Props = {
@@ -8,7 +8,7 @@ type Props = {
 export function UnarchiveButton({ showArchive }: Props) {
   return (
     <>
-      <NewButton
+      <Button
         onClick={showArchive}
         kind="danger"
         label="Unarchive app"

@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import Link from 'next/link';
+import NextLink from 'next/link';
 import { SignOutButton } from '@clerk/nextjs';
 import { Listbox } from '@headlessui/react';
 import {
@@ -20,8 +20,8 @@ export const ProfileMenu = ({ children }: { children: ReactNode }) => {
     <Listbox>
       <Listbox.Button className="w-full cursor-pointer ring-0">{children}</Listbox.Button>
       <div className="relative">
-        <Listbox.Options className="bg-canvasBase absolute -right-48 bottom-4 z-50 ml-8 w-[199px] rounded border shadow ring-0 focus:outline-none">
-          <Link href="/settings/organization" scroll={false}>
+        <Listbox.Options className="bg-canvasBase border-muted shadow-primary absolute -right-48 bottom-4 z-50 ml-8 w-[199px] rounded border ring-0 focus:outline-none">
+          <NextLink href="/settings/organization" scroll={false}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="org"
@@ -31,8 +31,8 @@ export const ProfileMenu = ({ children }: { children: ReactNode }) => {
                 <div>Your Organization</div>
               </div>
             </Listbox.Option>
-          </Link>
-          <Link href="/settings/organization/organization-members" scroll={false}>
+          </NextLink>
+          <NextLink href="/settings/organization/organization-members" scroll={false}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="members"
@@ -42,8 +42,8 @@ export const ProfileMenu = ({ children }: { children: ReactNode }) => {
                 <div>Members</div>
               </div>
             </Listbox.Option>
-          </Link>
-          <Link href={pathCreator.billing()} scroll={false}>
+          </NextLink>
+          <NextLink href={pathCreator.billing()} scroll={false}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="billing"
@@ -53,7 +53,7 @@ export const ProfileMenu = ({ children }: { children: ReactNode }) => {
                 <div>Billing</div>
               </div>
             </Listbox.Option>
-          </Link>
+          </NextLink>
           <a href="/organization-list">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
@@ -68,7 +68,7 @@ export const ProfileMenu = ({ children }: { children: ReactNode }) => {
 
           <hr />
 
-          <Link href="/settings/user" scroll={false}>
+          <NextLink href="/settings/user" scroll={false}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="userProfile"
@@ -78,7 +78,7 @@ export const ProfileMenu = ({ children }: { children: ReactNode }) => {
                 <div>Your Profile</div>
               </div>
             </Listbox.Option>
-          </Link>
+          </NextLink>
           <Listbox.Option
             className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
             value="signOut"

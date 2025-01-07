@@ -3,7 +3,7 @@ import * as Tabs from '@radix-ui/react-tabs';
 import { RiArrowRightSLine } from '@remixicon/react';
 import { isBefore, type Duration } from 'date-fns';
 
-import { NewButton } from '../Button';
+import { Button } from '../Button';
 import { Input } from '../Forms/Input';
 import { Pill } from '../Pill';
 import { Popover, PopoverContent, PopoverTrigger } from '../Popover';
@@ -296,8 +296,8 @@ export const RangePicker = ({
                   <div className="flex flex-col">
                     {startError && <p className="text-error mx-4 mt-1 text-sm">{startError}</p>}
                     <div className="flox-row flex justify-between p-4">
-                      <NewButton label="Cancel" appearance="ghost" onClick={() => setOpen(false)} />
-                      <NewButton
+                      <Button label="Cancel" appearance="ghost" onClick={() => setOpen(false)} />
+                      <Button
                         label="Next"
                         kind="primary"
                         disabled={!absoluteRange?.start || !startValid}
@@ -327,16 +327,16 @@ export const RangePicker = ({
                   <div className="flex flex-col">
                     {endError && <p className="text-error mx-4 mt-1 text-sm">{endError}</p>}
                     <div className="flox-row flex justify-between p-4">
-                      <NewButton label="Cancel" appearance="ghost" onClick={() => setOpen(false)} />
+                      <Button label="Cancel" appearance="ghost" onClick={() => setOpen(false)} />
                       <div className="flex flex-row">
-                        <NewButton
+                        <Button
                           label="Previous"
                           kind="primary"
                           appearance="outlined"
                           onClick={() => setTab('start')}
                           className="mr-2"
                         />
-                        <NewButton
+                        <Button
                           label="Apply"
                           kind="primary"
                           disabled={

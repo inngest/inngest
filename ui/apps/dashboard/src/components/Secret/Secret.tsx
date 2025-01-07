@@ -25,7 +25,7 @@ export function Secret({ className, kind, secret }: Props) {
   return (
     <div
       className={cn(
-        'border-subtle bg-CanvasBase text-light flex overflow-hidden rounded-md border',
+        'border-subtle bg-canvasBase text-light flex overflow-hidden rounded-md border',
         className
       )}
     >

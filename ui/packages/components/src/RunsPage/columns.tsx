@@ -65,13 +65,25 @@ const columns = [
       const data = props.row.original;
 
       if (data.isBatch) {
-        return <TextCell>Batch</TextCell>;
+        return (
+          <div className="flex items-center">
+            <TextCell>Batch</TextCell>
+          </div>
+        );
       }
       if (data.cronSchedule) {
-        return <PillCell type="CRON">{data.cronSchedule}</PillCell>;
+        return (
+          <div className="flex items-center">
+            <PillCell type="CRON">{data.cronSchedule}</PillCell>
+          </div>
+        );
       }
       if (data.eventName) {
-        return <PillCell type="EVENT">{data.eventName}</PillCell>;
+        return (
+          <div className="flex items-center">
+            <PillCell type="EVENT">{data.eventName}</PillCell>
+          </div>
+        );
       }
 
       // Unreachable

@@ -1,6 +1,6 @@
 import type { Route } from 'next';
 import NextLink from 'next/link';
-import { NewButton } from '@inngest/components/Button/index';
+import { Button } from '@inngest/components/Button/index';
 import { Link } from '@inngest/components/Link/Link';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { RiArrowRightSLine, RiExternalLinkLine } from '@remixicon/react';
@@ -29,7 +29,11 @@ export default async function VercelIntegrationPage() {
             <div className="text-basis mb-2 text-xl font-medium leading-7">Vercel</div>
             <div className="text-muted mb-7 text-base">
               You can manage all your projects on this page.{' '}
-              <Link showIcon={false} href={'https://www.inngest.com/docs/deploy/vercel' as Route}>
+              <Link
+                size="medium"
+                href={'https://www.inngest.com/docs/deploy/vercel' as Route}
+                target="_blank"
+              >
                 Learn more
               </Link>
             </div>
@@ -37,7 +41,7 @@ export default async function VercelIntegrationPage() {
         </div>
 
         <div className="place-self-start">
-          <NewButton
+          <Button
             appearance="outlined"
             kind="secondary"
             href={'https://vercel.com/integrations/inngest' as Route}

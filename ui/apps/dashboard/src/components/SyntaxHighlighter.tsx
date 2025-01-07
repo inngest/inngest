@@ -1,11 +1,10 @@
 'use client';
 
 import { forwardRef } from 'react';
+import { cn } from '@inngest/components/utils/classNames';
 import ReactSyntaxHighlighter from 'react-syntax-highlighter';
 import { atomOneDark } from 'react-syntax-highlighter/dist/cjs/styles/hljs';
 import colors from 'tailwindcss/colors';
-
-import cn from '@/utils/cn';
 
 type SyntaxHighlighterProps = {
   language: string;

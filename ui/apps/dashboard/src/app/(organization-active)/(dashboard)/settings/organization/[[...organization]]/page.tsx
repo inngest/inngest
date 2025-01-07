@@ -12,7 +12,7 @@ export default async function OrganizationSettingsPage() {
           },
           elements: {
             navbar: 'hidden',
-            scrollBox: 'bg-white shadow-none',
+            scrollBox: 'bg-canvasBase shadow-none',
             pageScrollBox: 'pt-6 px-2 w-full',
           },
         }}

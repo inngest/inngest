@@ -1,4 +1,5 @@
-import cn from '@/utils/cn';
+import { cn } from '@inngest/components/utils/classNames';
+
 import type { Status } from '../Support/Status';
 
 type SystemStatusIconProps = {

@@ -1,5 +1,5 @@
-import { useCallback, useState, type ComponentProps } from 'react';
-import { Button, NewButton } from '@inngest/components/Button';
+import { useCallback, useState } from 'react';
+import { Button } from '@inngest/components/Button';
 import { InvokeModal } from '@inngest/components/InvokeButton';
 import { RiFlashlightFill } from '@remixicon/react';
 
@@ -10,14 +10,12 @@ type Props = {
     data: Record<string, unknown>;
     user: Record<string, unknown> | null;
   }) => void;
-  btnAppearance?: ComponentProps<typeof Button>['appearance'];
 };
 
 export function InvokeButton({
   disabled,
   doesFunctionAcceptPayload: hasEventTrigger,
   btnAction,
-  btnAppearance,
 }: Props) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -31,7 +29,7 @@ export function InvokeButton({
 
   return (
     <>
-      <NewButton
+      <Button
         kind="secondary"
         appearance="outlined"
         onClick={() => setIsModalOpen(true)}

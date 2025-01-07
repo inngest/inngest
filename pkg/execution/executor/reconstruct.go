@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -53,9 +52,14 @@ func reconstruct(ctx context.Context, tr cqrs.TraceReader, req execution.Schedul
 			}
 		}
 		if span.SpanName == consts.OtelExecFnOk || span.SpanName == consts.OtelExecFnErr {
-			if spanStack, ok := span.SpanAttributes[consts.OtelSysStepStack]; ok {
-				stack = strings.Split(spanStack, ",")
-			}
+			stack, _ = tr.GetSpanStack(ctx, cqrs.SpanIdentifier{
+				AccountID:   req.AccountID,
+				WorkspaceID: req.WorkspaceID,
+				AppID:       req.AppID,
+				FunctionID:  req.Function.ID,
+				TraceID:     origTraceRun.TraceID,
+				SpanID:      span.SpanID,
+			})
 		}
 	}
 

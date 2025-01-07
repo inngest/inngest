@@ -46,7 +46,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   ref
 ) {
   const env = useEnvironment();
-  const { isReady: searchIsReady, value: searchEnabled } = useBooleanFlag('run-cel-query');
   const { value: stepAIEnabled, isReady } = useBooleanFlag('step.ai');
 
   const [{ data: pauseData }] = useQuery({
@@ -276,7 +275,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       scope={scope}
       totalCount={totalCount}
       temporaryAlert={temporaryAlert}
-      hasSearchFlag={searchIsReady && searchEnabled}
       stepAIEnabled={isReady && stepAIEnabled}
     />
   );

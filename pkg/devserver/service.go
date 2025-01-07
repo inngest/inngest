@@ -5,7 +5,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/connect/auth"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -624,6 +627,22 @@ func (d *devserver) importRedisSnapshot(ctx context.Context) (imported bool, err
 	imported = true
 
 	return
+}
+
+func (d *devserver) AuthenticateRequest(_ context.Context, _, _ string) (*auth.Response, error) {
+	return &auth.Response{
+		AccountID: consts.DevServerAccountId,
+		EnvID:     consts.DevServerEnvId,
+	}, nil
+}
+
+func (d *devserver) RetrieveGateway(_ context.Context, _, _ uuid.UUID, _ []string) (string, *url.URL, error) {
+	parsed, err := url.Parse("ws://127.0.0.1:8289/v0/connect")
+	if err != nil {
+		return "", nil, err
+	}
+
+	return "gw-dev", parsed, nil
 }
 
 // SDKHandler represents a handler that has registered with the dev server.

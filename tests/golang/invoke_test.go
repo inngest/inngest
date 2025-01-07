@@ -311,32 +311,34 @@ func TestInvokeTimeout(t *testing.T) {
 		require.NotNil(t, run.Trace.OutputID)
 		output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
 		require.NotNil(t, output)
-		// c.ExpectSpanErrorOutput(t, errMsg, "", output)
 
 		rootSpanID := run.Trace.SpanID
 
 		t.Run("invoke", func(t *testing.T) {
+			r := require.New(t)
 			invoke := run.Trace.ChildSpans[0]
-			assert.Equal(t, "invoke", invoke.Name)
-			assert.Equal(t, 0, invoke.Attempts)
-			assert.False(t, invoke.IsRoot)
-			assert.Equal(t, rootSpanID, invoke.ParentSpanID)
-			assert.Equal(t, models.StepOpInvoke.String(), invoke.StepOp)
-			assert.NotNil(t, invoke.EndedAt)
+			r.Equal("invoke", invoke.Name)
+			r.Equal(0, invoke.Attempts)
+			r.False(invoke.IsRoot)
+			r.Equal(rootSpanID, invoke.ParentSpanID)
+			r.Equal(models.StepOpInvoke.String(), invoke.StepOp)
+			r.NotNil(invoke.EndedAt)
 
 			// output test
 			assert.NotNil(t, invoke.OutputID)
-			invokeOutput := c.RunSpanOutput(ctx, *invoke.OutputID)
-			c.ExpectSpanErrorOutput(t, errMsg, "", invokeOutput)
+			r.EventuallyWithT(func(t *assert.CollectT) {
+				invokeOutput := c.RunSpanOutput(ctx, *invoke.OutputID)
+				c.ExpectSpanErrorOutput(t, errMsg, "", invokeOutput)
+			}, 10*time.Second, 1*time.Second)
 
 			var stepInfo models.InvokeStepInfo
 			byt, err := json.Marshal(invoke.StepInfo)
-			assert.NoError(t, err)
-			assert.NoError(t, json.Unmarshal(byt, &stepInfo))
+			r.NoError(err)
+			r.NoError(json.Unmarshal(byt, &stepInfo))
 
-			assert.True(t, *stepInfo.TimedOut)
-			assert.Nil(t, stepInfo.ReturnEventID)
-			assert.Nil(t, stepInfo.RunID)
+			r.True(*stepInfo.TimedOut)
+			r.Nil(stepInfo.ReturnEventID)
+			r.Nil(stepInfo.RunID)
 		})
 
 	})

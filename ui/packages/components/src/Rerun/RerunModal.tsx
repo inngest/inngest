@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { RiCloseLine } from '@remixicon/react';
 
-import { NewButton } from '../Button';
+import { Button } from '../Button';
 import { CodeBlock } from '../CodeBlock/CodeBlock';
 import { Modal } from '../Modal/Modal';
 
@@ -104,13 +104,8 @@ export const RerunModal = ({
       </div>
       <div className="mt-6 flex flex-row items-center justify-end gap-2">
         <div>{error && <span className="text-error">{error}</span>}</div>
-        <NewButton
-          kind="secondary"
-          appearance="ghost"
-          label="Cancel"
-          onClick={() => setOpen(false)}
-        />
-        <NewButton
+        <Button kind="secondary" appearance="ghost" label="Cancel" onClick={() => setOpen(false)} />
+        <Button
           label="Rerun function"
           loading={rerunning}
           onClick={async () => {

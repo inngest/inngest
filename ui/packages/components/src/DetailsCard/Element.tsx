@@ -1,4 +1,4 @@
-import { InlineCode } from '@inngest/components/InlineCode';
+import { InlineCode } from '@inngest/components/Code';
 import { Link, type LinkProps } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
@@ -98,7 +98,7 @@ export function TimeElement({ date }: { date: Date }) {
   );
 }
 
-export function LinkElement({ children, href, ...props }: LinkProps) {
+export function LinkElement({ children, href, ...props }: React.PropsWithChildren<LinkProps>) {
   return (
     <Link href={href} {...props}>
       {children}
@@ -107,7 +107,7 @@ export function LinkElement({ children, href, ...props }: LinkProps) {
 }
 
 export function CodeElement({ value }: { value: string }) {
-  return <InlineCode value={value} />;
+  return <InlineCode>{value}</InlineCode>;
 }
 
 export function SkeletonElement() {

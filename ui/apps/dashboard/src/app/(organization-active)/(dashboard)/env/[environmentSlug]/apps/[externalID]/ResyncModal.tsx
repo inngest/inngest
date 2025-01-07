@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
-import { Link } from '@inngest/components/Link';
+import { Input } from '@inngest/components/Forms/Input';
 import { Modal } from '@inngest/components/Modal';
 import { Switch, SwitchLabel, SwitchWrapper } from '@inngest/components/Switch';
 import { cn } from '@inngest/components/utils/classNames';
@@ -11,7 +11,6 @@ import { useMutation } from 'urql';
 
 import type { CodedError } from '@/codedError';
 import { useEnvironment } from '@/components/Environments/environment-context';
-import Input from '@/components/Forms/Input';
 import { SyncFailure } from '@/components/SyncFailure/SyncFailure';
 import { graphql } from '@/gql';
 
@@ -105,13 +104,18 @@ export default function ResyncModal({ appExternalID, isOpen, onClose, url, platf
         </div>
       }
     >
-      <div className="border-b border-slate-200 px-6">
+      <div className="border-subtle border-b px-6">
         {platform === 'vercel' && !failure && (
           <Alert className="my-6" severity="info" showIcon={false}>
             Vercel generates a unique URL for each deployment (
-            <Link showIcon={false} href="https://vercel.com/docs/deployments/generated-urls">
+            <Alert.Link
+              severity="info"
+              className="inline"
+              href="https://vercel.com/docs/deployments/generated-urls"
+              target="_blank"
+            >
               see docs
-            </Link>
+            </Alert.Link>
             ). Please confirm that you are using the correct URL if you choose a deployment&apos;s
             generated URL instead of a static domain for your app.
           </Alert>
@@ -121,9 +125,9 @@ export default function ResyncModal({ appExternalID, isOpen, onClose, url, platf
           configuration to Inngest.
         </p>
 
-        <p className="my-6">The URL where you serve Inngest functions:</p>
+        <p className="mb-2">The URL where you serve Inngest functions:</p>
 
-        <div className="my-6 flex-1">
+        <div className="mb-6 flex-1">
           <Input
             placeholder="https://example.com/api/inngest"
             name="url"
@@ -131,8 +135,8 @@ export default function ResyncModal({ appExternalID, isOpen, onClose, url, platf
             onChange={(e) => {
               setOverrideValue(e.target.value);
             }}
-            readonly={!isURLOverridden}
-            className={cn(!isURLOverridden && 'bg-slate-200')}
+            readOnly={!isURLOverridden}
+            className={cn(!isURLOverridden && 'bg-disabled')}
           />
         </div>
         <div className="mb-6">
@@ -148,11 +152,16 @@ export default function ResyncModal({ appExternalID, isOpen, onClose, url, platf
             <SwitchLabel htmlFor="override">Override Input</SwitchLabel>
           </SwitchWrapper>
           {isURLOverridden && !failure && (
-            <p className="pl-[50px] pt-1 font-semibold text-yellow-700">
+            <p className="text-warning pl-[50px] pt-1">
               Please ensure that your app ID (
-              <Link showIcon={false} href="https://www.inngest.com/docs/apps#apps-in-sdk">
+              <Alert.Link
+                severity="warning"
+                size="medium"
+                className="inline"
+                href="https://www.inngest.com/docs/apps#apps-in-sdk"
+              >
                 docs
-              </Link>
+              </Alert.Link>
               ) is not changed before resyncing. Changing the app ID will result in the creation of
               a new app in this environment.
             </p>
@@ -163,9 +172,15 @@ export default function ResyncModal({ appExternalID, isOpen, onClose, url, platf
       </div>
 
       <div className="flex justify-end gap-2 p-6">
-        <Button appearance="outlined" btnAction={onClose} disabled={isSyncing} label="Cancel" />
+        <Button
+          appearance="outlined"
+          kind="secondary"
+          onClick={onClose}
+          disabled={isSyncing}
+          label="Cancel"
+        />
 
-        <Button btnAction={onSync} disabled={isSyncing} kind="primary" label="Resync App" />
+        <Button onClick={onSync} disabled={isSyncing} kind="primary" label="Resync App" />
       </div>
     </Modal>
   );

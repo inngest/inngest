@@ -1,6 +1,6 @@
 import { Chart } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
-import { NewLink } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/Link';
 import { resolveColor } from '@inngest/components/utils/colors';
 import { isDark } from '@inngest/components/utils/theme';
 
@@ -94,13 +94,13 @@ export const AccountConcurrency = ({
           <Info
             text="Total number of steps running compared to the account-level concurrency limits."
             action={
-              <NewLink
+              <Link
                 arrowOnHover
                 className="text-sm"
                 href="https://www.inngest.com/docs/guides/concurrency#concurrency-use-cases"
               >
                 Learn more about concurrency.
-              </NewLink>
+              </Link>
             }
           />
         </div>

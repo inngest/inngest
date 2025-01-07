@@ -2,15 +2,13 @@ package v0
 
 import (
 	"encoding/json"
-	"net/http"
-
-	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/rest"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/publicerr"
+	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
+	"net/http"
 )
 
 // showConnections retrieves the list of connections from the gateway state

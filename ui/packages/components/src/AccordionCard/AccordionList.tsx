@@ -40,9 +40,14 @@ const AccordionItem = forwardRef<
 const AccordionTrigger = forwardRef<
   React.ElementRef<typeof AccordionPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Trigger>
->(({ children, ...props }, forwardedRef) => {
+>(({ children, className, ...props }, forwardedRef) => {
   return (
-    <AccordionPrimitive.Header className="data-[state=open]:border-subtle flex items-center text-sm data-[state=open]:border-b">
+    <AccordionPrimitive.Header
+      className={cn(
+        'data-[state=open]:border-subtle flex items-center text-sm data-[state=open]:border-b',
+        className
+      )}
+    >
       <AccordionPrimitive.Trigger
         {...props}
         ref={forwardedRef}
@@ -60,9 +65,13 @@ const AccordionTrigger = forwardRef<
 const AccordionContent = forwardRef<
   React.ElementRef<typeof AccordionPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Content>
->(({ children, ...props }, forwardedRef) => {
+>(({ children, className, ...props }, forwardedRef) => {
   return (
-    <AccordionPrimitive.Content {...props} ref={forwardedRef} className="px-4 py-3 text-sm">
+    <AccordionPrimitive.Content
+      {...props}
+      ref={forwardedRef}
+      className={cn('px-4 py-3 text-sm', className)}
+    >
       {children}
     </AccordionPrimitive.Content>
   );

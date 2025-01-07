@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import TabCards from '@inngest/components/TabCards/TabCards';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
@@ -12,7 +12,6 @@ import { RiCheckboxCircleFill, RiCloseCircleFill, RiInputCursorMove } from '@rem
 
 import { type CodedError } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
-import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { OnboardingSteps } from '../Onboarding/types';
 import { SyncFailure } from '../SyncFailure';
 import CommonVercelErrors from './CommonVercelErrors';
@@ -33,7 +32,6 @@ export default function SyncApp() {
   const [app, setApp] = useState<string | null>();
   const { updateCompletedSteps } = useOnboardingStep();
   const router = useRouter();
-  const { value: vercelFlowEnabled } = useBooleanFlag('onboarding-vercel-flow');
   const tracking = useOnboardingTracking();
 
   const searchParams = useSearchParams();
@@ -121,14 +119,14 @@ export default function SyncApp() {
       <p className="mb-6 text-sm">
         Since your code is hosted on another platform, you need to register where your functions are
         hosted with Inngest.{' '}
-        <NewLink
+        <Link
           className="inline-block"
           size="small"
           href="https://www.inngest.com/docs/apps/cloud?ref=app-onboarding-sync-app"
           target="_blank"
         >
           Learn more about syncs
-        </NewLink>
+        </Link>
       </p>
 
       <h4 className="mb-4 text-sm font-medium">Choose syncing method:</h4>
@@ -139,13 +137,11 @@ export default function SyncApp() {
               <RiInputCursorMove className="h-5 w-5" /> Sync manually
             </div>
           </TabCards.Button>
-          {vercelFlowEnabled && (
-            <TabCards.Button className="w-36" value="vercel">
-              <div className="flex items-center gap-1.5">
-                <IconVercel className="h-4 w-4" /> Sync with Vercel
-              </div>
-            </TabCards.Button>
-          )}
+          <TabCards.Button className="w-36" value="vercel">
+            <div className="flex items-center gap-1.5">
+              <IconVercel className="h-4 w-4" /> Sync with Vercel
+            </div>
+          </TabCards.Button>
         </TabCards.ButtonList>
         <TabCards.Content value="manually">
           <div className="mb-4 flex items-center gap-2">
@@ -175,7 +171,7 @@ export default function SyncApp() {
             </Alert.Link>
           </Alert>
           <Input
-            className={`${error && 'outline-error'} my-3 `}
+            className={`${error && 'outline-error'} my-3 w-full`}
             placeholder="https://myapp.com/api/inngest"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
@@ -197,7 +193,7 @@ export default function SyncApp() {
           {error && <SyncFailure className="mb-3 mt-0 text-sm" error={error} />}
           {!app && (
             <div className="flex items-center gap-2">
-              <NewButton
+              <Button
                 loading={isLoading}
                 label="Sync app here"
                 onClick={() => {
@@ -207,7 +203,7 @@ export default function SyncApp() {
                   handleSyncAppManually();
                 }}
               />
-              <NewButton
+              <Button
                 appearance="outlined"
                 label="I already have an Inngest app"
                 onClick={() => {
@@ -225,7 +221,7 @@ export default function SyncApp() {
             </div>
           )}
           {app && (
-            <NewButton
+            <Button
               label="Next"
               onClick={() => {
                 tracking?.trackOnboardingAction(currentStepName, {
@@ -236,102 +232,100 @@ export default function SyncApp() {
             />
           )}
         </TabCards.Content>
-        {vercelFlowEnabled && (
-          <TabCards.Content value="vercel">
-            <div className="mb-4 flex items-center justify-between gap-1">
-              <div className="flex items-center gap-2">
-                <div className="bg-canvasMuted flex h-9 w-9 items-center justify-center rounded">
-                  <IconVercel className="text-basis h-4 w-4" />
-                </div>
-                <p className="text-basis">Vercel</p>
+        <TabCards.Content value="vercel">
+          <div className="mb-4 flex items-center justify-between gap-1">
+            <div className="flex items-center gap-2">
+              <div className="bg-canvasMuted flex h-9 w-9 items-center justify-center rounded">
+                <IconVercel className="text-basis h-4 w-4" />
               </div>
-              <NewButton
-                kind="secondary"
-                appearance="outlined"
-                label="Manage Vercel integration"
-                href={pathCreator.vercel()}
-                size="small"
-                onClick={() =>
-                  tracking?.trackOnboardingAction(currentStepName, {
-                    metadata: {
-                      type: 'btn-click',
-                      label: 'view-integration',
-                      syncMethod: 'vercel',
-                    },
-                  })
-                }
-              />
+              <p className="text-basis">Vercel</p>
             </div>
-            <p className="mb-4 text-sm">
-              Inngest <span className="font-medium">automatically</span> syncs your app upon
-              deployment, ensuring a seamless connection.
-            </p>
-            {isLoadingVercelApps && !vercelSyncs && (
-              <div className="text-link mb-4 flex items-center gap-1 text-sm">
-                <IconSpinner className="fill-link h-4 w-4" />
-                Loading apps
-              </div>
-            )}
-            {vercelSyncs && (
-              <>
-                {vercelSyncs.apps.length ? (
-                  <div>
-                    {vercelSyncs.apps.map((app) => (
-                      <div
-                        key={app.id}
-                        className="border-subtle mb-4 flex items-center justify-between rounded border p-3"
-                      >
-                        {app.name && (
-                          <div className="flex items-center gap-2">
-                            <div className="bg-contrast border-muted flex h-9 w-9 items-center justify-center rounded border">
-                              <AppsIcon className="text-onContrast h-4 w-4" />
-                            </div>
-                            <p className="text-basis">{app.name}</p>
-                          </div>
-                        )}
-                        <StatusIndicator status={app.latestSync?.status} />
-                      </div>
-                    ))}
-                  </div>
-                ) : vercelSyncs.unattachedSyncs.length ? (
-                  <>
-                    <SyncFailure
-                      className="mb-4"
-                      error={{
-                        message: vercelSyncs.unattachedSyncs[0]?.error || 'Unknown error',
-                        code: 'unknown',
-                      }}
-                    />
-                    <CommonVercelErrors />
-                  </>
-                ) : (
-                  <div className="mb-4">
-                    <div className="border-subtle mb-4 flex items-center justify-between rounded-md border p-3 text-sm">
-                      No syncs found
-                    </div>
-                    <CommonVercelErrors />
-                  </div>
-                )}
-              </>
-            )}
-            <NewButton
-              disabled={!hasSuccessfulSync}
-              label="Next"
-              onClick={() => {
-                updateCompletedSteps(currentStepName, {
+            <Button
+              kind="secondary"
+              appearance="outlined"
+              label="Manage Vercel integration"
+              href={pathCreator.vercel()}
+              size="small"
+              onClick={() =>
+                tracking?.trackOnboardingAction(currentStepName, {
                   metadata: {
-                    completionSource: 'manual',
+                    type: 'btn-click',
+                    label: 'view-integration',
                     syncMethod: 'vercel',
                   },
-                });
-                tracking?.trackOnboardingAction(currentStepName, {
-                  metadata: { type: 'btn-click', label: 'next', syncMethod: 'vercel' },
-                });
-                router.push(pathCreator.onboardingSteps({ step: nextStepName }));
-              }}
+                })
+              }
             />
-          </TabCards.Content>
-        )}
+          </div>
+          <p className="mb-4 text-sm">
+            Inngest <span className="font-medium">automatically</span> syncs your app upon
+            deployment, ensuring a seamless connection.
+          </p>
+          {isLoadingVercelApps && !vercelSyncs && (
+            <div className="text-link mb-4 flex items-center gap-1 text-sm">
+              <IconSpinner className="fill-link h-4 w-4" />
+              Loading apps
+            </div>
+          )}
+          {vercelSyncs && (
+            <>
+              {vercelSyncs.apps.length ? (
+                <div>
+                  {vercelSyncs.apps.map((app) => (
+                    <div
+                      key={app.id}
+                      className="border-subtle mb-4 flex items-center justify-between rounded border p-3"
+                    >
+                      {app.name && (
+                        <div className="flex items-center gap-2">
+                          <div className="bg-contrast border-muted flex h-9 w-9 items-center justify-center rounded border">
+                            <AppsIcon className="text-onContrast h-4 w-4" />
+                          </div>
+                          <p className="text-basis">{app.name}</p>
+                        </div>
+                      )}
+                      <StatusIndicator status={app.latestSync?.status} />
+                    </div>
+                  ))}
+                </div>
+              ) : vercelSyncs.unattachedSyncs.length ? (
+                <>
+                  <SyncFailure
+                    className="mb-4"
+                    error={{
+                      message: vercelSyncs.unattachedSyncs[0]?.error || 'Unknown error',
+                      code: 'unknown',
+                    }}
+                  />
+                  <CommonVercelErrors />
+                </>
+              ) : (
+                <div className="mb-4">
+                  <div className="border-subtle mb-4 flex items-center justify-between rounded-md border p-3 text-sm">
+                    No syncs found
+                  </div>
+                  <CommonVercelErrors />
+                </div>
+              )}
+            </>
+          )}
+          <Button
+            disabled={!hasSuccessfulSync}
+            label="Next"
+            onClick={() => {
+              updateCompletedSteps(currentStepName, {
+                metadata: {
+                  completionSource: 'manual',
+                  syncMethod: 'vercel',
+                },
+              });
+              tracking?.trackOnboardingAction(currentStepName, {
+                metadata: { type: 'btn-click', label: 'next', syncMethod: 'vercel' },
+              });
+              router.push(pathCreator.onboardingSteps({ step: nextStepName }));
+            }}
+          />
+        </TabCards.Content>
       </TabCards>
     </div>
   );

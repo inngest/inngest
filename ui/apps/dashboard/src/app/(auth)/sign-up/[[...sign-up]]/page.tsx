@@ -33,21 +33,13 @@ export default async function SignUpPage() {
           }}
         />
       </div>
-      <p className="mt-auto text-center text-xs text-slate-400">
+      <p className="text-subtle mt-auto text-center text-xs">
         By signing up, you agree to our{' '}
-        <a
-          className="text-indigo-400 hover:underline"
-          href="https://inngest.com/terms"
-          target="_blank"
-        >
+        <a className="text-link hover:underline" href="https://inngest.com/terms" target="_blank">
           Terms of Service
         </a>{' '}
         and{' '}
-        <a
-          className="text-indigo-400 hover:underline"
-          href="https://inngest.com/privacy"
-          target="_blank"
-        >
+        <a className="text-link hover:underline" href="https://inngest.com/privacy" target="_blank">
           Privacy Policy
         </a>
         .

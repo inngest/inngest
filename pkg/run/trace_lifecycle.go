@@ -641,7 +641,6 @@ func (l traceLifecycle) OnStepGatewayRequestFinished(
 			attribute.Int(consts.OtelSysStepMaxAttempt, item.GetMaxAttempts()),
 			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
 			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeStepPlanned.String()),
-			attribute.String(consts.OtelSysStepStack, strings.Join(md.Stack, ",")),
 		),
 	)
 	// Common attrs.
@@ -742,7 +741,6 @@ func (l traceLifecycle) OnStepFinished(
 			attribute.Int(consts.OtelSysStepMaxAttempt, item.GetMaxAttempts()),
 			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
 			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeStepPlanned.String()),
-			attribute.String(consts.OtelSysStepStack, strings.Join(md.Stack, ",")),
 			attribute.Bool(consts.OtelSysFunctionHasAI, md.Config.HasAI),
 		),
 	)
@@ -863,6 +861,7 @@ func (l traceLifecycle) OnStepFinished(
 				output = resp.Output
 			}
 			span.SetStepOutput(output)
+			span.SetStepStack(md.Stack)
 		} else {
 			// if it's not a step or function response that represents either a failed or a successful execution.
 
