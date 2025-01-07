@@ -42,9 +42,7 @@ func (b *redisBroadcaster) Subscribe(ctx context.Context, s Subscription, topics
 					"topic", t,
 					"subscription_id", s.ID(),
 				)
-				// Unsubscribe in a goroutine, so that we can eventually lock
-				// after the subscribe call finsihes.
-				go b.Unsubscribe(ctx, s.ID(), []Topic{t})
+				b.Unsubscribe(ctx, s.ID(), []Topic{t})
 				return
 			}
 

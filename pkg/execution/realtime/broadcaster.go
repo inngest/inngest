@@ -141,7 +141,7 @@ func (b *broadcaster) subscribe(
 // setupCond sets up a new sync.Cond, ensuring that any goroutines waiting for
 // the topic to be unsubscribe are unblocked at the same time.
 //
-// NOTE: this must be called with the broadcast lock held.k held.
+// NOTE: this must be called with the broadcast lock held.
 func (b *broadcaster) setupCond(
 	ctx context.Context,
 	s Subscription,
