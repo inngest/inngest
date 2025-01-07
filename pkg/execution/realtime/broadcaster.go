@@ -308,6 +308,8 @@ func (b *broadcaster) Publish(ctx context.Context, m Message) {
 	wg.Wait()
 }
 
+// publishTo publishes a message to a subscription, keeping track of retries if the
+// write fails.
 func (b *broadcaster) publishTo(ctx context.Context, s Subscription, m Message) {
 	if err := s.WriteMessage(m); err == nil {
 		return
