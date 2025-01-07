@@ -86,18 +86,35 @@ func (b *broadcaster) subscribe(
 
 	b.l.Lock()
 	defer b.l.Unlock()
+
 	for _, t := range topics {
-		str := t.String()
-		subs, ok := b.topics[str]
+		topicHash := t.String()
+		topicsubs, ok := b.topics[topicHash]
 		if !ok {
 			sl := skiplist.New()
-			subs = topicsub{
+			topicsubs = topicsub{
 				Topic:         t,
 				subscriptions: &sl,
 			}
 		}
-		subs.subscriptions.Insert(skiplistSub{s})
-		b.topics[str] = subs
+
+		// If we already have this subscription, we don't want to insert it into
+		// the topic slice again.  It's okay to check this as we only update the
+		// active subscriptions after manipulating the topic map (see below).
+		var seen bool
+		if as, ok := b.subs[s.ID()]; ok {
+			_, seen = as.Topics[topicHash]
+		}
+
+		// We haven't seen the topic before.  The topics map is used when publishing,
+		// and we only want to insert the same subscription once.  This ensures that
+		// even if a single Subscription calls subscribe to the same topic, we only send
+		// a single message. Note that a Subscription represents a single connection,
+		// meaning we only send a single message per eg. websocket connection.
+		if !seen {
+			topicsubs.subscriptions.Insert(skiplistSub{s})
+			b.topics[topicHash] = topicsubs
+		}
 
 		// For each topic, create a new context which is cancelled when Unsubscribe or Close is called.
 		//
