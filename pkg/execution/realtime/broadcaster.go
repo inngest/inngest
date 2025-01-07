@@ -85,15 +85,50 @@ func (b *broadcaster) Subscribe(ctx context.Context, s Subscription, topics []To
 	if as, ok := b.subs[s.ID()]; ok {
 		as.AddTopics(topics...)
 	} else {
-		as = &activesub{
-			Subscription: s,
-			Topics:       topics,
-		}
+		as = &activesub{Subscription: s}
+		as.AddTopics(topics...)
 		b.subs[s.ID()] = as
 		// This is the first time we've seen a subscription.  Send
 		// keepalives after an interval to ensure that the connection
 		// remains open during periods of inactivity.
 		go b.keepalive(ctx, s.ID())
+	}
+
+	return nil
+}
+
+func (b *broadcaster) Unsubscribe(ctx context.Context, subID uuid.UUID, topics []Topic) error {
+	if atomic.LoadInt32(&b.closing) == 1 {
+		// Already happening, so ignore.
+		return ErrBroadcasterClosed
+	}
+
+	b.l.Lock()
+	defer b.l.Unlock()
+
+	as, ok := b.subs[subID]
+	if !ok {
+		return nil
+	}
+
+	// Delete all subscriptions from the topic lookup
+	for _, t := range topics {
+		str := t.String()
+
+		// Check to see if this active subscription is subscribed to the given
+		// topic.  If not, we're not going to bother.
+		subs, ok := b.topics[str]
+		if !ok {
+			continue
+		}
+
+		if _, ok := as.Topics[str]; !ok {
+			continue
+		}
+
+		// Remove this from the subscription list
+		subs.subscriptions.Delete(skiplistSub{as.Subscription})
+		delete(as.Topics, str)
 	}
 
 	return nil
@@ -261,11 +296,17 @@ type activesub struct {
 	Subscription
 
 	// Topics lists all topics that the subscription is interested in
-	Topics []Topic
+	Topics map[string]Topic
 }
 
 func (a *activesub) AddTopics(t ...Topic) {
-	a.Topics = append(a.Topics, t...)
+	if a.Topics == nil {
+		a.Topics = map[string]Topic{}
+	}
+
+	for _, item := range t {
+		a.Topics[item.String()] = item
+	}
 }
 
 // topicsub represents subscriptions to a particular topic, for lookup

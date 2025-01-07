@@ -63,6 +63,23 @@ func TestBroadcaster(t *testing.T) {
 			require.Equal(t, msg, messages[0])
 		})
 
+		t.Run("unsubscribing", func(t *testing.T) {
+			messages = []Message{}
+
+			err := b.Subscribe(ctx, sub, msg.Topics())
+			require.NoError(t, err)
+
+			b.Publish(ctx, msg)
+			require.Equal(t, 1, len(messages))
+			require.Equal(t, msg, messages[0])
+
+			b.Unsubscribe(ctx, sub.ID(), msg.Topics())
+			b.Publish(ctx, msg)
+			// No change in count
+			require.Equal(t, 1, len(messages))
+			require.Equal(t, msg, messages[0])
+		})
+
 		t.Run("many subscriptions", func(t *testing.T) {
 			messages = []Message{}
 

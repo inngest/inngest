@@ -74,9 +74,15 @@ type Broadcaster interface {
 	// Publish writes a given message to all subscriptions for the given Message
 	Publisher
 
-	// Subscribe adds a new authenticated Subscription.  Note that if the subscription
-	// currently exists, the current channels will be *added to* the subscribed set.
+	// Subscribe adds a new authenticated Subscription subscribed to the given
+	// topics.
+	//
+	// Note that if the subscription currently exists, the current channels will
+	// be *added to* the subscribed set.
 	Subscribe(ctx context.Context, s Subscription, topics []Topic) error
+
+	// Unsubscribe a subscription from a set of specific topics.
+	Unsubscribe(ctx context.Context, subID uuid.UUID, topics []Topic) error
 
 	// CloseSubscription closes a subscription, removing it from the broadcaster
 	// and stopping any messages from being published.  This terminates the subscription,
