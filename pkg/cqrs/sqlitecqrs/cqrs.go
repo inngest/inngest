@@ -1472,6 +1472,611 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	return res, nil
 }
 
+//
+// Connect
+//
+
+func (w wrapper) InsertWorkerConnection(ctx context.Context, conn *cqrs.WorkerConnection) error {
+	connectionID, err := ulid.Parse(conn.Id)
+	if err != nil {
+		return fmt.Errorf("error parsing runID as ULID: %w", err)
+	}
+
+	params := sqlc.InsertTraceRunParams{
+		AccountID:   run.AccountID,
+		WorkspaceID: run.WorkspaceID,
+		AppID:       run.AppID,
+		FunctionID:  run.FunctionID,
+		TraceID:     []byte(run.TraceID),
+		SourceID:    run.SourceID,
+		RunID:       runid,
+		QueuedAt:    run.QueuedAt.UnixMilli(),
+		StartedAt:   run.StartedAt.UnixMilli(),
+		EndedAt:     run.EndedAt.UnixMilli(),
+		Status:      run.Status.ToCode(),
+		TriggerIds:  []byte{},
+		Output:      run.Output,
+		IsDebounce:  run.IsDebounce,
+		HasAi:       run.HasAI,
+	}
+
+	if run.BatchID != nil {
+		params.BatchID = *run.BatchID
+	}
+	if run.CronSchedule != nil {
+		params.CronSchedule = sql.NullString{String: *run.CronSchedule, Valid: true}
+	}
+	if len(run.TriggerIDs) > 0 {
+		params.TriggerIds = []byte(strings.Join(run.TriggerIDs, ","))
+	}
+
+	return w.q.InsertTraceRun(ctx, params)
+}
+
+type traceRunCursorFilter struct {
+	ID    string
+	Value int64
+}
+
+func (w wrapper) GetTraceSpansByRun(ctx context.Context, id cqrs.TraceRunIdentifier) ([]*cqrs.Span, error) {
+	spans, err := w.q.GetTraceSpans(ctx, sqlc.GetTraceSpansParams{
+		TraceID: id.TraceID,
+		RunID:   id.RunID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res := []*cqrs.Span{}
+	seen := map[string]bool{}
+	for _, s := range spans {
+		// identifier to used for checking if this span is seen already
+		m := map[string]any{
+			"ts":  s.Timestamp.UnixMilli(),
+			"tid": s.TraceID,
+			"sid": s.SpanID,
+		}
+		byt, err := json.Marshal(m)
+		if err != nil {
+			return nil, err
+		}
+		ident := base64.StdEncoding.EncodeToString(byt)
+		if _, ok := seen[ident]; ok {
+			// already seen, so continue
+			continue
+		}
+
+		span := &cqrs.Span{
+			Timestamp:    s.Timestamp,
+			TraceID:      string(s.TraceID),
+			SpanID:       string(s.SpanID),
+			SpanName:     s.SpanName,
+			SpanKind:     s.SpanKind,
+			ServiceName:  s.ServiceName,
+			ScopeName:    s.ScopeName,
+			ScopeVersion: s.ScopeVersion,
+			Duration:     time.Duration(s.Duration * int64(time.Millisecond)),
+			StatusCode:   s.StatusCode,
+			RunID:        &s.RunID,
+		}
+
+		if s.StatusMessage.Valid {
+			span.StatusMessage = &s.StatusMessage.String
+		}
+
+		if s.ParentSpanID.Valid {
+			span.ParentSpanID = &s.ParentSpanID.String
+		}
+		if s.TraceState.Valid {
+			span.TraceState = &s.TraceState.String
+		}
+
+		var resourceAttr, spanAttr map[string]string
+		if err := json.Unmarshal(s.ResourceAttributes, &resourceAttr); err == nil {
+			span.ResourceAttributes = resourceAttr
+		}
+		if err := json.Unmarshal(s.SpanAttributes, &spanAttr); err == nil {
+			span.SpanAttributes = spanAttr
+		}
+
+		res = append(res, span)
+		seen[ident] = true
+	}
+
+	return res, nil
+}
+
+func (w wrapper) FindOrBuildTraceRun(ctx context.Context, opts cqrs.FindOrCreateTraceRunOpt) (*cqrs.TraceRun, error) {
+	run, err := w.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: opts.RunID})
+	if err == nil {
+		return run, nil
+	}
+
+	new := cqrs.TraceRun{
+		AccountID:   opts.AccountID,
+		WorkspaceID: opts.WorkspaceID,
+		AppID:       opts.AppID,
+		FunctionID:  opts.FunctionID,
+		RunID:       opts.RunID.String(),
+		TraceID:     opts.TraceID,
+		QueuedAt:    ulid.Time(opts.RunID.Time()),
+		TriggerIDs:  []string{},
+		Status:      enums.RunStatusUnknown,
+	}
+
+	return &new, nil
+}
+
+func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*cqrs.TraceRun, error) {
+
+	run, err := w.q.GetTraceRun(ctx, id.RunID)
+	if err != nil {
+		return nil, err
+	}
+
+	start := time.UnixMilli(run.StartedAt)
+	end := time.UnixMilli(run.EndedAt)
+	triggerIDS := strings.Split(string(run.TriggerIds), ",")
+
+	var (
+		isBatch bool
+		batchID *ulid.ULID
+		cron    *string
+	)
+
+	if run.BatchID != nilULID {
+		isBatch = true
+		batchID = &run.BatchID
+	}
+
+	if run.CronSchedule.Valid {
+		cron = &run.CronSchedule.String
+	}
+
+	trun := cqrs.TraceRun{
+		AccountID:    run.AccountID,
+		WorkspaceID:  run.WorkspaceID,
+		AppID:        run.AppID,
+		FunctionID:   run.FunctionID,
+		TraceID:      string(run.TraceID),
+		RunID:        id.RunID.String(),
+		QueuedAt:     time.UnixMilli(run.QueuedAt),
+		StartedAt:    start,
+		EndedAt:      end,
+		Duration:     end.Sub(start),
+		SourceID:     run.SourceID,
+		TriggerIDs:   triggerIDS,
+		Output:       run.Output,
+		Status:       enums.RunCodeToStatus(run.Status),
+		BatchID:      batchID,
+		IsBatch:      isBatch,
+		CronSchedule: cron,
+	}
+
+	return &trun, nil
+}
+
+func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {
+	if opts.TraceID == "" {
+		return nil, fmt.Errorf("traceID is required to retrieve output")
+	}
+	if opts.SpanID == "" {
+		return nil, fmt.Errorf("spanID is required to retrieve output")
+	}
+
+	// query spans in descending order
+	spans, err := w.q.GetTraceSpanOutput(ctx, sqlc.GetTraceSpanOutputParams{
+		TraceID: opts.TraceID,
+		SpanID:  opts.SpanID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving spans for output: %w", err)
+	}
+
+	for _, s := range spans {
+		var evts []cqrs.SpanEvent
+		err := json.Unmarshal(s.Events, &evts)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing span outputs: %w", err)
+		}
+
+		var (
+			input      []byte
+			spanOutput *cqrs.SpanOutput
+		)
+
+		for _, evt := range evts {
+			if spanOutput == nil {
+				_, isFnOutput := evt.Attributes[consts.OtelSysFunctionOutput]
+				_, isStepOutput := evt.Attributes[consts.OtelSysStepOutput]
+				if isFnOutput || isStepOutput {
+					var isError bool
+					switch strings.ToUpper(s.StatusCode) {
+					case "ERROR", "STATUS_CODE_ERROR":
+						isError = true
+					}
+
+					spanOutput = &cqrs.SpanOutput{
+						Data:             []byte(evt.Name),
+						Timestamp:        evt.Timestamp,
+						Attributes:       evt.Attributes,
+						IsError:          isError,
+						IsFunctionOutput: isFnOutput,
+						IsStepOutput:     isStepOutput,
+					}
+				}
+			}
+
+			if _, isInput := evt.Attributes[consts.OtelSysStepInput]; isInput && input == nil {
+				input = []byte(evt.Name)
+			}
+
+			if spanOutput != nil && input != nil {
+				break
+			}
+		}
+
+		if spanOutput != nil {
+			spanOutput.Input = input
+			return spanOutput, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no output found")
+}
+
+func (w wrapper) GetSpanStack(ctx context.Context, opts cqrs.SpanIdentifier) ([]string, error) {
+	if opts.TraceID == "" {
+		return nil, fmt.Errorf("traceID is required to retrieve stack")
+	}
+	if opts.SpanID == "" {
+		return nil, fmt.Errorf("spanID is required to retrieve stack")
+	}
+
+	// query spans in descending order
+	spans, err := w.q.GetTraceSpanOutput(ctx, sqlc.GetTraceSpanOutputParams{
+		TraceID: opts.TraceID,
+		SpanID:  opts.SpanID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving spans for stack: %w", err)
+	}
+
+	for _, s := range spans {
+		var evts []cqrs.SpanEvent
+		err := json.Unmarshal(s.Events, &evts)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing span outputs: %w", err)
+		}
+
+		for _, evt := range evts {
+			if stack, ok := evt.Attributes[consts.OtelSysStepStack]; ok {
+				return strings.Split(stack, ","), nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("no stack found")
+}
+
+type runsQueryBuilder struct {
+	filter       []sq.Expression
+	order        []sqexp.OrderedExpression
+	cursor       *cqrs.TracePageCursor
+	cursorLayout *cqrs.TracePageCursor
+}
+
+func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQueryBuilder {
+	// filters
+	filter := []sq.Expression{}
+	if len(opt.Filter.AppID) > 0 {
+		filter = append(filter, sq.C("app_id").In(opt.Filter.AppID))
+	}
+	if len(opt.Filter.FunctionID) > 0 {
+		filter = append(filter, sq.C("function_id").In(opt.Filter.FunctionID))
+	}
+	if len(opt.Filter.Status) > 0 {
+		status := []int64{}
+		for _, s := range opt.Filter.Status {
+			switch s {
+			case enums.RunStatusUnknown, enums.RunStatusOverflowed:
+				continue
+			}
+			status = append(status, s.ToCode())
+		}
+		filter = append(filter, sq.C("status").In(status))
+	}
+	tsfield := strings.ToLower(opt.Filter.TimeField.String())
+	filter = append(filter, sq.C(tsfield).Gte(opt.Filter.From.UnixMilli()))
+
+	until := opt.Filter.Until
+	if until.UnixMilli() <= 0 {
+		until = time.Now()
+	}
+	filter = append(filter, sq.C(tsfield).Lt(until.UnixMilli()))
+
+	// Layout to be used for the response cursors
+	resCursorLayout := cqrs.TracePageCursor{
+		Cursors: map[string]cqrs.TraceCursor{},
+	}
+
+	reqcursor := &cqrs.TracePageCursor{}
+	if opt.Cursor != "" {
+		if err := reqcursor.Decode(opt.Cursor); err != nil {
+			log.From(ctx).Error().Err(err).Str("cursor", opt.Cursor).Msg("error decoding function run cursor")
+		}
+	}
+
+	// order by
+	//
+	// When going through the sorting fields, construct
+	// - response pagination cursor layout
+	// - update filter with op against sorted fields for pagination
+	sortOrder := []enums.TraceRunTime{}
+	sortDir := map[enums.TraceRunTime]enums.TraceRunOrder{}
+	cursorFilter := map[enums.TraceRunTime]traceRunCursorFilter{}
+	for _, f := range opt.Order {
+		sortDir[f.Field] = f.Direction
+		found := false
+		for _, field := range sortOrder {
+			if f.Field == field {
+				found = true
+				break
+			}
+		}
+		if !found {
+			sortOrder = append(sortOrder, f.Field)
+		}
+
+		rc := reqcursor.Find(f.Field.String())
+		if rc != nil {
+			cursorFilter[f.Field] = traceRunCursorFilter{ID: reqcursor.ID, Value: rc.Value}
+		}
+		resCursorLayout.Add(f.Field.String())
+	}
+
+	order := []sqexp.OrderedExpression{}
+	for _, f := range sortOrder {
+		var o sqexp.OrderedExpression
+		field := strings.ToLower(f.String())
+		if d, ok := sortDir[f]; ok {
+			switch d {
+			case enums.TraceRunOrderAsc:
+				o = sq.C(field).Asc()
+			case enums.TraceRunOrderDesc:
+				o = sq.C(field).Desc()
+			default:
+				log.From(ctx).Error().Str("field", field).Str("direction", d.String()).Msg("invalid direction specified for sorting")
+				continue
+			}
+
+			order = append(order, o)
+		}
+	}
+	order = append(order, sq.C("run_id").Asc())
+
+	// cursor filter
+	for k, cf := range cursorFilter {
+		ord, ok := sortDir[k]
+		if !ok {
+			continue
+		}
+
+		var compare sq.Expression
+		field := strings.ToLower(k.String())
+		switch ord {
+		case enums.TraceRunOrderAsc:
+			compare = sq.C(field).Gt(cf.Value)
+		case enums.TraceRunOrderDesc:
+			compare = sq.C(field).Lt(cf.Value)
+		default:
+			continue
+		}
+
+		filter = append(filter, sq.Or(
+			compare,
+			sq.And(
+				sq.C(field).Eq(cf.Value),
+				sq.C("run_id").Gt(cf.ID),
+			),
+		))
+	}
+
+	return &runsQueryBuilder{
+		filter:       filter,
+		order:        order,
+		cursor:       reqcursor,
+		cursorLayout: &resCursorLayout,
+	}
+}
+
+func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
+	// explicitly set it to zero so it would not attempt to paginate
+	opt.Items = 0
+	res, err := w.GetTraceRuns(ctx, opt)
+	if err != nil {
+		return 0, err
+	}
+
+	return len(res), nil
+}
+
+func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
+	// use evtIDs as post query filter
+	evtIDs := []string{}
+	expHandler, err := run.NewExpressionHandler(ctx,
+		run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if expHandler.HasEventFilters() {
+		evts, err := w.GetEventsByExpressions(ctx, expHandler.EventExprList)
+		if err != nil {
+			return nil, err
+		}
+		for _, e := range evts {
+			evtIDs = append(evtIDs, e.ID.String())
+		}
+	}
+
+	builder := newRunsQueryBuilder(ctx, opt)
+	filter := builder.filter
+	order := builder.order
+	reqcursor := builder.cursor
+	resCursorLayout := builder.cursorLayout
+
+	// read from database
+	// TODO:
+	// change this to a continuous loop with limits instead of just attempting to grab everything.
+	// might not matter though since this is primarily meant for local development
+	sql, args, err := sq.Dialect("sqlite3").
+		From("trace_runs").
+		Select(
+			"app_id",
+			"function_id",
+			"trace_id",
+			"run_id",
+			"queued_at",
+			"started_at",
+			"ended_at",
+			"status",
+			"source_id",
+			"trigger_ids",
+			"output",
+			"batch_id",
+			"is_debounce",
+			"cron_schedule",
+			"has_ai",
+		).
+		Where(filter...).
+		Order(order...).
+		ToSQL()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := w.db.QueryContext(ctx, sql, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	res := []*cqrs.TraceRun{}
+	var count uint
+	for rows.Next() {
+		data := sqlc.TraceRun{}
+		err := rows.Scan(
+			&data.AppID,
+			&data.FunctionID,
+			&data.TraceID,
+			&data.RunID,
+			&data.QueuedAt,
+			&data.StartedAt,
+			&data.EndedAt,
+			&data.Status,
+			&data.SourceID,
+			&data.TriggerIds,
+			&data.Output,
+			&data.BatchID,
+			&data.IsDebounce,
+			&data.CronSchedule,
+			&data.HasAi,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// filter out runs that doesn't have the event IDs
+		if len(evtIDs) > 0 && !data.HasEventIDs(evtIDs) {
+			continue
+		}
+
+		// the cursor target should be skipped
+		if reqcursor.ID == data.RunID.String() {
+			continue
+		}
+
+		if expHandler.HasOutputFilters() {
+			ok, err := expHandler.MatchOutputExpressions(ctx, data.Output)
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("error inspecting run for output match",
+					"error", err,
+					"output", string(data.Output),
+					"acctID", data.AccountID,
+					"wsID", data.WorkspaceID,
+					"appID", data.AppID,
+					"wfID", data.FunctionID,
+					"runID", data.RunID,
+				)
+				continue
+			}
+			if !ok {
+				continue
+			}
+		}
+
+		// copy layout
+		pc := resCursorLayout
+		// construct the needed fields to generate a cursor representing this run
+		pc.ID = data.RunID.String()
+		for k := range pc.Cursors {
+			switch k {
+			case strings.ToLower(enums.TraceRunTimeQueuedAt.String()):
+				pc.Cursors[k] = cqrs.TraceCursor{Field: k, Value: data.QueuedAt}
+			case strings.ToLower(enums.TraceRunTimeStartedAt.String()):
+				pc.Cursors[k] = cqrs.TraceCursor{Field: k, Value: data.StartedAt}
+			case strings.ToLower(enums.TraceRunTimeEndedAt.String()):
+				pc.Cursors[k] = cqrs.TraceCursor{Field: k, Value: data.EndedAt}
+			default:
+				log.From(ctx).Warn().Str("field", k).Msg("unknown field registered as cursor")
+				delete(pc.Cursors, k)
+			}
+		}
+
+		cursor, err := pc.Encode()
+		if err != nil {
+			log.From(ctx).Error().Err(err).Interface("page_cursor", pc).Msg("error encoding cursor")
+		}
+		var cron *string
+		if data.CronSchedule.Valid {
+			cron = &data.CronSchedule.String
+		}
+		var batchID *ulid.ULID
+		isBatch := data.BatchID != nilULID
+		if isBatch {
+			batchID = &data.BatchID
+		}
+
+		res = append(res, &cqrs.TraceRun{
+			AppID:        data.AppID,
+			FunctionID:   data.FunctionID,
+			TraceID:      string(data.TraceID),
+			RunID:        data.RunID.String(),
+			QueuedAt:     time.UnixMilli(data.QueuedAt),
+			StartedAt:    time.UnixMilli(data.StartedAt),
+			EndedAt:      time.UnixMilli(data.EndedAt),
+			SourceID:     data.SourceID,
+			TriggerIDs:   data.EventIDs(),
+			Triggers:     [][]byte{},
+			Output:       data.Output,
+			Status:       enums.RunCodeToStatus(data.Status),
+			IsBatch:      isBatch,
+			BatchID:      batchID,
+			IsDebounce:   data.IsDebounce,
+			HasAI:        data.HasAi,
+			CronSchedule: cron,
+			Cursor:       cursor,
+		})
+		count++
+		// enough items, don't need to proceed anymore
+		if opt.Items > 0 && count >= opt.Items {
+			break
+		}
+	}
+
+	return res, nil
+}
+
 // copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types
 // automatically.
 func copyWriter[

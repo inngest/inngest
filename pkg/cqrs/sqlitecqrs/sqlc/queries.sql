@@ -274,3 +274,42 @@ WHERE snapshot_id NOT IN (
     ORDER BY snapshot_id DESC
     LIMIT ?
 );
+
+--
+-- Worker Connections
+--
+
+-- name: InsertWorkerConnection :exec
+INSERT INTO worker_connections (
+    account_id, workspace_id, app_id, id, gateway_id, instance_id, status, connected_at, last_heartbeat_at, disconnected_at,
+    group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, cpu_cores, mem_bytes, os
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id)
+DO UPDATE SET
+    account_id = excluded.account_id,
+    workspace_id = excluded.workspace_id,
+    app_id = excluded.app_id,
+
+    id = excluded.id,
+    gateway_id = excluded.gateway_id,
+    instance_id = excluded.instance_id,
+    status = excluded.status,
+
+    connected_at = excluded.connected_at,
+    last_heartbeat_at = excluded.last_heartbeat_at,
+    disconnected_at = excluded.disconnected_at,
+
+    group_hash = excluded.group_hash,
+    sdk_lang = excluded.sdk_lang,
+    sdk_version = excluded.sdk_version,
+    sdk_platform = excluded.sdk_platform,
+    sync_id = excluded.sync_id,
+
+    cpu_cores = excluded.cpu_cores,
+    mem_bytes = excluded.mem_bytes,
+    os = excluded.os
+;
+
+-- name: GetWorkerConnection :one
+SELECT * FROM worker_connections WHERE account_id = @account_id AND workspace_id = @workspace_id AND id = @connection_id;
