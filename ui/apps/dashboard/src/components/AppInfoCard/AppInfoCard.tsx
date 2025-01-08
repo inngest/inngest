@@ -95,13 +95,13 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
         />
         <CardItem
           detail={<div className="truncate">{sync?.sdkVersion ?? '-'}</div>}
-          term="SDK Version"
+          term="SDK version"
           loading={loading}
         />
         <CardItem
           className="col-span-2"
           detail={<div className="truncate">{lastSyncValue ?? '-'}</div>}
-          term="Last Sync"
+          term="Last sync"
           loading={loading}
         />
 
