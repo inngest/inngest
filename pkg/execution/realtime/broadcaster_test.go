@@ -3,6 +3,7 @@ package realtime
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -35,7 +36,7 @@ func TestBroadcaster(t *testing.T) {
 	t.Run("broadcasting", func(t *testing.T) {
 		msg := Message{
 			Kind:  MessageKindRun,
-			Data:  "output",
+			Data:  json.RawMessage(`"output"`),
 			RunID: ulid.MustNew(ulid.Now(), rand.Reader),
 		}
 
@@ -154,7 +155,7 @@ func TestBroadcasterConds(t *testing.T) {
 			sub = NewInmemorySubscription(uuid.New(), nil)
 			msg = Message{
 				Kind:  MessageKindRun,
-				Data:  "output",
+				Data:  json.RawMessage(`"output"`),
 				RunID: ulid.MustNew(ulid.Now(), rand.Reader),
 			}
 			unsubCalled int32
@@ -200,7 +201,7 @@ func TestBroadcasterConds(t *testing.T) {
 			sub = NewInmemorySubscription(uuid.New(), nil)
 			msg = Message{
 				Kind:  MessageKindRun,
-				Data:  "output",
+				Data:  json.RawMessage(`"output"`),
 				RunID: ulid.MustNew(ulid.Now(), rand.Reader),
 			}
 			unsubCalled int32

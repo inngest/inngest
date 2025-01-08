@@ -109,14 +109,15 @@ func (s SubscriptionWS) poll(ctx context.Context) error {
 		case MessageKindSubscribe:
 			// Subscribe messages must always have a JWT as the data;
 			// the JWT embeds the topics that will be subscribed to.
-			jwt, ok := msg.Data.(string)
-			if !ok {
+			var jwt string
+			if err := json.Unmarshal(msg.Data, &jwt); err != nil {
 				logger.StdlibLogger(ctx).Warn(
-					"unknown subscribe jwt type",
+					"unknown subscribe ws data type",
 					"type", fmt.Sprintf("%T", msg.Data),
 				)
 				continue
 			}
+
 			// TODO: Get token for topics.
 			topics, err := TopicsFromJWT(ctx, []byte("TODO"), jwt)
 			if err != nil {
@@ -133,7 +134,11 @@ func (s SubscriptionWS) poll(ctx context.Context) error {
 			continue
 
 		case MessageKindUnsubscribe:
-			// TODO: Unsub from the given topics.
+			// Unsub from the given topics.  Assume that the unsubscribe data
+			// is a list of topics.
+			// data := []Topic{}
 		}
 	}
 }
+
+// func (s SubscriptionWS) handleUnsubscribeMsg(

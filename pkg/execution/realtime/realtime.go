@@ -2,11 +2,13 @@ package realtime
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -160,12 +162,35 @@ func (t Topic) String() string {
 	return fmt.Sprintf("%s:%s", t.EnvID, t.Name)
 }
 
+// NewMessage creates a new message with the given kind and data.  If the data is
+// not of type byte or json.RawMessage, the data will be marshalled to JSON before
+// being set.
+//
+// Note that other fields in the message are not set.
+func NewMessage(kind MessageKind, data any) Message {
+	msg := Message{Kind: kind, CreatedAt: time.Now().Truncate(time.Millisecond)}
+	switch v := data.(type) {
+	case json.RawMessage:
+		msg.Data = v
+	case []byte:
+		msg.Data = json.RawMessage(v)
+	default:
+		var err error
+		msg.Data, err = json.Marshal(data)
+		if err != nil {
+			logger.StdlibLogger(context.Background()).
+				Error("error marshalling realtime msg data", "error", err)
+		}
+	}
+	return msg
+}
+
 // Message represents a single message sent on realtime topics.
 type Message struct {
 	// Kind represents the message kind.
 	Kind MessageKind `json:"kind"`
 	// Data represents the data in the message.
-	Data any `json:"data"`
+	Data json.RawMessage `json:"data"`
 
 	// FnID is the function ID that this message is related to.
 	FnID uuid.UUID `json:"fn_id,omitempty,omitzero"`
