@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"context"
+	"github.com/oklog/ulid/v2"
 
 	"github.com/google/uuid"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
@@ -18,11 +19,11 @@ func (noopConnector) ReceiveExecutorMessages(ctx context.Context, onMessage func
 	return nil
 }
 
-func (noopConnector) RouteExecutorRequest(ctx context.Context, gatewayId string, appId uuid.UUID, connId string, data *connpb.GatewayExecutorRequestData) error {
+func (noopConnector) RouteExecutorRequest(ctx context.Context, gatewayId ulid.ULID, appId uuid.UUID, connId ulid.ULID, data *connpb.GatewayExecutorRequestData) error {
 	return nil
 }
 
-func (noopConnector) ReceiveRoutedRequest(ctx context.Context, gatewayId string, appId uuid.UUID, connId string, onMessage func(rawBytes []byte, data *connpb.GatewayExecutorRequestData)) error {
+func (noopConnector) ReceiveRoutedRequest(ctx context.Context, gatewayId ulid.ULID, appId uuid.UUID, connId ulid.ULID, onMessage func(rawBytes []byte, data *connpb.GatewayExecutorRequestData)) error {
 	return nil
 }
 

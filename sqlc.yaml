@@ -138,13 +138,11 @@ sql:
           - column: "worker_connections.app_id"
             go_type:
               import: "github.com/google/uuid"
-              package: "uuid"
               type: "UUID"
               pointer: true
           - column: "worker_connections.sync_id"
             go_type:
               import: "github.com/google/uuid"
-              package: "uuid"
               type: "UUID"
               pointer: true
 

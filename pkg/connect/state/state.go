@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/oklog/ulid/v2"
 	"net/http"
 	"net/url"
 	"time"
@@ -29,7 +30,7 @@ type ConnectionManager interface {
 	GetConnectionsByAppID(ctx context.Context, envId uuid.UUID, appID uuid.UUID) ([]*connpb.ConnMetadata, error)
 	GetConnectionsByGroupID(ctx context.Context, envID uuid.UUID, groupID string) ([]*connpb.ConnMetadata, error)
 	UpsertConnection(ctx context.Context, conn *Connection) error
-	DeleteConnection(ctx context.Context, envID uuid.UUID, appID *uuid.UUID, groupID string, connId string) error
+	DeleteConnection(ctx context.Context, envID uuid.UUID, appID *uuid.UUID, groupID string, connId ulid.ULID) error
 }
 
 type WorkerGroupManager interface {
@@ -39,8 +40,8 @@ type WorkerGroupManager interface {
 
 type GatewayManager interface {
 	UpsertGateway(ctx context.Context, gateway *Gateway) error
-	DeleteGateway(ctx context.Context, gatewayId string) error
-	GetGateway(ctx context.Context, gatewayId string) (*Gateway, error)
+	DeleteGateway(ctx context.Context, gatewayId ulid.ULID) error
+	GetGateway(ctx context.Context, gatewayId ulid.ULID) (*Gateway, error)
 }
 
 type AuthContext struct {
@@ -100,7 +101,7 @@ const (
 )
 
 type Gateway struct {
-	Id              string        `json:"id"`
+	Id              ulid.ULID     `json:"id"`
 	Status          GatewayStatus `json:"status"`
 	LastHeartbeatAt time.Time     `json:"last_heartbeat_at"`
 
@@ -109,14 +110,17 @@ type Gateway struct {
 
 // Connection have all the metadata associated with a worker connection
 type Connection struct {
-	AccountID uuid.UUID
-	EnvID     uuid.UUID
+	AccountID    uuid.UUID
+	EnvID        uuid.UUID
+	ConnectionId ulid.ULID
 
-	Status    connpb.ConnectionStatus
+	Status          connpb.ConnectionStatus
+	LastHeartbeatAt time.Time
+
 	Data      *connpb.WorkerConnectRequestData
 	Session   *connpb.SessionDetails
 	Group     *WorkerGroup
-	GatewayId string
+	GatewayId ulid.ULID
 }
 
 // Sync attempts to sync the worker group configuration

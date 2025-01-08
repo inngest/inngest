@@ -45,6 +45,8 @@ type Config struct {
 
 type ResolverRoot interface {
 	App() AppResolver
+	ConnectV1WorkerConnection() ConnectV1WorkerConnectionResolver
+	ConnectV1WorkerConnectionsConnection() ConnectV1WorkerConnectionsConnectionResolver
 	Event() EventResolver
 	Function() FunctionResolver
 	FunctionRun() FunctionRunResolver
@@ -418,6 +420,12 @@ type AppResolver interface {
 	Connected(ctx context.Context, obj *cqrs.App) (bool, error)
 	FunctionCount(ctx context.Context, obj *cqrs.App) (int, error)
 	Autodiscovered(ctx context.Context, obj *cqrs.App) (bool, error)
+}
+type ConnectV1WorkerConnectionResolver interface {
+	App(ctx context.Context, obj *models.ConnectV1WorkerConnection) (*cqrs.App, error)
+}
+type ConnectV1WorkerConnectionsConnectionResolver interface {
+	TotalCount(ctx context.Context, obj *models.ConnectV1WorkerConnectionsConnection) (int, error)
 }
 type EventResolver interface {
 	Status(ctx context.Context, obj *models.Event) (*models.EventStatus, error)
@@ -2925,10 +2933,10 @@ type RunTraceTrigger {
 
 enum ConnectV1ConnectionStatus {
   CONNECTED
-	READY
-	DRAINING
-	DISCONNECTING
-	DISCONNECTED
+  READY
+  DRAINING
+  DISCONNECTING
+  DISCONNECTED
 }
 
 input ConnectV1WorkerConnectionsFilter {
@@ -2971,15 +2979,15 @@ type ConnectV1WorkerConnection {
 
   status: ConnectV1ConnectionStatus!
 
-	groupHash: String!
-	sdkLang: String!
-	sdkVersion: String!
-	sdkPlatform: String!
-	syncId: UUID
+  groupHash: String!
+  sdkLang: String!
+  sdkVersion: String!
+  sdkPlatform: String!
+  syncId: UUID
 
-	cpuCores: Int!
-	memBytes: Int!
-	os: String!
+  cpuCores: Int!
+  memBytes: Int!
+  os: String!
 }
 
 type ConnectV1WorkerConnectionsConnection {
@@ -4168,7 +4176,7 @@ func (ec *executionContext) _ConnectV1WorkerConnection_app(ctx context.Context, 
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.App, nil
+		return ec.resolvers.ConnectV1WorkerConnection().App(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -4186,8 +4194,8 @@ func (ec *executionContext) fieldContext_ConnectV1WorkerConnection_app(ctx conte
 	fc = &graphql.FieldContext{
 		Object:     "ConnectV1WorkerConnection",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
@@ -4984,7 +4992,7 @@ func (ec *executionContext) _ConnectV1WorkerConnectionsConnection_totalCount(ctx
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.TotalCount, nil
+		return ec.resolvers.ConnectV1WorkerConnectionsConnection().TotalCount(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5005,8 +5013,8 @@ func (ec *executionContext) fieldContext_ConnectV1WorkerConnectionsConnection_to
 	fc = &graphql.FieldContext{
 		Object:     "ConnectV1WorkerConnectionsConnection",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Int does not have child fields")
 		},
@@ -17655,14 +17663,14 @@ func (ec *executionContext) _ConnectV1WorkerConnection(ctx context.Context, sel 
 			out.Values[i] = ec._ConnectV1WorkerConnection_id(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "gatewayId":
 
 			out.Values[i] = ec._ConnectV1WorkerConnection_gatewayId(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "instanceId":
 
@@ -17673,15 +17681,28 @@ func (ec *executionContext) _ConnectV1WorkerConnection(ctx context.Context, sel 
 			out.Values[i] = ec._ConnectV1WorkerConnection_appID(ctx, field, obj)
 
 		case "app":
+			field := field
 
-			out.Values[i] = ec._ConnectV1WorkerConnection_app(ctx, field, obj)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._ConnectV1WorkerConnection_app(ctx, field, obj)
+				return res
+			}
 
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "connectedAt":
 
 			out.Values[i] = ec._ConnectV1WorkerConnection_connectedAt(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "lastHeartbeatAt":
 
@@ -17696,35 +17717,35 @@ func (ec *executionContext) _ConnectV1WorkerConnection(ctx context.Context, sel 
 			out.Values[i] = ec._ConnectV1WorkerConnection_status(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "groupHash":
 
 			out.Values[i] = ec._ConnectV1WorkerConnection_groupHash(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "sdkLang":
 
 			out.Values[i] = ec._ConnectV1WorkerConnection_sdkLang(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "sdkVersion":
 
 			out.Values[i] = ec._ConnectV1WorkerConnection_sdkVersion(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "sdkPlatform":
 
 			out.Values[i] = ec._ConnectV1WorkerConnection_sdkPlatform(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "syncId":
 
@@ -17735,21 +17756,21 @@ func (ec *executionContext) _ConnectV1WorkerConnection(ctx context.Context, sel 
 			out.Values[i] = ec._ConnectV1WorkerConnection_cpuCores(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "memBytes":
 
 			out.Values[i] = ec._ConnectV1WorkerConnection_memBytes(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "os":
 
 			out.Values[i] = ec._ConnectV1WorkerConnection_os(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -17812,22 +17833,35 @@ func (ec *executionContext) _ConnectV1WorkerConnectionsConnection(ctx context.Co
 			out.Values[i] = ec._ConnectV1WorkerConnectionsConnection_edges(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "pageInfo":
 
 			out.Values[i] = ec._ConnectV1WorkerConnectionsConnection_pageInfo(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "totalCount":
+			field := field
 
-			out.Values[i] = ec._ConnectV1WorkerConnectionsConnection_totalCount(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._ConnectV1WorkerConnectionsConnection_totalCount(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
 			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

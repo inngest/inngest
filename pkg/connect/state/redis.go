@@ -5,6 +5,8 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/oklog/ulid/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"io/fs"
 	"log/slog"
@@ -79,14 +81,16 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 }
 
 type redisConnectionStateManager struct {
-	client rueidis.Client
-	logger *slog.Logger
+	client        rueidis.Client
+	logger        *slog.Logger
+	historyWriter cqrs.ConnectionHistoryWriter
 }
 
-func NewRedisConnectionStateManager(client rueidis.Client) *redisConnectionStateManager {
+func NewRedisConnectionStateManager(client rueidis.Client, historyWriter cqrs.ConnectionHistoryWriter) *redisConnectionStateManager {
 	return &redisConnectionStateManager{
-		client: client,
-		logger: logger.StdlibLogger(context.Background()),
+		client:        client,
+		logger:        logger.StdlibLogger(context.Background()),
+		historyWriter: historyWriter,
 	}
 }
 
@@ -196,7 +200,7 @@ func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn
 		Version:         conn.Data.SdkVersion,
 		GroupId:         groupID,
 		Attributes:      conn.Data.SystemAttributes,
-		GatewayId:       conn.GatewayId,
+		GatewayId:       conn.GatewayId.String(),
 		LastHeartbeatAt: timestamppb.New(time.Now()),
 	}
 
@@ -248,8 +252,38 @@ func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn
 		return err
 	}
 
+	var instanceId *string
+	if conn.Session.SessionId.InstanceId != "" {
+		instanceId = &conn.Session.SessionId.InstanceId
+	}
+
 	switch status {
 	case 0:
+		// Persist history in history store
+		// TODO Should the implementation use a messaging system like NATS for batching internally?
+		err := r.historyWriter.InsertWorkerConnection(ctx, &cqrs.WorkerConnection{
+			AccountID:       conn.AccountID,
+			WorkspaceID:     conn.EnvID,
+			AppID:           conn.Group.AppID,
+			Id:              conn.ConnectionId,
+			GatewayId:       conn.GatewayId,
+			InstanceId:      instanceId,
+			Status:          conn.Status,
+			LastHeartbeatAt: conn.LastHeartbeatAt,
+			ConnectedAt:     ulid.Time(conn.ConnectionId.Time()),
+			GroupHash:       conn.Group.Hash,
+			SDKLang:         conn.Group.SDKLang,
+			SDKVersion:      conn.Group.SDKVersion,
+			SDKPlatform:     conn.Group.SDKPlatform,
+			SyncID:          conn.Group.SyncID,
+			CpuCores:        conn.Data.SystemAttributes.CpuCores,
+			MemBytes:        conn.Data.SystemAttributes.MemBytes,
+			Os:              conn.Data.SystemAttributes.Os,
+		})
+		if err != nil {
+			return fmt.Errorf("could not write to connection history store: %w", err)
+		}
+
 		return nil
 
 	default:
@@ -257,7 +291,7 @@ func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn
 	}
 }
 
-func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, envID uuid.UUID, appID *uuid.UUID, groupID string, connId string) error {
+func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, envID uuid.UUID, appID *uuid.UUID, groupID string, connId ulid.ULID) error {
 	keys := []string{
 		r.connKey(envID),
 		r.groupKey(envID),
@@ -266,7 +300,7 @@ func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, envI
 	}
 
 	args := []string{
-		connId,
+		connId.String(),
 		groupID,
 	}
 
@@ -364,7 +398,7 @@ func (r *redisConnectionStateManager) UpsertGateway(ctx context.Context, gateway
 
 	res := r.client.Do(
 		ctx,
-		r.client.B().Hset().Key(r.gatewaysHashKey()).FieldValue().FieldValue(gateway.Id, string(marshaled)).Build(),
+		r.client.B().Hset().Key(r.gatewaysHashKey()).FieldValue().FieldValue(gateway.Id.String(), string(marshaled)).Build(),
 	)
 	if err := res.Error(); err != nil {
 		return fmt.Errorf("could not set gateway state: %w", err)
@@ -373,10 +407,10 @@ func (r *redisConnectionStateManager) UpsertGateway(ctx context.Context, gateway
 	return nil
 }
 
-func (r *redisConnectionStateManager) DeleteGateway(ctx context.Context, gatewayId string) error {
+func (r *redisConnectionStateManager) DeleteGateway(ctx context.Context, gatewayId ulid.ULID) error {
 	res := r.client.Do(
 		ctx,
-		r.client.B().Hdel().Key(r.gatewaysHashKey()).Field(gatewayId).Build(),
+		r.client.B().Hdel().Key(r.gatewaysHashKey()).Field(gatewayId.String()).Build(),
 	)
 	if err := res.Error(); err != nil {
 		return fmt.Errorf("could not delete gateway state: %w", err)
@@ -385,10 +419,10 @@ func (r *redisConnectionStateManager) DeleteGateway(ctx context.Context, gateway
 	return nil
 }
 
-func (r *redisConnectionStateManager) GetGateway(ctx context.Context, gatewayId string) (*Gateway, error) {
+func (r *redisConnectionStateManager) GetGateway(ctx context.Context, gatewayId ulid.ULID) (*Gateway, error) {
 	gatewayBytes, err := r.client.Do(
 		ctx,
-		r.client.B().Hget().Key(r.gatewaysHashKey()).Field(gatewayId).Build(),
+		r.client.B().Hget().Key(r.gatewaysHashKey()).Field(gatewayId.String()).Build(),
 	).AsBytes()
 	if err != nil {
 		if rueidis.IsRedisNil(err) {

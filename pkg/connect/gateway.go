@@ -212,7 +212,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			// This is a transactional operation, it should always complete regardless of context cancellation
 
 			// TODO Persist disconnected status in history for UI (show disconnected connections with reason)
-			err := c.stateManager.DeleteConnection(context.Background(), conn.Group.EnvID, conn.Group.AppID, conn.Group.Hash, conn.Session.SessionId.ConnectionId)
+			err := c.stateManager.DeleteConnection(context.Background(), conn.Group.EnvID, conn.Group.AppID, conn.Group.Hash, conn.ConnectionId)
 			switch err {
 			case nil, state.ConnDeletedWithGroupErr:
 				// no-op
@@ -531,7 +531,7 @@ func (c *connectionHandler) receiveRouterMessages(ctx context.Context, appId uui
 	// Receive execution-related messages for the app, forwarded by the router.
 	// The router selects only one gateway to handle a request from a pool of one or more workers (and thus WebSockets)
 	// running for each app.
-	err := c.svc.receiver.ReceiveRoutedRequest(ctx, c.svc.gatewayId, appId, c.conn.Session.SessionId.ConnectionId, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
+	err := c.svc.receiver.ReceiveRoutedRequest(ctx, c.svc.gatewayId, appId, c.conn.ConnectionId, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
 		log := c.log.With(
 			"req_id", data.RequestId,
 			"fn_slug", data.FunctionSlug,
@@ -646,6 +646,7 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 	}
 
 	// Ensure connection ID is valid ULID
+	var connectionId ulid.ULID
 	{
 		if initialMessageData.SessionId == nil || initialMessageData.SessionId.ConnectionId == "" {
 			c.log.Debug("initial SDK message contained invalid connection ID")
@@ -657,7 +658,7 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 			}
 		}
 
-		if _, err = ulid.Parse(initialMessageData.SessionId.ConnectionId); err != nil {
+		if connectionId, err = ulid.Parse(initialMessageData.SessionId.ConnectionId); err != nil {
 			c.log.Debug("initial SDK message contained invalid connection ID")
 
 			return nil, &SocketError{
@@ -735,8 +736,9 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 	}
 
 	conn := state.Connection{
-		AccountID: authResp.AccountID,
-		EnvID:     authResp.EnvID,
+		AccountID:    authResp.AccountID,
+		EnvID:        authResp.EnvID,
+		ConnectionId: connectionId,
 
 		// Mark initial status, not ready to receive messages yet
 		Status: connect.ConnectionStatus_CONNECTED,
@@ -794,6 +796,7 @@ func (c *connectionHandler) updateConnStatus(status connect.ConnectionStatus) er
 	defer c.updateLock.Unlock()
 
 	c.conn.Status = status
+	c.conn.LastHeartbeatAt = time.Now()
 
 	// Always update the connection status, do not use context cancellation
 	return c.svc.stateManager.UpsertConnection(context.Background(), c.conn)
