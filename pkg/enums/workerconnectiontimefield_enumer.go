@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _WorkerConnectionTimeFieldName = "connected_atlast_heartbeat_at"
+const _WorkerConnectionTimeFieldName = "connected_atdisconnected_atlast_heartbeat_at"
 
-var _WorkerConnectionTimeFieldIndex = [...]uint8{0, 12, 29}
+var _WorkerConnectionTimeFieldIndex = [...]uint8{0, 12, 27, 44}
 
-const _WorkerConnectionTimeFieldLowerName = "connected_atlast_heartbeat_at"
+const _WorkerConnectionTimeFieldLowerName = "connected_atdisconnected_atlast_heartbeat_at"
 
 func (i WorkerConnectionTimeField) String() string {
 	if i < 0 || i >= WorkerConnectionTimeField(len(_WorkerConnectionTimeFieldIndex)-1) {
@@ -26,21 +26,25 @@ func (i WorkerConnectionTimeField) String() string {
 func _WorkerConnectionTimeFieldNoOp() {
 	var x [1]struct{}
 	_ = x[WorkerConnectionTimeFieldConnectedAt-(0)]
-	_ = x[WorkerConnectionTimeFieldLastHeartbeatAt-(1)]
+	_ = x[WorkerConnectionTimeFieldDisconnectedAt-(1)]
+	_ = x[WorkerConnectionTimeFieldLastHeartbeatAt-(2)]
 }
 
-var _WorkerConnectionTimeFieldValues = []WorkerConnectionTimeField{WorkerConnectionTimeFieldConnectedAt, WorkerConnectionTimeFieldLastHeartbeatAt}
+var _WorkerConnectionTimeFieldValues = []WorkerConnectionTimeField{WorkerConnectionTimeFieldConnectedAt, WorkerConnectionTimeFieldDisconnectedAt, WorkerConnectionTimeFieldLastHeartbeatAt}
 
 var _WorkerConnectionTimeFieldNameToValueMap = map[string]WorkerConnectionTimeField{
 	_WorkerConnectionTimeFieldName[0:12]:       WorkerConnectionTimeFieldConnectedAt,
 	_WorkerConnectionTimeFieldLowerName[0:12]:  WorkerConnectionTimeFieldConnectedAt,
-	_WorkerConnectionTimeFieldName[12:29]:      WorkerConnectionTimeFieldLastHeartbeatAt,
-	_WorkerConnectionTimeFieldLowerName[12:29]: WorkerConnectionTimeFieldLastHeartbeatAt,
+	_WorkerConnectionTimeFieldName[12:27]:      WorkerConnectionTimeFieldDisconnectedAt,
+	_WorkerConnectionTimeFieldLowerName[12:27]: WorkerConnectionTimeFieldDisconnectedAt,
+	_WorkerConnectionTimeFieldName[27:44]:      WorkerConnectionTimeFieldLastHeartbeatAt,
+	_WorkerConnectionTimeFieldLowerName[27:44]: WorkerConnectionTimeFieldLastHeartbeatAt,
 }
 
 var _WorkerConnectionTimeFieldNames = []string{
 	_WorkerConnectionTimeFieldName[0:12],
-	_WorkerConnectionTimeFieldName[12:29],
+	_WorkerConnectionTimeFieldName[12:27],
+	_WorkerConnectionTimeFieldName[27:44],
 }
 
 // WorkerConnectionTimeFieldString retrieves an enum value from the enum constants string name.
