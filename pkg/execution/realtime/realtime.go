@@ -152,12 +152,12 @@ type Topic struct {
 func (t Topic) String() string {
 	switch t.Kind {
 	case TopicKindRun:
-		return fmt.Sprintf("%s.%s.%s", t.EnvID, t.RunID, t.Name)
+		return fmt.Sprintf("%s:%s:%s", t.EnvID, t.RunID, t.Name)
 	case TopicKindEvent:
-		return fmt.Sprintf("%s.%s", t.EnvID, t.Name)
+		return fmt.Sprintf("%s:%s", t.EnvID, t.Name)
 	}
 
-	return fmt.Sprintf("%s.%s", t.EnvID, t.Name)
+	return fmt.Sprintf("%s:%s", t.EnvID, t.Name)
 }
 
 // Message represents a single message sent on realtime topics.

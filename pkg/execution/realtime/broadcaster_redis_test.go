@@ -58,14 +58,16 @@ func TestRedisBroadcaster(t *testing.T) {
 
 	// Create two messages with two separate topics.
 	msg1 := Message{
-		Kind:  MessageKindRun,
-		Data:  "output",
-		RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+		Kind:      MessageKindRun,
+		Data:      "output",
+		RunID:     ulid.MustNew(ulid.Now(), rand.Reader),
+		CreatedAt: time.Now().Truncate(time.Second),
 	}
 	msg2 := Message{
-		Kind:  MessageKindRun,
-		Data:  "output",
-		RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+		Kind:      MessageKindRun,
+		Data:      "output",
+		RunID:     ulid.MustNew(ulid.Now(), rand.Reader),
+		CreatedAt: time.Now().Truncate(time.Second),
 	}
 
 	t.Run("publishing on b1 broadcasts on b2 subscriber", func(t *testing.T) {

@@ -117,6 +117,7 @@ func (s SubscriptionWS) poll(ctx context.Context) error {
 				)
 				continue
 			}
+			// TODO: Get token for topics.
 			topics, err := TopicsFromJWT(ctx, []byte("TODO"), jwt)
 			if err != nil {
 				// TODO: Reply with unsuccessful subscribe msg
@@ -130,6 +131,7 @@ func (s SubscriptionWS) poll(ctx context.Context) error {
 
 			// TODO: Reply with successful subscribe msg
 			continue
+
 		case MessageKindUnsubscribe:
 			// TODO: Unsub from the given topics.
 		}
