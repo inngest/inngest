@@ -368,6 +368,9 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 	// Periodically report current status
 	go c.heartbeat(ctx)
 
+	// Periodically report metrics
+	go c.instrument(ctx)
+
 	return eg.Wait()
 }
 

@@ -381,7 +381,7 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 
 		// Unsubscribe from all channels
 		subs := i.subscribers
-		for channelName, _ := range subs {
+		for channelName := range subs {
 			c.Do(ctx, c.B().Unsubscribe().Channel(channelName).Build())
 		}
 
