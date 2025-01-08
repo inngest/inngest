@@ -56,8 +56,32 @@ func (h *historyLifecycles) OnConnected(ctx context.Context, conn *state.Connect
 }
 
 func (h *historyLifecycles) OnDisconnected(ctx context.Context, conn *state.Connection, closeReason string) {
+	var instanceId *string
+	if conn.Session.SessionId.InstanceId != "" {
+		instanceId = &conn.Session.SessionId.InstanceId
+	}
+
 	// Persist history in history store
-	err := h.upsertConnection(ctx, conn, connectpb.ConnectionStatus_DISCONNECTED, time.Now())
+	err := h.writer.InsertWorkerConnection(ctx, &cqrs.WorkerConnection{
+		AccountID:       conn.AccountID,
+		WorkspaceID:     conn.EnvID,
+		AppID:           conn.Group.AppID,
+		Id:              conn.ConnectionId,
+		GatewayId:       conn.GatewayId,
+		InstanceId:      instanceId,
+		Status:          connectpb.ConnectionStatus_DISCONNECTED,
+		LastHeartbeatAt: time.Now(),
+		DisconnectedAt:  time.Now(),
+		ConnectedAt:     ulid.Time(conn.ConnectionId.Time()),
+		GroupHash:       conn.Group.Hash,
+		SDKLang:         conn.Group.SDKLang,
+		SDKVersion:      conn.Group.SDKVersion,
+		SDKPlatform:     conn.Group.SDKPlatform,
+		SyncID:          conn.Group.SyncID,
+		CpuCores:        conn.Data.SystemAttributes.CpuCores,
+		MemBytes:        conn.Data.SystemAttributes.MemBytes,
+		Os:              conn.Data.SystemAttributes.Os,
+	})
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("could not persist connection history", "error", err)
 	}
