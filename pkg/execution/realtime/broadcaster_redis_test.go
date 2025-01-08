@@ -89,5 +89,21 @@ func TestRedisBroadcaster(t *testing.T) {
 			defer l.Unlock()
 			return len(m1) == 1 && len(m2) == 1
 		}, time.Second, 5*time.Millisecond)
+
+		require.Equal(t, msg1, m1[0])
+		require.Equal(t, msg1, m2[0])
+
+		// Publish message 2
+
+		b1.Publish(ctx, msg2)
+
+		require.Eventually(t, func() bool {
+			l.Lock()
+			defer l.Unlock()
+			return len(m1) == 2 && len(m2) == 2
+		}, time.Second, 5*time.Millisecond)
+
+		require.Equal(t, msg2, m1[1])
+		require.Equal(t, msg2, m2[1])
 	})
 }
