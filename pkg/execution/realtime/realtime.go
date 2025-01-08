@@ -86,6 +86,9 @@ type Broadcaster interface {
 	//
 	// Note that if the subscription currently exists, the current channels will
 	// be *added to* the subscribed set.
+	//
+	// This is non-blocking, running in another thread until the context is
+	// cancelled or Unsubscribe is called on the subscription ID and topic pair.
 	Subscribe(ctx context.Context, s Subscription, topics []Topic) error
 
 	// Unsubscribe a subscription from a set of specific topics.
