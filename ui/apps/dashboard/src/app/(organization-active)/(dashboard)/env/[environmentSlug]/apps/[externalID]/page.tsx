@@ -1,12 +1,12 @@
 'use client';
 
+import { FunctionList } from '@inngest/components/Apps/FunctionList';
 import { Button } from '@inngest/components/Button/Button';
 
 import { AppGitCard } from '@/components/AppGitCard/AppGitCard';
 import { AppInfoCard } from '@/components/AppInfoCard';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { SyncErrorCard } from '@/components/SyncErrorCard';
-import { FunctionList } from './FunctionList';
 import { useApp } from './useApp';
 
 type Props = {

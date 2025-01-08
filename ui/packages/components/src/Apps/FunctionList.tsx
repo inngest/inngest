@@ -9,7 +9,7 @@ import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 type Fn = Pick<Function, 'name' | 'slug' | 'triggers'>;
 
 type Props = {
-  envSlug: string;
+  envSlug?: string;
   functions: Fn[];
 };
 
@@ -41,7 +41,7 @@ export function FunctionList({ envSlug, functions }: Props) {
   );
 }
 
-function useColumns({ envSlug }: { envSlug: string }) {
+function useColumns({ envSlug }: { envSlug?: string }) {
   const columnHelper = createColumnHelper<Fn>();
 
   return [
@@ -49,18 +49,26 @@ function useColumns({ envSlug }: { envSlug: string }) {
       cell: (info) => {
         const name = info.getValue();
 
+        if (envSlug) {
+          return (
+            <div className="flex items-center">
+              <Link
+                arrowOnHover
+                size="medium"
+                className="w-full text-sm"
+                href={
+                  `/env/${envSlug}/functions/${encodeURIComponent(info.row.original.slug)}` as Route
+                }
+              >
+                {name}
+              </Link>
+            </div>
+          );
+        }
+
         return (
           <div className="flex items-center">
-            <Link
-              arrowOnHover
-              size="medium"
-              className="w-full text-sm font-medium"
-              href={
-                `/env/${envSlug}/functions/${encodeURIComponent(info.row.original.slug)}` as Route
-              }
-            >
-              {name}
-            </Link>
+            <span className="text-basis w-full text-sm">{name}</span>
           </div>
         );
       },
