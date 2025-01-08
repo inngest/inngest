@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"github.com/oklog/ulid/v2"
 	"io"
 	"log/slog"
 	"net"
@@ -641,6 +642,29 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 			SysCode:    syscode.CodeConnectWorkerHelloInvalidPayload,
 			StatusCode: websocket.StatusPolicyViolation,
 			Msg:        "Invalid Protobuf in SDK connect message",
+		}
+	}
+
+	// Ensure connection ID is valid ULID
+	{
+		if initialMessageData.SessionId == nil || initialMessageData.SessionId.ConnectionId == "" {
+			c.log.Debug("initial SDK message contained invalid connection ID")
+
+			return nil, &SocketError{
+				SysCode:    syscode.CodeConnectWorkerHelloInvalidPayload,
+				StatusCode: websocket.StatusPolicyViolation,
+				Msg:        "Invalid connection ID in SDK connect message",
+			}
+		}
+
+		if _, err = ulid.Parse(initialMessageData.SessionId.ConnectionId); err != nil {
+			c.log.Debug("initial SDK message contained invalid connection ID")
+
+			return nil, &SocketError{
+				SysCode:    syscode.CodeConnectWorkerHelloInvalidPayload,
+				StatusCode: websocket.StatusPolicyViolation,
+				Msg:        "Invalid connection ID in SDK connect message",
+			}
 		}
 	}
 

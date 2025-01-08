@@ -174,5 +174,5 @@ CREATE TABLE worker_connections (
 
     cpu_cores INT NOT NULL,
     mem_bytes INT NOT NULL,
-    os varchat NOT NULL
+    os VARCHAR NOT NULL
 );

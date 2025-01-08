@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	uuid "github.com/google/uuid"
 	ulid "github.com/oklog/ulid/v2"
 )
 
@@ -1168,9 +1169,9 @@ SELECT account_id, workspace_id, app_id, id, gateway_id, instance_id, status, co
 `
 
 type GetWorkerConnectionParams struct {
-	AccountID    interface{}
-	WorkspaceID  interface{}
-	ConnectionID interface{}
+	AccountID    uuid.UUID
+	WorkspaceID  uuid.UUID
+	ConnectionID ulid.ULID
 }
 
 func (q *Queries) GetWorkerConnection(ctx context.Context, arg GetWorkerConnectionParams) (*WorkerConnection, error) {
@@ -1623,11 +1624,11 @@ DO UPDATE SET
 `
 
 type InsertWorkerConnectionParams struct {
-	AccountID       interface{}
-	WorkspaceID     interface{}
-	AppID           interface{}
-	ID              interface{}
-	GatewayID       interface{}
+	AccountID       uuid.UUID
+	WorkspaceID     uuid.UUID
+	AppID           *uuid.UUID
+	ID              ulid.ULID
+	GatewayID       ulid.ULID
 	InstanceID      sql.NullString
 	Status          int64
 	ConnectedAt     int64
@@ -1637,10 +1638,10 @@ type InsertWorkerConnectionParams struct {
 	SdkLang         string
 	SdkVersion      string
 	SdkPlatform     string
-	SyncID          interface{}
+	SyncID          *uuid.UUID
 	CpuCores        int64
 	MemBytes        int64
-	Os              interface{}
+	Os              string
 }
 
 // Worker Connections

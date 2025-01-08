@@ -121,3 +121,30 @@ sql:
               import: "github.com/oklog/ulid/v2"
               package: "ulid"
               type: "ULID"
+          - column: "worker_connections.id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "worker_connections.gateway_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "worker_connections.account_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "worker_connections.workspace_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "worker_connections.app_id"
+            go_type:
+              import: "github.com/google/uuid"
+              package: "uuid"
+              type: "UUID"
+              pointer: true
+          - column: "worker_connections.sync_id"
+            go_type:
+              import: "github.com/google/uuid"
+              package: "uuid"
+              type: "UUID"
+              pointer: true
+

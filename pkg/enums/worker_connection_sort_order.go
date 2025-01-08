@@ -1,4 +1,4 @@
-//go:generate go run github.com/dmarkham/enumer -trimprefix=TraceRunOrder -type=TraceRunOrder -json -text
+//go:generate go run github.com/dmarkham/enumer -trimprefix=WorkerConnectionSortOrder -type=WorkerConnectionSortOrder -json -text
 package enums
 
 type WorkerConnectionSortOrder int

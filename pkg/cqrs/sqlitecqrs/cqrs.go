@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"strconv"
 	"strings"
 	"time"
@@ -1477,312 +1478,101 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 //
 
 func (w wrapper) InsertWorkerConnection(ctx context.Context, conn *cqrs.WorkerConnection) error {
-	connectionID, err := ulid.Parse(conn.Id)
-	if err != nil {
-		return fmt.Errorf("error parsing runID as ULID: %w", err)
+	instanceId := sql.NullString{}
+	if conn.InstanceId != nil {
+		instanceId.Valid = true
+		instanceId.String = *conn.InstanceId
 	}
 
-	params := sqlc.InsertTraceRunParams{
-		AccountID:   run.AccountID,
-		WorkspaceID: run.WorkspaceID,
-		AppID:       run.AppID,
-		FunctionID:  run.FunctionID,
-		TraceID:     []byte(run.TraceID),
-		SourceID:    run.SourceID,
-		RunID:       runid,
-		QueuedAt:    run.QueuedAt.UnixMilli(),
-		StartedAt:   run.StartedAt.UnixMilli(),
-		EndedAt:     run.EndedAt.UnixMilli(),
-		Status:      run.Status.ToCode(),
-		TriggerIds:  []byte{},
-		Output:      run.Output,
-		IsDebounce:  run.IsDebounce,
-		HasAi:       run.HasAI,
+	params := sqlc.InsertWorkerConnectionParams{
+		AccountID:       conn.AccountID,
+		WorkspaceID:     conn.WorkspaceID,
+		AppID:           conn.AppID,
+		ID:              conn.Id,
+		GatewayID:       conn.GatewayId,
+		InstanceID:      instanceId,
+		Status:          int64(conn.Status),
+		ConnectedAt:     conn.ConnectedAt.UnixMilli(),
+		LastHeartbeatAt: conn.LastHeartbeatAt.UnixMilli(),
+		DisconnectedAt:  conn.DisconnectedAt.UnixMilli(),
+		GroupHash:       []byte(conn.GroupHash),
+		SdkLang:         conn.SDKLang,
+		SdkVersion:      conn.SDKVersion,
+		SdkPlatform:     conn.SDKPlatform,
+		SyncID:          conn.SyncID,
+		CpuCores:        int64(conn.CpuCores),
+		MemBytes:        conn.MemBytes,
+		Os:              conn.Os,
 	}
 
-	if run.BatchID != nil {
-		params.BatchID = *run.BatchID
-	}
-	if run.CronSchedule != nil {
-		params.CronSchedule = sql.NullString{String: *run.CronSchedule, Valid: true}
-	}
-	if len(run.TriggerIDs) > 0 {
-		params.TriggerIds = []byte(strings.Join(run.TriggerIDs, ","))
-	}
-
-	return w.q.InsertTraceRun(ctx, params)
+	return w.q.InsertWorkerConnection(ctx, params)
 }
 
-type traceRunCursorFilter struct {
+type WorkerConnectionCursorFilter struct {
 	ID    string
 	Value int64
 }
 
-func (w wrapper) GetTraceSpansByRun(ctx context.Context, id cqrs.TraceRunIdentifier) ([]*cqrs.Span, error) {
-	spans, err := w.q.GetTraceSpans(ctx, sqlc.GetTraceSpansParams{
-		TraceID: id.TraceID,
-		RunID:   id.RunID,
+func (w wrapper) GetWorkerConnection(ctx context.Context, id cqrs.WorkerConnectionIdentifier) (*cqrs.WorkerConnection, error) {
+	conn, err := w.q.GetWorkerConnection(ctx, sqlc.GetWorkerConnectionParams{
+		AccountID:    id.AccountID,
+		WorkspaceID:  id.WorkspaceID,
+		ConnectionID: id.ConnectionID,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	res := []*cqrs.Span{}
-	seen := map[string]bool{}
-	for _, s := range spans {
-		// identifier to used for checking if this span is seen already
-		m := map[string]any{
-			"ts":  s.Timestamp.UnixMilli(),
-			"tid": s.TraceID,
-			"sid": s.SpanID,
-		}
-		byt, err := json.Marshal(m)
-		if err != nil {
-			return nil, err
-		}
-		ident := base64.StdEncoding.EncodeToString(byt)
-		if _, ok := seen[ident]; ok {
-			// already seen, so continue
-			continue
-		}
+	connectedAt := time.UnixMilli(conn.ConnectedAt)
+	disconnectedAt := time.UnixMilli(conn.DisconnectedAt)
+	lastHeartbeatAt := time.UnixMilli(conn.LastHeartbeatAt)
 
-		span := &cqrs.Span{
-			Timestamp:    s.Timestamp,
-			TraceID:      string(s.TraceID),
-			SpanID:       string(s.SpanID),
-			SpanName:     s.SpanName,
-			SpanKind:     s.SpanKind,
-			ServiceName:  s.ServiceName,
-			ScopeName:    s.ScopeName,
-			ScopeVersion: s.ScopeVersion,
-			Duration:     time.Duration(s.Duration * int64(time.Millisecond)),
-			StatusCode:   s.StatusCode,
-			RunID:        &s.RunID,
-		}
-
-		if s.StatusMessage.Valid {
-			span.StatusMessage = &s.StatusMessage.String
-		}
-
-		if s.ParentSpanID.Valid {
-			span.ParentSpanID = &s.ParentSpanID.String
-		}
-		if s.TraceState.Valid {
-			span.TraceState = &s.TraceState.String
-		}
-
-		var resourceAttr, spanAttr map[string]string
-		if err := json.Unmarshal(s.ResourceAttributes, &resourceAttr); err == nil {
-			span.ResourceAttributes = resourceAttr
-		}
-		if err := json.Unmarshal(s.SpanAttributes, &spanAttr); err == nil {
-			span.SpanAttributes = spanAttr
-		}
-
-		res = append(res, span)
-		seen[ident] = true
+	var instanceId *string
+	if conn.InstanceID.Valid {
+		instanceId = &conn.InstanceID.String
 	}
 
-	return res, nil
+	workerConn := cqrs.WorkerConnection{
+		AccountID:       conn.AccountID,
+		WorkspaceID:     conn.WorkspaceID,
+		AppID:           conn.AppID,
+		Id:              conn.ID,
+		GatewayId:       conn.GatewayID,
+		InstanceId:      instanceId,
+		Status:          connpb.ConnectionStatus(conn.Status),
+		LastHeartbeatAt: lastHeartbeatAt,
+		ConnectedAt:     connectedAt,
+		DisconnectedAt:  disconnectedAt,
+		GroupHash:       string(conn.GroupHash),
+		SDKLang:         conn.SdkLang,
+		SDKVersion:      conn.SdkVersion,
+		SDKPlatform:     conn.SdkPlatform,
+		SyncID:          conn.SyncID,
+		CpuCores:        int32(conn.CpuCores),
+		MemBytes:        conn.MemBytes,
+		Os:              conn.Os,
+	}
+
+	return &workerConn, nil
 }
 
-func (w wrapper) FindOrBuildTraceRun(ctx context.Context, opts cqrs.FindOrCreateTraceRunOpt) (*cqrs.TraceRun, error) {
-	run, err := w.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: opts.RunID})
-	if err == nil {
-		return run, nil
-	}
-
-	new := cqrs.TraceRun{
-		AccountID:   opts.AccountID,
-		WorkspaceID: opts.WorkspaceID,
-		AppID:       opts.AppID,
-		FunctionID:  opts.FunctionID,
-		RunID:       opts.RunID.String(),
-		TraceID:     opts.TraceID,
-		QueuedAt:    ulid.Time(opts.RunID.Time()),
-		TriggerIDs:  []string{},
-		Status:      enums.RunStatusUnknown,
-	}
-
-	return &new, nil
-}
-
-func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*cqrs.TraceRun, error) {
-
-	run, err := w.q.GetTraceRun(ctx, id.RunID)
-	if err != nil {
-		return nil, err
-	}
-
-	start := time.UnixMilli(run.StartedAt)
-	end := time.UnixMilli(run.EndedAt)
-	triggerIDS := strings.Split(string(run.TriggerIds), ",")
-
-	var (
-		isBatch bool
-		batchID *ulid.ULID
-		cron    *string
-	)
-
-	if run.BatchID != nilULID {
-		isBatch = true
-		batchID = &run.BatchID
-	}
-
-	if run.CronSchedule.Valid {
-		cron = &run.CronSchedule.String
-	}
-
-	trun := cqrs.TraceRun{
-		AccountID:    run.AccountID,
-		WorkspaceID:  run.WorkspaceID,
-		AppID:        run.AppID,
-		FunctionID:   run.FunctionID,
-		TraceID:      string(run.TraceID),
-		RunID:        id.RunID.String(),
-		QueuedAt:     time.UnixMilli(run.QueuedAt),
-		StartedAt:    start,
-		EndedAt:      end,
-		Duration:     end.Sub(start),
-		SourceID:     run.SourceID,
-		TriggerIDs:   triggerIDS,
-		Output:       run.Output,
-		Status:       enums.RunCodeToStatus(run.Status),
-		BatchID:      batchID,
-		IsBatch:      isBatch,
-		CronSchedule: cron,
-	}
-
-	return &trun, nil
-}
-
-func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {
-	if opts.TraceID == "" {
-		return nil, fmt.Errorf("traceID is required to retrieve output")
-	}
-	if opts.SpanID == "" {
-		return nil, fmt.Errorf("spanID is required to retrieve output")
-	}
-
-	// query spans in descending order
-	spans, err := w.q.GetTraceSpanOutput(ctx, sqlc.GetTraceSpanOutputParams{
-		TraceID: opts.TraceID,
-		SpanID:  opts.SpanID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving spans for output: %w", err)
-	}
-
-	for _, s := range spans {
-		var evts []cqrs.SpanEvent
-		err := json.Unmarshal(s.Events, &evts)
-		if err != nil {
-			return nil, fmt.Errorf("error parsing span outputs: %w", err)
-		}
-
-		var (
-			input      []byte
-			spanOutput *cqrs.SpanOutput
-		)
-
-		for _, evt := range evts {
-			if spanOutput == nil {
-				_, isFnOutput := evt.Attributes[consts.OtelSysFunctionOutput]
-				_, isStepOutput := evt.Attributes[consts.OtelSysStepOutput]
-				if isFnOutput || isStepOutput {
-					var isError bool
-					switch strings.ToUpper(s.StatusCode) {
-					case "ERROR", "STATUS_CODE_ERROR":
-						isError = true
-					}
-
-					spanOutput = &cqrs.SpanOutput{
-						Data:             []byte(evt.Name),
-						Timestamp:        evt.Timestamp,
-						Attributes:       evt.Attributes,
-						IsError:          isError,
-						IsFunctionOutput: isFnOutput,
-						IsStepOutput:     isStepOutput,
-					}
-				}
-			}
-
-			if _, isInput := evt.Attributes[consts.OtelSysStepInput]; isInput && input == nil {
-				input = []byte(evt.Name)
-			}
-
-			if spanOutput != nil && input != nil {
-				break
-			}
-		}
-
-		if spanOutput != nil {
-			spanOutput.Input = input
-			return spanOutput, nil
-		}
-	}
-
-	return nil, fmt.Errorf("no output found")
-}
-
-func (w wrapper) GetSpanStack(ctx context.Context, opts cqrs.SpanIdentifier) ([]string, error) {
-	if opts.TraceID == "" {
-		return nil, fmt.Errorf("traceID is required to retrieve stack")
-	}
-	if opts.SpanID == "" {
-		return nil, fmt.Errorf("spanID is required to retrieve stack")
-	}
-
-	// query spans in descending order
-	spans, err := w.q.GetTraceSpanOutput(ctx, sqlc.GetTraceSpanOutputParams{
-		TraceID: opts.TraceID,
-		SpanID:  opts.SpanID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving spans for stack: %w", err)
-	}
-
-	for _, s := range spans {
-		var evts []cqrs.SpanEvent
-		err := json.Unmarshal(s.Events, &evts)
-		if err != nil {
-			return nil, fmt.Errorf("error parsing span outputs: %w", err)
-		}
-
-		for _, evt := range evts {
-			if stack, ok := evt.Attributes[consts.OtelSysStepStack]; ok {
-				return strings.Split(stack, ","), nil
-			}
-		}
-	}
-
-	return nil, fmt.Errorf("no stack found")
-}
-
-type runsQueryBuilder struct {
+type workerConnectionsQueryBuilder struct {
 	filter       []sq.Expression
 	order        []sqexp.OrderedExpression
-	cursor       *cqrs.TracePageCursor
-	cursorLayout *cqrs.TracePageCursor
+	cursor       *cqrs.WorkerConnectionPageCursor
+	cursorLayout *cqrs.WorkerConnectionPageCursor
 }
 
-func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQueryBuilder {
+func newWorkerConnectionsQueryBuilder(ctx context.Context, opt cqrs.GetWorkerConnectionOpt) *workerConnectionsQueryBuilder {
 	// filters
 	filter := []sq.Expression{}
 	if len(opt.Filter.AppID) > 0 {
 		filter = append(filter, sq.C("app_id").In(opt.Filter.AppID))
 	}
-	if len(opt.Filter.FunctionID) > 0 {
-		filter = append(filter, sq.C("function_id").In(opt.Filter.FunctionID))
-	}
 	if len(opt.Filter.Status) > 0 {
 		status := []int64{}
 		for _, s := range opt.Filter.Status {
-			switch s {
-			case enums.RunStatusUnknown, enums.RunStatusOverflowed:
-				continue
-			}
-			status = append(status, s.ToCode())
+			status = append(status, int64(s))
 		}
 		filter = append(filter, sq.C("status").In(status))
 	}
@@ -1796,14 +1586,14 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 	filter = append(filter, sq.C(tsfield).Lt(until.UnixMilli()))
 
 	// Layout to be used for the response cursors
-	resCursorLayout := cqrs.TracePageCursor{
-		Cursors: map[string]cqrs.TraceCursor{},
+	resCursorLayout := cqrs.WorkerConnectionPageCursor{
+		Cursors: map[string]cqrs.WorkerConnectionCursor{},
 	}
 
-	reqcursor := &cqrs.TracePageCursor{}
+	reqcursor := &cqrs.WorkerConnectionPageCursor{}
 	if opt.Cursor != "" {
 		if err := reqcursor.Decode(opt.Cursor); err != nil {
-			log.From(ctx).Error().Err(err).Str("cursor", opt.Cursor).Msg("error decoding function run cursor")
+			log.From(ctx).Error().Err(err).Str("cursor", opt.Cursor).Msg("error decoding worker connection history cursor")
 		}
 	}
 
@@ -1812,9 +1602,9 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 	// When going through the sorting fields, construct
 	// - response pagination cursor layout
 	// - update filter with op against sorted fields for pagination
-	sortOrder := []enums.TraceRunTime{}
-	sortDir := map[enums.TraceRunTime]enums.TraceRunOrder{}
-	cursorFilter := map[enums.TraceRunTime]traceRunCursorFilter{}
+	sortOrder := []enums.WorkerConnectionTimeField{}
+	sortDir := map[enums.WorkerConnectionTimeField]enums.WorkerConnectionSortOrder{}
+	cursorFilter := map[enums.WorkerConnectionTimeField]WorkerConnectionCursorFilter{}
 	for _, f := range opt.Order {
 		sortDir[f.Field] = f.Direction
 		found := false
@@ -1830,7 +1620,7 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 
 		rc := reqcursor.Find(f.Field.String())
 		if rc != nil {
-			cursorFilter[f.Field] = traceRunCursorFilter{ID: reqcursor.ID, Value: rc.Value}
+			cursorFilter[f.Field] = WorkerConnectionCursorFilter{ID: reqcursor.ID, Value: rc.Value}
 		}
 		resCursorLayout.Add(f.Field.String())
 	}
@@ -1841,9 +1631,9 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 		field := strings.ToLower(f.String())
 		if d, ok := sortDir[f]; ok {
 			switch d {
-			case enums.TraceRunOrderAsc:
+			case enums.WorkerConnectionSortOrderAsc:
 				o = sq.C(field).Asc()
-			case enums.TraceRunOrderDesc:
+			case enums.WorkerConnectionSortOrderDesc:
 				o = sq.C(field).Desc()
 			default:
 				log.From(ctx).Error().Str("field", field).Str("direction", d.String()).Msg("invalid direction specified for sorting")
@@ -1853,7 +1643,7 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 			order = append(order, o)
 		}
 	}
-	order = append(order, sq.C("run_id").Asc())
+	order = append(order, sq.C("id").Asc())
 
 	// cursor filter
 	for k, cf := range cursorFilter {
@@ -1865,9 +1655,9 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 		var compare sq.Expression
 		field := strings.ToLower(k.String())
 		switch ord {
-		case enums.TraceRunOrderAsc:
+		case enums.WorkerConnectionSortOrderAsc:
 			compare = sq.C(field).Gt(cf.Value)
-		case enums.TraceRunOrderDesc:
+		case enums.WorkerConnectionSortOrderDesc:
 			compare = sq.C(field).Lt(cf.Value)
 		default:
 			continue
@@ -1877,12 +1667,12 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 			compare,
 			sq.And(
 				sq.C(field).Eq(cf.Value),
-				sq.C("run_id").Gt(cf.ID),
+				sq.C("id").Gt(cf.ID),
 			),
 		))
 	}
 
-	return &runsQueryBuilder{
+	return &workerConnectionsQueryBuilder{
 		filter:       filter,
 		order:        order,
 		cursor:       reqcursor,
@@ -1890,10 +1680,10 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 	}
 }
 
-func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
+func (w wrapper) GetWorkerConnectionsCount(ctx context.Context, opt cqrs.GetWorkerConnectionOpt) (int, error) {
 	// explicitly set it to zero so it would not attempt to paginate
 	opt.Items = 0
-	res, err := w.GetTraceRuns(ctx, opt)
+	res, err := w.GetWorkerConnections(ctx, opt)
 	if err != nil {
 		return 0, err
 	}
@@ -1901,26 +1691,8 @@ func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt)
 	return len(res), nil
 }
 
-func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
-	// use evtIDs as post query filter
-	evtIDs := []string{}
-	expHandler, err := run.NewExpressionHandler(ctx,
-		run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
-	)
-	if err != nil {
-		return nil, err
-	}
-	if expHandler.HasEventFilters() {
-		evts, err := w.GetEventsByExpressions(ctx, expHandler.EventExprList)
-		if err != nil {
-			return nil, err
-		}
-		for _, e := range evts {
-			evtIDs = append(evtIDs, e.ID.String())
-		}
-	}
-
-	builder := newRunsQueryBuilder(ctx, opt)
+func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerConnectionOpt) ([]*cqrs.WorkerConnection, error) {
+	builder := newWorkerConnectionsQueryBuilder(ctx, opt)
 	filter := builder.filter
 	order := builder.order
 	reqcursor := builder.cursor
@@ -1931,23 +1703,31 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	// change this to a continuous loop with limits instead of just attempting to grab everything.
 	// might not matter though since this is primarily meant for local development
 	sql, args, err := sq.Dialect("sqlite3").
-		From("trace_runs").
+		From("worker_connections").
 		Select(
+			"account_id",
+			"workspace_id",
+
 			"app_id",
-			"function_id",
-			"trace_id",
-			"run_id",
-			"queued_at",
-			"started_at",
-			"ended_at",
+
+			"id",
+			"gateway_id",
+			"instance_id",
 			"status",
-			"source_id",
-			"trigger_ids",
-			"output",
-			"batch_id",
-			"is_debounce",
-			"cron_schedule",
-			"has_ai",
+
+			"connected_at",
+			"last_heartbeat_at",
+			"disconnected_at",
+
+			"group_hash",
+			"sdk_lang",
+			"sdk_version",
+			"sdk_platform",
+			"sync_id",
+
+			"cpu_cores",
+			"mem_bytes",
+			"os",
 		).
 		Where(filter...).
 		Order(order...).
@@ -1961,72 +1741,55 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 		return nil, err
 	}
 
-	res := []*cqrs.TraceRun{}
+	res := []*cqrs.WorkerConnection{}
 	var count uint
 	for rows.Next() {
-		data := sqlc.TraceRun{}
+		data := sqlc.WorkerConnection{}
 		err := rows.Scan(
+			&data.AccountID,
+			&data.WorkspaceID,
+
 			&data.AppID,
-			&data.FunctionID,
-			&data.TraceID,
-			&data.RunID,
-			&data.QueuedAt,
-			&data.StartedAt,
-			&data.EndedAt,
+
+			&data.ID,
+			&data.GatewayID,
+			&data.InstanceID,
 			&data.Status,
-			&data.SourceID,
-			&data.TriggerIds,
-			&data.Output,
-			&data.BatchID,
-			&data.IsDebounce,
-			&data.CronSchedule,
-			&data.HasAi,
+
+			&data.ConnectedAt,
+			&data.LastHeartbeatAt,
+			&data.DisconnectedAt,
+
+			&data.GroupHash,
+			&data.SdkLang,
+			&data.SdkVersion,
+			&data.SyncID,
+
+			&data.CpuCores,
+			&data.MemBytes,
+			&data.Os,
 		)
 		if err != nil {
 			return nil, err
 		}
 
-		// filter out runs that doesn't have the event IDs
-		if len(evtIDs) > 0 && !data.HasEventIDs(evtIDs) {
-			continue
-		}
-
 		// the cursor target should be skipped
-		if reqcursor.ID == data.RunID.String() {
+		if reqcursor.ID == data.ID.String() {
 			continue
-		}
-
-		if expHandler.HasOutputFilters() {
-			ok, err := expHandler.MatchOutputExpressions(ctx, data.Output)
-			if err != nil {
-				logger.StdlibLogger(ctx).Error("error inspecting run for output match",
-					"error", err,
-					"output", string(data.Output),
-					"acctID", data.AccountID,
-					"wsID", data.WorkspaceID,
-					"appID", data.AppID,
-					"wfID", data.FunctionID,
-					"runID", data.RunID,
-				)
-				continue
-			}
-			if !ok {
-				continue
-			}
 		}
 
 		// copy layout
 		pc := resCursorLayout
 		// construct the needed fields to generate a cursor representing this run
-		pc.ID = data.RunID.String()
+		pc.ID = data.ID.String()
 		for k := range pc.Cursors {
 			switch k {
-			case strings.ToLower(enums.TraceRunTimeQueuedAt.String()):
-				pc.Cursors[k] = cqrs.TraceCursor{Field: k, Value: data.QueuedAt}
-			case strings.ToLower(enums.TraceRunTimeStartedAt.String()):
-				pc.Cursors[k] = cqrs.TraceCursor{Field: k, Value: data.StartedAt}
-			case strings.ToLower(enums.TraceRunTimeEndedAt.String()):
-				pc.Cursors[k] = cqrs.TraceCursor{Field: k, Value: data.EndedAt}
+			case strings.ToLower(enums.WorkerConnectionTimeFieldConnectedAt.String()):
+				pc.Cursors[k] = cqrs.WorkerConnectionCursor{Field: k, Value: data.ConnectedAt}
+			case strings.ToLower(enums.WorkerConnectionTimeFieldLastHeartbeatAt.String()):
+				pc.Cursors[k] = cqrs.WorkerConnectionCursor{Field: k, Value: data.LastHeartbeatAt}
+			case strings.ToLower(enums.WorkerConnectionTimeFieldDisconnectedAt.String()):
+				pc.Cursors[k] = cqrs.WorkerConnectionCursor{Field: k, Value: data.DisconnectedAt}
 			default:
 				log.From(ctx).Warn().Str("field", k).Msg("unknown field registered as cursor")
 				delete(pc.Cursors, k)
@@ -2037,35 +1800,36 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 		if err != nil {
 			log.From(ctx).Error().Err(err).Interface("page_cursor", pc).Msg("error encoding cursor")
 		}
-		var cron *string
-		if data.CronSchedule.Valid {
-			cron = &data.CronSchedule.String
-		}
-		var batchID *ulid.ULID
-		isBatch := data.BatchID != nilULID
-		if isBatch {
-			batchID = &data.BatchID
+
+		connectedAt := time.UnixMilli(data.ConnectedAt)
+		disconnectedAt := time.UnixMilli(data.DisconnectedAt)
+		lastHeartbeatAt := time.UnixMilli(data.LastHeartbeatAt)
+
+		var instanceId *string
+		if data.InstanceID.Valid {
+			instanceId = &data.InstanceID.String
 		}
 
-		res = append(res, &cqrs.TraceRun{
-			AppID:        data.AppID,
-			FunctionID:   data.FunctionID,
-			TraceID:      string(data.TraceID),
-			RunID:        data.RunID.String(),
-			QueuedAt:     time.UnixMilli(data.QueuedAt),
-			StartedAt:    time.UnixMilli(data.StartedAt),
-			EndedAt:      time.UnixMilli(data.EndedAt),
-			SourceID:     data.SourceID,
-			TriggerIDs:   data.EventIDs(),
-			Triggers:     [][]byte{},
-			Output:       data.Output,
-			Status:       enums.RunCodeToStatus(data.Status),
-			IsBatch:      isBatch,
-			BatchID:      batchID,
-			IsDebounce:   data.IsDebounce,
-			HasAI:        data.HasAi,
-			CronSchedule: cron,
-			Cursor:       cursor,
+		res = append(res, &cqrs.WorkerConnection{
+			AccountID:       data.AccountID,
+			WorkspaceID:     data.WorkspaceID,
+			AppID:           data.AppID,
+			Id:              data.ID,
+			GatewayId:       data.GatewayID,
+			InstanceId:      instanceId,
+			Status:          connpb.ConnectionStatus(data.Status),
+			LastHeartbeatAt: lastHeartbeatAt,
+			ConnectedAt:     connectedAt,
+			DisconnectedAt:  disconnectedAt,
+			GroupHash:       string(data.GroupHash),
+			SDKLang:         data.SdkLang,
+			SDKVersion:      data.SdkVersion,
+			SDKPlatform:     data.SdkPlatform,
+			SyncID:          data.SyncID,
+			CpuCores:        int32(data.CpuCores),
+			MemBytes:        data.MemBytes,
+			Os:              data.Os,
+			Cursor:          cursor,
 		})
 		count++
 		// enough items, don't need to proceed anymore

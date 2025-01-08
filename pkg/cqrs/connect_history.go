@@ -19,16 +19,18 @@ type WorkerConnection struct {
 	WorkspaceID uuid.UUID `json:"workspace_id"`
 
 	// This is optional and only set when connection is ready
-	// TODO Should we only store worker connections in the history store once they're assigned to an app?
-	AppID uuid.UUID `json:"app_id"`
+	AppID *uuid.UUID `json:"app_id"`
 
 	// Connection attributes
-	Id              string                  `json:"id"`
-	GatewayId       string                  `json:"gateway_id"`
-	InstanceId      *string                 `json:"instance_id"`
-	Status          connpb.ConnectionStatus `json:"status"`
-	LastHeartbeatAt time.Time               `json:"last_heartbeat_at"`
-	ConnectedAt     time.Time               `json:"connected_at"`
+	Id         ulid.ULID               `json:"id"`
+	GatewayId  ulid.ULID               `json:"gateway_id"`
+	InstanceId *string                 `json:"instance_id"`
+	Status     connpb.ConnectionStatus `json:"status"`
+
+	// Timestamps
+	LastHeartbeatAt time.Time `json:"last_heartbeat_at"`
+	ConnectedAt     time.Time `json:"connected_at"`
+	DisconnectedAt  time.Time `json:"disconnected_at"`
 
 	// Group attributes
 	GroupHash   string     `json:"group_hash"`
@@ -75,13 +77,12 @@ type GetWorkerConnectionOpt struct {
 type GetWorkerConnectionFilter struct {
 	AccountID   uuid.UUID
 	WorkspaceID uuid.UUID
-	AppID       []uuid.UUID
-	FunctionID  []uuid.UUID
-	TimeField   enums.WorkerConnectionTimeField
-	From        time.Time
-	Until       time.Time
-	Status      []enums.RunStatus
-	CEL         string
+
+	AppID     []uuid.UUID
+	TimeField enums.WorkerConnectionTimeField
+	From      time.Time
+	Until     time.Time
+	Status    []connpb.ConnectionStatus
 }
 
 type GetWorkerConnectionOrder struct {
