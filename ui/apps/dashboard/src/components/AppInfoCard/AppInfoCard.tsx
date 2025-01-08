@@ -52,12 +52,7 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
     if (app) {
       lastSyncValue = (
         <div className="flex items-center gap-2">
-          <span className="hidden sm:block">
-            <SyncStatusPill status={sync.status} />
-          </span>
-          <span className="block sm:hidden">
-            <SyncStatusPill status={sync.status} iconOnly />
-          </span>
+          <SyncStatusPill status={sync.status} />
           {linkToSyncs && <Time value={sync.lastSyncedAt} />}
           {!linkToSyncs && (
             <Link
@@ -72,12 +67,7 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
     } else {
       lastSyncValue = (
         <div className="flex items-center gap-2">
-          <span className="hidden sm:block">
-            <SyncStatusPill status={sync.status} />
-          </span>
-          <span className="block sm:hidden">
-            <SyncStatusPill status={sync.status} iconOnly />
-          </span>
+          <SyncStatusPill status={sync.status} />
           <Time value={sync.lastSyncedAt} />
         </div>
       );

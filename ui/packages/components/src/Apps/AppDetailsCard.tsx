@@ -14,7 +14,7 @@ export function AppDetailsCard({ title, className, children }: React.PropsWithCh
   return (
     <>
       <div className={cn('border-subtle bg-codeEditor rounded-lg border', className)}>
-        <h2 className="text-muted border-b px-6 py-3 text-sm">{title}</h2>
+        <h2 className="text-muted border-subtle border-b px-6 py-3 text-sm">{title}</h2>
 
         <dl className="bg-canvasBase flex flex-col gap-4 rounded-b-lg p-6 md:grid md:grid-cols-4">
           {children}
