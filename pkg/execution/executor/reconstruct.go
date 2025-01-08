@@ -17,7 +17,11 @@ func reconstruct(ctx context.Context, tr cqrs.TraceReader, req execution.Schedul
 	// Load the original run state and copy the state from the original
 	// run to the new run.
 	origTraceRun, err := tr.GetTraceRun(ctx, cqrs.TraceRunIdentifier{
-		RunID: *req.OriginalRunID,
+		RunID:       *req.OriginalRunID,
+		WorkspaceID: req.WorkspaceID,
+		AppID:       req.AppID,
+		FunctionID:  req.Function.ID,
+		AccountID:   req.AccountID,
 	})
 	if err != nil {
 		return fmt.Errorf("error loading original trace run: %w", err)
