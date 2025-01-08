@@ -67,7 +67,7 @@ export function SyncList({
                 onClick={() => onClick(sync.id)}
               >
                 <div className="flex items-center gap-1">
-                  <div className="hidden w-20 items-center p-4 sm:flex">
+                  <div className="ml-1 hidden w-20 items-center sm:flex">
                     <SyncStatusPill status={sync.status} />
                   </div>
                   <div className="py-4 pl-2 align-middle sm:pl-0">
