@@ -70,7 +70,7 @@ export function SyncList({
                   <div className="ml-1 hidden w-20 items-center sm:flex">
                     <SyncStatusPill status={sync.status} />
                   </div>
-                  <div className="py-4 pl-2 align-middle sm:pl-0">
+                  <div className="flex-1 py-4 pl-2 align-middle sm:pl-0">
                     <Time className="text-wrap" value={sync.lastSyncedAt} />
                   </div>
                 </div>
