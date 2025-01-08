@@ -35,10 +35,10 @@ const (
 	MessageKindPing = MessageKind("ping")
 	// MessageKindSubscribe is a message kind that subscribes to a new set of topics,
 	// given a valid JWT embedding the topics directly.
-	MessageKindSubscribe = MessageKind("subscribe")
+	MessageKindSubscribe = MessageKind("sub")
 	// MessageKindUnsubscribe is a message kind that indicates the subscription should
 	// stop listening to the given topics
-	MessageKindUnsubscribe = MessageKind("unsubscribe")
+	MessageKindUnsubscribe = MessageKind("unsub")
 
 	// MessageKindClosing is a message kind sent when the server is closing the
 	// realtime connection.  The subscriber should attempt to reconnect immediately,

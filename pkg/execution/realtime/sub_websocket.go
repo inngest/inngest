@@ -24,11 +24,18 @@ import (
 //     topics.
 //   - The websocket subscriber listens for incoming messages which can subscribe and unsubscribe from
 //     new topics at will (given a valid JWT in the websocket message, for subscription requests)
-func NewWebsocketSubscription(ctx context.Context, b Broadcaster, conn *websocket.Conn, topics []Topic) (Subscription, error) {
+func NewWebsocketSubscription(
+	ctx context.Context,
+	b Broadcaster,
+	jwtSigningKey []byte,
+	conn *websocket.Conn,
+	topics []Topic,
+) (Subscription, error) {
 	sub := &SubscriptionWS{
-		b:  b,
-		id: uuid.New(),
-		ws: conn,
+		b:             b,
+		id:            uuid.New(),
+		ws:            conn,
+		jwtSigningKey: jwtSigningKey,
 	}
 
 	// Handle reading of additional messages such as subscription requests from the WS
@@ -54,6 +61,8 @@ func NewWebsocketSubscription(ctx context.Context, b Broadcaster, conn *websocke
 type SubscriptionWS struct {
 	id uuid.UUID
 	b  Broadcaster
+
+	jwtSigningKey []byte
 
 	ws *websocket.Conn
 }
@@ -118,8 +127,7 @@ func (s SubscriptionWS) poll(ctx context.Context) error {
 				continue
 			}
 
-			// TODO: Get token for topics.
-			topics, err := TopicsFromJWT(ctx, []byte("TODO"), jwt)
+			topics, err := TopicsFromJWT(ctx, s.jwtSigningKey, jwt)
 			if err != nil {
 				// TODO: Reply with unsuccessful subscribe msg
 				continue
@@ -132,11 +140,21 @@ func (s SubscriptionWS) poll(ctx context.Context) error {
 
 			// TODO: Reply with successful subscribe msg
 			continue
-
 		case MessageKindUnsubscribe:
 			// Unsub from the given topics.  Assume that the unsubscribe data
 			// is a list of topics.
-			// data := []Topic{}
+			topics := []Topic{}
+			if err := json.Unmarshal(msg.Data, &topics); err != nil {
+				logger.StdlibLogger(ctx).Warn(
+					"error unmarshalling unsubscribe data",
+					"error", err,
+				)
+				continue
+			}
+
+			if err := s.b.Unsubscribe(ctx, s.id, topics); err != nil {
+				// TODO: reply with error.
+			}
 		}
 	}
 }
