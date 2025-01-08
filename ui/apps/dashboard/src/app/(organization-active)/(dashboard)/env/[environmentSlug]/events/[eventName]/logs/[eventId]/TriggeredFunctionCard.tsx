@@ -11,7 +11,6 @@ import { RiArrowRightSLine } from '@remixicon/react';
 import { noCase } from 'change-case';
 import { titleCase } from 'title-case';
 
-import { getBaseRunUrl } from '@/components/Runs/utils';
 import { graphql } from '@/gql';
 import { FunctionRunStatus } from '@/gql/graphql';
 import graphqlAPI from '@/queries/graphqlAPI';
@@ -74,19 +73,11 @@ export default async function TriggeredFunctionCard({
     );
   }
 
-  const baseUrl = getBaseRunUrl(function_.run.startedAt);
-  // runs from before clickhouse migration go to the old runs page
-  const url =
-    baseUrl === 'logs'
-      ? pathCreator.oldRun({
-          envSlug: environmentSlug,
-          functionSlug: function_.slug,
-          runID: function_.run.id,
-        })
-      : pathCreator.runPopout({ envSlug: environmentSlug, runID: function_.run.id });
-
   return (
-    <NextLink href={url} className="bg-canvasBase flex items-center rounded-lg border p-5 shadow">
+    <NextLink
+      href={pathCreator.runPopout({ envSlug: environmentSlug, runID: function_.run.id })}
+      className="bg-canvasBase flex items-center rounded-lg border p-5 shadow"
+    >
       <div className="flex-1">
         <div className="flex items-center gap-1.5">
           <FunctionsIcon className="text-subtle h-4 w-4" />
