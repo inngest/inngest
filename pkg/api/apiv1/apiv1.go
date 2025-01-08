@@ -45,7 +45,7 @@ type Opts struct {
 // AddRoutes adds a new API handler to the given router.
 func AddRoutes(r chi.Router, o Opts) http.Handler {
 	if o.AuthFinder == nil {
-		o.AuthFinder = nilAuthFinder
+		o.AuthFinder = NilAuthFinder
 	}
 
 	// Create the HTTP implementation, which wraps the handler.  We do ths to code
@@ -144,8 +144,8 @@ type V1Auth interface {
 	WorkspaceID() uuid.UUID
 }
 
-// nilAuthFinder is used in the dev server, returning zero auth.
-func nilAuthFinder(ctx context.Context) (V1Auth, error) {
+// NilAuthFinder is used in the dev server, returning zero auth.
+func NilAuthFinder(ctx context.Context) (V1Auth, error) {
 	return nilAuth{}, nil
 }
 

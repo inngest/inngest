@@ -132,6 +132,16 @@ type Subscription interface {
 	io.Closer
 }
 
+// ReadWriteSubscription is a subscription which reads messages via the Poll() method, allowing
+// the subscription itself to manage subscribing and unsubscribing from topics.
+type ReadWriteSubscription interface {
+	Subscription
+
+	// Poll polls for new messages, blocking until the Subscription closes or the context
+	// is cancelled.
+	Poll(ctx context.Context) error
+}
+
 // Topic represents a topic for a message.  This is used for publishing and subscribing.
 // Each message is published to one or more topics.
 type Topic struct {

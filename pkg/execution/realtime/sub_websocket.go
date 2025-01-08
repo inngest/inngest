@@ -27,26 +27,19 @@ import (
 func NewWebsocketSubscription(
 	ctx context.Context,
 	b Broadcaster,
+	acctID, envID uuid.UUID,
 	jwtSigningKey []byte,
 	conn *websocket.Conn,
 	topics []Topic,
-) (Subscription, error) {
+) (ReadWriteSubscription, error) {
 	sub := &SubscriptionWS{
 		b:             b,
+		acctID:        acctID,
+		envID:         envID,
 		id:            uuid.New(),
 		ws:            conn,
 		jwtSigningKey: jwtSigningKey,
 	}
-
-	// Handle reading of additional messages such as subscription requests from the WS
-	go func() {
-		if err := sub.poll(ctx); err != nil {
-			logger.StdlibLogger(ctx).Warn(
-				"error reading from rt ws conn",
-				"error", err,
-			)
-		}
-	}()
 
 	err := b.Subscribe(ctx, sub, topics)
 	return sub, err
@@ -55,7 +48,15 @@ func NewWebsocketSubscription(
 // SubscriptionWS represents a websocket subscription
 type SubscriptionWS struct {
 	id uuid.UUID
-	b  Broadcaster
+
+	// acctID represents the authenticated account ID when initializing
+	// the websocket connection
+	acctID uuid.UUID
+	// acctID represents the authenticated environment ID when initializing
+	// the websocket connection
+	envID uuid.UUID
+
+	b Broadcaster
 
 	jwtSigningKey []byte
 
@@ -87,7 +88,7 @@ func (s SubscriptionWS) Close() error {
 	return s.ws.Close(websocket.CloseStatus(nil), string(MessageKindClosing))
 }
 
-func (s SubscriptionWS) poll(ctx context.Context) error {
+func (s SubscriptionWS) Poll(ctx context.Context) error {
 	for {
 		mt, byt, err := s.ws.Read(ctx)
 		if err != nil {
