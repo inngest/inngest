@@ -20,7 +20,7 @@ type Props = {
 
 export function FunctionList({ envSlug, functions, pathCreator }: Props) {
   const tableContainerRef = useRef<HTMLDivElement>(null);
-  const columns = useColumns({ envSlug });
+  const columns = useColumns({ envSlug, pathCreator });
 
   const sortedFunctions = [...functions].sort((a, b) => {
     return a.name.localeCompare(b.name);
