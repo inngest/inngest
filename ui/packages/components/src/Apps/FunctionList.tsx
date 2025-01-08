@@ -11,9 +11,14 @@ type Fn = Pick<Function, 'name' | 'slug' | 'triggers'>;
 type Props = {
   envSlug?: string;
   functions: Fn[];
+  pathCreator?: {
+    // No need to make this env agnostic, since we only want links in Cloud
+    function: (params: { envSlug: string; functionSlug: string }) => Route;
+    eventType: (params: { envSlug: string; eventName: string }) => Route;
+  };
 };
 
-export function FunctionList({ envSlug, functions }: Props) {
+export function FunctionList({ envSlug, functions, pathCreator }: Props) {
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const columns = useColumns({ envSlug });
 
@@ -41,7 +46,16 @@ export function FunctionList({ envSlug, functions }: Props) {
   );
 }
 
-function useColumns({ envSlug }: { envSlug?: string }) {
+function useColumns({
+  envSlug,
+  pathCreator,
+}: {
+  envSlug?: string;
+  pathCreator?: {
+    function: (params: { envSlug: string; functionSlug: string }) => Route;
+    eventType: (params: { envSlug: string; eventName: string }) => Route;
+  };
+}) {
   const columnHelper = createColumnHelper<Fn>();
 
   return [
@@ -49,16 +63,14 @@ function useColumns({ envSlug }: { envSlug?: string }) {
       cell: (info) => {
         const name = info.getValue();
 
-        if (envSlug) {
+        if (envSlug && pathCreator) {
           return (
             <div className="flex items-center">
               <Link
                 arrowOnHover
                 size="medium"
                 className="w-full text-sm"
-                href={
-                  `/env/${envSlug}/functions/${encodeURIComponent(info.row.original.slug)}` as Route
-                }
+                href={pathCreator.function({ envSlug, functionSlug: info.row.original.slug })}
               >
                 {name}
               </Link>
@@ -85,8 +97,8 @@ function useColumns({ envSlug }: { envSlug?: string }) {
                 <Pill
                   appearance="outlined"
                   href={
-                    trigger.type === 'EVENT'
-                      ? (`/env/${envSlug}/events/${encodeURIComponent(trigger.value)}` as Route)
+                    envSlug && pathCreator && trigger.type === 'EVENT'
+                      ? pathCreator.eventType({ envSlug, eventName: trigger.value })
                       : undefined
                   }
                   key={trigger.type + trigger.value}
