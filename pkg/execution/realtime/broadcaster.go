@@ -25,8 +25,8 @@ var (
 	KeepaliveInterval   = 15 * time.Second
 )
 
-// NewInProcessBroadcaster is a single broadcaster which is used for in-memory, in-process
-// publishing.
+// NewInProcessBroadcaster is a single broadcaster which manages active subscriptions
+// in-memory and broadcasts to connected subscribers.
 func NewInProcessBroadcaster() Broadcaster {
 	return newBroadcaster()
 }
