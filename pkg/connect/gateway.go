@@ -180,6 +180,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				ch.log.Error("could not update connection status after context done", "err", err)
 			}
 
+			for _, l := range c.lifecycles {
+				go l.OnStartDraining(context.Background(), conn)
+			}
+
 			closeReason = "gateway-draining"
 
 			// Close WS connection once worker established another connection
@@ -221,7 +225,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 
 			for _, lifecycle := range c.lifecycles {
-				lifecycle.OnDisconnected(context.Background(), closeReason)
+				lifecycle.OnDisconnected(context.Background(), conn, closeReason)
 			}
 		}()
 
@@ -297,6 +301,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					// immediately stop routing messages to this connection
 					if err := ch.updateConnStatus(connect.ConnectionStatus_DISCONNECTING); err != nil {
 						ch.log.Error("could not update connection status after read error", "err", err)
+					}
+
+					for _, l := range c.lifecycles {
+						go l.OnStartDraining(context.Background(), conn)
 					}
 
 					closeErr := websocket.CloseError{}
@@ -381,8 +389,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 
 			// Mark connection as ready to receive traffic unless we require manual client ready signal (optional)
-			conn.Status = connect.ConnectionStatus_READY
-			err = c.stateManager.UpsertConnection(ctx, conn)
+			err = c.stateManager.UpsertConnection(ctx, conn, connect.ConnectionStatus_READY, time.Now())
 			if err != nil {
 				if ctx.Err() != nil {
 					c.closeDraining(ws)
@@ -397,6 +404,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				})
 
 				return
+			}
+
+			for _, l := range c.lifecycles {
+				go l.OnReady(context.Background(), conn)
 			}
 		}
 
@@ -438,6 +449,10 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(appId uuid.UUID, msg 
 			}
 		}
 
+		for _, l := range c.svc.lifecycles {
+			go l.OnReady(context.Background(), c.conn)
+		}
+
 		return nil
 	case connect.GatewayMessageType_WORKER_HEARTBEAT:
 		if c.svc.isDraining {
@@ -454,6 +469,10 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(appId uuid.UUID, msg 
 			}
 		}
 
+		for _, l := range c.svc.lifecycles {
+			go l.OnHeartbeat(context.Background(), c.conn)
+		}
+
 		return nil
 	case connect.GatewayMessageType_WORKER_PAUSE:
 		if c.svc.isDraining {
@@ -468,6 +487,10 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(appId uuid.UUID, msg 
 				StatusCode: websocket.StatusInternalError,
 				Msg:        "could not update connection status",
 			}
+		}
+
+		for _, l := range c.svc.lifecycles {
+			go l.OnStartDraining(context.Background(), c.conn)
 		}
 
 		return nil
@@ -740,9 +763,6 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 		EnvID:        authResp.EnvID,
 		ConnectionId: connectionId,
 
-		// Mark initial status, not ready to receive messages yet
-		Status: connect.ConnectionStatus_CONNECTED,
-
 		Data:    &initialMessageData,
 		Session: sessionDetails,
 		Group:   workerGroup,
@@ -755,7 +775,7 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 		// This is a transactional operation, it should always complete regardless of context cancellation
 
 		// Connection should always be upserted, we don't want inconsistent state
-		if err := c.svc.stateManager.UpsertConnection(context.Background(), &conn); err != nil {
+		if err := c.svc.stateManager.UpsertConnection(context.Background(), &conn, connect.ConnectionStatus_CONNECTED, time.Now()); err != nil {
 			log.Error("adding connection state failed", "err", err)
 			return nil, &SocketError{
 				SysCode:    syscode.CodeConnectInternal,
@@ -795,9 +815,6 @@ func (c *connectionHandler) updateConnStatus(status connect.ConnectionStatus) er
 	c.updateLock.Lock()
 	defer c.updateLock.Unlock()
 
-	c.conn.Status = status
-	c.conn.LastHeartbeatAt = time.Now()
-
 	// Always update the connection status, do not use context cancellation
-	return c.svc.stateManager.UpsertConnection(context.Background(), c.conn)
+	return c.svc.stateManager.UpsertConnection(context.Background(), c.conn, status, time.Now())
 }

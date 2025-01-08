@@ -1763,6 +1763,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			&data.GroupHash,
 			&data.SdkLang,
 			&data.SdkVersion,
+			&data.SdkPlatform,
 			&data.SyncID,
 
 			&data.CpuCores,

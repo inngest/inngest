@@ -190,22 +190,22 @@ func (r *redisConnectionStateManager) GetConnectionsByGroupID(ctx context.Contex
 	return conns, nil
 }
 
-func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn *Connection) error {
+func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn *Connection, status connpb.ConnectionStatus, lastHeartbeatAt time.Time) error {
 	groupID := conn.Group.Hash
 	meta := &connpb.ConnMetadata{
 		Id:              conn.Session.SessionId.ConnectionId,
 		InstanceId:      conn.Session.SessionId.InstanceId,
-		Status:          conn.Status,
+		Status:          status,
 		Language:        conn.Data.SdkLanguage,
 		Version:         conn.Data.SdkVersion,
 		GroupId:         groupID,
 		Attributes:      conn.Data.SystemAttributes,
 		GatewayId:       conn.GatewayId.String(),
-		LastHeartbeatAt: timestamppb.New(time.Now()),
+		LastHeartbeatAt: timestamppb.New(lastHeartbeatAt),
 	}
 
 	isHealthy := "0"
-	if conn.Status == connpb.ConnectionStatus_READY {
+	if status == connpb.ConnectionStatus_READY {
 		isHealthy = "1"
 	}
 
@@ -242,7 +242,7 @@ func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn
 		isHealthy,
 	}
 
-	status, err := scripts["upsert_conn"].Exec(
+	resp, err := scripts["upsert_conn"].Exec(
 		ctx,
 		r.client,
 		keys,
@@ -252,42 +252,12 @@ func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn
 		return err
 	}
 
-	var instanceId *string
-	if conn.Session.SessionId.InstanceId != "" {
-		instanceId = &conn.Session.SessionId.InstanceId
-	}
-
-	switch status {
+	switch resp {
 	case 0:
-		// Persist history in history store
-		// TODO Should the implementation use a messaging system like NATS for batching internally?
-		err := r.historyWriter.InsertWorkerConnection(ctx, &cqrs.WorkerConnection{
-			AccountID:       conn.AccountID,
-			WorkspaceID:     conn.EnvID,
-			AppID:           conn.Group.AppID,
-			Id:              conn.ConnectionId,
-			GatewayId:       conn.GatewayId,
-			InstanceId:      instanceId,
-			Status:          conn.Status,
-			LastHeartbeatAt: conn.LastHeartbeatAt,
-			ConnectedAt:     ulid.Time(conn.ConnectionId.Time()),
-			GroupHash:       conn.Group.Hash,
-			SDKLang:         conn.Group.SDKLang,
-			SDKVersion:      conn.Group.SDKVersion,
-			SDKPlatform:     conn.Group.SDKPlatform,
-			SyncID:          conn.Group.SyncID,
-			CpuCores:        conn.Data.SystemAttributes.CpuCores,
-			MemBytes:        conn.Data.SystemAttributes.MemBytes,
-			Os:              conn.Data.SystemAttributes.Os,
-		})
-		if err != nil {
-			return fmt.Errorf("could not write to connection history store: %w", err)
-		}
-
 		return nil
 
 	default:
-		return fmt.Errorf("unknown status when storing connection metadata: %d", status)
+		return fmt.Errorf("unknown status when storing connection metadata: %d", resp)
 	}
 }
 

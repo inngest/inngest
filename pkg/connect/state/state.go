@@ -29,7 +29,7 @@ type ConnectionManager interface {
 	GetConnectionsByEnvID(ctx context.Context, envID uuid.UUID) ([]*connpb.ConnMetadata, error)
 	GetConnectionsByAppID(ctx context.Context, envId uuid.UUID, appID uuid.UUID) ([]*connpb.ConnMetadata, error)
 	GetConnectionsByGroupID(ctx context.Context, envID uuid.UUID, groupID string) ([]*connpb.ConnMetadata, error)
-	UpsertConnection(ctx context.Context, conn *Connection) error
+	UpsertConnection(ctx context.Context, conn *Connection, status connpb.ConnectionStatus, lastHeartbeatAt time.Time) error
 	DeleteConnection(ctx context.Context, envID uuid.UUID, appID *uuid.UUID, groupID string, connId ulid.ULID) error
 }
 
@@ -113,9 +113,6 @@ type Connection struct {
 	AccountID    uuid.UUID
 	EnvID        uuid.UUID
 	ConnectionId ulid.ULID
-
-	Status          connpb.ConnectionStatus
-	LastHeartbeatAt time.Time
 
 	Data      *connpb.WorkerConnectRequestData
 	Session   *connpb.SessionDetails
