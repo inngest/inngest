@@ -95,7 +95,7 @@ func (b *redisBroadcaster) Subscribe(ctx context.Context, s Subscription, topics
 					"topic", t,
 					"subscription_id", s.ID(),
 				)
-				b.Unsubscribe(ctx, s.ID(), []Topic{t})
+				_ = b.Unsubscribe(ctx, s.ID(), []Topic{t})
 				return
 			}
 

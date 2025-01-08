@@ -70,6 +70,9 @@ type broadcaster struct {
 }
 
 func (b *broadcaster) Subscribe(ctx context.Context, s Subscription, topics []Topic) error {
+	if len(topics) == 0 {
+		return nil
+	}
 	return b.subscribe(ctx, s, topics, nil, nil)
 }
 
@@ -84,6 +87,9 @@ func (b *broadcaster) subscribe(
 	onSubscribe func(ctx context.Context, t Topic),
 	onUnsubscribe func(ctx context.Context, t Topic),
 ) error {
+	if len(topics) == 0 {
+		return nil
+	}
 	if atomic.LoadInt32(&b.closing) == 1 {
 		return ErrBroadcasterClosed
 	}

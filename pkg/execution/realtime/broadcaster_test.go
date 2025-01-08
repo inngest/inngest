@@ -84,7 +84,8 @@ func TestBroadcaster(t *testing.T) {
 			require.Equal(t, 1, len(messages))
 			require.Equal(t, msg, messages[0])
 
-			b.Unsubscribe(ctx, sub.ID(), msg.Topics())
+			err = b.Unsubscribe(ctx, sub.ID(), msg.Topics())
+			require.NoError(t, err)
 			b.Publish(ctx, msg)
 
 			// No change in count

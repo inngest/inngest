@@ -48,13 +48,8 @@ func NewWebsocketSubscription(
 		}
 	}()
 
-	if len(topics) > 0 {
-		if err := b.Subscribe(ctx, sub, topics); err != nil {
-			// TODO: Handle inability to subscribe.
-		}
-	}
-
-	return sub, nil
+	err := b.Subscribe(ctx, sub, topics)
+	return sub, err
 }
 
 // SubscriptionWS represents a websocket subscription
@@ -154,9 +149,8 @@ func (s SubscriptionWS) poll(ctx context.Context) error {
 
 			if err := s.b.Unsubscribe(ctx, s.id, topics); err != nil {
 				// TODO: reply with error.
+				continue
 			}
 		}
 	}
 }
-
-// func (s SubscriptionWS) handleUnsubscribeMsg(
