@@ -181,7 +181,7 @@ func (t Topic) String() string {
 //
 // Note that other fields in the message are not set.
 func NewMessage(kind MessageKind, data any) Message {
-	msg := Message{Kind: kind, CreatedAt: time.Now().Truncate(time.Millisecond)}
+	msg := Message{Kind: kind, CreatedAt: time.Now().Truncate(time.Millisecond).UTC()}
 	switch v := data.(type) {
 	case json.RawMessage:
 		msg.Data = v
