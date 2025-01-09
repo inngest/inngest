@@ -153,9 +153,9 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
           <ErrorBoundary
             fallback={({ error, resetError }) => (
               <div className="flex items-center justify-center">
-                <div className="rounded p-4">
+                <div className="rounded-md p-4">
                   <h2>Something went wrong!</h2>
-                  <div className="bg-canvasBase my-6 overflow-scroll rounded p-2">
+                  <div className="bg-canvasBase my-6 overflow-scroll rounded-md p-2">
                     {error.toString()}
                   </div>
                   <Button
@@ -174,7 +174,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
               <Block title="App">
                 <NextLink
                   href={appRoute}
-                  className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded border p-4"
+                  className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
                 >
                   <div className="flex min-w-0 items-center">
                     <div className="min-w-0 flex-1">
@@ -200,7 +200,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                         href={`/env/${params.environmentSlug}/events/${encodeURIComponent(
                           trigger.eventName
                         )}`}
-                        className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded border p-4"
+                        className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
                       >
                         <div className="flex min-w-0 items-center">
                           <div className="min-w-0 flex-1 space-y-1">
@@ -248,7 +248,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                             href={`/env/${params.environmentSlug}/events/${encodeURIComponent(
                               cancellation.event
                             )}`}
-                            className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded border p-4"
+                            className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
                           >
                             <div className="flex min-w-0 items-center">
                               <div className="min-w-0 flex-1 space-y-1">
@@ -295,7 +295,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                       href={`/env/${params.environmentSlug}/functions/${encodeURIComponent(
                         function_.failureHandler.slug
                       )}`}
-                      className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded border p-4"
+                      className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
                     >
                       <div className="flex min-w-0 items-center">
                         <div className="min-w-0 flex-1">
@@ -330,7 +330,7 @@ function ScheduleTrigger({ schedule, condition }: ScheduleTriggerProps) {
   const { nextRun } = useCron(schedule);
 
   return (
-    <div className="border-subtle bg-canvasBase rounded border p-4">
+    <div className="border-subtle bg-canvasBase rounded-md border p-4">
       <div className="flex min-w-0 items-center">
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex min-w-0 items-center">
