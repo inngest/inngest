@@ -105,6 +105,8 @@ func (h *connectHandler) prepareConnection(ctx context.Context, data connectionE
 	connectTimeout, cancelConnectTimeout := context.WithTimeout(ctx, 10*time.Second)
 	defer cancelConnectTimeout()
 
+	startTime := time.Now()
+
 	startRes, err := h.apiClient.start(ctx, data.hashedSigningKey, &connectproto.StartRequest{
 		ExcludeGateways: excludeGateways,
 	})
@@ -127,11 +129,11 @@ func (h *connectHandler) prepareConnection(ctx context.Context, data connectionE
 	}
 
 	// Connection ID is unique per connection, reconnections should get a new ID
-	connectionId := ulid.MustNew(ulid.Now(), rand.Reader)
+	connectionId := ulid.MustNew(ulid.Timestamp(startTime), rand.Reader)
 
 	h.logger.Debug("websocket connection established", "gateway_host", gatewayHost)
 
-	err = h.performConnectHandshake(ctx, connectionId.String(), ws, startRes, data)
+	err = h.performConnectHandshake(ctx, connectionId.String(), ws, startRes, data, startTime)
 	if err != nil {
 		return connection{}, reconnectError{fmt.Errorf("could not perform connect handshake: %w", err)}
 	}

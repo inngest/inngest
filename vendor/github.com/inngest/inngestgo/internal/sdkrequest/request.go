@@ -27,3 +27,7 @@ type CallStack struct {
 	Current uint     `json:"current"`
 	Stack   []string `json:"stack"`
 }
+
+type ErrorResponse struct {
+	Message string `json:"message"`
+}
