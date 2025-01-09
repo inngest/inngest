@@ -5,7 +5,6 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/oklog/ulid/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"io/fs"
@@ -81,16 +80,14 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 }
 
 type redisConnectionStateManager struct {
-	client        rueidis.Client
-	logger        *slog.Logger
-	historyWriter cqrs.ConnectionHistoryWriter
+	client rueidis.Client
+	logger *slog.Logger
 }
 
-func NewRedisConnectionStateManager(client rueidis.Client, historyWriter cqrs.ConnectionHistoryWriter) *redisConnectionStateManager {
+func NewRedisConnectionStateManager(client rueidis.Client) *redisConnectionStateManager {
 	return &redisConnectionStateManager{
-		client:        client,
-		logger:        logger.StdlibLogger(context.Background()),
-		historyWriter: historyWriter,
+		client: client,
+		logger: logger.StdlibLogger(context.Background()),
 	}
 }
 
