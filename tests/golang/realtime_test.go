@@ -39,7 +39,7 @@ func TestRealtime(t *testing.T) {
 			runID = input.InputCtx.RunID
 			atomic.AddInt32(&started, 1)
 
-			step.Run(ctx, "step-1", func(ctx context.Context) (string, error) {
+			_, _ = step.Run(ctx, "step-1", func(ctx context.Context) (string, error) {
 
 				// Wait for the lock so that we respond on demand.
 				l.Lock()
@@ -96,6 +96,7 @@ func TestRealtime(t *testing.T) {
 				require.NoError(t, err)
 				msg := realtime.Message{}
 				err = json.Unmarshal(resp, &msg)
+				require.NoError(t, err)
 				messages = append(messages, msg)
 			}
 		}()
