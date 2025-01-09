@@ -117,16 +117,17 @@ export default function Environments() {
           </div>
           {customEnvs.length > 0 ? (
             customEnvs.map((env) => (
-              <div key={env.id}>
-                <NextLink
-                  href={`/env/${env.slug}/functions` as Route}
-                  className="hover:bg-canvasMuted border-subtle bg-canvasBase mt-4 flex cursor-pointer items-center justify-between rounded-lg border px-4 py-1.5"
-                >
-                  <h3 className="flex items-center gap-2 text-sm font-medium">
-                    <span className="bg-primary-moderate block h-2 w-2 rounded-full" />
-                    {env.name}
-                  </h3>
-                  <DropdownMenu>
+              <div
+                key={env.id}
+                onClick={() => router.push(`/env/${env.slug}/functions`)}
+                className="hover:bg-canvasMuted border-subtle bg-canvasBase mt-4 flex cursor-pointer items-center justify-between rounded-lg border px-4 py-1.5"
+              >
+                <h3 className="flex items-center gap-2 text-sm font-medium">
+                  <span className="bg-primary-moderate block h-2 w-2 rounded-full" />
+                  {env.name}
+                </h3>
+                <div onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenu modal>
                     <DropdownMenuTrigger asChild>
                       <Button
                         kind="secondary"
@@ -148,7 +149,7 @@ export default function Environments() {
                       <EnvironmentArchiveDropdownItem env={env} />
                     </DropdownMenuContent>
                   </DropdownMenu>
-                </NextLink>
+                </div>
               </div>
             ))
           ) : (

@@ -29,7 +29,10 @@ export function EnvironmentArchiveDropdownItem({ env }: Props) {
   return (
     <>
       <DropdownMenuItem
-        onSelect={() => setIsModalOpen(true)}
+        onSelect={(e) => {
+          e.preventDefault();
+          setIsModalOpen(true);
+        }}
         className={!isArchived ? 'text-error' : undefined}
       >
         <RiArchive2Line className="h-4 w-4" />
