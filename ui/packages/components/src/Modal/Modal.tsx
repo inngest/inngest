@@ -62,7 +62,7 @@ export function Modal({
                 <Dialog.Content
                   className={cn(
                     className,
-                    'bg-canvasBase shadow-tooltip border-subtle max-h-full overflow-y-auto overflow-x-hidden rounded-lg border shadow-2xl'
+                    'bg-canvasBase shadow-tooltip border-subtle max-h-full overflow-y-auto overflow-x-hidden rounded-md border shadow-2xl'
                   )}
                 >
                   {(title || description) && <Header description={description}>{title}</Header>}

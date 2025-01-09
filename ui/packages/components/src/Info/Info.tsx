@@ -11,7 +11,7 @@ export const Info = ({ text, action }: { text: string; action: ReactNode }) => (
     <TooltipContent
       side="right"
       sideOffset={2}
-      className="border-subtle text-subtle mt-6 flex flex-col rounded-lg border p-0 text-sm leading-tight"
+      className="border-subtle text-subtle mt-6 flex flex-col rounded-md border p-0 text-sm leading-tight"
     >
       <div className="border-subtle text-subtle border-b p-3 text-sm leading-tight">{text}</div>
 
