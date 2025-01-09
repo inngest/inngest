@@ -63,7 +63,7 @@ export default function LatestLogsList({ environmentSlug, eventName }: LatestLog
 
       <main className="text-basis mx-2 min-h-0 flex-1 overflow-y-auto">
         <div className="border-subtle bg-canvasBase rounded-md border text-sm">
-          <table className="divide-subtle w-full divide-y rounded-lg">
+          <table className="divide-subtle w-full divide-y rounded-md">
             <thead className="h-full text-left">
               <tr>
                 <th className="p-4 font-semibold" scope="col">

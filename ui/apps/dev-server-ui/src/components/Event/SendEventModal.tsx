@@ -174,7 +174,7 @@ export default function SendEventModal({ data, isOpen, onClose }: SendEventModal
       </Modal.Header>
       <Modal.Body>
         <div
-          className="border-subtle relative flex h-[20rem] w-full flex-col overflow-hidden rounded-lg border"
+          className="border-subtle relative flex h-[20rem] w-full flex-col overflow-hidden rounded-md border"
           ref={wrapperRef}
         >
           <div className="border-subtle flex items-center justify-between border-b">

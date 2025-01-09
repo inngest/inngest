@@ -374,7 +374,7 @@
 
 /* Handle */
 .dark ::-webkit-scrollbar-thumb {
-  @apply rounded-lg;
+  @apply rounded-md;
   background: rgb(var(--color-carbon-400));
 }
 

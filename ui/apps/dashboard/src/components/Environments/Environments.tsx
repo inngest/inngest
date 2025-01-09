@@ -47,7 +47,7 @@ export default function Environments() {
           This is where you&apos;ll deploy all of your production apps.
         </p>
 
-        <div className="bg-info mt-4 flex items-center justify-between rounded-lg px-4 py-2">
+        <div className="bg-info mt-4 flex items-center justify-between rounded-md px-4 py-2">
           <h3 className="flex items-center gap-2 text-sm font-medium tracking-wide">
             <span className="bg-primary-moderate block h-2 w-2 rounded-full" />
             Production
@@ -102,7 +102,7 @@ export default function Environments() {
               </div>
             </div>
 
-            <div className=" border-subtle mt-8 overflow-hidden rounded-lg border">
+            <div className=" border-subtle mt-8 overflow-hidden rounded-md border">
               <EnvironmentListTable envs={branches} />
             </div>
           </div>
@@ -117,7 +117,7 @@ export default function Environments() {
             customEnvs.map((env) => (
               <div
                 key={env.id}
-                className="border-subtle bg-canvasBase mt-4 flex items-center justify-between rounded-lg border px-4 py-1.5"
+                className="border-subtle bg-canvasBase mt-4 flex items-center justify-between rounded-md border px-4 py-1.5"
               >
                 <h3 className="flex items-center gap-2 text-sm font-medium">
                   <span
