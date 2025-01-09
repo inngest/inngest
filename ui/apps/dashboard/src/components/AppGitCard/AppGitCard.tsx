@@ -1,8 +1,6 @@
 import type { Route } from 'next';
+import { AppDetailsCard, CardItem } from '@inngest/components/Apps/AppDetailsCard';
 import { Link } from '@inngest/components/Link';
-import { cn } from '@inngest/components/utils/classNames';
-
-import { CardItem } from '../AppInfoCard/CardItem';
 
 type Props = {
   className?: string;
@@ -63,23 +61,17 @@ export function AppGitCard({ className, sync }: Props) {
   }
 
   return (
-    <div className={cn('border-muted bg-canvasBase overflow-hidden rounded-lg border', className)}>
-      <div className="border-muted text-basis border-b px-6 py-3 text-sm font-medium">
-        Commit Information
-      </div>
+    <AppDetailsCard className={className} title="Commit information">
+      {/* Row 1 */}
+      <CardItem className="col-span-4" detail={commitMessage} term="Commit message" />
 
-      <dl className="flex flex-col gap-4 px-6 py-4 md:grid md:grid-cols-4">
-        {/* Row 1 */}
-        <CardItem className="col-span-4" detail={commitMessage} term="Commit Message" />
+      {/* Row 2 */}
+      <CardItem className="truncate" detail={commitAuthor} term="Commit author" />
+      <CardItem className="truncate" detail={commitRefValue} term="Commit ref" />
+      <CardItem className="truncate" detail={commitHashValue} term="Commit hash" />
 
-        {/* Row 2 */}
-        <CardItem className="truncate" detail={commitAuthor} term="Commit Author" />
-        <CardItem className="truncate" detail={commitRefValue} term="Commit Ref" />
-        <CardItem className="truncate" detail={commitHashValue} term="Commit Hash" />
-
-        {/* Row 3 */}
-        <CardItem className="col-span-4 truncate" detail={repositoryValue} term="Repository" />
-      </dl>
-    </div>
+      {/* Row 3 */}
+      <CardItem className="col-span-4 truncate" detail={repositoryValue} term="Repository" />
+    </AppDetailsCard>
   );
 }

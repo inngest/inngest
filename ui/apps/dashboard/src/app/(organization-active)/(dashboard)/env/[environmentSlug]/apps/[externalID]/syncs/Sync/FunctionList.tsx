@@ -97,6 +97,9 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                     </NextLink>
                   );
                 })}
+                {syncedFunctions.length === 0 && (
+                  <div className="text-muted p-2 text-center text-sm">No synced functions</div>
+                )}
               </CollapsibleCardContent>
             )}
           </CollapsibleCardContentWrapper>

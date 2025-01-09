@@ -80,23 +80,27 @@ export const getPillColors = ({
   clickable?: boolean;
 }) => {
   const solidPillStyles = {
-    default: `bg-canvasMuted text-basis ${clickable && 'hover:bg-surfaceMuted'}`,
-    primary: `bg-primary-intense text-alwaysWhite ${clickable && 'hover:bg-primary-xIntense'}`,
-    warning: `bg-accent-moderate text-alwaysWhite ${clickable && 'hover:bg-accent-intense'}`,
-    error: `bg-tertiary-moderate text-alwaysWhite ${clickable && 'hover:bg-tertiary-intense'}`,
-    info: `bg-secondary-moderate text-alwaysWhite ${clickable && 'hover:bg-secondary-intense'}`,
+    default: `bg-canvasMuted text-basis ${clickable ? 'hover:bg-surfaceMuted' : ''}`,
+    primary: `bg-primary-intense text-alwaysWhite ${clickable ? 'hover:bg-primary-xIntense' : ''}`,
+    warning: `bg-accent-moderate text-alwaysWhite ${clickable ? 'hover:bg-accent-intense' : ''}`,
+    error: `bg-tertiary-moderate text-alwaysWhite ${clickable ? 'hover:bg-tertiary-intense' : ''}`,
+    info: `bg-secondary-moderate text-alwaysWhite ${clickable ? 'hover:bg-secondary-intense' : ''}`,
   };
 
   const outlinedPillStyles = {
-    default: `border border-muted bg-canvasBase text-basis ${clickable && 'hover:bg-canvasMuted'}`,
+    default: `border border-muted bg-canvasBase text-basis ${
+      clickable ? 'hover:bg-canvasMuted' : ''
+    }`,
     primary: `border border-success bg-success text-success ${
-      clickable && 'hover:bg-primary-xSubtle'
+      clickable ? 'hover:bg-primary-xSubtle' : ''
     }`,
     warning: `border border-warning bg-warning text-warning ${
-      clickable && 'hover:bg-accent-xSubtle'
+      clickable ? 'hover:bg-accent-xSubtle' : ''
     }`,
-    error: `border border-error bg-error text-error ${clickable && 'hover:bg-tertiary-xSubtle'}`,
-    info: `border border-info bg-info text-info ${clickable && 'hover:bg-secondary-xSubtle'}`,
+    error: `border border-error bg-error text-error ${
+      clickable ? 'hover:bg-tertiary-xSubtle' : ''
+    }`,
+    info: `border border-info bg-info text-info ${clickable ? 'hover:bg-secondary-xSubtle' : ''}`,
   };
 
   if (appearance === 'solid') {

@@ -200,7 +200,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                         href={`/env/${params.environmentSlug}/events/${encodeURIComponent(
                           trigger.eventName
                         )}`}
-                        className="shadow-outline-secondary-light bg-canvasBase hover:bg-canvasMuted block rounded p-4"
+                        className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded border p-4"
                       >
                         <div className="flex min-w-0 items-center">
                           <div className="min-w-0 flex-1 space-y-1">
@@ -248,7 +248,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                             href={`/env/${params.environmentSlug}/events/${encodeURIComponent(
                               cancellation.event
                             )}`}
-                            className="shadow-outline-secondary-light bg-canvasBase hover:bg-canvasMuted block rounded p-4"
+                            className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded border p-4"
                           >
                             <div className="flex min-w-0 items-center">
                               <div className="min-w-0 flex-1 space-y-1">
@@ -295,7 +295,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                       href={`/env/${params.environmentSlug}/functions/${encodeURIComponent(
                         function_.failureHandler.slug
                       )}`}
-                      className="shadow-outline-secondary-light bg-canvasBase hover:bg-canvasMuted block rounded p-4"
+                      className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded border p-4"
                     >
                       <div className="flex min-w-0 items-center">
                         <div className="min-w-0 flex-1">

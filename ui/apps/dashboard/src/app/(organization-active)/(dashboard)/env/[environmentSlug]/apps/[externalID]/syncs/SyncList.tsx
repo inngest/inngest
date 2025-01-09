@@ -66,15 +66,12 @@ export function SyncList({
                 key={sync.id}
                 onClick={() => onClick(sync.id)}
               >
-                <div className="flex items-center">
-                  <div className="hidden w-40 p-4 align-middle lg:block">
+                <div className="flex items-center gap-1">
+                  <div className="ml-1 hidden w-20 items-center sm:flex">
                     <SyncStatusPill status={sync.status} />
                   </div>
-                  <div className="px-2 py-4 align-middle lg:hidden">
-                    <SyncStatusPill status={sync.status} iconOnly />
-                  </div>
-                  <div className="py-4 align-middle">
-                    <Time value={sync.lastSyncedAt} />
+                  <div className="flex-1 py-4 pl-2 align-middle sm:pl-0">
+                    <Time className="text-wrap" value={sync.lastSyncedAt} />
                   </div>
                 </div>
                 <div
@@ -85,7 +82,7 @@ export function SyncList({
                 >
                   {sync.syncedFunctions.length > 0 && (
                     <>
-                      <FunctionsIcon className="text-mute h-4 w-4" />
+                      <FunctionsIcon className="text-muted h-4 w-4" />
                       {sync.syncedFunctions.length}
                     </>
                   )}

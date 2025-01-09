@@ -110,13 +110,13 @@ export default function Environments() {
           </div>
         )}
 
-        {customEnvs.length > 0 && (
-          <div className="border-subtle border-t pt-8">
-            <div className="mb-4 flex w-full items-center justify-between">
-              <h2 className="text-lg font-medium">Custom Environments</h2>
-              <Button href="create-environment" kind="primary" label="Create environment" />
-            </div>
-            {customEnvs.map((env) => (
+        <div className="border-subtle border-t pt-8">
+          <div className="mb-4 flex w-full items-center justify-between">
+            <h2 className="text-lg font-medium">Custom Environments</h2>
+            <Button href="create-environment" kind="primary" label="Create environment" />
+          </div>
+          {customEnvs.length > 0 ? (
+            customEnvs.map((env) => (
               <div key={env.id}>
                 <NextLink
                   href={`/env/${env.slug}/functions` as Route}
@@ -150,9 +150,11 @@ export default function Environments() {
                   </DropdownMenu>
                 </NextLink>
               </div>
-            ))}
-          </div>
-        )}
+            ))
+          ) : (
+            <p className="text-basis py-3 text-center text-sm">No custom environments yet</p>
+          )}
+        </div>
       </div>
 
       <Toaster />
