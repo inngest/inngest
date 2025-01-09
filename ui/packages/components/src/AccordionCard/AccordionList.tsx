@@ -80,3 +80,5 @@ const AccordionContent = forwardRef<
 AccordionList.Item = AccordionItem;
 AccordionList.Trigger = AccordionTrigger;
 AccordionList.Content = AccordionContent;
+
+export * as AccordionPrimitive from '@radix-ui/react-accordion';

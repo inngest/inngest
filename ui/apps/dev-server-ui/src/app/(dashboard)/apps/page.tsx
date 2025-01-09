@@ -13,7 +13,7 @@ import { RiExternalLinkLine, RiInformationLine } from '@remixicon/react';
 import AddAppButton from '@/components/App/AddAppButton';
 import AppActions from '@/components/App/AppActions';
 import getAppCardContent from '@/components/App/AppCardContent';
-import AppFAQ from '@/components/App/AppFAQ';
+// import AppFAQ from '@/components/App/AppFAQ';
 import { useInfoQuery } from '@/store/devApi';
 import { useGetAppsQuery } from '@/store/generated';
 
@@ -82,7 +82,7 @@ export default function AppList() {
         }
         action={
           <div className="flex items-center gap-5">
-            {info?.isDiscoveryEnabled ? (
+            {apps.length > 0 && info?.isDiscoveryEnabled ? (
               <p className="text-btnPrimary flex items-center gap-2 text-sm leading-tight">
                 <IconSpinner className="fill-btnPrimary" />
                 Auto-detecting apps
@@ -107,32 +107,37 @@ export default function AppList() {
             Learn more
           </Link>
         </p>
-        <div className="bg-disabled my-4 mb-4 flex items-center justify-between gap-1 rounded p-4">
-          <p className="text-subtle text-sm">
-            {numberOfSyncedApps} / {apps.length} apps synced
-          </p>
-          <div className="flex items-center gap-2">
-            {info?.isDiscoveryEnabled ? (
-              <p className="text-btnPrimary flex items-center gap-2 text-sm leading-tight">
-                <IconSpinner className="fill-btnPrimary" />
-                Auto-detecting apps
+        {apps.length === 0 && (
+          <>
+            <div className="bg-disabled my-4 mb-4 flex items-center justify-between gap-1 rounded p-4">
+              <p className="text-subtle text-sm">
+                {numberOfSyncedApps} / {apps.length} apps synced
               </p>
-            ) : null}
-            <AddAppButton secondary />
-          </div>
-        </div>
-        {info?.isDiscoveryEnabled && (
-          <div className="text-light flex items-center gap-1">
-            <RiInformationLine className="h-4 w-4" />
-            <p className="text-sm">
-              Auto-detection is enabled on common ports. You can use the{' '}
-              <InlineCode>--no-discovery</InlineCode> flag in your CLI to disable it.
-            </p>
-          </div>
+              <div className="flex items-center gap-2">
+                {info?.isDiscoveryEnabled ? (
+                  <p className="text-btnPrimary flex items-center gap-2 text-sm leading-tight">
+                    <IconSpinner className="fill-btnPrimary" />
+                    Auto-detecting apps
+                  </p>
+                ) : null}
+                <AddAppButton secondary />
+              </div>
+            </div>
+            {info?.isDiscoveryEnabled && (
+              <div className="text-light flex items-center gap-1">
+                <RiInformationLine className="h-4 w-4" />
+                <p className="text-sm">
+                  Auto-detection is enabled on common ports. You can use the{' '}
+                  <InlineCode>--no-discovery</InlineCode> flag in your CLI to disable it.
+                </p>
+              </div>
+            )}
+          </>
         )}
 
         <div className="my-6 flex w-full flex-col gap-10">{memoizedAppCards}</div>
-        <AppFAQ />
+        {/* Temporarily hide FAQS, until we work on onboarding */}
+        {/* <AppFAQ /> */}
       </div>
     </div>
   );
