@@ -84,12 +84,13 @@ func TestRedisBroadcaster(t *testing.T) {
 			l.Lock()
 			defer l.Unlock()
 			return len(m1) == 1 && len(m2) == 1
-		}, 5*time.Second, 5*time.Millisecond)
+		}, 10*time.Second, 5*time.Millisecond)
 
 		l.Lock()
 		fmt.Printf("m1: %d, m2: %d\n", len(m1), len(m2))
 
 		require.Equal(t, 1, len(m1))
+		require.Equal(t, 1, len(m2))
 		require.Equal(t, msg1, m1[0])
 		require.Equal(t, msg1, m2[0])
 		l.Unlock()
