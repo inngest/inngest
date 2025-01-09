@@ -114,8 +114,7 @@ func (a *api) GetWebsocketUpgrade(w http.ResponseWriter, r *http.Request) {
 
 	ws, err := websocket.Accept(w, r, nil)
 	if err != nil {
-		w.Header().Add("content-type", "application/json")
-		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "Error creating websocket connection"))
+		// NOTE: This already responds with an error.
 		return
 	}
 
