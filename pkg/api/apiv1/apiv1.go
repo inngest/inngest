@@ -96,12 +96,6 @@ func (a *router) setup() {
 			}
 
 			r.Use(headers.ContentTypeJsonResponse())
-			r.Use(func(next http.Handler) http.Handler {
-				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					fmt.Println(r.URL.String())
-					next.ServeHTTP(w, r)
-				})
-			})
 
 			r.Get("/events", a.getEvents)
 			r.Get("/events/{eventID}", a.getEvent)
