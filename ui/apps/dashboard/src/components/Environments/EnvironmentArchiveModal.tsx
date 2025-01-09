@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { AlertModal } from '@inngest/components/Modal/AlertModal';
+import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
@@ -64,6 +65,7 @@ export function EnvironmentArchiveModal(props: Props) {
       }
 
       onSuccess();
+      toast.success(`Environment ${isArchived ? 'unarchived' : 'archived'}`);
       setError(undefined);
     } catch (error) {
       if (!(error instanceof Error)) {
