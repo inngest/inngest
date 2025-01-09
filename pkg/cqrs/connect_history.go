@@ -93,7 +93,6 @@ type GetWorkerConnectionOrder struct {
 type WorkerConnectionIdentifier struct {
 	AccountID    uuid.UUID
 	WorkspaceID  uuid.UUID
-	AppID        uuid.UUID
 	ConnectionID ulid.ULID
 }
 

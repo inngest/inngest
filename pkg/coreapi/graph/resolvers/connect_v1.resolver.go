@@ -13,6 +13,11 @@ import (
 	"time"
 )
 
+const (
+	defaultConnectionItems = 40
+	maxConnectionItems     = 400
+)
+
 func (r *connectV1workerConnectionConnResolver) App(ctx context.Context, obj *models.ConnectV1WorkerConnection) (*cqrs.App, error) {
 	if obj.AppID == nil {
 		return nil, nil
@@ -61,11 +66,6 @@ func (r *queryResolver) WorkerConnections(ctx context.Context, first int, after 
 	edges := []*models.ConnectV1WorkerConnectionEdge{}
 	total := len(workerConns)
 	for i, conn := range workerConns {
-		var (
-			disconnectedAt  *time.Time
-			lastHeartbeatAt *time.Time
-		)
-
 		c := conn.Cursor
 		if i == 0 {
 			scursor = &c // start cursor
@@ -74,48 +74,8 @@ func (r *queryResolver) WorkerConnections(ctx context.Context, first int, after 
 			ecursor = &c // end cursor
 		}
 
-		if conn.DisconnectedAt.UnixMilli() > 0 {
-			disconnectedAt = &conn.DisconnectedAt
-		}
-		if conn.LastHeartbeatAt.UnixMilli() > 0 {
-			lastHeartbeatAt = &conn.LastHeartbeatAt
-		}
-
-		var status models.ConnectV1ConnectionStatus
-		switch conn.Status {
-		case connpb.ConnectionStatus_READY:
-			status = models.ConnectV1ConnectionStatusReady
-		case connpb.ConnectionStatus_CONNECTED:
-			status = models.ConnectV1ConnectionStatusConnected
-		case connpb.ConnectionStatus_DRAINING:
-			status = models.ConnectV1ConnectionStatusDraining
-		case connpb.ConnectionStatus_DISCONNECTING:
-			status = models.ConnectV1ConnectionStatusDisconnecting
-		case connpb.ConnectionStatus_DISCONNECTED:
-			status = models.ConnectV1ConnectionStatusDisconnected
-		}
-
-		node := &models.ConnectV1WorkerConnection{
-			ID:              conn.Id,
-			GatewayID:       conn.GatewayId,
-			InstanceID:      conn.InstanceId,
-			AppID:           conn.AppID,
-			ConnectedAt:     conn.ConnectedAt,
-			LastHeartbeatAt: lastHeartbeatAt,
-			DisconnectedAt:  disconnectedAt,
-			Status:          status,
-			GroupHash:       conn.GroupHash,
-			SdkLang:         conn.SDKLang,
-			SdkVersion:      conn.SDKVersion,
-			SdkPlatform:     conn.SDKPlatform,
-			SyncID:          conn.SyncID,
-			CPUCores:        int(conn.CpuCores),
-			MemBytes:        int(conn.MemBytes),
-			Os:              conn.Os,
-		}
-
 		edges = append(edges, &models.ConnectV1WorkerConnectionEdge{
-			Node:   node,
+			Node:   connToNode(conn),
 			Cursor: conn.Cursor,
 		})
 	}
@@ -132,9 +92,66 @@ func (r *queryResolver) WorkerConnections(ctx context.Context, first int, after 
 	}, nil
 }
 
-func (a queryResolver) WorkerConnection(ctx context.Context, connectionID ulid.ULID) (*models.ConnectV1WorkerConnection, error) {
-	//TODO implement me
-	panic("implement me")
+func connToNode(conn *cqrs.WorkerConnection) *models.ConnectV1WorkerConnection {
+	var (
+		disconnectedAt  *time.Time
+		lastHeartbeatAt *time.Time
+	)
+
+	if conn.DisconnectedAt.UnixMilli() > 0 {
+		disconnectedAt = &conn.DisconnectedAt
+	}
+	if conn.LastHeartbeatAt.UnixMilli() > 0 {
+		lastHeartbeatAt = &conn.LastHeartbeatAt
+	}
+
+	var status models.ConnectV1ConnectionStatus
+	switch conn.Status {
+	case connpb.ConnectionStatus_READY:
+		status = models.ConnectV1ConnectionStatusReady
+	case connpb.ConnectionStatus_CONNECTED:
+		status = models.ConnectV1ConnectionStatusConnected
+	case connpb.ConnectionStatus_DRAINING:
+		status = models.ConnectV1ConnectionStatusDraining
+	case connpb.ConnectionStatus_DISCONNECTING:
+		status = models.ConnectV1ConnectionStatusDisconnecting
+	case connpb.ConnectionStatus_DISCONNECTED:
+		status = models.ConnectV1ConnectionStatusDisconnected
+	}
+
+	node := &models.ConnectV1WorkerConnection{
+		ID:              conn.Id,
+		GatewayID:       conn.GatewayId,
+		InstanceID:      conn.InstanceId,
+		AppID:           conn.AppID,
+		ConnectedAt:     conn.ConnectedAt,
+		LastHeartbeatAt: lastHeartbeatAt,
+		DisconnectedAt:  disconnectedAt,
+		Status:          status,
+		GroupHash:       conn.GroupHash,
+		SdkLang:         conn.SDKLang,
+		SdkVersion:      conn.SDKVersion,
+		SdkPlatform:     conn.SDKPlatform,
+		SyncID:          conn.SyncID,
+		CPUCores:        int(conn.CpuCores),
+		MemBytes:        int(conn.MemBytes),
+		Os:              conn.Os,
+	}
+
+	return node
+}
+
+func (r *queryResolver) WorkerConnection(ctx context.Context, connectionID ulid.ULID) (*models.ConnectV1WorkerConnection, error) {
+	conn, err := r.Data.GetWorkerConnection(ctx, cqrs.WorkerConnectionIdentifier{
+		AccountID:    consts.DevServerAccountId,
+		WorkspaceID:  consts.DevServerEnvId,
+		ConnectionID: connectionID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving worker connection: %w", err)
+	}
+
+	return connToNode(conn), nil
 }
 
 func toWorkerConnectionsQueryOpt(
@@ -214,8 +231,8 @@ func toWorkerConnectionsQueryOpt(
 		until = *filter.Until
 	}
 
-	items := defaultRunItems
-	if num > 0 && num < maxRunItems {
+	items := defaultConnectionItems
+	if num > 0 && num < maxConnectionItems {
 		items = num
 	}
 
