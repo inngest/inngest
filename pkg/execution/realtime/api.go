@@ -8,7 +8,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/inngest/inngest/pkg/api/apiv1"
+	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 )
@@ -21,12 +21,12 @@ type APIOpts struct {
 	// AuthMiddleware authenticates the incoming API request.
 	AuthMiddleware func(http.Handler) http.Handler
 	// AuthFinder authenticates the given request, returning the env and account IDs.
-	AuthFinder apiv1.AuthFinder
+	AuthFinder apiv1auth.AuthFinder
 }
 
 func NewAPI(o APIOpts) http.Handler {
 	if o.AuthFinder == nil {
-		o.AuthFinder = apiv1.NilAuthFinder
+		o.AuthFinder = apiv1auth.NilAuthFinder
 	}
 
 	// Create the HTTP implementation, which wraps the handler.  We do ths to code

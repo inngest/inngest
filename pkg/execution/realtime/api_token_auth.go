@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/inngest/inngest/pkg/api/apiv1"
+	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 )
 
 const claimsKey = "rt-claims"
@@ -33,12 +33,16 @@ func realtimeAuthMW(jwtSecret []byte, mw func(http.Handler) http.Handler) func(h
 			}
 
 			// Call the original middelware.
-			mw(next)
+			if mw != nil {
+				mw(next)
+				return
+			}
+			next.ServeHTTP(w, r)
 		})
 	}
 }
 
-func realtimeAuth(ctx context.Context, af apiv1.AuthFinder) (apiv1.V1Auth, error) {
+func realtimeAuth(ctx context.Context, af apiv1auth.AuthFinder) (apiv1auth.V1Auth, error) {
 	if claims, ok := ctx.Value(claimsKey).(*JWTClaims); ok {
 		return claims, nil
 	}
