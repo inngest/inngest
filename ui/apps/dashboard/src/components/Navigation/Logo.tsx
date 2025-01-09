@@ -1,8 +1,8 @@
 'use client';
 
 import type { Route } from 'next';
-import Link from 'next/link';
-import { NewButton } from '@inngest/components/Button';
+import NextLink from 'next/link';
+import { Button } from '@inngest/components/Button';
 import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
 import { InngestLogoSmallBW } from '@inngest/components/icons/logos/InngestLogoSmall';
 import { RiContractLeftLine, RiContractRightLine } from '@remixicon/react';
@@ -28,7 +28,7 @@ const NavToggle = ({ collapsed, setCollapsed }: LogoProps) => {
   };
 
   return (
-    <NewButton
+    <Button
       kind="primary"
       appearance="ghost"
       onClick={toggle}
@@ -58,9 +58,9 @@ export default function Logo({ collapsed, setCollapsed }: LogoProps) {
           </div>
         ) : (
           <>
-            <Link href={process.env.NEXT_PUBLIC_HOME_PATH as Route} scroll={false}>
+            <NextLink href={process.env.NEXT_PUBLIC_HOME_PATH as Route} scroll={false}>
               <InngestLogo className="text-basis mr-2" width={92} />
-            </Link>
+            </NextLink>
           </>
         )}
         <Search collapsed={collapsed} />

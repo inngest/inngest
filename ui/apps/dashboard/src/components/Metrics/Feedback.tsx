@@ -1,4 +1,4 @@
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 
 import { ChartIcon } from '@/icons/ChartIcon';
 
@@ -12,7 +12,7 @@ export const Feedback = ({}) => {
         you might need but are currently missing.
       </div>
       <div className="flex flex-row items-center justify-center gap-2">
-        <NewButton
+        <Button
           kind="secondary"
           appearance="outlined"
           label="Request charts"

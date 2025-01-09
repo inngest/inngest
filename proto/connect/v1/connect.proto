@@ -37,13 +37,11 @@ message SessionDetails {
 message ConfigDetails {
 	bytes capabilities = 1;
 	bytes functions = 2;
-	string api_origin = 3;
 }
 
 message AuthData {
-	bytes hashed_signing_key = 1;
-	string account_id = 2;
-	string env_id = 3;
+	string session_token = 1;
+	string sync_token = 2;
 }
 
 message WorkerConnectRequestData {
@@ -100,7 +98,8 @@ enum ConnectionStatus {
 	CONNECTED = 0;
 	READY = 1;
 	DRAINING = 2;
-	DISCONNECTED = 3;
+	DISCONNECTING = 3;
+	DISCONNECTED = 4;
 }
 
 // Connection metadata
@@ -133,4 +132,15 @@ message ConnGroup {
 
 enum WorkerDisconnectReason {
 	WORKER_SHUTDOWN = 0;
+}
+
+message StartResponse {
+	string gateway_endpoint = 1;
+	string gateway_group = 2;
+	string session_token = 3;
+	string sync_token = 4;
+}
+
+message StartRequest {
+	repeated string exclude_gateways = 1;
 }

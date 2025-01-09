@@ -1,17 +1,26 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@inngest/components/DropdownMenu';
+import { Switch } from '@inngest/components/Switch';
+import { AppsIcon } from '@inngest/components/icons/sections/Apps';
+import { cn } from '@inngest/components/utils/classNames';
+import { RiMore2Line } from '@remixicon/react';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
-import { Toggle } from '@/components/Toggle';
 import { graphql } from '@/gql';
-import cn from '@/utils/cn';
 import { type Environment } from '@/utils/environments';
 import { notNullish } from '@/utils/typeGuards';
 import { pathCreator } from '@/utils/urls';
-import { EnvironmentArchiveButton } from './EnvironmentArchiveButton';
+import { EnvironmentArchiveDropdownItem } from './EnvironmentArchiveDropdownItem';
 
 const DisableEnvironmentAutoArchiveDocument = graphql(`
   mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {
@@ -47,30 +56,26 @@ export default function EnvironmentListTable({ envs }: { envs: Environment[] }) 
 
   return (
     <table className="w-full">
-      <thead className="border-b border-slate-200 text-left shadow-sm">
+      <thead className="border-subtle border-b text-left">
         <tr>
-          <th scope="col" className="px-4 py-3 text-sm font-medium text-slate-500">
+          <th scope="col" className="text-muted px-4 py-3 text-sm font-semibold">
             Name
           </th>
-          <th scope="col" className="px-4 py-3 text-sm font-medium text-slate-500">
+          <th scope="col" className="text-muted px-4 py-3 text-sm font-semibold">
             Status
           </th>
 
-          <th scope="col" className="w-0 whitespace-nowrap pl-4 text-sm font-medium text-slate-500">
+          <th scope="col" className="text-muted w-0 whitespace-nowrap pl-4 text-sm font-semibold">
             Auto Archive
-          </th>
-
-          <th scope="col" className="w-0 whitespace-nowrap pl-4 text-sm font-medium text-slate-500">
-            Manual Archive
           </th>
 
           <th scope="col" className="w-0 pr-4"></th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-slate-100 px-4 py-3">
+      <tbody className="divide-subtle divide-y px-4 py-3">
         {envs.length === 0 ? (
           <tr>
-            <td colSpan={5} className="px-4 py-4 text-center text-sm font-semibold text-slate-500">
+            <td colSpan={4} className="text-basis px-4 py-3 text-center text-sm">
               There are no branch environments
             </td>
           </tr>
@@ -78,21 +83,21 @@ export default function EnvironmentListTable({ envs }: { envs: Environment[] }) 
           visibleEnvs.map((env, i) => <TableRow env={env} key={i} />)
         ) : (
           <tr>
-            <td colSpan={5} className="px-4 py-4 text-center text-sm font-semibold text-slate-500">
+            <td colSpan={4} className="text-basis px-4 py-3 text-center text-sm">
               There are no more branch environments
             </td>
           </tr>
         )}
       </tbody>
       {pages.length > 1 && (
-        <tfoot className="border-t border-slate-200">
+        <tfoot className="border-subtle border-t">
           <tr>
-            <td colSpan={5} className="px-4 py-1 text-center">
+            <td colSpan={4} className="px-4 py-1 text-center">
               {pages.map((_, idx) => (
                 <button
                   key={idx}
                   onClick={() => setPage(idx)}
-                  className="transition-color mx-1 cursor-pointer px-2 text-indigo-500 underline decoration-transparent decoration-2 underline-offset-4 duration-300 hover:text-indigo-800 hover:decoration-indigo-800 dark:text-indigo-400 dark:hover:decoration-indigo-400"
+                  className="transition-color text-link hover:decoration-link mx-1 cursor-pointer px-2 underline decoration-transparent decoration-2 underline-offset-4 duration-300"
                 >
                   {idx + 1}
                 </button>
@@ -106,6 +111,7 @@ export default function EnvironmentListTable({ envs }: { envs: Environment[] }) 
 }
 
 function TableRow(props: { env: Environment }) {
+  const router = useRouter();
   // Use an internal env object for optimistic updating.
   const [env, setEnv] = useState(props.env);
   useEffect(() => {
@@ -172,23 +178,22 @@ function TableRow(props: { env: Environment }) {
   }
 
   return (
-    <tr className="hover:bg-slate-100/60">
-      <td className="max-w-80 px-4 py-4">
-        <h3 className="flex items-center gap-2 break-all text-sm font-semibold text-slate-800">
-          {name}
-        </h3>
+    <tr className="hover:bg-canvasMuted">
+      <td className="max-w-80 px-4 py-3">
+        <h3 className="text-basis flex items-center gap-2 break-all text-sm">{name}</h3>
       </td>
       <td>
         <div className="flex items-center gap-2 px-4" title={`Last synced at ${lastDeployedAt}`}>
           <span className={cn('block h-2 w-2 rounded-full', statusColorClass)} />
-          <span className="text-sm font-medium text-slate-600">{statusText}</span>
+          <span className="text-basis text-sm">{statusText}</span>
         </div>
       </td>
 
       <td className="pl-4">
         {notNullish(isAutoArchiveEnabled) && (
-          <Toggle
+          <Switch
             checked={isAutoArchiveEnabled}
+            className="block"
             disabled={isModifying || env.isArchived}
             onClick={() => onClickAutoArchive(id, !isAutoArchiveEnabled)}
             title={
@@ -200,26 +205,20 @@ function TableRow(props: { env: Environment }) {
         )}
       </td>
 
-      <td className="pl-4">
-        <EnvironmentArchiveButton env={env} />
-      </td>
-
       <td className="px-4">
-        <Button
-          href={pathCreator.apps({ envSlug: slug })}
-          kind="primary"
-          appearance="outlined"
-          label="Apps"
-        />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button kind="secondary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onSelect={() => router.push(pathCreator.apps({ envSlug: slug }))}>
+              <AppsIcon className="h-4 w-4" />
+              Go to apps
+            </DropdownMenuItem>
+            <EnvironmentArchiveDropdownItem env={env} />
+          </DropdownMenuContent>
+        </DropdownMenu>
       </td>
-      {/* <td>
-        <div className="flex justify-end px-4 items-center gap-2">
-          <span className="text-slate-600 text-sm font-medium">
-            {env.latestDeploy.dateRelative}
-          </span>
-          <CheckCircleIcon className="w-4 h-4 text-teal-500" />
-        </div>
-      </td> */}
     </tr>
   );
 }

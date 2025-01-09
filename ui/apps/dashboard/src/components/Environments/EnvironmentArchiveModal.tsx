@@ -2,10 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
-import { Button } from '@inngest/components/Button';
+import { AlertModal } from '@inngest/components/Modal/AlertModal';
 import { useMutation } from 'urql';
 
-import Modal from '@/components/Modal';
 import { graphql } from '@/gql';
 
 const ArchiveEnvironmentDocument = graphql(`
@@ -79,41 +78,39 @@ export function EnvironmentArchiveModal(props: Props) {
   }, [archive, envID, isArchived, onSuccess, unarchive]);
 
   return (
-    <Modal className="flex max-w-xl flex-col gap-4" isOpen={isOpen} onClose={onCancel}>
-      <p>{`Are you sure you want to ${isArchived ? 'unarchive' : 'archive'} this environment?`}</p>
+    <AlertModal
+      className="max-w-xl"
+      isOpen={isOpen}
+      onClose={onCancel}
+      title={`${isArchived ? 'Unarchive' : 'Archive'} environment`}
+      confirmButtonLabel={isArchived ? 'Unarchive' : 'Archive'}
+      onSubmit={onSubmit}
+      isLoading={isLoading}
+      description={`Are you sure you want to ${
+        isArchived ? 'unarchive' : 'archive'
+      } this environment?`}
+    >
+      <div className="p-6 pb-0">
+        {isArchived && (
+          <p className="pb-4 text-sm">
+            Any active functions within this environment will become triggerable.
+          </p>
+        )}
 
-      {isArchived && (
-        <p className="pb-4 text-sm">
-          Any active functions within this environment will become triggerable.
-        </p>
-      )}
+        {!isArchived && (
+          <p className="pb-4 text-sm">
+            Functions within this environment will no longer be triggerable. Nothing will be deleted
+            and you can unarchive at any time.
+          </p>
+        )}
 
-      {!isArchived && (
-        <p className="pb-4 text-sm">
-          Functions within this environment will no longer be triggerable. Nothing will be deleted
-          and you can unarchive at any time.
-        </p>
-      )}
-
-      {!isArchived && isBranchEnv && (
-        <p className="pb-4 text-sm">
-          Since this is a branch environment, any future app syncs will unarchive the environment.
-        </p>
-      )}
-
-      {error && <Alert severity="error">{error}</Alert>}
-
-      <div className="flex content-center justify-end">
-        <Button appearance="outlined" btnAction={onCancel} label="Cancel" />
-
-        <Button
-          disabled={isLoading}
-          kind="danger"
-          appearance="text"
-          btnAction={onSubmit}
-          label={isArchived ? 'Unarchive' : 'Archive'}
-        />
+        {!isArchived && isBranchEnv && (
+          <p className="pb-4 text-sm">
+            Since this is a branch environment, any future app syncs will unarchive the environment.
+          </p>
+        )}
+        {error && <Alert severity="error">{error}</Alert>}
       </div>
-    </Modal>
+    </AlertModal>
   );
 }

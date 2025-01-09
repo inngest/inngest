@@ -50,7 +50,7 @@ export default function StatusFilter({
       <span
         key={status}
         className={cn(
-          'inline-block h-[9px] w-[9px] flex-shrink-0 rounded-full border border-slate-50 bg-slate-50 ring-1 ring-inset ring-slate-300 group-hover:border-slate-100 [&:not(:first-child)]:-ml-1',
+          'border-subtle bg-canvasBase group-hover:border-subtle inline-block h-[9px] w-[9px] flex-shrink-0 rounded-full border [&:not(:first-child)]:-ml-1',
           isSelected && [getStatusBackgroundClass(status), getStatusBorderClass(status), 'ring-0']
         )}
         aria-hidden="true"

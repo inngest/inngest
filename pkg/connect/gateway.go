@@ -6,9 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"io"
-
 	"log/slog"
 	"net"
 	"net/http"
@@ -18,6 +16,8 @@ import (
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
 	"github.com/gowebpki/jcs"
+	"github.com/inngest/inngest/pkg/connect/auth"
+	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/connect/types"
 	"github.com/inngest/inngest/pkg/connect/wsproto"
@@ -81,6 +81,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
+		var closed bool
+
 		ch := &connectionHandler{
 			svc:        c,
 			log:        c.logger,
@@ -88,10 +90,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			updateLock: sync.Mutex{},
 		}
 
-		c.connectionSema.Add(1)
+		c.connectionCount.Add()
 		defer func() {
 			// This is deferred so we always update the semaphore
-			defer c.connectionSema.Done()
+			defer c.connectionCount.Done()
 			ch.log.Debug("Closing WebSocket connection")
 
 			if c.isDraining {
@@ -99,6 +101,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				return
 			}
 			_ = ws.CloseNow()
+			closed = true
 		}()
 
 		ch.log.Debug("WebSocket connection established, sending hello")
@@ -136,7 +139,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
-		ch.log = ch.log.With("account_id", conn.Data.AuthData.AccountId, "env_id", conn.Data.AuthData.EnvId, "conn_id", conn.Data.SessionId.ConnectionId)
+		ch.log = ch.log.With("account_id", conn.AccountID, "env_id", conn.EnvID, "conn_id", conn.Data.SessionId.ConnectionId)
 
 		var closeReason string
 		var closeReasonLock sync.Mutex
@@ -145,9 +148,17 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		defer notifyWorkerDrained()
 
 		go func() {
-			// If gateway is shutting down, we must immediately start the draining process
+			// This is call in two cases
+			// - Connection was closed by the worker, and we already ran all defer actions
+			// - Gateway is draining/shutting down and the parent context was canceled
 			<-ctx.Done()
 
+			// If the connection is already closed, we don't have to drain
+			if closed {
+				return
+			}
+
+			// If gateway is shutting down, we must immediately start the draining process
 			ch.log.Debug("context done, starting draining process")
 
 			// Prevent routing any more messages to this connection
@@ -201,7 +212,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}()
 
-		err = conn.Sync(ctx, c.stateManager)
+		err = conn.Sync(ctx, c.stateManager, c.apiBaseUrl)
 		if err != nil {
 			if ctx.Err() != nil {
 				c.closeDraining(ws)
@@ -271,7 +282,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				err := wsproto.Read(context.Background(), ws, &msg)
 				if err != nil {
 					// immediately stop routing messages to this connection
-					if err := ch.updateConnStatus(connect.ConnectionStatus_DRAINING); err != nil {
+					if err := ch.updateConnStatus(connect.ConnectionStatus_DISCONNECTING); err != nil {
 						ch.log.Error("could not update connection status after read error", "err", err)
 					}
 
@@ -597,7 +608,7 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 		}
 	}
 
-	var authResp *AuthResponse
+	var authResp *auth.Response
 	{
 		// Run auth, add to distributed state
 		authResp, err = c.svc.auther(ctx, &initialMessageData)
@@ -623,13 +634,10 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 			}
 		}
 
-		initialMessageData.AuthData.AccountId = authResp.AccountID.String()
-		initialMessageData.AuthData.EnvId = authResp.EnvID.String()
-
 		c.log.Debug("SDK successfully authenticated", "authResp", authResp)
 	}
 
-	log := c.log.With("account_id", initialMessageData.AuthData.AccountId)
+	log := c.log.With("account_id", authResp.AccountID, "env_id", authResp.EnvID)
 
 	var functionHash []byte
 	{
@@ -667,11 +675,17 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 	}
 
 	conn := state.Connection{
+		AccountID: authResp.AccountID,
+		EnvID:     authResp.EnvID,
+
 		// Mark initial status, not ready to receive messages yet
-		Status:    connect.ConnectionStatus_CONNECTED,
-		Data:      &initialMessageData,
-		Session:   sessionDetails,
-		Group:     workerGroup,
+		Status: connect.ConnectionStatus_CONNECTED,
+
+		Data:    &initialMessageData,
+		Session: sessionDetails,
+		Group:   workerGroup,
+
+		// Used for routing messages to the correct gateway
 		GatewayId: c.svc.gatewayId,
 	}
 

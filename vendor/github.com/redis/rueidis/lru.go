@@ -20,7 +20,7 @@ const (
 	entryBaseSize = (keyCacheSize + entrySize + elementSize + stringSSize*2) * 3 / 2
 	entryMinSize  = entryBaseSize + messageStructSize
 
-	moveThreshold = uint64(1024 - 1)
+	moveThreshold = uint32(1024 - 1)
 )
 
 type cacheEntry struct {
@@ -48,8 +48,8 @@ func (e *cacheEntry) Wait(ctx context.Context) (RedisMessage, error) {
 type keyCache struct {
 	cache map[string]*list.Element
 	key   string
-	hits  uint64
-	miss  uint64
+	hits  uint32
+	miss  uint32
 }
 
 var _ CacheStore = (*lru)(nil)
@@ -78,7 +78,7 @@ func (c *lru) Flight(key, cmd string, ttl time.Duration, now time.Time) (v Redis
 
 	c.mu.RLock()
 	if kc, ok = c.store[key]; ok {
-		if ele, ok = kc.cache[cmd]; ok {
+		if ele = kc.cache[cmd]; ele != nil {
 			e = ele.Value.(*cacheEntry)
 			v = e.val
 			back = c.list.Back()
@@ -87,7 +87,7 @@ func (c *lru) Flight(key, cmd string, ttl time.Duration, now time.Time) (v Redis
 	c.mu.RUnlock()
 
 	if e != nil && (v.typ == 0 || v.relativePTTL(now) > 0) {
-		hits := atomic.AddUint64(&kc.hits, 1)
+		hits := atomic.AddUint32(&kc.hits, 1)
 		if ele != back && hits&moveThreshold == 0 {
 			c.mu.Lock()
 			if c.list != nil {
@@ -109,9 +109,9 @@ func (c *lru) Flight(key, cmd string, ttl time.Duration, now time.Time) (v Redis
 		kc = &keyCache{cache: make(map[string]*list.Element, 1), key: key}
 		c.store[key] = kc
 	}
-	if ele, ok = kc.cache[cmd]; ok {
+	if ele = kc.cache[cmd]; ele != nil {
 		if e = ele.Value.(*cacheEntry); e.val.typ == 0 || e.val.relativePTTL(now) > 0 {
-			atomic.AddUint64(&kc.hits, 1)
+			atomic.AddUint32(&kc.hits, 1)
 			v = e.val
 			c.list.MoveToBack(ele)
 			ce = e
@@ -121,10 +121,9 @@ func (c *lru) Flight(key, cmd string, ttl time.Duration, now time.Time) (v Redis
 			c.size -= e.size
 		}
 	}
-	atomic.AddUint64(&kc.miss, 1)
+	atomic.AddUint32(&kc.miss, 1)
 	v.setExpireAt(now.Add(ttl).UnixMilli())
-	c.list.PushBack(&cacheEntry{cmd: cmd, kc: kc, val: v, ch: make(chan struct{})})
-	kc.cache[cmd] = c.list.Back()
+	kc.cache[cmd] = c.list.PushBack(&cacheEntry{cmd: cmd, kc: kc, val: v, ch: make(chan struct{})})
 ret:
 	c.mu.Unlock()
 	return v, ce
@@ -137,7 +136,7 @@ func (c *lru) Flights(now time.Time, multi []CacheableTTL, results []RedisResult
 	for i, ct := range multi {
 		key, cmd := cmds.CacheKey(ct.Cmd)
 		if kc, ok := c.store[key]; ok {
-			if ele, ok := kc.cache[cmd]; ok {
+			if ele := kc.cache[cmd]; ele != nil {
 				e := ele.Value.(*cacheEntry)
 				v := e.val
 				if v.typ == 0 {
@@ -147,7 +146,7 @@ func (c *lru) Flights(now time.Time, multi []CacheableTTL, results []RedisResult
 				} else {
 					goto miss1
 				}
-				if atomic.AddUint64(&kc.hits, 1)&moveThreshold == 0 {
+				if atomic.AddUint32(&kc.hits, 1)&moveThreshold == 0 {
 					if moves == nil {
 						moves = make([]*list.Element, 0, len(multi))
 					}
@@ -191,7 +190,7 @@ func (c *lru) Flights(now time.Time, multi []CacheableTTL, results []RedisResult
 			kc = &keyCache{cache: make(map[string]*list.Element, 1), key: key}
 			c.store[key] = kc
 		}
-		if ele, ok := kc.cache[cmd]; ok {
+		if ele := kc.cache[cmd]; ele != nil {
 			e := ele.Value.(*cacheEntry)
 			v := e.val
 			if v.typ == 0 {
@@ -203,16 +202,15 @@ func (c *lru) Flights(now time.Time, multi []CacheableTTL, results []RedisResult
 				c.size -= e.size
 				goto miss2
 			}
-			atomic.AddUint64(&kc.hits, 1)
+			atomic.AddUint32(&kc.hits, 1)
 			c.list.MoveToBack(ele)
 			continue
 		}
 	miss2:
-		atomic.AddUint64(&kc.miss, 1)
+		atomic.AddUint32(&kc.miss, 1)
 		v := RedisMessage{}
 		v.setExpireAt(now.Add(multi[i].TTL).UnixMilli())
-		c.list.PushBack(&cacheEntry{cmd: cmd, kc: kc, val: v, ch: make(chan struct{})})
-		kc.cache[cmd] = c.list.Back()
+		kc.cache[cmd] = c.list.PushBack(&cacheEntry{cmd: cmd, kc: kc, val: v, ch: make(chan struct{})})
 		missed[j] = i
 		j++
 	}
@@ -224,7 +222,7 @@ func (c *lru) Update(key, cmd string, value RedisMessage) (pxat int64) {
 	var ch chan struct{}
 	c.mu.Lock()
 	if kc, ok := c.store[key]; ok {
-		if ele, ok := kc.cache[cmd]; ok {
+		if ele := kc.cache[cmd]; ele != nil {
 			if e := ele.Value.(*cacheEntry); e.val.typ == 0 {
 				pxat = value.getExpireAt()
 				cpttl := e.val.getExpireAt()
@@ -264,7 +262,7 @@ func (c *lru) Cancel(key, cmd string, err error) {
 	var ch chan struct{}
 	c.mu.Lock()
 	if kc, ok := c.store[key]; ok {
-		if ele, ok := kc.cache[cmd]; ok {
+		if ele := kc.cache[cmd]; ele != nil {
 			if e := ele.Value.(*cacheEntry); e.val.typ == 0 {
 				e.err = err
 				ch = e.ch
@@ -296,12 +294,16 @@ func (c *lru) GetTTL(key, cmd string) (ttl time.Duration) {
 func (c *lru) purge(key string, kc *keyCache) {
 	if kc != nil {
 		for cmd, ele := range kc.cache {
-			if e := ele.Value.(*cacheEntry); e.val.typ != 0 { // do not delete pending entries
-				if delete(kc.cache, cmd); len(kc.cache) == 0 {
-					delete(c.store, key)
+			if ele != nil {
+				e := ele.Value.(*cacheEntry)
+				if e.val.typ == 0 { // do not delete pending entries
+					continue
 				}
 				c.list.Remove(ele)
 				c.size -= e.size
+			}
+			if delete(kc.cache, cmd); len(kc.cache) == 0 {
+				delete(c.store, key)
 			}
 		}
 	}
@@ -325,9 +327,11 @@ func (c *lru) Close(err error) {
 	c.mu.Lock()
 	for _, kc := range c.store {
 		for _, ele := range kc.cache {
-			if e := ele.Value.(*cacheEntry); e.val.typ == 0 {
-				e.err = err
-				close(e.ch)
+			if ele != nil {
+				if e := ele.Value.(*cacheEntry); e.val.typ == 0 {
+					e.err = err
+					close(e.ch)
+				}
 			}
 		}
 	}

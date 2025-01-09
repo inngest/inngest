@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card';
 import { IconDatadog } from '@inngest/components/icons/platforms/Datadog';
 import { IconNeon } from '@inngest/components/icons/platforms/Neon';
@@ -28,7 +28,7 @@ const INTEGRATIONS: Integration[] = [
     slug: 'vercel',
     Icon: <IconVercel className="text-onContrast h-6 w-6" />,
     actionButton: (enabled, loading) => (
-      <NewButton
+      <Button
         kind="primary"
         appearance="solid"
         size="medium"
@@ -46,7 +46,7 @@ const INTEGRATIONS: Integration[] = [
     slug: 'neon',
     Icon: <IconNeon className="text-onContrast h-6 w-6" />,
     actionButton: (enabled, loading) => (
-      <NewButton
+      <Button
         kind="primary"
         appearance="solid"
         size="medium"
@@ -63,7 +63,7 @@ const INTEGRATIONS: Integration[] = [
     slug: 'supabase',
     Icon: <IconSupabase className="text-onContrast h-6 w-6" />,
     actionButton: (enabled, loading) => (
-      <NewButton
+      <Button
         kind="primary"
         appearance="solid"
         size="medium"
@@ -82,7 +82,7 @@ const INTEGRATIONS: Integration[] = [
     slug: 'netlify',
     Icon: <IconNetlify className="text-onContrast h-6 w-6" />,
     actionButton: () => (
-      <NewButton
+      <Button
         icon={<RiExternalLinkLine />}
         iconSide="left"
         kind="secondary"
@@ -100,7 +100,7 @@ const INTEGRATIONS: Integration[] = [
     slug: 'datadog',
     Icon: <IconDatadog className="text-onContrast h-6 w-6" />,
     actionButton: () => (
-      <NewButton
+      <Button
         icon={<RiExternalLinkLine />}
         iconSide="left"
         kind="secondary"
@@ -116,7 +116,6 @@ const INTEGRATIONS: Integration[] = [
 ];
 
 export default function IntegrationsList({ integrations }: { integrations: VercelIntegration[] }) {
-  const { value: postgressIntegration } = useBooleanFlag('postgres-integration');
   const { value: supabaseIntegration } = useBooleanFlag('supabase-integration');
 
   console.log('main integrations', integrations);
@@ -129,7 +128,6 @@ export default function IntegrationsList({ integrations }: { integrations: Verce
       <div className="mb-7 w-full text-2xl font-medium">All integrations</div>
       <div className="grid w-[800px] grid-cols-2 gap-6">
         {INTEGRATIONS.map((i: Integration, n) => {
-          if (i.title === 'Neon' && !postgressIntegration) return;
           if (i.title === 'Supabase' && !supabaseIntegration) return;
 
           const integrationData = getIntegrationData(i.slug);
@@ -161,7 +159,7 @@ export default function IntegrationsList({ integrations }: { integrations: Verce
               you.
             </div>
             <div>
-              <NewButton
+              <Button
                 icon={<RiExternalLinkLine />}
                 iconSide="left"
                 kind="secondary"

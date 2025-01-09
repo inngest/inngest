@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/config"
+	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/apiutil"
 	"github.com/inngest/inngest/pkg/coreapi/generated"
@@ -51,6 +52,8 @@ type Options struct {
 	// the server will still boot but core actions such as syncing, runs, and
 	// ingesting events will not work.
 	RequireKeys bool
+
+	ConnectOpts connectv0.Opts
 }
 
 func NewCoreApi(o Options) (*CoreAPI, error) {
@@ -105,6 +108,8 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	// NOTE: These are present in the 2.x and 3.x SDKs to enable large payload sizes.
 	a.Get("/runs/{runID}/batch", a.GetEventBatch)
 	a.Get("/runs/{runID}/actions", a.GetActions)
+
+	a.Mount("/connect", connectv0.New(a, o.ConnectOpts))
 
 	return a, nil
 }

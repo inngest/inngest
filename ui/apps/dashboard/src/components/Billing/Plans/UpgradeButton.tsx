@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { toast } from 'sonner';
 
 import CheckoutModal, { type CheckoutItem } from '@/components/Billing/Plans/CheckoutModal';
@@ -81,7 +81,7 @@ export default function UpgradeButton({
 
   return (
     <div className="my-8">
-      <NewButton
+      <Button
         className="w-full"
         label={buttonLabel}
         disabled={isActive}
@@ -99,7 +99,7 @@ export default function UpgradeButton({
         }}
       />
       {isEnterprise && isEnterpriseCard && (
-        <NewButton
+        <Button
           href={pathCreator.support({ ref: 'app-billing-plans-enterprise' })}
           label="Contact account manager"
           appearance="ghost"

@@ -1,14 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
-import { NewLink } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/Link';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiAddLine, RiQuestionLine } from '@remixicon/react';
 
 import { StatusMenu } from '@/components/Apps/StatusMenu';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import EmptyAppsCard from '@/components/Onboarding/EmptyAppsCard';
 import { getProdApps } from '@/components/Onboarding/actions';
 import { staticSlugs } from '@/utils/environments';
@@ -24,14 +23,16 @@ const AppInfo = () => (
     <TooltipContent
       side="right"
       sideOffset={2}
-      className="border-muted text-muted text-md mt-6 flex flex-col rounded-lg border p-0 text-sm"
+      className="border-muted text-muted mt-6 flex flex-col rounded-lg border p-0 text-sm"
     >
-      <div className="border-b px-4 py-2 ">Apps map directly to your products or services.</div>
+      <div className="border-subtle border-b px-4 py-2 ">
+        Apps map directly to your products or services.
+      </div>
 
       <div className="px-4 py-2">
-        <NewLink href="https://www.inngest.com/docs/apps" size="small">
+        <Link href="https://www.inngest.com/docs/apps" target="_blank">
           Learn how apps work
-        </NewLink>
+        </Link>
       </div>
     </TooltipContent>
   </Tooltip>
@@ -71,7 +72,6 @@ export default function AppsPage({
   });
 
   const isArchived = archived === 'true';
-  const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
 
   useEffect(() => {
     fetchInitialData().then((data) => {
@@ -79,8 +79,7 @@ export default function AppsPage({
     });
   }, []);
 
-  const displayOnboarding =
-    envSlug === staticSlugs.production && onboardingFlow && !hasProductionApps;
+  const displayOnboarding = envSlug === staticSlugs.production && !hasProductionApps;
 
   return (
     <>
@@ -89,7 +88,7 @@ export default function AppsPage({
         infoIcon={<AppInfo />}
         action={
           (!isArchived || displayOnboarding) && (
-            <NewButton
+            <Button
               kind="primary"
               label="Sync new app"
               href={pathCreator.createApp({ envSlug })}
@@ -99,7 +98,7 @@ export default function AppsPage({
           )
         }
       />
-      <div className="bg-canvasBase mx-auto flex h-full w-full max-w-[1200px] flex-col px-6 pt-16">
+      <div className="bg-canvasBase mx-auto flex h-full w-full max-w-[1200px] flex-col px-6 pb-4 pt-16">
         {isLoading ? (
           <div className="mb-4 flex items-center justify-center">
             <div className="mt-[50px] w-full max-w-[1200px]">

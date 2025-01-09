@@ -18,8 +18,10 @@ func NormalizeAppURL(u string, forceHTTPS bool) string {
 	parsed = stripDeployID(*parsed)
 
 	if forceHTTPS {
-		if parsed.Scheme != "https" {
-			parsed.Scheme = "https"
+		isWebSocket := strings.HasPrefix(parsed.Scheme, "ws")
+		parsed.Scheme = "https"
+		if isWebSocket {
+			parsed.Scheme = "wss"
 		}
 	}
 

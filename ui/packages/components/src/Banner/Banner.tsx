@@ -1,5 +1,5 @@
-import { NewButton } from '@inngest/components/Button';
-import { NewLink, type NewLinkProps } from '@inngest/components/Link';
+import { Button } from '@inngest/components/Button';
+import { Link, type LinkProps } from '@inngest/components/Link';
 import { cn } from '@inngest/components/utils/classNames';
 import {
   RiCheckboxCircleLine,
@@ -114,7 +114,7 @@ export function Banner({
       </div>
       {cta}
       {onDismiss && (
-        <NewButton
+        <Button
           size="small"
           appearance="ghost"
           onClick={onDismiss}
@@ -130,12 +130,12 @@ function BannerLink({
   severity,
   children,
   ...props
-}: React.PropsWithChildren<NewLinkProps & { severity: Severity }>) {
+}: React.PropsWithChildren<LinkProps & { severity: Severity }>) {
   const styles = severityStyles[severity].linkClassName;
   return (
-    <NewLink href={href} {...props} className={cn(styles, props.className)}>
+    <Link href={href} {...props} className={cn(styles, props.className)}>
       {children}
-    </NewLink>
+    </Link>
   );
 }
 
@@ -164,7 +164,7 @@ export function ContextualBanner({
         <span className="grow text-sm leading-6">{title}</span>
         {cta}
         {onDismiss && (
-          <NewButton
+          <Button
             size="small"
             appearance="ghost"
             onClick={onDismiss}

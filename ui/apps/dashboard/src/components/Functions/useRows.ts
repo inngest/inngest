@@ -13,7 +13,7 @@ type Output = {
   rows: FunctionTableRow[];
 };
 
-export function useRows({ archived }: { archived: boolean }): Output {
+export function useRows({ archived, search }: { archived: boolean; search: string }): Output {
   const client = useClient();
   const env = useEnvironment();
   const [page, setPage] = useState(1);
@@ -34,10 +34,11 @@ export function useRows({ archived }: { archived: boolean }): Output {
       lastPage: 0,
       rows: [],
     });
-  }, [archived]);
+  }, [archived, search]);
 
   const functionsRes = useFunctionsPage({
     archived,
+    search,
     envID: env.id,
     page,
   });

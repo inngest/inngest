@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
@@ -67,7 +67,7 @@ export default function BillingInformation({
       actions={
         <>
           {isEditing ? (
-            <NewButton
+            <Button
               appearance="ghost"
               disabled={isSaveDisabled}
               className="h-6 font-semibold"
@@ -76,7 +76,7 @@ export default function BillingInformation({
               label="Save"
             />
           ) : (
-            <NewButton
+            <Button
               appearance="ghost"
               kind="primary"
               className="h-6 font-semibold"

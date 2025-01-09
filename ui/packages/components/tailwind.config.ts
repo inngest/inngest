@@ -160,15 +160,24 @@ export default {
       placeholderColor: {
         disabled: 'rgb(var(--color-foreground-disabled) / <alpha-value>)',
       },
+      gradientColorStops: {
+        canvasMuted: 'rgb(var(--color-background-canvas-muted) / <alpha-value>)',
+      },
       fill: {
         // temporary tooltip token
         tooltipArrow: 'rgb(var(--color-background-canvas-base) / <alpha-value>)',
         onContrast: 'rgb(var(--color-foreground-onContrast) / <alpha-value>)',
+        basis: 'rgb(var(--color-foreground-base) / <alpha-value>)',
         subtle: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
+        muted: 'rgb(var(--color-foreground-muted) / <alpha-value>)',
+        disabled: 'rgb(var(--color-foreground-disabled) / <alpha-value>)',
         alwaysWhite: 'rgb(var(--color-foreground-alwaysWhite) / <alpha-value>)',
         btnPrimary: 'rgb(var(--color-foreground-btn-primary) / <alpha-value>)',
         btnDanger: 'rgb(var(--color-foreground-btn-danger) / <alpha-value>)',
         link: 'rgb(var(--color-foreground-link) / <alpha-value>)',
+      },
+      stroke: {
+        disabled: 'rgb(var(--color-border-disabled) / <alpha-value>)',
       },
       gridTemplateColumns: {
         dashboard: '1fr 1fr 1fr 432px',
@@ -180,15 +189,6 @@ export default {
       },
       boxShadow: {
         primary: '0 4px 4px 0 rgba(0,0,0,0.25)',
-        // old box-shadows:
-        'outline-primary-light':
-          'inset 0 1px 0 0 rgba(255, 255, 255, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 1px 3px rgba(0, 0, 0, 0.2)',
-        'outline-primary-dark':
-          '0 0 0 0.5px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 1px 3px rgba(0, 0, 0, 0.2)',
-        'outline-secondary-dark':
-          '0 0 0 0.5px rgba(0, 0, 0, 0.3), inset 0 1px 0 0 rgba(255, 255, 255, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.01), 0 1px 3px rgba(0, 0, 0, 0.15)',
-        'outline-secondary-light':
-          '0 0 0 0.5px rgba(0, 0, 0, 0.15), inset 0 1px 0 0 rgba(255, 255, 255, 0.8), inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 1px 3px rgba(0, 0, 0, 0.15)',
         floating: '0 0 0 0.5px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(255, 255, 255, 0.15)',
       },
       outlineOffset: {

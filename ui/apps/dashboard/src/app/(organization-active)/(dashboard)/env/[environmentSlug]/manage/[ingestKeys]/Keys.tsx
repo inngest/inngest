@@ -22,7 +22,7 @@ const GetKeysDocument = graphql(`
 `);
 
 const LoadingSkeleton = () => (
-  <div className="border-b border-slate-100 px-4 py-3">
+  <div className="border-subtle border-b px-4 py-3">
     <Skeleton className="mb-1 block h-11 w-full" />
   </div>
 );

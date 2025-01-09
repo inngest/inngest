@@ -1,7 +1,7 @@
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Chart } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
-import { NewLink } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/Link';
 import { RiArrowRightUpLine } from '@remixicon/react';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -49,18 +49,18 @@ export const FailedFunctions = ({
           <Info
             text="Total number of failed runs in your environment, app or function."
             action={
-              <NewLink
+              <Link
                 arrowOnHover
                 className="text-sm"
                 href="https://www.inngest.com/docs/platform/monitor/observability-metrics#failed-functions"
                 target="_new"
               >
                 Learn more about Inngest functions.
-              </NewLink>
+              </Link>
             }
           />
         </div>
-        <NewButton
+        <Button
           size="small"
           kind="secondary"
           appearance="outlined"

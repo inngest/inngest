@@ -2,7 +2,7 @@ import { forwardRef } from 'react';
 import { Combobox, Listbox, type ComboboxInputProps } from '@headlessui/react';
 import { RiArrowDownSLine } from '@remixicon/react';
 
-import { NewButton as InngestButton } from '../Button';
+import { Button as InngestButton } from '../Button';
 import { Checkbox } from '../Checkbox';
 import { cn } from '../utils/classNames';
 
@@ -101,7 +101,7 @@ function Options({
 }: React.PropsWithChildren<{ as: React.ElementType; className?: string }>) {
   return (
     <Component className={cn('absolute z-10 mt-1 min-w-max', className)}>
-      <div className="border-muted bg-surfaceBase z-10 overflow-hidden rounded-md border py-1 drop-shadow-lg">
+      <div className="border-muted bg-surfaceBase shadow-primary z-10 overflow-hidden rounded-md border py-1">
         {children}
       </div>
     </Component>

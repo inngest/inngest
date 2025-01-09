@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { IDCell, Table, TextCell, TimeCell } from '@inngest/components/Table';
 import { RiDeleteBinLine } from '@remixicon/react';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
@@ -64,7 +64,7 @@ export function CancellationTable({ envSlug, fnSlug }: Props) {
 
         {!isInitiallyFetching && (
           <span>
-            <NewButton
+            <Button
               appearance="outlined"
               disabled={isFetching || !hasNextPage}
               label="Load More"
@@ -127,7 +127,7 @@ function useColumns({ setPendingDelete }: { setPendingDelete: (obj: PendingDelet
           const data = props.row.original;
 
           return (
-            <NewButton
+            <Button
               appearance="ghost"
               icon={<RiDeleteBinLine className="size-5" />}
               kind="danger"

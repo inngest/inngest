@@ -4,7 +4,7 @@ package cmds
 
 import "strconv"
 
-type Xack Completed
+type Xack Incomplete
 
 func (b Builder) Xack() (c Xack) {
 	c = Xack{cs: get(), ks: b.ks}
@@ -22,14 +22,14 @@ func (c Xack) Key(key string) XackKey {
 	return (XackKey)(c)
 }
 
-type XackGroup Completed
+type XackGroup Incomplete
 
 func (c XackGroup) Id(id ...string) XackId {
 	c.cs.s = append(c.cs.s, id...)
 	return (XackId)(c)
 }
 
-type XackId Completed
+type XackId Incomplete
 
 func (c XackId) Id(id ...string) XackId {
 	c.cs.s = append(c.cs.s, id...)
@@ -38,17 +38,17 @@ func (c XackId) Id(id ...string) XackId {
 
 func (c XackId) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XackKey Completed
+type XackKey Incomplete
 
 func (c XackKey) Group(group string) XackGroup {
 	c.cs.s = append(c.cs.s, group)
 	return (XackGroup)(c)
 }
 
-type Xadd Completed
+type Xadd Incomplete
 
 func (b Builder) Xadd() (c Xadd) {
 	c = Xadd{cs: get(), ks: b.ks}
@@ -66,7 +66,7 @@ func (c Xadd) Key(key string) XaddKey {
 	return (XaddKey)(c)
 }
 
-type XaddFieldValue Completed
+type XaddFieldValue Incomplete
 
 func (c XaddFieldValue) FieldValue(field string, value string) XaddFieldValue {
 	c.cs.s = append(c.cs.s, field, value)
@@ -75,16 +75,16 @@ func (c XaddFieldValue) FieldValue(field string, value string) XaddFieldValue {
 
 func (c XaddFieldValue) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XaddId Completed
+type XaddId Incomplete
 
 func (c XaddId) FieldValue() XaddFieldValue {
 	return (XaddFieldValue)(c)
 }
 
-type XaddKey Completed
+type XaddKey Incomplete
 
 func (c XaddKey) Nomkstream() XaddNomkstream {
 	c.cs.s = append(c.cs.s, "NOMKSTREAM")
@@ -106,7 +106,7 @@ func (c XaddKey) Id(id string) XaddId {
 	return (XaddId)(c)
 }
 
-type XaddNomkstream Completed
+type XaddNomkstream Incomplete
 
 func (c XaddNomkstream) Maxlen() XaddTrimStrategyMaxlen {
 	c.cs.s = append(c.cs.s, "MAXLEN")
@@ -123,28 +123,28 @@ func (c XaddNomkstream) Id(id string) XaddId {
 	return (XaddId)(c)
 }
 
-type XaddTrimLimit Completed
+type XaddTrimLimit Incomplete
 
 func (c XaddTrimLimit) Id(id string) XaddId {
 	c.cs.s = append(c.cs.s, id)
 	return (XaddId)(c)
 }
 
-type XaddTrimOperatorAlmost Completed
+type XaddTrimOperatorAlmost Incomplete
 
 func (c XaddTrimOperatorAlmost) Threshold(threshold string) XaddTrimThreshold {
 	c.cs.s = append(c.cs.s, threshold)
 	return (XaddTrimThreshold)(c)
 }
 
-type XaddTrimOperatorExact Completed
+type XaddTrimOperatorExact Incomplete
 
 func (c XaddTrimOperatorExact) Threshold(threshold string) XaddTrimThreshold {
 	c.cs.s = append(c.cs.s, threshold)
 	return (XaddTrimThreshold)(c)
 }
 
-type XaddTrimStrategyMaxlen Completed
+type XaddTrimStrategyMaxlen Incomplete
 
 func (c XaddTrimStrategyMaxlen) Exact() XaddTrimOperatorExact {
 	c.cs.s = append(c.cs.s, "=")
@@ -161,7 +161,7 @@ func (c XaddTrimStrategyMaxlen) Threshold(threshold string) XaddTrimThreshold {
 	return (XaddTrimThreshold)(c)
 }
 
-type XaddTrimStrategyMinid Completed
+type XaddTrimStrategyMinid Incomplete
 
 func (c XaddTrimStrategyMinid) Exact() XaddTrimOperatorExact {
 	c.cs.s = append(c.cs.s, "=")
@@ -178,7 +178,7 @@ func (c XaddTrimStrategyMinid) Threshold(threshold string) XaddTrimThreshold {
 	return (XaddTrimThreshold)(c)
 }
 
-type XaddTrimThreshold Completed
+type XaddTrimThreshold Incomplete
 
 func (c XaddTrimThreshold) Limit(count int64) XaddTrimLimit {
 	c.cs.s = append(c.cs.s, "LIMIT", strconv.FormatInt(count, 10))
@@ -190,7 +190,7 @@ func (c XaddTrimThreshold) Id(id string) XaddId {
 	return (XaddId)(c)
 }
 
-type Xautoclaim Completed
+type Xautoclaim Incomplete
 
 func (b Builder) Xautoclaim() (c Xautoclaim) {
 	c = Xautoclaim{cs: get(), ks: b.ks}
@@ -208,14 +208,14 @@ func (c Xautoclaim) Key(key string) XautoclaimKey {
 	return (XautoclaimKey)(c)
 }
 
-type XautoclaimConsumer Completed
+type XautoclaimConsumer Incomplete
 
 func (c XautoclaimConsumer) MinIdleTime(minIdleTime string) XautoclaimMinIdleTime {
 	c.cs.s = append(c.cs.s, minIdleTime)
 	return (XautoclaimMinIdleTime)(c)
 }
 
-type XautoclaimCount Completed
+type XautoclaimCount Incomplete
 
 func (c XautoclaimCount) Justid() XautoclaimJustid {
 	c.cs.s = append(c.cs.s, "JUSTID")
@@ -224,38 +224,38 @@ func (c XautoclaimCount) Justid() XautoclaimJustid {
 
 func (c XautoclaimCount) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XautoclaimGroup Completed
+type XautoclaimGroup Incomplete
 
 func (c XautoclaimGroup) Consumer(consumer string) XautoclaimConsumer {
 	c.cs.s = append(c.cs.s, consumer)
 	return (XautoclaimConsumer)(c)
 }
 
-type XautoclaimJustid Completed
+type XautoclaimJustid Incomplete
 
 func (c XautoclaimJustid) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XautoclaimKey Completed
+type XautoclaimKey Incomplete
 
 func (c XautoclaimKey) Group(group string) XautoclaimGroup {
 	c.cs.s = append(c.cs.s, group)
 	return (XautoclaimGroup)(c)
 }
 
-type XautoclaimMinIdleTime Completed
+type XautoclaimMinIdleTime Incomplete
 
 func (c XautoclaimMinIdleTime) Start(start string) XautoclaimStart {
 	c.cs.s = append(c.cs.s, start)
 	return (XautoclaimStart)(c)
 }
 
-type XautoclaimStart Completed
+type XautoclaimStart Incomplete
 
 func (c XautoclaimStart) Count(count int64) XautoclaimCount {
 	c.cs.s = append(c.cs.s, "COUNT", strconv.FormatInt(count, 10))
@@ -269,10 +269,10 @@ func (c XautoclaimStart) Justid() XautoclaimJustid {
 
 func (c XautoclaimStart) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Xclaim Completed
+type Xclaim Incomplete
 
 func (b Builder) Xclaim() (c Xclaim) {
 	c = Xclaim{cs: get(), ks: b.ks}
@@ -290,14 +290,14 @@ func (c Xclaim) Key(key string) XclaimKey {
 	return (XclaimKey)(c)
 }
 
-type XclaimConsumer Completed
+type XclaimConsumer Incomplete
 
 func (c XclaimConsumer) MinIdleTime(minIdleTime string) XclaimMinIdleTime {
 	c.cs.s = append(c.cs.s, minIdleTime)
 	return (XclaimMinIdleTime)(c)
 }
 
-type XclaimForce Completed
+type XclaimForce Incomplete
 
 func (c XclaimForce) Justid() XclaimJustid {
 	c.cs.s = append(c.cs.s, "JUSTID")
@@ -311,17 +311,17 @@ func (c XclaimForce) Lastid() XclaimLastid {
 
 func (c XclaimForce) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XclaimGroup Completed
+type XclaimGroup Incomplete
 
 func (c XclaimGroup) Consumer(consumer string) XclaimConsumer {
 	c.cs.s = append(c.cs.s, consumer)
 	return (XclaimConsumer)(c)
 }
 
-type XclaimId Completed
+type XclaimId Incomplete
 
 func (c XclaimId) Id(id ...string) XclaimId {
 	c.cs.s = append(c.cs.s, id...)
@@ -360,10 +360,10 @@ func (c XclaimId) Lastid() XclaimLastid {
 
 func (c XclaimId) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XclaimIdle Completed
+type XclaimIdle Incomplete
 
 func (c XclaimIdle) Time(msUnixTime int64) XclaimTime {
 	c.cs.s = append(c.cs.s, "TIME", strconv.FormatInt(msUnixTime, 10))
@@ -392,10 +392,10 @@ func (c XclaimIdle) Lastid() XclaimLastid {
 
 func (c XclaimIdle) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XclaimJustid Completed
+type XclaimJustid Incomplete
 
 func (c XclaimJustid) Lastid() XclaimLastid {
 	c.cs.s = append(c.cs.s, "LASTID")
@@ -404,31 +404,31 @@ func (c XclaimJustid) Lastid() XclaimLastid {
 
 func (c XclaimJustid) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XclaimKey Completed
+type XclaimKey Incomplete
 
 func (c XclaimKey) Group(group string) XclaimGroup {
 	c.cs.s = append(c.cs.s, group)
 	return (XclaimGroup)(c)
 }
 
-type XclaimLastid Completed
+type XclaimLastid Incomplete
 
 func (c XclaimLastid) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XclaimMinIdleTime Completed
+type XclaimMinIdleTime Incomplete
 
 func (c XclaimMinIdleTime) Id(id ...string) XclaimId {
 	c.cs.s = append(c.cs.s, id...)
 	return (XclaimId)(c)
 }
 
-type XclaimRetrycount Completed
+type XclaimRetrycount Incomplete
 
 func (c XclaimRetrycount) Force() XclaimForce {
 	c.cs.s = append(c.cs.s, "FORCE")
@@ -447,10 +447,10 @@ func (c XclaimRetrycount) Lastid() XclaimLastid {
 
 func (c XclaimRetrycount) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XclaimTime Completed
+type XclaimTime Incomplete
 
 func (c XclaimTime) Retrycount(count int64) XclaimRetrycount {
 	c.cs.s = append(c.cs.s, "RETRYCOUNT", strconv.FormatInt(count, 10))
@@ -474,10 +474,10 @@ func (c XclaimTime) Lastid() XclaimLastid {
 
 func (c XclaimTime) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Xdel Completed
+type Xdel Incomplete
 
 func (b Builder) Xdel() (c Xdel) {
 	c = Xdel{cs: get(), ks: b.ks}
@@ -495,7 +495,7 @@ func (c Xdel) Key(key string) XdelKey {
 	return (XdelKey)(c)
 }
 
-type XdelId Completed
+type XdelId Incomplete
 
 func (c XdelId) Id(id ...string) XdelId {
 	c.cs.s = append(c.cs.s, id...)
@@ -504,17 +504,17 @@ func (c XdelId) Id(id ...string) XdelId {
 
 func (c XdelId) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XdelKey Completed
+type XdelKey Incomplete
 
 func (c XdelKey) Id(id ...string) XdelId {
 	c.cs.s = append(c.cs.s, id...)
 	return (XdelId)(c)
 }
 
-type XgroupCreate Completed
+type XgroupCreate Incomplete
 
 func (b Builder) XgroupCreate() (c XgroupCreate) {
 	c = XgroupCreate{cs: get(), ks: b.ks}
@@ -532,21 +532,21 @@ func (c XgroupCreate) Key(key string) XgroupCreateKey {
 	return (XgroupCreateKey)(c)
 }
 
-type XgroupCreateEntriesread Completed
+type XgroupCreateEntriesread Incomplete
 
 func (c XgroupCreateEntriesread) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XgroupCreateGroup Completed
+type XgroupCreateGroup Incomplete
 
 func (c XgroupCreateGroup) Id(id string) XgroupCreateId {
 	c.cs.s = append(c.cs.s, id)
 	return (XgroupCreateId)(c)
 }
 
-type XgroupCreateId Completed
+type XgroupCreateId Incomplete
 
 func (c XgroupCreateId) Mkstream() XgroupCreateMkstream {
 	c.cs.s = append(c.cs.s, "MKSTREAM")
@@ -560,17 +560,17 @@ func (c XgroupCreateId) Entriesread(entriesRead int64) XgroupCreateEntriesread {
 
 func (c XgroupCreateId) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XgroupCreateKey Completed
+type XgroupCreateKey Incomplete
 
 func (c XgroupCreateKey) Group(group string) XgroupCreateGroup {
 	c.cs.s = append(c.cs.s, group)
 	return (XgroupCreateGroup)(c)
 }
 
-type XgroupCreateMkstream Completed
+type XgroupCreateMkstream Incomplete
 
 func (c XgroupCreateMkstream) Entriesread(entriesRead int64) XgroupCreateEntriesread {
 	c.cs.s = append(c.cs.s, "ENTRIESREAD", strconv.FormatInt(entriesRead, 10))
@@ -579,10 +579,10 @@ func (c XgroupCreateMkstream) Entriesread(entriesRead int64) XgroupCreateEntries
 
 func (c XgroupCreateMkstream) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XgroupCreateconsumer Completed
+type XgroupCreateconsumer Incomplete
 
 func (b Builder) XgroupCreateconsumer() (c XgroupCreateconsumer) {
 	c = XgroupCreateconsumer{cs: get(), ks: b.ks}
@@ -600,28 +600,28 @@ func (c XgroupCreateconsumer) Key(key string) XgroupCreateconsumerKey {
 	return (XgroupCreateconsumerKey)(c)
 }
 
-type XgroupCreateconsumerConsumer Completed
+type XgroupCreateconsumerConsumer Incomplete
 
 func (c XgroupCreateconsumerConsumer) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XgroupCreateconsumerGroup Completed
+type XgroupCreateconsumerGroup Incomplete
 
 func (c XgroupCreateconsumerGroup) Consumer(consumer string) XgroupCreateconsumerConsumer {
 	c.cs.s = append(c.cs.s, consumer)
 	return (XgroupCreateconsumerConsumer)(c)
 }
 
-type XgroupCreateconsumerKey Completed
+type XgroupCreateconsumerKey Incomplete
 
 func (c XgroupCreateconsumerKey) Group(group string) XgroupCreateconsumerGroup {
 	c.cs.s = append(c.cs.s, group)
 	return (XgroupCreateconsumerGroup)(c)
 }
 
-type XgroupDelconsumer Completed
+type XgroupDelconsumer Incomplete
 
 func (b Builder) XgroupDelconsumer() (c XgroupDelconsumer) {
 	c = XgroupDelconsumer{cs: get(), ks: b.ks}
@@ -639,28 +639,28 @@ func (c XgroupDelconsumer) Key(key string) XgroupDelconsumerKey {
 	return (XgroupDelconsumerKey)(c)
 }
 
-type XgroupDelconsumerConsumername Completed
+type XgroupDelconsumerConsumername Incomplete
 
 func (c XgroupDelconsumerConsumername) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XgroupDelconsumerGroup Completed
+type XgroupDelconsumerGroup Incomplete
 
 func (c XgroupDelconsumerGroup) Consumername(consumername string) XgroupDelconsumerConsumername {
 	c.cs.s = append(c.cs.s, consumername)
 	return (XgroupDelconsumerConsumername)(c)
 }
 
-type XgroupDelconsumerKey Completed
+type XgroupDelconsumerKey Incomplete
 
 func (c XgroupDelconsumerKey) Group(group string) XgroupDelconsumerGroup {
 	c.cs.s = append(c.cs.s, group)
 	return (XgroupDelconsumerGroup)(c)
 }
 
-type XgroupDestroy Completed
+type XgroupDestroy Incomplete
 
 func (b Builder) XgroupDestroy() (c XgroupDestroy) {
 	c = XgroupDestroy{cs: get(), ks: b.ks}
@@ -678,21 +678,21 @@ func (c XgroupDestroy) Key(key string) XgroupDestroyKey {
 	return (XgroupDestroyKey)(c)
 }
 
-type XgroupDestroyGroup Completed
+type XgroupDestroyGroup Incomplete
 
 func (c XgroupDestroyGroup) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XgroupDestroyKey Completed
+type XgroupDestroyKey Incomplete
 
 func (c XgroupDestroyKey) Group(group string) XgroupDestroyGroup {
 	c.cs.s = append(c.cs.s, group)
 	return (XgroupDestroyGroup)(c)
 }
 
-type XgroupHelp Completed
+type XgroupHelp Incomplete
 
 func (b Builder) XgroupHelp() (c XgroupHelp) {
 	c = XgroupHelp{cs: get(), ks: b.ks}
@@ -702,10 +702,10 @@ func (b Builder) XgroupHelp() (c XgroupHelp) {
 
 func (c XgroupHelp) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XgroupSetid Completed
+type XgroupSetid Incomplete
 
 func (b Builder) XgroupSetid() (c XgroupSetid) {
 	c = XgroupSetid{cs: get(), ks: b.ks}
@@ -723,21 +723,21 @@ func (c XgroupSetid) Key(key string) XgroupSetidKey {
 	return (XgroupSetidKey)(c)
 }
 
-type XgroupSetidEntriesread Completed
+type XgroupSetidEntriesread Incomplete
 
 func (c XgroupSetidEntriesread) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XgroupSetidGroup Completed
+type XgroupSetidGroup Incomplete
 
 func (c XgroupSetidGroup) Id(id string) XgroupSetidId {
 	c.cs.s = append(c.cs.s, id)
 	return (XgroupSetidId)(c)
 }
 
-type XgroupSetidId Completed
+type XgroupSetidId Incomplete
 
 func (c XgroupSetidId) Entriesread(entriesRead int64) XgroupSetidEntriesread {
 	c.cs.s = append(c.cs.s, "ENTRIESREAD", strconv.FormatInt(entriesRead, 10))
@@ -746,20 +746,20 @@ func (c XgroupSetidId) Entriesread(entriesRead int64) XgroupSetidEntriesread {
 
 func (c XgroupSetidId) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XgroupSetidKey Completed
+type XgroupSetidKey Incomplete
 
 func (c XgroupSetidKey) Group(group string) XgroupSetidGroup {
 	c.cs.s = append(c.cs.s, group)
 	return (XgroupSetidGroup)(c)
 }
 
-type XinfoConsumers Completed
+type XinfoConsumers Incomplete
 
 func (b Builder) XinfoConsumers() (c XinfoConsumers) {
-	c = XinfoConsumers{cs: get(), ks: b.ks, cf: readonly}
+	c = XinfoConsumers{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "XINFO", "CONSUMERS")
 	return c
 }
@@ -774,24 +774,24 @@ func (c XinfoConsumers) Key(key string) XinfoConsumersKey {
 	return (XinfoConsumersKey)(c)
 }
 
-type XinfoConsumersGroup Completed
+type XinfoConsumersGroup Incomplete
 
 func (c XinfoConsumersGroup) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XinfoConsumersKey Completed
+type XinfoConsumersKey Incomplete
 
 func (c XinfoConsumersKey) Group(group string) XinfoConsumersGroup {
 	c.cs.s = append(c.cs.s, group)
 	return (XinfoConsumersGroup)(c)
 }
 
-type XinfoGroups Completed
+type XinfoGroups Incomplete
 
 func (b Builder) XinfoGroups() (c XinfoGroups) {
-	c = XinfoGroups{cs: get(), ks: b.ks, cf: readonly}
+	c = XinfoGroups{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "XINFO", "GROUPS")
 	return c
 }
@@ -806,30 +806,30 @@ func (c XinfoGroups) Key(key string) XinfoGroupsKey {
 	return (XinfoGroupsKey)(c)
 }
 
-type XinfoGroupsKey Completed
+type XinfoGroupsKey Incomplete
 
 func (c XinfoGroupsKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XinfoHelp Completed
+type XinfoHelp Incomplete
 
 func (b Builder) XinfoHelp() (c XinfoHelp) {
-	c = XinfoHelp{cs: get(), ks: b.ks, cf: readonly}
+	c = XinfoHelp{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "XINFO", "HELP")
 	return c
 }
 
 func (c XinfoHelp) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XinfoStream Completed
+type XinfoStream Incomplete
 
 func (b Builder) XinfoStream() (c XinfoStream) {
-	c = XinfoStream{cs: get(), ks: b.ks, cf: readonly}
+	c = XinfoStream{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "XINFO", "STREAM")
 	return c
 }
@@ -844,14 +844,14 @@ func (c XinfoStream) Key(key string) XinfoStreamKey {
 	return (XinfoStreamKey)(c)
 }
 
-type XinfoStreamFullCount Completed
+type XinfoStreamFullCount Incomplete
 
 func (c XinfoStreamFullCount) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XinfoStreamFullFull Completed
+type XinfoStreamFullFull Incomplete
 
 func (c XinfoStreamFullFull) Count(count int64) XinfoStreamFullCount {
 	c.cs.s = append(c.cs.s, "COUNT", strconv.FormatInt(count, 10))
@@ -860,10 +860,10 @@ func (c XinfoStreamFullFull) Count(count int64) XinfoStreamFullCount {
 
 func (c XinfoStreamFullFull) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XinfoStreamKey Completed
+type XinfoStreamKey Incomplete
 
 func (c XinfoStreamKey) Full() XinfoStreamFullFull {
 	c.cs.s = append(c.cs.s, "FULL")
@@ -872,13 +872,13 @@ func (c XinfoStreamKey) Full() XinfoStreamFullFull {
 
 func (c XinfoStreamKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Xlen Completed
+type Xlen Incomplete
 
 func (b Builder) Xlen() (c Xlen) {
-	c = Xlen{cs: get(), ks: b.ks, cf: readonly}
+	c = Xlen{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "XLEN")
 	return c
 }
@@ -893,17 +893,17 @@ func (c Xlen) Key(key string) XlenKey {
 	return (XlenKey)(c)
 }
 
-type XlenKey Completed
+type XlenKey Incomplete
 
 func (c XlenKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Xpending Completed
+type Xpending Incomplete
 
 func (b Builder) Xpending() (c Xpending) {
-	c = Xpending{cs: get(), ks: b.ks, cf: readonly}
+	c = Xpending{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "XPENDING")
 	return c
 }
@@ -918,14 +918,14 @@ func (c Xpending) Key(key string) XpendingKey {
 	return (XpendingKey)(c)
 }
 
-type XpendingFiltersConsumer Completed
+type XpendingFiltersConsumer Incomplete
 
 func (c XpendingFiltersConsumer) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XpendingFiltersCount Completed
+type XpendingFiltersCount Incomplete
 
 func (c XpendingFiltersCount) Consumer(consumer string) XpendingFiltersConsumer {
 	c.cs.s = append(c.cs.s, consumer)
@@ -934,31 +934,31 @@ func (c XpendingFiltersCount) Consumer(consumer string) XpendingFiltersConsumer 
 
 func (c XpendingFiltersCount) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XpendingFiltersEnd Completed
+type XpendingFiltersEnd Incomplete
 
 func (c XpendingFiltersEnd) Count(count int64) XpendingFiltersCount {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(count, 10))
 	return (XpendingFiltersCount)(c)
 }
 
-type XpendingFiltersIdle Completed
+type XpendingFiltersIdle Incomplete
 
 func (c XpendingFiltersIdle) Start(start string) XpendingFiltersStart {
 	c.cs.s = append(c.cs.s, start)
 	return (XpendingFiltersStart)(c)
 }
 
-type XpendingFiltersStart Completed
+type XpendingFiltersStart Incomplete
 
 func (c XpendingFiltersStart) End(end string) XpendingFiltersEnd {
 	c.cs.s = append(c.cs.s, end)
 	return (XpendingFiltersEnd)(c)
 }
 
-type XpendingGroup Completed
+type XpendingGroup Incomplete
 
 func (c XpendingGroup) Idle(minIdleTime int64) XpendingFiltersIdle {
 	c.cs.s = append(c.cs.s, "IDLE", strconv.FormatInt(minIdleTime, 10))
@@ -972,20 +972,20 @@ func (c XpendingGroup) Start(start string) XpendingFiltersStart {
 
 func (c XpendingGroup) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XpendingKey Completed
+type XpendingKey Incomplete
 
 func (c XpendingKey) Group(group string) XpendingGroup {
 	c.cs.s = append(c.cs.s, group)
 	return (XpendingGroup)(c)
 }
 
-type Xrange Completed
+type Xrange Incomplete
 
 func (b Builder) Xrange() (c Xrange) {
-	c = Xrange{cs: get(), ks: b.ks, cf: readonly}
+	c = Xrange{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "XRANGE")
 	return c
 }
@@ -1000,14 +1000,14 @@ func (c Xrange) Key(key string) XrangeKey {
 	return (XrangeKey)(c)
 }
 
-type XrangeCount Completed
+type XrangeCount Incomplete
 
 func (c XrangeCount) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XrangeEnd Completed
+type XrangeEnd Incomplete
 
 func (c XrangeEnd) Count(count int64) XrangeCount {
 	c.cs.s = append(c.cs.s, "COUNT", strconv.FormatInt(count, 10))
@@ -1016,27 +1016,27 @@ func (c XrangeEnd) Count(count int64) XrangeCount {
 
 func (c XrangeEnd) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XrangeKey Completed
+type XrangeKey Incomplete
 
 func (c XrangeKey) Start(start string) XrangeStart {
 	c.cs.s = append(c.cs.s, start)
 	return (XrangeStart)(c)
 }
 
-type XrangeStart Completed
+type XrangeStart Incomplete
 
 func (c XrangeStart) End(end string) XrangeEnd {
 	c.cs.s = append(c.cs.s, end)
 	return (XrangeEnd)(c)
 }
 
-type Xread Completed
+type Xread Incomplete
 
 func (b Builder) Xread() (c Xread) {
-	c = Xread{cs: get(), ks: b.ks, cf: readonly}
+	c = Xread{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "XREAD")
 	return c
 }
@@ -1047,7 +1047,7 @@ func (c Xread) Count(count int64) XreadCount {
 }
 
 func (c Xread) Block(milliseconds int64) XreadBlock {
-	c.cf = blockTag
+	c.cf |= int16(blockTag)
 	c.cs.s = append(c.cs.s, "BLOCK", strconv.FormatInt(milliseconds, 10))
 	return (XreadBlock)(c)
 }
@@ -1057,17 +1057,17 @@ func (c Xread) Streams() XreadStreams {
 	return (XreadStreams)(c)
 }
 
-type XreadBlock Completed
+type XreadBlock Incomplete
 
 func (c XreadBlock) Streams() XreadStreams {
 	c.cs.s = append(c.cs.s, "STREAMS")
 	return (XreadStreams)(c)
 }
 
-type XreadCount Completed
+type XreadCount Incomplete
 
 func (c XreadCount) Block(milliseconds int64) XreadBlock {
-	c.cf = blockTag
+	c.cf |= int16(blockTag)
 	c.cs.s = append(c.cs.s, "BLOCK", strconv.FormatInt(milliseconds, 10))
 	return (XreadBlock)(c)
 }
@@ -1077,7 +1077,7 @@ func (c XreadCount) Streams() XreadStreams {
 	return (XreadStreams)(c)
 }
 
-type XreadId Completed
+type XreadId Incomplete
 
 func (c XreadId) Id(id ...string) XreadId {
 	c.cs.s = append(c.cs.s, id...)
@@ -1086,10 +1086,10 @@ func (c XreadId) Id(id ...string) XreadId {
 
 func (c XreadId) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XreadKey Completed
+type XreadKey Incomplete
 
 func (c XreadKey) Key(key ...string) XreadKey {
 	if c.ks&NoSlot == NoSlot {
@@ -1111,7 +1111,7 @@ func (c XreadKey) Id(id ...string) XreadId {
 	return (XreadId)(c)
 }
 
-type XreadStreams Completed
+type XreadStreams Incomplete
 
 func (c XreadStreams) Key(key ...string) XreadKey {
 	if c.ks&NoSlot == NoSlot {
@@ -1128,7 +1128,7 @@ func (c XreadStreams) Key(key ...string) XreadKey {
 	return (XreadKey)(c)
 }
 
-type Xreadgroup Completed
+type Xreadgroup Incomplete
 
 func (b Builder) Xreadgroup() (c Xreadgroup) {
 	c = Xreadgroup{cs: get(), ks: b.ks}
@@ -1141,7 +1141,7 @@ func (c Xreadgroup) Group(group string, consumer string) XreadgroupGroup {
 	return (XreadgroupGroup)(c)
 }
 
-type XreadgroupBlock Completed
+type XreadgroupBlock Incomplete
 
 func (c XreadgroupBlock) Noack() XreadgroupNoack {
 	c.cs.s = append(c.cs.s, "NOACK")
@@ -1153,10 +1153,10 @@ func (c XreadgroupBlock) Streams() XreadgroupStreams {
 	return (XreadgroupStreams)(c)
 }
 
-type XreadgroupCount Completed
+type XreadgroupCount Incomplete
 
 func (c XreadgroupCount) Block(milliseconds int64) XreadgroupBlock {
-	c.cf = blockTag
+	c.cf |= int16(blockTag)
 	c.cs.s = append(c.cs.s, "BLOCK", strconv.FormatInt(milliseconds, 10))
 	return (XreadgroupBlock)(c)
 }
@@ -1171,7 +1171,7 @@ func (c XreadgroupCount) Streams() XreadgroupStreams {
 	return (XreadgroupStreams)(c)
 }
 
-type XreadgroupGroup Completed
+type XreadgroupGroup Incomplete
 
 func (c XreadgroupGroup) Count(count int64) XreadgroupCount {
 	c.cs.s = append(c.cs.s, "COUNT", strconv.FormatInt(count, 10))
@@ -1179,7 +1179,7 @@ func (c XreadgroupGroup) Count(count int64) XreadgroupCount {
 }
 
 func (c XreadgroupGroup) Block(milliseconds int64) XreadgroupBlock {
-	c.cf = blockTag
+	c.cf |= int16(blockTag)
 	c.cs.s = append(c.cs.s, "BLOCK", strconv.FormatInt(milliseconds, 10))
 	return (XreadgroupBlock)(c)
 }
@@ -1194,7 +1194,7 @@ func (c XreadgroupGroup) Streams() XreadgroupStreams {
 	return (XreadgroupStreams)(c)
 }
 
-type XreadgroupId Completed
+type XreadgroupId Incomplete
 
 func (c XreadgroupId) Id(id ...string) XreadgroupId {
 	c.cs.s = append(c.cs.s, id...)
@@ -1203,10 +1203,10 @@ func (c XreadgroupId) Id(id ...string) XreadgroupId {
 
 func (c XreadgroupId) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XreadgroupKey Completed
+type XreadgroupKey Incomplete
 
 func (c XreadgroupKey) Key(key ...string) XreadgroupKey {
 	if c.ks&NoSlot == NoSlot {
@@ -1228,14 +1228,14 @@ func (c XreadgroupKey) Id(id ...string) XreadgroupId {
 	return (XreadgroupId)(c)
 }
 
-type XreadgroupNoack Completed
+type XreadgroupNoack Incomplete
 
 func (c XreadgroupNoack) Streams() XreadgroupStreams {
 	c.cs.s = append(c.cs.s, "STREAMS")
 	return (XreadgroupStreams)(c)
 }
 
-type XreadgroupStreams Completed
+type XreadgroupStreams Incomplete
 
 func (c XreadgroupStreams) Key(key ...string) XreadgroupKey {
 	if c.ks&NoSlot == NoSlot {
@@ -1252,10 +1252,10 @@ func (c XreadgroupStreams) Key(key ...string) XreadgroupKey {
 	return (XreadgroupKey)(c)
 }
 
-type Xrevrange Completed
+type Xrevrange Incomplete
 
 func (b Builder) Xrevrange() (c Xrevrange) {
-	c = Xrevrange{cs: get(), ks: b.ks, cf: readonly}
+	c = Xrevrange{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "XREVRANGE")
 	return c
 }
@@ -1270,28 +1270,28 @@ func (c Xrevrange) Key(key string) XrevrangeKey {
 	return (XrevrangeKey)(c)
 }
 
-type XrevrangeCount Completed
+type XrevrangeCount Incomplete
 
 func (c XrevrangeCount) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XrevrangeEnd Completed
+type XrevrangeEnd Incomplete
 
 func (c XrevrangeEnd) Start(start string) XrevrangeStart {
 	c.cs.s = append(c.cs.s, start)
 	return (XrevrangeStart)(c)
 }
 
-type XrevrangeKey Completed
+type XrevrangeKey Incomplete
 
 func (c XrevrangeKey) End(end string) XrevrangeEnd {
 	c.cs.s = append(c.cs.s, end)
 	return (XrevrangeEnd)(c)
 }
 
-type XrevrangeStart Completed
+type XrevrangeStart Incomplete
 
 func (c XrevrangeStart) Count(count int64) XrevrangeCount {
 	c.cs.s = append(c.cs.s, "COUNT", strconv.FormatInt(count, 10))
@@ -1300,10 +1300,10 @@ func (c XrevrangeStart) Count(count int64) XrevrangeCount {
 
 func (c XrevrangeStart) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Xsetid Completed
+type Xsetid Incomplete
 
 func (b Builder) Xsetid() (c Xsetid) {
 	c = Xsetid{cs: get(), ks: b.ks}
@@ -1321,7 +1321,7 @@ func (c Xsetid) Key(key string) XsetidKey {
 	return (XsetidKey)(c)
 }
 
-type XsetidEntriesadded Completed
+type XsetidEntriesadded Incomplete
 
 func (c XsetidEntriesadded) Maxdeletedid(maxDeletedEntryId string) XsetidMaxdeletedid {
 	c.cs.s = append(c.cs.s, "MAXDELETEDID", maxDeletedEntryId)
@@ -1330,17 +1330,17 @@ func (c XsetidEntriesadded) Maxdeletedid(maxDeletedEntryId string) XsetidMaxdele
 
 func (c XsetidEntriesadded) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XsetidKey Completed
+type XsetidKey Incomplete
 
 func (c XsetidKey) LastId(lastId string) XsetidLastId {
 	c.cs.s = append(c.cs.s, lastId)
 	return (XsetidLastId)(c)
 }
 
-type XsetidLastId Completed
+type XsetidLastId Incomplete
 
 func (c XsetidLastId) Entriesadded(entriesAdded int64) XsetidEntriesadded {
 	c.cs.s = append(c.cs.s, "ENTRIESADDED", strconv.FormatInt(entriesAdded, 10))
@@ -1354,17 +1354,17 @@ func (c XsetidLastId) Maxdeletedid(maxDeletedEntryId string) XsetidMaxdeletedid 
 
 func (c XsetidLastId) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XsetidMaxdeletedid Completed
+type XsetidMaxdeletedid Incomplete
 
 func (c XsetidMaxdeletedid) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Xtrim Completed
+type Xtrim Incomplete
 
 func (b Builder) Xtrim() (c Xtrim) {
 	c = Xtrim{cs: get(), ks: b.ks}
@@ -1382,7 +1382,7 @@ func (c Xtrim) Key(key string) XtrimKey {
 	return (XtrimKey)(c)
 }
 
-type XtrimKey Completed
+type XtrimKey Incomplete
 
 func (c XtrimKey) Maxlen() XtrimTrimStrategyMaxlen {
 	c.cs.s = append(c.cs.s, "MAXLEN")
@@ -1394,28 +1394,28 @@ func (c XtrimKey) Minid() XtrimTrimStrategyMinid {
 	return (XtrimTrimStrategyMinid)(c)
 }
 
-type XtrimTrimLimit Completed
+type XtrimTrimLimit Incomplete
 
 func (c XtrimTrimLimit) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type XtrimTrimOperatorAlmost Completed
+type XtrimTrimOperatorAlmost Incomplete
 
 func (c XtrimTrimOperatorAlmost) Threshold(threshold string) XtrimTrimThreshold {
 	c.cs.s = append(c.cs.s, threshold)
 	return (XtrimTrimThreshold)(c)
 }
 
-type XtrimTrimOperatorExact Completed
+type XtrimTrimOperatorExact Incomplete
 
 func (c XtrimTrimOperatorExact) Threshold(threshold string) XtrimTrimThreshold {
 	c.cs.s = append(c.cs.s, threshold)
 	return (XtrimTrimThreshold)(c)
 }
 
-type XtrimTrimStrategyMaxlen Completed
+type XtrimTrimStrategyMaxlen Incomplete
 
 func (c XtrimTrimStrategyMaxlen) Exact() XtrimTrimOperatorExact {
 	c.cs.s = append(c.cs.s, "=")
@@ -1432,7 +1432,7 @@ func (c XtrimTrimStrategyMaxlen) Threshold(threshold string) XtrimTrimThreshold 
 	return (XtrimTrimThreshold)(c)
 }
 
-type XtrimTrimStrategyMinid Completed
+type XtrimTrimStrategyMinid Incomplete
 
 func (c XtrimTrimStrategyMinid) Exact() XtrimTrimOperatorExact {
 	c.cs.s = append(c.cs.s, "=")
@@ -1449,7 +1449,7 @@ func (c XtrimTrimStrategyMinid) Threshold(threshold string) XtrimTrimThreshold {
 	return (XtrimTrimThreshold)(c)
 }
 
-type XtrimTrimThreshold Completed
+type XtrimTrimThreshold Incomplete
 
 func (c XtrimTrimThreshold) Limit(count int64) XtrimTrimLimit {
 	c.cs.s = append(c.cs.s, "LIMIT", strconv.FormatInt(count, 10))
@@ -1458,5 +1458,5 @@ func (c XtrimTrimThreshold) Limit(count int64) XtrimTrimLimit {
 
 func (c XtrimTrimThreshold) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }

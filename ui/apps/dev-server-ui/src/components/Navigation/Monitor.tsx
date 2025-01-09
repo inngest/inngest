@@ -15,13 +15,13 @@ export default function Monitor({ collapsed }: { collapsed: boolean }) {
         href="/runs"
         collapsed={collapsed}
         text="Runs"
-        icon={<RiMistLine className="h-18px w-[18px]" />}
+        icon={<RiMistLine className="h-[18px] w-[18px]" />}
       />
       <MenuItem
         href="/stream"
         collapsed={collapsed}
         text="Stream"
-        icon={<IconFeed className="h-18px w-[18px]" />}
+        icon={<IconFeed className="h-[18px] w-[18px]" />}
       />
     </div>
   );

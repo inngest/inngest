@@ -87,7 +87,8 @@ export function RunInfo({
       <Card>
         <Card.Header className="h-11 flex-row items-center gap-2">
           <div className="text-basis flex grow items-center gap-2">
-            Run details {!standalone && <Link href={pathCreator.runPopout({ runID })} />}
+            Run details{' '}
+            {!standalone && <Link size="medium" href={pathCreator.runPopout({ runID })} />}
           </div>
 
           <CancelRunButton disabled={!allowCancel} onClick={cancelRun} />
@@ -117,11 +118,7 @@ export function RunInfo({
               >
                 {(run: Run) => {
                   return (
-                    <LinkElement
-                      internalNavigation
-                      href={pathCreator.app({ externalAppID: run.app.externalID })}
-                      showIcon={false}
-                    >
+                    <LinkElement href={pathCreator.app({ externalAppID: run.app.externalID })}>
                       {run.app.name}
                     </LinkElement>
                   );
@@ -136,11 +133,7 @@ export function RunInfo({
               >
                 {(run: Run) => {
                   return (
-                    <LinkElement
-                      internalNavigation
-                      href={pathCreator.function({ functionSlug: run.fn.slug })}
-                      showIcon={false}
-                    >
+                    <LinkElement href={pathCreator.function({ functionSlug: run.fn.slug })}>
                       {run.fn.name}
                     </LinkElement>
                   );

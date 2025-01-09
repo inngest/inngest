@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState, type UIEventHandler } from 'react';
 import dynamic from 'next/dynamic';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
 import { Pill } from '@inngest/components/Pill';
@@ -68,8 +68,6 @@ type Props = {
   functionIsPaused?: boolean;
   scope: ViewScope;
   totalCount: number | undefined;
-  temporaryAlert?: React.ReactElement;
-  hasSearchFlag?: boolean;
   stepAIEnabled?: boolean;
 };
 
@@ -96,8 +94,6 @@ export function RunsPage({
   functionIsPaused,
   scope,
   totalCount,
-  temporaryAlert,
-  hasSearchFlag = false,
   stepAIEnabled = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -338,21 +334,20 @@ export function RunsPage({
                 entities={functions}
               />
             )}
-            {hasSearchFlag && (
-              <NewButton
-                icon={<RiSearchLine />}
-                size="large"
-                iconSide="left"
-                appearance="outlined"
-                label={showSearch ? 'Hide search' : 'Show search'}
-                onClick={() => setShowSearch((prev) => !prev)}
-                className={cn(
-                  search
-                    ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
-                    : ''
-                )}
-              />
-            )}
+
+            <Button
+              icon={<RiSearchLine />}
+              size="large"
+              iconSide="left"
+              appearance="outlined"
+              label={showSearch ? 'Hide search' : 'Show search'}
+              onClick={() => setShowSearch((prev) => !prev)}
+              className={cn(
+                search
+                  ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
+                  : ''
+              )}
+            />
             <TotalCount totalCount={totalCount} />
           </div>
           <div className="flex items-center gap-2">
@@ -364,14 +359,14 @@ export function RunsPage({
           </div>
         </div>
 
-        {hasSearchFlag && showSearch && (
+        {showSearch && (
           <>
             <div className="bg-codeEditor flex items-center justify-between px-4 pt-4">
               <div className="flex items-center gap-2">
                 <p className="text-subtle text-sm">Search your runs by using a CEL query</p>
                 <Pill kind="primary">Beta</Pill>
               </div>
-              <NewButton
+              <Button
                 appearance="outlined"
                 label="Read the docs"
                 icon={<RiArrowRightUpLine />}
@@ -401,7 +396,7 @@ export function RunsPage({
         {!hasMore && data.length > 1 && (
           <div className="flex flex-col items-center pt-8">
             <p className="text-muted">No additional runs found.</p>
-            <NewButton
+            <Button
               label="Back to top"
               kind="primary"
               appearance="ghost"
@@ -411,7 +406,7 @@ export function RunsPage({
         )}
         {onRefresh && (
           <div className="flex flex-col items-center pt-2">
-            <NewButton
+            <Button
               kind="secondary"
               appearance="outlined"
               label="Refresh runs"
@@ -423,7 +418,6 @@ export function RunsPage({
             />
           </div>
         )}
-        {temporaryAlert}
       </div>
     </main>
   );

@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiSortAsc, RiSortDesc, RiSparkling2Fill } from '@remixicon/react';
+import { RiSortAsc, RiSortDesc } from '@remixicon/react';
 import {
   flexRender,
   getCoreRowModel,
@@ -68,7 +68,7 @@ export default function RunsTable({
       isLoading
         ? columns.map((column) => ({
             ...column,
-            cell: () => <Skeleton className="my-4 block h-4" />,
+            cell: () => <Skeleton className="my-4 block h-3" />,
           }))
         : columns,
     [isLoading]

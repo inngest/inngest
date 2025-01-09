@@ -1,4 +1,4 @@
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiInformationLine } from '@remixicon/react';
 
@@ -18,9 +18,9 @@ export default function AddOn({
   tooltipContent?: string | React.ReactNode;
 }) {
   return (
-    <div className="mb-6 flex items-center justify-between">
+    <div className="mb-4 flex items-end justify-between">
       <div>
-        <p className="text-subtle mb-1 flex items-center gap-1 text-xs font-medium">
+        <p className="text-subtle mb-1 flex items-center gap-1 text-sm font-medium">
           {title}
           {tooltipContent && (
             <Tooltip>
@@ -33,11 +33,11 @@ export default function AddOn({
             </Tooltip>
           )}
         </p>
-        {description && <p className="text-subtle mb-2 text-xs italic">{description}</p>}
+        {description && <p className="text-muted mb-0.5 text-sm italic">{description}</p>}
+        {value && <p className="text-basis pr-3 text-sm font-medium">{value}</p>}
       </div>
       <div>
-        {value && <p className="text-basis pr-3 text-right text-sm font-medium">{value}</p>}
-        <NewButton
+        <Button
           appearance="ghost"
           label={canIncreaseLimitInCurrentPlan ? 'Contact us' : 'Upgrade'}
           href={
