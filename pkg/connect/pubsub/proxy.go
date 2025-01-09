@@ -119,8 +119,11 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data 
 		go func() {
 			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(appId, data.RequestId, AckSourceRouter), func(msg string) {
 				routerAcked = true
-				metrics.HistogramConnectProxyExecutorRequestTimeToRouterAckDuration(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
+				metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
 					PkgName: pkgName,
+					Tags: map[string]any{
+						"kind": "router",
+					},
 				})
 			}, true)
 			routerAckErrChan <- err
@@ -135,8 +138,11 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data 
 		go func() {
 			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(appId, data.RequestId, AckSourceGateway), func(msg string) {
 				gatewayAcked = true
-				metrics.HistogramConnectProxyExecutorRequestTimeToGatewayAckDuration(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
+				metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
 					PkgName: pkgName,
+					Tags: map[string]any{
+						"kind": "gateway",
+					},
 				})
 			}, true)
 			gatewayAckErrChan <- err
@@ -151,8 +157,11 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data 
 		go func() {
 			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(appId, data.RequestId, AckSourceWorker), func(msg string) {
 				workerAcked = true
-				metrics.HistogramConnectProxyExecutorRequestTimeToWorkerAckDuration(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
+				metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
 					PkgName: pkgName,
+					Tags: map[string]any{
+						"kind": "worker",
+					},
 				})
 			}, true)
 			workerAckErrChan <- err

@@ -34,7 +34,11 @@ export const entitlementUsageDocument = graphql(`
           limit
         }
         userCount {
+          usage
           limit
+        }
+        hipaa {
+          enabled
         }
       }
       plan {
