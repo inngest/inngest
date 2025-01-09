@@ -3,6 +3,7 @@ package realtime
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -78,14 +80,18 @@ func TestRedisBroadcaster(t *testing.T) {
 		// subscriber via b2.
 		b1.Publish(ctx, msg1)
 
-		require.Eventually(t, func() bool {
+		assert.Eventually(t, func() bool {
 			l.Lock()
 			defer l.Unlock()
 			return len(m1) == 1 && len(m2) == 1
 		}, 5*time.Second, 5*time.Millisecond)
 
+		l.Lock()
+		fmt.Printf("m1: %d, m2: %d\n", len(m1), len(m2))
+
 		require.Equal(t, msg1, m1[0])
 		require.Equal(t, msg1, m2[0])
+		l.Unlock()
 
 		// Publish message 2
 
