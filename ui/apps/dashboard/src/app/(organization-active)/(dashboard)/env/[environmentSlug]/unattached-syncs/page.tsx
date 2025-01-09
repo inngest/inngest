@@ -27,7 +27,7 @@ export default function Page() {
     return (
       <div className="h-full w-full overflow-y-auto">
         <div className="mx-auto mt-16 w-full max-w-[1200px] p-4">
-          <p className="bg-canvasMuted text-basis rounded-lg p-4 text-center">No syncs found</p>
+          <p className="bg-canvasMuted text-basis rounded-md p-4 text-center">No syncs found</p>
         </div>
       </div>
     );

@@ -68,7 +68,6 @@ type Props = {
   functionIsPaused?: boolean;
   scope: ViewScope;
   totalCount: number | undefined;
-  temporaryAlert?: React.ReactElement;
   stepAIEnabled?: boolean;
 };
 
@@ -95,7 +94,6 @@ export function RunsPage({
   functionIsPaused,
   scope,
   totalCount,
-  temporaryAlert,
   stepAIEnabled = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -420,7 +418,6 @@ export function RunsPage({
             />
           </div>
         )}
-        {temporaryAlert}
       </div>
     </main>
   );

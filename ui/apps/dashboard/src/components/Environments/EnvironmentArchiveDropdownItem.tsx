@@ -9,9 +9,10 @@ import { EnvironmentArchiveModal } from './EnvironmentArchiveModal';
 
 type Props = {
   env: { id: string; isArchived: boolean; name: string; type: EnvironmentType };
+  onClose: () => void;
 };
 
-export function EnvironmentArchiveDropdownItem({ env }: Props) {
+export function EnvironmentArchiveDropdownItem({ env, onClose }: Props) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Need to store local state since the mutations don't invalidate the cache,
@@ -29,7 +30,10 @@ export function EnvironmentArchiveDropdownItem({ env }: Props) {
   return (
     <>
       <DropdownMenuItem
-        onSelect={() => setIsModalOpen(true)}
+        onSelect={(e) => {
+          e.preventDefault();
+          setIsModalOpen(true);
+        }}
         className={!isArchived ? 'text-error' : undefined}
       >
         <RiArchive2Line className="h-4 w-4" />
@@ -41,10 +45,14 @@ export function EnvironmentArchiveDropdownItem({ env }: Props) {
         isArchived={isArchived}
         isBranchEnv={env.type === EnvironmentType.BranchChild}
         isOpen={isModalOpen}
-        onCancel={() => setIsModalOpen(false)}
+        onCancel={() => {
+          setIsModalOpen(false);
+          onClose();
+        }}
         onSuccess={() => {
           setIsModalOpen(false);
           setIsArchived(!isArchived);
+          onClose();
         }}
       />
     </>

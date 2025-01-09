@@ -112,6 +112,8 @@ export default function EnvironmentListTable({ envs }: { envs: Environment[] }) 
 
 function TableRow(props: { env: Environment }) {
   const router = useRouter();
+  const [openDropdown, setOpenDropdown] = useState(false);
+
   // Use an internal env object for optimistic updating.
   const [env, setEnv] = useState(props.env);
   useEffect(() => {
@@ -178,7 +180,7 @@ function TableRow(props: { env: Environment }) {
   }
 
   return (
-    <tr className="hover:bg-canvasMuted">
+    <tr>
       <td className="max-w-80 px-4 py-3">
         <h3 className="text-basis flex items-center gap-2 break-all text-sm">{name}</h3>
       </td>
@@ -206,7 +208,7 @@ function TableRow(props: { env: Environment }) {
       </td>
 
       <td className="px-4">
-        <DropdownMenu>
+        <DropdownMenu open={openDropdown} onOpenChange={setOpenDropdown}>
           <DropdownMenuTrigger asChild>
             <Button kind="secondary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
           </DropdownMenuTrigger>
@@ -215,7 +217,7 @@ function TableRow(props: { env: Environment }) {
               <AppsIcon className="h-4 w-4" />
               Go to apps
             </DropdownMenuItem>
-            <EnvironmentArchiveDropdownItem env={env} />
+            <EnvironmentArchiveDropdownItem env={env} onClose={() => setOpenDropdown(false)} />
           </DropdownMenuContent>
         </DropdownMenu>
       </td>

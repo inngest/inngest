@@ -92,7 +92,7 @@ export default function LatestFailedFunctionRuns({
         />
       </header>
       <div className="border-subtle text-basis bg-canvasBase rounded-md border text-sm ">
-        <table className="divide-subtle w-full table-fixed divide-y rounded-lg">
+        <table className="divide-subtle w-full table-fixed divide-y rounded-md">
           <thead className="text-muted h-full text-left">
             <tr>
               <th className="p-4 font-semibold" scope="col">

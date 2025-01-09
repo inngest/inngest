@@ -217,3 +217,30 @@ func IncrAggregatePausesFoundCounter(ctx context.Context, value int64, opts Coun
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrConnectGatewayReceivedRouterPubSubMessageCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.router.received_pubsub_messages",
+		Description: "Total number of router PubSub messages received by a connect gateway",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConnectGatewayReceivedWorkerMessageCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.worker.received_messages",
+		Description: "Total number of worker messages received by a connect gateway",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConnectGatewayReceiveConnectionAttemptCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.connection_attempts",
+		Description: "Total number of worker connection attempts received by a connect gateway",
+		Tags:        opts.Tags,
+	})
+}
