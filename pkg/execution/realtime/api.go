@@ -49,8 +49,11 @@ type api struct {
 
 func (a *api) setup() {
 	a.Group(func(r chi.Router) {
-		r.Use(a.opts.AuthMiddleware)
 		r.Use(middleware.Recoverer)
+
+		// NOTE: We always use the realtime auth middleware which wraps the standard
+		// auth middleware with JWT validation
+		r.Use(realtimeAuthMW(a.opts.JWTSecret, a.opts.AuthMiddleware))
 
 		r.Get("/realtime/connect", a.GetWebsocketUpgrade)
 		r.Post("/realtime/token", a.PostCreateJWT)
@@ -99,9 +102,10 @@ func (a *api) PostCreateJWT(w http.ResponseWriter, r *http.Request) {
 func (a *api) GetWebsocketUpgrade(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// TODO: Auth via JWTs.
-	// TODO: Check if there's a list of topics that was posted in the JWT provided.
-	auth, err := a.opts.AuthFinder(ctx)
+	// NOTE: Here we always use the realtime auth finder, which attempts to auth
+	// realtime connections via single-use JWTs, falling back to other auth methods
+	// as necessary.
+	auth, err := realtimeAuth(ctx, a.opts.AuthFinder)
 	if err != nil {
 		w.Header().Add("content-type", "application/json")
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 401, "Not authenticated"))

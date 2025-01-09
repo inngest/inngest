@@ -16,20 +16,23 @@ const (
 	DefaultExpiry = time.Minute
 )
 
-type claims struct {
+type JWTClaims struct {
 	jwt.RegisteredClaims
 	Env    uuid.UUID `json:"env"`
 	Topics []Topic   `json:"topics"`
 }
 
-// TopicsFromJWT takes a JWT string, a secret, and returns any topics that the
-// JWT allows access to.
-//
-// JWTs are used to register interest and subscribe to topics.
-func TopicsFromJWT(ctx context.Context, secret []byte, token string) ([]Topic, error) {
-	claims := &claims{}
+func (j JWTClaims) AccountID() uuid.UUID {
+	return uuid.MustParse(j.RegisteredClaims.Subject)
+}
 
-	parsedToken, err := jwt.ParseWithClaims(
+func (j JWTClaims) WorkspaceID() uuid.UUID {
+	return j.Env
+}
+
+func ValidateJWT(ctx context.Context, secret []byte, token string) (*JWTClaims, error) {
+	claims := &JWTClaims{}
+	_, err := jwt.ParseWithClaims(
 		token,
 		claims,
 		func(token *jwt.Token) (interface{}, error) {
@@ -50,11 +53,19 @@ func TopicsFromJWT(ctx context.Context, secret []byte, token string) ([]Topic, e
 	if err != nil {
 		return nil, fmt.Errorf("invalid realtime token: %w", err)
 	}
+	return claims, nil
+}
 
-	// TODO: claims.Topics should be well defined.
-	_ = parsedToken
-
-	return nil, nil
+// TopicsFromJWT takes a JWT string, a secret, and returns any topics that the
+// JWT allows access to.
+//
+// JWTs are used to register interest and subscribe to topics.
+func TopicsFromJWT(ctx context.Context, secret []byte, token string) ([]Topic, error) {
+	claims, err := ValidateJWT(ctx, secret, token)
+	if err != nil {
+		return nil, err
+	}
+	return claims.Topics, nil
 }
 
 // NewJWT returns a new JWT used to subscribe to topics as an unauthenticated user.
@@ -68,7 +79,7 @@ func NewJWT(ctx context.Context, secret []byte, accountID, envID uuid.UUID, topi
 	if err != nil {
 		return "", fmt.Errorf("could not generate session token ID: %w", err)
 	}
-	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims{
+	t := jwt.NewWithClaims(jwt.SigningMethodHS256, JWTClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    Issuer,
 			Subject:   accountID.String(),
