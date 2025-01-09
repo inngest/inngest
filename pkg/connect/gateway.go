@@ -401,10 +401,19 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		ch.log.Debug("connection is ready")
 
-		metrics.IncrConnectGatewayConnectionSuccessCounter(ctx, 1, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags:    additionalMetricsTags,
-		})
+		{
+			successTags := map[string]any{
+				"success": true,
+			}
+			for k, v := range additionalMetricsTags {
+				successTags[k] = v
+			}
+
+			metrics.IncrConnectGatewayReceiveConnectionAttemptCounter(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    successTags,
+			})
+		}
 
 		// Connection was drained once it's closed by the worker (even if
 		// the connection broke unintentionally, we can stop waiting)
