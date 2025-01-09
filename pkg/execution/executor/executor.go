@@ -277,6 +277,13 @@ func WithTraceReader(m cqrs.TraceReader) ExecutorOpt {
 	}
 }
 
+func WithRealtimePublisher(b realtime.Publisher) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).rtpub = b
+		return nil
+	}
+}
+
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log *zerolog.Logger
@@ -1984,11 +1991,12 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		e.rtpub.Publish(ctx, realtime.Message{
 			Kind:       realtime.MessageKindStep,
 			Data:       gen.Data,
-			TopicNames: broadcastTopics(gen.DisplayName),
+			TopicNames: []string{gen.UserDefinedName()},
 			EnvID:      i.md.ID.Tenant.EnvID,
 			FnID:       i.md.ID.FunctionID,
 			FnSlug:     i.f.GetSlug(),
 			RunID:      i.md.ID.RunID,
+			CreatedAt:  time.Now(),
 		})
 	}
 
@@ -2789,11 +2797,4 @@ func extractTraceCtx(ctx context.Context, md sv2.Metadata) context.Context {
 	}
 
 	return ctx
-}
-
-func broadcastTopics(displayName *string) []string {
-	if displayName == nil {
-		return nil
-	}
-	return []string{*displayName}
 }

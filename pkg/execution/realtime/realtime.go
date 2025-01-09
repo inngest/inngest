@@ -155,6 +155,8 @@ type Topic struct {
 	RunID ulid.ULID `json:"run_id"`
 	// EnvID represents the environment ID that this topic is subscribed to.  This
 	// must always be present for both run and event topics.
+	//
+	// This will be auto-filled
 	EnvID uuid.UUID `json:"env_id"`
 	// Name represents a topic name, such as "$step", "$result", "step-name",
 	// or eg. "api/event.name".
@@ -218,7 +220,7 @@ type Message struct {
 	// TopicNames represents the custom channels that this message should be broadcast
 	// on.  For steps, this must include the unhashed step ID.  For custom broadcasts,
 	// this is the chosen channel name in the SDK.
-	TopicNames []string
+	TopicNames []string `json:"topics"`
 }
 
 // Topics returns all topics for the given message.

@@ -80,32 +80,42 @@ func (a *router) setup() {
 	a.Group(func(r chi.Router) {
 		r.Use(middleware.Recoverer)
 
-		if a.opts.CachingMiddleware != nil {
-			r.Use(a.opts.CachingMiddleware.Middleware)
-		}
-
-		r.Use(headers.ContentTypeJsonResponse())
-
-		rt := realtime.NewAPI(realtime.APIOpts{
-			JWTSecret:      consts.DevServerRealtimeJWTSecret,
-			Broadcaster:    a.opts.Broadcaster,
-			AuthMiddleware: a.opts.AuthMiddleware,
-			AuthFinder:     a.opts.AuthFinder,
+		r.Group(func(r chi.Router) {
+			rt := realtime.NewAPI(realtime.APIOpts{
+				JWTSecret:      consts.DevServerRealtimeJWTSecret,
+				Broadcaster:    a.opts.Broadcaster,
+				AuthMiddleware: a.opts.AuthMiddleware,
+				AuthFinder:     a.opts.AuthFinder,
+			})
+			r.Mount("/", rt)
 		})
-		r.Mount("/", rt)
 
-		r.Get("/events", a.getEvents)
-		r.Get("/events/{eventID}", a.getEvent)
-		r.Get("/events/{eventID}/runs", a.getEventRuns)
-		r.Get("/runs/{runID}", a.GetFunctionRun)
-		r.Delete("/runs/{runID}", a.cancelFunctionRun)
-		r.Get("/runs/{runID}/jobs", a.GetFunctionRunJobs)
+		r.Group(func(r chi.Router) {
+			if a.opts.CachingMiddleware != nil {
+				r.Use(a.opts.CachingMiddleware.Middleware)
+			}
 
-		r.Get("/apps/{appName}/functions", a.GetAppFunctions) // Returns an app and all of its functions.
+			r.Use(headers.ContentTypeJsonResponse())
+			r.Use(func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					fmt.Println(r.URL.String())
+					next.ServeHTTP(w, r)
+				})
+			})
 
-		r.Post("/cancellations", a.createCancellation)
-		r.Get("/cancellations", a.getCancellations)
-		r.Delete("/cancellations/{id}", a.deleteCancellation)
+			r.Get("/events", a.getEvents)
+			r.Get("/events/{eventID}", a.getEvent)
+			r.Get("/events/{eventID}/runs", a.getEventRuns)
+			r.Get("/runs/{runID}", a.GetFunctionRun)
+			r.Delete("/runs/{runID}", a.cancelFunctionRun)
+			r.Get("/runs/{runID}/jobs", a.GetFunctionRunJobs)
+
+			r.Get("/apps/{appName}/functions", a.GetAppFunctions) // Returns an app and all of its functions.
+
+			r.Post("/cancellations", a.createCancellation)
+			r.Get("/cancellations", a.getCancellations)
+			r.Delete("/cancellations/{id}", a.deleteCancellation)
+		})
 	})
 }
 

@@ -41,6 +41,9 @@ func NewWebsocketSubscription(
 		jwtSigningKey: jwtSigningKey,
 	}
 
+	if b == nil {
+		return nil, fmt.Errorf("Cannot make websocket connection without broadcaster")
+	}
 	err := b.Subscribe(ctx, sub, topics)
 	return sub, err
 }
@@ -89,11 +92,22 @@ func (s SubscriptionWS) Close() error {
 }
 
 func (s SubscriptionWS) Poll(ctx context.Context) error {
+	// Ping the websocket conn to begin with.
+	err := s.ws.Ping(ctx)
+	if err != nil {
+		return fmt.Errorf("error pinging websocket conn before polling: %w", err)
+	}
+
 	for {
 		mt, byt, err := s.ws.Read(ctx)
 		if err != nil {
+			fmt.Println("read err", err)
 			return err
 		}
+
+		fmt.Println("")
+		fmt.Println(mt, string(byt))
+		fmt.Println("")
 
 		if mt == websocket.MessageBinary {
 			// We do not handle binary data in realtime connections.

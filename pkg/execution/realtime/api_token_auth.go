@@ -2,9 +2,8 @@ package realtime
 
 import (
 	"context"
+	"fmt"
 	"net/http"
-
-	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 )
 
 type claimsKeyTyp string
@@ -18,11 +17,17 @@ func realtimeAuthMW(jwtSecret []byte, mw func(http.Handler) http.Handler) func(h
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
+			var key string
+
 			// Check to see if a valid realtime JWT is being sent as a bearer token.
-			key := r.Header.Get("Authorization")
-			if key != "" && len(key) > 8 {
+			if k := r.Header.Get("Authorization"); k != "" && len(k) > 8 {
 				// Remove "Bearer " prefix
-				key = key[7:]
+				key = k[7:]
+			}
+			// Check the ?token query param, for websocket libraries that cannot use
+			// http headers.
+			if key == "" {
+				key = r.URL.Query().Get("token")
 			}
 
 			claims, err := ValidateJWT(r.Context(), jwtSecret, key)
@@ -44,9 +49,9 @@ func realtimeAuthMW(jwtSecret []byte, mw func(http.Handler) http.Handler) func(h
 	}
 }
 
-func realtimeAuth(ctx context.Context, af apiv1auth.AuthFinder) (apiv1auth.V1Auth, error) {
+func realtimeAuth(ctx context.Context) (*JWTClaims, error) {
 	if claims, ok := ctx.Value(claimsKey).(*JWTClaims); ok {
 		return claims, nil
 	}
-	return af(ctx)
+	return nil, fmt.Errorf("no jwt found")
 }

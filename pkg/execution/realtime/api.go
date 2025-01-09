@@ -63,6 +63,7 @@ func (a *api) setup() {
 func (a *api) PostCreateJWT(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("content-type", "application/json")
 
+	// This only uses the given auth finder, which does not accept JWT claims.
 	auth, err := a.opts.AuthFinder(r.Context())
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 401, "Not authenticated"))
@@ -105,7 +106,7 @@ func (a *api) GetWebsocketUpgrade(w http.ResponseWriter, r *http.Request) {
 	// NOTE: Here we always use the realtime auth finder, which attempts to auth
 	// realtime connections via single-use JWTs, falling back to other auth methods
 	// as necessary.
-	auth, err := realtimeAuth(ctx, a.opts.AuthFinder)
+	auth, err := realtimeAuth(ctx)
 	if err != nil {
 		w.Header().Add("content-type", "application/json")
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 401, "Not authenticated"))
@@ -114,9 +115,18 @@ func (a *api) GetWebsocketUpgrade(w http.ResponseWriter, r *http.Request) {
 
 	ws, err := websocket.Accept(w, r, nil)
 	if err != nil {
+		w.WriteHeader(400)
+		logger.StdlibLogger(ctx).Error("error upgrading ws connection", "error", err)
 		// NOTE: This already responds with an error.
 		return
 	}
+
+	logger.StdlibLogger(ctx).Info(
+		"new realtime connection",
+		"acct_id", auth.AccountID(),
+		"env_id", auth.Env,
+		"topics", auth.Topics,
+	)
 
 	sub, err := NewWebsocketSubscription(
 		ctx,
@@ -125,9 +135,10 @@ func (a *api) GetWebsocketUpgrade(w http.ResponseWriter, r *http.Request) {
 		auth.WorkspaceID(),
 		a.opts.JWTSecret,
 		ws,
-		nil,
+		auth.Topics,
 	)
 	if err != nil {
+		logger.StdlibLogger(ctx).Error("error creating websocket subscription", "error", err)
 		ws.Close(websocket.StatusAbnormalClosure, "error subscribing to topics")
 		return
 	}

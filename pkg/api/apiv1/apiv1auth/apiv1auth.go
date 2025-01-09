@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 )
 
 // AuthFinder returns auth information from the current context.
@@ -23,9 +24,9 @@ func NilAuthFinder(ctx context.Context) (V1Auth, error) {
 type nilAuth struct{}
 
 func (nilAuth) AccountID() uuid.UUID {
-	return uuid.UUID{}
+	return consts.DevServerAccountId
 }
 
 func (nilAuth) WorkspaceID() uuid.UUID {
-	return uuid.UUID{}
+	return consts.DevServerEnvId
 }
