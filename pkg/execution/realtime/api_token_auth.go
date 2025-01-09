@@ -7,7 +7,9 @@ import (
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 )
 
-const claimsKey = "rt-claims"
+type claimsKeyTyp string
+
+const claimsKey = claimsKeyTyp("rt-claims")
 
 // realtimeAuthMW attempts to auth via realtime JWTs, falling back to the original auth
 // middleware if no JWT was found.
@@ -26,7 +28,7 @@ func realtimeAuthMW(jwtSecret []byte, mw func(http.Handler) http.Handler) func(h
 			claims, err := ValidateJWT(r.Context(), jwtSecret, key)
 			if err == nil {
 				// Update the request's context with the claims
-				r.WithContext(context.WithValue(ctx, claimsKey, claims))
+				r = r.WithContext(context.WithValue(ctx, claimsKey, claims))
 				// We have a valid set of claims
 				next.ServeHTTP(w, r)
 				return
