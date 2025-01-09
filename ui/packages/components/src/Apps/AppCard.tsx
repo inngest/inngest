@@ -87,7 +87,7 @@ type CardFooterProps = {
 
 export function AppCardFooter({ kind, header, content }: CardFooterProps) {
   return (
-    <AccordionList type="multiple" defaultValue={[]} className="rounded-t-none border-0 border-t">
+    <AccordionList type="multiple" defaultValue={[]} className="rounded-none border-0 border-t">
       <AccordionList.Item value="description">
         <AccordionList.Trigger
           className={cn(' text-sm data-[state=open]:border-0', kindStyles[kind].text)}
