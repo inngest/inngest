@@ -17,7 +17,7 @@ export function Sync({ syncID }: Props) {
     if (syncRes.error.message.includes('no rows')) {
       <div className="h-full w-full overflow-y-auto">
         <div className="mx-auto w-full max-w-[1200px] p-4">
-          <div className="flex items-center gap-2.5 rounded-md border border-red-500 bg-red-100 px-8 py-4 text-red-500">
+          <div className="border-error bg-error text-error flex items-center gap-2.5 rounded-md border px-8 py-4">
             <RiErrorWarningLine className="h-5 w-5" />
             Sync not found
           </div>
