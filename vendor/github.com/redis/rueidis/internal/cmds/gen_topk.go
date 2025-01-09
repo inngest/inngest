@@ -4,7 +4,7 @@ package cmds
 
 import "strconv"
 
-type TopkAdd Completed
+type TopkAdd Incomplete
 
 func (b Builder) TopkAdd() (c TopkAdd) {
 	c = TopkAdd{cs: get(), ks: b.ks}
@@ -22,7 +22,7 @@ func (c TopkAdd) Key(key string) TopkAddKey {
 	return (TopkAddKey)(c)
 }
 
-type TopkAddItems Completed
+type TopkAddItems Incomplete
 
 func (c TopkAddItems) Items(items ...string) TopkAddItems {
 	c.cs.s = append(c.cs.s, items...)
@@ -31,17 +31,17 @@ func (c TopkAddItems) Items(items ...string) TopkAddItems {
 
 func (c TopkAddItems) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TopkAddKey Completed
+type TopkAddKey Incomplete
 
 func (c TopkAddKey) Items(items ...string) TopkAddItems {
 	c.cs.s = append(c.cs.s, items...)
 	return (TopkAddItems)(c)
 }
 
-type TopkCount Completed
+type TopkCount Incomplete
 
 func (b Builder) TopkCount() (c TopkCount) {
 	c = TopkCount{cs: get(), ks: b.ks}
@@ -59,7 +59,7 @@ func (c TopkCount) Key(key string) TopkCountKey {
 	return (TopkCountKey)(c)
 }
 
-type TopkCountItem Completed
+type TopkCountItem Incomplete
 
 func (c TopkCountItem) Item(item ...string) TopkCountItem {
 	c.cs.s = append(c.cs.s, item...)
@@ -68,17 +68,17 @@ func (c TopkCountItem) Item(item ...string) TopkCountItem {
 
 func (c TopkCountItem) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TopkCountKey Completed
+type TopkCountKey Incomplete
 
 func (c TopkCountKey) Item(item ...string) TopkCountItem {
 	c.cs.s = append(c.cs.s, item...)
 	return (TopkCountItem)(c)
 }
 
-type TopkIncrby Completed
+type TopkIncrby Incomplete
 
 func (b Builder) TopkIncrby() (c TopkIncrby) {
 	c = TopkIncrby{cs: get(), ks: b.ks}
@@ -96,7 +96,7 @@ func (c TopkIncrby) Key(key string) TopkIncrbyKey {
 	return (TopkIncrbyKey)(c)
 }
 
-type TopkIncrbyItemsIncrement Completed
+type TopkIncrbyItemsIncrement Incomplete
 
 func (c TopkIncrbyItemsIncrement) Item(item string) TopkIncrbyItemsItem {
 	c.cs.s = append(c.cs.s, item)
@@ -105,27 +105,27 @@ func (c TopkIncrbyItemsIncrement) Item(item string) TopkIncrbyItemsItem {
 
 func (c TopkIncrbyItemsIncrement) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TopkIncrbyItemsItem Completed
+type TopkIncrbyItemsItem Incomplete
 
 func (c TopkIncrbyItemsItem) Increment(increment int64) TopkIncrbyItemsIncrement {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(increment, 10))
 	return (TopkIncrbyItemsIncrement)(c)
 }
 
-type TopkIncrbyKey Completed
+type TopkIncrbyKey Incomplete
 
 func (c TopkIncrbyKey) Item(item string) TopkIncrbyItemsItem {
 	c.cs.s = append(c.cs.s, item)
 	return (TopkIncrbyItemsItem)(c)
 }
 
-type TopkInfo Completed
+type TopkInfo Incomplete
 
 func (b Builder) TopkInfo() (c TopkInfo) {
-	c = TopkInfo{cs: get(), ks: b.ks, cf: readonly}
+	c = TopkInfo{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "TOPK.INFO")
 	return c
 }
@@ -140,22 +140,22 @@ func (c TopkInfo) Key(key string) TopkInfoKey {
 	return (TopkInfoKey)(c)
 }
 
-type TopkInfoKey Completed
+type TopkInfoKey Incomplete
 
 func (c TopkInfoKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c TopkInfoKey) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TopkList Completed
+type TopkList Incomplete
 
 func (b Builder) TopkList() (c TopkList) {
-	c = TopkList{cs: get(), ks: b.ks, cf: readonly}
+	c = TopkList{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "TOPK.LIST")
 	return c
 }
@@ -170,7 +170,7 @@ func (c TopkList) Key(key string) TopkListKey {
 	return (TopkListKey)(c)
 }
 
-type TopkListKey Completed
+type TopkListKey Incomplete
 
 func (c TopkListKey) Withcount() TopkListWithcount {
 	c.cs.s = append(c.cs.s, "WITHCOUNT")
@@ -179,30 +179,30 @@ func (c TopkListKey) Withcount() TopkListWithcount {
 
 func (c TopkListKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c TopkListKey) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TopkListWithcount Completed
+type TopkListWithcount Incomplete
 
 func (c TopkListWithcount) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c TopkListWithcount) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TopkQuery Completed
+type TopkQuery Incomplete
 
 func (b Builder) TopkQuery() (c TopkQuery) {
-	c = TopkQuery{cs: get(), ks: b.ks, cf: readonly}
+	c = TopkQuery{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "TOPK.QUERY")
 	return c
 }
@@ -217,7 +217,7 @@ func (c TopkQuery) Key(key string) TopkQueryKey {
 	return (TopkQueryKey)(c)
 }
 
-type TopkQueryItem Completed
+type TopkQueryItem Incomplete
 
 func (c TopkQueryItem) Item(item ...string) TopkQueryItem {
 	c.cs.s = append(c.cs.s, item...)
@@ -226,22 +226,22 @@ func (c TopkQueryItem) Item(item ...string) TopkQueryItem {
 
 func (c TopkQueryItem) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c TopkQueryItem) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TopkQueryKey Completed
+type TopkQueryKey Incomplete
 
 func (c TopkQueryKey) Item(item ...string) TopkQueryItem {
 	c.cs.s = append(c.cs.s, item...)
 	return (TopkQueryItem)(c)
 }
 
-type TopkReserve Completed
+type TopkReserve Incomplete
 
 func (b Builder) TopkReserve() (c TopkReserve) {
 	c = TopkReserve{cs: get(), ks: b.ks}
@@ -259,35 +259,35 @@ func (c TopkReserve) Key(key string) TopkReserveKey {
 	return (TopkReserveKey)(c)
 }
 
-type TopkReserveKey Completed
+type TopkReserveKey Incomplete
 
 func (c TopkReserveKey) Topk(topk int64) TopkReserveTopk {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(topk, 10))
 	return (TopkReserveTopk)(c)
 }
 
-type TopkReserveParamsDecay Completed
+type TopkReserveParamsDecay Incomplete
 
 func (c TopkReserveParamsDecay) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type TopkReserveParamsDepth Completed
+type TopkReserveParamsDepth Incomplete
 
 func (c TopkReserveParamsDepth) Decay(decay float64) TopkReserveParamsDecay {
 	c.cs.s = append(c.cs.s, strconv.FormatFloat(decay, 'f', -1, 64))
 	return (TopkReserveParamsDecay)(c)
 }
 
-type TopkReserveParamsWidth Completed
+type TopkReserveParamsWidth Incomplete
 
 func (c TopkReserveParamsWidth) Depth(depth int64) TopkReserveParamsDepth {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(depth, 10))
 	return (TopkReserveParamsDepth)(c)
 }
 
-type TopkReserveTopk Completed
+type TopkReserveTopk Incomplete
 
 func (c TopkReserveTopk) Width(width int64) TopkReserveParamsWidth {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(width, 10))
@@ -296,5 +296,5 @@ func (c TopkReserveTopk) Width(width int64) TopkReserveParamsWidth {
 
 func (c TopkReserveTopk) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }

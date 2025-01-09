@@ -1,7 +1,7 @@
 import { useRef } from 'react';
+import { Link } from '@inngest/components/Link';
 import { Table } from '@inngest/components/Table';
 import { Time } from '@inngest/components/Time';
-import { RiArrowRightLine } from '@remixicon/react';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 
 import type { Event } from './types';
@@ -35,13 +35,9 @@ function useColumns(onSelect: (eventID: string) => void) {
       cell: (props) => {
         const { id } = props.row.original;
         return (
-          <button
-            className="transition-color group flex cursor-pointer items-center gap-1 text-indigo-400 underline decoration-transparent decoration-2 underline-offset-4 duration-300 hover:decoration-indigo-400"
-            onClick={() => onSelect(id)}
-          >
+          <Link arrowOnHover onClick={() => onSelect(id)} href="">
             {id}
-            <RiArrowRightLine className="h-3 w-3 -translate-x-3 text-indigo-400 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
-          </button>
+          </Link>
         );
       },
       header: () => <span>ID</span>,

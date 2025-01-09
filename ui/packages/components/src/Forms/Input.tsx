@@ -2,7 +2,7 @@ import { forwardRef, type InputHTMLAttributes } from 'react';
 
 import { cn } from '../utils/classNames';
 
-type InputProps = InputHTMLAttributes<HTMLInputElement> & {
+export type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   allowPasswordManager?: boolean;
   label?: string;
   error?: string | undefined;
@@ -39,19 +39,21 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             {props.optional && <span className="text-subtle font-normal">(optional)</span>}
           </label>
         )}
-        <input
-          ref={ref}
-          className={cn(`bg-canvasBase border-muted placeholder-disabled text-basis outline-primary-moderate border text-sm leading-none outline-2 transition-all focus:outline
+        <div className="flex">
+          <input
+            ref={ref}
+            className={cn(`bg-canvasBase border-muted placeholder-disabled text-basis outline-primary-moderate w-full border text-sm leading-none outline-2 transition-all focus:outline
             ${sizeStyles[inngestSize]}
             ${
               props.readOnly &&
-              'cursor-not-allowed border-transparent shadow-transparent outline-transparent	'
+              'bg-disabled text-disabled cursor-not-allowed border-transparent	shadow-transparent outline-transparent'
             }
             ${props.error && 'outline-error'}
             ${className}`)}
-          {...passwordManagerProps}
-          {...props}
-        />
+            {...passwordManagerProps}
+            {...props}
+          />
+        </div>
 
         {props.error && <p className="text-error text-sm">{props.error}</p>}
       </div>

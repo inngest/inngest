@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import * as Collapsible from '@radix-ui/react-collapsible';
@@ -158,12 +158,7 @@ export function TriggerDetails({ className, getTrigger, runID }: Props) {
               <Card.Header className="h-11 flex-row items-center gap-2">
                 <div className="text-basis flex grow items-center gap-2">Trigger details</div>
                 <Collapsible.Trigger asChild>
-                  <Button
-                    size="large"
-                    appearance="text"
-                    icon={<RiContractRightFill />}
-                    className="text-muted hover:text-subtle"
-                  />
+                  <Button size="large" appearance="ghost" icon={<RiContractRightFill />} />
                 </Collapsible.Trigger>
               </Card.Header>
 

@@ -75,7 +75,7 @@ func TestEndToEnd(t *testing.T) {
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
 			a := assert.New(collect)
 
-			resp, err := http.Get("http://127.0.0.1:8289/v0/envs/dev/conns")
+			resp, err := http.Get(fmt.Sprintf("%s/v0/connect/envs/dev/conns", DEV_URL))
 			a.NoError(err)
 
 			var reply rest.ShowConnsReply
@@ -95,7 +95,7 @@ func TestEndToEnd(t *testing.T) {
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
 			a := assert.New(collect)
 
-			endpoint := fmt.Sprintf("http://127.0.0.1:8289/v0/envs/dev/groups/%s", workerGroupID)
+			endpoint := fmt.Sprintf("%s/v0/connect/envs/dev/groups/%s", DEV_URL, workerGroupID)
 			resp, err := http.Get(endpoint)
 			a.NoError(err)
 

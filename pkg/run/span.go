@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"strings"
 	"sync"
 	"time"
 
@@ -536,6 +537,10 @@ func (s *Span) TracerProvider() trace.TracerProvider {
 
 func (s *Span) SetFnOutput(data any) {
 	s.setAttrData(data, consts.OtelSysFunctionOutput)
+}
+
+func (s *Span) SetStepStack(stack []string) {
+	s.setAttrData(strings.Join(stack, ","), consts.OtelSysStepStack)
 }
 
 func (s *Span) SetStepInput(data any) {

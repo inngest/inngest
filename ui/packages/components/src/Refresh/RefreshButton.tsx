@@ -4,13 +4,13 @@ import { useRouter } from 'next/navigation';
 import { RiRefreshLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
-import { NewButton } from '../Button';
+import { Button } from '../Button';
 
 export const RefreshButton = () => {
   const router = useRouter();
 
   return (
-    <NewButton
+    <Button
       kind="primary"
       appearance="outlined"
       label="Refresh page"

@@ -1,24 +1,29 @@
-import { NewButton } from '@inngest/components/Button/index';
-import { Card } from '@inngest/components/Card/Card';
-import { NewLink } from '@inngest/components/Link/Link';
-import { Pill } from '@inngest/components/Pill/Pill';
+'use client';
 
-import { type IntegrationPageContent } from './types';
+import { useRouter } from 'next/navigation';
+import { Button } from '@inngest/components/Button/index';
+import { Card } from '@inngest/components/Card/Card';
+import { Link } from '@inngest/components/Link/Link';
+import { Pill } from '@inngest/components/Pill/Pill';
+import { toast } from 'sonner';
+
+import { type IntegrationPageContent, type Publication } from './types';
 
 export default function IntegrationPage({
   content,
   publications,
+  onDelete,
 }: {
   content: IntegrationPageContent;
-  // TO DO: change this format
-  publications: {
-    id: string;
-    name: string;
-    slug: string;
-    projects: never[];
-    enabled: boolean;
-  }[];
+  onDelete: (id: string) => Promise<{ success: boolean; error: string | null }>;
+  publications: Publication[];
 }) {
+  const router = useRouter();
+
+  const successRedirect = () => {
+    router.push('/settings/integrations');
+  };
+
   return (
     <div className="mx-auto mt-6 flex w-[800px] flex-col p-8">
       <div className="flex flex-col">
@@ -31,9 +36,9 @@ export default function IntegrationPage({
 
         <div className="text-subtle text-sm">
           Manage your {content.title} integration from this page.{' '}
-          <NewLink className="inline-block" size="small" href={content.url}>
+          <Link className="inline-block" size="small" href={content.url} target="_blank">
             Read documentation
-          </NewLink>
+          </Link>
         </div>
       </div>
       {publications.map((p, i) => (
@@ -63,17 +68,28 @@ export default function IntegrationPage({
       <div className="border-muted border-t py-7">
         <div className="flex items-center gap-2">
           <p>Remove {content.title} integration</p>
-          <Pill>Coming soon</Pill>
         </div>
         <p className="text-subtle mb-6 mt-3 text-sm">
           Permanently remove the {content.title} integration from Inngest
         </p>
-        <NewButton
-          disabled
+        <Button
           appearance="solid"
           kind="danger"
           label={`Remove ${content.title}`}
-          title="coming soon"
+          onClick={async () => {
+            if (!publications || !publications[0]) {
+              console.error('no neon cdc connection to remove');
+              return;
+            }
+
+            const { success, error } = await onDelete(publications[0].id);
+            if (success) {
+              successRedirect();
+            }
+            if (error) {
+              toast.error(error);
+            }
+          }}
         />
       </div>
     </div>

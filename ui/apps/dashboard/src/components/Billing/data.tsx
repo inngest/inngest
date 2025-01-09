@@ -30,8 +30,15 @@ export const entitlementUsageDocument = graphql(`
         eventSize {
           limit
         }
-        userCount {
+        history {
           limit
+        }
+        userCount {
+          usage
+          limit
+        }
+        hipaa {
+          enabled
         }
       }
       plan {

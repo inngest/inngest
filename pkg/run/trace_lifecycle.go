@@ -290,6 +290,7 @@ func (l traceLifecycle) OnFunctionFinished(
 			attribute.String(consts.OtelSysEventIDs, strings.Join(evtIDs, ",")),
 			attribute.String(consts.OtelSysIdempotencyKey, md.Config.Idempotency),
 			attribute.Bool(consts.OtelSysStepFirst, true),
+			attribute.Bool(consts.OtelSysFunctionHasAI, md.Config.HasAI),
 		),
 	)
 	defer span.End()
@@ -640,7 +641,6 @@ func (l traceLifecycle) OnStepGatewayRequestFinished(
 			attribute.Int(consts.OtelSysStepMaxAttempt, item.GetMaxAttempts()),
 			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
 			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeStepPlanned.String()),
-			attribute.String(consts.OtelSysStepStack, strings.Join(md.Stack, ",")),
 		),
 	)
 	// Common attrs.
@@ -690,8 +690,13 @@ func (l traceLifecycle) OnStepGatewayRequestFinished(
 	switch op.Op {
 	case enums.OpcodeAIGateway:
 		req, _ := op.AIGatewayOpts()
+		// Parse the request
 		if parsed, err := aigateway.ParseInput(ctx, req); err == nil {
 			span.SetAIRequestMetadata(parsed)
+		}
+		// And parse the response.
+		if parsed, err := aigateway.ParseOutput(ctx, req.Format, op.Data); err == nil {
+			span.SetAIResponseMetadata(parsed)
 		}
 	}
 }
@@ -736,7 +741,6 @@ func (l traceLifecycle) OnStepFinished(
 			attribute.Int(consts.OtelSysStepMaxAttempt, item.GetMaxAttempts()),
 			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
 			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeStepPlanned.String()),
-			attribute.String(consts.OtelSysStepStack, strings.Join(md.Stack, ",")),
 			attribute.Bool(consts.OtelSysFunctionHasAI, md.Config.HasAI),
 		),
 	)
@@ -765,7 +769,7 @@ func (l traceLifecycle) OnStepFinished(
 
 	if runErr != nil {
 		span.SetStatus(codes.Error, runErr.Error())
-		span.SetStepOutput(runErr.Error())
+		span.SetStepOutput(runErr)
 		return
 	}
 
@@ -857,6 +861,7 @@ func (l traceLifecycle) OnStepFinished(
 				output = resp.Output
 			}
 			span.SetStepOutput(output)
+			span.SetStepStack(md.Stack)
 		} else {
 			// if it's not a step or function response that represents either a failed or a successful execution.
 

@@ -83,5 +83,7 @@ func (r Request) HTTPRequest() (*http.Request, error) {
 	return req, nil
 }
 
-// RFOpenAIChatCompletion represents an OpenAI compatible format.
-type RFOpenAIChatCompletion openai.ChatCompletionRequest
+type (
+	// OpenAIChatCompletionRequest represents an OpenAI compatible format.
+	OpenAIChatCompletionRequest openai.ChatCompletionRequest
+)

@@ -4,7 +4,7 @@ package cmds
 
 import "strconv"
 
-type AiScriptdel Completed
+type AiScriptdel Incomplete
 
 func (b Builder) AiScriptdel() (c AiScriptdel) {
 	c = AiScriptdel{cs: get(), ks: b.ks}
@@ -22,17 +22,17 @@ func (c AiScriptdel) Key(key string) AiScriptdelKey {
 	return (AiScriptdelKey)(c)
 }
 
-type AiScriptdelKey Completed
+type AiScriptdelKey Incomplete
 
 func (c AiScriptdelKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiScriptget Completed
+type AiScriptget Incomplete
 
 func (b Builder) AiScriptget() (c AiScriptget) {
-	c = AiScriptget{cs: get(), ks: b.ks, cf: readonly}
+	c = AiScriptget{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "AI.SCRIPTGET")
 	return c
 }
@@ -47,7 +47,7 @@ func (c AiScriptget) Key(key string) AiScriptgetKey {
 	return (AiScriptgetKey)(c)
 }
 
-type AiScriptgetKey Completed
+type AiScriptgetKey Incomplete
 
 func (c AiScriptgetKey) Meta() AiScriptgetMeta {
 	c.cs.s = append(c.cs.s, "META")
@@ -61,15 +61,15 @@ func (c AiScriptgetKey) Source() AiScriptgetSource {
 
 func (c AiScriptgetKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c AiScriptgetKey) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiScriptgetMeta Completed
+type AiScriptgetMeta Incomplete
 
 func (c AiScriptgetMeta) Source() AiScriptgetSource {
 	c.cs.s = append(c.cs.s, "SOURCE")
@@ -78,27 +78,27 @@ func (c AiScriptgetMeta) Source() AiScriptgetSource {
 
 func (c AiScriptgetMeta) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c AiScriptgetMeta) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiScriptgetSource Completed
+type AiScriptgetSource Incomplete
 
 func (c AiScriptgetSource) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c AiScriptgetSource) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiScriptstore Completed
+type AiScriptstore Incomplete
 
 func (b Builder) AiScriptstore() (c AiScriptstore) {
 	c = AiScriptstore{cs: get(), ks: b.ks}
@@ -116,7 +116,7 @@ func (c AiScriptstore) Key(key string) AiScriptstoreKey {
 	return (AiScriptstoreKey)(c)
 }
 
-type AiScriptstoreDeviceCpu Completed
+type AiScriptstoreDeviceCpu Incomplete
 
 func (c AiScriptstoreDeviceCpu) Tag(tag string) AiScriptstoreTag {
 	c.cs.s = append(c.cs.s, "TAG", tag)
@@ -128,7 +128,7 @@ func (c AiScriptstoreDeviceCpu) EntryPoints(entryPointCount int64) AiScriptstore
 	return (AiScriptstoreEntryPointsEntryPoints)(c)
 }
 
-type AiScriptstoreDeviceGpu Completed
+type AiScriptstoreDeviceGpu Incomplete
 
 func (c AiScriptstoreDeviceGpu) Tag(tag string) AiScriptstoreTag {
 	c.cs.s = append(c.cs.s, "TAG", tag)
@@ -140,7 +140,7 @@ func (c AiScriptstoreDeviceGpu) EntryPoints(entryPointCount int64) AiScriptstore
 	return (AiScriptstoreEntryPointsEntryPoints)(c)
 }
 
-type AiScriptstoreEntryPointsEntryPoint Completed
+type AiScriptstoreEntryPointsEntryPoint Incomplete
 
 func (c AiScriptstoreEntryPointsEntryPoint) EntryPoint(entryPoint ...string) AiScriptstoreEntryPointsEntryPoint {
 	c.cs.s = append(c.cs.s, entryPoint...)
@@ -149,17 +149,17 @@ func (c AiScriptstoreEntryPointsEntryPoint) EntryPoint(entryPoint ...string) AiS
 
 func (c AiScriptstoreEntryPointsEntryPoint) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AiScriptstoreEntryPointsEntryPoints Completed
+type AiScriptstoreEntryPointsEntryPoints Incomplete
 
 func (c AiScriptstoreEntryPointsEntryPoints) EntryPoint(entryPoint ...string) AiScriptstoreEntryPointsEntryPoint {
 	c.cs.s = append(c.cs.s, entryPoint...)
 	return (AiScriptstoreEntryPointsEntryPoint)(c)
 }
 
-type AiScriptstoreKey Completed
+type AiScriptstoreKey Incomplete
 
 func (c AiScriptstoreKey) Cpu() AiScriptstoreDeviceCpu {
 	c.cs.s = append(c.cs.s, "CPU")
@@ -171,7 +171,7 @@ func (c AiScriptstoreKey) Gpu() AiScriptstoreDeviceGpu {
 	return (AiScriptstoreDeviceGpu)(c)
 }
 
-type AiScriptstoreTag Completed
+type AiScriptstoreTag Incomplete
 
 func (c AiScriptstoreTag) EntryPoints(entryPointCount int64) AiScriptstoreEntryPointsEntryPoints {
 	c.cs.s = append(c.cs.s, "ENTRY_POINTS", strconv.FormatInt(entryPointCount, 10))

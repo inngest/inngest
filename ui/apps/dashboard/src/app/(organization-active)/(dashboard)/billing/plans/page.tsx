@@ -1,4 +1,4 @@
-import { NewLink } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/Link';
 
 import { HorizontalPlanCard, VerticalPlanCard } from '@/components/Billing/Plans/PlanCard';
 import { isEnterprisePlan, isLegacyPlan, type Plan } from '@/components/Billing/Plans/utils';
@@ -21,6 +21,8 @@ const ENTERPRISE_PLAN: Plan = {
     },
   },
 };
+
+export const dynamic = 'force-dynamic';
 
 export default async function Page() {
   const plans = await getPlans();
@@ -79,14 +81,14 @@ export default async function Page() {
       )}
       <div className="mt-4 text-center text-sm">
         Want to cancel your plan?{' '}
-        <NewLink
+        <Link
           className="inline"
           target="_blank"
           size="small"
           href={pathCreator.support({ ref: 'app-billing-plans-footer' })}
         >
           Contact us
-        </NewLink>
+        </Link>
       </div>
     </>
   );

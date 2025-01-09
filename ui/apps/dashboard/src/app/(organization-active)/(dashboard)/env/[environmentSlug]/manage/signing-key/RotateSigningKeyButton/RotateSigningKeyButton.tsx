@@ -16,7 +16,7 @@ export function RotateSigningKeyButton({ disabled, envID }: Props) {
   return (
     <>
       <Button
-        btnAction={() => setIsModalOpen(true)}
+        onClick={() => setIsModalOpen(true)}
         disabled={disabled}
         kind="danger"
         label="Rotate key"

@@ -17,7 +17,7 @@ const TabButton = forwardRef<
     <TabsPrimitive.Trigger
       ref={ref}
       className={cn(
-        'border-subtle bg-canvasBase hover:bg-canvasMuted hover:border-muted data-[state=active]:bg-canvasSubtle data-[state=active]:border-contrast data-[state=active]:border-1 rounded-sm border px-2 py-1.5 text-sm',
+        'text-basis border-subtle bg-canvasBase hover:bg-canvasMuted hover:border-muted data-[state=active]:bg-canvasSubtle data-[state=active]:border-contrast data-[state=active]:border-1 rounded-sm border px-2 py-1.5 text-sm',
         className
       )}
       value={value}
@@ -42,10 +42,12 @@ const TabList = forwardRef<
 const TabContent = forwardRef<
   React.ElementRef<typeof TabsPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
->(({ children, value, ...props }, ref) => {
+>(({ children, className, value, ...props }, ref) => {
   return (
     <TabsPrimitive.Content value={value} asChild {...props} ref={ref}>
-      <div className="border-subtle rounded-md border px-6 py-4">{children}</div>
+      <div className={cn('text-basis border-subtle rounded-md border px-6 py-4', className)}>
+        {children}
+      </div>
     </TabsPrimitive.Content>
   );
 });

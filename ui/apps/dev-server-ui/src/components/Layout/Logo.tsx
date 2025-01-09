@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
-import { NewButton } from '@inngest/components/Button';
+import NextLink from 'next/link';
+import { Button } from '@inngest/components/Button';
 import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
 import { InngestLogoSmallBW } from '@inngest/components/icons/logos/InngestLogoSmall';
 import { RiContractLeftLine, RiContractRightLine } from '@remixicon/react';
@@ -22,7 +22,7 @@ const NavToggle = ({ collapsed, setCollapsed }: LogoProps) => {
   };
 
   return (
-    <NewButton
+    <Button
       kind="primary"
       appearance="ghost"
       onClick={toggle}
@@ -55,9 +55,9 @@ export default function Logo({ collapsed, setCollapsed }: LogoProps) {
           </div>
         ) : (
           <div className="flex flex-row items-center justify-start">
-            <Link href="/">
+            <NextLink href="/">
               <InngestLogo className="text-basis mr-1.5" width={92} />
-            </Link>
+            </NextLink>
             {isDevServer ? (
               <span className="text-primary-intense text-[11px] leading-none">DEV SERVER</span>
             ) : null}
