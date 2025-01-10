@@ -58,6 +58,7 @@ func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Meta
 		WithName(consts.OtelSpanTrigger),
 		WithTimestamp(ulid.Time(runID.Time())),
 		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycelID, "OnFunctionScheduled"),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -134,6 +135,7 @@ func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Meta
 							WithTimestamp(meta.InvokeTraceCarrier.Timestamp),
 							WithSpanID(sid),
 							WithSpanAttributes(
+								attribute.String(consts.OtelSysLifecycelID, "OnFunctionScheduled"),
 								attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 								attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 								attribute.String(consts.OtelSysAppID, meta.SourceAppID),
@@ -199,6 +201,7 @@ func (l traceLifecycle) OnFunctionStarted(
 		WithTimestamp(start),
 		WithSpanID(*spanID),
 		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycelID, "OnFunctionStarted"),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -280,6 +283,7 @@ func (l traceLifecycle) OnFunctionFinished(
 		WithTimestamp(start),
 		WithSpanID(*spanID),
 		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycelID, "OnFunctionFinished"),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -365,6 +369,7 @@ func (l traceLifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata
 		WithTimestamp(start),
 		WithSpanID(*fnSpanID),
 		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycelID, "OnFunctionCancelled"),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -436,6 +441,7 @@ func (l traceLifecycle) OnFunctionSkipped(
 			WithName(consts.OtelSpanTrigger),
 			WithTimestamp(ulid.Time(runID.Time())),
 			WithSpanAttributes(
+				attribute.String(consts.OtelSysLifecycelID, "OnFunctionSkipped"),
 				attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 				attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 				attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -489,6 +495,7 @@ func (l traceLifecycle) OnFunctionSkipped(
 		WithTimestamp(start),
 		WithSpanID(*spanID),
 		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycelID, "OnFunctionSkipped"),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -559,6 +566,7 @@ func (l traceLifecycle) OnStepStarted(
 		WithTimestamp(start),
 		WithSpanID(*spanID),
 		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycelID, "OnStepStarted"),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -630,6 +638,7 @@ func (l traceLifecycle) OnStepGatewayRequestFinished(
 		WithTimestamp(start),
 		WithSpanID(*spanID),
 		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycelID, "OnStepGatewayRequestFinished"),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -730,6 +739,7 @@ func (l traceLifecycle) OnStepFinished(
 		WithTimestamp(start),
 		WithSpanID(*spanID),
 		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycelID, "OnStepFinished"),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -898,6 +908,7 @@ func (l traceLifecycle) OnSleep(
 		WithName(consts.OtelSpanSleep),
 		WithTimestamp(startedAt),
 		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycelID, "OnSleep"),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -953,6 +964,7 @@ func (l traceLifecycle) OnInvokeFunction(
 		WithTimestamp(carrier.Timestamp),
 		WithSpanID(spanID),
 		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycelID, "OnInvokeFunction"),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -1021,6 +1033,7 @@ func (l traceLifecycle) OnInvokeFunctionResumed(
 				WithTimestamp(carrier.Timestamp),
 				WithSpanID(carrier.SpanID()),
 				WithSpanAttributes(
+					attribute.String(consts.OtelSysLifecycelID, "OnInvokeFunctionResumed"),
 					attribute.String(consts.OtelSysAccountID, pause.Identifier.AccountID.String()),
 					attribute.String(consts.OtelSysWorkspaceID, pause.Identifier.WorkspaceID.String()),
 					attribute.String(consts.OtelSysAppID, pause.Identifier.AppID.String()),
@@ -1096,6 +1109,7 @@ func (l traceLifecycle) OnWaitForEvent(
 		WithTimestamp(carrier.Timestamp),
 		WithSpanID(carrier.SpanID()),
 		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycelID, "OnWaitForEvent"),
 			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeWaitForEvent.String()),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
@@ -1150,6 +1164,7 @@ func (l traceLifecycle) OnWaitForEventResumed(
 				WithTimestamp(carrier.Timestamp),
 				WithSpanID(carrier.SpanID()),
 				WithSpanAttributes(
+					attribute.String(consts.OtelSysLifecycelID, "OnWaitForEventResumed"),
 					attribute.String(consts.OtelSysAccountID, pause.Identifier.AccountID.String()),
 					attribute.String(consts.OtelSysWorkspaceID, pause.Identifier.WorkspaceID.String()),
 					attribute.String(consts.OtelSysAppID, pause.Identifier.AppID.String()),

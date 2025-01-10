@@ -84,6 +84,8 @@ const (
 	OtelSysCronTimestamp = "sys.cron.timestamp"
 	OtelSysCronExpr      = "sys.cron.expr"
 
+	OtelSysLifecycelID = "sys.lifecycle.id"
+
 	// tracking delays
 	OtelSysDelaySystem  = "sys.delay.system.ms"
 	OtelSysDelaySojourn = "sys.delay.sojourn.ms"

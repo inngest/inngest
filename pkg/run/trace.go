@@ -73,10 +73,13 @@ func NewRunTree(opts RunTreeOpts) (*runTree, error) {
 		processed: map[string]bool{},
 	}
 
+	spew.Dump(opts.Spans)
+
 	for _, s := range opts.Spans {
 		// ignore parallelism planning spans
 		if s.StepOpCode() == enums.OpcodeStepPlanned {
 			if _, ok := s.SpanAttributes[consts.OtelSysStepPlan]; ok {
+				spew.Dump("SKIPPING SPAN", s, "\n\n\n\n\n")
 				continue
 			}
 		}
