@@ -402,6 +402,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			Executor:           ds.Executor,
 			QueueShardSelector: shardSelector,
 			Broadcaster:        broadcaster,
+			RealtimeJWTSecret:  consts.DevServerRealtimeJWTSecret,
 		})
 	})
 
