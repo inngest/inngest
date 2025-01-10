@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { RiAddFill, RiSubtractFill } from '@remixicon/react';
 
 import { Button } from '../Button';
 import { Input } from './Input';
@@ -34,29 +35,32 @@ export default function CounterInput({ initialValue = 0, min = 0, max = 100 }: C
   };
 
   return (
-    <div className="flex items-center">
-      <Button
-        kind="secondary"
-        appearance="outlined"
-        onClick={decrement}
-        disabled={value <= min}
-        label="-"
-        className="rounded-r-none"
-      />
-      <Input
-        type="number"
-        value={value}
-        onChange={handleChange}
-        className="z-10 w-12 rounded-none border-l-0 border-r-0"
-      />
-      <Button
-        kind="secondary"
-        appearance="outlined"
-        onClick={increment}
-        disabled={value >= max}
-        label="+"
-        className="rounded-l-none"
-      />
+    <div className="">
+      <div className="relative flex  items-center">
+        <Input
+          type="number"
+          value={value}
+          onChange={handleChange}
+          className="z-10 w-12 rounded-r-none border-r-0"
+        />
+        <Button
+          kind="secondary"
+          appearance="outlined"
+          onClick={decrement}
+          disabled={value <= min}
+          icon={<RiSubtractFill className="h-4" />}
+          className="disabled:border-muted disabled:bg-canvasBase rounded-none border-r-0"
+        />
+        <Button
+          kind="secondary"
+          appearance="outlined"
+          onClick={increment}
+          disabled={value >= max}
+          icon={<RiAddFill className="h-4" />}
+          className="disabled:border-muted disabled:bg-canvasBase rounded-l-none border-l-0"
+        />
+        {/* <p className="text-error absolute top-8 text-xs">Value not available</p> */}
+      </div>
     </div>
   );
 }
