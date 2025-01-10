@@ -675,9 +675,6 @@ func (l traceLifecycle) OnStepGatewayRequestFinished(
 		span.SetStatus(codes.Error, runErr.Name+": "+runErr.Message)
 
 		userLandErrByt, _ := json.Marshal(runErr)
-		// errByt, _ := json.Marshal(map[string]json.RawMessage{
-		// 	"error": userLandErrByt,
-		// })
 		span.SetStepOutput(userLandErrByt)
 	}
 
