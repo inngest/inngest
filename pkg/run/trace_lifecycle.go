@@ -607,7 +607,7 @@ func (l traceLifecycle) OnStepGatewayRequestFinished(
 	// Resp is the HTTP response
 	resp *http.Response,
 	// runErr is non-nil on a non-2xx status code.
-	runErr error,
+	runErr *state.UserError,
 ) {
 	// reassign here to make sure we have the right traceID and such
 	ctx = l.extractTraceCtx(ctx, md, false)
@@ -626,7 +626,7 @@ func (l traceLifecycle) OnStepGatewayRequestFinished(
 
 	_, span := NewSpan(ctx,
 		WithScope(consts.OtelScopeExecution),
-		WithName(consts.OtelExecPlaceholder),
+		WithName(op.UserDefinedName()),
 		WithTimestamp(start),
 		WithSpanID(*spanID),
 		WithSpanAttributes(
@@ -640,19 +640,13 @@ func (l traceLifecycle) OnStepGatewayRequestFinished(
 			attribute.Int(consts.OtelSysStepAttempt, item.Attempt),
 			attribute.Int(consts.OtelSysStepMaxAttempt, item.GetMaxAttempts()),
 			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
-			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeStepPlanned.String()),
+			attribute.Int(consts.OtelSysStepStatusCode, resp.StatusCode),
+			attribute.Int(consts.OtelSysStepOutputSizeBytes, int(resp.ContentLength)),
+			attribute.String(consts.OtelSysStepID, op.ID),
+			attribute.String(consts.OtelSysStepDisplayName, op.UserDefinedName()),
+			attribute.String(consts.OtelSysStepOpcode, op.Op.String()),
 		),
 	)
-	// Common attrs.
-	span.SetName(op.UserDefinedName())
-	span.SetAttributes(
-		attribute.Int(consts.OtelSysStepStatusCode, resp.StatusCode),
-		attribute.Int(consts.OtelSysStepOutputSizeBytes, int(resp.ContentLength)),
-		attribute.String(consts.OtelSysStepID, op.ID),
-		attribute.String(consts.OtelSysStepDisplayName, op.UserDefinedName()),
-		attribute.String(consts.OtelSysStepOpcode, op.Op.String()),
-	)
-
 	defer span.End()
 
 	if item.RunInfo != nil {
@@ -678,8 +672,13 @@ func (l traceLifecycle) OnStepGatewayRequestFinished(
 		span.SetStepOutput(op.Data)
 		span.SetStatus(codes.Ok, string(op.Data))
 	} else {
-		span.SetStatus(codes.Error, runErr.Error())
-		span.SetStepOutput(runErr.Error())
+		span.SetStatus(codes.Error, runErr.Name+": "+runErr.Message)
+
+		userLandErrByt, _ := json.Marshal(runErr)
+		// errByt, _ := json.Marshal(map[string]json.RawMessage{
+		// 	"error": userLandErrByt,
+		// })
+		span.SetStepOutput(userLandErrByt)
 	}
 
 	if input, _ := op.Input(); input != "" {

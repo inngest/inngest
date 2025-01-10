@@ -2198,11 +2198,13 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		}
 
 		// Ensure the opcode is treated as an error when calling OnStepFinish.
-		i.resp.UpdateOpcodeError(&gen, state.UserError{
-			Name:    fmt.Sprintf("Error making AI request: %s", err),
-			Message: string(output),
+		userLandErr := state.UserError{
+			Name:    "AIGatewayError",
+			Message: fmt.Sprintf("Error making AI request: %s", err),
 			Data:    output, // For golang's multiple returns.
-		})
+			Stack:   string(output),
+		}
+		i.resp.UpdateOpcodeError(&gen, userLandErr)
 
 		// And, finally, if this is retryable return an error which will be retried.
 		// Otherwise, we enqueue the next step directly so that the SDK can throw
@@ -2210,6 +2212,14 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		if queue.ShouldRetry(nil, i.item.Attempt, i.item.GetMaxAttempts()) {
 			// Set the response error, ensuring the response is retryable in the queue.
 			i.resp.SetError(err)
+
+			for _, e := range e.lifecycles {
+				// OnStepFinished handles step success and step errors/failures.  It is
+				// currently the responsibility of the lifecycle manager to handle the differing
+				// step statuses when a step finishes.
+				go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, hr, &userLandErr)
+			}
+
 			// This will retry, as it hits the queue directly.
 			return fmt.Errorf("error making inference request: %w", err)
 		}
@@ -2219,15 +2229,16 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		//
 		// The actual error should be wrapped with an "error" so that it respects the
 		// error wrapping of step errors.
+		userLandErrByt, _ := json.Marshal(userLandErr)
 		output, _ = json.Marshal(map[string]json.RawMessage{
-			"error": output,
+			"error": userLandErrByt,
 		})
 
 		for _, e := range e.lifecycles {
 			// OnStepFinished handles step success and step errors/failures.  It is
 			// currently the responsibility of the lifecycle manager to handle the differing
 			// step statuses when a step finishes.
-			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, hr, err)
+			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, hr, &userLandErr)
 		}
 	} else {
 		// The response output is actually now the result of this AI call. We need
