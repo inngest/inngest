@@ -51,7 +51,7 @@ export default function CreateEnvironment({}) {
       <p className="text-muted max-w-[600px] text-sm">
         Create a shared, non-production environment like staging, QA, or canary.
       </p>
-      <div className="bg-canvasSubtle my-6 rounded-lg px-6 py-4">
+      <div className="bg-canvasSubtle my-6 rounded-md px-6 py-4">
         <p className="mb-4 max-w-[600px] text-sm">
           Some key things to know about custom environments:
         </p>

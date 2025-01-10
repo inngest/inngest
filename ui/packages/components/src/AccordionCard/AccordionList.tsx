@@ -12,7 +12,7 @@ export function AccordionList({
   return (
     <AccordionPrimitive.Root
       className={cn(
-        'border-subtle bg-canvasBase divide-subtle divide-y overflow-hidden rounded-lg border',
+        'border-subtle bg-canvasBase divide-subtle divide-y overflow-hidden rounded-md border',
         className
       )}
       {...props}
@@ -80,3 +80,5 @@ const AccordionContent = forwardRef<
 AccordionList.Item = AccordionItem;
 AccordionList.Trigger = AccordionTrigger;
 AccordionList.Content = AccordionContent;
+
+export * as AccordionPrimitive from '@radix-ui/react-accordion';

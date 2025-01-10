@@ -80,7 +80,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               dangerGhostButton
             ),
             input:
-              '!border !ring-0 focus:ring-0 bg-canvasBase border-muted hover:border-muted focus:border-muted placeholder-disabled text-basis focus:outline-primary-moderate w-full border text-sm leading-none outline-2 transition-all focus:outline rounded-lg',
+              '!border !ring-0 focus:ring-0 bg-canvasBase border-muted hover:border-muted focus:border-muted placeholder-disabled text-basis focus:outline-primary-moderate w-full border text-sm leading-none outline-2 transition-all focus:outline rounded-md',
             main: 'text-basis',
             rootBox: 'px-6 mx-auto max-w-[1200px]',
             card: 'shadow-none border-0 bg-canvasBase',
@@ -100,7 +100,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             badge:
               '!shadow-none border border-muted bg-canvasBase text-basis shadow-none data-[color=warning]:bg-warning data-[color=warning]:border-warning data-[color=warning]:text-warning data-[color=success]:bg-success data-[color=success]:border-success data-[color=success]:text-success data-[color=danger]:bg-error data-[color=danger]:border-error data-[color=danger]:text-error', // Pill component outlined default styles
             tagPillContainer: 'bg-canvasMuted text-basis shadow-none hover:bg-surfaceMuted', // Pill component solid default styles
-            table: 'border border-subtle rounded-lg shadow-none bg-canvasBase',
+            table: 'border border-subtle rounded-md shadow-none bg-canvasBase',
             tableHead:
               'border-b border-subtle pl-4 pr-2 py-3 whitespace-nowrap text-muted text-sm font-semibold',
             formattedDate__tableCell: 'text-sm',

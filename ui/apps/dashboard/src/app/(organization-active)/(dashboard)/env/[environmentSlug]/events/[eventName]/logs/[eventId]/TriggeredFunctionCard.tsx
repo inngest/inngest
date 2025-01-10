@@ -76,7 +76,7 @@ export default async function TriggeredFunctionCard({
   return (
     <NextLink
       href={pathCreator.runPopout({ envSlug: environmentSlug, runID: function_.run.id })}
-      className="bg-canvasBase flex items-center rounded-lg border p-5 shadow"
+      className="bg-canvasBase flex items-center rounded-md border p-5 shadow"
     >
       <div className="flex-1">
         <div className="flex items-center gap-1.5">

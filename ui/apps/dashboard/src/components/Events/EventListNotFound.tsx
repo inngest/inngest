@@ -23,7 +23,7 @@ export default function EventListNotFound() {
     <div className="text-basis h-full w-full overflow-y-scroll py-16">
       <div className="mx-auto flex w-[640px] flex-col gap-4">
         <div className="text-center">
-          <h3 className="border-info bg-info text-info mb-4 flex items-center justify-center gap-1 rounded-lg border py-2.5 text-lg font-semibold">
+          <h3 className="border-info bg-info text-info mb-4 flex items-center justify-center gap-1 rounded-md border py-2.5 text-lg font-semibold">
             <RiErrorWarningLine className="text-info h-5 w-5" />
             <span>
               No Events <span className="text-info font-normal">received in</span>{' '}

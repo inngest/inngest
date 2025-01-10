@@ -21,7 +21,7 @@ export default function SegmentedProgressBar({
         return (
           <div
             key={index}
-            className={` h-1 rounded-lg ${completed ? 'bg-btnPrimary' : ' bg-canvasMuted'}`}
+            className={` h-1 rounded-md ${completed ? 'bg-btnPrimary' : ' bg-canvasMuted'}`}
           />
         );
       })}

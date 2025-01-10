@@ -38,7 +38,7 @@ export function SelectInput<T extends string>(props: SelectProps<T>) {
       onValueChange={props.onChange}
       required={props.required}
     >
-      <Select.Trigger className="border-muted bg-canvasBase outline-primary-moderate data-[placeholder]:text-light flex items-center justify-between rounded-lg border px-3 py-1.5 text-sm leading-none outline-2 outline-offset-2 transition-all focus:outline">
+      <Select.Trigger className="border-muted bg-canvasBase outline-primary-moderate data-[placeholder]:text-light flex items-center justify-between rounded-md border px-3 py-1.5 text-sm leading-none outline-2 outline-offset-2 transition-all focus:outline">
         <Select.Value placeholder={props.placeholder} />
         <Select.Icon className="">
           <RiArrowDownSLine className="h-5" />
@@ -46,7 +46,7 @@ export function SelectInput<T extends string>(props: SelectProps<T>) {
       </Select.Trigger>
 
       <Select.Content
-        className="border-muted bg-canvasBase outline-primary-moderate z-10 w-[var(--radix-select-trigger-width)] rounded-lg border py-1 text-sm leading-none shadow outline-2 outline-offset-2 transition-all focus:outline"
+        className="border-muted bg-canvasBase outline-primary-moderate z-10 w-[var(--radix-select-trigger-width)] rounded-md border py-1 text-sm leading-none shadow outline-2 outline-offset-2 transition-all focus:outline"
         position="popper"
         sideOffset={8}
       >

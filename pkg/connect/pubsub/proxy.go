@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -13,6 +14,10 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+)
+
+const (
+	pkgName = "connect.execution.proxy"
 )
 
 /*
@@ -94,6 +99,8 @@ func newRedisPubSubConnector(client rueidis.Client, logger *slog.Logger) *redisP
 // If the gateway does not ack the message within a 10-second timeout, an error is returned.
 // If no response is received before the context is canceled, an error is returned.
 func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data *connect.GatewayExecutorRequestData) (*connect.SDKResponse, error) {
+	proxyStartTime := time.Now()
+
 	if data.RequestId == "" {
 		data.RequestId = ulid.MustNew(ulid.Now(), rand.Reader).String()
 	}
@@ -112,6 +119,12 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data 
 		go func() {
 			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(appId, data.RequestId, AckSourceRouter), func(msg string) {
 				routerAcked = true
+				metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"kind": "router",
+					},
+				})
 			}, true)
 			routerAckErrChan <- err
 		}()
@@ -125,6 +138,12 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data 
 		go func() {
 			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(appId, data.RequestId, AckSourceGateway), func(msg string) {
 				gatewayAcked = true
+				metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"kind": "gateway",
+					},
+				})
 			}, true)
 			gatewayAckErrChan <- err
 		}()
@@ -138,6 +157,12 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data 
 		go func() {
 			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(appId, data.RequestId, AckSourceWorker), func(msg string) {
 				workerAcked = true
+				metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"kind": "worker",
+					},
+				})
 			}, true)
 			workerAckErrChan <- err
 		}()
@@ -365,7 +390,7 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 
 		// Unsubscribe from all channels
 		subs := i.subscribers
-		for channelName, _ := range subs {
+		for channelName := range subs {
 			c.Do(ctx, c.B().Unsubscribe().Channel(channelName).Build())
 		}
 

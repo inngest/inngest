@@ -182,7 +182,7 @@ export default function VercelConfigure() {
             </div>
           )}
 
-          <div className="border-subtle flex flex-col gap-2 rounded-lg border p-6">
+          <div className="border-subtle flex flex-col gap-2 rounded-md border p-6">
             <div className="text-basis text-lg font-medium">Project status</div>
             <div className="text-muted text-base font-normal">
               This determines whether or not Inngest will communicate with your Vercel application.
@@ -210,7 +210,7 @@ export default function VercelConfigure() {
 
           {areExtraSettingsVisible && (
             <>
-              <div className="border-subtle mt-4 flex flex-col gap-2 rounded-lg border p-6">
+              <div className="border-subtle mt-4 flex flex-col gap-2 rounded-md border p-6">
                 <div className="text-basis text-lg font-medium">Path information</div>
                 <div className="text-muted text-base font-normal">
                   Each Vercel project can serve one or more Inngest apps available on different URL
@@ -257,7 +257,7 @@ export default function VercelConfigure() {
               </div>
               <div className="flex flex-row gap-4">
                 <div
-                  className={`border-subtle mt-4 flex w-full flex-col gap-2 rounded-lg border p-6 ${
+                  className={`border-subtle mt-4 flex w-full flex-col gap-2 rounded-md border p-6 ${
                     project.ssoProtection?.deploymentType === VercelDeploymentProtection.Disabled &&
                     'bg-disabled'
                   }`}
@@ -287,7 +287,7 @@ export default function VercelConfigure() {
                     value={project.protectionBypassSecret ?? ''}
                   />
                 </div>
-                <div className="border-subtle mt-4 flex w-full flex-col gap-2 rounded-lg border p-6">
+                <div className="border-subtle mt-4 flex w-full flex-col gap-2 rounded-md border p-6">
                   <div className="text-basis text-lg font-medium">
                     Custom Production Domain <span className="text-sublte text-xs">(optional)</span>
                   </div>
