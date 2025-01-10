@@ -3,10 +3,17 @@
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import CounterInput from '@inngest/components/Forms/CounterInput';
+import { AlertModal } from '@inngest/components/Modal/AlertModal';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiInformationLine } from '@remixicon/react';
 
 import { pathCreator } from '@/utils/urls';
+
+const planLimit = 5; // TEMP: This is mocked data
+const price = 10; // TEMP: This is mocked data
+const quantityPer = 1; // TEMP: This is mocked data
+const currentValue = 5; // TEMP: This is mocked data
+const maxValue = 10000; // TEMP: This is mocked data
 
 export default function AddOn({
   title,
@@ -14,21 +21,19 @@ export default function AddOn({
   value,
   canIncreaseLimitInCurrentPlan,
   tooltipContent,
-  // TEMP: This is a temporary prop to show the self-service option
-  selfServiceAvailable = true,
+  selfServiceAvailable = false,
 }: {
   title: string;
   description?: string;
   value?: number | string;
   canIncreaseLimitInCurrentPlan: boolean;
   tooltipContent?: string | React.ReactNode;
+  // TEMP: Not currently passing this prop
   selfServiceAvailable?: boolean;
 }) {
   const [openSelfService, setOpenSelfService] = useState(false);
-
-  const planLimit = 5; // TEMP: This is mocked data
-  const price = 10; // TEMP: This is mocked data
-  const quantityPer = 1; // TEMP: This is mocked data
+  const [openConfirmationModal, setOpenConfirmationModal] = useState(false);
+  const [inputValue, setInputValue] = useState(Math.max(currentValue, planLimit));
 
   const priceText = `$${price} per ${quantityPer}`;
   const descriptionText = openSelfService ? (
@@ -42,6 +47,8 @@ export default function AddOn({
   ) : (
     description
   );
+  const currentCost =
+    inputValue === planLimit ? 0 : Math.ceil((inputValue - planLimit) / quantityPer) * price;
 
   return (
     <div className="mb-5">
@@ -99,9 +106,15 @@ export default function AddOn({
       </div>
       {openSelfService && (
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <CounterInput />
-            <p className="text-muted text-sm">Cost: $50</p>
+          <div className="flex items-baseline gap-4">
+            <CounterInput
+              value={inputValue}
+              onChange={setInputValue}
+              min={planLimit}
+              max={maxValue}
+              step={quantityPer}
+            />
+            <p className="text-muted text-sm">Cost: ${currentCost}</p>
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -109,18 +122,32 @@ export default function AddOn({
               appearance="ghost"
               onClick={() => {
                 setOpenSelfService(false);
+                setInputValue(Math.max(currentValue, planLimit));
               }}
               label="Cancel"
             />
             <Button
               appearance="outlined"
               onClick={() => {
+                setOpenConfirmationModal(true);
                 setOpenSelfService(false);
               }}
               label="Add"
             />
           </div>
         </div>
+      )}
+      {openConfirmationModal && (
+        <AlertModal
+          isOpen={openConfirmationModal}
+          onClose={() => setOpenConfirmationModal(false)}
+          onSubmit={() => {}}
+          title="Add to plan"
+          description="Are you sure you want to add this addon?"
+          confirmButtonLabel="Confirm and pay"
+          cancelButtonLabel="Cancel"
+          confirmButtonKind="primary"
+        ></AlertModal>
       )}
     </div>
   );

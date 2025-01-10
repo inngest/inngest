@@ -1,53 +1,75 @@
 'use client';
 
-import React, { useState } from 'react';
 import { RiAddFill, RiSubtractFill } from '@remixicon/react';
 
 import { Button } from '../Button';
 import { Input } from './Input';
 
 type CounterInputProps = {
-  initialValue?: number;
+  value?: number;
   min?: number;
   max?: number;
+  onChange: (value: number) => void;
+  step?: number;
 };
 
-export default function CounterInput({ initialValue = 0, min = 0, max = 100 }: CounterInputProps) {
-  const [value, setValue] = useState(initialValue);
-
+export default function CounterInput({
+  value = 0,
+  min = 0,
+  max = 100,
+  onChange,
+  step = 1,
+}: CounterInputProps) {
   const increment = () => {
-    if (value < max) {
-      setValue(value + 1);
+    const newValue = value + step;
+    if (newValue <= max) {
+      onChange(newValue);
     }
   };
 
   const decrement = () => {
-    if (value > min) {
-      setValue(value - 1);
+    const newValue = value - step;
+    if (newValue >= min) {
+      onChange(newValue);
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = parseInt(e.target.value, 10);
-    if (!isNaN(newValue) && newValue >= min && newValue <= max) {
-      setValue(newValue);
+
+    // TO DO: proper display of input validation
+    if (isNaN(newValue)) {
+      console.log('Value must be a number.');
+      return;
     }
+
+    if (newValue < min || newValue > max) {
+      console.log(`Value must be between ${min} and ${max}.`);
+      return;
+    }
+
+    if ((newValue - min) % step !== 0) {
+      console.log(`Value must align with step intervals of ${step}.`);
+      return;
+    }
+    onChange(newValue);
   };
 
   return (
-    <div className="">
-      <div className="relative flex  items-center">
+    <div>
+      <div className="flex items-center">
         <Input
           type="number"
           value={value}
           onChange={handleChange}
           className="z-10 w-12 rounded-r-none border-r-0"
+          step={step}
         />
         <Button
           kind="secondary"
           appearance="outlined"
           onClick={decrement}
-          disabled={value <= min}
+          disabled={value - step < min}
           icon={<RiSubtractFill className="h-4" />}
           className="disabled:border-muted disabled:bg-canvasBase rounded-none border-r-0"
         />
@@ -55,12 +77,13 @@ export default function CounterInput({ initialValue = 0, min = 0, max = 100 }: C
           kind="secondary"
           appearance="outlined"
           onClick={increment}
-          disabled={value >= max}
+          disabled={value + step > max}
           icon={<RiAddFill className="h-4" />}
           className="disabled:border-muted disabled:bg-canvasBase rounded-l-none border-l-0"
         />
-        {/* <p className="text-error absolute top-8 text-xs">Value not available</p> */}
       </div>
+
+      {/* {error && <p className="text-error text-xs">{error}</p>} */}
     </div>
   );
 }
