@@ -17,6 +17,7 @@ const (
 	OtelSysWorkspaceID    = "sys.workspace.id"
 	OtelSysAppID          = "sys.app.id"
 	OtelSysIdempotencyKey = "sys.idempotency.key"
+	OtelSysLifecycleID    = "sys.lifecycle.id"
 
 	OtelSysEventData       = "sys.event"
 	OtelSysEventRequestID  = "sys.event.request.id"
