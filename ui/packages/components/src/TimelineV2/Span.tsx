@@ -45,7 +45,10 @@ export function Span({ className, isInline, maxTime, minTime, trace }: Props) {
 
       {/* Queued part of the span */}
       {widths.queued > 0 && (
-        <div className="bg-surfaceSubtle h-2" style={{ flexGrow: widths.queued }}></div>
+        <div
+          className="bg-surfaceSubtle dark:bg-surfaceMuted h-2"
+          style={{ flexGrow: widths.queued }}
+        ></div>
       )}
 
       {/* Running part of the span */}
