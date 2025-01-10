@@ -2,12 +2,25 @@
 
 import { forwardRef } from 'react';
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
-import { RiCheckLine, RiSubtractLine } from '@remixicon/react';
 
 import { cn } from '../utils/classNames';
 
 export const DropdownMenu = DropdownMenuPrimitive.Root;
-export const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
+
+export const DropdownMenuTrigger = forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Trigger>
+>(({ children, ...props }, forwardedRef) => {
+  return (
+    <DropdownMenuPrimitive.Trigger
+      {...props}
+      ref={forwardedRef}
+      className={cn('data-[state=open]:border-primary-intense', props.className)}
+    >
+      {children}
+    </DropdownMenuPrimitive.Trigger>
+  );
+});
 
 export const DropdownMenuContent = forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
@@ -19,10 +32,11 @@ export const DropdownMenuContent = forwardRef<
         {...props}
         ref={forwardedRef}
         onCloseAutoFocus={(event) => event.preventDefault()}
-        align="start"
-        sideOffset={props.sideOffset ?? 14}
+        align={props.align ?? 'start'}
+        collisionPadding={8}
+        sideOffset={props.sideOffset ?? 8}
         className={cn(
-          'shadow-outline-primary-light bg-canvasBase min-w-[220px] rounded-md p-2',
+          'shadow-primary bg-canvasBase border-muted z-50 min-w-40 rounded-md border p-0.5 [&>*:not(:last-child)]:mb-0.5',
           props.className
         )}
       >
@@ -43,7 +57,7 @@ export const DropdownMenuItem = forwardRef<
       {...props}
       ref={forwardedRef}
       className={cn(
-        'text-basis hover:bg-canvasMuted flex select-none items-center gap-2 rounded-md p-2 text-sm',
+        'text-muted hover:bg-canvasSubtle flex cursor-pointer select-none items-center gap-2 rounded-md p-2 text-[0.8125rem]',
         props.className
       )}
     >
@@ -51,38 +65,3 @@ export const DropdownMenuItem = forwardRef<
     </DropdownMenuPrimitive.Item>
   );
 });
-
-export const DropdownMenuGroup = DropdownMenuPrimitive.Group;
-
-export const DropdownMenuCheckboxItem = forwardRef<
-  React.ElementRef<typeof DropdownMenuPrimitive.CheckboxItem>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.CheckboxItem>
->(({ children, ...props }, forwardedRef) => {
-  return (
-    <DropdownMenuPrimitive.CheckboxItem {...props} ref={forwardedRef}>
-      {children}
-      <DropdownMenuPrimitive.ItemIndicator>
-        {props.checked === 'indeterminate' && <RiSubtractLine />}
-        {props.checked === true && <RiCheckLine />}
-      </DropdownMenuPrimitive.ItemIndicator>
-    </DropdownMenuPrimitive.CheckboxItem>
-  );
-});
-
-export const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup;
-
-export const DropdownMenuRadioItem = forwardRef<
-  React.ElementRef<typeof DropdownMenuPrimitive.RadioItem>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.RadioItem>
->(({ children, ...props }, forwardedRef) => {
-  return (
-    <DropdownMenuPrimitive.RadioItem {...props} ref={forwardedRef}>
-      {children}
-      <DropdownMenuPrimitive.ItemIndicator>
-        <RiCheckLine />
-      </DropdownMenuPrimitive.ItemIndicator>
-    </DropdownMenuPrimitive.RadioItem>
-  );
-});
-
-export const DropdownMenuSeparator = DropdownMenuPrimitive.Separator;

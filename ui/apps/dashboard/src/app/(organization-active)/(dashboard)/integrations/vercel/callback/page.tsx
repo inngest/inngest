@@ -39,7 +39,7 @@ export default async function VercelCallbackPage({ searchParams }: VercelCallbac
       <div className="text-muted mb-7 text-base">
         Select the Vercel projects that have Inngest functions. You can optionally specify server
         route other than the default <span className="font-semibold">(`/api/inngest`)</span>.{' '}
-        <Link showIcon={false} href={'/create-organization/set-up' as Route}>
+        <Link size="medium" href={'/create-organization/set-up' as Route}>
           Learn more
         </Link>
       </div>

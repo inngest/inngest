@@ -1,5 +1,5 @@
 import { Alert } from '@inngest/components/Alert/Alert';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 
@@ -15,7 +15,7 @@ export default function VercelConnect() {
       <div className="text-muted mb-7 w-full text-base font-normal">
         This integration enables you to host your Inngest functions on the Vercel platform and
         automatically sync them every time you deploy code.{' '}
-        <Link showIcon={false} href="https://www.inngest.com/docs/deploy/vercel">
+        <Link target="_blank" size="medium" href="https://www.inngest.com/docs/deploy/vercel">
           Read documentation
         </Link>
       </div>
@@ -27,7 +27,7 @@ export default function VercelConnect() {
       <div className="text-basis mb-7 text-lg font-normal">Installation overview</div>
       <div className="text-basis text-lg font-normal">
         <div className="border-subtle ml-3 border-l">
-          <div className="before:border-subtle before:text-basis relative ml-[32px] pb-7 before:absolute before:left-[-46px] before:h-[28px] before:w-[28px] before:rounded-full before:border before:bg-white before:text-center before:align-middle before:text-[13px] before:content-['1']">
+          <div className="before:border-subtle before:text-basis before:bg-canvasBase relative ml-[32px] pb-7 before:absolute before:left-[-46px] before:h-[28px] before:w-[28px] before:rounded-full before:border before:text-center before:align-middle before:text-[13px] before:content-['1']">
             <div className="text-basis text-base">Install Inngest Integration on Vercel.</div>
             <div className="text-muted text-base">
               Click the &rdquo;Add Integration&rdquo; button.
@@ -36,7 +36,7 @@ export default function VercelConnect() {
         </div>
 
         <div className="border-subtle ml-3 border-l">
-          <div className="before:border-subtle before:text-basis relative ml-[32px] pb-7 before:absolute before:left-[-46px] before:h-[28px] before:w-[28px] before:rounded-full before:border before:bg-white before:text-center before:align-middle before:text-[13px] before:content-['2']">
+          <div className="before:border-subtle before:text-basis before:bg-canvasBase relative ml-[32px] pb-7 before:absolute before:left-[-46px] before:h-[28px] before:w-[28px] before:rounded-full before:border before:text-center before:align-middle before:text-[13px] before:content-['2']">
             <div className="text-basis text-base">
               Select the Vercel projects you wish to enable
             </div>
@@ -46,7 +46,7 @@ export default function VercelConnect() {
           </div>
         </div>
         <div className="ml-3">
-          <div className="before:border-subtle before:text-basis relative ml-[32px] pb-7 before:absolute before:left-[-46px] before:h-[28px] before:w-[28px] before:rounded-full before:border before:bg-white before:text-center before:align-middle before:text-[13px] before:content-['3']">
+          <div className="before:border-subtle before:text-basis before:bg-canvasBase relative ml-[32px] pb-7 before:absolute before:left-[-46px] before:h-[28px] before:w-[28px] before:rounded-full before:border before:text-center before:align-middle before:text-[13px] before:content-['3']">
             <div className="text-basis text-base">Setup Successful</div>
             <div className="text-muted text-base">
               The integration auto-configures necessary environment variables and syncs your app
@@ -56,7 +56,7 @@ export default function VercelConnect() {
         </div>
       </div>
       <div>
-        <NewButton
+        <Button
           appearance="solid"
           href="https://vercel.com/integrations/inngest/new"
           label="Connect Vercel to Inngest"

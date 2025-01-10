@@ -1,9 +1,9 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button/index';
+import { Button } from '@inngest/components/Button/index';
 import { Card } from '@inngest/components/Card/Card';
-import { NewLink } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/Link';
 import { Pill } from '@inngest/components/Pill/Pill';
 import { toast } from 'sonner';
 
@@ -36,9 +36,9 @@ export default function IntegrationPage({
 
         <div className="text-subtle text-sm">
           Manage your {content.title} integration from this page.{' '}
-          <NewLink className="inline-block" size="small" href={content.url}>
+          <Link className="inline-block" size="small" href={content.url} target="_blank">
             Read documentation
-          </NewLink>
+          </Link>
         </div>
       </div>
       {publications.map((p, i) => (
@@ -72,7 +72,7 @@ export default function IntegrationPage({
         <p className="text-subtle mb-6 mt-3 text-sm">
           Permanently remove the {content.title} integration from Inngest
         </p>
-        <NewButton
+        <Button
           appearance="solid"
           kind="danger"
           label={`Remove ${content.title}`}

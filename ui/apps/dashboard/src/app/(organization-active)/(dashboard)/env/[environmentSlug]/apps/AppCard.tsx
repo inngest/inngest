@@ -1,8 +1,8 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link';
-import { Link as InngestLink } from '@inngest/components/Link';
+import NextLink from 'next/link';
+import { Link } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
 import { cn } from '@inngest/components/utils/classNames';
@@ -38,7 +38,7 @@ type Sync = {
 };
 
 export const cardWrapperStyles =
-  'md:flex w-full lg:min-w-[800px] max-w-[1200px] overflow-hidden rounded-lg border border-subtle bg-canvasBase';
+  'md:flex w-full lg:min-w-[800px] max-w-[1200px] overflow-hidden rounded-md border border-subtle bg-canvasBase';
 const cardLeftPanelStyles =
   'h-36 md:h-56 bg-canvasSubtle flex md:w-[410px] flex-col justify-center gap-2 px-10';
 const cardRightPanelStyles = 'h-56 flex flex-col justify-center px-8';
@@ -47,7 +47,7 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
   const latestSyncURL = app.latestSync?.url?.replace(/^https:\/\//, '').replace(/\?.+$/, '');
   return (
     <div className={cn(cardWrapperStyles, className)}>
-      <Link
+      <NextLink
         href={pathCreator.app({ envSlug, externalAppID: app.externalID })}
         className={cn(cardLeftPanelStyles, 'hover:bg-canvasMuted transition-colors duration-300')}
       >
@@ -68,10 +68,10 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
             </dd>
           </dl>
         )}
-      </Link>
+      </NextLink>
       <div className="flex h-56 flex-1 flex-col">
         {app.latestSync?.error && (
-          <div className="bg-red-100 px-8 py-2 text-red-800">{app.latestSync.error}</div>
+          <div className="text-error bg-error px-8 py-2">{app.latestSync.error}</div>
         )}
 
         <div className={cn(cardRightPanelStyles, 'h-full')}>
@@ -83,13 +83,12 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
                 app.latestSync && (
                   <div className="flex items-center gap-2">
                     <SyncStatusPill status={app.latestSync.status} />
-                    <InngestLink
-                      internalNavigation
-                      showIcon={false}
+                    <Link
+                      size="medium"
                       href={pathCreator.appSyncs({ envSlug, externalAppID: app.externalID })}
                     >
                       <Time value={app.latestSync.lastSyncedAt} />
-                    </InngestLink>
+                    </Link>
                   </div>
                 )
               }
@@ -135,7 +134,7 @@ export function EmptyAppCard({
 }) {
   return (
     <div className={cn(cardWrapperStyles, className)}>
-      <div className={cn(cardLeftPanelStyles, 'bg-slate-910 items-center overflow-hidden')}>
+      <div className={cn(cardLeftPanelStyles, 'items-center overflow-hidden bg-black')}>
         <Image src={AppDiagramImage} alt="App diagram" className="object-none md:object-fill" />
       </div>
       <div className={cn(cardRightPanelStyles, 'flex-1')}>
@@ -149,11 +148,11 @@ export function EmptyAppCard({
         </p>
         <ol className="mt-3 flex flex-col gap-3">
           <li className="flex items-center gap-2">
-            <span className="h-6 w-6 rounded-full bg-slate-400 text-center text-white">1</span>
+            <span className="bg-canvasSubtle text-basis h-6 w-6 rounded-full text-center">1</span>
             <span className="flex-1">Deploy your code to your hosted platform of choice.</span>
           </li>
           <li className="flex items-center gap-2">
-            <span className="h-6 w-6 rounded-full bg-slate-400 text-center text-white">2</span>
+            <span className="bg-canvasSubtle text-basis h-6 w-6 rounded-full text-center">2</span>
             <span className="flex-1">Sync with Inngest.</span>
           </li>
         </ol>

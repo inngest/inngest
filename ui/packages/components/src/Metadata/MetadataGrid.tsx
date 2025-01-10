@@ -1,4 +1,4 @@
-import { classNames } from '@inngest/components/utils/classNames';
+import { cn } from '@inngest/components/utils/classNames';
 
 import { MetadataItem, type MetadataItemProps } from './MetadataItem';
 
@@ -29,7 +29,7 @@ export function MetadataGrid({ metadataItems, columns = 3, loading = false }: Pr
 
   return (
     <dl
-      className={`bg-canvasBase border-subtle grid rounded-lg border p-2.5 grid-cols-${gridColumns} grid-rows-${rows} gap-5`}
+      className={`bg-canvasBase border-subtle grid rounded-md border p-2.5 grid-cols-${gridColumns} grid-rows-${rows} gap-5`}
     >
       {metadataItems.map((item, index) => {
         const spanIndex = currentIndex;
@@ -51,7 +51,7 @@ export function MetadataGrid({ metadataItems, columns = 3, loading = false }: Pr
         return (
           <MetadataItem
             key={index}
-            className={classNames(
+            className={cn(
               'relative overflow-visible',
               spanIndex !== 0 && spanIndex % gridColumns !== 0 && verticalDividers,
               !lastOrOnlyRow && horizontalDividers,

@@ -9,13 +9,18 @@ import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 type Fn = Pick<Function, 'name' | 'slug' | 'triggers'>;
 
 type Props = {
-  envSlug: string;
+  envSlug?: string;
   functions: Fn[];
+  pathCreator?: {
+    // No need to make this env agnostic, since we only want links in Cloud
+    function: (params: { envSlug: string; functionSlug: string }) => Route;
+    eventType: (params: { envSlug: string; eventName: string }) => Route;
+  };
 };
 
-export function FunctionList({ envSlug, functions }: Props) {
+export function FunctionList({ envSlug, functions, pathCreator }: Props) {
   const tableContainerRef = useRef<HTMLDivElement>(null);
-  const columns = useColumns({ envSlug });
+  const columns = useColumns({ envSlug, pathCreator });
 
   const sortedFunctions = [...functions].sort((a, b) => {
     return a.name.localeCompare(b.name);
@@ -23,7 +28,7 @@ export function FunctionList({ envSlug, functions }: Props) {
 
   return (
     <main
-      className="border-muted min-h-0 overflow-y-auto rounded-lg border [&>table]:border-b-0"
+      className="[&_thead_th]:bg-codeEditor border-subtle mb-8 min-h-0 overflow-y-auto rounded-md border [&>table]:border-b-0 [&_thead_th]:font-normal"
       ref={tableContainerRef}
     >
       <Table
@@ -41,7 +46,16 @@ export function FunctionList({ envSlug, functions }: Props) {
   );
 }
 
-function useColumns({ envSlug }: { envSlug: string }) {
+function useColumns({
+  envSlug,
+  pathCreator,
+}: {
+  envSlug?: string;
+  pathCreator?: {
+    function: (params: { envSlug: string; functionSlug: string }) => Route;
+    eventType: (params: { envSlug: string; eventName: string }) => Route;
+  };
+}) {
   const columnHelper = createColumnHelper<Fn>();
 
   return [
@@ -49,21 +63,28 @@ function useColumns({ envSlug }: { envSlug: string }) {
       cell: (info) => {
         const name = info.getValue();
 
+        if (envSlug && pathCreator) {
+          return (
+            <div className="flex items-center">
+              <Link
+                arrowOnHover
+                size="medium"
+                className="w-full text-sm"
+                href={pathCreator.function({ envSlug, functionSlug: info.row.original.slug })}
+              >
+                {name}
+              </Link>
+            </div>
+          );
+        }
+
         return (
           <div className="flex items-center">
-            <Link
-              internalNavigation
-              className="w-full text-sm font-medium"
-              href={
-                `/env/${envSlug}/functions/${encodeURIComponent(info.row.original.slug)}` as Route
-              }
-            >
-              {name}
-            </Link>
+            <span className="text-basis w-full text-sm">{name}</span>
           </div>
         );
       },
-      header: 'Function Name',
+      header: 'Function',
     }),
     columnHelper.accessor('triggers', {
       cell: (props) => {
@@ -76,8 +97,8 @@ function useColumns({ envSlug }: { envSlug: string }) {
                 <Pill
                   appearance="outlined"
                   href={
-                    trigger.type === 'EVENT'
-                      ? (`/env/${envSlug}/events/${encodeURIComponent(trigger.value)}` as Route)
+                    envSlug && pathCreator && trigger.type === 'EVENT'
+                      ? pathCreator.eventType({ envSlug, eventName: trigger.value })
                       : undefined
                   }
                   key={trigger.type + trigger.value}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import NextLink from 'next/link';
 import { Select, type Option } from '@inngest/components/Select/Select';
 import ToggleGroup from '@inngest/components/ToggleGroup/ToggleGroup';
 import { useQuery } from 'urql';
@@ -109,12 +109,12 @@ export default function Billing({
             <div className="text-basis text-sm font-medium">{selectedPeriod.name}</div>
           </Select.Button>
           <Select.Options>
-            <Link href={pathCreator.billing({ tab: 'usage' })}>
+            <NextLink href={pathCreator.billing({ tab: 'usage' })}>
               <Select.Option option={options[0]}>{options[0].name}</Select.Option>
-            </Link>
-            <Link href={pathCreator.billing({ tab: 'usage' }) + '?previous=true'}>
+            </NextLink>
+            <NextLink href={pathCreator.billing({ tab: 'usage' }) + '?previous=true'}>
               <Select.Option option={options[1]}>{options[1].name}</Select.Option>
-            </Link>
+            </NextLink>
           </Select.Options>
         </Select>
       </div>

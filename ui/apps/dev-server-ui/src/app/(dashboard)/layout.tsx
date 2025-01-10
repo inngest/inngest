@@ -3,7 +3,6 @@
 import React from 'react';
 import { TooltipProvider } from '@inngest/components/Tooltip';
 import { Toaster } from 'sonner';
-import colors from 'tailwindcss/colors';
 
 import Layout from '@/components/Layout/Layout';
 

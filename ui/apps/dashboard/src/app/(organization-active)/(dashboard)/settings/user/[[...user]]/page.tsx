@@ -14,7 +14,7 @@ export default function UserSettingsPage() {
           },
           elements: {
             navbar: 'hidden',
-            scrollBox: 'bg-white shadow-none',
+            scrollBox: 'bg-canvasBase shadow-none',
             pageScrollBox: 'pt-6 px-2',
           },
         }}
@@ -23,16 +23,15 @@ export default function UserSettingsPage() {
       </UserProfile>
       <UserProfile
         routing="path"
-        path="/settings/user"
+        path="/settings/security"
         appearance={{
           layout: {
             logoPlacement: 'none',
           },
           elements: {
             navbar: 'hidden',
-            scrollBox: 'bg-white shadow-none',
-            pageScrollBox: 'pt-6 px-2',
-            profileSectionItemList__activeDevices: 'h-24 overflow-y-scroll',
+            scrollBox: 'bg-canvasBase shadow-none',
+            pageScrollBox: 'pt-0 px-2',
           },
         }}
       >

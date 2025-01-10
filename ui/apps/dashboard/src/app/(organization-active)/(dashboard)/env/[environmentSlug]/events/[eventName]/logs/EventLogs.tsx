@@ -15,7 +15,7 @@ export default function EventLogs({ eventName }: EventLogsProps) {
   const pathPrefix = `/env/${environment.slug}/events/${encodeURIComponent(eventName)}/logs`;
 
   return (
-    <ul role="list" className="h-full divide-y divide-slate-100">
+    <ul role="list" className="divide-subtle h-full divide-y">
       {cursors.map((cursor, index) => {
         return (
           <EventLogsPage

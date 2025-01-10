@@ -1,10 +1,9 @@
 'use client';
 
-import { Button } from '@inngest/components/Button';
+import { AlertModal } from '@inngest/components/Modal/AlertModal';
 import { useMutation } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import Modal from '@/components/Modal';
 import { graphql } from '@/gql';
 
 const ArchiveEvent = graphql(`
@@ -27,21 +26,15 @@ export default function ArchiveEventModal({ eventName, isOpen, onClose }: Archiv
   const [, archiveEvent] = useMutation(ArchiveEvent);
 
   return (
-    <Modal className="flex max-w-xl flex-col gap-4" isOpen={isOpen} onClose={onClose}>
-      <p className="pb-4">Are you sure you want to archive this event?</p>
-      <div className="flex content-center justify-end">
-        <Button appearance="outlined" btnAction={() => onClose()} label="No" />
-        <Button
-          kind="danger"
-          appearance="text"
-          disabled={missingData}
-          btnAction={() => {
-            !missingData && archiveEvent({ name: eventName, environmentId: environment.id });
-            !missingData && onClose();
-          }}
-          label="Yes"
-        />
-      </div>
-    </Modal>
+    <AlertModal
+      className="w-1/3 max-w-xl"
+      isOpen={isOpen}
+      title="Are you sure you want to archive this event?"
+      onClose={onClose}
+      onSubmit={() => {
+        !missingData && archiveEvent({ name: eventName, environmentId: environment.id });
+        !missingData && onClose();
+      }}
+    />
   );
 }

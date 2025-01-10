@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
 import { RiRefreshLine } from '@remixicon/react';
 
@@ -15,7 +15,7 @@ export default function Page() {
       <Header
         breadcrumb={[{ text: 'Runs' }]}
         action={
-          <NewButton
+          <Button
             kind="primary"
             appearance="outlined"
             label="Refresh runs"

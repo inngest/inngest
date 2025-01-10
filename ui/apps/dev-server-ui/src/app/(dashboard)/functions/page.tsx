@@ -6,8 +6,9 @@ import { BlankSlate } from '@inngest/components/BlankSlate';
 import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
 import { InvokeButton } from '@inngest/components/InvokeButton';
-import { NewLink } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/Link';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
+import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { Table } from '@inngest/components/Table';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
@@ -21,7 +22,6 @@ import {
 import { toast } from 'sonner';
 
 import SearchInput from '@/components/SearchInput/SearchInput';
-import Skeleton from '@/components/Skeleton';
 import {
   FunctionTriggerTypes,
   useGetFunctionsQuery,
@@ -32,7 +32,7 @@ import {
 const columnHelper = createColumnHelper<Function>();
 const columns = [
   columnHelper.accessor('name', {
-    header: () => <span>Function Name</span>,
+    header: () => <span>Function name</span>,
     cell: (props) => <p className="text-sm font-medium leading-7">{props.getValue()}</p>,
     sortingFn: 'text',
     filterFn: 'equalsString',
@@ -98,7 +98,6 @@ const columns = [
         <InvokeButton
           disabled={false}
           doesFunctionAcceptPayload={doesFunctionAcceptPayload}
-          btnAppearance="outlined"
           btnAction={async ({ data, user }) => {
             await invokeFunction({
               data,
@@ -153,7 +152,7 @@ export default function FunctionList() {
       isFetching
         ? columns.map((column) => ({
             ...column,
-            cell: () => <Skeleton className="my-[0.3rem] block h-5" />,
+            cell: () => <Skeleton className="my-[0.3rem] h-5" />,
           }))
         : columns,
     [isFetching, functions]
@@ -167,13 +166,13 @@ export default function FunctionList() {
           <Info
             text="List of all function in the development environment."
             action={
-              <NewLink
+              <Link
                 arrowOnHover
                 className="text-sm"
                 href={'https://www.inngest.com/docs/functions'}
               >
                 Learn how to create a function
-              </NewLink>
+              </Link>
             }
           />
         }
@@ -216,7 +215,7 @@ export default function FunctionList() {
               subtitle="Read our documentation to learn how to serve your functions"
               imageUrl="/images/no-results.png"
               link={{
-                text: 'Serving Functions',
+                text: 'Serving functions',
                 url: 'https://www.inngest.com/docs/sdk/serve',
               }}
             />

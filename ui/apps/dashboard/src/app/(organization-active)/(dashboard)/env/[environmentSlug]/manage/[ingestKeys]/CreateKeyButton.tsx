@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { Button, NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
+import { Input } from '@inngest/components/Forms/Input';
 import { Modal } from '@inngest/components/Modal';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { RiAddLine } from '@remixicon/react';
@@ -11,7 +12,6 @@ import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import Input from '@/components/Forms/Input';
 import { graphql } from '@/gql';
 import { defaultTransform } from './[keyID]/TransformEvent';
 import useManagePageTerminology from './useManagePageTerminology';
@@ -79,7 +79,7 @@ export default function CreateKeyButton() {
       <OptionalTooltip
         tooltip={environment.isArchived && 'Cannot create key. Environment is archived'}
       >
-        <NewButton
+        <Button
           icon={<RiAddLine />}
           onClick={() => setModalOpen(true)}
           disabled={environment.isArchived}
@@ -97,8 +97,9 @@ export default function CreateKeyButton() {
           <div className="flex justify-end gap-2">
             <Button
               appearance="outlined"
+              kind="secondary"
               label="Cancel"
-              btnAction={() => {
+              onClick={() => {
                 setModalOpen(false);
               }}
             />
@@ -106,7 +107,7 @@ export default function CreateKeyButton() {
               kind="primary"
               label="Create"
               loading={fetching}
-              btnAction={() => {
+              onClick={() => {
                 handleClick();
                 setModalOpen(false);
               }}

@@ -100,7 +100,7 @@ export function PauseFunctionModal({
       title={`${isPaused ? 'Resume' : 'Pause'} function “${functionName}”`}
       className="w-1/3"
       confirmButtonLabel={confirmButtonLabel}
-      confirmButtonKind={isPaused ? 'success' : 'danger'}
+      confirmButtonKind={isPaused ? 'primary' : 'danger'}
       cancelButtonLabel="Close"
     >
       {isPaused && (

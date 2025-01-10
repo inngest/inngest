@@ -4,15 +4,14 @@ import { useCallback, useEffect, useState } from 'react';
 import NextLink from 'next/link';
 import { useParams } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
-import { Button } from '@inngest/components/Button/Button';
-import { NewButton } from '@inngest/components/Button/index';
+import { Button } from '@inngest/components/Button/index';
+import { Input } from '@inngest/components/Forms/Input';
 import { Link } from '@inngest/components/Link/Link';
 import { Switch, SwitchLabel, SwitchWrapper } from '@inngest/components/Switch/Switch';
 import { RiAddLine, RiArrowRightSLine, RiDeleteBinLine, RiInformationLine } from '@remixicon/react';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
-import Input from '@/components/Forms/Input';
 import {
   CreateVercelAppDocument,
   RemoveVercelAppDocument,
@@ -183,7 +182,7 @@ export default function VercelConfigure() {
             </div>
           )}
 
-          <div className="border-subtle flex flex-col gap-2 rounded-lg border p-6">
+          <div className="border-subtle flex flex-col gap-2 rounded-md border p-6">
             <div className="text-basis text-lg font-medium">Project status</div>
             <div className="text-muted text-base font-normal">
               This determines whether or not Inngest will communicate with your Vercel application.
@@ -211,7 +210,7 @@ export default function VercelConfigure() {
 
           {areExtraSettingsVisible && (
             <>
-              <div className="border-subtle mt-4 flex flex-col gap-2 rounded-lg border p-6">
+              <div className="border-subtle mt-4 flex flex-col gap-2 rounded-md border p-6">
                 <div className="text-basis text-lg font-medium">Path information</div>
                 <div className="text-muted text-base font-normal">
                   Each Vercel project can serve one or more Inngest apps available on different URL
@@ -235,6 +234,7 @@ export default function VercelConfigure() {
                         kind="danger"
                         appearance="outlined"
                         icon={<RiDeleteBinLine className="h-5 w-5" />}
+                        iconSide="left"
                         className="h-10 w-10"
                         onClick={() => setPaths(paths.filter((_, n) => n !== i))}
                       />
@@ -242,7 +242,7 @@ export default function VercelConfigure() {
                   </div>
                 ))}
                 <div>
-                  <NewButton
+                  <Button
                     appearance="outlined"
                     icon={<RiAddLine className="mr-1" />}
                     iconSide="left"
@@ -257,7 +257,7 @@ export default function VercelConfigure() {
               </div>
               <div className="flex flex-row gap-4">
                 <div
-                  className={`border-subtle mt-4 flex w-full flex-col gap-2 rounded-lg border p-6 ${
+                  className={`border-subtle mt-4 flex w-full flex-col gap-2 rounded-md border p-6 ${
                     project.ssoProtection?.deploymentType === VercelDeploymentProtection.Disabled &&
                     'bg-disabled'
                   }`}
@@ -265,7 +265,11 @@ export default function VercelConfigure() {
                   <div className="text-basis text-lg font-medium">Deployment protection key</div>
                   <div className="text-muted text-base font-normal">
                     Used to bypass deployment protection.{' '}
-                    <Link href="https://www.inngest.com/docs/deploy/vercel#bypassing-deployment-protection">
+                    <Link
+                      size="medium"
+                      target="_blank"
+                      href="https://www.inngest.com/docs/deploy/vercel#bypassing-deployment-protection"
+                    >
                       Learn more
                     </Link>
                   </div>
@@ -274,7 +278,7 @@ export default function VercelConfigure() {
                       project.ssoProtection?.deploymentType ===
                         VercelDeploymentProtection.Disabled && 'border-subtle bg-disabled'
                     }`}
-                    readonly={
+                    readOnly={
                       project.ssoProtection?.deploymentType === VercelDeploymentProtection.Disabled
                     }
                     onChange={({ target: { value } }) =>
@@ -283,7 +287,7 @@ export default function VercelConfigure() {
                     value={project.protectionBypassSecret ?? ''}
                   />
                 </div>
-                <div className="border-subtle mt-4 flex w-full flex-col gap-2 rounded-lg border p-6">
+                <div className="border-subtle mt-4 flex w-full flex-col gap-2 rounded-md border p-6">
                   <div className="text-basis text-lg font-medium">
                     Custom Production Domain <span className="text-sublte text-xs">(optional)</span>
                   </div>
@@ -305,7 +309,7 @@ export default function VercelConfigure() {
           )}
 
           <div className="mt-6 flex flex-row items-center justify-start">
-            <NewButton
+            <Button
               label="Save configuration"
               disabled={!project.updated}
               onClick={submit}

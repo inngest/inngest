@@ -70,8 +70,8 @@ function createColumns({
       cell: (props) => {
         return (
           <Link
-            className="text-sm font-medium leading-7"
-            internalNavigation
+            className="leading-7"
+            arrowOnHover
             //@ts-ignore
             scroll={false}
             href={
@@ -216,8 +216,9 @@ export default function FunctionRunList({
           <Button
             label="Load More"
             appearance="outlined"
+            kind="secondary"
             loading={fetching}
-            btnAction={() => endCursor && setPageCursors([...pageCursors, endCursor])}
+            onClick={() => endCursor && setPageCursors([...pageCursors, endCursor])}
           />
         </div>
       )}

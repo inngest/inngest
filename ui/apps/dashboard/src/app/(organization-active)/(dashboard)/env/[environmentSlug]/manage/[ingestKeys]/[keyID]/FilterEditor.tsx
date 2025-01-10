@@ -6,7 +6,7 @@ type FilterEditorProps = {
 
 export function FilterEditor({ filter, list, children }: FilterEditorProps) {
   return (
-    <div className="bg-canvasBase text-basis border-muted flex h-full w-6/12 flex-col rounded-lg border text-sm">
+    <div className="bg-canvasBase text-basis border-muted flex h-full w-6/12 flex-col rounded-md border text-sm">
       <header className="border-muted rounded-t-lg border-b px-5 py-3">
         <h2 className="text-base font-medium">{filter === 'events' ? 'Events' : 'IP Addresses'}</h2>
         <p className="text-subtle mt-0.5 text-sm font-light tracking-wide">

@@ -36,7 +36,7 @@ export function useRerun({ envID, envSlug }: { envID: string; envSlug: string })
 
       // Give user a link to the new run
       toast.success(
-        <Link href={pathCreator.runPopout({ envSlug, runID: newRunID })} internalNavigation={false}>
+        <Link href={pathCreator.runPopout({ envSlug, runID: newRunID })} target="_blank">
           Successfully queued rerun
         </Link>
       );
