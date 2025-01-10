@@ -3,6 +3,7 @@ package lifecycles
 import (
 	"context"
 	"fmt"
+	"github.com/aws/smithy-go/ptr"
 	"github.com/inngest/inngest/pkg/connect"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -70,8 +71,8 @@ func (h *historyLifecycles) OnDisconnected(ctx context.Context, conn *state.Conn
 		GatewayId:       conn.GatewayId,
 		InstanceId:      instanceId,
 		Status:          connectpb.ConnectionStatus_DISCONNECTED,
-		LastHeartbeatAt: time.Now(),
-		DisconnectedAt:  time.Now(),
+		LastHeartbeatAt: ptr.Time(time.Now()),
+		DisconnectedAt:  ptr.Time(time.Now()),
 		ConnectedAt:     ulid.Time(conn.ConnectionId.Time()),
 		GroupHash:       conn.Group.Hash,
 		SDKLang:         conn.Group.SDKLang,
@@ -109,7 +110,7 @@ func (h *historyLifecycles) upsertConnection(ctx context.Context, conn *state.Co
 		GatewayId:       conn.GatewayId,
 		InstanceId:      instanceId,
 		Status:          status,
-		LastHeartbeatAt: lastHeartbeatAt,
+		LastHeartbeatAt: ptr.Time(lastHeartbeatAt),
 		ConnectedAt:     ulid.Time(conn.ConnectionId.Time()),
 		GroupHash:       conn.Group.Hash,
 		SDKLang:         conn.Group.SDKLang,

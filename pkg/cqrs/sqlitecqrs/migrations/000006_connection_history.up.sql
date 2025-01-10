@@ -10,8 +10,8 @@ CREATE TABLE "worker_connections" (
     status INT NOT NULL,
 
     connected_at INT NOT NULL,
-    last_heartbeat_at INT NOT NULL,
-    disconnected_at INT NOT NULL,
+    last_heartbeat_at INT,
+    disconnected_at INT,
 
     group_hash BLOB NOT NULL,
     sdk_lang VARCHAR NOT NULL,

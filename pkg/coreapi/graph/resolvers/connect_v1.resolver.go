@@ -98,11 +98,11 @@ func connToNode(conn *cqrs.WorkerConnection) *models.ConnectV1WorkerConnection {
 		lastHeartbeatAt *time.Time
 	)
 
-	if conn.DisconnectedAt.UnixMilli() > 0 {
-		disconnectedAt = &conn.DisconnectedAt
+	if conn.DisconnectedAt != nil && conn.DisconnectedAt.UnixMilli() > 0 {
+		disconnectedAt = conn.DisconnectedAt
 	}
-	if conn.LastHeartbeatAt.UnixMilli() > 0 {
-		lastHeartbeatAt = &conn.LastHeartbeatAt
+	if conn.LastHeartbeatAt != nil && conn.LastHeartbeatAt.UnixMilli() > 0 {
+		lastHeartbeatAt = conn.LastHeartbeatAt
 	}
 
 	var status models.ConnectV1ConnectionStatus

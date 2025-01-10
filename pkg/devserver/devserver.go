@@ -273,7 +273,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
 
-	connectionManager := connstate.NewRedisConnectionStateManager(connectRc, dbcqrs)
+	connectionManager := connstate.NewRedisConnectionStateManager(connectRc)
 
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)

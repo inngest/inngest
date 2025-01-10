@@ -169,8 +169,8 @@ type WorkerConnection struct {
 	InstanceID      sql.NullString
 	Status          int64
 	ConnectedAt     int64
-	LastHeartbeatAt int64
-	DisconnectedAt  int64
+	LastHeartbeatAt sql.NullInt64
+	DisconnectedAt  sql.NullInt64
 	GroupHash       []byte
 	SdkLang         string
 	SdkVersion      string

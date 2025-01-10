@@ -28,9 +28,9 @@ type WorkerConnection struct {
 	Status     connpb.ConnectionStatus `json:"status"`
 
 	// Timestamps
-	LastHeartbeatAt time.Time `json:"last_heartbeat_at"`
-	ConnectedAt     time.Time `json:"connected_at"`
-	DisconnectedAt  time.Time `json:"disconnected_at"`
+	ConnectedAt     time.Time  `json:"connected_at"`
+	LastHeartbeatAt *time.Time `json:"last_heartbeat_at"`
+	DisconnectedAt  *time.Time `json:"disconnected_at"`
 
 	// Group attributes
 	GroupHash   string     `json:"group_hash"`

@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/aws/smithy-go/ptr"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"strconv"
 	"strings"
@@ -1484,6 +1485,22 @@ func (w wrapper) InsertWorkerConnection(ctx context.Context, conn *cqrs.WorkerCo
 		instanceId.String = *conn.InstanceId
 	}
 
+	var lastHeartbeatAt, disconnectedAt sql.NullInt64
+
+	if conn.LastHeartbeatAt != nil {
+		lastHeartbeatAt = sql.NullInt64{
+			Int64: conn.LastHeartbeatAt.UnixMilli(),
+			Valid: true,
+		}
+	}
+
+	if conn.DisconnectedAt != nil {
+		lastHeartbeatAt = sql.NullInt64{
+			Int64: conn.DisconnectedAt.UnixMilli(),
+			Valid: true,
+		}
+	}
+
 	params := sqlc.InsertWorkerConnectionParams{
 		AccountID:       conn.AccountID,
 		WorkspaceID:     conn.WorkspaceID,
@@ -1493,8 +1510,8 @@ func (w wrapper) InsertWorkerConnection(ctx context.Context, conn *cqrs.WorkerCo
 		InstanceID:      instanceId,
 		Status:          int64(conn.Status),
 		ConnectedAt:     conn.ConnectedAt.UnixMilli(),
-		LastHeartbeatAt: conn.LastHeartbeatAt.UnixMilli(),
-		DisconnectedAt:  conn.DisconnectedAt.UnixMilli(),
+		LastHeartbeatAt: lastHeartbeatAt,
+		DisconnectedAt:  disconnectedAt,
 		GroupHash:       []byte(conn.GroupHash),
 		SdkLang:         conn.SDKLang,
 		SdkVersion:      conn.SDKVersion,
@@ -1524,8 +1541,15 @@ func (w wrapper) GetWorkerConnection(ctx context.Context, id cqrs.WorkerConnecti
 	}
 
 	connectedAt := time.UnixMilli(conn.ConnectedAt)
-	disconnectedAt := time.UnixMilli(conn.DisconnectedAt)
-	lastHeartbeatAt := time.UnixMilli(conn.LastHeartbeatAt)
+
+	var disconnectedAt, lastHeartbeatAt *time.Time
+	if conn.DisconnectedAt.Valid {
+		disconnectedAt = ptr.Time(time.UnixMilli(conn.DisconnectedAt.Int64))
+	}
+
+	if conn.LastHeartbeatAt.Valid {
+		lastHeartbeatAt = ptr.Time(time.UnixMilli(conn.LastHeartbeatAt.Int64))
+	}
 
 	var instanceId *string
 	if conn.InstanceID.Valid {
@@ -1788,9 +1812,9 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			case strings.ToLower(enums.WorkerConnectionTimeFieldConnectedAt.String()):
 				pc.Cursors[k] = cqrs.WorkerConnectionCursor{Field: k, Value: data.ConnectedAt}
 			case strings.ToLower(enums.WorkerConnectionTimeFieldLastHeartbeatAt.String()):
-				pc.Cursors[k] = cqrs.WorkerConnectionCursor{Field: k, Value: data.LastHeartbeatAt}
+				pc.Cursors[k] = cqrs.WorkerConnectionCursor{Field: k, Value: data.LastHeartbeatAt.Int64}
 			case strings.ToLower(enums.WorkerConnectionTimeFieldDisconnectedAt.String()):
-				pc.Cursors[k] = cqrs.WorkerConnectionCursor{Field: k, Value: data.DisconnectedAt}
+				pc.Cursors[k] = cqrs.WorkerConnectionCursor{Field: k, Value: data.DisconnectedAt.Int64}
 			default:
 				log.From(ctx).Warn().Str("field", k).Msg("unknown field registered as cursor")
 				delete(pc.Cursors, k)
@@ -1803,8 +1827,14 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 		}
 
 		connectedAt := time.UnixMilli(data.ConnectedAt)
-		disconnectedAt := time.UnixMilli(data.DisconnectedAt)
-		lastHeartbeatAt := time.UnixMilli(data.LastHeartbeatAt)
+
+		var disconnectedAt, lastHeartbeatAt *time.Time
+		if data.DisconnectedAt.Valid {
+			disconnectedAt = ptr.Time(time.UnixMilli(data.DisconnectedAt.Int64))
+		}
+		if data.LastHeartbeatAt.Valid {
+			lastHeartbeatAt = ptr.Time(time.UnixMilli(data.LastHeartbeatAt.Int64))
+		}
 
 		var instanceId *string
 		if data.InstanceID.Valid {
@@ -1845,10 +1875,10 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 // copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types
 // automatically.
 func copyWriter[
-	PARAMS_IN any,
-	INTERNAL_PARAMS any,
-	IN any,
-	OUT any,
+PARAMS_IN any,
+INTERNAL_PARAMS any,
+IN any,
+OUT any,
 ](
 	ctx context.Context,
 	f func(context.Context, INTERNAL_PARAMS) (IN, error),
@@ -1871,8 +1901,8 @@ func copyWriter[
 }
 
 func copyInto[
-	IN any,
-	OUT any,
+IN any,
+OUT any,
 ](
 	ctx context.Context,
 	f func(context.Context) (IN, error),
