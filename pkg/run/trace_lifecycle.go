@@ -625,7 +625,7 @@ func (l traceLifecycle) OnStepGatewayRequestFinished(
 	runID := md.ID.RunID
 
 	_, span := NewSpan(ctx,
-		WithScope(consts.OtelScopeExecution),
+		WithScope(consts.OtelScopeStep),
 		WithName(consts.OtelExecPlaceholder),
 		WithTimestamp(start),
 		WithSpanID(*spanID),

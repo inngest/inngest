@@ -707,6 +707,19 @@ type runInstance struct {
 	resp         *state.DriverResponse
 	stackIndex   int
 	appIsConnect bool
+	cleanupFns   []func()
+}
+
+func (i *runInstance) queueCleanup(fn func()) {
+	i.cleanupFns = append(i.cleanupFns, fn)
+}
+
+func (i *runInstance) cleanup() {
+	go func() {
+		for _, fn := range i.cleanupFns {
+			fn()
+		}
+	}()
 }
 
 // Execute loads a workflow and the current run state, then executes the
@@ -864,6 +877,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		appIsConnect: ef.AppIsConnect,
 	}
 
+	defer instance.cleanup()
+
 	resp, err := e.run(ctx, &instance)
 	// Now we have a response, update the run instance.  We need to do this as request
 	// offloads must mutate the response directly.
@@ -887,9 +902,11 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		"workflow_id", i.md.ID.FunctionID.String(),
 	)
 
-	for _, e := range e.lifecycles {
-		go e.OnStepFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, i.resp, nil)
-	}
+	i.queueCleanup(func() {
+		for _, e := range e.lifecycles {
+			e.OnStepFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, i.resp, nil)
+		}
+	})
 
 	if i.resp.Err == nil && !i.resp.IsFunctionResult() {
 		// Handle generator responses then return.
@@ -917,10 +934,12 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 					l.Error("error running finish handler", "error", err)
 				}
 
-				// Can be reached multiple times for parallel discovery steps
-				for _, e := range e.lifecycles {
-					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
-				}
+				i.queueCleanup(func() {
+					// Can be reached multiple times for parallel discovery steps
+					for _, e := range e.lifecycles {
+						e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
+					}
+				})
 
 				return nil
 			}
@@ -940,13 +959,16 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 	// This is purely for network errors or top-level function code errors.
 	if i.resp.Err != nil {
 		if i.resp.Retryable() {
-			// Retries are a native aspect of the queue;  returning errors always
-			// retries steps if possible.
-			for _, e := range e.lifecycles {
-				// Run the lifecycle method for this retry, which is baked into the queue.
-				i.item.Attempt += 1
-				go e.OnStepScheduled(context.WithoutCancel(ctx), i.md, i.item, &i.resp.Step.Name)
-			}
+			i.item.Attempt += 1
+
+			i.queueCleanup(func() {
+				// Retries are a native aspect of the queue;  returning errors always
+				// retries steps if possible.
+				for _, e := range e.lifecycles {
+					// Run the lifecycle method for this retry, which is baked into the queue.
+					e.OnStepScheduled(context.WithoutCancel(ctx), i.md, i.item, &i.resp.Step.Name)
+				}
+			})
 
 			return i.resp
 		}
@@ -966,10 +988,12 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 			l.Error("error running finish handler", "error", err)
 		}
 
-		// Can be reached multiple times for parallel discovery steps
-		for _, e := range e.lifecycles {
-			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
-		}
+		i.queueCleanup(func() {
+			// Can be reached multiple times for parallel discovery steps
+			for _, e := range e.lifecycles {
+				e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
+			}
+		})
 
 		return i.resp
 	}
@@ -980,10 +1004,12 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 			l.Error("error running finish handler", "error", err)
 		}
 
-		// Can be reached multiple times for parallel discovery steps
-		for _, e := range e.lifecycles {
-			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
-		}
+		i.queueCleanup(func() {
+			// Can be reached multiple times for parallel discovery steps
+			for _, e := range e.lifecycles {
+				e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
+			}
+		})
 	}
 
 	return nil
@@ -1961,12 +1987,13 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		return nil
 	}
 
-	for _, l := range e.lifecycles {
-		// We can't specify step name here since that will result in the
-		// "followup discovery step" having the same name as its predecessor.
-		var stepName *string = nil
-		go l.OnStepScheduled(ctx, i.md, nextItem, stepName)
-	}
+	i.queueCleanup(func() {
+		for _, l := range e.lifecycles {
+			// We can't specify step name here since that will result in the
+			// "followup discovery step" having the same name as its predecessor.
+			l.OnStepScheduled(ctx, i.md, nextItem, nil)
+		}
+	})
 
 	return err
 }
@@ -2009,11 +2036,14 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 	}
 
 	if retryable {
-		// Return an error to trigger standard queue retries.
-		for _, l := range e.lifecycles {
-			i.item.Attempt += 1
-			go l.OnStepScheduled(ctx, i.md, i.item, &gen.Name)
-		}
+		i.item.Attempt += 1
+
+		i.queueCleanup(func() {
+			// Return an error to trigger standard queue retries.
+			for _, l := range e.lifecycles {
+				l.OnStepScheduled(ctx, i.md, i.item, &gen.Name)
+			}
+		})
 		return ErrHandledStepError
 	}
 
@@ -2057,9 +2087,11 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 		return nil
 	}
 
-	for _, l := range e.lifecycles {
-		go l.OnStepScheduled(ctx, i.md, nextItem, nil)
-	}
+	i.queueCleanup(func() {
+		for _, l := range e.lifecycles {
+			l.OnStepScheduled(ctx, i.md, nextItem, nil)
+		}
+	})
 
 	return nil
 }
@@ -2109,9 +2141,12 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 		return nil
 	}
 
-	for _, l := range e.lifecycles {
-		go l.OnStepScheduled(ctx, i.md, nextItem, &gen.Name)
-	}
+	i.queueCleanup(func() {
+		for _, l := range e.lifecycles {
+			l.OnStepScheduled(ctx, i.md, nextItem, &gen.Name)
+		}
+	})
+
 	return err
 }
 
@@ -2157,9 +2192,11 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		return nil
 	}
 
-	for _, e := range e.lifecycles {
-		go e.OnSleep(context.WithoutCancel(ctx), i.md, i.item, gen, until)
-	}
+	i.queueCleanup(func() {
+		for _, e := range e.lifecycles {
+			e.OnSleep(context.WithoutCancel(ctx), i.md, i.item, gen, until)
+		}
+	})
 
 	return err
 }
@@ -2226,12 +2263,14 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 			"error": userLandErrByt,
 		})
 
-		for _, e := range e.lifecycles {
-			// OnStepFinished handles step success and step errors/failures.  It is
-			// currently the responsibility of the lifecycle manager to handle the differing
-			// step statuses when a step finishes.
-			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, hr, err)
-		}
+		i.queueCleanup(func() {
+			for _, e := range e.lifecycles {
+				// OnStepFinished handles step success and step errors/failures.  It is
+				// currently the responsibility of the lifecycle manager to handle the differing
+				// step statuses when a step finishes.
+				e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, hr, err)
+			}
+		})
 	} else {
 		// The response output is actually now the result of this AI call. We need
 		// to modify the opcode data so that accessing the step output is correct.
@@ -2247,12 +2286,15 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		}
 
 		i.resp.UpdateOpcodeOutput(&gen, output)
-		for _, e := range e.lifecycles {
-			// OnStepFinished handles step success and step errors/failures.  It is
-			// currently the responsibility of the lifecycle manager to handle the differing
-			// step statuses when a step finishes.
-			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, hr, nil)
-		}
+
+		i.queueCleanup(func() {
+			for _, e := range e.lifecycles {
+				// OnStepFinished handles step success and step errors/failures.  It is
+				// currently the responsibility of the lifecycle manager to handle the differing
+				// step statuses when a step finishes.
+				e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, hr, nil)
+			}
+		})
 	}
 
 	// Save the output as the step result.
@@ -2292,12 +2334,13 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		return nil
 	}
 
-	for _, l := range e.lifecycles {
-		// We can't specify step name here since that will result in the
-		// "followup discovery step" having the same name as its predecessor.
-		var stepName *string = nil
-		go l.OnStepScheduled(ctx, i.md, nextItem, stepName)
-	}
+	i.queueCleanup(func() {
+		for _, l := range e.lifecycles {
+			// We can't specify step name here since that will result in the
+			// "followup discovery step" having the same name as its predecessor.
+			l.OnStepScheduled(ctx, i.md, nextItem, nil)
+		}
+	})
 
 	return err
 }
@@ -2409,9 +2452,11 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		return fmt.Errorf("error publishing internal invocation event: %w", err)
 	}
 
-	for _, e := range e.lifecycles {
-		go e.OnInvokeFunction(context.WithoutCancel(ctx), i.md, i.item, gen, evt)
-	}
+	i.queueCleanup(func() {
+		for _, e := range e.lifecycles {
+			e.OnInvokeFunction(context.WithoutCancel(ctx), i.md, i.item, gen, evt)
+		}
+	})
 
 	return err
 }
@@ -2541,9 +2586,11 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		return nil
 	}
 
-	for _, e := range e.lifecycles {
-		go e.OnWaitForEvent(context.WithoutCancel(ctx), i.md, i.item, gen, pause)
-	}
+	i.queueCleanup(func() {
+		for _, e := range e.lifecycles {
+			e.OnWaitForEvent(context.WithoutCancel(ctx), i.md, i.item, gen, pause)
+		}
+	})
 
 	return err
 }
