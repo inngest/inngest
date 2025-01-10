@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/testapi"
-	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/coocood/freecache"
@@ -40,6 +41,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
+	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
@@ -176,6 +178,9 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 	smv2 := redis_state.MustRunServiceV2(sm)
 
+	// Create a new broadcaster which lets us broadcast realtime messages.
+	broadcaster := realtime.NewInProcessBroadcaster()
+
 	queueOpts := []redis_state.QueueOpt{
 		redis_state.WithRunMode(redis_state.QueueRunMode{
 			Sequential: true,
@@ -304,6 +309,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithQueue(rq),
 		executor.WithLogger(logger.From(ctx)),
 		executor.WithFunctionLoader(loader),
+		executor.WithRealtimePublisher(broadcaster),
 		executor.WithLifecycleListeners(
 			history.NewLifecycleListener(
 				nil,
@@ -395,6 +401,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			JobQueueReader:     ds.Queue.(queue.JobQueueReader),
 			Executor:           ds.Executor,
 			QueueShardSelector: shardSelector,
+			Broadcaster:        broadcaster,
 		})
 	})
 
