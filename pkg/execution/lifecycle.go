@@ -123,7 +123,7 @@ type LifecycleListener interface {
 		statev1.GeneratorOpcode,
 		// Resp is the HTTP response
 		*http.Response,
-		error,
+		*state.UserError,
 	)
 
 	// OnWaitForEvent is called when a wait for event step is scheduled.  The
@@ -283,7 +283,7 @@ func (NoopLifecyceListener) OnStepGatewayRequestFinished(
 	statev1.GeneratorOpcode,
 	// Resp is the HTTP response
 	*http.Response,
-	error,
+	*state.UserError,
 ) {
 }
 

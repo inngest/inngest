@@ -1282,13 +1282,6 @@ func (tb *runTree) processAIGatewayGroup(ctx context.Context, span *cqrs.Span, m
 			mod.StartedAt = timestamppb.New(peer.Timestamp)
 		}
 
-		opcode := peer.StepOpCode()
-		if opcode == enums.OpcodeAIGateway && peer.ScopeName == consts.OtelScopeExecution {
-			// ignore this span since it's not needed
-			tb.markProcessed(peer)
-			continue
-		}
-
 		nested, skipped := tb.constructSpan(ctx, peer)
 		if skipped {
 			continue
