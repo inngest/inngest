@@ -1362,6 +1362,7 @@ func (tb *runTree) processAIGateway(ctx context.Context, span *cqrs.Span, mod *r
 
 	mod.Name = *span.StepDisplayName()
 
+	mod.Status = toProtoStatus(span)
 	if hasFinished(mod) {
 		end := mod.StartedAt.AsTime().Add(span.Duration)
 		mod.DurationMs = span.DurationMS()
