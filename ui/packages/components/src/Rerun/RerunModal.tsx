@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { RiCloseLine } from '@remixicon/react';
 
 import { Button } from '../Button';
@@ -20,7 +20,7 @@ export type RerunModalType = {
 
 export type RerunResult = {
   data?: {
-    rerun: Record<string, unknown>;
+    rerun: unknown;
   };
   error?: unknown;
 };
@@ -49,10 +49,13 @@ export const RerunModal = ({
   const router = useRouter();
   const [rerunning, setRerunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pathname = usePathname();
+  const parts = pathname.trim().split('/').slice(1);
 
   useEffect(() => {
     if (!open) {
       setError(null);
+      setRerunning(false);
     }
   }, [open]);
 
@@ -117,11 +120,14 @@ export const RerunModal = ({
             if (result.error) {
               console.error('rerun from step error', result.error);
               setError('Rerun failed, please try again later.');
-              setRerunning(false);
             }
 
             if (result.data?.rerun) {
-              router.push(`/run?runID=${result.data.rerun}`);
+              router.push(
+                parts[0] === 'env'
+                  ? `/${parts[0]}/${parts[1]}/runs/${result.data.rerun}`
+                  : `/run?runID=${result.data.rerun}`
+              );
             }
           }}
         />

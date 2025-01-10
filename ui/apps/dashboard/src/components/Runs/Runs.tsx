@@ -20,6 +20,7 @@ import { useRerun } from '@/queries/useRerun';
 import { useRerunFromStep } from '@/queries/useRerunFromStep';
 import { pathCreator } from '@/utils/urls';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
+import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { AppFilterDocument, CountRunsDocument, GetRunsDocument } from './queries';
 import { parseRunsData, toRunStatuses, toTimeField } from './utils';
 
@@ -44,6 +45,8 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   ref
 ) {
   const env = useEnvironment();
+  const { value: stepAIEnabled, isReady } = useBooleanFlag('step.ai');
+
   const [{ data: pauseData }] = useQuery({
     pause: scope !== 'fn',
     query: GetFunctionPauseStateDocument,
@@ -77,10 +80,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 
   const cancelRun = useCancelRun({ envID: env.id });
   const rerun = useRerun({ envID: env.id, envSlug: env.slug });
-  const rerunFromStep = useRerunFromStep({
-    runID: 'runID',
-    fromStep: { stepID: 'stepID', input: 'input' },
-  });
+  const rerunFromStep = useRerunFromStep();
   const getTraceResult = useGetTraceResult();
   const getTrigger = useGetTrigger();
   const getRun = useGetRun();
@@ -244,6 +244,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       functionIsPaused={pauseData?.environment.function?.isPaused ?? false}
       scope={scope}
       totalCount={totalCount}
+      stepAIEnabled={isReady && stepAIEnabled}
     />
   );
 });
