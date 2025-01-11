@@ -18,6 +18,8 @@ type CreateState struct {
 	// StepInputs allows users to specify pre-defined step inputs to run
 	// workflows from arbitrary points.
 	StepInputs []state.MemoizedStep
+	// KV represents the input key-value state for a run.
+	KV map[string]any
 }
 
 type StateService interface {
@@ -47,6 +49,10 @@ type RunService interface {
 	UpdateMetadata(ctx context.Context, id ID, config MutableConfig) error
 	// SaveStep saves step output for the given run ID and step ID.
 	SaveStep(ctx context.Context, id ID, stepID string, data []byte) error
+	// SaveKV saves the key-value to the state store.  For proper accounting of
+	// state size, this always pefroms a get-then-set to ensure that we update the state
+	// size delta appropriately.
+	SaveKV(ctx context.Context, id ID, key string, value any) error
 }
 
 // Staeloader defines an interface for loading the entire run state from the state store.
@@ -57,9 +63,10 @@ type StateLoader interface {
 	LoadEvents(ctx context.Context, id ID) ([]json.RawMessage, error)
 	// LoadState returns all steps for a run.
 	LoadSteps(ctx context.Context, id ID) (map[string]json.RawMessage, error)
-
 	// LoadState returns all state for a run, including steps, events, and metadata.
 	LoadState(ctx context.Context, id ID) (State, error)
+	// LoadKVs loads all key-values for a given run.
+	LoadKV(ctx context.Context, id ID) (map[string]any, error)
 
 	// StreamState returns all state without loading in-memory
 	// StreamState(ctx context.Context, id ID) (io.Reader, error)

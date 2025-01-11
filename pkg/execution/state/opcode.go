@@ -139,6 +139,16 @@ func (g GeneratorOpcode) RunType() string {
 	return opts.Type
 }
 
+// AIGatewayOpts returns the AI gateway options within the driver.
+func (g *GeneratorOpcode) AIGatewayOpts() (aigateway.Request, error) {
+	return unmarshalAny(g.Opts, aigateway.Request{})
+}
+
+// IteratorOpts returns the iterator options within the driver.
+func (g *GeneratorOpcode) IteratorOpts() (IteratorOpts, error) {
+	return unmarshalAny(g.Opts, IteratorOpts{})
+}
+
 func (g GeneratorOpcode) RunOpts() (*RunOpts, error) {
 	opts := &RunOpts{}
 	if err := opts.UnmarshalAny(g.Opts); err != nil {
@@ -148,12 +158,8 @@ func (g GeneratorOpcode) RunOpts() (*RunOpts, error) {
 }
 
 func (g GeneratorOpcode) WaitForEventOpts() (*WaitForEventOpts, error) {
-	if opts, ok := g.Opts.(*WaitForEventOpts); ok && opts != nil {
-		return opts, nil
-	}
-
-	opts := &WaitForEventOpts{}
-	if err := opts.UnmarshalAny(g.Opts); err != nil {
+	opts, err := unmarshalAny(g.Opts, WaitForEventOpts{})
+	if err != nil {
 		return nil, err
 	}
 	if opts.Event == "" {
@@ -163,7 +169,7 @@ func (g GeneratorOpcode) WaitForEventOpts() (*WaitForEventOpts, error) {
 	if opts.Event == "" {
 		return nil, fmt.Errorf("An event name must be provided when waiting for an event")
 	}
-	return opts, nil
+	return &opts, nil
 }
 
 func (g GeneratorOpcode) SleepDuration() (time.Duration, error) {
@@ -339,27 +345,36 @@ func (w WaitForEventOpts) Expires() (time.Time, error) {
 	return time.Now().Add(dur), nil
 }
 
-// AIGatewayOpts returns the AI gateway options within the driver.
-func (g *GeneratorOpcode) AIGatewayOpts() (aigateway.Request, error) {
-	req := aigateway.Request{}
+type IteratorOpts struct {
+	// Done indicates whether the iterator is complete, eg. is this the last element
+	// within the iterator set.
+	Done bool `json:"done"`
+	// Index represents the index of the iterator
+	Index int `json:"index"`
+}
 
-	// Ensure we unmarshal g.Opts  into the request options.
-	// This contains Inngest-related and auth-related options
-	// that do not go in the API request body we make to the provider
-	var optByt []byte
-	switch typ := g.Opts.(type) {
+// unmarshalAny is a utility type that unmarshals common datatypes within
+// opcode.Opts.
+//
+// XXX: This was added in a past commit and has been refactored.  Ideally, we
+// can remove this and use a single datatype - json.RawMessage.
+func unmarshalAny[T any](input any, to T) (T, error) {
+	var mappedByt []byte
+	switch typ := input.(type) {
 	case []byte:
-		optByt = typ
+		mappedByt = typ
+	case T:
+		// No need to unmarshal again.
+		return typ, nil
 	default:
-		var err error
-		optByt, err = json.Marshal(g.Opts)
+		byt, err := json.Marshal(input)
 		if err != nil {
-			return aigateway.Request{}, err
+			return to, err
 		}
+		mappedByt = byt
 	}
-	if err := json.Unmarshal(optByt, &req); err != nil {
-		return aigateway.Request{}, err
+	if err := json.Unmarshal(mappedByt, &to); err != nil {
+		return to, err
 	}
-
-	return req, nil
+	return to, nil
 }

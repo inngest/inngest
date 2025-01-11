@@ -93,6 +93,11 @@ func (v v2) LoadSteps(ctx context.Context, id state.ID) (map[string]json.RawMess
 	return v.mgr.LoadSteps(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
 }
 
+// LoadKV returns all events for a run.
+func (v v2) LoadKV(ctx context.Context, id state.ID) (map[string]any, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 // LoadState returns all state for a run.
 func (v v2) LoadState(ctx context.Context, id state.ID) (state.State, error) {
 	var (
@@ -199,4 +204,8 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 		AccountID:  id.Tenant.AccountID,
 	}
 	return v.mgr.SaveResponse(ctx, v1id, stepID, string(data))
+}
+
+func (v v2) SaveKV(ctx context.Context, id state.ID, key string, value any) error {
+	return fmt.Errorf("not implemented")
 }

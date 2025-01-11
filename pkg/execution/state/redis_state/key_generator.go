@@ -44,6 +44,9 @@ type RunStateKeyGenerator interface {
 	// ActionInputs returns the key used to store the action inputs for a given
 	// run.
 	ActionInputs(ctx context.Context, isSharded bool, identifier state.Identifier) string
+
+	// KV returns the key used to store key-values for a given run.
+	KV(ctx context.Context, isSharded bool, runID ulid.ULID) string
 }
 
 type runStateKeyGenerator struct {
@@ -98,6 +101,16 @@ func (s runStateKeyGenerator) Stack(ctx context.Context, isSharded bool, runID u
 
 func (s runStateKeyGenerator) ActionInputs(ctx context.Context, isSharded bool, identifier state.Identifier) string {
 	return fmt.Sprintf("{%s}:inputs:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, identifier.RunID), identifier.WorkflowID, identifier.RunID)
+}
+
+func (s runStateKeyGenerator) KV(ctx context.Context, isSharded bool, runID ulid.ULID) string {
+	// If the prefix includes the run ID, we don't need to use the
+	// run ID in the actual key.
+	prefix := s.Prefix(ctx, s.stateDefaultKey, isSharded, runID)
+	if isSharded {
+		return fmt.Sprintf("{%s}:kv", prefix)
+	}
+	return fmt.Sprintf("{%s}:kv:%s", prefix, runID)
 }
 
 type GlobalKeyGenerator interface {

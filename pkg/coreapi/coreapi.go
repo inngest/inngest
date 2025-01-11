@@ -23,6 +23,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/history_reader"
 	"github.com/inngest/inngest/pkg/logger"
@@ -37,8 +38,8 @@ type Options struct {
 	Config        config.Config
 	Logger        *zerolog.Logger
 	Runner        runner.Runner
-	Tracker       *runner.Tracker
 	State         state.Manager
+	StateLoader   sv2.StateLoader
 	Queue         queue.JobQueueReader
 	EventHandler  api.EventHandler
 	Executor      execution.Executor
@@ -64,13 +65,13 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	}
 
 	a := &CoreAPI{
-		data:    o.Data,
-		config:  o.Config,
-		log:     &logger,
-		Router:  chi.NewMux(),
-		runner:  o.Runner,
-		tracker: o.Tracker,
-		state:   o.State,
+		data:     o.Data,
+		config:   o.Config,
+		log:      &logger,
+		Router:   chi.NewMux(),
+		runner:   o.Runner,
+		state:    o.StateLoader,
+		executor: o.Executor,
 	}
 
 	cors := cors.New(cors.Options{
@@ -108,6 +109,7 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	// NOTE: These are present in the 2.x and 3.x SDKs to enable large payload sizes.
 	a.Get("/runs/{runID}/batch", a.GetEventBatch)
 	a.Get("/runs/{runID}/actions", a.GetActions)
+	a.Get("/runs/{runID}/state", a.RunState)
 
 	a.Mount("/connect", connectv0.New(a, o.ConnectOpts))
 
@@ -116,13 +118,13 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 
 type CoreAPI struct {
 	chi.Router
-	data    cqrs.Manager
-	config  config.Config
-	log     *zerolog.Logger
-	server  *http.Server
-	state   state.Manager
-	runner  runner.Runner
-	tracker *runner.Tracker
+	data     cqrs.Manager
+	config   config.Config
+	log      *zerolog.Logger
+	server   *http.Server
+	state    sv2.StateLoader
+	runner   runner.Runner
+	executor execution.Executor
 }
 
 func (a *CoreAPI) Start(ctx context.Context) error {
@@ -156,8 +158,13 @@ func (a CoreAPI) GetActions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Find this run
-	state, err := a.state.Load(ctx, consts.DevServerAccountId, *runID)
+	id := sv2.ID{
+		RunID: *runID,
+		Tenant: sv2.Tenant{
+			AccountID: consts.DevServerAccountId,
+		},
+	}
+	steps, err := a.state.LoadSteps(ctx, id)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
 			Status:  410,
@@ -167,8 +174,7 @@ func (a CoreAPI) GetActions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	actions := state.Actions()
-	_ = json.NewEncoder(w).Encode(actions)
+	_ = json.NewEncoder(w).Encode(steps)
 }
 
 func (a CoreAPI) GetEventBatch(w http.ResponseWriter, r *http.Request) {
@@ -190,8 +196,13 @@ func (a CoreAPI) GetEventBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Find this run
-	state, err := a.state.Load(ctx, consts.DevServerAccountId, *runID)
+	id := sv2.ID{
+		RunID: *runID,
+		Tenant: sv2.Tenant{
+			AccountID: consts.DevServerAccountId,
+		},
+	}
+	events, err := a.state.LoadEvents(ctx, id)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
 			Status:  410,
@@ -200,9 +211,49 @@ func (a CoreAPI) GetEventBatch(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-
-	events := state.Events()
 	_ = json.NewEncoder(w).Encode(events)
+}
+
+func (a CoreAPI) RunState(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var runID *ulid.ULID
+	if id := chi.URLParam(r, "runID"); id != "" {
+		if parsed, err := ulid.Parse(id); err == nil {
+			runID = &parsed
+		}
+	}
+
+	if runID == nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Error{
+			Message: apiutil.ErrRunIDInvalid.Error(),
+			Status:  400,
+			Err:     apiutil.ErrRunIDInvalid,
+		})
+		return
+	}
+	id := sv2.ID{
+		RunID: *runID,
+		Tenant: sv2.Tenant{
+			AccountID: consts.DevServerAccountId,
+		},
+	}
+	state, err := a.state.LoadState(ctx, id)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Error{
+			Status:  410,
+			Message: fmt.Sprintf("runtime state is no longer available for runID: %s", runID),
+			Err:     err,
+		})
+		return
+	}
+	// NOTE: This doesn't call driver.MarshalV1, as that has much more request
+	// context, such as the step ID, attempt, etc.
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"events": state.Events,
+		"steps":  state.Steps,
+		"kv":     state.KV,
+	})
 }
 
 // CancelRun is used to cancel a function run via an API callo.
@@ -227,11 +278,27 @@ func (a CoreAPI) CancelRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	id := sv2.ID{
+		RunID: *runID,
+		Tenant: sv2.Tenant{
+			AccountID: consts.DevServerAccountId,
+		},
+	}
+	md, err := a.state.LoadMetadata(ctx, id)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Error{
+			Status:  410,
+			Message: fmt.Sprintf("runtime state is no longer available for runID: %s", runID),
+			Err:     err,
+		})
+		return
+	}
+
 	logger.From(ctx).Info().
 		Str("run_id", runID.String()).
 		Msg("cancelling function")
 
-	if err := apiutil.CancelRun(ctx, a.state, consts.DevServerAccountId, *runID); err != nil {
+	if err := a.executor.Cancel(ctx, md.ID, execution.CancelRequest{}); err != nil {
 		_ = publicerr.WriteHTTP(w, err)
 		return
 	}

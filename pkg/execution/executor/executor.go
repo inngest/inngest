@@ -1921,6 +1921,8 @@ func (e *executor) handleGenerator(ctx context.Context, i *runInstance, gen stat
 		return e.handleGeneratorInvokeFunction(ctx, i, gen, edge)
 	case enums.OpcodeAIGateway:
 		return e.handleGeneratorAIGateway(ctx, i, gen, edge)
+	case enums.OpcodeIterator:
+		return e.handleGeneratorIterator(ctx, i, gen, edge)
 	}
 
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
@@ -2339,6 +2341,57 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 	}
 
 	return err
+}
+
+func (e *executor) handleGeneratorIterator(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	iter, err := gen.IteratorOpts()
+	if err != nil {
+		return fmt.Errorf("error inspecting iterator opts: %w", err)
+	}
+
+	value := any(iter.Index)
+	if iter.Done {
+		// Update the KV to mark the iterator as done.
+		value = true
+	}
+
+	if err := e.smv2.SaveKV(ctx, i.md.ID, gen.ID, value); err != nil {
+		return fmt.Errorf("error saving kv state for iterator: %w", err)
+	}
+
+	// Enqueue another step after this iterator call.
+	//
+	// Note that if the iterator is done, we're enqueueing a regular step.  If the iterator
+	// isn't yet done, we're going to enqueue a step to run the next iterator loop.
+	incoming := gen.ID
+	if iter.Done {
+		incoming = "step"
+	}
+	groupID := uuid.New().String() // XXX: Remove once deprecated from history.
+	ctx = state.WithGroupID(ctx, groupID)
+	nextEdge := inngest.Edge{
+		Outgoing: gen.ID,
+		Incoming: incoming,
+	}
+	jobID := fmt.Sprintf("%s-%s-%v", i.md.IdempotencyKey(), gen.ID, value)
+	now := time.Now()
+	nextItem := queue.Item{
+		JobID:                 &jobID,
+		WorkspaceID:           i.md.ID.Tenant.EnvID,
+		GroupID:               groupID,
+		Kind:                  queue.KindEdge,
+		Identifier:            i.item.Identifier,
+		PriorityFactor:        i.item.PriorityFactor,
+		CustomConcurrencyKeys: i.item.CustomConcurrencyKeys,
+		Attempt:               0,
+		MaxAttempts:           i.item.MaxAttempts,
+		Payload:               queue.PayloadEdge{Edge: nextEdge},
+	}
+	err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
+	if err == redis_state.ErrQueueItemExists {
+		return nil
+	}
+	return nil
 }
 
 func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {

@@ -11,11 +11,13 @@ local metadataKey = KEYS[2]
 local stepKey = KEYS[3]
 local stepStackKey = KEYS[4]
 local stepInputsKey = KEYS[5]
+local keyKV         = KEYS[6]
 
 local events = ARGV[1]
 local metadata = ARGV[2]
 local steps = ARGV[3]
 local stepInputs = ARGV[4]
+local kv         = ARGV[5]
 
 -- Save all metadata
 local metadataJson = cjson.decode(metadata)
@@ -44,6 +46,15 @@ if stepInputs ~= nil and #stepInputs > 0 then
     redis.call("HSET", stepInputsKey, stepInput.id, cjson.encode(stepInput.data))
   end
 end
+
+-- For each key-value pairm
+local kvJSON = cjson.decode(kv)
+for k, v in pairs(kvJSON) do
+  -- it's important to re-encode all values as strings here, so that we can decode
+  -- into the correct datatype.
+  redis.call("HSET", keyKV, k, cjson.encode(v))
+end
+
 
 -- Save events
 redis.call("SETNX", eventsKey, events)

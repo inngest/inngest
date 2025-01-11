@@ -234,6 +234,9 @@ type Metadata struct {
 	// SpanID is the spanID used for this function run.
 	SpanID string `json:"sid"`
 	HasAI  bool   `json:"hasAI,omitempty"`
+	// UsesKV is set if there's at least one key stored in the run's KV store.
+	// This lets us optimize the LoadKV store within driver.MarshalV1
+	UsesKV bool `json:"usesKV,omitempty"`
 }
 
 func (md *Metadata) GetSpanID() (*trace.SpanID, error) {
@@ -284,6 +287,9 @@ type State interface {
 	// Events is the list of events that are used to trigger the workflow,
 	// which is typically a list of Inngest event.
 	Events() []map[string]any
+
+	// Actions returns a map of all output from each individual action.
+	KV() map[string]any
 
 	// Actions returns a map of all output from each individual action.
 	Actions() map[string]any
@@ -388,6 +394,7 @@ type Mutater interface {
 	Cancel(ctx context.Context, i Identifier) error
 
 	// SetStatus sets a status specifically.
+	// XXX: This isn't needed any more.
 	SetStatus(ctx context.Context, i Identifier, status enums.RunStatus) error
 
 	// SaveResponse saves the driver response for the attempt to the backing state store.
@@ -399,6 +406,15 @@ type Mutater interface {
 		i Identifier,
 		stepID string,
 		marshalledOutput string,
+	) error
+
+	// SaveKV saves a key-value pair for a run.
+	SaveKV(
+		ctx context.Context,
+		accountID uuid.UUID,
+		runID ulid.ULID,
+		key string,
+		value any,
 	) error
 }
 
@@ -432,6 +448,9 @@ type Input struct {
 	// StepInputs allows users to specify pre-defined step inputs to run
 	// workflows from arbitrary points.
 	StepInputs []MemoizedStep
+
+	// KV is the key-value input for the starting state of this run.
+	KV map[string]any
 
 	// Context is additional context for the run stored in metadata.
 	Context map[string]any
