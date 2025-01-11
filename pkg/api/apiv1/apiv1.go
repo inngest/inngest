@@ -9,7 +9,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -43,6 +42,8 @@ type Opts struct {
 	QueueShardSelector redis_state.ShardSelector
 	// Broadcaster is used to handle realtime via APIv1
 	Broadcaster realtime.Broadcaster
+	// RealtimeJWTSecret is the realtime JWT secret for the V1 API
+	RealtimeJWTSecret []byte
 }
 
 // AddRoutes adds a new API handler to the given router.
@@ -80,15 +81,18 @@ func (a *router) setup() {
 	a.Group(func(r chi.Router) {
 		r.Use(middleware.Recoverer)
 
-		r.Group(func(r chi.Router) {
-			rt := realtime.NewAPI(realtime.APIOpts{
-				JWTSecret:      consts.DevServerRealtimeJWTSecret,
-				Broadcaster:    a.opts.Broadcaster,
-				AuthMiddleware: a.opts.AuthMiddleware,
-				AuthFinder:     a.opts.AuthFinder,
+		if len(a.opts.RealtimeJWTSecret) > 0 {
+			// Only enable realtime if secrets are set.
+			r.Group(func(r chi.Router) {
+				rt := realtime.NewAPI(realtime.APIOpts{
+					JWTSecret:      a.opts.RealtimeJWTSecret,
+					Broadcaster:    a.opts.Broadcaster,
+					AuthMiddleware: a.opts.AuthMiddleware,
+					AuthFinder:     a.opts.AuthFinder,
+				})
+				r.Mount("/", rt)
 			})
-			r.Mount("/", rt)
-		})
+		}
 
 		r.Group(func(r chi.Router) {
 			if a.opts.CachingMiddleware != nil {
