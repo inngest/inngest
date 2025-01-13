@@ -26,6 +26,7 @@ type WorkerConnection struct {
 	GatewayId  ulid.ULID               `json:"gateway_id"`
 	InstanceId string                  `json:"instance_id"`
 	Status     connpb.ConnectionStatus `json:"status"`
+	WorkerIP   string                  `json:"worker_ip"`
 
 	// Timestamps
 	ConnectedAt     time.Time  `json:"connected_at"`

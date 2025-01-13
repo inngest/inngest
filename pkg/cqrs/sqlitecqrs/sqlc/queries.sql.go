@@ -1164,7 +1164,7 @@ func (q *Queries) GetTraceSpans(ctx context.Context, arg GetTraceSpansParams) ([
 const getWorkerConnection = `-- name: GetWorkerConnection :one
 ;
 
-SELECT account_id, workspace_id, app_id, id, gateway_id, instance_id, status, connected_at, last_heartbeat_at, disconnected_at, recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, build_id, function_count, cpu_cores, mem_bytes, os FROM worker_connections WHERE account_id = ?1 AND workspace_id = ?2 AND id = ?3
+SELECT account_id, workspace_id, app_id, id, gateway_id, instance_id, status, worker_ip, connected_at, last_heartbeat_at, disconnected_at, recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, build_id, function_count, cpu_cores, mem_bytes, os FROM worker_connections WHERE account_id = ?1 AND workspace_id = ?2 AND id = ?3
 `
 
 type GetWorkerConnectionParams struct {
@@ -1184,6 +1184,7 @@ func (q *Queries) GetWorkerConnection(ctx context.Context, arg GetWorkerConnecti
 		&i.GatewayID,
 		&i.InstanceID,
 		&i.Status,
+		&i.WorkerIp,
 		&i.ConnectedAt,
 		&i.LastHeartbeatAt,
 		&i.DisconnectedAt,
@@ -1597,10 +1598,10 @@ func (q *Queries) InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) 
 const insertWorkerConnection = `-- name: InsertWorkerConnection :exec
 
 INSERT INTO worker_connections (
-    account_id, workspace_id, app_id, id, gateway_id, instance_id, status, connected_at, last_heartbeat_at, disconnected_at,
+    account_id, workspace_id, app_id, id, gateway_id, instance_id, status, worker_ip, connected_at, last_heartbeat_at, disconnected_at,
     recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, build_id, function_count, cpu_cores, mem_bytes, os
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id)
 DO UPDATE SET
     account_id = excluded.account_id,
@@ -1611,12 +1612,15 @@ DO UPDATE SET
     gateway_id = excluded.gateway_id,
     instance_id = excluded.instance_id,
     status = excluded.status,
+    worker_ip = excluded.worker_ip,
 
     connected_at = excluded.connected_at,
     last_heartbeat_at = excluded.last_heartbeat_at,
     disconnected_at = excluded.disconnected_at,
     recorded_at = excluded.recorded_at,
     inserted_at = excluded.inserted_at,
+
+    disconnect_reason = excluded.disconnect_reason,
 
     group_hash = excluded.group_hash,
     sdk_lang = excluded.sdk_lang,
@@ -1625,8 +1629,6 @@ DO UPDATE SET
     sync_id = excluded.sync_id,
     build_id = excluded.build_id,
     function_count = excluded.function_count,
-
-    disconnect_reason = excluded.disconnect_reason,
 
     cpu_cores = excluded.cpu_cores,
     mem_bytes = excluded.mem_bytes,
@@ -1641,11 +1643,13 @@ type InsertWorkerConnectionParams struct {
 	GatewayID        ulid.ULID
 	InstanceID       string
 	Status           int64
+	WorkerIp         string
 	ConnectedAt      int64
 	LastHeartbeatAt  sql.NullInt64
 	DisconnectedAt   sql.NullInt64
 	RecordedAt       int64
 	InsertedAt       int64
+	DisconnectReason sql.NullString
 	GroupHash        []byte
 	SdkLang          string
 	SdkVersion       string
@@ -1656,7 +1660,6 @@ type InsertWorkerConnectionParams struct {
 	CpuCores         int64
 	MemBytes         int64
 	Os               string
-	DisconnectReason sql.NullString
 }
 
 // Worker Connections
@@ -1669,11 +1672,13 @@ func (q *Queries) InsertWorkerConnection(ctx context.Context, arg InsertWorkerCo
 		arg.GatewayID,
 		arg.InstanceID,
 		arg.Status,
+		arg.WorkerIp,
 		arg.ConnectedAt,
 		arg.LastHeartbeatAt,
 		arg.DisconnectedAt,
 		arg.RecordedAt,
 		arg.InsertedAt,
+		arg.DisconnectReason,
 		arg.GroupHash,
 		arg.SdkLang,
 		arg.SdkVersion,
@@ -1684,7 +1689,6 @@ func (q *Queries) InsertWorkerConnection(ctx context.Context, arg InsertWorkerCo
 		arg.CpuCores,
 		arg.MemBytes,
 		arg.Os,
-		arg.DisconnectReason,
 	)
 	return err
 }

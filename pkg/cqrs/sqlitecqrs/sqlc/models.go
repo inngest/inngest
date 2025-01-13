@@ -168,6 +168,7 @@ type WorkerConnection struct {
 	GatewayID        ulid.ULID
 	InstanceID       string
 	Status           int64
+	WorkerIp         string
 	ConnectedAt      int64
 	LastHeartbeatAt  sql.NullInt64
 	DisconnectedAt   sql.NullInt64

@@ -116,6 +116,7 @@ type Connection struct {
 	AccountID    uuid.UUID
 	EnvID        uuid.UUID
 	ConnectionId ulid.ULID
+	WorkerIP     string
 
 	Data      *connpb.WorkerConnectRequestData
 	Session   *connpb.SessionDetails

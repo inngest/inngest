@@ -281,10 +281,10 @@ WHERE snapshot_id NOT IN (
 
 -- name: InsertWorkerConnection :exec
 INSERT INTO worker_connections (
-    account_id, workspace_id, app_id, id, gateway_id, instance_id, status, connected_at, last_heartbeat_at, disconnected_at,
+    account_id, workspace_id, app_id, id, gateway_id, instance_id, status, worker_ip, connected_at, last_heartbeat_at, disconnected_at,
     recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, build_id, function_count, cpu_cores, mem_bytes, os
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id)
 DO UPDATE SET
     account_id = excluded.account_id,
@@ -295,6 +295,7 @@ DO UPDATE SET
     gateway_id = excluded.gateway_id,
     instance_id = excluded.instance_id,
     status = excluded.status,
+    worker_ip = excluded.worker_ip,
 
     connected_at = excluded.connected_at,
     last_heartbeat_at = excluded.last_heartbeat_at,

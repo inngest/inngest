@@ -1510,29 +1510,35 @@ func (w wrapper) InsertWorkerConnection(ctx context.Context, conn *cqrs.WorkerCo
 	}
 
 	params := sqlc.InsertWorkerConnectionParams{
-		AccountID:        conn.AccountID,
-		WorkspaceID:      conn.WorkspaceID,
-		AppID:            conn.AppID,
-		ID:               conn.Id,
-		GatewayID:        conn.GatewayId,
-		InstanceID:       conn.InstanceId,
-		Status:           int64(conn.Status),
-		ConnectedAt:      conn.ConnectedAt.UnixMilli(),
-		LastHeartbeatAt:  lastHeartbeatAt,
-		DisconnectedAt:   disconnectedAt,
-		RecordedAt:       conn.RecordedAt.UnixMilli(),
-		InsertedAt:       time.Now().UnixMilli(),
+		AccountID:   conn.AccountID,
+		WorkspaceID: conn.WorkspaceID,
+		AppID:       conn.AppID,
+
+		ID:         conn.Id,
+		GatewayID:  conn.GatewayId,
+		InstanceID: conn.InstanceId,
+		Status:     int64(conn.Status),
+		WorkerIp:   conn.WorkerIP,
+
+		ConnectedAt:     conn.ConnectedAt.UnixMilli(),
+		LastHeartbeatAt: lastHeartbeatAt,
+		DisconnectedAt:  disconnectedAt,
+		RecordedAt:      conn.RecordedAt.UnixMilli(),
+		InsertedAt:      time.Now().UnixMilli(),
+		
 		DisconnectReason: disconnectReason,
-		GroupHash:        []byte(conn.GroupHash),
-		SdkLang:          conn.SDKLang,
-		SdkVersion:       conn.SDKVersion,
-		SdkPlatform:      conn.SDKPlatform,
-		SyncID:           conn.SyncID,
-		BuildID:          buildId,
-		FunctionCount:    int64(conn.FunctionCount),
-		CpuCores:         int64(conn.CpuCores),
-		MemBytes:         conn.MemBytes,
-		Os:               conn.Os,
+
+		GroupHash:     []byte(conn.GroupHash),
+		SdkLang:       conn.SDKLang,
+		SdkVersion:    conn.SDKVersion,
+		SdkPlatform:   conn.SDKPlatform,
+		SyncID:        conn.SyncID,
+		BuildID:       buildId,
+		FunctionCount: int64(conn.FunctionCount),
+
+		CpuCores: int64(conn.CpuCores),
+		MemBytes: conn.MemBytes,
+		Os:       conn.Os,
 	}
 
 	return w.q.InsertWorkerConnection(ctx, params)
@@ -1575,29 +1581,35 @@ func (w wrapper) GetWorkerConnection(ctx context.Context, id cqrs.WorkerConnecti
 	}
 
 	workerConn := cqrs.WorkerConnection{
-		AccountID:        conn.AccountID,
-		WorkspaceID:      conn.WorkspaceID,
-		AppID:            conn.AppID,
-		Id:               conn.ID,
-		GatewayId:        conn.GatewayID,
-		InstanceId:       conn.InstanceID,
-		Status:           connpb.ConnectionStatus(conn.Status),
-		LastHeartbeatAt:  lastHeartbeatAt,
-		ConnectedAt:      connectedAt,
-		DisconnectedAt:   disconnectedAt,
-		RecordedAt:       time.UnixMilli(conn.RecordedAt),
-		InsertedAt:       time.UnixMilli(conn.InsertedAt),
+		AccountID:   conn.AccountID,
+		WorkspaceID: conn.WorkspaceID,
+		AppID:       conn.AppID,
+
+		Id:         conn.ID,
+		GatewayId:  conn.GatewayID,
+		InstanceId: conn.InstanceID,
+		Status:     connpb.ConnectionStatus(conn.Status),
+		WorkerIP:   conn.WorkerIp,
+
+		LastHeartbeatAt: lastHeartbeatAt,
+		ConnectedAt:     connectedAt,
+		DisconnectedAt:  disconnectedAt,
+		RecordedAt:      time.UnixMilli(conn.RecordedAt),
+		InsertedAt:      time.UnixMilli(conn.InsertedAt),
+
 		DisconnectReason: disconnectReason,
-		GroupHash:        string(conn.GroupHash),
-		SDKLang:          conn.SdkLang,
-		SDKVersion:       conn.SdkVersion,
-		SDKPlatform:      conn.SdkPlatform,
-		SyncID:           conn.SyncID,
-		BuildId:          buildId,
-		FunctionCount:    int(conn.FunctionCount),
-		CpuCores:         int32(conn.CpuCores),
-		MemBytes:         conn.MemBytes,
-		Os:               conn.Os,
+
+		GroupHash:     string(conn.GroupHash),
+		SDKLang:       conn.SdkLang,
+		SDKVersion:    conn.SdkVersion,
+		SDKPlatform:   conn.SdkPlatform,
+		SyncID:        conn.SyncID,
+		BuildId:       buildId,
+		FunctionCount: int(conn.FunctionCount),
+
+		CpuCores: int32(conn.CpuCores),
+		MemBytes: conn.MemBytes,
+		Os:       conn.Os,
 	}
 
 	return &workerConn, nil
@@ -1754,17 +1766,21 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 		Select(
 			"account_id",
 			"workspace_id",
-
 			"app_id",
 
 			"id",
 			"gateway_id",
 			"instance_id",
 			"status",
+			"worker_ip",
 
 			"connected_at",
 			"last_heartbeat_at",
 			"disconnected_at",
+			"recorded_at",
+			"inserted_at",
+
+			"disconnect_reason",
 
 			"group_hash",
 			"sdk_lang",
@@ -1797,17 +1813,21 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 		err := rows.Scan(
 			&data.AccountID,
 			&data.WorkspaceID,
-
 			&data.AppID,
 
 			&data.ID,
 			&data.GatewayID,
 			&data.InstanceID,
 			&data.Status,
+			&data.WorkerIp,
 
 			&data.ConnectedAt,
 			&data.LastHeartbeatAt,
 			&data.DisconnectedAt,
+			&data.RecordedAt,
+			&data.InsertedAt,
+
+			&data.DisconnectReason,
 
 			&data.GroupHash,
 			&data.SdkLang,
@@ -1874,30 +1894,37 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 		}
 
 		res = append(res, &cqrs.WorkerConnection{
-			AccountID:        data.AccountID,
-			WorkspaceID:      data.WorkspaceID,
-			AppID:            data.AppID,
-			Id:               data.ID,
-			GatewayId:        data.GatewayID,
-			InstanceId:       data.InstanceID,
-			Status:           connpb.ConnectionStatus(data.Status),
-			LastHeartbeatAt:  lastHeartbeatAt,
-			ConnectedAt:      connectedAt,
-			DisconnectedAt:   disconnectedAt,
-			RecordedAt:       time.UnixMilli(data.RecordedAt),
-			InsertedAt:       time.UnixMilli(data.InsertedAt),
+			AccountID:   data.AccountID,
+			WorkspaceID: data.WorkspaceID,
+			AppID:       data.AppID,
+
+			Id:         data.ID,
+			GatewayId:  data.GatewayID,
+			InstanceId: data.InstanceID,
+			Status:     connpb.ConnectionStatus(data.Status),
+			WorkerIP:   data.WorkerIp,
+
+			LastHeartbeatAt: lastHeartbeatAt,
+			ConnectedAt:     connectedAt,
+			DisconnectedAt:  disconnectedAt,
+			RecordedAt:      time.UnixMilli(data.RecordedAt),
+			InsertedAt:      time.UnixMilli(data.InsertedAt),
+
 			DisconnectReason: disconnectReason,
-			GroupHash:        string(data.GroupHash),
-			SDKLang:          data.SdkLang,
-			SDKVersion:       data.SdkVersion,
-			SDKPlatform:      data.SdkPlatform,
-			SyncID:           data.SyncID,
-			CpuCores:         int32(data.CpuCores),
-			FunctionCount:    int(data.FunctionCount),
-			BuildId:          buildId,
-			MemBytes:         data.MemBytes,
-			Os:               data.Os,
-			Cursor:           cursor,
+
+			GroupHash:     string(data.GroupHash),
+			SDKLang:       data.SdkLang,
+			SDKVersion:    data.SdkVersion,
+			SDKPlatform:   data.SdkPlatform,
+			SyncID:        data.SyncID,
+			FunctionCount: int(data.FunctionCount),
+			BuildId:       buildId,
+
+			CpuCores: int32(data.CpuCores),
+			MemBytes: data.MemBytes,
+			Os:       data.Os,
+
+			Cursor: cursor,
 		})
 		count++
 		// enough items, don't need to proceed anymore
@@ -1912,10 +1939,10 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 // copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types
 // automatically.
 func copyWriter[
-	PARAMS_IN any,
-	INTERNAL_PARAMS any,
-	IN any,
-	OUT any,
+PARAMS_IN any,
+INTERNAL_PARAMS any,
+IN any,
+OUT any,
 ](
 	ctx context.Context,
 	f func(context.Context, INTERNAL_PARAMS) (IN, error),
@@ -1938,8 +1965,8 @@ func copyWriter[
 }
 
 func copyInto[
-	IN any,
-	OUT any,
+IN any,
+OUT any,
 ](
 	ctx context.Context,
 	f func(context.Context) (IN, error),

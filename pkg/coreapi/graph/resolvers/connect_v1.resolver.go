@@ -120,25 +120,31 @@ func connToNode(conn *cqrs.WorkerConnection) *models.ConnectV1WorkerConnection {
 	}
 
 	node := &models.ConnectV1WorkerConnection{
-		ID:               conn.Id,
-		GatewayID:        conn.GatewayId,
-		InstanceID:       conn.InstanceId,
-		AppID:            conn.AppID,
-		ConnectedAt:      conn.ConnectedAt,
-		LastHeartbeatAt:  lastHeartbeatAt,
-		DisconnectedAt:   disconnectedAt,
+		AppID: conn.AppID,
+
+		ID:         conn.Id,
+		GatewayID:  conn.GatewayId,
+		InstanceID: conn.InstanceId,
+		Status:     status,
+		WorkerIP:   conn.WorkerIP,
+
+		ConnectedAt:     conn.ConnectedAt,
+		LastHeartbeatAt: lastHeartbeatAt,
+		DisconnectedAt:  disconnectedAt,
+
 		DisconnectReason: conn.DisconnectReason,
-		Status:           status,
-		GroupHash:        conn.GroupHash,
-		SdkLang:          conn.SDKLang,
-		SdkVersion:       conn.SDKVersion,
-		SdkPlatform:      conn.SDKPlatform,
-		SyncID:           conn.SyncID,
-		BuildID:          conn.BuildId,
-		FunctionCount:    conn.FunctionCount,
-		CPUCores:         int(conn.CpuCores),
-		MemBytes:         int(conn.MemBytes),
-		Os:               conn.Os,
+
+		GroupHash:     conn.GroupHash,
+		SdkLang:       conn.SDKLang,
+		SdkVersion:    conn.SDKVersion,
+		SdkPlatform:   conn.SDKPlatform,
+		SyncID:        conn.SyncID,
+		BuildID:       conn.BuildId,
+		FunctionCount: conn.FunctionCount,
+
+		CPUCores: int(conn.CpuCores),
+		MemBytes: int(conn.MemBytes),
+		Os:       conn.Os,
 	}
 
 	return node

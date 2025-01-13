@@ -72,6 +72,7 @@ func (h *historyLifecycles) OnDisconnected(ctx context.Context, conn *state.Conn
 		GatewayId:  conn.GatewayId,
 		InstanceId: conn.Session.SessionId.GetInstanceId(),
 		Status:     connectpb.ConnectionStatus_DISCONNECTED,
+		WorkerIP:   conn.WorkerIP,
 
 		ConnectedAt:     ulid.Time(conn.ConnectionId.Time()),
 		LastHeartbeatAt: ptr.Time(time.Now()),
@@ -115,6 +116,7 @@ func (h *historyLifecycles) upsertConnection(ctx context.Context, conn *state.Co
 		GatewayId:  conn.GatewayId,
 		InstanceId: conn.Session.SessionId.GetInstanceId(),
 		Status:     status,
+		WorkerIP:   conn.WorkerIP,
 
 		ConnectedAt:     ulid.Time(conn.ConnectionId.Time()),
 		LastHeartbeatAt: ptr.Time(lastHeartbeatAt),

@@ -161,6 +161,7 @@ CREATE TABLE worker_connections (
     gateway_id CHAR(26) NOT NULL,
     instance_id VARCHAR NOT NULL,
     status INT NOT NULL,
+    worker_ip VARCHAR NOT NULL,
 
     connected_at INT NOT NULL,
     last_heartbeat_at INT,

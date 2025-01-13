@@ -513,6 +513,7 @@ type ConnectV1WorkerConnection {
   id: ULID!
   gatewayId: ULID!
   instanceId: String!
+  workerIp: String!
 
   appID: UUID
   app: App
