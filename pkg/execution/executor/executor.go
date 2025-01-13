@@ -986,7 +986,9 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		return i.resp
 	}
 
-	if i.resp.IsFunctionResult() {
+	// The generator length check is necessary because parallel steps in older
+	// SDK versions (e.g. 2.7.2) can result in an OpcodeNone.
+	if len(i.resp.Generator) == 0 && i.resp.IsFunctionResult() {
 		// This is the function result.
 		if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
 			l.Error("error running finish handler", "error", err)
