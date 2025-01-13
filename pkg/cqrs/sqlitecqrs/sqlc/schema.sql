@@ -159,7 +159,7 @@ CREATE TABLE worker_connections (
 
     id CHAR(26) PRIMARY KEY,
     gateway_id CHAR(26) NOT NULL,
-    instance_id VARCHAR,
+    instance_id VARCHAR NOT NULL,
     status INT NOT NULL,
 
     connected_at INT NOT NULL,
@@ -175,6 +175,8 @@ CREATE TABLE worker_connections (
     sdk_version VARCHAR NOT NULL,
     sdk_platform VARCHAR NOT NULL,
     sync_id CHAR(36),
+    build_id VARCHAR,
+    function_count INT NOT NULL,
 
     cpu_cores INT NOT NULL,
     mem_bytes INT NOT NULL,

@@ -166,7 +166,7 @@ type WorkerConnection struct {
 	AppID            *uuid.UUID
 	ID               ulid.ULID
 	GatewayID        ulid.ULID
-	InstanceID       sql.NullString
+	InstanceID       string
 	Status           int64
 	ConnectedAt      int64
 	LastHeartbeatAt  sql.NullInt64
@@ -179,6 +179,8 @@ type WorkerConnection struct {
 	SdkVersion       string
 	SdkPlatform      string
 	SyncID           *uuid.UUID
+	BuildID          sql.NullString
+	FunctionCount    int64
 	CpuCores         int64
 	MemBytes         int64
 	Os               string

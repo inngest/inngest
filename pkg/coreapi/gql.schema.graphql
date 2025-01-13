@@ -512,7 +512,7 @@ enum ConnectV1WorkerConnectionsOrderByDirection {
 type ConnectV1WorkerConnection {
   id: ULID!
   gatewayId: ULID!
-  instanceId: String
+  instanceId: String!
 
   appID: UUID
   app: App
@@ -531,6 +531,8 @@ type ConnectV1WorkerConnection {
   sdkVersion: String!
   sdkPlatform: String!
   syncId: UUID
+  buildId: String
+  functionCount: Int!
 
   cpuCores: Int!
   memBytes: Int!

@@ -31,7 +31,7 @@ type ActionVersionQuery struct {
 type ConnectV1WorkerConnection struct {
 	ID               ulid.ULID                 `json:"id"`
 	GatewayID        ulid.ULID                 `json:"gatewayId"`
-	InstanceID       *string                   `json:"instanceId,omitempty"`
+	InstanceID       string                    `json:"instanceId"`
 	AppID            *uuid.UUID                `json:"appID,omitempty"`
 	App              *cqrs.App                 `json:"app,omitempty"`
 	ConnectedAt      time.Time                 `json:"connectedAt"`
@@ -44,6 +44,8 @@ type ConnectV1WorkerConnection struct {
 	SdkVersion       string                    `json:"sdkVersion"`
 	SdkPlatform      string                    `json:"sdkPlatform"`
 	SyncID           *uuid.UUID                `json:"syncId,omitempty"`
+	BuildID          *string                   `json:"buildId,omitempty"`
+	FunctionCount    int                       `json:"functionCount"`
 	CPUCores         int                       `json:"cpuCores"`
 	MemBytes         int                       `json:"memBytes"`
 	Os               string                    `json:"os"`

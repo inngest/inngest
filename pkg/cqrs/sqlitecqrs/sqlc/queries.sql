@@ -282,9 +282,9 @@ WHERE snapshot_id NOT IN (
 -- name: InsertWorkerConnection :exec
 INSERT INTO worker_connections (
     account_id, workspace_id, app_id, id, gateway_id, instance_id, status, connected_at, last_heartbeat_at, disconnected_at,
-    recorded_at, inserted_at, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, cpu_cores, mem_bytes, os, disconnect_reason
+    recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, build_id, function_count, cpu_cores, mem_bytes, os
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id)
 DO UPDATE SET
     account_id = excluded.account_id,
@@ -302,17 +302,19 @@ DO UPDATE SET
     recorded_at = excluded.recorded_at,
     inserted_at = excluded.inserted_at,
 
+    disconnect_reason = excluded.disconnect_reason,
+
     group_hash = excluded.group_hash,
     sdk_lang = excluded.sdk_lang,
     sdk_version = excluded.sdk_version,
     sdk_platform = excluded.sdk_platform,
     sync_id = excluded.sync_id,
+    build_id = excluded.build_id,
+    function_count = excluded.function_count,
 
     cpu_cores = excluded.cpu_cores,
     mem_bytes = excluded.mem_bytes,
-    os = excluded.os,
-
-    disconnect_reason = excluded.disconnect_reason
+    os = excluded.os
 ;
 
 -- name: GetWorkerConnection :one

@@ -701,6 +701,19 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 		}
 	}
 
+	// Ensure Instance ID is provided
+	{
+		if initialMessageData.SessionId == nil || initialMessageData.SessionId.InstanceId == "" {
+			c.log.Debug("initial SDK message missing instance ID")
+
+			return nil, &SocketError{
+				SysCode:    syscode.CodeConnectWorkerHelloInvalidPayload,
+				StatusCode: websocket.StatusPolicyViolation,
+				Msg:        "Missing instanceId in SDK connect message",
+			}
+		}
+	}
+
 	var authResp *auth.Response
 	{
 		// Run auth, add to distributed state

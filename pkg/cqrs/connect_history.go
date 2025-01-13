@@ -24,7 +24,7 @@ type WorkerConnection struct {
 	// Connection attributes
 	Id         ulid.ULID               `json:"id"`
 	GatewayId  ulid.ULID               `json:"gateway_id"`
-	InstanceId *string                 `json:"instance_id"`
+	InstanceId string                  `json:"instance_id"`
 	Status     connpb.ConnectionStatus `json:"status"`
 
 	// Timestamps
@@ -32,14 +32,20 @@ type WorkerConnection struct {
 	LastHeartbeatAt *time.Time `json:"last_heartbeat_at"`
 	DisconnectedAt  *time.Time `json:"disconnected_at"`
 
+	// Meta fields for tracking history ingestion
+	RecordedAt time.Time `json:"recorded_at"`
+	InsertedAt time.Time `json:"inserted_at"`
+
 	DisconnectReason *string `json:"disconnect_reason"`
 
 	// Group attributes
-	GroupHash   string     `json:"group_hash"`
-	SDKLang     string     `json:"sdk_lang"`
-	SDKVersion  string     `json:"sdk_version"`
-	SDKPlatform string     `json:"sdk_platform"`
-	SyncID      *uuid.UUID `json:"sync_id,omitempty"`
+	GroupHash     string     `json:"group_hash"`
+	SDKLang       string     `json:"sdk_lang"`
+	SDKVersion    string     `json:"sdk_version"`
+	SDKPlatform   string     `json:"sdk_platform"`
+	SyncID        *uuid.UUID `json:"sync_id,omitempty"`
+	BuildId       *string    `json:"build_id,omitempty"`
+	FunctionCount int        `json:"function_count"`
 
 	// System attributes
 	CpuCores int32  `json:"cpu_cores"`
@@ -48,10 +54,6 @@ type WorkerConnection struct {
 
 	// Cursor is a composite cursor used for pagination
 	Cursor string `json:"cursor"`
-
-	// Meta fields for tracking history ingestion
-	RecordedAt time.Time `json:"recorded_at"`
-	InsertedAt time.Time `json:"inserted_at"`
 }
 
 type ConnectionHistoryReadWriter interface {

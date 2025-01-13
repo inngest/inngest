@@ -80,10 +80,12 @@ type ComplexityRoot struct {
 	ConnectV1WorkerConnection struct {
 		App              func(childComplexity int) int
 		AppID            func(childComplexity int) int
+		BuildID          func(childComplexity int) int
 		CPUCores         func(childComplexity int) int
 		ConnectedAt      func(childComplexity int) int
 		DisconnectReason func(childComplexity int) int
 		DisconnectedAt   func(childComplexity int) int
+		FunctionCount    func(childComplexity int) int
 		GatewayID        func(childComplexity int) int
 		GroupHash        func(childComplexity int) int
 		ID               func(childComplexity int) int
@@ -609,6 +611,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ConnectV1WorkerConnection.AppID(childComplexity), true
 
+	case "ConnectV1WorkerConnection.buildId":
+		if e.complexity.ConnectV1WorkerConnection.BuildID == nil {
+			break
+		}
+
+		return e.complexity.ConnectV1WorkerConnection.BuildID(childComplexity), true
+
 	case "ConnectV1WorkerConnection.cpuCores":
 		if e.complexity.ConnectV1WorkerConnection.CPUCores == nil {
 			break
@@ -636,6 +645,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ConnectV1WorkerConnection.DisconnectedAt(childComplexity), true
+
+	case "ConnectV1WorkerConnection.functionCount":
+		if e.complexity.ConnectV1WorkerConnection.FunctionCount == nil {
+			break
+		}
+
+		return e.complexity.ConnectV1WorkerConnection.FunctionCount(childComplexity), true
 
 	case "ConnectV1WorkerConnection.gatewayId":
 		if e.complexity.ConnectV1WorkerConnection.GatewayID == nil {
@@ -2975,7 +2991,7 @@ enum ConnectV1WorkerConnectionsOrderByDirection {
 type ConnectV1WorkerConnection {
   id: ULID!
   gatewayId: ULID!
-  instanceId: String
+  instanceId: String!
 
   appID: UUID
   app: App
@@ -2994,6 +3010,8 @@ type ConnectV1WorkerConnection {
   sdkVersion: String!
   sdkPlatform: String!
   syncId: UUID
+  buildId: String
+  functionCount: Int!
 
   cpuCores: Int!
   memBytes: Int!
@@ -4111,11 +4129,14 @@ func (ec *executionContext) _ConnectV1WorkerConnection_instanceId(ctx context.Co
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_ConnectV1WorkerConnection_instanceId(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -4669,6 +4690,91 @@ func (ec *executionContext) fieldContext_ConnectV1WorkerConnection_syncId(ctx co
 	return fc, nil
 }
 
+func (ec *executionContext) _ConnectV1WorkerConnection_buildId(ctx context.Context, field graphql.CollectedField, obj *models.ConnectV1WorkerConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ConnectV1WorkerConnection_buildId(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.BuildID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ConnectV1WorkerConnection_buildId(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConnectV1WorkerConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ConnectV1WorkerConnection_functionCount(ctx context.Context, field graphql.CollectedField, obj *models.ConnectV1WorkerConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ConnectV1WorkerConnection_functionCount(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.FunctionCount, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ConnectV1WorkerConnection_functionCount(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConnectV1WorkerConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ConnectV1WorkerConnection_cpuCores(ctx context.Context, field graphql.CollectedField, obj *models.ConnectV1WorkerConnection) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ConnectV1WorkerConnection_cpuCores(ctx, field)
 	if err != nil {
@@ -4870,6 +4976,10 @@ func (ec *executionContext) fieldContext_ConnectV1WorkerConnectionEdge_node(ctx 
 				return ec.fieldContext_ConnectV1WorkerConnection_sdkPlatform(ctx, field)
 			case "syncId":
 				return ec.fieldContext_ConnectV1WorkerConnection_syncId(ctx, field)
+			case "buildId":
+				return ec.fieldContext_ConnectV1WorkerConnection_buildId(ctx, field)
+			case "functionCount":
+				return ec.fieldContext_ConnectV1WorkerConnection_functionCount(ctx, field)
 			case "cpuCores":
 				return ec.fieldContext_ConnectV1WorkerConnection_cpuCores(ctx, field)
 			case "memBytes":
@@ -10357,6 +10467,10 @@ func (ec *executionContext) fieldContext_Query_workerConnection(ctx context.Cont
 				return ec.fieldContext_ConnectV1WorkerConnection_sdkPlatform(ctx, field)
 			case "syncId":
 				return ec.fieldContext_ConnectV1WorkerConnection_syncId(ctx, field)
+			case "buildId":
+				return ec.fieldContext_ConnectV1WorkerConnection_buildId(ctx, field)
+			case "functionCount":
+				return ec.fieldContext_ConnectV1WorkerConnection_functionCount(ctx, field)
 			case "cpuCores":
 				return ec.fieldContext_ConnectV1WorkerConnection_cpuCores(ctx, field)
 			case "memBytes":
@@ -17731,6 +17845,9 @@ func (ec *executionContext) _ConnectV1WorkerConnection(ctx context.Context, sel 
 
 			out.Values[i] = ec._ConnectV1WorkerConnection_instanceId(ctx, field, obj)
 
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
 		case "appID":
 
 			out.Values[i] = ec._ConnectV1WorkerConnection_appID(ctx, field, obj)
@@ -17810,6 +17927,17 @@ func (ec *executionContext) _ConnectV1WorkerConnection(ctx context.Context, sel 
 
 			out.Values[i] = ec._ConnectV1WorkerConnection_syncId(ctx, field, obj)
 
+		case "buildId":
+
+			out.Values[i] = ec._ConnectV1WorkerConnection_buildId(ctx, field, obj)
+
+		case "functionCount":
+
+			out.Values[i] = ec._ConnectV1WorkerConnection_functionCount(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
 		case "cpuCores":
 
 			out.Values[i] = ec._ConnectV1WorkerConnection_cpuCores(ctx, field, obj)
