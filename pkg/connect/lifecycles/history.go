@@ -82,6 +82,7 @@ func (h *historyLifecycles) OnDisconnected(ctx context.Context, conn *state.Conn
 		CpuCores:        conn.Data.SystemAttributes.CpuCores,
 		MemBytes:        conn.Data.SystemAttributes.MemBytes,
 		Os:              conn.Data.SystemAttributes.Os,
+		RecordedAt:      time.Now(),
 	})
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("could not persist connection history", "error", err)
@@ -120,6 +121,7 @@ func (h *historyLifecycles) upsertConnection(ctx context.Context, conn *state.Co
 		CpuCores:        conn.Data.SystemAttributes.CpuCores,
 		MemBytes:        conn.Data.SystemAttributes.MemBytes,
 		Os:              conn.Data.SystemAttributes.Os,
+		RecordedAt:      time.Now(),
 	})
 	if err != nil {
 		return fmt.Errorf("could not persist connection history: %w", err)

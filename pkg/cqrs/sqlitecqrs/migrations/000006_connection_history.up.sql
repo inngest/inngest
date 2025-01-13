@@ -12,6 +12,8 @@ CREATE TABLE "worker_connections" (
     connected_at INT NOT NULL,
     last_heartbeat_at INT,
     disconnected_at INT,
+    recorded_at INT,
+    inserted_at INT,
 
     group_hash BLOB NOT NULL,
     sdk_lang VARCHAR NOT NULL,

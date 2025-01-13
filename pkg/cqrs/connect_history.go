@@ -46,6 +46,10 @@ type WorkerConnection struct {
 
 	// Cursor is a composite cursor used for pagination
 	Cursor string `json:"cursor"`
+
+	// Meta fields for tracking history ingestion
+	RecordedAt time.Time `json:"recorded_at"`
+	InsertedAt time.Time `json:"inserted_at"`
 }
 
 type ConnectionHistoryReadWriter interface {

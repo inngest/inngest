@@ -1164,7 +1164,7 @@ func (q *Queries) GetTraceSpans(ctx context.Context, arg GetTraceSpansParams) ([
 const getWorkerConnection = `-- name: GetWorkerConnection :one
 ;
 
-SELECT account_id, workspace_id, app_id, id, gateway_id, instance_id, status, connected_at, last_heartbeat_at, disconnected_at, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, cpu_cores, mem_bytes, os FROM worker_connections WHERE account_id = ?1 AND workspace_id = ?2 AND id = ?3
+SELECT account_id, workspace_id, app_id, id, gateway_id, instance_id, status, connected_at, last_heartbeat_at, disconnected_at, recorded_at, inserted_at, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, cpu_cores, mem_bytes, os FROM worker_connections WHERE account_id = ?1 AND workspace_id = ?2 AND id = ?3
 `
 
 type GetWorkerConnectionParams struct {
@@ -1187,6 +1187,8 @@ func (q *Queries) GetWorkerConnection(ctx context.Context, arg GetWorkerConnecti
 		&i.ConnectedAt,
 		&i.LastHeartbeatAt,
 		&i.DisconnectedAt,
+		&i.RecordedAt,
+		&i.InsertedAt,
 		&i.GroupHash,
 		&i.SdkLang,
 		&i.SdkVersion,
@@ -1593,9 +1595,9 @@ const insertWorkerConnection = `-- name: InsertWorkerConnection :exec
 
 INSERT INTO worker_connections (
     account_id, workspace_id, app_id, id, gateway_id, instance_id, status, connected_at, last_heartbeat_at, disconnected_at,
-    group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, cpu_cores, mem_bytes, os
+    recorded_at, inserted_at, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, cpu_cores, mem_bytes, os
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id)
 DO UPDATE SET
     account_id = excluded.account_id,
@@ -1610,6 +1612,8 @@ DO UPDATE SET
     connected_at = excluded.connected_at,
     last_heartbeat_at = excluded.last_heartbeat_at,
     disconnected_at = excluded.disconnected_at,
+    recorded_at = excluded.recorded_at,
+    inserted_at = excluded.inserted_at,
 
     group_hash = excluded.group_hash,
     sdk_lang = excluded.sdk_lang,
@@ -1633,6 +1637,8 @@ type InsertWorkerConnectionParams struct {
 	ConnectedAt     int64
 	LastHeartbeatAt sql.NullInt64
 	DisconnectedAt  sql.NullInt64
+	RecordedAt      int64
+	InsertedAt      int64
 	GroupHash       []byte
 	SdkLang         string
 	SdkVersion      string
@@ -1656,6 +1662,8 @@ func (q *Queries) InsertWorkerConnection(ctx context.Context, arg InsertWorkerCo
 		arg.ConnectedAt,
 		arg.LastHeartbeatAt,
 		arg.DisconnectedAt,
+		arg.RecordedAt,
+		arg.InsertedAt,
 		arg.GroupHash,
 		arg.SdkLang,
 		arg.SdkVersion,

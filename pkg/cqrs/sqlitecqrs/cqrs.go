@@ -1512,6 +1512,8 @@ func (w wrapper) InsertWorkerConnection(ctx context.Context, conn *cqrs.WorkerCo
 		ConnectedAt:     conn.ConnectedAt.UnixMilli(),
 		LastHeartbeatAt: lastHeartbeatAt,
 		DisconnectedAt:  disconnectedAt,
+		RecordedAt:      conn.RecordedAt.UnixMilli(),
+		InsertedAt:      time.Now().UnixMilli(),
 		GroupHash:       []byte(conn.GroupHash),
 		SdkLang:         conn.SDKLang,
 		SdkVersion:      conn.SDKVersion,
