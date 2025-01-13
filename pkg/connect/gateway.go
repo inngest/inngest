@@ -50,6 +50,8 @@ type connectionHandler struct {
 
 	updateLock sync.Mutex
 	log        *slog.Logger
+
+	remoteAddr string
 }
 
 var ErrDraining = SocketError{
@@ -96,11 +98,20 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		var closed bool
 
+		remoteAddr := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			remoteAddr = xff
+		}
+		if xff := r.Header.Get("X-Real-IP"); xff != "" {
+			remoteAddr = xff
+		}
+
 		ch := &connectionHandler{
 			svc:        c,
 			log:        c.logger,
 			ws:         ws,
 			updateLock: sync.Mutex{},
+			remoteAddr: remoteAddr,
 		}
 
 		c.connectionCount.Add()
@@ -784,6 +795,8 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 		AccountID:    authResp.AccountID,
 		EnvID:        authResp.EnvID,
 		ConnectionId: connectionId,
+
+		WorkerIP: c.remoteAddr,
 
 		Data:    &initialMessageData,
 		Session: sessionDetails,
