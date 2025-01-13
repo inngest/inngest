@@ -50,7 +50,7 @@ export const Chart = ({
       } catch (e) {
         //
         // fast successive toggling occasionally throws errors,
-        // catch theme so we don't pollute sentry
+        // catch them so we don't pollute sentry
         console.info('there was a problem toggling tooltip', e);
       }
     }
