@@ -78,23 +78,24 @@ type ComplexityRoot struct {
 	}
 
 	ConnectV1WorkerConnection struct {
-		App             func(childComplexity int) int
-		AppID           func(childComplexity int) int
-		CPUCores        func(childComplexity int) int
-		ConnectedAt     func(childComplexity int) int
-		DisconnectedAt  func(childComplexity int) int
-		GatewayID       func(childComplexity int) int
-		GroupHash       func(childComplexity int) int
-		ID              func(childComplexity int) int
-		InstanceID      func(childComplexity int) int
-		LastHeartbeatAt func(childComplexity int) int
-		MemBytes        func(childComplexity int) int
-		Os              func(childComplexity int) int
-		SdkLang         func(childComplexity int) int
-		SdkPlatform     func(childComplexity int) int
-		SdkVersion      func(childComplexity int) int
-		Status          func(childComplexity int) int
-		SyncID          func(childComplexity int) int
+		App              func(childComplexity int) int
+		AppID            func(childComplexity int) int
+		CPUCores         func(childComplexity int) int
+		ConnectedAt      func(childComplexity int) int
+		DisconnectReason func(childComplexity int) int
+		DisconnectedAt   func(childComplexity int) int
+		GatewayID        func(childComplexity int) int
+		GroupHash        func(childComplexity int) int
+		ID               func(childComplexity int) int
+		InstanceID       func(childComplexity int) int
+		LastHeartbeatAt  func(childComplexity int) int
+		MemBytes         func(childComplexity int) int
+		Os               func(childComplexity int) int
+		SdkLang          func(childComplexity int) int
+		SdkPlatform      func(childComplexity int) int
+		SdkVersion       func(childComplexity int) int
+		Status           func(childComplexity int) int
+		SyncID           func(childComplexity int) int
 	}
 
 	ConnectV1WorkerConnectionEdge struct {
@@ -621,6 +622,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ConnectV1WorkerConnection.ConnectedAt(childComplexity), true
+
+	case "ConnectV1WorkerConnection.disconnectReason":
+		if e.complexity.ConnectV1WorkerConnection.DisconnectReason == nil {
+			break
+		}
+
+		return e.complexity.ConnectV1WorkerConnection.DisconnectReason(childComplexity), true
 
 	case "ConnectV1WorkerConnection.disconnectedAt":
 		if e.complexity.ConnectV1WorkerConnection.DisconnectedAt == nil {
@@ -2977,6 +2985,8 @@ type ConnectV1WorkerConnection {
   lastHeartbeatAt: Time
   disconnectedAt: Time
 
+  disconnectReason: String
+
   status: ConnectV1ConnectionStatus!
 
   groupHash: String!
@@ -4357,6 +4367,47 @@ func (ec *executionContext) fieldContext_ConnectV1WorkerConnection_disconnectedA
 	return fc, nil
 }
 
+func (ec *executionContext) _ConnectV1WorkerConnection_disconnectReason(ctx context.Context, field graphql.CollectedField, obj *models.ConnectV1WorkerConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ConnectV1WorkerConnection_disconnectReason(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.DisconnectReason, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ConnectV1WorkerConnection_disconnectReason(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConnectV1WorkerConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ConnectV1WorkerConnection_status(ctx context.Context, field graphql.CollectedField, obj *models.ConnectV1WorkerConnection) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ConnectV1WorkerConnection_status(ctx, field)
 	if err != nil {
@@ -4805,6 +4856,8 @@ func (ec *executionContext) fieldContext_ConnectV1WorkerConnectionEdge_node(ctx 
 				return ec.fieldContext_ConnectV1WorkerConnection_lastHeartbeatAt(ctx, field)
 			case "disconnectedAt":
 				return ec.fieldContext_ConnectV1WorkerConnection_disconnectedAt(ctx, field)
+			case "disconnectReason":
+				return ec.fieldContext_ConnectV1WorkerConnection_disconnectReason(ctx, field)
 			case "status":
 				return ec.fieldContext_ConnectV1WorkerConnection_status(ctx, field)
 			case "groupHash":
@@ -10290,6 +10343,8 @@ func (ec *executionContext) fieldContext_Query_workerConnection(ctx context.Cont
 				return ec.fieldContext_ConnectV1WorkerConnection_lastHeartbeatAt(ctx, field)
 			case "disconnectedAt":
 				return ec.fieldContext_ConnectV1WorkerConnection_disconnectedAt(ctx, field)
+			case "disconnectReason":
+				return ec.fieldContext_ConnectV1WorkerConnection_disconnectReason(ctx, field)
 			case "status":
 				return ec.fieldContext_ConnectV1WorkerConnection_status(ctx, field)
 			case "groupHash":
@@ -17711,6 +17766,10 @@ func (ec *executionContext) _ConnectV1WorkerConnection(ctx context.Context, sel 
 		case "disconnectedAt":
 
 			out.Values[i] = ec._ConnectV1WorkerConnection_disconnectedAt(ctx, field, obj)
+
+		case "disconnectReason":
+
+			out.Values[i] = ec._ConnectV1WorkerConnection_disconnectReason(ctx, field, obj)
 
 		case "status":
 

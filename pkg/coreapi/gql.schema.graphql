@@ -522,6 +522,8 @@ type ConnectV1WorkerConnection {
   lastHeartbeatAt: Time
   disconnectedAt: Time
 
+  disconnectReason: String
+
   status: ConnectV1ConnectionStatus!
 
   groupHash: String!
