@@ -44,8 +44,15 @@ export const Chart = ({
 
   const toggleTooltips = (show: boolean) => {
     if (chartRef.current !== null) {
-      const chart = getInstanceByDom(chartRef.current);
-      chart?.setOption({ tooltip: { show }, xAxis: { axisPointer: { label: { show } } } });
+      try {
+        const chart = getInstanceByDom(chartRef.current);
+        chart?.setOption({ tooltip: { show }, xAxis: { axisPointer: { label: { show } } } });
+      } catch (e) {
+        //
+        // fast successive toggling occasionally throws errors,
+        // catch theme so we don't pollute sentry
+        console.info('there was a problem toggling tooltip', e);
+      }
     }
   };
 
