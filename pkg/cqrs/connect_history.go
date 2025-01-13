@@ -32,6 +32,8 @@ type WorkerConnection struct {
 	LastHeartbeatAt *time.Time `json:"last_heartbeat_at"`
 	DisconnectedAt  *time.Time `json:"disconnected_at"`
 
+	DisconnectReason *string `json:"disconnect_reason"`
+
 	// Group attributes
 	GroupHash   string     `json:"group_hash"`
 	SDKLang     string     `json:"sdk_lang"`

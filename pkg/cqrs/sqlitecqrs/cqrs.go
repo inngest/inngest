@@ -1501,27 +1501,36 @@ func (w wrapper) InsertWorkerConnection(ctx context.Context, conn *cqrs.WorkerCo
 		}
 	}
 
+	var disconnectReason sql.NullString
+	if conn.DisconnectReason != nil {
+		disconnectReason = sql.NullString{
+			String: *conn.DisconnectReason,
+			Valid:  true,
+		}
+	}
+
 	params := sqlc.InsertWorkerConnectionParams{
-		AccountID:       conn.AccountID,
-		WorkspaceID:     conn.WorkspaceID,
-		AppID:           conn.AppID,
-		ID:              conn.Id,
-		GatewayID:       conn.GatewayId,
-		InstanceID:      instanceId,
-		Status:          int64(conn.Status),
-		ConnectedAt:     conn.ConnectedAt.UnixMilli(),
-		LastHeartbeatAt: lastHeartbeatAt,
-		DisconnectedAt:  disconnectedAt,
-		RecordedAt:      conn.RecordedAt.UnixMilli(),
-		InsertedAt:      time.Now().UnixMilli(),
-		GroupHash:       []byte(conn.GroupHash),
-		SdkLang:         conn.SDKLang,
-		SdkVersion:      conn.SDKVersion,
-		SdkPlatform:     conn.SDKPlatform,
-		SyncID:          conn.SyncID,
-		CpuCores:        int64(conn.CpuCores),
-		MemBytes:        conn.MemBytes,
-		Os:              conn.Os,
+		AccountID:        conn.AccountID,
+		WorkspaceID:      conn.WorkspaceID,
+		AppID:            conn.AppID,
+		ID:               conn.Id,
+		GatewayID:        conn.GatewayId,
+		InstanceID:       instanceId,
+		Status:           int64(conn.Status),
+		ConnectedAt:      conn.ConnectedAt.UnixMilli(),
+		LastHeartbeatAt:  lastHeartbeatAt,
+		DisconnectedAt:   disconnectedAt,
+		RecordedAt:       conn.RecordedAt.UnixMilli(),
+		InsertedAt:       time.Now().UnixMilli(),
+		GroupHash:        []byte(conn.GroupHash),
+		SdkLang:          conn.SDKLang,
+		SdkVersion:       conn.SDKVersion,
+		SdkPlatform:      conn.SDKPlatform,
+		SyncID:           conn.SyncID,
+		CpuCores:         int64(conn.CpuCores),
+		MemBytes:         conn.MemBytes,
+		Os:               conn.Os,
+		DisconnectReason: disconnectReason,
 	}
 
 	return w.q.InsertWorkerConnection(ctx, params)

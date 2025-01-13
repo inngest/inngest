@@ -161,24 +161,25 @@ type TraceRun struct {
 }
 
 type WorkerConnection struct {
-	AccountID       uuid.UUID
-	WorkspaceID     uuid.UUID
-	AppID           *uuid.UUID
-	ID              ulid.ULID
-	GatewayID       ulid.ULID
-	InstanceID      sql.NullString
-	Status          int64
-	ConnectedAt     int64
-	LastHeartbeatAt sql.NullInt64
-	DisconnectedAt  sql.NullInt64
-	RecordedAt      int64
-	InsertedAt      int64
-	GroupHash       []byte
-	SdkLang         string
-	SdkVersion      string
-	SdkPlatform     string
-	SyncID          *uuid.UUID
-	CpuCores        int64
-	MemBytes        int64
-	Os              string
+	AccountID        uuid.UUID
+	WorkspaceID      uuid.UUID
+	AppID            *uuid.UUID
+	ID               ulid.ULID
+	GatewayID        ulid.ULID
+	InstanceID       sql.NullString
+	Status           int64
+	ConnectedAt      int64
+	LastHeartbeatAt  sql.NullInt64
+	DisconnectedAt   sql.NullInt64
+	RecordedAt       int64
+	InsertedAt       int64
+	DisconnectReason sql.NullString
+	GroupHash        []byte
+	SdkLang          string
+	SdkVersion       string
+	SdkPlatform      string
+	SyncID           *uuid.UUID
+	CpuCores         int64
+	MemBytes         int64
+	Os               string
 }

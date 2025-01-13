@@ -62,27 +62,33 @@ func (h *historyLifecycles) OnDisconnected(ctx context.Context, conn *state.Conn
 		instanceId = &conn.Session.SessionId.InstanceId
 	}
 
+	var disconnectReason *string
+	if closeReason != "" {
+		disconnectReason = ptr.String(closeReason)
+	}
+
 	// Persist history in history store
 	err := h.writer.InsertWorkerConnection(ctx, &cqrs.WorkerConnection{
-		AccountID:       conn.AccountID,
-		WorkspaceID:     conn.EnvID,
-		AppID:           conn.Group.AppID,
-		Id:              conn.ConnectionId,
-		GatewayId:       conn.GatewayId,
-		InstanceId:      instanceId,
-		Status:          connectpb.ConnectionStatus_DISCONNECTED,
-		LastHeartbeatAt: ptr.Time(time.Now()),
-		DisconnectedAt:  ptr.Time(time.Now()),
-		ConnectedAt:     ulid.Time(conn.ConnectionId.Time()),
-		GroupHash:       conn.Group.Hash,
-		SDKLang:         conn.Group.SDKLang,
-		SDKVersion:      conn.Group.SDKVersion,
-		SDKPlatform:     conn.Group.SDKPlatform,
-		SyncID:          conn.Group.SyncID,
-		CpuCores:        conn.Data.SystemAttributes.CpuCores,
-		MemBytes:        conn.Data.SystemAttributes.MemBytes,
-		Os:              conn.Data.SystemAttributes.Os,
-		RecordedAt:      time.Now(),
+		AccountID:        conn.AccountID,
+		WorkspaceID:      conn.EnvID,
+		AppID:            conn.Group.AppID,
+		Id:               conn.ConnectionId,
+		GatewayId:        conn.GatewayId,
+		InstanceId:       instanceId,
+		Status:           connectpb.ConnectionStatus_DISCONNECTED,
+		LastHeartbeatAt:  ptr.Time(time.Now()),
+		DisconnectedAt:   ptr.Time(time.Now()),
+		ConnectedAt:      ulid.Time(conn.ConnectionId.Time()),
+		GroupHash:        conn.Group.Hash,
+		SDKLang:          conn.Group.SDKLang,
+		SDKVersion:       conn.Group.SDKVersion,
+		SDKPlatform:      conn.Group.SDKPlatform,
+		SyncID:           conn.Group.SyncID,
+		CpuCores:         conn.Data.SystemAttributes.CpuCores,
+		MemBytes:         conn.Data.SystemAttributes.MemBytes,
+		Os:               conn.Data.SystemAttributes.Os,
+		RecordedAt:       time.Now(),
+		DisconnectReason: disconnectReason,
 	})
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("could not persist connection history", "error", err)

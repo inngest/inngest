@@ -15,6 +15,8 @@ CREATE TABLE "worker_connections" (
     recorded_at INT,
     inserted_at INT,
 
+    disconnect_reason VARCHAR,
+
     group_hash BLOB NOT NULL,
     sdk_lang VARCHAR NOT NULL,
     sdk_version VARCHAR NOT NULL,

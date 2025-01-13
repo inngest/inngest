@@ -168,6 +168,8 @@ CREATE TABLE worker_connections (
     recorded_at INT NOT NULL,
     inserted_at INT NOT NULL,
 
+    disconnect_reason VARCHAR,
+
     group_hash BLOB NOT NULL,
     sdk_lang VARCHAR NOT NULL,
     sdk_version VARCHAR NOT NULL,
