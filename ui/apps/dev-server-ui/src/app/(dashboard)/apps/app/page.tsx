@@ -3,10 +3,21 @@
 import { AppDetailsCard, CardItem } from '@inngest/components/Apps/AppDetailsCard';
 import { FunctionList } from '@inngest/components/Apps/FunctionList';
 import { Header } from '@inngest/components/Header/Header';
+import { Pill } from '@inngest/components/Pill/Pill';
+import { Time } from '@inngest/components/Time';
+import WorkersCounter from '@inngest/components/Workers/WorkersCounter';
 import { WorkersTable } from '@inngest/components/Workers/WorkersTable';
+import { isWorkerStatus } from '@inngest/components/types/workers';
 
 const app = {
   name: 'Growth',
+  id: 'id1',
+  sdkVersion: 'v1.0.0',
+  sdkLanguage: 'JS',
+  syncMethod: 'PERSISTENT',
+  lastSyncedAt: new Date('2021-08-01T00:00:00Z'),
+  framework: 'React',
+  version: '1.0.0',
   functions: [
     { name: 'Function 1', slug: 'function 1', triggers: [{ type: 'EVENT', value: 'fake event' }] },
   ],
@@ -18,7 +29,6 @@ const app = {
       status: 'ACTIVE',
       lastHeartbeatAt: new Date('2025-01-13T00:00:00Z'),
       appVersion: '1.0.0',
-
       workerIp: '18.118.72.162',
       sdkVersion: 'v1.0.0',
       sdkLang: 'JS',
@@ -47,6 +57,21 @@ const app = {
 };
 
 export default function AppList() {
+  const groupedWorkers = app.workers.reduce(
+    (acc, worker) => {
+      if (!isWorkerStatus(worker.status)) {
+        return { ACTIVE: 0, FAILED: 0, INACTIVE: 0 };
+      }
+      const status = worker.status;
+      if (!acc[status]) {
+        acc[status] = 0; // Default to 0 if the status doesn't exist
+      }
+      acc[status]++;
+      return acc;
+    },
+    { ACTIVE: 0, FAILED: 0, INACTIVE: 0 }
+  );
+
   return (
     <>
       <Header breadcrumb={[{ text: 'Apps', href: '/apps' }, { text: app?.name || 'App' }]} />
@@ -58,7 +83,17 @@ export default function AppList() {
         </div>
 
         <AppDetailsCard title="App information">
-          <CardItem term="App ID" detail="app-1234" />
+          <CardItem term="App ID" detail={app.id} />
+          <CardItem term="App version" detail={<Pill>{app.version}</Pill>} />
+          <CardItem term="Last synced at" detail={<Time value={app.lastSyncedAt} />} />
+          <CardItem term="Connected workers" detail={<WorkersCounter counts={groupedWorkers} />} />
+          <CardItem
+            term="Sync method"
+            detail={<p className="lowercase first-letter:capitalize">{app.syncMethod}</p>}
+          />
+          <CardItem term="SDK version" detail={<Pill>{app.sdkVersion}</Pill>} />
+          <CardItem term="Language" detail={app.sdkLanguage} />
+          <CardItem term="Framework" detail={app.framework} />
         </AppDetailsCard>
         <div>
           <h4 className="text-subtle mb-4 text-xl">Workers ({app.functions.length})</h4>

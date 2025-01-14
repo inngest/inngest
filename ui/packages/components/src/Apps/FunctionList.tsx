@@ -28,7 +28,7 @@ export function FunctionList({ envSlug, functions, pathCreator }: Props) {
 
   return (
     <main
-      className="[&_thead_th]:bg-codeEditor border-subtle mb-8 min-h-0 overflow-y-auto rounded-md border [&>table]:border-b-0 [&_thead_th]:font-normal"
+      className="[&_thead_th]:bg-canvasSubtle border-subtle mb-8 min-h-0 overflow-y-auto rounded-md border [&>table]:border-b-0 [&_thead_th]:font-normal"
       ref={tableContainerRef}
     >
       <Table

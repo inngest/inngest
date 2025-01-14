@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { CardItem } from '@inngest/components/Apps/AppDetailsCard';
+import { Pill } from '@inngest/components/Pill/Pill';
 import { type Worker } from '@inngest/components/types/workers';
 import { type Row, type SortingState } from '@tanstack/react-table';
 
@@ -38,6 +39,15 @@ function SubComponent({ row }: { row: Row<Worker> }) {
       <CardItem term="SDK version" detail={row.original.sdkVersion} />
       <CardItem term="SDK language" detail={row.original.sdkLang} />
       <CardItem term="No. of functions" detail={row.original.functionCount.toString()} />
+      <CardItem
+        term="System attributes"
+        detail={
+          <div className="flex items-center gap-1">
+            <Pill>{row.original.os + ' OS'}</Pill>
+            <Pill>{row.original.cpuCores + ' CPU cores'}</Pill>
+          </div>
+        }
+      />
     </dl>
   );
 }

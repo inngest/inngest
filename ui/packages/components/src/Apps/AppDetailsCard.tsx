@@ -52,7 +52,7 @@ export function CardItem({
           </Tooltip>
         )}
       </dt>
-      {!loading && <dd className="text-subtle">{detail ?? ''}</dd>}
+      {!loading && <dd className="text-subtle text-sm">{detail ?? ''}</dd>}
       {loading && <Skeleton className="mb-2 block h-6 w-full" />}
     </div>
   );
