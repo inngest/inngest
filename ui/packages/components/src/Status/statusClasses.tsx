@@ -4,11 +4,11 @@ import {
   type FunctionRunStatus,
   type ReplayRunStatus,
 } from '../types/functionRun';
-import { isWorkerStatus, type WorkerStatus } from '../types/workers';
+import { isWorkerStatus, type GroupedWorkerStatus } from '../types/workers';
 import { cn } from '../utils/classNames';
 
 const backgroundClasses: {
-  [key in FunctionRunStatus | ReplayRunStatus | WorkerStatus | 'UNKNOWN']: string;
+  [key in FunctionRunStatus | ReplayRunStatus | GroupedWorkerStatus | 'UNKNOWN']: string;
 } = {
   CANCELLED: 'bg-status-cancelled',
   COMPLETED: 'bg-status-completed',
@@ -19,11 +19,8 @@ const backgroundClasses: {
   SKIPPED_PAUSED: 'bg-accent-intense',
   PAUSED: 'bg-status-paused',
   SKIPPED: 'bg-status-paused',
-  CONNECTED: 'bg-accent-intense',
-  DISCONNECTED: 'bg-status-failed',
-  DISCONNECTING: 'bg-accent-intense',
-  DRAINING: 'bg-accent-intense',
-  READY: 'bg-status-completed',
+  INACTIVE: 'bg-accent-intense',
+  ACTIVE: 'bg-status-completed',
 };
 
 export function getStatusBackgroundClass(status: string): string {
@@ -35,7 +32,7 @@ export function getStatusBackgroundClass(status: string): string {
 }
 
 const borderClasses: {
-  [key in FunctionRunStatus | ReplayRunStatus | WorkerStatus | 'UNKNOWN']: string;
+  [key in FunctionRunStatus | ReplayRunStatus | GroupedWorkerStatus | 'UNKNOWN']: string;
 } = {
   CANCELLED: 'border-status-cancelled',
   COMPLETED: 'border-status-completed',
@@ -46,11 +43,8 @@ const borderClasses: {
   SKIPPED_PAUSED: 'border-accent-intense',
   PAUSED: 'border-accent-paused',
   SKIPPED: 'border-accent-paused',
-  CONNECTED: 'border-accent-intense',
-  DISCONNECTED: 'border-status-failed',
-  DISCONNECTING: 'border-accent-intense',
-  DRAINING: 'border-accent-intense',
-  READY: 'border-status-completed',
+  INACTIVE: 'border-accent-intense',
+  ACTIVE: 'border-status-completed',
 };
 
 export function getStatusBorderClass(status: string): string {
@@ -62,7 +56,7 @@ export function getStatusBorderClass(status: string): string {
 }
 
 const textClasses: {
-  [key in FunctionRunStatus | ReplayRunStatus | WorkerStatus | 'UNKNOWN']: string;
+  [key in FunctionRunStatus | ReplayRunStatus | GroupedWorkerStatus | 'UNKNOWN']: string;
 } = {
   CANCELLED: 'text-status-cancelledText',
   COMPLETED: 'text-status-completedText',
@@ -73,11 +67,8 @@ const textClasses: {
   SKIPPED_PAUSED: 'text-accent-intense',
   PAUSED: 'text-status-pausedText',
   SKIPPED: 'text-status-pausedText',
-  CONNECTED: 'text-accent-intense',
-  DISCONNECTED: 'text-status-failedText',
-  DISCONNECTING: 'text-accent-intense',
-  DRAINING: 'text-accent-intense',
-  READY: 'text-status-completedText',
+  INACTIVE: 'text-accent-intense',
+  ACTIVE: 'text-status-completedText',
 };
 
 export function getStatusTextClass(status: string): string {
