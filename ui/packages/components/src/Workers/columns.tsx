@@ -1,6 +1,9 @@
+import { Button } from '@inngest/components/Button';
 import { PillCell, StatusCell, TextCell, TimeCell } from '@inngest/components/Table';
 import { type GroupedWorkerStatus, type Worker } from '@inngest/components/types/workers';
-import { createColumnHelper } from '@tanstack/react-table';
+import { cn } from '@inngest/components/utils/classNames';
+import { RiArrowRightSLine } from '@remixicon/react';
+import { createColumnHelper, type Row } from '@tanstack/react-table';
 
 const columnHelper = createColumnHelper<Worker>();
 
@@ -23,6 +26,31 @@ function ensureColumnID(id: ColumnID): ColumnID {
 
 export function useColumns() {
   const columns = [
+    columnHelper.display({
+      id: 'expander',
+      header: () => null,
+      size: 60,
+      cell: ({ row }: { row: Row<Worker> }) => {
+        return row.getCanExpand() ? (
+          <Button
+            className="group"
+            appearance="ghost"
+            kind="secondary"
+            onClick={row.getToggleExpandedHandler()}
+            icon={
+              <RiArrowRightSLine
+                className={cn(
+                  row.getIsExpanded() ? 'rotate-90' : undefined,
+                  'transform-90 h-5 w-5 transition-transform duration-500'
+                )}
+              />
+            }
+          />
+        ) : (
+          <></>
+        );
+      },
+    }),
     columnHelper.accessor('instanceID', {
       cell: (info) => {
         const name = info.getValue();

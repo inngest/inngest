@@ -21,7 +21,7 @@ type TableProps<T> = {
   isLoading?: boolean;
   renderSubComponent: (props: { row: Row<T> }) => React.ReactElement;
   enableExpanding: boolean;
-  columns: ColumnDef<T>[];
+  columns: ColumnDef<T, any>[];
   getRowCanExpand: (row: Row<T>) => boolean;
 };
 

@@ -25,22 +25,18 @@ export const convertWorkerStatus = (status: WorkerStatus): GroupedWorkerStatus |
 
 export type Worker = {
   appVersion: string;
-  appID: string;
   connectedAt: Date;
   cpuCores: number;
-  disconnectedAt: Date | null;
-  gatewayID: string;
-  groupHash: string;
   id: string;
   instanceID: string | null;
   lastHeartbeatAt: Date | null;
   memBytes: number;
   os: string;
   sdkLang: string;
-  sdkPlatform: string;
   sdkVersion: string;
+  workerIp: string;
   status: GroupedWorkerStatus;
-  syncID: string | null;
+  functionCount: Number;
 };
 
 export const groupedWorkerStatuses = ['ACTIVE', 'INACTIVE', 'FAILED'] as const;
