@@ -1,2 +1,2 @@
-export { Pill, PillContent, type PillContentProps } from './Pill';
+export { Pill, PillContent, type PillContentProps, type PillAppearance } from './Pill';
 export { HorizontalPillList } from './HorizontalPillList';

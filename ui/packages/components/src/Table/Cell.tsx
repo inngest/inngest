@@ -1,4 +1,9 @@
-import { Pill, PillContent, type PillContentProps } from '@inngest/components/Pill';
+import {
+  Pill,
+  PillContent,
+  type PillAppearance,
+  type PillContentProps,
+} from '@inngest/components/Pill';
 import { StatusDot } from '@inngest/components/Status/StatusDot';
 import { getStatusTextClass } from '@inngest/components/Status/statusClasses';
 import { Time } from '@inngest/components/Time';
@@ -24,9 +29,13 @@ export function AICell({ children }: React.PropsWithChildren) {
   );
 }
 
-export function PillCell({ children, type }: PillContentProps) {
+export function PillCell({
+  children,
+  type,
+  appearance = 'outlined',
+}: PillContentProps & { appearance?: PillAppearance }) {
   return (
-    <Pill appearance="outlined">
+    <Pill appearance={appearance}>
       <PillContent type={type}>{children}</PillContent>
     </Pill>
   );
