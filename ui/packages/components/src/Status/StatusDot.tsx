@@ -1,5 +1,5 @@
-import { getStatusBackgroundClass, getStatusBorderClass } from '../statusClasses';
 import { cn } from '../utils/classNames';
+import { getStatusBackgroundClass, getStatusBorderClass } from './statusClasses';
 import { statusTitles } from './statusTitles';
 
 type Props = {
@@ -7,7 +7,7 @@ type Props = {
   className?: string;
 };
 
-export function RunStatusDot({ status, className }: Props) {
+export function StatusDot({ status, className }: Props) {
   const backgroundClass = getStatusBackgroundClass(status);
   const borderClass = getStatusBorderClass(status);
 
