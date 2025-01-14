@@ -1,4 +1,4 @@
-import { getStatusBackgroundClass, getStatusBorderClass } from '../statusClasses';
+import { getStatusBackgroundClass, getStatusBorderClass } from '../Status/statusClasses';
 import { cn } from '../utils/classNames';
 import { toMaybeDate } from '../utils/date';
 import { createSpanWidths } from './utils';
