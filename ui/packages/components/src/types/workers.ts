@@ -36,7 +36,7 @@ export type Worker = {
   sdkVersion: string;
   workerIp: string;
   status: GroupedWorkerStatus;
-  functionCount: Number;
+  functionCount: number;
 };
 
 export const groupedWorkerStatuses = ['ACTIVE', 'INACTIVE', 'FAILED'] as const;
