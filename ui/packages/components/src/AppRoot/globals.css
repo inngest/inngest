@@ -226,7 +226,7 @@
 
   .dark {
     --color-background-canvas-base: var(--color-carbon-1000);
-    --color-background-canvas-subtle: var(--color-carbon-900);
+    --color-background-canvas-subtle: var(--color-carbon-950);
     --color-background-canvas-muted: var(--color-carbon-900);
     --color-background-surface-base: var(--color-carbon-1000);
     --color-background-surface-subtle: var(--color-carbon-950);
