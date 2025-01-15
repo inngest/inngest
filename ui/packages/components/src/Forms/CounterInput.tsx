@@ -1,6 +1,7 @@
 'use client';
 
-import { RiAddFill, RiSubtractFill } from '@remixicon/react';
+import { useState } from 'react';
+import { RiAddFill, RiAlertFill, RiSubtractFill } from '@remixicon/react';
 
 import { Button } from '../Button';
 import { Input } from './Input';
@@ -20,9 +21,12 @@ export default function CounterInput({
   onChange,
   step = 1,
 }: CounterInputProps) {
+  const [err, setErr] = useState<string | null>(null);
+
   const increment = () => {
     const newValue = value + step;
     if (newValue <= max) {
+      setErr(null);
       onChange(newValue);
     }
   };
@@ -30,6 +34,7 @@ export default function CounterInput({
   const decrement = () => {
     const newValue = value - step;
     if (newValue >= min) {
+      setErr(null);
       onChange(newValue);
     }
   };
@@ -37,21 +42,20 @@ export default function CounterInput({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = parseInt(e.target.value, 10);
 
-    // TO DO: proper display of input validation
     if (isNaN(newValue)) {
-      console.log('Value must be a number.');
+      setErr('Value must be a number.');
       return;
     }
-
     if (newValue < min || newValue > max) {
-      console.log(`Value must be between ${min} and ${max}.`);
+      setErr(`Value must be between ${min} and ${max}.`);
+      return;
+    }
+    if ((newValue - min) % step !== 0) {
+      setErr(`Value must align with intervals of ${step}.`);
       return;
     }
 
-    if ((newValue - min) % step !== 0) {
-      console.log(`Value must align with step intervals of ${step}.`);
-      return;
-    }
+    setErr(null);
     onChange(newValue);
   };
 
@@ -81,9 +85,12 @@ export default function CounterInput({
           icon={<RiAddFill className="h-4" />}
           className="disabled:border-muted disabled:bg-canvasBase rounded-l-none border-l-0"
         />
+        {err && (
+          <p className="text-error ml-2 text-xs">
+            <RiAlertFill className="-mt-0.5 inline h-4" /> {err}
+          </p>
+        )}
       </div>
-
-      {/* {error && <p className="text-error text-xs">{error}</p>} */}
     </div>
   );
 }
