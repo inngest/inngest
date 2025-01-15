@@ -66,7 +66,7 @@ export default function CounterInput({
           type="number"
           value={value}
           onChange={handleChange}
-          className="z-10 w-12 rounded-r-none border-r-0"
+          className="z-10 w-16 rounded-r-none border-r-0"
           step={step}
         />
         <Button
