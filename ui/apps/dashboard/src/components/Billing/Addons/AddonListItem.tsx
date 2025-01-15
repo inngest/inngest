@@ -144,7 +144,7 @@ export default function AddOn({
                 setOpenConfirmationModal(true);
                 setOpenSelfService(false);
               }}
-              label="Add"
+              label="Update"
             />
           </div>
         </div>
