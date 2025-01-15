@@ -21,7 +21,7 @@ export default function AddOn({
   value,
   canIncreaseLimitInCurrentPlan,
   tooltipContent,
-  selfServiceAvailable = false,
+  selfServiceAvailable = true,
 }: {
   title: string;
   description?: string;
@@ -34,6 +34,7 @@ export default function AddOn({
   const [openSelfService, setOpenSelfService] = useState(false);
   const [openConfirmationModal, setOpenConfirmationModal] = useState(false);
   const [inputValue, setInputValue] = useState(Math.max(currentValue, planLimit));
+  const [inputValid, setInputValid] = useState(true);
 
   const priceText = `$${price} per ${quantityPer}`;
   const descriptionText = openSelfService ? (
@@ -79,7 +80,10 @@ export default function AddOn({
               <Button
                 appearance="outlined"
                 label={`Add ${title}`}
-                onClick={() => setOpenSelfService(true)}
+                onClick={() => {
+                  setOpenSelfService(true);
+                  setInputValid(true);
+                }}
               />
             ) : (
               <Button
@@ -110,11 +114,12 @@ export default function AddOn({
             <CounterInput
               value={inputValue}
               onChange={setInputValue}
+              onValid={setInputValid}
               min={planLimit}
               max={maxValue}
               step={quantityPer}
             />
-            <p className="text-muted text-sm">Cost: ${currentCost}</p>
+            {inputValid && <p className="text-muted text-sm">Cost: ${currentCost}</p>}
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -128,6 +133,7 @@ export default function AddOn({
             />
             <Button
               appearance="outlined"
+              disabled={!inputValid}
               onClick={() => {
                 setOpenConfirmationModal(true);
                 setOpenSelfService(false);
