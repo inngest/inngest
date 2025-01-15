@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import NextLink from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
 import { Button } from '@inngest/components/Button/index';
 import { Input } from '@inngest/components/Forms/Input';
