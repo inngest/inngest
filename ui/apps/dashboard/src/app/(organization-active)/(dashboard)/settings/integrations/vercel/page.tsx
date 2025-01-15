@@ -8,6 +8,9 @@ import { RiArrowRightSLine, RiExternalLinkLine } from '@remixicon/react';
 import { vercelIntegration } from '../data';
 import VercelProjects from './projects';
 
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
 export default async function VercelIntegrationPage() {
   const integrations = await vercelIntegration();
 

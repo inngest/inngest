@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import NextLink from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
 import { Button } from '@inngest/components/Button/index';
 import { Input } from '@inngest/components/Forms/Input';
@@ -33,13 +33,10 @@ export default function VercelConfigure() {
   const [, removeVercelApp] = useMutation(RemoveVercelAppDocument);
   const [, updateVercelApp] = useMutation(UpdateVercelAppDocument);
   const { id } = useParams<{ id: string }>();
-  const [project, setProject] = useState<VercelProject & { updated?: boolean }>();
+  const [originalProject, setOriginalProject] = useState<VercelProject>();
+  const [project, setProject] = useState<VercelProject>();
+  const [updated, setUpdated] = useState(false);
   const [notFound, setNotFound] = useState(false);
-
-  // Represents the new, unsaved enablement value. For example, the value will
-  // be "disabled" if the user disables the project but hasn't saved yet
-  const [newEnablement, setNewEnablement] = useState<'disabled' | 'enabled'>();
-
   const [paths, setPaths] = useState([defaultPath]);
 
   //
@@ -47,20 +44,42 @@ export default function VercelConfigure() {
   const [mutating, setMutating] = useState(false);
 
   useEffect(() => {
-    if (!project && data.projects.length > 0) {
-      const p = data.projects.find((p) => p.id === id);
-
-      if (p) {
-        setProject(p);
-        p.servePath && setPaths(p.servePath.split(','));
-        setNotFound(false);
-      } else {
-        setNotFound(true);
-      }
+    if (originalProject) {
+      return;
     }
-  }, [id, project, data.projects]);
 
-  const joinedPaths = paths.join(',');
+    //
+    // Whenever we load or update a project, store the original state.
+    // We need to do this so we only issue add/remove when those changes
+    // have been made as those operations are not idempotent upstream.
+    const p = data.projects.find((p) => p.id === id);
+    if (p) {
+      p.servePath && setPaths(p.servePath.split(','));
+      setOriginalProject(p);
+      setNotFound(false);
+    } else {
+      setNotFound(true);
+    }
+  }, [id, data.projects, originalProject]);
+
+  useEffect(() => {
+    originalProject && setProject({ ...originalProject });
+  }, [originalProject]);
+
+  useEffect(() => {
+    setUpdated(JSON.stringify(originalProject) !== JSON.stringify(project));
+    //
+    // we only want to track updates on project changes, not originalProject
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project]);
+
+  useEffect(() => {
+    project && setProject({ ...project, servePath: paths.join(',') });
+    //
+    // we only want to track updates on paths changes, not project
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paths]);
+
   const submit = useCallback(async () => {
     if (!defaultEnvID) {
       console.error('no environment found');
@@ -72,67 +91,60 @@ export default function VercelConfigure() {
     }
     setMutating(true);
 
-    let error: Error | undefined;
-
-    // This is a quick-and-dirty (a.k.a. disgusting) solution to handle the way
-    // we enable/disable Vercel projects. Enabling/disabling is actually done by
-    // inserting/deleting a row in the DB
-    if (newEnablement === 'enabled') {
-      error = (
-        await createVercelApp({
-          input: {
-            path: project.servePath,
-            projectID: project.id,
-            workspaceID: defaultEnvID,
-          },
-        })
-      ).error;
-    } else if (newEnablement === 'disabled') {
-      error = (
-        await removeVercelApp({
-          input: {
-            projectID: project.id,
-            workspaceID: defaultEnvID,
-          },
-        })
-      ).error;
-    } else {
-      error = (
-        await updateVercelApp({
-          input: {
-            projectID: project.id,
-            path: joinedPaths,
-            protectionBypassSecret: project.protectionBypassSecret,
-            originOverride: project.originOverride ? project.originOverride : undefined,
-          },
-        })
-      ).error;
+    //
+    // if there are other change and isEnabled is still false, this is a no-op
+    if (project.isEnabled === originalProject?.isEnabled && !project.isEnabled) {
+      setMutating(false);
+      return;
     }
+
+    //
+    // enable/disable are actually insert/delete in the db so we need to detect
+    // and call those specifically
+    const { error } =
+      project.isEnabled !== originalProject?.isEnabled && project.isEnabled
+        ? await createVercelApp({
+            input: {
+              path: project.servePath,
+              projectID: project.id,
+              workspaceID: defaultEnvID,
+            },
+          })
+        : project.isEnabled !== originalProject?.isEnabled && !project.isEnabled
+        ? await removeVercelApp({
+            input: {
+              projectID: project.id,
+              workspaceID: defaultEnvID,
+            },
+          })
+        : await updateVercelApp({
+            input: {
+              projectID: project.id,
+              path: project.servePath ?? '',
+              protectionBypassSecret: project.protectionBypassSecret,
+              originOverride: project.originOverride ? project.originOverride : undefined,
+            },
+          });
+
     setMutating(false);
 
     if (error) {
       throw error;
     } else {
-      setProject({ ...project, updated: false });
-      setNewEnablement(undefined);
+      setOriginalProject(project);
+
       //
       // TODO: new designs
       toast.success('Changes saved!');
     }
-  }, [
-    createVercelApp,
-    joinedPaths,
-    newEnablement,
-    defaultEnvID,
-    project,
-    removeVercelApp,
-    updateVercelApp,
-  ]);
+  }, [createVercelApp, defaultEnvID, project, removeVercelApp, updateVercelApp, originalProject]);
 
   // Only show the "extra" settings (stuff besides the enablement toggle) if the
   // project is enabled. This is mostly because not all extra inputs are saved
   // when enabling a project (e.g. the protection bypass secret)
-  const areExtraSettingsVisible = project?.isEnabled && newEnablement !== 'enabled';
+  const areExtraSettingsVisible = project?.isEnabled;
+  console.log('project', project?.isEnabled);
+  console.log('areExtraSettingsVisible', areExtraSettingsVisible);
 
   if (fetching) {
     return (
@@ -167,7 +179,13 @@ export default function VercelConfigure() {
               <div className="text-muted text-base">All integrations</div>
             </NextLink>
             <RiArrowRightSLine className="text-disabled h-4" />
-            <NextLink href="/settings/integrations/vercel">
+            <NextLink
+              href={{
+                pathname: '/settings/integrations/vercel',
+                query: { ts: Date.now() },
+              }}
+              prefetch={false}
+            >
               <div className="text-muted text-base">Vercel</div>
             </NextLink>
             <RiArrowRightSLine className="text-disabled h-4" />
@@ -190,16 +208,9 @@ export default function VercelConfigure() {
             <SwitchWrapper>
               <Switch
                 checked={project.isEnabled}
-                className="data-[state=checked]:bg-primary-moderate"
+                className="data-[state=checked]:bg-primary-moderate cursor-pointer"
                 onCheckedChange={(checked) => {
-                  setProject({ ...project, isEnabled: checked, updated: true });
-                  setNewEnablement((prev) => {
-                    if (!prev) {
-                      // Only change
-                      return checked ? 'enabled' : 'disabled';
-                    }
-                    return undefined;
-                  });
+                  setProject({ ...project, isEnabled: checked });
                 }}
               />
               <SwitchLabel htmlFor="override" className="text-muted text-sm leading-tight">
@@ -224,7 +235,7 @@ export default function VercelConfigure() {
                         className="text-basis h-10 w-full px-2 py-2 text-base"
                         onChange={({ target: { value } }) => {
                           setPaths(paths.map((p, n) => (i === n ? value : p)));
-                          setProject({ ...project, updated: true });
+                          setProject(project);
                         }}
                       />
                     </div>
@@ -249,7 +260,7 @@ export default function VercelConfigure() {
                     label="Add new path"
                     className="mt-3"
                     onClick={() => {
-                      setProject({ ...project, updated: true });
+                      setProject({ ...project });
                       setPaths([...paths, '']);
                     }}
                   />
@@ -282,7 +293,7 @@ export default function VercelConfigure() {
                       project.ssoProtection?.deploymentType === VercelDeploymentProtection.Disabled
                     }
                     onChange={({ target: { value } }) =>
-                      setProject({ ...project, protectionBypassSecret: value, updated: true })
+                      setProject({ ...project, protectionBypassSecret: value })
                     }
                     value={project.protectionBypassSecret ?? ''}
                   />
@@ -300,7 +311,7 @@ export default function VercelConfigure() {
                     placeholder="Add custom domain"
                     value={project.originOverride ?? ''}
                     onChange={({ target: { value } }) =>
-                      setProject({ ...project, originOverride: value, updated: true })
+                      setProject({ ...project, originOverride: value })
                     }
                   />
                 </div>
@@ -311,11 +322,11 @@ export default function VercelConfigure() {
           <div className="mt-6 flex flex-row items-center justify-start">
             <Button
               label="Save configuration"
-              disabled={!project.updated}
+              disabled={!updated}
               onClick={submit}
               loading={mutating}
             />
-            {project.updated && (
+            {updated && (
               <div className="text-muted ml-4 text-[13px] leading-tight">Unsaved changes</div>
             )}
           </div>
