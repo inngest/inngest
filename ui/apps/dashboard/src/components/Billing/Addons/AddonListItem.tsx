@@ -31,9 +31,10 @@ export default function AddOn({
   // TEMP: Not currently passing this prop
   selfServiceAvailable?: boolean;
 }) {
+  const startingValue = Math.max(currentValue, planLimit);
   const [openSelfService, setOpenSelfService] = useState(false);
   const [openConfirmationModal, setOpenConfirmationModal] = useState(false);
-  const [inputValue, setInputValue] = useState(Math.max(currentValue, planLimit));
+  const [inputValue, setInputValue] = useState(startingValue);
 
   const priceText = `$${price} per ${quantityPer}`;
   const descriptionText = openSelfService ? (
@@ -128,6 +129,7 @@ export default function AddOn({
             />
             <Button
               appearance="outlined"
+              disabled={inputValue == startingValue}
               onClick={() => {
                 setOpenConfirmationModal(true);
                 setOpenSelfService(false);
