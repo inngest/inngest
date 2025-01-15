@@ -91,6 +91,20 @@ export const currentPlanDocument = graphql(`
             limit
           }
         }
+        addons {
+          concurrency {
+            available
+            price
+            purchaseCount
+            quantityPer
+          }
+          userCount {
+            available
+            price
+            purchaseCount
+            quantityPer
+          }
+        }
       }
       subscription {
         nextInvoiceDate

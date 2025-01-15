@@ -60,7 +60,7 @@ export default async function Page() {
     entitlementUsage.runCount.overageAllowed || entitlementUsage.stepCount.overageAllowed;
 
   const paymentMethod = billing.paymentMethods?.[0] || null;
-  const isFreePlan = plan.plan?.name === PlanNames.Free;
+  // const isFreePlan = plan.plan?.name === PlanNames.Free;
 
   return (
     <div className="grid grid-cols-3 gap-4">
@@ -104,19 +104,24 @@ export default async function Page() {
             }
             canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             description="The maximum size for a single event"
+            selfServiceAvailable={false}
           />
           <AddOn
             title="Concurrency"
             value={entitlementUsage.concurrency.limit}
-            canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
+            canIncreaseLimitInCurrentPlan={
+              entitlementUsage.isCustomPlan || !!plan.plan?.addons.concurrency.available
+            }
             description="Maximum concurrently executing steps"
             tooltipContent="Functions actively sleeping and waiting for events are not counted"
+            selfServiceAvailable={!!plan.plan?.addons.concurrency.price}
           />
           <AddOn
             title="Users"
             value={`${entitlementUsage.userCount.usage}/${entitlementUsage.userCount.limit}`}
-            canIncreaseLimitInCurrentPlan={!isFreePlan}
+            canIncreaseLimitInCurrentPlan={!!plan.plan?.addons.userCount.available}
             description="Maximum number of users"
+            selfServiceAvailable={!!plan.plan?.addons.userCount.price}
           />
           <AddOn
             title="Log history"
@@ -125,17 +130,20 @@ export default async function Page() {
             }`}
             canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             description="View and search function run traces and metrics"
+            selfServiceAvailable={false}
           />
           <AddOn
             title="HIPAA"
             value={entitlementUsage.hipaa.enabled ? 'Enabled' : 'Not enabled'}
             canIncreaseLimitInCurrentPlan
             description="Sign BAAs for healthcare services"
+            selfServiceAvailable={false}
           />
           <AddOn
             title="Dedicated execution capacity"
             canIncreaseLimitInCurrentPlan
             description="Dedicated infrastructure for the lowest latency and highest throughput"
+            selfServiceAvailable={false}
           />
           <div className="flex flex-col items-center gap-2 pt-6">
             <p className="text-muted text-xs">Custom needs?</p>

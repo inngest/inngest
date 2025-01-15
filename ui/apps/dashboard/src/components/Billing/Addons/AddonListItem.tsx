@@ -21,15 +21,14 @@ export default function AddOn({
   value,
   canIncreaseLimitInCurrentPlan,
   tooltipContent,
-  selfServiceAvailable = false,
+  selfServiceAvailable,
 }: {
   title: string;
   description?: string;
   value?: number | string;
   canIncreaseLimitInCurrentPlan: boolean;
   tooltipContent?: string | React.ReactNode;
-  // TEMP: Not currently passing this prop
-  selfServiceAvailable?: boolean;
+  selfServiceAvailable: boolean;
 }) {
   const startingValue = Math.max(currentValue, planLimit);
   const [openSelfService, setOpenSelfService] = useState(false);
