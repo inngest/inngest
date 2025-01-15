@@ -55,7 +55,7 @@ export function Pill({
 
 export type PillContentProps = {
   children: React.ReactNode;
-  type: 'EVENT' | 'CRON' | 'FUNCTION' | 'APP';
+  type?: 'EVENT' | 'CRON' | 'FUNCTION' | 'APP';
 };
 
 export function PillContent({ children, type }: PillContentProps) {

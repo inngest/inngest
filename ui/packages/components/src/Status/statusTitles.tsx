@@ -7,4 +7,6 @@ export const statusTitles: Record<string, string> = {
   QUEUED: 'Queued',
   SKIPPED_PAUSED: 'Skipped',
   PAUSED: 'Paused',
+  INACTIVE: 'Inactive',
+  ACTIVE: 'Active',
 };
