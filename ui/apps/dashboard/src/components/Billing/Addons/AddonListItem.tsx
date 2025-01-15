@@ -155,7 +155,7 @@ export default function AddOn({
           onClose={() => setOpenConfirmationModal(false)}
           onSubmit={() => {}}
           title="Add to plan"
-          description="Are you sure you want to add this addon?"
+          description="Are you sure you want to add this addon to your plan?"
           confirmButtonLabel="Confirm and pay"
           cancelButtonLabel="Cancel"
           confirmButtonKind="primary"
