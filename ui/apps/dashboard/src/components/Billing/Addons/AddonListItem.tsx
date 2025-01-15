@@ -36,14 +36,24 @@ export default function AddOn({
   const [openConfirmationModal, setOpenConfirmationModal] = useState(false);
   const [inputValue, setInputValue] = useState(startingValue);
 
-  const priceText = `$${price} per ${quantityPer}`;
+  let priceText = `$${price} per ${quantityPer} ${title.toLowerCase()}/${billingPeriod}`;
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (quantityPer === 1) {
+    // TODO(cdzombak): extract unit text fn
+    let unitDescription = title.toLowerCase();
+    if (unitDescription === 'users') {
+      unitDescription = 'user';
+    }
+    priceText = `$${price} per ${unitDescription}/${billingPeriod}`;
+  }
+
   const descriptionText = openSelfService ? (
     <>
-      Your plan comes with{' '}
+      Your plan includes{' '}
       <span className="font-medium lowercase">
-        {planLimit} {title} by default
+        {planLimit} {title}
       </span>
-      . Additional cost is {priceText}
+      . Add more for {priceText}.
     </>
   ) : (
     description
