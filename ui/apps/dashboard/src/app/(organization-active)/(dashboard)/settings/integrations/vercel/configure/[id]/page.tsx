@@ -143,8 +143,6 @@ export default function VercelConfigure() {
   // project is enabled. This is mostly because not all extra inputs are saved
   // when enabling a project (e.g. the protection bypass secret)
   const areExtraSettingsVisible = project?.isEnabled;
-  console.log('project', project?.isEnabled);
-  console.log('areExtraSettingsVisible', areExtraSettingsVisible);
 
   if (fetching) {
     return (
