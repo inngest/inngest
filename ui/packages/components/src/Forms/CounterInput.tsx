@@ -11,6 +11,7 @@ type CounterInputProps = {
   min?: number;
   max?: number;
   onChange: (value: number) => void;
+  onValid: (valid: boolean) => void;
   step?: number;
 };
 
@@ -19,43 +20,60 @@ export default function CounterInput({
   min = 0,
   max = 100,
   onChange,
+  onValid,
   step = 1,
 }: CounterInputProps) {
   const [err, setErr] = useState<string | null>(null);
 
   const increment = () => {
-    const newValue = value + step;
-    if (newValue <= max) {
-      setErr(null);
-      onChange(newValue);
+    // NaN indicates invalid or empty input:
+    if (isNaN(value)) {
+      value = 0;
     }
+    // use min() to be sure the result is <= max, even after any rounding.
+    // if the result is unaligned with the step interval (due to user input), adjust it downward to be aligned.
+    // this guarantees the input value is always valid after the user clicks +.
+    let newValue = Math.min(value + step, max);
+    if (newValue != max && (newValue - min) % step !== 0) {
+      newValue -= (newValue - min) % step;
+    }
+    setErr(null);
+    onValid(true);
+    onChange(newValue);
   };
 
   const decrement = () => {
-    const newValue = value - step;
-    if (newValue >= min) {
-      setErr(null);
-      onChange(newValue);
+    // NaN indicates invalid or empty input:
+    if (isNaN(value)) {
+      value = 0;
     }
+    // use max() to be sure the result is >= min, even after any rounding.
+    // if the result is unaligned with the step interval (due to user input), adjust it upward to be aligned.
+    // this guarantees the input value is always valid after the user clicks -.
+    let newValue = Math.max(value - step, min);
+    if (newValue != min && (newValue - min) % step !== 0) {
+      newValue += step - ((newValue - min) % step);
+    }
+    setErr(null);
+    onValid(true);
+    onChange(newValue);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = parseInt(e.target.value, 10);
-
     if (isNaN(newValue)) {
+      onValid(false);
       setErr('Value must be a number.');
-      return;
-    }
-    if (newValue < min || newValue > max) {
+    } else if (newValue < min || newValue > max) {
+      onValid(false);
       setErr(`Value must be between ${min} and ${max}.`);
-      return;
-    }
-    if ((newValue - min) % step !== 0) {
+    } else if ((newValue - min) % step !== 0) {
+      onValid(false);
       setErr(`Value must align with intervals of ${step}.`);
-      return;
+    } else {
+      onValid(true);
+      setErr(null);
     }
-
-    setErr(null);
     onChange(newValue);
   };
 
@@ -64,7 +82,7 @@ export default function CounterInput({
       <div className="flex items-center">
         <Input
           type="number"
-          value={value}
+          value={isNaN(value) ? '' : value}
           onChange={handleChange}
           className="z-10 w-16 rounded-r-none border-r-0"
           step={step}
@@ -73,7 +91,7 @@ export default function CounterInput({
           kind="secondary"
           appearance="outlined"
           onClick={decrement}
-          disabled={value - step < min}
+          disabled={isNaN(value) || value == min}
           icon={<RiSubtractFill className="h-4" />}
           className="disabled:border-muted disabled:bg-canvasBase rounded-none border-r-0"
         />
@@ -81,7 +99,7 @@ export default function CounterInput({
           kind="secondary"
           appearance="outlined"
           onClick={increment}
-          disabled={value + step > max}
+          disabled={value == max}
           icon={<RiAddFill className="h-4" />}
           className="disabled:border-muted disabled:bg-canvasBase rounded-l-none border-l-0"
         />

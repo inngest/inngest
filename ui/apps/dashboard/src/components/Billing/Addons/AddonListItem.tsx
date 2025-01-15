@@ -35,6 +35,7 @@ export default function AddOn({
   const [openSelfService, setOpenSelfService] = useState(false);
   const [openConfirmationModal, setOpenConfirmationModal] = useState(false);
   const [inputValue, setInputValue] = useState(startingValue);
+  const [inputValid, setInputValid] = useState(true);
 
   let priceText = `$${price} per ${quantityPer} ${title.toLowerCase()}/${billingPeriod}`;
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
@@ -90,7 +91,10 @@ export default function AddOn({
               <Button
                 appearance="outlined"
                 label={`Add ${title}`}
-                onClick={() => setOpenSelfService(true)}
+                onClick={() => {
+                  setOpenSelfService(true);
+                  setInputValid(true);
+                }}
               />
             ) : (
               <Button
@@ -121,11 +125,12 @@ export default function AddOn({
             <CounterInput
               value={inputValue}
               onChange={setInputValue}
+              onValid={setInputValid}
               min={planLimit}
               max={maxValue}
               step={quantityPer}
             />
-            <p className="text-muted text-sm">Cost: ${currentCost}</p>
+            {inputValid && <p className="text-muted text-sm">Cost: ${currentCost}</p>}
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -139,7 +144,7 @@ export default function AddOn({
             />
             <Button
               appearance="outlined"
-              disabled={inputValue == startingValue}
+              disabled={inputValue == startingValue || !inputValid}
               onClick={() => {
                 setOpenConfirmationModal(true);
                 setOpenSelfService(false);
