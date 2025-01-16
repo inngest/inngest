@@ -16,7 +16,7 @@ export const StepsThroughput = ({
   const metrics = workspace && mapEntityLines(workspace.stepThroughput.metrics, entities);
 
   return (
-    <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-x-hidden rounded-lg border p-5">
+    <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-x-hidden rounded-md border p-5">
       <div className="mb-2 flex flex-row items-center justify-between">
         <div className="text-subtle flex w-full flex-row items-center gap-x-2 text-lg">
           Total steps throughput{' '}

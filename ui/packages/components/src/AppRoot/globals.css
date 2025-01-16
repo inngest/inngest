@@ -21,6 +21,16 @@
   box-shadow: none !important;
 }
 
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: none;
+}
+
 .monaco-editor .overflow-guard {
   @apply rounded-b-lg;
 }
@@ -226,7 +236,7 @@
 
   .dark {
     --color-background-canvas-base: var(--color-carbon-1000);
-    --color-background-canvas-subtle: var(--color-carbon-900);
+    --color-background-canvas-subtle: var(--color-carbon-950);
     --color-background-canvas-muted: var(--color-carbon-900);
     --color-background-surface-base: var(--color-carbon-1000);
     --color-background-surface-subtle: var(--color-carbon-950);
@@ -374,7 +384,7 @@
 
 /* Handle */
 .dark ::-webkit-scrollbar-thumb {
-  @apply rounded-lg;
+  @apply rounded-md;
   background: rgb(var(--color-carbon-400));
 }
 

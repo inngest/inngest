@@ -41,12 +41,13 @@ export function useVercelIntegration(): {
     isLoading: isLoadingAllProjects,
     error,
   } = useRestAPIRequest<VercelProjectAPIResponse>({ url, method: 'GET', pause: !url });
+
   const [{ data: savedVercelProjects, fetching: isLoadingSavedProjects }] = useQuery({
     query: GetSavedVercelProjectsDocument,
     variables: {
       environmentID: defaultEnv?.id || '',
     },
-    pause: !defaultEnv?.id,
+    requestPolicy: 'network-only',
   });
 
   const projects = mergeVercelProjectData({

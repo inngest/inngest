@@ -1,4 +1,5 @@
 import type { Route } from 'next';
+import { RiArrowRightUpLine } from '@remixicon/react';
 
 import { AITrace } from '../AI/AITrace';
 import { parseAIOutput } from '../AI/utils';
@@ -56,6 +57,7 @@ type Run = {
     queuedAt: string;
     startedAt: string | null;
     status: string;
+    stepID?: string | null;
   };
 };
 
@@ -74,10 +76,12 @@ export function RunInfo({
 }: Props) {
   let allowCancel = false;
   let isSuccess = false;
+  let stepID = null;
 
   if (isLazyDone(run)) {
     allowCancel = !Boolean(run.trace.endedAt);
     isSuccess = run.trace.status === 'COMPLETED';
+    stepID = run.trace.stepID;
   }
 
   const aiOutput = stepAIEnabled && result?.data ? parseAIOutput(result.data) : undefined;
@@ -88,7 +92,13 @@ export function RunInfo({
         <Card.Header className="h-11 flex-row items-center gap-2">
           <div className="text-basis flex grow items-center gap-2">
             Run details{' '}
-            {!standalone && <Link size="medium" href={pathCreator.runPopout({ runID })} />}
+            {!standalone && (
+              <Link
+                size="medium"
+                href={pathCreator.runPopout({ runID })}
+                iconAfter={<RiArrowRightUpLine className="h-4 w-4 shrink-0" />}
+              />
+            )}
           </div>
 
           <CancelRunButton disabled={!allowCancel} onClick={cancelRun} />
@@ -234,6 +244,7 @@ export function RunInfo({
             className="border-muted border-t"
             result={result}
             runID={runID}
+            stepID={stepID}
             rerunFromStep={rerunFromStep}
             isSuccess={isSuccess}
             stepAIEnabled={stepAIEnabled}

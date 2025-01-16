@@ -23,7 +23,7 @@ export function DashboardRunDetails({ runID, standalone = true }: Props) {
   const env = useEnvironment();
   const cancelRun = useCancelRun({ envID: env.id });
   const rerun = useRerun({ envID: env.id, envSlug: env.slug });
-  const rerunFromStep = useRerunFromStep({ runID, fromStep: { stepID: 'stepID', input: 'input' } });
+  const rerunFromStep = useRerunFromStep();
   const getTraceResult = useGetTraceResult();
   const { value: stepAIEnabled, isReady } = useBooleanFlag('step.ai');
 

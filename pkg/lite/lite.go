@@ -22,7 +22,7 @@ import (
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi"
-	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs"
+	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/event"
@@ -59,6 +59,7 @@ type StartOpts struct {
 	Config        config.Config `json:"-"`
 	RootDir       string        `json:"dir"`
 	RedisURI      string        `json:"redis-uri"`
+	PostgresURI   string        `json:"postgres-uri"`
 	PollInterval  int           `json:"poll-interval"`
 	URLs          []string      `json:"urls"`
 	Tick          time.Duration `json:"tick"`
@@ -102,9 +103,10 @@ func New(ctx context.Context, opts StartOpts) error {
 }
 
 func start(ctx context.Context, opts StartOpts) error {
-	db, err := sqlitecqrs.New(sqlitecqrs.SqliteCQRSOptions{
-		InMemory:  false,
-		Directory: opts.SQLiteDir,
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{
+		InMemory:    false,
+		PostgresURI: opts.PostgresURI,
+		Directory:   opts.SQLiteDir,
 	})
 	if err != nil {
 		return err
@@ -116,9 +118,13 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	// Initialize the devserver
-	dbcqrs := sqlitecqrs.NewCQRS(db)
-	hd := sqlitecqrs.NewHistoryDriver(db)
-	hr := sqlitecqrs.NewHistoryReader(db)
+	dbDriver := "sqlite"
+	if opts.PostgresURI != "" {
+		dbDriver = "postgres"
+	}
+	dbcqrs := base_cqrs.NewCQRS(db, dbDriver)
+	hd := base_cqrs.NewHistoryDriver(db, dbDriver)
+	hr := base_cqrs.NewHistoryReader(db, dbDriver)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	stepLimitOverrides := make(map[string]int)
