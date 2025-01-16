@@ -19,7 +19,7 @@ func NewHistoryDriver(db *sql.DB, driver string) history.Driver {
 }
 
 type historyDriver struct {
-	q *Queries
+	q sqlc.Querier
 }
 
 func (d historyDriver) Write(ctx context.Context, h history.History) (err error) {

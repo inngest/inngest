@@ -25,7 +25,7 @@ func NewHistoryReader(db *sql.DB, driver string) history_reader.Reader {
 }
 
 type reader struct {
-	q *Queries
+	q sqlc.Querier
 }
 
 func (r *reader) CountRuns(
