@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import CounterInput from '@inngest/components/Forms/CounterInput';
-import { Link } from '@inngest/components/Link/Link';
 import { AlertModal } from '@inngest/components/Modal/AlertModal';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiAlertFill, RiInformationLine } from '@remixicon/react';

@@ -122,7 +122,7 @@ const CommandBlock = ({ currentTabContent }: { currentTabContent?: TabsProps }) 
 };
 
 CommandBlock.Wrapper = ({ children }: React.PropsWithChildren) => {
-  return <div className="border-subtle w-full overflow-hidden rounded-lg border">{children}</div>;
+  return <div className="border-subtle w-full overflow-hidden rounded-md border">{children}</div>;
 };
 
 CommandBlock.Header = ({

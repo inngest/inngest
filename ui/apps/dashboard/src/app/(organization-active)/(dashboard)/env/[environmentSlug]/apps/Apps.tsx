@@ -60,7 +60,7 @@ export function Apps({ isArchived = false }: Props) {
           </EmptyAppCard>
         )}
         {!hasApps && isArchived && (
-          <p className="bg-canvasMuted text-basis rounded-lg p-4 text-center">No archived apps</p>
+          <p className="bg-canvasMuted text-basis rounded-md p-4 text-center">No archived apps</p>
         )}
         {sortedApps.map((app) => {
           return (

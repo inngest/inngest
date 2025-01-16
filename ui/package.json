@@ -15,12 +15,12 @@
   },
   "engines": {
     "node": "20.x",
-    "pnpm": "8.15.8"
+    "pnpm": "8.15.9"
   },
   "workspaces": [
     "packages/*",
     "apps/*"
   ],
-  "packageManager": "pnpm@8.15.8",
+  "packageManager": "pnpm@8.15.9",
   "private": true
 }

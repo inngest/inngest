@@ -27,6 +27,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -276,6 +277,13 @@ func WithTraceReader(m cqrs.TraceReader) ExecutorOpt {
 	}
 }
 
+func WithRealtimePublisher(b realtime.Publisher) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).rtpub = b
+		return nil
+	}
+}
+
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log *zerolog.Logger
@@ -299,6 +307,10 @@ type executor struct {
 	cancellationChecker cancellation.Checker
 
 	lifecycles []execution.LifecycleListener
+
+	// rtpub represents teh realtime publisher used to broadcast notifications
+	// on run execution.
+	rtpub realtime.Publisher
 
 	// steplimit finds step limits for a given run.
 	steplimit func(sv2.ID) int
@@ -888,13 +900,45 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 	)
 
 	for _, e := range e.lifecycles {
-		// OnStepFinished handles step success and step errors/failures.  It is
-		// currently the responsibility of the lifecycle manager to handle the differing
-		// step statuses when a step finishes.
-		//
-		// TODO (tonyhb): This should probably change, as each lifecycle listener has to
-		// do the same parsing & conditional checks.
 		go e.OnStepFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, i.resp, nil)
+	}
+
+	if i.resp.Err == nil && !i.resp.IsFunctionResult() {
+		// Handle generator responses then return.
+		if serr := e.HandleGeneratorResponse(ctx, i, i.resp); serr != nil {
+			// If this is an error compiling async expressions, fail the function.
+			shouldFailEarly := errors.Is(serr, &expressions.CompileError{}) || errors.Is(serr, state.ErrStateOverflowed) || errors.Is(serr, state.ErrFunctionOverflowed)
+
+			if shouldFailEarly {
+				var gracefulErr *state.WrappedStandardError
+				if hasGracefulErr := errors.As(serr, &gracefulErr); hasGracefulErr {
+					serialized := gracefulErr.Serialize(execution.StateErrorKey)
+					i.resp.Output = serialized
+					i.resp.Err = &gracefulErr.StandardError.Name
+
+					// Immediately fail the function.
+					i.resp.NoRetry = true
+
+					// This is required to get old history to look correct.
+					// Without it, the function run will have no output. We can
+					// probably delete this when we fully remove old history.
+					i.resp.Generator = []*state.GeneratorOpcode{}
+				}
+
+				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
+					l.Error("error running finish handler", "error", err)
+				}
+
+				// Can be reached multiple times for parallel discovery steps
+				for _, e := range e.lifecycles {
+					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
+				}
+
+				return nil
+			}
+
+			return fmt.Errorf("error handling generator response: %w", serr)
+		}
 	}
 
 	// Check for temporary failures.  The outputs of transient errors are not
@@ -929,62 +973,31 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		//
 		// TODO: Improve this.
 
-		// Check if this step permanently failed.  If so, the function is a failure.
-		if !i.resp.Retryable() {
-			// TODO: Refactor state input
-			if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
-				l.Error("error running finish handler", "error", err)
-			}
-
-			// Can be reached multiple times for parallel discovery steps
-			for _, e := range e.lifecycles {
-				go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
-			}
-
-			return i.resp
+		// TODO: Refactor state input
+		if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
+			l.Error("error running finish handler", "error", err)
 		}
-	}
 
-	// This is a success, which means either a generator or a function result.
-	if len(i.resp.Generator) > 0 {
-		// Handle generator responses then return.
-		if serr := e.HandleGeneratorResponse(ctx, i, i.resp); serr != nil {
-
-			// If this is an error compiling async expressions, fail the function.
-			shouldFailEarly := errors.Is(serr, &expressions.CompileError{}) || errors.Is(serr, state.ErrStateOverflowed) || errors.Is(serr, state.ErrFunctionOverflowed)
-
-			if shouldFailEarly {
-				var gracefulErr *state.WrappedStandardError
-				if hasGracefulErr := errors.As(serr, &gracefulErr); hasGracefulErr {
-					serialized := gracefulErr.Serialize(execution.StateErrorKey)
-					i.resp.Output = nil
-					i.resp.Err = &serialized
-				}
-
-				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
-					l.Error("error running finish handler", "error", err)
-				}
-
-				// Can be reached multiple times for parallel discovery steps
-				for _, e := range e.lifecycles {
-					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
-				}
-
-				return nil
-			}
-			return fmt.Errorf("error handling generator response: %w", serr)
+		// Can be reached multiple times for parallel discovery steps
+		for _, e := range e.lifecycles {
+			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
 		}
-		return nil
+
+		return i.resp
 	}
 
-	// This is the function result.
-	if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
-		l.Error("error running finish handler", "error", err)
-	}
+	// The generator length check is necessary because parallel steps in older
+	// SDK versions (e.g. 2.7.2) can result in an OpcodeNone.
+	if len(i.resp.Generator) == 0 && i.resp.IsFunctionResult() {
+		// This is the function result.
+		if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
+			l.Error("error running finish handler", "error", err)
+		}
 
-	// Can be reached multiple times for parallel discovery steps
-	for _, e := range e.lifecycles {
-		go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
+		// Can be reached multiple times for parallel discovery steps
+		for _, e := range e.lifecycles {
+			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
+		}
 	}
 
 	return nil
@@ -1961,6 +1974,10 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error scheduling step queue item", "error", err)
+		return err
+	}
 
 	for _, l := range e.lifecycles {
 		// We can't specify step name here since that will result in the
@@ -1969,7 +1986,22 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		go l.OnStepScheduled(ctx, i.md, nextItem, stepName)
 	}
 
-	return err
+	// Ensure we publish the step outputs to any publishers connected.  This broadcasts the
+	// step output to any realtime subscribers.
+	if e.rtpub != nil {
+		e.rtpub.Publish(ctx, realtime.Message{
+			Kind:       realtime.MessageKindStep,
+			Data:       gen.Data,
+			TopicNames: []string{gen.UserDefinedName()},
+			EnvID:      i.md.ID.Tenant.EnvID,
+			FnID:       i.md.ID.FunctionID,
+			FnSlug:     i.f.GetSlug(),
+			RunID:      i.md.ID.RunID,
+			CreatedAt:  time.Now(),
+		})
+	}
+
+	return nil
 }
 
 func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
@@ -2199,11 +2231,13 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		}
 
 		// Ensure the opcode is treated as an error when calling OnStepFinish.
-		i.resp.UpdateOpcodeError(&gen, state.UserError{
-			Name:    fmt.Sprintf("Error making AI request: %s", err),
-			Message: string(output),
+		userLandErr := state.UserError{
+			Name:    "AIGatewayError",
+			Message: fmt.Sprintf("Error making AI request: %s", err),
 			Data:    output, // For golang's multiple returns.
-		})
+			Stack:   string(output),
+		}
+		i.resp.UpdateOpcodeError(&gen, userLandErr)
 
 		// And, finally, if this is retryable return an error which will be retried.
 		// Otherwise, we enqueue the next step directly so that the SDK can throw
@@ -2211,6 +2245,14 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		if queue.ShouldRetry(nil, i.item.Attempt, i.item.GetMaxAttempts()) {
 			// Set the response error, ensuring the response is retryable in the queue.
 			i.resp.SetError(err)
+
+			for _, e := range e.lifecycles {
+				// OnStepFinished handles step success and step errors/failures.  It is
+				// currently the responsibility of the lifecycle manager to handle the differing
+				// step statuses when a step finishes.
+				go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, hr, &userLandErr)
+			}
+
 			// This will retry, as it hits the queue directly.
 			return fmt.Errorf("error making inference request: %w", err)
 		}
@@ -2220,15 +2262,16 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		//
 		// The actual error should be wrapped with an "error" so that it respects the
 		// error wrapping of step errors.
+		userLandErrByt, _ := json.Marshal(userLandErr)
 		output, _ = json.Marshal(map[string]json.RawMessage{
-			"error": output,
+			"error": userLandErrByt,
 		})
 
 		for _, e := range e.lifecycles {
 			// OnStepFinished handles step success and step errors/failures.  It is
 			// currently the responsibility of the lifecycle manager to handle the differing
 			// step statuses when a step finishes.
-			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, hr, err)
+			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, hr, &userLandErr)
 		}
 	} else {
 		// The response output is actually now the result of this AI call. We need
@@ -2419,6 +2462,19 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 	if err != nil {
 		return fmt.Errorf("unable to parse wait for event opts: %w", err)
 	}
+
+	if opts.If != nil {
+		err = expressions.Validate(ctx, *opts.If)
+		if err != nil {
+			return state.WrapInStandardError(
+				err,
+				"InvalidExpression",
+				"Wait for event expression is invalid",
+				err.Error(),
+			)
+		}
+	}
+
 	expires, err := opts.Expires()
 	if err != nil {
 		return fmt.Errorf("unable to parse wait for event expires: %w", err)

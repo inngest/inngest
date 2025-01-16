@@ -14,6 +14,7 @@ const traceDetailsFragment = graphql(`
     endedAt
     isRoot
     outputID
+    stepID
     spanID
     stepOp
     stepInfo {
