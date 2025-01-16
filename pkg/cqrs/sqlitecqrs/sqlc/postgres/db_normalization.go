@@ -19,6 +19,20 @@ type NormalizedQueries struct {
 	db *Queries
 }
 
+func (q NormalizedQueries) UpdateAppError(ctx context.Context, arg sqlc_sqlite.UpdateAppErrorParams) (*sqlc_sqlite.App, error) {
+	pgParams := UpdateAppErrorParams{
+		ID:    arg.ID,
+		Error: arg.Error,
+	}
+
+	app, err := q.db.UpdateAppError(ctx, pgParams)
+	if err != nil {
+		return nil, err
+	}
+
+	return app.ToSQLite()
+}
+
 func (q NormalizedQueries) GetAppByName(ctx context.Context, name string) (*sqlc_sqlite.App, error) {
 	app, err := q.db.GetAppByName(ctx, name)
 	if err != nil {
