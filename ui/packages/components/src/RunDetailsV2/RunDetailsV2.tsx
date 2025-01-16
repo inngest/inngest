@@ -72,13 +72,7 @@ export function RunDetailsV2(props: Props) {
   });
 
   const cancelRun = useCallback(async () => {
-    try {
-      await props.cancelRun(runID);
-      toast.success('Cancelled run');
-    } catch (e) {
-      toast.error('Failed to cancel run');
-      console.error(e);
-    }
+    return await props.cancelRun(runID);
   }, [props.cancelRun]);
 
   const run = runRes.data;
