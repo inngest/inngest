@@ -11,7 +11,7 @@ CREATE TABLE apps (
 	created_at TIMESTAMP NOT NULL,
 	archived_at TIMESTAMP,
 	url VARCHAR NOT NULL,
-    is_connect BOOLEAN
+    connection_type VARCHAR DEFAULT 'serverless' NOT NULL
 );
 
 CREATE TABLE events (

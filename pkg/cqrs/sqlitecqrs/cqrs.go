@@ -76,7 +76,7 @@ func (w wrapper) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*stat
 	return &state.ExecutorFunction{
 		Function:     def,
 		Paused:       false, // dev server does not support pausing
-		AppIsConnect: app.IsConnect.Bool,
+		AppIsConnect: app.ConnectionType.Bool,
 	}, nil
 }
 
@@ -1525,7 +1525,7 @@ func (w wrapper) InsertWorkerConnection(ctx context.Context, conn *cqrs.WorkerCo
 		DisconnectedAt:  disconnectedAt,
 		RecordedAt:      conn.RecordedAt.UnixMilli(),
 		InsertedAt:      time.Now().UnixMilli(),
-		
+
 		DisconnectReason: disconnectReason,
 
 		GroupHash:     []byte(conn.GroupHash),
