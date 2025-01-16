@@ -10,6 +10,7 @@ require (
 	connectrpc.com/connect v1.16.1
 	cuelang.org/go v0.4.2
 	github.com/99designs/gqlgen v0.17.27
+	github.com/MauriceGit/skiplist v0.0.0-20211105230623-77f5c8d3e145
 	github.com/VividCortex/ewma v1.2.0
 	github.com/alicebob/miniredis/v2 v2.30.3-0.20230520070231-a946a99f2c60
 	github.com/aws/aws-lambda-go v1.41.0

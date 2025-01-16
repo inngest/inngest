@@ -16,7 +16,7 @@ export function FuncCard({ title, id, status, active = false, onClick }: FuncCar
     <a
       className={cn(
         active ? `border-muted bg-canvasBase border` : undefined,
-        `bg-canvasSubtle block w-full overflow-hidden rounded-lg`,
+        `bg-canvasSubtle block w-full overflow-hidden rounded-md`,
         onClick ? 'hover:bg-surfaceMuted cursor-pointer' : undefined
       )}
       onClick={

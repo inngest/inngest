@@ -147,7 +147,7 @@ export const FunctionStatus = ({ totals }: { totals?: FunctionTotals }) => {
   const metrics = totals && mapMetrics(totals);
 
   return (
-    <div className="bg-canvasBase border-subtle relative flex h-[384px] w-[448px] shrink-0 flex-col rounded-lg border p-5">
+    <div className="bg-canvasBase border-subtle relative flex h-[384px] w-[448px] shrink-0 flex-col rounded-md border p-5">
       <div className="text-subtle mb-2 flex flex-row items-center gap-x-2 text-lg">
         Functions Status{' '}
         <Info

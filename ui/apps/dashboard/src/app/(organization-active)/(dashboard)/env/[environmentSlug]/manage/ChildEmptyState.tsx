@@ -9,7 +9,7 @@ export default function ChildEmptyState() {
   return (
     <div className="h-full w-full overflow-y-scroll py-16">
       <div className="mx-auto flex w-[640px] flex-col gap-4">
-        <div className="border-subtle rounded-lg border px-8 pt-8">
+        <div className="border-subtle rounded-md border px-8 pt-8">
           <h3 className="flex items-center text-xl font-semibold">
             Manage Keys for All Branch Environments
           </h3>

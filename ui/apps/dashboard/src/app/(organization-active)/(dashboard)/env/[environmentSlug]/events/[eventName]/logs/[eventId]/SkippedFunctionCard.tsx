@@ -67,7 +67,7 @@ export default async function SkippedFunctionCard({
   return (
     <NextLink
       href={`/env/${environmentSlug}/functions/${encodeURIComponent(function_.slug)}`}
-      className="bg-canvasBase flex items-center rounded-lg border p-5 shadow"
+      className="bg-canvasBase flex items-center rounded-md border p-5 shadow"
     >
       <div className="flex-1">
         <div className="flex items-center gap-1.5">

@@ -3,7 +3,6 @@
 import type { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { OptionalLink } from '@inngest/components/Link/OptionalLink';
-import { RiErrorWarningLine } from '@remixicon/react';
 
 import { Pill } from '../Pill';
 import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
@@ -57,7 +56,7 @@ export const MenuItem = ({
           )}
           {!collapsed && error && (
             <Pill kind="error" className="ml-2.5">
-              <RiErrorWarningLine className="h-3 w-3" />
+              Error
             </Pill>
           )}
         </div>

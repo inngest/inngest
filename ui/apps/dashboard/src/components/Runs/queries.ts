@@ -44,6 +44,7 @@ export const GetRunsDocument = graphql(`
             endedAt
             startedAt
             status
+            hasAI
           }
         }
         pageInfo {

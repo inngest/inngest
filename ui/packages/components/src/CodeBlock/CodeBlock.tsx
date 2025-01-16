@@ -379,5 +379,5 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
 }
 
 CodeBlock.Wrapper = ({ children }: React.PropsWithChildren) => {
-  return <div className="border-subtle w-full overflow-hidden rounded-lg border">{children}</div>;
+  return <div className="border-subtle w-full overflow-hidden rounded-md border">{children}</div>;
 };

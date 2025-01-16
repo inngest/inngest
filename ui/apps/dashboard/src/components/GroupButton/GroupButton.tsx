@@ -23,7 +23,7 @@ export default function GroupButton<T extends Options>({
   selectedOption,
   className,
 }: GroupButtonProps<T>) {
-  const groupStyles = cn('flex items-center gap-1 rounded-lg bg-canvasSubtle p-1', className);
+  const groupStyles = cn('flex items-center gap-1 rounded-md bg-canvasSubtle p-1', className);
 
   return (
     <div className={groupStyles} role="radiogroup" aria-label={title}>
