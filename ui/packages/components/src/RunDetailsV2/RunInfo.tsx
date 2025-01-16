@@ -1,4 +1,5 @@
 import type { Route } from 'next';
+import { RiArrowRightUpLine } from '@remixicon/react';
 
 import { AITrace } from '../AI/AITrace';
 import { parseAIOutput } from '../AI/utils';
@@ -91,7 +92,13 @@ export function RunInfo({
         <Card.Header className="h-11 flex-row items-center gap-2">
           <div className="text-basis flex grow items-center gap-2">
             Run details{' '}
-            {!standalone && <Link size="medium" href={pathCreator.runPopout({ runID })} />}
+            {!standalone && (
+              <Link
+                size="medium"
+                href={pathCreator.runPopout({ runID })}
+                iconAfter={<RiArrowRightUpLine className="h-4 w-4 shrink-0" />}
+              />
+            )}
           </div>
 
           <CancelRunButton disabled={!allowCancel} onClick={cancelRun} />
