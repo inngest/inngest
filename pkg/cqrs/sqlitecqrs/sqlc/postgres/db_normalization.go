@@ -33,6 +33,20 @@ func (q NormalizedQueries) UpdateAppError(ctx context.Context, arg sqlc_sqlite.U
 	return app.ToSQLite()
 }
 
+func (q NormalizedQueries) UpdateAppURL(ctx context.Context, arg sqlc_sqlite.UpdateAppURLParams) (*sqlc_sqlite.App, error) {
+	pgParams := UpdateAppURLParams{
+		ID:  arg.ID,
+		Url: arg.Url,
+	}
+
+	app, err := q.db.UpdateAppURL(ctx, pgParams)
+	if err != nil {
+		return nil, err
+	}
+
+	return app.ToSQLite()
+}
+
 func (q NormalizedQueries) GetAppByName(ctx context.Context, name string) (*sqlc_sqlite.App, error) {
 	app, err := q.db.GetAppByName(ctx, name)
 	if err != nil {
