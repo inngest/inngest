@@ -2,7 +2,6 @@
 
 import { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { toast } from 'sonner';
 
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { StatusCell } from '../Table';
