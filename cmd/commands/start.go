@@ -125,15 +125,16 @@ func doStart(cmd *cobra.Command, args []string) {
 	}
 
 	opts := lite.StartOpts{
-		Config:        *conf,
-		PollInterval:  viper.GetInt("poll-interval"),
-		RedisURI:      viper.GetString("redis-uri"),
-		RetryInterval: viper.GetInt("retry-interval"),
-		Tick:          time.Duration(tick) * time.Millisecond,
-		URLs:          viper.GetStringSlice("sdk-url"),
-		SQLiteDir:     viper.GetString("sqlite-dir"),
-		SigningKey:    viper.GetString("signing-key"),
-		EventKey:      viper.GetStringSlice("event-key"),
+		Config:            *conf,
+		PollInterval:      viper.GetInt("poll-interval"),
+		RedisURI:          viper.GetString("redis-uri"),
+		RetryInterval:     viper.GetInt("retry-interval"),
+		Tick:              time.Duration(tick) * time.Millisecond,
+		URLs:              viper.GetStringSlice("sdk-url"),
+		SQLiteDir:         viper.GetString("sqlite-dir"),
+		SigningKey:        viper.GetString("signing-key"),
+		EventKey:          viper.GetStringSlice("event-key"),
+		EnablePersistence: !config.IsEnvVarFalsy("INNGEST_EXPERIMENTAL_ENABLE_PERSISTENCE"),
 	}
 
 	err = lite.New(ctx, opts)
