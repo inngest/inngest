@@ -13,8 +13,6 @@ import { useMutation } from 'urql';
 import { graphql } from '@/gql';
 import { pathCreator } from '@/utils/urls';
 
-const billingPeriod = 'month'; // TODO(cdzombak): need this from the backend
-
 function unitDescriptionFromTitle(title: string) {
   let result = title.toLowerCase();
   if (result === 'users') {
@@ -60,6 +58,8 @@ export default function AddOn({
   price?: number; // Price for one purchase of this addon, in US Cents
   onChange?: () => void;
 }) {
+  const billingPeriod = 'month'; // TODO(cdzombak): need this from the backend
+
   const router = useRouter();
 
   const [openSelfService, setOpenSelfService] = useState(false);
