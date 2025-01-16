@@ -174,6 +174,7 @@ func (q NormalizedQueries) UpsertApp(ctx context.Context, params sqlc_sqlite.Ups
 		Error:       params.Error,
 		Checksum:    params.Checksum,
 		Url:         params.Url,
+		IsConnect:   params.IsConnect,
 	}
 
 	app, err := q.db.UpsertApp(ctx, pgParams)
@@ -621,6 +622,7 @@ func (q NormalizedQueries) InsertTraceRun(ctx context.Context, span sqlc_sqlite.
 		BatchID:      span.BatchID.Bytes(),
 		IsDebounce:   span.IsDebounce,
 		CronSchedule: span.CronSchedule,
+		HasAi:        span.HasAi,
 	}
 
 	return q.db.InsertTraceRun(ctx, pgSpan)
