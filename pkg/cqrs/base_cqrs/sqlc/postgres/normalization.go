@@ -2,7 +2,6 @@ package sqlc
 
 import (
 	"database/sql"
-
 	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
 )
 
@@ -282,5 +281,44 @@ func (r *GetFunctionRunsRow) ToSQLite() (*sqlc.GetFunctionRunsRow, error) {
 	return &sqlc.GetFunctionRunsRow{
 		FunctionRun:    *run,
 		FunctionFinish: *finish,
+	}, nil
+}
+
+func (wc *WorkerConnection) ToSQLite() (*sqlc.WorkerConnection, error) {
+	var lastHeartbeatAt, disconnectedAt sql.NullInt64
+	if wc.LastHeartbeatAt.Valid {
+		lastHeartbeatAt.Int64 = wc.LastHeartbeatAt.Time.UnixMilli()
+		lastHeartbeatAt.Valid = true
+	}
+	if wc.DisconnectedAt.Valid {
+		disconnectedAt.Int64 = wc.DisconnectedAt.Time.UnixMilli()
+		disconnectedAt.Valid = true
+	}
+
+	return &sqlc.WorkerConnection{
+		AccountID:        wc.AccountID,
+		WorkspaceID:      wc.WorkspaceID,
+		AppID:            wc.AppID,
+		ID:               wc.ID,
+		GatewayID:        wc.GatewayID,
+		InstanceID:       wc.InstanceID,
+		Status:           int64(wc.Status),
+		WorkerIp:         wc.WorkerIp,
+		ConnectedAt:      wc.ConnectedAt.UnixMilli(),
+		LastHeartbeatAt:  lastHeartbeatAt,
+		DisconnectedAt:   disconnectedAt,
+		RecordedAt:       wc.RecordedAt.UnixMilli(),
+		InsertedAt:       wc.InsertedAt.UnixMilli(),
+		DisconnectReason: wc.DisconnectReason,
+		GroupHash:        wc.GroupHash,
+		SdkLang:          wc.SdkLang,
+		SdkVersion:       wc.SdkVersion,
+		SdkPlatform:      wc.SdkPlatform,
+		SyncID:           wc.SyncID,
+		BuildID:          wc.BuildID,
+		FunctionCount:    int64(wc.FunctionCount),
+		CpuCores:         int64(wc.CpuCores),
+		MemBytes:         wc.MemBytes,
+		Os:               wc.Os,
 	}, nil
 }

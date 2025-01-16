@@ -1154,6 +1154,48 @@ func (q *Queries) GetTraceSpans(ctx context.Context, arg GetTraceSpansParams) ([
 	return items, nil
 }
 
+const getWorkerConnection = `-- name: GetWorkerConnection :one
+SELECT account_id, workspace_id, app_id, id, gateway_id, instance_id, status, worker_ip, connected_at, last_heartbeat_at, disconnected_at, recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, build_id, function_count, cpu_cores, mem_bytes, os FROM worker_connections WHERE account_id = $1 AND workspace_id = $2 AND id = $3
+`
+
+type GetWorkerConnectionParams struct {
+	AccountID    uuid.UUID
+	WorkspaceID  uuid.UUID
+	ConnectionID ulid.ULID
+}
+
+func (q *Queries) GetWorkerConnection(ctx context.Context, arg GetWorkerConnectionParams) (*WorkerConnection, error) {
+	row := q.db.QueryRowContext(ctx, getWorkerConnection, arg.AccountID, arg.WorkspaceID, arg.ConnectionID)
+	var i WorkerConnection
+	err := row.Scan(
+		&i.AccountID,
+		&i.WorkspaceID,
+		&i.AppID,
+		&i.ID,
+		&i.GatewayID,
+		&i.InstanceID,
+		&i.Status,
+		&i.WorkerIp,
+		&i.ConnectedAt,
+		&i.LastHeartbeatAt,
+		&i.DisconnectedAt,
+		&i.RecordedAt,
+		&i.InsertedAt,
+		&i.DisconnectReason,
+		&i.GroupHash,
+		&i.SdkLang,
+		&i.SdkVersion,
+		&i.SdkPlatform,
+		&i.SyncID,
+		&i.BuildID,
+		&i.FunctionCount,
+		&i.CpuCores,
+		&i.MemBytes,
+		&i.Os,
+	)
+	return &i, err
+}
+
 const historyCountRuns = `-- name: HistoryCountRuns :one
 SELECT COUNT(DISTINCT run_id) FROM history
 `
@@ -1539,6 +1581,129 @@ func (q *Queries) InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) 
 		arg.IsDebounce,
 		arg.CronSchedule,
 		arg.HasAi,
+	)
+	return err
+}
+
+const insertWorkerConnection = `-- name: InsertWorkerConnection :exec
+
+INSERT INTO worker_connections (
+    account_id, workspace_id, app_id, id, gateway_id, instance_id, status, worker_ip, connected_at, last_heartbeat_at, disconnected_at,
+    recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, build_id, function_count, cpu_cores, mem_bytes, os
+)
+VALUES (
+        $1,
+        $2,
+        $3,
+        $4,
+        $5,
+        $6,
+        $7,
+        $8,
+        $9,
+        $10,
+        $11,
+        $12,
+        $13,
+        $14,
+        $15,
+        $16,
+        $17,
+        $18,
+        $19,
+        $20,
+        $21,
+        $22,
+        $23,
+        $24
+        )
+    ON CONFLICT(id)
+DO UPDATE SET
+    account_id = excluded.account_id,
+           workspace_id = excluded.workspace_id,
+           app_id = excluded.app_id,
+
+           id = excluded.id,
+           gateway_id = excluded.gateway_id,
+           instance_id = excluded.instance_id,
+           status = excluded.status,
+           worker_ip = excluded.worker_ip,
+
+           connected_at = excluded.connected_at,
+           last_heartbeat_at = excluded.last_heartbeat_at,
+           disconnected_at = excluded.disconnected_at,
+           recorded_at = excluded.recorded_at,
+           inserted_at = excluded.inserted_at,
+
+           disconnect_reason = excluded.disconnect_reason,
+
+           group_hash = excluded.group_hash,
+           sdk_lang = excluded.sdk_lang,
+           sdk_version = excluded.sdk_version,
+           sdk_platform = excluded.sdk_platform,
+           sync_id = excluded.sync_id,
+           build_id = excluded.build_id,
+           function_count = excluded.function_count,
+
+           cpu_cores = excluded.cpu_cores,
+           mem_bytes = excluded.mem_bytes,
+           os = excluded.os
+`
+
+type InsertWorkerConnectionParams struct {
+	AccountID        uuid.UUID
+	WorkspaceID      uuid.UUID
+	AppID            *uuid.UUID
+	ID               ulid.ULID
+	GatewayID        ulid.ULID
+	InstanceID       string
+	Status           int16
+	WorkerIp         string
+	ConnectedAt      time.Time
+	LastHeartbeatAt  sql.NullTime
+	DisconnectedAt   sql.NullTime
+	RecordedAt       time.Time
+	InsertedAt       time.Time
+	DisconnectReason sql.NullString
+	GroupHash        []byte
+	SdkLang          string
+	SdkVersion       string
+	SdkPlatform      string
+	SyncID           *uuid.UUID
+	BuildID          sql.NullString
+	FunctionCount    int32
+	CpuCores         int32
+	MemBytes         int64
+	Os               string
+}
+
+// Worker Connections
+func (q *Queries) InsertWorkerConnection(ctx context.Context, arg InsertWorkerConnectionParams) error {
+	_, err := q.db.ExecContext(ctx, insertWorkerConnection,
+		arg.AccountID,
+		arg.WorkspaceID,
+		arg.AppID,
+		arg.ID,
+		arg.GatewayID,
+		arg.InstanceID,
+		arg.Status,
+		arg.WorkerIp,
+		arg.ConnectedAt,
+		arg.LastHeartbeatAt,
+		arg.DisconnectedAt,
+		arg.RecordedAt,
+		arg.InsertedAt,
+		arg.DisconnectReason,
+		arg.GroupHash,
+		arg.SdkLang,
+		arg.SdkVersion,
+		arg.SdkPlatform,
+		arg.SyncID,
+		arg.BuildID,
+		arg.FunctionCount,
+		arg.CpuCores,
+		arg.MemBytes,
+		arg.Os,
 	)
 	return err
 }

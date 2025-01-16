@@ -277,3 +277,74 @@ WHERE snapshot_id NOT IN (
     ORDER BY snapshot_id DESC
     LIMIT $1
 );
+
+--
+-- Worker Connections
+--
+
+-- name: InsertWorkerConnection :exec
+INSERT INTO worker_connections (
+    account_id, workspace_id, app_id, id, gateway_id, instance_id, status, worker_ip, connected_at, last_heartbeat_at, disconnected_at,
+    recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, build_id, function_count, cpu_cores, mem_bytes, os
+)
+VALUES (
+        sqlc.arg('account_id'),
+        sqlc.arg('workspace_id'),
+        sqlc.arg('app_id'),
+        sqlc.arg('id'),
+        sqlc.arg('gateway_id'),
+        sqlc.arg('instance_id'),
+        sqlc.arg('status'),
+        sqlc.arg('worker_ip'),
+        sqlc.arg('connected_at'),
+        sqlc.arg('last_heartbeat_at'),
+        sqlc.arg('disconnected_at'),
+        sqlc.arg('recorded_at'),
+        sqlc.arg('inserted_at'),
+        sqlc.arg('disconnect_reason'),
+        sqlc.arg('group_hash'),
+        sqlc.arg('sdk_lang'),
+        sqlc.arg('sdk_version'),
+        sqlc.arg('sdk_platform'),
+        sqlc.arg('sync_id'),
+        sqlc.arg('build_id'),
+        sqlc.arg('function_count'),
+        sqlc.arg('cpu_cores'),
+        sqlc.arg('mem_bytes'),
+        sqlc.arg('os')
+        )
+    ON CONFLICT(id)
+DO UPDATE SET
+    account_id = excluded.account_id,
+           workspace_id = excluded.workspace_id,
+           app_id = excluded.app_id,
+
+           id = excluded.id,
+           gateway_id = excluded.gateway_id,
+           instance_id = excluded.instance_id,
+           status = excluded.status,
+           worker_ip = excluded.worker_ip,
+
+           connected_at = excluded.connected_at,
+           last_heartbeat_at = excluded.last_heartbeat_at,
+           disconnected_at = excluded.disconnected_at,
+           recorded_at = excluded.recorded_at,
+           inserted_at = excluded.inserted_at,
+
+           disconnect_reason = excluded.disconnect_reason,
+
+           group_hash = excluded.group_hash,
+           sdk_lang = excluded.sdk_lang,
+           sdk_version = excluded.sdk_version,
+           sdk_platform = excluded.sdk_platform,
+           sync_id = excluded.sync_id,
+           build_id = excluded.build_id,
+           function_count = excluded.function_count,
+
+           cpu_cores = excluded.cpu_cores,
+           mem_bytes = excluded.mem_bytes,
+           os = excluded.os
+;
+
+-- name: GetWorkerConnection :one
+SELECT * FROM worker_connections WHERE account_id = sqlc.arg('account_id') AND workspace_id = sqlc.arg('workspace_id') AND id = sqlc.arg('connection_id');
