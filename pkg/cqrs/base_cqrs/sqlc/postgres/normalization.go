@@ -3,7 +3,7 @@ package sqlc
 import (
 	"database/sql"
 
-	sqlc "github.com/inngest/inngest/pkg/cqrs/sqlitecqrs/sqlc/sqlite"
+	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
 )
 
 func (a *App) ToSQLite() (*sqlc.App, error) {

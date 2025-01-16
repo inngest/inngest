@@ -7,7 +7,7 @@ import (
 	"math"
 
 	"github.com/google/uuid"
-	sqlc_sqlite "github.com/inngest/inngest/pkg/cqrs/sqlitecqrs/sqlc/sqlite"
+	sqlc_sqlite "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
 	"github.com/oklog/ulid/v2"
 )
 

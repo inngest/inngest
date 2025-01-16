@@ -1,4 +1,4 @@
-package sqlitecqrs
+package base_cqrs
 
 import (
 	"testing"

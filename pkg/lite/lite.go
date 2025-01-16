@@ -22,7 +22,7 @@ import (
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi"
-	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs"
+	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/event"
@@ -103,7 +103,7 @@ func New(ctx context.Context, opts StartOpts) error {
 }
 
 func start(ctx context.Context, opts StartOpts) error {
-	db, err := sqlitecqrs.New(sqlitecqrs.SqliteCQRSOptions{
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{
 		InMemory:    false,
 		PostgresURI: opts.PostgresURI,
 		Directory:   opts.SQLiteDir,
@@ -122,9 +122,9 @@ func start(ctx context.Context, opts StartOpts) error {
 	if opts.PostgresURI != "" {
 		dbDriver = "postgres"
 	}
-	dbcqrs := sqlitecqrs.NewCQRS(db, dbDriver)
-	hd := sqlitecqrs.NewHistoryDriver(db, dbDriver)
-	hr := sqlitecqrs.NewHistoryReader(db, dbDriver)
+	dbcqrs := base_cqrs.NewCQRS(db, dbDriver)
+	hd := base_cqrs.NewHistoryDriver(db, dbDriver)
+	hr := base_cqrs.NewHistoryReader(db, dbDriver)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	stepLimitOverrides := make(map[string]int)

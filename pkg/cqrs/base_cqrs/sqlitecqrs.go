@@ -1,4 +1,4 @@
-package sqlitecqrs
+package base_cqrs
 
 import (
 	"database/sql"
@@ -26,7 +26,7 @@ var (
 	db *sql.DB
 )
 
-type SqliteCQRSOptions struct {
+type BaseCQRSOptions struct {
 	InMemory bool
 
 	PostgresURI string
@@ -35,7 +35,7 @@ type SqliteCQRSOptions struct {
 	Directory string
 }
 
-func New(opts SqliteCQRSOptions) (*sql.DB, error) {
+func New(opts BaseCQRSOptions) (*sql.DB, error) {
 	var err error
 
 	if opts.PostgresURI != "" {
@@ -101,7 +101,7 @@ func New(opts SqliteCQRSOptions) (*sql.DB, error) {
 //go:embed **/**/*.sql
 var FS embed.FS
 
-func up(db *sql.DB, opts SqliteCQRSOptions) error {
+func up(db *sql.DB, opts BaseCQRSOptions) error {
 	var (
 		err    error
 		src    source.Driver

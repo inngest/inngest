@@ -2,13 +2,13 @@ version: 2
 
 sql:
   - engine: "postgresql"
-    schema: "pkg/cqrs/sqlitecqrs/sqlc/postgres/schema.sql"
-    queries: "pkg/cqrs/sqlitecqrs/sqlc/postgres/queries.sql"
+    schema: "pkg/cqrs/base_cqrs/sqlc/postgres/schema.sql"
+    queries: "pkg/cqrs/base_cqrs/sqlc/postgres/queries.sql"
     gen:
       go:
         emit_result_struct_pointers: true
         package: "sqlc"
-        out: "pkg/cqrs/sqlitecqrs/sqlc/postgres"
+        out: "pkg/cqrs/base_cqrs/sqlc/postgres"
         overrides:
           - column: "apps.id"
             go_type: "github.com/google/uuid.UUID"
@@ -118,14 +118,14 @@ sql:
               package: "ulid"
               type: "ULID"
   - engine: "sqlite"
-    schema: "pkg/cqrs/sqlitecqrs/sqlc/sqlite/schema.sql"
-    queries: "pkg/cqrs/sqlitecqrs/sqlc/sqlite/queries.sql"
+    schema: "pkg/cqrs/base_cqrs/sqlc/sqlite/schema.sql"
+    queries: "pkg/cqrs/base_cqrs/sqlc/sqlite/queries.sql"
     gen:
       go:
         emit_interface: true
         emit_result_struct_pointers: true
         package: "sqlc"
-        out: "pkg/cqrs/sqlitecqrs/sqlc/sqlite"
+        out: "pkg/cqrs/base_cqrs/sqlc/sqlite"
         overrides:
           - column: "apps.id"
             go_type: "github.com/google/uuid.UUID"
