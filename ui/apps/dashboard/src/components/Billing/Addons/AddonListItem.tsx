@@ -1,12 +1,17 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import CounterInput from '@inngest/components/Forms/CounterInput';
+import { Link } from '@inngest/components/Link/Link';
 import { AlertModal } from '@inngest/components/Modal/AlertModal';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
-import { RiInformationLine } from '@remixicon/react';
+import { RiAlertFill, RiInformationLine } from '@remixicon/react';
+import { toast } from 'sonner';
+import { useMutation } from 'urql';
 
+import { graphql } from '@/gql';
 import { pathCreator } from '@/utils/urls';
 
 const billingPeriod = 'month'; // TODO(cdzombak): need this from the backend
@@ -19,8 +24,17 @@ function unitDescriptionFromTitle(title: string) {
   return result;
 }
 
+const UpdateAccountAddonQuantityDocument = graphql(`
+  mutation UpdateAccountAddonQuantity($addonName: String!, $quantity: Int!) {
+    updateAccountAddonQuantity(addonName: $addonName, quantity: $quantity) {
+      purchaseCount
+    }
+  }
+`);
+
 export default function AddOn({
   title,
+  addonName,
   description,
   tooltipContent,
   value,
@@ -31,8 +45,10 @@ export default function AddOn({
   selfServiceAvailable,
   quantityPer,
   price,
+  onChange,
 }: {
-  title: string; // Name/Title of the addon (e.g. Users, Concurrency)
+  title: string; // Title of the addon (e.g. Users, Concurrency)
+  addonName: string;
   description?: string;
   tooltipContent?: string | React.ReactNode;
   value?: number | boolean; // Current value of the entitlement relevant to this addon, including plan + any addons + account-level overrides
@@ -43,10 +59,15 @@ export default function AddOn({
   selfServiceAvailable: boolean; // Is this addon available (for this account) via self-service or will they need to contact us?
   quantityPer: number; // The number of units (e.g. concurrency or users) included in one purchase of this addon
   price?: number; // Price for one purchase of this addon, in US Cents
+  onChange?: () => void;
 }) {
+  const router = useRouter();
+
   const [openSelfService, setOpenSelfService] = useState(false);
   const [openConfirmationModal, setOpenConfirmationModal] = useState(false);
+  const [, updateAccountAddonQuantity] = useMutation(UpdateAccountAddonQuantityDocument);
   const [inputValid, setInputValid] = useState(true);
+  const [err, setErr] = useState<String | null>(null);
 
   const useSwitchInput = typeof value === 'boolean';
   const useNumericInput = typeof value === 'number' && typeof planLimit === 'number';
@@ -56,6 +77,9 @@ export default function AddOn({
 
   const startingNumericInputValue = useNumericInput ? Math.max(value, planLimit) : 0;
   const [numericInputValue, setNumericInputValue] = useState(startingNumericInputValue);
+  const inputQuantity = Math.ceil(
+    (numericInputValue - (typeof planLimit == 'boolean' ? 1 : planLimit)) / quantityPer
+  );
 
   const priceDollars = price ? (price / 100).toFixed(2) : undefined;
   let priceText = !price
@@ -93,13 +117,7 @@ export default function AddOn({
     ? undefined
     : numericInputValue === planLimit
     ? 0
-    : (
-        (Math.ceil(
-          (numericInputValue - (typeof planLimit == 'boolean' ? 1 : planLimit)) / quantityPer
-        ) *
-          price) /
-        100
-      ).toFixed(2);
+    : ((inputQuantity * price) / 100).toFixed(2);
 
   const confirmationTitle =
     value === planLimit
@@ -108,6 +126,22 @@ export default function AddOn({
   const addedDescription = useNumericInput
     ? `Your new charge for ${numericInputValue} ${title.toLowerCase()} will be $${cost} per ${billingPeriod}.`
     : '';
+
+  const handleSubmit = async () => {
+    setOpenConfirmationModal(false);
+    const updateResult = await updateAccountAddonQuantity({ addonName, quantity: inputQuantity });
+    if (updateResult.error) {
+      console.error(updateResult.error.message);
+      setErr(updateResult.error.message);
+    } else {
+      setErr(null);
+      if (onChange) {
+        onChange();
+      }
+      router.refresh();
+      toast.success(`Addon updated successfully`);
+    }
+  };
 
   return (
     <div className="mb-5">
@@ -127,6 +161,15 @@ export default function AddOn({
             )}
           </p>
           {description && <p className="text-muted mb-0.5 text-sm italic">{descriptionText}</p>}
+          {err && (
+            <p className="text-error text-xs">
+              <RiAlertFill className="-mt-0.5 inline h-4" /> Failed to update addon.{' '}
+              <a href="/support" className="underline">
+                Contact support
+              </a>{' '}
+              if this problem persists.
+            </p>
+          )}
           {displayValue && !openSelfService && (
             <p className="text-basis pr-3 text-sm font-medium">{displayValue}</p>
           )}
@@ -141,6 +184,7 @@ export default function AddOn({
                 onClick={() => {
                   setOpenSelfService(true);
                   setInputValid(true);
+                  setErr(null);
                 }}
               />
             ) : (
@@ -204,12 +248,10 @@ export default function AddOn({
         </div>
       )}
       {openConfirmationModal && (
-        // TODO(cdzombak): include addon name, price, quantity/resolved amount in confirmation modal
-        // TODO(cdzombak): actually commit the change
         <AlertModal
           isOpen={openConfirmationModal}
           onClose={() => setOpenConfirmationModal(false)}
-          onSubmit={() => {}}
+          onSubmit={handleSubmit}
           title={confirmationTitle}
           description={
             'Are you sure you want to apply this change to your plan? ' + addedDescription

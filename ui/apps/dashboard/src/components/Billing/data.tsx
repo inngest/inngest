@@ -90,6 +90,9 @@ export const currentPlanDocument = graphql(`
           stepCount {
             limit
           }
+          userCount {
+            limit
+          }
         }
         addons {
           concurrency {

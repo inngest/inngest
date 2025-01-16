@@ -19,8 +19,19 @@ export const dynamic = 'force-dynamic';
 
 export default async function Page() {
   const entitlementUsage = await getEntitlementUsage();
-  const plan = await getCurrentPlan();
+  const { plan: currentPlan, subscription: currentSubscription } = await getCurrentPlan();
   const billing = await getBillingDetails();
+
+  if (!currentPlan) {
+    throw new Error('Failed to fetch current plan');
+  }
+
+  const refetch = async () => {
+    'use server';
+    await getCurrentPlan();
+    await getEntitlementUsage();
+    await getBillingDetails();
+  };
 
   const legacyNoRunsPlan = entitlementUsage.runCount.limit === null;
   const runs: Data = {
@@ -51,16 +62,31 @@ export default async function Page() {
     tooltipContent: 'An individual step in durable functions.',
   };
 
-  const nextInvoiceDate = plan.subscription?.nextInvoiceDate
-    ? day(plan.subscription.nextInvoiceDate)
+  const nextInvoiceDate = currentSubscription?.nextInvoiceDate
+    ? day(currentSubscription.nextInvoiceDate)
     : undefined;
 
-  const nextInvoiceAmount = plan.plan?.amount ? `$${plan.plan.amount / 100}` : 'Free';
+  const nextInvoiceAmount = currentPlan.amount
+    ? `$${(currentPlan.amount / 100).toFixed(2)}`
+    : 'Free';
   const overageAllowed =
     entitlementUsage.runCount.overageAllowed || entitlementUsage.stepCount.overageAllowed;
 
   const paymentMethod = billing.paymentMethods?.[0] || null;
-  // const isFreePlan = plan.plan?.name === PlanNames.Free;
+
+  const isProPlan = currentPlan.name === PlanNames.Pro;
+
+  // TODO(cdzombak): various data is missing from the backend:
+  //                 - canIncreaseLimitInCurrentPlan
+  //                 - billing period
+  //                 - maxValue
+  //                 - addonName
+  //                 - is override applied
+  // TODO(cdzombak): self service must be unavailable if account override is applied
+  // TODO(cdzombak): make most addonListItem inputs optional; refactor to make this flexibility cleaner
+  // TODO(cdzombak): addonListItem must handle planLimit == null|undefined
+  // TODO(cdzombak): hipaa addon
+  // TODO(cdzombak): dedicated capacity addon
 
   return (
     <div className="grid grid-cols-3 gap-4">
@@ -85,7 +111,7 @@ export default async function Page() {
         <Card.Content>
           <p className="text-muted mb-1">Your plan</p>
           <div className="flex items-center justify-between">
-            <p className="text-basis text-xl">{plan.plan?.name}</p>
+            <p className="text-basis text-xl">{currentPlan.name}</p>
             <Button
               appearance="ghost"
               label="Change plan"
@@ -103,41 +129,46 @@ export default async function Page() {
                 ? `${(entitlementUsage.eventSize.limit / 1024).toFixed(2)} MB`
                 : `${entitlementUsage.eventSize.limit} KB`
             }
-            planLimit={plan.plan?.entitlements.eventSize.limit || 0}
-            maxValue={10 * 1024 * 1024} // TODO(cdzombak): unnecessary for no-self-service addons
-            quantityPer={1024 * 1024} // TODO(cdzombak): unnecessary for no-self-service addons
+            planLimit={currentPlan.entitlements.eventSize.limit}
             canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             description="The maximum size for a single event"
             selfServiceAvailable={false}
+            maxValue={0} // unnecessary for no-self-service addons
+            quantityPer={0} // unnecessary for no-self-service addons
+            addonName={''} // unnecessary for no-self-service addons
           />
           <AddOn
             title="Concurrency"
             value={entitlementUsage.concurrency.limit}
             displayValue={`${entitlementUsage.concurrency.limit} concurrent steps`}
             canIncreaseLimitInCurrentPlan={
-              entitlementUsage.isCustomPlan || !!plan.plan?.addons.concurrency.available
+              entitlementUsage.isCustomPlan || currentPlan.addons.concurrency.available
             }
-            planLimit={plan.plan?.entitlements.concurrency.limit || 0}
+            planLimit={currentPlan.entitlements.concurrency.limit}
             maxValue={1000} // TODO(cdzombak): where should this come from?
-            quantityPer={10}
+            quantityPer={currentPlan.addons.concurrency.quantityPer}
             description="Maximum number of concurrently executing steps"
             tooltipContent="Functions actively sleeping and waiting for events are not counted"
-            selfServiceAvailable={!!plan.plan?.addons.concurrency.price}
-            price={plan.plan?.addons.concurrency.price || undefined}
+            selfServiceAvailable={!!currentPlan.addons.concurrency.price}
+            price={currentPlan.addons.concurrency.price || undefined}
+            addonName={'concurrency'}
+            onChange={refetch}
           />
           <AddOn
             title="Users"
             value={entitlementUsage.userCount.limit || 0}
             displayValue={`${entitlementUsage.userCount.usage} of ${entitlementUsage.userCount.limit} maximum users`}
-            canIncreaseLimitInCurrentPlan={!!plan.plan?.addons.userCount.available}
+            canIncreaseLimitInCurrentPlan={currentPlan.addons.userCount.available}
             description="Maximum number of users on the account"
-            planLimit={10} // TODO(cdzombak): where should this come from?
+            planLimit={currentPlan.entitlements.userCount.limit || -1}
             maxValue={1000} // TODO(cdzombak): where should this come from?
-            quantityPer={1}
+            quantityPer={currentPlan.addons.userCount.quantityPer}
             selfServiceAvailable={
-              !!plan.plan?.addons.userCount.price && entitlementUsage.userCount.limit !== null
+              !!currentPlan.addons.userCount.price && entitlementUsage.userCount.limit !== null
             }
-            price={plan.plan?.addons.userCount.price || undefined}
+            price={currentPlan.addons.userCount.price || undefined}
+            addonName={'!!!user_count'}
+            onChange={refetch}
           />
           <AddOn
             title="Log history"
@@ -145,25 +176,25 @@ export default async function Page() {
             displayValue={`${entitlementUsage.history.limit} day${
               entitlementUsage.history.limit === 1 ? '' : 's'
             }`}
-            planLimit={plan.plan?.entitlements.history.limit || 0}
-            maxValue={366} // TODO(cdzombak): unnecessary for no-self-service addons
-            quantityPer={7} // TODO(cdzombak): unnecessary for no-self-service addons
+            planLimit={currentPlan.entitlements.history.limit}
             canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             description="View and search function run traces and metrics"
             selfServiceAvailable={false}
+            maxValue={366} // unnecessary for no-self-service addons
+            quantityPer={7} // unnecessary for no-self-service addons
+            addonName={''} // unnecessary for no-self-service addons
           />
           <AddOn
             title="HIPAA"
             value={entitlementUsage.hipaa.enabled}
             displayValue={entitlementUsage.hipaa.enabled ? 'Enabled' : 'Not enabled'}
-            canIncreaseLimitInCurrentPlan={
-              entitlementUsage.isCustomPlan || plan.plan?.name === PlanNames.Pro
-            }
+            canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan || isProPlan}
             description="Sign BAAs for healthcare services"
             planLimit={1} // TODO(cdzombak): nonsense for boolean
             maxValue={1} // TODO(cdzombak): nonsense for boolean
             quantityPer={1} // TODO(cdzombak): nonsense for boolean
             selfServiceAvailable={false} // TODO(cdzombak): should be true eventually
+            addonName={'hipaa'}
           />
           <AddOn
             title="Dedicated execution capacity"
@@ -176,6 +207,7 @@ export default async function Page() {
             planLimit={0} // TODO(cdzombak): where should this come from?
             quantityPer={250} // TODO(cdzombak): where should this come from?
             price={500}
+            addonName={''}
           />
           <div className="flex flex-col items-center gap-2 pt-6">
             <p className="text-muted text-xs">Custom needs?</p>
