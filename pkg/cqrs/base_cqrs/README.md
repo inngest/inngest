@@ -20,6 +20,12 @@ normalization layer does not implement the new function. All other storage
 layers use SQLite as their I/O, so we must write custom code to transform the
 I/O for that layer.
 
+```
+[nixos@nixos:~/repo/inngest/inngest]$ go run ./cmd/main.go start
+# github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres
+pkg/cqrs/base_cqrs/sqlc/postgres/db_normalization.go:15:9: cannot use &NormalizedQueries{…} (value of type *NormalizedQueries) as "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite".Querier value in return statement: *NormalizedQueries does not implement "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite".Querier (missing method NewExampleQuery)
+```
+
 Head to `pkg/cqrs/base_cqrs/sqlc/postgres/db_normalization.go` and add the new
 function:
 ```go
