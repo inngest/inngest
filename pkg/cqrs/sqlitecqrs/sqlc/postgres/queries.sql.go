@@ -1495,7 +1495,7 @@ ON CONFLICT (run_id) DO UPDATE SET
     is_debounce = excluded.is_debounce,
     cron_schedule = excluded.cron_schedule,
     has_ai = CASE
-                WHEN trace_runs.has_ai = 1 THEN 1
+                WHEN trace_runs.has_ai = TRUE THEN TRUE
                 ELSE excluded.has_ai
              END
 `
