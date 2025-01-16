@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -115,14 +116,24 @@ func up(db *sql.DB, opts SqliteCQRSOptions) error {
 			return err
 		}
 
+		dbName = "postgres"
+		parsedURL, err := url.Parse(opts.PostgresURI)
+		if err != nil {
+			return fmt.Errorf("error parsing postgres URI to retrieve DB name: %w", err)
+		}
+
+		if parsedURL.Path != "" && parsedURL.Path != "/" {
+			// Remove the leading slash
+			dbName = parsedURL.Path[1:]
+		}
+
 		driver, err = postgres.WithInstance(db, &postgres.Config{
 			MigrationsTable: "migrations",
+			DatabaseName:    dbName,
 		})
 		if err != nil {
 			return err
 		}
-
-		dbName = "inngest"
 	} else {
 		src, err = iofs.New(FS, filepath.Join("migrations", "sqlite"))
 		if err != nil {
