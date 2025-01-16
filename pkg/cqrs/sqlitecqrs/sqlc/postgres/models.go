@@ -25,6 +25,7 @@ type App struct {
 	CreatedAt   time.Time
 	ArchivedAt  sql.NullTime
 	Url         string
+	IsConnect   sql.NullBool
 }
 
 type Event struct {
@@ -156,4 +157,5 @@ type TraceRun struct {
 	IsDebounce   bool
 	BatchID      ulid.ULID
 	CronSchedule sql.NullString
+	HasAi        bool
 }

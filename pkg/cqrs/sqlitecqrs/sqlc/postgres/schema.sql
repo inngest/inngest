@@ -10,7 +10,8 @@ CREATE TABLE apps (
 	checksum VARCHAR NOT NULL,
 	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	archived_at TIMESTAMP,
-	url VARCHAR NOT NULL
+	url VARCHAR NOT NULL,
+	is_connect BOOLEAN
 );
 
 -- XXX: - this is very basic right now.  it does not conform to the cloud.
@@ -143,7 +144,8 @@ CREATE TABLE trace_runs (
 	output BYTEA,
 	is_debounce BOOLEAN NOT NULL,
 	batch_id BYTEA,
-	cron_schedule TEXT
+	cron_schedule TEXT,
+	has_ai BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 CREATE TABLE queue_snapshot_chunks (

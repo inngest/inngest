@@ -20,6 +20,7 @@ func (a *App) ToSQLite() (*sqlc.App, error) {
 		CreatedAt:   a.CreatedAt,
 		ArchivedAt:  a.ArchivedAt,
 		Url:         a.Url,
+		IsConnect:   a.IsConnect,
 	}, nil
 }
 
@@ -191,6 +192,7 @@ func (tr *TraceRun) ToSQLite() (*sqlc.TraceRun, error) {
 		IsDebounce:   tr.IsDebounce,
 		BatchID:      tr.BatchID,
 		CronSchedule: tr.CronSchedule,
+		HasAi:        tr.HasAi,
 	}, nil
 }
 
