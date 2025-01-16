@@ -6,9 +6,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/connect/pubsub"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"io"
-
 	"log/slog"
 	"net"
 	"net/http"
@@ -18,6 +17,8 @@ import (
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
 	"github.com/gowebpki/jcs"
+	"github.com/inngest/inngest/pkg/connect/auth"
+	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/connect/types"
 	"github.com/inngest/inngest/pkg/connect/wsproto"
@@ -25,6 +26,10 @@ import (
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
+)
+
+const (
+	pkgName = "connect.gateway"
 )
 
 func (c *connectGatewaySvc) closeWithConnectError(ws *websocket.Conn, serr *SocketError) {
@@ -75,11 +80,20 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
+		additionalMetricsTags := c.metricsTags()
+
+		metrics.IncrConnectGatewayReceiveConnectionAttemptCounter(ctx, 1, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    additionalMetricsTags,
+		})
+
 		// Do not accept new connections if the gateway is draining
 		if c.isDraining {
 			c.closeDraining(ws)
 			return
 		}
+
+		var closed bool
 
 		ch := &connectionHandler{
 			svc:        c,
@@ -88,10 +102,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			updateLock: sync.Mutex{},
 		}
 
-		c.connectionSema.Add(1)
+		c.connectionCount.Add()
 		defer func() {
 			// This is deferred so we always update the semaphore
-			defer c.connectionSema.Done()
+			defer c.connectionCount.Done()
 			ch.log.Debug("Closing WebSocket connection")
 
 			if c.isDraining {
@@ -99,6 +113,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				return
 			}
 			_ = ws.CloseNow()
+			closed = true
 		}()
 
 		ch.log.Debug("WebSocket connection established, sending hello")
@@ -136,7 +151,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
-		ch.log = ch.log.With("account_id", conn.Data.AuthData.AccountId, "env_id", conn.Data.AuthData.EnvId, "conn_id", conn.Data.SessionId.ConnectionId)
+		ch.log = ch.log.With("account_id", conn.AccountID, "env_id", conn.EnvID, "conn_id", conn.Data.SessionId.ConnectionId)
 
 		var closeReason string
 		var closeReasonLock sync.Mutex
@@ -145,9 +160,17 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		defer notifyWorkerDrained()
 
 		go func() {
-			// If gateway is shutting down, we must immediately start the draining process
+			// This is call in two cases
+			// - Connection was closed by the worker, and we already ran all defer actions
+			// - Gateway is draining/shutting down and the parent context was canceled
 			<-ctx.Done()
 
+			// If the connection is already closed, we don't have to drain
+			if closed {
+				return
+			}
+
+			// If gateway is shutting down, we must immediately start the draining process
 			ch.log.Debug("context done, starting draining process")
 
 			// Prevent routing any more messages to this connection
@@ -201,7 +224,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}()
 
-		err = conn.Sync(ctx, c.stateManager)
+		err = conn.Sync(ctx, c.stateManager, c.apiBaseUrl)
 		if err != nil {
 			if ctx.Err() != nil {
 				c.closeDraining(ws)
@@ -271,7 +294,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				err := wsproto.Read(context.Background(), ws, &msg)
 				if err != nil {
 					// immediately stop routing messages to this connection
-					if err := ch.updateConnStatus(connect.ConnectionStatus_DRAINING); err != nil {
+					if err := ch.updateConnStatus(connect.ConnectionStatus_DISCONNECTING); err != nil {
 						ch.log.Error("could not update connection status after read error", "err", err)
 					}
 
@@ -303,6 +326,18 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 						Msg:        "could not read next message",
 					})
 				}
+
+				tags := map[string]any{
+					"kind": msg.Kind.String(),
+				}
+				for k, v := range additionalMetricsTags {
+					tags[k] = v
+				}
+
+				metrics.IncrConnectGatewayReceivedWorkerMessageCounter(ctx, 1, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags:    tags,
+				})
 
 				serr := ch.handleIncomingWebSocketMessage(app.ID, &msg)
 				if serr != nil {
@@ -365,6 +400,20 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		}
 
 		ch.log.Debug("connection is ready")
+
+		{
+			successTags := map[string]any{
+				"success": true,
+			}
+			for k, v := range additionalMetricsTags {
+				successTags[k] = v
+			}
+
+			metrics.IncrConnectGatewayReceiveConnectionAttemptCounter(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    successTags,
+			})
+		}
 
 		// Connection was drained once it's closed by the worker (even if
 		// the connection broke unintentionally, we can stop waiting)
@@ -485,6 +534,8 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(appId uuid.UUID, msg 
 }
 
 func (c *connectionHandler) receiveRouterMessages(ctx context.Context, appId uuid.UUID) {
+	additionalMetricsTags := c.svc.metricsTags()
+
 	// Receive execution-related messages for the app, forwarded by the router.
 	// The router selects only one gateway to handle a request from a pool of one or more workers (and thus WebSockets)
 	// running for each app.
@@ -496,6 +547,11 @@ func (c *connectionHandler) receiveRouterMessages(ctx context.Context, appId uui
 		)
 
 		log.Debug("gateway received msg")
+
+		metrics.IncrConnectGatewayReceivedRouterPubSubMessageCounter(ctx, 1, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    additionalMetricsTags,
+		})
 
 		// Do not forward messages if the connection is already draining
 		if ctx.Err() != nil {
@@ -597,7 +653,7 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 		}
 	}
 
-	var authResp *AuthResponse
+	var authResp *auth.Response
 	{
 		// Run auth, add to distributed state
 		authResp, err = c.svc.auther(ctx, &initialMessageData)
@@ -623,13 +679,10 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 			}
 		}
 
-		initialMessageData.AuthData.AccountId = authResp.AccountID.String()
-		initialMessageData.AuthData.EnvId = authResp.EnvID.String()
-
 		c.log.Debug("SDK successfully authenticated", "authResp", authResp)
 	}
 
-	log := c.log.With("account_id", initialMessageData.AuthData.AccountId)
+	log := c.log.With("account_id", authResp.AccountID, "env_id", authResp.EnvID)
 
 	var functionHash []byte
 	{
@@ -667,11 +720,17 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 	}
 
 	conn := state.Connection{
+		AccountID: authResp.AccountID,
+		EnvID:     authResp.EnvID,
+
 		// Mark initial status, not ready to receive messages yet
-		Status:    connect.ConnectionStatus_CONNECTED,
-		Data:      &initialMessageData,
-		Session:   sessionDetails,
-		Group:     workerGroup,
+		Status: connect.ConnectionStatus_CONNECTED,
+
+		Data:    &initialMessageData,
+		Session: sessionDetails,
+		Group:   workerGroup,
+
+		// Used for routing messages to the correct gateway
 		GatewayId: c.svc.gatewayId,
 	}
 

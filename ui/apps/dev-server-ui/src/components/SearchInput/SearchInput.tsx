@@ -18,7 +18,7 @@ export default function SearchInput({
   return (
     <div
       className={cn(
-        'bg-canvasBase text-muted border-subtle relative flex items-center border pl-4',
+        'bg-canvasBase text-muted border-subtle relative flex items-center border pl-4 text-sm',
         className
       )}
     >

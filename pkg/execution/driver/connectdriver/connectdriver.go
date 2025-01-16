@@ -3,9 +3,11 @@ package connectdriver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"net/http"
 	"net/url"
@@ -18,6 +20,10 @@ import (
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/syscode"
+)
+
+const (
+	pkgName = "connect.execution.driver"
 )
 
 func NewDriver(ctx context.Context, psf pubsub.RequestForwarder) driver.Driver {
@@ -36,6 +42,13 @@ func (e executor) RuntimeType() string {
 }
 
 func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadata, item queue.Item, edge inngest.Edge, step inngest.Step, idx, attempt int) (*state.DriverResponse, error) {
+	start := time.Now()
+	defer func() {
+		metrics.HistogramConnectExecutorEndToEndDuration(ctx, time.Since(start).Milliseconds(), metrics.HistogramOpt{
+			PkgName: pkgName,
+		})
+	}()
+
 	input, err := driver.MarshalV1(ctx, sl, s, step, idx, "", attempt)
 	if err != nil {
 		return nil, err
@@ -44,6 +57,10 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 	uri, err := url.Parse(step.URI)
 	if err != nil {
 		return nil, err
+	}
+
+	if e.forwarder == nil {
+		return nil, fmt.Errorf("missing connect request forwarder")
 	}
 
 	return ProxyRequest(ctx, e.forwarder, s.ID.Tenant, httpdriver.Request{

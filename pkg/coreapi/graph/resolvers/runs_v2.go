@@ -94,6 +94,7 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 			IsBatch:        r.IsBatch,
 			BatchCreatedAt: batchTime,
 			CronSchedule:   r.CronSchedule,
+			HasAi:          r.HasAI,
 		}
 
 		triggerIDS := []ulid.ULID{}

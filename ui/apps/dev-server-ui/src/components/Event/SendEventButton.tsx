@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import type { ButtonAppearance } from '@inngest/components/Button/Button';
 
 import SendEventModal from '@/components/Event/SendEventModal';
@@ -19,7 +19,7 @@ export default function SendEventButton({
 
   return (
     <>
-      <NewButton
+      <Button
         label={label}
         kind="secondary"
         appearance={appearance}

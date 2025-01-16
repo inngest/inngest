@@ -4,7 +4,7 @@ package cmds
 
 import "strconv"
 
-type Eval Completed
+type Eval Incomplete
 
 func (b Builder) Eval() (c Eval) {
 	c = Eval{cs: get(), ks: b.ks}
@@ -17,7 +17,7 @@ func (c Eval) Script(script string) EvalScript {
 	return (EvalScript)(c)
 }
 
-type EvalArg Completed
+type EvalArg Incomplete
 
 func (c EvalArg) Arg(arg ...string) EvalArg {
 	c.cs.s = append(c.cs.s, arg...)
@@ -26,10 +26,10 @@ func (c EvalArg) Arg(arg ...string) EvalArg {
 
 func (c EvalArg) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type EvalKey Completed
+type EvalKey Incomplete
 
 func (c EvalKey) Key(key ...string) EvalKey {
 	if c.ks&NoSlot == NoSlot {
@@ -53,10 +53,10 @@ func (c EvalKey) Arg(arg ...string) EvalArg {
 
 func (c EvalKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type EvalNumkeys Completed
+type EvalNumkeys Incomplete
 
 func (c EvalNumkeys) Key(key ...string) EvalKey {
 	if c.ks&NoSlot == NoSlot {
@@ -80,13 +80,13 @@ func (c EvalNumkeys) Arg(arg ...string) EvalArg {
 
 func (c EvalNumkeys) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type EvalRo Completed
+type EvalRo Incomplete
 
 func (b Builder) EvalRo() (c EvalRo) {
-	c = EvalRo{cs: get(), ks: b.ks, cf: scrRoTag}
+	c = EvalRo{cs: get(), ks: b.ks, cf: int16(scrRoTag)}
 	c.cs.s = append(c.cs.s, "EVAL_RO")
 	return c
 }
@@ -96,7 +96,7 @@ func (c EvalRo) Script(script string) EvalRoScript {
 	return (EvalRoScript)(c)
 }
 
-type EvalRoArg Completed
+type EvalRoArg Incomplete
 
 func (c EvalRoArg) Arg(arg ...string) EvalRoArg {
 	c.cs.s = append(c.cs.s, arg...)
@@ -105,15 +105,15 @@ func (c EvalRoArg) Arg(arg ...string) EvalRoArg {
 
 func (c EvalRoArg) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c EvalRoArg) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type EvalRoKey Completed
+type EvalRoKey Incomplete
 
 func (c EvalRoKey) Key(key ...string) EvalRoKey {
 	if c.ks&NoSlot == NoSlot {
@@ -137,15 +137,15 @@ func (c EvalRoKey) Arg(arg ...string) EvalRoArg {
 
 func (c EvalRoKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c EvalRoKey) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type EvalRoNumkeys Completed
+type EvalRoNumkeys Incomplete
 
 func (c EvalRoNumkeys) Key(key ...string) EvalRoKey {
 	if c.ks&NoSlot == NoSlot {
@@ -169,29 +169,29 @@ func (c EvalRoNumkeys) Arg(arg ...string) EvalRoArg {
 
 func (c EvalRoNumkeys) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c EvalRoNumkeys) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type EvalRoScript Completed
+type EvalRoScript Incomplete
 
 func (c EvalRoScript) Numkeys(numkeys int64) EvalRoNumkeys {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(numkeys, 10))
 	return (EvalRoNumkeys)(c)
 }
 
-type EvalScript Completed
+type EvalScript Incomplete
 
 func (c EvalScript) Numkeys(numkeys int64) EvalNumkeys {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(numkeys, 10))
 	return (EvalNumkeys)(c)
 }
 
-type Evalsha Completed
+type Evalsha Incomplete
 
 func (b Builder) Evalsha() (c Evalsha) {
 	c = Evalsha{cs: get(), ks: b.ks}
@@ -204,7 +204,7 @@ func (c Evalsha) Sha1(sha1 string) EvalshaSha1 {
 	return (EvalshaSha1)(c)
 }
 
-type EvalshaArg Completed
+type EvalshaArg Incomplete
 
 func (c EvalshaArg) Arg(arg ...string) EvalshaArg {
 	c.cs.s = append(c.cs.s, arg...)
@@ -213,10 +213,10 @@ func (c EvalshaArg) Arg(arg ...string) EvalshaArg {
 
 func (c EvalshaArg) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type EvalshaKey Completed
+type EvalshaKey Incomplete
 
 func (c EvalshaKey) Key(key ...string) EvalshaKey {
 	if c.ks&NoSlot == NoSlot {
@@ -240,10 +240,10 @@ func (c EvalshaKey) Arg(arg ...string) EvalshaArg {
 
 func (c EvalshaKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type EvalshaNumkeys Completed
+type EvalshaNumkeys Incomplete
 
 func (c EvalshaNumkeys) Key(key ...string) EvalshaKey {
 	if c.ks&NoSlot == NoSlot {
@@ -267,13 +267,13 @@ func (c EvalshaNumkeys) Arg(arg ...string) EvalshaArg {
 
 func (c EvalshaNumkeys) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type EvalshaRo Completed
+type EvalshaRo Incomplete
 
 func (b Builder) EvalshaRo() (c EvalshaRo) {
-	c = EvalshaRo{cs: get(), ks: b.ks, cf: scrRoTag}
+	c = EvalshaRo{cs: get(), ks: b.ks, cf: int16(scrRoTag)}
 	c.cs.s = append(c.cs.s, "EVALSHA_RO")
 	return c
 }
@@ -283,7 +283,7 @@ func (c EvalshaRo) Sha1(sha1 string) EvalshaRoSha1 {
 	return (EvalshaRoSha1)(c)
 }
 
-type EvalshaRoArg Completed
+type EvalshaRoArg Incomplete
 
 func (c EvalshaRoArg) Arg(arg ...string) EvalshaRoArg {
 	c.cs.s = append(c.cs.s, arg...)
@@ -292,15 +292,15 @@ func (c EvalshaRoArg) Arg(arg ...string) EvalshaRoArg {
 
 func (c EvalshaRoArg) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c EvalshaRoArg) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type EvalshaRoKey Completed
+type EvalshaRoKey Incomplete
 
 func (c EvalshaRoKey) Key(key ...string) EvalshaRoKey {
 	if c.ks&NoSlot == NoSlot {
@@ -324,15 +324,15 @@ func (c EvalshaRoKey) Arg(arg ...string) EvalshaRoArg {
 
 func (c EvalshaRoKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c EvalshaRoKey) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type EvalshaRoNumkeys Completed
+type EvalshaRoNumkeys Incomplete
 
 func (c EvalshaRoNumkeys) Key(key ...string) EvalshaRoKey {
 	if c.ks&NoSlot == NoSlot {
@@ -356,29 +356,29 @@ func (c EvalshaRoNumkeys) Arg(arg ...string) EvalshaRoArg {
 
 func (c EvalshaRoNumkeys) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c EvalshaRoNumkeys) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type EvalshaRoSha1 Completed
+type EvalshaRoSha1 Incomplete
 
 func (c EvalshaRoSha1) Numkeys(numkeys int64) EvalshaRoNumkeys {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(numkeys, 10))
 	return (EvalshaRoNumkeys)(c)
 }
 
-type EvalshaSha1 Completed
+type EvalshaSha1 Incomplete
 
 func (c EvalshaSha1) Numkeys(numkeys int64) EvalshaNumkeys {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(numkeys, 10))
 	return (EvalshaNumkeys)(c)
 }
 
-type Fcall Completed
+type Fcall Incomplete
 
 func (b Builder) Fcall() (c Fcall) {
 	c = Fcall{cs: get(), ks: b.ks}
@@ -391,7 +391,7 @@ func (c Fcall) Function(function string) FcallFunction {
 	return (FcallFunction)(c)
 }
 
-type FcallArg Completed
+type FcallArg Incomplete
 
 func (c FcallArg) Arg(arg ...string) FcallArg {
 	c.cs.s = append(c.cs.s, arg...)
@@ -400,17 +400,17 @@ func (c FcallArg) Arg(arg ...string) FcallArg {
 
 func (c FcallArg) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FcallFunction Completed
+type FcallFunction Incomplete
 
 func (c FcallFunction) Numkeys(numkeys int64) FcallNumkeys {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(numkeys, 10))
 	return (FcallNumkeys)(c)
 }
 
-type FcallKey Completed
+type FcallKey Incomplete
 
 func (c FcallKey) Key(key ...string) FcallKey {
 	if c.ks&NoSlot == NoSlot {
@@ -434,10 +434,10 @@ func (c FcallKey) Arg(arg ...string) FcallArg {
 
 func (c FcallKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FcallNumkeys Completed
+type FcallNumkeys Incomplete
 
 func (c FcallNumkeys) Key(key ...string) FcallKey {
 	if c.ks&NoSlot == NoSlot {
@@ -461,13 +461,13 @@ func (c FcallNumkeys) Arg(arg ...string) FcallArg {
 
 func (c FcallNumkeys) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FcallRo Completed
+type FcallRo Incomplete
 
 func (b Builder) FcallRo() (c FcallRo) {
-	c = FcallRo{cs: get(), ks: b.ks, cf: scrRoTag}
+	c = FcallRo{cs: get(), ks: b.ks, cf: int16(scrRoTag)}
 	c.cs.s = append(c.cs.s, "FCALL_RO")
 	return c
 }
@@ -477,7 +477,7 @@ func (c FcallRo) Function(function string) FcallRoFunction {
 	return (FcallRoFunction)(c)
 }
 
-type FcallRoArg Completed
+type FcallRoArg Incomplete
 
 func (c FcallRoArg) Arg(arg ...string) FcallRoArg {
 	c.cs.s = append(c.cs.s, arg...)
@@ -486,22 +486,22 @@ func (c FcallRoArg) Arg(arg ...string) FcallRoArg {
 
 func (c FcallRoArg) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c FcallRoArg) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FcallRoFunction Completed
+type FcallRoFunction Incomplete
 
 func (c FcallRoFunction) Numkeys(numkeys int64) FcallRoNumkeys {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(numkeys, 10))
 	return (FcallRoNumkeys)(c)
 }
 
-type FcallRoKey Completed
+type FcallRoKey Incomplete
 
 func (c FcallRoKey) Key(key ...string) FcallRoKey {
 	if c.ks&NoSlot == NoSlot {
@@ -525,15 +525,15 @@ func (c FcallRoKey) Arg(arg ...string) FcallRoArg {
 
 func (c FcallRoKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c FcallRoKey) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FcallRoNumkeys Completed
+type FcallRoNumkeys Incomplete
 
 func (c FcallRoNumkeys) Key(key ...string) FcallRoKey {
 	if c.ks&NoSlot == NoSlot {
@@ -557,15 +557,15 @@ func (c FcallRoNumkeys) Arg(arg ...string) FcallRoArg {
 
 func (c FcallRoNumkeys) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c FcallRoNumkeys) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FunctionDelete Completed
+type FunctionDelete Incomplete
 
 func (b Builder) FunctionDelete() (c FunctionDelete) {
 	c = FunctionDelete{cs: get(), ks: b.ks}
@@ -578,14 +578,14 @@ func (c FunctionDelete) LibraryName(libraryName string) FunctionDeleteLibraryNam
 	return (FunctionDeleteLibraryName)(c)
 }
 
-type FunctionDeleteLibraryName Completed
+type FunctionDeleteLibraryName Incomplete
 
 func (c FunctionDeleteLibraryName) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FunctionDump Completed
+type FunctionDump Incomplete
 
 func (b Builder) FunctionDump() (c FunctionDump) {
 	c = FunctionDump{cs: get(), ks: b.ks}
@@ -595,10 +595,10 @@ func (b Builder) FunctionDump() (c FunctionDump) {
 
 func (c FunctionDump) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FunctionFlush Completed
+type FunctionFlush Incomplete
 
 func (b Builder) FunctionFlush() (c FunctionFlush) {
 	c = FunctionFlush{cs: get(), ks: b.ks}
@@ -618,24 +618,24 @@ func (c FunctionFlush) Sync() FunctionFlushAsyncSync {
 
 func (c FunctionFlush) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FunctionFlushAsync Completed
+type FunctionFlushAsync Incomplete
 
 func (c FunctionFlushAsync) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FunctionFlushAsyncSync Completed
+type FunctionFlushAsyncSync Incomplete
 
 func (c FunctionFlushAsyncSync) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FunctionHelp Completed
+type FunctionHelp Incomplete
 
 func (b Builder) FunctionHelp() (c FunctionHelp) {
 	c = FunctionHelp{cs: get(), ks: b.ks}
@@ -645,10 +645,10 @@ func (b Builder) FunctionHelp() (c FunctionHelp) {
 
 func (c FunctionHelp) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FunctionKill Completed
+type FunctionKill Incomplete
 
 func (b Builder) FunctionKill() (c FunctionKill) {
 	c = FunctionKill{cs: get(), ks: b.ks}
@@ -658,10 +658,10 @@ func (b Builder) FunctionKill() (c FunctionKill) {
 
 func (c FunctionKill) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FunctionList Completed
+type FunctionList Incomplete
 
 func (b Builder) FunctionList() (c FunctionList) {
 	c = FunctionList{cs: get(), ks: b.ks}
@@ -681,10 +681,10 @@ func (c FunctionList) Withcode() FunctionListWithcode {
 
 func (c FunctionList) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FunctionListLibraryname Completed
+type FunctionListLibraryname Incomplete
 
 func (c FunctionListLibraryname) Withcode() FunctionListWithcode {
 	c.cs.s = append(c.cs.s, "WITHCODE")
@@ -693,17 +693,17 @@ func (c FunctionListLibraryname) Withcode() FunctionListWithcode {
 
 func (c FunctionListLibraryname) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FunctionListWithcode Completed
+type FunctionListWithcode Incomplete
 
 func (c FunctionListWithcode) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FunctionLoad Completed
+type FunctionLoad Incomplete
 
 func (b Builder) FunctionLoad() (c FunctionLoad) {
 	c = FunctionLoad{cs: get(), ks: b.ks}
@@ -721,21 +721,21 @@ func (c FunctionLoad) FunctionCode(functionCode string) FunctionLoadFunctionCode
 	return (FunctionLoadFunctionCode)(c)
 }
 
-type FunctionLoadFunctionCode Completed
+type FunctionLoadFunctionCode Incomplete
 
 func (c FunctionLoadFunctionCode) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FunctionLoadReplace Completed
+type FunctionLoadReplace Incomplete
 
 func (c FunctionLoadReplace) FunctionCode(functionCode string) FunctionLoadFunctionCode {
 	c.cs.s = append(c.cs.s, functionCode)
 	return (FunctionLoadFunctionCode)(c)
 }
 
-type FunctionRestore Completed
+type FunctionRestore Incomplete
 
 func (b Builder) FunctionRestore() (c FunctionRestore) {
 	c = FunctionRestore{cs: get(), ks: b.ks}
@@ -748,28 +748,28 @@ func (c FunctionRestore) SerializedValue(serializedValue string) FunctionRestore
 	return (FunctionRestoreSerializedValue)(c)
 }
 
-type FunctionRestorePolicyAppend Completed
+type FunctionRestorePolicyAppend Incomplete
 
 func (c FunctionRestorePolicyAppend) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FunctionRestorePolicyFlush Completed
+type FunctionRestorePolicyFlush Incomplete
 
 func (c FunctionRestorePolicyFlush) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FunctionRestorePolicyReplace Completed
+type FunctionRestorePolicyReplace Incomplete
 
 func (c FunctionRestorePolicyReplace) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FunctionRestoreSerializedValue Completed
+type FunctionRestoreSerializedValue Incomplete
 
 func (c FunctionRestoreSerializedValue) Flush() FunctionRestorePolicyFlush {
 	c.cs.s = append(c.cs.s, "FLUSH")
@@ -788,10 +788,10 @@ func (c FunctionRestoreSerializedValue) Replace() FunctionRestorePolicyReplace {
 
 func (c FunctionRestoreSerializedValue) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FunctionStats Completed
+type FunctionStats Incomplete
 
 func (b Builder) FunctionStats() (c FunctionStats) {
 	c = FunctionStats{cs: get(), ks: b.ks}
@@ -801,10 +801,10 @@ func (b Builder) FunctionStats() (c FunctionStats) {
 
 func (c FunctionStats) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ScriptDebug Completed
+type ScriptDebug Incomplete
 
 func (b Builder) ScriptDebug() (c ScriptDebug) {
 	c = ScriptDebug{cs: get(), ks: b.ks}
@@ -827,28 +827,28 @@ func (c ScriptDebug) No() ScriptDebugModeNo {
 	return (ScriptDebugModeNo)(c)
 }
 
-type ScriptDebugModeNo Completed
+type ScriptDebugModeNo Incomplete
 
 func (c ScriptDebugModeNo) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ScriptDebugModeSync Completed
+type ScriptDebugModeSync Incomplete
 
 func (c ScriptDebugModeSync) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ScriptDebugModeYes Completed
+type ScriptDebugModeYes Incomplete
 
 func (c ScriptDebugModeYes) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ScriptExists Completed
+type ScriptExists Incomplete
 
 func (b Builder) ScriptExists() (c ScriptExists) {
 	c = ScriptExists{cs: get(), ks: b.ks}
@@ -861,7 +861,7 @@ func (c ScriptExists) Sha1(sha1 ...string) ScriptExistsSha1 {
 	return (ScriptExistsSha1)(c)
 }
 
-type ScriptExistsSha1 Completed
+type ScriptExistsSha1 Incomplete
 
 func (c ScriptExistsSha1) Sha1(sha1 ...string) ScriptExistsSha1 {
 	c.cs.s = append(c.cs.s, sha1...)
@@ -870,10 +870,10 @@ func (c ScriptExistsSha1) Sha1(sha1 ...string) ScriptExistsSha1 {
 
 func (c ScriptExistsSha1) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ScriptFlush Completed
+type ScriptFlush Incomplete
 
 func (b Builder) ScriptFlush() (c ScriptFlush) {
 	c = ScriptFlush{cs: get(), ks: b.ks}
@@ -893,24 +893,24 @@ func (c ScriptFlush) Sync() ScriptFlushAsyncSync {
 
 func (c ScriptFlush) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ScriptFlushAsync Completed
+type ScriptFlushAsync Incomplete
 
 func (c ScriptFlushAsync) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ScriptFlushAsyncSync Completed
+type ScriptFlushAsyncSync Incomplete
 
 func (c ScriptFlushAsyncSync) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ScriptKill Completed
+type ScriptKill Incomplete
 
 func (b Builder) ScriptKill() (c ScriptKill) {
 	c = ScriptKill{cs: get(), ks: b.ks}
@@ -920,10 +920,10 @@ func (b Builder) ScriptKill() (c ScriptKill) {
 
 func (c ScriptKill) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ScriptLoad Completed
+type ScriptLoad Incomplete
 
 func (b Builder) ScriptLoad() (c ScriptLoad) {
 	c = ScriptLoad{cs: get(), ks: b.ks}
@@ -936,9 +936,29 @@ func (c ScriptLoad) Script(script string) ScriptLoadScript {
 	return (ScriptLoadScript)(c)
 }
 
-type ScriptLoadScript Completed
+type ScriptLoadScript Incomplete
 
 func (c ScriptLoadScript) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type ScriptShow Incomplete
+
+func (b Builder) ScriptShow() (c ScriptShow) {
+	c = ScriptShow{cs: get(), ks: b.ks}
+	c.cs.s = append(c.cs.s, "SCRIPT", "SHOW")
+	return c
+}
+
+func (c ScriptShow) Sha1(sha1 string) ScriptShowSha1 {
+	c.cs.s = append(c.cs.s, sha1)
+	return (ScriptShowSha1)(c)
+}
+
+type ScriptShowSha1 Incomplete
+
+func (c ScriptShowSha1) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }

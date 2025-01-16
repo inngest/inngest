@@ -1773,6 +1773,7 @@ func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
 		TriggerIds:  []byte{},
 		Output:      run.Output,
 		IsDebounce:  run.IsDebounce,
+		HasAi:       run.HasAI,
 	}
 
 	if run.BatchID != nil {
@@ -2000,6 +2001,40 @@ func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*
 	return nil, fmt.Errorf("no output found")
 }
 
+func (w wrapper) GetSpanStack(ctx context.Context, opts cqrs.SpanIdentifier) ([]string, error) {
+	if opts.TraceID == "" {
+		return nil, fmt.Errorf("traceID is required to retrieve stack")
+	}
+	if opts.SpanID == "" {
+		return nil, fmt.Errorf("spanID is required to retrieve stack")
+	}
+
+	// query spans in descending order
+	spans, err := w.q.GetTraceSpanOutput(ctx, sqlc.GetTraceSpanOutputParams{
+		TraceID: opts.TraceID,
+		SpanID:  opts.SpanID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving spans for stack: %w", err)
+	}
+
+	for _, s := range spans {
+		var evts []cqrs.SpanEvent
+		err := json.Unmarshal(s.Events, &evts)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing span outputs: %w", err)
+		}
+
+		for _, evt := range evts {
+			if stack, ok := evt.Attributes[consts.OtelSysStepStack]; ok {
+				return strings.Split(stack, ","), nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("no stack found")
+}
+
 type runsQueryBuilder struct {
 	filter       []sq.Expression
 	order        []sqexp.OrderedExpression
@@ -2189,6 +2224,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			"batch_id",
 			"is_debounce",
 			"cron_schedule",
+			"has_ai",
 		).
 		Where(filter...).
 		Order(order...).
@@ -2221,6 +2257,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			&data.BatchID,
 			&data.IsDebounce,
 			&data.CronSchedule,
+			&data.HasAi,
 		)
 		if err != nil {
 			return nil, err
@@ -2303,6 +2340,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			IsBatch:      isBatch,
 			BatchID:      batchID,
 			IsDebounce:   data.IsDebounce,
+			HasAI:        data.HasAi,
 			CronSchedule: cron,
 			Cursor:       cursor,
 		})

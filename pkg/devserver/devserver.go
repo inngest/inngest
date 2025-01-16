@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/inngest/inngest/pkg/enums"
-
 	"github.com/alicebob/miniredis/v2"
 	"github.com/coocood/freecache"
 	"github.com/eko/gocache/lib/v4/cache"
@@ -22,7 +20,9 @@ import (
 	_ "github.com/inngest/inngest/pkg/config/defaults"
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/connect"
+	"github.com/inngest/inngest/pkg/connect/auth"
 	pubsub2 "github.com/inngest/inngest/pkg/connect/pubsub"
+	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
 	connstate "github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi"
@@ -39,6 +39,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
+	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
@@ -51,8 +52,8 @@ import (
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/service"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/inngest/inngest/pkg/testapi"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
-	connectproto "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/sync/errgroup"
@@ -176,6 +177,9 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 	smv2 := redis_state.MustRunServiceV2(sm)
+
+	// Create a new broadcaster which lets us broadcast realtime messages.
+	broadcaster := realtime.NewInProcessBroadcaster()
 
 	queueOpts := []redis_state.QueueOpt{
 		redis_state.WithRunMode(redis_state.QueueRunMode{
@@ -305,6 +309,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithQueue(rq),
 		executor.WithLogger(logger.From(ctx)),
 		executor.WithFunctionLoader(loader),
+		executor.WithRealtimePublisher(broadcaster),
 		executor.WithLifecycleListeners(
 			history.NewLifecycleListener(
 				nil,
@@ -389,12 +394,15 @@ func start(ctx context.Context, opts StartOpts) error {
 		caching := apiv1.NewCacheMiddleware(cache)
 
 		apiv1.AddRoutes(r, apiv1.Opts{
-			CachingMiddleware: caching,
-			EventReader:       ds.Data,
-			FunctionReader:    ds.Data,
-			FunctionRunReader: ds.Data,
-			JobQueueReader:    ds.Queue.(queue.JobQueueReader),
-			Executor:          ds.Executor,
+			CachingMiddleware:  caching,
+			EventReader:        ds.Data,
+			FunctionReader:     ds.Data,
+			FunctionRunReader:  ds.Data,
+			JobQueueReader:     ds.Queue.(queue.JobQueueReader),
+			Executor:           ds.Executor,
+			QueueShardSelector: shardSelector,
+			Broadcaster:        broadcaster,
+			RealtimeJWTSecret:  consts.DevServerRealtimeJWTSecret,
 		})
 	})
 
@@ -411,23 +419,29 @@ func start(ctx context.Context, opts StartOpts) error {
 		EventHandler:  ds.HandleEvent,
 		Executor:      ds.Executor,
 		HistoryReader: memory_reader.NewReader(),
+		ConnectOpts: connectv0.Opts{
+			GroupManager:            connectionManager,
+			ConnectManager:          connectionManager,
+			Signer:                  auth.NewJWTSessionTokenSigner(consts.DevServerConnectJwtSecret),
+			RequestAuther:           ds,
+			ConnectGatewayRetriever: ds,
+			Dev:                     true,
+		},
 	})
 	if err != nil {
 		return err
 	}
 
-	connGateway, connRouter, connectHandler := connect.NewConnectGatewayService(
+	connGateway := connect.NewConnectGatewayService(
 		connect.WithConnectionStateManager(connectionManager),
 		connect.WithRequestReceiver(gatewayProxy),
-		connect.WithGatewayAuthHandler(func(ctx context.Context, data *connectproto.WorkerConnectRequestData) (*connect.AuthResponse, error) {
-			return &connect.AuthResponse{
-				AccountID: consts.DevServerAccountId,
-				EnvID:     consts.DevServerEnvId,
-			}, nil
-		}),
+		connect.WithGatewayAuthHandler(auth.NewJWTAuthHandler(consts.DevServerConnectJwtSecret)),
 		connect.WithAppLoader(dbcqrs),
 		connect.WithDev(),
+		connect.WithGatewayPublicPort(8289),
+		connect.WithApiBaseUrl(fmt.Sprintf("http://127.0.0.1:%d", opts.Config.EventAPI.Port)),
 	)
+	connRouter := connect.NewConnectMessageRouterService(connectionManager, gatewayProxy)
 
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
@@ -435,14 +449,25 @@ func start(ctx context.Context, opts StartOpts) error {
 	//
 	// Merge the dev server API (for handling files & registration) with the data
 	// API into the event API router.
+
+	mounts := []api.Mount{
+		{At: "/", Router: devAPI},
+		{At: "/v0", Router: core.Router},
+		{At: "/debug", Handler: middleware.Profiler()},
+	}
+
+	if testapi.ShouldEnable() {
+		mounts = append(mounts, api.Mount{At: "/test", Handler: testapi.New(testapi.Options{
+			QueueShardSelector: shardSelector,
+			Queue:              rq,
+			Executor:           exec,
+			StateManager:       smv2,
+		})})
+	}
+
 	ds.Apiservice = api.NewService(api.APIServiceOptions{
-		Config: ds.Opts.Config,
-		Mounts: []api.Mount{
-			{At: "/", Router: devAPI},
-			{At: "/v0", Router: core.Router},
-			{At: "/debug", Handler: middleware.Profiler()},
-			{At: "/connect", Handler: connectHandler},
-		},
+		Config:         ds.Opts.Config,
+		Mounts:         mounts,
 		LocalEventKeys: opts.EventKeys,
 	})
 

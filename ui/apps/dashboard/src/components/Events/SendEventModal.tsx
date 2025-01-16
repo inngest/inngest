@@ -1,11 +1,11 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Tab } from '@headlessui/react';
 import { Alert } from '@inngest/components/Alert';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
+import { Modal } from '@inngest/components/Modal/Modal';
+import TabCards from '@inngest/components/TabCards/TabCards';
 import ky from 'ky';
 import { toast } from 'sonner';
 import { type JsonValue } from 'type-fest';
@@ -13,7 +13,6 @@ import { useQuery } from 'urql';
 import { z } from 'zod';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import Modal from '@/components/Modal';
 import CodeEditor from '@/components/Textarea/CodeEditor';
 import { graphql } from '@/gql';
 import { EnvironmentType } from '@/gql/graphql';
@@ -64,7 +63,7 @@ const buildTabs = ({
     {
       tabLabel: 'JSON Editor',
       tabTitle: 'Send Custom JSON',
-      submitButtonLabel: 'Send Event',
+      submitButtonLabel: 'Send event',
       submitButtonEnabled: Boolean(eventKey),
       submitAction: sendEventAction,
       codeLanguage: 'json',
@@ -223,87 +222,82 @@ export function SendEventModal({
   ]);
 
   return (
-    <Modal className="max-w-6xl space-y-3 p-6" isOpen={isOpen} onClose={onClose}>
-      <Tab.Group
-        as="section"
-        className="space-y-6"
-        onChange={() => {
-          tabs = buildTabs({
-            envName,
-            payload,
-            eventKey,
-            sendEventURL,
-            isBranchChild,
-            copyToClipboardAction,
-            sendEventAction,
-          });
-        }}
-      >
-        <header className="flex items-center justify-between">
-          <span className="inline-flex items-center gap-2">
-            <h2 className="text-lg font-medium">Send Event</h2>
-          </span>
-          <Tab.List className="flex items-center gap-1 rounded-lg bg-slate-50 p-1">
-            {tabs.map(({ tabLabel }) => (
-              <Tab
-                key={tabLabel}
-                className="ui-selected:bg-white ui-selected:shadow-outline-secondary-light ui-selected:text-slate-700 ui-selected:hover:bg-white ui-selected:hover:text-slate-700 rounded px-3 py-1 text-sm font-medium text-slate-400 hover:bg-slate-100 hover:text-indigo-500"
-              >
-                {tabLabel}
-              </Tab>
-            ))}
-          </Tab.List>
-        </header>
-        {!hasEventKey && (
-          <Alert severity="warning">
-            There are no Event Keys for this environment. Please create an Event Key in{' '}
-            <Link href={pathCreator.keys({ envSlug: environment.slug })} className="underline">
-              the Manage tab
-            </Link>{' '}
-            first.
-          </Alert>
-        )}
-        <Tab.Panels>
-          {tabs.map(
-            ({
-              tabLabel,
-              tabTitle,
-              submitButtonLabel,
-              submitButtonEnabled,
-              submitAction,
-              codeLanguage,
-              initialCode,
-            }) => (
-              <Tab.Panel
-                key={tabLabel}
-                as="form"
-                className="rounded-md bg-slate-900"
-                onSubmit={submitAction}
-              >
-                <header className="bg bg-slate-910 flex items-center justify-between rounded-t-md p-2">
-                  <h3 className="px-2 text-white">{tabTitle}</h3>
-                  <NewButton
-                    type="submit"
-                    disabled={!submitButtonEnabled}
-                    label={submitButtonLabel}
-                    kind="primary"
-                  />
-                </header>
-                <div className="w-full overflow-auto p-4">
-                  <CodeEditor
-                    language={codeLanguage}
-                    initialCode={initialCode}
-                    name="code"
-                    className="h-80 w-[640px] bg-slate-900"
-                    onCodeChange={serializeData}
-                  />
-                </div>
-              </Tab.Panel>
-            )
+    <Modal className="max-w-6xl" isOpen={isOpen} onClose={onClose}>
+      <Modal.Body>
+        <TabCards
+          defaultValue="JSON Editor"
+          onChange={() => {
+            tabs = buildTabs({
+              envName,
+              payload,
+              eventKey,
+              sendEventURL,
+              isBranchChild,
+              copyToClipboardAction,
+              sendEventAction,
+            });
+          }}
+        >
+          <div className="items-top flex justify-between">
+            <h2 className="text-basis text-xl">Send Event</h2>
+            <TabCards.ButtonList>
+              {tabs.map(({ tabLabel }) => (
+                <TabCards.Button key={tabLabel} value={tabLabel}>
+                  {tabLabel}
+                </TabCards.Button>
+              ))}
+            </TabCards.ButtonList>
+          </div>
+          {!hasEventKey && (
+            <Alert severity="warning" className="mb-2 text-sm">
+              There are no Event Keys for this environment. Please create an Event Key in{' '}
+              <Alert.Link href={pathCreator.keys({ envSlug: environment.slug })} severity="warning">
+                the Manage tab
+              </Alert.Link>{' '}
+              first.
+            </Alert>
           )}
-        </Tab.Panels>
-      </Tab.Group>
-      <NewButton onClick={onClose} appearance="outlined" label="Close Modal" />
+          <>
+            {tabs.map(
+              ({
+                tabLabel,
+                tabTitle,
+                submitButtonLabel,
+                submitButtonEnabled,
+                submitAction,
+                codeLanguage,
+                initialCode,
+              }) => (
+                <TabCards.Content key={tabLabel} value={tabLabel} className="p-0">
+                  <form onSubmit={submitAction}>
+                    <header className="flex items-center justify-between rounded-t-md p-2">
+                      <h3 className="px-2">{tabTitle}</h3>
+                      <Button
+                        type="submit"
+                        disabled={!submitButtonEnabled}
+                        label={submitButtonLabel}
+                        kind="primary"
+                      />
+                    </header>
+                    <div className="bg-codeEditor w-full overflow-auto rounded-b-md p-4">
+                      <CodeEditor
+                        language={codeLanguage}
+                        initialCode={initialCode}
+                        name="code"
+                        className="h-80 w-[640px]"
+                        onCodeChange={serializeData}
+                      />
+                    </div>
+                  </form>
+                </TabCards.Content>
+              )
+            )}
+          </>
+        </TabCards>
+      </Modal.Body>
+      <Modal.Footer className="flex justify-end gap-2">
+        <Button kind="secondary" label="Close modal" appearance="outlined" onClick={onClose} />
+      </Modal.Footer>
     </Modal>
   );
 }

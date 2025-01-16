@@ -88,11 +88,11 @@ export default function useOnboardingStep() {
         // If we have previous steps not completed yet by the user, we automatically mark them as completed
         const stepsToAdd = steps.filter(
           (s) =>
-            s.stepNumber <= step.stepNumber &&
+            s.stepNumber < step.stepNumber &&
             !completedSteps.some((cs) => cs.stepNumber === s.stepNumber)
         );
 
-        const newCompletedSteps = [...completedSteps, ...stepsToAdd];
+        const newCompletedSteps = [...completedSteps, ...stepsToAdd, step];
 
         // Update local state
         setCompletedSteps(newCompletedSteps);
@@ -108,7 +108,9 @@ export default function useOnboardingStep() {
 
         // Tracking for the previous steps marked with automatic completion
         stepsToAdd.forEach((s) => {
-          tracking?.trackOnboardingStepCompleted(s, { completionSource: 'automatic' });
+          tracking?.trackOnboardingStepCompleted(s, {
+            metadata: { completionSource: 'automatic' },
+          });
         });
 
         tracking?.trackOnboardingStepCompleted(step, metadata);

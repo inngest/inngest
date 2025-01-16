@@ -106,6 +106,8 @@ type Config struct {
 	// Idempotency represents an optional idempotency key.  This must be an
 	// xxhash64 hashed string.
 	Idempotency string
+	// HasAI indicates if the function has AI steps
+	HasAI bool
 	// ReplayID stores the ID of the replay, if this identifier belongs to a replay.
 	ReplayID *uuid.UUID
 	// OriginalRunID stores the ID of the original run, for a one-off replay.
@@ -371,6 +373,7 @@ type MutableConfig struct {
 	StartedAt      time.Time
 	RequestVersion int
 	ForceStepPlan  bool
+	HasAI          bool
 }
 
 type CustomConcurrency = statev1.CustomConcurrency

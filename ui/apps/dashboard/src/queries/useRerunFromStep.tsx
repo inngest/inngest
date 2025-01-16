@@ -1,25 +1,31 @@
-import type { RerunResult } from '@inngest/components/Rerun/RerunModal';
+import { useMutation } from 'urql';
+
+import { graphql } from '@/gql';
+
+const rerun = graphql(`
+  mutation Rerun($runID: ULID!, $fromStep: RerunFromStepInput) {
+    rerun(runID: $runID, fromStep: $fromStep)
+  }
+`);
 
 type RerunFromStep = {
   runID: string;
   fromStep: { stepID: string; input: string };
 };
 
-export function useRerunFromStep(
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  { runID, fromStep }: RerunFromStep
-) {
-  const rerunFromStep = async ({
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    runID,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    fromStep,
-  }: {
-    runID: string;
-    fromStep: { stepID: string; input: string };
-  }): Promise<RerunResult> => {
-    console.log('not yet implemented in the dashboard');
-    return { data: { rerun: {} } };
+export function useRerunFromStep() {
+  const [, rerunMutation] = useMutation(rerun);
+
+  const rerunFromStep = async ({ runID, fromStep }: RerunFromStep) => {
+    const result = await rerunMutation({
+      runID,
+      fromStep: {
+        stepID: fromStep.stepID,
+        input: fromStep.input,
+      },
+    });
+
+    return result;
   };
 
   return rerunFromStep;

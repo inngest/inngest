@@ -201,6 +201,7 @@ type JobQueueReader interface {
 	// RunJobs reads items in the queue for a specific run.
 	RunJobs(
 		ctx context.Context,
+		queueShardName string,
 		workspaceID uuid.UUID,
 		workflowID uuid.UUID,
 		runID ulid.ULID,

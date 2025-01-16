@@ -1,12 +1,11 @@
-import Link from 'next/link';
+import NextLink from 'next/link';
 import { useRouter } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import SegmentedProgressBar from '@inngest/components/ProgressBar/SegmentedProgressBar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiBookReadLine, RiCheckboxCircleFill, RiCloseLine } from '@remixicon/react';
 
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { pathCreator } from '@/utils/urls';
 import { onboardingWidgetContent } from '../Onboarding/content';
 import { OnboardingSteps, steps } from '../Onboarding/types';
@@ -21,7 +20,6 @@ export default function OnboardingWidget({
   closeWidget: () => void;
 }) {
   const router = useRouter();
-  const { value: onboardingFlow } = useBooleanFlag('onboarding-flow-cloud');
   const { lastCompletedStep, nextStep, totalStepsCompleted } = useOnboardingStep();
   const tracking = useOnboardingTracking();
 
@@ -29,7 +27,6 @@ export default function OnboardingWidget({
     ? onboardingWidgetContent.step.success
     : onboardingWidgetContent.step[nextStep?.name || OnboardingSteps.CreateApp];
 
-  if (!onboardingFlow) return;
   return (
     <>
       {collapsed && (
@@ -46,7 +43,7 @@ export default function OnboardingWidget({
       )}
 
       {!collapsed && (
-        <Link
+        <NextLink
           href={pathCreator.onboardingSteps({
             step: nextStep ? nextStep.name : lastCompletedStep?.name,
             ref: 'app-onboarding-widget',
@@ -68,7 +65,7 @@ export default function OnboardingWidget({
                 </p>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <NewButton
+                    <Button
                       icon={<RiCloseLine className="text-subtle" />}
                       kind="secondary"
                       appearance="ghost"
@@ -104,7 +101,7 @@ export default function OnboardingWidget({
               <p className="text-light text-[10px] font-medium uppercase">{stepContent.eta}</p>
             )}
             {stepContent.cta && (
-              <NewButton
+              <Button
                 appearance="outlined"
                 className="hover:bg-canvasBase w-full text-sm"
                 label={stepContent.cta}
@@ -115,7 +112,7 @@ export default function OnboardingWidget({
               />
             )}
           </div>
-        </Link>
+        </NextLink>
       )}
     </>
   );

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/coder/websocket"
+	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/syscode"
@@ -14,7 +15,7 @@ import (
 	"strings"
 )
 
-func workerGroupHashFromConnRequest(req *connect.WorkerConnectRequestData, authResp *AuthResponse, sessionDetails *connect.SessionDetails) (string, error) {
+func workerGroupHashFromConnRequest(req *connect.WorkerConnectRequestData, authResp *auth.Response, sessionDetails *connect.SessionDetails) (string, error) {
 	buildId := ""
 	if req.SessionId.BuildId != nil {
 		buildId = *req.SessionId.BuildId
@@ -47,7 +48,7 @@ func workerGroupHashFromConnRequest(req *connect.WorkerConnectRequestData, authR
 func NewWorkerGroupFromConnRequest(
 	ctx context.Context,
 	req *connect.WorkerConnectRequestData,
-	authResp *AuthResponse,
+	authResp *auth.Response,
 	sessionDetails *connect.SessionDetails,
 ) (*state.WorkerGroup, error) {
 	hash, err := workerGroupHashFromConnRequest(req, authResp, sessionDetails)
@@ -96,6 +97,7 @@ func NewWorkerGroupFromConnRequest(
 		Hash:          hash,
 		SyncData: state.SyncData{
 			Functions: functions,
+			SyncToken: req.AuthData.SyncToken,
 		},
 	}
 

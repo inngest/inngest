@@ -135,6 +135,8 @@ func (s *Span) StepOpCode() enums.Opcode {
 			return enums.OpcodeWaitForEvent
 		case enums.OpcodeStepPlanned.String():
 			return enums.OpcodeStepPlanned
+		case enums.OpcodeAIGateway.String():
+			return enums.OpcodeAIGateway
 		}
 	}
 
@@ -177,6 +179,7 @@ type TraceRun struct {
 	Status       enums.RunStatus `json:"status"`
 	IsBatch      bool            `json:"is_batch"`
 	IsDebounce   bool            `json:"is_debounce"`
+	HasAI        bool            `json:"has_ai"`
 	BatchID      *ulid.ULID      `json:"batch_id,omitempty"`
 	CronSchedule *string         `json:"cron_schedule,omitempty"`
 	// Cursor is a composite cursor used for pagination
@@ -221,6 +224,8 @@ type TraceReader interface {
 	GetTraceSpansByRun(ctx context.Context, id TraceRunIdentifier) ([]*Span, error)
 	// GetSpanOutput retrieves the output for the specified span
 	GetSpanOutput(ctx context.Context, id SpanIdentifier) (*SpanOutput, error)
+	// GetSpanStack retrieves the step stack for the specified span
+	GetSpanStack(ctx context.Context, id SpanIdentifier) ([]string, error)
 }
 
 type GetTraceRunOpt struct {

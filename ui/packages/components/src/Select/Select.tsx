@@ -2,7 +2,7 @@ import { forwardRef } from 'react';
 import { Combobox, Listbox, type ComboboxInputProps } from '@headlessui/react';
 import { RiArrowDownSLine } from '@remixicon/react';
 
-import { NewButton as InngestButton } from '../Button';
+import { Button as InngestButton } from '../Button';
 import { Checkbox } from '../Checkbox';
 import { cn } from '../utils/classNames';
 
@@ -11,6 +11,7 @@ type SelectProps = {
   isLabelVisible?: boolean;
   children: React.ReactNode;
   className?: string;
+  size?: 'small' | 'medium';
 };
 
 export type Option = {
@@ -67,16 +68,18 @@ type ButtonProps = {
   isLabelVisible?: boolean;
   className?: string;
   as: React.ElementType;
+  size?: 'small' | 'medium';
 };
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ children, isLabelVisible, className, as: Component }, ref) => {
+  ({ children, isLabelVisible, className, as: Component, size = 'medium' }, ref) => {
     return (
       <Component
         ref={ref}
         className={cn(
           !isLabelVisible && 'rounded-l-[5px]',
-          'bg-surfaceBase text-basis flex h-10 w-full items-center justify-between rounded-r-[5px] px-2',
+          size === 'small' ? 'h-[30px]' : 'h-[38px]',
+          'bg-surfaceBase text-basis flex w-full items-center justify-between rounded-r-[5px] px-2',
           className
         )}
       >
@@ -98,7 +101,7 @@ function Options({
 }: React.PropsWithChildren<{ as: React.ElementType; className?: string }>) {
   return (
     <Component className={cn('absolute z-10 mt-1 min-w-max', className)}>
-      <div className="border-muted bg-surfaceBase z-10 overflow-hidden rounded-md border py-1 drop-shadow-lg">
+      <div className="border-muted bg-surfaceBase shadow-primary z-10 overflow-hidden rounded-md border py-1">
         {children}
       </div>
     </Component>
@@ -248,7 +251,7 @@ function Search<T>({ ...props }: ComboboxInputProps<'input', T>) {
   return (
     <div className="mx-2 my-2">
       <Combobox.Input
-        className="border-subtle text-basis bg-surfaceBase placeholder:text-disabled focus-visible:outline-primary-moderate w-full rounded-lg border px-4 py-2 text-sm"
+        className="border-subtle text-basis bg-surfaceBase placeholder:text-disabled focus-visible:outline-primary-moderate w-full rounded-md border px-4 py-2 text-sm"
         {...props}
       />
     </div>

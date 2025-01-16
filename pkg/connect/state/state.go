@@ -49,6 +49,7 @@ type AuthContext struct {
 }
 
 type SyncData struct {
+	SyncToken string
 	Functions []sdk.SDKFunction
 }
 
@@ -106,8 +107,11 @@ type Gateway struct {
 	Hostname string `json:"hostname"`
 }
 
-// Connection have all the metadata assocaited with a worker connection
+// Connection have all the metadata associated with a worker connection
 type Connection struct {
+	AccountID uuid.UUID
+	EnvID     uuid.UUID
+
 	Status    connpb.ConnectionStatus
 	Data      *connpb.WorkerConnectRequestData
 	Session   *connpb.SessionDetails
@@ -121,23 +125,13 @@ type Connection struct {
 // this should be dedupped when there's a large number of workers coming up at once
 // so it doesn't attempt to sync multiple times prior to the worker group getting
 // a response
-func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager) error {
+func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager, apiBaseUrl string) error {
 	if c.Group == nil {
 		return fmt.Errorf("worker group is required for syncing")
 	}
 
-	// Check state to see if group already exists
-	var envID uuid.UUID
-	{
-		id, err := uuid.Parse(c.Data.AuthData.EnvId)
-		if err != nil {
-			return fmt.Errorf("error parsing environment ID: %w", err)
-		}
-		envID = id
-	}
-
 	// The group is expected to exist in the state, as UpsertConnection also creates the group if it doesn't exist
-	group, err := groupManager.GetWorkerGroupByHash(ctx, envID, c.Group.Hash)
+	group, err := groupManager.GetWorkerGroupByHash(ctx, c.EnvID, c.Group.Hash)
 	if err != nil {
 		return fmt.Errorf("error attempting to retrieve worker group: %w", err)
 	}
@@ -174,7 +168,7 @@ func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager) 
 
 	// NOTE: pick this up via SDK
 	// technically it should only be accessible to the system that's the gateway is associated with
-	registerURL := fmt.Sprintf("%s/fn/register", c.Data.Config.ApiOrigin)
+	registerURL := fmt.Sprintf("%s/fn/register", apiBaseUrl)
 
 	byt, err := json.Marshal(config)
 	if err != nil {
@@ -191,11 +185,10 @@ func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager) 
 	req.Header.Set(headers.HeaderKeySDK, sdkVersion)
 	req.Header.Set(headers.HeaderUserAgent, sdkVersion)
 
-	hashedSigningKey := string(c.Data.AuthData.HashedSigningKey)
-	if hashedSigningKey == "" {
-		return fmt.Errorf("no signing key available for syncing")
+	// Use sync token returned by initial Connect API handshake
+	if c.Group.SyncData.SyncToken != "" {
+		req.Header.Set(headers.HeaderAuthorization, fmt.Sprintf("Bearer %s", c.Group.SyncData.SyncToken))
 	}
-	req.Header.Set(headers.HeaderAuthorization, fmt.Sprintf("Bearer %s", hashedSigningKey))
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -214,7 +207,7 @@ func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager) 
 		c.Group.AppID = syncReply.AppID
 		// Update the worker group with the syncID so it's aware that it's already sync'd before
 		// Always update the worker group for consistency, even if the context is cancelled
-		if err := groupManager.UpdateWorkerGroup(context.Background(), envID, c.Group); err != nil {
+		if err := groupManager.UpdateWorkerGroup(context.Background(), c.EnvID, c.Group); err != nil {
 			return fmt.Errorf("error updating worker group: %w", err)
 		}
 	}

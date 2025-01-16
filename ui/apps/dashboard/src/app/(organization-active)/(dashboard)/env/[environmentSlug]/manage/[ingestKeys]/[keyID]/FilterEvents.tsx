@@ -3,9 +3,9 @@
 import { useContext, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
+import ToggleGroup from '@inngest/components/ToggleGroup/ToggleGroup';
 import { toast } from 'sonner';
 
-import GroupButton from '@/components/GroupButton/GroupButton';
 import CodeEditor from '@/components/Textarea/CodeEditor';
 import { Context } from './Context';
 import { FilterEditor } from './FilterEditor';
@@ -61,14 +61,7 @@ export default function FilterEvents({ keyID, filter }: FilterEventsProps) {
 
   function handleCodeChange(name: 'events' | 'ips', code: string) {
     const trimmedValue = code.trim();
-    const nextValueEmpty = { ...newFilter, [name]: null };
     const nextValueFull = { ...newFilter, [name]: trimmedValue.split('\n') };
-
-    if (trimmedValue === '') {
-      setNewFilter(nextValueEmpty);
-      validateSubmit(nextValueEmpty);
-      return;
-    }
 
     setNewFilter(nextValueFull);
     validateSubmit(nextValueFull);
@@ -77,23 +70,26 @@ export default function FilterEvents({ keyID, filter }: FilterEventsProps) {
   return (
     <form className="pt-3" onSubmit={handleSubmit}>
       <h2 className="pb-1 text-lg font-semibold">Filter Events</h2>
-      <p className="text-sm text-slate-700">
+      <p className="text-subtle text-sm">
         Filtering allows you to specify allow or deny lists for event names and/or IP addresses.
       </p>
-      <p className="text-sm text-slate-700">
+      <p className="text-subtle text-sm">
         Allowlists only allow specified values, whereas denylists allow all but the specified
         values.
       </p>
+      <p className="text-subtle mt-2 text-sm font-bold">
+        You cannot use both allowlists and denylists simultaneously.
+      </p>
       <div className="my-5 inline-block">
-        <GroupButton
-          title="Select allowlist or denyList to configure filters"
-          options={[
-            { name: 'Allowlist', id: 'allow' },
-            { name: 'Denylist', id: 'deny' },
-          ]}
-          handleClick={handleClick}
-          selectedOption={newFilter.type}
-        />
+        <ToggleGroup
+          type="single"
+          defaultValue={newFilter.type}
+          size="small"
+          onValueChange={handleClick}
+        >
+          <ToggleGroup.Item value="allow">Allowlist</ToggleGroup.Item>
+          <ToggleGroup.Item value="deny">Denylist</ToggleGroup.Item>
+        </ToggleGroup>
       </div>
       <div className="mb-5 flex gap-5">
         <FilterEditor filter="events" list={newFilter.type}>
@@ -112,7 +108,7 @@ export default function FilterEvents({ keyID, filter }: FilterEventsProps) {
         </FilterEditor>
       </div>
       <div className="flex justify-end">
-        <Button kind="primary" disabled={isDisabled} type="submit" label="Save Filter Changes" />
+        <Button disabled={isDisabled} type="submit" label="Save filter changes" />
       </div>
     </form>
   );

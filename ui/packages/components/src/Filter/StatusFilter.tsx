@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
 
-import { RunStatusDot } from '../FunctionRunStatusIcons';
 import { Select, type Option } from '../Select/Select';
-import { getStatusBackgroundClass, getStatusBorderClass } from '../statusClasses';
+import { StatusDot } from '../Status/StatusDot';
+import { getStatusBackgroundClass, getStatusBorderClass } from '../Status/statusClasses';
 import {
   functionRunStatuses,
   isFunctionRunStatus,
@@ -50,7 +50,7 @@ export default function StatusFilter({
       <span
         key={status}
         className={cn(
-          'inline-block h-[9px] w-[9px] flex-shrink-0 rounded-full border border-slate-50 bg-slate-50 ring-1 ring-inset ring-slate-300 group-hover:border-slate-100 [&:not(:first-child)]:-ml-1',
+          'border-subtle bg-canvasBase group-hover:border-subtle inline-block h-[9px] w-[9px] flex-shrink-0 rounded-full border [&:not(:first-child)]:-ml-1',
           isSelected && [getStatusBackgroundClass(status), getStatusBorderClass(status), 'ring-0']
         )}
         aria-hidden="true"
@@ -106,7 +106,7 @@ export default function StatusFilter({
           return (
             <Select.CheckboxOption key={option.id} option={option}>
               <span className="flex items-center gap-1 lowercase">
-                <RunStatusDot status={option.id} className="h-2 w-2" />
+                <StatusDot status={option.id} className="h-2 w-2" />
                 <label className="text-sm first-letter:capitalize">{option.name}</label>
               </span>
             </Select.CheckboxOption>

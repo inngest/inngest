@@ -1,9 +1,14 @@
-import { RunStatusDot } from '@inngest/components/FunctionRunStatusIcons/RunStatusDot';
-import { Pill, PillContent, type PillContentProps } from '@inngest/components/Pill';
+import {
+  Pill,
+  PillContent,
+  type PillAppearance,
+  type PillContentProps,
+} from '@inngest/components/Pill';
+import { StatusDot } from '@inngest/components/Status/StatusDot';
+import { getStatusTextClass } from '@inngest/components/Status/statusClasses';
 import { Time } from '@inngest/components/Time';
 import { cn } from '@inngest/components/utils/classNames';
-
-import { getStatusTextClass } from '../statusClasses';
+import { RiSparkling2Fill } from '@remixicon/react';
 
 const cellStyles = 'text-basis text-sm';
 
@@ -15,18 +20,31 @@ export function TextCell({ children }: React.PropsWithChildren) {
   return <p className={cn(cellStyles, 'font-medium')}>{children}</p>;
 }
 
-export function PillCell({ children, type }: PillContentProps) {
+export function AICell({ children }: React.PropsWithChildren) {
   return (
-    <Pill appearance="outlined">
+    <div className={cn(cellStyles, 'text-primary-xIntense flex items-center gap-2')}>
+      <RiSparkling2Fill className="h-4 w-4" />
+      {children}
+    </div>
+  );
+}
+
+export function PillCell({
+  children,
+  type,
+  appearance = 'outlined',
+}: PillContentProps & { appearance?: PillAppearance }) {
+  return (
+    <Pill appearance={appearance}>
       <PillContent type={type}>{children}</PillContent>
     </Pill>
   );
 }
 
-export function TimeCell({ date }: { date: Date | string }) {
+export function TimeCell({ date, format }: { date: Date | string; format?: 'relative' }) {
   return (
-    <span className={cn(cellStyles, 'font-medium')}>
-      <Time value={date} />
+    <span className={cn(cellStyles, 'text-muted font-medium')}>
+      <Time value={date} format={format} />
     </span>
   );
 }
@@ -36,7 +54,7 @@ export function StatusCell({ status }: React.PropsWithChildren<{ status: string 
 
   return (
     <div className={cn(cellStyles, 'flex items-center gap-2.5 font-medium')}>
-      <RunStatusDot status={status} />
+      <StatusDot status={status} />
       <p className={cn(colorClass, 'lowercase first-letter:capitalize')}>{status}</p>
     </div>
   );

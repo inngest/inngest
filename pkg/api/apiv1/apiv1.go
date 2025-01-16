@@ -1,7 +1,6 @@
 package apiv1
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,10 +8,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/realtime"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/headers"
 )
 
@@ -24,7 +25,7 @@ type Opts struct {
 	// a max-age.
 	CachingMiddleware CachingMiddleware
 	// WorkspaceFinder returns the authenticated workspace given the current context.
-	AuthFinder AuthFinder
+	AuthFinder apiv1auth.AuthFinder
 	// Executor is required to cancel and manage function executions.
 	Executor execution.Executor
 	// EventReader allows reading of events from storage.
@@ -37,12 +38,18 @@ type Opts struct {
 	JobQueueReader queue.JobQueueReader
 	// CancellationReadWriter reads and writes cancellations to/from a backing store.
 	CancellationReadWriter cqrs.CancellationReadWriter
+	// QueueShardSelector determines the queue shard to use
+	QueueShardSelector redis_state.ShardSelector
+	// Broadcaster is used to handle realtime via APIv1
+	Broadcaster realtime.Broadcaster
+	// RealtimeJWTSecret is the realtime JWT secret for the V1 API
+	RealtimeJWTSecret []byte
 }
 
 // AddRoutes adds a new API handler to the given router.
 func AddRoutes(r chi.Router, o Opts) http.Handler {
 	if o.AuthFinder == nil {
-		o.AuthFinder = nilAuthFinder
+		o.AuthFinder = apiv1auth.NilAuthFinder
 	}
 
 	// Create the HTTP implementation, which wraps the handler.  We do ths to code
@@ -74,24 +81,39 @@ func (a *router) setup() {
 	a.Group(func(r chi.Router) {
 		r.Use(middleware.Recoverer)
 
-		if a.opts.CachingMiddleware != nil {
-			r.Use(a.opts.CachingMiddleware.Middleware)
+		if len(a.opts.RealtimeJWTSecret) > 0 {
+			// Only enable realtime if secrets are set.
+			r.Group(func(r chi.Router) {
+				rt := realtime.NewAPI(realtime.APIOpts{
+					JWTSecret:      a.opts.RealtimeJWTSecret,
+					Broadcaster:    a.opts.Broadcaster,
+					AuthMiddleware: a.opts.AuthMiddleware,
+					AuthFinder:     a.opts.AuthFinder,
+				})
+				r.Mount("/", rt)
+			})
 		}
 
-		r.Use(headers.ContentTypeJsonResponse())
+		r.Group(func(r chi.Router) {
+			if a.opts.CachingMiddleware != nil {
+				r.Use(a.opts.CachingMiddleware.Middleware)
+			}
 
-		r.Get("/events", a.getEvents)
-		r.Get("/events/{eventID}", a.getEvent)
-		r.Get("/events/{eventID}/runs", a.getEventRuns)
-		r.Get("/runs/{runID}", a.GetFunctionRun)
-		r.Delete("/runs/{runID}", a.cancelFunctionRun)
-		r.Get("/runs/{runID}/jobs", a.GetFunctionRunJobs)
+			r.Use(headers.ContentTypeJsonResponse())
 
-		r.Get("/apps/{appName}/functions", a.GetAppFunctions) // Returns an app and all of its functions.
+			r.Get("/events", a.getEvents)
+			r.Get("/events/{eventID}", a.getEvent)
+			r.Get("/events/{eventID}/runs", a.getEventRuns)
+			r.Get("/runs/{runID}", a.GetFunctionRun)
+			r.Delete("/runs/{runID}", a.cancelFunctionRun)
+			r.Get("/runs/{runID}/jobs", a.GetFunctionRunJobs)
 
-		r.Post("/cancellations", a.createCancellation)
-		r.Get("/cancellations", a.getCancellations)
-		r.Delete("/cancellations/{id}", a.deleteCancellation)
+			r.Get("/apps/{appName}/functions", a.GetAppFunctions) // Returns an app and all of its functions.
+
+			r.Post("/cancellations", a.createCancellation)
+			r.Get("/cancellations", a.getCancellations)
+			r.Delete("/cancellations/{id}", a.deleteCancellation)
+		})
 	})
 }
 
@@ -128,30 +150,4 @@ type Response[T any] struct {
 type ResponseMetadata struct {
 	FetchedAt   time.Time  `json:"fetched_at,omitempty"`
 	CachedUntil *time.Time `json:"cached_until,omitempty"`
-}
-
-// TODO (tonyhb) Open source the auth context.
-
-// AuthFinder returns auth information from the current context.
-type AuthFinder func(ctx context.Context) (V1Auth, error)
-
-// V1Auth represents an object that returns the account and worskpace currently authed.
-type V1Auth interface {
-	AccountID() uuid.UUID
-	WorkspaceID() uuid.UUID
-}
-
-// nilAuthFinder is used in the dev server, returning zero auth.
-func nilAuthFinder(ctx context.Context) (V1Auth, error) {
-	return nilAuth{}, nil
-}
-
-type nilAuth struct{}
-
-func (nilAuth) AccountID() uuid.UUID {
-	return uuid.UUID{}
-}
-
-func (nilAuth) WorkspaceID() uuid.UUID {
-	return uuid.UUID{}
 }

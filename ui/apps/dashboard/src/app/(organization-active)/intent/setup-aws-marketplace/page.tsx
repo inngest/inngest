@@ -59,11 +59,11 @@ export default function Page() {
         setError(
           <>
             {cleanError}.{' '}
-            <Link internalNavigation className="inline-flex" href="/support">
+            <Link size="medium" className="inline-flex" href="/support">
               Contact support
             </Link>{' '}
             or{' '}
-            <Link internalNavigation className="inline-flex" href={pathCreator.billing()}>
+            <Link size="medium" className="inline-flex" href={pathCreator.billing()}>
               manage billing
             </Link>
             .

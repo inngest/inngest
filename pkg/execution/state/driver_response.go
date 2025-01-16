@@ -126,6 +126,21 @@ func (r DriverResponse) NextRetryAt() *time.Time {
 	return r.RetryAt
 }
 
+// HasAI checks if any ops in the response are related to AI.
+func (r DriverResponse) HasAI() bool {
+	if r.Generator == nil {
+		return false
+	}
+
+	for _, op := range r.Generator {
+		if op.HasAI() {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (r DriverResponse) Error() string {
 	if r.Err == nil {
 		return ""
@@ -268,6 +283,17 @@ func (r *DriverResponse) UpdateOpcodeError(op *GeneratorOpcode, err UserError) {
 		op.Error = &err
 		r.Generator[n].Error = &err
 	}
+}
+
+// IsFunctionResult returns true if the response is a function result. It will
+// return false if it's a step result.
+func (r *DriverResponse) IsFunctionResult() bool {
+	for _, op := range r.Generator {
+		if op.Op != enums.OpcodeNone {
+			return false
+		}
+	}
+	return true
 }
 
 type WrappedStandardError struct {

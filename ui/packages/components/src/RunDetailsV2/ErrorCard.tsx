@@ -1,5 +1,5 @@
 import { Alert } from '@inngest/components/Alert';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 
 type Props = {
   error: Error | any;
@@ -12,12 +12,7 @@ export function ErrorCard({ error, reset }: Props) {
       severity="error"
       button={
         reset && (
-          <NewButton
-            onClick={() => reset()}
-            kind="secondary"
-            appearance="outlined"
-            label="Reload"
-          />
+          <Button onClick={() => reset()} kind="secondary" appearance="outlined" label="Reload" />
         )
       }
     >

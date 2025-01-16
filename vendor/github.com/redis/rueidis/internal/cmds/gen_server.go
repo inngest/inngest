@@ -4,7 +4,7 @@ package cmds
 
 import "strconv"
 
-type AclCat Completed
+type AclCat Incomplete
 
 func (b Builder) AclCat() (c AclCat) {
 	c = AclCat{cs: get(), ks: b.ks}
@@ -19,17 +19,17 @@ func (c AclCat) Categoryname(categoryname string) AclCatCategoryname {
 
 func (c AclCat) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AclCatCategoryname Completed
+type AclCatCategoryname Incomplete
 
 func (c AclCatCategoryname) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AclDeluser Completed
+type AclDeluser Incomplete
 
 func (b Builder) AclDeluser() (c AclDeluser) {
 	c = AclDeluser{cs: get(), ks: b.ks}
@@ -42,7 +42,7 @@ func (c AclDeluser) Username(username ...string) AclDeluserUsername {
 	return (AclDeluserUsername)(c)
 }
 
-type AclDeluserUsername Completed
+type AclDeluserUsername Incomplete
 
 func (c AclDeluserUsername) Username(username ...string) AclDeluserUsername {
 	c.cs.s = append(c.cs.s, username...)
@@ -51,10 +51,10 @@ func (c AclDeluserUsername) Username(username ...string) AclDeluserUsername {
 
 func (c AclDeluserUsername) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AclDryrun Completed
+type AclDryrun Incomplete
 
 func (b Builder) AclDryrun() (c AclDryrun) {
 	c = AclDryrun{cs: get(), ks: b.ks}
@@ -67,7 +67,7 @@ func (c AclDryrun) Username(username string) AclDryrunUsername {
 	return (AclDryrunUsername)(c)
 }
 
-type AclDryrunArg Completed
+type AclDryrunArg Incomplete
 
 func (c AclDryrunArg) Arg(arg ...string) AclDryrunArg {
 	c.cs.s = append(c.cs.s, arg...)
@@ -76,10 +76,10 @@ func (c AclDryrunArg) Arg(arg ...string) AclDryrunArg {
 
 func (c AclDryrunArg) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AclDryrunCommand Completed
+type AclDryrunCommand Incomplete
 
 func (c AclDryrunCommand) Arg(arg ...string) AclDryrunArg {
 	c.cs.s = append(c.cs.s, arg...)
@@ -88,17 +88,17 @@ func (c AclDryrunCommand) Arg(arg ...string) AclDryrunArg {
 
 func (c AclDryrunCommand) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AclDryrunUsername Completed
+type AclDryrunUsername Incomplete
 
 func (c AclDryrunUsername) Command(command string) AclDryrunCommand {
 	c.cs.s = append(c.cs.s, command)
 	return (AclDryrunCommand)(c)
 }
 
-type AclGenpass Completed
+type AclGenpass Incomplete
 
 func (b Builder) AclGenpass() (c AclGenpass) {
 	c = AclGenpass{cs: get(), ks: b.ks}
@@ -113,17 +113,17 @@ func (c AclGenpass) Bits(bits int64) AclGenpassBits {
 
 func (c AclGenpass) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AclGenpassBits Completed
+type AclGenpassBits Incomplete
 
 func (c AclGenpassBits) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AclGetuser Completed
+type AclGetuser Incomplete
 
 func (b Builder) AclGetuser() (c AclGetuser) {
 	c = AclGetuser{cs: get(), ks: b.ks}
@@ -136,14 +136,14 @@ func (c AclGetuser) Username(username string) AclGetuserUsername {
 	return (AclGetuserUsername)(c)
 }
 
-type AclGetuserUsername Completed
+type AclGetuserUsername Incomplete
 
 func (c AclGetuserUsername) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AclHelp Completed
+type AclHelp Incomplete
 
 func (b Builder) AclHelp() (c AclHelp) {
 	c = AclHelp{cs: get(), ks: b.ks}
@@ -153,10 +153,10 @@ func (b Builder) AclHelp() (c AclHelp) {
 
 func (c AclHelp) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AclList Completed
+type AclList Incomplete
 
 func (b Builder) AclList() (c AclList) {
 	c = AclList{cs: get(), ks: b.ks}
@@ -166,10 +166,10 @@ func (b Builder) AclList() (c AclList) {
 
 func (c AclList) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AclLoad Completed
+type AclLoad Incomplete
 
 func (b Builder) AclLoad() (c AclLoad) {
 	c = AclLoad{cs: get(), ks: b.ks}
@@ -179,10 +179,10 @@ func (b Builder) AclLoad() (c AclLoad) {
 
 func (c AclLoad) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AclLog Completed
+type AclLog Incomplete
 
 func (b Builder) AclLog() (c AclLog) {
 	c = AclLog{cs: get(), ks: b.ks}
@@ -200,7 +200,7 @@ func (c AclLog) Reset() AclLogCountReset {
 	return (AclLogCountReset)(c)
 }
 
-type AclLogCountCount Completed
+type AclLogCountCount Incomplete
 
 func (c AclLogCountCount) Reset() AclLogCountReset {
 	c.cs.s = append(c.cs.s, "RESET")
@@ -209,17 +209,17 @@ func (c AclLogCountCount) Reset() AclLogCountReset {
 
 func (c AclLogCountCount) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AclLogCountReset Completed
+type AclLogCountReset Incomplete
 
 func (c AclLogCountReset) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AclSave Completed
+type AclSave Incomplete
 
 func (b Builder) AclSave() (c AclSave) {
 	c = AclSave{cs: get(), ks: b.ks}
@@ -229,10 +229,10 @@ func (b Builder) AclSave() (c AclSave) {
 
 func (c AclSave) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AclSetuser Completed
+type AclSetuser Incomplete
 
 func (b Builder) AclSetuser() (c AclSetuser) {
 	c = AclSetuser{cs: get(), ks: b.ks}
@@ -245,7 +245,7 @@ func (c AclSetuser) Username(username string) AclSetuserUsername {
 	return (AclSetuserUsername)(c)
 }
 
-type AclSetuserRule Completed
+type AclSetuserRule Incomplete
 
 func (c AclSetuserRule) Rule(rule ...string) AclSetuserRule {
 	c.cs.s = append(c.cs.s, rule...)
@@ -254,10 +254,10 @@ func (c AclSetuserRule) Rule(rule ...string) AclSetuserRule {
 
 func (c AclSetuserRule) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AclSetuserUsername Completed
+type AclSetuserUsername Incomplete
 
 func (c AclSetuserUsername) Rule(rule ...string) AclSetuserRule {
 	c.cs.s = append(c.cs.s, rule...)
@@ -266,10 +266,10 @@ func (c AclSetuserUsername) Rule(rule ...string) AclSetuserRule {
 
 func (c AclSetuserUsername) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AclUsers Completed
+type AclUsers Incomplete
 
 func (b Builder) AclUsers() (c AclUsers) {
 	c = AclUsers{cs: get(), ks: b.ks}
@@ -279,10 +279,10 @@ func (b Builder) AclUsers() (c AclUsers) {
 
 func (c AclUsers) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type AclWhoami Completed
+type AclWhoami Incomplete
 
 func (b Builder) AclWhoami() (c AclWhoami) {
 	c = AclWhoami{cs: get(), ks: b.ks}
@@ -292,10 +292,10 @@ func (b Builder) AclWhoami() (c AclWhoami) {
 
 func (c AclWhoami) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Bgrewriteaof Completed
+type Bgrewriteaof Incomplete
 
 func (b Builder) Bgrewriteaof() (c Bgrewriteaof) {
 	c = Bgrewriteaof{cs: get(), ks: b.ks}
@@ -305,10 +305,10 @@ func (b Builder) Bgrewriteaof() (c Bgrewriteaof) {
 
 func (c Bgrewriteaof) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Bgsave Completed
+type Bgsave Incomplete
 
 func (b Builder) Bgsave() (c Bgsave) {
 	c = Bgsave{cs: get(), ks: b.ks}
@@ -323,17 +323,17 @@ func (c Bgsave) Schedule() BgsaveSchedule {
 
 func (c Bgsave) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type BgsaveSchedule Completed
+type BgsaveSchedule Incomplete
 
 func (c BgsaveSchedule) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Command Completed
+type Command Incomplete
 
 func (b Builder) Command() (c Command) {
 	c = Command{cs: get(), ks: b.ks}
@@ -343,10 +343,10 @@ func (b Builder) Command() (c Command) {
 
 func (c Command) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CommandCount Completed
+type CommandCount Incomplete
 
 func (b Builder) CommandCount() (c CommandCount) {
 	c = CommandCount{cs: get(), ks: b.ks}
@@ -356,10 +356,10 @@ func (b Builder) CommandCount() (c CommandCount) {
 
 func (c CommandCount) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CommandDocs Completed
+type CommandDocs Incomplete
 
 func (b Builder) CommandDocs() (c CommandDocs) {
 	c = CommandDocs{cs: get(), ks: b.ks}
@@ -374,10 +374,10 @@ func (c CommandDocs) CommandName(commandName ...string) CommandDocsCommandName {
 
 func (c CommandDocs) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CommandDocsCommandName Completed
+type CommandDocsCommandName Incomplete
 
 func (c CommandDocsCommandName) CommandName(commandName ...string) CommandDocsCommandName {
 	c.cs.s = append(c.cs.s, commandName...)
@@ -386,10 +386,10 @@ func (c CommandDocsCommandName) CommandName(commandName ...string) CommandDocsCo
 
 func (c CommandDocsCommandName) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CommandGetkeys Completed
+type CommandGetkeys Incomplete
 
 func (b Builder) CommandGetkeys() (c CommandGetkeys) {
 	c = CommandGetkeys{cs: get(), ks: b.ks}
@@ -402,7 +402,7 @@ func (c CommandGetkeys) Command(command string) CommandGetkeysCommand {
 	return (CommandGetkeysCommand)(c)
 }
 
-type CommandGetkeysArg Completed
+type CommandGetkeysArg Incomplete
 
 func (c CommandGetkeysArg) Arg(arg ...string) CommandGetkeysArg {
 	c.cs.s = append(c.cs.s, arg...)
@@ -411,10 +411,10 @@ func (c CommandGetkeysArg) Arg(arg ...string) CommandGetkeysArg {
 
 func (c CommandGetkeysArg) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CommandGetkeysCommand Completed
+type CommandGetkeysCommand Incomplete
 
 func (c CommandGetkeysCommand) Arg(arg ...string) CommandGetkeysArg {
 	c.cs.s = append(c.cs.s, arg...)
@@ -423,10 +423,10 @@ func (c CommandGetkeysCommand) Arg(arg ...string) CommandGetkeysArg {
 
 func (c CommandGetkeysCommand) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CommandGetkeysandflags Completed
+type CommandGetkeysandflags Incomplete
 
 func (b Builder) CommandGetkeysandflags() (c CommandGetkeysandflags) {
 	c = CommandGetkeysandflags{cs: get(), ks: b.ks}
@@ -439,7 +439,7 @@ func (c CommandGetkeysandflags) Command(command string) CommandGetkeysandflagsCo
 	return (CommandGetkeysandflagsCommand)(c)
 }
 
-type CommandGetkeysandflagsArg Completed
+type CommandGetkeysandflagsArg Incomplete
 
 func (c CommandGetkeysandflagsArg) Arg(arg ...string) CommandGetkeysandflagsArg {
 	c.cs.s = append(c.cs.s, arg...)
@@ -448,10 +448,10 @@ func (c CommandGetkeysandflagsArg) Arg(arg ...string) CommandGetkeysandflagsArg 
 
 func (c CommandGetkeysandflagsArg) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CommandGetkeysandflagsCommand Completed
+type CommandGetkeysandflagsCommand Incomplete
 
 func (c CommandGetkeysandflagsCommand) Arg(arg ...string) CommandGetkeysandflagsArg {
 	c.cs.s = append(c.cs.s, arg...)
@@ -460,10 +460,10 @@ func (c CommandGetkeysandflagsCommand) Arg(arg ...string) CommandGetkeysandflags
 
 func (c CommandGetkeysandflagsCommand) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CommandInfo Completed
+type CommandInfo Incomplete
 
 func (b Builder) CommandInfo() (c CommandInfo) {
 	c = CommandInfo{cs: get(), ks: b.ks}
@@ -478,10 +478,10 @@ func (c CommandInfo) CommandName(commandName ...string) CommandInfoCommandName {
 
 func (c CommandInfo) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CommandInfoCommandName Completed
+type CommandInfoCommandName Incomplete
 
 func (c CommandInfoCommandName) CommandName(commandName ...string) CommandInfoCommandName {
 	c.cs.s = append(c.cs.s, commandName...)
@@ -490,10 +490,10 @@ func (c CommandInfoCommandName) CommandName(commandName ...string) CommandInfoCo
 
 func (c CommandInfoCommandName) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CommandList Completed
+type CommandList Incomplete
 
 func (b Builder) CommandList() (c CommandList) {
 	c = CommandList{cs: get(), ks: b.ks}
@@ -518,31 +518,31 @@ func (c CommandList) FilterbyPatternPattern(pattern string) CommandListFilterbyP
 
 func (c CommandList) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CommandListFilterbyAclcatCategory Completed
+type CommandListFilterbyAclcatCategory Incomplete
 
 func (c CommandListFilterbyAclcatCategory) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CommandListFilterbyModuleName Completed
+type CommandListFilterbyModuleName Incomplete
 
 func (c CommandListFilterbyModuleName) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type CommandListFilterbyPatternPattern Completed
+type CommandListFilterbyPatternPattern Incomplete
 
 func (c CommandListFilterbyPatternPattern) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ConfigGet Completed
+type ConfigGet Incomplete
 
 func (b Builder) ConfigGet() (c ConfigGet) {
 	c = ConfigGet{cs: get(), ks: b.ks}
@@ -555,7 +555,7 @@ func (c ConfigGet) Parameter(parameter ...string) ConfigGetParameter {
 	return (ConfigGetParameter)(c)
 }
 
-type ConfigGetParameter Completed
+type ConfigGetParameter Incomplete
 
 func (c ConfigGetParameter) Parameter(parameter ...string) ConfigGetParameter {
 	c.cs.s = append(c.cs.s, parameter...)
@@ -564,10 +564,10 @@ func (c ConfigGetParameter) Parameter(parameter ...string) ConfigGetParameter {
 
 func (c ConfigGetParameter) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ConfigResetstat Completed
+type ConfigResetstat Incomplete
 
 func (b Builder) ConfigResetstat() (c ConfigResetstat) {
 	c = ConfigResetstat{cs: get(), ks: b.ks}
@@ -577,10 +577,10 @@ func (b Builder) ConfigResetstat() (c ConfigResetstat) {
 
 func (c ConfigResetstat) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ConfigRewrite Completed
+type ConfigRewrite Incomplete
 
 func (b Builder) ConfigRewrite() (c ConfigRewrite) {
 	c = ConfigRewrite{cs: get(), ks: b.ks}
@@ -590,10 +590,10 @@ func (b Builder) ConfigRewrite() (c ConfigRewrite) {
 
 func (c ConfigRewrite) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ConfigSet Completed
+type ConfigSet Incomplete
 
 func (b Builder) ConfigSet() (c ConfigSet) {
 	c = ConfigSet{cs: get(), ks: b.ks}
@@ -605,7 +605,7 @@ func (c ConfigSet) ParameterValue() ConfigSetParameterValue {
 	return (ConfigSetParameterValue)(c)
 }
 
-type ConfigSetParameterValue Completed
+type ConfigSetParameterValue Incomplete
 
 func (c ConfigSetParameterValue) ParameterValue(parameter string, value string) ConfigSetParameterValue {
 	c.cs.s = append(c.cs.s, parameter, value)
@@ -614,23 +614,23 @@ func (c ConfigSetParameterValue) ParameterValue(parameter string, value string) 
 
 func (c ConfigSetParameterValue) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Dbsize Completed
+type Dbsize Incomplete
 
 func (b Builder) Dbsize() (c Dbsize) {
-	c = Dbsize{cs: get(), ks: b.ks, cf: readonly}
+	c = Dbsize{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "DBSIZE")
 	return c
 }
 
 func (c Dbsize) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type DebugObject Completed
+type DebugObject Incomplete
 
 func (b Builder) DebugObject() (c DebugObject) {
 	c = DebugObject{cs: get(), ks: b.ks}
@@ -648,14 +648,14 @@ func (c DebugObject) Key(key string) DebugObjectKey {
 	return (DebugObjectKey)(c)
 }
 
-type DebugObjectKey Completed
+type DebugObjectKey Incomplete
 
 func (c DebugObjectKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type DebugSegfault Completed
+type DebugSegfault Incomplete
 
 func (b Builder) DebugSegfault() (c DebugSegfault) {
 	c = DebugSegfault{cs: get(), ks: b.ks}
@@ -665,10 +665,10 @@ func (b Builder) DebugSegfault() (c DebugSegfault) {
 
 func (c DebugSegfault) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Failover Completed
+type Failover Incomplete
 
 func (b Builder) Failover() (c Failover) {
 	c = Failover{cs: get(), ks: b.ks}
@@ -693,10 +693,10 @@ func (c Failover) Timeout(milliseconds int64) FailoverTimeout {
 
 func (c Failover) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FailoverAbort Completed
+type FailoverAbort Incomplete
 
 func (c FailoverAbort) Timeout(milliseconds int64) FailoverTimeout {
 	c.cs.s = append(c.cs.s, "TIMEOUT", strconv.FormatInt(milliseconds, 10))
@@ -705,10 +705,10 @@ func (c FailoverAbort) Timeout(milliseconds int64) FailoverTimeout {
 
 func (c FailoverAbort) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FailoverTargetForce Completed
+type FailoverTargetForce Incomplete
 
 func (c FailoverTargetForce) Abort() FailoverAbort {
 	c.cs.s = append(c.cs.s, "ABORT")
@@ -722,17 +722,17 @@ func (c FailoverTargetForce) Timeout(milliseconds int64) FailoverTimeout {
 
 func (c FailoverTargetForce) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FailoverTargetHost Completed
+type FailoverTargetHost Incomplete
 
 func (c FailoverTargetHost) Port(port int64) FailoverTargetPort {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(port, 10))
 	return (FailoverTargetPort)(c)
 }
 
-type FailoverTargetPort Completed
+type FailoverTargetPort Incomplete
 
 func (c FailoverTargetPort) Force() FailoverTargetForce {
 	c.cs.s = append(c.cs.s, "FORCE")
@@ -751,24 +751,24 @@ func (c FailoverTargetPort) Timeout(milliseconds int64) FailoverTimeout {
 
 func (c FailoverTargetPort) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FailoverTargetTo Completed
+type FailoverTargetTo Incomplete
 
 func (c FailoverTargetTo) Host(host string) FailoverTargetHost {
 	c.cs.s = append(c.cs.s, host)
 	return (FailoverTargetHost)(c)
 }
 
-type FailoverTimeout Completed
+type FailoverTimeout Incomplete
 
 func (c FailoverTimeout) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Flushall Completed
+type Flushall Incomplete
 
 func (b Builder) Flushall() (c Flushall) {
 	c = Flushall{cs: get(), ks: b.ks}
@@ -788,24 +788,24 @@ func (c Flushall) Sync() FlushallAsyncSync {
 
 func (c Flushall) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FlushallAsync Completed
+type FlushallAsync Incomplete
 
 func (c FlushallAsync) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FlushallAsyncSync Completed
+type FlushallAsyncSync Incomplete
 
 func (c FlushallAsyncSync) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Flushdb Completed
+type Flushdb Incomplete
 
 func (b Builder) Flushdb() (c Flushdb) {
 	c = Flushdb{cs: get(), ks: b.ks}
@@ -825,24 +825,24 @@ func (c Flushdb) Sync() FlushdbAsyncSync {
 
 func (c Flushdb) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FlushdbAsync Completed
+type FlushdbAsync Incomplete
 
 func (c FlushdbAsync) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FlushdbAsyncSync Completed
+type FlushdbAsyncSync Incomplete
 
 func (c FlushdbAsyncSync) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Info Completed
+type Info Incomplete
 
 func (b Builder) Info() (c Info) {
 	c = Info{cs: get(), ks: b.ks}
@@ -857,10 +857,10 @@ func (c Info) Section(section ...string) InfoSection {
 
 func (c Info) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type InfoSection Completed
+type InfoSection Incomplete
 
 func (c InfoSection) Section(section ...string) InfoSection {
 	c.cs.s = append(c.cs.s, section...)
@@ -869,10 +869,10 @@ func (c InfoSection) Section(section ...string) InfoSection {
 
 func (c InfoSection) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Lastsave Completed
+type Lastsave Incomplete
 
 func (b Builder) Lastsave() (c Lastsave) {
 	c = Lastsave{cs: get(), ks: b.ks}
@@ -882,10 +882,10 @@ func (b Builder) Lastsave() (c Lastsave) {
 
 func (c Lastsave) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type LatencyDoctor Completed
+type LatencyDoctor Incomplete
 
 func (b Builder) LatencyDoctor() (c LatencyDoctor) {
 	c = LatencyDoctor{cs: get(), ks: b.ks}
@@ -895,10 +895,10 @@ func (b Builder) LatencyDoctor() (c LatencyDoctor) {
 
 func (c LatencyDoctor) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type LatencyGraph Completed
+type LatencyGraph Incomplete
 
 func (b Builder) LatencyGraph() (c LatencyGraph) {
 	c = LatencyGraph{cs: get(), ks: b.ks}
@@ -911,14 +911,14 @@ func (c LatencyGraph) Event(event string) LatencyGraphEvent {
 	return (LatencyGraphEvent)(c)
 }
 
-type LatencyGraphEvent Completed
+type LatencyGraphEvent Incomplete
 
 func (c LatencyGraphEvent) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type LatencyHelp Completed
+type LatencyHelp Incomplete
 
 func (b Builder) LatencyHelp() (c LatencyHelp) {
 	c = LatencyHelp{cs: get(), ks: b.ks}
@@ -928,10 +928,10 @@ func (b Builder) LatencyHelp() (c LatencyHelp) {
 
 func (c LatencyHelp) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type LatencyHistogram Completed
+type LatencyHistogram Incomplete
 
 func (b Builder) LatencyHistogram() (c LatencyHistogram) {
 	c = LatencyHistogram{cs: get(), ks: b.ks}
@@ -946,10 +946,10 @@ func (c LatencyHistogram) Command(command ...string) LatencyHistogramCommand {
 
 func (c LatencyHistogram) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type LatencyHistogramCommand Completed
+type LatencyHistogramCommand Incomplete
 
 func (c LatencyHistogramCommand) Command(command ...string) LatencyHistogramCommand {
 	c.cs.s = append(c.cs.s, command...)
@@ -958,10 +958,10 @@ func (c LatencyHistogramCommand) Command(command ...string) LatencyHistogramComm
 
 func (c LatencyHistogramCommand) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type LatencyHistory Completed
+type LatencyHistory Incomplete
 
 func (b Builder) LatencyHistory() (c LatencyHistory) {
 	c = LatencyHistory{cs: get(), ks: b.ks}
@@ -974,14 +974,14 @@ func (c LatencyHistory) Event(event string) LatencyHistoryEvent {
 	return (LatencyHistoryEvent)(c)
 }
 
-type LatencyHistoryEvent Completed
+type LatencyHistoryEvent Incomplete
 
 func (c LatencyHistoryEvent) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type LatencyLatest Completed
+type LatencyLatest Incomplete
 
 func (b Builder) LatencyLatest() (c LatencyLatest) {
 	c = LatencyLatest{cs: get(), ks: b.ks}
@@ -991,10 +991,10 @@ func (b Builder) LatencyLatest() (c LatencyLatest) {
 
 func (c LatencyLatest) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type LatencyReset Completed
+type LatencyReset Incomplete
 
 func (b Builder) LatencyReset() (c LatencyReset) {
 	c = LatencyReset{cs: get(), ks: b.ks}
@@ -1009,10 +1009,10 @@ func (c LatencyReset) Event(event ...string) LatencyResetEvent {
 
 func (c LatencyReset) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type LatencyResetEvent Completed
+type LatencyResetEvent Incomplete
 
 func (c LatencyResetEvent) Event(event ...string) LatencyResetEvent {
 	c.cs.s = append(c.cs.s, event...)
@@ -1021,13 +1021,13 @@ func (c LatencyResetEvent) Event(event ...string) LatencyResetEvent {
 
 func (c LatencyResetEvent) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Lolwut Completed
+type Lolwut Incomplete
 
 func (b Builder) Lolwut() (c Lolwut) {
-	c = Lolwut{cs: get(), ks: b.ks, cf: readonly}
+	c = Lolwut{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "LOLWUT")
 	return c
 }
@@ -1039,30 +1039,30 @@ func (c Lolwut) Version(version int64) LolwutVersion {
 
 func (c Lolwut) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type LolwutVersion Completed
+type LolwutVersion Incomplete
 
 func (c LolwutVersion) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type MemoryDoctor Completed
+type MemoryDoctor Incomplete
 
 func (b Builder) MemoryDoctor() (c MemoryDoctor) {
-	c = MemoryDoctor{cs: get(), ks: b.ks, cf: readonly}
+	c = MemoryDoctor{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "MEMORY", "DOCTOR")
 	return c
 }
 
 func (c MemoryDoctor) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type MemoryHelp Completed
+type MemoryHelp Incomplete
 
 func (b Builder) MemoryHelp() (c MemoryHelp) {
 	c = MemoryHelp{cs: get(), ks: b.ks}
@@ -1072,23 +1072,23 @@ func (b Builder) MemoryHelp() (c MemoryHelp) {
 
 func (c MemoryHelp) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type MemoryMallocStats Completed
+type MemoryMallocStats Incomplete
 
 func (b Builder) MemoryMallocStats() (c MemoryMallocStats) {
-	c = MemoryMallocStats{cs: get(), ks: b.ks, cf: readonly}
+	c = MemoryMallocStats{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "MEMORY", "MALLOC-STATS")
 	return c
 }
 
 func (c MemoryMallocStats) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type MemoryPurge Completed
+type MemoryPurge Incomplete
 
 func (b Builder) MemoryPurge() (c MemoryPurge) {
 	c = MemoryPurge{cs: get(), ks: b.ks}
@@ -1098,26 +1098,26 @@ func (b Builder) MemoryPurge() (c MemoryPurge) {
 
 func (c MemoryPurge) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type MemoryStats Completed
+type MemoryStats Incomplete
 
 func (b Builder) MemoryStats() (c MemoryStats) {
-	c = MemoryStats{cs: get(), ks: b.ks, cf: readonly}
+	c = MemoryStats{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "MEMORY", "STATS")
 	return c
 }
 
 func (c MemoryStats) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type MemoryUsage Completed
+type MemoryUsage Incomplete
 
 func (b Builder) MemoryUsage() (c MemoryUsage) {
-	c = MemoryUsage{cs: get(), ks: b.ks, cf: readonly}
+	c = MemoryUsage{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "MEMORY", "USAGE")
 	return c
 }
@@ -1132,7 +1132,7 @@ func (c MemoryUsage) Key(key string) MemoryUsageKey {
 	return (MemoryUsageKey)(c)
 }
 
-type MemoryUsageKey Completed
+type MemoryUsageKey Incomplete
 
 func (c MemoryUsageKey) Samples(count int64) MemoryUsageSamples {
 	c.cs.s = append(c.cs.s, "SAMPLES", strconv.FormatInt(count, 10))
@@ -1141,17 +1141,17 @@ func (c MemoryUsageKey) Samples(count int64) MemoryUsageSamples {
 
 func (c MemoryUsageKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type MemoryUsageSamples Completed
+type MemoryUsageSamples Incomplete
 
 func (c MemoryUsageSamples) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ModuleList Completed
+type ModuleList Incomplete
 
 func (b Builder) ModuleList() (c ModuleList) {
 	c = ModuleList{cs: get(), ks: b.ks}
@@ -1161,10 +1161,10 @@ func (b Builder) ModuleList() (c ModuleList) {
 
 func (c ModuleList) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ModuleLoad Completed
+type ModuleLoad Incomplete
 
 func (b Builder) ModuleLoad() (c ModuleLoad) {
 	c = ModuleLoad{cs: get(), ks: b.ks}
@@ -1177,7 +1177,7 @@ func (c ModuleLoad) Path(path string) ModuleLoadPath {
 	return (ModuleLoadPath)(c)
 }
 
-type ModuleLoadArg Completed
+type ModuleLoadArg Incomplete
 
 func (c ModuleLoadArg) Arg(arg ...string) ModuleLoadArg {
 	c.cs.s = append(c.cs.s, arg...)
@@ -1186,10 +1186,10 @@ func (c ModuleLoadArg) Arg(arg ...string) ModuleLoadArg {
 
 func (c ModuleLoadArg) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ModuleLoadPath Completed
+type ModuleLoadPath Incomplete
 
 func (c ModuleLoadPath) Arg(arg ...string) ModuleLoadArg {
 	c.cs.s = append(c.cs.s, arg...)
@@ -1198,10 +1198,10 @@ func (c ModuleLoadPath) Arg(arg ...string) ModuleLoadArg {
 
 func (c ModuleLoadPath) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ModuleLoadex Completed
+type ModuleLoadex Incomplete
 
 func (b Builder) ModuleLoadex() (c ModuleLoadex) {
 	c = ModuleLoadex{cs: get(), ks: b.ks}
@@ -1214,7 +1214,7 @@ func (c ModuleLoadex) Path(path string) ModuleLoadexPath {
 	return (ModuleLoadexPath)(c)
 }
 
-type ModuleLoadexArgs Completed
+type ModuleLoadexArgs Incomplete
 
 func (c ModuleLoadexArgs) Args(args ...string) ModuleLoadexArgs {
 	c.cs.s = append(c.cs.s, "ARGS")
@@ -1224,10 +1224,10 @@ func (c ModuleLoadexArgs) Args(args ...string) ModuleLoadexArgs {
 
 func (c ModuleLoadexArgs) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ModuleLoadexConfig Completed
+type ModuleLoadexConfig Incomplete
 
 func (c ModuleLoadexConfig) Config(name string, value string) ModuleLoadexConfig {
 	c.cs.s = append(c.cs.s, "CONFIG", name, value)
@@ -1242,10 +1242,10 @@ func (c ModuleLoadexConfig) Args(args ...string) ModuleLoadexArgs {
 
 func (c ModuleLoadexConfig) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ModuleLoadexPath Completed
+type ModuleLoadexPath Incomplete
 
 func (c ModuleLoadexPath) Config() ModuleLoadexConfig {
 	return (ModuleLoadexConfig)(c)
@@ -1259,10 +1259,10 @@ func (c ModuleLoadexPath) Args(args ...string) ModuleLoadexArgs {
 
 func (c ModuleLoadexPath) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ModuleUnload Completed
+type ModuleUnload Incomplete
 
 func (b Builder) ModuleUnload() (c ModuleUnload) {
 	c = ModuleUnload{cs: get(), ks: b.ks}
@@ -1275,14 +1275,14 @@ func (c ModuleUnload) Name(name string) ModuleUnloadName {
 	return (ModuleUnloadName)(c)
 }
 
-type ModuleUnloadName Completed
+type ModuleUnloadName Incomplete
 
 func (c ModuleUnloadName) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Monitor Completed
+type Monitor Incomplete
 
 func (b Builder) Monitor() (c Monitor) {
 	c = Monitor{cs: get(), ks: b.ks}
@@ -1292,10 +1292,10 @@ func (b Builder) Monitor() (c Monitor) {
 
 func (c Monitor) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Psync Completed
+type Psync Incomplete
 
 func (b Builder) Psync() (c Psync) {
 	c = Psync{cs: get(), ks: b.ks}
@@ -1308,21 +1308,21 @@ func (c Psync) Replicationid(replicationid string) PsyncReplicationid {
 	return (PsyncReplicationid)(c)
 }
 
-type PsyncOffset Completed
+type PsyncOffset Incomplete
 
 func (c PsyncOffset) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type PsyncReplicationid Completed
+type PsyncReplicationid Incomplete
 
 func (c PsyncReplicationid) Offset(offset int64) PsyncOffset {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(offset, 10))
 	return (PsyncOffset)(c)
 }
 
-type Replicaof Completed
+type Replicaof Incomplete
 
 func (b Builder) Replicaof() (c Replicaof) {
 	c = Replicaof{cs: get(), ks: b.ks}
@@ -1330,26 +1330,45 @@ func (b Builder) Replicaof() (c Replicaof) {
 	return c
 }
 
-func (c Replicaof) Host(host string) ReplicaofHost {
+func (c Replicaof) Host(host string) ReplicaofArgsHostPortHost {
 	c.cs.s = append(c.cs.s, host)
-	return (ReplicaofHost)(c)
+	return (ReplicaofArgsHostPortHost)(c)
 }
 
-type ReplicaofHost Completed
+func (c Replicaof) No() ReplicaofArgsNoOneNo {
+	c.cs.s = append(c.cs.s, "NO")
+	return (ReplicaofArgsNoOneNo)(c)
+}
 
-func (c ReplicaofHost) Port(port int64) ReplicaofPort {
+type ReplicaofArgsHostPortHost Incomplete
+
+func (c ReplicaofArgsHostPortHost) Port(port int64) ReplicaofArgsHostPortPort {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(port, 10))
-	return (ReplicaofPort)(c)
+	return (ReplicaofArgsHostPortPort)(c)
 }
 
-type ReplicaofPort Completed
+type ReplicaofArgsHostPortPort Incomplete
 
-func (c ReplicaofPort) Build() Completed {
+func (c ReplicaofArgsHostPortPort) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Role Completed
+type ReplicaofArgsNoOneNo Incomplete
+
+func (c ReplicaofArgsNoOneNo) One() ReplicaofArgsNoOneOne {
+	c.cs.s = append(c.cs.s, "ONE")
+	return (ReplicaofArgsNoOneOne)(c)
+}
+
+type ReplicaofArgsNoOneOne Incomplete
+
+func (c ReplicaofArgsNoOneOne) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type Role Incomplete
 
 func (b Builder) Role() (c Role) {
 	c = Role{cs: get(), ks: b.ks}
@@ -1359,10 +1378,10 @@ func (b Builder) Role() (c Role) {
 
 func (c Role) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Save Completed
+type Save Incomplete
 
 func (b Builder) Save() (c Save) {
 	c = Save{cs: get(), ks: b.ks}
@@ -1372,10 +1391,10 @@ func (b Builder) Save() (c Save) {
 
 func (c Save) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Shutdown Completed
+type Shutdown Incomplete
 
 func (b Builder) Shutdown() (c Shutdown) {
 	c = Shutdown{cs: get(), ks: b.ks}
@@ -1410,17 +1429,17 @@ func (c Shutdown) Abort() ShutdownAbort {
 
 func (c Shutdown) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ShutdownAbort Completed
+type ShutdownAbort Incomplete
 
 func (c ShutdownAbort) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ShutdownForce Completed
+type ShutdownForce Incomplete
 
 func (c ShutdownForce) Abort() ShutdownAbort {
 	c.cs.s = append(c.cs.s, "ABORT")
@@ -1429,10 +1448,10 @@ func (c ShutdownForce) Abort() ShutdownAbort {
 
 func (c ShutdownForce) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ShutdownNow Completed
+type ShutdownNow Incomplete
 
 func (c ShutdownNow) Force() ShutdownForce {
 	c.cs.s = append(c.cs.s, "FORCE")
@@ -1446,10 +1465,10 @@ func (c ShutdownNow) Abort() ShutdownAbort {
 
 func (c ShutdownNow) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ShutdownSaveModeNosave Completed
+type ShutdownSaveModeNosave Incomplete
 
 func (c ShutdownSaveModeNosave) Now() ShutdownNow {
 	c.cs.s = append(c.cs.s, "NOW")
@@ -1468,10 +1487,10 @@ func (c ShutdownSaveModeNosave) Abort() ShutdownAbort {
 
 func (c ShutdownSaveModeNosave) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type ShutdownSaveModeSave Completed
+type ShutdownSaveModeSave Incomplete
 
 func (c ShutdownSaveModeSave) Now() ShutdownNow {
 	c.cs.s = append(c.cs.s, "NOW")
@@ -1490,10 +1509,10 @@ func (c ShutdownSaveModeSave) Abort() ShutdownAbort {
 
 func (c ShutdownSaveModeSave) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Slaveof Completed
+type Slaveof Incomplete
 
 func (b Builder) Slaveof() (c Slaveof) {
 	c = Slaveof{cs: get(), ks: b.ks}
@@ -1501,29 +1520,48 @@ func (b Builder) Slaveof() (c Slaveof) {
 	return c
 }
 
-func (c Slaveof) Host(host string) SlaveofHost {
+func (c Slaveof) Host(host string) SlaveofArgsHostPortHost {
 	c.cs.s = append(c.cs.s, host)
-	return (SlaveofHost)(c)
+	return (SlaveofArgsHostPortHost)(c)
 }
 
-type SlaveofHost Completed
+func (c Slaveof) No() SlaveofArgsNoOneNo {
+	c.cs.s = append(c.cs.s, "NO")
+	return (SlaveofArgsNoOneNo)(c)
+}
 
-func (c SlaveofHost) Port(port int64) SlaveofPort {
+type SlaveofArgsHostPortHost Incomplete
+
+func (c SlaveofArgsHostPortHost) Port(port int64) SlaveofArgsHostPortPort {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(port, 10))
-	return (SlaveofPort)(c)
+	return (SlaveofArgsHostPortPort)(c)
 }
 
-type SlaveofPort Completed
+type SlaveofArgsHostPortPort Incomplete
 
-func (c SlaveofPort) Build() Completed {
+func (c SlaveofArgsHostPortPort) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SlowlogGet Completed
+type SlaveofArgsNoOneNo Incomplete
+
+func (c SlaveofArgsNoOneNo) One() SlaveofArgsNoOneOne {
+	c.cs.s = append(c.cs.s, "ONE")
+	return (SlaveofArgsNoOneOne)(c)
+}
+
+type SlaveofArgsNoOneOne Incomplete
+
+func (c SlaveofArgsNoOneOne) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type SlowlogGet Incomplete
 
 func (b Builder) SlowlogGet() (c SlowlogGet) {
-	c = SlowlogGet{cs: get(), ks: b.ks, cf: readonly}
+	c = SlowlogGet{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "SLOWLOG", "GET")
 	return c
 }
@@ -1535,43 +1573,43 @@ func (c SlowlogGet) Count(count int64) SlowlogGetCount {
 
 func (c SlowlogGet) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SlowlogGetCount Completed
+type SlowlogGetCount Incomplete
 
 func (c SlowlogGetCount) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SlowlogHelp Completed
+type SlowlogHelp Incomplete
 
 func (b Builder) SlowlogHelp() (c SlowlogHelp) {
-	c = SlowlogHelp{cs: get(), ks: b.ks, cf: readonly}
+	c = SlowlogHelp{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "SLOWLOG", "HELP")
 	return c
 }
 
 func (c SlowlogHelp) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SlowlogLen Completed
+type SlowlogLen Incomplete
 
 func (b Builder) SlowlogLen() (c SlowlogLen) {
-	c = SlowlogLen{cs: get(), ks: b.ks, cf: readonly}
+	c = SlowlogLen{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "SLOWLOG", "LEN")
 	return c
 }
 
 func (c SlowlogLen) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SlowlogReset Completed
+type SlowlogReset Incomplete
 
 func (b Builder) SlowlogReset() (c SlowlogReset) {
 	c = SlowlogReset{cs: get(), ks: b.ks}
@@ -1581,10 +1619,10 @@ func (b Builder) SlowlogReset() (c SlowlogReset) {
 
 func (c SlowlogReset) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Swapdb Completed
+type Swapdb Incomplete
 
 func (b Builder) Swapdb() (c Swapdb) {
 	c = Swapdb{cs: get(), ks: b.ks}
@@ -1597,21 +1635,21 @@ func (c Swapdb) Index1(index1 int64) SwapdbIndex1 {
 	return (SwapdbIndex1)(c)
 }
 
-type SwapdbIndex1 Completed
+type SwapdbIndex1 Incomplete
 
 func (c SwapdbIndex1) Index2(index2 int64) SwapdbIndex2 {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(index2, 10))
 	return (SwapdbIndex2)(c)
 }
 
-type SwapdbIndex2 Completed
+type SwapdbIndex2 Incomplete
 
 func (c SwapdbIndex2) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Sync Completed
+type Sync Incomplete
 
 func (b Builder) Sync() (c Sync) {
 	c = Sync{cs: get(), ks: b.ks}
@@ -1621,10 +1659,10 @@ func (b Builder) Sync() (c Sync) {
 
 func (c Sync) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Time Completed
+type Time Incomplete
 
 func (b Builder) Time() (c Time) {
 	c = Time{cs: get(), ks: b.ks}
@@ -1634,5 +1672,5 @@ func (b Builder) Time() (c Time) {
 
 func (c Time) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }

@@ -457,9 +457,9 @@ func (l lifecycle) OnStepGatewayRequestFinished(
 	state.GeneratorOpcode,
 	// Resp is the HTTP response
 	*http.Response,
-	error,
+	*state.UserError,
 ) {
-	// XXX: The tracing lifecycle has taken place over
+	// XXX: The tracing lifecycle has taken place over this, and this is not used.
 }
 
 func (l lifecycle) OnWaitForEvent(

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -24,7 +25,6 @@ import (
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"github.com/inngest/inngestgo/internal/types"
 	"github.com/inngest/inngestgo/step"
-	"log/slog"
 )
 
 var (
@@ -105,12 +105,6 @@ type HandlerOpts struct {
 	//
 	// This only needs to be set when self hosting.
 	RegisterURL *string
-
-	// ConnectURLs are the URLs to use for establishing outbound connections.  If nil
-	// this defaults to Inngest's Connect endpoint.
-	//
-	// This only needs to be set when self hosting.
-	ConnectURLs []string
 
 	// InstanceId represents a stable identifier to be used for identifying connected SDKs.
 	// This can be a hostname or other identifier that remains stable across restarts.

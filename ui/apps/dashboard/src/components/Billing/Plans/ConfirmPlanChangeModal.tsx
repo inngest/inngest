@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal/Modal';
 import { capitalCase } from 'change-case';
 import { useMutation } from 'urql';
@@ -72,16 +72,44 @@ export default function ConfirmPlanChangeModal({
       </Modal.Header>
 
       <Modal.Body>
-        <p>
-          {isCancellation
-            ? `Please confirm before cancelling your plan. You will immediately lose the features of your current plan`
-            : action === 'downgrade'
-            ? `Please confirm before downgrading your plan. You will immediately lose the features of your current plan.`
-            : `You have chosen wisely - Please confirm your upgrade!`}
-        </p>
+        {isCancellation ? (
+          <>
+            <p className="mb-2">
+              <b>This is an immediate action.</b> Please confirm before canceling your plan.{' '}
+            </p>
+            <ul className="list-inside list-disc">
+              <li>
+                Once canceled, you will lose access to your current plan and its features{' '}
+                <b>immediately</b>.
+              </li>
+              <li>
+                You will be credited for any unused time from your current plan, calculated on a
+                prorated basis.
+              </li>
+            </ul>
+          </>
+        ) : action === 'downgrade' ? (
+          <>
+            <p className="mb-2">
+              <b>This is an immediate action.</b> Please confirm before downgrading your plan.{' '}
+            </p>
+            <ul className="list-inside list-disc">
+              <li>
+                Once donwgraded, you will lose access to your current plan and its features{' '}
+                <b>immediately</b>.
+              </li>
+              <li>
+                You will be credited for any unused time from your current plan, calculated on a
+                prorated basis.
+              </li>
+            </ul>
+          </>
+        ) : (
+          <p>You have chosen wisely - Please confirm your upgrade!</p>
+        )}
         <p className="my-4 font-semibold">New monthly cost: ${amount / 100}</p>
         <div className="mt-6 flex flex-row justify-end">
-          <NewButton
+          <Button
             kind={isCancellation || action === 'downgrade' ? 'danger' : 'primary'}
             onClick={handlePlanChange}
             label={`Confirm ${capitalCase(action)}`}

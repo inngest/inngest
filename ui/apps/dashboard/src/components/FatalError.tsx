@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { Alert } from '@inngest/components/Alert';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import * as Sentry from '@sentry/nextjs';
 
 import { pathCreator } from '@/utils/urls';
@@ -22,7 +22,7 @@ export function FatalError({ error, reset }: Props) {
       <Alert
         severity="error"
         button={
-          <NewButton
+          <Button
             onClick={() => reset()}
             kind="secondary"
             appearance="outlined"

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 
 import { pathCreator } from '@/utils/urls';
@@ -12,8 +12,8 @@ export default function EmptyAppsCard() {
   const { nextStep, lastCompletedStep } = useOnboardingStep();
 
   return (
-    <div className="border-muted bg-canvasSubtle flex flex-col items-center gap-6 rounded-lg border border-dashed px-6 py-9">
-      <div className="bg-primary-3xSubtle text-primary-moderate rounded-lg p-3 ">
+    <div className="border-muted bg-canvasSubtle flex flex-col items-center gap-6 rounded-md border border-dashed px-6 py-9">
+      <div className="bg-primary-3xSubtle text-primary-moderate rounded-md p-3 ">
         <AppsIcon className="h-8 w-8" />
       </div>
       <div className="text-center">
@@ -24,7 +24,7 @@ export default function EmptyAppsCard() {
           Inngest Dev Server.
         </p>
       </div>
-      <NewButton
+      <Button
         label="Take me to onboarding"
         onClick={() =>
           router.push(

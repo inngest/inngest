@@ -1,7 +1,5 @@
 import { RiArrowRightSLine, RiSparkling2Fill } from '@remixicon/react';
 
-import type { ExperimentalAI } from '../AI/utils';
-import { Badge } from '../Badge';
 import { Button } from '../Button';
 import { Pill } from '../Pill';
 import { Time } from '../Time';
@@ -43,13 +41,12 @@ export function TraceHeading({
       <span className="flex h-fit">
         <Tooltip>
           <TooltipTrigger>
-            <Badge
+            <Pill
               className="border-muted text-subtle border px-1.5"
               flatSide={isRetried ? 'right' : undefined}
-              kind="solid"
             >
               <span>{title}</span>
-            </Badge>
+            </Pill>
           </TooltipTrigger>
           <TooltipContent>Step method</TooltipContent>
         </Tooltip>
@@ -57,13 +54,12 @@ export function TraceHeading({
         {(trace.attempts ?? 0) > 1 && (
           <Tooltip>
             <TooltipTrigger>
-              <Badge
+              <Pill
                 className="border-r-1 border-muted text-subtle border-l-0 px-1.5"
                 flatSide="left"
-                kind="solid"
               >
                 <span>{trace.attempts}</span>
-              </Badge>
+              </Pill>
             </TooltipTrigger>
             <TooltipContent>Attempt count</TooltipContent>
           </Tooltip>
@@ -76,9 +72,9 @@ export function TraceHeading({
     <div className="text-basis flex w-72 gap-2">
       {isExpandable && (
         <Button
-          btnAction={onClickExpandToggle}
-          className="flex-none"
-          size="small"
+          onClick={onClickExpandToggle}
+          className={cn('flex-none', isExpanded && 'border border-transparent')}
+          kind={isExpanded ? 'primary' : 'secondary'}
           appearance={isExpanded ? 'solid' : 'outlined'}
           icon={
             <RiArrowRightSLine
@@ -95,7 +91,7 @@ export function TraceHeading({
             {trace.name}
           </span>
 
-          <div className="h-8">{opCodeBadge}</div>
+          {!isAI && <div className="h-8">{opCodeBadge}</div>}
         </div>
         <TimeWithText trace={trace} />
       </div>

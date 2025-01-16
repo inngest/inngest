@@ -24,9 +24,15 @@ type FnRunTestEvt inngestgo.GenericEvent[FnRunTestEvtData, any]
 
 func TestFunctionRunList(t *testing.T) {
 	ctx := context.Background()
+	r := require.New(t)
+
+	// Unique names so the test can be retried without a Dev Server restart.
+	appName := fmt.Sprintf("fnrun-%d", time.Now().UnixNano())
+	okEventName := fmt.Sprintf("%s/ok", appName)
+	failedEventName := fmt.Sprintf("%s/failed", appName)
 
 	c := client.New(t)
-	h, server, registerFuncs := NewSDKHandler(t, "fnrun")
+	h, server, registerFuncs := NewSDKHandler(t, appName)
 	defer server.Close()
 
 	var (
@@ -37,7 +43,7 @@ func TestFunctionRunList(t *testing.T) {
 		inngestgo.FunctionOpts{
 			Name: "fn-run-ok",
 		},
-		inngestgo.EventTrigger("fnrun/ok", nil),
+		inngestgo.EventTrigger(okEventName, nil),
 		func(ctx context.Context, input inngestgo.Input[FnRunTestEvt]) (any, error) {
 			atomic.AddInt32(&ok, 1)
 			return map[string]any{"num": input.Event.Data.Index * 2}, nil
@@ -48,7 +54,7 @@ func TestFunctionRunList(t *testing.T) {
 		inngestgo.FunctionOpts{
 			Name: "fn-run-err", Retries: inngestgo.IntPtr(0),
 		},
-		inngestgo.EventTrigger("fnrun/failed", nil),
+		inngestgo.EventTrigger(failedEventName, nil),
 		func(ctx context.Context, input inngestgo.Input[FnRunTestEvt]) (any, error) {
 			atomic.AddInt32(&failed, 1)
 			return nil, fmt.Errorf("fail")
@@ -57,9 +63,6 @@ func TestFunctionRunList(t *testing.T) {
 
 	h.Register(fn1, fn2)
 	registerFuncs()
-
-	// buy some time here so it doesn't collide with other runs happening :fingers_crossed:
-	<-time.After(2 * time.Second)
 
 	start := time.Now()
 
@@ -72,7 +75,7 @@ func TestFunctionRunList(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < successTotal; i++ {
-			_, _ = inngestgo.Send(ctx, inngestgo.Event{Name: "fnrun/ok", Data: map[string]any{"success": true, "idx": i}})
+			_, _ = inngestgo.Send(ctx, inngestgo.Event{Name: okEventName, Data: map[string]any{"success": true, "idx": i}})
 		}
 	}()
 
@@ -80,18 +83,18 @@ func TestFunctionRunList(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < failureTotal; i++ {
-			_, _ = inngestgo.Send(ctx, inngestgo.Event{Name: "fnrun/failed", Data: map[string]any{"success": false, "idx": i}})
+			_, _ = inngestgo.Send(ctx, inngestgo.Event{Name: failedEventName, Data: map[string]any{"success": false, "idx": i}})
 		}
 	}()
 
 	wg.Wait()
 
-	<-time.After(3 * time.Second)
-	end := time.Now()
-	<-time.After(3 * time.Second)
-
-	require.EqualValues(t, successTotal, ok)
-	require.EqualValues(t, failureTotal, failed)
+	r.EventuallyWithT(func(t *assert.CollectT) {
+		a := assert.New(t)
+		a.EqualValues(successTotal, ok)
+		a.EqualValues(failureTotal, failed)
+	}, 10*time.Second, 100*time.Millisecond)
+	end := time.Now().Add(10 * time.Second)
 
 	total := successTotal + failureTotal
 
@@ -217,8 +220,9 @@ func TestFunctionRunList(t *testing.T) {
 		require.EventuallyWithT(t, func(t *assert.CollectT) {
 			items := 2
 			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
-				Start:     start,
-				End:       end,
+				Start: start,
+				// End:       end,
+				End:       time.Now(),
 				TimeField: models.RunsV2OrderByFieldEndedAt,
 				Status:    []string{models.FunctionRunStatusFailed.String()},
 				Order: []models.RunsV2OrderBy{
@@ -233,8 +237,9 @@ func TestFunctionRunList(t *testing.T) {
 
 			// there are only 3 failed runs, so there shouldn't be anymore than 1
 			edges, pageInfo, _ = c.FunctionRuns(ctx, client.FunctionRunOpt{
-				Start:     start,
-				End:       end,
+				Start: start,
+				// End:       end,
+				End:       time.Now(),
 				TimeField: models.RunsV2OrderByFieldEndedAt,
 				Status:    []string{models.FunctionRunStatusFailed.String()},
 				Items:     items,
@@ -254,7 +259,7 @@ func TestFunctionRunList(t *testing.T) {
 	t.Run("filter with event CEL expression", func(t *testing.T) {
 		min := 5
 		cel := celBlob([]string{
-			"event.name == 'fnrun/ok'",
+			fmt.Sprintf("event.name == '%s'", okEventName),
 			fmt.Sprintf("event.data.idx > %d", min),
 		})
 

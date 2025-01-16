@@ -1,13 +1,13 @@
 'use client';
 
 import { type Route } from 'next';
-import Link from 'next/link';
+import NextLink from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Time } from '@inngest/components/Time';
+import { cn } from '@inngest/components/utils/classNames';
 import { RiTimeLine } from '@remixicon/react';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import cn from '@/utils/cn';
 import { getManageKey } from '@/utils/urls';
 
 type KeysListItemProps = {
@@ -35,7 +35,7 @@ export default function KeysListItem({ list }: KeysListItemProps) {
   if (filteredList.length === 0) {
     return (
       <div className="flex h-full w-full items-center justify-center">
-        <h2 className="text-sm font-semibold text-gray-900">{'No ' + page + ' yet.'}</h2>
+        <h2 className="text-basis text-sm font-semibold">{'No ' + page + ' yet.'}</h2>
       </div>
     );
   }
@@ -47,22 +47,22 @@ export default function KeysListItem({ list }: KeysListItemProps) {
         const isActive = pathname === eventPathname;
 
         return (
-          <li key={key.id} className="border-b border-slate-100">
-            <Link
+          <li key={key.id} className="border-subtle text-basis border-b">
+            <NextLink
               href={eventPathname as Route}
-              className={cn('block px-4 py-3 hover:bg-slate-100', isActive && 'bg-slate-100')}
+              className={cn('hover:bg-canvasMuted block px-4 py-3', isActive && 'bg-canvasSubtle')}
             >
-              <p className="mb-1 text-sm font-semibold text-slate-800">{key.name}</p>
+              <p className="mb-1 text-sm font-semibold">{key.name}</p>
               <div className="flex items-center gap-1">
                 <RiTimeLine className="h-4 w-4" />
 
                 <Time
-                  className="truncate text-sm text-slate-700"
+                  className="truncate text-sm"
                   format="relative"
                   value={new Date(key.createdAt)}
                 />
               </div>
-            </Link>
+            </NextLink>
           </li>
         );
       })}

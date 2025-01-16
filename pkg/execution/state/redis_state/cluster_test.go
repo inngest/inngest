@@ -2,12 +2,13 @@ package redis_state
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 type fakeClient struct {
@@ -45,6 +46,16 @@ func (f *fakeClient) DoCache(ctx context.Context, cmd rueidis.Cacheable, ttl tim
 }
 
 func (f *fakeClient) DoMultiCache(ctx context.Context, multi ...rueidis.CacheableTTL) (resp []rueidis.RedisResult) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (f *fakeClient) DoStream(ctx context.Context, cmd rueidis.Completed) rueidis.RedisResultStream {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (f *fakeClient) DoMultiStream(ctx context.Context, multi ...rueidis.Completed) rueidis.MultiRedisResultStream {
 	//TODO implement me
 	panic("implement me")
 }

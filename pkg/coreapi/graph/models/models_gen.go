@@ -124,6 +124,7 @@ type FunctionRunV2 struct {
 	CronSchedule   *string           `json:"cronSchedule,omitempty"`
 	Output         *string           `json:"output,omitempty"`
 	Trace          *RunTraceSpan     `json:"trace,omitempty"`
+	HasAi          bool              `json:"hasAI"`
 }
 
 type FunctionRunV2Edge struct {
@@ -717,6 +718,7 @@ const (
 	StepOpRun          StepOp = "RUN"
 	StepOpSleep        StepOp = "SLEEP"
 	StepOpWaitForEvent StepOp = "WAIT_FOR_EVENT"
+	StepOpAiGateway    StepOp = "AI_GATEWAY"
 )
 
 var AllStepOp = []StepOp{
@@ -724,11 +726,12 @@ var AllStepOp = []StepOp{
 	StepOpRun,
 	StepOpSleep,
 	StepOpWaitForEvent,
+	StepOpAiGateway,
 }
 
 func (e StepOp) IsValid() bool {
 	switch e {
-	case StepOpInvoke, StepOpRun, StepOpSleep, StepOpWaitForEvent:
+	case StepOpInvoke, StepOpRun, StepOpSleep, StepOpWaitForEvent, StepOpAiGateway:
 		return true
 	}
 	return false

@@ -56,13 +56,8 @@ type Run = {
     queuedAt: string;
     startedAt: string | null;
     status: string;
+    stepID?: string | null;
   };
-};
-
-const hasAIChildren = (trace: Run['trace']): boolean => {
-  return !!trace?.childrenSpans?.find(
-    (c?: any) => c?.stepInfo?.type === 'step.ai.wrap' || c?.stepInfo?.type === 'step.ai.infer'
-  );
 };
 
 export function RunInfo({
@@ -80,12 +75,12 @@ export function RunInfo({
 }: Props) {
   let allowCancel = false;
   let isSuccess = false;
-  let isAI = false;
+  let stepID = null;
 
   if (isLazyDone(run)) {
     allowCancel = !Boolean(run.trace.endedAt);
     isSuccess = run.trace.status === 'COMPLETED';
-    isAI = hasAIChildren(run.trace);
+    stepID = run.trace.stepID;
   }
 
   const aiOutput = stepAIEnabled && result?.data ? parseAIOutput(result.data) : undefined;
@@ -95,7 +90,8 @@ export function RunInfo({
       <Card>
         <Card.Header className="h-11 flex-row items-center gap-2">
           <div className="text-basis flex grow items-center gap-2">
-            Run details {!standalone && <Link href={pathCreator.runPopout({ runID })} />}
+            Run details{' '}
+            {!standalone && <Link size="medium" href={pathCreator.runPopout({ runID })} />}
           </div>
 
           <CancelRunButton disabled={!allowCancel} onClick={cancelRun} />
@@ -125,11 +121,7 @@ export function RunInfo({
               >
                 {(run: Run) => {
                   return (
-                    <LinkElement
-                      internalNavigation
-                      href={pathCreator.app({ externalAppID: run.app.externalID })}
-                      showIcon={false}
-                    >
+                    <LinkElement href={pathCreator.app({ externalAppID: run.app.externalID })}>
                       {run.app.name}
                     </LinkElement>
                   );
@@ -144,11 +136,7 @@ export function RunInfo({
               >
                 {(run: Run) => {
                   return (
-                    <LinkElement
-                      internalNavigation
-                      href={pathCreator.function({ functionSlug: run.fn.slug })}
-                      showIcon={false}
-                    >
+                    <LinkElement href={pathCreator.function({ functionSlug: run.fn.slug })}>
                       {run.fn.name}
                     </LinkElement>
                   );
@@ -249,6 +237,7 @@ export function RunInfo({
             className="border-muted border-t"
             result={result}
             runID={runID}
+            stepID={stepID}
             rerunFromStep={rerunFromStep}
             isSuccess={isSuccess}
             stepAIEnabled={stepAIEnabled}

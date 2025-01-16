@@ -2,7 +2,7 @@
 
 import { useMemo, useRef } from 'react';
 import { type Route } from 'next';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { Table, TextCell } from '@inngest/components/Table';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
@@ -67,9 +67,9 @@ const columns = [
       const requiresConfirmation = props.row.original.status === 'requires_confirmation';
       if (url) {
         return (
-          <NewLink href={url as Route} size="small">
+          <Link href={url as Route} size="small" target="_blank">
             {requiresConfirmation ? 'Pay invoice' : 'View invoice'}
-          </NewLink>
+          </Link>
         );
       }
       return null;
@@ -82,7 +82,8 @@ export default function Payments() {
   const [{ data, fetching }] = useQuery({
     query: GetPaymentIntentsDocument,
   });
-  const payments = data?.account.paymentIntents || [];
+
+  const payments = useMemo(() => data?.account.paymentIntents || [], [data]);
 
   const tableColumns = useMemo(
     () =>
@@ -116,11 +117,11 @@ export default function Payments() {
         url: payment.invoiceURL,
       })
     );
-  }, [fetching, data]);
+  }, [fetching, payments]);
 
   return (
     <main
-      className="border-muted min-h-0 overflow-y-auto rounded-lg border [&>table]:border-b-0"
+      className="border-muted min-h-0 overflow-y-auto rounded-md border [&>table]:border-b-0"
       ref={tableContainerRef}
     >
       <Table

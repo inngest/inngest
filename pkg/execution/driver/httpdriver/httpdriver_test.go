@@ -189,7 +189,7 @@ func TestParseStream(t *testing.T) {
 
 func TestStreamResponseTooLarge(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		data := make([]byte, consts.MaxBodySize)
+		data := make([]byte, consts.MaxSDKResponseBodySize)
 		_, err := rand.Read(data)
 		require.NoError(t, err)
 

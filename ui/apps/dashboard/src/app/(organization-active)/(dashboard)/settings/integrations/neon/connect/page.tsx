@@ -10,6 +10,7 @@ import { pathCreator } from '@/utils/urls';
 export default function NeonConnect() {
   const router = useRouter();
   const firstStep = STEPS_ORDER[0]!;
+
   return (
     <ConnectPage
       content={neonConnectContent}

@@ -34,6 +34,23 @@ func TestNormalizeAppURL(t *testing.T) {
 			inputURL:    "https://api.example.com/api/inngest?deployId=1234",
 			expectedURL: "https://api.example.com/api/inngest",
 		},
+		{
+			name:        "insecure WebSocket URL should be normalized to wss",
+			inputURL:    "ws://api.example.com/api/inngest",
+			expectedURL: "wss://api.example.com/api/inngest",
+			forceHTTPS:  true,
+		},
+		{
+			name:        "secure WebSocket URL should stay the same with force",
+			inputURL:    "wss://api.example.com/api/inngest",
+			expectedURL: "wss://api.example.com/api/inngest",
+			forceHTTPS:  true,
+		},
+		{
+			name:        "insecure WebSocket URL should stay the same without force",
+			inputURL:    "ws://api.example.com/api/inngest",
+			expectedURL: "ws://api.example.com/api/inngest",
+		},
 	}
 
 	for _, test := range tests {

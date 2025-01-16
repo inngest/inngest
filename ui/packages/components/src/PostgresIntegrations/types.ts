@@ -62,3 +62,11 @@ export function parseConnectionString(connectionString: string) {
 
   return null;
 }
+
+export type Publication = {
+  id: string;
+  name: string;
+  slug: string;
+  projects: never[];
+  enabled: boolean;
+};

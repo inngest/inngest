@@ -16,7 +16,7 @@ export const EventsHeader = ({
   <Header
     breadcrumb={[{ text: 'Events' }]}
     infoIcon={<EventInfo />}
-    action={sendEvents && <SendEventButton newIANav={true} />}
+    action={sendEvents && <SendEventButton />}
     tabs={[
       {
         children: 'All events',

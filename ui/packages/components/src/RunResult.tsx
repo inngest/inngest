@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
 
-import { NewButton } from './Button';
+import { Button } from './Button';
 import { CodeBlock } from './CodeBlock';
 import { RerunModal } from './Rerun/RerunModal';
 import type { Result } from './types/functionRun';
@@ -13,7 +13,7 @@ type Props = {
   result: Result;
   runID: string;
   rerunFromStep: React.ComponentProps<typeof RerunModal>['rerunFromStep'];
-  stepID?: string;
+  stepID?: string | null;
   isSuccess?: boolean;
   stepAIEnabled?: boolean;
 };
@@ -52,7 +52,7 @@ export function RunResult({
 
             {runID && stepID && (
               <>
-                <NewButton
+                <Button
                   className="m-2 w-40"
                   label="Rerun with new prompt"
                   onClick={() => setRerunModalOpen(true)}

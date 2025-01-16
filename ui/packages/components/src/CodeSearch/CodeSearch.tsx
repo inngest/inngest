@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { NewButton as Button } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import {
   FONT,
   LINE_HEIGHT,

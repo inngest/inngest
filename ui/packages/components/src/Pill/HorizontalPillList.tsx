@@ -1,4 +1,4 @@
-import { Tooltip, TooltipArrow, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 
 import { Pill } from './Pill';
 
@@ -15,22 +15,21 @@ export function HorizontalPillList({ pills, alwaysVisibleCount }: FunctionsCellC
     const alwaysVisiblePills = pills.slice(0, alwaysVisibleCount);
 
     return (
-      <div className="flex items-center">
+      <div className="flex items-center gap-1">
         {alwaysVisiblePills}
 
         <Tooltip delayDuration={0}>
-          <TooltipTrigger className="cursor-default">
+          <TooltipTrigger className="flex cursor-default">
             <Pill className="px-2.5 align-middle">+{hiddenPills.length}</Pill>
           </TooltipTrigger>
 
           <TooltipContent sideOffset={5} className="p-3">
             <div className="flex flex-col gap-2">{hiddenPills}</div>
-            <TooltipArrow className="fill-white dark:fill-slate-800" />
           </TooltipContent>
         </Tooltip>
       </div>
     );
   }
 
-  return <>{pills}</>;
+  return <div className="flex items-center gap-1">{pills}</div>;
 }

@@ -1,6 +1,6 @@
 import { CopyButton } from '@inngest/components/CopyButton';
 import { useCopyToClipboard } from '@inngest/components/hooks/useCopyToClipboard';
-import { classNames } from '@inngest/components/utils/classNames';
+import { cn } from '@inngest/components/utils/classNames';
 
 type CodeLineProps = {
   code: string;
@@ -12,13 +12,13 @@ export function CodeLine({ code, className }: CodeLineProps) {
 
   return (
     <div
-      className={classNames(
+      className={cn(
         className,
-        'dark:bg-slate-910 flex items-center justify-between rounded-md bg-slate-50 text-sm'
+        'bg-codeEditor flex items-center justify-between rounded-md text-sm'
       )}
     >
       <code
-        className="flex-1 cursor-pointer px-4 py-2 text-slate-500 dark:text-slate-300"
+        className="text-codeDelimiterBracketJson flex-1 cursor-pointer px-4 py-2"
         onClick={() => handleCopyClick(code)}
       >
         {code}
