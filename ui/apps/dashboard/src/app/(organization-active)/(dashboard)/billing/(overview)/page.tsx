@@ -167,7 +167,7 @@ export default async function Page() {
               !!currentPlan.addons.userCount.price && entitlementUsage.userCount.limit !== null
             }
             price={currentPlan.addons.userCount.price || undefined}
-            addonName={'!!!user_count'}
+            addonName={'user_count'}
             onChange={refetch}
           />
           <AddOn
