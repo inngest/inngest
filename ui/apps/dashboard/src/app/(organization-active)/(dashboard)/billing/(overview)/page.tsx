@@ -97,11 +97,15 @@ export default async function Page() {
           <div className="border-subtle mb-6 border" />
           <AddOn
             title="Event Size"
-            value={
+            value={entitlementUsage.eventSize.limit}
+            displayValue={
               entitlementUsage.eventSize.limit >= 1024
                 ? `${(entitlementUsage.eventSize.limit / 1024).toFixed(2)} MB`
                 : `${entitlementUsage.eventSize.limit} KB`
             }
+            planLimit={plan.plan?.entitlements.eventSize.limit || 0}
+            maxValue={10 * 1024 * 1024} // TODO(cdzombak): unnecessary for no-self-service addons
+            quantityPer={1024 * 1024} // TODO(cdzombak): unnecessary for no-self-service addons
             canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             description="The maximum size for a single event"
             selfServiceAvailable={false}
@@ -109,41 +113,69 @@ export default async function Page() {
           <AddOn
             title="Concurrency"
             value={entitlementUsage.concurrency.limit}
+            displayValue={`${entitlementUsage.concurrency.limit} concurrent steps`}
             canIncreaseLimitInCurrentPlan={
               entitlementUsage.isCustomPlan || !!plan.plan?.addons.concurrency.available
             }
-            description="Maximum concurrently executing steps"
+            planLimit={plan.plan?.entitlements.concurrency.limit || 0}
+            maxValue={1000} // TODO(cdzombak): where should this come from?
+            quantityPer={10}
+            description="Maximum number of concurrently executing steps"
             tooltipContent="Functions actively sleeping and waiting for events are not counted"
             selfServiceAvailable={!!plan.plan?.addons.concurrency.price}
+            price={plan.plan?.addons.concurrency.price || undefined}
           />
           <AddOn
             title="Users"
-            value={`${entitlementUsage.userCount.usage}/${entitlementUsage.userCount.limit}`}
+            value={entitlementUsage.userCount.limit || 0}
+            displayValue={`${entitlementUsage.userCount.usage} of ${entitlementUsage.userCount.limit} maximum users`}
             canIncreaseLimitInCurrentPlan={!!plan.plan?.addons.userCount.available}
-            description="Maximum number of users"
-            selfServiceAvailable={!!plan.plan?.addons.userCount.price}
+            description="Maximum number of users on the account"
+            planLimit={10} // TODO(cdzombak): where should this come from?
+            maxValue={1000} // TODO(cdzombak): where should this come from?
+            quantityPer={1}
+            selfServiceAvailable={
+              !!plan.plan?.addons.userCount.price && entitlementUsage.userCount.limit !== null
+            }
+            price={plan.plan?.addons.userCount.price || undefined}
           />
           <AddOn
             title="Log history"
-            value={`${entitlementUsage.history.limit} day${
+            value={entitlementUsage.history.limit}
+            displayValue={`${entitlementUsage.history.limit} day${
               entitlementUsage.history.limit === 1 ? '' : 's'
             }`}
+            planLimit={plan.plan?.entitlements.history.limit || 0}
+            maxValue={366} // TODO(cdzombak): unnecessary for no-self-service addons
+            quantityPer={7} // TODO(cdzombak): unnecessary for no-self-service addons
             canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             description="View and search function run traces and metrics"
             selfServiceAvailable={false}
           />
           <AddOn
             title="HIPAA"
-            value={entitlementUsage.hipaa.enabled ? 'Enabled' : 'Not enabled'}
-            canIncreaseLimitInCurrentPlan
+            value={entitlementUsage.hipaa.enabled}
+            displayValue={entitlementUsage.hipaa.enabled ? 'Enabled' : 'Not enabled'}
+            canIncreaseLimitInCurrentPlan={
+              entitlementUsage.isCustomPlan || plan.plan?.name === PlanNames.Pro
+            }
             description="Sign BAAs for healthcare services"
-            selfServiceAvailable={false}
+            planLimit={1} // TODO(cdzombak): nonsense for boolean
+            maxValue={1} // TODO(cdzombak): nonsense for boolean
+            quantityPer={1} // TODO(cdzombak): nonsense for boolean
+            selfServiceAvailable={false} // TODO(cdzombak): should be true eventually
           />
           <AddOn
             title="Dedicated execution capacity"
-            canIncreaseLimitInCurrentPlan
+            canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             description="Dedicated infrastructure for the lowest latency and highest throughput"
             selfServiceAvailable={false}
+            value={0} // TODO(cdzombak): need this from the backend
+            displayValue={'Not enabled'}
+            maxValue={1000} // TODO(cdzombak): where should this come from?
+            planLimit={0} // TODO(cdzombak): where should this come from?
+            quantityPer={250} // TODO(cdzombak): where should this come from?
+            price={500}
           />
           <div className="flex flex-col items-center gap-2 pt-6">
             <p className="text-muted text-xs">Custom needs?</p>
