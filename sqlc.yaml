@@ -122,6 +122,7 @@ sql:
     queries: "pkg/cqrs/sqlitecqrs/sqlc/sqlite/queries.sql"
     gen:
       go:
+        emit_interface: true
         emit_result_struct_pointers: true
         package: "sqlc"
         out: "pkg/cqrs/sqlitecqrs/sqlc/sqlite"
