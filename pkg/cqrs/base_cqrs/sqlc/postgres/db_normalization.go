@@ -424,7 +424,12 @@ func (q NormalizedQueries) GetEventsByInternalIDs(ctx context.Context, ids []uli
 		return nil, nil
 	}
 
-	events, err := q.db.GetEventsByInternalIDs(ctx, ids)
+	bytIDs := make([][]byte, len(ids))
+	for i, id := range ids {
+		bytIDs[i] = id.Bytes()
+	}
+
+	events, err := q.db.GetEventsByInternalIDs(ctx, bytIDs)
 	if err != nil {
 		return nil, err
 	}

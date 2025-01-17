@@ -431,21 +431,11 @@ func (q *Queries) GetEventByInternalID(ctx context.Context, internalID ulid.ULID
 }
 
 const getEventsByInternalIDs = `-- name: GetEventsByInternalIDs :many
-SELECT internal_id, account_id, workspace_id, source, source_id, received_at, event_id, event_name, event_data, event_user, event_v, event_ts FROM events WHERE internal_id IN ($1)
+SELECT internal_id, account_id, workspace_id, source, source_id, received_at, event_id, event_name, event_data, event_user, event_v, event_ts FROM events WHERE internal_id = ANY($1::BYTEA[])
 `
 
-func (q *Queries) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([]*Event, error) {
-	query := getEventsByInternalIDs
-	var queryParams []interface{}
-	if len(ids) > 0 {
-		for _, v := range ids {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
-	}
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+func (q *Queries) GetEventsByInternalIDs(ctx context.Context, dollar_1 [][]byte) ([]*Event, error) {
+	rows, err := q.db.QueryContext(ctx, getEventsByInternalIDs, pq.Array(dollar_1))
 	if err != nil {
 		return nil, err
 	}
