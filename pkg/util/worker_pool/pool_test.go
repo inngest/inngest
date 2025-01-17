@@ -11,13 +11,14 @@ import (
 func TestPool(t *testing.T) {
 	numWorkers := 50_000
 
-	type poolData interface{}
+	type fnInput interface{}
+	type fnOutput interface{}
 
 	var TEST_completed = map[int]int{}
 	var TEST_used = map[int]int{}
 	var TEST_lock = sync.Mutex{}
 
-	processJob := func(job Job[poolData], workerID int) Result[poolData] {
+	processJob := func(job Job[fnInput, fnOutput], workerID int) Result[fnOutput] {
 		fmt.Printf("processing job %d on worker %d\n", job.ID, workerID)
 		<-time.After(time.Second * 2)
 
@@ -28,7 +29,7 @@ func TestPool(t *testing.T) {
 
 		// Simulate some work being done
 		// Replace this with actual job processing logic
-		return Result[poolData]{
+		return Result[fnOutput]{
 			JobID: job.ID,
 			Data:  fmt.Sprintf("Processed job %d by worker %d", job.ID, workerID),
 			Err:   nil,
@@ -36,21 +37,21 @@ func TestPool(t *testing.T) {
 	}
 
 	// Create a worker pool with numWorkers workers
-	p := NewWorkerPool[poolData](numWorkers, processJob)
+	p := NewWorkerPool[fnInput, fnOutput](numWorkers, processJob)
 	p.Start()
 
 	// Create two batches of jobs
-	batch1 := make([]Job[poolData], 5_000)
+	batch1 := make([]Job[fnInput, fnOutput], 5_000)
 	for i := range batch1 {
-		batch1[i] = Job[poolData]{
+		batch1[i] = Job[fnInput, fnOutput]{
 			ID:   i,
 			Data: fmt.Sprintf("Batch 1, Job %d", i),
 		}
 	}
 
-	batch2 := make([]Job[poolData], 80_000)
+	batch2 := make([]Job[fnInput, fnOutput], 80_000)
 	for i := range batch2 {
-		batch2[i] = Job[poolData]{
+		batch2[i] = Job[fnInput, fnOutput]{
 			ID:   i + len(batch1), // Different ID range
 			Data: fmt.Sprintf("Batch 2, Job %d", i),
 		}

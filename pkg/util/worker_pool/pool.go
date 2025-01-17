@@ -4,43 +4,43 @@ import (
 	"sync"
 )
 
-type Job[Data any] struct {
+type Job[Input any, Output any] struct {
 	ID           int
-	Data         Data
-	batchResults chan Result[Data]
+	Data         Input
+	batchResults chan Result[Output]
 }
 
-type Result[Data any] struct {
+type Result[Output any] struct {
 	JobID int
-	Data  Data
+	Data  Output
 	Err   error
 }
 
-type BatchRequest[Data any] struct {
-	Jobs    []Job[Data]
-	Results chan []Result[Data]
+type BatchRequest[Input any, Output any] struct {
+	Jobs    []Job[Input, Output]
+	Results chan []Result[Output]
 }
 
-type WorkerPool[Data any] struct {
+type WorkerPool[Input any, Output any] struct {
 	numWorkers int
-	jobs       chan Job[Data]
-	scheduler  chan BatchRequest[Data]
+	jobs       chan Job[Input, Output]
+	scheduler  chan BatchRequest[Input, Output]
 	quit       chan struct{}
 	wg         sync.WaitGroup
-	process    func(job Job[Data], workerID int) Result[Data]
+	process    func(job Job[Input, Output], workerID int) Result[Output]
 }
 
-func NewWorkerPool[Data any](numWorkers int, process func(job Job[Data], workerID int) Result[Data]) *WorkerPool[Data] {
-	return &WorkerPool[Data]{
+func NewWorkerPool[Input any, Output any](numWorkers int, process func(job Job[Input, Output], workerID int) Result[Output]) *WorkerPool[Input, Output] {
+	return &WorkerPool[Input, Output]{
 		numWorkers: numWorkers,
 		process:    process,
-		jobs:       make(chan Job[Data]),
-		scheduler:  make(chan BatchRequest[Data]),
+		jobs:       make(chan Job[Input, Output]),
+		scheduler:  make(chan BatchRequest[Input, Output]),
 		quit:       make(chan struct{}),
 	}
 }
 
-func (wp *WorkerPool[Data]) Start() {
+func (wp *WorkerPool[Input, Output]) Start() {
 	// Launch fixed number of worker goroutines
 	for i := 0; i < wp.numWorkers; i++ {
 		wp.wg.Add(1)
@@ -65,21 +65,21 @@ func (wp *WorkerPool[Data]) Start() {
 	go wp.runScheduler()
 }
 
-func (wp *WorkerPool[Data]) runScheduler() {
+func (wp *WorkerPool[Input, Output]) runScheduler() {
 	for batch := range wp.scheduler {
 		batchSize := len(batch.Jobs)
 		if batchSize == 0 {
-			batch.Results <- []Result[Data]{}
+			batch.Results <- []Result[Output]{}
 			continue
 		}
 
-		batchResultsChan := make(chan Result[Data], 0)
+		batchResultsChan := make(chan Result[Output], 0)
 
 		// Create results slice for this batch
-		batchResults := make([]Result[Data], batchSize)
+		batchResults := make([]Result[Output], batchSize)
 
 		// Launch a single collector goroutine for this batch
-		go func(results chan []Result[Data]) {
+		go func(results chan []Result[Output]) {
 			// Collect all results for this batch
 			for i := 0; i < batchSize; i++ {
 				result := <-batchResultsChan
@@ -98,16 +98,16 @@ func (wp *WorkerPool[Data]) runScheduler() {
 	}
 }
 
-func (wp *WorkerPool[Data]) SubmitBatch(jobs []Job[Data]) []Result[Data] {
-	resultsChan := make(chan []Result[Data], 1)
-	wp.scheduler <- BatchRequest[Data]{
+func (wp *WorkerPool[Input, Output]) SubmitBatch(jobs []Job[Input, Output]) []Result[Output] {
+	resultsChan := make(chan []Result[Output], 1)
+	wp.scheduler <- BatchRequest[Input, Output]{
 		Jobs:    jobs,
 		Results: resultsChan,
 	}
 	return <-resultsChan
 }
 
-func (wp *WorkerPool[Data]) Stop() {
+func (wp *WorkerPool[Input, Output]) Stop() {
 	close(wp.scheduler)
 	close(wp.quit)
 	wp.wg.Wait()
