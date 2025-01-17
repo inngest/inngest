@@ -9,61 +9,15 @@ import { Time } from '@inngest/components/Time';
 import WorkersCounter from '@inngest/components/Workers/WorkersCounter';
 import { WorkersTable } from '@inngest/components/Workers/WorkersTable';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
-import { convertWorkerStatus, isWorkerStatus } from '@inngest/components/types/workers';
+import { convertWorkerStatus } from '@inngest/components/types/workers';
 
 import {
+  ConnectV1ConnectionStatus,
   ConnectV1WorkerConnectionsOrderByField,
   useCountWorkerConnectionsQuery,
   useGetAppQuery,
   useGetWorkerConnectionsQuery,
 } from '@/store/generated';
-
-// const app = {
-//   name: 'Growth',
-//   id: 'id1',
-//   sdkVersion: 'v1.0.0',
-//   sdkLanguage: 'JS',
-//   syncMethod: 'PERSISTENT',
-//   lastSyncedAt: new Date('2021-08-01T00:00:00Z'),
-//   framework: 'React',
-//   version: '1.0.0',
-//   functions: [
-//     { name: 'Function 1', slug: 'function 1', triggers: [{ type: 'EVENT', value: 'fake event' }] },
-//   ],
-//   workers: [
-//     {
-//       id: 'id1',
-//       instanceID: 'Worker 1',
-//       connectedAt: new Date('2021-08-01T00:00:00Z'),
-//       status: 'ACTIVE',
-//       lastHeartbeatAt: new Date('2025-01-13T00:00:00Z'),
-//       appVersion: '1.0.0',
-//       workerIp: '18.118.72.162',
-//       sdkVersion: 'v1.0.0',
-//       sdkLang: 'JS',
-//       functionCount: 1,
-//       cpuCores: 14,
-//       os: 'linux',
-//       memBytes: 1024,
-//     },
-//     {
-//       id: 'id2',
-//       instanceID: 'Worker 2',
-//       connectedAt: new Date('2021-08-03T00:00:00Z'),
-//       status: 'FAILED',
-//       lastHeartbeatAt: new Date('2021-08-04T00:00:00Z'),
-//       appVersion: '1.0.0',
-//
-//       workerIp: '18.118.72.161',
-//       sdkVersion: 'v1.5',
-//       sdkLang: 'JS',
-//       functionCount: 1,
-//       cpuCores: 3,
-//       os: 'darwin',
-//       memBytes: 1024,
-//     },
-//   ],
-// };
 
 export default function AppPageWrapper() {
   const [id] = useSearchParam('id');
@@ -83,10 +37,25 @@ export function AppPage({ id }: { id: string }) {
     appIDs: [id],
     status: [],
   });
-  const { data: countWorkersData } = useCountWorkerConnectionsQuery({
+  const { data: countAllWorkersData } = useCountWorkerConnectionsQuery({
     timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
     appIDs: [id],
     status: [],
+  });
+  const { data: countReadyWorkersData } = useCountWorkerConnectionsQuery({
+    timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
+    appIDs: [id],
+    status: [ConnectV1ConnectionStatus.Ready],
+  });
+  const { data: countInactiveWorkersData } = useCountWorkerConnectionsQuery({
+    timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
+    appIDs: [id],
+    status: [
+      ConnectV1ConnectionStatus.Connected,
+      ConnectV1ConnectionStatus.Disconnecting,
+      ConnectV1ConnectionStatus.Draining,
+      ConnectV1ConnectionStatus.Disconnected,
+    ],
   });
 
   const workers = useMemo(() => {
@@ -97,9 +66,30 @@ export function AppPage({ id }: { id: string }) {
       return {
         ...e.node,
         status: convertWorkerStatus(e.node.status),
+        instanceID: e.node.instanceId,
+        appVersion: e.node.buildId,
       };
     });
   }, [workerConnsData]);
+
+  const connectionsCount = useMemo(() => {
+    if (
+      typeof countReadyWorkersData?.workerConnections?.totalCount !== 'number' ||
+      typeof countInactiveWorkersData?.workerConnections?.totalCount !== 'number'
+    ) {
+      return {
+        ACTIVE: 0,
+        INACTIVE: 0,
+        FAILED: 0,
+      };
+    }
+
+    return {
+      ACTIVE: countReadyWorkersData.workerConnections.totalCount,
+      INACTIVE: countInactiveWorkersData.workerConnections.totalCount,
+      FAILED: 0,
+    };
+  }, [countReadyWorkersData, countInactiveWorkersData]);
 
   if (!data || !data.app) {
     // TODO Render loading screen
@@ -110,11 +100,6 @@ export function AppPage({ id }: { id: string }) {
 
   let version = 'unknown';
   let lastSyncedAt = new Date();
-  let connectionsCount = {
-    ACTIVE: 0,
-    INACTIVE: 0,
-    FAILED: 0,
-  };
 
   return (
     <>
@@ -144,7 +129,7 @@ export function AppPage({ id }: { id: string }) {
         </AppDetailsCard>
         <div>
           <h4 className="text-subtle mb-4 text-xl">
-            Workers ({countWorkersData?.workerConnections?.totalCount || 0})
+            Workers ({countAllWorkersData?.workerConnections?.totalCount || 0})
           </h4>
           {/* @ts-ignore TEMP */}
           <WorkersTable workers={workers} />
