@@ -149,7 +149,7 @@ INSERT INTO event_batches
 SELECT * FROM events WHERE internal_id = $1;
 
 -- name: GetEventsByInternalIDs :many
-SELECT * FROM events WHERE internal_id IN (sqlc.slice('ids'));;
+SELECT * FROM events WHERE internal_id = ANY($1::BYTEA[]);
 
 -- name: GetEventBatchByRunID :one
 SELECT * FROM event_batches WHERE run_id = CAST($1 AS CHAR(26));
