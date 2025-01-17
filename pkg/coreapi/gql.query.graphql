@@ -1,5 +1,5 @@
 type Query {
-  apps: [App!]!
+  apps(filter: AppsFilterV1): [App!]!
 
   stream(query: StreamQuery!): [StreamItem!]!
 

@@ -64,6 +64,7 @@ type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type eventResolver struct{ *Resolver }
 type appResolver struct{ *Resolver }
+
 type functionRunResolver struct{ *Resolver }
 type functionRunV2Resolver struct{ *Resolver }
 type connectV1workerConnectionConnResolver struct{ *Resolver }

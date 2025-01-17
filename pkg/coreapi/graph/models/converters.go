@@ -97,3 +97,42 @@ func ToFunctionRunStatus(s enums.RunStatus) (FunctionRunStatus, error) {
 		return FunctionRunStatusRunning, fmt.Errorf("unknown run status: %d", s)
 	}
 }
+
+func FromAppConnectionType(connectionType AppConnectionType) (enums.AppConnectionType, error) {
+	switch connectionType {
+	case AppConnectionTypeConnect:
+		return enums.AppConnectionTypeConnect, nil
+	case AppConnectionTypeServerless:
+		return enums.AppConnectionTypeServerless, nil
+	default:
+		return enums.AppConnectionType(0), fmt.Errorf("unknown connection type: %d", connectionType)
+	}
+}
+
+func FromAppsFilter(in *AppsFilterV1) (*cqrs.FilterAppParam, error) {
+	if in == nil {
+		return nil, nil
+	}
+
+	filter := &cqrs.FilterAppParam{}
+	if in.ConnectionType != nil {
+		connType, err := FromAppConnectionType(*in.ConnectionType)
+		if err != nil {
+			return nil, err
+		}
+		filter.ConnectionType = &connType
+	}
+
+	return filter, nil
+}
+
+func ToAppConnectionType(connectionType enums.AppConnectionType) AppConnectionType {
+	switch connectionType {
+	case enums.AppConnectionTypeServerless:
+		return AppConnectionTypeServerless
+	case enums.AppConnectionTypeConnect:
+		return AppConnectionTypeConnect
+	default:
+		return AppConnectionTypeServerless
+	}
+}

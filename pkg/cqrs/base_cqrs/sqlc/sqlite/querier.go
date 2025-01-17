@@ -24,7 +24,7 @@ type Querier interface {
 	GetAppByURL(ctx context.Context, url string) (*App, error)
 	GetAppFunctions(ctx context.Context, appID uuid.UUID) ([]*Function, error)
 	GetAppFunctionsBySlug(ctx context.Context, name string) ([]*Function, error)
-	GetApps(ctx context.Context) ([]*App, error)
+	GetApps(ctx context.Context, connectionType string) ([]*App, error)
 	GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*EventBatch, error)
 	GetEventBatchesByEventID(ctx context.Context, instr string) ([]*EventBatch, error)
 	GetEventByInternalID(ctx context.Context, internalID ulid.ULID) (*Event, error)

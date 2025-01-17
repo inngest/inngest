@@ -1,5 +1,5 @@
 -- name: UpsertApp :one
-INSERT INTO apps (id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url, is_connect)
+INSERT INTO apps (id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url, connection_type)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 ON CONFLICT(id) DO UPDATE SET
     name = excluded.name,
@@ -11,14 +11,14 @@ ON CONFLICT(id) DO UPDATE SET
     error = excluded.error,
     checksum = excluded.checksum,
     archived_at = NULL,
-    is_connect = excluded.is_connect
+    connection_type = excluded.connection_type
 RETURNING *;
 
 -- name: GetApp :one
 SELECT * FROM apps WHERE id = $1;
 
 -- name: GetApps :many
-SELECT * FROM apps WHERE archived_at IS NULL;
+SELECT * FROM apps WHERE archived_at IS NULL AND connection_type = $1;
 
 -- name: GetAppByChecksum :one
 SELECT * FROM apps WHERE checksum = $1 AND archived_at IS NULL LIMIT 1;

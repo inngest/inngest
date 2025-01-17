@@ -328,13 +328,16 @@ export type ConnectV1WorkerConnection = {
   __typename?: 'ConnectV1WorkerConnection';
   app: Maybe<App>;
   appID: Maybe<Scalars['UUID']>;
+  buildId: Maybe<Scalars['String']>;
   connectedAt: Scalars['Time'];
   cpuCores: Scalars['Int'];
+  deploy: Maybe<Deploy>;
+  disconnectReason: Maybe<Scalars['String']>;
   disconnectedAt: Maybe<Scalars['Time']>;
+  functionCount: Scalars['Int'];
   gatewayId: Scalars['ULID'];
-  groupHash: Scalars['String'];
   id: Scalars['ULID'];
-  instanceId: Maybe<Scalars['String']>;
+  instanceId: Scalars['String'];
   lastHeartbeatAt: Maybe<Scalars['Time']>;
   memBytes: Scalars['Int'];
   os: Scalars['String'];
@@ -342,7 +345,7 @@ export type ConnectV1WorkerConnection = {
   sdkPlatform: Scalars['String'];
   sdkVersion: Scalars['String'];
   status: ConnectV1ConnectionStatus;
-  syncId: Maybe<Scalars['UUID']>;
+  workerIp: Scalars['String'];
 };
 
 export type ConnectV1WorkerConnectionEdge = {

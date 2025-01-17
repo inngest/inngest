@@ -101,7 +101,7 @@ func (w wrapper) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*stat
 	return &state.ExecutorFunction{
 		Function:     def,
 		Paused:       false, // dev server does not support pausing
-		AppIsConnect: app.IsConnect.Bool,
+		AppIsConnect: app.ConnectionType == enums.AppConnectionTypeConnect.String(),
 	}, nil
 }
 
@@ -251,8 +251,17 @@ func (w wrapper) InsertQueueSnapshotChunk(ctx context.Context, params cqrs.Inser
 //
 
 // GetApps returns apps that have not been deleted.
-func (w wrapper) GetApps(ctx context.Context, envID uuid.UUID) ([]*cqrs.App, error) {
-	return copyInto(ctx, w.q.GetApps, []*cqrs.App{})
+func (w wrapper) GetApps(ctx context.Context, envID uuid.UUID, filter *cqrs.FilterAppParam) ([]*cqrs.App, error) {
+	connectionType := enums.AppConnectionTypeServerless
+	if filter != nil && filter.ConnectionType != nil {
+		connectionType = *filter.ConnectionType
+	}
+
+	f := func(ctx context.Context) ([]*sqlc.App, error) {
+		return w.q.GetApps(ctx, connectionType.String())
+	}
+
+	return copyInto(ctx, f, []*cqrs.App{})
 }
 
 func (w wrapper) GetAppByChecksum(ctx context.Context, envID uuid.UUID, checksum string) (*cqrs.App, error) {
@@ -295,6 +304,10 @@ func (w wrapper) GetAllApps(ctx context.Context, envID uuid.UUID) ([]*cqrs.App, 
 func (w wrapper) UpsertApp(ctx context.Context, arg cqrs.UpsertAppParams) (*cqrs.App, error) {
 	// Normalize the URL before inserting into the DB.
 	arg.Url = util.NormalizeAppURL(arg.Url, forceHTTPS)
+
+	if arg.ConnectionType == "" {
+		arg.ConnectionType = enums.AppConnectionTypeServerless.String()
+	}
 
 	return copyWriter(
 		ctx,
@@ -1559,7 +1572,7 @@ func (w wrapper) InsertWorkerConnection(ctx context.Context, conn *cqrs.WorkerCo
 		DisconnectedAt:  disconnectedAt,
 		RecordedAt:      conn.RecordedAt.UnixMilli(),
 		InsertedAt:      time.Now().UnixMilli(),
-		
+
 		DisconnectReason: disconnectReason,
 
 		GroupHash:     []byte(conn.GroupHash),
@@ -1973,10 +1986,10 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 // copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types
 // automatically.
 func copyWriter[
-PARAMS_IN any,
-INTERNAL_PARAMS any,
-IN any,
-OUT any,
+	PARAMS_IN any,
+	INTERNAL_PARAMS any,
+	IN any,
+	OUT any,
 ](
 	ctx context.Context,
 	f func(context.Context, INTERNAL_PARAMS) (IN, error),
@@ -1999,8 +2012,8 @@ OUT any,
 }
 
 func copyInto[
-IN any,
-OUT any,
+	IN any,
+	OUT any,
 ](
 	ctx context.Context,
 	f func(context.Context) (IN, error),

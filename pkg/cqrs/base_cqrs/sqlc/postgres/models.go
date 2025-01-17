@@ -13,19 +13,20 @@ import (
 )
 
 type App struct {
-	ID          uuid.UUID
-	Name        string
-	SdkLanguage string
-	SdkVersion  string
-	Framework   sql.NullString
-	Metadata    string
-	Status      string
-	Error       sql.NullString
-	Checksum    string
-	CreatedAt   time.Time
-	ArchivedAt  sql.NullTime
-	Url         string
-	IsConnect   sql.NullBool
+	ID             uuid.UUID
+	Name           string
+	SdkLanguage    string
+	SdkVersion     string
+	Framework      sql.NullString
+	Metadata       string
+	Status         string
+	Error          sql.NullString
+	Checksum       string
+	CreatedAt      time.Time
+	ArchivedAt     sql.NullTime
+	Url            string
+	IsConnect      sql.NullBool
+	ConnectionType string
 }
 
 type Event struct {

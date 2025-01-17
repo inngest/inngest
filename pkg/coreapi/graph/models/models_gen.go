@@ -28,6 +28,10 @@ type ActionVersionQuery struct {
 	VersionMinor *int   `json:"versionMinor,omitempty"`
 }
 
+type AppsFilterV1 struct {
+	ConnectionType *AppConnectionType `json:"connectionType,omitempty"`
+}
+
 type ConnectV1WorkerConnection struct {
 	ID               ulid.ULID                 `json:"id"`
 	GatewayID        ulid.ULID                 `json:"gatewayId"`
@@ -348,6 +352,47 @@ func (WaitForEventStepInfo) IsStepInfo() {}
 
 type Workspace struct {
 	ID string `json:"id"`
+}
+
+type AppConnectionType string
+
+const (
+	AppConnectionTypeServerless AppConnectionType = "SERVERLESS"
+	AppConnectionTypeConnect    AppConnectionType = "CONNECT"
+)
+
+var AllAppConnectionType = []AppConnectionType{
+	AppConnectionTypeServerless,
+	AppConnectionTypeConnect,
+}
+
+func (e AppConnectionType) IsValid() bool {
+	switch e {
+	case AppConnectionTypeServerless, AppConnectionTypeConnect:
+		return true
+	}
+	return false
+}
+
+func (e AppConnectionType) String() string {
+	return string(e)
+}
+
+func (e *AppConnectionType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = AppConnectionType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid AppConnectionType", str)
+	}
+	return nil
+}
+
+func (e AppConnectionType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 type ConnectV1ConnectionStatus string

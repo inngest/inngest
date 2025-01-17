@@ -165,8 +165,8 @@ func (q NormalizedQueries) InsertQueueSnapshotChunk(ctx context.Context, params 
 	})
 }
 
-func (q NormalizedQueries) GetApps(ctx context.Context) ([]*sqlc_sqlite.App, error) {
-	apps, err := q.db.GetApps(ctx)
+func (q NormalizedQueries) GetApps(ctx context.Context, connectionType string) ([]*sqlc_sqlite.App, error) {
+	apps, err := q.db.GetApps(ctx, connectionType)
 	if err != nil {
 		return nil, err
 	}
@@ -222,17 +222,17 @@ func (q NormalizedQueries) GetAllApps(ctx context.Context) ([]*sqlc_sqlite.App, 
 
 func (q NormalizedQueries) UpsertApp(ctx context.Context, params sqlc_sqlite.UpsertAppParams) (*sqlc_sqlite.App, error) {
 	pgParams := UpsertAppParams{
-		ID:          params.ID,
-		Name:        params.Name,
-		SdkLanguage: params.SdkLanguage,
-		SdkVersion:  params.SdkVersion,
-		Framework:   params.Framework,
-		Metadata:    params.Metadata,
-		Status:      params.Status,
-		Error:       params.Error,
-		Checksum:    params.Checksum,
-		Url:         params.Url,
-		IsConnect:   params.IsConnect,
+		ID:             params.ID,
+		Name:           params.Name,
+		SdkLanguage:    params.SdkLanguage,
+		SdkVersion:     params.SdkVersion,
+		Framework:      params.Framework,
+		Metadata:       params.Metadata,
+		Status:         params.Status,
+		Error:          params.Error,
+		Checksum:       params.Checksum,
+		Url:            params.Url,
+		ConnectionType: params.ConnectionType,
 	}
 
 	app, err := q.db.UpsertApp(ctx, pgParams)

@@ -65,6 +65,7 @@ type ComplexityRoot struct {
 		Autodiscovered func(childComplexity int) int
 		Checksum       func(childComplexity int) int
 		Connected      func(childComplexity int) int
+		ConnectionType func(childComplexity int) int
 		Error          func(childComplexity int) int
 		ExternalID     func(childComplexity int) int
 		Framework      func(childComplexity int) int
@@ -237,7 +238,7 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		Apps                   func(childComplexity int) int
+		Apps                   func(childComplexity int, filter *models.AppsFilterV1) int
 		Event                  func(childComplexity int, query models.EventQuery) int
 		Events                 func(childComplexity int, query models.EventsQuery) int
 		FunctionRun            func(childComplexity int, query models.FunctionRunQuery) int
@@ -421,6 +422,7 @@ type AppResolver interface {
 
 	Error(ctx context.Context, obj *cqrs.App) (*string, error)
 	Functions(ctx context.Context, obj *cqrs.App) ([]*models.Function, error)
+	ConnectionType(ctx context.Context, obj *cqrs.App) (models.AppConnectionType, error)
 	Connected(ctx context.Context, obj *cqrs.App) (bool, error)
 	FunctionCount(ctx context.Context, obj *cqrs.App) (int, error)
 	Autodiscovered(ctx context.Context, obj *cqrs.App) (bool, error)
@@ -472,7 +474,7 @@ type MutationResolver interface {
 	Rerun(ctx context.Context, runID ulid.ULID, fromStep *models.RerunFromStepInput) (ulid.ULID, error)
 }
 type QueryResolver interface {
-	Apps(ctx context.Context) ([]*cqrs.App, error)
+	Apps(ctx context.Context, filter *models.AppsFilterV1) ([]*cqrs.App, error)
 	Stream(ctx context.Context, query models.StreamQuery) ([]*models.StreamItem, error)
 	Event(ctx context.Context, query models.EventQuery) (*models.Event, error)
 	Events(ctx context.Context, query models.EventsQuery) ([]*models.Event, error)
@@ -527,6 +529,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.App.Connected(childComplexity), true
+
+	case "App.connectionType":
+		if e.complexity.App.ConnectionType == nil {
+			break
+		}
+
+		return e.complexity.App.ConnectionType(childComplexity), true
 
 	case "App.error":
 		if e.complexity.App.Error == nil {
@@ -1462,7 +1471,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		return e.complexity.Query.Apps(childComplexity), true
+		args, err := ec.field_Query_apps_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.Apps(childComplexity, args["filter"].(*models.AppsFilterV1)), true
 
 	case "Query.event":
 		if e.complexity.Query.Event == nil {
@@ -2307,6 +2321,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	ec := executionContext{rc, e}
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
 		ec.unmarshalInputActionVersionQuery,
+		ec.unmarshalInputAppsFilterV1,
 		ec.unmarshalInputConnectV1WorkerConnectionsFilter,
 		ec.unmarshalInputConnectV1WorkerConnectionsOrderBy,
 		ec.unmarshalInputCreateAppInput,
@@ -2412,7 +2427,7 @@ input RerunFromStepInput {
 }
 `, BuiltIn: false},
 	{Name: "../gql.query.graphql", Input: `type Query {
-  apps: [App!]!
+  apps(filter: AppsFilterV1): [App!]!
 
   stream(query: StreamQuery!): [StreamItem!]!
 
@@ -2601,6 +2616,7 @@ type App {
   checksum: String
   error: String
   functions: [Function!]!
+  connectionType: AppConnectionType!
 
   # These fields are UI convenience fields
   connected: Boolean!
@@ -3037,6 +3053,15 @@ type ConnectV1WorkerConnectionEdge {
   node: ConnectV1WorkerConnection!
   cursor: String!
 }
+
+enum AppConnectionType {
+	SERVERLESS
+	CONNECT
+}
+
+input AppsFilterV1 {
+	connectionType: AppConnectionType
+}
 `, BuiltIn: false},
 }
 var parsedSchema = gqlparser.MustLoadSchema(sources...)
@@ -3204,6 +3229,21 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 		}
 	}
 	args["name"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_apps_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *models.AppsFilterV1
+	if tmp, ok := rawArgs["filter"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("filter"))
+		arg0, err = ec.unmarshalOAppsFilterV12ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐAppsFilterV1(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["filter"] = arg0
 	return args, nil
 }
 
@@ -3897,6 +3937,50 @@ func (ec *executionContext) fieldContext_App_functions(ctx context.Context, fiel
 	return fc, nil
 }
 
+func (ec *executionContext) _App_connectionType(ctx context.Context, field graphql.CollectedField, obj *cqrs.App) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_App_connectionType(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.App().ConnectionType(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(models.AppConnectionType)
+	fc.Result = res
+	return ec.marshalNAppConnectionType2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐAppConnectionType(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_App_connectionType(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "App",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type AppConnectionType does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _App_connected(ctx context.Context, field graphql.CollectedField, obj *cqrs.App) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_App_connected(ctx, field)
 	if err != nil {
@@ -4302,6 +4386,8 @@ func (ec *executionContext) fieldContext_ConnectV1WorkerConnection_app(ctx conte
 				return ec.fieldContext_App_error(ctx, field)
 			case "functions":
 				return ec.fieldContext_App_functions(ctx, field)
+			case "connectionType":
+				return ec.fieldContext_App_connectionType(ctx, field)
 			case "connected":
 				return ec.fieldContext_App_connected(ctx, field)
 			case "functionCount":
@@ -6191,6 +6277,8 @@ func (ec *executionContext) fieldContext_Function_app(ctx context.Context, field
 				return ec.fieldContext_App_error(ctx, field)
 			case "functions":
 				return ec.fieldContext_App_functions(ctx, field)
+			case "connectionType":
+				return ec.fieldContext_App_connectionType(ctx, field)
 			case "connected":
 				return ec.fieldContext_App_connected(ctx, field)
 			case "functionCount":
@@ -7480,6 +7568,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_app(ctx context.Context, 
 				return ec.fieldContext_App_error(ctx, field)
 			case "functions":
 				return ec.fieldContext_App_functions(ctx, field)
+			case "connectionType":
+				return ec.fieldContext_App_connectionType(ctx, field)
 			case "connected":
 				return ec.fieldContext_App_connected(ctx, field)
 			case "functionCount":
@@ -9069,6 +9159,8 @@ func (ec *executionContext) fieldContext_Mutation_createApp(ctx context.Context,
 				return ec.fieldContext_App_error(ctx, field)
 			case "functions":
 				return ec.fieldContext_App_functions(ctx, field)
+			case "connectionType":
+				return ec.fieldContext_App_connectionType(ctx, field)
 			case "connected":
 				return ec.fieldContext_App_connected(ctx, field)
 			case "functionCount":
@@ -9152,6 +9244,8 @@ func (ec *executionContext) fieldContext_Mutation_updateApp(ctx context.Context,
 				return ec.fieldContext_App_error(ctx, field)
 			case "functions":
 				return ec.fieldContext_App_functions(ctx, field)
+			case "connectionType":
+				return ec.fieldContext_App_connectionType(ctx, field)
 			case "connected":
 				return ec.fieldContext_App_connected(ctx, field)
 			case "functionCount":
@@ -9670,7 +9764,7 @@ func (ec *executionContext) _Query_apps(ctx context.Context, field graphql.Colle
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().Apps(rctx)
+		return ec.resolvers.Query().Apps(rctx, fc.Args["filter"].(*models.AppsFilterV1))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -9715,6 +9809,8 @@ func (ec *executionContext) fieldContext_Query_apps(ctx context.Context, field g
 				return ec.fieldContext_App_error(ctx, field)
 			case "functions":
 				return ec.fieldContext_App_functions(ctx, field)
+			case "connectionType":
+				return ec.fieldContext_App_connectionType(ctx, field)
 			case "connected":
 				return ec.fieldContext_App_connected(ctx, field)
 			case "functionCount":
@@ -9724,6 +9820,17 @@ func (ec *executionContext) fieldContext_Query_apps(ctx context.Context, field g
 			}
 			return nil, fmt.Errorf("no field named %q was found under type App", field.Name)
 		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_apps_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
 	}
 	return fc, nil
 }
@@ -17078,6 +17185,34 @@ func (ec *executionContext) unmarshalInputActionVersionQuery(ctx context.Context
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputAppsFilterV1(ctx context.Context, obj interface{}) (models.AppsFilterV1, error) {
+	var it models.AppsFilterV1
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"connectionType"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "connectionType":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("connectionType"))
+			it.ConnectionType, err = ec.unmarshalOAppConnectionType2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐAppConnectionType(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputConnectV1WorkerConnectionsFilter(ctx context.Context, obj interface{}) (models.ConnectV1WorkerConnectionsFilter, error) {
 	var it models.ConnectV1WorkerConnectionsFilter
 	asMap := map[string]interface{}{}
@@ -17793,6 +17928,26 @@ func (ec *executionContext) _App(ctx context.Context, sel ast.SelectionSet, obj 
 					}
 				}()
 				res = ec._App_functions(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "connectionType":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._App_connectionType(ctx, field, obj)
 				if res == graphql.Null {
 					atomic.AddUint32(&invalids, 1)
 				}
@@ -20765,6 +20920,16 @@ func (ec *executionContext) marshalNApp2ᚖgithubᚗcomᚋinngestᚋinngestᚋpk
 	return ec._App(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNAppConnectionType2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐAppConnectionType(ctx context.Context, v interface{}) (models.AppConnectionType, error) {
+	var res models.AppConnectionType
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNAppConnectionType2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐAppConnectionType(ctx context.Context, sel ast.SelectionSet, v models.AppConnectionType) graphql.Marshaler {
+	return v
+}
+
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v interface{}) (bool, error) {
 	res, err := graphql.UnmarshalBoolean(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -21913,6 +22078,30 @@ func (ec *executionContext) marshalOApp2ᚖgithubᚗcomᚋinngestᚋinngestᚋpk
 		return graphql.Null
 	}
 	return ec._App(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOAppConnectionType2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐAppConnectionType(ctx context.Context, v interface{}) (*models.AppConnectionType, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(models.AppConnectionType)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOAppConnectionType2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐAppConnectionType(ctx context.Context, sel ast.SelectionSet, v *models.AppConnectionType) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
+}
+
+func (ec *executionContext) unmarshalOAppsFilterV12ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐAppsFilterV1(ctx context.Context, v interface{}) (*models.AppsFilterV1, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputAppsFilterV1(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalOBoolean2bool(ctx context.Context, v interface{}) (bool, error) {
