@@ -442,3 +442,68 @@ export const GET_TRIGGER = gql`
     }
   }
 `;
+
+export const GET_WORKER_CONNECTIONS = gql`
+  query GetWorkerConnections(
+    $appIDs: [UUID!]
+    $startTime: Time
+    $status: [ConnectV1ConnectionStatus!]
+    $timeField: ConnectV1WorkerConnectionsOrderByField!
+    $connectionCursor: String = null
+  ) {
+    workerConnections(
+      filter: { appIDs: $appIDs, from: $startTime, status: $status, timeField: $timeField }
+      orderBy: [{ field: $timeField, direction: DESC }]
+      after: $connectionCursor
+    ) {
+      edges {
+        node {
+          id
+          gatewayId
+          instanceId
+          workerip
+          app {
+            id
+          }
+          connectedAt
+          lastHeartbeatAt
+          disconnectedAt
+          disconnectReason
+          status
+          groupHash
+          sdkLang
+          sdkVersion
+          sdkPlatform
+          syncId
+          buildId
+          functionCount
+          cpuCores
+          memBytes
+          os
+        }
+      }
+      pageInfo {
+        hasNextPage
+        hasPreviousPage
+        startCursor
+        endCursor
+      }
+    }
+  }
+`;
+
+export const COUNT_WORKER_CONNECTIONS = gql`
+  query CountWorkerConnections(
+    $appIDs: [UUID!]
+    $status: [ConnectV1ConnectionStatus!]
+    $timeField: ConnectV1WorkerConnectionsOrderByField!
+  ) {
+    workerConnections(
+      filter: { appIDs: $appIDs, status: $status, timeField: $timeField }
+      orderBy: [{ field: $timeField, direction: DESC }]
+      after: $connectionCursor
+    ) {
+      totalCount
+    }
+  }
+`;

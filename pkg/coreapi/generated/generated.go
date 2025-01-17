@@ -3003,7 +3003,7 @@ enum ConnectV1ConnectionStatus {
 }
 
 input ConnectV1WorkerConnectionsFilter {
-  from: Time!
+  from: Time
   until: Time
   timeField: ConnectV1WorkerConnectionsOrderByField = CONNECTED_AT
 
@@ -17347,7 +17347,7 @@ func (ec *executionContext) unmarshalInputConnectV1WorkerConnectionsFilter(ctx c
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("from"))
-			it.From, err = ec.unmarshalNTime2timeᚐTime(ctx, v)
+			it.From, err = ec.unmarshalOTime2ᚖtimeᚐTime(ctx, v)
 			if err != nil {
 				return it, err
 			}

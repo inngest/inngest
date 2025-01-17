@@ -68,7 +68,7 @@ type ConnectV1WorkerConnectionsConnection struct {
 }
 
 type ConnectV1WorkerConnectionsFilter struct {
-	From      time.Time                               `json:"from"`
+	From      *time.Time                              `json:"from,omitempty"`
 	Until     *time.Time                              `json:"until,omitempty"`
 	TimeField *ConnectV1WorkerConnectionsOrderByField `json:"timeField,omitempty"`
 	Status    []ConnectV1ConnectionStatus             `json:"status,omitempty"`

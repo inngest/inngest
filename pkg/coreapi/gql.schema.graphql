@@ -486,7 +486,7 @@ enum ConnectV1ConnectionStatus {
 }
 
 input ConnectV1WorkerConnectionsFilter {
-  from: Time!
+  from: Time
   until: Time
   timeField: ConnectV1WorkerConnectionsOrderByField = CONNECTED_AT
 
