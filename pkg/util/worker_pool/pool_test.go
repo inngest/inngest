@@ -9,9 +9,12 @@ import (
 )
 
 func TestPool(t *testing.T) {
+	numWorkers := 50_000
+
 	type poolData interface{}
 
 	var TEST_completed = map[int]int{}
+	var TEST_used = map[int]int{}
 	var TEST_lock = sync.Mutex{}
 
 	processJob := func(job Job[poolData], workerID int) Result[poolData] {
@@ -20,6 +23,7 @@ func TestPool(t *testing.T) {
 
 		TEST_lock.Lock()
 		TEST_completed[job.ID] += 1
+		TEST_used[workerID] = 1
 		TEST_lock.Unlock()
 
 		// Simulate some work being done
@@ -31,8 +35,8 @@ func TestPool(t *testing.T) {
 		}
 	}
 
-	// Create a worker pool with 50,000 workers
-	p := NewWorkerPool[poolData](50_000, processJob)
+	// Create a worker pool with numWorkers workers
+	p := NewWorkerPool[poolData](numWorkers, processJob)
 	p.Start()
 
 	// Create two batches of jobs
@@ -71,7 +75,12 @@ func TestPool(t *testing.T) {
 	wg.Wait()
 	p.Stop()
 
-	// Verify this works
+	// All workers must be used
+	for i := 0; i < numWorkers; i++ {
+		require.Equal(t, 1, TEST_used[i], "worker %d was unused", i)
+	}
+
+	// All jobs must have completed
 	for i := range batch1 {
 		require.Equal(t, 1, TEST_completed[i], "did not process job %d", i)
 	}
