@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/google/uuid"
 	sqlc_sqlite "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
@@ -17,6 +18,63 @@ func NewNormalized(db DBTX) sqlc_sqlite.Querier {
 
 type NormalizedQueries struct {
 	db *Queries
+}
+
+func (q NormalizedQueries) GetWorkerConnection(ctx context.Context, arg sqlc_sqlite.GetWorkerConnectionParams) (*sqlc_sqlite.WorkerConnection, error) {
+	wc, err := q.db.GetWorkerConnection(ctx, GetWorkerConnectionParams{
+		AccountID:    arg.AccountID,
+		WorkspaceID:  arg.WorkspaceID,
+		ConnectionID: arg.ConnectionID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return wc.ToSQLite()
+}
+
+func (q NormalizedQueries) InsertWorkerConnection(ctx context.Context, arg sqlc_sqlite.InsertWorkerConnectionParams) error {
+	var lastHeartbeatAt, disconnectedAt sql.NullTime
+	if arg.LastHeartbeatAt.Valid {
+		lastHeartbeatAt.Time = time.UnixMilli(arg.LastHeartbeatAt.Int64)
+		lastHeartbeatAt.Valid = true
+	}
+	if arg.DisconnectedAt.Valid {
+		disconnectedAt.Time = time.UnixMilli(arg.DisconnectedAt.Int64)
+		disconnectedAt.Valid = true
+	}
+
+	err := q.db.InsertWorkerConnection(ctx, InsertWorkerConnectionParams{
+		AccountID:        arg.AccountID,
+		WorkspaceID:      arg.WorkspaceID,
+		AppID:            arg.AppID,
+		ID:               arg.ID,
+		GatewayID:        arg.GatewayID,
+		InstanceID:       arg.InstanceID,
+		Status:           int16(arg.Status),
+		WorkerIp:         arg.WorkerIp,
+		ConnectedAt:      time.UnixMilli(arg.ConnectedAt),
+		LastHeartbeatAt:  lastHeartbeatAt,
+		DisconnectedAt:   disconnectedAt,
+		RecordedAt:       time.UnixMilli(arg.RecordedAt),
+		InsertedAt:       time.UnixMilli(arg.InsertedAt),
+		DisconnectReason: arg.DisconnectReason,
+		GroupHash:        arg.GroupHash,
+		SdkLang:          arg.SdkLang,
+		SdkVersion:       arg.SdkVersion,
+		SdkPlatform:      arg.SdkPlatform,
+		SyncID:           arg.SyncID,
+		BuildID:          arg.BuildID,
+		FunctionCount:    int32(arg.FunctionCount),
+		CpuCores:         int32(arg.CpuCores),
+		MemBytes:         arg.MemBytes,
+		Os:               arg.Os,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (q NormalizedQueries) UpdateAppError(ctx context.Context, arg sqlc_sqlite.UpdateAppErrorParams) (*sqlc_sqlite.App, error) {

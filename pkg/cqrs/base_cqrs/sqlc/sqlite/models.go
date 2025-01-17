@@ -159,3 +159,30 @@ type TraceRun struct {
 	CronSchedule sql.NullString
 	HasAi        bool
 }
+
+type WorkerConnection struct {
+	AccountID        uuid.UUID
+	WorkspaceID      uuid.UUID
+	AppID            *uuid.UUID
+	ID               ulid.ULID
+	GatewayID        ulid.ULID
+	InstanceID       string
+	Status           int64
+	WorkerIp         string
+	ConnectedAt      int64
+	LastHeartbeatAt  sql.NullInt64
+	DisconnectedAt   sql.NullInt64
+	RecordedAt       int64
+	InsertedAt       int64
+	DisconnectReason sql.NullString
+	GroupHash        []byte
+	SdkLang          string
+	SdkVersion       string
+	SdkPlatform      string
+	SyncID           *uuid.UUID
+	BuildID          sql.NullString
+	FunctionCount    int64
+	CpuCores         int64
+	MemBytes         int64
+	Os               string
+}

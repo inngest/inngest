@@ -48,6 +48,7 @@ type Querier interface {
 	GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, error)
 	GetTraceSpanOutput(ctx context.Context, arg GetTraceSpanOutputParams) ([]*Trace, error)
 	GetTraceSpans(ctx context.Context, arg GetTraceSpansParams) ([]*Trace, error)
+	GetWorkerConnection(ctx context.Context, arg GetWorkerConnectionParams) (*WorkerConnection, error)
 	HistoryCountRuns(ctx context.Context) (int64, error)
 	//
 	// Events
@@ -74,6 +75,10 @@ type Querier interface {
 	//
 	InsertTrace(ctx context.Context, arg InsertTraceParams) error
 	InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) error
+	//
+	// Worker Connections
+	//
+	InsertWorkerConnection(ctx context.Context, arg InsertWorkerConnectionParams) error
 	UpdateAppError(ctx context.Context, arg UpdateAppErrorParams) (*App, error)
 	UpdateAppURL(ctx context.Context, arg UpdateAppURLParams) (*App, error)
 	UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionConfigParams) (*Function, error)

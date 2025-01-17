@@ -316,6 +316,72 @@ export enum ConcurrencyScope {
   Function = 'FUNCTION'
 }
 
+export enum ConnectV1ConnectionStatus {
+  Connected = 'CONNECTED',
+  Disconnected = 'DISCONNECTED',
+  Disconnecting = 'DISCONNECTING',
+  Draining = 'DRAINING',
+  Ready = 'READY'
+}
+
+export type ConnectV1WorkerConnection = {
+  __typename?: 'ConnectV1WorkerConnection';
+  app: Maybe<App>;
+  appID: Maybe<Scalars['UUID']>;
+  connectedAt: Scalars['Time'];
+  cpuCores: Scalars['Int'];
+  disconnectedAt: Maybe<Scalars['Time']>;
+  gatewayId: Scalars['ULID'];
+  groupHash: Scalars['String'];
+  id: Scalars['ULID'];
+  instanceId: Maybe<Scalars['String']>;
+  lastHeartbeatAt: Maybe<Scalars['Time']>;
+  memBytes: Scalars['Int'];
+  os: Scalars['String'];
+  sdkLang: Scalars['String'];
+  sdkPlatform: Scalars['String'];
+  sdkVersion: Scalars['String'];
+  status: ConnectV1ConnectionStatus;
+  syncId: Maybe<Scalars['UUID']>;
+};
+
+export type ConnectV1WorkerConnectionEdge = {
+  __typename?: 'ConnectV1WorkerConnectionEdge';
+  cursor: Scalars['String'];
+  node: ConnectV1WorkerConnection;
+};
+
+export type ConnectV1WorkerConnectionsConnection = {
+  __typename?: 'ConnectV1WorkerConnectionsConnection';
+  edges: Array<ConnectV1WorkerConnectionEdge>;
+  pageInfo: PageInfo;
+  totalCount: Scalars['Int'];
+};
+
+export type ConnectV1WorkerConnectionsFilter = {
+  appIDs?: InputMaybe<Array<Scalars['UUID']>>;
+  from: Scalars['Time'];
+  status?: InputMaybe<Array<ConnectV1ConnectionStatus>>;
+  timeField?: InputMaybe<ConnectV1WorkerConnectionsOrderByField>;
+  until?: InputMaybe<Scalars['Time']>;
+};
+
+export type ConnectV1WorkerConnectionsOrderBy = {
+  direction: ConnectV1WorkerConnectionsOrderByDirection;
+  field: ConnectV1WorkerConnectionsOrderByField;
+};
+
+export enum ConnectV1WorkerConnectionsOrderByDirection {
+  Asc = 'ASC',
+  Desc = 'DESC'
+}
+
+export enum ConnectV1WorkerConnectionsOrderByField {
+  ConnectedAt = 'CONNECTED_AT',
+  DisconnectedAt = 'DISCONNECTED_AT',
+  LastHeartbeatAt = 'LAST_HEARTBEAT_AT'
+}
+
 export type CreateCancellationInput = {
   envID: Scalars['UUID'];
   functionSlug: Scalars['String'];
@@ -1964,6 +2030,8 @@ export type Workspace = {
   unattachedSyncs: Array<Deploy>;
   vercelApps: Array<VercelApp>;
   webhookSigningKey: Scalars['String'];
+  workerConnection: Maybe<ConnectV1WorkerConnection>;
+  workerConnections: ConnectV1WorkerConnectionsConnection;
   workflow: Maybe<Workflow>;
   workflowBySlug: Maybe<Workflow>;
   workflows: PaginatedWorkflows;
@@ -2063,6 +2131,19 @@ export type WorkspaceTraceOutputArgs = {
 export type WorkspaceUnattachedSyncsArgs = {
   after: InputMaybe<Scalars['Time']>;
   first?: Scalars['Int'];
+};
+
+
+export type WorkspaceWorkerConnectionArgs = {
+  connectionId: Scalars['ULID'];
+};
+
+
+export type WorkspaceWorkerConnectionsArgs = {
+  after: InputMaybe<Scalars['String']>;
+  filter: ConnectV1WorkerConnectionsFilter;
+  first?: Scalars['Int'];
+  orderBy: Array<ConnectV1WorkerConnectionsOrderBy>;
 };
 
 

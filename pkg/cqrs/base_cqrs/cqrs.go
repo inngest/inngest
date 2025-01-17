@@ -7,6 +7,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/aws/smithy-go/ptr"
+	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"strconv"
 	"strings"
 	"time"
@@ -1506,13 +1508,475 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	return res, nil
 }
 
+//
+// Connect
+//
+
+func (w wrapper) InsertWorkerConnection(ctx context.Context, conn *cqrs.WorkerConnection) error {
+	buildId := sql.NullString{}
+	if conn.BuildId != nil {
+		buildId.Valid = true
+		buildId.String = *conn.BuildId
+	}
+
+	var lastHeartbeatAt, disconnectedAt sql.NullInt64
+
+	if conn.LastHeartbeatAt != nil {
+		lastHeartbeatAt = sql.NullInt64{
+			Int64: conn.LastHeartbeatAt.UnixMilli(),
+			Valid: true,
+		}
+	}
+
+	if conn.DisconnectedAt != nil {
+		lastHeartbeatAt = sql.NullInt64{
+			Int64: conn.DisconnectedAt.UnixMilli(),
+			Valid: true,
+		}
+	}
+
+	var disconnectReason sql.NullString
+	if conn.DisconnectReason != nil {
+		disconnectReason = sql.NullString{
+			String: *conn.DisconnectReason,
+			Valid:  true,
+		}
+	}
+
+	params := sqlc.InsertWorkerConnectionParams{
+		AccountID:   conn.AccountID,
+		WorkspaceID: conn.WorkspaceID,
+		AppID:       conn.AppID,
+
+		ID:         conn.Id,
+		GatewayID:  conn.GatewayId,
+		InstanceID: conn.InstanceId,
+		Status:     int64(conn.Status),
+		WorkerIp:   conn.WorkerIP,
+
+		ConnectedAt:     conn.ConnectedAt.UnixMilli(),
+		LastHeartbeatAt: lastHeartbeatAt,
+		DisconnectedAt:  disconnectedAt,
+		RecordedAt:      conn.RecordedAt.UnixMilli(),
+		InsertedAt:      time.Now().UnixMilli(),
+		
+		DisconnectReason: disconnectReason,
+
+		GroupHash:     []byte(conn.GroupHash),
+		SdkLang:       conn.SDKLang,
+		SdkVersion:    conn.SDKVersion,
+		SdkPlatform:   conn.SDKPlatform,
+		SyncID:        conn.SyncID,
+		BuildID:       buildId,
+		FunctionCount: int64(conn.FunctionCount),
+
+		CpuCores: int64(conn.CpuCores),
+		MemBytes: conn.MemBytes,
+		Os:       conn.Os,
+	}
+
+	return w.q.InsertWorkerConnection(ctx, params)
+}
+
+type WorkerConnectionCursorFilter struct {
+	ID    string
+	Value int64
+}
+
+func (w wrapper) GetWorkerConnection(ctx context.Context, id cqrs.WorkerConnectionIdentifier) (*cqrs.WorkerConnection, error) {
+	conn, err := w.q.GetWorkerConnection(ctx, sqlc.GetWorkerConnectionParams{
+		AccountID:    id.AccountID,
+		WorkspaceID:  id.WorkspaceID,
+		ConnectionID: id.ConnectionID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	connectedAt := time.UnixMilli(conn.ConnectedAt)
+
+	var disconnectedAt, lastHeartbeatAt *time.Time
+	if conn.DisconnectedAt.Valid {
+		disconnectedAt = ptr.Time(time.UnixMilli(conn.DisconnectedAt.Int64))
+	}
+
+	if conn.LastHeartbeatAt.Valid {
+		lastHeartbeatAt = ptr.Time(time.UnixMilli(conn.LastHeartbeatAt.Int64))
+	}
+
+	var buildId *string
+	if conn.BuildID.Valid {
+		buildId = &conn.BuildID.String
+	}
+
+	var disconnectReason *string
+	if conn.DisconnectReason.Valid {
+		disconnectReason = &conn.DisconnectReason.String
+	}
+
+	workerConn := cqrs.WorkerConnection{
+		AccountID:   conn.AccountID,
+		WorkspaceID: conn.WorkspaceID,
+		AppID:       conn.AppID,
+
+		Id:         conn.ID,
+		GatewayId:  conn.GatewayID,
+		InstanceId: conn.InstanceID,
+		Status:     connpb.ConnectionStatus(conn.Status),
+		WorkerIP:   conn.WorkerIp,
+
+		LastHeartbeatAt: lastHeartbeatAt,
+		ConnectedAt:     connectedAt,
+		DisconnectedAt:  disconnectedAt,
+		RecordedAt:      time.UnixMilli(conn.RecordedAt),
+		InsertedAt:      time.UnixMilli(conn.InsertedAt),
+
+		DisconnectReason: disconnectReason,
+
+		GroupHash:     string(conn.GroupHash),
+		SDKLang:       conn.SdkLang,
+		SDKVersion:    conn.SdkVersion,
+		SDKPlatform:   conn.SdkPlatform,
+		SyncID:        conn.SyncID,
+		BuildId:       buildId,
+		FunctionCount: int(conn.FunctionCount),
+
+		CpuCores: int32(conn.CpuCores),
+		MemBytes: conn.MemBytes,
+		Os:       conn.Os,
+	}
+
+	return &workerConn, nil
+}
+
+type workerConnectionsQueryBuilder struct {
+	filter       []sq.Expression
+	order        []sqexp.OrderedExpression
+	cursor       *cqrs.WorkerConnectionPageCursor
+	cursorLayout *cqrs.WorkerConnectionPageCursor
+}
+
+func newWorkerConnectionsQueryBuilder(ctx context.Context, opt cqrs.GetWorkerConnectionOpt) *workerConnectionsQueryBuilder {
+	// filters
+	filter := []sq.Expression{}
+	if len(opt.Filter.AppID) > 0 {
+		filter = append(filter, sq.C("app_id").In(opt.Filter.AppID))
+	}
+	if len(opt.Filter.Status) > 0 {
+		status := []int64{}
+		for _, s := range opt.Filter.Status {
+			status = append(status, int64(s))
+		}
+		filter = append(filter, sq.C("status").In(status))
+	}
+	tsfield := strings.ToLower(opt.Filter.TimeField.String())
+	filter = append(filter, sq.C(tsfield).Gte(opt.Filter.From.UnixMilli()))
+
+	until := opt.Filter.Until
+	if until.UnixMilli() <= 0 {
+		until = time.Now()
+	}
+	filter = append(filter, sq.C(tsfield).Lt(until.UnixMilli()))
+
+	// Layout to be used for the response cursors
+	resCursorLayout := cqrs.WorkerConnectionPageCursor{
+		Cursors: map[string]cqrs.WorkerConnectionCursor{},
+	}
+
+	reqcursor := &cqrs.WorkerConnectionPageCursor{}
+	if opt.Cursor != "" {
+		if err := reqcursor.Decode(opt.Cursor); err != nil {
+			log.From(ctx).Error().Err(err).Str("cursor", opt.Cursor).Msg("error decoding worker connection history cursor")
+		}
+	}
+
+	// order by
+	//
+	// When going through the sorting fields, construct
+	// - response pagination cursor layout
+	// - update filter with op against sorted fields for pagination
+	sortOrder := []enums.WorkerConnectionTimeField{}
+	sortDir := map[enums.WorkerConnectionTimeField]enums.WorkerConnectionSortOrder{}
+	cursorFilter := map[enums.WorkerConnectionTimeField]WorkerConnectionCursorFilter{}
+	for _, f := range opt.Order {
+		sortDir[f.Field] = f.Direction
+		found := false
+		for _, field := range sortOrder {
+			if f.Field == field {
+				found = true
+				break
+			}
+		}
+		if !found {
+			sortOrder = append(sortOrder, f.Field)
+		}
+
+		rc := reqcursor.Find(f.Field.String())
+		if rc != nil {
+			cursorFilter[f.Field] = WorkerConnectionCursorFilter{ID: reqcursor.ID, Value: rc.Value}
+		}
+		resCursorLayout.Add(f.Field.String())
+	}
+
+	order := []sqexp.OrderedExpression{}
+	for _, f := range sortOrder {
+		var o sqexp.OrderedExpression
+		field := strings.ToLower(f.String())
+		if d, ok := sortDir[f]; ok {
+			switch d {
+			case enums.WorkerConnectionSortOrderAsc:
+				o = sq.C(field).Asc()
+			case enums.WorkerConnectionSortOrderDesc:
+				o = sq.C(field).Desc()
+			default:
+				log.From(ctx).Error().Str("field", field).Str("direction", d.String()).Msg("invalid direction specified for sorting")
+				continue
+			}
+
+			order = append(order, o)
+		}
+	}
+	order = append(order, sq.C("id").Asc())
+
+	// cursor filter
+	for k, cf := range cursorFilter {
+		ord, ok := sortDir[k]
+		if !ok {
+			continue
+		}
+
+		var compare sq.Expression
+		field := strings.ToLower(k.String())
+		switch ord {
+		case enums.WorkerConnectionSortOrderAsc:
+			compare = sq.C(field).Gt(cf.Value)
+		case enums.WorkerConnectionSortOrderDesc:
+			compare = sq.C(field).Lt(cf.Value)
+		default:
+			continue
+		}
+
+		filter = append(filter, sq.Or(
+			compare,
+			sq.And(
+				sq.C(field).Eq(cf.Value),
+				sq.C("id").Gt(cf.ID),
+			),
+		))
+	}
+
+	return &workerConnectionsQueryBuilder{
+		filter:       filter,
+		order:        order,
+		cursor:       reqcursor,
+		cursorLayout: &resCursorLayout,
+	}
+}
+
+func (w wrapper) GetWorkerConnectionsCount(ctx context.Context, opt cqrs.GetWorkerConnectionOpt) (int, error) {
+	// explicitly set it to zero so it would not attempt to paginate
+	opt.Items = 0
+	res, err := w.GetWorkerConnections(ctx, opt)
+	if err != nil {
+		return 0, err
+	}
+
+	return len(res), nil
+}
+
+func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerConnectionOpt) ([]*cqrs.WorkerConnection, error) {
+	builder := newWorkerConnectionsQueryBuilder(ctx, opt)
+	filter := builder.filter
+	order := builder.order
+	reqcursor := builder.cursor
+	resCursorLayout := builder.cursorLayout
+
+	// read from database
+	// TODO:
+	// change this to a continuous loop with limits instead of just attempting to grab everything.
+	// might not matter though since this is primarily meant for local development
+	sql, args, err := sq.Dialect("sqlite3").
+		From("worker_connections").
+		Select(
+			"account_id",
+			"workspace_id",
+			"app_id",
+
+			"id",
+			"gateway_id",
+			"instance_id",
+			"status",
+			"worker_ip",
+
+			"connected_at",
+			"last_heartbeat_at",
+			"disconnected_at",
+			"recorded_at",
+			"inserted_at",
+
+			"disconnect_reason",
+
+			"group_hash",
+			"sdk_lang",
+			"sdk_version",
+			"sdk_platform",
+			"sync_id",
+			"build_id",
+			"function_count",
+
+			"cpu_cores",
+			"mem_bytes",
+			"os",
+		).
+		Where(filter...).
+		Order(order...).
+		ToSQL()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := w.db.QueryContext(ctx, sql, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	res := []*cqrs.WorkerConnection{}
+	var count uint
+	for rows.Next() {
+		data := sqlc.WorkerConnection{}
+		err := rows.Scan(
+			&data.AccountID,
+			&data.WorkspaceID,
+			&data.AppID,
+
+			&data.ID,
+			&data.GatewayID,
+			&data.InstanceID,
+			&data.Status,
+			&data.WorkerIp,
+
+			&data.ConnectedAt,
+			&data.LastHeartbeatAt,
+			&data.DisconnectedAt,
+			&data.RecordedAt,
+			&data.InsertedAt,
+
+			&data.DisconnectReason,
+
+			&data.GroupHash,
+			&data.SdkLang,
+			&data.SdkVersion,
+			&data.SdkPlatform,
+			&data.SyncID,
+			&data.BuildID,
+			&data.FunctionCount,
+
+			&data.CpuCores,
+			&data.MemBytes,
+			&data.Os,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// the cursor target should be skipped
+		if reqcursor.ID == data.ID.String() {
+			continue
+		}
+
+		// copy layout
+		pc := resCursorLayout
+		// construct the needed fields to generate a cursor representing this run
+		pc.ID = data.ID.String()
+		for k := range pc.Cursors {
+			switch k {
+			case strings.ToLower(enums.WorkerConnectionTimeFieldConnectedAt.String()):
+				pc.Cursors[k] = cqrs.WorkerConnectionCursor{Field: k, Value: data.ConnectedAt}
+			case strings.ToLower(enums.WorkerConnectionTimeFieldLastHeartbeatAt.String()):
+				pc.Cursors[k] = cqrs.WorkerConnectionCursor{Field: k, Value: data.LastHeartbeatAt.Int64}
+			case strings.ToLower(enums.WorkerConnectionTimeFieldDisconnectedAt.String()):
+				pc.Cursors[k] = cqrs.WorkerConnectionCursor{Field: k, Value: data.DisconnectedAt.Int64}
+			default:
+				log.From(ctx).Warn().Str("field", k).Msg("unknown field registered as cursor")
+				delete(pc.Cursors, k)
+			}
+		}
+
+		cursor, err := pc.Encode()
+		if err != nil {
+			log.From(ctx).Error().Err(err).Interface("page_cursor", pc).Msg("error encoding cursor")
+		}
+
+		connectedAt := time.UnixMilli(data.ConnectedAt)
+
+		var disconnectedAt, lastHeartbeatAt *time.Time
+		if data.DisconnectedAt.Valid {
+			disconnectedAt = ptr.Time(time.UnixMilli(data.DisconnectedAt.Int64))
+		}
+		if data.LastHeartbeatAt.Valid {
+			lastHeartbeatAt = ptr.Time(time.UnixMilli(data.LastHeartbeatAt.Int64))
+		}
+
+		var buildId *string
+		if data.BuildID.Valid {
+			buildId = &data.BuildID.String
+		}
+
+		var disconnectReason *string
+		if data.DisconnectReason.Valid {
+			disconnectReason = &data.DisconnectReason.String
+		}
+
+		res = append(res, &cqrs.WorkerConnection{
+			AccountID:   data.AccountID,
+			WorkspaceID: data.WorkspaceID,
+			AppID:       data.AppID,
+
+			Id:         data.ID,
+			GatewayId:  data.GatewayID,
+			InstanceId: data.InstanceID,
+			Status:     connpb.ConnectionStatus(data.Status),
+			WorkerIP:   data.WorkerIp,
+
+			LastHeartbeatAt: lastHeartbeatAt,
+			ConnectedAt:     connectedAt,
+			DisconnectedAt:  disconnectedAt,
+			RecordedAt:      time.UnixMilli(data.RecordedAt),
+			InsertedAt:      time.UnixMilli(data.InsertedAt),
+
+			DisconnectReason: disconnectReason,
+
+			GroupHash:     string(data.GroupHash),
+			SDKLang:       data.SdkLang,
+			SDKVersion:    data.SdkVersion,
+			SDKPlatform:   data.SdkPlatform,
+			SyncID:        data.SyncID,
+			FunctionCount: int(data.FunctionCount),
+			BuildId:       buildId,
+
+			CpuCores: int32(data.CpuCores),
+			MemBytes: data.MemBytes,
+			Os:       data.Os,
+
+			Cursor: cursor,
+		})
+		count++
+		// enough items, don't need to proceed anymore
+		if opt.Items > 0 && count >= opt.Items {
+			break
+		}
+	}
+
+	return res, nil
+}
+
 // copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types
 // automatically.
 func copyWriter[
-	PARAMS_IN any,
-	INTERNAL_PARAMS any,
-	IN any,
-	OUT any,
+PARAMS_IN any,
+INTERNAL_PARAMS any,
+IN any,
+OUT any,
 ](
 	ctx context.Context,
 	f func(context.Context, INTERNAL_PARAMS) (IN, error),
@@ -1535,8 +1999,8 @@ func copyWriter[
 }
 
 func copyInto[
-	IN any,
-	OUT any,
+IN any,
+OUT any,
 ](
 	ctx context.Context,
 	f func(context.Context) (IN, error),

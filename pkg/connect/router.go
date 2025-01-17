@@ -10,6 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
+	"github.com/oklog/ulid/v2"
 	"gonum.org/v1/gonum/stat/sampleuv"
 	"log/slog"
 	"time"
@@ -89,13 +90,19 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 				return
 			}
 
+			gatewayId, err := ulid.Parse(routeTo.GatewayId)
+			if err != nil {
+				log.Error("invalid gatewayId", "gatewayId", gatewayId, "err", err)
+				return
+			}
+
 			log = log.With("gateway_id", routeTo.GatewayId, "conn_id", routeTo.Id, "group_hash", routeTo.GroupId)
 
 			// TODO What if something goes wrong inbetween setting idempotency (claiming exclusivity) and forwarding the req?
 			// We'll potentially lose data here
 
 			// Forward message to the gateway
-			err = c.receiver.RouteExecutorRequest(ctx, routeTo.GatewayId, appId, routeTo.Id, data)
+			err = c.receiver.RouteExecutorRequest(ctx, gatewayId, appId, gatewayId, data)
 			if err != nil {
 				// TODO Should we retry? Log error?
 				log.Error("failed to route request to gateway", "err", err)
@@ -167,8 +174,13 @@ func (c *connectRouterSvc) isHealthy(ctx context.Context, envId uuid.UUID, appId
 			return
 		}
 
+		connId, err := ulid.Parse(conn.Id)
+		if err != nil {
+			c.logger.Error("could not clean up inactive connection, invalid connection ID", "conn_id", conn.Id, "err", err)
+		}
+
 		// Clean up unhealthy connection
-		err = c.stateManager.DeleteConnection(context.Background(), envId, &appId, conn.GroupId, conn.Id)
+		err = c.stateManager.DeleteConnection(context.Background(), envId, &appId, conn.GroupId, connId)
 		if err != nil {
 			c.logger.Error("could not clean up inactive connection", "conn_id", conn.Id, "err", err)
 		}
@@ -199,15 +211,20 @@ func (c *connectRouterSvc) isHealthy(ctx context.Context, envId uuid.UUID, appId
 		return
 	}
 
+	gatewayId, err := ulid.Parse(conn.GatewayId)
+	if err != nil {
+		return
+	}
+
 	// Ensure gateway is healthy
-	gw, err := c.stateManager.GetGateway(ctx, conn.GatewayId)
+	gw, err := c.stateManager.GetGateway(ctx, gatewayId)
 	if err != nil {
 		return
 	}
 
 	if gw.Status != state.GatewayStatusActive || gw.LastHeartbeatAt.Before(time.Now().Add(-2*GatewayHeartbeatInterval)) {
 		// Clean up unhealthy gateway
-		err = c.stateManager.DeleteGateway(ctx, conn.GatewayId)
+		err = c.stateManager.DeleteGateway(ctx, gatewayId)
 		if err != nil {
 			c.logger.Error("could not clean up inactive gateway", "gateway_id", conn.GatewayId, "err", err)
 		}

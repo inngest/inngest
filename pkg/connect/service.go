@@ -67,7 +67,7 @@ type connectGatewaySvc struct {
 
 	// gatewayId is a unique identifier, generated each time the service is started.
 	// This should be used to uniquely identify the gateway instance when sending messages and routing requests.
-	gatewayId string
+	gatewayId ulid.ULID
 	dev       bool
 
 	logger *slog.Logger
@@ -178,7 +178,7 @@ func WithGroupName(groupName string) gatewayOpt {
 
 func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 	gateway := &connectGatewaySvc{
-		gatewayId:         ulid.MustNew(ulid.Now(), rand.Reader).String(),
+		gatewayId:         ulid.MustNew(ulid.Now(), rand.Reader),
 		lifecycles:        []ConnectGatewayLifecycleListener{},
 		drainListener:     newDrainListener(),
 		gatewayPublicPort: 8080,

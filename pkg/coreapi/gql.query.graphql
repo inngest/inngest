@@ -25,6 +25,14 @@ type Query {
   run(runID: String!): FunctionRunV2
   runTraceSpanOutputByID(outputID: String!): RunTraceSpanOutput!
   runTrigger(runID: String!): RunTraceTrigger!
+
+  workerConnections(
+      first: Int! = 100
+      after: String
+      orderBy: [ConnectV1WorkerConnectionsOrderBy!]!
+      filter: ConnectV1WorkerConnectionsFilter!
+    ): ConnectV1WorkerConnectionsConnection!
+	workerConnection(connectionId: ULID!): ConnectV1WorkerConnection
 }
 
 input ActionVersionQuery {
