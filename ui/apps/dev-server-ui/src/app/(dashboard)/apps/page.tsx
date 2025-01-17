@@ -34,7 +34,6 @@ export default function AppList() {
             app={{
               ...app,
               name: !app.name ? 'Syncing...' : !app.connected ? `Syncing to ${app.name}` : app.name,
-              syncMethod: 'SERVERLESS',
             }}
             pill={
               status || app.autodiscovered ? (

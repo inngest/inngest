@@ -32,6 +32,7 @@ export type App = {
   autodiscovered: Scalars['Boolean'];
   checksum: Maybe<Scalars['String']>;
   connected: Scalars['Boolean'];
+  connectionType: AppConnectionType;
   error: Maybe<Scalars['String']>;
   externalID: Scalars['String'];
   framework: Maybe<Scalars['String']>;
@@ -394,6 +395,7 @@ export type PageInfo = {
 
 export type Query = {
   __typename?: 'Query';
+  app: Maybe<App>;
   apps: Array<App>;
   event: Maybe<Event>;
   events: Maybe<Array<Event>>;
@@ -406,6 +408,11 @@ export type Query = {
   stream: Array<StreamItem>;
   workerConnection: Maybe<ConnectV1WorkerConnection>;
   workerConnections: ConnectV1WorkerConnectionsConnection;
+};
+
+
+export type QueryAppArgs = {
+  id: Scalars['UUID'];
 };
 
 
@@ -748,7 +755,14 @@ export type GetFunctionsQuery = { __typename?: 'Query', functions: Array<{ __typ
 export type GetAppsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetAppsQuery = { __typename?: 'Query', apps: Array<{ __typename?: 'App', id: string, name: string, sdkLanguage: string, sdkVersion: string, framework: string | null, url: string | null, error: string | null, connected: boolean, functionCount: number, autodiscovered: boolean, functions: Array<{ __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string }> }> };
+export type GetAppsQuery = { __typename?: 'Query', apps: Array<{ __typename?: 'App', id: string, name: string, sdkLanguage: string, sdkVersion: string, framework: string | null, url: string | null, error: string | null, connected: boolean, functionCount: number, autodiscovered: boolean, connectionType: AppConnectionType, functions: Array<{ __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string }> }> };
+
+export type GetAppQueryVariables = Exact<{
+  id: Scalars['UUID'];
+}>;
+
+
+export type GetAppQuery = { __typename?: 'Query', app: { __typename?: 'App', id: string, name: string, sdkLanguage: string, sdkVersion: string, framework: string | null, url: string | null, error: string | null, connected: boolean, functionCount: number, autodiscovered: boolean, connectionType: AppConnectionType, functions: Array<{ __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string, triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null }> } | null };
 
 export type CreateAppMutationVariables = Exact<{
   input: CreateAppInput;
@@ -1048,6 +1062,7 @@ export const GetAppsDocument = `
     connected
     functionCount
     autodiscovered
+    connectionType
     functions {
       name
       id
@@ -1055,6 +1070,35 @@ export const GetAppsDocument = `
       config
       slug
       url
+    }
+  }
+}
+    `;
+export const GetAppDocument = `
+    query GetApp($id: UUID!) {
+  app(id: $id) {
+    id
+    name
+    sdkLanguage
+    sdkVersion
+    framework
+    url
+    error
+    connected
+    functionCount
+    autodiscovered
+    connectionType
+    functions {
+      name
+      id
+      concurrency
+      config
+      slug
+      url
+      triggers {
+        type
+        value
+      }
     }
   }
 }
@@ -1262,6 +1306,9 @@ const injectedRtkApi = api.injectEndpoints({
     GetApps: build.query<GetAppsQuery, GetAppsQueryVariables | void>({
       query: (variables) => ({ document: GetAppsDocument, variables })
     }),
+    GetApp: build.query<GetAppQuery, GetAppQueryVariables>({
+      query: (variables) => ({ document: GetAppDocument, variables })
+    }),
     CreateApp: build.mutation<CreateAppMutation, CreateAppMutationVariables>({
       query: (variables) => ({ document: CreateAppDocument, variables })
     }),
@@ -1314,5 +1361,5 @@ const injectedRtkApi = api.injectEndpoints({
 });
 
 export { injectedRtkApi as api };
-export const { useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery, useGetFunctionRunStatusQuery, useLazyGetFunctionRunStatusQuery, useGetFunctionRunOutputQuery, useLazyGetFunctionRunOutputQuery, useGetHistoryItemOutputQuery, useLazyGetHistoryItemOutputQuery, useInvokeFunctionMutation, useCancelRunMutation, useRerunMutation, useRerunFromStepMutation, useGetRunsQuery, useLazyGetRunsQuery, useCountRunsQuery, useLazyCountRunsQuery, useGetRunQuery, useLazyGetRunQuery, useGetTraceResultQuery, useLazyGetTraceResultQuery, useGetTriggerQuery, useLazyGetTriggerQuery } = injectedRtkApi;
+export const { useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useGetAppQuery, useLazyGetAppQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery, useGetFunctionRunStatusQuery, useLazyGetFunctionRunStatusQuery, useGetFunctionRunOutputQuery, useLazyGetFunctionRunOutputQuery, useGetHistoryItemOutputQuery, useLazyGetHistoryItemOutputQuery, useInvokeFunctionMutation, useCancelRunMutation, useRerunMutation, useRerunFromStepMutation, useGetRunsQuery, useLazyGetRunsQuery, useCountRunsQuery, useLazyCountRunsQuery, useGetRunQuery, useLazyGetRunQuery, useGetTraceResultQuery, useLazyGetTraceResultQuery, useGetTriggerQuery, useLazyGetTriggerQuery } = injectedRtkApi;
 

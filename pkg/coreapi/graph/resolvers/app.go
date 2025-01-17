@@ -3,6 +3,7 @@ package resolvers
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 
 	"github.com/inngest/inngest/pkg/consts"
@@ -17,6 +18,10 @@ func (a queryResolver) Apps(ctx context.Context, filter *models.AppsFilterV1) ([
 		return nil, fmt.Errorf("failed to parse filter: %w", err)
 	}
 	return a.Data.GetApps(ctx, consts.DevServerEnvId, cqrsFilter)
+}
+
+func (a queryResolver) App(ctx context.Context, id uuid.UUID) (*cqrs.App, error) {
+	return a.Data.GetAppByID(ctx, id)
 }
 
 func (a appResolver) ID(ctx context.Context, obj *cqrs.App) (string, error) {

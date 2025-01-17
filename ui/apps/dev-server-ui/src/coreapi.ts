@@ -134,6 +134,7 @@ export const APPS = gql`
       connected
       functionCount
       autodiscovered
+      connectionType
       functions {
         name
         id
@@ -141,6 +142,36 @@ export const APPS = gql`
         config
         slug
         url
+      }
+    }
+  }
+`;
+
+export const GET_APP = gql`
+  query GetApp($id: UUID!) {
+    app(id: $id) {
+      id
+      name
+      sdkLanguage
+      sdkVersion
+      framework
+      url
+      error
+      connected
+      functionCount
+      autodiscovered
+      connectionType
+      functions {
+        name
+        id
+        concurrency
+        config
+        slug
+        url
+        triggers {
+          type
+          value
+        }
       }
     }
   }

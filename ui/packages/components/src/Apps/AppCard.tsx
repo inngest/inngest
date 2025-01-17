@@ -55,7 +55,7 @@ export function AppCardContent({ app, pill, actions }: CardContentProps) {
         )}
         <Description
           term="Sync method"
-          detail={<div className="lowercase first-letter:capitalize">{app.syncMethod}</div>}
+          detail={<div className="lowercase first-letter:capitalize">{app.connectionType}</div>}
         />
         <Description term="SDK version" detail={app.sdkVersion?.trim() ? app.sdkVersion : '-'} />
         <Description term="Language" detail={app.sdkLanguage?.trim() ? app.sdkLanguage : '-'} />
