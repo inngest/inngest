@@ -62,10 +62,6 @@ export default function AddOn({
   price?: number; // Price for one purchase of this addon, in US Cents
   onChange?: () => void;
 }) {
-  // TODO: this should come from the backend
-  //       https://linear.app/inngest/issue/INN-4305/addon-billing-periods-displayed-come-from-the-backend
-  const billingPeriod = 'month';
-
   const router = useRouter();
 
   const [openSelfService, setOpenSelfService] = useState(false);
@@ -89,11 +85,11 @@ export default function AddOn({
   const priceDollars = price ? (price / 100).toFixed(2) : undefined;
   let priceText = !price
     ? undefined
-    : `$${priceDollars} per ${quantityPer} ${title.toLowerCase()}/${billingPeriod}`;
+    : `$${priceDollars} per ${quantityPer} ${title.toLowerCase()}/month`;
   if (quantityPer === 1) {
-    priceText = `$${priceDollars} per ${unitDescriptionFromTitle(title)}/${billingPeriod}`;
+    priceText = `$${priceDollars} per ${unitDescriptionFromTitle(title)}/month`;
   } else if (useSwitchInput) {
-    priceText = `$${priceDollars} per ${billingPeriod}`;
+    priceText = `$${priceDollars} per month`;
   }
 
   const descriptionText = openSelfService ? (
@@ -129,7 +125,7 @@ export default function AddOn({
       ? `Add ${title.toLowerCase()} to plan`
       : `Change ${title.toLowerCase()} addon`;
   const addedDescription = useNumericInput
-    ? `Your new charge for ${numericInputValue} ${title.toLowerCase()} will be $${cost} per ${billingPeriod}.`
+    ? `Your new charge for ${numericInputValue} ${title.toLowerCase()} will be $${cost} per month.`
     : '';
 
   const handleSubmit = async () => {
