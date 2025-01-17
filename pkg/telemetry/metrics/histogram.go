@@ -137,3 +137,14 @@ func HistogramConnectExecutorEndToEndDuration(ctx context.Context, dur int64, op
 		Boundaries:  PausesBoundaries,
 	})
 }
+
+func HistogramConnectSetupDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.connection.setup_duration",
+		Description: "Duration from starting to set up the connection to being fully ready.",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  PausesBoundaries,
+	})
+}

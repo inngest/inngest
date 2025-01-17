@@ -413,6 +413,11 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				PkgName: pkgName,
 				Tags:    successTags,
 			})
+
+			metrics.HistogramConnectSetupDuration(ctx, time.Since(conn.Data.StartedAt.AsTime()).Milliseconds(), metrics.HistogramOpt{
+				PkgName: pkgName,
+				Tags:    additionalMetricsTags,
+			})
 		}
 
 		// Connection was drained once it's closed by the worker (even if

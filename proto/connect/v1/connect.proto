@@ -57,6 +57,8 @@ message WorkerConnectRequestData {
 	optional string platform = 9;
 	string sdk_version = 10;
 	string sdk_language = 11;
+
+	google.protobuf.Timestamp started_at = 12;
 }
 
 message GatewaySyncRequestData {
