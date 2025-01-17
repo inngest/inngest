@@ -29,6 +29,10 @@ const UpdateAccountAddonQuantityDocument = graphql(`
   }
 `);
 
+// TODO: boolean/switch support: https://linear.app/inngest/issue/INN-4303/addon-ui-component-supports-switchboolean-inputs
+// TODO: AddOn must handle planLimit == null|undefined|unlimited: https://linear.app/inngest/issue/INN-4307/addon-ui-compoment-must-handle-planlimit-==-nullorundefinedorunlimited
+// TODO: maxValue, quantityPer, addonName are not needed for non-self-service addons: https://linear.app/inngest/issue/INN-4311/addon-ui-component-does-not-require-maxvalue-quantityper-addonname-for
+
 export default function AddOn({
   title,
   addonName,
@@ -58,7 +62,9 @@ export default function AddOn({
   price?: number; // Price for one purchase of this addon, in US Cents
   onChange?: () => void;
 }) {
-  const billingPeriod = 'month'; // TODO(cdzombak): need this from the backend
+  // TODO: this should come from the backend
+  //       https://linear.app/inngest/issue/INN-4305/addon-billing-periods-displayed-come-from-the-backend
+  const billingPeriod = 'month';
 
   const router = useRouter();
 

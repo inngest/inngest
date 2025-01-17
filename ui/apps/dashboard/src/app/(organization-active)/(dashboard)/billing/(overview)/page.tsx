@@ -76,17 +76,8 @@ export default async function Page() {
 
   const isProPlan = currentPlan.name === PlanNames.Pro;
 
-  // TODO(cdzombak): various data is missing from the backend:
-  //                 - canIncreaseLimitInCurrentPlan
-  //                 - billing period
-  //                 - maxValue
-  //                 - addonName
-  //                 - is override applied
-  // TODO(cdzombak): self service must be unavailable if account override is applied
-  // TODO(cdzombak): make most addonListItem inputs optional; refactor to make this flexibility cleaner
-  // TODO(cdzombak): addonListItem must handle planLimit == null|undefined
-  // TODO(cdzombak): hipaa addon
-  // TODO(cdzombak): dedicated capacity addon
+  // TODO: self service must be unavailable for a given addon if account override is applied for the relevant entitlement
+  //       https://linear.app/inngest/issue/INN-4306/self-service-must-be-unavailable-when-account-override-is-applied
 
   return (
     <div className="grid grid-cols-3 gap-4">
@@ -133,9 +124,9 @@ export default async function Page() {
             canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             description="The maximum size for a single event"
             selfServiceAvailable={false}
-            maxValue={0} // unnecessary for no-self-service addons
-            quantityPer={0} // unnecessary for no-self-service addons
-            addonName={''} // unnecessary for no-self-service addons
+            maxValue={0} // TODO: https://linear.app/inngest/issue/INN-4311/addon-ui-component-does-not-require-maxvalue-quantityper-addonname-for
+            quantityPer={0} // TODO: https://linear.app/inngest/issue/INN-4311/addon-ui-component-does-not-require-maxvalue-quantityper-addonname-for
+            addonName={''} // TODO: https://linear.app/inngest/issue/INN-4311/addon-ui-component-does-not-require-maxvalue-quantityper-addonname-for
           />
           <AddOn
             title="Concurrency"
@@ -145,13 +136,13 @@ export default async function Page() {
               entitlementUsage.isCustomPlan || currentPlan.addons.concurrency.available
             }
             planLimit={currentPlan.entitlements.concurrency.limit}
-            maxValue={1000} // TODO(cdzombak): where should this come from?
+            maxValue={1000} // TODO: https://linear.app/inngest/issue/INN-4310/use-maxlimitincurrentplan-data-from-gql-in-the-addons-ui
             quantityPer={currentPlan.addons.concurrency.quantityPer}
             description="Maximum number of concurrently executing steps"
             tooltipContent="Functions actively sleeping and waiting for events are not counted"
             selfServiceAvailable={!!currentPlan.addons.concurrency.price}
             price={currentPlan.addons.concurrency.price || undefined}
-            addonName={'concurrency'}
+            addonName={'concurrency'} // TODO: https://linear.app/inngest/issue/INN-4308/addon-names-used-in-ui-come-from-the-backend
             onChange={refetch}
           />
           <AddOn
@@ -161,13 +152,13 @@ export default async function Page() {
             canIncreaseLimitInCurrentPlan={currentPlan.addons.userCount.available}
             description="Maximum number of users on the account"
             planLimit={currentPlan.entitlements.userCount.limit || -1}
-            maxValue={1000} // TODO(cdzombak): where should this come from?
+            maxValue={1000} // TODO: https://linear.app/inngest/issue/INN-4310/use-maxlimitincurrentplan-data-from-gql-in-the-addons-ui
             quantityPer={currentPlan.addons.userCount.quantityPer}
             selfServiceAvailable={
               !!currentPlan.addons.userCount.price && entitlementUsage.userCount.limit !== null
             }
             price={currentPlan.addons.userCount.price || undefined}
-            addonName={'user_count'}
+            addonName={'user_count'} // TODO: https://linear.app/inngest/issue/INN-4308/addon-names-used-in-ui-come-from-the-backend
             onChange={refetch}
           />
           <AddOn
@@ -180,34 +171,34 @@ export default async function Page() {
             canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             description="View and search function run traces and metrics"
             selfServiceAvailable={false}
-            maxValue={366} // unnecessary for no-self-service addons
-            quantityPer={7} // unnecessary for no-self-service addons
-            addonName={''} // unnecessary for no-self-service addons
+            maxValue={366} // TODO: https://linear.app/inngest/issue/INN-4311/addon-ui-component-does-not-require-maxvalue-quantityper-addonname-for
+            quantityPer={7} // TODO: https://linear.app/inngest/issue/INN-4311/addon-ui-component-does-not-require-maxvalue-quantityper-addonname-for
+            addonName={''} // TODO: https://linear.app/inngest/issue/INN-4311/addon-ui-component-does-not-require-maxvalue-quantityper-addonname-for
           />
           <AddOn
             title="HIPAA"
             value={entitlementUsage.hipaa.enabled}
             displayValue={entitlementUsage.hipaa.enabled ? 'Enabled' : 'Not enabled'}
-            canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan || isProPlan}
+            canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan || isProPlan} // TODO: https://linear.app/inngest/issue/INN-4310/use-maxlimitincurrentplan-data-from-gql-in-the-addons-ui
             description="Sign BAAs for healthcare services"
-            planLimit={1} // TODO(cdzombak): nonsense for boolean
-            maxValue={1} // TODO(cdzombak): nonsense for boolean
-            quantityPer={1} // TODO(cdzombak): nonsense for boolean
-            selfServiceAvailable={false} // TODO(cdzombak): should be true eventually
-            addonName={'hipaa'}
+            planLimit={1} // TODO: https://linear.app/inngest/issue/INN-4303/addon-ui-component-supports-switchboolean-inputs
+            maxValue={1} // TODO: https://linear.app/inngest/issue/INN-4303/addon-ui-component-supports-switchboolean-inputs
+            quantityPer={1} // TODO: https://linear.app/inngest/issue/INN-4303/addon-ui-component-supports-switchboolean-inputs
+            selfServiceAvailable={false} // TODO: https://linear.app/inngest/issue/INN-4304/self-service-addon-ui-supports-hipaa-addon
+            addonName={'hipaa'} // TODO: https://linear.app/inngest/issue/INN-4308/addon-names-used-in-ui-come-from-the-backend
           />
           <AddOn
             title="Dedicated execution capacity"
             canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             description="Dedicated infrastructure for the lowest latency and highest throughput"
             selfServiceAvailable={false}
-            value={0} // TODO(cdzombak): need this from the backend
-            displayValue={'Not enabled'}
-            maxValue={1000} // TODO(cdzombak): where should this come from?
-            planLimit={0} // TODO(cdzombak): where should this come from?
-            quantityPer={250} // TODO(cdzombak): where should this come from?
-            price={500}
-            addonName={''}
+            displayValue={'Not enabled'} // TODO: https://linear.app/inngest/issue/INN-4202/add-dedicated-capacity-addon
+            value={0} // TODO: https://linear.app/inngest/issue/INN-4202/add-dedicated-capacity-addon
+            quantityPer={250} // TODO: https://linear.app/inngest/issue/INN-4202/add-dedicated-capacity-addon
+            price={500} // TODO: https://linear.app/inngest/issue/INN-4202/add-dedicated-capacity-addon
+            addonName={''} // TODO: https://linear.app/inngest/issue/INN-4202/add-dedicated-capacity-addon
+            maxValue={1000} // TODO: https://linear.app/inngest/issue/INN-4310/use-maxlimitincurrentplan-data-from-gql-in-the-addons-ui
+            planLimit={0} // TODO: https://linear.app/inngest/issue/INN-4202/add-dedicated-capacity-addon
           />
           <div className="flex flex-col items-center gap-2 pt-6">
             <p className="text-muted text-xs">Custom needs?</p>
