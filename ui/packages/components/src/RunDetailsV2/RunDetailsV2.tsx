@@ -2,7 +2,6 @@
 
 import { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { toast } from 'sonner';
 
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { StatusCell } from '../Table';
@@ -72,13 +71,7 @@ export function RunDetailsV2(props: Props) {
   });
 
   const cancelRun = useCallback(async () => {
-    try {
-      await props.cancelRun(runID);
-      toast.success('Cancelled run');
-    } catch (e) {
-      toast.error('Failed to cancel run');
-      console.error(e);
-    }
+    return await props.cancelRun(runID);
   }, [props.cancelRun]);
 
   const run = runRes.data;
