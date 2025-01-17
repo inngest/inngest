@@ -142,7 +142,7 @@ export default async function Page() {
             tooltipContent="Functions actively sleeping and waiting for events are not counted"
             selfServiceAvailable={!!currentPlan.addons.concurrency.price}
             price={currentPlan.addons.concurrency.price || undefined}
-            addonName={'concurrency'} // TODO: https://linear.app/inngest/issue/INN-4308/addon-names-used-in-ui-come-from-the-backend
+            addonName={'concurrency'}
             onChange={refetch}
           />
           <AddOn
@@ -158,7 +158,7 @@ export default async function Page() {
               !!currentPlan.addons.userCount.price && entitlementUsage.userCount.limit !== null
             }
             price={currentPlan.addons.userCount.price || undefined}
-            addonName={'user_count'} // TODO: https://linear.app/inngest/issue/INN-4308/addon-names-used-in-ui-come-from-the-backend
+            addonName={'user_count'}
             onChange={refetch}
           />
           <AddOn
@@ -185,7 +185,7 @@ export default async function Page() {
             maxValue={1} // TODO: https://linear.app/inngest/issue/INN-4303/addon-ui-component-supports-switchboolean-inputs
             quantityPer={1} // TODO: https://linear.app/inngest/issue/INN-4303/addon-ui-component-supports-switchboolean-inputs
             selfServiceAvailable={false} // TODO: https://linear.app/inngest/issue/INN-4304/self-service-addon-ui-supports-hipaa-addon
-            addonName={'hipaa'} // TODO: https://linear.app/inngest/issue/INN-4308/addon-names-used-in-ui-come-from-the-backend
+            addonName={'hipaa'}
           />
           <AddOn
             title="Dedicated execution capacity"
