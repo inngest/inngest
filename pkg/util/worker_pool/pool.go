@@ -73,7 +73,7 @@ func (wp *WorkerPool[Input, Output]) runScheduler() {
 			continue
 		}
 
-		batchResultsChan := make(chan Result[Output], 0)
+		batchResultsChan := make(chan Result[Output])
 
 		// Create results slice for this batch
 		batchResults := make([]Result[Output], batchSize)
