@@ -461,7 +461,7 @@ export const GET_WORKER_CONNECTIONS = gql`
           id
           gatewayId
           instanceId
-          workerip
+          workerIp
           app {
             id
           }
@@ -501,7 +501,6 @@ export const COUNT_WORKER_CONNECTIONS = gql`
     workerConnections(
       filter: { appIDs: $appIDs, status: $status, timeField: $timeField }
       orderBy: [{ field: $timeField, direction: DESC }]
-      after: $connectionCursor
     ) {
       totalCount
     }

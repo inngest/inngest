@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { AppDetailsCard, CardItem } from '@inngest/components/Apps/AppDetailsCard';
 import { FunctionList } from '@inngest/components/Apps/FunctionList';
 import { Header } from '@inngest/components/Header/Header';
@@ -8,9 +9,14 @@ import { Time } from '@inngest/components/Time';
 import WorkersCounter from '@inngest/components/Workers/WorkersCounter';
 import { WorkersTable } from '@inngest/components/Workers/WorkersTable';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
-import { isWorkerStatus } from '@inngest/components/types/workers';
+import { convertWorkerStatus, isWorkerStatus } from '@inngest/components/types/workers';
 
-import { useGetAppQuery } from '@/store/generated';
+import {
+  ConnectV1WorkerConnectionsOrderByField,
+  useCountWorkerConnectionsQuery,
+  useGetAppQuery,
+  useGetWorkerConnectionsQuery,
+} from '@/store/generated';
 
 // const app = {
 //   name: 'Growth',
@@ -70,27 +76,37 @@ export default function AppPageWrapper() {
 
 export function AppPage({ id }: { id: string }) {
   const { data } = useGetAppQuery({ id: id });
+
+  const { data: workerConnsData } = useGetWorkerConnectionsQuery({
+    timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
+    startTime: null,
+    appIDs: [id],
+    status: [],
+  });
+  const { data: countWorkersData } = useCountWorkerConnectionsQuery({
+    timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
+    appIDs: [id],
+    status: [],
+  });
+
+  const workers = useMemo(() => {
+    if (!workerConnsData?.workerConnections?.edges) {
+      return [];
+    }
+    return workerConnsData.workerConnections.edges.map((e) => {
+      return {
+        ...e.node,
+        status: convertWorkerStatus(e.node.status),
+      };
+    });
+  }, [workerConnsData]);
+
   if (!data || !data.app) {
     // TODO Render loading screen
     return null;
   }
 
   const { app } = data;
-
-  // const groupedWorkers = app.workers.reduce(
-  //   (acc, worker) => {
-  //     if (!isWorkerStatus(worker.status)) {
-  //       return { ACTIVE: 0, FAILED: 0, INACTIVE: 0 };
-  //     }
-  //     const status = worker.status;
-  //     if (!acc[status]) {
-  //       acc[status] = 0; // Default to 0 if the status doesn't exist
-  //     }
-  //     acc[status]++;
-  //     return acc;
-  //   },
-  //   { ACTIVE: 0, FAILED: 0, INACTIVE: 0 }
-  // );
 
   let version = 'unknown';
   let lastSyncedAt = new Date();
@@ -127,9 +143,11 @@ export function AppPage({ id }: { id: string }) {
           <CardItem term="Framework" detail={app.framework} />
         </AppDetailsCard>
         <div>
-          <h4 className="text-subtle mb-4 text-xl">Workers ({app.functions.length})</h4>
+          <h4 className="text-subtle mb-4 text-xl">
+            Workers ({countWorkersData?.workerConnections?.totalCount || 0})
+          </h4>
           {/* @ts-ignore TEMP */}
-          <WorkersTable workers={app.workers} />
+          <WorkersTable workers={workers} />
         </div>
         <div>
           <h4 className="text-subtle mb-4 text-xl">Function list ({app.functions.length})</h4>

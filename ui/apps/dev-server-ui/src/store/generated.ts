@@ -102,7 +102,7 @@ export type ConnectV1WorkerConnectionsConnection = {
 
 export type ConnectV1WorkerConnectionsFilter = {
   appIDs?: InputMaybe<Array<Scalars['UUID']>>;
-  from: Scalars['Time'];
+  from?: InputMaybe<Scalars['Time']>;
   status?: InputMaybe<Array<ConnectV1ConnectionStatus>>;
   timeField?: InputMaybe<ConnectV1WorkerConnectionsOrderByField>;
   until?: InputMaybe<Scalars['Time']>;
@@ -892,6 +892,26 @@ export type GetTriggerQueryVariables = Exact<{
 
 export type GetTriggerQuery = { __typename?: 'Query', runTrigger: { __typename?: 'RunTraceTrigger', IDs: Array<any>, payloads: Array<any>, timestamp: any, eventName: string | null, isBatch: boolean, batchID: any | null, cron: string | null } };
 
+export type GetWorkerConnectionsQueryVariables = Exact<{
+  appIDs: InputMaybe<Array<Scalars['UUID']> | Scalars['UUID']>;
+  startTime: InputMaybe<Scalars['Time']>;
+  status: InputMaybe<Array<ConnectV1ConnectionStatus> | ConnectV1ConnectionStatus>;
+  timeField: ConnectV1WorkerConnectionsOrderByField;
+  connectionCursor?: InputMaybe<Scalars['String']>;
+}>;
+
+
+export type GetWorkerConnectionsQuery = { __typename?: 'Query', workerConnections: { __typename?: 'ConnectV1WorkerConnectionsConnection', edges: Array<{ __typename?: 'ConnectV1WorkerConnectionEdge', node: { __typename?: 'ConnectV1WorkerConnection', id: any, gatewayId: any, instanceId: string, workerIp: string, connectedAt: any, lastHeartbeatAt: any | null, disconnectedAt: any | null, disconnectReason: string | null, status: ConnectV1ConnectionStatus, groupHash: string, sdkLang: string, sdkVersion: string, sdkPlatform: string, syncId: any | null, buildId: string | null, functionCount: number, cpuCores: number, memBytes: number, os: string, app: { __typename?: 'App', id: string } | null } }>, pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, hasPreviousPage: boolean, startCursor: string | null, endCursor: string | null } } };
+
+export type CountWorkerConnectionsQueryVariables = Exact<{
+  appIDs: InputMaybe<Array<Scalars['UUID']> | Scalars['UUID']>;
+  status: InputMaybe<Array<ConnectV1ConnectionStatus> | ConnectV1ConnectionStatus>;
+  timeField: ConnectV1WorkerConnectionsOrderByField;
+}>;
+
+
+export type CountWorkerConnectionsQuery = { __typename?: 'Query', workerConnections: { __typename?: 'ConnectV1WorkerConnectionsConnection', totalCount: number } };
+
 export const TraceDetailsFragmentDoc = `
     fragment TraceDetails on RunTraceSpan {
   name
@@ -1291,6 +1311,58 @@ export const GetTriggerDocument = `
   }
 }
     `;
+export const GetWorkerConnectionsDocument = `
+    query GetWorkerConnections($appIDs: [UUID!], $startTime: Time, $status: [ConnectV1ConnectionStatus!], $timeField: ConnectV1WorkerConnectionsOrderByField!, $connectionCursor: String = null) {
+  workerConnections(
+    filter: {appIDs: $appIDs, from: $startTime, status: $status, timeField: $timeField}
+    orderBy: [{field: $timeField, direction: DESC}]
+    after: $connectionCursor
+  ) {
+    edges {
+      node {
+        id
+        gatewayId
+        instanceId
+        workerIp
+        app {
+          id
+        }
+        connectedAt
+        lastHeartbeatAt
+        disconnectedAt
+        disconnectReason
+        status
+        groupHash
+        sdkLang
+        sdkVersion
+        sdkPlatform
+        syncId
+        buildId
+        functionCount
+        cpuCores
+        memBytes
+        os
+      }
+    }
+    pageInfo {
+      hasNextPage
+      hasPreviousPage
+      startCursor
+      endCursor
+    }
+  }
+}
+    `;
+export const CountWorkerConnectionsDocument = `
+    query CountWorkerConnections($appIDs: [UUID!], $status: [ConnectV1ConnectionStatus!], $timeField: ConnectV1WorkerConnectionsOrderByField!) {
+  workerConnections(
+    filter: {appIDs: $appIDs, status: $status, timeField: $timeField}
+    orderBy: [{field: $timeField, direction: DESC}]
+  ) {
+    totalCount
+  }
+}
+    `;
 
 const injectedRtkApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -1357,9 +1429,15 @@ const injectedRtkApi = api.injectEndpoints({
     GetTrigger: build.query<GetTriggerQuery, GetTriggerQueryVariables>({
       query: (variables) => ({ document: GetTriggerDocument, variables })
     }),
+    GetWorkerConnections: build.query<GetWorkerConnectionsQuery, GetWorkerConnectionsQueryVariables>({
+      query: (variables) => ({ document: GetWorkerConnectionsDocument, variables })
+    }),
+    CountWorkerConnections: build.query<CountWorkerConnectionsQuery, CountWorkerConnectionsQueryVariables>({
+      query: (variables) => ({ document: CountWorkerConnectionsDocument, variables })
+    }),
   }),
 });
 
 export { injectedRtkApi as api };
-export const { useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useGetAppQuery, useLazyGetAppQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery, useGetFunctionRunStatusQuery, useLazyGetFunctionRunStatusQuery, useGetFunctionRunOutputQuery, useLazyGetFunctionRunOutputQuery, useGetHistoryItemOutputQuery, useLazyGetHistoryItemOutputQuery, useInvokeFunctionMutation, useCancelRunMutation, useRerunMutation, useRerunFromStepMutation, useGetRunsQuery, useLazyGetRunsQuery, useCountRunsQuery, useLazyCountRunsQuery, useGetRunQuery, useLazyGetRunQuery, useGetTraceResultQuery, useLazyGetTraceResultQuery, useGetTriggerQuery, useLazyGetTriggerQuery } = injectedRtkApi;
+export const { useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useGetAppQuery, useLazyGetAppQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery, useGetFunctionRunStatusQuery, useLazyGetFunctionRunStatusQuery, useGetFunctionRunOutputQuery, useLazyGetFunctionRunOutputQuery, useGetHistoryItemOutputQuery, useLazyGetHistoryItemOutputQuery, useInvokeFunctionMutation, useCancelRunMutation, useRerunMutation, useRerunFromStepMutation, useGetRunsQuery, useLazyGetRunsQuery, useCountRunsQuery, useLazyCountRunsQuery, useGetRunQuery, useLazyGetRunQuery, useGetTraceResultQuery, useLazyGetTraceResultQuery, useGetTriggerQuery, useLazyGetTriggerQuery, useGetWorkerConnectionsQuery, useLazyGetWorkerConnectionsQuery, useCountWorkerConnectionsQuery, useLazyCountWorkerConnectionsQuery } = injectedRtkApi;
 
