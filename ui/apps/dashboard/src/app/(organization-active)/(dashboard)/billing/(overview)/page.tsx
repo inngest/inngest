@@ -12,6 +12,7 @@ import {
   currentPlan as getCurrentPlan,
   entitlementUsage as getEntitlementUsage,
 } from '@/components/Billing/data';
+import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import { day } from '@/utils/date';
 import { pathCreator } from '@/utils/urls';
 
@@ -79,6 +80,8 @@ export default async function Page() {
   // TODO: self service must be unavailable for a given addon if account override is applied for the relevant entitlement
   //       https://linear.app/inngest/issue/INN-4306/self-service-must-be-unavailable-when-account-override-is-applied
 
+  const enableSelfService = await getBooleanFlag('enable-addon-self-service');
+
   return (
     <div className="grid grid-cols-3 gap-4">
       <Card className="col-span-2">
@@ -140,7 +143,7 @@ export default async function Page() {
             quantityPer={currentPlan.addons.concurrency.quantityPer}
             description="Maximum number of concurrently executing steps"
             tooltipContent="Functions actively sleeping and waiting for events are not counted"
-            selfServiceAvailable={!!currentPlan.addons.concurrency.price}
+            selfServiceAvailable={enableSelfService && !!currentPlan.addons.concurrency.price}
             price={currentPlan.addons.concurrency.price || undefined}
             addonName={'concurrency'}
             onChange={refetch}
@@ -155,7 +158,9 @@ export default async function Page() {
             maxValue={1000} // TODO: https://linear.app/inngest/issue/INN-4310/use-maxlimitincurrentplan-data-from-gql-in-the-addons-ui
             quantityPer={currentPlan.addons.userCount.quantityPer}
             selfServiceAvailable={
-              !!currentPlan.addons.userCount.price && entitlementUsage.userCount.limit !== null
+              enableSelfService &&
+              !!currentPlan.addons.userCount.price &&
+              entitlementUsage.userCount.limit !== null
             }
             price={currentPlan.addons.userCount.price || undefined}
             addonName={'user_count'}
