@@ -8,29 +8,29 @@ import (
 	"time"
 )
 
-type poolData interface{}
-
-var TEST_completed = map[int]int{}
-var TEST_lock = sync.Mutex{}
-
-func processJob(job Job[poolData], workerID int) Result[poolData] {
-	fmt.Printf("processing job %d on worker %d\n", job.ID, workerID)
-	<-time.After(time.Second * 2)
-
-	TEST_lock.Lock()
-	TEST_completed[job.ID] += 1
-	TEST_lock.Unlock()
-
-	// Simulate some work being done
-	// Replace this with actual job processing logic
-	return Result[poolData]{
-		JobID: job.ID,
-		Data:  fmt.Sprintf("Processed job %d by worker %d", job.ID, workerID),
-		Err:   nil,
-	}
-}
-
 func TestPool(t *testing.T) {
+	type poolData interface{}
+
+	var TEST_completed = map[int]int{}
+	var TEST_lock = sync.Mutex{}
+
+	processJob := func(job Job[poolData], workerID int) Result[poolData] {
+		fmt.Printf("processing job %d on worker %d\n", job.ID, workerID)
+		<-time.After(time.Second * 2)
+
+		TEST_lock.Lock()
+		TEST_completed[job.ID] += 1
+		TEST_lock.Unlock()
+
+		// Simulate some work being done
+		// Replace this with actual job processing logic
+		return Result[poolData]{
+			JobID: job.ID,
+			Data:  fmt.Sprintf("Processed job %d by worker %d", job.ID, workerID),
+			Err:   nil,
+		}
+	}
+
 	// Create a worker pool with 50,000 workers
 	p := NewWorkerPool[poolData](50_000, processJob)
 	p.Start()
