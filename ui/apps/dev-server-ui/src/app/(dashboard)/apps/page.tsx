@@ -82,12 +82,6 @@ export default function AppList() {
         }
         action={
           <div className="flex items-center gap-5">
-            {apps.length > 0 && info?.isDiscoveryEnabled ? (
-              <p className="text-btnPrimary flex items-center gap-2 text-sm leading-tight">
-                <IconSpinner className="fill-btnPrimary" />
-                Auto-detecting apps
-              </p>
-            ) : null}
             <AddAppButton />
           </div>
         }
