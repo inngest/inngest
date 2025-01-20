@@ -31,7 +31,7 @@ func NewCmdDev() *cobra.Command {
 	cmd.Flags().String("host", "", "host to run the API on")
 	cmd.Flags().StringP("port", "p", "8288", "port to run the API on")
 	cmd.Flags().StringSliceP("sdk-url", "u", []string{}, "SDK URLs to load functions from")
-	cmd.Flags().Bool("no-discovery", false, "Disable autodiscovery")
+	cmd.Flags().Bool("no-discovery", false, "Disable app auto-discovery")
 	cmd.Flags().Bool("no-poll", false, "Disable polling of apps for updates")
 	cmd.Flags().Int("poll-interval", devserver.DefaultPollInterval, "Interval in seconds between polling for updates to apps")
 	cmd.Flags().Int("retry-interval", 0, "Retry interval in seconds for linear backoff when retrying functions - must be 1 or above")
