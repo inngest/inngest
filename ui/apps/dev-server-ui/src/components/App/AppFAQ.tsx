@@ -1,5 +1,6 @@
 import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
 import { InlineCode } from '@inngest/components/Code';
+import { CodeLine } from '@inngest/components/CodeLine';
 import { Link } from '@inngest/components/Link';
 
 export default function AppFAQ() {
@@ -82,6 +83,34 @@ export default function AppFAQ() {
                 <p className="mb-2">
                   You can disable auto-discovery with the <InlineCode>--no-discovery</InlineCode>{' '}
                   flag.
+                </p>
+              </AccordionList.Content>
+            </AccordionList.Item>
+            <AccordionList.Item value="skip_manual_sync">
+              <AccordionList.Trigger>How can I skip manual syncing?</AccordionList.Trigger>
+              <AccordionList.Content>
+                <p className="mb-2">
+                  You can specify the URL of your apps at startup by using the{' '}
+                  <InlineCode>-u &lt;url&gt;</InlineCode> flag. You can specify more than one app
+                  URLs by using the flag multiple times. For example:
+                </p>
+                <CodeLine
+                  code="inngest dev -u http://localhost:3000/api/inngest -u http://localhost:3333/api/inngest"
+                  className="mb-2"
+                />
+                <p className="mb-2">
+                  Alternatively, you can specify the URL of your app in an{' '}
+                  <InlineCode>inngest.json</InlineCode> configuration file that you can check into
+                  version control.{' '}
+                  <Link
+                    target="_blank"
+                    size="small"
+                    className="inline"
+                    href="https://www.inngest.com/docs/dev-server#configuration-file"
+                  >
+                    Learn more in the docs
+                  </Link>
+                  .
                 </p>
               </AccordionList.Content>
             </AccordionList.Item>
