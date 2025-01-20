@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import NextLink from 'next/link';
 import { AppCard } from '@inngest/components/Apps/AppCard';
 import { InlineCode } from '@inngest/components/Code';
 import { Header } from '@inngest/components/Header/Header';
@@ -28,6 +29,8 @@ export default function AppList() {
     return apps.map((app) => {
       const { appKind, status, footerHeader, footerContent } = getAppCardContent({ app });
 
+      const detailsLink = `/apps/app?id=${app.id}`;
+
       return (
         <AppCard key={app?.id} kind={appKind}>
           <AppCard.Content
@@ -35,6 +38,7 @@ export default function AppList() {
               ...app,
               name: !app.name ? 'Syncing...' : !app.connected ? `Syncing to ${app.name}` : app.name,
             }}
+            detailsLink={detailsLink}
             pill={
               status || app.autodiscovered ? (
                 <>
@@ -51,7 +55,11 @@ export default function AppList() {
                 </>
               ) : null
             }
-            actions={!app.autodiscovered ? <AppActions id={app.id} name={app.name} /> : null}
+            actions={
+              !app.autodiscovered ? (
+                <AppActions id={app.id} name={app.name} detailsLink={detailsLink} />
+              ) : null
+            }
           />
           <AppCard.Footer kind={appKind} header={footerHeader} content={footerContent} />
         </AppCard>

@@ -165,8 +165,8 @@ func (q NormalizedQueries) InsertQueueSnapshotChunk(ctx context.Context, params 
 	})
 }
 
-func (q NormalizedQueries) GetApps(ctx context.Context, connectionType string) ([]*sqlc_sqlite.App, error) {
-	apps, err := q.db.GetApps(ctx, connectionType)
+func (q NormalizedQueries) GetApps(ctx context.Context) ([]*sqlc_sqlite.App, error) {
+	apps, err := q.db.GetApps(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -252,16 +252,24 @@ func (w wrapper) InsertQueueSnapshotChunk(ctx context.Context, params cqrs.Inser
 
 // GetApps returns apps that have not been deleted.
 func (w wrapper) GetApps(ctx context.Context, envID uuid.UUID, filter *cqrs.FilterAppParam) ([]*cqrs.App, error) {
-	connectionType := enums.AppConnectionTypeServerless
-	if filter != nil && filter.ConnectionType != nil {
-		connectionType = *filter.ConnectionType
-	}
-
 	f := func(ctx context.Context) ([]*sqlc.App, error) {
-		return w.q.GetApps(ctx, connectionType.String())
+		return w.q.GetApps(ctx)
 	}
 
-	return copyInto(ctx, f, []*cqrs.App{})
+	apps, err := copyInto(ctx, f, []*cqrs.App{})
+	if err != nil {
+		return nil, fmt.Errorf("could not get apps: %w", err)
+	}
+
+	filtered := make([]*cqrs.App, 0, len(apps))
+	for _, app := range apps {
+		if filter != nil && filter.ConnectionType != nil && filter.ConnectionType.String() != app.ConnectionType {
+			continue
+		}
+		filtered = append(filtered, app)
+	}
+
+	return filtered, nil
 }
 
 func (w wrapper) GetAppByChecksum(ctx context.Context, envID uuid.UUID, checksum string) (*cqrs.App, error) {

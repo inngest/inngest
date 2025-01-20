@@ -314,11 +314,11 @@ func (q *Queries) GetAppFunctionsBySlug(ctx context.Context, name string) ([]*Fu
 }
 
 const getApps = `-- name: GetApps :many
-SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url, is_connect, connection_type FROM apps WHERE archived_at IS NULL AND connection_type = $1
+SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url, is_connect, connection_type FROM apps WHERE archived_at IS NULL
 `
 
-func (q *Queries) GetApps(ctx context.Context, connectionType string) ([]*App, error) {
-	rows, err := q.db.QueryContext(ctx, getApps, connectionType)
+func (q *Queries) GetApps(ctx context.Context) ([]*App, error) {
+	rows, err := q.db.QueryContext(ctx, getApps)
 	if err != nil {
 		return nil, err
 	}

@@ -18,7 +18,7 @@ RETURNING *;
 SELECT * FROM apps WHERE id = ?;
 
 -- name: GetApps :many
-SELECT * FROM apps WHERE archived_at IS NULL AND connection_type = ?;
+SELECT * FROM apps WHERE archived_at IS NULL;
 
 -- name: GetAppByChecksum :one
 SELECT * FROM apps WHERE checksum = ? AND archived_at IS NULL LIMIT 1;

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import {
   DropdownMenu,
@@ -7,14 +8,23 @@ import {
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
 import { AlertModal } from '@inngest/components/Modal';
-import { RiDeleteBinLine, RiMore2Line } from '@remixicon/react';
+import { RiArrowRightLine, RiDeleteBinLine, RiMore2Line } from '@remixicon/react';
 import { toast } from 'sonner';
 
 import { useDeleteAppMutation } from '@/store/generated';
 
-export default function AppActions({ id, name }: { id: string; name: string }) {
+export default function AppActions({
+  id,
+  name,
+  detailsLink,
+}: {
+  id: string;
+  name: string;
+  detailsLink?: string;
+}) {
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
   const [_deleteApp] = useDeleteAppMutation();
+  const router = useRouter();
 
   async function deleteApp() {
     try {
@@ -30,6 +40,13 @@ export default function AppActions({ id, name }: { id: string; name: string }) {
     // To do: add optimistic render in the list
   }
 
+  function navigateToDetails() {
+    if (!detailsLink) {
+      return;
+    }
+    router.push(detailsLink);
+  }
+
   return (
     <>
       <DropdownMenu>
@@ -37,6 +54,12 @@ export default function AppActions({ id, name }: { id: string; name: string }) {
           <Button kind="secondary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
         </DropdownMenuTrigger>
         <DropdownMenuContent>
+          {detailsLink ? (
+            <DropdownMenuItem className="text-info" onSelect={() => navigateToDetails()}>
+              <RiArrowRightLine className="h-4 w-4" />
+              More
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem className="text-error" onSelect={() => setIsAlertModalOpen(true)}>
             <RiDeleteBinLine className="h-4 w-4" />
             Delete

@@ -67,7 +67,7 @@ export function AppPage({ id }: { id: string }) {
         ...e.node,
         status: convertWorkerStatus(e.node.status),
         instanceID: e.node.instanceId,
-        appVersion: e.node.buildId,
+        appVersion: e.node.buildId || 'unknown',
       };
     });
   }, [workerConnsData]);
@@ -113,7 +113,7 @@ export function AppPage({ id }: { id: string }) {
 
         <AppDetailsCard title="App information">
           <CardItem term="App ID" detail={app.id} />
-          <CardItem term="App version" detail={<Pill>{version}</Pill>} />
+          <CardItem term="App version" detail={<Pill>{version || 'unknown'}</Pill>} />
           <CardItem term="Last synced at" detail={<Time value={lastSyncedAt} />} />
           <CardItem
             term="Connected workers"
