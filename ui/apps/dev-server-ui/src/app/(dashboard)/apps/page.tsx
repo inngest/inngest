@@ -13,7 +13,7 @@ import { RiExternalLinkLine, RiInformationLine } from '@remixicon/react';
 import AddAppButton from '@/components/App/AddAppButton';
 import AppActions from '@/components/App/AppActions';
 import getAppCardContent from '@/components/App/AppCardContent';
-// import AppFAQ from '@/components/App/AppFAQ';
+import AppFAQ from '@/components/App/AppFAQ';
 import { useInfoQuery } from '@/store/devApi';
 import { useGetAppsQuery } from '@/store/generated';
 
@@ -90,13 +90,13 @@ export default function AppList() {
       <div className="mx-auto my-12 w-4/5 max-w-7xl">
         <h2 className="mb-1 text-xl">Synced Apps</h2>
         <p className="text-muted text-sm">
-          Synced Inngest apps appear below. Apps will sync automatically if auto-discovery is
-          enabled, or you can sync them manually. {''}
+          Apps can be synced manually with the CLI's <InlineCode>-u</InlineCode> flag, a config
+          file, the button below, or via auto-discovery.{' '}
           <Link
             target="_blank"
             size="small"
             className="inline"
-            href="https://www.inngest.com/docs/local-development#connecting-apps-to-the-dev-server"
+            href="https://www.inngest.com/docs/dev-server#connecting-apps-to-the-dev-server"
           >
             Learn more
           </Link>
@@ -111,7 +111,7 @@ export default function AppList() {
                 {info?.isDiscoveryEnabled ? (
                   <p className="text-btnPrimary flex items-center gap-2 text-sm leading-tight">
                     <IconSpinner className="fill-btnPrimary" />
-                    Auto-detecting apps
+                    Auto-discovering apps
                   </p>
                 ) : null}
                 <AddAppButton secondary />
@@ -121,8 +121,17 @@ export default function AppList() {
               <div className="text-light flex items-center gap-1">
                 <RiInformationLine className="h-4 w-4" />
                 <p className="text-sm">
-                  Auto-detection is enabled on common ports. You can use the{' '}
-                  <InlineCode>--no-discovery</InlineCode> flag in your CLI to disable it.
+                  Auto-discovery scans common ports and paths for apps. Use the{' '}
+                  <InlineCode>--no-discovery</InlineCode> flag in your CLI to disable it.{' '}
+                  <Link
+                    target="_blank"
+                    size="small"
+                    className="inline"
+                    href="https://www.inngest.com/docs/dev-server#auto-discovery"
+                  >
+                    Learn more
+                  </Link>
+                  .
                 </p>
               </div>
             )}
@@ -130,8 +139,7 @@ export default function AppList() {
         )}
 
         <div className="my-6 flex w-full flex-col gap-10">{memoizedAppCards}</div>
-        {/* Temporarily hide FAQS, until we work on onboarding */}
-        {/* <AppFAQ /> */}
+        <AppFAQ />
       </div>
     </div>
   );
