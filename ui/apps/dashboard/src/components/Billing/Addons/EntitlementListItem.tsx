@@ -33,7 +33,7 @@ const UpdateAccountAddonQuantityDocument = graphql(`
 // TODO: AddOn must handle planLimit == null|undefined|unlimited: https://linear.app/inngest/issue/INN-4307/addon-ui-compoment-must-handle-planlimit-==-nullorundefinedorunlimited
 // TODO: maxValue, quantityPer, addonName are not needed for non-self-service addons: https://linear.app/inngest/issue/INN-4311/addon-ui-component-does-not-require-maxvalue-quantityper-addonname-for
 
-export default function AddOn({
+export default function EntitlementListItem({
   title,
   addonName,
   description,
@@ -118,14 +118,15 @@ export default function AddOn({
     ? undefined
     : numericInputValue === planLimit
     ? 0
-    : ((inputQuantity * price) / 100).toFixed(2);
+    : (inputQuantity * price) / 100;
+  const costStr = cost ? cost.toFixed(2) : '';
 
   const confirmationTitle =
     value === planLimit
       ? `Add ${title.toLowerCase()} to plan`
       : `Change ${title.toLowerCase()} addon`;
   const addedDescription = useNumericInput
-    ? `Your new charge for ${numericInputValue} ${title.toLowerCase()} will be $${cost} per month.`
+    ? `Your new charge for ${numericInputValue} ${title.toLowerCase()} will be $${costStr} per month.`
     : '';
 
   const handleSubmit = async () => {
@@ -224,7 +225,7 @@ export default function AddOn({
                 step={quantityPer}
               />
             )}
-            {inputValid && <p className="text-muted text-sm">Cost: ${cost}</p>}
+            {inputValid && <p className="text-muted text-sm">Cost: ${costStr}</p>}
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -257,7 +258,7 @@ export default function AddOn({
           description={
             'Are you sure you want to apply this change to your plan? ' + addedDescription
           }
-          confirmButtonLabel="Confirm and pay"
+          confirmButtonLabel={(cost || 0) > 0 ? 'Confirm and pay' : 'Confirm'}
           cancelButtonLabel="Cancel"
           confirmButtonKind="primary"
         ></AlertModal>

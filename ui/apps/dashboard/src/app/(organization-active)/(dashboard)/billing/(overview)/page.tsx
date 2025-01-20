@@ -2,7 +2,7 @@ import { Alert } from '@inngest/components/Alert/Alert';
 import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
 
-import AddOn from '@/components/Billing/Addons/AddonListItem';
+import EntitlementListItem from '@/components/Billing/Addons/EntitlementListItem';
 import BillingInformation from '@/components/Billing/BillingDetails/BillingInformation';
 import PaymentMethod from '@/components/Billing/BillingDetails/PaymentMethod';
 import { LimitBar, type Data } from '@/components/Billing/LimitBar';
@@ -115,7 +115,7 @@ export default async function Page() {
           {!legacyNoRunsPlan && <LimitBar data={runs} className="my-4" />}
           <LimitBar data={steps} className="mb-6" />
           <div className="border-subtle mb-6 border" />
-          <AddOn
+          <EntitlementListItem
             title="Event Size"
             value={entitlementUsage.eventSize.limit}
             displayValue={
@@ -131,7 +131,7 @@ export default async function Page() {
             quantityPer={0} // TODO: https://linear.app/inngest/issue/INN-4311/addon-ui-component-does-not-require-maxvalue-quantityper-addonname-for
             addonName={''} // TODO: https://linear.app/inngest/issue/INN-4311/addon-ui-component-does-not-require-maxvalue-quantityper-addonname-for
           />
-          <AddOn
+          <EntitlementListItem
             title="Concurrency"
             value={entitlementUsage.concurrency.limit}
             displayValue={`${entitlementUsage.concurrency.limit} concurrent steps`}
@@ -148,7 +148,7 @@ export default async function Page() {
             addonName={'concurrency'}
             onChange={refetch}
           />
-          <AddOn
+          <EntitlementListItem
             title="Users"
             value={entitlementUsage.userCount.limit || 0}
             displayValue={`${entitlementUsage.userCount.usage} of ${entitlementUsage.userCount.limit} maximum users`}
@@ -166,7 +166,7 @@ export default async function Page() {
             addonName={'user_count'}
             onChange={refetch}
           />
-          <AddOn
+          <EntitlementListItem
             title="Log history"
             value={entitlementUsage.history.limit}
             displayValue={`${entitlementUsage.history.limit} day${
@@ -180,7 +180,7 @@ export default async function Page() {
             quantityPer={7} // TODO: https://linear.app/inngest/issue/INN-4311/addon-ui-component-does-not-require-maxvalue-quantityper-addonname-for
             addonName={''} // TODO: https://linear.app/inngest/issue/INN-4311/addon-ui-component-does-not-require-maxvalue-quantityper-addonname-for
           />
-          <AddOn
+          <EntitlementListItem
             title="HIPAA"
             value={entitlementUsage.hipaa.enabled}
             displayValue={entitlementUsage.hipaa.enabled ? 'Enabled' : 'Not enabled'}
@@ -192,7 +192,7 @@ export default async function Page() {
             selfServiceAvailable={false} // TODO: https://linear.app/inngest/issue/INN-4304/self-service-addon-ui-supports-hipaa-addon
             addonName={'hipaa'}
           />
-          <AddOn
+          <EntitlementListItem
             title="Dedicated execution capacity"
             canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             description="Dedicated infrastructure for the lowest latency and highest throughput"
