@@ -180,7 +180,7 @@ func do(ctx context.Context, forwarder pubsub.RequestForwarder, appId uuid.UUID,
 		Duration:       dur,
 		RetryAt:        retryAt,
 		NoRetry:        noRetry,
-		RequestVersion: 0, // not supported by go sdk even for http
+		RequestVersion: int(resp.RequestVersion),
 		IsSDK:          isSDK,
 		Sdk:            resp.SdkVersion,
 		Header:         http.Header{}, // not supported by connect
