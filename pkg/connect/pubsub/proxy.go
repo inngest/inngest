@@ -346,6 +346,7 @@ func (i *redisPubSubConnector) ReceiveRoutedRequest(ctx context.Context, gateway
 		err := proto.Unmarshal(msgBytes, &data)
 		if err != nil {
 			// TODO This should never happen, but PubSub will not redeliver, should we push the message into a dead-letter channel?
+			i.logger.Error("invalid protobuf received by gateway", "err", err, "msg", msgBytes, "gateway_id", gatewayId, "app_id", appId, "conn_id", connId)
 			return
 		}
 
@@ -481,12 +482,15 @@ func (i *redisPubSubConnector) RouteExecutorRequest(ctx context.Context, gateway
 	}
 
 	channelName := i.channelGatewayAppRequests(gatewayId, appId, connId)
-	i.logger.Debug("forwarded connect request to gateway", "gateway_id", gatewayId, "channel", channelName, "request_id", data.RequestId, "conn_id", connId)
+
 	// TODO Test whether this works with marshaled Protobuf bytes
 	err = i.client.Do(ctx, i.client.B().Publish().Channel(channelName).Message(string(dataBytes)).Build()).Error()
 	if err != nil {
+		i.logger.Error("could not forward request to gateway", "err", err, "gateway_id", gatewayId, "channel", channelName, "request_id", data.RequestId, "conn_id", connId, "app_id", appId)
 		return fmt.Errorf("could not publish executor request: %w", err)
 	}
+
+	i.logger.Debug("forwarded connect request to gateway", "gateway_id", gatewayId, "channel", channelName, "request_id", data.RequestId, "conn_id", connId, "app_id", appId)
 
 	return nil
 }
