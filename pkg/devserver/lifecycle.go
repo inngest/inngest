@@ -33,6 +33,7 @@ func (l Lifecycle) OnFunctionScheduled(
 		EventID:       md.Config.EventID(),
 		Cron:          md.Config.CronSchedule(),
 		OriginalRunID: md.Config.OriginalRunID,
+		WorkspaceID:   md.ID.Tenant.EnvID,
 	})
 
 	if md.Config.BatchID != nil {
