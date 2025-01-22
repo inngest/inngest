@@ -94,6 +94,7 @@ message SDKResponse {
 	bool no_retry = 4;
 	optional string retry_after = 5;
 	string sdk_version = 6;
+	uint32 request_version = 7;
 }
 
 enum ConnectionStatus {
