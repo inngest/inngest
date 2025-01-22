@@ -841,6 +841,7 @@ func toCQRSRun(run sqlc.FunctionRun, finish sqlc.FunctionFinish) *cqrs.FunctionR
 		FunctionID:      run.FunctionID,
 		FunctionVersion: run.FunctionVersion,
 		EventID:         run.EventID,
+		WorkspaceID:     run.WorkspaceID,
 	}
 	if run.BatchID != nilULID {
 		copied.BatchID = &run.BatchID

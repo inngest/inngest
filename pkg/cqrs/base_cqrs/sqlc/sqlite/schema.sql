@@ -48,7 +48,8 @@ CREATE TABLE function_runs (
 	event_id CHAR(26) NOT NULL,
 	batch_id CHAR(26),
 	original_run_id CHAR(26),
-	cron VARCHAR
+	cron VARCHAR,
+	workspace_id UUID
 );
 
 CREATE TABLE function_finishes (
