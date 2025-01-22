@@ -98,7 +98,7 @@ func (r *runValidator) checkStepLimit(ctx context.Context) error {
 		resp.Err = &gracefulErr
 		resp.SetFinal()
 
-		if err := r.e.finalize(ctx, r.md, r.evts, r.f.GetSlug(), r.e.assignedQueueShard, resp); err != nil {
+		if err := r.e.finalize(ctx, r.md, r.evts, r.f.GetSlug(), r.f.AppID, r.e.assignedQueueShard, resp); err != nil {
 			l.Error("error running finish handler", "error", err)
 		}
 

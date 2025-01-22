@@ -925,7 +925,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 					i.resp.Generator = []*state.GeneratorOpcode{}
 				}
 
-				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
+				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), i.f.AppID, e.assignedQueueShard, *i.resp); err != nil {
 					l.Error("error running finish handler", "error", err)
 				}
 
@@ -974,7 +974,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		// TODO: Improve this.
 
 		// TODO: Refactor state input
-		if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
+		if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), i.f.AppID, e.assignedQueueShard, *i.resp); err != nil {
 			l.Error("error running finish handler", "error", err)
 		}
 
@@ -990,7 +990,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 	// SDK versions (e.g. 2.7.2) can result in an OpcodeNone.
 	if len(i.resp.Generator) == 0 && i.resp.IsFunctionResult() {
 		// This is the function result.
-		if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
+		if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), i.f.AppID, e.assignedQueueShard, *i.resp); err != nil {
 			l.Error("error running finish handler", "error", err)
 		}
 
@@ -1005,6 +1005,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 
 type functionFinishedData struct {
 	FunctionID          string         `json:"function_id"`
+	AppID               string         `json:"app_id"`
 	RunID               ulid.ULID      `json:"run_id"`
 	Event               map[string]any `json:"event"`
 	Events              []event.Event  `json:"events"`
@@ -1037,7 +1038,7 @@ func (f functionFinishedData) Map() map[string]any {
 // Returns a boolean indicating whether it performed finalization. If the run
 // had parallel steps then it may be false, since parallel steps cause the
 // function end to be reached multiple times in a single run
-func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, queueShard redis_state.QueueShard, resp state.DriverResponse) error {
+func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, appId string, queueShard redis_state.QueueShard, resp state.DriverResponse) error {
 	// Parse events for the fail handler before deleting state.
 	inputEvents := make([]event.Event, len(evts))
 	for n, e := range evts {
@@ -1107,6 +1108,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 	now := time.Now()
 	base := &functionFinishedData{
 		FunctionID: fnSlug,
+		AppID:      appId,
 		RunID:      md.ID.RunID,
 		Events:     inputEvents,
 	}
@@ -1656,7 +1658,7 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	}
 
 	fnCancelledErr := state.ErrFunctionCancelled.Error()
-	if err := e.finalize(ctx, md, evts, f.Function.GetSlug(), shard, state.DriverResponse{
+	if err := e.finalize(ctx, md, evts, f.Function.GetSlug(), f.Function.AppID, shard, state.DriverResponse{
 		Err: &fnCancelledErr,
 	}); err != nil {
 		l.Error("error running finish handler", "error", err)

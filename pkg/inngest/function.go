@@ -55,6 +55,9 @@ type Function struct {
 	// Slug is the human-friendly ID for the function
 	Slug string `json:"slug"`
 
+	// AppID is the ID of the app that this function belongs to.
+	AppID string `json:"app_id"`
+
 	Priority *Priority `json:"priority,omitempty"`
 
 	// Timeouts represents timeouts for a function.
