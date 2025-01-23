@@ -859,12 +859,15 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, appId uuid.UUID,
 	replyAck, err := proto.Marshal(&connect.WorkerReplyAckData{
 		RequestId: data.RequestId,
 	})
+	if err != nil {
+		return fmt.Errorf("could not marshal reply ack: %w", err)
+	}
 
 	if err := wsproto.Write(ctx, c.ws, &connect.ConnectMessage{
 		Kind:    connect.GatewayMessageType_WORKER_REPLY_ACK,
 		Payload: replyAck,
 	}); err != nil {
-		c.log.Debug("failed to send worker reply acknowledgement", "err")
+		return fmt.Errorf("could not send reply ack: %w", err)
 	}
 
 	return nil
