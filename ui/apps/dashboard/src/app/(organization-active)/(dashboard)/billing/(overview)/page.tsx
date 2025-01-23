@@ -80,7 +80,7 @@ export default async function Page() {
   // TODO: self service must be unavailable for a given addon if account override is applied for the relevant entitlement
   //       https://linear.app/inngest/issue/INN-4306/self-service-must-be-unavailable-when-account-override-is-applied
 
-  const enableSelfService = await getBooleanFlag('enable-addon-self-service');
+  const enableSelfService = true; // await getBooleanFlag('enable-addon-self-service');
 
   return (
     <div className="grid grid-cols-3 gap-4">
@@ -117,93 +117,93 @@ export default async function Page() {
           <div className="border-subtle mb-6 border" />
           <EntitlementListItem
             title="Event Size"
-            value={entitlementUsage.eventSize.limit}
-            displayValue={
-              entitlementUsage.eventSize.limit >= 1024
-                ? `${(entitlementUsage.eventSize.limit / 1024).toFixed(2)} MB`
-                : `${entitlementUsage.eventSize.limit} KB`
-            }
-            planLimit={currentPlan.entitlements.eventSize.limit}
-            canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             description="The maximum size for a single event"
             selfServiceAvailable={false}
-            maxValue={0} // TODO: https://linear.app/inngest/issue/INN-4311/addon-ui-component-does-not-require-maxvalue-quantityper-addonname-for
-            quantityPer={0} // TODO: https://linear.app/inngest/issue/INN-4311/addon-ui-component-does-not-require-maxvalue-quantityper-addonname-for
-            addonName={''} // TODO: https://linear.app/inngest/issue/INN-4311/addon-ui-component-does-not-require-maxvalue-quantityper-addonname-for
+            canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
+            entitlement={{
+              currentValue: entitlementUsage.eventSize.limit,
+              displayValue:
+                entitlementUsage.eventSize.limit >= 1024
+                  ? `${(entitlementUsage.eventSize.limit / 1024).toFixed(2)} MB`
+                  : `${entitlementUsage.eventSize.limit} KB`,
+              planLimit: currentPlan.entitlements.eventSize.limit,
+            }}
           />
           <EntitlementListItem
             title="Concurrency"
-            value={entitlementUsage.concurrency.limit}
-            displayValue={`${entitlementUsage.concurrency.limit} concurrent steps`}
-            canIncreaseLimitInCurrentPlan={
-              entitlementUsage.isCustomPlan || currentPlan.addons.concurrency.available
-            }
-            planLimit={currentPlan.entitlements.concurrency.limit}
-            maxValue={1000} // TODO: https://linear.app/inngest/issue/INN-4310/use-maxlimitincurrentplan-data-from-gql-in-the-addons-ui
-            quantityPer={currentPlan.addons.concurrency.quantityPer}
             description="Maximum number of concurrently executing steps"
             tooltipContent="Functions actively sleeping and waiting for events are not counted"
             selfServiceAvailable={enableSelfService && !!currentPlan.addons.concurrency.price}
-            price={currentPlan.addons.concurrency.price || undefined}
-            addonName={'concurrency'}
+            canIncreaseLimitInCurrentPlan={
+              entitlementUsage.isCustomPlan || currentPlan.addons.concurrency.available
+            }
+            entitlement={{
+              currentValue: entitlementUsage.concurrency.limit,
+              displayValue: `${entitlementUsage.concurrency.limit} concurrent steps`,
+              planLimit: currentPlan.entitlements.concurrency.limit,
+              maxValue: 1000, // TODO: https://linear.app/inngest/issue/INN-4310/use-maxlimitincurrentplan-data-from-gql-in-the-addons-ui
+            }}
+            addon={{
+              price: currentPlan.addons.concurrency.price!,
+              quantityPer: currentPlan.addons.concurrency.quantityPer,
+              addonName: 'concurrency',
+            }}
             onChange={refetch}
           />
           <EntitlementListItem
             title="Users"
-            value={entitlementUsage.userCount.limit || 0}
-            displayValue={`${entitlementUsage.userCount.usage} of ${entitlementUsage.userCount.limit} maximum users`}
-            canIncreaseLimitInCurrentPlan={currentPlan.addons.userCount.available}
             description="Maximum number of users on the account"
-            planLimit={currentPlan.entitlements.userCount.limit || -1}
-            maxValue={1000} // TODO: https://linear.app/inngest/issue/INN-4310/use-maxlimitincurrentplan-data-from-gql-in-the-addons-ui
-            quantityPer={currentPlan.addons.userCount.quantityPer}
             selfServiceAvailable={
               enableSelfService &&
               !!currentPlan.addons.userCount.price &&
               entitlementUsage.userCount.limit !== null
             }
-            price={currentPlan.addons.userCount.price || undefined}
-            addonName={'user_count'}
+            canIncreaseLimitInCurrentPlan={currentPlan.addons.userCount.available}
+            entitlement={{
+              currentValue: entitlementUsage.userCount.limit || undefined,
+              displayValue: `${entitlementUsage.userCount.usage} of ${entitlementUsage.userCount.limit} maximum users`,
+              planLimit: currentPlan.entitlements.userCount.limit || undefined,
+              maxValue: 1000, // TODO: https://linear.app/inngest/issue/INN-4310/use-maxlimitincurrentplan-data-from-gql-in-the-addons-ui
+            }}
+            addon={{
+              quantityPer: currentPlan.addons.userCount.quantityPer,
+              price: currentPlan.addons.userCount.price!,
+              addonName: 'user_count',
+            }}
             onChange={refetch}
           />
           <EntitlementListItem
             title="Log history"
-            value={entitlementUsage.history.limit}
-            displayValue={`${entitlementUsage.history.limit} day${
-              entitlementUsage.history.limit === 1 ? '' : 's'
-            }`}
-            planLimit={currentPlan.entitlements.history.limit}
-            canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             description="View and search function run traces and metrics"
             selfServiceAvailable={false}
-            maxValue={366} // TODO: https://linear.app/inngest/issue/INN-4311/addon-ui-component-does-not-require-maxvalue-quantityper-addonname-for
-            quantityPer={7} // TODO: https://linear.app/inngest/issue/INN-4311/addon-ui-component-does-not-require-maxvalue-quantityper-addonname-for
-            addonName={''} // TODO: https://linear.app/inngest/issue/INN-4311/addon-ui-component-does-not-require-maxvalue-quantityper-addonname-for
+            canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
+            entitlement={{
+              currentValue: entitlementUsage.history.limit,
+              displayValue: `${entitlementUsage.history.limit} day${
+                entitlementUsage.history.limit === 1 ? '' : 's'
+              }`,
+              planLimit: currentPlan.entitlements.history.limit,
+            }}
           />
           <EntitlementListItem
             title="HIPAA"
-            value={entitlementUsage.hipaa.enabled}
-            displayValue={entitlementUsage.hipaa.enabled ? 'Enabled' : 'Not enabled'}
-            canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan || isProPlan} // TODO: https://linear.app/inngest/issue/INN-4310/use-maxlimitincurrentplan-data-from-gql-in-the-addons-ui
             description="Sign BAAs for healthcare services"
-            planLimit={1} // TODO: https://linear.app/inngest/issue/INN-4303/addon-ui-component-supports-switchboolean-inputs
-            maxValue={1} // TODO: https://linear.app/inngest/issue/INN-4303/addon-ui-component-supports-switchboolean-inputs
-            quantityPer={1} // TODO: https://linear.app/inngest/issue/INN-4303/addon-ui-component-supports-switchboolean-inputs
             selfServiceAvailable={false} // TODO: https://linear.app/inngest/issue/INN-4304/self-service-addon-ui-supports-hipaa-addon
-            addonName={'hipaa'}
+            canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan || isProPlan} // TODO: https://linear.app/inngest/issue/INN-4310/use-maxlimitincurrentplan-data-from-gql-in-the-addons-ui
+            entitlement={{
+              currentValue: entitlementUsage.hipaa.enabled,
+              displayValue: entitlementUsage.hipaa.enabled ? 'Enabled' : 'Not enabled',
+            }}
           />
           <EntitlementListItem
             title="Dedicated execution capacity"
-            canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             description="Dedicated infrastructure for the lowest latency and highest throughput"
-            selfServiceAvailable={false}
-            displayValue={'Not enabled'} // TODO: https://linear.app/inngest/issue/INN-4202/add-dedicated-capacity-addon
-            value={0} // TODO: https://linear.app/inngest/issue/INN-4202/add-dedicated-capacity-addon
-            quantityPer={250} // TODO: https://linear.app/inngest/issue/INN-4202/add-dedicated-capacity-addon
-            price={500} // TODO: https://linear.app/inngest/issue/INN-4202/add-dedicated-capacity-addon
-            addonName={''} // TODO: https://linear.app/inngest/issue/INN-4202/add-dedicated-capacity-addon
-            maxValue={1000} // TODO: https://linear.app/inngest/issue/INN-4310/use-maxlimitincurrentplan-data-from-gql-in-the-addons-ui
-            planLimit={0} // TODO: https://linear.app/inngest/issue/INN-4202/add-dedicated-capacity-addon
+            selfServiceAvailable={false} // TODO: https://linear.app/inngest/issue/INN-4202/add-dedicated-capacity-addon
+            canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
+            entitlement={{
+              currentValue: false,
+              displayValue: 'Not enabled', // TODO: https://linear.app/inngest/issue/INN-4202/add-dedicated-capacity-addon
+            }}
           />
           <div className="flex flex-col items-center gap-2 pt-6">
             <p className="text-muted text-xs">Custom needs?</p>
