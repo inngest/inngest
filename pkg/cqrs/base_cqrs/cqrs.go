@@ -1181,8 +1181,9 @@ func (w wrapper) GetSpanStack(ctx context.Context, opts cqrs.SpanIdentifier) ([]
 		}
 
 		for _, evt := range evts {
-			if stack, ok := evt.Attributes[consts.OtelSysStepStack]; ok {
-				return strings.Split(stack, ","), nil
+			if _, isStackEvt := evt.Attributes[consts.OtelSysStepStack]; isStackEvt {
+				// Data is kept in the `Name` field
+				return strings.Split(evt.Name, ","), nil
 			}
 		}
 	}
@@ -1560,7 +1561,7 @@ func (w wrapper) InsertWorkerConnection(ctx context.Context, conn *cqrs.WorkerCo
 		DisconnectedAt:  disconnectedAt,
 		RecordedAt:      conn.RecordedAt.UnixMilli(),
 		InsertedAt:      time.Now().UnixMilli(),
-		
+
 		DisconnectReason: disconnectReason,
 
 		GroupHash:     []byte(conn.GroupHash),
@@ -1974,10 +1975,10 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 // copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types
 // automatically.
 func copyWriter[
-PARAMS_IN any,
-INTERNAL_PARAMS any,
-IN any,
-OUT any,
+	PARAMS_IN any,
+	INTERNAL_PARAMS any,
+	IN any,
+	OUT any,
 ](
 	ctx context.Context,
 	f func(context.Context, INTERNAL_PARAMS) (IN, error),
@@ -2000,8 +2001,8 @@ OUT any,
 }
 
 func copyInto[
-IN any,
-OUT any,
+	IN any,
+	OUT any,
 ](
 	ctx context.Context,
 	f func(context.Context) (IN, error),
