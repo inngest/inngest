@@ -856,6 +856,17 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, appId uuid.UUID,
 		return fmt.Errorf("could not notify executor: %w", err)
 	}
 
+	replyAck, err := proto.Marshal(&connect.WorkerReplyAckData{
+		RequestId: data.RequestId,
+	})
+
+	if err := wsproto.Write(ctx, c.ws, &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_REPLY_ACK,
+		Payload: replyAck,
+	}); err != nil {
+		c.log.Debug("failed to send worker reply acknowledgement", "err")
+	}
+
 	return nil
 }
 

@@ -13,10 +13,11 @@ enum GatewayMessageType {
   WORKER_READY = 4;
   WORKER_REQUEST_ACK = 5;
   WORKER_REPLY = 6;
-  WORKER_PAUSE = 7;
-  WORKER_HEARTBEAT = 8;
-  GATEWAY_HEARTBEAT = 9;
-  GATEWAY_CLOSING = 10;
+  WORKER_REPLY_ACK = 7;
+  WORKER_PAUSE = 8;
+  WORKER_HEARTBEAT = 9;
+  GATEWAY_HEARTBEAT = 10;
+  GATEWAY_CLOSING = 11;
 }
 
 message ConnectMessage {
@@ -96,6 +97,10 @@ message SDKResponse {
 	optional string retry_after = 5;
 	string sdk_version = 6;
 	uint32 request_version = 7;
+}
+
+message WorkerReplyAckData {
+	string request_id = 1;
 }
 
 enum ConnectionStatus {
