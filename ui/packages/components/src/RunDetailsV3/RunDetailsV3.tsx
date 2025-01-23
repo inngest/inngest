@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { ErrorCard } from '../RunDetailsV2/ErrorCard';
@@ -46,6 +46,47 @@ export const RunDetailsV3 = (props: Props) => {
   const { getResult, getRun, getTrigger, pathCreator, rerun, rerunFromStep, runID, standalone } =
     props;
   const [pollInterval, setPollInterval] = useState(props.pollInterval);
+  const [leftWidth, setLeftWidth] = useState(55);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleMouseDown = useCallback(() => {
+    setIsDragging(true);
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isDragging) {
+        return;
+      }
+
+      const container = document.getElementById('run-details-container');
+      if (!container) {
+        return;
+      }
+
+      const containerRect = container.getBoundingClientRect();
+      const newWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+      setLeftWidth(Math.min(Math.max(newWidth, 20), 80));
+    },
+    [isDragging]
+  );
+
+  useEffect(() => {
+    if (isDragging) {
+      document.body.style.userSelect = 'none';
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, handleMouseMove, handleMouseUp]);
 
   const runRes = useQuery({
     queryKey: ['run', runID],
@@ -88,9 +129,9 @@ export const RunDetailsV3 = (props: Props) => {
       : runRes.error || resultRes.error;
 
   return (
-    <div className="ml-4 mt-4 flex h-full flex-row">
-      <div className="flex h-full w-[55%] flex-col">
-        <div className="h-full resize-x pb-4 pr-4">
+    <div id="run-details-container" className="ml-4 mt-4 flex h-full flex-row">
+      <div className="flex h-full flex-col" style={{ width: `${leftWidth}%` }}>
+        <div className="h-full pb-4 pr-4">
           <RunInfo
             cancelRun={cancelRun}
             className="mb-4"
@@ -113,7 +154,13 @@ export const RunDetailsV3 = (props: Props) => {
         </div>
         <Trace />
       </div>
-      <div className="border-muted flex h-full w-[45%] resize-x flex-col border-l">
+
+      <div className="w-1 cursor-col-resize" onMouseDown={handleMouseDown} />
+
+      <div
+        className="border-muted flex h-full flex-col border-l"
+        style={{ width: `${100 - leftWidth}%` }}
+      >
         <TriggerInfo getTrigger={getTrigger} runID={runID} />
       </div>
     </div>
