@@ -6,14 +6,16 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/auth"
+	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/headers"
 	"net/url"
 )
 
 type Opts struct {
-	ConnectManager state.ConnectionManager
-	GroupManager   state.WorkerGroupManager
+	ConnectManager          state.ConnectionManager
+	GroupManager            state.WorkerGroupManager
+	ConnectResponseNotifier pubsub.ResponseNotifier
 
 	Signer                  auth.SessionTokenSigner
 	RequestAuther           RequestAuther
@@ -73,5 +75,6 @@ func (a *router) setup() {
 	// Worker API
 	a.Group(func(r chi.Router) {
 		r.Post("/start", a.start)
+		r.Post("/envs/{envID}/flush", a.flushBuffer)
 	})
 }

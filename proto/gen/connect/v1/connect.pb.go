@@ -1373,6 +1373,51 @@ func (x *StartRequest) GetExcludeGateways() []string {
 	return nil
 }
 
+type FlushResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	RequestId string `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+}
+
+func (x *FlushResponse) Reset() {
+	*x = FlushResponse{}
+	mi := &file_connect_v1_connect_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FlushResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FlushResponse) ProtoMessage() {}
+
+func (x *FlushResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_connect_v1_connect_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FlushResponse.ProtoReflect.Descriptor instead.
+func (*FlushResponse) Descriptor() ([]byte, []int) {
+	return file_connect_v1_connect_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *FlushResponse) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
 var File_connect_v1_connect_proto protoreflect.FileDescriptor
 
 var file_connect_v1_connect_proto_rawDesc = []byte{
@@ -1559,7 +1604,10 @@ var file_connect_v1_connect_proto_rawDesc = []byte{
 	0x0c, 0x53, 0x74, 0x61, 0x72, 0x74, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x29, 0x0a,
 	0x10, 0x65, 0x78, 0x63, 0x6c, 0x75, 0x64, 0x65, 0x5f, 0x67, 0x61, 0x74, 0x65, 0x77, 0x61, 0x79,
 	0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x09, 0x52, 0x0f, 0x65, 0x78, 0x63, 0x6c, 0x75, 0x64, 0x65,
-	0x47, 0x61, 0x74, 0x65, 0x77, 0x61, 0x79, 0x73, 0x2a, 0x9d, 0x02, 0x0a, 0x12, 0x47, 0x61, 0x74,
+	0x47, 0x61, 0x74, 0x65, 0x77, 0x61, 0x79, 0x73, 0x22, 0x2e, 0x0a, 0x0d, 0x46, 0x6c, 0x75, 0x73,
+	0x68, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x1d, 0x0a, 0x0a, 0x72, 0x65, 0x71,
+	0x75, 0x65, 0x73, 0x74, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x72,
+	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x49, 0x64, 0x2a, 0x9d, 0x02, 0x0a, 0x12, 0x47, 0x61, 0x74,
 	0x65, 0x77, 0x61, 0x79, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x54, 0x79, 0x70, 0x65, 0x12,
 	0x11, 0x0a, 0x0d, 0x47, 0x41, 0x54, 0x45, 0x57, 0x41, 0x59, 0x5f, 0x48, 0x45, 0x4c, 0x4c, 0x4f,
 	0x10, 0x00, 0x12, 0x12, 0x0a, 0x0e, 0x57, 0x4f, 0x52, 0x4b, 0x45, 0x52, 0x5f, 0x43, 0x4f, 0x4e,
@@ -1610,7 +1658,7 @@ func file_connect_v1_connect_proto_rawDescGZIP() []byte {
 }
 
 var file_connect_v1_connect_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_connect_v1_connect_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_connect_v1_connect_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_connect_v1_connect_proto_goTypes = []any{
 	(GatewayMessageType)(0),            // 0: connect.v1.GatewayMessageType
 	(SDKResponseStatus)(0),             // 1: connect.v1.SDKResponseStatus
@@ -1632,7 +1680,8 @@ var file_connect_v1_connect_proto_goTypes = []any{
 	(*ConnGroup)(nil),                  // 17: connect.v1.ConnGroup
 	(*StartResponse)(nil),              // 18: connect.v1.StartResponse
 	(*StartRequest)(nil),               // 19: connect.v1.StartRequest
-	(*timestamppb.Timestamp)(nil),      // 20: google.protobuf.Timestamp
+	(*FlushResponse)(nil),              // 20: connect.v1.FlushResponse
+	(*timestamppb.Timestamp)(nil),      // 21: google.protobuf.Timestamp
 }
 var file_connect_v1_connect_proto_depIdxs = []int32{
 	0,  // 0: connect.v1.ConnectMessage.kind:type_name -> connect.v1.GatewayMessageType
@@ -1641,10 +1690,10 @@ var file_connect_v1_connect_proto_depIdxs = []int32{
 	8,  // 3: connect.v1.WorkerConnectRequestData.auth_data:type_name -> connect.v1.AuthData
 	7,  // 4: connect.v1.WorkerConnectRequestData.config:type_name -> connect.v1.ConfigDetails
 	16, // 5: connect.v1.WorkerConnectRequestData.system_attributes:type_name -> connect.v1.SystemAttributes
-	20, // 6: connect.v1.WorkerConnectRequestData.started_at:type_name -> google.protobuf.Timestamp
+	21, // 6: connect.v1.WorkerConnectRequestData.started_at:type_name -> google.protobuf.Timestamp
 	1,  // 7: connect.v1.SDKResponse.status:type_name -> connect.v1.SDKResponseStatus
 	2,  // 8: connect.v1.ConnMetadata.status:type_name -> connect.v1.ConnectionStatus
-	20, // 9: connect.v1.ConnMetadata.last_heartbeat_at:type_name -> google.protobuf.Timestamp
+	21, // 9: connect.v1.ConnMetadata.last_heartbeat_at:type_name -> google.protobuf.Timestamp
 	16, // 10: connect.v1.ConnMetadata.attributes:type_name -> connect.v1.SystemAttributes
 	15, // 11: connect.v1.ConnGroup.conns:type_name -> connect.v1.ConnMetadata
 	12, // [12:12] is the sub-list for method output_type
@@ -1672,7 +1721,7 @@ func file_connect_v1_connect_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_connect_v1_connect_proto_rawDesc,
 			NumEnums:      4,
-			NumMessages:   16,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

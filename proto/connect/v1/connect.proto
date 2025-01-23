@@ -155,3 +155,7 @@ message StartResponse {
 message StartRequest {
 	repeated string exclude_gateways = 1;
 }
+
+message FlushResponse {
+	string request_id = 1;
+}
