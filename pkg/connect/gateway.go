@@ -359,7 +359,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					Tags:    tags,
 				})
 
-				serr := ch.handleIncomingWebSocketMessage(app.ID, &msg)
+				serr := ch.handleIncomingWebSocketMessage(ctx, app.ID, &msg)
 				if serr != nil {
 					c.closeWithConnectError(ws, serr)
 					return serr
@@ -455,7 +455,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 	})
 }
 
-func (c *connectionHandler) handleIncomingWebSocketMessage(appId uuid.UUID, msg *connect.ConnectMessage) *SocketError {
+func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, appId uuid.UUID, msg *connect.ConnectMessage) *SocketError {
 	c.log.Debug("received WebSocket message", "kind", msg.Kind.String())
 
 	switch msg.Kind {
@@ -496,6 +496,14 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(appId uuid.UUID, msg 
 
 		for _, l := range c.svc.lifecycles {
 			go l.OnHeartbeat(context.Background(), c.conn)
+		}
+
+		// Respond with gateway heartbeat
+		if err := wsproto.Write(ctx, c.ws, &connect.ConnectMessage{
+			Kind: connect.GatewayMessageType_GATEWAY_HEARTBEAT,
+		}); err != nil {
+			// The connection will fail to read and be closed in the read loop
+			return nil
 		}
 
 		return nil

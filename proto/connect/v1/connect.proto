@@ -15,7 +15,8 @@ enum GatewayMessageType {
   WORKER_REPLY = 6;
   WORKER_PAUSE = 7;
   WORKER_HEARTBEAT = 8;
-  GATEWAY_CLOSING = 9;
+  GATEWAY_HEARTBEAT = 9;
+  GATEWAY_CLOSING = 10;
 }
 
 message ConnectMessage {
