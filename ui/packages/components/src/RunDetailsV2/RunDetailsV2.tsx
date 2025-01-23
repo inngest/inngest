@@ -7,7 +7,6 @@ import type { Run as InitialRunData } from '../RunsPage/types';
 import { StatusCell } from '../Table';
 import { Trace as OldTrace } from '../TimelineV2';
 import { TimelineV2 } from '../TimelineV2/Timeline';
-import { Trace } from '../Trace/Trace';
 import { TriggerDetails } from '../TriggerDetails';
 import type { Result } from '../types/functionRun';
 import { nullishToLazy } from '../utils/lazyLoad';
