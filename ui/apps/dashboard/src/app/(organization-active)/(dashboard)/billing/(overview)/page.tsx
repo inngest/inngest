@@ -77,10 +77,7 @@ export default async function Page() {
 
   const isProPlan = currentPlan.name === PlanNames.Pro;
 
-  // TODO: self service must be unavailable for a given addon if account override is applied for the relevant entitlement
-  //       https://linear.app/inngest/issue/INN-4306/self-service-must-be-unavailable-when-account-override-is-applied
-
-  const enableSelfService = await getBooleanFlag('enable-addon-self-service');
+  const enableSelfServiceFF = await getBooleanFlag('enable-addon-self-service');
 
   return (
     <div className="grid grid-cols-3 gap-4">
@@ -118,7 +115,6 @@ export default async function Page() {
           <EntitlementListItem
             title="Event Size"
             description="The maximum size for a single event"
-            selfServiceAvailable={false}
             canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             entitlement={{
               currentValue: entitlementUsage.eventSize.limit,
@@ -128,12 +124,12 @@ export default async function Page() {
                   : `${entitlementUsage.eventSize.limit} KB`,
               planLimit: currentPlan.entitlements.eventSize.limit,
             }}
+            enableSelfServiceFeatureFlag={enableSelfServiceFF}
           />
           <EntitlementListItem
             title="Concurrency"
             description="Maximum number of concurrently executing steps"
             tooltipContent="Functions actively sleeping and waiting for events are not counted"
-            selfServiceAvailable={enableSelfService && !!currentPlan.addons.concurrency.price}
             canIncreaseLimitInCurrentPlan={
               entitlementUsage.isCustomPlan || currentPlan.addons.concurrency.available
             }
@@ -144,38 +140,36 @@ export default async function Page() {
               maxValue: 1000, // TODO: https://linear.app/inngest/issue/INN-4310/use-maxlimitincurrentplan-data-from-gql-in-the-addons-ui
             }}
             addon={{
-              price: currentPlan.addons.concurrency.price!,
+              price: currentPlan.addons.concurrency.price,
               quantityPer: currentPlan.addons.concurrency.quantityPer,
               addonName: 'concurrency',
             }}
             onChange={refetch}
+            enableSelfServiceFeatureFlag={enableSelfServiceFF}
           />
           <EntitlementListItem
             title="Users"
             description="Maximum number of users on the account"
-            selfServiceAvailable={
-              enableSelfService &&
-              !!currentPlan.addons.userCount.price &&
-              entitlementUsage.userCount.limit !== null
+            canIncreaseLimitInCurrentPlan={
+              entitlementUsage.isCustomPlan || currentPlan.addons.userCount.available
             }
-            canIncreaseLimitInCurrentPlan={currentPlan.addons.userCount.available}
             entitlement={{
-              currentValue: entitlementUsage.userCount.limit || undefined,
+              currentValue: entitlementUsage.userCount.limit,
               displayValue: `${entitlementUsage.userCount.usage} of ${entitlementUsage.userCount.limit} maximum users`,
-              planLimit: currentPlan.entitlements.userCount.limit || undefined,
+              planLimit: currentPlan.entitlements.userCount.limit,
               maxValue: 1000, // TODO: https://linear.app/inngest/issue/INN-4310/use-maxlimitincurrentplan-data-from-gql-in-the-addons-ui
             }}
             addon={{
               quantityPer: currentPlan.addons.userCount.quantityPer,
-              price: currentPlan.addons.userCount.price!,
+              price: currentPlan.addons.userCount.price,
               addonName: 'user_count',
             }}
             onChange={refetch}
+            enableSelfServiceFeatureFlag={enableSelfServiceFF}
           />
           <EntitlementListItem
             title="Log history"
             description="View and search function run traces and metrics"
-            selfServiceAvailable={false}
             canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             entitlement={{
               currentValue: entitlementUsage.history.limit,
@@ -184,26 +178,27 @@ export default async function Page() {
               }`,
               planLimit: currentPlan.entitlements.history.limit,
             }}
+            enableSelfServiceFeatureFlag={enableSelfServiceFF}
           />
           <EntitlementListItem
             title="HIPAA"
             description="Sign BAAs for healthcare services"
-            selfServiceAvailable={false} // TODO: https://linear.app/inngest/issue/INN-4304/self-service-addon-ui-supports-hipaa-addon
             canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan || isProPlan} // TODO: https://linear.app/inngest/issue/INN-4310/use-maxlimitincurrentplan-data-from-gql-in-the-addons-ui
             entitlement={{
               currentValue: entitlementUsage.hipaa.enabled,
               displayValue: entitlementUsage.hipaa.enabled ? 'Enabled' : 'Not enabled',
             }}
+            enableSelfServiceFeatureFlag={enableSelfServiceFF}
           />
           <EntitlementListItem
             title="Dedicated execution capacity"
             description="Dedicated infrastructure for the lowest latency and highest throughput"
-            selfServiceAvailable={false} // TODO: https://linear.app/inngest/issue/INN-4202/add-dedicated-capacity-addon
             canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             entitlement={{
               currentValue: false,
               displayValue: 'Not enabled', // TODO: https://linear.app/inngest/issue/INN-4202/add-dedicated-capacity-addon
             }}
+            enableSelfServiceFeatureFlag={enableSelfServiceFF}
           />
           <div className="flex flex-col items-center gap-2 pt-6">
             <p className="text-muted text-xs">Custom needs?</p>

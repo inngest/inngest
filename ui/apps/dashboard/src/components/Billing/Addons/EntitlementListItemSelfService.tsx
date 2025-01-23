@@ -53,22 +53,23 @@ export default function EntitlementListItemSelfService({
   const [, updateAccountAddonQuantity] = useMutation(UpdateAccountAddonQuantityDocument);
   const [err, setErr] = useState<String | null>(null);
 
-  const useSwitchInput = typeof entitlement.currentValue === 'boolean';
-  const useNumericInput = typeof entitlement.currentValue === 'number';
+  const switchInput = typeof entitlement.currentValue === 'boolean';
+  const numericInput = typeof entitlement.currentValue === 'number';
 
-  const addonCostStr = addonQtyCostString(title, addonQty, addon);
+  const addonCostStr = addonQtyCostString(addonQty, addon);
+
   const addonConfirmTitle =
-    entitlement.currentValue === entitlement.planLimit ||
-    (useSwitchInput && !entitlement.currentValue)
+    entitlement.currentValue === entitlement.planLimit || (switchInput && !entitlement.currentValue)
       ? `Add ${title.toLowerCase()} to plan`
       : `Change ${title.toLowerCase()} addon`;
-  const addonConfirmDescription = useNumericInput
+
+  const addonConfirmDescription = numericInput
     ? `Your new charge for ${
         addonQty * addon.quantityPer
       } ${title.toLowerCase()} will be ${addonCostStr}.`
     : `Your new charge for ${title.toLowerCase()} will be ${addonCostStr}.`;
 
-  if (useSwitchInput) {
+  if (switchInput) {
     // TODO: boolean/switch support: https://linear.app/inngest/issue/INN-4303/addon-ui-component-supports-switchboolean-inputs
     throw new Error('Switch input is not yet supported');
   }
@@ -129,7 +130,7 @@ export default function EntitlementListItemSelfService({
           />
         )}
       </div>
-      {openSelfService && useNumericInput && typeof entitlement.currentValue === 'number' && (
+      {openSelfService && numericInput && typeof entitlement.currentValue === 'number' && (
         <EntitlementListItemSelfServiceNumeric
           entitlement={{
             currentValue: entitlement.currentValue,

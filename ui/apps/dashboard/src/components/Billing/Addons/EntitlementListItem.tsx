@@ -3,6 +3,7 @@
 import { Button } from '@inngest/components/Button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiInformationLine } from '@remixicon/react';
+import { add } from 'husky';
 
 import EntitlementListItemSelfService from '@/components/Billing/Addons/EntitlementListItemSelfService';
 import { addonPriceStr } from '@/components/Billing/Addons/pricing_help';
@@ -12,56 +13,63 @@ export default function EntitlementListItem({
   title,
   description,
   tooltipContent,
-  selfServiceAvailable,
   canIncreaseLimitInCurrentPlan,
   entitlement,
   addon,
   onChange,
+  enableSelfServiceFeatureFlag,
 }: {
   title: string; // Title of the addon (e.g. Users, Concurrency)
   description?: string;
   tooltipContent?: string | React.ReactNode;
-  selfServiceAvailable: boolean; // Is an addon available (for this account) via self-service or will they need to contact us?
   canIncreaseLimitInCurrentPlan: boolean; // Can this limit be increased on the current billing plan (or does the user need to upgrade to a higher plan)?
   entitlement: {
-    currentValue?: number | boolean; // Current value of the entitlement relevant to this addon, including plan + any addons + account-level overrides
+    currentValue?: number | boolean | null; // Current value of the entitlement relevant to this addon, including plan + any addons + account-level overrides
     displayValue?: string;
-    planLimit?: number; // The amount of this addon included in the current billing plan
+    planLimit?: number | null; // The amount of this addon included in the current billing plan
     maxValue?: number; // The maximum amount of (value * quantityPer) that can be purchased
   };
   addon?: {
     addonName: string;
-    quantityPer: number; // The number of units (e.g. concurrency or users) included in one purchase of this addon
-    price: number; // Price for one purchase of this addon, in US Cents
-  };
+    quantityPer?: number; // The number of units (e.g. concurrency or users) included in one purchase of this addon
+    price?: number | null; // Price for one purchase of this addon, in US Cents.
+  }; // No addon, or no price, implies self-service is not available.
   onChange?: () => void;
+  enableSelfServiceFeatureFlag: boolean;
 }) {
-  const isPlanEntUnlimited = entitlement.planLimit === undefined || entitlement.planLimit === -1;
+  const isPlanEntUnlimited = entitlement.planLimit === undefined || entitlement.planLimit === null; // note: entitlement.planLimit can be 0
+  const isAccountEntUnlimited =
+    entitlement.currentValue === undefined || entitlement.currentValue === null; // note: entitlement.currentValue can be 0
 
-  if (entitlement.currentValue === undefined) {
-    entitlement.currentValue = -1;
-  }
-  if (!canIncreaseLimitInCurrentPlan || isPlanEntUnlimited) {
-    selfServiceAvailable = false;
-  }
-  if (selfServiceAvailable && !addon) {
-    console.error('EntitlementListItem: addon is required when selfServiceAvailable is true');
-    selfServiceAvailable = false;
-  }
-  if (selfServiceAvailable && !entitlement.maxValue) {
-    console.error(
-      'EntitlementListItem: entitlement.maxValue is required when selfServiceAvailable is true'
-    );
-    selfServiceAvailable = false;
-  }
+  // TODO: self service must be unavailable for a given addon if account override is applied for the relevant entitlement
+  //       https://linear.app/inngest/issue/INN-4306/self-service-must-be-unavailable-when-account-override-is-applied
+
+  const selfServiceAvailable =
+    enableSelfServiceFeatureFlag &&
+    !isAccountEntUnlimited &&
+    !isPlanEntUnlimited &&
+    canIncreaseLimitInCurrentPlan &&
+    addon?.price &&
+    addon.quantityPer &&
+    entitlement.maxValue;
 
   const priceText =
-    !isPlanEntUnlimited && canIncreaseLimitInCurrentPlan && addon
-      ? addonPriceStr(title, entitlement, addon)
+    !isPlanEntUnlimited &&
+    !isAccountEntUnlimited &&
+    canIncreaseLimitInCurrentPlan &&
+    addon?.price &&
+    addon.quantityPer &&
+    entitlement.currentValue !== undefined &&
+    entitlement.currentValue !== null // note: entitlement.currentValue can be 0
+      ? addonPriceStr(title, entitlement.currentValue, addon.quantityPer, addon.price)
       : undefined;
-  const planLimitStr = isPlanEntUnlimited ? 'unlimited' : entitlement.planLimit!.toString();
+
+  const planLimitStr =
+    isPlanEntUnlimited || isAccountEntUnlimited ? 'unlimited' : entitlement.planLimit!.toString(); // nil-checked at declaration of isPlanEntUnlimited above
+
   const planIncludesStr =
     typeof entitlement.currentValue === 'boolean' ? title : planLimitStr + ' ' + title;
+
   const descriptionText = description ? (
     description
   ) : (
@@ -87,17 +95,21 @@ export default function EntitlementListItem({
 
   return (
     <div className="mb-5">
-      {selfServiceAvailable && addon && entitlement.maxValue && entitlement.planLimit ? (
+      {selfServiceAvailable ? (
         <EntitlementListItemSelfService
           title={title}
           description={descriptionText}
           tooltip={tooltip}
           entitlement={{
-            currentValue: entitlement.currentValue,
-            planLimit: entitlement.planLimit,
-            maxValue: entitlement.maxValue,
+            currentValue: entitlement.currentValue!, // nil-checked at declaration of selfServiceAvailable above
+            planLimit: entitlement.planLimit!, // nil-checked at declaration of selfServiceAvailable above
+            maxValue: entitlement.maxValue!, // nil-checked at declaration of selfServiceAvailable above
           }}
-          addon={addon}
+          addon={{
+            price: addon.price!, // nil-checked at declaration of selfServiceAvailable above
+            quantityPer: addon.quantityPer!, // nil-checked at declaration of selfServiceAvailable above
+            addonName: addon.addonName,
+          }}
           onChange={onChange}
         />
       ) : (

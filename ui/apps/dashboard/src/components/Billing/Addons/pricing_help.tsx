@@ -8,30 +8,21 @@ function unitDescriptionFromTitle(title: string) {
 
 export function addonPriceStr(
   title: string,
-  entitlement: {
-    currentValue?: number | boolean;
-  },
-  addon: {
-    quantityPer: number;
-    price: number;
-  }
+  currentValue: number | boolean,
+  quantityPer: number,
+  price: number
 ) {
-  if (entitlement.currentValue === undefined || entitlement.currentValue === -1) {
-    console.error('calling addonPriceStr is nonsensical if current entitlement is unlimited');
-    return '';
-  }
-  const priceDollars = (addon.price / 100).toFixed(2);
-  if (typeof entitlement.currentValue === 'boolean') {
+  const priceDollars = (price / 100).toFixed(2);
+  if (typeof currentValue === 'boolean') {
     return `$${priceDollars} per month`;
   }
-  if (addon.quantityPer === 1) {
+  if (quantityPer === 1) {
     return `$${priceDollars} per ${unitDescriptionFromTitle(title)}/month`;
   }
-  return `$${priceDollars} per ${addon.quantityPer} ${title.toLowerCase()}/month`;
+  return `$${priceDollars} per ${quantityPer} ${title.toLowerCase()}/month`;
 }
 
 export function addonQtyCostString(
-  title: string,
   qty: number,
   addon: {
     quantityPer: number;
