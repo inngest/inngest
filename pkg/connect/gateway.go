@@ -560,7 +560,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 		}
 	case connect.GatewayMessageType_WORKER_REPLY:
 		// Always handle SDK reply, even if gateway is draining
-		err := c.handleSdkReply(context.Background(), appId, msg)
+		err := c.handleSdkReply(context.Background(), msg)
 		if err != nil {
 			// TODO Should we actually close the connection here?
 			return &SocketError{
@@ -843,7 +843,7 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 	return &conn, nil
 }
 
-func (c *connectionHandler) handleSdkReply(ctx context.Context, appId uuid.UUID, msg *connect.ConnectMessage) error {
+func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connect.ConnectMessage) error {
 	var data connect.SDKResponse
 	if err := proto.Unmarshal(msg.Payload, &data); err != nil {
 		return fmt.Errorf("invalid response type: %w", err)
@@ -851,7 +851,7 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, appId uuid.UUID,
 
 	c.log.Debug("notifying executor about response", "status", data.Status.String(), "no_retry", data.NoRetry, "retry_after", data.RetryAfter)
 
-	err := c.svc.receiver.NotifyExecutor(ctx, appId, &data)
+	err := c.svc.receiver.NotifyExecutor(ctx, &data)
 	if err != nil {
 		return fmt.Errorf("could not notify executor: %w", err)
 	}

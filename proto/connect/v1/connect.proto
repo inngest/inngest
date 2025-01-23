@@ -91,12 +91,13 @@ enum SDKResponseStatus {
 
 message SDKResponse {
 	string request_id = 1;
-	SDKResponseStatus status = 2;
-	bytes body = 3;
-	bool no_retry = 4;
-	optional string retry_after = 5;
-	string sdk_version = 6;
-	uint32 request_version = 7;
+	string app_id = 2;
+	SDKResponseStatus status = 3;
+	bytes body = 4;
+	bool no_retry = 5;
+	optional string retry_after = 6;
+	string sdk_version = 7;
+	uint32 request_version = 8;
 }
 
 message WorkerReplyAckData {
