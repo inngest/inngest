@@ -80,7 +80,7 @@ export default async function Page() {
   // TODO: self service must be unavailable for a given addon if account override is applied for the relevant entitlement
   //       https://linear.app/inngest/issue/INN-4306/self-service-must-be-unavailable-when-account-override-is-applied
 
-  const enableSelfService = true; // await getBooleanFlag('enable-addon-self-service');
+  const enableSelfService = await getBooleanFlag('enable-addon-self-service');
 
   return (
     <div className="grid grid-cols-3 gap-4">
