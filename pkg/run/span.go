@@ -540,7 +540,14 @@ func (s *Span) SetFnOutput(data any) {
 }
 
 func (s *Span) SetStepStack(stack []string) {
-	s.setAttrData(strings.Join(stack, ","), consts.OtelSysStepStack)
+	if len(stack) == 0 {
+		return
+	}
+	stackStr := strings.Join(stack, ",")
+
+	s.AddEvent(stackStr, trace.WithAttributes(
+		attribute.String(consts.OtelSysStepStack, stackStr),
+	))
 }
 
 func (s *Span) SetStepInput(data any) {

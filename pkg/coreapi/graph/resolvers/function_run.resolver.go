@@ -268,8 +268,8 @@ func (r *mutationResolver) Rerun(
 	fromStep *models.RerunFromStepInput,
 ) (ulid.ULID, error) {
 	zero := ulid.ULID{}
-	accountID := uuid.New()
-	workspaceID := uuid.New()
+	accountID := consts.DevServerAccountId
+	workspaceID := consts.DevServerEnvId
 
 	fnrun, err := r.Data.GetFunctionRun(
 		ctx,
@@ -337,8 +337,9 @@ func (r *mutationResolver) Rerun(
 			// will result in the creation of a new ID
 			event.NewOSSTrackedEventWithID(evt.Event(), evt.InternalID()),
 		},
+		WorkspaceID:   workspaceID,
 		OriginalRunID: &fnrun.RunID,
-		AccountID:     consts.DevServerAccountId,
+		AccountID:     accountID,
 		FromStep:      fromStepReq,
 	})
 	if err != nil {
