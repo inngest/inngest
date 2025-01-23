@@ -17,6 +17,7 @@ import { Link } from '../Link';
 import { RerunButton } from '../RerunButtonV2';
 import { RunResult } from '../RunResult';
 import type { Run as InitialRunData } from '../RunsPage/types';
+import { AICell } from '../Table/Cell';
 import type { Result } from '../types/functionRun';
 import { cn } from '../utils/classNames';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
@@ -37,7 +38,6 @@ type Props = {
   run: Lazy<Run>;
   runID: string;
   result?: Result;
-  stepAIEnabled?: boolean;
 };
 
 type Run = {
@@ -59,6 +59,7 @@ type Run = {
     status: string;
     stepID?: string | null;
   };
+  hasAI: boolean;
 };
 
 export function RunInfo({
@@ -72,7 +73,6 @@ export function RunInfo({
   runID,
   standalone,
   result,
-  stepAIEnabled = false,
 }: Props) {
   let allowCancel = false;
   let isSuccess = false;
@@ -84,7 +84,7 @@ export function RunInfo({
     stepID = run.trace.stepID;
   }
 
-  const aiOutput = stepAIEnabled && result?.data ? parseAIOutput(result.data) : undefined;
+  const aiOutput = result?.data ? parseAIOutput(result.data) : undefined;
 
   return (
     <div className={cn('flex flex-col gap-5', className)}>
@@ -144,7 +144,7 @@ export function RunInfo({
                 {(run: Run) => {
                   return (
                     <LinkElement href={pathCreator.function({ functionSlug: run.fn.slug })}>
-                      {run.fn.name}
+                      {run.hasAI ? <AICell>{run.fn.name}</AICell> : run.fn.name}
                     </LinkElement>
                   );
                 }}
@@ -224,7 +224,16 @@ export function RunInfo({
             </dl>
           </div>
         </Card.Content>
-        {!result &&
+        {result ? (
+          <RunResult
+            className="border-muted border-t"
+            result={result}
+            runID={runID}
+            stepID={stepID}
+            rerunFromStep={rerunFromStep}
+            isSuccess={isSuccess}
+          />
+        ) : (
           !isLazyDone(run) &&
           (initialRunData?.status === 'QUEUED' ? (
             <div className="border-muted bg-canvas border-t">
@@ -238,17 +247,7 @@ export function RunInfo({
                 </p>
               </div>
             </div>
-          ) : null)}
-        {result && (
-          <RunResult
-            className="border-muted border-t"
-            result={result}
-            runID={runID}
-            stepID={stepID}
-            rerunFromStep={rerunFromStep}
-            isSuccess={isSuccess}
-            stepAIEnabled={stepAIEnabled}
-          />
+          ) : null)
         )}
       </Card>
     </div>

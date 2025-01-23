@@ -380,6 +380,7 @@ export const GET_RUN = gql`
           }
         }
       }
+      hasAI
     }
   }
 `;

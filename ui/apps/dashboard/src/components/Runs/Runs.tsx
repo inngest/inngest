@@ -45,7 +45,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   ref
 ) {
   const env = useEnvironment();
-  const { value: stepAIEnabled, isReady } = useBooleanFlag('step.ai');
+  const { value: traceAIEnabled, isReady } = useBooleanFlag('ai-traces');
 
   const [{ data: pauseData }] = useQuery({
     pause: scope !== 'fn',
@@ -244,7 +244,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       functionIsPaused={pauseData?.environment.function?.isPaused ?? false}
       scope={scope}
       totalCount={totalCount}
-      stepAIEnabled={isReady && stepAIEnabled}
+      traceAIEnabled={isReady && traceAIEnabled}
     />
   );
 });

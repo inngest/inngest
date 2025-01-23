@@ -3,16 +3,15 @@
 import { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
+import { ErrorCard } from '../RunDetailsV2/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
-import { StatusCell } from '../Table';
 import { Trace as OldTrace } from '../TimelineV2';
-import { TimelineV2 } from '../TimelineV2/Timeline';
-import { Trace } from '../Trace/Trace';
 import { TriggerDetails } from '../TriggerDetails';
 import type { Result } from '../types/functionRun';
 import { nullishToLazy } from '../utils/lazyLoad';
-import { ErrorCard } from './ErrorCard';
 import { RunInfo } from './RunInfo';
+import { Trace } from './Trace';
+import { TriggerInfo } from './TriggerInfo';
 
 type Props = {
   standalone: boolean;
@@ -43,7 +42,7 @@ type Run = {
   hasAI: boolean;
 };
 
-export function RunDetailsV2(props: Props) {
+export const RunDetailsV3 = (props: Props) => {
   const { getResult, getRun, getTrigger, pathCreator, rerun, rerunFromStep, runID, standalone } =
     props;
   const [pollInterval, setPollInterval] = useState(props.pollInterval);
@@ -89,51 +88,34 @@ export function RunDetailsV2(props: Props) {
       : runRes.error || resultRes.error;
 
   return (
-    <div>
-      {standalone && run && (
-        <div className="mx-8 flex flex-col gap-1 pb-6">
-          <StatusCell status={run.trace.status} />
-          <p className="text-basis text-2xl font-medium">{run.fn.name}</p>
-          <p className="text-subtle font-mono">{runID}</p>
-        </div>
-      )}
-
-      <div className="flex gap-4">
-        <div className="grow">
-          <div className="ml-8">
-            <RunInfo
-              cancelRun={cancelRun}
-              className="mb-4"
-              pathCreator={pathCreator}
-              rerun={rerun}
-              rerunFromStep={rerunFromStep}
-              initialRunData={props.initialRunData}
-              run={nullishToLazy(run)}
-              runID={runID}
-              standalone={standalone}
-              result={resultRes.data}
-            />
-            {showError && (
-              <ErrorCard
-                error={runRes.error || resultRes.error}
-                reset={runRes.error ? () => runRes.refetch() : () => resultRes.refetch()}
-              />
-            )}
-          </div>
-
-          {run && (
-            <TimelineV2
-              getResult={getResult}
-              pathCreator={pathCreator}
-              runID={runID}
-              trace={run.trace}
-              rerunFromStep={rerunFromStep}
+    <div className="ml-4 mt-4 flex h-full flex-row">
+      <div className="flex h-full w-[55%] flex-col">
+        <div className="h-full resize-x pb-4 pr-4">
+          <RunInfo
+            cancelRun={cancelRun}
+            className="mb-4"
+            pathCreator={pathCreator}
+            rerun={rerun}
+            rerunFromStep={rerunFromStep}
+            initialRunData={props.initialRunData}
+            run={nullishToLazy(run)}
+            runID={runID}
+            standalone={standalone}
+            result={resultRes.data}
+            traceAIEnabled={false}
+          />
+          {showError && (
+            <ErrorCard
+              error={runRes.error || resultRes.error}
+              reset={runRes.error ? () => runRes.refetch() : () => resultRes.refetch()}
             />
           )}
         </div>
-
-        <TriggerDetails getTrigger={getTrigger} runID={runID} />
+        <Trace />
+      </div>
+      <div className="border-muted flex h-full w-[45%] resize-x flex-col border-l">
+        <TriggerInfo getTrigger={getTrigger} runID={runID} />
       </div>
     </div>
   );
-}
+};
