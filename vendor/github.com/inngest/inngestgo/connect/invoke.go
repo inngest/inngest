@@ -15,6 +15,10 @@ import (
 	"time"
 )
 
+const (
+	ResponseAcknowlegeDeadline = time.Second * 5
+)
+
 func (h *connectHandler) handleInvokeMessage(ctx context.Context, ws *websocket.Conn, msg *connectproto.ConnectMessage) error {
 	resp, err := h.connectInvoke(ctx, ws, msg)
 	if err != nil {
@@ -35,14 +39,17 @@ func (h *connectHandler) handleInvokeMessage(ctx context.Context, ws *websocket.
 		Payload: data,
 	}
 
+	// Add message to pending messages to ensure it is acknowledged by the gateway.
+	// This is necessary because even if Write() below does not error, there's no guarantee
+	// that the message was truly passed on to the executor _unless_ we receive the ack message.
+	h.messageBuffer.addPending(ctx, resp, ResponseAcknowlegeDeadline)
+
 	err = wsproto.Write(ctx, ws, responseMessage)
 	if err != nil {
 		h.logger.Error("failed to send sdk response", "err", err)
 
-		// Buffer message to retry
-		h.messageBufferLock.Lock()
-		h.messageBuffer = append(h.messageBuffer, responseMessage)
-		h.messageBufferLock.Unlock()
+		// We received an error, the message definitely was not sent: Buffer message to retry
+		h.messageBuffer.append(resp)
 
 		return fmt.Errorf("could not send sdk response: %w", err)
 	}
@@ -151,6 +158,8 @@ func (h *connectHandler) connectInvoke(ctx context.Context, ws *websocket.Conn, 
 		h.logger.Error("error calling function", "error", err)
 		return &connectproto.SDKResponse{
 			RequestId:  body.RequestId,
+			EnvId:      body.EnvId,
+			AppId:      body.AppId,
 			Status:     connectproto.SDKResponseStatus_ERROR,
 			Body:       []byte(fmt.Sprintf("error calling function: %s", err.Error())),
 			NoRetry:    noRetry,
@@ -171,6 +180,8 @@ func (h *connectHandler) connectInvoke(ctx context.Context, ws *websocket.Conn, 
 		// over function return values as the function has not yet finished.
 		return &connectproto.SDKResponse{
 			RequestId:  body.RequestId,
+			EnvId:      body.EnvId,
+			AppId:      body.AppId,
 			Status:     connectproto.SDKResponseStatus_NOT_COMPLETED,
 			Body:       serializedOps,
 			NoRetry:    noRetry,
@@ -188,6 +199,8 @@ func (h *connectHandler) connectInvoke(ctx context.Context, ws *websocket.Conn, 
 	// Return the function response.
 	return &connectproto.SDKResponse{
 		RequestId:  body.RequestId,
+		EnvId:      body.EnvId,
+		AppId:      body.AppId,
 		Status:     connectproto.SDKResponseStatus_DONE,
 		Body:       serializedResp,
 		NoRetry:    noRetry,
