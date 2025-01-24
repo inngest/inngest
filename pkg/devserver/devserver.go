@@ -423,6 +423,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		ConnectOpts: connectv0.Opts{
 			GroupManager:            connectionManager,
 			ConnectManager:          connectionManager,
+			ConnectResponseNotifier: gatewayProxy,
 			Signer:                  auth.NewJWTSessionTokenSigner(consts.DevServerConnectJwtSecret),
 			RequestAuther:           ds,
 			ConnectGatewayRetriever: ds,
