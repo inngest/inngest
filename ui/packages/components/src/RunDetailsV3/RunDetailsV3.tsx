@@ -130,36 +130,38 @@ export const RunDetailsV3 = (props: Props) => {
 
   return (
     <div id="run-details-container" className="ml-4 mt-4 flex h-full flex-row">
-      <div className="flex h-full flex-col" style={{ width: `${leftWidth}%` }}>
-        <div className="h-full pb-4 pr-4">
-          <RunInfo
-            cancelRun={cancelRun}
-            className="mb-4"
-            pathCreator={pathCreator}
-            rerun={rerun}
-            rerunFromStep={rerunFromStep}
-            initialRunData={props.initialRunData}
-            run={nullishToLazy(run)}
-            runID={runID}
-            standalone={standalone}
-            result={resultRes.data}
-            traceAIEnabled={false}
+      <div
+        className="flex h-full min-h-full flex-col gap-4"
+        style={{ width: `${leftWidth}%`, minHeight: '100%' }}
+      >
+        <RunInfo
+          cancelRun={cancelRun}
+          className="mb-4"
+          pathCreator={pathCreator}
+          rerun={rerun}
+          rerunFromStep={rerunFromStep}
+          initialRunData={props.initialRunData}
+          run={nullishToLazy(run)}
+          runID={runID}
+          standalone={standalone}
+          result={resultRes.data}
+          traceAIEnabled={false}
+        />
+        {showError && (
+          <ErrorCard
+            error={runRes.error || resultRes.error}
+            reset={runRes.error ? () => runRes.refetch() : () => resultRes.refetch()}
           />
-          {showError && (
-            <ErrorCard
-              error={runRes.error || resultRes.error}
-              reset={runRes.error ? () => runRes.refetch() : () => resultRes.refetch()}
-            />
-          )}
-        </div>
+        )}
+
         <Trace />
       </div>
 
-      <div className="w-1 cursor-col-resize" onMouseDown={handleMouseDown} />
+      <div className="min-h-full w-1 cursor-col-resize" onMouseDown={handleMouseDown} />
 
       <div
-        className="border-muted flex h-full flex-col border-l"
-        style={{ width: `${100 - leftWidth}%` }}
+        className="border-muted flex h-full min-h-full flex-col border-l"
+        style={{ width: `${100 - leftWidth}%`, minHeight: '100%' }}
       >
         <TriggerInfo getTrigger={getTrigger} runID={runID} />
       </div>
