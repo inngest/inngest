@@ -49,7 +49,14 @@ const (
 	AckSourceRouter  AckSource = "router"
 )
 
+type ResponseNotifier interface {
+	// NotifyExecutor sends a response to the executor for a specific request.
+	NotifyExecutor(ctx context.Context, resp *connect.SDKResponse) error
+}
+
 type RequestReceiver interface {
+	ResponseNotifier
+
 	// ReceiveExecutorMessages listens for incoming PubSub messages for the connect router.
 	// This is a blocking call which only stops once the context is canceled.
 	ReceiveExecutorMessages(ctx context.Context, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error
@@ -63,9 +70,6 @@ type RequestReceiver interface {
 
 	// AckMessage sends an acknowledgment for a specific request.
 	AckMessage(ctx context.Context, appId uuid.UUID, requestId string, source AckSource) error
-
-	// NotifyExecutor sends a response to the executor for a specific request.
-	NotifyExecutor(ctx context.Context, appId uuid.UUID, resp *connect.SDKResponse) error
 
 	// Wait blocks and listens for incoming PubSub messages for the internal subscribers. This must be run before
 	// subscribing to any channels to ensure that the PubSub client is connected and ready to receive messages.
@@ -431,10 +435,15 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 }
 
 // NotifyExecutor sends a response to the executor for a specific request.
-func (i *redisPubSubConnector) NotifyExecutor(ctx context.Context, appId uuid.UUID, resp *connect.SDKResponse) error {
+func (i *redisPubSubConnector) NotifyExecutor(ctx context.Context, resp *connect.SDKResponse) error {
 	serialized, err := proto.Marshal(resp)
 	if err != nil {
 		return fmt.Errorf("could not serialize response: %w", err)
+	}
+
+	appId, err := uuid.Parse(resp.AppId)
+	if err != nil {
+		return fmt.Errorf("missing appId in sdk response: %w", err)
 	}
 
 	channelName := i.channelAppRequestsReply(appId, resp.RequestId)

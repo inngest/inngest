@@ -6,14 +6,16 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/auth"
+	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/headers"
 	"net/url"
 )
 
 type Opts struct {
-	ConnectManager state.ConnectionManager
-	GroupManager   state.WorkerGroupManager
+	ConnectManager          state.ConnectionManager
+	GroupManager            state.WorkerGroupManager
+	ConnectResponseNotifier pubsub.ResponseNotifier
 
 	Signer                  auth.SessionTokenSigner
 	RequestAuther           RequestAuther
@@ -38,7 +40,7 @@ type ConnectGatewayRetriever interface {
 	RetrieveGateway(ctx context.Context, accountId uuid.UUID, envId uuid.UUID, exclude []string) (string, *url.URL, error)
 }
 
-type router struct {
+type connectApiRouter struct {
 	chi.Router
 	Opts
 }
@@ -46,8 +48,8 @@ type router struct {
 // New creates a v0 connect REST API, which exposes connection states, history, and more.
 // This does not include the actual connect endpoint, nor does it include internal operations
 // for rolling out the connect gateway service.
-func New(r chi.Router, opts Opts) *router {
-	api := &router{
+func New(r chi.Router, opts Opts) *connectApiRouter {
+	api := &connectApiRouter{
 		Router: r,
 		Opts:   opts,
 	}
@@ -55,23 +57,21 @@ func New(r chi.Router, opts Opts) *router {
 	return api
 }
 
-func (a *router) setup() {
-	// Connect API
-	a.Group(func(r chi.Router) {
-		r.Use(middleware.Recoverer)
-		r.Use(headers.ContentTypeJsonResponse())
-
-		// TODO Implement ClickHouse-based connection history routes
-		if a.Dev {
+func (a *connectApiRouter) setup() {
+	// These routes are testing-only
+	if a.Dev {
+		a.Group(func(r chi.Router) {
+			r.Use(middleware.Recoverer)
+			r.Use(headers.ContentTypeJsonResponse())
 
 			r.Get("/envs/{envID}/conns", a.showConnections)
 			r.Get("/envs/{envID}/groups/{groupID}", a.showWorkerGroup)
-		}
-
-	})
+		})
+	}
 
 	// Worker API
 	a.Group(func(r chi.Router) {
 		r.Post("/start", a.start)
+		r.Post("/flush", a.flushBuffer)
 	})
 }
