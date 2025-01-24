@@ -15,7 +15,7 @@ import (
 //
 // Provides query params to further filter the returned data
 //   - app_id
-func (c *router) showConnections(w http.ResponseWriter, r *http.Request) {
+func (c *connectApiRouter) showConnections(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var (

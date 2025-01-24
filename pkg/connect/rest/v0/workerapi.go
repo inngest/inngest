@@ -9,7 +9,7 @@ import (
 	"net/http"
 )
 
-func (a *router) start(w http.ResponseWriter, r *http.Request) {
+func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	hashedSigningKey := r.Header.Get("Authorization")
@@ -77,7 +77,7 @@ func (a *router) start(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(msg)
 }
 
-func (a *router) flushBuffer(w http.ResponseWriter, r *http.Request) {
+func (a *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	hashedSigningKey := r.Header.Get("Authorization")
@@ -118,8 +118,7 @@ func (a *router) flushBuffer(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// TODO Forward
-
+	// Marshal response before notifying executor, marshaling should never fail
 	msg, err := proto.Marshal(&connect.FlushResponse{
 		RequestId: reqBody.RequestId,
 	})
@@ -128,6 +127,12 @@ func (a *router) flushBuffer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := a.ConnectResponseNotifier.NotifyExecutor(ctx, reqBody); err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not notify executor"))
+		return
+	}
+
+	// Send response once executor was notified
 	w.Header().Set("Content-Type", "application/octet-stream")
 	_, _ = w.Write(msg)
 }

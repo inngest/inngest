@@ -40,7 +40,7 @@ type ConnectGatewayRetriever interface {
 	RetrieveGateway(ctx context.Context, accountId uuid.UUID, envId uuid.UUID, exclude []string) (string, *url.URL, error)
 }
 
-type router struct {
+type connectApiRouter struct {
 	chi.Router
 	Opts
 }
@@ -48,8 +48,8 @@ type router struct {
 // New creates a v0 connect REST API, which exposes connection states, history, and more.
 // This does not include the actual connect endpoint, nor does it include internal operations
 // for rolling out the connect gateway service.
-func New(r chi.Router, opts Opts) *router {
-	api := &router{
+func New(r chi.Router, opts Opts) *connectApiRouter {
+	api := &connectApiRouter{
 		Router: r,
 		Opts:   opts,
 	}
@@ -57,7 +57,7 @@ func New(r chi.Router, opts Opts) *router {
 	return api
 }
 
-func (a *router) setup() {
+func (a *connectApiRouter) setup() {
 	// Connect API
 	a.Group(func(r chi.Router) {
 		r.Use(middleware.Recoverer)
@@ -75,6 +75,6 @@ func (a *router) setup() {
 	// Worker API
 	a.Group(func(r chi.Router) {
 		r.Post("/start", a.start)
-		r.Post("/envs/{envID}/flush", a.flushBuffer)
+		r.Post("/flush", a.flushBuffer)
 	})
 }
