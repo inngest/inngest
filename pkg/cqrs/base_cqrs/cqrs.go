@@ -1082,6 +1082,7 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 		BatchID:      batchID,
 		IsBatch:      isBatch,
 		CronSchedule: cron,
+		HasAI:        run.HasAi,
 	}
 
 	return &trun, nil

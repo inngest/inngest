@@ -224,6 +224,7 @@ func (r *queryResolver) Run(ctx context.Context, runID string) (*models.Function
 		BatchCreatedAt: batchTS,
 		CronSchedule:   run.CronSchedule,
 		Output:         output,
+		HasAi:          run.HasAI,
 	}
 
 	return &res, nil

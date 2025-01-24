@@ -160,7 +160,6 @@ export function TraceInfo({
           <RunResult
             className="border-subtle border-t"
             result={result}
-            stepAIEnabled={!!aiOutput}
             rerunFromStep={rerunFromStep}
             runID={runID}
             stepID={trace.stepID ?? undefined}
