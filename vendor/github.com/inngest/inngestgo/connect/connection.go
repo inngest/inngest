@@ -352,38 +352,3 @@ func (h *connectHandler) handleMessageReplyAck(msg *connectproto.ConnectMessage)
 
 	return nil
 }
-
-func (h *connectHandler) withTemporaryConnection(data connectionEstablishData, handler func(ws *websocket.Conn) error) error {
-	// Prevent this connection from receiving work
-	data.manualReadinessAck = true
-
-	maxAttempts := 4
-
-	var conn *websocket.Conn
-	var attempts int
-	for {
-		if attempts == maxAttempts {
-			return fmt.Errorf("could not establish connection after %d attempts", maxAttempts)
-		}
-
-		ws, err := h.prepareConnection(context.Background(), data, nil)
-		if err != nil {
-			attempts++
-			continue
-		}
-
-		conn = ws.ws
-		break
-	}
-
-	defer func() {
-		_ = conn.Close(websocket.StatusNormalClosure, connectproto.WorkerDisconnectReason_WORKER_SHUTDOWN.String())
-	}()
-
-	err := handler(conn)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}

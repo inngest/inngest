@@ -58,19 +58,16 @@ func New(r chi.Router, opts Opts) *connectApiRouter {
 }
 
 func (a *connectApiRouter) setup() {
-	// Connect API
-	a.Group(func(r chi.Router) {
-		r.Use(middleware.Recoverer)
-		r.Use(headers.ContentTypeJsonResponse())
-
-		// TODO Implement ClickHouse-based connection history routes
-		if a.Dev {
+	// These routes are testing-only
+	if a.Dev {
+		a.Group(func(r chi.Router) {
+			r.Use(middleware.Recoverer)
+			r.Use(headers.ContentTypeJsonResponse())
 
 			r.Get("/envs/{envID}/conns", a.showConnections)
 			r.Get("/envs/{envID}/groups/{groupID}", a.showWorkerGroup)
-		}
-
-	})
+		})
+	}
 
 	// Worker API
 	a.Group(func(r chi.Router) {
