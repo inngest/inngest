@@ -64,6 +64,7 @@ const (
 	DefaultTick         = 150
 	DefaultTickDuration = time.Millisecond * DefaultTick
 	DefaultPollInterval = 5
+	DefaultQueueWorkers = 100
 )
 
 // StartOpts configures the dev server
@@ -76,6 +77,7 @@ type StartOpts struct {
 	PollInterval  int           `json:"poll_interval"`
 	Tick          time.Duration `json:"tick"`
 	RetryInterval int           `json:"retry_interval"`
+	QueueWorkers  int           `json:"queue_workers"`
 
 	// SigningKey is used to decide that the server should sign requests and
 	// validate responses where applicable, modelling cloud behaviour.
@@ -189,7 +191,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			Partition:  true,
 		}),
 		redis_state.WithIdempotencyTTL(time.Hour),
-		redis_state.WithNumWorkers(100),
+		redis_state.WithNumWorkers(int32(opts.QueueWorkers)),
 		redis_state.WithPollTick(opts.Tick),
 		redis_state.WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i queue.QueueItem) []state.CustomConcurrency {
 			keys := i.Data.GetConcurrencyKeys()
