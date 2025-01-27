@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import NextLink from 'next/link';
 import { SignOutButton } from '@clerk/nextjs';
 import { Listbox } from '@headlessui/react';
@@ -16,13 +17,8 @@ import {
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { pathCreator } from '@/utils/urls';
 
-type Props = React.PropsWithChildren<{
-  isMarketplace: boolean;
-}>;
-
-export const ProfileMenu = ({ children, isMarketplace }: Props) => {
+export const ProfileMenu = ({ children }: { children: ReactNode }) => {
   const isThemeModeSwitchEnabled = useBooleanFlag('theme-mode');
-
   return (
     <Listbox>
       <Listbox.Button className="w-full cursor-pointer ring-0">{children}</Listbox.Button>
@@ -64,20 +60,17 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
               </div>
             </Listbox.Option>
           </NextLink>
-
-          {!isMarketplace && (
-            <NextLink href={pathCreator.billing()} scroll={false}>
-              <Listbox.Option
-                className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
-                value="billing"
-              >
-                <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                  <RiBillLine className="text-muted mr-2 h-4 w-4" />
-                  <div>Billing</div>
-                </div>
-              </Listbox.Option>
-            </NextLink>
-          )}
+          <NextLink href={pathCreator.billing()} scroll={false}>
+            <Listbox.Option
+              className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              value="billing"
+            >
+              <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
+                <RiBillLine className="text-muted mr-2 h-4 w-4" />
+                <div>Billing</div>
+              </div>
+            </Listbox.Option>
+          </NextLink>
           <a href="/organization-list">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
@@ -107,29 +100,15 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
             className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
             value="signOut"
           >
-            <SignOut isMarketplace={isMarketplace} />
+            <SignOutButton>
+              <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
+                <RiLogoutCircleLine className="text-muted mr-2 h-4 w-4" />
+                <div>Sign Out</div>
+              </div>
+            </SignOutButton>
           </Listbox.Option>
         </Listbox.Options>
       </div>
     </Listbox>
   );
 };
-
-function SignOut({ isMarketplace }: { isMarketplace: boolean }) {
-  const content = (
-    <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-      <RiLogoutCircleLine className="text-muted mr-2 h-4 w-4" />
-      <div>Sign Out</div>
-    </div>
-  );
-
-  if (!isMarketplace) {
-    // Sign out via Clerk.
-    return <SignOutButton>{content}</SignOutButton>;
-  }
-
-  // Sign out via our backend.
-  return (
-    <NextLink href={`${process.env.NEXT_PUBLIC_API_URL}/vercel-market/logout`}>{content}</NextLink>
-  );
-}

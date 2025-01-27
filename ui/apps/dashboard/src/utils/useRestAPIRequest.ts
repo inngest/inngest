@@ -31,9 +31,6 @@ export function useRestAPIRequest<T>({
       const sessionToken = await getToken();
       if (!sessionToken) {
         setIsLoading(false);
-
-        // TODO: Does this need to be changed for Vercel Marketplace? Vercel
-        // Marketplace users don't auth with Clerk.
         return; // TODO - Handle no auth
       }
       const response = await fetch(url, {

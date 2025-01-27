@@ -1,4 +1,3 @@
-import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { GraphQLClient, type RequestMiddleware, type ResponseMiddleware } from 'graphql-request';
@@ -8,30 +7,13 @@ import 'server-only';
 const requestMiddleware: RequestMiddleware = async (request) => {
   const { getToken } = auth();
   const sessionToken = await getToken();
-
-  let headers = request.headers;
-  if (sessionToken) {
-    headers = {
-      ...headers,
-      Authorization: `Bearer ${sessionToken}`,
-    };
-  } else {
-    // Need to forward the `Cookie` header for non-Clerk users.
-
-    const allCookies = cookies()
-      .getAll()
-      .map((c) => `${c.name}=${c.value}`)
-      .join('; ');
-
-    headers = {
-      ...headers,
-      Cookie: allCookies,
-    };
-  }
-
+  if (!sessionToken) return request;
   return {
     ...request,
-    headers,
+    headers: {
+      ...request.headers,
+      Authorization: `Bearer ${sessionToken}`,
+    },
   };
 };
 
