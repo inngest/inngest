@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import NextLink from 'next/link';
 import { SignOutButton } from '@clerk/nextjs';
 import { Listbox } from '@headlessui/react';
+import ModeSwitch from '@inngest/components/ThemeMode/ModeSwitch';
 import {
   RiArrowLeftRightLine,
   RiBillLine,
@@ -13,14 +14,30 @@ import {
   RiUserLine,
 } from '@remixicon/react';
 
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { pathCreator } from '@/utils/urls';
 
 export const ProfileMenu = ({ children }: { children: ReactNode }) => {
+  const isThemeModeSwitchEnabled = useBooleanFlag('theme-mode');
   return (
     <Listbox>
       <Listbox.Button className="w-full cursor-pointer ring-0">{children}</Listbox.Button>
       <div className="relative">
         <Listbox.Options className="bg-canvasBase border-muted shadow-primary absolute -right-48 bottom-4 z-50 ml-8 w-[199px] rounded border ring-0 focus:outline-none">
+          {isThemeModeSwitchEnabled.isReady && isThemeModeSwitchEnabled.value && (
+            <>
+              <Listbox.Option
+                disabled
+                value="themeMode"
+                className="text-muted mx-2 my-2 flex h-8 items-center justify-between px-2 text-[13px]"
+              >
+                <div>Theme</div>
+                <ModeSwitch />
+              </Listbox.Option>
+
+              <hr className="border-subtle" />
+            </>
+          )}
           <NextLink href="/settings/organization" scroll={false}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
@@ -66,7 +83,7 @@ export const ProfileMenu = ({ children }: { children: ReactNode }) => {
             </Listbox.Option>
           </a>
 
-          <hr />
+          <hr className="border-subtle" />
 
           <NextLink href="/settings/user" scroll={false}>
             <Listbox.Option
