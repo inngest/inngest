@@ -35,6 +35,7 @@ const (
 	TracerTypeJaeger
 	TracerTypeOTLPHTTP
 	TracerTypeNATS
+	TracerTypeKafka
 )
 
 var (
@@ -202,6 +203,8 @@ func newTracer(ctx context.Context, opts TracerOpts) (Tracer, error) {
 		return newIOTraceProvider(ctx, opts)
 	case TracerTypeNATS:
 		return newNatsTraceProvider(ctx, opts)
+	case TracerTypeKafka:
+		return newKafkaTraceExporter(ctx, opts)
 	default:
 		return newNoopTraceProvider(ctx, opts)
 	}
@@ -430,7 +433,37 @@ func newNatsTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) 
 		provider:   tp,
 		propagator: newTextMapPropagator(),
 		processor:  sp,
-		shutdown: func(context.Context) {
+		shutdown: func(ctx context.Context) {
+			_ = tp.ForceFlush(ctx)
+			_ = tp.Shutdown(ctx)
+			_ = exp.Shutdown(ctx)
+		},
+	}, nil
+}
+
+func newKafkaTraceExporter(ctx context.Context, opts TracerOpts) (Tracer, error) {
+	// TODO: add opts?
+	exp, err := exporters.NewKafkaSpanExporter(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error creating Kafka trace client: %w", err)
+	}
+
+	bopts := []exporters.BatchSpanProcessorOpt{}
+
+	sp := exporters.NewBatchSpanProcessor(ctx, exp, bopts...)
+	tp := trace.NewTracerProvider(
+		trace.WithSpanProcessor(sp),
+		trace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String(opts.ServiceName),
+		)),
+	)
+
+	return &tracer{
+		provider:   tp,
+		propagator: newTextMapPropagator(),
+		processor:  sp,
+		shutdown: func(ctx context.Context) {
 			_ = tp.ForceFlush(ctx)
 			_ = tp.Shutdown(ctx)
 			_ = exp.Shutdown(ctx)
