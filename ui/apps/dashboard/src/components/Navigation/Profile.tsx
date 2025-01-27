@@ -27,13 +27,18 @@ export const Profile = ({ collapsed, profile }: { collapsed: boolean; profile: P
               : 'hover:bg-canvasSubtle text-subtle'
           }`}
         >
-          <div className="bg-canvasMuted text-subtle flex h-8 w-8 items-center justify-center rounded-full text-xs uppercase">
+          <div className="bg-canvasMuted text-subtle flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs uppercase">
             {profile.orgName?.substring(0, 2) || '?'}
           </div>
 
           {!collapsed && (
-            <div className="ml-2 flex flex-col items-start justify-start">
-              <div className="text-subtle leading-1 text-sm">{profile.orgName}</div>
+            <div className="ml-2 flex flex-col items-start justify-start overflow-hidden">
+              <div
+                className="text-subtle leading-1 max-w-full overflow-hidden text-ellipsis text-nowrap text-sm"
+                title={profile.orgName}
+              >
+                {profile.orgName}
+              </div>
               <div className="text-muted text-xs leading-4">{profile.displayName}</div>
             </div>
           )}
