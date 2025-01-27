@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/enums"
 	"net"
 	"net/url"
 	"os"
@@ -310,6 +311,10 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 		urls := map[string]struct{}{}
 		if apps, err := d.Data.GetApps(ctx, consts.DevServerEnvId, nil); err == nil {
 			for _, app := range apps {
+				if app.ConnectionType == enums.AppConnectionTypeConnect.String() {
+					continue
+				}
+
 				// We've seen this URL.
 				urls[app.Url] = struct{}{}
 

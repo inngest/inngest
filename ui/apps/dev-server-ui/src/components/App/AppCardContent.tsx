@@ -2,17 +2,20 @@ import { Link } from '@inngest/components/Link/Link';
 import { type AppKind } from '@inngest/components/types/app';
 import { RiExternalLinkLine } from '@remixicon/react';
 
-import { type GetAppsQuery } from '@/store/generated';
+import { AppConnectionType, type GetAppsQuery } from '@/store/generated';
 import UpdateApp from './UpdateApp';
 
 const getAppCardContent = ({ app }: { app: GetAppsQuery['apps'][number] }) => {
   const appKind: AppKind = !app.connected ? 'error' : app.functionCount > 0 ? 'primary' : 'warning';
 
-  const status = !app.connected
-    ? 'Not Synced'
-    : app.functionCount === 0
-    ? 'No functions found'
-    : null;
+  const status =
+    app.connectionType === AppConnectionType.Connect
+      ? null
+      : !app.connected
+      ? 'Not Synced'
+      : app.functionCount === 0
+      ? 'No functions found'
+      : null;
 
   const footerHeader = !app.connected ? (
     app.error === 'unreachable' ? (
@@ -27,9 +30,15 @@ const getAppCardContent = ({ app }: { app: GetAppsQuery['apps'][number] }) => {
       <span>
         {app.functionCount} {app.functionCount === 1 ? 'function' : 'functions'} found
       </span>
-      <Link size="small" href="/functions" arrowOnHover>
-        View functions
-      </Link>
+      {app.connectionType === AppConnectionType.Connect ? (
+        <Link size="small" href={`/apps/app?id=${app.id}`} arrowOnHover>
+          View details
+        </Link>
+      ) : (
+        <Link size="small" href="/functions" arrowOnHover>
+          View functions
+        </Link>
+      )}
     </div>
   );
 

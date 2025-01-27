@@ -1,5 +1,4 @@
 import type React from 'react';
-import NextLink from 'next/link';
 import { AccordionList, AccordionPrimitive } from '@inngest/components/AccordionCard/AccordionList';
 import { Button } from '@inngest/components/Button';
 import { Time } from '@inngest/components/Time';
@@ -34,16 +33,15 @@ type CardContentProps = {
   app: App;
   pill: React.ReactNode;
   actions: React.ReactNode;
-  detailsLink?: string;
 };
 
-export function AppCardContent({ app, pill, actions, detailsLink }: CardContentProps) {
+export function AppCardContent({ app, pill, actions }: CardContentProps) {
   return (
     <div className="text-basis p-6">
       <div className="mb-6">
         <div className="items-top flex justify-between">
           <div className="flex items-center gap-2 text-xl">
-            {detailsLink ? <NextLink href={detailsLink}>{app.name}</NextLink> : app.name}
+            {app.name}
             {pill}
           </div>
           {actions}

@@ -16,7 +16,7 @@ import AppActions from '@/components/App/AppActions';
 import getAppCardContent from '@/components/App/AppCardContent';
 import AppFAQ from '@/components/App/AppFAQ';
 import { useInfoQuery } from '@/store/devApi';
-import { useGetAppsQuery } from '@/store/generated';
+import { AppConnectionType, useGetAppsQuery } from '@/store/generated';
 
 export default function AppList() {
   const { data } = useGetAppsQuery(undefined, { pollingInterval: 1500 });
@@ -29,16 +29,14 @@ export default function AppList() {
     return apps.map((app) => {
       const { appKind, status, footerHeader, footerContent } = getAppCardContent({ app });
 
-      const detailsLink = `/apps/app?id=${app.id}`;
-
       return (
         <AppCard key={app?.id} kind={appKind}>
           <AppCard.Content
             app={{
               ...app,
+              url: app.connectionType === AppConnectionType.Connect ? '' : app.url,
               name: !app.name ? 'Syncing...' : !app.connected ? `Syncing to ${app.name}` : app.name,
             }}
-            detailsLink={detailsLink}
             pill={
               status || app.autodiscovered ? (
                 <>
@@ -55,11 +53,7 @@ export default function AppList() {
                 </>
               ) : null
             }
-            actions={
-              !app.autodiscovered ? (
-                <AppActions id={app.id} name={app.name} detailsLink={detailsLink} />
-              ) : null
-            }
+            actions={!app.autodiscovered ? <AppActions id={app.id} name={app.name} /> : null}
           />
           <AppCard.Footer kind={appKind} header={footerHeader} content={footerContent} />
         </AppCard>

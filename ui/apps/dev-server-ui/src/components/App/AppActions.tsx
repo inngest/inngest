@@ -13,15 +13,7 @@ import { toast } from 'sonner';
 
 import { useDeleteAppMutation } from '@/store/generated';
 
-export default function AppActions({
-  id,
-  name,
-  detailsLink,
-}: {
-  id: string;
-  name: string;
-  detailsLink?: string;
-}) {
+export default function AppActions({ id, name }: { id: string; name: string }) {
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
   const [_deleteApp] = useDeleteAppMutation();
   const router = useRouter();
@@ -40,13 +32,6 @@ export default function AppActions({
     // To do: add optimistic render in the list
   }
 
-  function navigateToDetails() {
-    if (!detailsLink) {
-      return;
-    }
-    router.push(detailsLink);
-  }
-
   return (
     <>
       <DropdownMenu>
@@ -54,12 +39,6 @@ export default function AppActions({
           <Button kind="secondary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
         </DropdownMenuTrigger>
         <DropdownMenuContent>
-          {detailsLink ? (
-            <DropdownMenuItem className="text-info" onSelect={() => navigateToDetails()}>
-              <RiArrowRightLine className="h-4 w-4" />
-              More
-            </DropdownMenuItem>
-          ) : null}
           <DropdownMenuItem className="text-error" onSelect={() => setIsAlertModalOpen(true)}>
             <RiDeleteBinLine className="h-4 w-4" />
             Delete
