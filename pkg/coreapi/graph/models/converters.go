@@ -105,7 +105,7 @@ func FromAppConnectionType(connectionType AppConnectionType) (enums.AppConnectio
 	case AppConnectionTypeServerless:
 		return enums.AppConnectionTypeServerless, nil
 	default:
-		return enums.AppConnectionType(0), fmt.Errorf("unknown connection type: %d", connectionType)
+		return enums.AppConnectionType(0), fmt.Errorf("unknown connection type: %s", connectionType.String())
 	}
 }
 
