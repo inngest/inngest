@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo } from 'react';
-import NextLink from 'next/link';
 import { AppCard } from '@inngest/components/Apps/AppCard';
 import { InlineCode } from '@inngest/components/Code';
 import { Header } from '@inngest/components/Header/Header';
