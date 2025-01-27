@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/headers"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
@@ -25,6 +26,10 @@ func NewCmdDev() *cobra.Command {
 		Example: "inngest dev -u http://localhost:3000/api/inngest",
 		Run:     doDev,
 	}
+
+	baseFlags := pflag.NewFlagSet("base", pflag.ExitOnError)
+
+	advancedFlags := pflag.NewFlagSet("advanced", pflag.ExitOnError)
 
 	cmd.Flags().String("config", "", "Path to an Inngest configuration file")
 	cmd.Flags().BoolP("help", "h", false, "Output this help information")
@@ -37,6 +42,8 @@ func NewCmdDev() *cobra.Command {
 	cmd.Flags().Int("retry-interval", 0, "Retry interval in seconds for linear backoff when retrying functions - must be 1 or above")
 	cmd.Flags().Int("queue-workers", devserver.DefaultQueueWorkers, "Number of workers to execute steps in the queue")
 	cmd.Flags().Int("tick", 150, "The interval (in milliseconds) at which the executor checks for new work, during local development")
+
+	cmd.SetHelpTemplate(cmd.HelpTemplate() + "YOYO")
 
 	return cmd
 }
