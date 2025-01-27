@@ -13,7 +13,7 @@ export const convertWorkerStatus = (status: WorkerStatus): GroupedWorkerStatus |
     case 'READY':
       return 'ACTIVE';
     case 'DISCONNECTED':
-      return 'FAILED';
+      return 'DISCONNECTED';
     case 'DISCONNECTING':
     case 'CONNECTED':
     case 'DRAINING':
@@ -39,7 +39,7 @@ export type Worker = {
   functionCount: number;
 };
 
-export const groupedWorkerStatuses = ['ACTIVE', 'INACTIVE', 'FAILED'] as const;
+export const groupedWorkerStatuses = ['ACTIVE', 'INACTIVE', 'FAILED', 'DISCONNECTED'] as const;
 
 export type GroupedWorkerStatus = (typeof groupedWorkerStatuses)[number];
 

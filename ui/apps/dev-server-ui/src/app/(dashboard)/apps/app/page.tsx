@@ -67,8 +67,15 @@ export function AppPage({ id }: { id: string }) {
         ConnectV1ConnectionStatus.Connected,
         ConnectV1ConnectionStatus.Disconnecting,
         ConnectV1ConnectionStatus.Draining,
-        ConnectV1ConnectionStatus.Disconnected,
       ],
+    },
+    { pollingInterval: refreshInterval }
+  );
+  const { data: countDisconnectedWorkersData } = useCountWorkerConnectionsQuery(
+    {
+      timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
+      appIDs: [id],
+      status: [ConnectV1ConnectionStatus.Disconnected],
     },
     { pollingInterval: refreshInterval }
   );
@@ -90,11 +97,13 @@ export function AppPage({ id }: { id: string }) {
   const connectionsCount = useMemo(() => {
     if (
       typeof countReadyWorkersData?.workerConnections?.totalCount !== 'number' ||
-      typeof countInactiveWorkersData?.workerConnections?.totalCount !== 'number'
+      typeof countInactiveWorkersData?.workerConnections?.totalCount !== 'number' ||
+      typeof countDisconnectedWorkersData?.workerConnections?.totalCount !== 'number'
     ) {
       return {
         ACTIVE: 0,
         INACTIVE: 0,
+        DISCONNECTED: 0,
         FAILED: 0,
       };
     }
@@ -102,6 +111,7 @@ export function AppPage({ id }: { id: string }) {
     return {
       ACTIVE: countReadyWorkersData.workerConnections.totalCount,
       INACTIVE: countInactiveWorkersData.workerConnections.totalCount,
+      DISCONNECTED: countDisconnectedWorkersData.workerConnections.totalCount,
       FAILED: 0,
     };
   }, [countReadyWorkersData, countInactiveWorkersData]);
