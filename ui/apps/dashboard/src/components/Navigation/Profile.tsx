@@ -4,7 +4,11 @@ import { usePathname } from 'next/navigation';
 
 import { ProfileMenu } from './ProfileMenu';
 
-export type ProfileType = { orgName?: string; displayName: string };
+export type ProfileType = {
+  displayName: string;
+  isMarketplace: boolean;
+  orgName?: string;
+};
 
 export const Profile = ({ collapsed, profile }: { collapsed: boolean; profile: ProfileType }) => {
   const pathname = usePathname();
@@ -14,7 +18,7 @@ export const Profile = ({ collapsed, profile }: { collapsed: boolean; profile: P
     pathname.startsWith('/settings/user');
 
   return (
-    <ProfileMenu>
+    <ProfileMenu isMarketplace={profile.isMarketplace}>
       <div
         className={`border-subtle mt-2 flex h-16 w-full flex-row items-center justify-start border-t px-2.5 `}
       >

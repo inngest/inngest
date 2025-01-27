@@ -10,7 +10,11 @@ const restAPI = ky.create({
       async (request) => {
         const { getToken } = auth();
         const sessionToken = await getToken();
+
+        // TODO: Does this need to be changed for Vercel Marketplace? Vercel
+        // Marketplace users don't auth with Clerk.
         if (!sessionToken) return;
+
         request.headers.set('Authorization', `Bearer ${sessionToken}`);
       },
     ],
