@@ -28,35 +28,50 @@ export default function AppPageWrapper() {
   return <AppPage id={id} />;
 }
 
+const refreshInterval = 5000;
+
 export function AppPage({ id }: { id: string }) {
   const { data } = useGetAppQuery({ id: id });
 
-  const { data: workerConnsData } = useGetWorkerConnectionsQuery({
-    timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-    startTime: null,
-    appIDs: [id],
-    status: [],
-  });
-  const { data: countAllWorkersData } = useCountWorkerConnectionsQuery({
-    timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-    appIDs: [id],
-    status: [],
-  });
-  const { data: countReadyWorkersData } = useCountWorkerConnectionsQuery({
-    timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-    appIDs: [id],
-    status: [ConnectV1ConnectionStatus.Ready],
-  });
-  const { data: countInactiveWorkersData } = useCountWorkerConnectionsQuery({
-    timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-    appIDs: [id],
-    status: [
-      ConnectV1ConnectionStatus.Connected,
-      ConnectV1ConnectionStatus.Disconnecting,
-      ConnectV1ConnectionStatus.Draining,
-      ConnectV1ConnectionStatus.Disconnected,
-    ],
-  });
+  const { data: workerConnsData } = useGetWorkerConnectionsQuery(
+    {
+      timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
+      startTime: null,
+      appIDs: [id],
+      status: [],
+    },
+    { pollingInterval: refreshInterval }
+  );
+
+  const { data: countAllWorkersData } = useCountWorkerConnectionsQuery(
+    {
+      timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
+      appIDs: [id],
+      status: [],
+    },
+    { pollingInterval: refreshInterval }
+  );
+  const { data: countReadyWorkersData } = useCountWorkerConnectionsQuery(
+    {
+      timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
+      appIDs: [id],
+      status: [ConnectV1ConnectionStatus.Ready],
+    },
+    { pollingInterval: refreshInterval }
+  );
+  const { data: countInactiveWorkersData } = useCountWorkerConnectionsQuery(
+    {
+      timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
+      appIDs: [id],
+      status: [
+        ConnectV1ConnectionStatus.Connected,
+        ConnectV1ConnectionStatus.Disconnecting,
+        ConnectV1ConnectionStatus.Draining,
+        ConnectV1ConnectionStatus.Disconnected,
+      ],
+    },
+    { pollingInterval: refreshInterval }
+  );
 
   const workers = useMemo(() => {
     if (!workerConnsData?.workerConnections?.edges) {
