@@ -24,7 +24,7 @@ export const ProfileMenu = ({ children }: { children: ReactNode }) => {
       <Listbox.Button className="w-full cursor-pointer ring-0">{children}</Listbox.Button>
       <div className="relative">
         <Listbox.Options className="bg-canvasBase border-muted shadow-primary absolute -right-48 bottom-4 z-50 ml-8 w-[199px] rounded border ring-0 focus:outline-none">
-          {isThemeModeSwitchEnabled && (
+          {isThemeModeSwitchEnabled.isReady && isThemeModeSwitchEnabled.value && (
             <>
               <Listbox.Option
                 disabled
