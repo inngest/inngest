@@ -1,12 +1,13 @@
 package v0
 
 import (
-	"github.com/gogo/protobuf/proto"
+	"io"
+	"net/http"
+
+	"github.com/golang/protobuf/proto"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
-	"io"
-	"net/http"
 )
 
 func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
@@ -87,8 +88,10 @@ func (a *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Remove "Bearer " prefix
-		hashedSigningKey = hashedSigningKey[7:]
+		if len(hashedSigningKey) > 7 {
+			// Remove "Bearer " prefix
+			hashedSigningKey = hashedSigningKey[7:]
+		}
 	}
 
 	envOverride := r.Header.Get("X-Inngest-Env")
@@ -104,18 +107,21 @@ func (a *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	byt, err := io.ReadAll(io.LimitReader(r.Body, 1024*1024))
+	byt, err := io.ReadAll(r.Body)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "could not read request body"))
 		return
 	}
 
+	if len(byt) == 0 {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "missing request body"))
+		return
+	}
+
 	reqBody := &connect.SDKResponse{}
-	if len(byt) > 0 {
-		if err := proto.Unmarshal(byt, reqBody); err != nil {
-			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "could not unmarshal request"))
-			return
-		}
+	if err := proto.Unmarshal(byt, reqBody); err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "could not unmarshal request"))
+		return
 	}
 
 	// Marshal response before notifying executor, marshaling should never fail
