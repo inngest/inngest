@@ -124,7 +124,7 @@ export function AppPage({ id }: { id: string }) {
   const { app } = data;
 
   let version = 'unknown';
-  let lastSyncedAt = new Date();
+  let lastSyncedAt = null;
 
   return (
     <>
@@ -139,7 +139,10 @@ export function AppPage({ id }: { id: string }) {
         <AppDetailsCard title="App information">
           <CardItem term="App ID" detail={app.id} />
           <CardItem term="App version" detail={<Pill>{version || 'unknown'}</Pill>} />
-          <CardItem term="Last synced at" detail={<Time value={lastSyncedAt} />} />
+          <CardItem
+            term="Last synced at"
+            detail={lastSyncedAt ? <Time value={lastSyncedAt} /> : <Pill>unknown</Pill>}
+          />
           <CardItem
             term="Connected workers"
             detail={<WorkersCounter counts={connectionsCount} />}
