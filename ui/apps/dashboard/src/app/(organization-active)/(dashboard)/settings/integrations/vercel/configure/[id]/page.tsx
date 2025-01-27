@@ -16,10 +16,11 @@ import {
   CreateVercelAppDocument,
   RemoveVercelAppDocument,
   UpdateVercelAppDocument,
+  VercelDeploymentProtection,
+  type VercelProject,
 } from '@/gql/graphql';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useDefaultEnvironment } from '@/queries';
-import { VercelDeploymentProtection, type VercelProject } from '../../VercelIntegration';
 import { useVercelIntegration } from '../../useVercelIntegration';
 
 const defaultPath = '/api/inngest';
@@ -28,7 +29,7 @@ export default function VercelConfigure() {
   const [{ data: defaultEnv }] = useDefaultEnvironment();
   const defaultEnvID = defaultEnv?.id;
 
-  const { data, fetching, error: fetchError } = useVercelIntegration();
+  const { data, isLoading, error: fetchError } = useVercelIntegration();
   const [, createVercelApp] = useMutation(CreateVercelAppDocument);
   const [, removeVercelApp] = useMutation(RemoveVercelAppDocument);
   const [, updateVercelApp] = useMutation(UpdateVercelAppDocument);
@@ -44,7 +45,7 @@ export default function VercelConfigure() {
   const [mutating, setMutating] = useState(false);
 
   useEffect(() => {
-    if (originalProject) {
+    if (originalProject || !data) {
       return;
     }
 
@@ -52,7 +53,7 @@ export default function VercelConfigure() {
     // Whenever we load or update a project, store the original state.
     // We need to do this so we only issue add/remove when those changes
     // have been made as those operations are not idempotent upstream.
-    const p = data.projects.find((p) => p.id === id);
+    const p = data.projects.find((p) => p.projectID === id);
     if (p) {
       p.servePath && setPaths(p.servePath.split(','));
       setOriginalProject(p);
@@ -60,7 +61,7 @@ export default function VercelConfigure() {
     } else {
       setNotFound(true);
     }
-  }, [id, data.projects, originalProject]);
+  }, [id, data, originalProject]);
 
   useEffect(() => {
     originalProject && setProject({ ...originalProject });
@@ -106,21 +107,21 @@ export default function VercelConfigure() {
         ? await createVercelApp({
             input: {
               path: project.servePath,
-              projectID: project.id,
+              projectID: project.projectID,
               workspaceID: defaultEnvID,
             },
           })
         : project.isEnabled !== originalProject?.isEnabled && !project.isEnabled
         ? await removeVercelApp({
             input: {
-              projectID: project.id,
+              projectID: project.projectID,
               workspaceID: defaultEnvID,
             },
           })
         : await updateVercelApp({
             input: {
-              projectID: project.id,
-              path: project.servePath ?? '',
+              projectID: project.projectID,
+              path: project.servePath,
               protectionBypassSecret: project.protectionBypassSecret,
               originOverride: project.originOverride ? project.originOverride : undefined,
             },
@@ -144,7 +145,7 @@ export default function VercelConfigure() {
   // when enabling a project (e.g. the protection bypass secret)
   const areExtraSettingsVisible = project?.isEnabled;
 
-  if (fetching) {
+  if (isLoading) {
     return (
       <div className="mt-6 flex h-full w-full items-center justify-center">
         <LoadingIcon />
@@ -190,7 +191,7 @@ export default function VercelConfigure() {
             <div className="text-basis text-base">{project.name}</div>
           </div>
           <div className="text-basis mb-2 mt-6 text-2xl font-medium">{project.name}</div>
-          {project.ssoProtection?.deploymentType !== VercelDeploymentProtection.Disabled && (
+          {project.deploymentProtection !== VercelDeploymentProtection.Disabled && (
             <div className="text-accent-intense mb-7 flex flex-row items-center justify-start text-sm leading-tight">
               <RiInformationLine className="mr-1 h-4 w-4" />
               Vercel Deployment Protection might block syncing. Use the deployment protection key
@@ -198,24 +199,27 @@ export default function VercelConfigure() {
             </div>
           )}
 
-          <div className="border-subtle flex flex-col gap-2 rounded-md border p-6">
-            <div className="text-basis text-lg font-medium">Project status</div>
-            <div className="text-muted text-base font-normal">
-              This determines whether or not Inngest will communicate with your Vercel application.
+          {project.canChangeEnabled && (
+            <div className="border-subtle flex flex-col gap-2 rounded-md border p-6">
+              <div className="text-basis text-lg font-medium">Project status</div>
+              <div className="text-muted text-base font-normal">
+                This determines whether or not Inngest will communicate with your Vercel
+                application.
+              </div>
+              <SwitchWrapper>
+                <Switch
+                  checked={project.isEnabled}
+                  className="data-[state=checked]:bg-primary-moderate cursor-pointer"
+                  onCheckedChange={(checked) => {
+                    setProject({ ...project, isEnabled: checked });
+                  }}
+                />
+                <SwitchLabel htmlFor="override" className="text-muted text-sm leading-tight">
+                  {project.isEnabled ? 'Enabled' : 'Disabled'}
+                </SwitchLabel>
+              </SwitchWrapper>
             </div>
-            <SwitchWrapper>
-              <Switch
-                checked={project.isEnabled}
-                className="data-[state=checked]:bg-primary-moderate cursor-pointer"
-                onCheckedChange={(checked) => {
-                  setProject({ ...project, isEnabled: checked });
-                }}
-              />
-              <SwitchLabel htmlFor="override" className="text-muted text-sm leading-tight">
-                {project.isEnabled ? 'Enabled' : 'Disabled'}
-              </SwitchLabel>
-            </SwitchWrapper>
-          </div>
+          )}
 
           {areExtraSettingsVisible && (
             <>
@@ -267,7 +271,7 @@ export default function VercelConfigure() {
               <div className="flex flex-row gap-4">
                 <div
                   className={`border-subtle mt-4 flex w-full flex-col gap-2 rounded-md border p-6 ${
-                    project.ssoProtection?.deploymentType === VercelDeploymentProtection.Disabled &&
+                    project.deploymentProtection === VercelDeploymentProtection.Disabled &&
                     'bg-disabled'
                   }`}
                 >
@@ -284,12 +288,10 @@ export default function VercelConfigure() {
                   </div>
                   <Input
                     className={`text-basis mt-4 h-10 px-2 py-2 text-base ${
-                      project.ssoProtection?.deploymentType ===
-                        VercelDeploymentProtection.Disabled && 'border-subtle bg-disabled'
+                      project.deploymentProtection === VercelDeploymentProtection.Disabled &&
+                      'border-subtle bg-disabled'
                     }`}
-                    readOnly={
-                      project.ssoProtection?.deploymentType === VercelDeploymentProtection.Disabled
-                    }
+                    readOnly={project.deploymentProtection === VercelDeploymentProtection.Disabled}
                     onChange={({ target: { value } }) =>
                       setProject({ ...project, protectionBypassSecret: value })
                     }
