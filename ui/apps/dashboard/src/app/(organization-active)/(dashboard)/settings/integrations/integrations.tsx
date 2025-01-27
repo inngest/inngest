@@ -11,7 +11,6 @@ import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { RiExternalLinkLine } from '@remixicon/react';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
-import type VercelIntegration from './vercel/VercelIntegration';
 
 type Integration = {
   title: string;
@@ -115,10 +114,16 @@ const INTEGRATIONS: Integration[] = [
   },
 ];
 
-export default function IntegrationsList({ integrations }: { integrations: VercelIntegration[] }) {
-  const { value: supabaseIntegration } = useBooleanFlag('supabase-integration');
+type Props = {
+  integrations: {
+    slug: string;
+    enabled: boolean;
+    projects: unknown[];
+  }[];
+};
 
-  console.log('main integrations', integrations);
+export default function IntegrationsList({ integrations }: Props) {
+  const { value: supabaseIntegration } = useBooleanFlag('supabase-integration');
 
   const getIntegrationData = (slug: string) =>
     integrations.find((integration) => integration.slug === slug);
