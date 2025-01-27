@@ -15,10 +15,36 @@
   }
 }
 
-/* Override clerk's internal style for social style buttons */
-.cl-socialButtonsBlockButton {
-  border-width: 1px !important;
-  box-shadow: none !important;
+/* Override Clerk text colors */
+.cl-rootBox,
+.cl-rootBox
+  :not([class*='__danger']):not([class*='__warning']):not([class*='__success']):not(
+    [class*='button']
+  ):not([class*='button'] *):not([class*='ErrorText']):not([class*='ErrorText'] *):not(
+    [class*='WarningText']
+  ):not([class*='WarningText'] *):not([class*='SuccessText']):not([class*='SuccessText'] *) {
+  color: rgb(var(--color-foreground-base));
+}
+
+.cl-rootBox [class*='__danger'],
+.cl-rootBox [class*='__danger'] *,
+.cl-rootBox [class*='__danger'] svg * {
+  color: rgb(var(--color-foreground-error));
+  fill: rgb(var(--color-foreground-error)); /* Explicitly set `fill` for SVG */
+}
+
+.cl-rootBox [class*='__warning'],
+.cl-rootBox [class*='__warning'] *,
+.cl-rootBox [class*='__warning'] svg * {
+  color: rgb(var(--color-foreground-warning));
+  fill: rgb(var(--color-foreground-warning)); /* Explicitly set `fill` for SVG */
+}
+
+.cl-rootBox [class*='__success'],
+.cl-rootBox [class*='__success'] *,
+.cl-rootBox [class*='__success'] svg * {
+  color: rgb(var(--color-foreground-success));
+  fill: rgb(var(--color-foreground-success)); /* Explicitly set `fill` for SVG */
 }
 
 input[type='number']::-webkit-inner-spin-button,
