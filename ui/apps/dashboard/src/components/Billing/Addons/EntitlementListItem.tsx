@@ -3,7 +3,6 @@
 import { Button } from '@inngest/components/Button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiInformationLine } from '@remixicon/react';
-import { add } from 'husky';
 
 import EntitlementListItemSelfService from '@/components/Billing/Addons/EntitlementListItemSelfService';
 import { addonPriceStr } from '@/components/Billing/Addons/pricing_help';
