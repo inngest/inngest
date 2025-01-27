@@ -96,18 +96,26 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 				return
 			}
 
+			connId, err := ulid.Parse(routeTo.Id)
+			if err != nil {
+				c.logger.Error("invalid connection ID", "conn_id", routeTo.Id, "err", err)
+				return
+			}
+
 			log = log.With("gateway_id", routeTo.GatewayId, "conn_id", routeTo.Id, "group_hash", routeTo.GroupId)
 
 			// TODO What if something goes wrong inbetween setting idempotency (claiming exclusivity) and forwarding the req?
 			// We'll potentially lose data here
 
 			// Forward message to the gateway
-			err = c.receiver.RouteExecutorRequest(ctx, gatewayId, appId, gatewayId, data)
+			err = c.receiver.RouteExecutorRequest(ctx, gatewayId, appId, connId, data)
 			if err != nil {
 				// TODO Should we retry? Log error?
 				log.Error("failed to route request to gateway", "err", err)
 				return
 			}
+
+			log.Debug("forwarded executor request to gateway")
 		})
 		if err != nil {
 			// TODO Log error, retry?

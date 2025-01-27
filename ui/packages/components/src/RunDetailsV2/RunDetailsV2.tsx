@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { StatusCell } from '../Table';
-import { Trace } from '../TimelineV2';
+import { Trace as OldTrace } from '../TimelineV2';
 import { TimelineV2 } from '../TimelineV2/Timeline';
 import { TriggerDetails } from '../TriggerDetails';
 import type { Result } from '../types/functionRun';
@@ -25,7 +25,6 @@ type Props = {
   rerun: React.ComponentProps<typeof RunInfo>['rerun'];
   rerunFromStep: React.ComponentProps<typeof RunInfo>['rerunFromStep'];
   runID: string;
-  stepAIEnabled?: boolean;
 };
 
 type Run = {
@@ -39,7 +38,8 @@ type Run = {
     slug: string;
   };
   id: string;
-  trace: React.ComponentProps<typeof Trace>['trace'];
+  trace: React.ComponentProps<typeof OldTrace>['trace'];
+  hasAI: boolean;
 };
 
 export function RunDetailsV2(props: Props) {
@@ -111,7 +111,6 @@ export function RunDetailsV2(props: Props) {
               runID={runID}
               standalone={standalone}
               result={resultRes.data}
-              stepAIEnabled={props.stepAIEnabled}
             />
             {showError && (
               <ErrorCard
@@ -127,7 +126,6 @@ export function RunDetailsV2(props: Props) {
               pathCreator={pathCreator}
               runID={runID}
               trace={run.trace}
-              stepAIEnabled={props.stepAIEnabled}
               rerunFromStep={rerunFromStep}
             />
           )}

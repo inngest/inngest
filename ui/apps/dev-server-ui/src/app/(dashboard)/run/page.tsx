@@ -38,7 +38,6 @@ export default function Page() {
         rerun={rerun}
         rerunFromStep={rerunFromStep}
         runID={runID}
-        stepAIEnabled={true}
       />
     </div>
   );

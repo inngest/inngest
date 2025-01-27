@@ -359,7 +359,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					Tags:    tags,
 				})
 
-				serr := ch.handleIncomingWebSocketMessage(app.ID, &msg)
+				serr := ch.handleIncomingWebSocketMessage(ctx, app.ID, &msg)
 				if serr != nil {
 					c.closeWithConnectError(ws, serr)
 					return serr
@@ -455,7 +455,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 	})
 }
 
-func (c *connectionHandler) handleIncomingWebSocketMessage(appId uuid.UUID, msg *connect.ConnectMessage) *SocketError {
+func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, appId uuid.UUID, msg *connect.ConnectMessage) *SocketError {
 	c.log.Debug("received WebSocket message", "kind", msg.Kind.String())
 
 	switch msg.Kind {
@@ -496,6 +496,14 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(appId uuid.UUID, msg 
 
 		for _, l := range c.svc.lifecycles {
 			go l.OnHeartbeat(context.Background(), c.conn)
+		}
+
+		// Respond with gateway heartbeat
+		if err := wsproto.Write(ctx, c.ws, &connect.ConnectMessage{
+			Kind: connect.GatewayMessageType_GATEWAY_HEARTBEAT,
+		}); err != nil {
+			// The connection will fail to read and be closed in the read loop
+			return nil
 		}
 
 		return nil
@@ -552,8 +560,9 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(appId uuid.UUID, msg 
 		}
 	case connect.GatewayMessageType_WORKER_REPLY:
 		// Always handle SDK reply, even if gateway is draining
-		err := c.handleSdkReply(context.Background(), appId, msg)
+		err := c.handleSdkReply(context.Background(), msg)
 		if err != nil {
+			c.log.Error("could not handle sdk reply", "err", err)
 			// TODO Should we actually close the connection here?
 			return &SocketError{
 				SysCode:    syscode.CodeConnectInternal,
@@ -835,7 +844,7 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 	return &conn, nil
 }
 
-func (c *connectionHandler) handleSdkReply(ctx context.Context, appId uuid.UUID, msg *connect.ConnectMessage) error {
+func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connect.ConnectMessage) error {
 	var data connect.SDKResponse
 	if err := proto.Unmarshal(msg.Payload, &data); err != nil {
 		return fmt.Errorf("invalid response type: %w", err)
@@ -843,9 +852,23 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, appId uuid.UUID,
 
 	c.log.Debug("notifying executor about response", "status", data.Status.String(), "no_retry", data.NoRetry, "retry_after", data.RetryAfter)
 
-	err := c.svc.receiver.NotifyExecutor(ctx, appId, &data)
+	err := c.svc.receiver.NotifyExecutor(ctx, &data)
 	if err != nil {
 		return fmt.Errorf("could not notify executor: %w", err)
+	}
+
+	replyAck, err := proto.Marshal(&connect.WorkerReplyAckData{
+		RequestId: data.RequestId,
+	})
+	if err != nil {
+		return fmt.Errorf("could not marshal reply ack: %w", err)
+	}
+
+	if err := wsproto.Write(ctx, c.ws, &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_REPLY_ACK,
+		Payload: replyAck,
+	}); err != nil {
+		return fmt.Errorf("could not send reply ack: %w", err)
 	}
 
 	return nil

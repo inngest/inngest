@@ -587,7 +587,7 @@ func (q *Queries) GetFunctionBySlug(ctx context.Context, slug string) (*Function
 }
 
 const getFunctionRun = `-- name: GetFunctionRun :one
-SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_finishes.run_id, function_finishes.status, function_finishes.output, function_finishes.completed_step_count, function_finishes.created_at
+SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_runs.workspace_id, function_finishes.run_id, function_finishes.status, function_finishes.output, function_finishes.completed_step_count, function_finishes.created_at
   FROM function_runs
   LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
   WHERE function_runs.run_id = ?1
@@ -611,6 +611,7 @@ func (q *Queries) GetFunctionRun(ctx context.Context, runID ulid.ULID) (*GetFunc
 		&i.FunctionRun.BatchID,
 		&i.FunctionRun.OriginalRunID,
 		&i.FunctionRun.Cron,
+		&i.FunctionRun.WorkspaceID,
 		&i.FunctionFinish.RunID,
 		&i.FunctionFinish.Status,
 		&i.FunctionFinish.Output,
@@ -716,7 +717,7 @@ func (q *Queries) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([
 }
 
 const getFunctionRuns = `-- name: GetFunctionRuns :many
-SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_finishes.run_id, function_finishes.status, function_finishes.output, function_finishes.completed_step_count, function_finishes.created_at FROM function_runs
+SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_runs.workspace_id, function_finishes.run_id, function_finishes.status, function_finishes.output, function_finishes.completed_step_count, function_finishes.created_at FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
 `
 
@@ -744,6 +745,7 @@ func (q *Queries) GetFunctionRuns(ctx context.Context) ([]*GetFunctionRunsRow, e
 			&i.FunctionRun.BatchID,
 			&i.FunctionRun.OriginalRunID,
 			&i.FunctionRun.Cron,
+			&i.FunctionRun.WorkspaceID,
 			&i.FunctionFinish.RunID,
 			&i.FunctionFinish.Status,
 			&i.FunctionFinish.Output,
@@ -764,7 +766,7 @@ func (q *Queries) GetFunctionRuns(ctx context.Context) ([]*GetFunctionRunsRow, e
 }
 
 const getFunctionRunsFromEvents = `-- name: GetFunctionRunsFromEvents :many
-SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_finishes.run_id, function_finishes.status, function_finishes.output, function_finishes.completed_step_count, function_finishes.created_at FROM function_runs
+SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_runs.workspace_id, function_finishes.run_id, function_finishes.status, function_finishes.output, function_finishes.completed_step_count, function_finishes.created_at FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
 WHERE function_runs.event_id IN (/*SLICE:event_ids*/?)
 `
@@ -803,6 +805,7 @@ func (q *Queries) GetFunctionRunsFromEvents(ctx context.Context, eventIds []ulid
 			&i.FunctionRun.BatchID,
 			&i.FunctionRun.OriginalRunID,
 			&i.FunctionRun.Cron,
+			&i.FunctionRun.WorkspaceID,
 			&i.FunctionFinish.RunID,
 			&i.FunctionFinish.Status,
 			&i.FunctionFinish.Output,
@@ -823,7 +826,7 @@ func (q *Queries) GetFunctionRunsFromEvents(ctx context.Context, eventIds []ulid
 }
 
 const getFunctionRunsTimebound = `-- name: GetFunctionRunsTimebound :many
-SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_finishes.run_id, function_finishes.status, function_finishes.output, function_finishes.completed_step_count, function_finishes.created_at FROM function_runs
+SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_runs.workspace_id, function_finishes.run_id, function_finishes.status, function_finishes.output, function_finishes.completed_step_count, function_finishes.created_at FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
 WHERE function_runs.run_started_at > ? AND function_runs.run_started_at <= ?
 ORDER BY function_runs.run_started_at DESC
@@ -860,6 +863,7 @@ func (q *Queries) GetFunctionRunsTimebound(ctx context.Context, arg GetFunctionR
 			&i.FunctionRun.BatchID,
 			&i.FunctionRun.OriginalRunID,
 			&i.FunctionRun.Cron,
+			&i.FunctionRun.WorkspaceID,
 			&i.FunctionFinish.RunID,
 			&i.FunctionFinish.Status,
 			&i.FunctionFinish.Output,
@@ -1352,8 +1356,8 @@ func (q *Queries) InsertFunctionFinish(ctx context.Context, arg InsertFunctionFi
 const insertFunctionRun = `-- name: InsertFunctionRun :exec
 
 INSERT INTO function_runs
-	(run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id, cron) VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?)
+	(run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id, cron, workspace_id) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertFunctionRunParams struct {
@@ -1366,6 +1370,7 @@ type InsertFunctionRunParams struct {
 	BatchID         ulid.ULID
 	OriginalRunID   ulid.ULID
 	Cron            sql.NullString
+	WorkspaceID     uuid.UUID
 }
 
 // function runs
@@ -1380,6 +1385,7 @@ func (q *Queries) InsertFunctionRun(ctx context.Context, arg InsertFunctionRunPa
 		arg.BatchID,
 		arg.OriginalRunID,
 		arg.Cron,
+		arg.WorkspaceID,
 	)
 	return err
 }

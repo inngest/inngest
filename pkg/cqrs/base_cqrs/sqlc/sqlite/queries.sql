@@ -90,8 +90,8 @@ UPDATE functions SET archived_at = datetime('now') WHERE id IN (sqlc.slice('ids'
 
 -- name: InsertFunctionRun :exec
 INSERT INTO function_runs
-	(run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id, cron) VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?);
+	(run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id, cron, workspace_id) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: InsertFunctionFinish :exec
 INSERT INTO function_finishes

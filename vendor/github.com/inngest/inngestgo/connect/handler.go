@@ -6,11 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/coder/websocket"
-	"github.com/inngest/inngest/pkg/connect/wsproto"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/syscode"
-	connectproto "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"github.com/pbnjay/memory"
 	"golang.org/x/sync/errgroup"
@@ -18,7 +16,6 @@ import (
 	"log/slog"
 	"os"
 	"runtime"
-	"sync"
 	"time"
 )
 
@@ -27,6 +24,7 @@ const (
 )
 
 func Connect(ctx context.Context, opts Opts, invoker FunctionInvoker, logger *slog.Logger) error {
+	apiClient := newWorkerApiClient(opts.APIBaseUrl, opts.Env)
 	ch := &connectHandler{
 		logger:                 logger,
 		invoker:                invoker,
@@ -34,7 +32,8 @@ func Connect(ctx context.Context, opts Opts, invoker FunctionInvoker, logger *sl
 		notifyConnectDoneChan:  make(chan connectReport),
 		notifyConnectedChan:    make(chan struct{}),
 		initiateConnectionChan: make(chan struct{}),
-		apiClient:              newWorkerApiClient(opts.APIBaseUrl, opts.Env),
+		apiClient:              apiClient,
+		messageBuffer:          newMessageBuffer(apiClient, logger),
 	}
 
 	wp := NewWorkerPool(ctx, opts.WorkerConcurrency, ch.processExecutorRequest)
@@ -87,8 +86,7 @@ type connectHandler struct {
 
 	logger *slog.Logger
 
-	messageBuffer     []*connectproto.ConnectMessage
-	messageBufferLock sync.Mutex
+	messageBuffer *messageBuffer
 
 	workerPool *workerPool
 
@@ -182,9 +180,17 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 						case syscode.CodeConnectGatewayClosing, syscode.CodeConnectInternal, syscode.CodeConnectWorkerHelloTimeout:
 							// continue to reconnect logic
 						default:
-							// If we received a reason  that's non-retriable, stop here.
+							// If we received a reason that's non-retriable, stop here.
 							return fmt.Errorf("connect failed with error code %q", closeErr.Reason)
 						}
+					}
+				}
+
+				// Attempt to flush messages before reconnecting
+				if h.messageBuffer.hasMessages() {
+					err := h.messageBuffer.flush(auth.hashedSigningKey)
+					if err != nil {
+						h.logger.Error("could not send buffered messages", "err", err)
 					}
 				}
 
@@ -218,53 +224,17 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 		return fmt.Errorf("could not establish connection: %w", err)
 	}
 
-	// Send out buffered messages, using new connection if necessary!
-	h.messageBufferLock.Lock()
-	defer h.messageBufferLock.Unlock()
-	if len(h.messageBuffer) > 0 {
-		//  Send buffered messages via a working connection
-		err = h.withTemporaryConnection(connectionEstablishData{
-			hashedSigningKey:      auth.hashedSigningKey,
-			numCpuCores:           int32(numCpuCores),
-			totalMem:              int64(totalMem),
-			marshaledFns:          marshaledFns,
-			marshaledCapabilities: marshaledCapabilities,
-		}, func(ws *websocket.Conn) error {
-			// Send buffered messages
-			err := h.sendBufferedMessages(ws)
-			if err != nil {
-				return fmt.Errorf("could not send buffered messages: %w", err)
-			}
-
-			return nil
-		})
+	// Send out buffered messages using API
+	if h.messageBuffer.hasMessages() {
+		// Send buffered messages
+		err := h.messageBuffer.flush(auth.hashedSigningKey)
 		if err != nil {
-			h.logger.Error("could not establish connection for sending buffered messages", "err", err)
+			h.logger.Error("could not send buffered messages", "err", err)
 		}
 
 		// TODO Push remaining messages to another destination for processing?
 	}
 
-	return nil
-}
-
-func (h *connectHandler) sendBufferedMessages(ws *websocket.Conn) error {
-	processed := 0
-	for _, msg := range h.messageBuffer {
-		// always send the message, even if the context is cancelled
-		err := wsproto.Write(context.Background(), ws, msg)
-		if err != nil {
-			// Only send buffered messages once
-			h.messageBuffer = h.messageBuffer[processed:]
-
-			h.logger.Error("failed to send buffered message", "err", err)
-			return fmt.Errorf("could not send buffered message: %w", err)
-		}
-
-		h.logger.Debug("sent buffered message", "msg", msg)
-		processed++
-	}
-	h.messageBuffer = nil
 	return nil
 }
 

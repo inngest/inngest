@@ -7,12 +7,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/aws/smithy-go/ptr"
-	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/aws/smithy-go/ptr"
 	sq "github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
@@ -29,6 +28,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/util"
+	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/jinzhu/copier"
 	"github.com/oklog/ulid/v2"
 )
@@ -862,6 +862,7 @@ func toCQRSRun(run sqlc.FunctionRun, finish sqlc.FunctionFinish) *cqrs.FunctionR
 		FunctionID:      run.FunctionID,
 		FunctionVersion: run.FunctionVersion,
 		EventID:         run.EventID,
+		WorkspaceID:     run.WorkspaceID,
 	}
 	if run.BatchID != nilULID {
 		copied.BatchID = &run.BatchID
@@ -1102,6 +1103,7 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 		BatchID:      batchID,
 		IsBatch:      isBatch,
 		CronSchedule: cron,
+		HasAI:        run.HasAi,
 	}
 
 	return &trun, nil
@@ -1201,8 +1203,9 @@ func (w wrapper) GetSpanStack(ctx context.Context, opts cqrs.SpanIdentifier) ([]
 		}
 
 		for _, evt := range evts {
-			if stack, ok := evt.Attributes[consts.OtelSysStepStack]; ok {
-				return strings.Split(stack, ","), nil
+			if _, isStackEvt := evt.Attributes[consts.OtelSysStepStack]; isStackEvt {
+				// Data is kept in the `Name` field
+				return strings.Split(evt.Name, ","), nil
 			}
 		}
 	}

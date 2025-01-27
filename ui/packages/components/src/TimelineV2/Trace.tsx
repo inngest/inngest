@@ -22,7 +22,6 @@ type Props = {
   };
   trace: Trace;
   runID: string;
-  stepAIEnabled?: boolean;
   rerunFromStep: React.ComponentProps<typeof TraceInfo>['rerunFromStep'];
 };
 
@@ -35,7 +34,6 @@ export function Trace({
   pathCreator,
   trace,
   runID,
-  stepAIEnabled = false,
   rerunFromStep,
 }: Props) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -74,7 +72,7 @@ export function Trace({
     spans = trace.childrenSpans;
   }
 
-  const aiOutput = stepAIEnabled && result?.data ? parseAIOutput(result.data) : undefined;
+  const aiOutput = result?.data ? parseAIOutput(result.data) : undefined;
 
   return (
     <div
@@ -99,7 +97,7 @@ export function Trace({
             isExpanded={isExpanded}
             onClickExpandToggle={() => setIsExpanded((prev) => !prev)}
             trace={trace}
-            isAI={stepAIEnabled && isAI}
+            isAI={isAI}
           />
         </div>
 
@@ -136,7 +134,6 @@ export function Trace({
                     pathCreator={pathCreator}
                     trace={child}
                     runID={runID}
-                    stepAIEnabled={stepAIEnabled}
                     rerunFromStep={rerunFromStep}
                   />
                 </div>

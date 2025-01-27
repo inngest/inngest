@@ -18,6 +18,10 @@ func (h *handler) Connect(ctx context.Context) error {
 		Host:   "connect",
 	}
 
+	if h.InstanceId == nil {
+		return fmt.Errorf("missing required Instance ID")
+	}
+
 	fns, err := createFunctionConfigs(h.appName, h.funcs, connectPlaceholder, true)
 	if err != nil {
 		return fmt.Errorf("error creating function configs: %w", err)

@@ -78,7 +78,7 @@ func (a *api) PostCreateJWT(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Set the env ID from the authentication context.
-	for n, _ := range topics {
+	for n := range topics {
 		topics[n].EnvID = auth.WorkspaceID()
 	}
 

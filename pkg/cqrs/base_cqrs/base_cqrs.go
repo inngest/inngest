@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -111,7 +112,7 @@ func up(db *sql.DB, opts BaseCQRSOptions) error {
 
 	// Grab the migration driver.
 	if opts.PostgresURI != "" {
-		src, err = iofs.New(FS, filepath.Join("migrations", "postgres"))
+		src, err = iofs.New(FS, path.Join("migrations", "postgres"))
 		if err != nil {
 			return err
 		}
@@ -135,7 +136,7 @@ func up(db *sql.DB, opts BaseCQRSOptions) error {
 			return err
 		}
 	} else {
-		src, err = iofs.New(FS, filepath.Join("migrations", "sqlite"))
+		src, err = iofs.New(FS, path.Join("migrations", "sqlite"))
 		if err != nil {
 			return err
 		}
