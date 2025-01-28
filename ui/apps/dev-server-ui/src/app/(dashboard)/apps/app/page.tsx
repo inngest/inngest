@@ -139,7 +139,7 @@ export function AppPage({ id }: { id: string }) {
           <CardItem term="App version" detail={<Pill>{version || 'unknown'}</Pill>} />
           <CardItem
             term="Last synced at"
-            detail={lastSyncedAt ? <Time value={lastSyncedAt} /> : <Pill>unknown</Pill>}
+            detail={lastSyncedAt ? <Time value={lastSyncedAt} /> : '-'}
           />
           <CardItem
             term="Connected workers"
@@ -151,13 +151,12 @@ export function AppPage({ id }: { id: string }) {
           />
           <CardItem term="SDK version" detail={<Pill>{app.sdkVersion}</Pill>} />
           <CardItem term="Language" detail={app.sdkLanguage} />
-          <CardItem term="Framework" detail={app.framework} />
+          <CardItem term="Framework" detail={app.framework ? app.framework : '-'} />
         </AppDetailsCard>
         <div>
           <h4 className="text-subtle mb-4 text-xl">
             Workers ({countAllWorkersData?.workerConnections?.totalCount || 0})
           </h4>
-          {/* @ts-ignore TEMP */}
           <WorkersTable workers={workers} />
         </div>
         <div>
