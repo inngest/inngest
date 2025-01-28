@@ -61,11 +61,12 @@ export const indicatorColor: { [K in Indicator]: string } = {
 
 export const STATUS_PAGE_URL = 'https://status.inngest.com';
 
-export const mapStatus = (res: StatusPageSummaryResponse) => {
+export const mapStatus = (res: StatusPageSummaryResponse): Status => {
   // Grab first incident and maintenance item
   const incident = res.ongoing_incidents[0];
   const maintenance = res.in_progress_maintenances[0];
-  const impact = incident?.current_worst_impact || (maintenance ? 'maintenance' : 'none');
+  const impact: Indicator =
+    incident?.current_worst_impact || (maintenance ? 'maintenance' : 'none');
   return {
     indicatorColor: indicatorColor[impact],
     impact,
