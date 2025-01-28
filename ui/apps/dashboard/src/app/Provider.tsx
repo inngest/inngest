@@ -68,6 +68,8 @@ export default function Provider({ children }: React.PropsWithChildren) {
           formattedDate__tableCell: 'text-sm',
           formInputGroup: 'shadow-none',
           socialButtons: 'flex flex-col gap-4',
+          organizationProfileMembersSearchInput: 'pl-8',
+          organizationPreviewMainIdentifier__organizationList: 'text-basis hover:text-basis',
           profileSection: 'flex-col-reverse gap-2 border border-subtle rounded-md p-6 pt-0 mb-8',
           profileSectionTitleText: '!text-muted text-lg',
           profileSection__organizationProfile: 'border-0',
@@ -100,9 +102,8 @@ export default function Provider({ children }: React.PropsWithChildren) {
             appearance: 'outlined',
             loading: false,
           }),
-          formFieldErrorText: 'text-error',
-          formFieldWarningText: 'text-warning',
-          formFieldSuccessText: 'text-success',
+          profileSectionContent__activeDevices: 'max-h-80 overflow-scroll',
+          profileSectionTitleText__activeDevices: 'sticky top-0 bg-canvasBase z-10',
           identityPreviewEditButton: 'text-btnPrimary',
           providerIcon__github: 'dark:invert',
           socialButtonsBlockButton: 'shadow-none border',
@@ -116,13 +117,15 @@ export default function Provider({ children }: React.PropsWithChildren) {
           formFieldLabel: 'text-basis text-sm font-medium',
           formFieldAction:
             'text-subtle hover:text-subtle hover:decoration-subtle decoration-transparent decoration-1 underline underline-offset-2 cursor-pointer transition-color duration-300',
+          formFieldErrorText: 'text-error',
+          formFieldWarningText: 'text-warning',
+          formFieldSuccessText: 'text-success',
           buttonArrowIcon: 'hidden',
           tagInputContainer: 'border-0 shadow-none bg-transparent *:px-3 *:p-1.5 *:text-sm',
           footerActionText: 'text-sm font-medium text-basis',
           footerActionLink:
             '!text-link hover:text-link hover:decoration-link decoration-transparent decoration-1 underline underline-offset-2 cursor-pointer transition-color duration-300',
           footerPagesLink: 'text-sm font-medium text-basis',
-          profileSection__activeDevices: 'max-h-80 overflow-scroll',
         },
       }}
     >

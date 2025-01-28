@@ -47,6 +47,10 @@
   fill: rgb(var(--color-foreground-success)); /* Explicitly set `fill` for SVG */
 }
 
+.cl-selectButton * {
+  color: rgb(var(--color-foreground-base));
+}
+
 input[type='number']::-webkit-inner-spin-button,
 input[type='number']::-webkit-outer-spin-button {
   -webkit-appearance: none;
