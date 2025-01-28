@@ -562,6 +562,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 		// Always handle SDK reply, even if gateway is draining
 		err := c.handleSdkReply(context.Background(), msg)
 		if err != nil {
+			c.log.Error("could not handle sdk reply", "err", err)
 			// TODO Should we actually close the connection here?
 			return &SocketError{
 				SysCode:    syscode.CodeConnectInternal,

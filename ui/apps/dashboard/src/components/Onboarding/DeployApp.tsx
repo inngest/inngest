@@ -35,11 +35,11 @@ export default function DeployApp() {
     false
   );
 
-  const { data, fetching, error } = useVercelIntegration();
+  const { data, isLoading, error } = useVercelIntegration();
 
-  const hasVercelIntegration = data.enabled;
-  const vercelProjects = data.projects;
-  const enabledProjects = vercelProjects.filter((project) => project.isEnabled);
+  const hasVercelIntegration = Boolean(data);
+  const vercelProjects = data?.projects;
+  const enabledProjects = vercelProjects?.filter((project) => project.isEnabled) ?? [];
 
   return (
     <div className="text-subtle">
@@ -183,9 +183,9 @@ export default function DeployApp() {
                   setInstallingVercelFromOnboarding(true);
                   router.push(`https://vercel.com/integrations/inngest/new`);
                 }}
-                disabled={fetching}
+                disabled={isLoading}
               />
-              {fetching && (
+              {isLoading && (
                 <div className="text-link flex items-center gap-1.5 text-sm">
                   <IconSpinner className="fill-link h-4 w-4" />
                   Searching for integration

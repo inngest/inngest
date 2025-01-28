@@ -1,5 +1,6 @@
 type Query {
-  apps: [App!]!
+  apps(filter: AppsFilterV1): [App!]!
+	app(id: UUID!): App
 
   stream(query: StreamQuery!): [StreamItem!]!
 

@@ -49,13 +49,13 @@ export function AppCardContent({ app, pill, actions }: CardContentProps) {
         <p className="text-subtle mt-0.5">{app.url}</p>
       </div>
 
-      <div className="flex justify-between">
+      <div className="grid grid-cols-4 gap-4">
         {app.lastSyncedAt && (
           <Description term="Last synced at" detail={<Time value={app.lastSyncedAt} />} />
         )}
         <Description
           term="Sync method"
-          detail={<div className="lowercase first-letter:capitalize">{app.syncMethod}</div>}
+          detail={<div className="lowercase first-letter:capitalize">{app.connectionType}</div>}
         />
         <Description term="SDK version" detail={app.sdkVersion?.trim() ? app.sdkVersion : '-'} />
         <Description term="Language" detail={app.sdkLanguage?.trim() ? app.sdkLanguage : '-'} />

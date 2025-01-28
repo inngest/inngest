@@ -3,6 +3,8 @@ package resolvers
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
@@ -10,8 +12,16 @@ import (
 	"github.com/inngest/inngest/pkg/devserver/discovery"
 )
 
-func (a queryResolver) Apps(ctx context.Context) ([]*cqrs.App, error) {
-	return a.Data.GetApps(ctx, consts.DevServerEnvId)
+func (a queryResolver) Apps(ctx context.Context, filter *models.AppsFilterV1) ([]*cqrs.App, error) {
+	cqrsFilter, err := models.FromAppsFilter(filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse filter: %w", err)
+	}
+	return a.Data.GetApps(ctx, consts.DevServerEnvId, cqrsFilter)
+}
+
+func (a queryResolver) App(ctx context.Context, id uuid.UUID) (*cqrs.App, error) {
+	return a.Data.GetAppByID(ctx, id)
 }
 
 func (a appResolver) ID(ctx context.Context, obj *cqrs.App) (string, error) {
@@ -87,4 +97,13 @@ func (a appResolver) FunctionCount(ctx context.Context, obj *cqrs.App) (int, err
 		return 0, err
 	}
 	return len(funcs), nil
+}
+
+func (a appResolver) ConnectionType(ctx context.Context, obj *cqrs.App) (models.AppConnectionType, error) {
+	connectionType, err := enums.AppConnectionTypeString(obj.ConnectionType)
+	if err != nil {
+		return models.AppConnectionTypeConnect, fmt.Errorf("unknown connection type")
+	}
+
+	return models.ToAppConnectionType(connectionType), nil
 }

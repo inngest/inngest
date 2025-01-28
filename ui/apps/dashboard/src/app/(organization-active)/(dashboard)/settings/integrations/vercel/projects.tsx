@@ -9,7 +9,7 @@ import { Select } from '@inngest/components/Select/Select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiInformationLine, RiRefreshLine } from '@remixicon/react';
 
-import { VercelDeploymentProtection, type VercelIntegration } from './VercelIntegration';
+import { VercelDeploymentProtection, type VercelIntegration } from '@/gql/graphql';
 
 // type DisableProjectProps = {
 //   isOpen: boolean;
@@ -95,7 +95,7 @@ export default function VercelProjects({ integration }: { integration: VercelInt
                   </div>
                   <div className="mt-4 flex flex-row items-center justify-start">
                     <div className="text-basis text-xl font-medium">{p.name}</div>
-                    {p.ssoProtection?.deploymentType !== VercelDeploymentProtection.Disabled && (
+                    {p.deploymentProtection !== VercelDeploymentProtection.Disabled && (
                       <Tooltip>
                         <TooltipTrigger>
                           <RiInformationLine className="text-accent-subtle ml-2 h-4 w-4 cursor-pointer" />
@@ -130,7 +130,9 @@ export default function VercelProjects({ integration }: { integration: VercelInt
                   <Button
                     appearance="outlined"
                     label="Configure"
-                    href={`/settings/integrations/vercel/configure/${encodeURIComponent(p.id)}`}
+                    href={`/settings/integrations/vercel/configure/${encodeURIComponent(
+                      p.projectID
+                    )}`}
                   />
                 </div>
               </div>

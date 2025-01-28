@@ -511,6 +511,7 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 		}
 	}()
 
+	// Look up all functions have a trigger that matches the event name, including wildcards.
 	fns, err := s.data.FunctionsByTrigger(ctx, evt.Name)
 	if err != nil {
 		return fmt.Errorf("error loading functions by trigger: %w", err)
@@ -533,11 +534,7 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 		go func() {
 			defer wg.Done()
 			for _, t := range copied.Triggers {
-				if t.EventTrigger == nil || t.Event != evt.Name {
-					// This isn't triggered by an event, so we skip this trigger entirely.
-					continue
-				}
-
+				// Evaluate all expressions for matching triggers
 				if t.Expression != nil {
 					// Execute expressions here, ensuring that each function is only triggered
 					// under the correct conditions.
