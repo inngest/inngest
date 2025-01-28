@@ -68,7 +68,8 @@ type TracerOpts struct {
 	TraceURLPath             string
 	TraceMaxPayloadSizeBytes int
 
-	NATS []exporters.NatsExporterOpts
+	NATS  []exporters.NatsExporterOpts
+	Kafka []exporters.KafkaSpansExporterOpts
 }
 
 func (o TracerOpts) Endpoint() string {
@@ -442,8 +443,7 @@ func newNatsTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) 
 }
 
 func newKafkaTraceExporter(ctx context.Context, opts TracerOpts) (Tracer, error) {
-	// TODO: add opts?
-	exp, err := exporters.NewKafkaSpanExporter(ctx)
+	exp, err := exporters.NewKafkaSpanExporter(ctx, opts.Kafka...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Kafka trace client: %w", err)
 	}

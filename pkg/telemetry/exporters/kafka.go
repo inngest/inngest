@@ -25,6 +25,16 @@ type kafkaSpansExporterOpts struct {
 
 type KafkaSpansExporterOpts func(k *kafkaSpansExporterOpts)
 
+func WithKafkaExporterTopic(topic, key string) KafkaSpansExporterOpts {
+	return func(k *kafkaSpansExporterOpts) {
+		k.topic = topic
+
+		if key != "" {
+			k.key = key
+		}
+	}
+}
+
 func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (trace.SpanExporter, error) {
 	conf := &kafkaSpansExporterOpts{}
 
