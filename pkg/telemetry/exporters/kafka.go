@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"github.com/sourcegraph/conc/pool"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"gocloud.dev/pubsub"
 	"google.golang.org/protobuf/proto"
@@ -73,51 +75,69 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 
 	l := logger.StdlibLogger(ctx)
 
+	errp := pool.New().WithErrors().WithMaxGoroutines(1000)
+
 	for _, sp := range spans {
-		span, err := SpanToProto(ctx, sp)
-		if err != nil {
-			return err
-		}
+		sp := sp
 
-		id := span.GetId()
+		errp.Go(func() error {
+			span, err := SpanToProto(ctx, sp)
+			if err != nil {
+				l.Error("error converting span to proto", "err", err)
+				return fmt.Errorf("error converting span to proto: %w", err)
+			}
 
-		byt, err := proto.Marshal(span)
-		if err != nil {
-			l.Error("error serializing span into binary",
-				"err", err,
-				"acctID", id.AccountId,
-				"wsID", id.EnvId,
-				"fnID", id.FunctionId,
-				"runID", id.RunId,
-			)
+			id := span.GetId()
 
-			return fmt.Errorf("error serializing span into binary: %w", err)
-		}
+			byt, err := proto.Marshal(span)
+			if err != nil {
+				l.Error("error serializing span into binary",
+					"err", err,
+					"acctID", id.AccountId,
+					"wsID", id.EnvId,
+					"fnID", id.FunctionId,
+					"runID", id.RunId,
+				)
 
-		msg := &pubsub.Message{
-			Metadata: map[string]string{},
-			Body:     byt,
-		}
-		if e.key == defaultMsgKey {
-			msg.Metadata[e.key] = id.GetFunctionId()
-		}
+				return fmt.Errorf("error serialzing span into binary: %w", err)
+			}
 
-		if err := e.topic.Send(ctx, &pubsub.Message{}); err != nil {
-			l.Error("error publishing span to kafka",
-				"err", err,
-				"acctID", id.AccountId,
-				"wsID", id.EnvId,
-				"fnID", id.FunctionId,
-				"runID", id.RunId,
-			)
+			msg := &pubsub.Message{
+				Metadata: map[string]string{},
+				Body:     byt,
+			}
+			if e.key == defaultMsgKey {
+				msg.Metadata[e.key] = id.GetFunctionId()
+			}
 
-			return fmt.Errorf("error publishing span to kafka: %w", err)
-		}
+			status := "success"
+			if err := e.topic.Send(ctx, &pubsub.Message{}); err != nil {
+				l.Error("error publishing span to kafka",
+					"err", err,
+					"acctID", id.AccountId,
+					"wsID", id.EnvId,
+					"fnID", id.FunctionId,
+					"runID", id.RunId,
+				)
 
-		// TODO: return metrics for exported count
+				status = "error"
+
+				// TODO: should attempt error handling or resending it
+			}
+
+			metrics.IncrSpanExportedCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"producer": "kafka",
+					"status":   status,
+				},
+			})
+
+			return nil
+		})
 	}
 
-	return nil
+	return errp.Wait()
 }
 
 func (e *kafkaSpanExporter) Shutdown(ctx context.Context) error {

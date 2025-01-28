@@ -379,8 +379,9 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 				metrics.IncrSpanExportedCounter(ctx, metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"subject": conf.Subject,
-						"status":  pstatus,
+						"producer": "nats",
+						"subject":  conf.Subject,
+						"status":   pstatus,
 					},
 				})
 			}(ctx, *stream, sp)
