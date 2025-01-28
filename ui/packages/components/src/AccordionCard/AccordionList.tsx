@@ -12,7 +12,7 @@ export function AccordionList({
   return (
     <AccordionPrimitive.Root
       className={cn(
-        'border-subtle bg-canvasBase divide-subtle divide-y overflow-hidden rounded-lg border',
+        'border-subtle bg-canvasBase divide-subtle divide-y overflow-hidden rounded-md border',
         className
       )}
       {...props}
@@ -54,7 +54,7 @@ const AccordionTrigger = forwardRef<
         className="hover:bg-canvasSubtle group w-full"
       >
         <div className="flex items-center gap-1 px-3 py-2">
-          <RiArrowDownSLine className="transform-90 h-5 w-5 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
+          <RiArrowDownSLine className="transform-90 duration-50 h-5 w-5 transition-transform group-data-[state=open]:-rotate-180" />
           {children}
         </div>
       </AccordionPrimitive.Trigger>
@@ -80,3 +80,5 @@ const AccordionContent = forwardRef<
 AccordionList.Item = AccordionItem;
 AccordionList.Trigger = AccordionTrigger;
 AccordionList.Content = AccordionContent;
+
+export * as AccordionPrimitive from '@radix-ui/react-accordion';

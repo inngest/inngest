@@ -5,8 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/connect/auth"
+	"github.com/inngest/inngest/pkg/enums"
 	"net"
 	"net/url"
 	"os"
@@ -14,6 +13,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/connect/auth"
 
 	"github.com/inngest/inngest/pkg/cli"
 	"github.com/inngest/inngest/pkg/consts"
@@ -246,16 +248,22 @@ func (d *devserver) startPersistenceRoutine(ctx context.Context) {
 // runDiscovery attempts to run autodiscovery while the dev server is running.
 //
 // This lets the dev server start and wait for the SDK server to come up at
-
 // any point.
 func (d *devserver) runDiscovery(ctx context.Context) {
 	logger.From(ctx).Info().Msg("autodiscovering locally hosted SDKs")
 	pollInterval := time.Duration(d.Opts.PollInterval) * time.Second
-	for {
+	for d.Opts.Autodiscover {
 		if ctx.Err() != nil {
 			return
 		}
-		_ = discovery.Autodiscover(ctx)
+		// If we have found any app, disable auto-discovery
+		apps, err := d.Data.GetApps(ctx, consts.DevServerEnvId, nil)
+		if err == nil && len(apps) > 0 {
+			logger.From(ctx).Info().Msg("apps synced, disabling auto-discovery")
+			d.Opts.Autodiscover = false
+		} else {
+			_ = discovery.Autodiscover(ctx)
+		}
 
 		<-time.After(pollInterval)
 	}
@@ -301,8 +309,12 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 		}
 
 		urls := map[string]struct{}{}
-		if apps, err := d.Data.GetApps(ctx, consts.DevServerEnvId); err == nil {
+		if apps, err := d.Data.GetApps(ctx, consts.DevServerEnvId, nil); err == nil {
 			for _, app := range apps {
+				if app.ConnectionType == enums.AppConnectionTypeConnect.String() {
+					continue
+				}
+
 				// We've seen this URL.
 				urls[app.Url] = struct{}{}
 

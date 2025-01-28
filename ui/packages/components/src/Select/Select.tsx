@@ -251,7 +251,7 @@ function Search<T>({ ...props }: ComboboxInputProps<'input', T>) {
   return (
     <div className="mx-2 my-2">
       <Combobox.Input
-        className="border-subtle text-basis bg-surfaceBase placeholder:text-disabled focus-visible:outline-primary-moderate w-full rounded-lg border px-4 py-2 text-sm"
+        className="border-subtle text-basis bg-surfaceBase placeholder:text-disabled focus-visible:outline-primary-moderate w-full rounded-md border px-4 py-2 text-sm"
         {...props}
       />
     </div>

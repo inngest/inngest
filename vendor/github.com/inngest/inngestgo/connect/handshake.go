@@ -8,6 +8,7 @@ import (
 	"github.com/inngest/inngest/pkg/connect/wsproto"
 	connectproto "github.com/inngest/inngest/proto/gen/connect/v1"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"runtime"
 	"time"
 )
@@ -28,7 +29,7 @@ func shouldReconnect(err error) bool {
 	return errors.Is(err, reconnectError{})
 }
 
-func (h *connectHandler) performConnectHandshake(ctx context.Context, connectionId string, ws *websocket.Conn, startResponse *connectproto.StartResponse, data connectionEstablishData) error {
+func (h *connectHandler) performConnectHandshake(ctx context.Context, connectionId string, ws *websocket.Conn, startResponse *connectproto.StartResponse, data connectionEstablishData, startTime time.Time) error {
 	// Wait for gateway hello message
 	{
 		initialMessageTimeout, cancelInitialTimeout := context.WithTimeout(ctx, 5*time.Second)
@@ -73,6 +74,7 @@ func (h *connectHandler) performConnectHandshake(ctx context.Context, connection
 			SdkVersion:               h.opts.SDKVersion,
 			SdkLanguage:              h.opts.SDKLanguage,
 			WorkerManualReadinessAck: data.manualReadinessAck,
+			StartedAt:                timestamppb.New(startTime),
 		})
 		if err != nil {
 			return fmt.Errorf("could not serialize sdk connect message: %w", err)

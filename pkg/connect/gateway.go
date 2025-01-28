@@ -22,9 +22,15 @@ import (
 	"github.com/inngest/inngest/pkg/connect/types"
 	"github.com/inngest/inngest/pkg/connect/wsproto"
 	"github.com/inngest/inngest/pkg/syscode"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
+	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
+)
+
+const (
+	pkgName = "connect.gateway"
 )
 
 func (c *connectGatewaySvc) closeWithConnectError(ws *websocket.Conn, serr *SocketError) {
@@ -44,6 +50,8 @@ type connectionHandler struct {
 
 	updateLock sync.Mutex
 	log        *slog.Logger
+
+	remoteAddr string
 }
 
 var ErrDraining = SocketError{
@@ -75,6 +83,13 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
+		additionalMetricsTags := c.metricsTags()
+
+		metrics.IncrConnectGatewayReceiveConnectionAttemptCounter(ctx, 1, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    additionalMetricsTags,
+		})
+
 		// Do not accept new connections if the gateway is draining
 		if c.isDraining {
 			c.closeDraining(ws)
@@ -83,11 +98,20 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		var closed bool
 
+		remoteAddr := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			remoteAddr = xff
+		}
+		if xff := r.Header.Get("X-Real-IP"); xff != "" {
+			remoteAddr = xff
+		}
+
 		ch := &connectionHandler{
 			svc:        c,
 			log:        c.logger,
 			ws:         ws,
 			updateLock: sync.Mutex{},
+			remoteAddr: remoteAddr,
 		}
 
 		c.connectionCount.Add()
@@ -167,6 +191,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				ch.log.Error("could not update connection status after context done", "err", err)
 			}
 
+			for _, l := range c.lifecycles {
+				go l.OnStartDraining(context.Background(), conn)
+			}
+
 			closeReason = "gateway-draining"
 
 			// Close WS connection once worker established another connection
@@ -199,7 +227,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			// This is a transactional operation, it should always complete regardless of context cancellation
 
 			// TODO Persist disconnected status in history for UI (show disconnected connections with reason)
-			err := c.stateManager.DeleteConnection(context.Background(), conn.Group.EnvID, conn.Group.AppID, conn.Group.Hash, conn.Session.SessionId.ConnectionId)
+			err := c.stateManager.DeleteConnection(context.Background(), conn.Group.EnvID, conn.Group.AppID, conn.Group.Hash, conn.ConnectionId)
 			switch err {
 			case nil, state.ConnDeletedWithGroupErr:
 				// no-op
@@ -208,7 +236,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 
 			for _, lifecycle := range c.lifecycles {
-				lifecycle.OnDisconnected(context.Background(), closeReason)
+				lifecycle.OnDisconnected(context.Background(), conn, closeReason)
 			}
 		}()
 
@@ -286,6 +314,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 						ch.log.Error("could not update connection status after read error", "err", err)
 					}
 
+					for _, l := range c.lifecycles {
+						go l.OnStartDraining(context.Background(), conn)
+					}
+
 					closeErr := websocket.CloseError{}
 					if errors.As(err, &closeErr) {
 						ch.log.Error("connection closed with reason", "reason", closeErr.Reason)
@@ -315,7 +347,19 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					})
 				}
 
-				serr := ch.handleIncomingWebSocketMessage(app.ID, &msg)
+				tags := map[string]any{
+					"kind": msg.Kind.String(),
+				}
+				for k, v := range additionalMetricsTags {
+					tags[k] = v
+				}
+
+				metrics.IncrConnectGatewayReceivedWorkerMessageCounter(ctx, 1, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags:    tags,
+				})
+
+				serr := ch.handleIncomingWebSocketMessage(ctx, app.ID, &msg)
 				if serr != nil {
 					c.closeWithConnectError(ws, serr)
 					return serr
@@ -356,8 +400,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 
 			// Mark connection as ready to receive traffic unless we require manual client ready signal (optional)
-			conn.Status = connect.ConnectionStatus_READY
-			err = c.stateManager.UpsertConnection(ctx, conn)
+			err = c.stateManager.UpsertConnection(ctx, conn, connect.ConnectionStatus_READY, time.Now())
 			if err != nil {
 				if ctx.Err() != nil {
 					c.closeDraining(ws)
@@ -373,9 +416,32 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 				return
 			}
+
+			for _, l := range c.lifecycles {
+				go l.OnReady(context.Background(), conn)
+			}
 		}
 
 		ch.log.Debug("connection is ready")
+
+		{
+			successTags := map[string]any{
+				"success": true,
+			}
+			for k, v := range additionalMetricsTags {
+				successTags[k] = v
+			}
+
+			metrics.IncrConnectGatewayReceiveConnectionAttemptCounter(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    successTags,
+			})
+
+			metrics.HistogramConnectSetupDuration(ctx, time.Since(conn.Data.StartedAt.AsTime()).Milliseconds(), metrics.HistogramOpt{
+				PkgName: pkgName,
+				Tags:    additionalMetricsTags,
+			})
+		}
 
 		// Connection was drained once it's closed by the worker (even if
 		// the connection broke unintentionally, we can stop waiting)
@@ -389,7 +455,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 	})
 }
 
-func (c *connectionHandler) handleIncomingWebSocketMessage(appId uuid.UUID, msg *connect.ConnectMessage) *SocketError {
+func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, appId uuid.UUID, msg *connect.ConnectMessage) *SocketError {
 	c.log.Debug("received WebSocket message", "kind", msg.Kind.String())
 
 	switch msg.Kind {
@@ -408,6 +474,10 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(appId uuid.UUID, msg 
 			}
 		}
 
+		for _, l := range c.svc.lifecycles {
+			go l.OnReady(context.Background(), c.conn)
+		}
+
 		return nil
 	case connect.GatewayMessageType_WORKER_HEARTBEAT:
 		if c.svc.isDraining {
@@ -424,6 +494,18 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(appId uuid.UUID, msg 
 			}
 		}
 
+		for _, l := range c.svc.lifecycles {
+			go l.OnHeartbeat(context.Background(), c.conn)
+		}
+
+		// Respond with gateway heartbeat
+		if err := wsproto.Write(ctx, c.ws, &connect.ConnectMessage{
+			Kind: connect.GatewayMessageType_GATEWAY_HEARTBEAT,
+		}); err != nil {
+			// The connection will fail to read and be closed in the read loop
+			return nil
+		}
+
 		return nil
 	case connect.GatewayMessageType_WORKER_PAUSE:
 		if c.svc.isDraining {
@@ -438,6 +520,10 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(appId uuid.UUID, msg 
 				StatusCode: websocket.StatusInternalError,
 				Msg:        "could not update connection status",
 			}
+		}
+
+		for _, l := range c.svc.lifecycles {
+			go l.OnStartDraining(context.Background(), c.conn)
 		}
 
 		return nil
@@ -474,8 +560,9 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(appId uuid.UUID, msg 
 		}
 	case connect.GatewayMessageType_WORKER_REPLY:
 		// Always handle SDK reply, even if gateway is draining
-		err := c.handleSdkReply(context.Background(), appId, msg)
+		err := c.handleSdkReply(context.Background(), msg)
 		if err != nil {
+			c.log.Error("could not handle sdk reply", "err", err)
 			// TODO Should we actually close the connection here?
 			return &SocketError{
 				SysCode:    syscode.CodeConnectInternal,
@@ -496,10 +583,12 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(appId uuid.UUID, msg 
 }
 
 func (c *connectionHandler) receiveRouterMessages(ctx context.Context, appId uuid.UUID) {
+	additionalMetricsTags := c.svc.metricsTags()
+
 	// Receive execution-related messages for the app, forwarded by the router.
 	// The router selects only one gateway to handle a request from a pool of one or more workers (and thus WebSockets)
 	// running for each app.
-	err := c.svc.receiver.ReceiveRoutedRequest(ctx, c.svc.gatewayId, appId, c.conn.Session.SessionId.ConnectionId, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
+	err := c.svc.receiver.ReceiveRoutedRequest(ctx, c.svc.gatewayId, appId, c.conn.ConnectionId, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
 		log := c.log.With(
 			"req_id", data.RequestId,
 			"fn_slug", data.FunctionSlug,
@@ -507,6 +596,11 @@ func (c *connectionHandler) receiveRouterMessages(ctx context.Context, appId uui
 		)
 
 		log.Debug("gateway received msg")
+
+		metrics.IncrConnectGatewayReceivedRouterPubSubMessageCounter(ctx, 1, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    additionalMetricsTags,
+		})
 
 		// Do not forward messages if the connection is already draining
 		if ctx.Err() != nil {
@@ -608,6 +702,43 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 		}
 	}
 
+	// Ensure connection ID is valid ULID
+	var connectionId ulid.ULID
+	{
+		if initialMessageData.SessionId == nil || initialMessageData.SessionId.ConnectionId == "" {
+			c.log.Debug("initial SDK message contained invalid connection ID")
+
+			return nil, &SocketError{
+				SysCode:    syscode.CodeConnectWorkerHelloInvalidPayload,
+				StatusCode: websocket.StatusPolicyViolation,
+				Msg:        "Invalid connection ID in SDK connect message",
+			}
+		}
+
+		if connectionId, err = ulid.Parse(initialMessageData.SessionId.ConnectionId); err != nil {
+			c.log.Debug("initial SDK message contained invalid connection ID")
+
+			return nil, &SocketError{
+				SysCode:    syscode.CodeConnectWorkerHelloInvalidPayload,
+				StatusCode: websocket.StatusPolicyViolation,
+				Msg:        "Invalid connection ID in SDK connect message",
+			}
+		}
+	}
+
+	// Ensure Instance ID is provided
+	{
+		if initialMessageData.SessionId == nil || initialMessageData.SessionId.InstanceId == "" {
+			c.log.Debug("initial SDK message missing instance ID")
+
+			return nil, &SocketError{
+				SysCode:    syscode.CodeConnectWorkerHelloInvalidPayload,
+				StatusCode: websocket.StatusPolicyViolation,
+				Msg:        "Missing instanceId in SDK connect message",
+			}
+		}
+	}
+
 	var authResp *auth.Response
 	{
 		// Run auth, add to distributed state
@@ -675,11 +806,11 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 	}
 
 	conn := state.Connection{
-		AccountID: authResp.AccountID,
-		EnvID:     authResp.EnvID,
+		AccountID:    authResp.AccountID,
+		EnvID:        authResp.EnvID,
+		ConnectionId: connectionId,
 
-		// Mark initial status, not ready to receive messages yet
-		Status: connect.ConnectionStatus_CONNECTED,
+		WorkerIP: c.remoteAddr,
 
 		Data:    &initialMessageData,
 		Session: sessionDetails,
@@ -693,7 +824,7 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 		// This is a transactional operation, it should always complete regardless of context cancellation
 
 		// Connection should always be upserted, we don't want inconsistent state
-		if err := c.svc.stateManager.UpsertConnection(context.Background(), &conn); err != nil {
+		if err := c.svc.stateManager.UpsertConnection(context.Background(), &conn, connect.ConnectionStatus_CONNECTED, time.Now()); err != nil {
 			log.Error("adding connection state failed", "err", err)
 			return nil, &SocketError{
 				SysCode:    syscode.CodeConnectInternal,
@@ -713,7 +844,7 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 	return &conn, nil
 }
 
-func (c *connectionHandler) handleSdkReply(ctx context.Context, appId uuid.UUID, msg *connect.ConnectMessage) error {
+func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connect.ConnectMessage) error {
 	var data connect.SDKResponse
 	if err := proto.Unmarshal(msg.Payload, &data); err != nil {
 		return fmt.Errorf("invalid response type: %w", err)
@@ -721,9 +852,23 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, appId uuid.UUID,
 
 	c.log.Debug("notifying executor about response", "status", data.Status.String(), "no_retry", data.NoRetry, "retry_after", data.RetryAfter)
 
-	err := c.svc.receiver.NotifyExecutor(ctx, appId, &data)
+	err := c.svc.receiver.NotifyExecutor(ctx, &data)
 	if err != nil {
 		return fmt.Errorf("could not notify executor: %w", err)
+	}
+
+	replyAck, err := proto.Marshal(&connect.WorkerReplyAckData{
+		RequestId: data.RequestId,
+	})
+	if err != nil {
+		return fmt.Errorf("could not marshal reply ack: %w", err)
+	}
+
+	if err := wsproto.Write(ctx, c.ws, &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_REPLY_ACK,
+		Payload: replyAck,
+	}); err != nil {
+		return fmt.Errorf("could not send reply ack: %w", err)
 	}
 
 	return nil
@@ -733,8 +878,6 @@ func (c *connectionHandler) updateConnStatus(status connect.ConnectionStatus) er
 	c.updateLock.Lock()
 	defer c.updateLock.Unlock()
 
-	c.conn.Status = status
-
 	// Always update the connection status, do not use context cancellation
-	return c.svc.stateManager.UpsertConnection(context.Background(), c.conn)
+	return c.svc.stateManager.UpsertConnection(context.Background(), c.conn, status, time.Now())
 }

@@ -114,6 +114,7 @@ type App {
   checksum: String
   error: String
   functions: [Function!]!
+  connectionType: AppConnectionType!
 
   # These fields are UI convenience fields
   connected: Boolean!
@@ -472,4 +473,90 @@ type RunTraceTrigger {
   isBatch: Boolean! # indicates if this trigger is a batch trigger
   batchID: ULID # the batchID of this list of events if available
   cron: String # The cron expression if available
+}
+
+# connect
+
+enum ConnectV1ConnectionStatus {
+  CONNECTED
+  READY
+  DRAINING
+  DISCONNECTING
+  DISCONNECTED
+}
+
+input ConnectV1WorkerConnectionsFilter {
+  from: Time
+  until: Time
+  timeField: ConnectV1WorkerConnectionsOrderByField = CONNECTED_AT
+
+  status: [ConnectV1ConnectionStatus!]
+  appIDs: [UUID!]
+}
+
+input ConnectV1WorkerConnectionsOrderBy {
+  field: ConnectV1WorkerConnectionsOrderByField!
+  direction: ConnectV1WorkerConnectionsOrderByDirection!
+}
+
+enum ConnectV1WorkerConnectionsOrderByField {
+  CONNECTED_AT
+  LAST_HEARTBEAT_AT
+  DISCONNECTED_AT
+}
+
+enum ConnectV1WorkerConnectionsOrderByDirection {
+  ASC
+  DESC
+}
+
+type ConnectV1WorkerConnection {
+  id: ULID!
+  gatewayId: ULID!
+  instanceId: String!
+  workerIp: String!
+
+  appID: UUID
+  app: App
+
+  # timestamps
+  connectedAt: Time!
+  lastHeartbeatAt: Time
+  disconnectedAt: Time
+
+  disconnectReason: String
+
+  status: ConnectV1ConnectionStatus!
+
+  groupHash: String!
+  sdkLang: String!
+  sdkVersion: String!
+  sdkPlatform: String!
+  syncId: UUID
+  buildId: String
+  functionCount: Int!
+
+  cpuCores: Int!
+  memBytes: Int!
+  os: String!
+}
+
+type ConnectV1WorkerConnectionsConnection {
+  edges: [ConnectV1WorkerConnectionEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ConnectV1WorkerConnectionEdge {
+  node: ConnectV1WorkerConnection!
+  cursor: String!
+}
+
+enum AppConnectionType {
+	SERVERLESS
+	CONNECT
+}
+
+input AppsFilterV1 {
+	connectionType: AppConnectionType
 }

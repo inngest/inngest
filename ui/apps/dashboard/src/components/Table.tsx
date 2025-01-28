@@ -19,7 +19,7 @@ export default function Table<T extends Row>({
   empty = 'No results',
 }: TableProps<T>) {
   return (
-    <div className="border-subtle w-full overflow-hidden rounded-lg border">
+    <div className="border-subtle w-full overflow-hidden rounded-md border">
       <table className="divide-subtle bg-canvasBase text-basis w-full table-fixed divide-y text-sm">
         <thead className="text-muted h-full text-left">
           <tr>

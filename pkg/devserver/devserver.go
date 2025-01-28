@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/inngest/inngest/pkg/connect/auth"
-	"github.com/inngest/inngest/pkg/testapi"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
@@ -22,12 +20,14 @@ import (
 	_ "github.com/inngest/inngest/pkg/config/defaults"
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/connect"
+	"github.com/inngest/inngest/pkg/connect/auth"
+	"github.com/inngest/inngest/pkg/connect/lifecycles"
 	pubsub2 "github.com/inngest/inngest/pkg/connect/pubsub"
 	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
 	connstate "github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi"
-	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs"
+	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -40,6 +40,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
+	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
@@ -52,6 +53,7 @@ import (
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/service"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/inngest/inngest/pkg/testapi"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
 	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/propagation"
@@ -62,6 +64,7 @@ const (
 	DefaultTick         = 150
 	DefaultTickDuration = time.Millisecond * DefaultTick
 	DefaultPollInterval = 5
+	DefaultQueueWorkers = 100
 )
 
 // StartOpts configures the dev server
@@ -74,6 +77,7 @@ type StartOpts struct {
 	PollInterval  int           `json:"poll_interval"`
 	Tick          time.Duration `json:"tick"`
 	RetryInterval int           `json:"retry_interval"`
+	QueueWorkers  int           `json:"queue_workers"`
 
 	// SigningKey is used to decide that the server should sign requests and
 	// validate responses where applicable, modelling cloud behaviour.
@@ -112,7 +116,7 @@ func New(ctx context.Context, opts StartOpts) error {
 }
 
 func start(ctx context.Context, opts StartOpts) error {
-	db, err := sqlitecqrs.New(sqlitecqrs.SqliteCQRSOptions{InMemory: true})
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true})
 	if err != nil {
 		return err
 	}
@@ -122,8 +126,9 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	// Initialize the devserver
-	dbcqrs := sqlitecqrs.NewCQRS(db)
-	hd := sqlitecqrs.NewHistoryDriver(db)
+	dbDriver := "sqlite"
+	dbcqrs := base_cqrs.NewCQRS(db, dbDriver)
+	hd := base_cqrs.NewHistoryDriver(db, dbDriver)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	stepLimitOverrides := make(map[string]int)
@@ -176,6 +181,9 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 	smv2 := redis_state.MustRunServiceV2(sm)
 
+	// Create a new broadcaster which lets us broadcast realtime messages.
+	broadcaster := realtime.NewInProcessBroadcaster()
+
 	queueOpts := []redis_state.QueueOpt{
 		redis_state.WithRunMode(redis_state.QueueRunMode{
 			Sequential: true,
@@ -183,7 +191,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			Partition:  true,
 		}),
 		redis_state.WithIdempotencyTTL(time.Hour),
-		redis_state.WithNumWorkers(100),
+		redis_state.WithNumWorkers(int32(opts.QueueWorkers)),
 		redis_state.WithPollTick(opts.Tick),
 		redis_state.WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i queue.QueueItem) []state.CustomConcurrency {
 			keys := i.Data.GetConcurrencyKeys()
@@ -304,6 +312,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithQueue(rq),
 		executor.WithLogger(logger.From(ctx)),
 		executor.WithFunctionLoader(loader),
+		executor.WithRealtimePublisher(broadcaster),
 		executor.WithLifecycleListeners(
 			history.NewLifecycleListener(
 				nil,
@@ -395,6 +404,8 @@ func start(ctx context.Context, opts StartOpts) error {
 			JobQueueReader:     ds.Queue.(queue.JobQueueReader),
 			Executor:           ds.Executor,
 			QueueShardSelector: shardSelector,
+			Broadcaster:        broadcaster,
+			RealtimeJWTSecret:  consts.DevServerRealtimeJWTSecret,
 		})
 	})
 
@@ -414,6 +425,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		ConnectOpts: connectv0.Opts{
 			GroupManager:            connectionManager,
 			ConnectManager:          connectionManager,
+			ConnectResponseNotifier: gatewayProxy,
 			Signer:                  auth.NewJWTSessionTokenSigner(consts.DevServerConnectJwtSecret),
 			RequestAuther:           ds,
 			ConnectGatewayRetriever: ds,
@@ -432,6 +444,10 @@ func start(ctx context.Context, opts StartOpts) error {
 		connect.WithDev(),
 		connect.WithGatewayPublicPort(8289),
 		connect.WithApiBaseUrl(fmt.Sprintf("http://127.0.0.1:%d", opts.Config.EventAPI.Port)),
+		connect.WithLifeCycles(
+			[]connect.ConnectGatewayLifecycleListener{
+				lifecycles.NewHistoryLifecycle(dbcqrs),
+			}),
 	)
 	connRouter := connect.NewConnectMessageRouterService(connectionManager, gatewayProxy)
 

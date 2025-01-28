@@ -28,6 +28,58 @@ type ActionVersionQuery struct {
 	VersionMinor *int   `json:"versionMinor,omitempty"`
 }
 
+type AppsFilterV1 struct {
+	ConnectionType *AppConnectionType `json:"connectionType,omitempty"`
+}
+
+type ConnectV1WorkerConnection struct {
+	ID               ulid.ULID                 `json:"id"`
+	GatewayID        ulid.ULID                 `json:"gatewayId"`
+	InstanceID       string                    `json:"instanceId"`
+	WorkerIP         string                    `json:"workerIp"`
+	AppID            *uuid.UUID                `json:"appID,omitempty"`
+	App              *cqrs.App                 `json:"app,omitempty"`
+	ConnectedAt      time.Time                 `json:"connectedAt"`
+	LastHeartbeatAt  *time.Time                `json:"lastHeartbeatAt,omitempty"`
+	DisconnectedAt   *time.Time                `json:"disconnectedAt,omitempty"`
+	DisconnectReason *string                   `json:"disconnectReason,omitempty"`
+	Status           ConnectV1ConnectionStatus `json:"status"`
+	GroupHash        string                    `json:"groupHash"`
+	SdkLang          string                    `json:"sdkLang"`
+	SdkVersion       string                    `json:"sdkVersion"`
+	SdkPlatform      string                    `json:"sdkPlatform"`
+	SyncID           *uuid.UUID                `json:"syncId,omitempty"`
+	BuildID          *string                   `json:"buildId,omitempty"`
+	FunctionCount    int                       `json:"functionCount"`
+	CPUCores         int                       `json:"cpuCores"`
+	MemBytes         int                       `json:"memBytes"`
+	Os               string                    `json:"os"`
+}
+
+type ConnectV1WorkerConnectionEdge struct {
+	Node   *ConnectV1WorkerConnection `json:"node"`
+	Cursor string                     `json:"cursor"`
+}
+
+type ConnectV1WorkerConnectionsConnection struct {
+	Edges      []*ConnectV1WorkerConnectionEdge `json:"edges"`
+	PageInfo   *PageInfo                        `json:"pageInfo"`
+	TotalCount int                              `json:"totalCount"`
+}
+
+type ConnectV1WorkerConnectionsFilter struct {
+	From      *time.Time                              `json:"from,omitempty"`
+	Until     *time.Time                              `json:"until,omitempty"`
+	TimeField *ConnectV1WorkerConnectionsOrderByField `json:"timeField,omitempty"`
+	Status    []ConnectV1ConnectionStatus             `json:"status,omitempty"`
+	AppIDs    []uuid.UUID                             `json:"appIDs,omitempty"`
+}
+
+type ConnectV1WorkerConnectionsOrderBy struct {
+	Field     ConnectV1WorkerConnectionsOrderByField     `json:"field"`
+	Direction ConnectV1WorkerConnectionsOrderByDirection `json:"direction"`
+}
+
 type CreateAppInput struct {
 	URL string `json:"url"`
 }
@@ -300,6 +352,178 @@ func (WaitForEventStepInfo) IsStepInfo() {}
 
 type Workspace struct {
 	ID string `json:"id"`
+}
+
+type AppConnectionType string
+
+const (
+	AppConnectionTypeServerless AppConnectionType = "SERVERLESS"
+	AppConnectionTypeConnect    AppConnectionType = "CONNECT"
+)
+
+var AllAppConnectionType = []AppConnectionType{
+	AppConnectionTypeServerless,
+	AppConnectionTypeConnect,
+}
+
+func (e AppConnectionType) IsValid() bool {
+	switch e {
+	case AppConnectionTypeServerless, AppConnectionTypeConnect:
+		return true
+	}
+	return false
+}
+
+func (e AppConnectionType) String() string {
+	return string(e)
+}
+
+func (e *AppConnectionType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = AppConnectionType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid AppConnectionType", str)
+	}
+	return nil
+}
+
+func (e AppConnectionType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type ConnectV1ConnectionStatus string
+
+const (
+	ConnectV1ConnectionStatusConnected     ConnectV1ConnectionStatus = "CONNECTED"
+	ConnectV1ConnectionStatusReady         ConnectV1ConnectionStatus = "READY"
+	ConnectV1ConnectionStatusDraining      ConnectV1ConnectionStatus = "DRAINING"
+	ConnectV1ConnectionStatusDisconnecting ConnectV1ConnectionStatus = "DISCONNECTING"
+	ConnectV1ConnectionStatusDisconnected  ConnectV1ConnectionStatus = "DISCONNECTED"
+)
+
+var AllConnectV1ConnectionStatus = []ConnectV1ConnectionStatus{
+	ConnectV1ConnectionStatusConnected,
+	ConnectV1ConnectionStatusReady,
+	ConnectV1ConnectionStatusDraining,
+	ConnectV1ConnectionStatusDisconnecting,
+	ConnectV1ConnectionStatusDisconnected,
+}
+
+func (e ConnectV1ConnectionStatus) IsValid() bool {
+	switch e {
+	case ConnectV1ConnectionStatusConnected, ConnectV1ConnectionStatusReady, ConnectV1ConnectionStatusDraining, ConnectV1ConnectionStatusDisconnecting, ConnectV1ConnectionStatusDisconnected:
+		return true
+	}
+	return false
+}
+
+func (e ConnectV1ConnectionStatus) String() string {
+	return string(e)
+}
+
+func (e *ConnectV1ConnectionStatus) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ConnectV1ConnectionStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ConnectV1ConnectionStatus", str)
+	}
+	return nil
+}
+
+func (e ConnectV1ConnectionStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type ConnectV1WorkerConnectionsOrderByDirection string
+
+const (
+	ConnectV1WorkerConnectionsOrderByDirectionAsc  ConnectV1WorkerConnectionsOrderByDirection = "ASC"
+	ConnectV1WorkerConnectionsOrderByDirectionDesc ConnectV1WorkerConnectionsOrderByDirection = "DESC"
+)
+
+var AllConnectV1WorkerConnectionsOrderByDirection = []ConnectV1WorkerConnectionsOrderByDirection{
+	ConnectV1WorkerConnectionsOrderByDirectionAsc,
+	ConnectV1WorkerConnectionsOrderByDirectionDesc,
+}
+
+func (e ConnectV1WorkerConnectionsOrderByDirection) IsValid() bool {
+	switch e {
+	case ConnectV1WorkerConnectionsOrderByDirectionAsc, ConnectV1WorkerConnectionsOrderByDirectionDesc:
+		return true
+	}
+	return false
+}
+
+func (e ConnectV1WorkerConnectionsOrderByDirection) String() string {
+	return string(e)
+}
+
+func (e *ConnectV1WorkerConnectionsOrderByDirection) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ConnectV1WorkerConnectionsOrderByDirection(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ConnectV1WorkerConnectionsOrderByDirection", str)
+	}
+	return nil
+}
+
+func (e ConnectV1WorkerConnectionsOrderByDirection) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type ConnectV1WorkerConnectionsOrderByField string
+
+const (
+	ConnectV1WorkerConnectionsOrderByFieldConnectedAt     ConnectV1WorkerConnectionsOrderByField = "CONNECTED_AT"
+	ConnectV1WorkerConnectionsOrderByFieldLastHeartbeatAt ConnectV1WorkerConnectionsOrderByField = "LAST_HEARTBEAT_AT"
+	ConnectV1WorkerConnectionsOrderByFieldDisconnectedAt  ConnectV1WorkerConnectionsOrderByField = "DISCONNECTED_AT"
+)
+
+var AllConnectV1WorkerConnectionsOrderByField = []ConnectV1WorkerConnectionsOrderByField{
+	ConnectV1WorkerConnectionsOrderByFieldConnectedAt,
+	ConnectV1WorkerConnectionsOrderByFieldLastHeartbeatAt,
+	ConnectV1WorkerConnectionsOrderByFieldDisconnectedAt,
+}
+
+func (e ConnectV1WorkerConnectionsOrderByField) IsValid() bool {
+	switch e {
+	case ConnectV1WorkerConnectionsOrderByFieldConnectedAt, ConnectV1WorkerConnectionsOrderByFieldLastHeartbeatAt, ConnectV1WorkerConnectionsOrderByFieldDisconnectedAt:
+		return true
+	}
+	return false
+}
+
+func (e ConnectV1WorkerConnectionsOrderByField) String() string {
+	return string(e)
+}
+
+func (e *ConnectV1WorkerConnectionsOrderByField) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ConnectV1WorkerConnectionsOrderByField(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ConnectV1WorkerConnectionsOrderByField", str)
+	}
+	return nil
+}
+
+func (e ConnectV1WorkerConnectionsOrderByField) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 type EventStatus string

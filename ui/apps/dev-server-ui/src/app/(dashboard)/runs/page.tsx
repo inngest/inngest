@@ -202,7 +202,7 @@ export default function Page() {
         pollInterval={pollInterval}
         scope="env"
         totalCount={totalCount}
-        stepAIEnabled={true}
+        traceAIEnabled={false}
       />
     </>
   );

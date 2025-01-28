@@ -64,9 +64,11 @@ export async function POST(req: Request) {
 
   const upsertCustomerRes = await client.upsertCustomer({
     identifier: {
-      // Use only one identifier in the system - we'll use email for now as the user might have emailed before using the form
-      // externalId: body.user.id,
-      emailAddress: body.user.email,
+      //
+      // use externalId not email,
+      // support ticket submission will forever fail if we use email as the identifier and
+      // a user changes their email address.
+      externalId: body.user.id,
     },
     onCreate: {
       externalId: body.user.id,

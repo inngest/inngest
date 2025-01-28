@@ -24,6 +24,7 @@ import { useLocalStorage } from 'react-use';
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
 import { RunDetailsV2 } from '../RunDetailsV2';
+import { RunDetailsV3 } from '../RunDetailsV3/RunDetailsV3';
 import {
   useBatchedSearchParams,
   useSearchParam,
@@ -68,7 +69,7 @@ type Props = {
   functionIsPaused?: boolean;
   scope: ViewScope;
   totalCount: number | undefined;
-  stepAIEnabled?: boolean;
+  traceAIEnabled?: boolean;
 };
 
 export function RunsPage({
@@ -94,7 +95,7 @@ export function RunsPage({
   functionIsPaused,
   scope,
   totalCount,
-  stepAIEnabled = false,
+  traceAIEnabled = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useScopedColumns(scope);
@@ -240,21 +241,36 @@ export function RunsPage({
   const renderSubComponent = useCallback(
     (rowData: Run) => {
       return (
-        <div className="border-subtle border-l-4 pb-6">
-          <RunDetailsV2
-            cancelRun={cancelRun}
-            getResult={getTraceResult}
-            getRun={getRun}
-            initialRunData={rowData}
-            getTrigger={getTrigger}
-            pathCreator={pathCreator}
-            pollInterval={pollInterval}
-            rerun={rerun}
-            rerunFromStep={rerunFromStep}
-            runID={rowData.id}
-            standalone={false}
-            stepAIEnabled={stepAIEnabled}
-          />
+        <div className={`border-subtle border-l-4 ${traceAIEnabled ? '' : 'pb-6'}`}>
+          {traceAIEnabled ? (
+            <RunDetailsV3
+              cancelRun={cancelRun}
+              getResult={getTraceResult}
+              getRun={getRun}
+              initialRunData={rowData}
+              getTrigger={getTrigger}
+              pathCreator={pathCreator}
+              pollInterval={pollInterval}
+              rerun={rerun}
+              rerunFromStep={rerunFromStep}
+              runID={rowData.id}
+              standalone={false}
+            />
+          ) : (
+            <RunDetailsV2
+              cancelRun={cancelRun}
+              getResult={getTraceResult}
+              getRun={getRun}
+              initialRunData={rowData}
+              getTrigger={getTrigger}
+              pathCreator={pathCreator}
+              pollInterval={pollInterval}
+              rerun={rerun}
+              rerunFromStep={rerunFromStep}
+              runID={rowData.id}
+              standalone={false}
+            />
+          )}
         </div>
       );
     },

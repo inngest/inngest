@@ -13,7 +13,7 @@ type Props = {
 export function AppDetailsCard({ title, className, children }: React.PropsWithChildren<Props>) {
   return (
     <>
-      <div className={cn('border-subtle bg-codeEditor rounded-lg border', className)}>
+      <div className={cn('border-subtle bg-canvasSubtle rounded-md border', className)}>
         <h2 className="text-muted border-subtle border-b px-6 py-3 text-sm">{title}</h2>
 
         <dl className="bg-canvasBase flex flex-col gap-4 rounded-b-lg p-6 md:grid md:grid-cols-4">
@@ -52,7 +52,14 @@ export function CardItem({
           </Tooltip>
         )}
       </dt>
-      {!loading && <dd className="text-subtle">{detail ?? ''}</dd>}
+      {!loading && (
+        <dd
+          className="text-subtle truncate text-sm"
+          title={typeof detail === 'string' ? detail : undefined}
+        >
+          {detail ?? ''}
+        </dd>
+      )}
       {loading && <Skeleton className="mb-2 block h-6 w-full" />}
     </div>
   );

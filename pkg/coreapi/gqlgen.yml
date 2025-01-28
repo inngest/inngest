@@ -77,7 +77,15 @@ models:
         resolver: true
       trace:
         resolver: true
+  ConnectV1WorkerConnection:
+    fields:
+      app:
+        resolver: true
   RunsV2Connection:
+    fields:
+      totalCount:
+        resolver: true
+  ConnectV1WorkerConnectionsConnection:
     fields:
       totalCount:
         resolver: true

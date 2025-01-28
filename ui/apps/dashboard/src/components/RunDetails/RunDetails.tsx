@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { RunDetailsV2 } from '@inngest/components/RunDetailsV2';
+import { RunDetailsV3 } from '@inngest/components/RunDetailsV3/RunDetailsV3';
 import { cn } from '@inngest/components/utils/classNames';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -23,9 +24,9 @@ export function DashboardRunDetails({ runID, standalone = true }: Props) {
   const env = useEnvironment();
   const cancelRun = useCancelRun({ envID: env.id });
   const rerun = useRerun({ envID: env.id, envSlug: env.slug });
-  const rerunFromStep = useRerunFromStep({ runID, fromStep: { stepID: 'stepID', input: 'input' } });
+  const rerunFromStep = useRerunFromStep();
   const getTraceResult = useGetTraceResult();
-  const { value: stepAIEnabled, isReady } = useBooleanFlag('step.ai');
+  const { value: traceAIEnabled, isReady } = useBooleanFlag('ai-traces');
 
   const internalPathCreator = useMemo(() => {
     return {
@@ -45,18 +46,31 @@ export function DashboardRunDetails({ runID, standalone = true }: Props) {
 
   return (
     <div className={cn('overflow-y-auto', standalone && 'pt-8')}>
-      <RunDetailsV2
-        pathCreator={internalPathCreator}
-        standalone={standalone}
-        cancelRun={cancelRun}
-        getResult={getTraceResult}
-        getRun={getRun}
-        getTrigger={getTrigger}
-        rerun={rerun}
-        rerunFromStep={rerunFromStep}
-        runID={runID}
-        stepAIEnabled={isReady && stepAIEnabled}
-      />
+      {isReady && traceAIEnabled ? (
+        <RunDetailsV3
+          pathCreator={internalPathCreator}
+          standalone={standalone}
+          cancelRun={cancelRun}
+          getResult={getTraceResult}
+          getRun={getRun}
+          getTrigger={getTrigger}
+          rerun={rerun}
+          rerunFromStep={rerunFromStep}
+          runID={runID}
+        />
+      ) : (
+        <RunDetailsV2
+          pathCreator={internalPathCreator}
+          standalone={standalone}
+          cancelRun={cancelRun}
+          getResult={getTraceResult}
+          getRun={getRun}
+          getTrigger={getTrigger}
+          rerun={rerun}
+          rerunFromStep={rerunFromStep}
+          runID={runID}
+        />
+      )}
     </div>
   );
 }

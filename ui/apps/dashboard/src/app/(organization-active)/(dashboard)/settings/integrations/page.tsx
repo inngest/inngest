@@ -1,12 +1,22 @@
 import { PostgresIntegrations } from '@/components/PostgresIntegration/data';
-import { vercelIntegration } from './data';
+import { getVercelIntegration } from './data';
 import IntegrationsList from './integrations';
 
 export default async function IntegrationsPage() {
-  const integration = await vercelIntegration();
-  const postgresIntegrations = await PostgresIntegrations();
+  let allIntegrations: React.ComponentProps<typeof IntegrationsList>['integrations'] =
+    await PostgresIntegrations();
 
-  const allIntegrations = [integration, ...postgresIntegrations];
+  const integration = await getVercelIntegration();
+  if (integration) {
+    allIntegrations = [
+      {
+        slug: 'vercel',
+        enabled: true,
+        projects: integration.projects,
+      },
+      ...allIntegrations,
+    ];
+  }
 
   return <IntegrationsList integrations={allIntegrations} />;
 }

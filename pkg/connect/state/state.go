@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/oklog/ulid/v2"
 	"net/http"
 	"net/url"
 	"time"
@@ -28,8 +29,8 @@ type ConnectionManager interface {
 	GetConnectionsByEnvID(ctx context.Context, envID uuid.UUID) ([]*connpb.ConnMetadata, error)
 	GetConnectionsByAppID(ctx context.Context, envId uuid.UUID, appID uuid.UUID) ([]*connpb.ConnMetadata, error)
 	GetConnectionsByGroupID(ctx context.Context, envID uuid.UUID, groupID string) ([]*connpb.ConnMetadata, error)
-	UpsertConnection(ctx context.Context, conn *Connection) error
-	DeleteConnection(ctx context.Context, envID uuid.UUID, appID *uuid.UUID, groupID string, connId string) error
+	UpsertConnection(ctx context.Context, conn *Connection, status connpb.ConnectionStatus, lastHeartbeatAt time.Time) error
+	DeleteConnection(ctx context.Context, envID uuid.UUID, appID *uuid.UUID, groupID string, connId ulid.ULID) error
 }
 
 type WorkerGroupManager interface {
@@ -39,8 +40,8 @@ type WorkerGroupManager interface {
 
 type GatewayManager interface {
 	UpsertGateway(ctx context.Context, gateway *Gateway) error
-	DeleteGateway(ctx context.Context, gatewayId string) error
-	GetGateway(ctx context.Context, gatewayId string) (*Gateway, error)
+	DeleteGateway(ctx context.Context, gatewayId ulid.ULID) error
+	GetGateway(ctx context.Context, gatewayId ulid.ULID) (*Gateway, error)
 }
 
 type AuthContext struct {
@@ -62,6 +63,9 @@ type WorkerGroup struct {
 	// AppID represents the app that this worker group is associated with.
 	// If set, it means this worker group is already synced
 	AppID *uuid.UUID `json:"app_id,omitempty"`
+
+	// User-supplied build ID
+	BuildId *string `json:"build_id,omitempty"`
 
 	// Typical metadata associated with the SDK
 	SDKLang     string `json:"sdk_lang"`
@@ -100,7 +104,7 @@ const (
 )
 
 type Gateway struct {
-	Id              string        `json:"id"`
+	Id              ulid.ULID     `json:"id"`
 	Status          GatewayStatus `json:"status"`
 	LastHeartbeatAt time.Time     `json:"last_heartbeat_at"`
 
@@ -109,14 +113,15 @@ type Gateway struct {
 
 // Connection have all the metadata associated with a worker connection
 type Connection struct {
-	AccountID uuid.UUID
-	EnvID     uuid.UUID
+	AccountID    uuid.UUID
+	EnvID        uuid.UUID
+	ConnectionId ulid.ULID
+	WorkerIP     string
 
-	Status    connpb.ConnectionStatus
 	Data      *connpb.WorkerConnectRequestData
 	Session   *connpb.SessionDetails
 	Group     *WorkerGroup
-	GatewayId string
+	GatewayId ulid.ULID
 }
 
 // Sync attempts to sync the worker group configuration

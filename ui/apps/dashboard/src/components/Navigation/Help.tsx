@@ -66,7 +66,7 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
               </div>
             </Listbox.Option>
           </NextLink>
-          <hr />
+          <hr className="border-subtle" />
           <NextLink href="https://roadmap.inngest.com/roadmap" target="_blank">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
@@ -100,7 +100,7 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
               </div>
             </Listbox.Option>
           </NextLink>
-          <hr />
+          <hr className="border-subtle" />
           <NextLink
             href={pathCreator.onboardingSteps({
               step: nextStep ? nextStep.name : lastCompletedStep?.name,

@@ -93,6 +93,7 @@ func NewWorkerGroupFromConnRequest(
 		SDKLang:       req.SdkLanguage,
 		SDKVersion:    req.SdkVersion,
 		SDKPlatform:   req.GetPlatform(),
+		BuildId:       req.SessionId.BuildId,
 		FunctionSlugs: slugs,
 		Hash:          hash,
 		SyncData: state.SyncData{

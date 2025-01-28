@@ -38,6 +38,10 @@ var (
 
 	ErrTypeMismatch = fmt.Errorf("cannot invoke function with mismatched types")
 
+	errBadRequest      = fmt.Errorf("bad request")
+	errFunctionMissing = fmt.Errorf("function not found")
+	errUnauthorized    = fmt.Errorf("unauthorized")
+
 	// DefaultMaxBodySize is the default maximum size read within a single incoming
 	// invoke request (100MB).
 	DefaultMaxBodySize = 1024 * 1024 * 100
@@ -386,7 +390,22 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := h.invoke(w, r); err != nil {
-			_ = publicerr.WriteHTTP(w, err)
+			status := http.StatusInternalServerError
+			if errors.Is(err, errFunctionMissing) {
+				// XXX: This is a 500 within the JS SDK. We should probably
+				// change the JS SDK's status code to 410. 404 indicates that
+				// the overall API for serving Inngest isn't found.
+				status = http.StatusGone
+			} else if errors.Is(err, errBadRequest) {
+				status = http.StatusBadRequest
+			} else if errors.Is(err, errUnauthorized) {
+				status = http.StatusUnauthorized
+			}
+			w.WriteHeader(status)
+			w.Header().Set("content-type", "application/json")
+			_ = json.NewEncoder(w).Encode(sdkrequest.ErrorResponse{
+				Message: err.Error(),
+			})
 		}
 		return
 	case http.MethodPut:
@@ -811,10 +830,7 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 
 	if !h.isDev() {
 		if sig = r.Header.Get(HeaderKeySignature); sig == "" {
-			return publicerr.Error{
-				Message: "unauthorized",
-				Status:  401,
-			}
+			return errUnauthorized
 		}
 	}
 
@@ -825,10 +841,7 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	byt, err := io.ReadAll(http.MaxBytesReader(w, r.Body, int64(max)))
 	if err != nil {
 		h.Logger.Error("error decoding function request", "error", err)
-		return publicerr.Error{
-			Message: "Error reading request",
-			Status:  500,
-		}
+		return fmt.Errorf("%w: %s", errBadRequest, err)
 	}
 
 	if valid, _, err := ValidateRequestSignature(
@@ -840,10 +853,7 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 		h.isDev(),
 	); !valid {
 		h.Logger.Error("unauthorized inngest invoke request", "error", err)
-		return publicerr.Error{
-			Message: "unauthorized",
-			Status:  401,
-		}
+		return errUnauthorized
 	}
 
 	fnID := r.URL.Query().Get("fnId")
@@ -851,10 +861,7 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	request := &sdkrequest.Request{}
 	if err := json.Unmarshal(byt, request); err != nil {
 		h.Logger.Error("error decoding function request", "error", err)
-		return publicerr.Error{
-			Message: "malformed input",
-			Status:  400,
-		}
+		return fmt.Errorf("%w: %s", errBadRequest, err)
 	}
 
 	if request.UseAPI {
@@ -876,13 +883,7 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	h.l.RUnlock()
 
 	if fn == nil {
-		// XXX: This is a 500 within the JS SDK.  We should probably change
-		// the JS SDK's status code to 410.  404 indicates that the overall
-		// API for serving Inngest isn't found.
-		return publicerr.Error{
-			Message: fmt.Sprintf("function not found: %s", fnID),
-			Status:  410,
-		}
+		return fmt.Errorf("%w: %s", errFunctionMissing, fnID)
 	}
 
 	l := h.Logger.With("fn", fnID, "call_ctx", request.CallCtx)
@@ -969,10 +970,7 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 
 	if err != nil {
 		l.Error("error calling function", "error", err)
-		return publicerr.Error{
-			Message: fmt.Sprintf("error calling function: %s", err.Error()),
-			Status:  500,
-		}
+		return err
 	}
 
 	if len(ops) > 0 {

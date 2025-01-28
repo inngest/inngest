@@ -14,6 +14,7 @@ const traceDetailsFragment = graphql(`
     endedAt
     isRoot
     outputID
+    stepID
     spanID
     stepOp
     stepInfo {
@@ -62,6 +63,7 @@ const query = graphql(`
             }
           }
         }
+        hasAI
       }
     }
   }

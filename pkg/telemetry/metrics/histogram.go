@@ -115,3 +115,36 @@ func HistogramAggregatePausesEvalDuration(ctx context.Context, dur int64, opts H
 		Boundaries:  PausesBoundaries,
 	})
 }
+
+func HistogramConnectProxyAckTime(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_proxy.ack_time",
+		Description: "Duration for a request to be acknowledged",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  PausesBoundaries,
+	})
+}
+
+func HistogramConnectExecutorEndToEndDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_proxy.end_to_end_duration",
+		Description: "Duration for a request to be proxied and for the response to be received by the executor.",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  PausesBoundaries,
+	})
+}
+
+func HistogramConnectSetupDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.connection.setup_duration",
+		Description: "Duration from starting to set up the connection to being fully ready.",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  PausesBoundaries,
+	})
+}

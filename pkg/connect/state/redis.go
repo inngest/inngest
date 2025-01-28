@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"github.com/oklog/ulid/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"io/fs"
 	"log/slog"
@@ -186,22 +187,22 @@ func (r *redisConnectionStateManager) GetConnectionsByGroupID(ctx context.Contex
 	return conns, nil
 }
 
-func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn *Connection) error {
+func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn *Connection, status connpb.ConnectionStatus, lastHeartbeatAt time.Time) error {
 	groupID := conn.Group.Hash
 	meta := &connpb.ConnMetadata{
 		Id:              conn.Session.SessionId.ConnectionId,
 		InstanceId:      conn.Session.SessionId.InstanceId,
-		Status:          conn.Status,
+		Status:          status,
 		Language:        conn.Data.SdkLanguage,
 		Version:         conn.Data.SdkVersion,
 		GroupId:         groupID,
 		Attributes:      conn.Data.SystemAttributes,
-		GatewayId:       conn.GatewayId,
-		LastHeartbeatAt: timestamppb.New(time.Now()),
+		GatewayId:       conn.GatewayId.String(),
+		LastHeartbeatAt: timestamppb.New(lastHeartbeatAt),
 	}
 
 	isHealthy := "0"
-	if conn.Status == connpb.ConnectionStatus_READY {
+	if status == connpb.ConnectionStatus_READY {
 		isHealthy = "1"
 	}
 
@@ -238,7 +239,7 @@ func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn
 		isHealthy,
 	}
 
-	status, err := scripts["upsert_conn"].Exec(
+	resp, err := scripts["upsert_conn"].Exec(
 		ctx,
 		r.client,
 		keys,
@@ -248,16 +249,16 @@ func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn
 		return err
 	}
 
-	switch status {
+	switch resp {
 	case 0:
 		return nil
 
 	default:
-		return fmt.Errorf("unknown status when storing connection metadata: %d", status)
+		return fmt.Errorf("unknown status when storing connection metadata: %d", resp)
 	}
 }
 
-func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, envID uuid.UUID, appID *uuid.UUID, groupID string, connId string) error {
+func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, envID uuid.UUID, appID *uuid.UUID, groupID string, connId ulid.ULID) error {
 	keys := []string{
 		r.connKey(envID),
 		r.groupKey(envID),
@@ -266,7 +267,7 @@ func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, envI
 	}
 
 	args := []string{
-		connId,
+		connId.String(),
 		groupID,
 	}
 
@@ -364,7 +365,7 @@ func (r *redisConnectionStateManager) UpsertGateway(ctx context.Context, gateway
 
 	res := r.client.Do(
 		ctx,
-		r.client.B().Hset().Key(r.gatewaysHashKey()).FieldValue().FieldValue(gateway.Id, string(marshaled)).Build(),
+		r.client.B().Hset().Key(r.gatewaysHashKey()).FieldValue().FieldValue(gateway.Id.String(), string(marshaled)).Build(),
 	)
 	if err := res.Error(); err != nil {
 		return fmt.Errorf("could not set gateway state: %w", err)
@@ -373,10 +374,10 @@ func (r *redisConnectionStateManager) UpsertGateway(ctx context.Context, gateway
 	return nil
 }
 
-func (r *redisConnectionStateManager) DeleteGateway(ctx context.Context, gatewayId string) error {
+func (r *redisConnectionStateManager) DeleteGateway(ctx context.Context, gatewayId ulid.ULID) error {
 	res := r.client.Do(
 		ctx,
-		r.client.B().Hdel().Key(r.gatewaysHashKey()).Field(gatewayId).Build(),
+		r.client.B().Hdel().Key(r.gatewaysHashKey()).Field(gatewayId.String()).Build(),
 	)
 	if err := res.Error(); err != nil {
 		return fmt.Errorf("could not delete gateway state: %w", err)
@@ -385,10 +386,10 @@ func (r *redisConnectionStateManager) DeleteGateway(ctx context.Context, gateway
 	return nil
 }
 
-func (r *redisConnectionStateManager) GetGateway(ctx context.Context, gatewayId string) (*Gateway, error) {
+func (r *redisConnectionStateManager) GetGateway(ctx context.Context, gatewayId ulid.ULID) (*Gateway, error) {
 	gatewayBytes, err := r.client.Do(
 		ctx,
-		r.client.B().Hget().Key(r.gatewaysHashKey()).Field(gatewayId).Build(),
+		r.client.B().Hget().Key(r.gatewaysHashKey()).Field(gatewayId.String()).Build(),
 	).AsBytes()
 	if err != nil {
 		if rueidis.IsRedisNil(err) {
