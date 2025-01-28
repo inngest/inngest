@@ -30,7 +30,7 @@ export default function AppPageWrapper() {
 
 const refreshInterval = 5000;
 
-export function AppPage({ id }: { id: string }) {
+function AppPage({ id }: { id: string }) {
   const { data } = useGetAppQuery({ id: id });
 
   const { data: workerConnsData } = useGetWorkerConnectionsQuery(
