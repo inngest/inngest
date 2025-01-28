@@ -114,6 +114,7 @@ type App {
   checksum: String
   error: String
   functions: [Function!]!
+  connectionType: AppConnectionType!
 
   # These fields are UI convenience fields
   connected: Boolean!
@@ -485,7 +486,7 @@ enum ConnectV1ConnectionStatus {
 }
 
 input ConnectV1WorkerConnectionsFilter {
-  from: Time!
+  from: Time
   until: Time
   timeField: ConnectV1WorkerConnectionsOrderByField = CONNECTED_AT
 
@@ -549,4 +550,13 @@ type ConnectV1WorkerConnectionsConnection {
 type ConnectV1WorkerConnectionEdge {
   node: ConnectV1WorkerConnection!
   cursor: String!
+}
+
+enum AppConnectionType {
+	SERVERLESS
+	CONNECT
+}
+
+input AppsFilterV1 {
+	connectionType: AppConnectionType
 }

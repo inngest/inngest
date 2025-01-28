@@ -101,7 +101,7 @@ func (w wrapper) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*stat
 	return &state.ExecutorFunction{
 		Function:     def,
 		Paused:       false, // dev server does not support pausing
-		AppIsConnect: app.IsConnect.Bool,
+		AppIsConnect: app.ConnectionType == enums.AppConnectionTypeConnect.String(),
 	}, nil
 }
 
@@ -251,8 +251,25 @@ func (w wrapper) InsertQueueSnapshotChunk(ctx context.Context, params cqrs.Inser
 //
 
 // GetApps returns apps that have not been deleted.
-func (w wrapper) GetApps(ctx context.Context, envID uuid.UUID) ([]*cqrs.App, error) {
-	return copyInto(ctx, w.q.GetApps, []*cqrs.App{})
+func (w wrapper) GetApps(ctx context.Context, envID uuid.UUID, filter *cqrs.FilterAppParam) ([]*cqrs.App, error) {
+	f := func(ctx context.Context) ([]*sqlc.App, error) {
+		return w.q.GetApps(ctx)
+	}
+
+	apps, err := copyInto(ctx, f, []*cqrs.App{})
+	if err != nil {
+		return nil, fmt.Errorf("could not get apps: %w", err)
+	}
+
+	filtered := make([]*cqrs.App, 0, len(apps))
+	for _, app := range apps {
+		if filter != nil && filter.ConnectionType != nil && filter.ConnectionType.String() != app.ConnectionType {
+			continue
+		}
+		filtered = append(filtered, app)
+	}
+
+	return filtered, nil
 }
 
 func (w wrapper) GetAppByChecksum(ctx context.Context, envID uuid.UUID, checksum string) (*cqrs.App, error) {
@@ -295,6 +312,10 @@ func (w wrapper) GetAllApps(ctx context.Context, envID uuid.UUID) ([]*cqrs.App, 
 func (w wrapper) UpsertApp(ctx context.Context, arg cqrs.UpsertAppParams) (*cqrs.App, error) {
 	// Normalize the URL before inserting into the DB.
 	arg.Url = util.NormalizeAppURL(arg.Url, forceHTTPS)
+
+	if arg.ConnectionType == "" {
+		arg.ConnectionType = enums.AppConnectionTypeServerless.String()
+	}
 
 	return copyWriter(
 		ctx,

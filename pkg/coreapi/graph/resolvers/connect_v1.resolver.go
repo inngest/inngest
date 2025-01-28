@@ -235,6 +235,11 @@ func toWorkerConnectionsQueryOpt(
 		cursor = *cur
 	}
 
+	from := time.Time{}
+	if filter.From != nil {
+		from = *filter.From
+	}
+
 	until := time.Now()
 	if filter.Until != nil {
 		until = *filter.Until
@@ -251,7 +256,7 @@ func toWorkerConnectionsQueryOpt(
 			WorkspaceID: consts.DevServerEnvId,
 			AppID:       filter.AppIDs,
 			TimeField:   tsfield,
-			From:        filter.From,
+			From:        from,
 			Until:       until,
 			Status:      statuses,
 		},

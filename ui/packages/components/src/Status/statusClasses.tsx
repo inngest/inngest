@@ -21,6 +21,7 @@ const backgroundClasses: {
   SKIPPED: 'bg-status-paused',
   INACTIVE: 'bg-accent-intense',
   ACTIVE: 'bg-status-completed',
+  DISCONNECTED: 'bg-status-cancelled',
 };
 
 export function getStatusBackgroundClass(status: string): string {
@@ -45,6 +46,7 @@ const borderClasses: {
   SKIPPED: 'border-accent-paused',
   INACTIVE: 'border-accent-intense',
   ACTIVE: 'border-status-completed',
+  DISCONNECTED: 'border-status-cancelled',
 };
 
 export function getStatusBorderClass(status: string): string {
@@ -69,6 +71,7 @@ const textClasses: {
   SKIPPED: 'text-status-pausedText',
   INACTIVE: 'text-accent-intense',
   ACTIVE: 'text-status-completedText',
+  DISCONNECTED: 'text-status-cancelledText',
 };
 
 export function getStatusTextClass(status: string): string {

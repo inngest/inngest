@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/enums"
 	"io"
 	"io/fs"
 	"net/http"
@@ -235,12 +236,9 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*cqrs.Sync
 	}
 
 	defer func() {
-		isConnect := sql.NullBool{Valid: false}
+		connectionType := enums.AppConnectionTypeServerless
 		if r.IsConnect() {
-			isConnect = sql.NullBool{
-				Bool:  true,
-				Valid: true,
-			}
+			connectionType = enums.AppConnectionTypeConnect
 		}
 
 		appParams := cqrs.UpsertAppParams{
@@ -253,9 +251,9 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*cqrs.Sync
 				String: r.Framework,
 				Valid:  r.Framework != "",
 			},
-			Url:       r.URL,
-			Checksum:  sum,
-			IsConnect: isConnect,
+			Url:            r.URL,
+			Checksum:       sum,
+			ConnectionType: connectionType.String(),
 		}
 
 		// We want to save an app at the end, after handling each error.

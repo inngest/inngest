@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/enums"
 	"net"
 	"net/url"
 	"os"
@@ -256,7 +257,7 @@ func (d *devserver) runDiscovery(ctx context.Context) {
 			return
 		}
 		// If we have found any app, disable auto-discovery
-		apps, err := d.Data.GetApps(ctx, consts.DevServerEnvId)
+		apps, err := d.Data.GetApps(ctx, consts.DevServerEnvId, nil)
 		if err == nil && len(apps) > 0 {
 			log.From(ctx).Info().Msg("apps synced, disabling auto-discovery")
 			d.Opts.Autodiscover = false
@@ -308,8 +309,12 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 		}
 
 		urls := map[string]struct{}{}
-		if apps, err := d.Data.GetApps(ctx, consts.DevServerEnvId); err == nil {
+		if apps, err := d.Data.GetApps(ctx, consts.DevServerEnvId, nil); err == nil {
 			for _, app := range apps {
+				if app.ConnectionType == enums.AppConnectionTypeConnect.String() {
+					continue
+				}
+
 				// We've seen this URL.
 				urls[app.Url] = struct{}{}
 
