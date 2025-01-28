@@ -20,12 +20,17 @@ type Opts struct {
 	Signer                  auth.SessionTokenSigner
 	RequestAuther           RequestAuther
 	ConnectGatewayRetriever ConnectGatewayRetriever
+	ConnectionLimiter       ConnectionLimiter
 
 	Dev bool
 }
 
 type RequestAuther interface {
 	AuthenticateRequest(ctx context.Context, hashedSigningKey string, env string) (*auth.Response, error)
+}
+
+type ConnectionLimiter interface {
+	CheckConnectionLimit(ctx context.Context, resp *auth.Response) (bool, error)
 }
 
 type ConnectGatewayRetriever interface {
