@@ -21,7 +21,13 @@ export default function ChildEmptyState() {
             <Button
               kind="primary"
               href={`/env/${staticSlugs.branch}/manage/keys` as Route}
-              label="Manage"
+              label="Manage Event Keys"
+            />
+
+            <Button
+              kind="primary"
+              href={`/env/${staticSlugs.branch}/manage/signing-key` as Route}
+              label="Manage Signing Keys"
             />
           </div>
         </div>
