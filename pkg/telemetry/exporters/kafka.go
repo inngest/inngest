@@ -118,12 +118,19 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 				Metadata: map[string]string{},
 				Body:     byt,
 			}
-			if e.key == defaultMsgKey {
+			switch e.key {
+			case "account_id", "acct_id":
+				msg.Metadata[e.key] = id.GetAccountId()
+			case "workspace_id", "ws_id", "env_id":
+				msg.Metadata[e.key] = id.GetEnvId()
+			case "function_id", "workflow_id", "fn_id":
 				msg.Metadata[e.key] = id.GetFunctionId()
+			case "run_id":
+				msg.Metadata[e.key] = id.GetRunId()
 			}
 
 			status := "success"
-			if err := e.topic.Send(ctx, &pubsub.Message{}); err != nil {
+			if err := e.topic.Send(ctx, msg); err != nil {
 				l.Error("error publishing span to kafka",
 					"err", err,
 					"acctID", id.AccountId,
