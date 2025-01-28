@@ -13,17 +13,20 @@ import (
 )
 
 var (
-	defaultMsgKey = "fn_id"
+	defaultMsgKey   = "fn_id"
+	defaultPoolSize = 500
 )
 
 type kafkaSpanExporter struct {
-	topic *pubsub.Topic
-	key   string
+	topic    *pubsub.Topic
+	key      string
+	poolSize int
 }
 
 type kafkaSpansExporterOpts struct {
-	topic string
-	key   string
+	topic    string
+	key      string
+	poolSize int
 }
 
 type KafkaSpansExporterOpts func(k *kafkaSpansExporterOpts)
@@ -38,8 +41,16 @@ func WithKafkaExporterTopic(topic, key string) KafkaSpansExporterOpts {
 	}
 }
 
+func WithKafkaExporterPoolSize(size int) KafkaSpansExporterOpts {
+	return func(k *kafkaSpansExporterOpts) {
+		k.poolSize = size
+	}
+}
+
 func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (trace.SpanExporter, error) {
-	conf := &kafkaSpansExporterOpts{}
+	conf := &kafkaSpansExporterOpts{
+		poolSize: defaultPoolSize,
+	}
 
 	for _, apply := range opts {
 		apply(conf)
@@ -65,8 +76,9 @@ func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (
 	}
 
 	return &kafkaSpanExporter{
-		topic: topic,
-		key:   conf.key,
+		topic:    topic,
+		key:      conf.key,
+		poolSize: conf.poolSize,
 	}, nil
 }
 
@@ -75,7 +87,7 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 
 	l := logger.StdlibLogger(ctx)
 
-	errp := pool.New().WithErrors().WithMaxGoroutines(1000)
+	errp := pool.New().WithErrors().WithMaxGoroutines(e.poolSize)
 
 	for _, sp := range spans {
 		sp := sp
