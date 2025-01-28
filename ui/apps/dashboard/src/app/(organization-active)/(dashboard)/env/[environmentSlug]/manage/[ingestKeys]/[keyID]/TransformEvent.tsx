@@ -11,6 +11,7 @@ import DashboardCodeBlock from '@/components/DashboardCodeBlock/DashboardCodeBlo
 import { getManageKey } from '@/utils/urls';
 import makeVM from '@/utils/vm';
 import { Context } from './Context';
+import { Alert } from '@inngest/components/Alert';
 
 type FilterEventsProps = {
   keyID: string;
@@ -86,6 +87,7 @@ export default function TransformEvents({ keyID, metadata }: FilterEventsProps) 
   const [incoming, setIncoming] = useState(defaultIncoming);
   const [isDisabled, setDisabled] = useState(true);
   const [output, setOutput] = useState(defaultOutput);
+  const [transformWarningOnKey, setTransformWarningOnKey] = useState<string | null>(null);
   const { save } = useContext(Context);
   const router = useRouter();
   const pathname = usePathname();
@@ -97,9 +99,21 @@ export default function TransformEvents({ keyID, metadata }: FilterEventsProps) 
     }
 
     const result = await preview(transform, incoming);
-    setOutput(result);
-    if (result === '' || result.indexOf('Error') === 0) {
-      return;
+      setTransformWarningOnKey(null);
+      setOutput(result);
+
+      try {
+        const parsed = JSON.parse(result);
+        if (parsed['name'] === undefined) {
+          setTransformWarningOnKey('name');
+        } else if (parsed['data'] === undefined) {
+          setTransformWarningOnKey('data');
+        }
+      }
+      catch (e) {
+        setTransformWarningOnKey('The resulting output is not a valid JSON object.');
+      }
+
     }
   };
 
@@ -208,7 +222,7 @@ export default function TransformEvents({ keyID, metadata }: FilterEventsProps) 
         </div>
         <div className="w-6/12">
           <h2 className="pb-1 text-lg font-semibold">Transformed Event</h2>
-          <p className="text-subtle mb-6 text-sm">Preview the transformed JSON payload here.</p>
+          <p className="text-subtle text-sm mb-6">Preview the transformed JSON payload here.</p>
           <DashboardCodeBlock
             header={{
               title: 'Payload',
@@ -218,6 +232,19 @@ export default function TransformEvents({ keyID, metadata }: FilterEventsProps) 
               language: 'json',
             }}
           />
+          { transformWarningOnKey &&
+            <Alert severity="warning" className="mt-4">
+                The resulting output is missing a <code>{transformWarningOnKey}</code> field
+                and is not{' '}
+                <a
+                  href="https://www.inngest.com/docs/features/events-triggers/event-format"
+                  className={"underline"}
+                  target={"_blank"}>
+                    a valid Inngest event
+                </a>
+                .
+            </Alert>
+          }
         </div>
       </div>
       <div className="mb-8 flex justify-end">
