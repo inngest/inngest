@@ -11,8 +11,6 @@ import { RiInformationLine, RiRefreshLine } from '@remixicon/react';
 
 import { VercelDeploymentProtection, type VercelIntegration } from '@/gql/graphql';
 
-// import { VercelDeploymentProtection, type VercelIntegration } from './VercelIntegration';
-
 // type DisableProjectProps = {
 //   isOpen: boolean;
 //   onClose: () => void;
