@@ -61,7 +61,16 @@ const afterAuth = async (
 };
 
 export default clerkMiddleware((auth, request) => {
-  //
+  const hasJwtCookie = request.cookies.getAll().some((cookie) => {
+    // Our non-Clerk JWT is either named "jwt" or "jwt-staging".
+    return cookie.name.startsWith('jwt');
+  });
+
+  if (hasJwtCookie) {
+    // Skip Clerk auth for non-Clerk users.
+    return NextResponse.next();
+  }
+
   // Some clerk-nextjs shenanigans. We must check auth user id before calling
   // auth.protect() below becuase that will always return a 404 by design.
   // https://discord.com/channels/856971667393609759/1021521740800733244/threads/1253004875273338922
