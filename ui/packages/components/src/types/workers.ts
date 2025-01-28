@@ -7,7 +7,7 @@ export const workerStatuses = [
 ] as const;
 type WorkerStatus = (typeof workerStatuses)[number];
 
-// We only display three statuses for workers: ACTIVE, INACTIVE, and FAILED
+// We only display three statuses for workers: ACTIVE, INACTIVE, and DISCONNECTED
 export const convertWorkerStatus = (status: WorkerStatus): GroupedWorkerStatus | 'UNKNOWN' => {
   switch (status) {
     case 'READY':
@@ -39,7 +39,7 @@ export type Worker = {
   functionCount: number;
 };
 
-export const groupedWorkerStatuses = ['ACTIVE', 'INACTIVE', 'FAILED', 'DISCONNECTED'] as const;
+export const groupedWorkerStatuses = ['ACTIVE', 'INACTIVE', 'DISCONNECTED'] as const;
 
 export type GroupedWorkerStatus = (typeof groupedWorkerStatuses)[number];
 

@@ -104,7 +104,6 @@ export function AppPage({ id }: { id: string }) {
         ACTIVE: 0,
         INACTIVE: 0,
         DISCONNECTED: 0,
-        FAILED: 0,
       };
     }
 
@@ -112,7 +111,6 @@ export function AppPage({ id }: { id: string }) {
       ACTIVE: countReadyWorkersData.workerConnections.totalCount,
       INACTIVE: countInactiveWorkersData.workerConnections.totalCount,
       DISCONNECTED: countDisconnectedWorkersData.workerConnections.totalCount,
-      FAILED: 0,
     };
   }, [countReadyWorkersData, countInactiveWorkersData]);
 
