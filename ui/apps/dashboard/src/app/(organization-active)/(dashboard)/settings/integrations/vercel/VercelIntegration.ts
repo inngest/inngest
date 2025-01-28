@@ -25,10 +25,6 @@ export type VercelProjectViaAPI = {
   };
 };
 
-export type VercelProjectAPIResponse = {
-  projects: VercelProjectViaAPI[];
-};
-
 export type VercelIntegration = {
   id: string;
   name: string;
