@@ -192,7 +192,7 @@ export default function TransformEvents({ keyID, metadata }: FilterEventsProps) 
       <div className="mb-6">
         <DashboardCodeBlock
           header={{
-            title: 'Payload',
+            title: 'Transform Function',
           }}
           tab={{
             content: rawTransform ?? defaultTransform,
@@ -210,7 +210,7 @@ export default function TransformEvents({ keyID, metadata }: FilterEventsProps) 
           </p>
           <DashboardCodeBlock
             header={{
-              title: 'Payload',
+              title: 'Webhook Payload',
             }}
             tab={{
               content: incoming,
@@ -225,7 +225,7 @@ export default function TransformEvents({ keyID, metadata }: FilterEventsProps) 
           <p className="text-subtle text-sm mb-6">Preview the transformed JSON payload here.</p>
           <DashboardCodeBlock
             header={{
-              title: 'Payload',
+              title: 'Event Payload',
             }}
             tab={{
               content: output,
