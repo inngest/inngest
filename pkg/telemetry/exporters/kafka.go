@@ -123,7 +123,7 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 				msg.Metadata[e.key] = id.GetAccountId()
 			case "workspace_id", "ws_id", "env_id":
 				msg.Metadata[e.key] = id.GetEnvId()
-			case "function_id", "workflow_id", "fn_id":
+			case "workflow_id", "wf_id", "function_id", "fn_id":
 				msg.Metadata[e.key] = id.GetFunctionId()
 			case "run_id":
 				msg.Metadata[e.key] = id.GetRunId()
