@@ -258,7 +258,7 @@ func (d *devserver) runDiscovery(ctx context.Context) {
 		// If we have found any app, disable auto-discovery
 		apps, err := d.Data.GetApps(ctx, consts.DevServerEnvId)
 		if err == nil && len(apps) > 0 {
-			log.From(ctx).Info().Msg("apps synced, disabling auto-discovery")
+			logger.From(ctx).Info().Msg("apps synced, disabling auto-discovery")
 			d.Opts.Autodiscover = false
 		} else {
 			_ = discovery.Autodiscover(ctx)
