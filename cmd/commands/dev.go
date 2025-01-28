@@ -35,6 +35,7 @@ func NewCmdDev() *cobra.Command {
 	cmd.Flags().Bool("no-poll", false, "Disable polling of apps for updates")
 	cmd.Flags().Int("poll-interval", devserver.DefaultPollInterval, "Interval in seconds between polling for updates to apps")
 	cmd.Flags().Int("retry-interval", 0, "Retry interval in seconds for linear backoff when retrying functions - must be 1 or above")
+	cmd.Flags().Int("queue-workers", devserver.DefaultQueueWorkers, "Number of workers to execute steps in the queue")
 	cmd.Flags().Int("tick", 150, "The interval (in milliseconds) at which the executor checks for new work, during local development")
 
 	return cmd
@@ -86,6 +87,7 @@ func doDev(cmd *cobra.Command, args []string) {
 	noPoll := viper.GetBool("no-poll")
 	pollInterval := viper.GetInt("poll-interval")
 	retryInterval := viper.GetInt("retry-interval")
+	queueWorkers := viper.GetInt("queue-workers")
 	tick := viper.GetInt("tick")
 
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
@@ -109,6 +111,7 @@ func doDev(cmd *cobra.Command, args []string) {
 		Poll:          !noPoll,
 		PollInterval:  pollInterval,
 		RetryInterval: retryInterval,
+		QueueWorkers:  queueWorkers,
 		Tick:          time.Duration(tick) * time.Millisecond,
 		URLs:          urls,
 	}

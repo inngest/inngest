@@ -38,8 +38,9 @@ func NewCmdStart(rootCmd *cobra.Command) *cobra.Command {
 	baseFlags.StringP("port", "p", "8288", "Server port")
 	baseFlags.Int("poll-interval", 0, "Enable app sync polling at a specific interval in seconds. (default disabled)")
 	baseFlags.Int("retry-interval", 0, "Retry interval in seconds for linear backoff. Minimum: 1.")
-	baseFlags.StringSliceP("sdk-url", "u", []string{}, "SDK URLs to load functions from")
+	baseFlags.Int("queue-workers", devserver.DefaultQueueWorkers, "Number of workers to execute steps in the queue")
 	baseFlags.Int("tick", devserver.DefaultTick, "Interval, in milliseconds, of which to check for new work.")
+	baseFlags.StringSliceP("sdk-url", "u", []string{}, "SDK URLs to load functions from")
 	baseFlags.String("signing-key", "", "Signing key used to sign and validate data between the server and apps.")
 	baseFlags.StringSlice("event-key", []string{}, "Event key(s) that will be used by apps to send events to the server.")
 	cmd.Flags().AddFlagSet(baseFlags)
@@ -130,6 +131,7 @@ func doStart(cmd *cobra.Command, args []string) {
 		RedisURI:      viper.GetString("redis-uri"),
 		PostgresURI:   viper.GetString("postgres-uri"),
 		RetryInterval: viper.GetInt("retry-interval"),
+		QueueWorkers:  viper.GetInt("queue-workers"),
 		Tick:          time.Duration(tick) * time.Millisecond,
 		URLs:          viper.GetStringSlice("sdk-url"),
 		SQLiteDir:     viper.GetString("sqlite-dir"),
