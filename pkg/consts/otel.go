@@ -17,6 +17,7 @@ const (
 	OtelSysWorkspaceID    = "sys.workspace.id"
 	OtelSysAppID          = "sys.app.id"
 	OtelSysIdempotencyKey = "sys.idempotency.key"
+	OtelSysLifecycleID    = "sys.lifecycle.id"
 
 	OtelSysEventData       = "sys.event"
 	OtelSysEventRequestID  = "sys.event.request.id"
@@ -40,7 +41,9 @@ const (
 	OtelSysFunctionStatusCode = "sys.function.status.code"
 	OtelSysFunctionOutput     = "sys.function.output"
 	OtelSysFunctionLink       = "sys.function.link"
+	OtelSysFunctionHasAI      = "sys.function.hasAI"
 
+	OtelSysStepID              = "sys.step.id"
 	OtelSysStepDisplayName     = "sys.step.display.name"
 	OtelSysStepOpcode          = "sys.step.opcode"
 	OtelSysStepScheduleAt      = "sys.step.time.schedule"
@@ -50,10 +53,16 @@ const (
 	OtelSysStepStatusCode      = "sys.step.status.code"
 	OtelSysStepAttempt         = "sys.step.attempt"
 	OtelSysStepMaxAttempt      = "sys.step.attempt.max"
+	OtelSysStepInput           = "sys.step.input"
 	OtelSysStepOutput          = "sys.step.output"
 	OtelSysStepOutputSizeBytes = "sys.step.output.size.bytes"
 	OtelSysStepFirst           = "sys.step.first"
 	OtelSysStepGroupID         = "sys.step.group.id"
+	OtelSysStepStack           = "sys.step.stack"
+	OtelSysStepAIRequest       = "sys.step.ai.req" // ai request metadata
+	OtelSysStepAIResponse      = "sys.step.ai.res" // ai response metadata
+	OtelSysStepRunType         = "sys.step.run.type"
+	OtelSysStepPlan            = "sys.step.plan" // indicate this is a planning step
 
 	OtelSysStepSleepEndAt = "sys.step.sleep.end"
 

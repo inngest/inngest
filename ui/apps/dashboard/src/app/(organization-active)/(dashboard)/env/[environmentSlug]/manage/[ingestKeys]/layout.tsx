@@ -11,7 +11,7 @@ export default function KeysLayout({ children }: KeysLayoutProps) {
       <div className="border-muted w-80 flex-shrink-0 border-r">
         <Keys />
       </div>
-      <div className="h-full min-w-0 flex-1 overflow-y-auto bg-white">{children}</div>
+      <div className="text-basis h-full min-w-0 flex-1 overflow-y-auto">{children}</div>
     </div>
   );
 }

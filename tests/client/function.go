@@ -7,9 +7,16 @@ import (
 	"github.com/99designs/gqlgen/graphql"
 )
 
+type App struct {
+	ID         string `json:"id"`
+	ExternalID string `json:"externalID"`
+	Name       string `json:"name"`
+}
+
 type Function struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+	App  App    `json:"app"`
 }
 
 func (c *Client) Functions(ctx context.Context) ([]Function, error) {
@@ -20,6 +27,11 @@ func (c *Client) Functions(ctx context.Context) ([]Function, error) {
 			functions {
 				id
 				name
+				app {
+					id
+					externalID
+					name
+				}
 			}
 		}`
 

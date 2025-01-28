@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState, type UIEventHandler } from 'react';
 import dynamic from 'next/dynamic';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
 import { Pill } from '@inngest/components/Pill';
@@ -23,7 +23,8 @@ import { useLocalStorage } from 'react-use';
 
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
-import { RunDetails } from '../RunDetailsV2';
+import { RunDetailsV2 } from '../RunDetailsV2';
+import { RunDetailsV3 } from '../RunDetailsV3/RunDetailsV3';
 import {
   useBatchedSearchParams,
   useSearchParam,
@@ -46,29 +47,29 @@ const CodeSearch = dynamic(() => import('@inngest/components/CodeSearch/CodeSear
 });
 
 type Props = {
-  cancelRun: React.ComponentProps<typeof RunDetails>['cancelRun'];
+  cancelRun: React.ComponentProps<typeof RunDetailsV2>['cancelRun'];
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
   features: Pick<Features, 'history'>;
-  getRun: React.ComponentProps<typeof RunDetails>['getRun'];
-  getTraceResult: React.ComponentProps<typeof RunDetails>['getResult'];
-  getTrigger: React.ComponentProps<typeof RunDetails>['getTrigger'];
+  getRun: React.ComponentProps<typeof RunDetailsV2>['getRun'];
+  getTraceResult: React.ComponentProps<typeof RunDetailsV2>['getResult'];
+  getTrigger: React.ComponentProps<typeof RunDetailsV2>['getTrigger'];
   hasMore: boolean;
   isLoadingInitial: boolean;
   isLoadingMore: boolean;
   onRefresh?: () => void;
   onScroll: UIEventHandler<HTMLDivElement>;
   onScrollToTop: () => void;
-  pathCreator: React.ComponentProps<typeof RunDetails>['pathCreator'];
+  pathCreator: React.ComponentProps<typeof RunDetailsV2>['pathCreator'];
   pollInterval?: number;
-  rerun: React.ComponentProps<typeof RunDetails>['rerun'];
+  rerun: React.ComponentProps<typeof RunDetailsV2>['rerun'];
+  rerunFromStep: React.ComponentProps<typeof RunDetailsV2>['rerunFromStep'];
   apps?: Option[];
   functions?: Option[];
   functionIsPaused?: boolean;
   scope: ViewScope;
   totalCount: number | undefined;
-  temporaryAlert?: React.ReactElement;
-  hasSearchFlag?: boolean;
+  traceAIEnabled?: boolean;
 };
 
 export function RunsPage({
@@ -78,6 +79,7 @@ export function RunsPage({
   getTraceResult,
   getTrigger,
   rerun,
+  rerunFromStep,
   data,
   features,
   hasMore,
@@ -93,8 +95,7 @@ export function RunsPage({
   functionIsPaused,
   scope,
   totalCount,
-  temporaryAlert,
-  hasSearchFlag = false,
+  traceAIEnabled = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useScopedColumns(scope);
@@ -240,19 +241,36 @@ export function RunsPage({
   const renderSubComponent = useCallback(
     (rowData: Run) => {
       return (
-        <div className="border-subtle border-l-4 pb-6">
-          <RunDetails
-            cancelRun={cancelRun}
-            getResult={getTraceResult}
-            getRun={getRun}
-            initialRunData={rowData}
-            getTrigger={getTrigger}
-            pathCreator={pathCreator}
-            pollInterval={pollInterval}
-            rerun={rerun}
-            runID={rowData.id}
-            standalone={false}
-          />
+        <div className={`border-subtle border-l-4 ${traceAIEnabled ? '' : 'pb-6'}`}>
+          {traceAIEnabled ? (
+            <RunDetailsV3
+              cancelRun={cancelRun}
+              getResult={getTraceResult}
+              getRun={getRun}
+              initialRunData={rowData}
+              getTrigger={getTrigger}
+              pathCreator={pathCreator}
+              pollInterval={pollInterval}
+              rerun={rerun}
+              rerunFromStep={rerunFromStep}
+              runID={rowData.id}
+              standalone={false}
+            />
+          ) : (
+            <RunDetailsV2
+              cancelRun={cancelRun}
+              getResult={getTraceResult}
+              getRun={getRun}
+              initialRunData={rowData}
+              getTrigger={getTrigger}
+              pathCreator={pathCreator}
+              pollInterval={pollInterval}
+              rerun={rerun}
+              rerunFromStep={rerunFromStep}
+              runID={rowData.id}
+              standalone={false}
+            />
+          )}
         </div>
       );
     },
@@ -280,9 +298,9 @@ export function RunsPage({
     pollInterval && pollInterval < 1000 ? isLoadingInitial : isLoadingMore || isLoadingInitial;
 
   return (
-    <main className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-auto focus-visible:outline-none">
-      <div className="bg-canvasBase border-subtle sticky top-0 z-10 flex flex-col border-b px-3">
-        <div className="flex h-[58px] items-center justify-between gap-2">
+    <main className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
+      <div className="bg-canvasBase sticky top-0 z-10 flex flex-col">
+        <div className="border-subtle flex h-[58px] items-center justify-between gap-2 border-b px-3">
           <div className="flex items-center gap-2">
             <SelectGroup>
               <TimeFieldFilter
@@ -332,21 +350,20 @@ export function RunsPage({
                 entities={functions}
               />
             )}
-            {hasSearchFlag && (
-              <NewButton
-                icon={<RiSearchLine />}
-                iconSide="left"
-                appearance="outlined"
-                label={showSearch ? 'Hide search' : 'Show search'}
-                onClick={() => setShowSearch((prev) => !prev)}
-                className={cn(
-                  'h-[42px]',
-                  search
-                    ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
-                    : ''
-                )}
-              />
-            )}
+
+            <Button
+              icon={<RiSearchLine />}
+              size="large"
+              iconSide="left"
+              appearance="outlined"
+              label={showSearch ? 'Hide search' : 'Show search'}
+              onClick={() => setShowSearch((prev) => !prev)}
+              className={cn(
+                search
+                  ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
+                  : ''
+              )}
+            />
             <TotalCount totalCount={totalCount} />
           </div>
           <div className="flex items-center gap-2">
@@ -357,16 +374,15 @@ export function RunsPage({
             />
           </div>
         </div>
-      </div>
-      <>
-        {hasSearchFlag && showSearch && (
+
+        {showSearch && (
           <>
             <div className="bg-codeEditor flex items-center justify-between px-4 pt-4">
               <div className="flex items-center gap-2">
                 <p className="text-subtle text-sm">Search your runs by using a CEL query</p>
                 <Pill kind="primary">Beta</Pill>
               </div>
-              <NewButton
+              <Button
                 appearance="outlined"
                 label="Read the docs"
                 icon={<RiArrowRightUpLine />}
@@ -382,7 +398,8 @@ export function RunsPage({
             />
           </>
         )}
-      </>
+      </div>
+
       <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
         <RunsTable
           data={data}
@@ -395,7 +412,7 @@ export function RunsPage({
         {!hasMore && data.length > 1 && (
           <div className="flex flex-col items-center pt-8">
             <p className="text-muted">No additional runs found.</p>
-            <NewButton
+            <Button
               label="Back to top"
               kind="primary"
               appearance="ghost"
@@ -405,7 +422,7 @@ export function RunsPage({
         )}
         {onRefresh && (
           <div className="flex flex-col items-center pt-2">
-            <NewButton
+            <Button
               kind="secondary"
               appearance="outlined"
               label="Refresh runs"
@@ -417,7 +434,6 @@ export function RunsPage({
             />
           </div>
         )}
-        {temporaryAlert}
       </div>
     </main>
   );

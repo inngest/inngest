@@ -40,6 +40,10 @@ type RunStateKeyGenerator interface {
 
 	// Stack returns the key used to store the stack for a given run
 	Stack(ctx context.Context, isSharded bool, runID ulid.ULID) string
+
+	// ActionInputs returns the key used to store the action inputs for a given
+	// run.
+	ActionInputs(ctx context.Context, isSharded bool, identifier state.Identifier) string
 }
 
 type runStateKeyGenerator struct {
@@ -90,6 +94,10 @@ func (s runStateKeyGenerator) History(ctx context.Context, isSharded bool, runID
 
 func (s runStateKeyGenerator) Stack(ctx context.Context, isSharded bool, runID ulid.ULID) string {
 	return fmt.Sprintf("{%s}:stack:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), runID)
+}
+
+func (s runStateKeyGenerator) ActionInputs(ctx context.Context, isSharded bool, identifier state.Identifier) string {
+	return fmt.Sprintf("{%s}:inputs:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, identifier.RunID), identifier.WorkflowID, identifier.RunID)
 }
 
 type GlobalKeyGenerator interface {

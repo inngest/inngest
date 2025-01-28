@@ -4,12 +4,13 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/enums"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
@@ -161,7 +162,11 @@ func (t testLifecycleListener) OnFnConcurrencyLimitReached(_ context.Context, fn
 	t.fnConcurrency[fnID] = i + 1
 }
 
-func (t testLifecycleListener) OnAccountConcurrencyLimitReached(_ context.Context, acctID uuid.UUID) {
+func (t testLifecycleListener) OnAccountConcurrencyLimitReached(
+	_ context.Context,
+	acctID uuid.UUID,
+	workspaceID *uuid.UUID,
+) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 

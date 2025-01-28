@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/inngest/inngest/pkg/enums"
 	"time"
+
+	"github.com/inngest/inngest/pkg/enums"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/coocood/freecache"
@@ -21,7 +22,7 @@ import (
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi"
-	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs"
+	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/event"
@@ -58,10 +59,12 @@ type StartOpts struct {
 	Config        config.Config `json:"-"`
 	RootDir       string        `json:"dir"`
 	RedisURI      string        `json:"redis-uri"`
+	PostgresURI   string        `json:"postgres-uri"`
 	PollInterval  int           `json:"poll-interval"`
 	URLs          []string      `json:"urls"`
 	Tick          time.Duration `json:"tick"`
 	RetryInterval int           `json:"retry_interval"`
+	QueueWorkers  int           `json:"queue_workers"`
 
 	// SigningKey is used to decide that the server should sign requests and
 	// validate responses where applicable, modelling cloud behaviour.
@@ -101,9 +104,10 @@ func New(ctx context.Context, opts StartOpts) error {
 }
 
 func start(ctx context.Context, opts StartOpts) error {
-	db, err := sqlitecqrs.New(sqlitecqrs.SqliteCQRSOptions{
-		InMemory:  false,
-		Directory: opts.SQLiteDir,
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{
+		InMemory:    false,
+		PostgresURI: opts.PostgresURI,
+		Directory:   opts.SQLiteDir,
 	})
 	if err != nil {
 		return err
@@ -115,9 +119,13 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	// Initialize the devserver
-	dbcqrs := sqlitecqrs.NewCQRS(db)
-	hd := sqlitecqrs.NewHistoryDriver(db)
-	hr := sqlitecqrs.NewHistoryReader(db)
+	dbDriver := "sqlite"
+	if opts.PostgresURI != "" {
+		dbDriver = "postgres"
+	}
+	dbcqrs := base_cqrs.NewCQRS(db, dbDriver)
+	hd := base_cqrs.NewHistoryDriver(db, dbDriver)
+	hr := base_cqrs.NewHistoryReader(db, dbDriver)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	stepLimitOverrides := make(map[string]int)
@@ -167,7 +175,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	queueOpts := []redis_state.QueueOpt{
 		redis_state.WithIdempotencyTTL(time.Hour),
-		redis_state.WithNumWorkers(100),
+		redis_state.WithNumWorkers(int32(opts.QueueWorkers)),
 		redis_state.WithPollTick(tick),
 		redis_state.WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i queue.QueueItem) []state.CustomConcurrency {
 			keys := i.Data.GetConcurrencyKeys()
@@ -384,12 +392,13 @@ func start(ctx context.Context, opts StartOpts) error {
 		caching := apiv1.NewCacheMiddleware(cache)
 
 		apiv1.AddRoutes(r, apiv1.Opts{
-			CachingMiddleware: caching,
-			EventReader:       ds.Data,
-			FunctionReader:    ds.Data,
-			FunctionRunReader: ds.Data,
-			JobQueueReader:    ds.Queue.(queue.JobQueueReader),
-			Executor:          ds.Executor,
+			CachingMiddleware:  caching,
+			EventReader:        ds.Data,
+			FunctionReader:     ds.Data,
+			FunctionRunReader:  ds.Data,
+			JobQueueReader:     ds.Queue.(queue.JobQueueReader),
+			Executor:           ds.Executor,
+			QueueShardSelector: shardSelector,
 		})
 	})
 
@@ -436,18 +445,16 @@ func connectToOrCreateRedis(redisURI string) (rueidis.Client, error) {
 		return createInmemoryRedisConnection()
 	}
 
-	url := redisURI
-	// strip the redis:// prefix if we have one; connection fails with it
-	if len(url) > 8 && url[:8] == "redis://" {
-		url = url[8:]
+	opt, err := rueidis.ParseURL(redisURI)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing redis uri: %w", err)
 	}
 
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:       []string{url},
-		DisableCache:      true,
-		BlockingPoolSize:  1,
-		ForceSingleClient: true,
-	})
+	// Set default overrides
+	opt.DisableCache = true
+	opt.BlockingPoolSize = 1
+
+	rc, err := rueidis.NewClient(opt)
 	if err != nil {
 		return nil, fmt.Errorf("error creating redis client: %w", err)
 	}

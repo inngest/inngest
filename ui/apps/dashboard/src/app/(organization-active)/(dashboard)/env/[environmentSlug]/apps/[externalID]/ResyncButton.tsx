@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { RiRefreshLine } from '@remixicon/react';
 
 import ResyncModal from './ResyncModal';
@@ -16,7 +16,7 @@ export function ResyncButton({ appExternalID, disabled = false, latestSyncUrl, p
 
   return (
     <>
-      <NewButton
+      <Button
         onClick={() => setIsModalVisible(true)}
         disabled={disabled}
         kind="primary"

@@ -1,4 +1,4 @@
-import { classNames } from '@inngest/components/utils/classNames';
+import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowDownSLine } from '@remixicon/react';
 import { flexRender, useReactTable, type Row, type TableOptions } from '@tanstack/react-table';
 import { useVirtual } from 'react-virtual';
@@ -51,7 +51,7 @@ export function Table<T>({
           <tr key={headerGroup.id}>
             {headerGroup.headers.map((header) => (
               <th
-                className={classNames(
+                className={cn(
                   cellStyles,
                   'bg-canvasBase text-muted text-sm font-semibold',
                   header.column.getIsPinned() && 'sticky left-0 z-[4]',
@@ -69,7 +69,7 @@ export function Table<T>({
                     : flexRender(header.column.columnDef.header, header.getContext())}
                   {header.column.getIsSorted() && options.data.length > 1 && (
                     <RiArrowDownSLine
-                      className={classNames(
+                      className={cn(
                         'h-3 w-3 transition-all duration-500',
                         header.column.getIsSorted() === 'asc' && '-rotate-180'
                       )}
@@ -84,7 +84,7 @@ export function Table<T>({
       <tbody className="divide-subtle text-basis divide-y">
         {options.data.length < 1 && (
           <tr>
-            <td className={classNames(cellStyles, 'text-center')} colSpan={colSpanTotalSum}>
+            <td className={cn(cellStyles, 'text-center')} colSpan={colSpanTotalSum}>
               {blankState}
             </td>
           </tr>
@@ -107,10 +107,7 @@ export function Table<T>({
               >
                 {row.getVisibleCells().map((cell) => (
                   <td
-                    className={classNames(
-                      cellStyles,
-                      cell.column.getIsPinned() && 'sticky left-0 z-[2]'
-                    )}
+                    className={cn(cellStyles, cell.column.getIsPinned() && 'sticky left-0 z-[2]')}
                     key={cell.id}
                     style={{
                       width:
@@ -139,10 +136,7 @@ export function Table<T>({
             >
               {row.getVisibleCells().map((cell) => (
                 <td
-                  className={classNames(
-                    cellStyles,
-                    cell.column.getIsPinned() && 'sticky left-0 z-[2]'
-                  )}
+                  className={cn(cellStyles, cell.column.getIsPinned() && 'sticky left-0 z-[2]')}
                   key={cell.id}
                   style={{
                     width:

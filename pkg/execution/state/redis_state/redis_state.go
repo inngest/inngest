@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 
 	"github.com/google/uuid"
@@ -259,6 +260,22 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 		return nil, err
 	}
 
+	var stepsByt []byte
+	if len(input.Steps) > 0 {
+		stepsByt, err = json.Marshal(input.Steps)
+		if err != nil {
+			return nil, fmt.Errorf("error storing run state in redis when marshalling steps: %w", err)
+		}
+	}
+
+	var stepInputsByt []byte
+	if len(input.StepInputs) > 0 {
+		stepInputsByt, err = json.Marshal(input.StepInputs)
+		if err != nil {
+			return nil, fmt.Errorf("error storing run state in redis when marshalling step inputs: %w", err)
+		}
+	}
+
 	metadata := runMetadata{
 		Identifier:     input.Identifier,
 		Debugger:       input.Debugger,
@@ -268,21 +285,12 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 		Status:         enums.RunStatusScheduled,
 		SpanID:         input.SpanID,
 		EventSize:      len(events),
+		StateSize:      len(events) + len(stepsByt) + len(stepInputsByt),
+		StepCount:      len(input.Steps),
 	}
 	if input.RunType != nil {
 		metadata.RunType = *input.RunType
 	}
-
-	var stepsByt []byte
-	if len(input.Steps) > 0 {
-		stepsByt, err = json.Marshal(input.Steps)
-		if err != nil {
-			return nil, fmt.Errorf("error storing run state in redis: %w", err)
-		}
-	}
-
-	// Add total state size, including size of input steps.
-	metadata.StateSize = len(events) + len(stepsByt)
 
 	metadataByt, err := json.Marshal(metadata.Map())
 	if err != nil {
@@ -293,6 +301,7 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 		events,
 		metadataByt,
 		stepsByt,
+		stepInputsByt,
 	})
 	if err != nil {
 		return nil, err
@@ -305,6 +314,8 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 			fnRunState.kg.Events(ctx, isSharded, input.Identifier),
 			fnRunState.kg.RunMetadata(ctx, isSharded, input.Identifier.RunID),
 			fnRunState.kg.Actions(ctx, isSharded, input.Identifier),
+			fnRunState.kg.Stack(ctx, isSharded, input.Identifier.RunID),
+			fnRunState.kg.ActionInputs(ctx, isSharded, input.Identifier),
 		},
 		args,
 	).AsInt64()
@@ -312,7 +323,6 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 	if err != nil {
 		return nil, fmt.Errorf("error storing run state in redis: %w", err)
 	}
-
 	if status == 1 {
 		return nil, state.ErrIdentifierExists
 	}
@@ -334,6 +344,7 @@ func (m shardedMgr) UpdateMetadata(ctx context.Context, accountID uuid.UUID, run
 		"0", // Force planning / disable immediate execution
 		strconv.Itoa(consts.RequestVersionUnknown), // Request version
 		"0", // start time default value
+		"0", // has AI default value
 	}
 	if md.DisableImmediateExecution {
 		input[0] = "1"
@@ -343,6 +354,9 @@ func (m shardedMgr) UpdateMetadata(ctx context.Context, accountID uuid.UUID, run
 	}
 	if !md.StartedAt.IsZero() {
 		input[2] = strconv.FormatInt(md.StartedAt.UnixMilli(), 10)
+	}
+	if md.HasAI {
+		input[3] = "1"
 	}
 
 	fnRunState := m.s.FunctionRunState()
@@ -520,6 +534,24 @@ func (m shardedMgr) LoadSteps(ctx context.Context, accountId uuid.UUID, fnID uui
 
 	r, isSharded := fnRunState.Client(ctx, accountId, runID)
 
+	// Load action inputs
+	inputMap, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Hgetall().Key(fnRunState.kg.ActionInputs(ctx, isSharded, v1id)).Build()
+	}).AsStrMap()
+	if err != nil {
+		return nil, fmt.Errorf("failed loading action inputs; %w", err)
+	}
+	for stepID, marshalled := range inputMap {
+		wrapper := map[string]json.RawMessage{
+			"input": json.RawMessage(marshalled),
+		}
+		wrappedData, err := json.Marshal(wrapper)
+		if err != nil {
+			return nil, fmt.Errorf("failed to wrap action input for \"%s\"; %w", stepID, err)
+		}
+		steps[stepID] = wrappedData
+	}
+
 	// Load the actions.  This is a map of step IDs to JSON-encoded results.
 	rmap, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
 		return client.B().Hgetall().Key(fnRunState.kg.Actions(ctx, isSharded, v1id)).Build()
@@ -530,6 +562,7 @@ func (m shardedMgr) LoadSteps(ctx context.Context, accountId uuid.UUID, fnID uui
 	for stepID, marshalled := range rmap {
 		steps[stepID] = json.RawMessage(marshalled)
 	}
+
 	return steps, nil
 }
 
@@ -579,21 +612,47 @@ func (m shardedMgr) Load(ctx context.Context, accountId uuid.UUID, runID ulid.UL
 		}
 	}
 
-	// Load the actions.  This is a map of step IDs to JSON-encoded results.
+	actions := []state.MemoizedStep{}
+
+	// Load action inputs
+	inputMap, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Hgetall().Key(fnRunState.kg.ActionInputs(ctx, isSharded, id)).Build()
+	}).AsStrMap()
+	if err != nil {
+		return nil, fmt.Errorf("failed loading action inputs; %w", err)
+	}
+	for stepID, marshalled := range inputMap {
+		wrapper := map[string]json.RawMessage{
+			"input": json.RawMessage(marshalled),
+		}
+		wrappedData, err := json.Marshal(wrapper)
+		if err != nil {
+			return nil, fmt.Errorf("failed to wrap action input for \"%s\"; %w", stepID, err)
+		}
+		actions = append(actions, state.MemoizedStep{
+			ID:   stepID,
+			Data: wrappedData,
+		})
+	}
+
+	// Load the actions
 	rmap, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
 		return client.B().Hgetall().Key(fnRunState.kg.Actions(ctx, isSharded, id)).Build()
 	}).AsStrMap()
 	if err != nil {
 		return nil, fmt.Errorf("failed loading actions; %w", err)
 	}
-	actions := map[string]any{}
+
 	for stepID, marshalled := range rmap {
 		var data any
 		err = json.Unmarshal([]byte(marshalled), &data)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal step \"%s\" with data \"%s\"; %w", stepID, marshalled, err)
 		}
-		actions[stepID] = data
+		actions = append(actions, state.MemoizedStep{
+			ID:   stepID,
+			Data: data,
+		})
 	}
 
 	meta := metadata.Metadata()
@@ -656,6 +715,7 @@ func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID
 		fnRunState.kg.Actions(ctx, isSharded, i),
 		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
 		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
+		fnRunState.kg.ActionInputs(ctx, isSharded, i),
 	}
 	args := []string{stepID, marshalledOuptut}
 
@@ -1145,6 +1205,11 @@ func (m unshardedMgr) PauseByStep(ctx context.Context, i state.Identifier, actio
 
 // PausesByEvent returns all pauses for a given event within a workspace.
 func (m unshardedMgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event string) (state.PauseIterator, error) {
+	return m.pausesByEvent(ctx, workspaceID, event, time.Time{})
+}
+
+// pausesByEvent returns all pauses for a given event within a workspace.
+func (m unshardedMgr) pausesByEvent(ctx context.Context, workspaceID uuid.UUID, event string, aggregateStart time.Time) (state.PauseIterator, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PausesByEvent"), redis_telemetry.ScopePauses)
 
 	pauses := m.u.Pauses()
@@ -1158,8 +1223,9 @@ func (m unshardedMgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, 
 	if err != nil || cnt > 1000 {
 		key := pauses.kg.PauseEvent(ctx, workspaceID, event)
 		iter := &scanIter{
-			count: cnt,
-			r:     pauses.Client(),
+			count:          cnt,
+			r:              pauses.Client(),
+			aggregateStart: aggregateStart,
 		}
 		err := iter.init(ctx, key, 1000)
 		return iter, err
@@ -1167,14 +1233,16 @@ func (m unshardedMgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, 
 
 	// If there are less than a thousand items, query the keys
 	// for iteration.
-	iter := &bufIter{r: pauses.Client()}
+	iter := &bufIter{r: pauses.Client(), aggregateStart: aggregateStart}
 	err = iter.init(ctx, key)
 	return iter, err
 }
 
 func (m unshardedMgr) PausesByEventSince(ctx context.Context, workspaceID uuid.UUID, event string, since time.Time) (state.PauseIterator, error) {
+	start := time.Now()
+
 	if since.IsZero() {
-		return m.PausesByEvent(ctx, workspaceID, event)
+		return m.pausesByEvent(ctx, workspaceID, event, start)
 	}
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PausesByEventSince"), redis_telemetry.ScopePauses)
@@ -1194,8 +1262,9 @@ func (m unshardedMgr) PausesByEventSince(ctx context.Context, workspaceID uuid.U
 	}
 
 	iter := &keyIter{
-		r:  pauses.Client(),
-		kf: pauses.kg,
+		r:     pauses.Client(),
+		kf:    pauses.kg,
+		start: start,
 	}
 	err = iter.init(ctx, ids, 100)
 	return iter, err
@@ -1264,7 +1333,8 @@ type bufIter struct {
 	val *state.Pause
 	err error
 
-	l sync.Mutex
+	l              sync.Mutex
+	aggregateStart time.Time
 }
 
 func (i *bufIter) init(ctx context.Context, key string) error {
@@ -1291,6 +1361,13 @@ func (i *bufIter) Next(ctx context.Context) bool {
 
 	if len(i.items) == 0 {
 		i.err = context.Canceled
+		if !i.aggregateStart.IsZero() {
+			dur := time.Since(i.aggregateStart).Milliseconds()
+			metrics.HistogramAggregatePausesLoadDuration(ctx, dur, metrics.HistogramOpt{
+				PkgName: pkgName,
+				// TODO: tag workspace ID eventually??
+			})
+		}
 		return false
 	}
 
@@ -1332,6 +1409,8 @@ type scanIter struct {
 	err    error
 
 	l sync.Mutex
+
+	aggregateStart time.Time
 }
 
 func (i *scanIter) Error() error {
@@ -1404,6 +1483,13 @@ func (i *scanIter) Next(ctx context.Context) bool {
 		if err == scanDoneErr {
 			// No more present.
 			i.err = context.Canceled
+			if !i.aggregateStart.IsZero() {
+				dur := time.Since(i.aggregateStart).Milliseconds()
+				metrics.HistogramAggregatePausesLoadDuration(ctx, dur, metrics.HistogramOpt{
+					PkgName: pkgName,
+					// TODO: tag workspace ID eventually??
+				})
+			}
 			return false
 		}
 		if err != nil {
@@ -1534,6 +1620,13 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 			m.DisableImmediateExecution = true
 		}
 	}
+
+	if val, ok := data["hasAI"]; ok {
+		if val == "true" || val == "1" {
+			m.HasAI = true
+		}
+	}
+
 	if val, ok := data["sid"]; ok {
 		m.SpanID = val
 	}
@@ -1550,9 +1643,10 @@ type keyIter struct {
 	// keys stores pause IDs to fetch in batches
 	keys []string
 	// vals stores pauses as strings from MGET
-	vals []string
-	idx  int64
-	err  error
+	vals  []string
+	idx   int64
+	err   error
+	start time.Time
 }
 
 func (i *keyIter) Error() error {
@@ -1581,6 +1675,11 @@ func (i *keyIter) fetch(ctx context.Context) error {
 	if len(i.keys) == 0 {
 		// No more present.
 		i.err = context.Canceled
+		dur := time.Since(i.start).Milliseconds()
+		metrics.HistogramAggregatePausesLoadDuration(ctx, dur, metrics.HistogramOpt{
+			PkgName: pkgName,
+			// TODO: tag workspace ID eventually??
+		})
 		return scanDoneErr
 	}
 
@@ -1657,6 +1756,7 @@ type runMetadata struct {
 	DisableImmediateExecution bool           `json:"die,omitempty"`
 	SpanID                    string         `json:"sid"`
 	StartedAt                 int64          `json:"sat,omitempty"`
+	HasAI                     bool           `json:"hasAI,omitempty"`
 }
 
 func (r runMetadata) Map() map[string]any {
@@ -1671,6 +1771,7 @@ func (r runMetadata) Map() map[string]any {
 		"die":      r.DisableImmediateExecution,
 		"sid":      r.SpanID,
 		"sat":      r.StartedAt,
+		"hasAI":    r.HasAI,
 	}
 }
 
@@ -1684,6 +1785,7 @@ func (r runMetadata) Metadata() state.Metadata {
 		Context:                   r.Context,
 		DisableImmediateExecution: r.DisableImmediateExecution,
 		SpanID:                    r.SpanID,
+		HasAI:                     r.HasAI,
 	}
 	// 0 != time.IsZero
 	// only convert to time if runMetadata's StartedAt is > 0

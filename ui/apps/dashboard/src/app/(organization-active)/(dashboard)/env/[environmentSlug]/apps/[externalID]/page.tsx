@@ -1,12 +1,13 @@
 'use client';
 
-import { Link } from '@inngest/components/Link/Link';
+import { FunctionList } from '@inngest/components/Apps/FunctionList';
+import { Button } from '@inngest/components/Button/Button';
 
 import { AppGitCard } from '@/components/AppGitCard/AppGitCard';
 import { AppInfoCard } from '@/components/AppInfoCard';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { SyncErrorCard } from '@/components/SyncErrorCard';
-import { FunctionList } from './FunctionList';
+import { pathCreator } from '@/utils/urls';
 import { useApp } from './useApp';
 
 type Props = {
@@ -47,12 +48,12 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
           <div className="flex flex-col">
             <div className="text-basis text-2xl leading-tight">{appRes.data.name}</div>
           </div>
-          <Link
-            internalNavigation={true}
+          <Button
+            appearance="outlined"
+            kind="secondary"
             href={`/env/${env.slug}/apps/${encodeURIComponent(externalID)}/syncs`}
-          >
-            See all syncs
-          </Link>
+            label="See all syncs"
+          />
         </div>
 
         {appRes.data.latestSync?.error && (
@@ -63,7 +64,11 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
 
         {appRes.data.latestSync && <AppGitCard className="mb-4" sync={appRes.data.latestSync} />}
 
-        <FunctionList envSlug={environmentSlug} functions={appRes.data.functions} />
+        <FunctionList
+          envSlug={environmentSlug}
+          functions={appRes.data.functions}
+          pathCreator={{ function: pathCreator.function, eventType: pathCreator.eventType }}
+        />
       </div>
     </div>
   );

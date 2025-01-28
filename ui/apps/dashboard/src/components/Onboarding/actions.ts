@@ -4,9 +4,13 @@ import { type InvokeFunctionMutationVariables } from '@/gql/graphql';
 import { getProductionEnvironment } from '@/queries/server-only/getEnvironment';
 import {
   getInvokeFunctionLookups,
+  getProductionApps,
+  getVercelApps,
   invokeFn,
   preloadInvokeFunctionLookups,
   syncNewApp,
+  type UnattachedSync,
+  type VercelApp,
 } from './data';
 
 export async function syncAppManually(appURL: string) {
@@ -66,4 +70,43 @@ export async function prefetchFunctions() {
   } = await getInvokeFunctionLookups(environment.slug);
 
   return functions;
+}
+
+export async function getProdApps() {
+  try {
+    const response = await getProductionApps();
+    const { apps, unattachedSyncs } = response.environment;
+    return { apps, unattachedSyncs };
+  } catch (error) {
+    console.error('Error fetching production apps:', error);
+    return null;
+  }
+}
+
+export type VercelSyncsResponse = {
+  apps: VercelApp[];
+  unattachedSyncs: UnattachedSync[];
+};
+
+export async function getVercelSyncs(): Promise<VercelSyncsResponse> {
+  try {
+    const response = await getVercelApps();
+    const syncs = response.environment;
+
+    // Filter apps to only include those with latestSync.platform === "vercel", that are active
+    const vercelApps = syncs.apps.filter(
+      (app) => app.latestSync?.platform === 'vercel' && !app.isArchived
+    );
+
+    // Filter unattachedSyncs to only include those with a vercelDeploymentURL
+    const unattachedSyncs = syncs.unattachedSyncs.filter((sync) => sync.vercelDeploymentURL);
+
+    return {
+      apps: vercelApps,
+      unattachedSyncs: unattachedSyncs,
+    };
+  } catch (error) {
+    console.error('Error fetching vercel apps:', error);
+    return { apps: [], unattachedSyncs: [] };
+  }
 }

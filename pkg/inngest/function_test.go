@@ -68,7 +68,7 @@ func TestValidate(t *testing.T) {
 
 			err := f.Validate(context.Background())
 			require.NotNil(t, err)
-			require.Contains(t, err.Error(), "Non-HTTP steps are not yet supported")
+			require.Contains(t, err.Error(), "Non-supported step schema: htt")
 		})
 
 		t.Run("With an invalid cache expression", func(t *testing.T) {

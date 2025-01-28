@@ -18,7 +18,11 @@ type QueueLifecycleListener interface {
 
 	// OnAccountConcurrencyLimitReached is called when a queue item cannot be processed due to
 	// its account's concurrency limit.
-	OnAccountConcurrencyLimitReached(ctx context.Context, accountID uuid.UUID)
+	OnAccountConcurrencyLimitReached(
+		ctx context.Context,
+		accountID uuid.UUID,
+		workspaceID *uuid.UUID,
+	)
 }
 
 type QueueLifecycleListeners []QueueLifecycleListener
@@ -37,9 +41,13 @@ func (l QueueLifecycleListeners) OnFnConcurrencyLimitReached(ctx context.Context
 	})
 }
 
-func (l QueueLifecycleListeners) OnAccountConcurrencyLimitReached(ctx context.Context, acctID uuid.UUID) {
+func (l QueueLifecycleListeners) OnAccountConcurrencyLimitReached(
+	ctx context.Context,
+	acctID uuid.UUID,
+	workspaceID *uuid.UUID,
+) {
 	l.GoEach(func(listener QueueLifecycleListener) {
-		listener.OnAccountConcurrencyLimitReached(ctx, acctID)
+		listener.OnAccountConcurrencyLimitReached(ctx, acctID, workspaceID)
 	})
 }
 

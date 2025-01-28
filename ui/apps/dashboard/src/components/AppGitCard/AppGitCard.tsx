@@ -1,8 +1,6 @@
 import type { Route } from 'next';
+import { AppDetailsCard, CardItem } from '@inngest/components/Apps/AppDetailsCard';
 import { Link } from '@inngest/components/Link';
-import { classNames } from '@inngest/components/utils/classNames';
-
-import { CardItem } from '../AppInfoCard/CardItem';
 
 type Props = {
   className?: string;
@@ -25,7 +23,7 @@ export function AppGitCard({ className, sync }: Props) {
   if (commitHash) {
     if (repoURL) {
       commitHashValue = (
-        <Link href={`${repoURL}/commit/${commitHash}` as Route} internalNavigation={false}>
+        <Link href={`${repoURL}/commit/${commitHash}` as Route} target="_blank" size="medium">
           <span className="truncate">{commitHash.substring(0, 7)}</span>
         </Link>
       );
@@ -40,7 +38,7 @@ export function AppGitCard({ className, sync }: Props) {
   if (commitRef) {
     if (repoURL) {
       commitRefValue = (
-        <Link href={`${repoURL}/tree/${commitRef}` as Route} internalNavigation={false}>
+        <Link href={`${repoURL}/tree/${commitRef}` as Route} target="_blank" size="medium">
           <span className="truncate">{commitRef}</span>
         </Link>
       );
@@ -54,7 +52,7 @@ export function AppGitCard({ className, sync }: Props) {
   let repositoryValue;
   if (repoURL) {
     repositoryValue = (
-      <Link href={repoURL as Route} internalNavigation={false}>
+      <Link href={repoURL as Route} target="_blank" size="medium">
         <span className="truncate">{repoURL}</span>
       </Link>
     );
@@ -63,25 +61,17 @@ export function AppGitCard({ className, sync }: Props) {
   }
 
   return (
-    <div
-      className={classNames('border-muted overflow-hidden rounded-lg border bg-white', className)}
-    >
-      <div className="border-muted border-b px-6 py-3 text-sm font-medium text-slate-600">
-        Commit Information
-      </div>
+    <AppDetailsCard className={className} title="Commit information">
+      {/* Row 1 */}
+      <CardItem className="col-span-4" detail={commitMessage} term="Commit message" />
 
-      <dl className="flex flex-col gap-4 px-6 py-4 md:grid md:grid-cols-4">
-        {/* Row 1 */}
-        <CardItem className="col-span-4" detail={commitMessage} term="Commit Message" />
+      {/* Row 2 */}
+      <CardItem className="truncate" detail={commitAuthor} term="Commit author" />
+      <CardItem className="truncate" detail={commitRefValue} term="Commit ref" />
+      <CardItem className="truncate" detail={commitHashValue} term="Commit hash" />
 
-        {/* Row 2 */}
-        <CardItem className="truncate" detail={commitAuthor} term="Commit Author" />
-        <CardItem className="truncate" detail={commitRefValue} term="Commit Ref" />
-        <CardItem className="truncate" detail={commitHashValue} term="Commit Hash" />
-
-        {/* Row 3 */}
-        <CardItem className="col-span-4 truncate" detail={repositoryValue} term="Repository" />
-      </dl>
-    </div>
+      {/* Row 3 */}
+      <CardItem className="col-span-4 truncate" detail={repositoryValue} term="Repository" />
+    </AppDetailsCard>
   );
 }

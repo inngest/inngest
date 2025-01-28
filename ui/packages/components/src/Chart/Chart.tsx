@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { resolveColor } from '@inngest/components/utils/colors';
+import { isDark } from '@inngest/components/utils/theme';
 import {
   connect,
   getInstanceByDom,
@@ -10,8 +12,15 @@ import {
   type LineSeriesOption,
   type SetOptionOpts,
 } from 'echarts';
+import resolveConfig from 'tailwindcss/resolveConfig';
 
-export type { LegendComponentOption, LineSeriesOption };
+import tailwindConfig from '../../tailwind.config';
+
+const {
+  theme: { textColor, colors },
+} = resolveConfig(tailwindConfig);
+
+export type { LegendComponentOption, LineSeriesOption, EChartsOption };
 
 export interface ChartProps {
   option: EChartsOption;
@@ -19,6 +28,7 @@ export interface ChartProps {
   theme?: 'light' | 'dark';
   className?: string;
   group?: string;
+  loading?: boolean;
 }
 
 export const Chart = ({
@@ -27,13 +37,22 @@ export const Chart = ({
   theme = 'light',
   className,
   group,
+  loading = false,
 }: ChartProps) => {
+  const dark = isDark();
   const chartRef = useRef<HTMLDivElement>(null);
 
   const toggleTooltips = (show: boolean) => {
     if (chartRef.current !== null) {
-      const chart = getInstanceByDom(chartRef.current);
-      chart?.setOption({ tooltip: { show }, xAxis: { axisPointer: { label: { show } } } });
+      try {
+        const chart = getInstanceByDom(chartRef.current);
+        chart?.setOption({ tooltip: { show }, xAxis: { axisPointer: { label: { show } } } });
+      } catch (e) {
+        //
+        // fast successive toggling occasionally throws errors,
+        // catch them so we don't pollute sentry
+        console.info('there was a problem toggling tooltip', e);
+      }
     }
   };
 
@@ -60,12 +79,31 @@ export const Chart = ({
       const chart = getInstanceByDom(chartRef.current);
       chart?.setOption(option, settings);
 
-      if (chart && group) {
-        chart.group = group;
-        connect(group);
+      if (chart) {
+        if (loading) {
+          chart.showLoading('default', {
+            text: 'Loading...',
+            color: resolveColor(colors.primary.moderate, dark), // Spinner color
+            textColor: resolveColor(textColor.basis, dark),
+            maskColor: dark ? 'rgba(2, 2, 2, 0.8)' : 'rgba(254, 254, 254, 0.8)', // bg-canvasBase
+            spinnerRadius: 10,
+            lineWidth: 2,
+            fontSize: 14,
+          });
+        } else {
+          chart.hideLoading();
+          if (option) {
+            chart.setOption(option, settings); // Update chart with new data
+          }
+        }
+
+        if (group) {
+          chart.group = group;
+          connect(group);
+        }
       }
     }
-  }, [option, settings]);
+  }, [option, settings, loading]);
 
   return (
     <div

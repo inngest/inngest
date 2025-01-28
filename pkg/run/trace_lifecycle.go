@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -56,6 +58,7 @@ func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Meta
 		WithName(consts.OtelSpanTrigger),
 		WithTimestamp(ulid.Time(runID.Time())),
 		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycleID, "OnFunctionScheduled"),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -132,6 +135,7 @@ func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Meta
 							WithTimestamp(meta.InvokeTraceCarrier.Timestamp),
 							WithSpanID(sid),
 							WithSpanAttributes(
+								attribute.String(consts.OtelSysLifecycleID, "OnFunctionScheduled"),
 								attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 								attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 								attribute.String(consts.OtelSysAppID, meta.SourceAppID),
@@ -197,6 +201,7 @@ func (l traceLifecycle) OnFunctionStarted(
 		WithTimestamp(start),
 		WithSpanID(*spanID),
 		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycleID, "OnFunctionStarted"),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -278,6 +283,7 @@ func (l traceLifecycle) OnFunctionFinished(
 		WithTimestamp(start),
 		WithSpanID(*spanID),
 		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycleID, "OnFunctionFinished"),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -288,6 +294,7 @@ func (l traceLifecycle) OnFunctionFinished(
 			attribute.String(consts.OtelSysEventIDs, strings.Join(evtIDs, ",")),
 			attribute.String(consts.OtelSysIdempotencyKey, md.Config.Idempotency),
 			attribute.Bool(consts.OtelSysStepFirst, true),
+			attribute.Bool(consts.OtelSysFunctionHasAI, md.Config.HasAI),
 		),
 	)
 	defer span.End()
@@ -362,6 +369,7 @@ func (l traceLifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata
 		WithTimestamp(start),
 		WithSpanID(*fnSpanID),
 		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycleID, "OnFunctionCancelled"),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -433,6 +441,7 @@ func (l traceLifecycle) OnFunctionSkipped(
 			WithName(consts.OtelSpanTrigger),
 			WithTimestamp(ulid.Time(runID.Time())),
 			WithSpanAttributes(
+				attribute.String(consts.OtelSysLifecycleID, "OnFunctionSkipped"),
 				attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 				attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 				attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -486,6 +495,7 @@ func (l traceLifecycle) OnFunctionSkipped(
 		WithTimestamp(start),
 		WithSpanID(*spanID),
 		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycleID, "OnFunctionSkipped"),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -542,12 +552,21 @@ func (l traceLifecycle) OnStepStarted(
 	}
 	runID := md.ID.RunID
 
+	name := consts.OtelExecPlaceholder
+	// Check if this is a step planned from parallelism
+	if edge, _ := queue.GetEdge(item); edge != nil {
+		if edge.Edge.IncomingGeneratorStepName != "" {
+			name = edge.Edge.IncomingGeneratorStepName
+		}
+	}
+
 	_, span := NewSpan(ctx,
 		WithScope(consts.OtelScopeExecution),
-		WithName(consts.OtelExecPlaceholder),
+		WithName(name),
 		WithTimestamp(start),
 		WithSpanID(*spanID),
 		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycleID, "OnStepStarted"),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -581,6 +600,108 @@ func (l traceLifecycle) OnStepStarted(
 		// function run itself.
 		if item.Attempt == 0 {
 			span.SetAttributes(attribute.Bool(consts.OtelSysStepFirst, true))
+		}
+	}
+}
+
+func (l traceLifecycle) OnStepGatewayRequestFinished(
+	ctx context.Context,
+	md sv2.Metadata,
+	item queue.Item,
+	edge inngest.Edge,
+	// Opcode is the opcode for the offloaded request.  The Data field must be
+	// set with the length of the output.
+	op statev1.GeneratorOpcode,
+	// Resp is the HTTP response
+	resp *http.Response,
+	// runErr is non-nil on a non-2xx status code.
+	runErr *state.UserError,
+) {
+	// reassign here to make sure we have the right traceID and such
+	ctx = l.extractTraceCtx(ctx, md, false)
+
+	spanID, err := item.SpanID()
+	if err != nil {
+		l.log.Error("error retrieving spanID", "meta", md, "error", err, "lifecycle", "OnStepFinished")
+		return
+	}
+	start, ok := redis_state.GetItemStart(ctx)
+	if !ok {
+		l.log.Warn("start time not available for item", "lifecycle", "OnStepFinished")
+		start = time.Now()
+	}
+	runID := md.ID.RunID
+
+	_, span := NewSpan(ctx,
+		WithScope(consts.OtelScopeExecution),
+		WithName(op.UserDefinedName()),
+		WithTimestamp(start),
+		WithSpanID(*spanID),
+		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycleID, "OnStepGatewayRequestFinished"),
+			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
+			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, md.ID.FunctionID.String()),
+			attribute.String(consts.OtelSysFunctionSlug, md.Config.FunctionSlug()),
+			attribute.Int(consts.OtelSysFunctionVersion, md.Config.FunctionVersion),
+			attribute.String(consts.OtelAttrSDKRunID, runID.String()),
+			attribute.Int(consts.OtelSysStepAttempt, item.Attempt),
+			attribute.Int(consts.OtelSysStepMaxAttempt, item.GetMaxAttempts()),
+			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
+			attribute.Int(consts.OtelSysStepStatusCode, resp.StatusCode),
+			attribute.Int(consts.OtelSysStepOutputSizeBytes, int(resp.ContentLength)),
+			attribute.String(consts.OtelSysStepID, op.ID),
+			attribute.String(consts.OtelSysStepDisplayName, op.UserDefinedName()),
+			attribute.String(consts.OtelSysStepOpcode, op.Op.String()),
+		),
+	)
+	defer span.End()
+
+	if item.RunInfo != nil {
+		span.SetAttributes(
+			attribute.Int64(consts.OtelSysDelaySystem, item.RunInfo.Latency.Milliseconds()),
+			attribute.Int64(consts.OtelSysDelaySojourn, item.RunInfo.SojournDelay.Milliseconds()),
+		)
+	}
+	if item.Attempt > 0 {
+		span.SetAttributes(attribute.Bool(consts.OtelSysStepRetry, true))
+	}
+	// first step
+	if edge.Incoming == inngest.TriggerName {
+		// NOTE:
+		// annotate the step as the first step of the function
+		// this way the delay associated with this run is directly correlated to the delay of the
+		// function run itself.
+		if item.Attempt == 0 {
+			span.SetAttributes(attribute.Bool(consts.OtelSysStepFirst, true))
+		}
+	}
+	if runErr == nil {
+		span.SetStepOutput(op.Data)
+		span.SetStatus(codes.Ok, string(op.Data))
+	} else {
+		span.SetStatus(codes.Error, runErr.Name+": "+runErr.Message)
+
+		userLandErrByt, _ := json.Marshal(runErr)
+		span.SetStepOutput(userLandErrByt)
+	}
+
+	if input, _ := op.Input(); input != "" {
+		span.SetStepInput(input)
+	}
+
+	// If we have AI calls, parse the input and output metadata directly.
+	switch op.Op {
+	case enums.OpcodeAIGateway:
+		req, _ := op.AIGatewayOpts()
+		// Parse the request
+		if parsed, err := aigateway.ParseInput(ctx, req); err == nil {
+			span.SetAIRequestMetadata(parsed)
+		}
+		// And parse the response.
+		if parsed, err := aigateway.ParseOutput(ctx, req.Format, op.Data); err == nil {
+			span.SetAIResponseMetadata(parsed)
 		}
 	}
 }
@@ -614,6 +735,7 @@ func (l traceLifecycle) OnStepFinished(
 		WithTimestamp(start),
 		WithSpanID(*spanID),
 		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycleID, "OnStepFinished"),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -625,6 +747,7 @@ func (l traceLifecycle) OnStepFinished(
 			attribute.Int(consts.OtelSysStepMaxAttempt, item.GetMaxAttempts()),
 			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
 			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeStepPlanned.String()),
+			attribute.Bool(consts.OtelSysFunctionHasAI, md.Config.HasAI),
 		),
 	)
 	defer span.End()
@@ -652,7 +775,7 @@ func (l traceLifecycle) OnStepFinished(
 
 	if runErr != nil {
 		span.SetStatus(codes.Error, runErr.Error())
-		span.SetStepOutput(runErr.Error())
+		span.SetStepOutput(runErr)
 		return
 	}
 
@@ -675,9 +798,14 @@ func (l traceLifecycle) OnStepFinished(
 			span.SetAttributes(
 				attribute.Int(consts.OtelSysStepStatusCode, resp.StatusCode),
 				attribute.Int(consts.OtelSysStepOutputSizeBytes, resp.OutputSize),
+				attribute.String(consts.OtelSysStepID, op.ID),
 				attribute.String(consts.OtelSysStepDisplayName, op.UserDefinedName()),
 				attribute.String(consts.OtelSysStepOpcode, foundOp.String()),
 			)
+
+			if typ := op.RunType(); typ != "" {
+				span.SetStepRunType(typ)
+			}
 
 			if op.IsError() {
 				span.SetStepOutput(op.Error)
@@ -686,6 +814,29 @@ func (l traceLifecycle) OnStepFinished(
 				span.SetStepOutput(op.Data)
 				span.SetStatus(codes.Ok, string(op.Data))
 			}
+
+			if input, _ := op.Input(); input != "" {
+				span.SetStepInput(input)
+			}
+
+			// If we have AI calls, parse the input and output metadata directly.
+			switch op.Op {
+			case enums.OpcodeAIGateway:
+				req, _ := op.AIGatewayOpts()
+				if parsed, err := aigateway.ParseInput(ctx, req); err == nil {
+					span.SetAIRequestMetadata(parsed)
+				}
+			case enums.OpcodeStep, enums.OpcodeStepRun:
+				// Handle input and attempt to best-effort parse.
+				input, _ := op.Input()
+				if parsed, err := aigateway.ParseUnknownInput(ctx, json.RawMessage(input)); err == nil {
+					span.SetAIRequestMetadata(parsed)
+
+					// Now that we know the step run was a wrapped AI call, we can also parse the output
+					// to see if we can store the response metadata correctly.
+				}
+			}
+
 		} else if resp.Retryable() { // these are function retries
 			span.SetStatus(codes.Error, *resp.Err)
 			span.SetAttributes(
@@ -716,10 +867,15 @@ func (l traceLifecycle) OnStepFinished(
 				output = resp.Output
 			}
 			span.SetStepOutput(output)
+			span.SetStepStack(md.Stack)
 		} else {
 			// if it's not a step or function response that represents either a failed or a successful execution.
-			// Do not record discovery spans and cancel it.
-			_ = span.Cancel(ctx)
+
+			// annotate it as a planning step currently only used for parallelism, so we know
+			// we can ignore it when displaying on UI
+			span.SetAttributes(
+				attribute.Bool(consts.OtelSysStepPlan, true),
+			)
 		}
 	}
 }
@@ -748,6 +904,7 @@ func (l traceLifecycle) OnSleep(
 		WithName(consts.OtelSpanSleep),
 		WithTimestamp(startedAt),
 		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycleID, "OnSleep"),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -803,6 +960,7 @@ func (l traceLifecycle) OnInvokeFunction(
 		WithTimestamp(carrier.Timestamp),
 		WithSpanID(spanID),
 		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycleID, "OnInvokeFunction"),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
@@ -871,6 +1029,7 @@ func (l traceLifecycle) OnInvokeFunctionResumed(
 				WithTimestamp(carrier.Timestamp),
 				WithSpanID(carrier.SpanID()),
 				WithSpanAttributes(
+					attribute.String(consts.OtelSysLifecycleID, "OnInvokeFunctionResumed"),
 					attribute.String(consts.OtelSysAccountID, pause.Identifier.AccountID.String()),
 					attribute.String(consts.OtelSysWorkspaceID, pause.Identifier.WorkspaceID.String()),
 					attribute.String(consts.OtelSysAppID, pause.Identifier.AppID.String()),
@@ -946,6 +1105,7 @@ func (l traceLifecycle) OnWaitForEvent(
 		WithTimestamp(carrier.Timestamp),
 		WithSpanID(carrier.SpanID()),
 		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycleID, "OnWaitForEvent"),
 			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeWaitForEvent.String()),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
@@ -1000,6 +1160,7 @@ func (l traceLifecycle) OnWaitForEventResumed(
 				WithTimestamp(carrier.Timestamp),
 				WithSpanID(carrier.SpanID()),
 				WithSpanAttributes(
+					attribute.String(consts.OtelSysLifecycleID, "OnWaitForEventResumed"),
 					attribute.String(consts.OtelSysAccountID, pause.Identifier.AccountID.String()),
 					attribute.String(consts.OtelSysWorkspaceID, pause.Identifier.WorkspaceID.String()),
 					attribute.String(consts.OtelSysAppID, pause.Identifier.AppID.String()),

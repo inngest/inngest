@@ -158,10 +158,14 @@ type ScheduleRequest struct {
 	WorkspaceID uuid.UUID
 	// AppID is the app that this request belongs to.
 	AppID uuid.UUID
+
 	// OriginalRunID is the ID of the ID of the original run, if this a replay.
 	OriginalRunID *ulid.ULID
 	// ReplayID is the ID of the ID of the replay, if this a replay.
 	ReplayID *uuid.UUID
+	// FromStep is the step that this function is being scheduled from.
+	FromStep *ScheduleRequestFromStep
+
 	// Events represent one or more events that the function is being triggered with.
 	Events []event.TrackedEvent
 	// BatchID refers to the batch ID, if this function is started as a batch.
@@ -176,6 +180,15 @@ type ScheduleRequest struct {
 	PreventDebounce bool
 	// FunctionPausedAt indicates whether the function is paused.
 	FunctionPausedAt *time.Time
+}
+
+type ScheduleRequestFromStep struct {
+	// StepID is the ID of the step that this function is being scheduled from.
+	StepID string
+
+	// Input is the input data for the step. Can be partial JSON, in which case
+	// an SDK will merge this with the existing input data.
+	Input json.RawMessage
 }
 
 // CancelRequest stores information about the incoming cancellation request within

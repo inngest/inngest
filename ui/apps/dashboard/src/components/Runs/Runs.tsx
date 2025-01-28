@@ -1,7 +1,6 @@
 'use client';
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from 'react';
-import { Alert } from '@inngest/components/Alert';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import type { Run } from '@inngest/components/RunsPage/types';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
@@ -18,11 +17,12 @@ import { useGetTrigger } from '@/components/RunDetails/useGetTrigger';
 import { GetFunctionPauseStateDocument, RunsOrderByField } from '@/gql/graphql';
 import { useCancelRun } from '@/queries/useCancelRun';
 import { useRerun } from '@/queries/useRerun';
+import { useRerunFromStep } from '@/queries/useRerunFromStep';
 import { pathCreator } from '@/utils/urls';
-import { usePlanFeatures } from '@/utils/usePlanFeatures';
+import { useAccountFeatures } from '@/utils/useAccountFeatures';
 import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { AppFilterDocument, CountRunsDocument, GetRunsDocument } from './queries';
-import { isBeforeRunsMigration, parseRunsData, toRunStatuses, toTimeField } from './utils';
+import { parseRunsData, toRunStatuses, toTimeField } from './utils';
 
 export type RefreshRunsRef = {
   refresh: () => void;
@@ -45,7 +45,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   ref
 ) {
   const env = useEnvironment();
-  const { isReady: searchIsReady, value: searchEnabled } = useBooleanFlag('run-cel-query');
+  const { value: traceAIEnabled, isReady } = useBooleanFlag('ai-traces');
 
   const [{ data: pauseData }] = useQuery({
     pause: scope !== 'fn',
@@ -80,10 +80,11 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 
   const cancelRun = useCancelRun({ envID: env.id });
   const rerun = useRerun({ envID: env.id, envSlug: env.slug });
+  const rerunFromStep = useRerunFromStep();
   const getTraceResult = useGetTraceResult();
   const getTrigger = useGetTrigger();
   const getRun = useGetRun();
-  const features = usePlanFeatures();
+  const features = useAccountFeatures();
 
   const internalPathCreator = useMemo(() => {
     return {
@@ -217,35 +218,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     },
   }));
 
-  /**
-   * Delete after December 7
-   */
-  const temporaryAlert = useMemo(() => {
-    const showBanner = isBeforeRunsMigration(calculatedStartTime.toISOString());
-    if (!showBanner) return;
-
-    return (
-      <Alert
-        showIcon
-        severity="info"
-        className="mx-auto my-4 flex max-w-xl items-center justify-between"
-        link={
-          scope === 'fn' ? (
-            <Alert.Link
-              severity="info"
-              href={pathCreator.oldRuns({ envSlug: environment.slug, functionSlug })}
-            >
-              View legacy runs
-            </Alert.Link>
-          ) : undefined
-        }
-      >
-        <p>Looking for runs before 2023-09-08T01:00:00Z?</p>
-        <p>Please use the legacy runs page to view those runs</p>
-      </Alert>
-    );
-  }, [calculatedStartTime, scope, environment.slug, functionSlug]);
-
   return (
     <RunsPage
       apps={appsRes.data?.env?.apps.map((app) => ({
@@ -268,11 +240,11 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       getTrigger={getTrigger}
       pathCreator={internalPathCreator}
       rerun={rerun}
+      rerunFromStep={rerunFromStep}
       functionIsPaused={pauseData?.environment.function?.isPaused ?? false}
       scope={scope}
       totalCount={totalCount}
-      temporaryAlert={temporaryAlert}
-      hasSearchFlag={searchIsReady && searchEnabled}
+      traceAIEnabled={isReady && traceAIEnabled}
     />
   );
 });

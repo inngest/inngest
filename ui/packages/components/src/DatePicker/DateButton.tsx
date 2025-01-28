@@ -11,7 +11,7 @@ export const DateInputButton = forwardRef<HTMLButtonElement, DateButtonProps>(
       <button
         {...props}
         ref={forwardRef}
-        className={`border-muted bg-canvasBase outline-primary-moderate h-8 rounded-lg border px-2 text-sm leading-none outline-2 transition-all focus:outline ${className}`}
+        className={`border-muted bg-canvasBase outline-primary-moderate h-8 rounded-md border px-2 text-sm leading-none outline-2 transition-all focus:outline ${className}`}
       >
         <span className="flex items-center gap-2">
           <RiCalendarLine className="text-disabled h-5 w-5" />
@@ -29,7 +29,7 @@ export const DateSelectButton = forwardRef<HTMLButtonElement, DateButtonProps>(
         {...props}
         ref={forwardRef}
         className={cn(
-          'border-muted bg-surfaceBase text-basis group box-content flex h-10 w-full items-center justify-between rounded-l-[5px] rounded-r-[5px] border px-2 text-sm',
+          'border-muted bg-surfaceBase text-basis group box-content flex h-[38px] w-full items-center justify-between rounded-l-[5px] rounded-r-[5px] border px-2 text-sm',
           className
         )}
       >

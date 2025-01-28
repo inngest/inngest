@@ -5,12 +5,17 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/enums"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/connect/auth"
 
 	"github.com/inngest/inngest/pkg/cli"
 	"github.com/inngest/inngest/pkg/consts"
@@ -139,7 +144,7 @@ func (d *devserver) HasEventKeys() bool {
 
 func (d *devserver) Pre(ctx context.Context) error {
 	// Import Redis if we can and have persistence enabled
-	if d.IsSingleNodeService() {
+	if d.HasRedisSnapshotsEnabled() {
 		_, _ = d.importRedisSnapshot(ctx)
 	}
 
@@ -208,15 +213,21 @@ func (d *devserver) Run(ctx context.Context) error {
 }
 
 func (d *devserver) Stop(ctx context.Context) error {
-	if d.IsSingleNodeService() {
+	if d.HasRedisSnapshotsEnabled() {
 		return d.exportRedisSnapshot(ctx)
 	}
 
 	return nil
 }
 
+// HasRedisSnapshotsEnabled returns true if Redis is persisted via snapshots to the database.
+// External redis-servers do not require snapshots.
+func (d *devserver) HasRedisSnapshotsEnabled() bool {
+	return d.singleNodeServiceOpts != nil && d.singleNodeServiceOpts.PersistenceInterval != nil
+}
+
 func (d *devserver) startPersistenceRoutine(ctx context.Context) {
-	if !d.IsSingleNodeService() {
+	if !d.HasRedisSnapshotsEnabled() {
 		return
 	}
 
@@ -237,16 +248,22 @@ func (d *devserver) startPersistenceRoutine(ctx context.Context) {
 // runDiscovery attempts to run autodiscovery while the dev server is running.
 //
 // This lets the dev server start and wait for the SDK server to come up at
-
 // any point.
 func (d *devserver) runDiscovery(ctx context.Context) {
 	logger.From(ctx).Info().Msg("autodiscovering locally hosted SDKs")
 	pollInterval := time.Duration(d.Opts.PollInterval) * time.Second
-	for {
+	for d.Opts.Autodiscover {
 		if ctx.Err() != nil {
 			return
 		}
-		_ = discovery.Autodiscover(ctx)
+		// If we have found any app, disable auto-discovery
+		apps, err := d.Data.GetApps(ctx, consts.DevServerEnvId, nil)
+		if err == nil && len(apps) > 0 {
+			logger.From(ctx).Info().Msg("apps synced, disabling auto-discovery")
+			d.Opts.Autodiscover = false
+		} else {
+			_ = discovery.Autodiscover(ctx)
+		}
 
 		<-time.After(pollInterval)
 	}
@@ -292,8 +309,12 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 		}
 
 		urls := map[string]struct{}{}
-		if apps, err := d.Data.GetApps(ctx); err == nil {
+		if apps, err := d.Data.GetApps(ctx, consts.DevServerEnvId, nil); err == nil {
 			for _, app := range apps {
+				if app.ConnectionType == enums.AppConnectionTypeConnect.String() {
+					continue
+				}
+
 				// We've seen this URL.
 				urls[app.Url] = struct{}{}
 
@@ -618,6 +639,22 @@ func (d *devserver) importRedisSnapshot(ctx context.Context) (imported bool, err
 	imported = true
 
 	return
+}
+
+func (d *devserver) AuthenticateRequest(_ context.Context, _, _ string) (*auth.Response, error) {
+	return &auth.Response{
+		AccountID: consts.DevServerAccountId,
+		EnvID:     consts.DevServerEnvId,
+	}, nil
+}
+
+func (d *devserver) RetrieveGateway(_ context.Context, _, _ uuid.UUID, _ []string) (string, *url.URL, error) {
+	parsed, err := url.Parse("ws://127.0.0.1:8289/v0/connect")
+	if err != nil {
+		return "", nil, err
+	}
+
+	return "gw-dev", parsed, nil
 }
 
 // SDKHandler represents a handler that has registered with the dev server.

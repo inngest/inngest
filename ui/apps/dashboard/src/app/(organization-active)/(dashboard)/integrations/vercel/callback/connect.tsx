@@ -3,17 +3,21 @@
 import { useState } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button/index';
+import { Button } from '@inngest/components/Button/index';
 import { Card } from '@inngest/components/Card/Card';
 import { Checkbox } from '@inngest/components/Checkbox/Checkbox';
+import { Input } from '@inngest/components/Forms/Input';
 import {
   RiArrowLeftSLine,
   RiArrowRightSLine,
   RiCloseLine,
   RiInformationLine,
 } from '@remixicon/react';
+import { useLocalStorage } from 'react-use';
 
-import Input from '@/components/Forms/Input';
+import { OnboardingSteps } from '@/components/Onboarding/types';
+import useOnboardingStep from '@/components/Onboarding/useOnboardingStep';
+import { ONBOARDING_VERCEL_NEXT_URL } from '@/components/Onboarding/utils';
 import type VercelIntegration from '../../../settings/integrations/vercel/VercelIntegration';
 import useUpdateVercelIntegration from '../../../settings/integrations/vercel/useUpdateVercelIntegration';
 import type { VercelCallbackProps } from './page';
@@ -30,6 +34,11 @@ export default function Connect({
   const [page, setPage] = useState(1);
   const start = (page - 1) * PAGE_SIZE;
   const [custom, setCustom] = useState<string[]>([]);
+  const { updateCompletedSteps } = useOnboardingStep();
+  const [installingVercelFromOnboarding, setInstallingVercelFromOnboarding] = useLocalStorage(
+    'installingVercelFromOnboarding',
+    false
+  );
 
   const updateVercelIntegration = useUpdateVercelIntegration(integrations);
 
@@ -48,9 +57,19 @@ export default function Connect({
       projects,
     });
     setSaving(false);
+    updateCompletedSteps(OnboardingSteps.DeployApp, {
+      metadata: {
+        completionSource: 'automatic',
+        hostingProvider: 'vercel',
+      },
+    });
+
     router.push(
-      `/integrations/vercel/callback/success?onSuccessRedirectURL=${searchParams.next}&source=${searchParams.source}` as Route
+      `/integrations/vercel/callback/success?onSuccessRedirectURL=${
+        installingVercelFromOnboarding ? ONBOARDING_VERCEL_NEXT_URL : searchParams.next
+      }&source=${searchParams.source}` as Route
     );
+    setInstallingVercelFromOnboarding(false);
   };
 
   return (
@@ -88,10 +107,9 @@ export default function Connect({
                     required={true}
                     placeholder="Add custom path"
                     className="h-10 w-96"
-                    showError={false}
                     onChange={(e) => setPath(p.id, e.target.value)}
                   />
-                  <NewButton
+                  <Button
                     size="small"
                     appearance="ghost"
                     kind="secondary"
@@ -101,7 +119,7 @@ export default function Connect({
                   />
                 </div>
               ) : (
-                <NewButton
+                <Button
                   className="hidden group-hover:block"
                   appearance="outlined"
                   label="Add custom path"
@@ -114,7 +132,7 @@ export default function Connect({
           ))}
           {projects.length > PAGE_SIZE && (
             <div className="row flex items-center justify-center p-2">
-              <NewButton
+              <Button
                 appearance="ghost"
                 icon={
                   <RiArrowLeftSLine className="bg-canvasBase group-disabled:text-disabled text-basis h-6 w-6" />
@@ -124,7 +142,7 @@ export default function Connect({
                 className="group mr-1 h-6 w-6 p-0"
               />
               {[...Array(pages)].map((_, i) => (
-                <NewButton
+                <Button
                   key={`page-${i}`}
                   appearance={page === i + 1 ? 'solid' : 'ghost'}
                   disabled={page === i + 1}
@@ -133,7 +151,7 @@ export default function Connect({
                   className="text-basis disabled:bg-contrast disabled:text-onContrast mr-1 h-6 w-6 text-sm"
                 />
               ))}
-              <NewButton
+              <Button
                 appearance="ghost"
                 icon={
                   <RiArrowRightSLine className="bg-canvasBase group-disabled:text-disabled text-basis h-6 w-6" />
@@ -154,7 +172,7 @@ export default function Connect({
         </div>
       </div>
       <div>
-        <NewButton
+        <Button
           kind="primary"
           appearance="solid"
           size="medium"

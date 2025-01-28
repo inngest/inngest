@@ -21,14 +21,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
-	"github.com/jonboulle/clockwork"
-	"github.com/oklog/ulid/v2"
-	"github.com/redis/rueidis"
-	"github.com/rs/zerolog"
-	"golang.org/x/sync/semaphore"
-	"gonum.org/v1/gonum/stat/sampleuv"
-	"lukechampine.com/frand"
-
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/consts"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -37,6 +29,12 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/jonboulle/clockwork"
+	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
+	"github.com/rs/zerolog"
+	"golang.org/x/sync/semaphore"
+	"gonum.org/v1/gonum/stat/sampleuv"
 )
 
 const (
@@ -116,7 +114,6 @@ var (
 	ErrQueuePeekMaxExceedsLimits     = fmt.Errorf("peek exceeded the maximum limit of %d", AbsoluteQueuePeekMax)
 	ErrPriorityTooLow                = fmt.Errorf("priority is too low")
 	ErrPriorityTooHigh               = fmt.Errorf("priority is too high")
-	ErrWeightedSampleRead            = fmt.Errorf("error reading from weighted sample")
 	ErrPartitionNotFound             = fmt.Errorf("partition not found")
 	ErrPartitionAlreadyLeased        = fmt.Errorf("partition already leased")
 	ErrPartitionPeekMaxExceedsLimits = fmt.Errorf("peek exceeded the maximum limit of %d", PartitionPeekMax)
@@ -145,12 +142,12 @@ var (
 )
 
 var (
-	rnd *frandRNG
+	rnd *util.FrandRNG
 )
 
 func init() {
 	// For weighted shuffles generate a new rand.
-	rnd = &frandRNG{RNG: frand.New(), lock: &sync.Mutex{}}
+	rnd = util.NewFrandRNG()
 }
 
 type QueueManager interface {
@@ -1174,19 +1171,24 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 }
 
 // RunJobs returns a list of jobs that are due to run for a given run ID.
-func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]osqueue.JobResponse, error) {
+func (q *queue) RunJobs(ctx context.Context, queueShardName string, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]osqueue.JobResponse, error) {
 	if limit > 1000 || limit <= 0 {
 		limit = 1000
 	}
 
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for RunJobs: %s", q.primaryQueueShard.Kind)
+	shard, ok := q.queueShardClients[queueShardName]
+	if !ok {
+		return nil, fmt.Errorf("queue shard %s not found", queueShardName)
+	}
+
+	if shard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for RunJobs: %s", shard.Kind)
 	}
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RunJobs"), redis_telemetry.ScopeQueue)
 
-	cmd := q.primaryQueueShard.RedisClient.unshardedRc.B().Zscan().Key(q.primaryQueueShard.RedisClient.kg.RunIndex(runID)).Cursor(uint64(offset)).Count(limit).Build()
-	jobIDs, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).AsScanEntry()
+	cmd := shard.RedisClient.unshardedRc.B().Zscan().Key(shard.RedisClient.kg.RunIndex(runID)).Cursor(uint64(offset)).Count(limit).Build()
+	jobIDs, err := shard.RedisClient.unshardedRc.Do(ctx, cmd).AsScanEntry()
 	if err != nil {
 		return nil, fmt.Errorf("error reading index: %w", err)
 	}
@@ -1196,7 +1198,7 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 	}
 
 	// Get all job items.
-	jsonItems, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, q.primaryQueueShard.RedisClient.unshardedRc.B().Hmget().Key(q.primaryQueueShard.RedisClient.kg.QueueItem()).Field(jobIDs.Elements...).Build()).AsStrSlice()
+	jsonItems, err := shard.RedisClient.unshardedRc.Do(ctx, shard.RedisClient.unshardedRc.B().Hmget().Key(shard.RedisClient.kg.QueueItem()).Field(jobIDs.Elements...).Build()).AsStrSlice()
 	if err != nil {
 		return nil, fmt.Errorf("error reading jobs: %w", err)
 	}
@@ -1214,8 +1216,8 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 		if qi.Data.Identifier.WorkspaceID != workspaceID {
 			continue
 		}
-		cmd := q.primaryQueueShard.RedisClient.unshardedRc.B().Zrank().Key(q.primaryQueueShard.RedisClient.kg.FnQueueSet(workflowID.String())).Member(qi.ID).Build()
-		pos, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).AsInt64()
+		cmd := shard.RedisClient.unshardedRc.B().Zrank().Key(shard.RedisClient.kg.FnQueueSet(workflowID.String())).Member(qi.ID).Build()
+		pos, err := shard.RedisClient.unshardedRc.Do(ctx, cmd).AsInt64()
 		if !rueidis.IsRedisNil(err) && err != nil {
 			return nil, fmt.Errorf("error reading queue position: %w", err)
 		}
@@ -2803,7 +2805,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	for n := range result {
 		idx, ok := w.Take()
 		if !ok {
-			return nil, ErrWeightedSampleRead
+			return nil, util.ErrWeightedSampleRead
 		}
 		result[n] = items[idx]
 	}
@@ -2886,7 +2888,7 @@ func (q *queue) accountPeek(ctx context.Context, sequential bool, until time.Tim
 	for n := range result {
 		idx, ok := w.Take()
 		if !ok {
-			return nil, ErrWeightedSampleRead
+			return nil, util.ErrWeightedSampleRead
 		}
 		result[n] = items[idx]
 	}
@@ -3470,44 +3472,6 @@ func (q *queue) readFnMetadata(ctx context.Context, fnID uuid.UUID) (*FnMetadata
 		return nil, fmt.Errorf("error reading function metadata: %w", err)
 	}
 	return &retv, nil
-}
-
-// frandRNG is a fast crypto-secure prng which uses a mutex to guard
-// parallel reads.  It also implements the x/exp/rand.Source interface
-// by adding a Seed() method which does nothing.
-type frandRNG struct {
-	*frand.RNG
-	lock *sync.Mutex
-}
-
-func (f *frandRNG) Read(b []byte) (int, error) {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	return f.RNG.Read(b)
-}
-
-func (f *frandRNG) Uint64() uint64 {
-	return f.Uint64n(math.MaxUint64)
-}
-
-func (f *frandRNG) Uint64n(n uint64) uint64 {
-	// sampled.Take calls Uint64n, which must be guarded by a lock in order
-	// to be thread-safe.
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	return f.RNG.Uint64n(n)
-}
-
-func (f *frandRNG) Float64() float64 {
-	// sampled.Take also calls Float64, which must be guarded by a lock in order
-	// to be thread-safe.
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	return f.RNG.Float64()
-}
-
-func (f *frandRNG) Seed(seed uint64) {
-	// Do nothing.
 }
 
 func newLeaseDenyList() *leaseDenies {

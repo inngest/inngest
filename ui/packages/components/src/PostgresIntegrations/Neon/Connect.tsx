@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
-import { NewButton } from '@inngest/components/Button';
-import { NewLink } from '@inngest/components/Link';
+import { Button } from '@inngest/components/Button';
+import { InlineCode } from '@inngest/components/Code';
 import { parseConnectionString } from '@inngest/components/PostgresIntegrations/utils';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { RiCheckboxCircleFill, RiCloseCircleFill } from '@remixicon/react';
@@ -153,7 +153,7 @@ export default function Connect({
             <AccordionList.Content>
               <p className="mb-3">
                 Create a dedicated Inngest role for replicating data. The role must have the{' '}
-                <code className="text-accent-xIntense text-xs">REPLICATION</code> privilege:
+                <InlineCode>REPLICATION</InlineCode> privilege:
               </p>
               <RoleCommand />
             </AccordionList.Content>
@@ -171,10 +171,9 @@ export default function Connect({
             </AccordionList.Trigger>
             <AccordionList.Content>
               <p className="mb-3">
-                Grant{' '}
-                <code className="text-accent-xIntense text-xs">SELECT ON ALL TABLES IN SCHEMA</code>{' '}
-                instead of naming the specific tables avoids having to add privileges later if you
-                add tables to your publication:
+                Grant <InlineCode>SELECT ON ALL TABLES IN SCHEMA</InlineCode> instead of naming the
+                specific tables avoids having to add privileges later if you add tables to your
+                publication:
               </p>
               <AccessCommand />
             </AccordionList.Content>
@@ -192,18 +191,16 @@ export default function Connect({
             </AccordionList.Trigger>
             <AccordionList.Content>
               <p className="mb-3">
-                Inngest uses the <code className="text-accent-xIntense text-xs">pgoutput</code>{' '}
-                plugin in Postgres for decoding WAL changes into a logical replication stream. To
-                create a replication slot called{' '}
-                <code className="text-accent-xIntense text-xs">inngest_slot</code> that uses the{' '}
-                <code className="text-accent-xIntense text-xs">pgoutput</code> plugin, run the
-                following command on your database using your replication role:
+                Inngest uses the <InlineCode>pgoutput</InlineCode> plugin in Postgres for decoding
+                WAL changes into a logical replication stream. To create a replication slot called{' '}
+                <InlineCode>inngest_slot</InlineCode> that uses the{' '}
+                <InlineCode>pgoutput</InlineCode> plugin, run the following command on your database
+                using your replication role:
               </p>
               <ReplicationSlotCommand />
               <p className="mt-3">
-                <code className="text-accent-xIntense text-xs">inngest_slot</code> is the name
-                assigned to the replication slot. You will need to provide this name when you set up
-                your Inngest events.
+                <InlineCode>inngest_slot</InlineCode> is the name assigned to the replication slot.
+                You will need to provide this name when you set up your Inngest events.
               </p>
             </AccordionList.Content>
           </AccordionList.Item>
@@ -237,16 +234,12 @@ export default function Connect({
       </div>
 
       {isVerified ? (
-        <NewButton
+        <Button
           label="Connected. See your integration"
           href={`/settings/integrations/${integration}`}
         />
       ) : (
-        <NewButton
-          label="Complete setup automatically"
-          onClick={handleVerify}
-          loading={isVerifying}
-        />
+        <Button label="Complete setup automatically" onClick={handleVerify} loading={isVerifying} />
       )}
       {error && <p className="text-error mt-4 text-sm">{error}</p>}
     </>

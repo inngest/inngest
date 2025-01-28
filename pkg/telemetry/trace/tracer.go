@@ -105,7 +105,7 @@ func (o TracerOpts) MaxPayloadSizeBytes() int {
 		return size
 	}
 
-	return (consts.AbsoluteMaxEventSize + consts.MaxBodySize) * 2
+	return (consts.AbsoluteMaxEventSize + consts.MaxSDKResponseBodySize) * 2
 }
 
 func NewUserTracer(ctx context.Context, opts TracerOpts) error {

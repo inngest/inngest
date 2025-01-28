@@ -29,14 +29,15 @@ export default function ApprovalDialog({
       <div className="mx-auto max-w-xl">{description}</div>
       <div className="my-12 flex justify-center gap-6">
         <Button
-          btnAction={onCancel}
+          onClick={onCancel}
           appearance="outlined"
+          kind="secondary"
           size="large"
           disabled={isLoading}
           label="Cancel"
         />
         <Button
-          btnAction={onApprove}
+          onClick={onApprove}
           kind="primary"
           size="large"
           disabled={isLoading}
@@ -44,7 +45,7 @@ export default function ApprovalDialog({
         />
       </div>
       {error && <Alert severity="error">{error}</Alert>}
-      <p className="mt-12 text-sm text-slate-500">{secondaryInfo}</p>
+      <p className="text-subtle mt-12 text-sm">{secondaryInfo}</p>
     </main>
   );
 }

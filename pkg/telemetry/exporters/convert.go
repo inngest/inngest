@@ -159,6 +159,8 @@ func toProtoKind(code string) runv2.SpanStepOp {
 		return runv2.SpanStepOp_STEP
 	case enums.OpcodeStepError:
 		return runv2.SpanStepOp_STEP_ERROR
+	case enums.OpcodeAIGateway:
+		return runv2.SpanStepOp_AI_GATEWAY
 
 	default:
 		return runv2.SpanStepOp_RUN

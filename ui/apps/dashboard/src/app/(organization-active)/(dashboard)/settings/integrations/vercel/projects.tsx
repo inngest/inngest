@@ -1,15 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { Badge } from '@inngest/components/Badge/Badge';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
 import { Link } from '@inngest/components/Link/Link';
+import { Pill } from '@inngest/components/Pill';
 import { Select } from '@inngest/components/Select/Select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiInformationLine, RiRefreshLine } from '@remixicon/react';
 
-import { VercelDeploymentProtection, type VercelIntegration } from './VercelIntegration';
+import { VercelDeploymentProtection, type VercelIntegration } from '@/gql/graphql';
 
 // type DisableProjectProps = {
 //   isOpen: boolean;
@@ -25,7 +25,7 @@ import { VercelDeploymentProtection, type VercelIntegration } from './VercelInte
 //     onSubmit={onConfirm}
 //     title="Confirm disable"
 //   >
-//     <p className="px-6 pb-0 pt-4 dark:text-white">
+//     <p className="px-6 pb-0 pt-4">
 //       Are you sure you want to disable Vercel Integration?
 //     </p>
 //   </AlertModal>
@@ -42,7 +42,7 @@ export default function VercelProjects({ integration }: { integration: VercelInt
           Projects (<span className="mx-[2px]">{projects.length}</span>)
         </div>
         <div className="text-btnPrimary flex cursor-pointer flex-row items-center justify-between text-xs">
-          <NewButton
+          <Button
             appearance="ghost"
             icon={<RiRefreshLine className="h-4 w-4" />}
             iconSide="left"
@@ -56,7 +56,7 @@ export default function VercelProjects({ integration }: { integration: VercelInt
             className="text-muted bg-canvasBase ml-4 h-6 rounded-sm text-xs leading-tight"
           >
             <Select.Button className="rounded-0 h-4">
-              <span className="text-slate- text-basis pr-2 text-xs leading-tight first-letter:capitalize">
+              <span className="text-basis pr-2 text-xs leading-tight first-letter:capitalize">
                 {filter}
               </span>
             </Select.Button>
@@ -89,20 +89,13 @@ export default function VercelProjects({ integration }: { integration: VercelInt
               <div className="flex flex-row items-center justify-between">
                 <div className="flex flex-col">
                   <div>
-                    <Badge
-                      kind="solid"
-                      className={`h-6 ${
-                        p.isEnabled
-                          ? 'bg-primary-intense text-onContrast'
-                          : 'bg-disabled text-muted'
-                      }`}
-                    >
+                    <Pill kind={p.isEnabled ? 'primary' : 'default'} className="h-6">
                       {p.isEnabled ? 'enabled' : 'disabled'}
-                    </Badge>
+                    </Pill>
                   </div>
                   <div className="mt-4 flex flex-row items-center justify-start">
                     <div className="text-basis text-xl font-medium">{p.name}</div>
-                    {p.ssoProtection?.deploymentType !== VercelDeploymentProtection.Disabled && (
+                    {p.deploymentProtection !== VercelDeploymentProtection.Disabled && (
                       <Tooltip>
                         <TooltipTrigger>
                           <RiInformationLine className="text-accent-subtle ml-2 h-4 w-4 cursor-pointer" />
@@ -117,7 +110,10 @@ export default function VercelProjects({ integration }: { integration: VercelInt
                               default.
                             </div>
                             <div className="bg-disabled w-full px-4 py-2">
-                              <Link href="https://www.inngest.com/docs/deploy/vercel#bypassing-deployment-protection">
+                              <Link
+                                target="_blank"
+                                href="https://www.inngest.com/docs/deploy/vercel#bypassing-deployment-protection"
+                              >
                                 Learn more
                               </Link>
                             </div>
@@ -131,10 +127,12 @@ export default function VercelProjects({ integration }: { integration: VercelInt
                   </div>
                 </div>
                 <div>
-                  <NewButton
+                  <Button
                     appearance="outlined"
                     label="Configure"
-                    href={`/settings/integrations/vercel/configure/${encodeURIComponent(p.id)}`}
+                    href={`/settings/integrations/vercel/configure/${encodeURIComponent(
+                      p.projectID
+                    )}`}
                   />
                 </div>
               </div>
@@ -142,9 +140,9 @@ export default function VercelProjects({ integration }: { integration: VercelInt
           </Card>
         ))}
 
-      {/* <div className="mt-10 flex flex-col gap-4 border-t border-slate-200 py-7">
-        <div className="text-lg font-medium text-gray-900">Disable Vercel integration</div>
-        <div className="text-base font-normal leading-snug text-slate-600">
+      {/* <div className="mt-10 flex flex-col gap-4 border-t border-subtle py-7">
+        <div className="text-lg font-medium">Disable Vercel integration</div>
+        <div className="text-base font-normal leading-snug text-subtle">
           This action disables API key and stops webhooks.
         </div>
         <div>
@@ -158,7 +156,7 @@ export default function VercelProjects({ integration }: { integration: VercelInt
               }}
             />
           )}
-          <NewButton
+          <Button
             kind="danger"
             appearance="outlined"
             label="Disable Vercel"

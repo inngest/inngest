@@ -8,6 +8,7 @@ import { useMutation } from 'urql';
 import { graphql } from '@/gql';
 import { type AwsMarketplaceSetupInput } from '@/gql/graphql';
 import AWSLogo from '@/icons/aws-logo.svg';
+import { pathCreator } from '@/utils/urls';
 import ApprovalDialog from '../ApprovalDialog';
 
 const CompleteAWSMarketplaceSetup = graphql(`
@@ -58,11 +59,11 @@ export default function Page() {
         setError(
           <>
             {cleanError}.{' '}
-            <Link internalNavigation className="inline-flex" href="/support">
+            <Link size="medium" className="inline-flex" href="/support">
               Contact support
             </Link>{' '}
             or{' '}
-            <Link internalNavigation className="inline-flex" href="/settings/billing">
+            <Link size="medium" className="inline-flex" href={pathCreator.billing()}>
               manage billing
             </Link>
             .
@@ -70,7 +71,7 @@ export default function Page() {
         );
         console.log('error', result.error);
       } else {
-        router.push('/settings/billing');
+        router.push(pathCreator.billing());
       }
     });
   }

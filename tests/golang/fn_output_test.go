@@ -33,7 +33,7 @@ func TestFnOutputTooLarge(t *testing.T) {
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
 			runID = input.InputCtx.RunID
-			return strings.Repeat("A", consts.MaxBodySize+1), nil
+			return strings.Repeat("A", consts.MaxSDKResponseBodySize+1), nil
 		},
 	)
 

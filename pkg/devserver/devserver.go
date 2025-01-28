@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/inngest/inngest/pkg/enums"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
@@ -19,10 +18,18 @@ import (
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
 	_ "github.com/inngest/inngest/pkg/config/defaults"
+	"github.com/inngest/inngest/pkg/config/registration"
+	"github.com/inngest/inngest/pkg/connect"
+	"github.com/inngest/inngest/pkg/connect/auth"
+	"github.com/inngest/inngest/pkg/connect/lifecycles"
+	pubsub2 "github.com/inngest/inngest/pkg/connect/pubsub"
+	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
+	connstate "github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi"
-	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs"
+	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
 	"github.com/inngest/inngest/pkg/deploy"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/batch"
@@ -33,6 +40,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
+	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
@@ -45,6 +53,7 @@ import (
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/service"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/inngest/inngest/pkg/testapi"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
 	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/propagation"
@@ -55,6 +64,7 @@ const (
 	DefaultTick         = 150
 	DefaultTickDuration = time.Millisecond * DefaultTick
 	DefaultPollInterval = 5
+	DefaultQueueWorkers = 100
 )
 
 // StartOpts configures the dev server
@@ -67,6 +77,7 @@ type StartOpts struct {
 	PollInterval  int           `json:"poll_interval"`
 	Tick          time.Duration `json:"tick"`
 	RetryInterval int           `json:"retry_interval"`
+	QueueWorkers  int           `json:"queue_workers"`
 
 	// SigningKey is used to decide that the server should sign requests and
 	// validate responses where applicable, modelling cloud behaviour.
@@ -105,7 +116,7 @@ func New(ctx context.Context, opts StartOpts) error {
 }
 
 func start(ctx context.Context, opts StartOpts) error {
-	db, err := sqlitecqrs.New(sqlitecqrs.SqliteCQRSOptions{InMemory: true})
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true})
 	if err != nil {
 		return err
 	}
@@ -115,8 +126,9 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	// Initialize the devserver
-	dbcqrs := sqlitecqrs.NewCQRS(db)
-	hd := sqlitecqrs.NewHistoryDriver(db)
+	dbDriver := "sqlite"
+	dbcqrs := base_cqrs.NewCQRS(db, dbDriver)
+	hd := base_cqrs.NewHistoryDriver(db, dbDriver)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	stepLimitOverrides := make(map[string]int)
@@ -128,6 +140,11 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	unshardedRc, err := createInmemoryRedis(ctx, opts.Tick)
+	if err != nil {
+		return err
+	}
+
+	connectRc, err := createInmemoryRedis(ctx, opts.Tick)
 	if err != nil {
 		return err
 	}
@@ -164,6 +181,9 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 	smv2 := redis_state.MustRunServiceV2(sm)
 
+	// Create a new broadcaster which lets us broadcast realtime messages.
+	broadcaster := realtime.NewInProcessBroadcaster()
+
 	queueOpts := []redis_state.QueueOpt{
 		redis_state.WithRunMode(redis_state.QueueRunMode{
 			Sequential: true,
@@ -171,7 +191,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			Partition:  true,
 		}),
 		redis_state.WithIdempotencyTTL(time.Hour),
-		redis_state.WithNumWorkers(100),
+		redis_state.WithNumWorkers(int32(opts.QueueWorkers)),
 		redis_state.WithPollTick(opts.Tick),
 		redis_state.WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i queue.QueueItem) []state.CustomConcurrency {
 			keys := i.Data.GetConcurrencyKeys()
@@ -254,12 +274,22 @@ func start(ctx context.Context, opts StartOpts) error {
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq)
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
 
+	connectPubSubRedis := createConnectPubSubRedis()
+	gatewayProxy, err := pubsub2.NewConnector(ctx, pubsub2.WithRedis(connectPubSubRedis, logger.StdlibLoggerWithCustomVarName(ctx, "CONNECT_PUBSUB_LOG_LEVEL"), true))
+	if err != nil {
+		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
+	}
+
+	connectionManager := connstate.NewRedisConnectionStateManager(connectRc)
+
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
 
 	var drivers = []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
-		d, err := driverConfig.NewDriver()
+		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
+			ConnectForwarder: gatewayProxy,
+		})
 		if err != nil {
 			return err
 		}
@@ -282,6 +312,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithQueue(rq),
 		executor.WithLogger(logger.From(ctx)),
 		executor.WithFunctionLoader(loader),
+		executor.WithRealtimePublisher(broadcaster),
 		executor.WithLifecycleListeners(
 			history.NewLifecycleListener(
 				nil,
@@ -317,6 +348,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithBatcher(batcher),
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
+		executor.WithTraceReader(dbcqrs),
 	)
 	if err != nil {
 		return err
@@ -365,12 +397,15 @@ func start(ctx context.Context, opts StartOpts) error {
 		caching := apiv1.NewCacheMiddleware(cache)
 
 		apiv1.AddRoutes(r, apiv1.Opts{
-			CachingMiddleware: caching,
-			EventReader:       ds.Data,
-			FunctionReader:    ds.Data,
-			FunctionRunReader: ds.Data,
-			JobQueueReader:    ds.Queue.(queue.JobQueueReader),
-			Executor:          ds.Executor,
+			CachingMiddleware:  caching,
+			EventReader:        ds.Data,
+			FunctionReader:     ds.Data,
+			FunctionRunReader:  ds.Data,
+			JobQueueReader:     ds.Queue.(queue.JobQueueReader),
+			Executor:           ds.Executor,
+			QueueShardSelector: shardSelector,
+			Broadcaster:        broadcaster,
+			RealtimeJWTSecret:  consts.DevServerRealtimeJWTSecret,
 		})
 	})
 
@@ -387,10 +422,34 @@ func start(ctx context.Context, opts StartOpts) error {
 		EventHandler:  ds.HandleEvent,
 		Executor:      ds.Executor,
 		HistoryReader: memory_reader.NewReader(),
+		ConnectOpts: connectv0.Opts{
+			GroupManager:            connectionManager,
+			ConnectManager:          connectionManager,
+			ConnectResponseNotifier: gatewayProxy,
+			Signer:                  auth.NewJWTSessionTokenSigner(consts.DevServerConnectJwtSecret),
+			RequestAuther:           ds,
+			ConnectGatewayRetriever: ds,
+			Dev:                     true,
+		},
 	})
 	if err != nil {
 		return err
 	}
+
+	connGateway := connect.NewConnectGatewayService(
+		connect.WithConnectionStateManager(connectionManager),
+		connect.WithRequestReceiver(gatewayProxy),
+		connect.WithGatewayAuthHandler(auth.NewJWTAuthHandler(consts.DevServerConnectJwtSecret)),
+		connect.WithAppLoader(dbcqrs),
+		connect.WithDev(),
+		connect.WithGatewayPublicPort(8289),
+		connect.WithApiBaseUrl(fmt.Sprintf("http://127.0.0.1:%d", opts.Config.EventAPI.Port)),
+		connect.WithLifeCycles(
+			[]connect.ConnectGatewayLifecycleListener{
+				lifecycles.NewHistoryLifecycle(dbcqrs),
+			}),
+	)
+	connRouter := connect.NewConnectMessageRouterService(connectionManager, gatewayProxy)
 
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
@@ -398,17 +457,31 @@ func start(ctx context.Context, opts StartOpts) error {
 	//
 	// Merge the dev server API (for handling files & registration) with the data
 	// API into the event API router.
+
+	mounts := []api.Mount{
+		{At: "/", Router: devAPI},
+		{At: "/v0", Router: core.Router},
+		{At: "/debug", Handler: middleware.Profiler()},
+	}
+
+	if testapi.ShouldEnable() {
+		mounts = append(mounts, api.Mount{At: "/test", Handler: testapi.New(testapi.Options{
+			QueueShardSelector: shardSelector,
+			Queue:              rq,
+			Executor:           exec,
+			StateManager:       smv2,
+		})})
+	}
+
 	ds.Apiservice = api.NewService(api.APIServiceOptions{
-		Config: ds.Opts.Config,
-		Mounts: []api.Mount{
-			{At: "/", Router: devAPI},
-			{At: "/v0", Router: core.Router},
-			{At: "/debug", Handler: middleware.Profiler()},
-		},
+		Config:         ds.Opts.Config,
+		Mounts:         mounts,
 		LocalEventKeys: opts.EventKeys,
 	})
 
-	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice)
+	svcs := []service.Service{ds, runner, executorSvc, ds.Apiservice}
+	svcs = append(svcs, connGateway, connRouter)
+	return service.StartAll(ctx, svcs...)
 }
 
 func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Client, error) {
@@ -435,6 +508,15 @@ func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Clien
 		}
 	}()
 	return rc, nil
+}
+
+func createConnectPubSubRedis() rueidis.ClientOption {
+	r := miniredis.NewMiniRedis()
+	_ = r.Start()
+	return rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	}
 }
 
 func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleSendingEvent {

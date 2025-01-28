@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
+import { Input } from '@inngest/components/Forms/Input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import { RiInformationLine } from '@remixicon/react';
 import { useClient } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import Input from '@/components/Forms/Input';
 import { Details } from './Details';
 import { EventTable } from './EventTable';
 import { searchEvents } from './searchEvents';
@@ -92,7 +92,7 @@ export function EventSearch() {
           <p className="text-sm">Experimental feature</p>
           <Tooltip>
             <TooltipTrigger>
-              <RiInformationLine className="h-4 w-4 text-slate-400" />
+              <RiInformationLine className="text-subtle h-4 w-4" />
             </TooltipTrigger>
             <TooltipContent className="whitespace-pre-line">
               This is an experimental feature, with a few limitations:

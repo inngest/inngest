@@ -46,7 +46,7 @@ export default function EventLayout({
         action={
           <div className="flex flex-row items-center justify-end gap-x-1">
             <ActionsMenu archive={() => setShowArchive(true)} />
-            <SendEventButton eventName={eventName} newIANav={true} />
+            <SendEventButton eventName={eventName} />
           </div>
         }
       />

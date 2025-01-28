@@ -1,18 +1,28 @@
 'use client';
 
-import { type Route } from 'next';
-import Link from 'next/link';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
-import { Link as InngestLink } from '@inngest/components/Link';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@inngest/components/DropdownMenu';
+import { AppsIcon } from '@inngest/components/icons/sections/Apps';
+import { cn } from '@inngest/components/utils/classNames';
+import { RiAddLine, RiMore2Line, RiSettingsLine } from '@remixicon/react';
 
 import Toaster from '@/components/Toaster';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useEnvironments } from '@/queries';
 import { EnvironmentType } from '@/utils/environments';
-import { EnvironmentArchiveButton } from './EnvironmentArchiveButton';
+import { EnvironmentArchiveDropdownItem } from './EnvironmentArchiveDropdownItem';
 import EnvironmentListTable from './EnvironmentListTable';
 
 export default function Environments() {
+  const [openCustomEnvDropdownId, setOpenCustomEnvDropdownId] = useState<string | null>(null);
+  const router = useRouter();
   const [{ data: envs = [], fetching }] = useEnvironments();
 
   const branchParent = envs.find((env) => env.type === EnvironmentType.BranchParent);
@@ -31,97 +41,127 @@ export default function Environments() {
     <>
       <div className="mx-auto w-full max-w-[860px] px-12 py-16">
         <div className="mb-4 flex w-full items-center  justify-between">
-          <h2 className="text-lg font-medium text-slate-800">Production Environment</h2>
-          <div className="flex items-center gap-2">
-            <Button href="/env/production/manage" appearance="outlined" label="Manage" />
-            <Button href={`/env/production/apps` as Route} kind="primary" label="Go To Apps" />
-          </div>
+          <h2 className="text-lg font-medium">Production Environment</h2>
         </div>
-        <p className="mt-2 max-w-[400px] text-sm font-medium text-slate-600">
+        <p className="text-muted mt-2 max-w-[400px] text-sm">
           This is where you&apos;ll deploy all of your production apps.
         </p>
 
-        <Link
-          href={process.env.NEXT_PUBLIC_HOME_PATH as Route}
-          className="to-slate-940 mt-4 flex items-center justify-between rounded-lg bg-slate-900 bg-gradient-to-br from-slate-800 px-4 py-4 hover:bg-slate-800 hover:from-slate-700 hover:to-slate-900"
-        >
-          <h3 className="flex items-center gap-2 text-sm font-medium tracking-wide text-white">
+        <div className="bg-info mt-4 flex items-center justify-between rounded-md px-4 py-2">
+          <h3 className="flex items-center gap-2 text-sm font-medium tracking-wide">
             <span className="bg-primary-moderate block h-2 w-2 rounded-full" />
             Production
           </h3>
-        </Link>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button kind="secondary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onSelect={() => router.push('/env/production/manage')}>
+                <RiSettingsLine className="h-4 w-4" />
+                Manage
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => router.push('/env/production/apps')}>
+                <AppsIcon className="h-4 w-4" />
+                Go to apps
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
 
         {Boolean(branchParent) && (
-          <div className="mt-12 border-t border-slate-100 pt-8">
+          <div className="border-subtle my-12 border-t pt-8">
             <div className="mb-8 flex w-full items-center justify-between">
-              <h2 className="text-lg font-medium text-slate-800">Branch Environments</h2>
+              <h2 className="text-lg font-medium">Branch Environments</h2>
               <div className="flex items-center gap-2">
-                <Button
-                  href={`/env/${branchParent?.slug}/manage`}
-                  appearance="outlined"
-                  label="Manage"
-                />
-
-                {/* Here we don't link to the modal since the /deploy empty state has more info on branch envs */}
-                <Button
-                  href={`/env/${branchParent?.slug || 'branch'}/apps` as Route}
-                  kind="primary"
-                  label="Sync New App"
-                />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      kind="secondary"
+                      appearance="outlined"
+                      size="medium"
+                      icon={<RiMore2Line />}
+                    />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem
+                      onSelect={() => router.push(`/env/${branchParent?.slug}/manage`)}
+                    >
+                      <RiSettingsLine className="h-4 w-4" />
+                      Manage
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-success"
+                      onSelect={() => router.push(`/env/${branchParent?.slug || 'branch'}/apps`)}
+                    >
+                      <RiAddLine className="h-4 w-4" />
+                      Sync new app
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
 
-            <div className=" mb-20 mt-8 overflow-hidden rounded-lg border border-slate-200 shadow-sm">
+            <div className=" border-subtle mt-8 overflow-hidden rounded-md border">
               <EnvironmentListTable envs={branches} />
             </div>
           </div>
         )}
 
-        {customEnvs.length > 0 &&
-          customEnvs.map((env) => (
-            <div key={env.id} className="mt-12 border-t border-slate-100 pt-8">
-              <div className="mb-4 flex w-full items-center  justify-between">
-                <h2 className="text-lg font-medium text-slate-800">{env.name}</h2>
-                <div className="flex items-center gap-2">
-                  <Button href={`/env/${env.slug}/manage`} appearance="outlined" label="Manage" />
-
-                  <EnvironmentArchiveButton env={env} />
-
-                  <Button
-                    href={`/env/${env.slug}/apps` as Route}
-                    kind="primary"
-                    label="Go To Apps"
-                  />
-                </div>
-              </div>
-              <Link
-                href={`/env/${env.slug}/functions` as Route}
-                className="mt-8 flex cursor-pointer items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm hover:bg-slate-100/60"
+        <div className="border-subtle border-t pt-8">
+          <div className="mb-4 flex w-full items-center justify-between">
+            <h2 className="text-lg font-medium">Custom Environments</h2>
+            <Button href="create-environment" kind="primary" label="Create environment" />
+          </div>
+          {customEnvs.length > 0 ? (
+            customEnvs.map((env) => (
+              <div
+                key={env.id}
+                className="border-subtle bg-canvasBase mt-4 flex items-center justify-between rounded-md border px-4 py-1.5"
               >
-                <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                  <span className="bg-primary-moderate block h-2 w-2 rounded-full" />
+                <h3 className="flex items-center gap-2 text-sm font-medium">
+                  <span
+                    className={cn(
+                      'block h-2 w-2 rounded-full',
+                      env.isArchived ? 'bg-surfaceMuted' : 'bg-primary-moderate '
+                    )}
+                  />
                   {env.name}
                 </h3>
-              </Link>
-            </div>
-          ))}
+                <DropdownMenu
+                  modal
+                  open={openCustomEnvDropdownId === env.id}
+                  onOpenChange={(open) => setOpenCustomEnvDropdownId(open ? env.id : null)}
+                >
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      kind="secondary"
+                      appearance="outlined"
+                      size="medium"
+                      icon={<RiMore2Line />}
+                    />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onSelect={() => router.push(`/env/${env.slug}/manage`)}>
+                      <RiSettingsLine className="h-4 w-4" />
+                      Manage
+                    </DropdownMenuItem>
 
-        <div className="mt-12 border-t border-slate-100 pt-8">
-          <div className="mb-4 flex w-full items-center  justify-between">
-            <h2 className="text-lg font-medium text-slate-800">Create an environment</h2>
-            <div className="flex items-center gap-2">
-              <Button href="create-environment" kind="primary" label="Create environment" />
-            </div>
-          </div>
-          <p className="mt-2 text-sm font-medium text-slate-600">
-            Create a shared, non-production environment like staging, QA, or canary.{' '}
-            <InngestLink
-              className="inline-flex"
-              href="https://www.inngest.com/docs/platform/environments#custom-environments"
-            >
-              Read the docs to learn more
-            </InngestLink>
-          </p>
+                    <DropdownMenuItem onSelect={() => router.push(`/env/${env.slug}/apps`)}>
+                      <AppsIcon className="h-4 w-4" />
+                      Go to apps
+                    </DropdownMenuItem>
+                    <EnvironmentArchiveDropdownItem
+                      env={env}
+                      onClose={() => setOpenCustomEnvDropdownId(null)}
+                    />
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ))
+          ) : (
+            <p className="text-basis py-3 text-center text-sm">No custom environments yet</p>
+          )}
         </div>
       </div>
 

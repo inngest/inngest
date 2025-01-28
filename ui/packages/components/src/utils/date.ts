@@ -21,6 +21,7 @@ export {
   isValid,
   lightFormat,
   sub,
+  format,
 };
 
 export const DURATION_STRING_REGEX = /^[1-9]\d*[smMhdwy]$/;
@@ -183,3 +184,13 @@ export const toDate = (dateString?: string): Date | undefined => {
   const d = new Date(dateString);
   return isNaN(d.getTime()) ? undefined : d;
 };
+
+export function getPeriodAbbreviation(period: string): string {
+  const periodAbbreviations: Record<string, string> = {
+    month: 'mo',
+    week: 'wk',
+    year: 'yr',
+  };
+
+  return periodAbbreviations[period] || period;
+}

@@ -32,7 +32,7 @@ export default function EventKeyError({ error }: EventKeyErrorProps) {
 
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-5">
-      <div className="inline-flex items-center gap-2 text-red-600">
+      <div className="text-error inline-flex items-center gap-2">
         <RiErrorWarningLine className="h-4 w-4" />
         <h2 className="text-sm">
           {'Failed to load this ' +

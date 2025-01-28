@@ -1,6 +1,6 @@
 import { Chart, type ChartProps } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
-import { NewLink } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/Link';
 import { resolveColor } from '@inngest/components/utils/colors';
 import { isDark } from '@inngest/components/utils/theme';
 import resolveConfig from 'tailwindcss/resolveConfig';
@@ -147,20 +147,20 @@ export const FunctionStatus = ({ totals }: { totals?: FunctionTotals }) => {
   const metrics = totals && mapMetrics(totals);
 
   return (
-    <div className="bg-canvasBase border-subtle relative flex h-[384px] w-[448px] shrink-0 flex-col rounded-lg border p-5">
+    <div className="bg-canvasBase border-subtle relative flex h-[384px] w-[448px] shrink-0 flex-col rounded-md border p-5">
       <div className="text-subtle mb-2 flex flex-row items-center gap-x-2 text-lg">
         Functions Status{' '}
         <Info
           text="Interact with the chart to see the status and total number of your function runs over a period of time."
           action={
-            <NewLink
+            <Link
               arrowOnHover
               className="text-sm"
               href="https://www.inngest.com/docs/platform/monitor/observability-metrics#function-status"
               target="_new"
             >
               Learn more about Inngest functions.
-            </NewLink>
+            </Link>
           }
         />
       </div>

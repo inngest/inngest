@@ -24,7 +24,7 @@ export function useRerun() {
 
         // Give user a link to the new run
         toast.success(
-          <Link href={pathCreator.runPopout({ runID: newRunID })} internalNavigation={false}>
+          <Link href={pathCreator.runPopout({ runID: newRunID })} target="_blank">
             Successfully queued rerun
           </Link>
         );

@@ -26,6 +26,7 @@ message Span {
   bytes output = 12;
   repeated SpanLink links = 13;
   repeated SpanEvent events = 14;
+  bytes input = 15;
 }
 
 message SpanIdentifier {

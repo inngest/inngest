@@ -52,12 +52,23 @@ func (r *Resolver) RunsV2Connection() generated.RunsV2ConnectionResolver {
 	return &runsV2ConnResolver{r}
 }
 
+func (r *Resolver) ConnectV1WorkerConnection() generated.ConnectV1WorkerConnectionResolver {
+	return &connectV1workerConnectionConnResolver{r}
+}
+
+func (r *Resolver) ConnectV1WorkerConnectionsConnection() generated.ConnectV1WorkerConnectionsConnectionResolver {
+	return &connectV1workerConnectionResolver{r}
+}
+
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type eventResolver struct{ *Resolver }
 type appResolver struct{ *Resolver }
+
 type functionRunResolver struct{ *Resolver }
 type functionRunV2Resolver struct{ *Resolver }
+type connectV1workerConnectionConnResolver struct{ *Resolver }
+type connectV1workerConnectionResolver struct{ *Resolver }
 type functionResolver struct{ *Resolver }
 type streamItemResolver struct{ *Resolver }
 type runsV2ConnResolver struct{ *Resolver }

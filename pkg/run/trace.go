@@ -73,9 +73,11 @@ func NewRunTree(opts RunTreeOpts) (*runTree, error) {
 	}
 
 	for _, s := range opts.Spans {
-		// don't even bother
+		// ignore parallelism planning spans
 		if s.StepOpCode() == enums.OpcodeStepPlanned {
-			continue
+			if _, ok := s.SpanAttributes[consts.OtelSysStepPlan]; ok {
+				continue
+			}
 		}
 
 		if s.ScopeName == consts.OtelScopeFunction {
@@ -99,9 +101,11 @@ func NewRunTree(opts RunTreeOpts) (*runTree, error) {
 
 	// loop through again to construct parent/child relationship
 	for _, s := range opts.Spans {
-		// don't even bother
+		// ignore parallelism planning spans
 		if s.StepOpCode() == enums.OpcodeStepPlanned {
-			continue
+			if _, ok := s.SpanAttributes[consts.OtelSysStepPlan]; ok {
+				continue
+			}
 		}
 
 		if s.ParentSpanID != nil {
@@ -195,7 +199,7 @@ func (tb *runTree) ToRunSpan(ctx context.Context) (*rpbv2.RunSpan, error) {
 	return root, nil
 }
 
-func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan, bool, error) {
+func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (span *rpbv2.RunSpan, skipped bool, err error) {
 	res, skipped := tb.constructSpan(ctx, s)
 	if skipped {
 		return nil, skipped, nil
@@ -225,16 +229,17 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan,
 		switch s.StepOpCode() {
 		case enums.OpcodeSleep:
 			if err := tb.processSleep(ctx, s, res); err != nil {
-				return nil, false, fmt.Errorf("error parsing invoke: %w", err)
+				return nil, false, fmt.Errorf("error parsing sleep: %w", err)
 			}
 		case enums.OpcodeWaitForEvent:
 			if err := tb.processWaitForEvent(ctx, s, res); err != nil {
-				return nil, false, fmt.Errorf("error parsing invoke: %w", err)
+				return nil, false, fmt.Errorf("error parsing wait for event: %w", err)
 			}
 		case enums.OpcodeInvokeFunction:
 			if err := tb.processInvoke(ctx, s, res); err != nil {
 				return nil, false, fmt.Errorf("error parsing invoke: %w", err)
 			}
+
 		}
 
 	// the rest are grouped executions
@@ -277,8 +282,13 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan,
 
 				return nil, false, fmt.Errorf("error grouping invoke: %w", err)
 			}
-		case enums.OpcodeStepPlanned: // don't bother
-			return nil, true, nil
+		case enums.OpcodeAIGateway:
+			if err := tb.processAIGatewayGroup(ctx, s, res); err != nil {
+				if err == ErrRedundantExecSpan {
+					return nil, true, nil // no-op
+				}
+				return nil, false, fmt.Errorf("error grouping AI gateway: %w", err)
+			}
 		default:
 			// execution spans
 			if s.ScopeName == consts.OtelScopeExecution {
@@ -359,6 +369,11 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 		}
 	}
 
+	var stepID *string
+	if attrStepID, ok := s.SpanAttributes[consts.OtelSysStepID]; ok && attrStepID != "" {
+		stepID = &attrStepID
+	}
+
 	return &rpbv2.RunSpan{
 		AccountId:    acctID.String(),
 		WorkspaceId:  wsID.String(),
@@ -374,6 +389,7 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 		StartedAt:    timestamppb.New(s.Timestamp),
 		EndedAt:      timestamppb.New(endedAt),
 		DurationMs:   dur,
+		StepId:       stepID,
 	}, false
 }
 
@@ -399,6 +415,16 @@ func (tb *runTree) processStepRunGroup(ctx context.Context, span *cqrs.Span, mod
 
 	stepOp := rpbv2.SpanStepOp_RUN
 	mod.StepOp = &stepOp
+
+	if v, ok := span.SpanAttributes[consts.OtelSysStepRunType]; ok {
+		mod.StepInfo = &rpbv2.StepInfo{
+			Info: &rpbv2.StepInfo_Run{
+				Run: &rpbv2.StepInfoRun{
+					Type: &v,
+				},
+			},
+		}
+	}
 
 	// not need to provide nesting if it's just itself and it's successful
 	if len(peers) == 1 && span.Status() == cqrs.SpanStatusOk {
@@ -1234,4 +1260,114 @@ func hasFinished(rs *rpbv2.RunSpan) bool {
 
 func hasIdenticalChild(rs *rpbv2.RunSpan, s *cqrs.Span) bool {
 	return len(rs.Children) == 1 && rs.SpanId == s.SpanID && rs.Name == s.SpanName
+}
+
+func (tb *runTree) processAIGatewayGroup(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
+	group, err := tb.findGroup(span)
+	if err != nil {
+		return err
+	}
+
+	if len(group) == 1 {
+		return tb.processAIGateway(ctx, span, mod)
+	}
+
+	stepOp := rpbv2.SpanStepOp_AI_GATEWAY
+	mod.StepOp = &stepOp
+
+	var i int
+	// if there are more than one, that means this is not the first attempt to execute
+	for _, peer := range group {
+		if i == 0 {
+			mod.StartedAt = timestamppb.New(peer.Timestamp)
+		}
+
+		nested, skipped := tb.constructSpan(ctx, peer)
+		if skipped {
+			continue
+		}
+
+		status := toProtoStatus(peer)
+		if status == rpbv2.SpanStatus_RUNNING {
+			nested.EndedAt = nil
+		}
+
+		outputID, err := tb.outputID(nested)
+		if err != nil {
+			return err
+		}
+
+		nested.Status = status
+		nested.OutputId = &outputID
+
+		// process sleep span
+		if peer.StepOpCode() == enums.OpcodeAIGateway {
+			err := tb.processAIGateway(ctx, peer, nested)
+			switch err {
+			case nil: // no-op
+			case ErrRedundantExecSpan:
+				tb.markProcessed(peer)
+				continue
+			default:
+				return err
+			}
+
+			mod.Name = nested.Name
+			mod.OutputId = nil
+			mod.StepInfo = nested.StepInfo
+			mod.EndedAt = nested.EndedAt
+			mod.Status = nested.Status
+
+			if mod.EndedAt != nil {
+				dur := mod.EndedAt.AsTime().Sub(mod.StartedAt.AsTime())
+				mod.DurationMs = int64(dur / time.Millisecond)
+			}
+		}
+		nested.Name = fmt.Sprintf("Attempt %d", i)
+		mod.Children = append(mod.Children, nested)
+		tb.markProcessed(peer)
+		i++
+	}
+
+	// if the total number of children span end up with just one, it means
+	// redundant spans has been excluded, so it's basically the same span
+	// as the parent. We can discard it in this case
+	if hasFinished(mod) && hasIdenticalChild(mod, span) {
+		mod.Children = nil
+	}
+
+	return nil
+}
+
+func (tb *runTree) processAIGateway(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
+	defer tb.markProcessed(span)
+
+	ident := &cqrs.SpanIdentifier{
+		AccountID:   tb.acctID,
+		WorkspaceID: tb.wsID,
+		AppID:       tb.appID,
+		FunctionID:  tb.fnID,
+		TraceID:     span.TraceID,
+		SpanID:      span.SpanID,
+	}
+	outputID, err := ident.Encode()
+	if err != nil {
+		return err
+	}
+
+	mod.OutputId = &outputID
+
+	stepOp := rpbv2.SpanStepOp_AI_GATEWAY
+	mod.StepOp = &stepOp
+
+	mod.Name = *span.StepDisplayName()
+
+	mod.Status = toProtoStatus(span)
+	if hasFinished(mod) {
+		end := mod.StartedAt.AsTime().Add(span.Duration)
+		mod.DurationMs = span.DurationMS()
+		mod.EndedAt = timestamppb.New(end)
+	}
+
+	return nil
 }

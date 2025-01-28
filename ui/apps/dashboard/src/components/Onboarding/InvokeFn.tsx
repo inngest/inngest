@@ -1,17 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { CodeBlock } from '@inngest/components/CodeBlock/CodeBlock';
 import { parseCode } from '@inngest/components/InvokeButton/utils';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import { Select, type Option } from '@inngest/components/Select/Select';
+import { RiCheckboxCircleFill } from '@remixicon/react';
 import { toast } from 'sonner';
 
 import { pathCreator } from '@/utils/urls';
 import { OnboardingSteps } from '../Onboarding/types';
 import { invokeFunction, prefetchFunctions } from './actions';
 import useOnboardingStep from './useOnboardingStep';
+import { useOnboardingTracking } from './useOnboardingTracking';
 
 const initialCode = JSON.stringify(
   {
@@ -33,7 +35,8 @@ interface FunctionOption extends Option {
 }
 
 export default function InvokeFn() {
-  const { updateLastCompletedStep } = useOnboardingStep();
+  const currentStepName = OnboardingSteps.InvokeFn;
+  const { updateCompletedSteps, lastCompletedStep } = useOnboardingStep();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const [functions, setFunctions] = useState<FunctionOption[]>([]);
@@ -41,6 +44,9 @@ export default function InvokeFn() {
   const [rawPayload, setRawPayload] = useState(initialCode);
   const [isFnInvoked, setIsFnInvoked] = useState(false);
   const router = useRouter();
+  const tracking = useOnboardingTracking();
+
+  const isOnboardingCompleted = lastCompletedStep?.isFinalStep;
 
   const hasEventTrigger =
     selectedFunction?.current.triggers.some((trigger) => trigger.eventName) ?? false;
@@ -77,7 +83,12 @@ export default function InvokeFn() {
         data: payload.data,
       });
       if (success) {
-        updateLastCompletedStep(OnboardingSteps.InvokeFn, 'manual');
+        updateCompletedSteps(currentStepName, {
+          metadata: {
+            completionSource: 'manual',
+            invokedFunction: selectedFunction,
+          },
+        });
         setError(undefined);
         setIsFnInvoked(true);
         // TO DO: add link to run ID, need to update mutation first to return ID
@@ -104,16 +115,16 @@ export default function InvokeFn() {
       <p className="mb-6 text-sm">
         You can send a test event and see your function in action. You will be able to access all
         our monitoring and debugging features.{' '}
-        <NewLink
+        <Link
           className="inline-block"
           size="small"
           href="https://www.inngest.com/docs/features/events-triggers?ref=app-onboarding-invoke-fn"
           target="_blank"
         >
           Read more
-        </NewLink>
+        </Link>
       </p>
-      <div className="border-subtle my-6 rounded-sm border px-6 py-4">
+      <div className="border-subtle my-6 rounded-md border px-6 py-4">
         <p className="text-muted mb-2 text-sm font-medium">Select function to test:</p>
 
         <Select
@@ -172,33 +183,67 @@ export default function InvokeFn() {
             <p className="text-sm">{error}</p>
           </Alert>
         )}
-        {!isFnInvoked ? (
-          <div className="mt-6 flex items-center gap-2">
-            <NewButton
-              label="Invoke test function"
-              disabled={!selectedFunction}
+        <div className="mt-6 flex items-center justify-between">
+          {!isFnInvoked ? (
+            <div className="flex items-center gap-2">
+              <Button
+                label="Invoke test function"
+                disabled={!selectedFunction}
+                onClick={() => {
+                  tracking?.trackOnboardingAction(currentStepName, {
+                    metadata: {
+                      type: 'btn-click',
+                      label: 'invoke',
+                      invokedFunction: selectedFunction,
+                    },
+                  });
+                  handleInvokeFn();
+                }}
+              />
+              <Button
+                appearance="outlined"
+                label="Skip, take me to dashboard"
+                onClick={() => {
+                  updateCompletedSteps(currentStepName, {
+                    metadata: {
+                      completionSource: 'manual',
+                      invokedFunction: null,
+                    },
+                  });
+                  tracking?.trackOnboardingAction(currentStepName, {
+                    metadata: {
+                      type: 'btn-click',
+                      label: 'skip',
+                      invokedFunction: selectedFunction,
+                    },
+                  });
+                  router.push(pathCreator.apps({ envSlug: 'production' }));
+                }}
+              />
+            </div>
+          ) : (
+            <Button
+              label="Go to runs"
               onClick={() => {
-                handleInvokeFn();
+                tracking?.trackOnboardingAction(currentStepName, {
+                  metadata: {
+                    type: 'btn-click',
+                    label: 'go-to-runs',
+                    invokedFunction: selectedFunction,
+                  },
+                });
+                router.push(pathCreator.runs({ envSlug: 'production' }));
               }}
             />
-            <NewButton
-              appearance="outlined"
-              label="Skip, take me to dashboard"
-              onClick={() => {
-                updateLastCompletedStep(OnboardingSteps.InvokeFn, 'manual');
-                router.push(pathCreator.apps({ envSlug: 'production' }));
-              }}
-            />
-          </div>
-        ) : (
-          <NewButton
-            className="mt-6"
-            label="Go to runs"
-            onClick={() => {
-              router.push(pathCreator.runs({ envSlug: 'production' }));
-            }}
-          />
-        )}
+          )}
+
+          {isOnboardingCompleted && (
+            <div className="text-success flex items-center gap-0.5 text-sm">
+              <RiCheckboxCircleFill className="h-4 w-4" />
+              Onboarding completed
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

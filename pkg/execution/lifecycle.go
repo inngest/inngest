@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -109,6 +110,20 @@ type LifecycleListener interface {
 		inngest.Edge,
 		*statev1.DriverResponse,
 		error,
+	)
+
+	// OnGatewayRequestFinished is called when a step's offloaded request finishes.
+	// The offloaded request may be a success or error; it does not matter.
+	OnStepGatewayRequestFinished(
+		context.Context,
+		statev2.Metadata,
+		queue.Item,
+		inngest.Edge,
+		// Opcode is the opcode for the offloaded request.
+		statev1.GeneratorOpcode,
+		// Resp is the HTTP response
+		*http.Response,
+		*state.UserError,
 	)
 
 	// OnWaitForEvent is called when a wait for event step is scheduled.  The
@@ -256,6 +271,19 @@ func (NoopLifecyceListener) OnStepFinished(
 	inngest.Edge,
 	*statev1.DriverResponse,
 	error,
+) {
+}
+
+func (NoopLifecyceListener) OnStepGatewayRequestFinished(
+	context.Context,
+	statev2.Metadata,
+	queue.Item,
+	inngest.Edge,
+	// Opcode is the opcode for the offloaded request.
+	statev1.GeneratorOpcode,
+	// Resp is the HTTP response
+	*http.Response,
+	*state.UserError,
 ) {
 }
 

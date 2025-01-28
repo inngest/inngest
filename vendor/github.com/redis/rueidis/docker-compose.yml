@@ -1,12 +1,10 @@
-version: "3.8"
-
 services:
   redis:
-    image: redis:7.2-rc-alpine
+    image: redis:7.4-alpine
     ports:
       - "6379:6379"
   redislock:
-    image: redis:7.2-rc-alpine
+    image: redis:7.4-alpine
     ports:
       - "6376:6379"
   redis5:
@@ -18,7 +16,7 @@ services:
     ports:
       - "6344:6379"
   dragonflydb:
-    image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.4.0
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.20.1
     ports:
       - "6333:6379"
   kvrocks:
@@ -26,19 +24,23 @@ services:
     ports:
       - "6666:6666"
   redisearch:
-    image: redislabs/redisearch:2.4.9
+    image: redislabs/redisearch:2.8.4
     ports:
       - "6377:6379"
   compat:
-    image: redis:7.2-rc-alpine
+    image: redis/redis-stack:7.4.0-v0
     ports:
       - "6378:6379"
   compat5:
     image: redis:5-alpine
     ports:
       - "6356:6379"
+  compat-redisearch:
+    image: redis/redis-stack:7.4.0-v0
+    ports:
+      - "6381:6379"
   sentinel:
-    image: redis:7.2-rc-alpine
+    image: redis:7.4-alpine
     entrypoint:
       - /bin/sh
       - -c
@@ -62,7 +64,7 @@ services:
       - "6385:6385"
       - "26355:26379"
   cluster:
-    image: redis:7.2-rc-alpine
+    image: redis:7.4-alpine
     entrypoint:
       - /bin/sh
       - -c
@@ -107,7 +109,7 @@ services:
       - "7008:7008"
       - "7009:7009"
   clusteradapter:
-    image: redis:7.2-rc-alpine
+    image: redis:7.4-alpine
     entrypoint:
       - /bin/sh
       - -c

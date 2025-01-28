@@ -68,7 +68,7 @@ export default function RunsTable({
       isLoading
         ? columns.map((column) => ({
             ...column,
-            cell: () => <Skeleton className="my-4 block h-4" />,
+            cell: () => <Skeleton className="my-4 block h-3" />,
           }))
         : columns,
     [isLoading]

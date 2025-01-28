@@ -69,7 +69,7 @@ func (loader) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*state.E
 		fn.Function = &w
 		return fn, nil
 	}
- 
+
 	return nil, fmt.Errorf("workflow not found: %s", fnID)
 }
 
@@ -213,9 +213,10 @@ func checkNew_stepdata(t *testing.T, m state.Manager) {
 	init := state.Input{
 		Identifier:     id,
 		EventBatchData: batch,
-		Steps: map[string]any{
-			"step-a": map[string]any{
-				"result": "predetermined",
+		Steps: []state.MemoizedStep{
+			{
+				ID:   "step-a",
+				Data: map[string]any{"result": "predetermined"},
 			},
 		},
 	}
@@ -233,7 +234,7 @@ func checkNew_stepdata(t *testing.T, m state.Manager) {
 
 	data := loaded.Actions()
 	require.Equal(t, 1, len(data), "New should store predetermined step data")
-	require.Equal(t, init.Steps["step-a"], data["step-a"], "New should store predetermined step data")
+	require.Equal(t, init.Steps[0].Data, data["step-a"], "New should store predetermined step data")
 }
 
 func checkUpdateMetadata(t *testing.T, m state.Manager) {
@@ -250,9 +251,10 @@ func checkUpdateMetadata(t *testing.T, m state.Manager) {
 	init := state.Input{
 		Identifier:     id,
 		EventBatchData: batch,
-		Steps: map[string]any{
-			"step-a": map[string]any{
-				"result": "predetermined",
+		Steps: []state.MemoizedStep{
+			{
+				ID:   "step-a",
+				Data: map[string]any{"result": "predetermined"},
 			},
 		},
 		Context: map[string]any{

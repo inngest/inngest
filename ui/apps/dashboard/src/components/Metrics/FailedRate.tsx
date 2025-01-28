@@ -1,5 +1,5 @@
 import React from 'react';
-import { NewLink } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/Link';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { formatDistanceToNow } from '@inngest/components/utils/date';
 
@@ -86,12 +86,12 @@ export const FailedRate = ({
       {rateList?.map((r, i) => (
         <React.Fragment key={`function-failed-list-${i}`}>
           <div className="mt-3 flex w-full flex-row items-center justify-between gap-x-3 text-xs font-light leading-none">
-            <NewLink
+            <Link
               className="text-basis text-xs font-light leading-none hover:no-underline"
               href={`${pathCreator.function({ envSlug: env.slug, functionSlug: r.slug })}/runs`}
             >
               <div className="w-[136px] overflow-hidden text-ellipsis text-nowrap">{r.name}</div>
-            </NewLink>
+            </Link>
             <div className="flex flex-row justify-end gap-x-4">
               <div className="justify-self-end">{r.totalFailures}</div>
               <div className="text-tertiary-moderate">

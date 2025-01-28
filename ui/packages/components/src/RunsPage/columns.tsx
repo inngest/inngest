@@ -2,8 +2,10 @@ import { useMemo } from 'react';
 import { IDCell, PillCell, StatusCell, TextCell, TimeCell } from '@inngest/components/Table';
 import { type FunctionRunStatus } from '@inngest/components/types/functionRun';
 import { formatMilliseconds } from '@inngest/components/utils/date';
+import { RiSparkling2Fill } from '@remixicon/react';
 import { createColumnHelper } from '@tanstack/react-table';
 
+import { AICell } from '../Table/Cell';
 import type { Run, ViewScope } from './types';
 
 const columnHelper = createColumnHelper<Run>();
@@ -63,13 +65,25 @@ const columns = [
       const data = props.row.original;
 
       if (data.isBatch) {
-        return <TextCell>Batch</TextCell>;
+        return (
+          <div className="flex items-center">
+            <TextCell>Batch</TextCell>
+          </div>
+        );
       }
       if (data.cronSchedule) {
-        return <PillCell type="CRON">{data.cronSchedule}</PillCell>;
+        return (
+          <div className="flex items-center">
+            <PillCell type="CRON">{data.cronSchedule}</PillCell>
+          </div>
+        );
       }
       if (data.eventName) {
-        return <PillCell type="EVENT">{data.eventName}</PillCell>;
+        return (
+          <div className="flex items-center">
+            <PillCell type="EVENT">{data.eventName}</PillCell>
+          </div>
+        );
       }
 
       // Unreachable
@@ -81,6 +95,11 @@ const columns = [
   }),
   columnHelper.accessor('function', {
     cell: (info) => {
+      const data = info.row.original;
+
+      if (data.hasAI) {
+        return <AICell>{info.getValue().name}</AICell>;
+      }
       return (
         <div className="flex items-center text-nowrap">
           <TextCell>{info.getValue().name}</TextCell>

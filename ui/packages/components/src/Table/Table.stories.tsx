@@ -21,11 +21,11 @@ const columnHelper = createColumnHelper<Table>();
 const defaultColumns = [
   columnHelper.accessor('firstName', {
     header: () => <span>First Name</span>,
-    cell: (info) => <p className="text-slate-400">{info.getValue()}</p>,
+    cell: (info) => <p className="text-basis">{info.getValue()}</p>,
   }),
   columnHelper.accessor('lastName', {
     header: () => <span>Last Name</span>,
-    cell: (info) => <p className="text-slate-400">{info.getValue()}</p>,
+    cell: (info) => <p className="text-basis">{info.getValue()}</p>,
   }),
 ];
 
@@ -53,7 +53,7 @@ export const Default: Story = {
           getCoreRowModel: getCoreRowModel(),
         }}
         tableContainerRef={tableContainerRef}
-        blankState={<p className="text-slate-400">No names</p>}
+        blankState={<p className="text-basis">No names</p>}
       />
     );
   },
@@ -70,7 +70,7 @@ export const Empty: Story = {
           getCoreRowModel: getCoreRowModel(),
         }}
         tableContainerRef={tableContainerRef}
-        blankState={<p className="text-slate-400">No names</p>}
+        blankState={<p className="text-basis">No names</p>}
       />
     );
   },

@@ -1,7 +1,7 @@
-import { RiArrowRightSLine } from '@remixicon/react';
+import { RiArrowRightSLine, RiSparkling2Fill } from '@remixicon/react';
 
-import { Badge } from '../Badge';
 import { Button } from '../Button';
+import { Pill } from '../Pill';
 import { Time } from '../Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
 import { isFunctionRunStatus } from '../types/functionRun';
@@ -21,9 +21,16 @@ type Props = {
     status: string;
     stepOp?: string | null;
   };
+  isAI?: boolean;
 };
 
-export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, trace }: Props) {
+export function TraceHeading({
+  isExpanded,
+  isExpandable,
+  onClickExpandToggle,
+  trace,
+  isAI,
+}: Props) {
   const isAttempt = trace.stepOp === 'RUN' && (trace.childrenSpans?.length ?? 0) === 0;
   let opCodeBadge;
   if (trace.stepOp && !isAttempt) {
@@ -31,16 +38,15 @@ export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, tr
     const isRetried = (trace.attempts ?? 0) > 1;
 
     opCodeBadge = (
-      <span className="ml-2 flex h-fit">
+      <span className="flex h-fit">
         <Tooltip>
           <TooltipTrigger>
-            <Badge
+            <Pill
               className="border-muted text-subtle border px-1.5"
               flatSide={isRetried ? 'right' : undefined}
-              kind="solid"
             >
               <span>{title}</span>
-            </Badge>
+            </Pill>
           </TooltipTrigger>
           <TooltipContent>Step method</TooltipContent>
         </Tooltip>
@@ -48,13 +54,12 @@ export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, tr
         {(trace.attempts ?? 0) > 1 && (
           <Tooltip>
             <TooltipTrigger>
-              <Badge
+              <Pill
                 className="border-r-1 border-muted text-subtle border-l-0 px-1.5"
                 flatSide="left"
-                kind="solid"
               >
                 <span>{trace.attempts}</span>
-              </Badge>
+              </Pill>
             </TooltipTrigger>
             <TooltipContent>Attempt count</TooltipContent>
           </Tooltip>
@@ -67,9 +72,9 @@ export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, tr
     <div className="text-basis flex w-72 gap-2">
       {isExpandable && (
         <Button
-          btnAction={onClickExpandToggle}
-          className="flex-none"
-          size="small"
+          onClick={onClickExpandToggle}
+          className={cn('flex-none', isExpanded && 'border border-transparent')}
+          kind={isExpanded ? 'primary' : 'secondary'}
           appearance={isExpanded ? 'solid' : 'outlined'}
           icon={
             <RiArrowRightSLine
@@ -80,9 +85,13 @@ export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, tr
       )}
 
       <div className="grow">
-        <div className="flex">
-          <span className="mt-1 h-fit self-start text-sm">{trace.name}</span>
-          <div className="h-8">{opCodeBadge}</div>
+        <div className="flex items-center justify-start gap-2">
+          {isAI && <RiSparkling2Fill className="text-primary-xIntense h-4 w-4" />}
+          <span className={`mt-1 h-fit self-start text-sm ${isAI && 'text-primary-xIntense'}`}>
+            {trace.name}
+          </span>
+
+          {!isAI && <div className="h-8">{opCodeBadge}</div>}
         </div>
         <TimeWithText trace={trace} />
       </div>

@@ -42,12 +42,7 @@ export default async function RootLayout({
       <Layout activeEnv={env}>
         <Env env={env}>{children}</Env>
       </Layout>
-      <Toaster
-        toastOptions={{
-          // Ensure that the toast is clickable when there are overlays/modals
-          className: 'pointer-events-auto',
-        }}
-      />
+      <Toaster />
     </>
   );
 }

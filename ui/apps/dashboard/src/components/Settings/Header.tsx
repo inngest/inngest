@@ -8,11 +8,10 @@ import { Header, type BreadCrumbType } from '@inngest/components/Header/Header';
 // are their own top level pages with their own breadcrumb
 const paths: [string, string][] = [
   ['/integrations', 'Integrations'],
-  ['/billing', 'Billing'],
   ['/organization', 'Organization'],
   ['/organization/organization-members', 'Members'],
-  ['/user', 'Your profile'],
-  ['/user/security', 'Account Security'],
+  ['/user', 'Profile'],
+  ['/user/security', 'Profile'],
 ];
 
 const defined = <T,>(value: T | undefined): value is T => value !== undefined;
@@ -24,9 +23,24 @@ const getBreadCrumbs = (pathname: string): BreadCrumbType[] =>
     ? [{ text: 'Integrations', href: `/settings/integrations` }, { text: 'Neon' }]
     : paths.map(([path, text]) => (pathname.endsWith(path) ? { text } : undefined)).filter(defined);
 
+const userTabs = [
+  {
+    children: 'General',
+    href: '/settings/user',
+    exactRouteMatch: true,
+  },
+  {
+    children: 'Security',
+    href: '/settings/user/security',
+  },
+];
+
 export const SettingsHeader = () => {
   const pathname = usePathname();
   const breadcrumb: BreadCrumbType[] = getBreadCrumbs(pathname);
+  const isProfilePage = pathname.includes('settings/user');
 
-  return <Header backNav={true} breadcrumb={breadcrumb} />;
+  return (
+    <Header backNav={true} breadcrumb={breadcrumb} tabs={isProfilePage ? userTabs : undefined} />
+  );
 };

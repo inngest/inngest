@@ -1,11 +1,13 @@
 import type { Route } from 'next';
+import { RiArrowRightUpLine } from '@remixicon/react';
 
+import { AITrace } from '../AI/AITrace';
+import { parseAIOutput } from '../AI/utils';
 import { CancelRunButton } from '../CancelRunButton';
 import { Card } from '../Card';
 import {
   ElementWrapper,
   IDElement,
-  LazyElementWrapper,
   LinkElement,
   OptimisticElementWrapper,
   TextElement,
@@ -15,6 +17,7 @@ import { Link } from '../Link';
 import { RerunButton } from '../RerunButtonV2';
 import { RunResult } from '../RunResult';
 import type { Run as InitialRunData } from '../RunsPage/types';
+import { AICell } from '../Table/Cell';
 import type { Result } from '../types/functionRun';
 import { cn } from '../utils/classNames';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
@@ -30,6 +33,7 @@ type Props = {
     runPopout: (params: { runID: string }) => Route;
   };
   rerun: (args: { fnID: string; runID: string }) => Promise<unknown>;
+  rerunFromStep: React.ComponentProps<typeof RunResult>['rerunFromStep'];
   initialRunData?: InitialRunData;
   run: Lazy<Run>;
   runID: string;
@@ -53,7 +57,9 @@ type Run = {
     queuedAt: string;
     startedAt: string | null;
     status: string;
+    stepID?: string | null;
   };
+  hasAI: boolean;
 };
 
 export function RunInfo({
@@ -61,6 +67,7 @@ export function RunInfo({
   className,
   pathCreator,
   rerun,
+  rerunFromStep,
   initialRunData,
   run,
   runID,
@@ -69,17 +76,29 @@ export function RunInfo({
 }: Props) {
   let allowCancel = false;
   let isSuccess = false;
+  let stepID = null;
+
   if (isLazyDone(run)) {
     allowCancel = !Boolean(run.trace.endedAt);
     isSuccess = run.trace.status === 'COMPLETED';
+    stepID = run.trace.stepID;
   }
+
+  const aiOutput = result?.data ? parseAIOutput(result.data) : undefined;
 
   return (
     <div className={cn('flex flex-col gap-5', className)}>
       <Card>
         <Card.Header className="h-11 flex-row items-center gap-2">
           <div className="text-basis flex grow items-center gap-2">
-            Run details {!standalone && <Link href={pathCreator.runPopout({ runID })} />}
+            Run details{' '}
+            {!standalone && (
+              <Link
+                size="medium"
+                href={pathCreator.runPopout({ runID })}
+                iconAfter={<RiArrowRightUpLine className="h-4 w-4 shrink-0" />}
+              />
+            )}
           </div>
 
           <CancelRunButton disabled={!allowCancel} onClick={cancelRun} />
@@ -109,11 +128,7 @@ export function RunInfo({
               >
                 {(run: Run) => {
                   return (
-                    <LinkElement
-                      internalNavigation
-                      href={pathCreator.app({ externalAppID: run.app.externalID })}
-                      showIcon={false}
-                    >
+                    <LinkElement href={pathCreator.app({ externalAppID: run.app.externalID })}>
                       {run.app.name}
                     </LinkElement>
                   );
@@ -128,12 +143,8 @@ export function RunInfo({
               >
                 {(run: Run) => {
                   return (
-                    <LinkElement
-                      internalNavigation
-                      href={pathCreator.function({ functionSlug: run.fn.slug })}
-                      showIcon={false}
-                    >
-                      {run.fn.name}
+                    <LinkElement href={pathCreator.function({ functionSlug: run.fn.slug })}>
+                      {run.hasAI ? <AICell>{run.fn.name}</AICell> : run.fn.name}
                     </LinkElement>
                   );
                 }}
@@ -209,10 +220,20 @@ export function RunInfo({
                   return <TimeElement date={endedAt} />;
                 }}
               </OptimisticElementWrapper>
+              {aiOutput && <AITrace aiOutput={aiOutput} />}
             </dl>
           </div>
         </Card.Content>
-        {!result &&
+        {result ? (
+          <RunResult
+            className="border-muted border-t"
+            result={result}
+            runID={runID}
+            stepID={stepID}
+            rerunFromStep={rerunFromStep}
+            isSuccess={isSuccess}
+          />
+        ) : (
           !isLazyDone(run) &&
           (initialRunData?.status === 'QUEUED' ? (
             <div className="border-muted bg-canvas border-t">
@@ -226,9 +247,7 @@ export function RunInfo({
                 </p>
               </div>
             </div>
-          ) : null)}
-        {result && (
-          <RunResult className="border-muted border-t" result={result} isSuccess={isSuccess} />
+          ) : null)
         )}
       </Card>
     </div>

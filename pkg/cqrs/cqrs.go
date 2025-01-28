@@ -33,6 +33,9 @@ type Manager interface {
 	TraceReadWriter
 	TraceWriterDev
 
+	// Connection history
+	ConnectionHistoryReadWriter
+
 	// Scoped allows creating a new manager using a transaction.
 	WithTx(ctx context.Context) (TxManager, error)
 }

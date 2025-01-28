@@ -209,9 +209,9 @@ An SDK MAY support these optional variables, as well as specify any of their own
 Recommended as an environment variable to use when debugging issues with an SDK, allowing a Developer to control the log level of the SDK’s internals.
 - `INNGEST_DEV`
 Recommended as a way for the user to inform an SDK that it should connect to an Inngest Dev Server, either by providing a value of `1` or an origin to use. See Targeting an Inngest Server [[4.2.1](#421-targeting-an-inngest-server)].
-- `INNGEST_API_ORIGIN`
+- `INNGEST_API_BASE_URL`
 Can be used to allow a Developer to inform the SDK of where it can access the target Inngest Server’s API [[4.2](#42-kinds-of-inngest-server)]. In most situations, use of `INNGEST_DEV` will suffice, but this environment variable provides more fine-grained control.
-- `INNGEST_EVENT_API_ORIGIN`
+- `INNGEST_EVENT_API_BASE_URL`
 Can be used to allow a Developer to inform the SDK of where it should send Events to [[4.2](#42-kinds-of-inngest-server)]. In most situations, use of `INNGEST_DEV` will suffice, but this environment variable provides more fine-grained control.
 - `INNGEST_SERVE_ORIGIN`
 Because an SDK exposes an HTTP endpoint for Inngest to contact, the SDK needs to know the URL at which it exists. Sometimes this can be inferred, but it may also be useful to allow a Developer to set this manually. This environment variable sets the origin and appends the discovered path or `INNGEST_SERVE_PATH`.
@@ -922,7 +922,7 @@ The following is schema version `2024-05-24`:
   // Will be null if the request was unsigned and false if the request was
   // signed but failed validation
   authentication_succeeded: false | null
-  
+
   extra?: Record<string, any>
 	function_count: number
 	has_event_key: boolean

@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
+import { InlineCode } from '@inngest/components/Code';
 import CommandBlock from '@inngest/components/CodeBlock/CommandBlock';
-import { NewLink } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { useDevServer } from '@inngest/components/utils/useDevServer';
 import { RiCheckboxCircleFill, RiExternalLinkLine } from '@remixicon/react';
@@ -11,6 +12,8 @@ import { RiCheckboxCircleFill, RiExternalLinkLine } from '@remixicon/react';
 import { pathCreator } from '@/utils/urls';
 import { OnboardingSteps } from '../Onboarding/types';
 import useOnboardingStep from './useOnboardingStep';
+import { useOnboardingTracking } from './useOnboardingTracking';
+import { getNextStepName } from './utils';
 
 const tabs = [
   {
@@ -31,30 +34,33 @@ const tabs = [
 ];
 
 export default function CreateApp() {
-  const { updateLastCompletedStep } = useOnboardingStep();
+  const currentStepName = OnboardingSteps.CreateApp;
+  const nextStepName = getNextStepName(currentStepName);
+  const { updateCompletedSteps } = useOnboardingStep();
   const [activeTab, setActiveTab] = useState(tabs[0]?.title || '');
   const currentTabContent = tabs.find((tab) => tab.title === activeTab) || tabs[0];
   const router = useRouter();
   const { isRunning: devServerIsRunning } = useDevServer(2500);
+  const tracking = useOnboardingTracking();
 
   return (
     <div className="text-subtle">
       <p className="mb-6 text-sm">
-        Inngest “App” is a group of functions served on a single endpoint or server. The first step
-        is to create your app and functions, serve it, and test it locally with the Inngest Dev
-        Server.
+        An Inngest &quot;App&quot; is a group of functions served on a single endpoint or server.
+        The first step is to create your app and functions, serve it, and test it locally with the
+        Inngest Dev Server.
       </p>
       <p className="mb-6 text-sm">
         The Dev Server will guide you through setup and help you build and test functions end to
         end.{' '}
-        <NewLink
+        <Link
           className="inline-block"
           size="small"
           target="_blank"
           href="https://www.inngest.com/docs/local-development?ref=app-onboarding-create-app"
         >
           Learn more about local development
-        </NewLink>
+        </Link>
       </p>
       <p className="mb-2 text-sm">
         Run the following CLI command on your machine to get the Inngest Dev Server started locally:
@@ -70,7 +76,7 @@ export default function CreateApp() {
         <div className="flex items-center justify-between gap-2 p-4">
           <div>
             <div className="mb-1 flex items-center gap-1">
-              <p className=" text-basis text-base font-medium">Dev Server UI</p>
+              <p className=" text-basis text-base font-medium">Dev Server</p>
               {devServerIsRunning && (
                 <div className="text-success flex items-center gap-0.5 text-sm">
                   <RiCheckboxCircleFill className="h-4 w-4" />
@@ -79,15 +85,12 @@ export default function CreateApp() {
               )}
             </div>
             <p className="text-sm">
-              Open the Dev Server at{' '}
-              <code className="text-basis bg-canvasMuted rounded-sm px-1.5 py-0.5 text-xs">
-                http://localhost:8288
-              </code>{' '}
-              and follow the guide to create your app.
+              Open the Dev Server at <InlineCode>http://localhost:8288</InlineCode> and follow the
+              guide to create your app.
             </p>
           </div>
           {devServerIsRunning ? (
-            <NewButton
+            <Button
               icon={<RiExternalLinkLine />}
               iconSide="left"
               appearance="outlined"
@@ -95,6 +98,11 @@ export default function CreateApp() {
               href="http://localhost:8288"
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() =>
+                tracking?.trackOnboardingAction(currentStepName, {
+                  metadata: { type: 'btn-click', label: 'open-dev-server' },
+                })
+              }
             />
           ) : (
             <div className="text-link flex items-center gap-1.5 text-sm">
@@ -105,21 +113,34 @@ export default function CreateApp() {
         </div>
       </Card>
       <div className="flex items-center gap-2">
-        <NewButton
+        <Button
           label="Next"
           disabled={!devServerIsRunning}
           onClick={() => {
-            updateLastCompletedStep(OnboardingSteps.CreateApp, 'manual');
-            router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.DeployApp }));
+            updateCompletedSteps(currentStepName, {
+              metadata: {
+                completionSource: 'manual',
+              },
+            });
+            tracking?.trackOnboardingAction(currentStepName, {
+              metadata: { type: 'btn-click', label: 'next' },
+            });
+            router.push(pathCreator.onboardingSteps({ step: nextStepName }));
           }}
         />
-        {/* TODO: add tracking */}
-        <NewButton
+        <Button
           appearance="outlined"
           label="I already have an Inngest app"
           onClick={() => {
-            updateLastCompletedStep(OnboardingSteps.CreateApp, 'manual');
-            router.push(pathCreator.onboardingSteps({ step: OnboardingSteps.DeployApp }));
+            updateCompletedSteps(currentStepName, {
+              metadata: {
+                completionSource: 'manual',
+              },
+            });
+            tracking?.trackOnboardingAction(currentStepName, {
+              metadata: { type: 'btn-click', label: 'skip' },
+            });
+            router.push(pathCreator.onboardingSteps({ step: nextStepName }));
           }}
         />
       </div>

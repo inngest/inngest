@@ -21,11 +21,11 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 
 import SendEventButton from '@/components/Event/SendEventButton';
 import { useCancelRun } from '@/hooks/useCancelRun';
-import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import { useGetRun } from '@/hooks/useGetRun';
 import { useGetTraceResult } from '@/hooks/useGetTraceResult';
 import { useGetTrigger } from '@/hooks/useGetTrigger';
 import { useRerun } from '@/hooks/useRerun';
+import { useRerunFromStep } from '@/hooks/useRerunFromStep';
 import { client } from '@/store/baseApi';
 import {
   CountRunsDocument,
@@ -39,7 +39,6 @@ import { pathCreator } from '@/utils/pathCreator';
 const pollInterval = 400;
 
 export default function Page() {
-  const { featureFlags } = useFeatureFlags();
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [filterApp] = useStringArraySearchParam('filterApp');
   const [totalCount, setTotalCount] = useState<number>();
@@ -134,6 +133,7 @@ export default function Page() {
 
   const cancelRun = useCancelRun();
   const rerun = useRerun();
+  const rerunFromStep = useRerunFromStep();
   const getTraceResult = useGetTraceResult();
   const getTrigger = useGetTrigger();
   const getRun = useGetRun();
@@ -157,8 +157,6 @@ export default function Page() {
     // TODO: What should this do?
   }, []);
 
-  const isSearchEnabled = featureFlags.FEATURE_CEL_SEARCH;
-
   return (
     <>
       <Header
@@ -166,7 +164,7 @@ export default function Page() {
         action={
           <div className="flex flex-row items-center gap-x-1">
             <SendEventButton
-              label="Send Test Event"
+              label="Send test event"
               data={JSON.stringify({
                 name: '',
                 data: {},
@@ -199,11 +197,12 @@ export default function Page() {
         getTraceResult={getTraceResult}
         getTrigger={getTrigger}
         rerun={rerun}
+        rerunFromStep={rerunFromStep}
         pathCreator={pathCreator}
         pollInterval={pollInterval}
         scope="env"
         totalCount={totalCount}
-        hasSearchFlag={isSearchEnabled}
+        traceAIEnabled={false}
       />
     </>
   );

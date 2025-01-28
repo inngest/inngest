@@ -1,7 +1,10 @@
 package golang
 
 import (
+	"context"
 	"fmt"
+	"github.com/inngest/inngest/pkg/logger"
+	"log/slog"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -11,7 +14,6 @@ import (
 
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/slog"
 )
 
 const DEV_URL = "http://127.0.0.1:8288"
@@ -59,6 +61,42 @@ func NewSDKHandler(t *testing.T, appID string, hopts ...opt) (inngestgo.Handler,
 		_ = resp.Body.Close()
 	}
 	return h, server, r
+}
+
+func WithBuildId(buildId string) opt {
+	return func(h *inngestgo.HandlerOpts) {
+		h.BuildId = &buildId
+	}
+}
+
+func WithInstanceId(instanceId string) opt {
+	return func(h *inngestgo.HandlerOpts) {
+		h.InstanceId = &instanceId
+	}
+}
+
+func NewSDKConnectHandler(t *testing.T, appID string, hopts ...opt) inngestgo.Handler {
+	t.Helper()
+
+	key := "test"
+	inngestgo.DefaultClient = inngestgo.NewClient(inngestgo.ClientOpts{
+		EventKey: &key,
+	})
+
+	_ = os.Setenv("INNGEST_DEV", DEV_URL)
+
+	opts := inngestgo.HandlerOpts{
+		RegisterURL: inngestgo.StrPtr(fmt.Sprintf("%s/fn/register", DEV_URL)),
+		Logger:      logger.StdlibLogger(context.Background()),
+	}
+
+	for _, o := range hopts {
+		o(&opts)
+	}
+
+	h := inngestgo.NewHandler(appID, opts)
+
+	return h
 }
 
 type HTTPServer struct {

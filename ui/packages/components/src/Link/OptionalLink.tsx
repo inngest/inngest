@@ -1,19 +1,19 @@
 import type { UrlObject } from 'url';
 import type { ReactNode } from 'react';
-import Link, { type LinkProps } from 'next/link';
+import NextLink, { type LinkProps as NextLinkProps } from 'next/link';
 
 export const OptionalLink = ({
   children,
   href,
   ...props
-}: Omit<LinkProps, 'href'> & {
+}: Omit<NextLinkProps, 'href'> & {
   href?: string | UrlObject;
   children: ReactNode;
 }) =>
   href ? (
-    <Link href={href} {...props}>
+    <NextLink href={href} {...props}>
       {children}
-    </Link>
+    </NextLink>
   ) : (
     <>{children}</>
   );

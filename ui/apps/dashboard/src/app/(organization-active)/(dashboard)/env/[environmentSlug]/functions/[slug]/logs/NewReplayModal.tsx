@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
+import { InlineCode } from '@inngest/components/Code';
 import { RangePicker } from '@inngest/components/DatePicker';
 import { Input } from '@inngest/components/Forms/Input';
 import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcons';
@@ -17,24 +18,18 @@ import { ulid } from 'ulid';
 import { useMutation, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import Placeholder from '@/components/Placeholder';
 import { graphql } from '@/gql';
 import { ReplayRunStatus } from '@/gql/graphql';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 
-const GetBillingPlanDocument = graphql(`
-  query GetBillingPlan {
+const GetAccountEntitlementsDocument = graphql(`
+  query GetAccountEntitlements {
     account {
-      plan {
-        id
-        name
-        features
+      entitlements {
+        history {
+          limit
+        }
       }
-    }
-
-    plans {
-      name
-      features
     }
   }
 `);
@@ -107,11 +102,11 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
   const environment = useEnvironment();
 
   const [{ data: planData }] = useQuery({
-    query: GetBillingPlanDocument,
+    query: GetAccountEntitlementsDocument,
   });
 
-  const logRetention = Number(planData?.account.plan?.features.log_retention);
-  const upgradeCutoff = subtractDuration(new Date(), { days: logRetention || 7 });
+  const logRetention = planData?.account.entitlements.history.limit || 7;
+  const upgradeCutoff = subtractDuration(new Date(), { days: logRetention });
 
   const { data, isLoading } = useSkippableGraphQLQuery({
     query: GetReplayRunCountsDocument,
@@ -272,14 +267,14 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
                   {timeRange && (
                     <p aria-label={`Number of ${label} runs`} className="text-muted text-sm">
                       {isLoading ? (
-                        <Placeholder className="top-px inline-flex h-3 w-3 bg-slate-200" />
+                        <span>Loading</span>
                       ) : (
                         count.toLocaleString(undefined, {
                           notation: 'compact',
                           compactDisplay: 'short',
                         })
                       )}{' '}
-                      runs
+                      runs {isLoading ? '...' : undefined}
                     </p>
                   )}
                 </ToggleGroup.Item>
@@ -291,41 +286,39 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
           <div className="text-muted bg-canvasSubtle rounded-md px-6 py-4 text-sm">
             <p>
               Note: Replayed functions are re-run from the beginning. Previously run steps and
-              function states will not be reused during the replay. The <code>event.user</code>{' '}
-              object will be empty for all runs in the replay.
+              function states will not be reused during the replay. The{' '}
+              <InlineCode>event.user</InlineCode> object will be empty for all runs in the replay.
             </p>
-            <Link href="https://inngest.com/docs/platform/replay">Learn more about replay</Link>
+            <Link target="_blank" href="https://inngest.com/docs/platform/replay">
+              Learn more about replay
+            </Link>
           </div>
         </div>
-        <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-5 py-4">
+        <div className="border-subtle flex items-center justify-between gap-2 border-t px-5 py-4">
           {!timeRange && <p></p>}
-          {timeRange && (
+          {timeRange && !isLoading && (
             <div className="flex items-center gap-2">
               <p className="text-muted inline-flex items-center gap-1.5 text-sm">
                 <RiInformationLine className="h-5 w-5" />A total of{' '}
                 <span className="font-bold">
-                  {isLoading ? (
-                    <Placeholder className="top-px inline-flex h-4 w-4 bg-slate-200" />
-                  ) : (
-                    selectedRunsCount.toLocaleString(undefined, {
-                      notation: 'compact',
-                      compactDisplay: 'short',
-                    })
-                  )}
+                  {selectedRunsCount.toLocaleString(undefined, {
+                    notation: 'compact',
+                    compactDisplay: 'short',
+                  })}
                 </span>
                 runs will be replayed.
               </p>
             </div>
           )}
           <div className="flex gap-2">
-            <NewButton
+            <Button
               type="button"
               appearance="outlined"
               kind="secondary"
               label="Cancel"
               onClick={onClose}
             />
-            <NewButton
+            <Button
               label="Replay Function"
               kind="primary"
               type="submit"

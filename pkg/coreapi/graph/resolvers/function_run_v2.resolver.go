@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	loader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -18,7 +18,7 @@ func (r *functionRunV2Resolver) App(
 }
 
 func (r *functionRunV2Resolver) Function(ctx context.Context, fn *models.FunctionRunV2) (*models.Function, error) {
-	fun, err := r.Data.GetFunctionByInternalUUID(ctx, uuid.UUID{}, fn.FunctionID)
+	fun, err := r.Data.GetFunctionByInternalUUID(ctx, consts.DevServerEnvId, fn.FunctionID)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving function: %w", err)
 	}

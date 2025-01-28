@@ -3,7 +3,6 @@
 import React from 'react';
 import { TooltipProvider } from '@inngest/components/Tooltip';
 import { Toaster } from 'sonner';
-import colors from 'tailwindcss/colors';
 
 import Layout from '@/components/Layout/Layout';
 
@@ -14,9 +13,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <React.Suspense>{children}</React.Suspense>
 
         <Toaster
-          theme="dark"
           toastOptions={{
-            style: { background: colors.slate['700'] },
+            className: 'drop-shadow-lg',
+            style: {
+              background: `rgb(var(--color-background-canvas-base))`,
+              borderRadius: 0,
+              borderWidth: '0px 0px 2px',
+              color: `rgb(var(--color-foreground-base))`,
+            },
           }}
         />
       </Layout>

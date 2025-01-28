@@ -1,14 +1,11 @@
 import { Fragment } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
+import { Pill } from '@inngest/components/Pill/Pill';
 import { RiArrowDownSLine } from '@remixicon/react';
 import dayjs from 'dayjs';
 import { useQuery } from 'urql';
 
-import {
-  getMinimumPlanForLogRetention,
-  transformPlans,
-  type TimeRange,
-} from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
+import { type TimeRange } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
 import { graphql } from '@/gql';
 
 const currentTime = new Date();
@@ -67,19 +64,14 @@ export function getTimeRangeByKey(key: string): TimeRange | undefined {
   return timeRanges.find((timeRange) => timeRange.key === key);
 }
 
-const GetBillingPlanDocument = graphql(`
-  query GetBillingPlan {
+const GetAccountEntitlementsDocument = graphql(`
+  query GetAccountEntitlements {
     account {
-      plan {
-        id
-        name
-        features
+      entitlements {
+        history {
+          limit
+        }
       }
-    }
-
-    plans {
-      name
-      features
     }
   }
 `);
@@ -95,20 +87,10 @@ export default function DashboardTimeRangeFilter({
   onTimeRangeChange,
 }: DashboardTimeRangeFilterProps) {
   const [{ data }] = useQuery({
-    query: GetBillingPlanDocument,
+    query: GetAccountEntitlementsDocument,
   });
 
-  // Since "features" is a map, we can't be 100% sure that there's a log
-  // retention value. So default to 7 days.
-  let logRetention = 7;
-  if (typeof data?.account.plan?.features.log_retention === 'number') {
-    logRetention = data.account.plan.features.log_retention;
-  }
-
-  let plans: ReturnType<typeof transformPlans> | undefined;
-  if (data?.plans) {
-    plans = transformPlans(data.plans);
-  }
+  const logRetention = data?.account.entitlements.history.limit || 7;
 
   return (
     <Listbox value={selectedTimeRange} onChange={onTimeRangeChange}>
@@ -116,7 +98,7 @@ export default function DashboardTimeRangeFilter({
         <>
           <Listbox.Label className="sr-only">Filter by time</Listbox.Label>
           <div className="relative">
-            <Listbox.Button className="shadow-outline-secondary-light group inline-flex items-center gap-1 rounded-[6px] bg-slate-50 px-3 py-[5px] text-sm font-medium capitalize text-slate-800 hover:bg-slate-100 focus:outline-indigo-500">
+            <Listbox.Button className="border-subtle bg-canvasBase text-basis hover:bg-canvasSubtle focus:outline-primary-moderate group inline-flex items-center gap-1 rounded-[6px] border px-3 py-[5px] text-sm font-medium capitalize">
               <p>Last {getTimeRangeLabel(selectedTimeRange)}</p>
               <RiArrowDownSLine className="h-4 w-4" aria-hidden="true" />
             </Listbox.Button>
@@ -128,7 +110,7 @@ export default function DashboardTimeRangeFilter({
               leaveFrom="opacity-100"
               leaveTo="opacity-0"
             >
-              <Listbox.Options className="shadow-floating absolute right-0 z-10 mt-[5px] w-52 origin-top-right overflow-hidden rounded-md bg-white/95 py-[9px] ring-1 ring-black/5 backdrop-blur-[3px] focus:outline-none">
+              <Listbox.Options className="shadow-floating bg-canvasBase absolute right-0 z-10 mt-[5px] w-52 origin-top-right overflow-hidden rounded-md py-[9px] ring-1 ring-black/5 backdrop-blur-[3px] focus:outline-none">
                 {timeRanges.map((timeRange) => {
                   const timeRangeStartInDaysAgo = dayjs(currentTime).diff(
                     dayjs(timeRange.start),
@@ -136,23 +118,19 @@ export default function DashboardTimeRangeFilter({
                   );
 
                   const isPlanSufficient = timeRangeStartInDaysAgo <= logRetention;
-                  let minimumPlanName: string | undefined = undefined;
-                  if (plans) {
-                    minimumPlanName = getMinimumPlanForLogRetention(plans, timeRangeStartInDaysAgo);
-                  }
 
                   return (
                     <Listbox.Option
                       key={timeRange.end.valueOf() - timeRange.start.valueOf()}
-                      className="ui-selected:bg-indigo-100 ui-disabled:text-slate-400 ui-selected:text-indigo-700 flex cursor-pointer select-none items-center justify-between px-3.5 py-1 text-sm font-medium capitalize text-slate-800 hover:bg-slate-100 focus:outline-none"
+                      className="ui-selected:bg-canvasSubtle ui-selected:text-success ui-selected:font-medium ui-active:bg-canvasSubtle/50 text-basis flex select-none items-center justify-between px-3.5 py-1 text-sm focus:outline-none"
                       value={timeRange}
                       disabled={!isPlanSufficient}
                     >
                       {getTimeRangeLabel(timeRange)}{' '}
-                      {!isPlanSufficient && minimumPlanName && (
-                        <span className="inline-flex items-center rounded px-[5px] py-0.5 text-[12px] font-semibold leading-tight text-indigo-500 ring-1 ring-inset ring-indigo-300">
-                          {minimumPlanName} Plan
-                        </span>
+                      {!isPlanSufficient && (
+                        <Pill kind="primary" appearance="outlined">
+                          Upgrade Plan
+                        </Pill>
                       )}
                     </Listbox.Option>
                   );

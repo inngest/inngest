@@ -4,7 +4,6 @@ import React, { useCallback, useState } from 'react';
 import { Header } from '@inngest/components/Header/Header';
 import { InvokeModal } from '@inngest/components/InvokeButton';
 import { Pill } from '@inngest/components/Pill';
-import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { RiPauseCircleLine } from '@remixicon/react';
 import { useMutation } from 'urql';
 
@@ -48,6 +47,7 @@ export default function FunctionLayout({
   const env = useEnvironment();
 
   const isBulkCancellationEnabled = useBooleanFlag('bulk-cancellation-ui');
+  const isOldRunsPageEnabled = useBooleanFlag('old-runs-page');
 
   const fn = data?.workspace.workflow;
   const { isArchived = false, isPaused } = fn ?? {};
@@ -124,6 +124,7 @@ export default function FunctionLayout({
             </Pill>
           )
         }
+        loading={fetching}
         action={
           <div className="flex flex-row items-center justify-end">
             <ActionsMenu
@@ -143,15 +144,19 @@ export default function FunctionLayout({
             exactRouteMatch: true,
           },
           { children: 'Runs', href: `/env/${environmentSlug}/functions/${slug}/runs` },
-          {
-            children: (
-              <div className="m-0 flex flex-row items-center justify-start space-x-1 p-0">
-                <div>Old runs</div>
-                <Pill kind="info">Legacy</Pill>
-              </div>
-            ),
-            href: `/env/${environmentSlug}/functions/${slug}/logs`,
-          },
+          ...(isOldRunsPageEnabled.isReady && isOldRunsPageEnabled.value
+            ? [
+                {
+                  children: (
+                    <div className="m-0 flex flex-row items-center justify-start space-x-1 p-0">
+                      <div>Old runs</div>
+                      <Pill kind="info">Legacy</Pill>
+                    </div>
+                  ),
+                  href: `/env/${environmentSlug}/functions/${slug}/logs`,
+                },
+              ]
+            : []),
           { children: 'Replay history', href: `/env/${environmentSlug}/functions/${slug}/replay` },
           ...(isBulkCancellationEnabled.isReady && isBulkCancellationEnabled.value
             ? [
@@ -163,7 +168,6 @@ export default function FunctionLayout({
             : []),
         ]}
       />
-      {fetching && <Skeleton className="h-36 w-full" />}
       {children}
     </>
   );
