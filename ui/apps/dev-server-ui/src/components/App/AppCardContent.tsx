@@ -30,15 +30,9 @@ const getAppCardContent = ({ app }: { app: GetAppsQuery['apps'][number] }) => {
       <span>
         {app.functionCount} {app.functionCount === 1 ? 'function' : 'functions'} found
       </span>
-      {app.connectionType === AppConnectionType.Connect ? (
-        <Link size="small" href={`/apps/app?id=${app.id}`} arrowOnHover>
-          View details
-        </Link>
-      ) : (
-        <Link size="small" href="/functions" arrowOnHover>
-          View functions
-        </Link>
-      )}
+      <Link size="small" href="/functions" arrowOnHover>
+        View functions
+      </Link>
     </div>
   );
 

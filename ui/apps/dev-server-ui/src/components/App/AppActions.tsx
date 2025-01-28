@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import {
   DropdownMenu,
@@ -8,7 +7,7 @@ import {
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
 import { AlertModal } from '@inngest/components/Modal';
-import { RiArrowRightLine, RiDeleteBinLine, RiMore2Line } from '@remixicon/react';
+import { RiDeleteBinLine, RiMore2Line } from '@remixicon/react';
 import { toast } from 'sonner';
 
 import { useDeleteAppMutation } from '@/store/generated';
@@ -16,7 +15,6 @@ import { useDeleteAppMutation } from '@/store/generated';
 export default function AppActions({ id, name }: { id: string; name: string }) {
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
   const [_deleteApp] = useDeleteAppMutation();
-  const router = useRouter();
 
   async function deleteApp() {
     try {

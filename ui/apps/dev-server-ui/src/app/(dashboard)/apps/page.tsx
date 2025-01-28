@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { AppCard } from '@inngest/components/Apps/AppCard';
+import { Button } from '@inngest/components/Button/Button';
 import { InlineCode } from '@inngest/components/Code';
 import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
@@ -52,7 +53,18 @@ export default function AppList() {
                 </>
               ) : null
             }
-            actions={!app.autodiscovered ? <AppActions id={app.id} name={app.name} /> : null}
+            actions={
+              <div className="flex items-center gap-2">
+                {app.connectionType === AppConnectionType.Connect && (
+                  <Button
+                    appearance="outlined"
+                    label="View details"
+                    href={`/apps/app?id=${app.id}`}
+                  />
+                )}
+                {!app.autodiscovered && <AppActions id={app.id} name={app.name} />}
+              </div>
+            }
           />
           <AppCard.Footer kind={appKind} header={footerHeader} content={footerContent} />
         </AppCard>
