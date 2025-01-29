@@ -1,11 +1,9 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-
 import { EmptyActiveCard, EmptyArchivedCard } from '@/components/Apps/EmptyAppsCard';
+import { UnattachedSyncsCard } from '@/components/Apps/UnattachedSyncsCard';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { AppCard, SkeletonCard } from './AppCard';
-import { UnattachedSyncsCard } from './UnattachedSyncsCard';
 import { useApps } from './useApps';
 
 type Props = {
@@ -14,7 +12,6 @@ type Props = {
 
 export function Apps({ isArchived = false }: Props) {
   const env = useEnvironment();
-  const router = useRouter();
 
   const res = useApps({ envID: env.id, isArchived });
   if (res.error) {
