@@ -7,19 +7,19 @@ export const workerStatuses = [
 ] as const;
 type WorkerStatus = (typeof workerStatuses)[number];
 
-// We only display three statuses for workers: ACTIVE, INACTIVE, and FAILED
-export const convertWorkerStatus = (status: WorkerStatus): GroupedWorkerStatus | 'UNKNOWN' => {
+// We only display three statuses for workers: ACTIVE, INACTIVE, and DISCONNECTED
+export const convertWorkerStatus = (status: WorkerStatus): GroupedWorkerStatus => {
   switch (status) {
     case 'READY':
       return 'ACTIVE';
     case 'DISCONNECTED':
-      return 'FAILED';
+      return 'DISCONNECTED';
     case 'DISCONNECTING':
     case 'CONNECTED':
     case 'DRAINING':
       return 'INACTIVE';
     default:
-      return 'UNKNOWN';
+      return status;
   }
 };
 
@@ -39,7 +39,7 @@ export type Worker = {
   functionCount: number;
 };
 
-export const groupedWorkerStatuses = ['ACTIVE', 'INACTIVE', 'FAILED'] as const;
+export const groupedWorkerStatuses = ['ACTIVE', 'INACTIVE', 'DISCONNECTED'] as const;
 
 export type GroupedWorkerStatus = (typeof groupedWorkerStatuses)[number];
 

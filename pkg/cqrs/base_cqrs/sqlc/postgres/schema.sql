@@ -11,7 +11,8 @@ CREATE TABLE apps (
 	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	archived_at TIMESTAMP,
 	url VARCHAR NOT NULL,
-	is_connect BOOLEAN
+	is_connect BOOLEAN,
+    connection_type VARCHAR(32) NOT NULL DEFAULT 'serverless'
 );
 
 -- XXX: - this is very basic right now.  it does not conform to the cloud.

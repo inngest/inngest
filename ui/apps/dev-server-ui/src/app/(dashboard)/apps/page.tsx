@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { AppCard } from '@inngest/components/Apps/AppCard';
+import { Button } from '@inngest/components/Button/Button';
 import { InlineCode } from '@inngest/components/Code';
 import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
@@ -15,7 +16,7 @@ import AppActions from '@/components/App/AppActions';
 import getAppCardContent from '@/components/App/AppCardContent';
 import AppFAQ from '@/components/App/AppFAQ';
 import { useInfoQuery } from '@/store/devApi';
-import { useGetAppsQuery } from '@/store/generated';
+import { AppConnectionType, useGetAppsQuery } from '@/store/generated';
 
 export default function AppList() {
   const { data } = useGetAppsQuery(undefined, { pollingInterval: 1500 });
@@ -33,8 +34,8 @@ export default function AppList() {
           <AppCard.Content
             app={{
               ...app,
+              url: app.connectionType === AppConnectionType.Connect ? '' : app.url,
               name: !app.name ? 'Syncing...' : !app.connected ? `Syncing to ${app.name}` : app.name,
-              syncMethod: 'SERVERLESS',
             }}
             pill={
               status || app.autodiscovered ? (
@@ -52,7 +53,18 @@ export default function AppList() {
                 </>
               ) : null
             }
-            actions={!app.autodiscovered ? <AppActions id={app.id} name={app.name} /> : null}
+            actions={
+              <div className="flex items-center gap-2">
+                {app.connectionType === AppConnectionType.Connect && (
+                  <Button
+                    appearance="outlined"
+                    label="View details"
+                    href={`/apps/app?id=${app.id}`}
+                  />
+                )}
+                {!app.autodiscovered && <AppActions id={app.id} name={app.name} />}
+              </div>
+            }
           />
           <AppCard.Footer kind={appKind} header={footerHeader} content={footerContent} />
         </AppCard>
