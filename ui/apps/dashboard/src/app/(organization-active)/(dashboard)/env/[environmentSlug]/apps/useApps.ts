@@ -39,25 +39,25 @@ export function useApps({ envID, isArchived }: { envID: string; isArchived: bool
 
   if (res.data) {
     const apps = res.data.environment.apps
-      .map((app) => {
-        let latestSync = null;
-        if (app.latestSync) {
-          latestSync = {
-            ...app.latestSync,
-            lastSyncedAt: new Date(app.latestSync.lastSyncedAt),
+      .map(({ latestSync, ...app }) => {
+        let latestSyncData = null;
+        if (latestSync) {
+          latestSyncData = {
+            ...latestSync,
+            lastSyncedAt: new Date(latestSync.lastSyncedAt),
           };
         }
 
         return {
           ...app,
-          latestSync,
+          ...latestSyncData,
           isArchived: app.isArchived,
         };
       })
       .filter((app) => {
         // Filter the results because GraphQL doesn't have an isArchived filter
         // yet.
-        return app.latestSync && app.isArchived === isArchived;
+        return app.lastSyncedAt && app.isArchived === isArchived;
       });
 
     let latestUnattachedSyncTime;

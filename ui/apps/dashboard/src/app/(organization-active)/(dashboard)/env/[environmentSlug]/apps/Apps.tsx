@@ -1,9 +1,11 @@
 'use client';
 
+import { AppCard } from '@inngest/components/Apps/AppCard';
+
 import { EmptyActiveCard, EmptyArchivedCard } from '@/components/Apps/EmptyAppsCard';
 import { UnattachedSyncsCard } from '@/components/Apps/UnattachedSyncsCard';
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { AppCard, SkeletonCard } from './AppCard';
+import { SkeletonCard } from './AppCard';
 import { useApps } from './useApps';
 
 type Props = {
@@ -14,6 +16,7 @@ export function Apps({ isArchived = false }: Props) {
   const env = useEnvironment();
 
   const res = useApps({ envID: env.id, isArchived });
+  console.log(res);
   if (res.error) {
     throw res.error;
   }
@@ -32,8 +35,8 @@ export function Apps({ isArchived = false }: Props) {
   // Sort apps by latest sync time
   const sortedApps = apps.sort((a, b) => {
     return (
-      (b.latestSync ? new Date(b.latestSync.lastSyncedAt).getTime() : 0) -
-      (a.latestSync ? new Date(a.latestSync.lastSyncedAt).getTime() : 0)
+      (b.lastSyncedAt ? new Date(b.lastSyncedAt).getTime() : 0) -
+      (a.lastSyncedAt ? new Date(a.lastSyncedAt).getTime() : 0)
     );
   });
 
@@ -44,13 +47,19 @@ export function Apps({ isArchived = false }: Props) {
         {!hasApps && isArchived && <EmptyArchivedCard />}
         {sortedApps.map((app) => {
           return (
-            <AppCard
-              app={app}
-              className="mb-4"
-              envSlug={env.slug}
-              key={app.id}
-              isArchived={isArchived}
-            />
+            <div className="mb-6" key={app.id}>
+              <AppCard
+                // TO DO: make the error and warning status
+                kind={isArchived ? 'default' : 'primary'}
+              >
+                <AppCard.Content
+                  app={app}
+                  // TO DO: build pills and actions
+                  pill={<></>}
+                  actions={<></>}
+                ></AppCard.Content>
+              </AppCard>
+            </div>
           );
         })}
 

@@ -1,12 +1,12 @@
 export type App = {
   id: string;
   name: string;
-  sdkVersion: string;
-  framework: string | null;
+  sdkVersion?: string;
+  framework?: string | null;
   sdkLanguage?: string;
   connectionType?: ConnectionType;
   lastSyncedAt?: Date;
-  url: string | null;
+  url?: string | null;
 };
 
 export const connectionTypes = ['CONNECT', 'SERVERLESS'] as const;

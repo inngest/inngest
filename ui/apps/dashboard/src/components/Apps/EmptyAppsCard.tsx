@@ -74,8 +74,6 @@ export function EmptyActiveCard({ envSlug }: { envSlug: string }) {
 }
 
 export function EmptyArchivedCard() {
-  const router = useRouter();
-
   return (
     <EmptyCard
       title="No archived apps found"
