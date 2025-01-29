@@ -37,6 +37,17 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	allowed, err := a.ConnectionLimiter.CheckConnectionLimit(ctx, res)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not check connection limit"))
+		return
+	}
+
+	if !allowed {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 429, "reached max allowed connections"))
+		return
+	}
+
 	byt, err := io.ReadAll(io.LimitReader(r.Body, 1024*1024))
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "could not read request body"))

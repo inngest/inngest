@@ -430,6 +430,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			RequestAuther:           ds,
 			ConnectGatewayRetriever: ds,
 			Dev:                     true,
+			ConnectionLimiter:       ds,
 		},
 	})
 	if err != nil {

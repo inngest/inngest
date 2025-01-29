@@ -648,6 +648,10 @@ func (d *devserver) AuthenticateRequest(_ context.Context, _, _ string) (*auth.R
 	}, nil
 }
 
+func (d *devserver) CheckConnectionLimit(_ context.Context, _ *auth.Response) (bool, error) {
+	return true, nil
+}
+
 func (d *devserver) RetrieveGateway(_ context.Context, _, _ uuid.UUID, _ []string) (string, *url.URL, error) {
 	parsed, err := url.Parse("ws://127.0.0.1:8289/v0/connect")
 	if err != nil {
