@@ -102,7 +102,6 @@ export type Addons = {
 export type App = {
   __typename?: 'App';
   archivedAt: Maybe<Scalars['Time']>;
-  connectionType: AppConnectionType;
   createdAt: Scalars['Time'];
   externalID: Scalars['String'];
   functionCount: Scalars['Int'];
@@ -161,11 +160,6 @@ export type AppCheckResult = {
   signingKeyStatus: SecretCheck;
 };
 
-export enum AppConnectionType {
-  Connect = 'CONNECT',
-  Serverless = 'SERVERLESS'
-}
-
 export type AppliedAddonMulti = {
   __typename?: 'AppliedAddonMulti';
   addon: AddonMulti;
@@ -180,7 +174,6 @@ export type AppliedAddons = {
 
 export type AppsFilter = {
   archived?: InputMaybe<Scalars['Boolean']>;
-  connectionType?: InputMaybe<AppConnectionType>;
 };
 
 export type ArchiveWorkflowInput = {

@@ -18,7 +18,7 @@ export const ActionsMenu = ({ archive }: EventActions) => {
         <Listbox.Options className="bg-canvasBase absolute right-1 top-5 z-50 w-[170px] gap-y-0.5 rounded border shadow">
           <Listbox.Option
             className="flex h-8 cursor-pointer items-center text-[13px]"
-            value="signingKeys"
+            value="eventsActions"
           >
             <Button
               appearance="ghost"
