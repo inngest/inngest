@@ -33,10 +33,6 @@ export function useVercelIntegration() {
     return res;
   }
 
-  if (!res.data.account.vercelIntegration) {
-    throw new Error('no vercel integration found');
-  }
-
   return {
     ...res,
     data: res.data.account.vercelIntegration,
