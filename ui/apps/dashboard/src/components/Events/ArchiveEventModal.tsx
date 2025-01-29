@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert';
 import { AlertModal } from '@inngest/components/Modal/AlertModal';
 import { useMutation } from 'urql';
@@ -26,10 +27,12 @@ export default function ArchiveEventModal({ eventName, isOpen, onClose }: Archiv
   const environment = useEnvironment();
   const [error, setError] = useState<string>();
   const [{ fetching }, archiveEvent] = useMutation(ArchiveEvent);
+  const router = useRouter();
 
   const handleSubmit = async () => {
     try {
       await archiveEvent({ name: eventName, environmentId: environment.id });
+      router.push(`/env/${environment.slug}/events`);
     } catch (error) {
       setError('Failed to archive event, please try again later.');
       console.error('error achiving event', eventName, error);
@@ -43,7 +46,7 @@ export default function ArchiveEventModal({ eventName, isOpen, onClose }: Archiv
       isOpen={isOpen}
       onClose={onClose}
       onSubmit={handleSubmit}
-      title="Are you sure you want to archive this event?"
+      title="Archive Event"
     >
       <p className="px-6 pt-4">
         Are you sure you want to archive this event? This action cannot be undone.
