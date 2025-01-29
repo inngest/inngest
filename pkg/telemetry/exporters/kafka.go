@@ -3,18 +3,22 @@ package exporters
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
-	"github.com/sourcegraph/conc/pool"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"gocloud.dev/pubsub"
+	"gocloud.dev/pubsub/batcher"
+	"gocloud.dev/pubsub/kafkapubsub"
 	"google.golang.org/protobuf/proto"
 )
 
 var (
-	defaultMsgKey   = "fn_id"
-	defaultPoolSize = 500
+	defaultMsgKey           = "fn_id"
+	defaultPoolSize         = 500
+	defaultHandlerBatchSize = 500
+	defaultHandlerNum       = 500
 )
 
 type kafkaSpanExporter struct {
@@ -24,12 +28,21 @@ type kafkaSpanExporter struct {
 }
 
 type kafkaSpansExporterOpts struct {
-	topic    string
-	key      string
-	poolSize int
+	addrs            []string
+	topic            string
+	key              string
+	poolSize         int
+	handlerNum       int
+	handlerBatchSize int
 }
 
 type KafkaSpansExporterOpts func(k *kafkaSpansExporterOpts)
+
+func WithKafkaExporterBrokers(addrs []string) KafkaSpansExporterOpts {
+	return func(k *kafkaSpansExporterOpts) {
+		k.addrs = addrs
+	}
+}
 
 func WithKafkaExporterTopic(topic, key string) KafkaSpansExporterOpts {
 	return func(k *kafkaSpansExporterOpts) {
@@ -47,30 +60,52 @@ func WithKafkaExporterPoolSize(size int) KafkaSpansExporterOpts {
 	}
 }
 
+func WithKafkaSendHandlerNum(n int) KafkaSpansExporterOpts {
+	return func(k *kafkaSpansExporterOpts) {
+		k.handlerNum = n
+	}
+}
+
+func WithKafkaSendHandlerBatchSize(n int) KafkaSpansExporterOpts {
+	return func(k *kafkaSpansExporterOpts) {
+		k.handlerBatchSize = n
+	}
+}
+
 func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (trace.SpanExporter, error) {
 	conf := &kafkaSpansExporterOpts{
-		poolSize: defaultPoolSize,
+		poolSize:         defaultPoolSize,
+		handlerNum:       defaultHandlerNum,
+		handlerBatchSize: defaultHandlerBatchSize,
 	}
 
 	for _, apply := range opts {
 		apply(conf)
 	}
 
+	if len(conf.addrs) == 0 {
+		return nil, fmt.Errorf("not kafka broker addresses provided")
+	}
+
 	if conf.topic == "" {
 		return nil, fmt.Errorf("no topic provided for span exporter")
 	}
 
-	if conf.key == "" {
-		conf.key = defaultMsgKey
+	// Configure kafka connection options
+	config := kafkapubsub.MinimalConfig()
+	kopts := kafkapubsub.TopicOptions{
+		BatcherOptions: batcher.Options{
+			MaxHandlers:  conf.handlerNum,
+			MaxBatchSize: conf.handlerBatchSize,
+		},
 	}
 
-	// construct topic URL
-	topicURL := fmt.Sprintf("kafka://%s?key_name=%s", conf.topic, conf.key)
+	if conf.key != "" {
+		conf.key = defaultMsgKey
+		kopts.KeyName = defaultMsgKey
+	}
 
-	// Open kafka topic with URL
-	//
-	// NOTE: the set of kafka brokers must be set in an environment variable KAFKA_BROKERS
-	topic, err := pubsub.OpenTopic(ctx, topicURL)
+	topic, err := kafkapubsub.OpenTopic(conf.addrs, config, conf.topic, &kopts)
 	if err != nil {
 		return nil, fmt.Errorf("error opening topic with kafka for span exporter: %w", err)
 	}
@@ -87,20 +122,20 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 
 	l := logger.StdlibLogger(ctx)
 
-	errp := pool.New().WithErrors().WithMaxGoroutines(e.poolSize)
+	wg := sync.WaitGroup{}
 
 	for _, sp := range spans {
-		sp := sp
+		wg.Add(1)
 
-		errp.Go(func() error {
+		go func(ctx context.Context, sp trace.ReadOnlySpan) {
+			defer wg.Done()
+
 			span, err := SpanToProto(ctx, sp)
 			if err != nil {
 				l.Error("error converting span to proto", "err", err)
-				return fmt.Errorf("error converting span to proto: %w", err)
 			}
 
 			id := span.GetId()
-
 			byt, err := proto.Marshal(span)
 			if err != nil {
 				l.Error("error serializing span into binary",
@@ -110,8 +145,6 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 					"fnID", id.FunctionId,
 					"runID", id.RunId,
 				)
-
-				return fmt.Errorf("error serialzing span into binary: %w", err)
 			}
 
 			msg := &pubsub.Message{
@@ -140,7 +173,6 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 				)
 
 				status = "error"
-
 				// TODO: should attempt error handling or resending it
 			}
 
@@ -152,11 +184,12 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 				},
 			})
 
-			return nil
-		})
+			return
+		}(ctx, sp)
 	}
 
-	return errp.Wait()
+	wg.Wait()
+	return nil
 }
 
 func (e *kafkaSpanExporter) Shutdown(ctx context.Context) error {
