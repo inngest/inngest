@@ -101,6 +101,7 @@ export default function EntitlementListItem({
           tooltip={tooltip}
           entitlement={{
             currentValue: entitlement.currentValue!, // nil-checked at declaration of selfServiceAvailable above
+            displayValue: entitlement.displayValue,
             planLimit: entitlement.planLimit!, // nil-checked at declaration of selfServiceAvailable above
             maxValue: entitlement.maxValue!, // nil-checked at declaration of selfServiceAvailable above
           }}

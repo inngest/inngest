@@ -16,6 +16,13 @@ import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import { day } from '@/utils/date';
 import { pathCreator } from '@/utils/urls';
 
+function kbyteDisplayValue(kibibytes: number): string {
+  if (kibibytes >= 1024) {
+    return `${(kibibytes / 1024).toFixed(2)} MiB`;
+  }
+  return `${kibibytes} KiB`;
+}
+
 export const dynamic = 'force-dynamic';
 
 export default async function Page() {
@@ -118,10 +125,7 @@ export default async function Page() {
             canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             entitlement={{
               currentValue: entitlementUsage.eventSize.limit,
-              displayValue:
-                entitlementUsage.eventSize.limit >= 1024
-                  ? `${(entitlementUsage.eventSize.limit / 1024).toFixed(2)} MB`
-                  : `${entitlementUsage.eventSize.limit} KB`,
+              displayValue: kbyteDisplayValue(entitlementUsage.eventSize.limit),
               planLimit: currentPlan.entitlements.eventSize.limit,
             }}
             enableSelfServiceFeatureFlag={enableSelfServiceFF}
