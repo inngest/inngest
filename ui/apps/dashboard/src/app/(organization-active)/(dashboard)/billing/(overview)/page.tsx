@@ -113,7 +113,7 @@ export default async function Page() {
           <LimitBar data={steps} className="mb-6" />
           <div className="border-subtle mb-6 border" />
           <EntitlementListItem
-            title="Event Size"
+            title="Event size"
             description="The maximum size for a single event"
             canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             entitlement={{
