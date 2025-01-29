@@ -7,8 +7,8 @@ import { Link } from '@inngest/components/Link/Link';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiAddLine, RiQuestionLine } from '@remixicon/react';
 
+import { EmptyOnboardingCard } from '@/components/Apps/EmptyAppsCard';
 import { StatusMenu } from '@/components/Apps/StatusMenu';
-import EmptyAppsCard from '@/components/Onboarding/EmptyAppsCard';
 import { getProdApps } from '@/components/Onboarding/actions';
 import { staticSlugs } from '@/utils/environments';
 import { pathCreator } from '@/utils/urls';
@@ -108,7 +108,7 @@ export default function AppsPage({
         ) : (
           <>
             {displayOnboarding ? (
-              <EmptyAppsCard />
+              <EmptyOnboardingCard />
             ) : (
               <>
                 <div className="relative flex w-full flex-row justify-start">

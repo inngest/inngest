@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import NextLink from 'next/link';
 import { Link } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton';
@@ -9,7 +8,6 @@ import { cn } from '@inngest/components/utils/classNames';
 import { RiArchive2Line, RiArrowRightSLine } from '@remixicon/react';
 
 import { SyncStatusPill } from '@/components/SyncStatusPill';
-import AppDiagramImage from '@/images/app-diagram.png';
 import { pathCreator } from '@/utils/urls';
 
 type Props = {
@@ -121,43 +119,6 @@ function Description({
     <div className={className}>
       <dt className="text-muted pb-2 text-sm">{term}</dt>
       <dd className="text-basis leading-8">{detail ?? ''}</dd>
-    </div>
-  );
-}
-
-export function EmptyAppCard({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={cn(cardWrapperStyles, className)}>
-      <div className={cn(cardLeftPanelStyles, 'items-center overflow-hidden bg-black')}>
-        <Image src={AppDiagramImage} alt="App diagram" className="object-none md:object-fill" />
-      </div>
-      <div className={cn(cardRightPanelStyles, 'flex-1')}>
-        <p>
-          When you serve your functions using our serve API handler, you are hosting a new Inngest
-          app.{' '}
-          <span className="hidden lg:inline">
-            In order to have your functions invoked by Inngest, you must sync your app.
-          </span>{' '}
-          Syncing is easy!
-        </p>
-        <ol className="mt-3 flex flex-col gap-3">
-          <li className="flex items-center gap-2">
-            <span className="bg-canvasSubtle text-basis h-6 w-6 rounded-full text-center">1</span>
-            <span className="flex-1">Deploy your code to your hosted platform of choice.</span>
-          </li>
-          <li className="flex items-center gap-2">
-            <span className="bg-canvasSubtle text-basis h-6 w-6 rounded-full text-center">2</span>
-            <span className="flex-1">Sync with Inngest.</span>
-          </li>
-        </ol>
-        {children}
-      </div>
     </div>
   );
 }
