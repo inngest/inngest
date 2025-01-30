@@ -10,8 +10,11 @@ import { TriggerDetails } from '../TriggerDetails';
 import type { Result } from '../types/functionRun';
 import { nullishToLazy } from '../utils/lazyLoad';
 import { RunInfo } from './RunInfo';
+import { Tabs } from './Tabs';
+import { Timeline } from './Timeline';
+import { TopInfo } from './TopInfo';
 import { Trace } from './Trace';
-import { TriggerInfo } from './TriggerInfo';
+import { Workflow } from './Workflow';
 
 type Props = {
   standalone: boolean;
@@ -129,9 +132,9 @@ export const RunDetailsV3 = (props: Props) => {
       : runRes.error || resultRes.error;
 
   return (
-    <div id="run-details-container" className="ml-4 mt-4 flex h-full flex-row">
-      <div className="flex h-full flex-col" style={{ width: `${leftWidth}%` }}>
-        <div className="h-full pb-4 pr-4">
+    <div id="run-details-container" className="mt-4 flex h-full flex-row">
+      <div className="flex h-full flex-col gap-4" style={{ width: `${leftWidth}%` }}>
+        <div className="h-full px-4">
           <RunInfo
             cancelRun={cancelRun}
             className="mb-4"
@@ -152,16 +155,18 @@ export const RunDetailsV3 = (props: Props) => {
             />
           )}
         </div>
-        <Trace />
+        <Tabs
+          tabs={[
+            { label: 'Trace', node: <Timeline /> },
+            { label: 'Workflow', node: <Workflow /> },
+          ]}
+        />
       </div>
 
-      <div className="w-1 cursor-col-resize" onMouseDown={handleMouseDown} />
+      <div className="border-muted cursor-col-resize border-[.5px]" onMouseDown={handleMouseDown} />
 
-      <div
-        className="border-muted flex h-full flex-col border-l"
-        style={{ width: `${100 - leftWidth}%` }}
-      >
-        <TriggerInfo getTrigger={getTrigger} runID={runID} />
+      <div className="border-muted flex h-full flex-col" style={{ width: `${100 - leftWidth}%` }}>
+        <TopInfo getTrigger={getTrigger} runID={runID} />
       </div>
     </div>
   );

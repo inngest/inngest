@@ -241,7 +241,7 @@ export function RunsPage({
   const renderSubComponent = useCallback(
     (rowData: Run) => {
       return (
-        <div className={`border-subtle border-l-4 ${traceAIEnabled ? '' : 'pb-6'}`}>
+        <div className={`border-subtle  ${traceAIEnabled ? '' : 'border-l-4 pb-6'}`}>
           {traceAIEnabled ? (
             <RunDetailsV3
               cancelRun={cancelRun}

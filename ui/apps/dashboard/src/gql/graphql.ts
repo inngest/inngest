@@ -55,6 +55,7 @@ export type Account = {
   entitlementUsage: EntitlementUsage;
   entitlements: Entitlements;
   id: Scalars['ID'];
+  marketplace: Maybe<Marketplace>;
   name: Maybe<Scalars['NullString']>;
   paymentIntents: Array<PaymentIntent>;
   paymentMethods: Maybe<Array<PaymentMethod>>;
@@ -64,6 +65,7 @@ export type Account = {
   subscription: Maybe<BillingSubscription>;
   updatedAt: Scalars['Time'];
   users: Array<User>;
+  vercelIntegration: Maybe<VercelIntegration>;
 };
 
 
@@ -860,6 +862,10 @@ export type InvokeStepInfo = {
   timeout: Scalars['Time'];
   triggeringEventID: Scalars['ULID'];
 };
+
+export enum Marketplace {
+  Vercel = 'VERCEL'
+}
 
 export type MetricsData = {
   __typename?: 'MetricsData';
@@ -1869,6 +1875,32 @@ export type VercelApp = {
   projectID: Scalars['String'];
   protectionBypassSecret: Maybe<Scalars['String']>;
   workspaceID: Scalars['UUID'];
+};
+
+export enum VercelDeploymentProtection {
+  All = 'ALL',
+  Disabled = 'DISABLED',
+  Preview = 'PREVIEW',
+  ProdDeploymentUrlsAndAllPreviews = 'PROD_DEPLOYMENT_URLS_AND_ALL_PREVIEWS',
+  Unknown = 'UNKNOWN'
+}
+
+export type VercelIntegration = {
+  __typename?: 'VercelIntegration';
+  isMarketplace: Scalars['Boolean'];
+  projects: Array<VercelProject>;
+};
+
+export type VercelProject = {
+  __typename?: 'VercelProject';
+  canChangeEnabled: Scalars['Boolean'];
+  deploymentProtection: VercelDeploymentProtection;
+  isEnabled: Scalars['Boolean'];
+  name: Scalars['String'];
+  originOverride: Maybe<Scalars['String']>;
+  projectID: Scalars['String'];
+  protectionBypassSecret: Maybe<Scalars['String']>;
+  servePath: Scalars['String'];
 };
 
 export type WaitForEventStepInfo = {

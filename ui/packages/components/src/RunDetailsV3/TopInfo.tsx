@@ -1,12 +1,8 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Button } from '@inngest/components/Button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
-import * as Collapsible from '@radix-ui/react-collapsible';
-import { RiContractRightFill, RiExpandLeftFill } from '@remixicon/react';
+import { RiArrowUpSLine } from '@remixicon/react';
 import { useQuery } from '@tanstack/react-query';
-import { useLocalStorage } from 'react-use';
 
-import { Card } from '../Card';
 import { CodeBlock } from '../CodeBlock';
 import {
   CodeElement,
@@ -20,11 +16,15 @@ import {
 // Until then, we re-use it from the RunDetailsV2 as these are part of the same parent UI.
 import { ErrorCard } from '../RunDetailsV2/ErrorCard';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
-import { cn } from '../utils/classNames';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
+import { IO } from './IO';
+import { Input } from './Input';
+import { Output } from './Output';
+import { Tabs } from './Tabs';
+import { Timeline } from './Timeline';
+import { Workflow } from './Workflow';
 
 type Props = {
-  className?: string;
   getTrigger: (runID: string) => Promise<Trigger>;
   runID: string;
 };
@@ -39,7 +39,40 @@ export type Trigger = {
   cron: string | null;
 };
 
-export const TriggerInfo = ({ className, getTrigger, runID }: Props) => {
+export const actionConfigs = (
+  trigger: Trigger | undefined,
+  isRunning: boolean,
+  send: (payload: string) => void
+) => {
+  if (!trigger) {
+    return { title: 'Loading trigger' };
+  }
+
+  if (trigger.isBatch) {
+    return { title: "Can't send a batch" };
+  }
+
+  if (trigger.cron) {
+    return { title: "Can't send a cron" };
+  }
+
+  const payload = trigger.payloads[0];
+  if (!payload) {
+    console.error('Trigger has no payloads');
+    return { title: 'Trigger has no payloads' };
+  }
+
+  return {
+    title: isRunning
+      ? 'Send event payload to running Dev Server'
+      : `Dev Server is not running at ${devServerURL}`,
+    disabled: !isRunning,
+    onClick: () => send(payload),
+  };
+};
+
+export const TopInfo = ({ getTrigger, runID }: Props) => {
+  const [expanded, setExpanded] = useState(true);
   const { isRunning, send } = useDevServer();
 
   const {
@@ -56,85 +89,60 @@ export const TriggerInfo = ({ className, getTrigger, runID }: Props) => {
   });
 
   const prettyPayload = useMemo(() => {
-    if (!trigger?.payloads) return null;
-    let payload = 'Unknown';
-    if (trigger.payloads.length === 1 && trigger.payloads[0]) {
-      payload = trigger.payloads[0];
-    } else if (trigger.payloads.length > 1) {
-      payload = JSON.stringify(
-        trigger.payloads.map((e) => {
-          return JSON.parse(e);
-        })
-      );
-    }
     try {
-      const data = JSON.parse(payload);
-      if (data === null) {
-        throw new Error();
-      }
-
+      const data = trigger?.payloads?.map((p) => JSON.parse(p));
       return JSON.stringify(data, null, 2);
     } catch (e) {
-      console.warn('Unable to parse content as JSON: ', payload);
-      return '';
+      console.warn('Unable to parse payloads as JSON:', trigger?.payloads);
+      return undefined;
     }
   }, [trigger?.payloads]);
 
-  let type = 'EVENT';
-  if (trigger?.isBatch) {
-    type = 'BATCH';
-  } else if (trigger?.cron) {
-    type = 'CRON';
-  }
+  const type = trigger?.isBatch ? 'BATCH' : trigger?.cron ? 'CRON' : 'EVENT';
 
   const codeBlockActions = useMemo(() => {
-    let disabled = true;
-    let onClick = () => {};
-    let title: string;
-
-    if (!trigger) {
-      title = 'Loading trigger';
-    } else if (trigger.isBatch) {
-      title = "Can't send a batch";
-    } else if (trigger.cron) {
-      title = "Can't send a cron";
-    } else {
-      const payload = trigger.payloads[0];
-
-      if (!payload) {
-        // Unreachable
-        title = 'Trigger has no payloads';
-        console.error(title);
-      } else {
-        disabled = !isRunning;
-        onClick = () => send(payload);
-
-        title = isRunning
-          ? 'Send event payload to running Dev Server'
-          : `Dev Server is not running at ${devServerURL}`;
-      }
-    }
-
     return [
       {
         label: 'Send to Dev Server',
-        title,
         icon: <IconCloudArrowDown />,
-        onClick,
-        disabled,
+        disabled: true,
+        onClick: () => {},
+        ...actionConfigs(trigger, isRunning, send),
       },
     ];
-  }, [trigger]);
+  }, [trigger, isRunning, send]);
 
   if (error) {
     return <ErrorCard error={error} reset={() => refetch()} />;
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="text-basis flex grow items-center gap-2 pl-4">Trigger details</div>
+    <div className="flex h-full flex-col gap-4">
+      <div className="flex h-11 w-full flex-row items-center justify-between border-none px-4">
+        <div className="text-basis flex items-center justify-start gap-2">
+          <RiArrowUpSLine
+            className={`cursor-pointer transition-transform duration-500 ${
+              expanded ? 'rotate-180' : ''
+            }`}
+            onClick={() => setExpanded(!expanded)}
+          />
+          {isPending ? (
+            <SkeletonElement />
+          ) : (
+            <span className="text-basis text-sm font-normal">{trigger.eventName}</span>
+          )}
+        </div>
 
-      <dl className="flex flex-wrap gap-4 pl-4">
+        <Button
+          kind="primary"
+          appearance="outlined"
+          size="medium"
+          iconSide="right"
+          label="Invoke"
+        />
+      </div>
+
+      <dl className="flex flex-wrap gap-4 px-4">
         {type === 'EVENT' && (
           <>
             <ElementWrapper label="Event name">
@@ -180,7 +188,7 @@ export const TriggerInfo = ({ className, getTrigger, runID }: Props) => {
         )}
       </dl>
 
-      {trigger?.payloads && type !== 'CRON' && (
+      {/* {trigger?.payloads && type !== 'CRON' && (
         <div className="border-muted border-t">
           <CodeBlock
             actions={codeBlockActions}
@@ -190,9 +198,17 @@ export const TriggerInfo = ({ className, getTrigger, runID }: Props) => {
             tab={{
               content: prettyPayload ?? 'Unknown',
             }}
+            allowFullScreen={true}
           />
         </div>
-      )}
+      )} */}
+      <Tabs
+        defaultActive={0}
+        tabs={[
+          { label: 'Input', node: <Input raw={prettyPayload} actions={codeBlockActions} /> },
+          { label: 'Output', node: <Output /> },
+        ]}
+      />
     </div>
   );
 };

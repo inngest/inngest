@@ -13,7 +13,7 @@ import { IconWrapText } from '@inngest/components/icons/WrapText';
 import { cn } from '@inngest/components/utils/classNames';
 import { FONT, LINE_HEIGHT, createColors, createRules } from '@inngest/components/utils/monaco';
 import Editor, { useMonaco } from '@monaco-editor/react';
-import { RiDownload2Line } from '@remixicon/react';
+import { RiCollapseDiagonalLine, RiDownload2Line, RiExpandDiagonalLine } from '@remixicon/react';
 import { type editor } from 'monaco-editor';
 import { useLocalStorage } from 'react-use';
 
@@ -46,11 +46,21 @@ interface CodeBlockProps {
   };
   actions?: CodeBlockAction[];
   minLines?: number;
+  allowFullScreen?: boolean;
+  resize?: boolean;
 }
 
-export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlockProps) {
+export function CodeBlock({
+  header,
+  tab,
+  actions = [],
+  minLines = 0,
+  allowFullScreen = false,
+  resize = false,
+}: CodeBlockProps) {
   const [dark, setDark] = useState(isDark());
   const [editorHeight, setEditorHeight] = useState(0);
+  const [fullScreen, setFullScreen] = useState(false);
   const editorRef = useRef<MonacoEditorType>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -86,7 +96,7 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
     if (editorRef.current) {
       updateEditorLayout(editorRef.current);
     }
-  }, [isWordWrap, isFullHeight]);
+  }, [isWordWrap, isFullHeight, fullScreen, resize]);
 
   function getTextWidth(text: string, font: string) {
     const canvas = document.createElement('canvas');
@@ -237,7 +247,7 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
   return (
     <>
       {monaco && (
-        <>
+        <div className={cn('relative', fullScreen && 'bg-canvasBase fixed inset-0 z-50')}>
           <div className={cn('bg-canvasBase border-subtle border-b')}>
             <div
               className={cn(
@@ -298,12 +308,23 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
                     appearance="outlined"
                     kind="secondary"
                   />
+                  {allowFullScreen && (
+                    <Button
+                      onClick={() => setFullScreen(!fullScreen)}
+                      size="small"
+                      icon={fullScreen ? <RiCollapseDiagonalLine /> : <RiExpandDiagonalLine />}
+                      aria-label="Full screen"
+                      title="Full screen"
+                      tooltip="Full screen"
+                      appearance="outlined"
+                      kind="secondary"
+                    />
+                  )}
                 </div>
               )}
             </div>
           </div>
-          {/* Content */}
-          <div ref={wrapperRef}>
+          <div ref={wrapperRef} className={cn('relative', fullScreen && 'h-screen')}>
             {isOutputTooLarge ? (
               <>
                 <Alert severity="warning">Output size is too large to render {`( > 1MB )`}</Alert>
@@ -319,8 +340,8 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
               </>
             ) : (
               <Editor
-                className="absolute"
-                height={editorHeight}
+                className={cn('absolute', fullScreen && 'h-full')}
+                height={fullScreen ? '100%' : editorHeight}
                 defaultLanguage={language}
                 value={content}
                 theme="inngest-theme"
@@ -372,7 +393,7 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
               />
             )}
           </div>
-        </>
+        </div>
       )}
     </>
   );

@@ -85,6 +85,7 @@ export function RunInfo({
   }
 
   const aiOutput = result?.data ? parseAIOutput(result.data) : undefined;
+  console.log('shit result.data', result?.data);
 
   return (
     <div className={cn('flex flex-col gap-5', className)}>
