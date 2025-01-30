@@ -1,39 +1,49 @@
-type Impact = 'partial_outage' | 'degraded_performance' | 'full_outage';
-type Indicator = Impact | 'none' | 'maintenance';
-type StatusEvent = {
-  id: string;
-  name: string;
-  url: string;
-  last_update_at: string; // ISO-8601
-  last_update_message: string;
-  affected_components: {
-    id: string;
-    name: string;
-    group_name?: string;
-  }[];
-};
-type Incident = StatusEvent & {
-  status: 'identified' | 'investigating' | 'monitoring';
-  current_worst_impact: Impact;
-};
-type MaintenanceInProgressEvent = StatusEvent & {
-  status: 'maintenance_in_progress';
-  started_at: string; // ISO-8601
-  scheduled_end_at: string; // ISO-8601
-};
-type MaintenanceScheduledEvent = StatusEvent & {
-  status: 'maintenance_scheduled';
-  starts_at: string; // ISO-8601
-  ends_at: string; // ISO-8601
-};
+import { z } from 'zod';
 
-type StatusPageSummaryResponse = {
-  page_title: string;
-  page_url: string;
-  ongoing_incidents: Incident[];
-  in_progress_maintenances: MaintenanceInProgressEvent[];
-  scheduled_maintenances: MaintenanceScheduledEvent[];
-};
+const impactSchema = z.enum(['partial_outage', 'degraded_performance', 'full_outage']);
+
+const indicatorSchema = z.enum(['none', 'maintenance', ...impactSchema.options]);
+type Indicator = z.infer<typeof indicatorSchema>;
+
+const statusEventSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  url: z.string(),
+  last_update_at: z.string(),
+  last_update_message: z.string(),
+  affected_components: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      group_name: z.string().optional(),
+    })
+  ),
+});
+
+const incidentSchema = statusEventSchema.extend({
+  status: z.enum(['identified', 'investigating', 'monitoring']),
+  current_worst_impact: impactSchema,
+});
+
+const maintenanceInProgressEventSchema = statusEventSchema.extend({
+  status: z.enum(['maintenance_in_progress']),
+  started_at: z.string(),
+  scheduled_end_at: z.string(),
+});
+
+const maintenanceScheduledEventSchema = statusEventSchema.extend({
+  status: z.enum(['maintenance_scheduled']),
+  starts_at: z.string(),
+  ends_at: z.string(),
+});
+
+const statusPageSummaryResponseSchema = z.object({
+  page_title: z.string(),
+  page_url: z.string(),
+  ongoing_incidents: z.array(incidentSchema),
+  in_progress_maintenances: z.array(maintenanceInProgressEventSchema),
+  scheduled_maintenances: z.array(maintenanceScheduledEventSchema),
+});
 
 export type Status = {
   url: string;
@@ -61,7 +71,7 @@ export const indicatorColor: { [K in Indicator]: string } = {
 
 export const STATUS_PAGE_URL = 'https://status.inngest.com';
 
-export const mapStatus = (res: StatusPageSummaryResponse): Status => {
+const mapStatus = (res: z.infer<typeof statusPageSummaryResponseSchema>): Status => {
   // Grab first incident and maintenance item
   const incident = res.ongoing_incidents[0];
   const maintenance = res.in_progress_maintenances[0];
@@ -76,10 +86,17 @@ export const mapStatus = (res: StatusPageSummaryResponse): Status => {
   };
 };
 
-export const fetchStatus = async (): Promise<StatusPageSummaryResponse> => {
-  return await fetch('https://inngest.statuspage.io/api/v2/status.json').then((r) => r.json());
+const fetchStatus = async () => {
+  return statusPageSummaryResponseSchema.parse(
+    await fetch('https://status.inngest.com/api/v1/summary').then((r) => r.json())
+  );
 };
 
-export const getStatus = async (): Promise<Status> => {
-  return mapStatus(await fetchStatus());
+export const getStatus = async (): Promise<Status | undefined> => {
+  try {
+    return mapStatus(await fetchStatus());
+  } catch (e) {
+    console.error(e);
+    return undefined;
+  }
 };
