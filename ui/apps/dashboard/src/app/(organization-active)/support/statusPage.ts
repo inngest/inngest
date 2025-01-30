@@ -19,7 +19,10 @@ export function useSystemStatus() {
   });
   useEffect(() => {
     (async function () {
-      setStatus(await getStatus());
+      const newStatus = await getStatus();
+      if (newStatus) {
+        setStatus(newStatus);
+      }
     })();
   }, []);
   return status;
