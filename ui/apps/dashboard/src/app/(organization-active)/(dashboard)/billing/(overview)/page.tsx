@@ -6,13 +6,11 @@ import EntitlementListItem from '@/components/Billing/Addons/EntitlementListItem
 import BillingInformation from '@/components/Billing/BillingDetails/BillingInformation';
 import PaymentMethod from '@/components/Billing/BillingDetails/PaymentMethod';
 import { LimitBar, type Data } from '@/components/Billing/LimitBar';
-import { PlanNames } from '@/components/Billing/Plans/utils';
 import {
   billingDetails as getBillingDetails,
   currentPlan as getCurrentPlan,
   entitlementUsage as getEntitlementUsage,
 } from '@/components/Billing/data';
-import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import { day } from '@/utils/date';
 import { pathCreator } from '@/utils/urls';
 
@@ -26,7 +24,7 @@ function kbyteDisplayValue(kibibytes: number): string {
 export const dynamic = 'force-dynamic';
 
 export default async function Page() {
-  const entitlementUsage = await getEntitlementUsage();
+  const { addons, entitlements } = await getEntitlementUsage();
   const { plan: currentPlan, subscription: currentSubscription } = await getCurrentPlan();
   const billing = await getBillingDetails();
 
@@ -41,32 +39,30 @@ export default async function Page() {
     await getBillingDetails();
   };
 
-  const legacyNoRunsPlan = entitlementUsage.runCount.limit === null;
+  const legacyNoRunsPlan = entitlements.runCount.limit === null;
   const runs: Data = {
     title: 'Runs',
     description: `${
-      entitlementUsage.runCount.overageAllowed
-        ? 'Additional usage incurred at additional charge.'
-        : ''
+      entitlements.runCount.overageAllowed ? 'Additional usage incurred at additional charge.' : ''
     }`,
-    current: entitlementUsage.runCount.usage || 0,
-    limit: entitlementUsage.runCount.limit || null,
-    overageAllowed: entitlementUsage.runCount.overageAllowed,
+    current: entitlements.runCount.usage || 0,
+    limit: entitlements.runCount.limit || null,
+    overageAllowed: entitlements.runCount.overageAllowed,
     tooltipContent: 'A single durable function execution.',
   };
 
   const steps: Data = {
     title: 'Steps',
     description: `${
-      entitlementUsage.runCount.overageAllowed && !legacyNoRunsPlan
+      entitlements.runCount.overageAllowed && !legacyNoRunsPlan
         ? 'Additional usage incurred at additional charge. Additional runs include 5 steps per run.'
-        : entitlementUsage.runCount.overageAllowed
+        : entitlements.runCount.overageAllowed
         ? 'Additional usage incurred at additional charge.'
         : ''
     }`,
-    current: entitlementUsage.stepCount.usage || 0,
-    limit: entitlementUsage.stepCount.limit || null,
-    overageAllowed: entitlementUsage.stepCount.overageAllowed,
+    current: entitlements.stepCount.usage || 0,
+    limit: entitlements.stepCount.limit || null,
+    overageAllowed: entitlements.stepCount.overageAllowed,
     tooltipContent: 'An individual step in durable functions.',
   };
 
@@ -78,13 +74,9 @@ export default async function Page() {
     ? `$${(currentPlan.amount / 100).toFixed(2)}`
     : 'Free';
   const overageAllowed =
-    entitlementUsage.runCount.overageAllowed || entitlementUsage.stepCount.overageAllowed;
+    entitlements.runCount.overageAllowed || entitlements.stepCount.overageAllowed;
 
   const paymentMethod = billing.paymentMethods?.[0] || null;
-
-  const isProPlan = currentPlan.name === PlanNames.Pro;
-
-  const enableSelfServiceFF = await getBooleanFlag('enable-addon-self-service');
 
   return (
     <div className="grid grid-cols-3 gap-4">
@@ -120,89 +112,67 @@ export default async function Page() {
           <LimitBar data={steps} className="mb-6" />
           <div className="border-subtle mb-6 border" />
           <EntitlementListItem
+            planName={currentPlan.name}
             title="Event size"
             description="The maximum size for a single event"
-            canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             entitlement={{
-              currentValue: entitlementUsage.eventSize.limit,
-              displayValue: kbyteDisplayValue(entitlementUsage.eventSize.limit),
-              planLimit: currentPlan.entitlements.eventSize.limit,
+              currentValue: entitlements.eventSize.limit,
+              displayValue: kbyteDisplayValue(entitlements.eventSize.limit),
             }}
-            enableSelfServiceFeatureFlag={enableSelfServiceFF}
           />
           <EntitlementListItem
+            planName={currentPlan.name}
             title="Concurrency"
             description="Maximum number of concurrently executing steps"
             tooltipContent="Functions actively sleeping and waiting for events are not counted"
-            canIncreaseLimitInCurrentPlan={
-              entitlementUsage.isCustomPlan || currentPlan.addons.concurrency.available
-            }
             entitlement={{
-              currentValue: entitlementUsage.concurrency.limit,
-              displayValue: `${entitlementUsage.concurrency.limit} concurrent steps`,
-              planLimit: currentPlan.entitlements.concurrency.limit,
-              maxValue: 1000, // TODO: https://linear.app/inngest/issue/INN-4310/use-maxlimitincurrentplan-data-from-gql-in-the-addons-ui
+              currentValue: entitlements.concurrency.limit,
+              displayValue: `${entitlements.concurrency.limit} concurrent steps`,
             }}
-            addon={{
-              price: currentPlan.addons.concurrency.price,
-              quantityPer: currentPlan.addons.concurrency.quantityPer,
-              addonName: 'concurrency',
-            }}
+            addon={addons.concurrency}
             onChange={refetch}
-            enableSelfServiceFeatureFlag={enableSelfServiceFF}
           />
           <EntitlementListItem
+            planName={currentPlan.name}
             title="Users"
             description="Maximum number of users on the account"
-            canIncreaseLimitInCurrentPlan={
-              entitlementUsage.isCustomPlan || currentPlan.addons.userCount.available
-            }
             entitlement={{
-              currentValue: entitlementUsage.userCount.limit,
-              displayValue: `${entitlementUsage.userCount.usage} of ${entitlementUsage.userCount.limit} maximum users`,
-              planLimit: currentPlan.entitlements.userCount.limit,
-              maxValue: 1000, // TODO: https://linear.app/inngest/issue/INN-4310/use-maxlimitincurrentplan-data-from-gql-in-the-addons-ui
+              currentValue: entitlements.userCount.limit,
+              displayValue: `${entitlements.userCount.usage} of ${entitlements.userCount.limit} maximum users`,
             }}
-            addon={{
-              quantityPer: currentPlan.addons.userCount.quantityPer,
-              price: currentPlan.addons.userCount.price,
-              addonName: 'user_count',
-            }}
+            addon={addons.userCount}
             onChange={refetch}
-            enableSelfServiceFeatureFlag={enableSelfServiceFF}
           />
           <EntitlementListItem
+            planName={currentPlan.name}
             title="Log history"
             description="View and search function run traces and metrics"
-            canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             entitlement={{
-              currentValue: entitlementUsage.history.limit,
-              displayValue: `${entitlementUsage.history.limit} day${
-                entitlementUsage.history.limit === 1 ? '' : 's'
+              currentValue: entitlements.history.limit,
+              displayValue: `${entitlements.history.limit} day${
+                entitlements.history.limit === 1 ? '' : 's'
               }`,
-              planLimit: currentPlan.entitlements.history.limit,
             }}
-            enableSelfServiceFeatureFlag={enableSelfServiceFF}
           />
           <EntitlementListItem
+            increaseInHigherPlan={false}
+            planName={currentPlan.name}
             title="HIPAA"
             description="Sign BAAs for healthcare services"
-            canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan || isProPlan} // TODO: https://linear.app/inngest/issue/INN-4310/use-maxlimitincurrentplan-data-from-gql-in-the-addons-ui
             entitlement={{
-              currentValue: entitlementUsage.hipaa.enabled,
-              displayValue: entitlementUsage.hipaa.enabled ? 'Enabled' : 'Not enabled',
+              currentValue: entitlements.hipaa.enabled,
+              displayValue: entitlements.hipaa.enabled ? 'Enabled' : 'Not enabled',
             }}
-            enableSelfServiceFeatureFlag={enableSelfServiceFF}
           />
           <EntitlementListItem
+            increaseInHigherPlan={false}
+            planName={currentPlan.name}
             title="Dedicated execution capacity"
             description="Dedicated infrastructure for the lowest latency and highest throughput"
-            canIncreaseLimitInCurrentPlan={entitlementUsage.isCustomPlan}
             entitlement={{
               currentValue: false,
               displayValue: 'Not enabled', // TODO: https://linear.app/inngest/issue/INN-4202/add-dedicated-capacity-addon
             }}
-            enableSelfServiceFeatureFlag={enableSelfServiceFF}
           />
           <div className="flex flex-col items-center gap-2 pt-6">
             <p className="text-muted text-xs">Custom needs?</p>
