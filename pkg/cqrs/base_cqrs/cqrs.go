@@ -93,15 +93,9 @@ func (w wrapper) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*stat
 		return nil, err
 	}
 
-	app, err := w.GetAppByID(ctx, fn.AppID)
-	if err != nil {
-		return nil, err
-	}
-
 	return &state.ExecutorFunction{
-		Function:     def,
-		Paused:       false, // dev server does not support pausing
-		AppIsConnect: app.ConnectionType == enums.AppConnectionTypeConnect.String(),
+		Function: def,
+		Paused:   false, // dev server does not support pausing
 	}, nil
 }
 
@@ -1997,10 +1991,10 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 // copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types
 // automatically.
 func copyWriter[
-	PARAMS_IN any,
-	INTERNAL_PARAMS any,
-	IN any,
-	OUT any,
+PARAMS_IN any,
+INTERNAL_PARAMS any,
+IN any,
+OUT any,
 ](
 	ctx context.Context,
 	f func(context.Context, INTERNAL_PARAMS) (IN, error),
@@ -2023,8 +2017,8 @@ func copyWriter[
 }
 
 func copyInto[
-	IN any,
-	OUT any,
+IN any,
+OUT any,
 ](
 	ctx context.Context,
 	f func(context.Context) (IN, error),
