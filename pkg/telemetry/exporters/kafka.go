@@ -88,8 +88,6 @@ func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (
 	kconf := kafkapubsub.MinimalConfig()
 	kconf.Producer.MaxMessageBytes = defaultMaxMsgBytes
 	kconf.Producer.RequiredAcks = sarama.WaitForAll // Most durable
-	kconf.Producer.Compression = sarama.CompressionZSTD
-	kconf.Producer.CompressionLevel = 6
 
 	kopts := kafkapubsub.TopicOptions{
 		BatcherOptions: batcher.Options{
