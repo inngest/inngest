@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/IBM/sarama"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"go.opentelemetry.io/otel/sdk/trace"
@@ -16,9 +17,9 @@ import (
 
 var (
 	defaultMsgKey           = "fn_id"
-	defaultPoolSize         = 500
 	defaultHandlerBatchSize = 500
 	defaultHandlerNum       = 500
+	defaultMaxMsgBytes      = 1024 * 1024 * 30 // 30MB
 )
 
 type kafkaSpanExporter struct {
@@ -31,7 +32,6 @@ type kafkaSpansExporterOpts struct {
 	addrs            []string
 	topic            string
 	key              string
-	poolSize         int
 	handlerNum       int
 	handlerBatchSize int
 }
@@ -54,12 +54,6 @@ func WithKafkaExporterTopic(topic, key string) KafkaSpansExporterOpts {
 	}
 }
 
-func WithKafkaExporterPoolSize(size int) KafkaSpansExporterOpts {
-	return func(k *kafkaSpansExporterOpts) {
-		k.poolSize = size
-	}
-}
-
 func WithKafkaSendHandlerNum(n int) KafkaSpansExporterOpts {
 	return func(k *kafkaSpansExporterOpts) {
 		k.handlerNum = n
@@ -74,7 +68,6 @@ func WithKafkaSendHandlerBatchSize(n int) KafkaSpansExporterOpts {
 
 func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (trace.SpanExporter, error) {
 	conf := &kafkaSpansExporterOpts{
-		poolSize:         defaultPoolSize,
 		handlerNum:       defaultHandlerNum,
 		handlerBatchSize: defaultHandlerBatchSize,
 	}
@@ -92,7 +85,12 @@ func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (
 	}
 
 	// Configure kafka connection options
-	config := kafkapubsub.MinimalConfig()
+	kconf := kafkapubsub.MinimalConfig()
+	kconf.Producer.MaxMessageBytes = defaultMaxMsgBytes
+	kconf.Producer.RequiredAcks = sarama.WaitForAll // Most durable
+	kconf.Producer.Compression = sarama.CompressionZSTD
+	kconf.Producer.CompressionLevel = 6
+
 	kopts := kafkapubsub.TopicOptions{
 		BatcherOptions: batcher.Options{
 			MaxHandlers:  conf.handlerNum,
@@ -105,15 +103,14 @@ func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (
 		kopts.KeyName = defaultMsgKey
 	}
 
-	topic, err := kafkapubsub.OpenTopic(conf.addrs, config, conf.topic, &kopts)
+	topic, err := kafkapubsub.OpenTopic(conf.addrs, kconf, conf.topic, &kopts)
 	if err != nil {
 		return nil, fmt.Errorf("error opening topic with kafka for span exporter: %w", err)
 	}
 
 	return &kafkaSpanExporter{
-		topic:    topic,
-		key:      conf.key,
-		poolSize: conf.poolSize,
+		topic: topic,
+		key:   conf.key,
 	}, nil
 }
 
