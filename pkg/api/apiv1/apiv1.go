@@ -113,6 +113,8 @@ func (a *router) setup() {
 			r.Post("/cancellations", a.createCancellation)
 			r.Get("/cancellations", a.getCancellations)
 			r.Delete("/cancellations/{id}", a.deleteCancellation)
+
+			r.Get("/prom/{env}", a.promScrape)
 		})
 	})
 }
