@@ -4,12 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"math"
-	"time"
-
 	"github.com/google/uuid"
 	sqlc_sqlite "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
 	"github.com/oklog/ulid/v2"
+	"math"
 )
 
 func NewNormalized(db DBTX) sqlc_sqlite.Querier {
@@ -34,16 +32,6 @@ func (q NormalizedQueries) GetWorkerConnection(ctx context.Context, arg sqlc_sql
 }
 
 func (q NormalizedQueries) InsertWorkerConnection(ctx context.Context, arg sqlc_sqlite.InsertWorkerConnectionParams) error {
-	var lastHeartbeatAt, disconnectedAt sql.NullTime
-	if arg.LastHeartbeatAt.Valid {
-		lastHeartbeatAt.Time = time.UnixMilli(arg.LastHeartbeatAt.Int64)
-		lastHeartbeatAt.Valid = true
-	}
-	if arg.DisconnectedAt.Valid {
-		disconnectedAt.Time = time.UnixMilli(arg.DisconnectedAt.Int64)
-		disconnectedAt.Valid = true
-	}
-
 	err := q.db.InsertWorkerConnection(ctx, InsertWorkerConnectionParams{
 		AccountID:        arg.AccountID,
 		WorkspaceID:      arg.WorkspaceID,
@@ -53,11 +41,11 @@ func (q NormalizedQueries) InsertWorkerConnection(ctx context.Context, arg sqlc_
 		InstanceID:       arg.InstanceID,
 		Status:           int16(arg.Status),
 		WorkerIp:         arg.WorkerIp,
-		ConnectedAt:      time.UnixMilli(arg.ConnectedAt),
-		LastHeartbeatAt:  lastHeartbeatAt,
-		DisconnectedAt:   disconnectedAt,
-		RecordedAt:       time.UnixMilli(arg.RecordedAt),
-		InsertedAt:       time.UnixMilli(arg.InsertedAt),
+		ConnectedAt:      arg.ConnectedAt,
+		LastHeartbeatAt:  arg.LastHeartbeatAt,
+		DisconnectedAt:   arg.DisconnectedAt,
+		RecordedAt:       arg.RecordedAt,
+		InsertedAt:       arg.InsertedAt,
 		DisconnectReason: arg.DisconnectReason,
 		GroupHash:        arg.GroupHash,
 		SdkLang:          arg.SdkLang,
