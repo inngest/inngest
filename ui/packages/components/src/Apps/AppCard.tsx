@@ -1,6 +1,8 @@
 import type React from 'react';
 import { AccordionList, AccordionPrimitive } from '@inngest/components/AccordionCard/AccordionList';
 import { Button } from '@inngest/components/Button';
+import { Pill } from '@inngest/components/Pill';
+import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
 import { RiArrowDownSLine } from '@remixicon/react';
 
@@ -20,6 +22,30 @@ const kindStyles = {
   default: { background: 'bg-surfaceSubtle', text: 'text-surfaceSubtle' },
   info: { background: 'bg-secondary-moderate', text: 'text-secondary-moderate' },
 };
+
+export function SkeletonCard() {
+  return (
+    <Card>
+      <div className="text-basis mb-px ml-1 p-6">
+        <div className="mb-6">
+          <div className="pb-3">
+            <Skeleton className="mb-2 block h-8 w-96" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-4 pt-1.5">
+          <Description term="Last synced at" detail={<Skeleton className="block h-5 w-36" />} />
+          <Description term="Sync method" detail={<Skeleton className="block h-5 w-28" />} />
+          <Description term="SDK version" detail={<Skeleton className="block h-5 w-14" />} />
+          <Description term="Language" detail={<Skeleton className="block h-5 w-28" />} />
+        </div>
+      </div>
+      <div className="border-muted border-t px-6 py-3">
+        <Skeleton className="block h-6 w-28" />
+      </div>
+    </Card>
+  );
+}
 
 export function AppCard({ kind, children }: React.PropsWithChildren<{ kind: CardKind }>) {
   return (
@@ -57,7 +83,10 @@ export function AppCardContent({ app, pill, actions }: CardContentProps) {
           term="Sync method"
           detail={<div className="lowercase first-letter:capitalize">{app.connectionType}</div>}
         />
-        <Description term="SDK version" detail={app.sdkVersion?.trim() ? app.sdkVersion : '-'} />
+        <Description
+          term="SDK version"
+          detail={app.sdkVersion?.trim() ? <Pill>{app.sdkVersion}</Pill> : '-'}
+        />
         <Description term="Language" detail={app.sdkLanguage?.trim() ? app.sdkLanguage : '-'} />
       </div>
     </div>
