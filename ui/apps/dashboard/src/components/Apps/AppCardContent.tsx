@@ -17,9 +17,9 @@ const getAppCardContent = ({ app, envSlug }: { app: FlattenedApp; envSlug: strin
   ) : app.functionCount === 0 ? (
     'There are currently no functions registered at this URL.'
   ) : (
-    <span>
+    <>
       {app.functionCount} {app.functionCount === 1 ? 'function' : 'functions'} found
-    </span>
+    </>
   );
 
   const footerHeaderSecondaryCTA =

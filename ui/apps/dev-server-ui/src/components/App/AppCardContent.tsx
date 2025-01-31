@@ -26,11 +26,9 @@ const getAppCardContent = ({ app }: { app: GetAppsQuery['apps'][number] }) => {
   ) : app.functionCount === 0 ? (
     'There are currently no functions registered at this URL.'
   ) : (
-    <div className="flex w-full items-center justify-between">
-      <span>
-        {app.functionCount} {app.functionCount === 1 ? 'function' : 'functions'} found
-      </span>
-    </div>
+    <>
+      {app.functionCount} {app.functionCount === 1 ? 'function' : 'functions'} found
+    </>
   );
 
   const footerHeaderSecondaryCTA =

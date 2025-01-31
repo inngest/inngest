@@ -15,12 +15,12 @@ type CardKind = 'default' | 'warning' | 'primary' | 'error' | 'info';
 const kindStyles = {
   primary: {
     background: 'bg-primary-moderate',
-    text: 'text-primary-moderate',
+    text: 'text-primary-intense',
   },
   error: { background: 'bg-tertiary-moderate', text: 'text-tertiary-moderate' },
   warning: { background: 'bg-accent-moderate', text: 'text-accent-moderate' },
   default: { background: 'bg-surfaceSubtle', text: 'text-surfaceSubtle' },
-  info: { background: 'bg-secondary-moderate', text: 'text-secondary-moderate' },
+  info: { background: 'bg-secondary-moderate', text: 'text-secondary-intense' },
 };
 
 export function SkeletonCard() {
@@ -119,7 +119,7 @@ function Description({
   return (
     <div className={className}>
       <dt className="text-light pb-1 text-sm">{term}</dt>
-      <dd className="text-subtle text-sm">{detail}</dd>
+      <dd className="text-subtle truncate text-sm">{detail}</dd>
     </div>
   );
 }
@@ -144,9 +144,9 @@ export function AppCardFooter({ kind, headerTitle, headerSecondaryCTA, content }
         >
           <div className="flex w-full items-center justify-between">
             <AccordionPrimitive.Trigger asChild>
-              <span className="flex items-center gap-1">
+              <span className="group flex items-center gap-1 text-sm font-medium">
                 <Button
-                  className="group h-6 p-1"
+                  className="h-6 p-1"
                   appearance="ghost"
                   kind="secondary"
                   icon={
