@@ -427,7 +427,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		ch.log.Debug("connection is ready")
 		if c.devlogger != nil {
-			c.devlogger.Info().Msg("worker connected")
+			c.devlogger.Info().Str("app_name", app.Name).Msg("worker connected")
 		}
 
 		{

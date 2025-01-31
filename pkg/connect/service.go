@@ -232,8 +232,13 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 	// Set up gateway-specific logger with info for correlations
 	c.logger = logger.StdlibLogger(ctx).With("gateway_id", c.gatewayId)
 	if c.dev {
-		c.logger = logger.VoidLogger()
+		// Initialize prettier logger for dev server
 		c.devlogger = logger.From(ctx)
+
+		// Hide verbose connect gateway logs in dev server by default
+		if os.Getenv("CONNECT_GATEWAY_FULL_LOGS") != "true" {
+			c.logger = logger.VoidLogger()
+		}
 	}
 
 	hostname, err := os.Hostname()
