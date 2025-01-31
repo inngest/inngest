@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"github.com/rs/zerolog"
 	"log/slog"
 	"net/http"
 	"os"
@@ -70,7 +71,8 @@ type connectGatewaySvc struct {
 	gatewayId ulid.ULID
 	dev       bool
 
-	logger *slog.Logger
+	logger    *slog.Logger
+	devlogger *zerolog.Logger
 
 	runCtx context.Context
 
@@ -229,6 +231,10 @@ func (c *connectGatewaySvc) Name() string {
 func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 	// Set up gateway-specific logger with info for correlations
 	c.logger = logger.StdlibLogger(ctx).With("gateway_id", c.gatewayId)
+	if c.dev {
+		c.logger = logger.VoidLogger()
+		c.devlogger = logger.From(ctx)
+	}
 
 	hostname, err := os.Hostname()
 	if err != nil {
