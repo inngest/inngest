@@ -13,10 +13,7 @@ import (
 )
 
 var (
-	defaultMsgKey           = "fn_id"
-	defaultHandlerBatchSize = 500
-	defaultHandlerNum       = 500
-	defaultMaxMsgBytes      = 1024 * 1024 * 30 // 30MB
+	defaultMsgKey = "fn_id"
 )
 
 type kafkaSpanExporter struct {
@@ -25,11 +22,9 @@ type kafkaSpanExporter struct {
 }
 
 type kafkaSpansExporterOpts struct {
-	addrs            []string
-	topic            string
-	key              string
-	handlerNum       int
-	handlerBatchSize int
+	addrs []string
+	topic string
+	key   string
 }
 
 type KafkaSpansExporterOpts func(k *kafkaSpansExporterOpts)
@@ -50,23 +45,8 @@ func WithKafkaExporterTopic(topic, key string) KafkaSpansExporterOpts {
 	}
 }
 
-func WithKafkaSendHandlerNum(n int) KafkaSpansExporterOpts {
-	return func(k *kafkaSpansExporterOpts) {
-		k.handlerNum = n
-	}
-}
-
-func WithKafkaSendHandlerBatchSize(n int) KafkaSpansExporterOpts {
-	return func(k *kafkaSpansExporterOpts) {
-		k.handlerBatchSize = n
-	}
-}
-
 func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (trace.SpanExporter, error) {
-	conf := &kafkaSpansExporterOpts{
-		handlerNum:       defaultHandlerNum,
-		handlerBatchSize: defaultHandlerBatchSize,
-	}
+	conf := &kafkaSpansExporterOpts{}
 
 	for _, apply := range opts {
 		apply(conf)
