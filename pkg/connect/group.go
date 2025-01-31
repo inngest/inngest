@@ -12,7 +12,6 @@ import (
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
-	"strings"
 )
 
 func workerGroupHashFromConnRequest(req *connect.WorkerConnectRequestData, authResp *auth.Response, sessionDetails *connect.SessionDetails) (string, error) {
@@ -84,7 +83,8 @@ func NewWorkerGroupFromConnRequest(
 
 	slugs := make([]string, len(functions))
 	for i, fn := range functions {
-		slugs[i] = strings.TrimPrefix(fn.Slug, fmt.Sprintf("%s-", req.AppName))
+		// Use slug as is
+		slugs[i] = fn.Slug
 	}
 
 	workerGroup := &state.WorkerGroup{

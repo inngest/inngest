@@ -70,7 +70,7 @@ func (h *handler) getServableFunctionBySlug(slug string) ServableFunction {
 	h.l.RLock()
 	var fn ServableFunction
 	for _, f := range h.funcs {
-		if f.Slug() == slug {
+		if f.Slug(h.appName) == slug {
 			fn = f
 			break
 		}

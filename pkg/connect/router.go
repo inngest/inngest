@@ -79,7 +79,7 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 
 			// Now we're guaranteed to be the exclusive connection processing this message!
 
-			routeTo, err := c.getSuitableConnection(ctx, envId, appId, data.FunctionSlug)
+			routeTo, err := c.getSuitableConnection(ctx, envId, appId, data.FunctionSlug, log)
 			if err != nil {
 				log.Error("could not retrieve suitable connection", "err", err)
 				return
@@ -134,7 +134,7 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 
 }
 
-func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, envId uuid.UUID, appId uuid.UUID, fnSlug string) (*connect.ConnMetadata, error) {
+func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, envId uuid.UUID, appId uuid.UUID, fnSlug string, log *slog.Logger) (*connect.ConnMetadata, error) {
 	conns, err := c.stateManager.GetConnectionsByAppID(ctx, envId, appId)
 	if err != nil {
 		return nil, fmt.Errorf("could not get connections by app ID: %w", err)
@@ -146,7 +146,7 @@ func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, envId uuid
 
 	healthy := make([]*connect.ConnMetadata, 0, len(conns))
 	for _, conn := range conns {
-		isHealthy, err := c.isHealthy(ctx, envId, appId, fnSlug, conn)
+		isHealthy, err := c.isHealthy(ctx, envId, appId, fnSlug, conn, log)
 		if err != nil {
 			return nil, err
 		}
@@ -176,7 +176,7 @@ func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, envId uuid
 	return chosen, nil
 }
 
-func (c *connectRouterSvc) isHealthy(ctx context.Context, envId uuid.UUID, appId uuid.UUID, fnSlug string, conn *connect.ConnMetadata) (isHealthy bool, err error) {
+func (c *connectRouterSvc) isHealthy(ctx context.Context, envId uuid.UUID, appId uuid.UUID, fnSlug string, conn *connect.ConnMetadata, log *slog.Logger) (isHealthy bool, err error) {
 	defer func() {
 		if isHealthy {
 			return
@@ -184,26 +184,41 @@ func (c *connectRouterSvc) isHealthy(ctx context.Context, envId uuid.UUID, appId
 
 		connId, err := ulid.Parse(conn.Id)
 		if err != nil {
-			c.logger.Error("could not clean up inactive connection, invalid connection ID", "conn_id", conn.Id, "err", err)
+			log.Error("could not clean up inactive connection, invalid connection ID", "conn_id", conn.Id, "err", err)
 		}
 
 		// Clean up unhealthy connection
 		err = c.stateManager.DeleteConnection(context.Background(), envId, &appId, conn.GroupId, connId)
-		if err != nil {
-			c.logger.Error("could not clean up inactive connection", "conn_id", conn.Id, "err", err)
+		if err != nil && !errors.Is(err, state.ConnDeletedWithGroupErr) {
+			log.Error("could not clean up inactive connection", "conn_id", conn.Id, "err", err)
 		}
 	}()
 
+	log.Debug("evaluating connection", "connection_id", conn.Id, "status", conn.Status, "last_heartbeat_at", conn.LastHeartbeatAt.AsTime())
+
+	gatewayId, err := ulid.Parse(conn.GatewayId)
+	if err != nil {
+		log.Error("connection gateway id could not be parsed", "err", err, "gateway_id", conn.GatewayId)
+
+		return
+	}
+
 	if conn.Status != connect.ConnectionStatus_READY {
+		log.Debug("connection is not ready")
+
 		return
 	}
 
 	if conn.LastHeartbeatAt.AsTime().Before(time.Now().Add(-2 * WorkerHeartbeatInterval)) {
+		log.Debug("last heartbeat is too old")
+
 		return
 	}
 
 	group, err := c.stateManager.GetWorkerGroupByHash(ctx, envId, conn.GroupId)
 	if err != nil {
+		log.Error("could not get worker group for connection", "group_id", conn.GroupId)
+
 		return
 	}
 
@@ -216,21 +231,24 @@ func (c *connectRouterSvc) isHealthy(ctx context.Context, envId uuid.UUID, appId
 	}
 
 	if !hasFn {
-		return
-	}
+		log.Debug("connection does not have function", "slug", fnSlug, "available", group.FunctionSlugs)
 
-	gatewayId, err := ulid.Parse(conn.GatewayId)
-	if err != nil {
 		return
 	}
 
 	// Ensure gateway is healthy
 	gw, err := c.stateManager.GetGateway(ctx, gatewayId)
 	if err != nil {
+		log.Error("could not get gateway", "gateway_id", gatewayId.String())
+
 		return
 	}
 
+	log.Debug("retrieved gateway for connection", "conn_id", conn.Id, "gateway_id", gatewayId.String(), "status", gw.Status, "last_heartbeat_at", gw.LastHeartbeatAt)
+
 	if gw.Status != state.GatewayStatusActive || gw.LastHeartbeatAt.Before(time.Now().Add(-2*GatewayHeartbeatInterval)) {
+		log.Debug("gateway is unhealthy", "conn_id", conn.Id, "gateway_id", gatewayId.String(), "status", gw.Status, "last_heartbeat_at", gw.LastHeartbeatAt)
+
 		// Clean up unhealthy gateway
 		err = c.stateManager.DeleteGateway(ctx, gatewayId)
 		if err != nil {
