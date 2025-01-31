@@ -85,6 +85,9 @@ func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (
 	if err != nil {
 		return nil, fmt.Errorf("error initializing kafka client: %w", err)
 	}
+	if err := cl.Ping(ctx); err != nil {
+		return nil, fmt.Errorf("error establishing connection to kafka: %w", err)
+	}
 
 	return &kafkaSpanExporter{
 		client: cl,
@@ -134,9 +137,7 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 		e.client.Produce(ctx, rec, func(r *kgo.Record, err error) {
 			defer wg.Done()
 
-			// TODO: do something here?
 			status := "success"
-
 			if err != nil {
 				l.Error("error on producing span", "error", err)
 				status = "error"
