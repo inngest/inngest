@@ -164,6 +164,15 @@ func IncrSpanExportedCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrSpanExportDataLoss(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_export_data_loss_total",
+		Description: "Total number of data loss detected",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrSpanBatchProcessorEnqueuedCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,

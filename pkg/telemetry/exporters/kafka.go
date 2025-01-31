@@ -70,7 +70,17 @@ func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (
 		kgo.RequiredAcks(kgo.AllISRAcks()), // Most durable with some perf hits
 
 		// Increment metrics on data loss detection
-		kgo.ProducerOnDataLossDetected(func(topic string, partition int32) {}),
+		kgo.ProducerOnDataLossDetected(func(topic string, partition int32) {
+			// record data loss when happened.
+			metrics.IncrSpanExportDataLoss(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"producer":  "kafka",
+					"topic":     topic,
+					"partition": partition,
+				},
+			})
+		}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing kafka client: %w", err)
