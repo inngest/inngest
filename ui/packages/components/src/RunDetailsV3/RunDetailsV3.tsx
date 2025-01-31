@@ -166,7 +166,7 @@ export const RunDetailsV3 = (props: Props) => {
       <div className="border-muted cursor-col-resize border-[.5px]" onMouseDown={handleMouseDown} />
 
       <div className="border-muted flex h-full flex-col" style={{ width: `${100 - leftWidth}%` }}>
-        <TopInfo getTrigger={getTrigger} runID={runID} />
+        <TopInfo getTrigger={getTrigger} runID={runID} result={resultRes.data} />
       </div>
     </div>
   );

@@ -1,9 +1,8 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { RiArrowUpSLine } from '@remixicon/react';
 import { useQuery } from '@tanstack/react-query';
 
-import { CodeBlock } from '../CodeBlock';
 import {
   CodeElement,
   ElementWrapper,
@@ -15,17 +14,17 @@ import {
 // NOTE - This component should be a shared component as part of the design system.
 // Until then, we re-use it from the RunDetailsV2 as these are part of the same parent UI.
 import { ErrorCard } from '../RunDetailsV2/ErrorCard';
+import { usePrettyJson } from '../hooks/usePrettyJson';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
+import type { Result } from '../types/functionRun';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
-import { IO } from './IO';
 import { Input } from './Input';
 import { Output } from './Output';
 import { Tabs } from './Tabs';
-import { Timeline } from './Timeline';
-import { Workflow } from './Workflow';
 
-type Props = {
+type TopInfoProps = {
   getTrigger: (runID: string) => Promise<Trigger>;
+  result?: Result;
   runID: string;
 };
 
@@ -71,7 +70,7 @@ export const actionConfigs = (
   };
 };
 
-export const TopInfo = ({ getTrigger, runID }: Props) => {
+export const TopInfo = ({ getTrigger, runID, result }: TopInfoProps) => {
   const [expanded, setExpanded] = useState(true);
   const { isRunning, send } = useDevServer();
 
@@ -97,6 +96,8 @@ export const TopInfo = ({ getTrigger, runID }: Props) => {
       return undefined;
     }
   }, [trigger?.payloads]);
+
+  const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
 
   const type = trigger?.isBatch ? 'BATCH' : trigger?.cron ? 'CRON' : 'EVENT';
 
@@ -188,25 +189,11 @@ export const TopInfo = ({ getTrigger, runID }: Props) => {
         )}
       </dl>
 
-      {/* {trigger?.payloads && type !== 'CRON' && (
-        <div className="border-muted border-t">
-          <CodeBlock
-            actions={codeBlockActions}
-            header={{
-              title: trigger.isBatch ? 'Batch' : 'Event payload',
-            }}
-            tab={{
-              content: prettyPayload ?? 'Unknown',
-            }}
-            allowFullScreen={true}
-          />
-        </div>
-      )} */}
       <Tabs
         defaultActive={0}
         tabs={[
           { label: 'Input', node: <Input raw={prettyPayload} actions={codeBlockActions} /> },
-          { label: 'Output', node: <Output /> },
+          { label: 'Output', node: <Output raw={prettyOutput} /> },
         ]}
       />
     </div>
