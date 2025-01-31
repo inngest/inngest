@@ -5,15 +5,16 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"log/slog"
+	"sync"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"google.golang.org/protobuf/proto"
-	"log/slog"
-	"sync"
-	"time"
 )
 
 const (
@@ -411,9 +412,12 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 			// Run in another goroutine to avoid blocking `c`
 			go func() {
 				i.subscribersLock.RLock()
-				subs := i.subscribers[m.Channel]
-				i.subscribersLock.RUnlock()
+				// NOTE:  We have to keep this lock as we send in channels, otherwise we may attempt
+				// to send on a closed channel that's unsubscribed.  Therefore, we keep the read lock
+				// until we're done sending to all chans.
+				defer i.subscribersLock.RUnlock()
 
+				subs := i.subscribers[m.Channel]
 				if len(subs) == 0 {
 					// This should not happen: In subscribe, we UNSUBSCRIBE once the last subscriber is removed
 					i.logger.Debug("no subscribers for connect pubsub channel", "channel", m.Channel)
