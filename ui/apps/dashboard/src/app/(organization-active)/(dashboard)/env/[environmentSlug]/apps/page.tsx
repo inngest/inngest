@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { SkeletonCard } from '@inngest/components/Apps/AppCard';
 import { Button } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
 import { Link } from '@inngest/components/Link/Link';
@@ -12,7 +13,6 @@ import { StatusMenu } from '@/components/Apps/StatusMenu';
 import { getProdApps } from '@/components/Onboarding/actions';
 import { staticSlugs } from '@/utils/environments';
 import { pathCreator } from '@/utils/urls';
-import { SkeletonCard } from './AppCard';
 import { Apps } from './Apps';
 
 const AppInfo = () => (

@@ -1,10 +1,11 @@
 'use client';
 
+import { SkeletonCard } from '@inngest/components/Apps/AppCard';
+
 import AppCards from '@/components/Apps/AppCards';
 import { EmptyActiveCard, EmptyArchivedCard } from '@/components/Apps/EmptyAppsCard';
 import { UnattachedSyncsCard } from '@/components/Apps/UnattachedSyncsCard';
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { SkeletonCard } from './AppCard';
 import { useApps } from './useApps';
 
 type Props = {
