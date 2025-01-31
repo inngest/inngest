@@ -33,11 +33,12 @@ export function SkeletonCard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-4 gap-4 pt-1.5">
+        <div className="grid grid-cols-5 gap-5 pt-1.5">
           <Description term="Last synced at" detail={<Skeleton className="block h-5 w-36" />} />
           <Description term="Sync method" detail={<Skeleton className="block h-5 w-28" />} />
           <Description term="SDK version" detail={<Skeleton className="block h-5 w-14" />} />
           <Description term="Language" detail={<Skeleton className="block h-5 w-28" />} />
+          <Description term="Framework" detail={<Skeleton className="block h-5 w-28" />} />
         </div>
       </div>
       <div className="border-muted border-t px-6 py-3">
@@ -75,7 +76,7 @@ export function AppCardContent({ app, pill, actions }: CardContentProps) {
         <p className="text-muted mt-0.5">{app.url}</p>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-5 gap-4">
         {app.lastSyncedAt && (
           <Description term="Last synced at" detail={<Time value={app.lastSyncedAt} />} />
         )}
@@ -97,6 +98,10 @@ export function AppCardContent({ app, pill, actions }: CardContentProps) {
           detail={app.sdkVersion?.trim() ? <Pill>{app.sdkVersion}</Pill> : '-'}
         />
         <Description term="Language" detail={app.sdkLanguage?.trim() ? app.sdkLanguage : '-'} />
+        {/* TODO: Add Connected Workers counter */}
+        {app.connectionType === connectionTypes.Connect ? null : (
+          <Description term="Framework" detail={app.framework ?? '-'} />
+        )}
       </div>
     </div>
   );
