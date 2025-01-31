@@ -27,7 +27,8 @@ export default function AppList() {
 
   const memoizedAppCards = useMemo(() => {
     return apps.map((app) => {
-      const { appKind, status, footerHeader, footerContent } = getAppCardContent({ app });
+      const { appKind, status, footerHeaderTitle, footerHeaderSecondaryCTA, footerContent } =
+        getAppCardContent({ app });
 
       return (
         <AppCard key={app?.id} kind={appKind}>
@@ -66,7 +67,12 @@ export default function AppList() {
               </div>
             }
           />
-          <AppCard.Footer kind={appKind} header={footerHeader} content={footerContent} />
+          <AppCard.Footer
+            kind={appKind}
+            headerTitle={footerHeaderTitle}
+            headerSecondaryCTA={footerHeaderSecondaryCTA}
+            content={footerContent}
+          />
         </AppCard>
       );
     });

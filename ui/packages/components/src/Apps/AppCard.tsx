@@ -121,11 +121,12 @@ function Description({
 
 type CardFooterProps = {
   kind: CardKind;
-  header: React.ReactNode;
+  headerTitle: React.ReactNode;
+  headerSecondaryCTA: React.ReactNode;
   content: React.ReactNode;
 };
 
-export function AppCardFooter({ kind, header, content }: CardFooterProps) {
+export function AppCardFooter({ kind, headerTitle, headerSecondaryCTA, content }: CardFooterProps) {
   return (
     <AccordionList
       type="multiple"
@@ -136,22 +137,27 @@ export function AppCardFooter({ kind, header, content }: CardFooterProps) {
         <AccordionPrimitive.Header
           className={cn('flex items-center gap-1 text-sm', kindStyles[kind].text)}
         >
-          <AccordionPrimitive.Trigger asChild>
-            <Button
-              className="group h-6 p-1"
-              appearance="ghost"
-              kind="secondary"
-              icon={
-                <RiArrowDownSLine
-                  className={cn(
-                    'transform-90 transition-transform duration-500 group-data-[state=open]:-rotate-180',
-                    kindStyles[kind].text
-                  )}
+          <div className="flex w-full items-center justify-between">
+            <AccordionPrimitive.Trigger asChild>
+              <span className="flex items-center gap-1">
+                <Button
+                  className="group h-6 p-1"
+                  appearance="ghost"
+                  kind="secondary"
+                  icon={
+                    <RiArrowDownSLine
+                      className={cn(
+                        'transform-90 transition-transform duration-500 group-data-[state=open]:-rotate-180',
+                        kindStyles[kind].text
+                      )}
+                    />
+                  }
                 />
-              }
-            />
-          </AccordionPrimitive.Trigger>
-          {header}
+                {headerTitle}
+              </span>
+            </AccordionPrimitive.Trigger>
+            {headerSecondaryCTA}
+          </div>
         </AccordionPrimitive.Header>
         <AccordionList.Content className="px-7">{content}</AccordionList.Content>
       </AccordionList.Item>

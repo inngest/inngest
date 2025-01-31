@@ -12,20 +12,22 @@ const getAppCardContent = ({ app, envSlug }: { app: FlattenedApp; envSlug: strin
 
   const status = app.isArchived ? 'Archived' : syncStatusText[statusKey] ?? null;
 
-  const footerHeader = app.error ? (
+  const footerHeaderTitle = app.error ? (
     `Error: ${app.error}`
   ) : app.functionCount === 0 ? (
     'There are currently no functions registered at this URL.'
   ) : (
-    <div className="flex w-full items-center justify-between">
-      <span>
-        {app.functionCount} {app.functionCount === 1 ? 'function' : 'functions'} found
-      </span>
+    <span>
+      {app.functionCount} {app.functionCount === 1 ? 'function' : 'functions'} found
+    </span>
+  );
+
+  const footerHeaderSecondaryCTA =
+    !app.error && app.functionCount > 0 ? (
       <Link size="small" href={pathCreator.functions({ envSlug: envSlug })} arrowOnHover>
         View functions
       </Link>
-    </div>
-  );
+    ) : null;
 
   const footerContent =
     app.functionCount === 0 ? (
@@ -57,7 +59,7 @@ const getAppCardContent = ({ app, envSlug }: { app: FlattenedApp; envSlug: strin
       </ul>
     );
 
-  return { appKind, status, footerHeader, footerContent };
+  return { appKind, status, footerHeaderTitle, footerHeaderSecondaryCTA, footerContent };
 };
 
 export default getAppCardContent;

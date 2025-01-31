@@ -22,10 +22,11 @@ export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envS
   }, [apps]);
 
   return sortedApps.map((app) => {
-    const { appKind, status, footerHeader, footerContent } = getAppCardContent({
-      app,
-      envSlug,
-    });
+    const { appKind, status, footerHeaderTitle, footerHeaderSecondaryCTA, footerContent } =
+      getAppCardContent({
+        app,
+        envSlug,
+      });
 
     return (
       <div className="mb-6" key={app.id}>
@@ -51,7 +52,12 @@ export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envS
               </div>
             }
           />
-          <AppCard.Footer kind={appKind} header={footerHeader} content={footerContent} />
+          <AppCard.Footer
+            kind={appKind}
+            headerTitle={footerHeaderTitle}
+            headerSecondaryCTA={footerHeaderSecondaryCTA}
+            content={footerContent}
+          />
         </AppCard>
       </div>
     );
