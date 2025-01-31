@@ -58,7 +58,7 @@ export default function Layout({ children, params: { externalID } }: Props) {
         <ValidateModal
           isOpen={showValidate}
           onClose={() => setShowValidate(false)}
-          url={res.data.latestSync.url}
+          initialURL={res.data.latestSync.url}
         />
       )}
       {res.data && (
