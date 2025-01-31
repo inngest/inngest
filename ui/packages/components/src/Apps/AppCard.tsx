@@ -4,10 +4,10 @@ import { Button } from '@inngest/components/Button';
 import { Pill } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
-import { RiArrowDownSLine } from '@remixicon/react';
+import { RiArrowDownSLine, RiArrowLeftRightLine, RiInfinityLine } from '@remixicon/react';
 
 import { Card } from '../Card';
-import { type App } from '../types/app';
+import { connectionTypes, type App } from '../types/app';
 import { cn } from '../utils/classNames';
 
 type CardKind = 'default' | 'warning' | 'primary' | 'error' | 'info';
@@ -72,7 +72,7 @@ export function AppCardContent({ app, pill, actions }: CardContentProps) {
           </div>
           {actions}
         </div>
-        <p className="text-subtle mt-0.5">{app.url}</p>
+        <p className="text-muted mt-0.5">{app.url}</p>
       </div>
 
       <div className="grid grid-cols-4 gap-4">
@@ -81,7 +81,16 @@ export function AppCardContent({ app, pill, actions }: CardContentProps) {
         )}
         <Description
           term="Sync method"
-          detail={<div className="lowercase first-letter:capitalize">{app.connectionType}</div>}
+          detail={
+            <div className="flex items-center gap-1">
+              {app.connectionType === connectionTypes.Connect ? (
+                <RiInfinityLine className="h-4 w-4" />
+              ) : (
+                <RiArrowLeftRightLine className="h-4 w-4" />
+              )}
+              <div className="lowercase first-letter:capitalize">{app.connectionType}</div>
+            </div>
+          }
         />
         <Description
           term="SDK version"
