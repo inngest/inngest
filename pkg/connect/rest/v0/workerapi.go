@@ -101,7 +101,7 @@ func (a *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if len(hashedSigningKey) > 7 {
+		if hashedSigningKey != "" && len(hashedSigningKey) > 7 {
 			// Remove "Bearer " prefix
 			hashedSigningKey = hashedSigningKey[7:]
 		}
