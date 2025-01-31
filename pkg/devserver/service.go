@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/inngest/inngest/pkg/enums"
 	"net"
 	"net/url"
 	"os"
@@ -13,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/inngest/inngest/pkg/enums"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/auth"
@@ -652,8 +653,8 @@ func (d *devserver) CheckConnectionLimit(_ context.Context, _ *auth.Response) (b
 	return true, nil
 }
 
-func (d *devserver) RetrieveGateway(_ context.Context, _, _ uuid.UUID, _ []string) (string, *url.URL, error) {
-	parsed, err := url.Parse("ws://127.0.0.1:8289/v0/connect")
+func (d *devserver) RetrieveGateway(_ context.Context, _, _ uuid.UUID, _ []string, hostname string) (string, *url.URL, error) {
+	parsed, err := url.Parse("ws://" + hostname + ":8289/v0/connect")
 	if err != nil {
 		return "", nil, err
 	}

@@ -2,6 +2,8 @@ package v0
 
 import (
 	"context"
+	"net/url"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
@@ -9,7 +11,6 @@ import (
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/headers"
-	"net/url"
 )
 
 type Opts struct {
@@ -42,7 +43,7 @@ type ConnectGatewayRetriever interface {
 	// may still return a gateway from an excluded group.
 	//
 	// On a successful request, the gateway group name and URL are returned.
-	RetrieveGateway(ctx context.Context, accountId uuid.UUID, envId uuid.UUID, exclude []string) (string, *url.URL, error)
+	RetrieveGateway(ctx context.Context, accountId uuid.UUID, envId uuid.UUID, exclude []string, hostname string) (string, *url.URL, error)
 }
 
 type connectApiRouter struct {

@@ -3,6 +3,7 @@ package v0
 import (
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/inngest/inngest/pkg/connect/auth"
@@ -70,7 +71,9 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gatewayGroup, gatewayUrl, err := a.ConnectGatewayRetriever.RetrieveGateway(ctx, res.AccountID, res.EnvID, reqBody.ExcludeGateways)
+	host := r.Host
+	hostname := strings.Split(host, ":")[0]
+	gatewayGroup, gatewayUrl, err := a.ConnectGatewayRetriever.RetrieveGateway(ctx, res.AccountID, res.EnvID, reqBody.ExcludeGateways, hostname)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not retrieve gateway"))
 		return
