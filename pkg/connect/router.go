@@ -189,7 +189,7 @@ func (c *connectRouterSvc) isHealthy(ctx context.Context, envId uuid.UUID, appId
 
 		// Clean up unhealthy connection
 		err = c.stateManager.DeleteConnection(context.Background(), envId, &appId, conn.GroupId, connId)
-		if err != nil {
+		if err != nil && !errors.Is(err, state.ConnDeletedWithGroupErr) {
 			c.logger.Error("could not clean up inactive connection", "conn_id", conn.Id, "err", err)
 		}
 	}()
