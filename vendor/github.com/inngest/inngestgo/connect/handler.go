@@ -119,6 +119,20 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 	numCpuCores := runtime.NumCPU()
 	totalMem := memory.TotalMemory()
 
+	functionSlugs := make(map[string][]string)
+	for _, function := range h.opts.Functions {
+		stepUrls := make([]string, len(function.Steps))
+		j := 0
+		for _, step := range function.Steps {
+			stepUrls[j] = step.Runtime["url"].(string)
+			j++
+		}
+
+		functionSlugs[function.Slug] = stepUrls
+	}
+
+	h.logger.Debug("using provided functions", "slugs", functionSlugs)
+
 	marshaledFns, err := json.Marshal(h.opts.Functions)
 	if err != nil {
 		return fmt.Errorf("failed to serialize connect config: %w", err)
@@ -220,11 +234,9 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 	h.initiateConnectionChan <- struct{}{}
 
 	// Wait until connection loop finishes
-	if err := eg.Wait(); err != nil {
-		return fmt.Errorf("could not establish connection: %w", err)
-	}
+	egError := eg.Wait()
 
-	// Send out buffered messages using API
+	// Always send out buffered messages using API
 	if h.messageBuffer.hasMessages() {
 		// Send buffered messages
 		err := h.messageBuffer.flush(auth.hashedSigningKey)
@@ -233,6 +245,10 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 		}
 
 		// TODO Push remaining messages to another destination for processing?
+	}
+
+	if egError != nil {
+		return fmt.Errorf("could not establish connection: %w", err)
 	}
 
 	return nil

@@ -339,13 +339,13 @@ func (h *handler) Register(funcs ...ServableFunction) {
 	// that already exists, clear it.
 	slugs := map[string]ServableFunction{}
 	for _, f := range h.funcs {
-		slugs[f.Slug()] = f
+		slugs[f.Slug(h.appName)] = f
 	}
 
 	for _, f := range funcs {
-		slugs[f.Slug()] = f
+		slugs[f.Slug(h.appName)] = f
 	}
-
+	
 	newFuncs := make([]ServableFunction, len(slugs))
 	i := 0
 	for _, f := range slugs {
@@ -748,13 +748,13 @@ func createFunctionConfigs(
 
 		// Modify URL to contain fn ID, step params
 		values := appURL.Query()
-		values.Set("fnId", fn.Slug())
+		values.Set("fnId", fn.Slug(appName)) // This should match the Slug below
 		values.Set("step", "step")
 		appURL.RawQuery = values.Encode()
 
 		f := sdk.SDKFunction{
 			Name:        fn.Name(),
-			Slug:        appName + "-" + fn.Slug(),
+			Slug:        fn.Slug(appName),
 			Idempotency: c.Idempotency,
 			Priority:    fn.Config().Priority,
 			Triggers:    inngest.MultipleTriggers{},
@@ -875,7 +875,8 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	h.l.RLock()
 	var fn ServableFunction
 	for _, f := range h.funcs {
-		if f.Slug() == fnID {
+		isOldFormat := f.Slug("") == fnID // Only include function slug
+		if f.Slug(h.appName) == fnID || isOldFormat {
 			fn = f
 			break
 		}
