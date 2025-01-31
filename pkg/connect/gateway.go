@@ -294,7 +294,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
-		ch.log = ch.log.With("app_id", app.ID)
+		// Once app is found, set App ID in connection so worker connection history is associated with app
+		conn.Group.AppID = &app.ID
+
+		ch.log = ch.log.With("app_id", conn.Group.AppID, "sync_id", conn.Group.SyncID)
 
 		ch.log.Debug("found app, preparing to receive messages")
 
