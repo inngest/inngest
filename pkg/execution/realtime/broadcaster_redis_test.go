@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"github.com/inngest/inngest/pkg/logger"
 	"sync"
 	"testing"
 	"time"
@@ -75,6 +76,9 @@ func TestRedisBroadcaster(t *testing.T) {
 		require.NoError(t, err)
 		err = b2.Subscribe(ctx, s2, msg2.Topics())
 		require.NoError(t, err)
+
+		// Wait a short delay to ensure all subscriptions have been set up in Redis
+		<-time.After(100 * time.Millisecond)
 
 		// and publishing on b1 should also broadcast a message to the s2
 		// subscriber via b2.
