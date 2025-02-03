@@ -2,6 +2,7 @@ package logger
 
 import (
 	"context"
+	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -25,6 +26,10 @@ func StdlibLogger(ctx context.Context) *slog.Logger {
 		}))
 	}
 	return logger.(*slog.Logger)
+}
+
+func VoidLogger() *slog.Logger {
+	return slog.New(slog.NewJSONHandler(io.Discard, &slog.HandlerOptions{}))
 }
 
 func StdlibLoggerWithCustomVarName(ctx context.Context, varName string) *slog.Logger {

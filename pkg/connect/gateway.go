@@ -119,13 +119,18 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			// This is deferred so we always update the semaphore
 			defer c.connectionCount.Done()
 			ch.log.Debug("Closing WebSocket connection")
+			if c.devlogger != nil {
+				c.devlogger.Info().Msg("worker disconnected")
+			}
+
+			closed = true
 
 			if c.isDraining {
 				c.closeDraining(ws)
 				return
 			}
+
 			_ = ws.CloseNow()
-			closed = true
 		}()
 
 		ch.log.Debug("WebSocket connection established, sending hello")
@@ -225,8 +230,6 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		// regardless of whether it's permanent or temporary
 		defer func() {
 			// This is a transactional operation, it should always complete regardless of context cancellation
-
-			// TODO Persist disconnected status in history for UI (show disconnected connections with reason)
 			err := c.stateManager.DeleteConnection(context.Background(), conn.Group.EnvID, conn.Group.AppID, conn.Group.Hash, conn.ConnectionId)
 			switch err {
 			case nil, state.ConnDeletedWithGroupErr:
@@ -297,7 +300,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
-		ch.log = ch.log.With("app_id", app.ID)
+		// Once app is found, set App ID in connection so worker connection history is associated with app
+		conn.Group.AppID = &app.ID
+
+		ch.log = ch.log.With("app_id", conn.Group.AppID, "sync_id", conn.Group.SyncID)
 
 		ch.log.Debug("found app, preparing to receive messages")
 
@@ -429,6 +435,9 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		}
 
 		ch.log.Debug("connection is ready")
+		if c.devlogger != nil {
+			c.devlogger.Info().Str("app_name", app.Name).Msg("worker connected")
+		}
 
 		{
 			successTags := map[string]any{

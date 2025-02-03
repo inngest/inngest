@@ -287,11 +287,11 @@ func (r *GetFunctionRunsRow) ToSQLite() (*sqlc.GetFunctionRunsRow, error) {
 func (wc *WorkerConnection) ToSQLite() (*sqlc.WorkerConnection, error) {
 	var lastHeartbeatAt, disconnectedAt sql.NullInt64
 	if wc.LastHeartbeatAt.Valid {
-		lastHeartbeatAt.Int64 = wc.LastHeartbeatAt.Time.UnixMilli()
+		lastHeartbeatAt.Int64 = wc.LastHeartbeatAt.Int64
 		lastHeartbeatAt.Valid = true
 	}
 	if wc.DisconnectedAt.Valid {
-		disconnectedAt.Int64 = wc.DisconnectedAt.Time.UnixMilli()
+		disconnectedAt.Int64 = wc.DisconnectedAt.Int64
 		disconnectedAt.Valid = true
 	}
 
@@ -304,11 +304,11 @@ func (wc *WorkerConnection) ToSQLite() (*sqlc.WorkerConnection, error) {
 		InstanceID:       wc.InstanceID,
 		Status:           int64(wc.Status),
 		WorkerIp:         wc.WorkerIp,
-		ConnectedAt:      wc.ConnectedAt.UnixMilli(),
+		ConnectedAt:      wc.ConnectedAt,
 		LastHeartbeatAt:  lastHeartbeatAt,
 		DisconnectedAt:   disconnectedAt,
-		RecordedAt:       wc.RecordedAt.UnixMilli(),
-		InsertedAt:       wc.InsertedAt.UnixMilli(),
+		RecordedAt:       wc.RecordedAt,
+		InsertedAt:       wc.InsertedAt,
 		DisconnectReason: wc.DisconnectReason,
 		GroupHash:        wc.GroupHash,
 		SdkLang:          wc.SdkLang,

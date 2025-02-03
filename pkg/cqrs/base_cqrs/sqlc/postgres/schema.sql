@@ -11,7 +11,6 @@ CREATE TABLE apps (
 	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	archived_at TIMESTAMP,
 	url VARCHAR NOT NULL,
-	is_connect BOOLEAN,
     connection_type VARCHAR(32) NOT NULL DEFAULT 'serverless'
 );
 
@@ -162,17 +161,17 @@ CREATE TABLE worker_connections (
 
     app_id UUID,
 
-    id CHAR(26) PRIMARY KEY,
-    gateway_id CHAR(26) NOT NULL,
+    id BYTEA PRIMARY KEY,
+    gateway_id BYTEA NOT NULL,
     instance_id VARCHAR NOT NULL,
     status smallint NOT NULL,
     worker_ip VARCHAR NOT NULL,
 
-    connected_at TIMESTAMP NOT NULL,
-    last_heartbeat_at TIMESTAMP,
-    disconnected_at TIMESTAMP,
-    recorded_at TIMESTAMP NOT NULL,
-    inserted_at TIMESTAMP NOT NULL,
+    connected_at BIGINT NOT NULL,
+    last_heartbeat_at BIGINT,
+    disconnected_at BIGINT,
+    recorded_at BIGINT NOT NULL,
+    inserted_at BIGINT NOT NULL,
 
     disconnect_reason VARCHAR,
 
