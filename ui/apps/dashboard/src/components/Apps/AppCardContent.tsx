@@ -52,9 +52,9 @@ const getAppCardContent = ({ app, envSlug }: { app: FlattenedApp; envSlug: strin
           .sort((a, b) => a.name.localeCompare(b.name))
           .map((func) => {
             return (
-              <li key={func.id} className="flex items-center justify-between gap-1 py-2">
+              <li key={func.id} className="grid grid-cols-3 gap-1 py-2">
                 <Link
-                  className="text-subtle hover:text-link duration-0"
+                  className="text-subtle hover:text-link col-span-2 duration-0"
                   href={pathCreator.function({ envSlug, functionSlug: func.slug })}
                   arrowOnHover
                 >
