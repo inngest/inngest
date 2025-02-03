@@ -3,8 +3,8 @@
 import React from 'react';
 import { useQuery } from 'urql';
 
-import NewReplayButton from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/NewReplayButton';
 import { useEnvironment } from '@/components/Environments/environment-context';
+import NewReplayButton from '@/components/Replay/NewReplayButton';
 import { graphql } from '@/gql';
 import { ReplayList } from './ReplayList';
 

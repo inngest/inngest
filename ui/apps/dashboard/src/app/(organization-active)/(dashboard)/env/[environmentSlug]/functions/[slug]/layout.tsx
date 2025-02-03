@@ -14,9 +14,9 @@ import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { ActionsMenu } from '@/components/Functions/ActionMenu';
 import { CancelFunctionModal } from '@/components/Functions/CancelFunction/CancelFunctionModal';
 import { PauseFunctionModal } from '@/components/Functions/PauseFunction/PauseModal';
+import NewReplayModal from '@/components/Replay/NewReplayModal';
 import { graphql } from '@/gql';
 import { useFunction } from '@/queries';
-import NewReplayModal from './logs/NewReplayModal';
 
 const InvokeFunctionDocument = graphql(`
   mutation InvokeFunction($envID: UUID!, $data: Map, $functionSlug: String!, $user: Map) {
