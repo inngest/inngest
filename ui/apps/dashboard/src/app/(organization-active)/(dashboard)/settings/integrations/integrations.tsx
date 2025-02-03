@@ -6,6 +6,7 @@ import { Card } from '@inngest/components/Card';
 import { IconDatadog } from '@inngest/components/icons/platforms/Datadog';
 import { IconNeon } from '@inngest/components/icons/platforms/Neon';
 import { IconNetlify } from '@inngest/components/icons/platforms/Netlify';
+import { IconPrometheus } from '@inngest/components/icons/platforms/Prometheus';
 import { IconSupabase } from '@inngest/components/icons/platforms/Supabase';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { RiExternalLinkLine } from '@remixicon/react';
@@ -95,6 +96,21 @@ const INTEGRATIONS: Integration[] = [
       'Check out our docs to see how you can use Inngest with your applications deployed to Netlify.',
   },
   {
+    title: 'Prometheus',
+    slug: 'prometheus',
+    Icon: <IconPrometheus className="text-onContrast h-6 w-6" />,
+    actionButton: () => (
+      <Button
+        iconSide="left"
+        appearance="solid"
+        size="medium"
+        label="Configure"
+        href="/settings/integrations/prometheus"
+      />
+    ),
+    description: 'Configure your Prometheus instance to scrape metrics directly from Inngest.',
+  },
+  {
     title: 'Datadog',
     slug: 'datadog',
     Icon: <IconDatadog className="text-onContrast h-6 w-6" />,
@@ -156,8 +172,8 @@ export default function IntegrationsList({ integrations }: Props) {
             </Card>
           );
         })}
-        <Card>
-          <div className="bg-canvasSubtle flex h-[189px] w-[388px] flex-col p-6">
+        <Card className="col-span-2">
+          <div className="bg-canvasSubtle flex h-[189px] w-[800px] flex-col p-6">
             <div className="text-basis text-lg font-medium">Can&apos;t find what you need?</div>
             <div className="text-basis mt-3 text-sm leading-tight">
               Write to our team about the integration you are looking for and we will get back to
