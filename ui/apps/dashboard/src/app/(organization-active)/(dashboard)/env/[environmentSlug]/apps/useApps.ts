@@ -1,8 +1,14 @@
+import type { Function } from '@inngest/components/types/function';
+
 import { graphql } from '@/gql';
 import { type AppsQuery } from '@/gql/graphql';
+import { transformTriggers } from '@/utils/triggers';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
-export type FlattenedApp = Omit<AppsQuery['environment']['apps'][number], 'latestSync'> & {
+export type FlattenedApp = Omit<
+  AppsQuery['environment']['apps'][number],
+  'latestSync' | 'functions'
+> & {
   __typename?: 'App';
   lastSyncedAt?: Date;
   error?: string | null;
@@ -12,6 +18,7 @@ export type FlattenedApp = Omit<AppsQuery['environment']['apps'][number], 'lates
   sdkVersion?: string;
   status?: string;
   url?: string | null;
+  functions: Function[];
 };
 
 const query = graphql(`
@@ -24,6 +31,7 @@ const query = graphql(`
         isArchived
         name
         connectionType
+        isParentArchived
         latestSync {
           error
           framework
@@ -38,6 +46,11 @@ const query = graphql(`
         functions {
           id
           name
+          slug
+          triggers {
+            eventName
+            schedule
+          }
         }
       }
 
@@ -58,8 +71,8 @@ export function useApps({ envID, isArchived }: { envID: string; isArchived: bool
   // We are flattening the latestSync data to match the structure used in the DevServer
   if (res.data) {
     const apps = res.data.environment.apps
-      .map(({ latestSync, ...app }) => {
-        const latestSyncData: Omit<FlattenedApp, keyof typeof app> = latestSync
+      .map(({ latestSync, functions, ...app }) => {
+        const latestSyncData: Omit<FlattenedApp, keyof typeof app | 'functions'> = latestSync
           ? {
               lastSyncedAt: new Date(latestSync.lastSyncedAt),
               error: latestSync.error,
@@ -84,6 +97,12 @@ export function useApps({ envID, isArchived }: { envID: string; isArchived: bool
         return {
           ...app,
           ...latestSyncData,
+          functions: functions.map((fn) => {
+            return {
+              ...fn,
+              triggers: transformTriggers(fn.triggers),
+            };
+          }),
           __typename: 'App' as const,
         };
       })

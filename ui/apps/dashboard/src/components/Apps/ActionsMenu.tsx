@@ -12,6 +12,7 @@ import { RiArchive2Line, RiFirstAidKitLine, RiMore2Line } from '@remixicon/react
 
 export type AppActions = {
   isArchived: boolean;
+  showUnarchive?: boolean;
   showArchive: () => void;
   showValidate: () => void;
   disableArchive?: boolean;
@@ -19,6 +20,7 @@ export type AppActions = {
 };
 
 export const ActionsMenu = ({
+  showUnarchive = true,
   isArchived,
   showArchive,
   showValidate,
@@ -38,13 +40,13 @@ export const ActionsMenu = ({
           </OptionalTooltip>
         </DropdownMenuItem>
 
-        {!isArchived && (
+        {(!isArchived || showUnarchive) && (
           <DropdownMenuItem disabled={disableArchive} onSelect={showArchive} className="text-error">
             <OptionalTooltip
               tooltip={disableArchive && 'Parent app is archived. Archive action not available.'}
             >
               <RiArchive2Line className="h-4 w-4" />
-              Archive app
+              {isArchived ? 'Unarchive app' : 'Archive app'}
             </OptionalTooltip>
           </DropdownMenuItem>
         )}

@@ -9,8 +9,11 @@ export type App = {
   url?: string | null;
 };
 
-export const connectionTypes = ['CONNECT', 'SERVERLESS'] as const;
+export const connectionTypes = {
+  Connect: 'CONNECT',
+  Serverless: 'SERVERLESS',
+} as const;
 
-export type ConnectionType = (typeof connectionTypes)[number];
+export type ConnectionType = (typeof connectionTypes)[keyof typeof connectionTypes];
 
 export type AppKind = 'default' | 'info' | 'warning' | 'primary' | 'error';

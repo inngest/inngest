@@ -17,7 +17,7 @@ type Props = {
 export function UnattachedSyncsCard({ envSlug, latestSyncTime }: Props) {
   const router = useRouter();
   return (
-    <Card>
+    <Card className="mb-6">
       <div className="text-basis p-6">
         <div className="items-top flex justify-between">
           <div className="flex items-center gap-3">

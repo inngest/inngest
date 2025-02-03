@@ -8,7 +8,7 @@ type EmptyAppsCardProps = {
 
 export default function EmptyAppsCard({ title, description, actions }: EmptyAppsCardProps) {
   return (
-    <div className="border-muted bg-canvasBase text-basis flex flex-col items-center gap-5 rounded-md border border-dashed px-6 py-9">
+    <div className="border-muted bg-canvasBase text-basis mb-6 flex flex-col items-center gap-5 rounded-md border border-dashed px-6 py-9">
       <div className="bg-canvasSubtle text-light rounded-md p-3 ">
         <AppsIcon className="h-7 w-7" />
       </div>

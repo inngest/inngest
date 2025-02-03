@@ -1,5 +1,6 @@
 'use client';
 
+import { Alert } from '@inngest/components/Alert/Alert';
 import { SkeletonCard } from '@inngest/components/Apps/AppCard';
 
 import AppCards from '@/components/Apps/AppCards';
@@ -35,11 +36,32 @@ export function Apps({ isArchived = false }: Props) {
   return (
     <div className="flex items-center justify-center">
       <div className="w-full max-w-[1200px]">
-        {!hasApps && !isArchived && <EmptyActiveCard envSlug={env.slug} />}
+        {!hasApps && !latestUnattachedSyncTime && !isArchived && (
+          <EmptyActiveCard envSlug={env.slug} />
+        )}
         {!hasApps && isArchived && <EmptyArchivedCard />}
         {hasApps && <AppCards apps={apps} envSlug={env.slug} />}
         {latestUnattachedSyncTime && !isArchived && (
-          <UnattachedSyncsCard envSlug={env.slug} latestSyncTime={latestUnattachedSyncTime} />
+          <>
+            <UnattachedSyncsCard envSlug={env.slug} latestSyncTime={latestUnattachedSyncTime} />
+            {!hasApps && (
+              <Alert
+                className="flex items-center justify-between text-sm"
+                link={
+                  <Alert.Link
+                    severity="info"
+                    href="https://www.inngest.com/docs/apps/cloud#troubleshooting?ref=apps-unattached-sync"
+                    target="_blank"
+                  >
+                    Go to docs
+                  </Alert.Link>
+                }
+                severity="info"
+              >
+                Having trouble syncing an app? Check our documentation.
+              </Alert>
+            )}
+          </>
         )}
       </div>
     </div>

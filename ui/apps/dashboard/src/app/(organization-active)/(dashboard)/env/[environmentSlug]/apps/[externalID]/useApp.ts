@@ -1,6 +1,5 @@
-import type { Function } from '@inngest/components/types/function';
-
 import { graphql } from '@/gql';
+import { transformTriggers } from '@/utils/triggers';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const query = graphql(`
@@ -79,26 +78,4 @@ export function useApp({ envID, externalAppID }: { envID: string; externalAppID:
   }
 
   return { ...res, data: undefined };
-}
-
-function transformTriggers(
-  rawTriggers: { eventName: string | null; schedule: string | null }[]
-): Function['triggers'] {
-  const triggers: Function['triggers'] = [];
-
-  for (const trigger of rawTriggers) {
-    if (trigger.eventName) {
-      triggers.push({
-        type: 'EVENT',
-        value: trigger.eventName,
-      });
-    } else if (trigger.schedule) {
-      triggers.push({
-        type: 'CRON',
-        value: trigger.schedule,
-      });
-    }
-  }
-
-  return triggers;
 }
