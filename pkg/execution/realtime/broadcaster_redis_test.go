@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"github.com/inngest/inngest/pkg/logger"
 	"sync"
 	"testing"
 	"time"
