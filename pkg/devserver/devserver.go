@@ -61,10 +61,11 @@ import (
 )
 
 const (
-	DefaultTick         = 150
-	DefaultTickDuration = time.Millisecond * DefaultTick
-	DefaultPollInterval = 5
-	DefaultQueueWorkers = 100
+	DefaultTick               = 150
+	DefaultTickDuration       = time.Millisecond * DefaultTick
+	DefaultPollInterval       = 5
+	DefaultQueueWorkers       = 100
+	DefaultConnectGatewayPort = 8289
 )
 
 // StartOpts configures the dev server
@@ -92,6 +93,8 @@ type StartOpts struct {
 	// the server will still boot but core actions such as syncing, runs, and
 	// ingesting events will not work.
 	RequireKeys bool `json:"require_keys"`
+
+	ConnectGatewayPort int `json:"connectGatewayPort"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -443,7 +446,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		connect.WithGatewayAuthHandler(auth.NewJWTAuthHandler(consts.DevServerConnectJwtSecret)),
 		connect.WithAppLoader(dbcqrs),
 		connect.WithDev(),
-		connect.WithGatewayPublicPort(8289),
+		connect.WithGatewayPublicPort(opts.ConnectGatewayPort),
 		connect.WithApiBaseUrl(fmt.Sprintf("http://127.0.0.1:%d", opts.Config.EventAPI.Port)),
 		connect.WithLifeCycles(
 			[]connect.ConnectGatewayLifecycleListener{

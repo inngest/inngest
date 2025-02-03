@@ -268,6 +268,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
+		appLoadStart := time.Now()
+
 		app, err := c.appLoader.GetAppByName(ctx, conn.Group.EnvID, conn.Data.AppName)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			if ctx.Err() != nil {
@@ -283,6 +285,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			})
 			return
 		}
+
+		metrics.HistogramConnectAppLoaderDuration(ctx, time.Since(appLoadStart).Milliseconds(), metrics.HistogramOpt{
+			PkgName: pkgName,
+		})
 
 		if errors.Is(err, sql.ErrNoRows) || app == nil {
 			ch.log.Error("could not find app", "appName", conn.Data.AppName)
