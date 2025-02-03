@@ -17,7 +17,7 @@ const getAppCardContent = ({ app }: { app: GetAppsQuery['apps'][number] }) => {
       ? 'No functions found'
       : null;
 
-  const footerHeader = !app.connected ? (
+  const footerHeaderTitle = !app.connected ? (
     app.error === 'unreachable' ? (
       `The Inngest Dev Server can't find your application.`
     ) : (
@@ -26,15 +26,17 @@ const getAppCardContent = ({ app }: { app: GetAppsQuery['apps'][number] }) => {
   ) : app.functionCount === 0 ? (
     'There are currently no functions registered at this URL.'
   ) : (
-    <div className="flex w-full items-center justify-between">
-      <span>
-        {app.functionCount} {app.functionCount === 1 ? 'function' : 'functions'} found
-      </span>
+    <>
+      {app.functionCount} {app.functionCount === 1 ? 'function' : 'functions'} found
+    </>
+  );
+
+  const footerHeaderSecondaryCTA =
+    !app.error && app.functionCount > 0 ? (
       <Link size="small" href="/functions" arrowOnHover>
         View functions
       </Link>
-    </div>
-  );
+    ) : null;
 
   const footerContent = !app.connected ? (
     <>
@@ -72,7 +74,7 @@ const getAppCardContent = ({ app }: { app: GetAppsQuery['apps'][number] }) => {
     </ul>
   );
 
-  return { appKind, status, footerHeader, footerContent };
+  return { appKind, status, footerHeaderTitle, footerHeaderSecondaryCTA, footerContent };
 };
 
 export default getAppCardContent;

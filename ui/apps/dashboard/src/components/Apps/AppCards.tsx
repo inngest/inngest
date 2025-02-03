@@ -1,16 +1,21 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppCard } from '@inngest/components/Apps/AppCard';
 import { Button } from '@inngest/components/Button/Button';
 import { Pill } from '@inngest/components/Pill/Pill';
 
+import { ArchiveModal } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/apps/[externalID]/ArchiveModal';
+import { ValidateModal } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/apps/[externalID]/ValidateButton/ValidateModal';
 import { type FlattenedApp } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/apps/useApps';
+import { ActionsMenu } from '@/components/Apps/ActionsMenu';
 import getAppCardContent from '@/components/Apps/AppCardContent';
 import { pathCreator } from '@/utils/urls';
 
 export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envSlug: string }) {
+  const [showArchive, setShowArchive] = useState(false);
+  const [showValidate, setShowValidate] = useState(false);
   const router = useRouter();
   const sortedApps = useMemo(() => {
     return [...apps].sort((a, b) => {
@@ -22,15 +27,17 @@ export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envS
   }, [apps]);
 
   return sortedApps.map((app) => {
-    const { appKind, status, footerHeader, footerContent } = getAppCardContent({
-      app,
-      envSlug,
-    });
+    const { appKind, status, footerHeaderTitle, footerHeaderSecondaryCTA, footerContent } =
+      getAppCardContent({
+        app,
+        envSlug,
+      });
 
     return (
       <div className="mb-6" key={app.id}>
         <AppCard kind={appKind}>
           <AppCard.Content
+            url={pathCreator.app({ envSlug, externalAppID: app.externalID })}
             app={app}
             pill={
               status ? (
@@ -40,7 +47,7 @@ export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envS
               ) : null
             }
             actions={
-              <div className="flex items-center gap-2">
+              <div className="items-top flex gap-2">
                 <Button
                   appearance="outlined"
                   label="View details"
@@ -48,11 +55,36 @@ export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envS
                     router.push(pathCreator.app({ envSlug, externalAppID: app.externalID }))
                   }
                 />
+                <ActionsMenu
+                  isArchived={app.isArchived}
+                  showArchive={() => setShowArchive(true)}
+                  disableArchive={!app.url}
+                  showValidate={() => setShowValidate(true)}
+                  disableValidate={app.isParentArchived}
+                />
               </div>
             }
           />
-          <AppCard.Footer kind={appKind} header={footerHeader} content={footerContent} />
+          <AppCard.Footer
+            kind={appKind}
+            headerTitle={footerHeaderTitle}
+            headerSecondaryCTA={footerHeaderSecondaryCTA}
+            content={footerContent}
+          />
         </AppCard>
+        {app.url && (
+          <ValidateModal
+            isOpen={showValidate}
+            onClose={() => setShowValidate(false)}
+            url={app.url}
+          />
+        )}
+        <ArchiveModal
+          appID={app.id}
+          isArchived={app.isArchived}
+          isOpen={showArchive}
+          onClose={() => setShowArchive(false)}
+        />
       </div>
     );
   });

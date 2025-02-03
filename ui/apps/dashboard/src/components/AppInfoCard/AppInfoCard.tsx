@@ -3,6 +3,7 @@
 import { type Route } from 'next';
 import { AppDetailsCard, CardItem } from '@inngest/components/Apps/AppDetailsCard';
 import { Link } from '@inngest/components/Link';
+import { Pill } from '@inngest/components/Pill/Pill';
 import { TextClickToCopy } from '@inngest/components/Text';
 import { Time } from '@inngest/components/Time';
 
@@ -57,7 +58,7 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
           {!linkToSyncs && (
             <Link
               href={`/env/${env.slug}/apps/${encodeURIComponent(app.externalID)}/syncs` as Route}
-              size="medium"
+              size="small"
             >
               <Time value={sync.lastSyncedAt} />
             </Link>
@@ -84,7 +85,11 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
           loading={loading}
         />
         <CardItem
-          detail={<div className="truncate">{sync?.sdkVersion ?? '-'}</div>}
+          detail={
+            <div className="truncate">
+              {sync?.sdkVersion ? <Pill>{sync.sdkVersion}</Pill> : '-'}
+            </div>
+          }
           term="SDK version"
           loading={loading}
         />

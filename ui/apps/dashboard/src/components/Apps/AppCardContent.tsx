@@ -1,4 +1,5 @@
 import { Link } from '@inngest/components/Link/Link';
+import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { type AppKind } from '@inngest/components/types/app';
 import { RiExternalLinkLine } from '@remixicon/react';
 
@@ -12,20 +13,22 @@ const getAppCardContent = ({ app, envSlug }: { app: FlattenedApp; envSlug: strin
 
   const status = app.isArchived ? 'Archived' : syncStatusText[statusKey] ?? null;
 
-  const footerHeader = app.error ? (
+  const footerHeaderTitle = app.error ? (
     `Error: ${app.error}`
   ) : app.functionCount === 0 ? (
     'There are currently no functions registered at this URL.'
   ) : (
-    <div className="flex w-full items-center justify-between">
-      <span>
-        {app.functionCount} {app.functionCount === 1 ? 'function' : 'functions'} found
-      </span>
+    <>
+      {app.functionCount} {app.functionCount === 1 ? 'function' : 'functions'} found
+    </>
+  );
+
+  const footerHeaderSecondaryCTA =
+    !app.error && app.functionCount > 0 ? (
       <Link size="small" href={pathCreator.functions({ envSlug: envSlug })} arrowOnHover>
         View functions
       </Link>
-    </div>
-  );
+    ) : null;
 
   const footerContent =
     app.functionCount === 0 ? (
@@ -49,15 +52,39 @@ const getAppCardContent = ({ app, envSlug }: { app: FlattenedApp; envSlug: strin
           .sort((a, b) => a.name.localeCompare(b.name))
           .map((func) => {
             return (
-              <li key={func.id} className="text-subtle py-2">
-                {func.name}
+              <li key={func.id} className="grid grid-cols-3 gap-1 py-2">
+                <Link
+                  className="text-subtle hover:text-link col-span-2 duration-0"
+                  href={pathCreator.function({ envSlug, functionSlug: func.slug })}
+                  arrowOnHover
+                >
+                  {func.name}
+                </Link>
+                <HorizontalPillList
+                  alwaysVisibleCount={2}
+                  pills={func.triggers.map((trigger) => {
+                    return (
+                      <Pill
+                        appearance="outlined"
+                        href={
+                          trigger.type === 'EVENT'
+                            ? pathCreator.eventType({ envSlug, eventName: trigger.value })
+                            : undefined
+                        }
+                        key={trigger.type + trigger.value}
+                      >
+                        <PillContent type={trigger.type}>{trigger.value}</PillContent>
+                      </Pill>
+                    );
+                  })}
+                />
               </li>
             );
           })}
       </ul>
     );
 
-  return { appKind, status, footerHeader, footerContent };
+  return { appKind, status, footerHeaderTitle, footerHeaderSecondaryCTA, footerContent };
 };
 
 export default getAppCardContent;
