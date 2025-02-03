@@ -71,8 +71,8 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 	}
 
 	gatewayGroup, gatewayUrl, err := a.ConnectGatewayRetriever.RetrieveGateway(ctx, RetrieveGatewayOpts{
-		AccountId:   res.AccountID,
-		EnvId:       res.EnvID,
+		AccountID:   res.AccountID,
+		EnvID:       res.EnvID,
 		Exclude:     reqBody.ExcludeGateways,
 		RequestHost: r.Host,
 	})

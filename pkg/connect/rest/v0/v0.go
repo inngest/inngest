@@ -34,8 +34,8 @@ type ConnectionLimiter interface {
 }
 
 type RetrieveGatewayOpts struct {
-	AccountId uuid.UUID
-	EnvId     uuid.UUID
+	AccountID uuid.UUID
+	EnvID     uuid.UUID
 
 	// Exclude is a list of gateway group names that should be excluded, if possible.
 	// Implementations can choose to return a gateway included in this list, if no other gateways are available or reasonable to select.
