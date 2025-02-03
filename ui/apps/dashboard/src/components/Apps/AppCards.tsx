@@ -37,6 +37,7 @@ export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envS
       <div className="mb-6" key={app.id}>
         <AppCard kind={appKind}>
           <AppCard.Content
+            url={pathCreator.app({ envSlug, externalAppID: app.externalID })}
             app={app}
             pill={
               status ? (

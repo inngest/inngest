@@ -60,12 +60,15 @@ type CardContentProps = {
   app: App;
   pill: React.ReactNode;
   actions: React.ReactNode;
+  url?: string;
 };
 
-export function AppCardContent({ app, pill, actions }: CardContentProps) {
+export function AppCardContent({ url, app, pill, actions }: CardContentProps) {
+  const Wrapper = url ? 'a' : 'div';
+
   return (
     <div className="text-basis p-6">
-      <div className="mb-6">
+      <Wrapper className="mb-6" href={url}>
         <div className="items-top flex justify-between">
           <div className="inline text-xl">
             {app.name}
@@ -74,7 +77,7 @@ export function AppCardContent({ app, pill, actions }: CardContentProps) {
           {actions}
         </div>
         <p className="text-muted mt-0.5">{app.url}</p>
-      </div>
+      </Wrapper>
 
       <div className="grid grid-cols-5 gap-4">
         {app.lastSyncedAt && (
