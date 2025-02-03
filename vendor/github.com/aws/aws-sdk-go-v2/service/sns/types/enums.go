@@ -22,8 +22,9 @@ const (
 )
 
 // Values returns all known values for LanguageCodeString. Note that this can be
-// expanded in the future, and so it is only as up to date as the client. The
-// ordering of this slice is not guaranteed to be stable across updates.
+// expanded in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
 func (LanguageCodeString) Values() []LanguageCodeString {
 	return []LanguageCodeString{
 		"en-US",
@@ -52,8 +53,9 @@ const (
 )
 
 // Values returns all known values for NumberCapability. Note that this can be
-// expanded in the future, and so it is only as up to date as the client. The
-// ordering of this slice is not guaranteed to be stable across updates.
+// expanded in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
 func (NumberCapability) Values() []NumberCapability {
 	return []NumberCapability{
 		"SMS",
@@ -71,9 +73,10 @@ const (
 	RouteTypePremium       RouteType = "Premium"
 )
 
-// Values returns all known values for RouteType. Note that this can be expanded in
-// the future, and so it is only as up to date as the client. The ordering of this
-// slice is not guaranteed to be stable across updates.
+// Values returns all known values for RouteType. Note that this can be expanded
+// in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
 func (RouteType) Values() []RouteType {
 	return []RouteType{
 		"Transactional",
@@ -92,8 +95,9 @@ const (
 
 // Values returns all known values for SMSSandboxPhoneNumberVerificationStatus.
 // Note that this can be expanded in the future, and so it is only as up to date as
-// the client. The ordering of this slice is not guaranteed to be stable across
-// updates.
+// the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
 func (SMSSandboxPhoneNumberVerificationStatus) Values() []SMSSandboxPhoneNumberVerificationStatus {
 	return []SMSSandboxPhoneNumberVerificationStatus{
 		"Pending",

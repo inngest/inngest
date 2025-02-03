@@ -4,19 +4,19 @@ package sns
 
 import (
 	"context"
+	"fmt"
 	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
-	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/smithy-go/middleware"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Sets the attributes of the platform application object for the supported push
 // notification services, such as APNS and GCM (Firebase Cloud Messaging). For more
-// information, see Using Amazon SNS Mobile Push Notifications
-// (https://docs.aws.amazon.com/sns/latest/dg/SNSMobilePush.html). For information
-// on configuring attributes for message delivery status, see Using Amazon SNS
-// Application Attributes for Message Delivery Status
-// (https://docs.aws.amazon.com/sns/latest/dg/sns-msg-status.html).
+// information, see [Using Amazon SNS Mobile Push Notifications]. For information on configuring attributes for message
+// delivery status, see [Using Amazon SNS Application Attributes for Message Delivery Status].
+//
+// [Using Amazon SNS Application Attributes for Message Delivery Status]: https://docs.aws.amazon.com/sns/latest/dg/sns-msg-status.html
+// [Using Amazon SNS Mobile Push Notifications]: https://docs.aws.amazon.com/sns/latest/dg/SNSMobilePush.html
 func (c *Client) SetPlatformApplicationAttributes(ctx context.Context, params *SetPlatformApplicationAttributesInput, optFns ...func(*Options)) (*SetPlatformApplicationAttributesOutput, error) {
 	if params == nil {
 		params = &SetPlatformApplicationAttributesInput{}
@@ -35,71 +35,70 @@ func (c *Client) SetPlatformApplicationAttributes(ctx context.Context, params *S
 // Input for SetPlatformApplicationAttributes action.
 type SetPlatformApplicationAttributesInput struct {
 
-	// A map of the platform application attributes. Attributes in this map include the
-	// following:
+	// A map of the platform application attributes. Attributes in this map include
+	// the following:
 	//
-	// * PlatformCredential – The credential received from the notification
-	// service.
+	//   - PlatformCredential – The credential received from the notification service.
 	//
-	// * For ADM, PlatformCredentialis client secret.
+	//   - For ADM, PlatformCredential is client secret.
 	//
-	// * For Apple Services
-	// using certificate credentials, PlatformCredential is private key.
+	//   - For Apple Services using certificate credentials, PlatformCredential is
+	//   private key.
 	//
-	// * For Apple
-	// Services using token credentials, PlatformCredential is signing key.
+	//   - For Apple Services using token credentials, PlatformCredential is signing
+	//   key.
 	//
-	// * For GCM
-	// (Firebase Cloud Messaging), PlatformCredential is API key.
+	//   - For GCM (Firebase Cloud Messaging) using key credentials, there is no
+	//   PlatformPrincipal . The PlatformCredential is API key .
 	//
-	// * PlatformPrincipal
-	// – The principal received from the notification service.
+	//   - For GCM (Firebase Cloud Messaging) using token credentials, there is no
+	//   PlatformPrincipal . The PlatformCredential is a JSON formatted private key
+	//   file. When using the Amazon Web Services CLI, the file must be in string format
+	//   and special characters must be ignored. To format the file correctly, Amazon SNS
+	//   recommends using the following command: SERVICE_JSON=`jq @json <<< cat
+	//   service.json` .
 	//
-	// * For ADM,
-	// PlatformPrincipalis client id.
+	//   - PlatformPrincipal – The principal received from the notification service.
 	//
-	// * For Apple Services using certificate
-	// credentials, PlatformPrincipal is SSL certificate.
+	//   - For ADM, PlatformPrincipal is client id.
 	//
-	// * For Apple Services using
-	// token credentials, PlatformPrincipal is signing key ID.
+	//   - For Apple Services using certificate credentials, PlatformPrincipal is SSL
+	//   certificate.
 	//
-	// * For GCM (Firebase
-	// Cloud Messaging), there is no PlatformPrincipal.
+	//   - For Apple Services using token credentials, PlatformPrincipal is signing key
+	//   ID.
 	//
-	// * EventEndpointCreated – Topic
-	// ARN to which EndpointCreated event notifications are sent.
+	//   - For GCM (Firebase Cloud Messaging), there is no PlatformPrincipal .
 	//
-	// *
-	// EventEndpointDeleted – Topic ARN to which EndpointDeleted event notifications
-	// are sent.
+	//   - EventEndpointCreated – Topic ARN to which EndpointCreated event
+	//   notifications are sent.
 	//
-	// * EventEndpointUpdated – Topic ARN to which EndpointUpdate event
-	// notifications are sent.
+	//   - EventEndpointDeleted – Topic ARN to which EndpointDeleted event
+	//   notifications are sent.
 	//
-	// * EventDeliveryFailure – Topic ARN to which
-	// DeliveryFailure event notifications are sent upon Direct Publish delivery
-	// failure (permanent) to one of the application's endpoints.
+	//   - EventEndpointUpdated – Topic ARN to which EndpointUpdate event notifications
+	//   are sent.
 	//
-	// *
-	// SuccessFeedbackRoleArn – IAM role ARN used to give Amazon SNS write access to
-	// use CloudWatch Logs on your behalf.
+	//   - EventDeliveryFailure – Topic ARN to which DeliveryFailure event
+	//   notifications are sent upon Direct Publish delivery failure (permanent) to one
+	//   of the application's endpoints.
 	//
-	// * FailureFeedbackRoleArn – IAM role ARN
-	// used to give Amazon SNS write access to use CloudWatch Logs on your behalf.
+	//   - SuccessFeedbackRoleArn – IAM role ARN used to give Amazon SNS write access
+	//   to use CloudWatch Logs on your behalf.
 	//
-	// *
-	// SuccessFeedbackSampleRate – Sample rate percentage (0-100) of successfully
-	// delivered messages.
+	//   - FailureFeedbackRoleArn – IAM role ARN used to give Amazon SNS write access
+	//   to use CloudWatch Logs on your behalf.
 	//
-	// The following attributes only apply to APNs token-based
-	// authentication:
+	//   - SuccessFeedbackSampleRate – Sample rate percentage (0-100) of successfully
+	//   delivered messages.
 	//
-	// * ApplePlatformTeamID – The identifier that's assigned to your
-	// Apple developer account team.
+	// The following attributes only apply to APNs token-based authentication:
 	//
-	// * ApplePlatformBundleID – The bundle identifier
-	// that's assigned to your iOS app.
+	//   - ApplePlatformTeamID – The identifier that's assigned to your Apple developer
+	//   account team.
+	//
+	//   - ApplePlatformBundleID – The bundle identifier that's assigned to your iOS
+	//   app.
 	//
 	// This member is required.
 	Attributes map[string]string
@@ -120,6 +119,9 @@ type SetPlatformApplicationAttributesOutput struct {
 }
 
 func (c *Client) addOperationSetPlatformApplicationAttributesMiddlewares(stack *middleware.Stack, options Options) (err error) {
+	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+		return err
+	}
 	err = stack.Serialize.Add(&awsAwsquery_serializeOpSetPlatformApplicationAttributes{}, middleware.After)
 	if err != nil {
 		return err
@@ -128,34 +130,38 @@ func (c *Client) addOperationSetPlatformApplicationAttributesMiddlewares(stack *
 	if err != nil {
 		return err
 	}
+	if err := addProtocolFinalizerMiddlewares(stack, options, "SetPlatformApplicationAttributes"); err != nil {
+		return fmt.Errorf("add protocol finalizers: %v", err)
+	}
+
+	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
+		return err
+	}
 	if err = addSetLoggerMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddClientRequestIDMiddleware(stack); err != nil {
+	if err = addClientRequestID(stack); err != nil {
 		return err
 	}
-	if err = smithyhttp.AddComputeContentLengthMiddleware(stack); err != nil {
+	if err = addComputeContentLength(stack); err != nil {
 		return err
 	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = v4.AddComputePayloadSHA256Middleware(stack); err != nil {
+	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetryMiddlewares(stack, options); err != nil {
+	if err = addRetry(stack, options); err != nil {
 		return err
 	}
-	if err = addHTTPSignerV4Middleware(stack, options); err != nil {
+	if err = addRawResponseToMetadata(stack); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddRawResponseToMetadata(stack); err != nil {
+	if err = addRecordResponseTiming(stack); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack); err != nil {
+	if err = addClientUserAgent(stack, options); err != nil {
 		return err
 	}
 	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
@@ -164,10 +170,22 @@ func (c *Client) addOperationSetPlatformApplicationAttributesMiddlewares(stack *
 	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
 		return err
 	}
+	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
+		return err
+	}
+	if err = addTimeOffsetBuild(stack, c); err != nil {
+		return err
+	}
+	if err = addUserAgentRetryMode(stack, options); err != nil {
+		return err
+	}
 	if err = addOpSetPlatformApplicationAttributesValidationMiddleware(stack); err != nil {
 		return err
 	}
 	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opSetPlatformApplicationAttributes(options.Region), middleware.Before); err != nil {
+		return err
+	}
+	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -179,6 +197,9 @@ func (c *Client) addOperationSetPlatformApplicationAttributesMiddlewares(stack *
 	if err = addRequestResponseLogging(stack, options); err != nil {
 		return err
 	}
+	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -186,7 +207,6 @@ func newServiceMetadataMiddleware_opSetPlatformApplicationAttributes(region stri
 	return &awsmiddleware.RegisterServiceMetadata{
 		Region:        region,
 		ServiceID:     ServiceID,
-		SigningName:   "sns",
 		OperationName: "SetPlatformApplicationAttributes",
 	}
 }

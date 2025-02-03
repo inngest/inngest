@@ -6,23 +6,24 @@ import (
 	"context"
 	"fmt"
 	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
-	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/service/sns/types"
 	"github.com/aws/smithy-go/middleware"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Lists the calling Amazon Web Services account's current verified and pending
-// destination phone numbers in the SMS sandbox. When you start using Amazon SNS to
-// send SMS messages, your Amazon Web Services account is in the SMS sandbox. The
-// SMS sandbox provides a safe environment for you to try Amazon SNS features
-// without risking your reputation as an SMS sender. While your Amazon Web Services
-// account is in the SMS sandbox, you can use all of the features of Amazon SNS.
-// However, you can send SMS messages only to verified destination phone numbers.
-// For more information, including how to move out of the sandbox to send messages
-// without restrictions, see SMS sandbox
-// (https://docs.aws.amazon.com/sns/latest/dg/sns-sms-sandbox.html) in the Amazon
-// SNS Developer Guide.
+// destination phone numbers in the SMS sandbox.
+//
+// When you start using Amazon SNS to send SMS messages, your Amazon Web Services
+// account is in the SMS sandbox. The SMS sandbox provides a safe environment for
+// you to try Amazon SNS features without risking your reputation as an SMS sender.
+// While your Amazon Web Services account is in the SMS sandbox, you can use all of
+// the features of Amazon SNS. However, you can send SMS messages only to verified
+// destination phone numbers. For more information, including how to move out of
+// the sandbox to send messages without restrictions, see [SMS sandbox]in the Amazon SNS
+// Developer Guide.
+//
+// [SMS sandbox]: https://docs.aws.amazon.com/sns/latest/dg/sns-sms-sandbox.html
 func (c *Client) ListSMSSandboxPhoneNumbers(ctx context.Context, params *ListSMSSandboxPhoneNumbersInput, optFns ...func(*Options)) (*ListSMSSandboxPhoneNumbersOutput, error) {
 	if params == nil {
 		params = &ListSMSSandboxPhoneNumbersInput{}
@@ -67,6 +68,9 @@ type ListSMSSandboxPhoneNumbersOutput struct {
 }
 
 func (c *Client) addOperationListSMSSandboxPhoneNumbersMiddlewares(stack *middleware.Stack, options Options) (err error) {
+	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+		return err
+	}
 	err = stack.Serialize.Add(&awsAwsquery_serializeOpListSMSSandboxPhoneNumbers{}, middleware.After)
 	if err != nil {
 		return err
@@ -75,34 +79,38 @@ func (c *Client) addOperationListSMSSandboxPhoneNumbersMiddlewares(stack *middle
 	if err != nil {
 		return err
 	}
+	if err := addProtocolFinalizerMiddlewares(stack, options, "ListSMSSandboxPhoneNumbers"); err != nil {
+		return fmt.Errorf("add protocol finalizers: %v", err)
+	}
+
+	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
+		return err
+	}
 	if err = addSetLoggerMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddClientRequestIDMiddleware(stack); err != nil {
+	if err = addClientRequestID(stack); err != nil {
 		return err
 	}
-	if err = smithyhttp.AddComputeContentLengthMiddleware(stack); err != nil {
+	if err = addComputeContentLength(stack); err != nil {
 		return err
 	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = v4.AddComputePayloadSHA256Middleware(stack); err != nil {
+	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetryMiddlewares(stack, options); err != nil {
+	if err = addRetry(stack, options); err != nil {
 		return err
 	}
-	if err = addHTTPSignerV4Middleware(stack, options); err != nil {
+	if err = addRawResponseToMetadata(stack); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddRawResponseToMetadata(stack); err != nil {
+	if err = addRecordResponseTiming(stack); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack); err != nil {
+	if err = addClientUserAgent(stack, options); err != nil {
 		return err
 	}
 	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
@@ -111,7 +119,19 @@ func (c *Client) addOperationListSMSSandboxPhoneNumbersMiddlewares(stack *middle
 	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
 		return err
 	}
+	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
+		return err
+	}
+	if err = addTimeOffsetBuild(stack, c); err != nil {
+		return err
+	}
+	if err = addUserAgentRetryMode(stack, options); err != nil {
+		return err
+	}
 	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opListSMSSandboxPhoneNumbers(options.Region), middleware.Before); err != nil {
+		return err
+	}
+	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -123,16 +143,11 @@ func (c *Client) addOperationListSMSSandboxPhoneNumbersMiddlewares(stack *middle
 	if err = addRequestResponseLogging(stack, options); err != nil {
 		return err
 	}
+	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
 	return nil
 }
-
-// ListSMSSandboxPhoneNumbersAPIClient is a client that implements the
-// ListSMSSandboxPhoneNumbers operation.
-type ListSMSSandboxPhoneNumbersAPIClient interface {
-	ListSMSSandboxPhoneNumbers(context.Context, *ListSMSSandboxPhoneNumbersInput, ...func(*Options)) (*ListSMSSandboxPhoneNumbersOutput, error)
-}
-
-var _ ListSMSSandboxPhoneNumbersAPIClient = (*Client)(nil)
 
 // ListSMSSandboxPhoneNumbersPaginatorOptions is the paginator options for
 // ListSMSSandboxPhoneNumbers
@@ -200,6 +215,9 @@ func (p *ListSMSSandboxPhoneNumbersPaginator) NextPage(ctx context.Context, optF
 	}
 	params.MaxResults = limit
 
+	optFns = append([]func(*Options){
+		addIsPaginatorUserAgent,
+	}, optFns...)
 	result, err := p.client.ListSMSSandboxPhoneNumbers(ctx, &params, optFns...)
 	if err != nil {
 		return nil, err
@@ -219,11 +237,18 @@ func (p *ListSMSSandboxPhoneNumbersPaginator) NextPage(ctx context.Context, optF
 	return result, nil
 }
 
+// ListSMSSandboxPhoneNumbersAPIClient is a client that implements the
+// ListSMSSandboxPhoneNumbers operation.
+type ListSMSSandboxPhoneNumbersAPIClient interface {
+	ListSMSSandboxPhoneNumbers(context.Context, *ListSMSSandboxPhoneNumbersInput, ...func(*Options)) (*ListSMSSandboxPhoneNumbersOutput, error)
+}
+
+var _ ListSMSSandboxPhoneNumbersAPIClient = (*Client)(nil)
+
 func newServiceMetadataMiddleware_opListSMSSandboxPhoneNumbers(region string) *awsmiddleware.RegisterServiceMetadata {
 	return &awsmiddleware.RegisterServiceMetadata{
 		Region:        region,
 		ServiceID:     ServiceID,
-		SigningName:   "sns",
 		OperationName: "ListSMSSandboxPhoneNumbers",
 	}
 }

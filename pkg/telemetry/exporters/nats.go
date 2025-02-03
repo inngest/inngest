@@ -16,14 +16,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type spanEvtType int
-
-const (
-	spanEvtTypeUnknown spanEvtType = iota
-	spanEvtTypeEvent
-	spanEvtTypeOutput
-)
-
 // NATS span exporter
 type natsSpanExporter struct {
 	streams    []*StreamConf
@@ -387,8 +379,9 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 				metrics.IncrSpanExportedCounter(ctx, metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"subject": conf.Subject,
-						"status":  pstatus,
+						"producer": "nats",
+						"subject":  conf.Subject,
+						"status":   pstatus,
 					},
 				})
 			}(ctx, *stream, sp)

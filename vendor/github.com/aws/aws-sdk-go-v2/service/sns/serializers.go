@@ -720,6 +720,70 @@ func (m *awsAwsquery_serializeOpDeleteTopic) HandleSerialize(ctx context.Context
 	return next.HandleSerialize(ctx, in)
 }
 
+type awsAwsquery_serializeOpGetDataProtectionPolicy struct {
+}
+
+func (*awsAwsquery_serializeOpGetDataProtectionPolicy) ID() string {
+	return "OperationSerializer"
+}
+
+func (m *awsAwsquery_serializeOpGetDataProtectionPolicy) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
+	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
+) {
+	request, ok := in.Request.(*smithyhttp.Request)
+	if !ok {
+		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
+	}
+
+	input, ok := in.Parameters.(*GetDataProtectionPolicyInput)
+	_ = input
+	if !ok {
+		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown input parameters type %T", in.Parameters)}
+	}
+
+	operationPath := "/"
+	if len(request.Request.URL.Path) == 0 {
+		request.Request.URL.Path = operationPath
+	} else {
+		request.Request.URL.Path = path.Join(request.Request.URL.Path, operationPath)
+		if request.Request.URL.Path != "/" && operationPath[len(operationPath)-1] == '/' {
+			request.Request.URL.Path += "/"
+		}
+	}
+	request.Request.Method = "POST"
+	httpBindingEncoder, err := httpbinding.NewEncoder(request.URL.Path, request.URL.RawQuery, request.Header)
+	if err != nil {
+		return out, metadata, &smithy.SerializationError{Err: err}
+	}
+	httpBindingEncoder.SetHeader("Content-Type").String("application/x-www-form-urlencoded")
+
+	bodyWriter := bytes.NewBuffer(nil)
+	bodyEncoder := query.NewEncoder(bodyWriter)
+	body := bodyEncoder.Object()
+	body.Key("Action").String("GetDataProtectionPolicy")
+	body.Key("Version").String("2010-03-31")
+
+	if err := awsAwsquery_serializeOpDocumentGetDataProtectionPolicyInput(input, bodyEncoder.Value); err != nil {
+		return out, metadata, &smithy.SerializationError{Err: err}
+	}
+
+	err = bodyEncoder.Encode()
+	if err != nil {
+		return out, metadata, &smithy.SerializationError{Err: err}
+	}
+
+	if request, err = request.SetStream(bytes.NewReader(bodyWriter.Bytes())); err != nil {
+		return out, metadata, &smithy.SerializationError{Err: err}
+	}
+
+	if request.Request, err = httpBindingEncoder.Encode(request.Request); err != nil {
+		return out, metadata, &smithy.SerializationError{Err: err}
+	}
+	in.Request = request
+
+	return next.HandleSerialize(ctx, in)
+}
+
 type awsAwsquery_serializeOpGetEndpointAttributes struct {
 }
 
@@ -1868,6 +1932,70 @@ func (m *awsAwsquery_serializeOpPublishBatch) HandleSerialize(ctx context.Contex
 	return next.HandleSerialize(ctx, in)
 }
 
+type awsAwsquery_serializeOpPutDataProtectionPolicy struct {
+}
+
+func (*awsAwsquery_serializeOpPutDataProtectionPolicy) ID() string {
+	return "OperationSerializer"
+}
+
+func (m *awsAwsquery_serializeOpPutDataProtectionPolicy) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
+	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
+) {
+	request, ok := in.Request.(*smithyhttp.Request)
+	if !ok {
+		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
+	}
+
+	input, ok := in.Parameters.(*PutDataProtectionPolicyInput)
+	_ = input
+	if !ok {
+		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown input parameters type %T", in.Parameters)}
+	}
+
+	operationPath := "/"
+	if len(request.Request.URL.Path) == 0 {
+		request.Request.URL.Path = operationPath
+	} else {
+		request.Request.URL.Path = path.Join(request.Request.URL.Path, operationPath)
+		if request.Request.URL.Path != "/" && operationPath[len(operationPath)-1] == '/' {
+			request.Request.URL.Path += "/"
+		}
+	}
+	request.Request.Method = "POST"
+	httpBindingEncoder, err := httpbinding.NewEncoder(request.URL.Path, request.URL.RawQuery, request.Header)
+	if err != nil {
+		return out, metadata, &smithy.SerializationError{Err: err}
+	}
+	httpBindingEncoder.SetHeader("Content-Type").String("application/x-www-form-urlencoded")
+
+	bodyWriter := bytes.NewBuffer(nil)
+	bodyEncoder := query.NewEncoder(bodyWriter)
+	body := bodyEncoder.Object()
+	body.Key("Action").String("PutDataProtectionPolicy")
+	body.Key("Version").String("2010-03-31")
+
+	if err := awsAwsquery_serializeOpDocumentPutDataProtectionPolicyInput(input, bodyEncoder.Value); err != nil {
+		return out, metadata, &smithy.SerializationError{Err: err}
+	}
+
+	err = bodyEncoder.Encode()
+	if err != nil {
+		return out, metadata, &smithy.SerializationError{Err: err}
+	}
+
+	if request, err = request.SetStream(bytes.NewReader(bodyWriter.Bytes())); err != nil {
+		return out, metadata, &smithy.SerializationError{Err: err}
+	}
+
+	if request.Request, err = httpBindingEncoder.Encode(request.Request); err != nil {
+		return out, metadata, &smithy.SerializationError{Err: err}
+	}
+	in.Request = request
+
+	return next.HandleSerialize(ctx, in)
+}
+
 type awsAwsquery_serializeOpRemovePermission struct {
 }
 
@@ -2572,9 +2700,6 @@ func (m *awsAwsquery_serializeOpVerifySMSSandboxPhoneNumber) HandleSerialize(ctx
 	return next.HandleSerialize(ctx, in)
 }
 func awsAwsquery_serializeDocumentActionsList(v []string, value query.Value) error {
-	if len(v) == 0 {
-		return nil
-	}
 	array := value.Array("member")
 
 	for i := range v {
@@ -2585,9 +2710,6 @@ func awsAwsquery_serializeDocumentActionsList(v []string, value query.Value) err
 }
 
 func awsAwsquery_serializeDocumentDelegatesList(v []string, value query.Value) error {
-	if len(v) == 0 {
-		return nil
-	}
 	array := value.Array("member")
 
 	for i := range v {
@@ -2598,9 +2720,6 @@ func awsAwsquery_serializeDocumentDelegatesList(v []string, value query.Value) e
 }
 
 func awsAwsquery_serializeDocumentListString(v []string, value query.Value) error {
-	if len(v) == 0 {
-		return nil
-	}
 	array := value.Array("member")
 
 	for i := range v {
@@ -2718,9 +2837,6 @@ func awsAwsquery_serializeDocumentPublishBatchRequestEntry(v *types.PublishBatch
 }
 
 func awsAwsquery_serializeDocumentPublishBatchRequestEntryList(v []types.PublishBatchRequestEntry, value query.Value) error {
-	if len(v) == 0 {
-		return nil
-	}
 	array := value.Array("member")
 
 	for i := range v {
@@ -2769,9 +2885,6 @@ func awsAwsquery_serializeDocumentTag(v *types.Tag, value query.Value) error {
 }
 
 func awsAwsquery_serializeDocumentTagKeyList(v []string, value query.Value) error {
-	if len(v) == 0 {
-		return nil
-	}
 	array := value.Array("member")
 
 	for i := range v {
@@ -2782,9 +2895,6 @@ func awsAwsquery_serializeDocumentTagKeyList(v []string, value query.Value) erro
 }
 
 func awsAwsquery_serializeDocumentTagList(v []types.Tag, value query.Value) error {
-	if len(v) == 0 {
-		return nil
-	}
 	array := value.Array("member")
 
 	for i := range v {
@@ -2961,6 +3071,11 @@ func awsAwsquery_serializeOpDocumentCreateTopicInput(v *CreateTopicInput, value 
 		}
 	}
 
+	if v.DataProtectionPolicy != nil {
+		objectKey := object.Key("DataProtectionPolicy")
+		objectKey.String(*v.DataProtectionPolicy)
+	}
+
 	if v.Name != nil {
 		objectKey := object.Key("Name")
 		objectKey.String(*v.Name)
@@ -3019,6 +3134,18 @@ func awsAwsquery_serializeOpDocumentDeleteTopicInput(v *DeleteTopicInput, value 
 	if v.TopicArn != nil {
 		objectKey := object.Key("TopicArn")
 		objectKey.String(*v.TopicArn)
+	}
+
+	return nil
+}
+
+func awsAwsquery_serializeOpDocumentGetDataProtectionPolicyInput(v *GetDataProtectionPolicyInput, value query.Value) error {
+	object := value.Object()
+	_ = object
+
+	if v.ResourceArn != nil {
+		objectKey := object.Key("ResourceArn")
+		objectKey.String(*v.ResourceArn)
 	}
 
 	return nil
@@ -3301,6 +3428,23 @@ func awsAwsquery_serializeOpDocumentPublishInput(v *PublishInput, value query.Va
 	if v.TopicArn != nil {
 		objectKey := object.Key("TopicArn")
 		objectKey.String(*v.TopicArn)
+	}
+
+	return nil
+}
+
+func awsAwsquery_serializeOpDocumentPutDataProtectionPolicyInput(v *PutDataProtectionPolicyInput, value query.Value) error {
+	object := value.Object()
+	_ = object
+
+	if v.DataProtectionPolicy != nil {
+		objectKey := object.Key("DataProtectionPolicy")
+		objectKey.String(*v.DataProtectionPolicy)
+	}
+
+	if v.ResourceArn != nil {
+		objectKey := object.Key("ResourceArn")
+		objectKey.String(*v.ResourceArn)
 	}
 
 	return nil

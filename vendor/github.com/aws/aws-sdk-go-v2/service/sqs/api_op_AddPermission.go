@@ -4,42 +4,38 @@ package sqs
 
 import (
 	"context"
+	"fmt"
 	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
-	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/smithy-go/middleware"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
-// Adds a permission to a queue for a specific principal
-// (https://docs.aws.amazon.com/general/latest/gr/glos-chap.html#P). This allows
-// sharing access to the queue. When you create a queue, you have full control
-// access rights for the queue. Only you, the owner of the queue, can grant or deny
-// permissions to the queue. For more information about these permissions, see
-// Allow Developers to Write Messages to a Shared Queue
-// (https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-writing-an-sqs-policy.html#write-messages-to-shared-queue)
+// Adds a permission to a queue for a specific [principal]. This allows sharing access to the
+// queue.
+//
+// When you create a queue, you have full control access rights for the queue.
+// Only you, the owner of the queue, can grant or deny permissions to the queue.
+// For more information about these permissions, see [Allow Developers to Write Messages to a Shared Queue]in the Amazon SQS Developer
+// Guide.
+//
+//   - AddPermission generates a policy for you. You can use SetQueueAttributesto upload your
+//     policy. For more information, see [Using Custom Policies with the Amazon SQS Access Policy Language]in the Amazon SQS Developer Guide.
+//
+//   - An Amazon SQS policy can have a maximum of seven actions per statement.
+//
+//   - To remove the ability to change queue permissions, you must deny permission
+//     to the AddPermission , RemovePermission , and SetQueueAttributes actions in
+//     your IAM policy.
+//
+//   - Amazon SQS AddPermission does not support adding a non-account principal.
+//
+// Cross-account permissions don't apply to this action. For more information, see [Grant cross-account permissions to a role and a username]
 // in the Amazon SQS Developer Guide.
 //
-// * AddPermission generates a policy for you.
-// You can use SetQueueAttributes to upload your policy. For more information, see
-// Using Custom Policies with the Amazon SQS Access Policy Language
-// (https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-creating-custom-policies.html)
-// in the Amazon SQS Developer Guide.
-//
-// * An Amazon SQS policy can have a maximum of
-// 7 actions.
-//
-// * To remove the ability to change queue permissions, you must deny
-// permission to the AddPermission, RemovePermission, and SetQueueAttributes
-// actions in your IAM policy.
-//
-// Some actions take lists of parameters. These lists
-// are specified using the param.n notation. Values of n are integers starting from
-// 1. For example, a parameter list with two elements looks like this:
-// &AttributeName.1=first&AttributeName.2=second Cross-account permissions don't
-// apply to this action. For more information, see Grant cross-account permissions
-// to a role and a user name
-// (https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-customer-managed-policy-examples.html#grant-cross-account-permissions-to-role-and-user-name)
-// in the Amazon SQS Developer Guide.
+// [principal]: https://docs.aws.amazon.com/general/latest/gr/glos-chap.html#P
+// [Allow Developers to Write Messages to a Shared Queue]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-writing-an-sqs-policy.html#write-messages-to-shared-queue
+// [Using Custom Policies with the Amazon SQS Access Policy Language]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-creating-custom-policies.html
+// [Grant cross-account permissions to a role and a username]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-customer-managed-policy-examples.html#grant-cross-account-permissions-to-role-and-user-name
 func (c *Client) AddPermission(ctx context.Context, params *AddPermissionInput, optFns ...func(*Options)) (*AddPermissionOutput, error) {
 	if params == nil {
 		params = &AddPermissionInput{}
@@ -55,41 +51,44 @@ func (c *Client) AddPermission(ctx context.Context, params *AddPermissionInput, 
 	return out, nil
 }
 
-//
 type AddPermissionInput struct {
 
-	// The Amazon Web Services account numbers of the principals
-	// (https://docs.aws.amazon.com/general/latest/gr/glos-chap.html#P) who are to
-	// receive permission. For information about locating the Amazon Web Services
-	// account identification, see Your Amazon Web Services Identifiers
-	// (https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-making-api-requests.html#sqs-api-request-authentication)
-	// in the Amazon SQS Developer Guide.
+	// The Amazon Web Services account numbers of the [principals] who are to receive permission.
+	// For information about locating the Amazon Web Services account identification,
+	// see [Your Amazon Web Services Identifiers]in the Amazon SQS Developer Guide.
+	//
+	// [Your Amazon Web Services Identifiers]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-making-api-requests.html#sqs-api-request-authentication
+	// [principals]: https://docs.aws.amazon.com/general/latest/gr/glos-chap.html#P
 	//
 	// This member is required.
 	AWSAccountIds []string
 
 	// The action the client wants to allow for the specified principal. Valid values:
-	// the name of any action or *. For more information about these actions, see
-	// Overview of Managing Access Permissions to Your Amazon Simple Queue Service
-	// Resource
-	// (https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-overview-of-managing-access.html)
-	// in the Amazon SQS Developer Guide. Specifying SendMessage, DeleteMessage, or
-	// ChangeMessageVisibility for ActionName.n also grants permissions for the
-	// corresponding batch versions of those actions: SendMessageBatch,
-	// DeleteMessageBatch, and ChangeMessageVisibilityBatch.
+	// the name of any action or * .
+	//
+	// For more information about these actions, see [Overview of Managing Access Permissions to Your Amazon Simple Queue Service Resource] in the Amazon SQS Developer
+	// Guide.
+	//
+	// Specifying SendMessage , DeleteMessage , or ChangeMessageVisibility for
+	// ActionName.n also grants permissions for the corresponding batch versions of
+	// those actions: SendMessageBatch , DeleteMessageBatch , and
+	// ChangeMessageVisibilityBatch .
+	//
+	// [Overview of Managing Access Permissions to Your Amazon Simple Queue Service Resource]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-overview-of-managing-access.html
 	//
 	// This member is required.
 	Actions []string
 
 	// The unique identification of the permission you're setting (for example,
-	// AliceSendMessage). Maximum 80 characters. Allowed characters include
-	// alphanumeric characters, hyphens (-), and underscores (_).
+	// AliceSendMessage ). Maximum 80 characters. Allowed characters include
+	// alphanumeric characters, hyphens ( - ), and underscores ( _ ).
 	//
 	// This member is required.
 	Label *string
 
-	// The URL of the Amazon SQS queue to which permissions are added. Queue URLs and
-	// names are case-sensitive.
+	// The URL of the Amazon SQS queue to which permissions are added.
+	//
+	// Queue URLs and names are case-sensitive.
 	//
 	// This member is required.
 	QueueUrl *string
@@ -105,42 +104,49 @@ type AddPermissionOutput struct {
 }
 
 func (c *Client) addOperationAddPermissionMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpAddPermission{}, middleware.After)
+	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+		return err
+	}
+	err = stack.Serialize.Add(&awsAwsjson10_serializeOpAddPermission{}, middleware.After)
 	if err != nil {
 		return err
 	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpAddPermission{}, middleware.After)
+	err = stack.Deserialize.Add(&awsAwsjson10_deserializeOpAddPermission{}, middleware.After)
 	if err != nil {
+		return err
+	}
+	if err := addProtocolFinalizerMiddlewares(stack, options, "AddPermission"); err != nil {
+		return fmt.Errorf("add protocol finalizers: %v", err)
+	}
+
+	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
 		return err
 	}
 	if err = addSetLoggerMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddClientRequestIDMiddleware(stack); err != nil {
+	if err = addClientRequestID(stack); err != nil {
 		return err
 	}
-	if err = smithyhttp.AddComputeContentLengthMiddleware(stack); err != nil {
+	if err = addComputeContentLength(stack); err != nil {
 		return err
 	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = v4.AddComputePayloadSHA256Middleware(stack); err != nil {
+	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetryMiddlewares(stack, options); err != nil {
+	if err = addRetry(stack, options); err != nil {
 		return err
 	}
-	if err = addHTTPSignerV4Middleware(stack, options); err != nil {
+	if err = addRawResponseToMetadata(stack); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddRawResponseToMetadata(stack); err != nil {
+	if err = addRecordResponseTiming(stack); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack); err != nil {
+	if err = addClientUserAgent(stack, options); err != nil {
 		return err
 	}
 	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
@@ -149,10 +155,22 @@ func (c *Client) addOperationAddPermissionMiddlewares(stack *middleware.Stack, o
 	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
 		return err
 	}
+	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
+		return err
+	}
+	if err = addTimeOffsetBuild(stack, c); err != nil {
+		return err
+	}
+	if err = addUserAgentRetryMode(stack, options); err != nil {
+		return err
+	}
 	if err = addOpAddPermissionValidationMiddleware(stack); err != nil {
 		return err
 	}
 	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opAddPermission(options.Region), middleware.Before); err != nil {
+		return err
+	}
+	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -164,6 +182,9 @@ func (c *Client) addOperationAddPermissionMiddlewares(stack *middleware.Stack, o
 	if err = addRequestResponseLogging(stack, options); err != nil {
 		return err
 	}
+	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -171,7 +192,6 @@ func newServiceMetadataMiddleware_opAddPermission(region string) *awsmiddleware.
 	return &awsmiddleware.RegisterServiceMetadata{
 		Region:        region,
 		ServiceID:     ServiceID,
-		SigningName:   "sqs",
 		OperationName: "AddPermission",
 	}
 }

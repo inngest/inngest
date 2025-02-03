@@ -6,23 +6,25 @@ import (
 	"context"
 	"fmt"
 	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
-	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/smithy-go/middleware"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Returns a list of your queues that have the RedrivePolicy queue attribute
-// configured with a dead-letter queue. The ListDeadLetterSourceQueues methods
-// supports pagination. Set parameter MaxResults in the request to specify the
-// maximum number of results to be returned in the response. If you do not set
-// MaxResults, the response includes a maximum of 1,000 results. If you set
-// MaxResults and there are additional results to display, the response includes a
-// value for NextToken. Use NextToken as a parameter in your next request to
-// ListDeadLetterSourceQueues to receive the next page of results. For more
-// information about using dead-letter queues, see Using Amazon SQS Dead-Letter
-// Queues
-// (https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html)
-// in the Amazon SQS Developer Guide.
+// configured with a dead-letter queue.
+//
+// The ListDeadLetterSourceQueues methods supports pagination. Set parameter
+// MaxResults in the request to specify the maximum number of results to be
+// returned in the response. If you do not set MaxResults , the response includes a
+// maximum of 1,000 results. If you set MaxResults and there are additional
+// results to display, the response includes a value for NextToken . Use NextToken
+// as a parameter in your next request to ListDeadLetterSourceQueues to receive
+// the next page of results.
+//
+// For more information about using dead-letter queues, see [Using Amazon SQS Dead-Letter Queues] in the Amazon SQS
+// Developer Guide.
+//
+// [Using Amazon SQS Dead-Letter Queues]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html
 func (c *Client) ListDeadLetterSourceQueues(ctx context.Context, params *ListDeadLetterSourceQueuesInput, optFns ...func(*Options)) (*ListDeadLetterSourceQueuesOutput, error) {
 	if params == nil {
 		params = &ListDeadLetterSourceQueuesInput{}
@@ -38,10 +40,11 @@ func (c *Client) ListDeadLetterSourceQueues(ctx context.Context, params *ListDea
 	return out, nil
 }
 
-//
 type ListDeadLetterSourceQueuesInput struct {
 
-	// The URL of a dead-letter queue. Queue URLs and names are case-sensitive.
+	// The URL of a dead-letter queue.
+	//
+	// Queue URLs and names are case-sensitive.
 	//
 	// This member is required.
 	QueueUrl *string
@@ -77,42 +80,49 @@ type ListDeadLetterSourceQueuesOutput struct {
 }
 
 func (c *Client) addOperationListDeadLetterSourceQueuesMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpListDeadLetterSourceQueues{}, middleware.After)
+	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+		return err
+	}
+	err = stack.Serialize.Add(&awsAwsjson10_serializeOpListDeadLetterSourceQueues{}, middleware.After)
 	if err != nil {
 		return err
 	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpListDeadLetterSourceQueues{}, middleware.After)
+	err = stack.Deserialize.Add(&awsAwsjson10_deserializeOpListDeadLetterSourceQueues{}, middleware.After)
 	if err != nil {
+		return err
+	}
+	if err := addProtocolFinalizerMiddlewares(stack, options, "ListDeadLetterSourceQueues"); err != nil {
+		return fmt.Errorf("add protocol finalizers: %v", err)
+	}
+
+	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
 		return err
 	}
 	if err = addSetLoggerMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddClientRequestIDMiddleware(stack); err != nil {
+	if err = addClientRequestID(stack); err != nil {
 		return err
 	}
-	if err = smithyhttp.AddComputeContentLengthMiddleware(stack); err != nil {
+	if err = addComputeContentLength(stack); err != nil {
 		return err
 	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = v4.AddComputePayloadSHA256Middleware(stack); err != nil {
+	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetryMiddlewares(stack, options); err != nil {
+	if err = addRetry(stack, options); err != nil {
 		return err
 	}
-	if err = addHTTPSignerV4Middleware(stack, options); err != nil {
+	if err = addRawResponseToMetadata(stack); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddRawResponseToMetadata(stack); err != nil {
+	if err = addRecordResponseTiming(stack); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack); err != nil {
+	if err = addClientUserAgent(stack, options); err != nil {
 		return err
 	}
 	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
@@ -121,10 +131,22 @@ func (c *Client) addOperationListDeadLetterSourceQueuesMiddlewares(stack *middle
 	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
 		return err
 	}
+	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
+		return err
+	}
+	if err = addTimeOffsetBuild(stack, c); err != nil {
+		return err
+	}
+	if err = addUserAgentRetryMode(stack, options); err != nil {
+		return err
+	}
 	if err = addOpListDeadLetterSourceQueuesValidationMiddleware(stack); err != nil {
 		return err
 	}
 	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opListDeadLetterSourceQueues(options.Region), middleware.Before); err != nil {
+		return err
+	}
+	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -136,16 +158,11 @@ func (c *Client) addOperationListDeadLetterSourceQueuesMiddlewares(stack *middle
 	if err = addRequestResponseLogging(stack, options); err != nil {
 		return err
 	}
+	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
 	return nil
 }
-
-// ListDeadLetterSourceQueuesAPIClient is a client that implements the
-// ListDeadLetterSourceQueues operation.
-type ListDeadLetterSourceQueuesAPIClient interface {
-	ListDeadLetterSourceQueues(context.Context, *ListDeadLetterSourceQueuesInput, ...func(*Options)) (*ListDeadLetterSourceQueuesOutput, error)
-}
-
-var _ ListDeadLetterSourceQueuesAPIClient = (*Client)(nil)
 
 // ListDeadLetterSourceQueuesPaginatorOptions is the paginator options for
 // ListDeadLetterSourceQueues
@@ -214,6 +231,9 @@ func (p *ListDeadLetterSourceQueuesPaginator) NextPage(ctx context.Context, optF
 	}
 	params.MaxResults = limit
 
+	optFns = append([]func(*Options){
+		addIsPaginatorUserAgent,
+	}, optFns...)
 	result, err := p.client.ListDeadLetterSourceQueues(ctx, &params, optFns...)
 	if err != nil {
 		return nil, err
@@ -233,11 +253,18 @@ func (p *ListDeadLetterSourceQueuesPaginator) NextPage(ctx context.Context, optF
 	return result, nil
 }
 
+// ListDeadLetterSourceQueuesAPIClient is a client that implements the
+// ListDeadLetterSourceQueues operation.
+type ListDeadLetterSourceQueuesAPIClient interface {
+	ListDeadLetterSourceQueues(context.Context, *ListDeadLetterSourceQueuesInput, ...func(*Options)) (*ListDeadLetterSourceQueuesOutput, error)
+}
+
+var _ ListDeadLetterSourceQueuesAPIClient = (*Client)(nil)
+
 func newServiceMetadataMiddleware_opListDeadLetterSourceQueues(region string) *awsmiddleware.RegisterServiceMetadata {
 	return &awsmiddleware.RegisterServiceMetadata{
 		Region:        region,
 		ServiceID:     ServiceID,
-		SigningName:   "sqs",
 		OperationName: "ListDeadLetterSourceQueues",
 	}
 }

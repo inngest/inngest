@@ -31,23 +31,15 @@ type BatchResultErrorEntry struct {
 	noSmithyDocumentSerde
 }
 
-// Encloses a receipt handle and an entry id for each message in
-// ChangeMessageVisibilityBatch. All of the following list parameters must be
-// prefixed with ChangeMessageVisibilityBatchRequestEntry.n, where n is an integer
-// value starting with 1. For example, a parameter list for this action might look
-// like this:
-// &ChangeMessageVisibilityBatchRequestEntry.1.Id=change_visibility_msg_2
-//
-// &ChangeMessageVisibilityBatchRequestEntry.1.ReceiptHandle=your_receipt_handle
-//
-//
-// &ChangeMessageVisibilityBatchRequestEntry.1.VisibilityTimeout=45
+// Encloses a receipt handle and an entry ID for each message in ChangeMessageVisibilityBatch.
 type ChangeMessageVisibilityBatchRequestEntry struct {
 
 	// An identifier for this particular receipt handle used to communicate the result.
-	// The Ids of a batch request need to be unique within a request. This identifier
-	// can have up to 80 characters. The following characters are accepted:
-	// alphanumeric characters, hyphens(-), and underscores (_).
+	//
+	// The Id s of a batch request need to be unique within a request.
+	//
+	// This identifier can have up to 80 characters. The following characters are
+	// accepted: alphanumeric characters, hyphens(-), and underscores (_).
 	//
 	// This member is required.
 	Id *string
@@ -77,10 +69,13 @@ type ChangeMessageVisibilityBatchResultEntry struct {
 // Encloses a receipt handle and an identifier for it.
 type DeleteMessageBatchRequestEntry struct {
 
-	// An identifier for this particular receipt handle. This is used to communicate
-	// the result. The Ids of a batch request need to be unique within a request. This
-	// identifier can have up to 80 characters. The following characters are accepted:
-	// alphanumeric characters, hyphens(-), and underscores (_).
+	// The identifier for this particular receipt handle. This is used to communicate
+	// the result.
+	//
+	// The Id s of a batch request need to be unique within a request.
+	//
+	// This identifier can have up to 80 characters. The following characters are
+	// accepted: alphanumeric characters, hyphens(-), and underscores (_).
 	//
 	// This member is required.
 	Id *string
@@ -104,31 +99,73 @@ type DeleteMessageBatchResultEntry struct {
 	noSmithyDocumentSerde
 }
 
+// Contains the details of a message movement task.
+type ListMessageMoveTasksResultEntry struct {
+
+	// The approximate number of messages already moved to the destination queue.
+	ApproximateNumberOfMessagesMoved int64
+
+	// The number of messages to be moved from the source queue. This number is
+	// obtained at the time of starting the message movement task and is only included
+	// after the message movement task is selected to start.
+	ApproximateNumberOfMessagesToMove *int64
+
+	// The ARN of the destination queue if it has been specified in the
+	// StartMessageMoveTask request. If a DestinationArn has not been specified in the
+	// StartMessageMoveTask request, this field value will be NULL.
+	DestinationArn *string
+
+	// The task failure reason (only included if the task status is FAILED).
+	FailureReason *string
+
+	// The number of messages to be moved per second (the message movement rate), if
+	// it has been specified in the StartMessageMoveTask request. If a
+	// MaxNumberOfMessagesPerSecond has not been specified in the StartMessageMoveTask
+	// request, this field value will be NULL.
+	MaxNumberOfMessagesPerSecond *int32
+
+	// The ARN of the queue that contains the messages to be moved to another queue.
+	SourceArn *string
+
+	// The timestamp of starting the message movement task.
+	StartedTimestamp int64
+
+	// The status of the message movement task. Possible values are: RUNNING,
+	// COMPLETED, CANCELLING, CANCELLED, and FAILED.
+	Status *string
+
+	// An identifier associated with a message movement task. When this field is
+	// returned in the response of the ListMessageMoveTasks action, it is only
+	// populated for tasks that are in RUNNING status.
+	TaskHandle *string
+
+	noSmithyDocumentSerde
+}
+
 // An Amazon SQS message.
 type Message struct {
 
-	// A map of the attributes requested in ReceiveMessage to their respective values.
-	// Supported attributes:
+	// A map of the attributes requested in ReceiveMessage to their respective values. Supported
+	// attributes:
 	//
-	// * ApproximateReceiveCount
+	//   - ApproximateReceiveCount
 	//
-	// *
-	// ApproximateFirstReceiveTimestamp
+	//   - ApproximateFirstReceiveTimestamp
 	//
-	// * MessageDeduplicationId
+	//   - MessageDeduplicationId
 	//
-	// * MessageGroupId
+	//   - MessageGroupId
 	//
-	// *
-	// SenderId
+	//   - SenderId
 	//
-	// * SentTimestamp
+	//   - SentTimestamp
 	//
-	// * SequenceNumber
+	//   - SequenceNumber
 	//
-	// ApproximateFirstReceiveTimestamp
-	// and SentTimestamp are each returned as an integer representing the epoch time
-	// (http://en.wikipedia.org/wiki/Unix_time) in milliseconds.
+	// ApproximateFirstReceiveTimestamp and SentTimestamp are each returned as an
+	// integer representing the [epoch time]in milliseconds.
+	//
+	// [epoch time]: http://en.wikipedia.org/wiki/Unix_time
 	Attributes map[string]string
 
 	// The message's contents (not URL-encoded).
@@ -140,16 +177,18 @@ type Message struct {
 	// An MD5 digest of the non-URL-encoded message attribute string. You can use this
 	// attribute to verify that Amazon SQS received the message correctly. Amazon SQS
 	// URL-decodes the message before creating the MD5 digest. For information about
-	// MD5, see RFC1321 (https://www.ietf.org/rfc/rfc1321.txt).
+	// MD5, see [RFC1321].
+	//
+	// [RFC1321]: https://www.ietf.org/rfc/rfc1321.txt
 	MD5OfMessageAttributes *string
 
-	// Each message attribute consists of a Name, Type, and Value. For more
-	// information, see Amazon SQS message attributes
-	// (https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-message-metadata.html#sqs-message-attributes)
-	// in the Amazon SQS Developer Guide.
+	// Each message attribute consists of a Name , Type , and Value . For more
+	// information, see [Amazon SQS message attributes]in the Amazon SQS Developer Guide.
+	//
+	// [Amazon SQS message attributes]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-message-metadata.html#sqs-message-attributes
 	MessageAttributes map[string]MessageAttributeValue
 
-	// A unique identifier for the message. A MessageIdis considered unique across all
+	// A unique identifier for the message. A MessageId is considered unique across all
 	// Amazon Web Services accounts for an extended period of time.
 	MessageId *string
 
@@ -163,16 +202,20 @@ type Message struct {
 
 // The user-specified message attribute value. For string data types, the Value
 // attribute has the same restrictions on the content as the message body. For more
-// information, see SendMessage.Name, type, value and the message body must not be
-// empty or null. All parts of the message attribute, including Name, Type, and
-// Value, are part of the message size restriction (256 KB or 262,144 bytes).
+// information, see SendMessage.
+//
+// Name , type , value and the message body must not be empty or null. All parts
+// of the message attribute, including Name , Type , and Value , are part of the
+// message size restriction (256 KiB or 262,144 bytes).
 type MessageAttributeValue struct {
 
-	// Amazon SQS supports the following logical data types: String, Number, and
-	// Binary. For the Number data type, you must use StringValue. You can also append
-	// custom labels. For more information, see Amazon SQS Message Attributes
-	// (https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-message-metadata.html#sqs-message-attributes)
-	// in the Amazon SQS Developer Guide.
+	// Amazon SQS supports the following logical data types: String , Number , and
+	// Binary . For the Number data type, you must use StringValue .
+	//
+	// You can also append custom labels. For more information, see [Amazon SQS Message Attributes] in the Amazon SQS
+	// Developer Guide.
+	//
+	// [Amazon SQS Message Attributes]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-message-metadata.html#sqs-message-attributes
 	//
 	// This member is required.
 	DataType *string
@@ -187,9 +230,9 @@ type MessageAttributeValue struct {
 	// Not implemented. Reserved for future use.
 	StringListValues []string
 
-	// Strings are Unicode with UTF-8 binary encoding. For a list of code values, see
-	// ASCII Printable Characters
-	// (http://en.wikipedia.org/wiki/ASCII#ASCII_printable_characters).
+	// Strings are Unicode with UTF-8 binary encoding. For a list of code values, see [ASCII Printable Characters].
+	//
+	// [ASCII Printable Characters]: http://en.wikipedia.org/wiki/ASCII#ASCII_printable_characters
 	StringValue *string
 
 	noSmithyDocumentSerde
@@ -197,15 +240,18 @@ type MessageAttributeValue struct {
 
 // The user-specified message system attribute value. For string data types, the
 // Value attribute has the same restrictions on the content as the message body.
-// For more information, see SendMessage.Name, type, value and the message body
-// must not be empty or null.
+// For more information, see SendMessage.
+//
+// Name , type , value and the message body must not be empty or null.
 type MessageSystemAttributeValue struct {
 
-	// Amazon SQS supports the following logical data types: String, Number, and
-	// Binary. For the Number data type, you must use StringValue. You can also append
-	// custom labels. For more information, see Amazon SQS Message Attributes
-	// (https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-message-metadata.html#sqs-message-attributes)
-	// in the Amazon SQS Developer Guide.
+	// Amazon SQS supports the following logical data types: String , Number , and
+	// Binary . For the Number data type, you must use StringValue .
+	//
+	// You can also append custom labels. For more information, see [Amazon SQS Message Attributes] in the Amazon SQS
+	// Developer Guide.
+	//
+	// [Amazon SQS Message Attributes]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-message-metadata.html#sqs-message-attributes
 	//
 	// This member is required.
 	DataType *string
@@ -220,21 +266,23 @@ type MessageSystemAttributeValue struct {
 	// Not implemented. Reserved for future use.
 	StringListValues []string
 
-	// Strings are Unicode with UTF-8 binary encoding. For a list of code values, see
-	// ASCII Printable Characters
-	// (http://en.wikipedia.org/wiki/ASCII#ASCII_printable_characters).
+	// Strings are Unicode with UTF-8 binary encoding. For a list of code values, see [ASCII Printable Characters].
+	//
+	// [ASCII Printable Characters]: http://en.wikipedia.org/wiki/ASCII#ASCII_printable_characters
 	StringValue *string
 
 	noSmithyDocumentSerde
 }
 
-// Contains the details of a single Amazon SQS message along with an Id.
+// Contains the details of a single Amazon SQS message along with an Id .
 type SendMessageBatchRequestEntry struct {
 
-	// An identifier for a message in this batch used to communicate the result. The
-	// Ids of a batch request need to be unique within a request. This identifier can
-	// have up to 80 characters. The following characters are accepted: alphanumeric
-	// characters, hyphens(-), and underscores (_).
+	// An identifier for a message in this batch used to communicate the result.
+	//
+	// The Id s of a batch request need to be unique within a request.
+	//
+	// This identifier can have up to 80 characters. The following characters are
+	// accepted: alphanumeric characters, hyphens(-), and underscores (_).
 	//
 	// This member is required.
 	Id *string
@@ -247,104 +295,109 @@ type SendMessageBatchRequestEntry struct {
 	// The length of time, in seconds, for which a specific message is delayed. Valid
 	// values: 0 to 900. Maximum: 15 minutes. Messages with a positive DelaySeconds
 	// value become available for processing after the delay period is finished. If you
-	// don't specify a value, the default value for the queue is applied. When you set
-	// FifoQueue, you can't set DelaySeconds per message. You can set this parameter
-	// only on a queue level.
+	// don't specify a value, the default value for the queue is applied.
+	//
+	// When you set FifoQueue , you can't set DelaySeconds per message. You can set
+	// this parameter only on a queue level.
 	DelaySeconds int32
 
-	// Each message attribute consists of a Name, Type, and Value. For more
-	// information, see Amazon SQS message attributes
-	// (https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-message-metadata.html#sqs-message-attributes)
-	// in the Amazon SQS Developer Guide.
+	// Each message attribute consists of a Name , Type , and Value . For more
+	// information, see [Amazon SQS message attributes]in the Amazon SQS Developer Guide.
+	//
+	// [Amazon SQS message attributes]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-message-metadata.html#sqs-message-attributes
 	MessageAttributes map[string]MessageAttributeValue
 
-	// This parameter applies only to FIFO (first-in-first-out) queues. The token used
-	// for deduplication of messages within a 5-minute minimum deduplication interval.
-	// If a message with a particular MessageDeduplicationId is sent successfully,
-	// subsequent messages with the same MessageDeduplicationId are accepted
-	// successfully but aren't delivered. For more information, see  Exactly-once
-	// processing
-	// (https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/FIFO-queues-exactly-once-processing.html)
-	// in the Amazon SQS Developer Guide.
+	// This parameter applies only to FIFO (first-in-first-out) queues.
 	//
-	// * Every message must have a unique
-	// MessageDeduplicationId,
+	// The token used for deduplication of messages within a 5-minute minimum
+	// deduplication interval. If a message with a particular MessageDeduplicationId
+	// is sent successfully, subsequent messages with the same MessageDeduplicationId
+	// are accepted successfully but aren't delivered. For more information, see [Exactly-once processing]in
+	// the Amazon SQS Developer Guide.
 	//
-	// * You may provide a MessageDeduplicationId
-	// explicitly.
+	//   - Every message must have a unique MessageDeduplicationId ,
 	//
-	// * If you aren't able to provide a MessageDeduplicationId and you
-	// enable ContentBasedDeduplication for your queue, Amazon SQS uses a SHA-256 hash
-	// to generate the MessageDeduplicationId using the body of the message (but not
-	// the attributes of the message).
+	//   - You may provide a MessageDeduplicationId explicitly.
 	//
-	// * If you don't provide a MessageDeduplicationId
-	// and the queue doesn't have ContentBasedDeduplication set, the action fails with
-	// an error.
+	//   - If you aren't able to provide a MessageDeduplicationId and you enable
+	//   ContentBasedDeduplication for your queue, Amazon SQS uses a SHA-256 hash to
+	//   generate the MessageDeduplicationId using the body of the message (but not the
+	//   attributes of the message).
 	//
-	// * If the queue has ContentBasedDeduplication set, your
-	// MessageDeduplicationId overrides the generated one.
+	//   - If you don't provide a MessageDeduplicationId and the queue doesn't have
+	//   ContentBasedDeduplication set, the action fails with an error.
 	//
-	// * When
-	// ContentBasedDeduplication is in effect, messages with identical content sent
-	// within the deduplication interval are treated as duplicates and only one copy of
-	// the message is delivered.
+	//   - If the queue has ContentBasedDeduplication set, your MessageDeduplicationId
+	//   overrides the generated one.
 	//
-	// * If you send one message with
-	// ContentBasedDeduplication enabled and then another message with a
-	// MessageDeduplicationId that is the same as the one generated for the first
-	// MessageDeduplicationId, the two messages are treated as duplicates and only one
-	// copy of the message is delivered.
+	//   - When ContentBasedDeduplication is in effect, messages with identical content
+	//   sent within the deduplication interval are treated as duplicates and only one
+	//   copy of the message is delivered.
 	//
-	// The MessageDeduplicationId is available to
-	// the consumer of the message (this can be useful for troubleshooting delivery
-	// issues). If a message is sent successfully but the acknowledgement is lost and
-	// the message is resent with the same MessageDeduplicationId after the
-	// deduplication interval, Amazon SQS can't detect duplicate messages. Amazon SQS
-	// continues to keep track of the message deduplication ID even after the message
-	// is received and deleted. The length of MessageDeduplicationId is 128 characters.
-	// MessageDeduplicationId can contain alphanumeric characters (a-z, A-Z, 0-9) and
-	// punctuation (!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~). For best practices of using
-	// MessageDeduplicationId, see Using the MessageDeduplicationId Property
-	// (https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagededuplicationid-property.html)
-	// in the Amazon SQS Developer Guide.
+	//   - If you send one message with ContentBasedDeduplication enabled and then
+	//   another message with a MessageDeduplicationId that is the same as the one
+	//   generated for the first MessageDeduplicationId , the two messages are treated
+	//   as duplicates and only one copy of the message is delivered.
+	//
+	// The MessageDeduplicationId is available to the consumer of the message (this
+	// can be useful for troubleshooting delivery issues).
+	//
+	// If a message is sent successfully but the acknowledgement is lost and the
+	// message is resent with the same MessageDeduplicationId after the deduplication
+	// interval, Amazon SQS can't detect duplicate messages.
+	//
+	// Amazon SQS continues to keep track of the message deduplication ID even after
+	// the message is received and deleted.
+	//
+	// The length of MessageDeduplicationId is 128 characters. MessageDeduplicationId
+	// can contain alphanumeric characters ( a-z , A-Z , 0-9 ) and punctuation (
+	// !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~ ).
+	//
+	// For best practices of using MessageDeduplicationId , see [Using the MessageDeduplicationId Property] in the Amazon SQS
+	// Developer Guide.
+	//
+	// [Using the MessageDeduplicationId Property]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagededuplicationid-property.html
+	// [Exactly-once processing]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/FIFO-queues-exactly-once-processing.html
 	MessageDeduplicationId *string
 
-	// This parameter applies only to FIFO (first-in-first-out) queues. The tag that
-	// specifies that a message belongs to a specific message group. Messages that
-	// belong to the same message group are processed in a FIFO manner (however,
-	// messages in different message groups might be processed out of order). To
-	// interleave multiple ordered streams within a single queue, use MessageGroupId
+	// This parameter applies only to FIFO (first-in-first-out) queues.
+	//
+	// The tag that specifies that a message belongs to a specific message group.
+	// Messages that belong to the same message group are processed in a FIFO manner
+	// (however, messages in different message groups might be processed out of order).
+	// To interleave multiple ordered streams within a single queue, use MessageGroupId
 	// values (for example, session data for multiple users). In this scenario,
 	// multiple consumers can process the queue, but the session data of each user is
 	// processed in a FIFO fashion.
 	//
-	// * You must associate a non-empty MessageGroupId
-	// with a message. If you don't provide a MessageGroupId, the action fails.
+	//   - You must associate a non-empty MessageGroupId with a message. If you don't
+	//   provide a MessageGroupId , the action fails.
 	//
-	// *
-	// ReceiveMessage might return messages with multiple MessageGroupId values. For
-	// each MessageGroupId, the messages are sorted by time sent. The caller can't
-	// specify a MessageGroupId.
+	//   - ReceiveMessage might return messages with multiple MessageGroupId values.
+	//   For each MessageGroupId , the messages are sorted by time sent. The caller
+	//   can't specify a MessageGroupId .
 	//
-	// The length of MessageGroupId is 128 characters. Valid
-	// values: alphanumeric characters and punctuation
-	// (!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~). For best practices of using MessageGroupId,
-	// see Using the MessageGroupId Property
-	// (https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagegroupid-property.html)
-	// in the Amazon SQS Developer Guide. MessageGroupId is required for FIFO queues.
-	// You can't use it for Standard queues.
+	// The length of MessageGroupId is 128 characters. Valid values: alphanumeric
+	// characters and punctuation (!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~) .
+	//
+	// For best practices of using MessageGroupId , see [Using the MessageGroupId Property] in the Amazon SQS Developer
+	// Guide.
+	//
+	// MessageGroupId is required for FIFO queues. You can't use it for Standard
+	// queues.
+	//
+	// [Using the MessageGroupId Property]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagegroupid-property.html
 	MessageGroupId *string
 
-	// The message system attribute to send Each message system attribute consists of a
-	// Name, Type, and Value.
+	// The message system attribute to send Each message system attribute consists of
+	// a Name , Type , and Value .
 	//
-	// * Currently, the only supported message system attribute
-	// is AWSTraceHeader. Its type must be String and its value must be a correctly
-	// formatted X-Ray trace header string.
+	//   - Currently, the only supported message system attribute is AWSTraceHeader .
+	//   Its type must be String and its value must be a correctly formatted X-Ray
+	//   trace header string.
 	//
-	// * The size of a message system attribute
-	// doesn't count towards the total size of a message.
+	//   - The size of a message system attribute doesn't count towards the total size
+	//   of a message.
 	MessageSystemAttributes map[string]MessageSystemAttributeValue
 
 	noSmithyDocumentSerde
@@ -361,7 +414,9 @@ type SendMessageBatchResultEntry struct {
 	// An MD5 digest of the non-URL-encoded message body string. You can use this
 	// attribute to verify that Amazon SQS received the message correctly. Amazon SQS
 	// URL-decodes the message before creating the MD5 digest. For information about
-	// MD5, see RFC1321 (https://www.ietf.org/rfc/rfc1321.txt).
+	// MD5, see [RFC1321].
+	//
+	// [RFC1321]: https://www.ietf.org/rfc/rfc1321.txt
 	//
 	// This member is required.
 	MD5OfMessageBody *string
@@ -374,19 +429,25 @@ type SendMessageBatchResultEntry struct {
 	// An MD5 digest of the non-URL-encoded message attribute string. You can use this
 	// attribute to verify that Amazon SQS received the message correctly. Amazon SQS
 	// URL-decodes the message before creating the MD5 digest. For information about
-	// MD5, see RFC1321 (https://www.ietf.org/rfc/rfc1321.txt).
+	// MD5, see [RFC1321].
+	//
+	// [RFC1321]: https://www.ietf.org/rfc/rfc1321.txt
 	MD5OfMessageAttributes *string
 
 	// An MD5 digest of the non-URL-encoded message system attribute string. You can
 	// use this attribute to verify that Amazon SQS received the message correctly.
 	// Amazon SQS URL-decodes the message before creating the MD5 digest. For
-	// information about MD5, see RFC1321 (https://www.ietf.org/rfc/rfc1321.txt).
+	// information about MD5, see [RFC1321].
+	//
+	// [RFC1321]: https://www.ietf.org/rfc/rfc1321.txt
 	MD5OfMessageSystemAttributes *string
 
-	// This parameter applies only to FIFO (first-in-first-out) queues. The large,
-	// non-consecutive number that Amazon SQS assigns to each message. The length of
-	// SequenceNumber is 128 bits. As SequenceNumber continues to increase for a
-	// particular MessageGroupId.
+	// This parameter applies only to FIFO (first-in-first-out) queues.
+	//
+	// The large, non-consecutive number that Amazon SQS assigns to each message.
+	//
+	// The length of SequenceNumber is 128 bits. As SequenceNumber continues to
+	// increase for a particular MessageGroupId .
 	SequenceNumber *string
 
 	noSmithyDocumentSerde

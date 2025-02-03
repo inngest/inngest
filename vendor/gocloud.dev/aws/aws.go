@@ -22,10 +22,14 @@ import (
 	"strconv"
 
 	awsv2 "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/ratelimit"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
+	"github.com/aws/aws-sdk-go-v2/config"
 	awsv2cfg "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/google/wire"
 )
@@ -77,10 +81,12 @@ func (co ConfigOverrider) ClientConfig(serviceName string, cfgs ...*aws.Config) 
 // ConfigFromURLParams.
 //
 // The following query options are supported:
-//  - region: The AWS region for requests; sets aws.Config.Region.
-//  - endpoint: The endpoint URL (hostname only or fully qualified URI); sets aws.Config.Endpoint.
-//  - disableSSL: A value of "true" disables SSL when sending requests; sets aws.Config.DisableSSL.
-//  - s3ForcePathStyle: A value of "true" forces the request to use path-style addressing; sets aws.Config.S3ForcePathStyle.
+//   - region: The AWS region for requests; sets aws.Config.Region.
+//   - endpoint: The endpoint URL (hostname only or fully qualified URI); sets aws.Config.Endpoint.
+//   - disable_ssl (or disableSSL): A value of "true" disables SSL when sending requests; sets aws.Config.DisableSSL.
+//   - s3_force_path_style (or s3ForcePathStyle): A value of "true" forces the request to use path-style addressing; sets aws.Config.S3ForcePathStyle.
+//   - dualstack: A value of "true" enables dual stack (IPv4 and IPv6) endpoints
+//   - fips: A value of "true" enables the use of FIPS endpoints
 func ConfigFromURLParams(q url.Values) (*aws.Config, error) {
 	var cfg aws.Config
 	for param, values := range q {
@@ -90,18 +96,32 @@ func ConfigFromURLParams(q url.Values) (*aws.Config, error) {
 			cfg.Region = aws.String(value)
 		case "endpoint":
 			cfg.Endpoint = aws.String(value)
-		case "disableSSL":
+		case "disable_ssl", "disableSSL":
 			b, err := strconv.ParseBool(value)
 			if err != nil {
 				return nil, fmt.Errorf("invalid value for query parameter %q: %v", param, err)
 			}
 			cfg.DisableSSL = aws.Bool(b)
-		case "s3ForcePathStyle":
+		case "s3_force_path_style", "s3ForcePathStyle":
 			b, err := strconv.ParseBool(value)
 			if err != nil {
 				return nil, fmt.Errorf("invalid value for query parameter %q: %v", param, err)
 			}
 			cfg.S3ForcePathStyle = aws.Bool(b)
+		case "dualstack":
+			b, err := strconv.ParseBool(value)
+			if err != nil {
+				return nil, fmt.Errorf("invalid value for query parameter %q: %v", param, err)
+			}
+			cfg.UseDualStack = aws.Bool(b)
+		case "fips":
+			b, err := strconv.ParseBool(value)
+			if err != nil {
+				return nil, fmt.Errorf("invalid value for query parameter %q: %v", param, err)
+			}
+			if b {
+				cfg.UseFIPSEndpoint = endpoints.FIPSEndpointStateEnabled
+			}
 		case "awssdk":
 			// ignore, should be handled before this
 		default:
@@ -119,8 +139,8 @@ func ConfigFromURLParams(q url.Values) (*aws.Config, error) {
 // parameters it knows about
 //
 // The following query options are supported:
-//  - profile: The AWS profile to use from the AWS configs (shared config file and
-//             shared credentials file)
+//   - profile: The AWS profile to use from the AWS configs (shared config file and
+//     shared credentials file)
 func NewSessionFromURLParams(q url.Values) (*session.Session, url.Values, error) {
 	// always enable shared config (~/.aws/config by default)
 	opts := session.Options{SharedConfigState: session.SharedConfigEnable}
@@ -147,16 +167,15 @@ func NewSessionFromURLParams(q url.Values) (*session.Session, url.Values, error)
 // should use the AWS SDK v2.
 //
 // "awssdk=v1" will force V1.
-// "asssdk=v2" will force V2.
-// No "awssdk" parameter (or any other value) will return the default, currently V1.
-// Note that the default may change in the future.
+// "awssdk=v2" will force V2.
+// No "awssdk" parameter (or any other value) will return the default, currently V2.
 func UseV2(q url.Values) bool {
 	if values, ok := q["awssdk"]; ok {
-		if values[0] == "v2" || values[0] == "V2" {
-			return true
+		if values[0] == "v1" || values[0] == "V1" {
+			return false
 		}
 	}
-	return false
+	return true
 }
 
 // NewDefaultV2Config returns a aws.Config for AWS SDK v2, using the default options.
@@ -175,22 +194,86 @@ func NewDefaultV2Config(ctx context.Context) (awsv2.Config, error) {
 // V2ConfigFromURLParams.
 //
 // The following query options are supported:
-//  - region: The AWS region for requests; sets WithRegion.
-//  - profile: The shared config profile to use; sets SharedConfigProfile.
+//   - region: The AWS region for requests; sets WithRegion.
+//   - profile: The shared config profile to use; sets SharedConfigProfile.
+//   - endpoint: The AWS service endpoint to send HTTP request.
+//   - hostname_immutable: Make the hostname immutable, only works if endpoint is also set.
+//   - dualstack: A value of "true" enables dual stack (IPv4 and IPv6) endpoints.
+//   - fips: A value of "true" enables the use of FIPS endpoints.
+//   - rate_limiter_capacity: A integer value configures the capacity of a token bucket used
+//     in client-side rate limits. If no value is set, the client-side rate limiting is disabled.
+//     See https://aws.github.io/aws-sdk-go-v2/docs/configuring-sdk/retries-timeouts/#client-side-rate-limiting.
 func V2ConfigFromURLParams(ctx context.Context, q url.Values) (awsv2.Config, error) {
+	var endpoint string
+	var hostnameImmutable bool
+	var rateLimitCapacity int64
 	var opts []func(*awsv2cfg.LoadOptions) error
 	for param, values := range q {
 		value := values[0]
 		switch param {
+		case "hostname_immutable":
+			var err error
+			hostnameImmutable, err = strconv.ParseBool(value)
+			if err != nil {
+				return awsv2.Config{}, fmt.Errorf("invalid value for hostname_immutable: %w", err)
+			}
 		case "region":
 			opts = append(opts, awsv2cfg.WithRegion(value))
+		case "endpoint":
+			endpoint = value
 		case "profile":
 			opts = append(opts, awsv2cfg.WithSharedConfigProfile(value))
+		case "dualstack":
+			dualStack, err := strconv.ParseBool(value)
+			if err != nil {
+				return awsv2.Config{}, fmt.Errorf("invalid value for dualstack: %w", err)
+			}
+			if dualStack {
+				opts = append(opts, awsv2cfg.WithUseDualStackEndpoint(awsv2.DualStackEndpointStateEnabled))
+			}
+		case "fips":
+			fips, err := strconv.ParseBool(value)
+			if err != nil {
+				return awsv2.Config{}, fmt.Errorf("invalid value for fips: %w", err)
+			}
+			if fips {
+				opts = append(opts, awsv2cfg.WithUseFIPSEndpoint(awsv2.FIPSEndpointStateEnabled))
+			}
+		case "rate_limiter_capacity":
+			var err error
+			rateLimitCapacity, err = strconv.ParseInt(value, 10, 32)
+			if err != nil {
+				return awsv2.Config{}, fmt.Errorf("invalid value for capacity: %w", err)
+			}
 		case "awssdk":
 			// ignore, should be handled before this
 		default:
 			return awsv2.Config{}, fmt.Errorf("unknown query parameter %q", param)
 		}
 	}
+	if endpoint != "" {
+		customResolver := awsv2.EndpointResolverWithOptionsFunc(
+			func(service, region string, options ...interface{}) (awsv2.Endpoint, error) {
+				return awsv2.Endpoint{
+					PartitionID:       "aws",
+					URL:               endpoint,
+					SigningRegion:     region,
+					HostnameImmutable: hostnameImmutable,
+				}, nil
+			})
+		opts = append(opts, awsv2cfg.WithEndpointResolverWithOptions(customResolver))
+	}
+
+	var rateLimiter retry.RateLimiter
+	rateLimiter = ratelimit.None
+	if rateLimitCapacity > 0 {
+		rateLimiter = ratelimit.NewTokenRateLimit(uint(rateLimitCapacity))
+	}
+	opts = append(opts, config.WithRetryer(func() awsv2.Retryer {
+		return retry.NewStandard(func(so *retry.StandardOptions) {
+			so.RateLimiter = rateLimiter
+		})
+	}))
+
 	return awsv2cfg.LoadDefaultConfig(ctx, opts...)
 }
