@@ -70,7 +70,12 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gatewayGroup, gatewayUrl, err := a.ConnectGatewayRetriever.RetrieveGateway(ctx, res.AccountID, res.EnvID, reqBody.ExcludeGateways)
+	gatewayGroup, gatewayUrl, err := a.ConnectGatewayRetriever.RetrieveGateway(ctx, RetrieveGatewayOpts{
+		AccountId:   res.AccountID,
+		EnvId:       res.EnvID,
+		Exclude:     reqBody.ExcludeGateways,
+		RequestHost: r.Host,
+	})
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not retrieve gateway"))
 		return
