@@ -33,6 +33,18 @@ type ConnectionLimiter interface {
 	CheckConnectionLimit(ctx context.Context, resp *auth.Response) (bool, error)
 }
 
+type RetrieveGatewayOpts struct {
+	AccountId uuid.UUID
+	EnvId     uuid.UUID
+
+	// Exclude is a list of gateway group names that should be excluded, if possible.
+	// Implementations can choose to return a gateway included in this list, if no other gateways are available or reasonable to select.
+	Exclude []string
+
+	// RequestHost is the value of the `Host` header supplied to the Start request.
+	RequestHost string
+}
+
 type ConnectGatewayRetriever interface {
 	// RetrieveGateway retrieves a gateway to use for a new worker connection.
 	//
@@ -42,7 +54,7 @@ type ConnectGatewayRetriever interface {
 	// may still return a gateway from an excluded group.
 	//
 	// On a successful request, the gateway group name and URL are returned.
-	RetrieveGateway(ctx context.Context, accountId uuid.UUID, envId uuid.UUID, exclude []string) (string, *url.URL, error)
+	RetrieveGateway(ctx context.Context, opts RetrieveGatewayOpts) (string, *url.URL, error)
 }
 
 type connectApiRouter struct {

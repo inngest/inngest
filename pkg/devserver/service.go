@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	v0 "github.com/inngest/inngest/pkg/connect/rest/v0"
 	"github.com/inngest/inngest/pkg/enums"
 	"net"
 	"net/url"
@@ -14,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/auth"
 
 	"github.com/inngest/inngest/pkg/cli"
@@ -652,10 +652,20 @@ func (d *devserver) CheckConnectionLimit(_ context.Context, _ *auth.Response) (b
 	return true, nil
 }
 
-func (d *devserver) RetrieveGateway(_ context.Context, _, _ uuid.UUID, _ []string) (string, *url.URL, error) {
-	parsed, err := url.Parse("ws://127.0.0.1:8289/v0/connect")
+func (d *devserver) RetrieveGateway(_ context.Context, opts v0.RetrieveGatewayOpts) (string, *url.URL, error) {
+	parsed, err := url.Parse(fmt.Sprintf("ws://127.0.0.1:%d/v0/connect", d.Opts.ConnectGatewayPort))
 	if err != nil {
 		return "", nil, err
+	}
+
+	// If request host was included in the Start request, use this instead of the default loopback address.
+	// This is important for scenarios where the devserver needs to be accessed from within
+	// a Docker container.
+	if opts.RequestHost != "" {
+		parts := strings.Split(opts.RequestHost, ":")
+		if len(parts) > 0 {
+			parsed.Host = fmt.Sprintf("%s:%d", parts[0], d.Opts.ConnectGatewayPort)
+		}
 	}
 
 	return "gw-dev", parsed, nil

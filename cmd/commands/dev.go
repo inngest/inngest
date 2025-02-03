@@ -45,6 +45,7 @@ func NewCmdDev(rootCmd *cobra.Command) *cobra.Command {
 	advancedFlags.Int("retry-interval", 0, "Retry interval in seconds for linear backoff when retrying functions - must be 1 or above")
 	advancedFlags.Int("queue-workers", devserver.DefaultQueueWorkers, "Number of executor workers to execute steps from the queue")
 	advancedFlags.Int("tick", devserver.DefaultTick, "The interval (in milliseconds) at which the executor polls the queue")
+	advancedFlags.Int("connect-gateway-port", devserver.DefaultConnectGatewayPort, "Port to expose connect gateway endpoint")
 	cmd.Flags().AddFlagSet(advancedFlags)
 	groups = append(groups, FlagGroup{name: "Advanced Flags:", fs: advancedFlags})
 
@@ -123,6 +124,7 @@ func doDev(cmd *cobra.Command, args []string) {
 	retryInterval := viper.GetInt("retry-interval")
 	queueWorkers := viper.GetInt("queue-workers")
 	tick := viper.GetInt("tick")
+	connectGatewayPort := viper.GetInt("connect-gateway-port")
 
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
 		ServiceName:   "tracing",
@@ -140,14 +142,15 @@ func doDev(cmd *cobra.Command, args []string) {
 	conf.ServerKind = headers.ServerKindDev
 
 	opts := devserver.StartOpts{
-		Autodiscover:  !noDiscovery,
-		Config:        *conf,
-		Poll:          !noPoll,
-		PollInterval:  pollInterval,
-		RetryInterval: retryInterval,
-		QueueWorkers:  queueWorkers,
-		Tick:          time.Duration(tick) * time.Millisecond,
-		URLs:          urls,
+		Autodiscover:       !noDiscovery,
+		Config:             *conf,
+		Poll:               !noPoll,
+		PollInterval:       pollInterval,
+		RetryInterval:      retryInterval,
+		QueueWorkers:       queueWorkers,
+		Tick:               time.Duration(tick) * time.Millisecond,
+		URLs:               urls,
+		ConnectGatewayPort: connectGatewayPort,
 	}
 
 	err = devserver.New(ctx, opts)
