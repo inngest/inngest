@@ -22,9 +22,10 @@ type kafkaSpanExporter struct {
 }
 
 type kafkaSpansExporterOpts struct {
-	addrs []string
-	topic string
-	key   string
+	addrs           []string
+	topic           string
+	key             string
+	autoCreateTopic bool
 }
 
 type KafkaSpansExporterOpts func(k *kafkaSpansExporterOpts)
@@ -42,6 +43,12 @@ func WithKafkaExporterTopic(topic, key string) KafkaSpansExporterOpts {
 		if key != "" {
 			k.key = key
 		}
+	}
+}
+
+func WithKafkaExporterAutoCreateTopic() KafkaSpansExporterOpts {
+	return func(k *kafkaSpansExporterOpts) {
+		k.autoCreateTopic = true
 	}
 }
 
@@ -64,7 +71,7 @@ func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (
 		conf.key = defaultMsgKey
 	}
 
-	cl, err := kgo.NewClient(
+	kclopts := []kgo.Opt{
 		kgo.SeedBrokers(conf.addrs...),
 		kgo.DefaultProduceTopic(conf.topic),
 		kgo.RequiredAcks(kgo.AllISRAcks()), // Most durable with some perf hits
@@ -81,7 +88,13 @@ func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (
 				},
 			})
 		}),
-	)
+	}
+
+	if conf.autoCreateTopic {
+		kclopts = append(kclopts, kgo.AllowAutoTopicCreation())
+	}
+
+	cl, err := kgo.NewClient(kclopts...)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing kafka client: %w", err)
 	}
