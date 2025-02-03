@@ -2,8 +2,8 @@ import type { Function } from '@inngest/components/types/function';
 
 import { graphql } from '@/gql';
 import { type AppsQuery } from '@/gql/graphql';
+import { transformTriggers } from '@/utils/triggers';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
-import { transformTriggers } from './[externalID]/useApp';
 
 export type FlattenedApp = Omit<
   AppsQuery['environment']['apps'][number],
