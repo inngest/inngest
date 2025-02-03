@@ -81,7 +81,7 @@ export function useApp({ envID, externalAppID }: { envID: string; externalAppID:
   return { ...res, data: undefined };
 }
 
-function transformTriggers(
+export function transformTriggers(
   rawTriggers: { eventName: string | null; schedule: string | null }[]
 ): Function['triggers'] {
   const triggers: Function['triggers'] = [];

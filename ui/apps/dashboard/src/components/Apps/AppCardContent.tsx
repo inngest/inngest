@@ -1,4 +1,5 @@
 import { Link } from '@inngest/components/Link/Link';
+import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { type AppKind } from '@inngest/components/types/app';
 import { RiExternalLinkLine } from '@remixicon/react';
 
@@ -51,8 +52,32 @@ const getAppCardContent = ({ app, envSlug }: { app: FlattenedApp; envSlug: strin
           .sort((a, b) => a.name.localeCompare(b.name))
           .map((func) => {
             return (
-              <li key={func.id} className="text-subtle py-2">
-                {func.name}
+              <li key={func.id} className="flex items-center justify-between gap-1 py-2">
+                <Link
+                  className="text-subtle hover:text-link duration-0"
+                  href={pathCreator.function({ envSlug, functionSlug: func.slug })}
+                  arrowOnHover
+                >
+                  {func.name}
+                </Link>
+                <HorizontalPillList
+                  alwaysVisibleCount={2}
+                  pills={func.triggers.map((trigger) => {
+                    return (
+                      <Pill
+                        appearance="outlined"
+                        href={
+                          trigger.type === 'EVENT'
+                            ? pathCreator.eventType({ envSlug, eventName: trigger.value })
+                            : undefined
+                        }
+                        key={trigger.type + trigger.value}
+                      >
+                        <PillContent type={trigger.type}>{trigger.value}</PillContent>
+                      </Pill>
+                    );
+                  })}
+                />
               </li>
             );
           })}
