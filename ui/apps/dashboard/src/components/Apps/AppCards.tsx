@@ -76,7 +76,7 @@ export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envS
           <ValidateModal
             isOpen={showValidate}
             onClose={() => setShowValidate(false)}
-            url={app.url}
+            initialURL={app.url}
           />
         )}
         <ArchiveModal
