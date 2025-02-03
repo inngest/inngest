@@ -658,9 +658,9 @@ func (d *devserver) RetrieveGateway(_ context.Context, opts v0.RetrieveGatewayOp
 		return "", nil, err
 	}
 
-	// If request host was included in the Start request, use this instead of the default loopback address.
-	// This is important for scenarios where the devserver needs to be accessed from within
-	// a Docker container.
+	// Devserver-specific convenience implementation: If request host was included in the Start request,
+	// use this instead of the default loopback address. This is important for scenarios where the devserver
+	// needs to be accessed from within a Docker container.
 	if opts.RequestHost != "" {
 		parts := strings.Split(opts.RequestHost, ":")
 		if len(parts) > 0 {
