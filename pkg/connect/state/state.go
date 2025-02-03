@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 	"net/http"
 	"net/url"
@@ -15,6 +16,10 @@ import (
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/sdk"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
+)
+
+const (
+	pkgName = "connect.state"
 )
 
 type StateManager interface {
@@ -146,6 +151,13 @@ func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager, 
 		c.Group = group
 		return nil
 	}
+
+	start := time.Now()
+	defer func() {
+		metrics.HistogramConnectSyncDuration(ctx, time.Since(start).Milliseconds(), metrics.HistogramOpt{
+			PkgName: pkgName,
+		})
+	}()
 
 	// Construct sync request via off-band sync
 	// Can't do in-band
