@@ -41,7 +41,7 @@ export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envS
               ) : null
             }
             actions={
-              <div className="flex items-center gap-2">
+              <div className="items-top flex gap-2">
                 <Button
                   appearance="outlined"
                   label="View details"

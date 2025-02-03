@@ -67,9 +67,9 @@ export function AppCardContent({ app, pill, actions }: CardContentProps) {
     <div className="text-basis p-6">
       <div className="mb-6">
         <div className="items-top flex justify-between">
-          <div className="flex items-center gap-2 text-xl">
+          <div className="inline text-xl">
             {app.name}
-            {pill}
+            {pill ? <span className="ml-2 inline-flex align-middle">{pill}</span> : null}
           </div>
           {actions}
         </div>

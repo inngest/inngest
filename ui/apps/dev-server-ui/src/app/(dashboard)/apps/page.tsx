@@ -55,7 +55,7 @@ export default function AppList() {
               ) : null
             }
             actions={
-              <div className="flex items-center gap-2">
+              <div className="items-top flex gap-2">
                 {app.connectionType === AppConnectionType.Connect && (
                   <Button
                     appearance="outlined"
