@@ -31,6 +31,7 @@ const query = graphql(`
         isArchived
         name
         connectionType
+        isParentArchived
         latestSync {
           error
           framework
