@@ -148,3 +148,25 @@ func HistogramConnectSetupDuration(ctx context.Context, dur int64, opts Histogra
 		Boundaries:  PausesBoundaries,
 	})
 }
+
+func HistogramConnectSyncDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.connection.sync_duration",
+		Description: "End to end duration for the out-of-band sync request initiated by the connect gateway.",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  PausesBoundaries,
+	})
+}
+
+func HistogramConnectAppLoaderDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.connection.app_loader_duration",
+		Description: "Duration for loading the app during connection setup in the connect gateway.",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  PausesBoundaries,
+	})
+}
