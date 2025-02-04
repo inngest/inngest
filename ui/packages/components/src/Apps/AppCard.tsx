@@ -4,6 +4,7 @@ import { Button } from '@inngest/components/Button';
 import { Pill } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
+import WorkersCounter from '@inngest/components/Workers/WorkersCounter';
 import { RiArrowDownSLine, RiArrowLeftRightLine, RiInfinityLine } from '@remixicon/react';
 
 import { Card } from '../Card';
@@ -26,7 +27,7 @@ const kindStyles = {
 export function SkeletonCard() {
   return (
     <Card>
-      <div className="text-basis mb-px ml-1 p-6">
+      <div className="text-basis mb-px ml-1 flex h-44 flex-col justify-between p-6">
         <div className="mb-6">
           <div className="pb-3">
             <Skeleton className="mb-2 block h-8 w-96" />
@@ -35,7 +36,7 @@ export function SkeletonCard() {
 
         <div className="grid grid-cols-5 gap-5 pt-1.5">
           <Description term="Last synced at" detail={<Skeleton className="block h-5 w-36" />} />
-          <Description term="Sync method" detail={<Skeleton className="block h-5 w-28" />} />
+          <Description term="Method" detail={<Skeleton className="block h-5 w-28" />} />
           <Description term="SDK version" detail={<Skeleton className="block h-5 w-14" />} />
           <Description term="Language" detail={<Skeleton className="block h-5 w-28" />} />
           <Description term="Framework" detail={<Skeleton className="block h-5 w-28" />} />
@@ -67,7 +68,7 @@ export function AppCardContent({ url, app, pill, actions }: CardContentProps) {
   const Wrapper = url ? 'a' : 'div';
 
   return (
-    <div className="text-basis p-6">
+    <div className="text-basis flex h-44 flex-col justify-between p-6">
       <Wrapper className="mb-6" href={url}>
         <div className="items-top flex justify-between">
           <div className="inline text-xl">
@@ -84,7 +85,7 @@ export function AppCardContent({ url, app, pill, actions }: CardContentProps) {
           <Description term="Last synced at" detail={<Time value={app.lastSyncedAt} />} />
         )}
         <Description
-          term="Sync method"
+          term="Method"
           detail={
             <div className="flex items-center gap-1">
               {app.connectionType === connectionTypes.Connect ? (
@@ -101,8 +102,13 @@ export function AppCardContent({ url, app, pill, actions }: CardContentProps) {
           detail={app.sdkVersion?.trim() ? <Pill>{app.sdkVersion}</Pill> : '-'}
         />
         <Description term="Language" detail={app.sdkLanguage?.trim() ? app.sdkLanguage : '-'} />
-        {/* TODO: Add Connected Workers counter */}
-        {app.connectionType === connectionTypes.Connect ? null : (
+        {app.connectionType === connectionTypes.Connect ? (
+          // TODO: Wire workers data
+          <Description
+            term="Method"
+            detail={<WorkersCounter counts={{ ACTIVE: 1, INACTIVE: 0, DISCONNECTED: 0 }} />}
+          />
+        ) : (
           <Description term="Framework" detail={app.framework ?? '-'} />
         )}
       </div>
