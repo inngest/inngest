@@ -136,8 +136,9 @@ export default function FunctionConfiguration({ configuration }: FunctionConfigu
           const items: MetadataItemProps[] = [
             {
               label: 'Scope',
+              title: concurrencyItem.scope,
               value: (
-                <span className="lowercase first-letter:capitalize">{concurrencyItem.scope}</span>
+                <div className="lowercase first-letter:capitalize">{concurrencyItem.scope}</div>
               ),
             },
             {
