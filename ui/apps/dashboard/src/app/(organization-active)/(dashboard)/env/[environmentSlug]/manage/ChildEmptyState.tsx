@@ -20,12 +20,14 @@ export default function ChildEmptyState() {
           <div className="border-subtle mt-6 flex items-center gap-2 border-t py-4">
             <Button
               kind="primary"
+              appearance="outlined"
               href={`/env/${staticSlugs.branch}/manage/keys` as Route}
               label="Manage Event Keys"
             />
 
             <Button
               kind="primary"
+              appearance="outlined"
               href={`/env/${staticSlugs.branch}/manage/signing-key` as Route}
               label="Manage Signing Keys"
             />
