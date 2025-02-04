@@ -66,7 +66,7 @@ export const actionConfigs = (
       ? 'Send event payload to running Dev Server'
       : `Dev Server is not running at ${devServerURL}`,
     disabled: !isRunning,
-    onClick: () => send(payload),
+    onClick: (): void => send(payload),
   };
 };
 
