@@ -38,11 +38,17 @@ export type Trigger = {
   cron: string | null;
 };
 
+interface ActionConfig {
+  title: string;
+  disabled?: boolean;
+  onClick?: () => void;
+}
+
 export const actionConfigs = (
   trigger: Trigger | undefined,
   isRunning: boolean,
   send: (payload: string) => void
-) => {
+): ActionConfig => {
   if (!trigger) {
     return { title: 'Loading trigger' };
   }
@@ -66,7 +72,7 @@ export const actionConfigs = (
       ? 'Send event payload to running Dev Server'
       : `Dev Server is not running at ${devServerURL}`,
     disabled: !isRunning,
-    onClick: (): void => send(payload),
+    onClick: () => send(payload),
   };
 };
 
