@@ -146,7 +146,7 @@ function AppPage({ id }: { id: string }) {
             detail={<WorkersCounter counts={connectionsCount} />}
           />
           <CardItem
-            term="Sync method"
+            term="Method"
             detail={<p className="lowercase first-letter:capitalize">{app.connectionType}</p>}
           />
           <CardItem term="SDK version" detail={<Pill>{app.sdkVersion}</Pill>} />
