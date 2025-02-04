@@ -1,8 +1,8 @@
 import { Fragment } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
 import { Pill } from '@inngest/components/Pill/Pill';
+import { differenceInDays, formatDistanceStrict } from '@inngest/components/utils/date';
 import { RiArrowDownSLine } from '@remixicon/react';
-import dayjs from 'dayjs';
 import { useQuery } from 'urql';
 
 import { type TimeRange } from '@/types/TimeRangeFilter';
@@ -112,11 +112,10 @@ export default function DashboardTimeRangeFilter({
             >
               <Listbox.Options className="shadow-floating bg-canvasBase absolute right-0 z-10 mt-[5px] w-52 origin-top-right overflow-hidden rounded-md py-[9px] ring-1 ring-black/5 backdrop-blur-[3px] focus:outline-none">
                 {timeRanges.map((timeRange) => {
-                  const timeRangeStartInDaysAgo = dayjs(currentTime).diff(
-                    dayjs(timeRange.start),
-                    'days'
+                  const timeRangeStartInDaysAgo = differenceInDays(
+                    new Date(currentTime),
+                    new Date(timeRange.start)
                   );
-
                   const isPlanSufficient = timeRangeStartInDaysAgo <= logRetention;
 
                   return (
@@ -145,5 +144,5 @@ export default function DashboardTimeRangeFilter({
 }
 
 export function getTimeRangeLabel(timeRange: TimeRange) {
-  return dayjs(timeRange.start).from(timeRange.end, true);
+  return formatDistanceStrict(new Date(timeRange.start), new Date(timeRange.end));
 }

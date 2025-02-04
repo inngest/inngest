@@ -101,9 +101,6 @@ importers:
       cmdk:
         specifier: 0.2.1
         version: 0.2.1(@types/react@18.2.11)(react-dom@18.2.0)(react@18.2.0)
-      dayjs:
-        specifier: 1.11.7
-        version: 1.11.7
       framer-motion:
         specifier: 10.16.4
         version: 10.16.4(react-dom@18.2.0)(react@18.2.0)
@@ -149,9 +146,6 @@ importers:
       tailwind-merge:
         specifier: 1.10.0
         version: 1.10.0
-      title-case:
-        specifier: 3.0.3
-        version: 3.0.3
       type-fest:
         specifier: 3.7.2
         version: 3.7.2
@@ -478,9 +472,6 @@ importers:
       date-fns:
         specifier: 3.6.0
         version: 3.6.0
-      dayjs:
-        specifier: 1.11.7
-        version: 1.11.7
       echarts:
         specifier: 5.5.1
         version: 5.5.1
@@ -14760,10 +14751,6 @@ packages:
     resolution: {integrity: sha512-fRHTG8g/Gif+kSh50gaGEdToemgfj74aRX3swtiouboip5JDLAyDE9F11nHMIcvOaXeOC6D7SpNhi7uFyB7Uww==}
     dev: false
 
-  /dayjs@1.11.7:
-    resolution: {integrity: sha512-+Yw9U6YO5TQohxLcIkrXBeY73WP3ejHWVvx8XCk3gxvQDCTEmS48ZrSZCKciI7Bhl/uCMyxYtE9UqRILmFphkQ==}
-    dev: false
-
   /debounce@1.2.1:
     resolution: {integrity: sha512-XRRe6Glud4rd/ZGQfiV1ruXSfbvfJedlV9Y6zOlP+2K04vBYiJEte6stfFkCP03aMnY5tsipamumUjL14fofug==}
     dev: true
@@ -22835,6 +22822,7 @@ packages:
     resolution: {integrity: sha512-e1zGYRvbffpcHIrnuqT0Dh+gEJtDaxDSoG4JAIpq4oDFyooziLBIiYQv0GBT4FUAnUop5uZ1hiIAj7oAF6sOCA==}
     dependencies:
       tslib: 2.5.0
+    dev: true
 
   /tmp@0.0.33:
     resolution: {integrity: sha512-jRCJlojKnZ3addtTOjdIqoRuPEKBvNXcGYqzO6zWZX8KfKEpnGY5jfggJQ3EjKuu8D4bJRr0y+cYJFmYbImXGw==}

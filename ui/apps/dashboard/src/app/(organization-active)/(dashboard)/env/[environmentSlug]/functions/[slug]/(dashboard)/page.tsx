@@ -11,16 +11,15 @@ import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { cn } from '@inngest/components/utils/classNames';
+import { relativeTime } from '@inngest/components/utils/date';
 import { RiArrowRightSLine, RiTimeLine } from '@remixicon/react';
 import { ErrorBoundary } from '@sentry/nextjs';
-import { titleCase } from 'title-case';
 
 import type { TimeRange } from '@/types/TimeRangeFilter';
 import FunctionConfiguration from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/(dashboard)/FunctionConfiguration';
 import Block from '@/components/Block';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useFunction, useFunctionUsage } from '@/queries';
-import { relativeTime } from '@/utils/date';
 import DashboardTimeRangeFilter, {
   defaultTimeRange,
   getTimeRangeByKey,
@@ -351,10 +350,10 @@ function ScheduleTrigger({ schedule, condition }: ScheduleTriggerProps) {
             )}
             {nextRun && (
               <div className="flex gap-1">
-                <dt className="text-subtle">Next Run</dt>
+                <dt className="text-subtle">Next run</dt>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <dd className="truncate ">{titleCase(relativeTime(nextRun))}</dd>
+                    <dd className="truncate">{relativeTime(nextRun)}</dd>
                   </TooltipTrigger>
                   <TooltipContent className="font-mono text-xs">
                     {nextRun.toISOString()}

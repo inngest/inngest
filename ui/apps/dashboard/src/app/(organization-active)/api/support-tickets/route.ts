@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { auth, currentUser } from '@clerk/nextjs/server';
+import { getTimestampDaysAgo } from '@inngest/components/utils/date';
 import {
   PlainClient,
   type CreateThreadInput,
   type ThreadPartsFragment,
   type UpsertCustomTimelineEntryInput,
 } from '@team-plain/typescript-sdk';
-import dayjs from 'dayjs';
 
 import {
   labelTypeIDs,
@@ -153,10 +153,11 @@ export async function GET() {
     if (threadsRes.error) {
       continue;
     }
-    const oneMonthAgo = dayjs().subtract(30, 'days');
+    const oneMonthAgo = getTimestampDaysAgo({ currentDate: new Date(), days: 30 });
     threads = threads.concat(
       threadsRes.data.threads.filter(
-        (thread) => parseInt(thread.updatedAt.unixTimestamp, 10) > oneMonthAgo.unix()
+        (thread) =>
+          parseInt(thread.updatedAt.unixTimestamp, 10) > Math.floor(oneMonthAgo.getTime() / 1000)
       )
     );
   }
