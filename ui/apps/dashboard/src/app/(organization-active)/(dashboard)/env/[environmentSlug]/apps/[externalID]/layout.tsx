@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert';
 import { Header } from '@inngest/components/Header/Header';
-import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import type { CombinedError } from 'urql';
 
 import { ActionsMenu } from '@/components/Apps/ActionsMenu';
@@ -78,6 +77,7 @@ export default function Layout({ children, params: { externalID } }: Props) {
           },
           ...(pathname.endsWith('/syncs') ? [{ text: 'All syncs' }] : []),
         ]}
+        loading={res.isLoading}
         action={
           <div className="flex flex-row items-center justify-end gap-x-1">
             {res.data && (
@@ -106,11 +106,9 @@ export default function Layout({ children, params: { externalID } }: Props) {
       />
       <div className="bg-canvasBase no-scrollbar mx-auto flex h-full w-full flex-col overflow-y-auto">
         <div className="bg-canvasBase h-full overflow-hidden">
-          {res.isLoading ? (
-            <Skeleton className="h-36 w-full" />
-          ) : res.error ? (
+          {res.error ? (
             <Error error={res.error as CombinedError} externalID={externalAppID} />
-          ) : !res.data.id ? (
+          ) : !res.data?.id && !res.isLoading ? (
             <NotFound externalID={externalAppID} />
           ) : (
             children

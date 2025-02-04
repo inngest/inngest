@@ -2,6 +2,7 @@
 
 import { FunctionList } from '@inngest/components/Apps/FunctionList';
 import { Button } from '@inngest/components/Button/Button';
+import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { RiListCheck } from '@remixicon/react';
 
 import { AppGitCard } from '@/components/AppGitCard/AppGitCard';
@@ -35,7 +36,11 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
   if (appRes.isLoading && !appRes.data) {
     return (
       <div className="h-full overflow-y-auto">
-        <div className="mx-auto w-full max-w-[1200px] py-4">
+        <div className="mx-auto my-12 flex w-full max-w-[1200px] flex-col gap-9 px-6">
+          <div>
+            <Skeleton className="mb-1 h-8 w-72" />
+            <p className="text-muted text-sm">Information about the app.</p>
+          </div>
           <AppInfoCard className="mb-4" loading />
         </div>
       </div>
@@ -48,7 +53,7 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
         <div className="flex items-center justify-between">
           <div>
             <h2 className="mb-1 text-2xl">{appRes.data.name}</h2>
-            <p className="text-muted text-sm">Information about the latest successful sync.</p>
+            <p className="text-muted text-sm">Information about the app.</p>
           </div>
           <Button
             appearance="outlined"
