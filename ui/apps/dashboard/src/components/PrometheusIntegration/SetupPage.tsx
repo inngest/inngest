@@ -10,10 +10,7 @@ type Props = {
   metricsGranularitySeconds: number;
 };
 
-export default function PrometheusSetupPage({
-  metricsExportEnabled,
-  metricsGranularitySeconds,
-}: Props) {
+export default function SetupPage({ metricsExportEnabled, metricsGranularitySeconds }: Props) {
   return (
     <div className="mx-auto mt-16 flex w-[800px] flex-col">
       <div className="text-basis mb-7 flex flex-row items-center justify-start text-2xl font-medium">
