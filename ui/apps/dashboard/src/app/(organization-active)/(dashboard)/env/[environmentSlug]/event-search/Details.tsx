@@ -118,7 +118,7 @@ export function Details({ envID, eventID, onClose, navigateToRun }: Props) {
     <>
       {eventID && (
         <SlideOver onClose={onClose} size="large">
-          <div className={'text-basis dark grid h-full grid-cols-2'}>
+          <div className={'text-basis grid h-full grid-cols-2'}>
             {eventDetails}
             {runDetails}
           </div>
