@@ -20,8 +20,91 @@ import { formatMilliseconds, toMaybeDate } from '../utils/date';
 import { Input } from './Input';
 import { Output } from './Output';
 import { Tabs } from './Tabs';
-import { isStepInfoInvoke, isStepInfoSleep, isStepInfoWait } from './types';
-import { maybeBooleanToString, type StepInfoType } from './utils';
+import {
+  isStepInfoInvoke,
+  isStepInfoSleep,
+  isStepInfoWait,
+  type StepInfoInvoke,
+  type StepInfoSleep,
+  type StepInfoWait,
+} from './types';
+import { maybeBooleanToString, type PathCreator, type StepInfoType } from './utils';
+
+type StepKindInfoProps = {
+  stepInfo: StepInfoType['trace']['stepInfo'];
+  pathCreator: StepInfoType['pathCreator'];
+};
+
+const InvokeInfo = ({
+  stepInfo,
+  pathCreator,
+}: {
+  stepInfo: StepInfoInvoke;
+  pathCreator: PathCreator;
+}) => {
+  const timeout = toMaybeDate(stepInfo.timeout);
+  return (
+    <>
+      <ElementWrapper label="Run">
+        {stepInfo.runID ? (
+          <LinkElement href={pathCreator.runPopout({ runID: stepInfo.runID })}>
+            {stepInfo.runID}
+          </LinkElement>
+        ) : (
+          '-'
+        )}
+      </ElementWrapper>
+      <ElementWrapper label="Timeout">
+        {timeout ? <TimeElement date={timeout} /> : <TextElement>-</TextElement>}
+      </ElementWrapper>
+      <ElementWrapper label="Timed out">
+        <TextElement>{maybeBooleanToString(stepInfo.timedOut)}</TextElement>
+      </ElementWrapper>
+    </>
+  );
+};
+
+const SleepInfo = ({ stepInfo }: { stepInfo: StepInfoSleep }) => {
+  const sleepUntil = toMaybeDate(stepInfo.sleepUntil);
+  return (
+    <ElementWrapper label="Sleep until">
+      {sleepUntil ? <Time value={sleepUntil} /> : <TextElement>-</TextElement>}
+    </ElementWrapper>
+  );
+};
+
+const WaitInfo = ({ stepInfo }: { stepInfo: StepInfoWait }) => {
+  const timeout = toMaybeDate(stepInfo.timeout);
+  return (
+    <>
+      <ElementWrapper label="Event name">
+        <TextElement>{stepInfo.eventName}</TextElement>
+      </ElementWrapper>
+      <ElementWrapper label="Timeout">
+        {timeout ? <TimeElement date={timeout} /> : <TextElement>-</TextElement>}
+      </ElementWrapper>
+      <ElementWrapper label="Timed out">
+        <TextElement>{maybeBooleanToString(stepInfo.timedOut)}</TextElement>
+      </ElementWrapper>
+      <ElementWrapper className="w-full" label="Match expression">
+        {stepInfo.expression ? (
+          <CodeElement value={stepInfo.expression} />
+        ) : (
+          <TextElement>-</TextElement>
+        )}
+      </ElementWrapper>
+    </>
+  );
+};
+
+const getStepKindInfo = (props: StepKindInfoProps): JSX.Element | null =>
+  isStepInfoInvoke(props.stepInfo) ? (
+    <InvokeInfo stepInfo={props.stepInfo} pathCreator={props.pathCreator} />
+  ) : isStepInfoSleep(props.stepInfo) ? (
+    <SleepInfo stepInfo={props.stepInfo} />
+  ) : isStepInfoWait(props.stepInfo) ? (
+    <WaitInfo stepInfo={props.stepInfo} />
+  ) : null;
 
 export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
   const [expanded, setExpanded] = useState(true);
@@ -33,79 +116,26 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
     (toMaybeDate(trace.startedAt) ?? new Date()).getTime() - new Date(trace.queuedAt).getTime()
   );
 
-  let duration = 0;
-  if (trace.childrenSpans && trace.childrenSpans.length > 0) {
-    trace.childrenSpans.forEach((child, i) => {
-      if (!child.startedAt) {
-        return;
-      }
+  const duration = trace.childrenSpans?.length
+    ? trace.childrenSpans
+        .filter((child) => child.startedAt)
+        .reduce(
+          (total, child) =>
+            total +
+            ((toMaybeDate(child.endedAt) ?? new Date()).getTime() -
+              new Date(child.startedAt!).getTime()),
+          0
+        )
+    : trace.startedAt
+    ? (toMaybeDate(trace.endedAt) ?? new Date()).getTime() - new Date(trace.startedAt).getTime()
+    : 0;
 
-      duration +=
-        (toMaybeDate(child.endedAt) ?? new Date()).getTime() - new Date(child.startedAt).getTime();
-    });
-  } else if (trace.startedAt) {
-    duration =
-      (toMaybeDate(trace.endedAt) ?? new Date()).getTime() - new Date(trace.startedAt).getTime();
-  }
+  const durationText = duration > 0 ? formatMilliseconds(duration) : '-';
 
-  let durationText = '-';
-  if (duration > 0) {
-    durationText = formatMilliseconds(duration);
-  }
-
-  let stepKindInfo = null;
-
-  if (isStepInfoInvoke(trace.stepInfo)) {
-    const timeout = toMaybeDate(trace.stepInfo.timeout);
-    stepKindInfo = (
-      <>
-        <ElementWrapper label="Run">
-          {trace.stepInfo.runID ? (
-            <LinkElement href={pathCreator.runPopout({ runID: trace.stepInfo.runID })}>
-              {trace.stepInfo.runID}
-            </LinkElement>
-          ) : (
-            '-'
-          )}
-        </ElementWrapper>
-        <ElementWrapper label="Timeout">
-          {timeout ? <TimeElement date={timeout} /> : <TextElement>-</TextElement>}
-        </ElementWrapper>
-        <ElementWrapper label="Timed out">
-          <TextElement>{maybeBooleanToString(trace.stepInfo.timedOut)}</TextElement>
-        </ElementWrapper>
-      </>
-    );
-  } else if (isStepInfoSleep(trace.stepInfo)) {
-    const sleepUntil = toMaybeDate(trace.stepInfo.sleepUntil);
-    stepKindInfo = (
-      <ElementWrapper label="Sleep until">
-        {sleepUntil ? <Time value={sleepUntil} /> : <TextElement>-</TextElement>}
-      </ElementWrapper>
-    );
-  } else if (isStepInfoWait(trace.stepInfo)) {
-    const timeout = toMaybeDate(trace.stepInfo.timeout);
-    stepKindInfo = (
-      <>
-        <ElementWrapper label="Event name">
-          <TextElement>{trace.stepInfo.eventName}</TextElement>
-        </ElementWrapper>
-        <ElementWrapper label="Timeout">
-          {timeout ? <TimeElement date={timeout} /> : <TextElement>-</TextElement>}
-        </ElementWrapper>
-        <ElementWrapper label="Timed out">
-          <TextElement>{maybeBooleanToString(trace.stepInfo.timedOut)}</TextElement>
-        </ElementWrapper>
-        <ElementWrapper className="w-full" label="Match expression">
-          {trace.stepInfo.expression ? (
-            <CodeElement value={trace.stepInfo.expression} />
-          ) : (
-            <TextElement>-</TextElement>
-          )}
-        </ElementWrapper>
-      </>
-    );
-  }
+  const stepKindInfo = getStepKindInfo({
+    stepInfo: trace.stepInfo,
+    pathCreator,
+  });
 
   const aiOutput = result?.data ? parseAIOutput(result.data) : undefined;
   const prettyInput = usePrettyJson(result?.input ?? '') || (result?.input ?? '');

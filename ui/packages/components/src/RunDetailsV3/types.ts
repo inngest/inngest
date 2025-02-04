@@ -14,7 +14,7 @@ export type Trace = {
   stepOp?: string | null;
 };
 
-type StepInfoInvoke = {
+export type StepInfoInvoke = {
   triggeringEventID: string;
   functionID: string;
   timeout: string;
@@ -23,11 +23,11 @@ type StepInfoInvoke = {
   timedOut: boolean | null;
 };
 
-type StepInfoSleep = {
+export type StepInfoSleep = {
   sleepUntil: string;
 };
 
-type StepInfoWait = {
+export type StepInfoWait = {
   eventName: string;
   expression: string | null;
   timeout: string;
@@ -35,7 +35,7 @@ type StepInfoWait = {
   timedOut: boolean | null;
 };
 
-type StepInfoRun = {
+export type StepInfoRun = {
   type: string | null;
 };
 
