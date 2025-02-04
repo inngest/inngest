@@ -1,6 +1,6 @@
 import { Client, useQuery, type UseQueryResponse } from 'urql';
 
-import type { TimeRange } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
+import type { TimeRange } from '@/types/TimeRangeFilter';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import type { GetFunctionQuery } from '@/gql/graphql';

@@ -15,8 +15,8 @@ import { RiArrowRightSLine, RiTimeLine } from '@remixicon/react';
 import { ErrorBoundary } from '@sentry/nextjs';
 import { titleCase } from 'title-case';
 
+import type { TimeRange } from '@/types/TimeRangeFilter';
 import FunctionConfiguration from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/(dashboard)/FunctionConfiguration';
-import type { TimeRange } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
 import Block from '@/components/Block';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useFunction, useFunctionUsage } from '@/queries';

@@ -5,7 +5,7 @@ import { RiArrowDownSLine } from '@remixicon/react';
 import dayjs from 'dayjs';
 import { useQuery } from 'urql';
 
-import { type TimeRange } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
+import { type TimeRange } from '@/types/TimeRangeFilter';
 import { graphql } from '@/gql';
 
 const currentTime = new Date();
