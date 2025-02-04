@@ -22,7 +22,7 @@ export default function SetupPage({ metricsExportEnabled, metricsGranularitySeco
 
       <div className="text-muted mb-6 w-full text-base font-normal">
         This integration allows your Prometheus server to scrape metrics about your Inngest
-        deployment.
+        environment.
         {/* TODO: Link to Prometheus scrape endpoint docs, once we've written them */}
         {/*<Link target="_blank" size="medium" href="https://www.inngest.com/docs/deploy/vercel">*/}
         {/*  Read documentation*/}
