@@ -1,19 +1,26 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { SkeletonCard } from '@inngest/components/Apps/AppCard';
 import { Button } from '@inngest/components/Button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@inngest/components/DropdownMenu/DropdownMenu';
 import { Header } from '@inngest/components/Header/Header';
 import { Link } from '@inngest/components/Link/Link';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
-import { RiAddLine, RiQuestionLine } from '@remixicon/react';
+import { RiAddLine, RiFirstAidKitLine, RiMore2Line, RiQuestionLine } from '@remixicon/react';
 
+import { EmptyOnboardingCard } from '@/components/Apps/EmptyAppsCard';
 import { StatusMenu } from '@/components/Apps/StatusMenu';
-import EmptyAppsCard from '@/components/Onboarding/EmptyAppsCard';
 import { getProdApps } from '@/components/Onboarding/actions';
 import { staticSlugs } from '@/utils/environments';
 import { pathCreator } from '@/utils/urls';
-import { SkeletonCard } from './AppCard';
 import { Apps } from './Apps';
+import { ValidateModal } from './[externalID]/ValidateButton/ValidateModal';
 
 const AppInfo = () => (
   <Tooltip>
@@ -66,6 +73,7 @@ export default function AppsPage({
   params: { environmentSlug: string };
   searchParams: { archived: string };
 }) {
+  const [showValidate, setShowValidate] = useState(false);
   const [{ hasProductionApps, isLoading }, setState] = useState<LoadingState>({
     hasProductionApps: true,
     isLoading: true,
@@ -88,13 +96,32 @@ export default function AppsPage({
         infoIcon={<AppInfo />}
         action={
           (!isArchived || displayOnboarding) && (
-            <Button
-              kind="primary"
-              label="Sync new app"
-              href={pathCreator.createApp({ envSlug })}
-              icon={<RiAddLine />}
-              iconSide="left"
-            />
+            <div className="flex flex-row items-center justify-end gap-x-1">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    kind="primary"
+                    appearance="outlined"
+                    size="medium"
+                    icon={<RiMore2Line />}
+                  />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => setShowValidate(true)}>
+                    <RiFirstAidKitLine className="h-4 w-4" />
+                    Check app health
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Button
+                kind="primary"
+                label="Sync new app"
+                href={pathCreator.createApp({ envSlug })}
+                icon={<RiAddLine />}
+                iconSide="left"
+              />
+            </div>
           )
         }
       />
@@ -108,7 +135,7 @@ export default function AppsPage({
         ) : (
           <>
             {displayOnboarding ? (
-              <EmptyAppsCard />
+              <EmptyOnboardingCard />
             ) : (
               <>
                 <div className="relative flex w-full flex-row justify-start">
@@ -120,6 +147,8 @@ export default function AppsPage({
           </>
         )}
       </div>
+
+      <ValidateModal isOpen={showValidate} onClose={() => setShowValidate(false)} />
     </>
   );
 }

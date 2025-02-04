@@ -8,8 +8,6 @@ import { IconStatusPaused } from '@inngest/components/icons/status/Paused';
 import { IconStatusQueued } from '@inngest/components/icons/status/Queued';
 import { IconStatusRunning } from '@inngest/components/icons/status/Running';
 import { RiArrowRightSLine } from '@remixicon/react';
-import { noCase } from 'change-case';
-import { titleCase } from 'title-case';
 
 import { graphql } from '@/gql';
 import { FunctionRunStatus } from '@/gql/graphql';
@@ -94,7 +92,8 @@ export default async function TriggeredFunctionCard({
           </dd>
           <dt className="sr-only">Status</dt>
           <dd className="text-subtle mt-2 flex items-center gap-1.5 font-medium">
-            <StatusIcon className="h-4 w-4" /> {titleCase(noCase(function_.run.status))}
+            <StatusIcon className="h-4 w-4 lowercase first-letter:capitalize" />{' '}
+            {function_.run.status}
           </dd>
         </dl>
       </div>

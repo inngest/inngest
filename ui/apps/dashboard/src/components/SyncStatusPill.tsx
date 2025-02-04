@@ -2,14 +2,14 @@ import { Pill } from '@inngest/components/Pill/Pill';
 import { type AppKind } from '@inngest/components/types/app';
 import { type SyncStatus } from '@inngest/components/types/sync';
 
-const syncStatusText: Record<string, string> = {
+export const syncStatusText: Record<string, string> = {
   duplicate: 'No change',
   error: 'Error',
   pending: 'Syncing',
   success: 'Success',
 } as const satisfies { [key in SyncStatus]: unknown };
 
-const syncKind: Record<string, AppKind> = {
+export const syncKind: Record<string, AppKind> = {
   duplicate: 'primary',
   error: 'error',
   pending: 'info',

@@ -5,15 +5,16 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"log/slog"
+	"sync"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"google.golang.org/protobuf/proto"
-	"log/slog"
-	"sync"
-	"time"
 )
 
 const (
@@ -49,7 +50,14 @@ const (
 	AckSourceRouter  AckSource = "router"
 )
 
+type ResponseNotifier interface {
+	// NotifyExecutor sends a response to the executor for a specific request.
+	NotifyExecutor(ctx context.Context, resp *connect.SDKResponse) error
+}
+
 type RequestReceiver interface {
+	ResponseNotifier
+
 	// ReceiveExecutorMessages listens for incoming PubSub messages for the connect router.
 	// This is a blocking call which only stops once the context is canceled.
 	ReceiveExecutorMessages(ctx context.Context, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error
@@ -63,9 +71,6 @@ type RequestReceiver interface {
 
 	// AckMessage sends an acknowledgment for a specific request.
 	AckMessage(ctx context.Context, appId uuid.UUID, requestId string, source AckSource) error
-
-	// NotifyExecutor sends a response to the executor for a specific request.
-	NotifyExecutor(ctx context.Context, appId uuid.UUID, resp *connect.SDKResponse) error
 
 	// Wait blocks and listens for incoming PubSub messages for the internal subscribers. This must be run before
 	// subscribing to any channels to ensure that the PubSub client is connected and ready to receive messages.
@@ -407,9 +412,12 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 			// Run in another goroutine to avoid blocking `c`
 			go func() {
 				i.subscribersLock.RLock()
-				subs := i.subscribers[m.Channel]
-				i.subscribersLock.RUnlock()
+				// NOTE:  We have to keep this lock as we send in channels, otherwise we may attempt
+				// to send on a closed channel that's unsubscribed.  Therefore, we keep the read lock
+				// until we're done sending to all chans.
+				defer i.subscribersLock.RUnlock()
 
+				subs := i.subscribers[m.Channel]
 				if len(subs) == 0 {
 					// This should not happen: In subscribe, we UNSUBSCRIBE once the last subscriber is removed
 					i.logger.Debug("no subscribers for connect pubsub channel", "channel", m.Channel)
@@ -431,10 +439,15 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 }
 
 // NotifyExecutor sends a response to the executor for a specific request.
-func (i *redisPubSubConnector) NotifyExecutor(ctx context.Context, appId uuid.UUID, resp *connect.SDKResponse) error {
+func (i *redisPubSubConnector) NotifyExecutor(ctx context.Context, resp *connect.SDKResponse) error {
 	serialized, err := proto.Marshal(resp)
 	if err != nil {
 		return fmt.Errorf("could not serialize response: %w", err)
+	}
+
+	appId, err := uuid.Parse(resp.AppId)
+	if err != nil {
+		return fmt.Errorf("missing appId in sdk response: %w", err)
 	}
 
 	channelName := i.channelAppRequestsReply(appId, resp.RequestId)

@@ -61,9 +61,11 @@ import (
 )
 
 const (
-	DefaultTick         = 150
-	DefaultTickDuration = time.Millisecond * DefaultTick
-	DefaultPollInterval = 5
+	DefaultTick               = 150
+	DefaultTickDuration       = time.Millisecond * DefaultTick
+	DefaultPollInterval       = 5
+	DefaultQueueWorkers       = 100
+	DefaultConnectGatewayPort = 8289
 )
 
 // StartOpts configures the dev server
@@ -76,6 +78,7 @@ type StartOpts struct {
 	PollInterval  int           `json:"poll_interval"`
 	Tick          time.Duration `json:"tick"`
 	RetryInterval int           `json:"retry_interval"`
+	QueueWorkers  int           `json:"queue_workers"`
 
 	// SigningKey is used to decide that the server should sign requests and
 	// validate responses where applicable, modelling cloud behaviour.
@@ -90,6 +93,8 @@ type StartOpts struct {
 	// the server will still boot but core actions such as syncing, runs, and
 	// ingesting events will not work.
 	RequireKeys bool `json:"require_keys"`
+
+	ConnectGatewayPort int `json:"connectGatewayPort"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -189,7 +194,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			Partition:  true,
 		}),
 		redis_state.WithIdempotencyTTL(time.Hour),
-		redis_state.WithNumWorkers(100),
+		redis_state.WithNumWorkers(int32(opts.QueueWorkers)),
 		redis_state.WithPollTick(opts.Tick),
 		redis_state.WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i queue.QueueItem) []state.CustomConcurrency {
 			keys := i.Data.GetConcurrencyKeys()
@@ -423,10 +428,12 @@ func start(ctx context.Context, opts StartOpts) error {
 		ConnectOpts: connectv0.Opts{
 			GroupManager:            connectionManager,
 			ConnectManager:          connectionManager,
+			ConnectResponseNotifier: gatewayProxy,
 			Signer:                  auth.NewJWTSessionTokenSigner(consts.DevServerConnectJwtSecret),
 			RequestAuther:           ds,
 			ConnectGatewayRetriever: ds,
 			Dev:                     true,
+			ConnectionLimiter:       ds,
 		},
 	})
 	if err != nil {
@@ -439,7 +446,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		connect.WithGatewayAuthHandler(auth.NewJWTAuthHandler(consts.DevServerConnectJwtSecret)),
 		connect.WithAppLoader(dbcqrs),
 		connect.WithDev(),
-		connect.WithGatewayPublicPort(8289),
+		connect.WithGatewayPublicPort(opts.ConnectGatewayPort),
 		connect.WithApiBaseUrl(fmt.Sprintf("http://127.0.0.1:%d", opts.Config.EventAPI.Port)),
 		connect.WithLifeCycles(
 			[]connect.ConnectGatewayLifecycleListener{

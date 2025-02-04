@@ -7,19 +7,19 @@ import (
 
 func (a *App) ToSQLite() (*sqlc.App, error) {
 	return &sqlc.App{
-		ID:          a.ID,
-		Name:        a.Name,
-		SdkLanguage: a.SdkLanguage,
-		SdkVersion:  a.SdkVersion,
-		Framework:   a.Framework,
-		Metadata:    a.Metadata,
-		Status:      a.Status,
-		Error:       a.Error,
-		Checksum:    a.Checksum,
-		CreatedAt:   a.CreatedAt,
-		ArchivedAt:  a.ArchivedAt,
-		Url:         a.Url,
-		IsConnect:   a.IsConnect,
+		ID:             a.ID,
+		Name:           a.Name,
+		SdkLanguage:    a.SdkLanguage,
+		SdkVersion:     a.SdkVersion,
+		Framework:      a.Framework,
+		Metadata:       a.Metadata,
+		Status:         a.Status,
+		Error:          a.Error,
+		Checksum:       a.Checksum,
+		CreatedAt:      a.CreatedAt,
+		ArchivedAt:     a.ArchivedAt,
+		Url:            a.Url,
+		ConnectionType: a.ConnectionType,
 	}, nil
 }
 
@@ -287,11 +287,11 @@ func (r *GetFunctionRunsRow) ToSQLite() (*sqlc.GetFunctionRunsRow, error) {
 func (wc *WorkerConnection) ToSQLite() (*sqlc.WorkerConnection, error) {
 	var lastHeartbeatAt, disconnectedAt sql.NullInt64
 	if wc.LastHeartbeatAt.Valid {
-		lastHeartbeatAt.Int64 = wc.LastHeartbeatAt.Time.UnixMilli()
+		lastHeartbeatAt.Int64 = wc.LastHeartbeatAt.Int64
 		lastHeartbeatAt.Valid = true
 	}
 	if wc.DisconnectedAt.Valid {
-		disconnectedAt.Int64 = wc.DisconnectedAt.Time.UnixMilli()
+		disconnectedAt.Int64 = wc.DisconnectedAt.Int64
 		disconnectedAt.Valid = true
 	}
 
@@ -304,11 +304,11 @@ func (wc *WorkerConnection) ToSQLite() (*sqlc.WorkerConnection, error) {
 		InstanceID:       wc.InstanceID,
 		Status:           int64(wc.Status),
 		WorkerIp:         wc.WorkerIp,
-		ConnectedAt:      wc.ConnectedAt.UnixMilli(),
+		ConnectedAt:      wc.ConnectedAt,
 		LastHeartbeatAt:  lastHeartbeatAt,
 		DisconnectedAt:   disconnectedAt,
-		RecordedAt:       wc.RecordedAt.UnixMilli(),
-		InsertedAt:       wc.InsertedAt.UnixMilli(),
+		RecordedAt:       wc.RecordedAt,
+		InsertedAt:       wc.InsertedAt,
 		DisconnectReason: wc.DisconnectReason,
 		GroupHash:        wc.GroupHash,
 		SdkLang:          wc.SdkLang,

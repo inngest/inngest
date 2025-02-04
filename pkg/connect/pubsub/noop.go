@@ -31,7 +31,7 @@ func (noopConnector) AckMessage(ctx context.Context, appId uuid.UUID, requestId 
 	return nil
 }
 
-func (noopConnector) NotifyExecutor(ctx context.Context, appId uuid.UUID, resp *connpb.SDKResponse) error {
+func (noopConnector) NotifyExecutor(ctx context.Context, resp *connpb.SDKResponse) error {
 	return nil
 }
 

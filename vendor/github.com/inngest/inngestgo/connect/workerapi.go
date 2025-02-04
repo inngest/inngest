@@ -65,3 +65,46 @@ func (a *workerApiClient) start(ctx context.Context, hashedSigningKey []byte, re
 
 	return res, nil
 }
+
+func (a *workerApiClient) sendBufferedMessage(ctx context.Context, hashedSigningKey []byte, req *connect.SDKResponse) error {
+	reqBody, err := proto.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("could not marshal sdk response for flush request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/v0/connect/flush", a.apiBaseUrl), bytes.NewBuffer(reqBody))
+	if err != nil {
+		return fmt.Errorf("could not create flush request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/protobuf")
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", string(hashedSigningKey)))
+
+	if a.env != nil {
+		httpReq.Header.Add("X-Inngest-Env", *a.env)
+	}
+
+	httpRes, err := a.client.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("could not send flush request: %w", err)
+	}
+
+	defer httpRes.Body.Close()
+
+	if httpRes.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", httpRes.StatusCode)
+	}
+
+	byt, err := io.ReadAll(httpRes.Body)
+	if err != nil {
+		return fmt.Errorf("could not read flush response: %w", err)
+	}
+
+	res := &connect.FlushResponse{}
+	err = proto.Unmarshal(byt, res)
+	if err != nil {
+		return fmt.Errorf("could not unmarshal flush response: %w", err)
+	}
+
+	return nil
+}

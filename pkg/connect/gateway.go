@@ -119,13 +119,18 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			// This is deferred so we always update the semaphore
 			defer c.connectionCount.Done()
 			ch.log.Debug("Closing WebSocket connection")
+			if c.devlogger != nil {
+				c.devlogger.Info().Msg("worker disconnected")
+			}
+
+			closed = true
 
 			if c.isDraining {
 				c.closeDraining(ws)
 				return
 			}
+
 			_ = ws.CloseNow()
-			closed = true
 		}()
 
 		ch.log.Debug("WebSocket connection established, sending hello")
@@ -225,8 +230,6 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		// regardless of whether it's permanent or temporary
 		defer func() {
 			// This is a transactional operation, it should always complete regardless of context cancellation
-
-			// TODO Persist disconnected status in history for UI (show disconnected connections with reason)
 			err := c.stateManager.DeleteConnection(context.Background(), conn.Group.EnvID, conn.Group.AppID, conn.Group.Hash, conn.ConnectionId)
 			switch err {
 			case nil, state.ConnDeletedWithGroupErr:
@@ -265,6 +268,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
+		appLoadStart := time.Now()
+
 		app, err := c.appLoader.GetAppByName(ctx, conn.Group.EnvID, conn.Data.AppName)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			if ctx.Err() != nil {
@@ -281,6 +286,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
+		metrics.HistogramConnectAppLoaderDuration(ctx, time.Since(appLoadStart).Milliseconds(), metrics.HistogramOpt{
+			PkgName: pkgName,
+		})
+
 		if errors.Is(err, sql.ErrNoRows) || app == nil {
 			ch.log.Error("could not find app", "appName", conn.Data.AppName)
 			c.closeWithConnectError(ws, &SocketError{
@@ -291,7 +300,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
-		ch.log = ch.log.With("app_id", app.ID)
+		// Once app is found, set App ID in connection so worker connection history is associated with app
+		conn.Group.AppID = &app.ID
+
+		ch.log = ch.log.With("app_id", conn.Group.AppID, "sync_id", conn.Group.SyncID)
 
 		ch.log.Debug("found app, preparing to receive messages")
 
@@ -359,7 +371,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					Tags:    tags,
 				})
 
-				serr := ch.handleIncomingWebSocketMessage(app.ID, &msg)
+				serr := ch.handleIncomingWebSocketMessage(ctx, app.ID, &msg)
 				if serr != nil {
 					c.closeWithConnectError(ws, serr)
 					return serr
@@ -423,6 +435,9 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		}
 
 		ch.log.Debug("connection is ready")
+		if c.devlogger != nil {
+			c.devlogger.Info().Str("app_name", app.Name).Msg("worker connected")
+		}
 
 		{
 			successTags := map[string]any{
@@ -455,7 +470,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 	})
 }
 
-func (c *connectionHandler) handleIncomingWebSocketMessage(appId uuid.UUID, msg *connect.ConnectMessage) *SocketError {
+func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, appId uuid.UUID, msg *connect.ConnectMessage) *SocketError {
 	c.log.Debug("received WebSocket message", "kind", msg.Kind.String())
 
 	switch msg.Kind {
@@ -496,6 +511,14 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(appId uuid.UUID, msg 
 
 		for _, l := range c.svc.lifecycles {
 			go l.OnHeartbeat(context.Background(), c.conn)
+		}
+
+		// Respond with gateway heartbeat
+		if err := wsproto.Write(ctx, c.ws, &connect.ConnectMessage{
+			Kind: connect.GatewayMessageType_GATEWAY_HEARTBEAT,
+		}); err != nil {
+			// The connection will fail to read and be closed in the read loop
+			return nil
 		}
 
 		return nil
@@ -552,8 +575,9 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(appId uuid.UUID, msg 
 		}
 	case connect.GatewayMessageType_WORKER_REPLY:
 		// Always handle SDK reply, even if gateway is draining
-		err := c.handleSdkReply(context.Background(), appId, msg)
+		err := c.handleSdkReply(context.Background(), msg)
 		if err != nil {
+			c.log.Error("could not handle sdk reply", "err", err)
 			// TODO Should we actually close the connection here?
 			return &SocketError{
 				SysCode:    syscode.CodeConnectInternal,
@@ -835,7 +859,7 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 	return &conn, nil
 }
 
-func (c *connectionHandler) handleSdkReply(ctx context.Context, appId uuid.UUID, msg *connect.ConnectMessage) error {
+func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connect.ConnectMessage) error {
 	var data connect.SDKResponse
 	if err := proto.Unmarshal(msg.Payload, &data); err != nil {
 		return fmt.Errorf("invalid response type: %w", err)
@@ -843,9 +867,23 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, appId uuid.UUID,
 
 	c.log.Debug("notifying executor about response", "status", data.Status.String(), "no_retry", data.NoRetry, "retry_after", data.RetryAfter)
 
-	err := c.svc.receiver.NotifyExecutor(ctx, appId, &data)
+	err := c.svc.receiver.NotifyExecutor(ctx, &data)
 	if err != nil {
 		return fmt.Errorf("could not notify executor: %w", err)
+	}
+
+	replyAck, err := proto.Marshal(&connect.WorkerReplyAckData{
+		RequestId: data.RequestId,
+	})
+	if err != nil {
+		return fmt.Errorf("could not marshal reply ack: %w", err)
+	}
+
+	if err := wsproto.Write(ctx, c.ws, &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_REPLY_ACK,
+		Payload: replyAck,
+	}); err != nil {
+		return fmt.Errorf("could not send reply ack: %w", err)
 	}
 
 	return nil

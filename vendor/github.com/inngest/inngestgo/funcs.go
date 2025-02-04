@@ -238,7 +238,7 @@ type SDKFunction[T any] func(ctx context.Context, input Input[T]) (any, error)
 // This is created via CreateFunction in this package.
 type ServableFunction interface {
 	// Slug returns the function's human-readable ID, such as "sign-up-flow".
-	Slug() string
+	Slug(appName string) string
 
 	// Name returns the function name.
 	Name() string
@@ -284,11 +284,19 @@ func (s servableFunc) Config() FunctionOpts {
 	return s.fc
 }
 
-func (s servableFunc) Slug() string {
-	if s.fc.ID == "" {
-		return slug.Make(s.fc.Name)
+func (s servableFunc) Slug(appName string) string {
+	fnSlug := s.fc.ID
+	if fnSlug == "" {
+		fnSlug = slug.Make(s.fc.Name)
 	}
-	return s.fc.ID
+
+	// Old format which only includes the fn slug
+	// This should no longer be used.
+	if appName == "" {
+		return fnSlug
+	}
+
+	return appName + "-" + fnSlug
 }
 
 func (s servableFunc) Name() string {

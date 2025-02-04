@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	v0 "github.com/inngest/inngest/pkg/connect/rest/v0"
+	"github.com/inngest/inngest/pkg/enums"
 	"net"
 	"net/url"
 	"os"
@@ -13,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/auth"
 
 	"github.com/inngest/inngest/pkg/cli"
@@ -256,9 +257,9 @@ func (d *devserver) runDiscovery(ctx context.Context) {
 			return
 		}
 		// If we have found any app, disable auto-discovery
-		apps, err := d.Data.GetApps(ctx, consts.DevServerEnvId)
+		apps, err := d.Data.GetApps(ctx, consts.DevServerEnvId, nil)
 		if err == nil && len(apps) > 0 {
-			log.From(ctx).Info().Msg("apps synced, disabling auto-discovery")
+			logger.From(ctx).Info().Msg("apps synced, disabling auto-discovery")
 			d.Opts.Autodiscover = false
 		} else {
 			_ = discovery.Autodiscover(ctx)
@@ -308,8 +309,12 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 		}
 
 		urls := map[string]struct{}{}
-		if apps, err := d.Data.GetApps(ctx, consts.DevServerEnvId); err == nil {
+		if apps, err := d.Data.GetApps(ctx, consts.DevServerEnvId, nil); err == nil {
 			for _, app := range apps {
+				if app.ConnectionType == enums.AppConnectionTypeConnect.String() {
+					continue
+				}
+
 				// We've seen this URL.
 				urls[app.Url] = struct{}{}
 
@@ -643,10 +648,24 @@ func (d *devserver) AuthenticateRequest(_ context.Context, _, _ string) (*auth.R
 	}, nil
 }
 
-func (d *devserver) RetrieveGateway(_ context.Context, _, _ uuid.UUID, _ []string) (string, *url.URL, error) {
-	parsed, err := url.Parse("ws://127.0.0.1:8289/v0/connect")
+func (d *devserver) CheckConnectionLimit(_ context.Context, _ *auth.Response) (bool, error) {
+	return true, nil
+}
+
+func (d *devserver) RetrieveGateway(_ context.Context, opts v0.RetrieveGatewayOpts) (string, *url.URL, error) {
+	parsed, err := url.Parse(fmt.Sprintf("ws://127.0.0.1:%d/v0/connect", d.Opts.ConnectGatewayPort))
 	if err != nil {
 		return "", nil, err
+	}
+
+	// Devserver-specific convenience implementation: If request host was included in the Start request,
+	// use this instead of the default loopback address. This is important for scenarios where the devserver
+	// needs to be accessed from within a Docker container.
+	if opts.RequestHost != "" {
+		parts := strings.Split(opts.RequestHost, ":")
+		if len(parts) > 0 {
+			parsed.Host = fmt.Sprintf("%s:%d", parts[0], d.Opts.ConnectGatewayPort)
+		}
 	}
 
 	return "gw-dev", parsed, nil

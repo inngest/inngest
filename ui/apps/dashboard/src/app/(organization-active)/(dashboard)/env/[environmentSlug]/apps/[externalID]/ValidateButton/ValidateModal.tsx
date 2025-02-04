@@ -14,7 +14,9 @@ import { useGetAppInfo } from './getAppInfo';
 type Props = {
   isOpen: boolean;
   onClose: () => void;
-  url: string;
+
+  /** If set, the modal will automatically perform a check when it opens. */
+  initialURL?: string;
 };
 
 export function ValidateModal(props: Props) {
@@ -29,7 +31,7 @@ export function ValidateModal(props: Props) {
   }, [_onClose]);
 
   const [overrideValue, setOverrideValue] = useState<string>();
-  const url = overrideValue ?? props.url;
+  const url = overrideValue ?? props.initialURL;
 
   const [data, setData] = useState<AppCheckResult>();
   const [error, setError] = useState<Error>();
@@ -37,31 +39,34 @@ export function ValidateModal(props: Props) {
 
   const getAppInfo = useGetAppInfo();
 
-  const check = useCallback(async () => {
-    setIsLoading(true);
+  const check = useCallback(
+    async (url: string) => {
+      setIsLoading(true);
 
-    try {
-      const appCheck = await getAppInfo(url);
-      setData(appCheck);
-      setError(undefined);
-    } catch (error) {
-      setData(undefined);
-      if (error instanceof Error) {
-        setError(error);
-      } else {
-        setError(new Error('unknown error'));
+      try {
+        const appCheck = await getAppInfo(url);
+        setData(appCheck);
+        setError(undefined);
+      } catch (error) {
+        setData(undefined);
+        if (error instanceof Error) {
+          setError(error);
+        } else {
+          setError(new Error('unknown error'));
+        }
+      } finally {
+        setIsLoading(false);
       }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [getAppInfo, url]);
+    },
+    [getAppInfo]
+  );
 
   useEffect(() => {
-    if (!data && !error && !isLoading) {
+    if (!data && !error && !isLoading && props.initialURL) {
       // Load data on open
-      check();
+      check(props.initialURL);
     }
-  }, [check, data, error, isLoading, url]);
+  }, [check, data, error, isLoading, props.initialURL]);
 
   return (
     <Modal className="w-[800px]" isOpen={isOpen} onClose={onClose}>
@@ -88,7 +93,17 @@ export function ValidateModal(props: Props) {
               }}
             />
           </div>
-          <Button onClick={check} disabled={isLoading} kind="primary" label="Retry" />
+          <Button
+            onClick={() => {
+              if (!url) {
+                return;
+              }
+              check(url);
+            }}
+            disabled={isLoading || !url}
+            kind="primary"
+            label="Check"
+          />
         </div>
 
         <hr className="border-subtle my-4" />

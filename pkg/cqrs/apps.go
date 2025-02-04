@@ -3,25 +3,26 @@ package cqrs
 import (
 	"context"
 	"database/sql"
+	"github.com/inngest/inngest/pkg/enums"
 	"time"
 
 	"github.com/google/uuid"
 )
 
 type App struct {
-	ID          uuid.UUID
-	Name        string
-	SdkLanguage string
-	SdkVersion  string
-	Framework   sql.NullString
-	Metadata    map[string]string
-	Status      string
-	Error       sql.NullString
-	Checksum    string
-	CreatedAt   time.Time
-	DeletedAt   time.Time
-	Url         string
-	IsConnect   sql.NullBool
+	ID             uuid.UUID
+	Name           string
+	SdkLanguage    string
+	SdkVersion     string
+	Framework      sql.NullString
+	Metadata       map[string]string
+	Status         string
+	Error          sql.NullString
+	Checksum       string
+	CreatedAt      time.Time
+	DeletedAt      time.Time
+	Url            string
+	ConnectionType string
 }
 
 type AppManager interface {
@@ -31,7 +32,7 @@ type AppManager interface {
 
 type AppReader interface {
 	// GetApps returns apps that have not been deleted.
-	GetApps(ctx context.Context, envID uuid.UUID) ([]*App, error)
+	GetApps(ctx context.Context, envID uuid.UUID, filter *FilterAppParam) ([]*App, error)
 	// GetAppByChecksum returns an app by checksum.
 	GetAppByChecksum(ctx context.Context, envID uuid.UUID, checksum string) (*App, error)
 	// GetAppByURL returns an app by URL
@@ -57,17 +58,17 @@ type AppWriter interface {
 }
 
 type UpsertAppParams struct {
-	ID          uuid.UUID
-	Name        string
-	SdkLanguage string
-	SdkVersion  string
-	Framework   sql.NullString
-	Metadata    string
-	Status      string
-	Error       sql.NullString
-	Checksum    string
-	Url         string
-	IsConnect   sql.NullBool
+	ID             uuid.UUID
+	Name           string
+	SdkLanguage    string
+	SdkVersion     string
+	Framework      sql.NullString
+	Metadata       string
+	Status         string
+	Error          sql.NullString
+	Checksum       string
+	Url            string
+	ConnectionType string
 }
 
 type UpdateAppErrorParams struct {
@@ -78,4 +79,8 @@ type UpdateAppErrorParams struct {
 type UpdateAppURLParams struct {
 	ID  uuid.UUID
 	Url string
+}
+
+type FilterAppParam struct {
+	ConnectionType *enums.AppConnectionType
 }

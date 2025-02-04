@@ -95,8 +95,10 @@ func mapDevFlags(cmd *cobra.Command) error {
 	err = errors.Join(err, viper.BindPFlag("poll-interval", cmd.Flags().Lookup("poll-interval")))
 	err = errors.Join(err, viper.BindPFlag("port", cmd.Flags().Lookup("port")))
 	err = errors.Join(err, viper.BindPFlag("retry-interval", cmd.Flags().Lookup("retry-interval")))
+	err = errors.Join(err, viper.BindPFlag("queue-workers", cmd.Flags().Lookup("queue-workers")))
 	err = errors.Join(err, viper.BindPFlag("tick", cmd.Flags().Lookup("tick")))
 	err = errors.Join(err, viper.BindPFlag("sdk-url", cmd.Flags().Lookup("sdk-url")))
+	err = errors.Join(err, viper.BindPFlag("connect-gateway-port", cmd.Flags().Lookup("connect-gateway-port")))
 
 	return err
 }
@@ -112,6 +114,7 @@ func mapStartFlags(cmd *cobra.Command) error {
 	err = errors.Join(err, viper.BindPFlag("postgres-uri", cmd.Flags().Lookup("postgres-uri")))
 	err = errors.Join(err, viper.BindPFlag("poll-interval", cmd.Flags().Lookup("poll-interval")))
 	err = errors.Join(err, viper.BindPFlag("retry-interval", cmd.Flags().Lookup("retry-interval")))
+	err = errors.Join(err, viper.BindPFlag("queue-workers", cmd.Flags().Lookup("queue-workers")))
 	err = errors.Join(err, viper.BindPFlag("sdk-url", cmd.Flags().Lookup("sdk-url")))
 	err = errors.Join(err, viper.BindPFlag("sqlite-dir", cmd.Flags().Lookup("sqlite-dir")))
 	err = errors.Join(err, viper.BindPFlag("tick", cmd.Flags().Lookup("tick")))

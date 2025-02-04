@@ -58,7 +58,7 @@ export default function Layout({ children, params: { externalID } }: Props) {
         <ValidateModal
           isOpen={showValidate}
           onClose={() => setShowValidate(false)}
-          url={res.data.latestSync.url}
+          initialURL={res.data.latestSync.url}
         />
       )}
       {res.data && (
@@ -82,6 +82,7 @@ export default function Layout({ children, params: { externalID } }: Props) {
           <div className="flex flex-row items-center justify-end gap-x-1">
             {res.data && (
               <ActionsMenu
+                showUnarchive={false}
                 isArchived={res.data.isArchived}
                 showArchive={() => setShowArchive(true)}
                 disableArchive={!res.data.latestSync?.url}

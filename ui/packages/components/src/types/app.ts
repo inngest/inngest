@@ -1,16 +1,19 @@
 export type App = {
   id: string;
   name: string;
-  sdkVersion: string;
-  framework: string | null;
+  sdkVersion?: string;
+  framework?: string | null;
   sdkLanguage?: string;
-  syncMethod?: SyncMethod;
+  connectionType?: ConnectionType;
   lastSyncedAt?: Date;
-  url: string | null;
+  url?: string | null;
 };
 
-export const syncMethods = ['PERSISTENT', 'SERVERLESS'] as const;
+export const connectionTypes = {
+  Connect: 'CONNECT',
+  Serverless: 'SERVERLESS',
+} as const;
 
-export type SyncMethod = (typeof syncMethods)[number];
+export type ConnectionType = (typeof connectionTypes)[keyof typeof connectionTypes];
 
 export type AppKind = 'default' | 'info' | 'warning' | 'primary' | 'error';

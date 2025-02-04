@@ -13,9 +13,11 @@ enum GatewayMessageType {
   WORKER_READY = 4;
   WORKER_REQUEST_ACK = 5;
   WORKER_REPLY = 6;
-  WORKER_PAUSE = 7;
-  WORKER_HEARTBEAT = 8;
-  GATEWAY_CLOSING = 9;
+  WORKER_REPLY_ACK = 7;
+  WORKER_PAUSE = 8;
+  WORKER_HEARTBEAT = 9;
+  GATEWAY_HEARTBEAT = 10;
+  GATEWAY_CLOSING = 11;
 }
 
 message ConnectMessage {
@@ -89,12 +91,18 @@ enum SDKResponseStatus {
 
 message SDKResponse {
 	string request_id = 1;
-	SDKResponseStatus status = 2;
-	bytes body = 3;
-	bool no_retry = 4;
-	optional string retry_after = 5;
-	string sdk_version = 6;
-	uint32 request_version = 7;
+	string env_id = 2;
+	string app_id = 3;
+	SDKResponseStatus status = 4;
+	bytes body = 5;
+	bool no_retry = 6;
+	optional string retry_after = 7;
+	string sdk_version = 9;
+	uint32 request_version = 10;
+}
+
+message WorkerReplyAckData {
+	string request_id = 1;
 }
 
 enum ConnectionStatus {
@@ -146,4 +154,8 @@ message StartResponse {
 
 message StartRequest {
 	repeated string exclude_gateways = 1;
+}
+
+message FlushResponse {
+	string request_id = 1;
 }

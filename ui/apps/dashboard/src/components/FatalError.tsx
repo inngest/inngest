@@ -34,7 +34,12 @@ export function FatalError({ error, reset }: Props) {
 
         <p>
           An error occurred! Refresh the page to try again. If the problem persists, contact{' '}
-          <Alert.Link severity="error" className="inline-flex" href={pathCreator.support()}>
+          <Alert.Link
+            size="medium"
+            severity="error"
+            className="inline-flex"
+            href={pathCreator.support()}
+          >
             Inngest support
           </Alert.Link>
           .

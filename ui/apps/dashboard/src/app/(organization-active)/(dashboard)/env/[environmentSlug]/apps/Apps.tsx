@@ -1,13 +1,12 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
-import { RiAddLine } from '@remixicon/react';
+import { Alert } from '@inngest/components/Alert/Alert';
+import { SkeletonCard } from '@inngest/components/Apps/AppCard';
 
+import AppCards from '@/components/Apps/AppCards';
+import { EmptyActiveCard, EmptyArchivedCard } from '@/components/Apps/EmptyAppsCard';
+import { UnattachedSyncsCard } from '@/components/Apps/UnattachedSyncsCard';
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { pathCreator } from '@/utils/urls';
-import { AppCard, EmptyAppCard, SkeletonCard } from './AppCard';
-import { UnattachedSyncsCard } from './UnattachedSyncsCard';
 import { useApps } from './useApps';
 
 type Props = {
@@ -16,7 +15,6 @@ type Props = {
 
 export function Apps({ isArchived = false }: Props) {
   const env = useEnvironment();
-  const router = useRouter();
 
   const res = useApps({ envID: env.id, isArchived });
   if (res.error) {
@@ -34,48 +32,36 @@ export function Apps({ isArchived = false }: Props) {
 
   const { apps, latestUnattachedSyncTime } = res.data;
   const hasApps = apps.length > 0;
-  // Sort apps by latest sync time
-  const sortedApps = apps.sort((a, b) => {
-    return (
-      (b.latestSync ? new Date(b.latestSync.lastSyncedAt).getTime() : 0) -
-      (a.latestSync ? new Date(a.latestSync.lastSyncedAt).getTime() : 0)
-    );
-  });
 
   return (
     <div className="flex items-center justify-center">
       <div className="w-full max-w-[1200px]">
-        {!hasApps && !isArchived && (
-          <EmptyAppCard className="mb-4">
-            <div className="items-center md:items-start">
-              <Button
-                className="mt-4"
-                kind="primary"
-                label="Sync app"
-                onClick={() => router.push(pathCreator.createApp({ envSlug: env.slug }))}
-                icon={<RiAddLine />}
-                iconSide="left"
-              />
-            </div>
-          </EmptyAppCard>
+        {!hasApps && !latestUnattachedSyncTime && !isArchived && (
+          <EmptyActiveCard envSlug={env.slug} />
         )}
-        {!hasApps && isArchived && (
-          <p className="bg-canvasMuted text-basis rounded-md p-4 text-center">No archived apps</p>
-        )}
-        {sortedApps.map((app) => {
-          return (
-            <AppCard
-              app={app}
-              className="mb-4"
-              envSlug={env.slug}
-              key={app.id}
-              isArchived={isArchived}
-            />
-          );
-        })}
-
+        {!hasApps && isArchived && <EmptyArchivedCard />}
+        {hasApps && <AppCards apps={apps} envSlug={env.slug} />}
         {latestUnattachedSyncTime && !isArchived && (
-          <UnattachedSyncsCard envSlug={env.slug} latestSyncTime={latestUnattachedSyncTime} />
+          <>
+            <UnattachedSyncsCard envSlug={env.slug} latestSyncTime={latestUnattachedSyncTime} />
+            {!hasApps && (
+              <Alert
+                className="flex items-center justify-between text-sm"
+                link={
+                  <Alert.Link
+                    severity="info"
+                    href="https://www.inngest.com/docs/apps/cloud#troubleshooting?ref=apps-unattached-sync"
+                    target="_blank"
+                  >
+                    Go to docs
+                  </Alert.Link>
+                }
+                severity="info"
+              >
+                Having trouble syncing an app? Check our documentation.
+              </Alert>
+            )}
+          </>
         )}
       </div>
     </div>

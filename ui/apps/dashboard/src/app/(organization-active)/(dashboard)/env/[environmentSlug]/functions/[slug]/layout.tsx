@@ -14,9 +14,9 @@ import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { ActionsMenu } from '@/components/Functions/ActionMenu';
 import { CancelFunctionModal } from '@/components/Functions/CancelFunction/CancelFunctionModal';
 import { PauseFunctionModal } from '@/components/Functions/PauseFunction/PauseModal';
+import NewReplayModal from '@/components/Replay/NewReplayModal';
 import { graphql } from '@/gql';
 import { useFunction } from '@/queries';
-import NewReplayModal from './logs/NewReplayModal';
 
 const InvokeFunctionDocument = graphql(`
   mutation InvokeFunction($envID: UUID!, $data: Map, $functionSlug: String!, $user: Map) {
@@ -47,7 +47,6 @@ export default function FunctionLayout({
   const env = useEnvironment();
 
   const isBulkCancellationEnabled = useBooleanFlag('bulk-cancellation-ui');
-  const isOldRunsPageEnabled = useBooleanFlag('old-runs-page');
 
   const fn = data?.workspace.workflow;
   const { isArchived = false, isPaused } = fn ?? {};
@@ -144,19 +143,6 @@ export default function FunctionLayout({
             exactRouteMatch: true,
           },
           { children: 'Runs', href: `/env/${environmentSlug}/functions/${slug}/runs` },
-          ...(isOldRunsPageEnabled.isReady && isOldRunsPageEnabled.value
-            ? [
-                {
-                  children: (
-                    <div className="m-0 flex flex-row items-center justify-start space-x-1 p-0">
-                      <div>Old runs</div>
-                      <Pill kind="info">Legacy</Pill>
-                    </div>
-                  ),
-                  href: `/env/${environmentSlug}/functions/${slug}/logs`,
-                },
-              ]
-            : []),
           { children: 'Replay history', href: `/env/${environmentSlug}/functions/${slug}/replay` },
           ...(isBulkCancellationEnabled.isReady && isBulkCancellationEnabled.value
             ? [
