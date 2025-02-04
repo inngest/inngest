@@ -118,7 +118,7 @@ export const TopInfo = ({ getTrigger, runID, result }: TopInfoProps) => {
   }
 
   return (
-    <div className="flex h-full flex-col gap-4">
+    <div className="flex h-full flex-col gap-2">
       <div className="flex h-11 w-full flex-row items-center justify-between border-none px-4">
         <div className="text-basis flex items-center justify-start gap-2">
           <RiArrowUpSLine
@@ -143,56 +143,73 @@ export const TopInfo = ({ getTrigger, runID, result }: TopInfoProps) => {
         />
       </div>
 
-      <dl className="flex flex-wrap gap-4 px-4">
-        {type === 'EVENT' && (
-          <>
-            <ElementWrapper label="Event name">
-              {isPending ? <SkeletonElement /> : <TextElement>{trigger.eventName}</TextElement>}
-            </ElementWrapper>
-            <ElementWrapper label="Event ID">
-              {isPending ? <SkeletonElement /> : <IDElement>{trigger.IDs[0]}</IDElement>}
-            </ElementWrapper>
-            <ElementWrapper label="Received at">
-              {isPending ? <SkeletonElement /> : <TimeElement date={new Date(trigger.timestamp)} />}
-            </ElementWrapper>
-          </>
-        )}
-        {type === 'CRON' && trigger?.cron && (
-          <>
-            <ElementWrapper label="Cron expression">
-              {isPending ? <SkeletonElement /> : <CodeElement value={trigger.cron} />}
-            </ElementWrapper>
-            <ElementWrapper label="Cron ID">
-              {isPending ? <SkeletonElement /> : <IDElement>{trigger.IDs[0]}</IDElement>}
-            </ElementWrapper>
-            <ElementWrapper label="Triggered at">
-              {isPending ? <SkeletonElement /> : <TimeElement date={new Date(trigger.timestamp)} />}
-            </ElementWrapper>
-          </>
-        )}
-        {type === 'BATCH' && (
-          <>
-            <ElementWrapper label="Event name">
-              {isPending ? (
-                <SkeletonElement />
-              ) : (
-                <TextElement>{trigger.eventName ?? '-'}</TextElement>
-              )}
-            </ElementWrapper>
-            <ElementWrapper label="Batch ID">
-              {isPending ? <SkeletonElement /> : <IDElement>{trigger.batchID}</IDElement>}
-            </ElementWrapper>
-            <ElementWrapper label="Received at">
-              {isPending ? <SkeletonElement /> : <TimeElement date={new Date(trigger.timestamp)} />}
-            </ElementWrapper>
-          </>
-        )}
-      </dl>
+      {expanded && (
+        <dl className="flex flex-wrap gap-4 px-4">
+          {type === 'EVENT' && (
+            <>
+              <ElementWrapper label="Event name">
+                {isPending ? <SkeletonElement /> : <TextElement>{trigger.eventName}</TextElement>}
+              </ElementWrapper>
+              <ElementWrapper label="Event ID">
+                {isPending ? <SkeletonElement /> : <IDElement>{trigger.IDs[0]}</IDElement>}
+              </ElementWrapper>
+              <ElementWrapper label="Received at">
+                {isPending ? (
+                  <SkeletonElement />
+                ) : (
+                  <TimeElement date={new Date(trigger.timestamp)} />
+                )}
+              </ElementWrapper>
+            </>
+          )}
+          {type === 'CRON' && trigger?.cron && (
+            <>
+              <ElementWrapper label="Cron expression">
+                {isPending ? <SkeletonElement /> : <CodeElement value={trigger.cron} />}
+              </ElementWrapper>
+              <ElementWrapper label="Cron ID">
+                {isPending ? <SkeletonElement /> : <IDElement>{trigger.IDs[0]}</IDElement>}
+              </ElementWrapper>
+              <ElementWrapper label="Triggered at">
+                {isPending ? (
+                  <SkeletonElement />
+                ) : (
+                  <TimeElement date={new Date(trigger.timestamp)} />
+                )}
+              </ElementWrapper>
+            </>
+          )}
+          {type === 'BATCH' && (
+            <>
+              <ElementWrapper label="Event name">
+                {isPending ? (
+                  <SkeletonElement />
+                ) : (
+                  <TextElement>{trigger.eventName ?? '-'}</TextElement>
+                )}
+              </ElementWrapper>
+              <ElementWrapper label="Batch ID">
+                {isPending ? <SkeletonElement /> : <IDElement>{trigger.batchID}</IDElement>}
+              </ElementWrapper>
+              <ElementWrapper label="Received at">
+                {isPending ? (
+                  <SkeletonElement />
+                ) : (
+                  <TimeElement date={new Date(trigger.timestamp)} />
+                )}
+              </ElementWrapper>
+            </>
+          )}
+        </dl>
+      )}
 
       <Tabs
         defaultActive={0}
         tabs={[
-          { label: 'Input', node: <Input raw={prettyPayload} actions={codeBlockActions} /> },
+          {
+            label: 'Input',
+            node: <Input title="Function Payload" raw={prettyPayload} actions={codeBlockActions} />,
+          },
           { label: 'Output', node: <Output raw={prettyOutput} /> },
         ]}
       />

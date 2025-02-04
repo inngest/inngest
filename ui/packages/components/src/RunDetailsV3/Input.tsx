@@ -1,14 +1,14 @@
 import { CodeBlock, type CodeBlockAction } from '../CodeBlock';
 
-export type InputProps = { actions?: CodeBlockAction[]; raw?: string };
+export type InputProps = { actions?: CodeBlockAction[]; title?: string; raw?: string };
 
-export const Input = ({ actions, raw }: InputProps) => {
+export const Input = ({ title, actions, raw }: InputProps) => {
   return (
     <div className="text-muted">
       <CodeBlock
         actions={actions}
         header={{
-          title: 'Function Payload',
+          title: title || 'Input',
         }}
         tab={{
           content: raw ?? 'Unknown',

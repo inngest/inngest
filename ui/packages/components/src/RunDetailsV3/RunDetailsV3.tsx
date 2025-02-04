@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { ErrorCard } from '../RunDetailsV2/ErrorCard';
@@ -10,11 +10,12 @@ import { TriggerDetails } from '../TriggerDetails';
 import type { Result } from '../types/functionRun';
 import { nullishToLazy } from '../utils/lazyLoad';
 import { RunInfo } from './RunInfo';
+import { StepInfo } from './StepInfo';
 import { Tabs } from './Tabs';
 import { Timeline } from './Timeline';
 import { TopInfo } from './TopInfo';
-import { Trace } from './Trace';
 import { Workflow } from './Workflow';
+import { useStepSelection } from './utils';
 
 type Props = {
   standalone: boolean;
@@ -46,11 +47,13 @@ type Run = {
 };
 
 export const RunDetailsV3 = (props: Props) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const { getResult, getRun, getTrigger, pathCreator, rerun, rerunFromStep, runID, standalone } =
     props;
   const [pollInterval, setPollInterval] = useState(props.pollInterval);
   const [leftWidth, setLeftWidth] = useState(55);
   const [isDragging, setIsDragging] = useState(false);
+  const { selectedStep } = useStepSelection();
 
   const handleMouseDown = useCallback(() => {
     setIsDragging(true);
@@ -66,7 +69,7 @@ export const RunDetailsV3 = (props: Props) => {
         return;
       }
 
-      const container = document.getElementById('run-details-container');
+      const container = containerRef.current;
       if (!container) {
         return;
       }
@@ -132,9 +135,9 @@ export const RunDetailsV3 = (props: Props) => {
       : runRes.error || resultRes.error;
 
   return (
-    <div id="run-details-container" className="mt-4 flex h-full flex-row">
-      <div className="flex h-full flex-col gap-4" style={{ width: `${leftWidth}%` }}>
-        <div className="h-full px-4">
+    <div ref={containerRef} className="flex h-full flex-row">
+      <div className="flex flex-col gap-2" style={{ width: `${leftWidth}%` }}>
+        <div className="px-4">
           <RunInfo
             cancelRun={cancelRun}
             className="mb-4"
@@ -157,16 +160,34 @@ export const RunDetailsV3 = (props: Props) => {
         </div>
         <Tabs
           tabs={[
-            { label: 'Trace', node: <Timeline /> },
+            {
+              label: 'Trace',
+              node: run && (
+                <Timeline
+                  getResult={getResult}
+                  pathCreator={pathCreator}
+                  runID={runID}
+                  trace={run?.trace}
+                  rerunFromStep={rerunFromStep}
+                />
+              ),
+            },
             { label: 'Workflow', node: <Workflow /> },
           ]}
         />
       </div>
 
-      <div className="border-muted cursor-col-resize border-[.5px]" onMouseDown={handleMouseDown} />
+      <div
+        className="border-muted w-2 cursor-col-resize border-r-[.5px]"
+        onMouseDown={handleMouseDown}
+      />
 
       <div className="border-muted flex h-full flex-col" style={{ width: `${100 - leftWidth}%` }}>
-        <TopInfo getTrigger={getTrigger} runID={runID} result={resultRes.data} />
+        {selectedStep ? (
+          <StepInfo selectedStep={selectedStep} />
+        ) : (
+          <TopInfo getTrigger={getTrigger} runID={runID} result={resultRes.data} />
+        )}
       </div>
     </div>
   );
