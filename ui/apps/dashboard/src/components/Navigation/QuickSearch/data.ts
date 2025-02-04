@@ -11,10 +11,6 @@ const quickSearchQuery = graphql(`
         apps {
           name
         }
-        envs {
-          name
-          slug
-        }
         event {
           id
           name

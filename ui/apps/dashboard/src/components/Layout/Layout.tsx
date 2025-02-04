@@ -11,12 +11,11 @@ import { getBooleanFlag } from '../FeatureFlags/ServerFeatureFlag';
 import SideBar from './SideBar';
 
 type LayoutProps = {
-  envSlug?: string;
   activeEnv?: Environment;
   children: ReactNode;
 };
 
-export default async function Layout({ activeEnv, children, envSlug }: LayoutProps) {
+export default async function Layout({ activeEnv, children }: LayoutProps) {
   const collapsed = await getNavCollapsed();
   const profile = await getProfileDisplay();
   const enableQuickSearchV2 = await getBooleanFlag('quick-search-v2');
@@ -27,7 +26,7 @@ export default async function Layout({ activeEnv, children, envSlug }: LayoutPro
         activeEnv={activeEnv}
         collapsed={collapsed}
         enableQuickSearchV2={enableQuickSearchV2}
-        envSlug={envSlug}
+        envSlug={activeEnv?.slug ?? 'production'}
         profile={profile}
       />
 

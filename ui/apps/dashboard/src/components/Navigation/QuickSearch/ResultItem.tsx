@@ -6,7 +6,7 @@ import { Pill } from '@inngest/components/Pill/Pill';
 import { Command } from 'cmdk';
 
 type Props = {
-  kind: 'app' | 'env' | 'event' | 'eventType' | 'function' | 'run';
+  kind: 'app' | 'event' | 'eventType' | 'function' | 'run';
   onClick: () => unknown;
   path: Route;
   value: string;
@@ -35,8 +35,6 @@ function toKindName(kind: Props['kind']) {
   switch (kind) {
     case 'app':
       return 'App';
-    case 'env':
-      return 'Environment';
     case 'event':
       return 'Event';
     case 'eventType':

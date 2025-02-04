@@ -36,7 +36,9 @@ export function QuickSearchModal({ envSlug, isOpen, onClose }: Props) {
         <Command.List className="text-subtle bg-canvasBase px-3 py-3">
           {(isTyping || res.isFetching) && <Command.Loading>Searching...</Command.Loading>}
 
-          {!isTyping && !res.isFetching && res.data && (
+          {res.error && <Command.Empty>Error searching</Command.Empty>}
+
+          {!isTyping && !res.isFetching && res.data && !res.error && (
             <Command.Group>
               {res.data.apps.map((app) => {
                 return (
@@ -46,18 +48,6 @@ export function QuickSearchModal({ envSlug, isOpen, onClose }: Props) {
                     onClick={onClose}
                     path={pathCreator.app({ envSlug, externalAppID: app.name })}
                     value={app.name}
-                  />
-                );
-              })}
-
-              {res.data.envs.map((env) => {
-                return (
-                  <ResultItem
-                    key={env.name}
-                    kind="env"
-                    onClick={onClose}
-                    path={pathCreator.apps({ envSlug: env.slug })}
-                    value={env.name}
                   />
                 );
               })}
