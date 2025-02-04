@@ -20,6 +20,7 @@ export function QuickSearchModal({ envSlug, isOpen, onClose }: Props) {
   const isTyping = term !== debouncedTerm;
 
   const res = useQuickSearch({ envSlug, term: debouncedTerm });
+  console.log(Boolean(res.error), Boolean(res.data));
 
   return (
     <Modal alignTop isOpen={isOpen} onClose={onClose} className="max-w-2xl align-baseline">
@@ -35,8 +36,6 @@ export function QuickSearchModal({ envSlug, isOpen, onClose }: Props) {
         />
         <Command.List className="text-subtle bg-canvasBase px-3 py-3">
           {(isTyping || res.isFetching) && <Command.Loading>Searching...</Command.Loading>}
-
-          {res.error && <Command.Empty>Error searching</Command.Empty>}
 
           {!isTyping && !res.isFetching && res.data && !res.error && (
             <Command.Group>
@@ -101,7 +100,9 @@ export function QuickSearchModal({ envSlug, isOpen, onClose }: Props) {
             </Command.Group>
           )}
 
-          <Command.Empty className={cn((isTyping || res.isPending) && 'hidden')}>
+          <Command.Empty className={cn(!res.error && 'hidden')}>Error searching</Command.Empty>
+
+          <Command.Empty className={cn((isTyping || res.isPending || res.error) && 'hidden')}>
             No results found
           </Command.Empty>
         </Command.List>

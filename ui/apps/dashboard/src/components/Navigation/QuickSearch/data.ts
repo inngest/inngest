@@ -33,24 +33,38 @@ const quickSearchQuery = graphql(`
 export function useQuickSearch({ envSlug, term }: { envSlug: string; term: string }) {
   const client = useClient();
 
-  const queryFn = useCallback(async () => {
-    const res = await client.query(quickSearchQuery, {
-      envSlug,
-      term,
-    });
-    if (res.error) {
-      throw res.error;
-    }
-    if (!res.data) {
-      throw new Error('No data');
-    }
-    return res.data.account.quickSearch;
-  }, [client, envSlug, term]);
+  // const queryFn = useCallback(async () => {
+  //   const res = await client.query(quickSearchQuery, {
+  //     envSlug,
+  //     term,
+  //   });
+  //   if (res.error) {
+  //     throw res.error;
+  //   }
+  //   if (!res.data) {
+  //     throw new Error('No data');
+  //   }
+  //   return res.data.account.quickSearch;
+  // }, [client, envSlug, term]);
+
+  console.log(['quick-search', term, envSlug]);
 
   return useQuery({
     queryKey: ['quick-search', term, envSlug],
-    queryFn,
+    queryFn: async () => {
+      const res = await client.query(quickSearchQuery, {
+        envSlug,
+        term,
+      });
+      if (res.error) {
+        throw res.error;
+      }
+      if (!res.data) {
+        throw new Error('No data');
+      }
+      return res.data.account.quickSearch;
+    },
     enabled: Boolean(term),
-    gcTime: 0,
+    // gcTime: 0,
   });
 }
