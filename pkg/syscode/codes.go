@@ -14,6 +14,7 @@ const (
 	CodeSigVerificationFailed     = "sig_verification_failed"
 	CodeUnknown                   = "unknown"
 	CodeBatchKeyExpressionInvalid = "batch_key_expression_invalid"
+	CodePlanUpgradeRequired       = "plan_upgrade_required"
 
 	// Connect
 	CodeConnectWorkerHelloTimeout             = "connect_worker_hello_timeout"
