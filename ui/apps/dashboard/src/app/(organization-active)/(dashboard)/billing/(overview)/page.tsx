@@ -1,6 +1,7 @@
 import { Alert } from '@inngest/components/Alert/Alert';
 import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
+import { formatDayString } from '@inngest/components/utils/date';
 
 import EntitlementListItem from '@/components/Billing/Addons/EntitlementListItem';
 import BillingInformation from '@/components/Billing/BillingDetails/BillingInformation';
@@ -11,7 +12,6 @@ import {
   currentPlan as getCurrentPlan,
   entitlementUsage as getEntitlementUsage,
 } from '@/components/Billing/data';
-import { day } from '@/utils/date';
 import { pathCreator } from '@/utils/urls';
 
 function kbyteDisplayValue(kibibytes: number): string {
@@ -67,7 +67,7 @@ export default async function Page() {
   };
 
   const nextInvoiceDate = currentSubscription?.nextInvoiceDate
-    ? day(currentSubscription.nextInvoiceDate)
+    ? formatDayString(new Date(currentSubscription.nextInvoiceDate))
     : undefined;
 
   const nextInvoiceAmount = currentPlan.amount

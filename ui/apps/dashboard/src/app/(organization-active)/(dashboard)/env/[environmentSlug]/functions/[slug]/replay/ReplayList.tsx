@@ -7,13 +7,12 @@ import { ReplayStatusIcon } from '@inngest/components/ReplayStatusIcon';
 import { Table } from '@inngest/components/Table';
 import { Time } from '@inngest/components/Time';
 import type { Replay } from '@inngest/components/types/replay';
+import { differenceInMilliseconds, formatMilliseconds } from '@inngest/components/utils/date';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
-import dayjs from 'dayjs';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import LoadingIcon from '@/icons/LoadingIcon';
-import { duration } from '@/utils/date';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const GetReplaysDocument = graphql(`
@@ -76,7 +75,7 @@ const columns = [
       if (!replayDuration) {
         return <span>-</span>;
       }
-      return <time dateTime={replayDuration.toString()}>{duration(replayDuration)}</time>;
+      return <time dateTime={replayDuration.toString()}>{formatMilliseconds(replayDuration)}</time>;
     },
     size: 250,
     minSize: 250,
@@ -128,7 +127,7 @@ export function ReplayList({ functionSlug }: Props) {
           ...baseReplay,
           status: 'ENDED',
           endedAt: new Date(replay.endedAt),
-          duration: dayjs.duration(dayjs(replay.endedAt).diff(replay.createdAt)),
+          duration: differenceInMilliseconds(new Date(replay.endedAt), new Date(replay.createdAt)),
         };
       }
 

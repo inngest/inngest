@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import NewReplayModal from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/NewReplayModal';
+import NewReplayModal from '@/components/Replay/NewReplayModal';
 
 type NewReplayButtonProps = {
   functionSlug: string;
