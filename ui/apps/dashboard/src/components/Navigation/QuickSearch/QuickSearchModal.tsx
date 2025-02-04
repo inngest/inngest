@@ -20,7 +20,6 @@ export function QuickSearchModal({ envSlug, isOpen, onClose }: Props) {
   const isTyping = term !== debouncedTerm;
 
   const res = useQuickSearch({ envSlug, term: debouncedTerm });
-  console.log(Boolean(res.error), Boolean(res.data));
 
   return (
     <Modal alignTop isOpen={isOpen} onClose={onClose} className="max-w-2xl align-baseline">
