@@ -7,7 +7,7 @@ import { HistoryParser } from '@inngest/components/utils/historyParser';
 import { useClient } from 'urql';
 
 import LoadingIcon from '@/icons/LoadingIcon';
-import { getHistoryItemOutput } from '../functions/[slug]/logs/(run)/[runId]/getHistoryItemOutput';
+import { getHistoryItemOutput } from './getHistoryItemOutput';
 import { useEvent } from './useEvent';
 import { useRun } from './useRun';
 
