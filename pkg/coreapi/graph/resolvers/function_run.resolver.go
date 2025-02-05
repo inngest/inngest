@@ -60,14 +60,11 @@ func (r *functionRunResolver) History(
 		return nil, fmt.Errorf("invalid run ID: %w", err)
 	}
 
-	// For required UUID fields that don't matter in OSS.
-	randomUUID := uuid.New()
-
 	return r.HistoryReader.GetRunHistory(
 		ctx,
 		runID,
 		history_reader.GetRunOpts{
-			AccountID: randomUUID,
+			AccountID: consts.DevServerAccountId,
 		},
 	)
 }
@@ -82,17 +79,17 @@ func (r *functionRunResolver) HistoryItemOutput(
 		return nil, fmt.Errorf("invalid run ID: %w", err)
 	}
 
-	// For required UUID fields that don't matter in OSS.
-	randomUUID := uuid.New()
-
 	return r.HistoryReader.GetRunHistoryItemOutput(
 		ctx,
 		historyID,
 		history_reader.GetHistoryOutputOpts{
-			AccountID:   randomUUID,
-			RunID:       runID,
-			WorkflowID:  randomUUID,
-			WorkspaceID: randomUUID,
+			AccountID: consts.DevServerAccountId,
+			RunID:     runID,
+
+			// TODO: Where should we get this?
+			WorkflowID: uuid.New(),
+
+			WorkspaceID: consts.DevServerEnvId,
 		},
 	)
 }
@@ -192,8 +189,8 @@ func (r *mutationResolver) CancelRun(
 	ctx context.Context,
 	runID ulid.ULID,
 ) (*models.FunctionRun, error) {
-	accountID := uuid.New()
-	workspaceID := uuid.New()
+	accountID := consts.DevServerAccountId
+	workspaceID := consts.DevServerEnvId
 	run, err := r.HistoryReader.GetFunctionRun(
 		ctx,
 		accountID,
@@ -268,8 +265,8 @@ func (r *mutationResolver) Rerun(
 	fromStep *models.RerunFromStepInput,
 ) (ulid.ULID, error) {
 	zero := ulid.ULID{}
-	accountID := uuid.New()
-	workspaceID := uuid.New()
+	accountID := consts.DevServerAccountId
+	workspaceID := consts.DevServerEnvId
 
 	fnrun, err := r.Data.GetFunctionRun(
 		ctx,
@@ -340,6 +337,7 @@ func (r *mutationResolver) Rerun(
 		OriginalRunID: &fnrun.RunID,
 		AccountID:     consts.DevServerAccountId,
 		FromStep:      fromStepReq,
+		WorkspaceID:   consts.DevServerEnvId,
 	})
 	if err != nil {
 		return zero, err
