@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { AppRoot } from '@inngest/components/AppRoot';
+import { SignalsProvider, type SignalHandlers } from '@inngest/components/Signals/SignalsContext';
 
 import StoreProvider from '@/app/StoreProvider';
+import { useInvokeFunctionMutation } from '@/store/generated';
 
 export const metadata: Metadata = {
   title: 'Inngest Development Server',

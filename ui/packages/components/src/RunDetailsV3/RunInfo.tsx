@@ -22,6 +22,7 @@ import { AICell } from '../Table/Cell';
 import type { Result } from '../types/functionRun';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
 import { isLazyDone, type Lazy } from '../utils/lazyLoad';
+import { ActionsMenu } from './ActionMenu';
 
 type Props = {
   standalone: boolean;
@@ -107,15 +108,15 @@ export const RunInfo = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <CancelRunButton disabled={!allowCancel} onClick={cancelRun} />
-          <RerunButton
-            disabled={!isLazyDone(run)}
-            onClick={async () => {
+          <ActionsMenu
+            cancel={cancelRun}
+            reRun={async () => {
               if (!isLazyDone(run)) {
                 return;
               }
               await rerun({ fnID: run.fn.id, runID });
             }}
+            allowCancel={allowCancel}
           />
         </div>
       </div>

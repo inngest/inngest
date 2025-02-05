@@ -1,8 +1,11 @@
 import { useCallback, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import { RiArrowUpSLine } from '@remixicon/react';
 import { useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
+import { Alert } from '../Alert';
 import {
   CodeElement,
   ElementWrapper,
@@ -11,9 +14,11 @@ import {
   TextElement,
   TimeElement,
 } from '../DetailsCard/Element';
+import { InvokeModal } from '../InvokeButton';
 // NOTE - This component should be a shared component as part of the design system.
 // Until then, we re-use it from the RunDetailsV2 as these are part of the same parent UI.
 import { ErrorCard } from '../RunDetailsV2/ErrorCard';
+import { useInvokeRun } from '../Signals/useInvokeRun';
 import { usePrettyJson } from '../hooks/usePrettyJson';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
 import type { Result } from '../types/functionRun';
@@ -23,6 +28,7 @@ import { Output } from './Output';
 import { Tabs } from './Tabs';
 
 type TopInfoProps = {
+  slug?: string;
   getTrigger: (runID: string) => Promise<Trigger>;
   result?: Result;
   runID: string;
@@ -76,10 +82,12 @@ export const actionConfigs = (
   };
 };
 
-export const TopInfo = ({ getTrigger, runID, result }: TopInfoProps) => {
+export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
+  const router = useRouter();
   const [expanded, setExpanded] = useState(true);
   const { isRunning, send } = useDevServer();
-
+  const { invoke, loading: invokeLoading, error: invokeError } = useInvokeRun();
+  const [invokeOpen, setInvokeOpen] = useState(false);
   const {
     data: trigger,
     error,
@@ -146,6 +154,32 @@ export const TopInfo = ({ getTrigger, runID, result }: TopInfoProps) => {
           size="medium"
           iconSide="right"
           label="Invoke"
+          loading={invokeLoading}
+          disabled={invokeLoading}
+          onClick={() => {
+            setInvokeOpen(true);
+          }}
+        />
+
+        {invokeError && <Alert severity="error">{invokeError.message}</Alert>}
+        <InvokeModal
+          doesFunctionAcceptPayload={true}
+          isOpen={invokeOpen}
+          onCancel={() => setInvokeOpen(false)}
+          onConfirm={async ({ data, user }) => {
+            const res = await invoke({
+              functionSlug: slug || '',
+              data,
+              user,
+            });
+
+            if (res) {
+              console.log('shit success');
+              setInvokeOpen(false);
+              toast.success('Function invoked');
+              router.push('/runs');
+            }
+          }}
         />
       </div>
 

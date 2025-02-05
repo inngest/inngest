@@ -187,7 +187,12 @@ export const RunDetailsV3 = (props: Props) => {
         {selectedStep ? (
           <StepInfo selectedStep={selectedStep} />
         ) : (
-          <TopInfo getTrigger={getTrigger} runID={runID} result={resultRes.data} />
+          <TopInfo
+            slug={run?.fn.slug}
+            getTrigger={getTrigger}
+            runID={runID}
+            result={resultRes.data}
+          />
         )}
       </div>
     </div>
