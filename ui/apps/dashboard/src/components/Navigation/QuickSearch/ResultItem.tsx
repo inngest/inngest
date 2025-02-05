@@ -25,7 +25,6 @@ export function ResultItem({ kind, onClick, path, value }: Props) {
       value={value}
     >
       <p className="flex-1 truncate">{value}</p>
-      <div className="grow" />
       <Pill>{toKindName(kind)}</Pill>
     </Command.Item>
   );

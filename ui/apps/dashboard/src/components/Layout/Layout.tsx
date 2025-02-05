@@ -26,7 +26,6 @@ export default async function Layout({ activeEnv, children }: LayoutProps) {
         activeEnv={activeEnv}
         collapsed={collapsed}
         enableQuickSearchV2={enableQuickSearchV2}
-        envSlug={activeEnv?.slug ?? 'production'}
         profile={profile}
       />
 

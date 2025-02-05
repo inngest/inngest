@@ -25,7 +25,7 @@ export function QuickSearchModal({ envSlug, isOpen, onClose }: Props) {
     <Modal alignTop isOpen={isOpen} onClose={onClose} className="max-w-2xl align-baseline">
       <Command label="Search by ID menu" shouldFilter={false} className="p-2">
         <Command.Input
-          placeholder="Search by ID..."
+          placeholder="Search by ID or name..."
           value={term}
           onValueChange={setTerm}
           className={cn(
