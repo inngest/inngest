@@ -60,6 +60,15 @@ export const entitlementUsageDocument = graphql(`
         hipaa {
           enabled
         }
+        metricsExport {
+          enabled
+        }
+        metricsExportFreshness {
+          limit
+        }
+        metricsExportGranularity {
+          limit
+        }
       }
       plan {
         name
