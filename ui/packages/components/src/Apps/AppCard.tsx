@@ -5,6 +5,7 @@ import { Pill } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
 import WorkersCounter from '@inngest/components/Workers/WorkersCounter';
+import { type GroupedWorkerStatus } from '@inngest/components/types/workers';
 import { RiArrowDownSLine, RiArrowLeftRightLine, RiInfinityLine } from '@remixicon/react';
 
 import { Card } from '../Card';
@@ -62,9 +63,10 @@ type CardContentProps = {
   pill: React.ReactNode;
   actions: React.ReactNode;
   url?: string;
+  workerCounts?: Record<GroupedWorkerStatus, number>;
 };
 
-export function AppCardContent({ url, app, pill, actions }: CardContentProps) {
+export function AppCardContent({ url, app, pill, actions, workerCounts }: CardContentProps) {
   const Wrapper = url ? 'a' : 'div';
 
   return (
@@ -102,12 +104,8 @@ export function AppCardContent({ url, app, pill, actions }: CardContentProps) {
           detail={app.sdkVersion?.trim() ? <Pill>{app.sdkVersion}</Pill> : '-'}
         />
         <Description term="Language" detail={app.sdkLanguage?.trim() ? app.sdkLanguage : '-'} />
-        {app.connectionType === connectionTypes.Connect ? (
-          // TODO: Wire workers data
-          <Description
-            term="Connected workers"
-            detail={<WorkersCounter counts={{ ACTIVE: 1, INACTIVE: 0, DISCONNECTED: 0 }} />}
-          />
+        {app.connectionType === connectionTypes.Connect && workerCounts ? (
+          <Description term="Connected workers" detail={<WorkersCounter counts={workerCounts} />} />
         ) : (
           <Description term="Framework" detail={app.framework ?? '-'} />
         )}
@@ -145,7 +143,7 @@ export function AppCardFooter({ kind, headerTitle, headerSecondaryCTA, content }
     <AccordionList
       type="multiple"
       defaultValue={[]}
-      className="border-muted rounded-none border-0 border-t"
+      className="border-subtle rounded-none border-0 border-t"
     >
       <AccordionList.Item value="description" className="px-4 py-3">
         <AccordionPrimitive.Header
