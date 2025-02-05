@@ -11,6 +11,8 @@ import (
 type AuthorizationErrorException struct {
 	Message *string
 
+	ErrorCodeOverride *string
+
 	noSmithyDocumentSerde
 }
 
@@ -23,12 +25,19 @@ func (e *AuthorizationErrorException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *AuthorizationErrorException) ErrorCode() string             { return "AuthorizationError" }
+func (e *AuthorizationErrorException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "AuthorizationError"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *AuthorizationErrorException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
-// Two or more batch entries in the request have the same Id.
+// Two or more batch entries in the request have the same Id .
 type BatchEntryIdsNotDistinctException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -42,12 +51,19 @@ func (e *BatchEntryIdsNotDistinctException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *BatchEntryIdsNotDistinctException) ErrorCode() string             { return "BatchEntryIdsNotDistinct" }
+func (e *BatchEntryIdsNotDistinctException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "BatchEntryIdsNotDistinct"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *BatchEntryIdsNotDistinctException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // The length of all the batch messages put together is more than the limit.
 type BatchRequestTooLongException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -61,13 +77,20 @@ func (e *BatchRequestTooLongException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *BatchRequestTooLongException) ErrorCode() string             { return "BatchRequestTooLong" }
+func (e *BatchRequestTooLongException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "BatchRequestTooLong"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *BatchRequestTooLongException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // Can't perform multiple operations on a tag simultaneously. Perform the
 // operations sequentially.
 type ConcurrentAccessException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -81,12 +104,19 @@ func (e *ConcurrentAccessException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *ConcurrentAccessException) ErrorCode() string             { return "ConcurrentAccess" }
+func (e *ConcurrentAccessException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "ConcurrentAccess"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *ConcurrentAccessException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // The batch request doesn't contain any entries.
 type EmptyBatchRequestException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -100,12 +130,19 @@ func (e *EmptyBatchRequestException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *EmptyBatchRequestException) ErrorCode() string             { return "EmptyBatchRequest" }
+func (e *EmptyBatchRequestException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "EmptyBatchRequest"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *EmptyBatchRequestException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // Exception error indicating endpoint disabled.
 type EndpointDisabledException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -119,7 +156,12 @@ func (e *EndpointDisabledException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *EndpointDisabledException) ErrorCode() string             { return "EndpointDisabled" }
+func (e *EndpointDisabledException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "EndpointDisabled"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *EndpointDisabledException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // Indicates that the number of filter polices in your Amazon Web Services account
@@ -127,6 +169,8 @@ func (e *EndpointDisabledException) ErrorFault() smithy.ErrorFault { return smit
 // Increase case in the Amazon Web Services Support Center.
 type FilterPolicyLimitExceededException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -140,7 +184,12 @@ func (e *FilterPolicyLimitExceededException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *FilterPolicyLimitExceededException) ErrorCode() string { return "FilterPolicyLimitExceeded" }
+func (e *FilterPolicyLimitExceededException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "FilterPolicyLimitExceeded"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *FilterPolicyLimitExceededException) ErrorFault() smithy.ErrorFault {
 	return smithy.FaultClient
 }
@@ -148,6 +197,8 @@ func (e *FilterPolicyLimitExceededException) ErrorFault() smithy.ErrorFault {
 // Indicates an internal service error.
 type InternalErrorException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -161,12 +212,19 @@ func (e *InternalErrorException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *InternalErrorException) ErrorCode() string             { return "InternalError" }
+func (e *InternalErrorException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "InternalError"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *InternalErrorException) ErrorFault() smithy.ErrorFault { return smithy.FaultServer }
 
 // The Id of a batch entry in a batch request doesn't abide by the specification.
 type InvalidBatchEntryIdException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -180,13 +238,20 @@ func (e *InvalidBatchEntryIdException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *InvalidBatchEntryIdException) ErrorCode() string             { return "InvalidBatchEntryId" }
+func (e *InvalidBatchEntryIdException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "InvalidBatchEntryId"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *InvalidBatchEntryIdException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // Indicates that a request parameter does not comply with the associated
 // constraints.
 type InvalidParameterException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -200,13 +265,20 @@ func (e *InvalidParameterException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *InvalidParameterException) ErrorCode() string             { return "InvalidParameter" }
+func (e *InvalidParameterException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "InvalidParameter"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *InvalidParameterException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // Indicates that a request parameter does not comply with the associated
 // constraints.
 type InvalidParameterValueException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -220,13 +292,20 @@ func (e *InvalidParameterValueException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *InvalidParameterValueException) ErrorCode() string             { return "ParameterValueInvalid" }
+func (e *InvalidParameterValueException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "ParameterValueInvalid"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *InvalidParameterValueException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // The credential signature isn't valid. You must use an HTTPS endpoint and sign
 // your request using Signature Version 4.
 type InvalidSecurityException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -240,13 +319,46 @@ func (e *InvalidSecurityException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *InvalidSecurityException) ErrorCode() string             { return "InvalidSecurity" }
+func (e *InvalidSecurityException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "InvalidSecurity"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *InvalidSecurityException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
-// The ciphertext references a key that doesn't exist or that you don't have access
-// to.
+// Indicates that the specified state is not a valid state for an event source.
+type InvalidStateException struct {
+	Message *string
+
+	ErrorCodeOverride *string
+
+	noSmithyDocumentSerde
+}
+
+func (e *InvalidStateException) Error() string {
+	return fmt.Sprintf("%s: %s", e.ErrorCode(), e.ErrorMessage())
+}
+func (e *InvalidStateException) ErrorMessage() string {
+	if e.Message == nil {
+		return ""
+	}
+	return *e.Message
+}
+func (e *InvalidStateException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "InvalidState"
+	}
+	return *e.ErrorCodeOverride
+}
+func (e *InvalidStateException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
+
+// The ciphertext references a key that doesn't exist or that you don't have
+// access to.
 type KMSAccessDeniedException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -260,13 +372,20 @@ func (e *KMSAccessDeniedException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *KMSAccessDeniedException) ErrorCode() string             { return "KMSAccessDenied" }
+func (e *KMSAccessDeniedException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "KMSAccessDenied"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *KMSAccessDeniedException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
-// The request was rejected because the specified customer master key (CMK) isn't
-// enabled.
+// The request was rejected because the specified Amazon Web Services KMS key
+// isn't enabled.
 type KMSDisabledException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -280,16 +399,23 @@ func (e *KMSDisabledException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *KMSDisabledException) ErrorCode() string             { return "KMSDisabled" }
+func (e *KMSDisabledException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "KMSDisabled"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *KMSDisabledException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
-// The request was rejected because the state of the specified resource isn't valid
-// for this request. For more information, see How Key State Affects Use of a
-// Customer Master Key
-// (https://docs.aws.amazon.com/kms/latest/developerguide/key-state.html) in the
-// Key Management Service Developer Guide.
+// The request was rejected because the state of the specified resource isn't
+// valid for this request. For more information, see [Key states of Amazon Web Services KMS keys]in the Key Management Service
+// Developer Guide.
+//
+// [Key states of Amazon Web Services KMS keys]: https://docs.aws.amazon.com/kms/latest/developerguide/key-state.html
 type KMSInvalidStateException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -303,13 +429,20 @@ func (e *KMSInvalidStateException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *KMSInvalidStateException) ErrorCode() string             { return "KMSInvalidState" }
+func (e *KMSInvalidStateException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "KMSInvalidState"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *KMSInvalidStateException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // The request was rejected because the specified entity or resource can't be
 // found.
 type KMSNotFoundException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -323,12 +456,19 @@ func (e *KMSNotFoundException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *KMSNotFoundException) ErrorCode() string             { return "KMSNotFound" }
+func (e *KMSNotFoundException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "KMSNotFound"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *KMSNotFoundException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // The Amazon Web Services access key ID needs a subscription for the service.
 type KMSOptInRequired struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -342,15 +482,22 @@ func (e *KMSOptInRequired) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *KMSOptInRequired) ErrorCode() string             { return "KMSOptInRequired" }
+func (e *KMSOptInRequired) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "KMSOptInRequired"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *KMSOptInRequired) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // The request was denied due to request throttling. For more information about
-// throttling, see Limits
-// (https://docs.aws.amazon.com/kms/latest/developerguide/limits.html#requests-per-second)
-// in the Key Management Service Developer Guide.
+// throttling, see [Limits]in the Key Management Service Developer Guide.
+//
+// [Limits]: https://docs.aws.amazon.com/kms/latest/developerguide/limits.html#requests-per-second
 type KMSThrottlingException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -364,12 +511,19 @@ func (e *KMSThrottlingException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *KMSThrottlingException) ErrorCode() string             { return "KMSThrottling" }
+func (e *KMSThrottlingException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "KMSThrottling"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *KMSThrottlingException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // Indicates that the requested resource does not exist.
 type NotFoundException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -383,7 +537,12 @@ func (e *NotFoundException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *NotFoundException) ErrorCode() string             { return "NotFound" }
+func (e *NotFoundException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "NotFound"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *NotFoundException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // Indicates that the specified phone number opted out of receiving SMS messages
@@ -391,6 +550,8 @@ func (e *NotFoundException) ErrorFault() smithy.ErrorFault { return smithy.Fault
 // numbers that opt out.
 type OptedOutException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -404,12 +565,19 @@ func (e *OptedOutException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *OptedOutException) ErrorCode() string             { return "OptedOut" }
+func (e *OptedOutException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "OptedOut"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *OptedOutException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // Exception error indicating platform application disabled.
 type PlatformApplicationDisabledException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -424,16 +592,48 @@ func (e *PlatformApplicationDisabledException) ErrorMessage() string {
 	return *e.Message
 }
 func (e *PlatformApplicationDisabledException) ErrorCode() string {
-	return "PlatformApplicationDisabled"
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "PlatformApplicationDisabled"
+	}
+	return *e.ErrorCodeOverride
 }
 func (e *PlatformApplicationDisabledException) ErrorFault() smithy.ErrorFault {
 	return smithy.FaultClient
 }
 
+// Indicates that the request parameter has exceeded the maximum number of
+// concurrent message replays.
+type ReplayLimitExceededException struct {
+	Message *string
+
+	ErrorCodeOverride *string
+
+	noSmithyDocumentSerde
+}
+
+func (e *ReplayLimitExceededException) Error() string {
+	return fmt.Sprintf("%s: %s", e.ErrorCode(), e.ErrorMessage())
+}
+func (e *ReplayLimitExceededException) ErrorMessage() string {
+	if e.Message == nil {
+		return ""
+	}
+	return *e.Message
+}
+func (e *ReplayLimitExceededException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "ReplayLimitExceeded"
+	}
+	return *e.ErrorCodeOverride
+}
+func (e *ReplayLimitExceededException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
+
 // Can’t perform the action on the specified resource. Make sure that the resource
 // exists.
 type ResourceNotFoundException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -447,13 +647,20 @@ func (e *ResourceNotFoundException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *ResourceNotFoundException) ErrorCode() string             { return "ResourceNotFound" }
+func (e *ResourceNotFoundException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "ResourceNotFound"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *ResourceNotFoundException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
-// A tag has been added to a resource with the same ARN as a deleted resource. Wait
-// a short while and then retry the operation.
+// A tag has been added to a resource with the same ARN as a deleted resource.
+// Wait a short while and then retry the operation.
 type StaleTagException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -467,13 +674,20 @@ func (e *StaleTagException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *StaleTagException) ErrorCode() string             { return "StaleTag" }
+func (e *StaleTagException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "StaleTag"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *StaleTagException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // Indicates that the customer already owns the maximum allowed number of
 // subscriptions.
 type SubscriptionLimitExceededException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -487,7 +701,12 @@ func (e *SubscriptionLimitExceededException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *SubscriptionLimitExceededException) ErrorCode() string { return "SubscriptionLimitExceeded" }
+func (e *SubscriptionLimitExceededException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "SubscriptionLimitExceeded"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *SubscriptionLimitExceededException) ErrorFault() smithy.ErrorFault {
 	return smithy.FaultClient
 }
@@ -495,6 +714,8 @@ func (e *SubscriptionLimitExceededException) ErrorFault() smithy.ErrorFault {
 // Can't add more than 50 tags to a topic.
 type TagLimitExceededException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -508,13 +729,20 @@ func (e *TagLimitExceededException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *TagLimitExceededException) ErrorCode() string             { return "TagLimitExceeded" }
+func (e *TagLimitExceededException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "TagLimitExceeded"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *TagLimitExceededException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // The request doesn't comply with the IAM tag policy. Correct your request and
 // then retry it.
 type TagPolicyException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -528,13 +756,20 @@ func (e *TagPolicyException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *TagPolicyException) ErrorCode() string             { return "TagPolicy" }
+func (e *TagPolicyException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "TagPolicy"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *TagPolicyException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // Indicates that the rate at which requests have been submitted for this action
 // exceeds the limit for your Amazon Web Services account.
 type ThrottledException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -548,12 +783,19 @@ func (e *ThrottledException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *ThrottledException) ErrorCode() string             { return "Throttled" }
+func (e *ThrottledException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "Throttled"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *ThrottledException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // The batch request contains more entries than permissible.
 type TooManyEntriesInBatchRequestException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -568,7 +810,10 @@ func (e *TooManyEntriesInBatchRequestException) ErrorMessage() string {
 	return *e.Message
 }
 func (e *TooManyEntriesInBatchRequestException) ErrorCode() string {
-	return "TooManyEntriesInBatchRequest"
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "TooManyEntriesInBatchRequest"
+	}
+	return *e.ErrorCodeOverride
 }
 func (e *TooManyEntriesInBatchRequestException) ErrorFault() smithy.ErrorFault {
 	return smithy.FaultClient
@@ -577,6 +822,8 @@ func (e *TooManyEntriesInBatchRequestException) ErrorFault() smithy.ErrorFault {
 // Indicates that the customer already owns the maximum allowed number of topics.
 type TopicLimitExceededException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -590,13 +837,20 @@ func (e *TopicLimitExceededException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *TopicLimitExceededException) ErrorCode() string             { return "TopicLimitExceeded" }
+func (e *TopicLimitExceededException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "TopicLimitExceeded"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *TopicLimitExceededException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // Indicates that a request parameter does not comply with the associated
 // constraints.
 type UserErrorException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -610,12 +864,19 @@ func (e *UserErrorException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *UserErrorException) ErrorCode() string             { return "UserError" }
+func (e *UserErrorException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "UserError"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *UserErrorException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // Indicates that a parameter in the request is invalid.
 type ValidationException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	noSmithyDocumentSerde
 }
@@ -629,12 +890,19 @@ func (e *ValidationException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *ValidationException) ErrorCode() string             { return "ValidationException" }
+func (e *ValidationException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "ValidationException"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *ValidationException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // Indicates that the one-time password (OTP) used for verification is invalid.
 type VerificationException struct {
 	Message *string
+
+	ErrorCodeOverride *string
 
 	Status *string
 
@@ -650,5 +918,10 @@ func (e *VerificationException) ErrorMessage() string {
 	}
 	return *e.Message
 }
-func (e *VerificationException) ErrorCode() string             { return "VerificationException" }
+func (e *VerificationException) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "VerificationException"
+	}
+	return *e.ErrorCodeOverride
+}
 func (e *VerificationException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
