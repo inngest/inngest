@@ -21,6 +21,39 @@ function kbyteDisplayValue(kibibytes: number): string {
   return `${kibibytes} KiB`;
 }
 
+function secondsToStr(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m == 0) {
+    return `${s}s`;
+  }
+  if (s == 0) {
+    return `${m}m`;
+  }
+  return `${m}m ${s}s`;
+}
+
+function metricExportDisplayValue(
+  enabled: boolean,
+  granularitySeconds: number,
+  freshnessSeconds: number
+): string | React.ReactNode {
+  if (!enabled) {
+    return 'Not enabled';
+  }
+  return (
+    <>
+      <span className="font-medium">Enabled</span>
+      <br />
+      <span className="text-muted">Granularity:</span>{' '}
+      <span className="font-medium">{secondsToStr(granularitySeconds)}</span>
+      <br />
+      <span className="text-muted">Freshness:</span>{' '}
+      <span className="font-medium">{secondsToStr(freshnessSeconds)}</span>
+    </>
+  );
+}
+
 export const dynamic = 'force-dynamic';
 
 export default async function Page() {
@@ -172,6 +205,20 @@ export default async function Page() {
             entitlement={{
               currentValue: false,
               displayValue: 'Not enabled', // TODO: https://linear.app/inngest/issue/INN-4202/add-dedicated-capacity-addon
+            }}
+          />
+          <EntitlementListItem
+            increaseInHigherPlan={true}
+            planName={currentPlan.name}
+            title="Exportable metrics"
+            description="Export key Inngest metrics into your own monitoring infrastructure"
+            entitlement={{
+              currentValue: entitlements.metricsExport.enabled,
+              displayValue: metricExportDisplayValue(
+                entitlements.metricsExport.enabled,
+                entitlements.metricsExportGranularity.limit,
+                entitlements.metricsExportFreshness.limit
+              ),
             }}
           />
           <div className="flex flex-col items-center gap-2 pt-6">
