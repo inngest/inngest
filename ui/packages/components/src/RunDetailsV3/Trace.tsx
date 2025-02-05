@@ -12,8 +12,8 @@ import { createSpanWidths, useStepSelection } from './utils';
 type Props = {
   depth: number;
   getResult: (outputID: string) => Promise<Result>;
-  minTime?: Date;
-  maxTime?: Date;
+  minTime: Date;
+  maxTime: Date;
   pathCreator: {
     runPopout: (params: { runID: string }) => Route;
   };
@@ -47,14 +47,6 @@ export function Trace({
       });
     }
   }, [expanded, result]);
-
-  if (!minTime) {
-    minTime = new Date(trace.queuedAt);
-  }
-
-  if (!maxTime) {
-    maxTime = new Date(trace.endedAt ?? new Date());
-  }
 
   const widths = createSpanWidths({
     ended: toMaybeDate(trace.endedAt)?.getTime() ?? null,

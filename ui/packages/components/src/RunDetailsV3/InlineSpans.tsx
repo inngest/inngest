@@ -21,21 +21,6 @@ type Props = {
 };
 
 export function InlineSpans({ className, minTime, maxTime, name, spans, widths }: Props) {
-  let delay = 0;
-  if (spans.length === 1) {
-    const startedAt = toMaybeDate(spans[0]?.startedAt);
-    delay = (startedAt ?? new Date()).getTime() - minTime.getTime();
-  }
-
-  let duration = 0;
-  spans.forEach((span) => {
-    const startedAt = toMaybeDate(span.startedAt)?.getTime();
-    const endedAt = toMaybeDate(span.endedAt)?.getTime();
-    if (startedAt && endedAt) {
-      duration += endedAt - startedAt;
-    }
-  });
-
   return (
     <Tooltip>
       <TooltipTrigger className="h-fit w-full grow">
@@ -96,11 +81,7 @@ function Times({
   const endedAt = toMaybeDate(span.endedAt);
 
   const delay = (startedAt ?? new Date()).getTime() - queuedAt.getTime();
-
-  let duration = 0;
-  if (startedAt) {
-    duration = (endedAt ?? new Date()).getTime() - startedAt.getTime();
-  }
+  const duration = startedAt ? (endedAt ?? new Date()).getTime() - startedAt.getTime() : 0;
 
   return (
     <>

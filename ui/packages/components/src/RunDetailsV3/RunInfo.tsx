@@ -5,7 +5,6 @@ import { RiArrowRightUpLine, RiArrowUpSLine } from '@remixicon/react';
 import { AITrace } from '../AI/AITrace';
 import { parseAIOutput } from '../AI/utils';
 import { CancelRunButton } from '../CancelRunButton';
-import { Card } from '../Card';
 import {
   ElementWrapper,
   IDElement,
@@ -21,7 +20,6 @@ import { RunResult } from '../RunResult';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { AICell } from '../Table/Cell';
 import type { Result } from '../types/functionRun';
-import { cn } from '../utils/classNames';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
 import { isLazyDone, type Lazy } from '../utils/lazyLoad';
 
