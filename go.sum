@@ -366,8 +366,8 @@ github.com/golang-migrate/migrate/v4 v4.16.2/go.mod h1:pfcJX4nPHaVdc5nmdCikFBWtm
 github.com/golang-sql/civil v0.0.0-20190719163853-cb61b32ac6fe/go.mod h1:8vg3r2VgvsThLBIFL93Qb5yWzgyZWhEmBwUJWevAkK0=
 github.com/golang-sql/sqlexp v0.0.0-20170517235910-f1bb20e5a188/go.mod h1:vXjM/+wXQnTPR4KqTKDgJukSZ6amVRtWMPEjE6sQoK8=
 github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b/go.mod h1:SBH7ygxi8pfUlaOkMMuAQtPIUF8ecWP5IEl/CR7VP2Q=
-github.com/golang/glog v1.2.2 h1:1+mZ9upx1Dh6FmUTFR1naJ77miKiXgALjWOZ3NVFPmY=
-github.com/golang/glog v1.2.2/go.mod h1:6AhwSGph0fcJtXVM/PEHPqZlFeoLxhs7/t5UDAwmO+w=
+github.com/golang/glog v1.2.4 h1:CNNw5U8lSiiBk7druxtSHHTsRWcxKoac6kZKm2peBBc=
+github.com/golang/glog v1.2.4/go.mod h1:6AhwSGph0fcJtXVM/PEHPqZlFeoLxhs7/t5UDAwmO+w=
 github.com/golang/groupcache v0.0.0-20190129154638-5b532d6fd5ef/go.mod h1:cIg4eruTrX1D+g88fzRXU5OdNfaM+9IcxsU14FzY7Hc=
 github.com/golang/groupcache v0.0.0-20190702054246-869f871628b6/go.mod h1:cIg4eruTrX1D+g88fzRXU5OdNfaM+9IcxsU14FzY7Hc=
 github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7/go.mod h1:cIg4eruTrX1D+g88fzRXU5OdNfaM+9IcxsU14FzY7Hc=
@@ -523,10 +523,6 @@ github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
 github.com/inngest/expr v0.0.0-20241106234328-863dff7deec0 h1:cqaGD0mx745BYyVGZ3GJsiZETktC64h1r9zdDInmKIs=
 github.com/inngest/expr v0.0.0-20241106234328-863dff7deec0/go.mod h1:0Dllw9clwlMWWxfiSsHY9VdE+Zjt/8SVCMxK9r39aKE=
-github.com/inngest/inngestgo v0.7.5-0.20250124122022-10fdd744bf35 h1:8j01fa2LBcXgIrtTog64ATfthmLrHrURUnuU/K4FM38=
-github.com/inngest/inngestgo v0.7.5-0.20250124122022-10fdd744bf35/go.mod h1:Ilq2+IJJG1dSselO5N85fNZqHcquAHY/Bs63PLEU/G0=
-github.com/inngest/inngestgo v0.7.5-0.20250131124742-ae0eadde2a8e h1:8o6idiJ6P+9ImLPoxlN1EORrFl6j4Q8yLiwVetYi+M0=
-github.com/inngest/inngestgo v0.7.5-0.20250131124742-ae0eadde2a8e/go.mod h1:Ilq2+IJJG1dSselO5N85fNZqHcquAHY/Bs63PLEU/G0=
 github.com/inngest/inngestgo v0.7.5-0.20250131142046-6beb83ad6d58 h1:GjROmfEGUUoRxXgDhkijdIo+9DKEtElQRd+4hFdpWKk=
 github.com/inngest/inngestgo v0.7.5-0.20250131142046-6beb83ad6d58/go.mod h1:Ilq2+IJJG1dSselO5N85fNZqHcquAHY/Bs63PLEU/G0=
 github.com/jackc/chunkreader v1.0.0/go.mod h1:RT6O25fNZIuasFJRyZ4R/Y2BbhasbmZXF9QQ7T3kePo=
