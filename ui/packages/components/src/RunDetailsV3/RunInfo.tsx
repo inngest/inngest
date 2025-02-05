@@ -15,8 +15,8 @@ import {
   TimeElement,
 } from '../DetailsCard/Element';
 import { Link } from '../Link';
+import type { RerunFromStep } from '../Rerun/RerunModal';
 import { RerunButton } from '../RerunButtonV2';
-import { RunResult } from '../RunResult';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { AICell } from '../Table/Cell';
 import type { Result } from '../types/functionRun';
@@ -33,7 +33,7 @@ type Props = {
     runPopout: (params: { runID: string }) => Route;
   };
   rerun: (args: { fnID: string; runID: string }) => Promise<unknown>;
-  rerunFromStep: React.ComponentProps<typeof RunResult>['rerunFromStep'];
+  rerunFromStep: RerunFromStep;
   initialRunData?: InitialRunData;
   run: Lazy<Run>;
   runID: string;

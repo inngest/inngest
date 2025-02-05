@@ -6,16 +6,18 @@ import { Button } from '../Button';
 import { CodeBlock } from '../CodeBlock/CodeBlock';
 import { Modal } from '../Modal/Modal';
 
+export type RerunFromStep = (args: {
+  runID: string;
+  fromStep: { stepID: string; input: string };
+}) => Promise<RerunResult>;
+
 export type RerunModalType = {
   open: boolean;
   setOpen: (open: boolean) => void;
   runID: string;
   stepID: string;
   input: string;
-  rerunFromStep: (args: {
-    runID: string;
-    fromStep: { stepID: string; input: string };
-  }) => Promise<RerunResult>;
+  rerunFromStep: RerunFromStep;
 };
 
 export type RerunResult = {

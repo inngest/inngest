@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { Route } from 'next';
-import type { RunResult } from '@inngest/components/RunResult';
 import type { Result } from '@inngest/components/types/functionRun';
 
+import type { RerunFromStep } from '../Rerun/RerunModal';
 import type { Trace } from './types';
 
 type Span = {
@@ -82,7 +82,7 @@ export type StepInfoType = {
   trace: Trace;
   runID: string;
   result?: Result;
-  rerunFromStep: React.ComponentProps<typeof RunResult>['rerunFromStep'];
+  rerunFromStep: RerunFromStep;
   pathCreator: PathCreator;
 };
 

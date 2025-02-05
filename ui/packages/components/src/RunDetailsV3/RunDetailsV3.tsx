@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
+import type { RerunFromStep } from '../Rerun/RerunModal';
 import { ErrorCard } from '../RunDetailsV2/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { Trace as OldTrace } from '../TimelineV2';
@@ -27,7 +28,7 @@ type Props = {
   pathCreator: React.ComponentProps<typeof RunInfo>['pathCreator'];
   pollInterval?: number;
   rerun: React.ComponentProps<typeof RunInfo>['rerun'];
-  rerunFromStep: React.ComponentProps<typeof RunInfo>['rerunFromStep'];
+  rerunFromStep: RerunFromStep;
   runID: string;
 };
 

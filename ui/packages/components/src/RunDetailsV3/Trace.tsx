@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import type { Route } from 'next';
 import { RiArrowUpSLine } from '@remixicon/react';
 
+import type { RerunFromStep } from '../Rerun/RerunModal';
 import type { Result } from '../types/functionRun';
 import { toMaybeDate } from '../utils/date';
 import { InlineSpans } from './InlineSpans';
-import { TraceInfo } from './TraceInfo';
 import { type Trace } from './types';
 import { createSpanWidths, useStepSelection } from './utils';
 
@@ -19,7 +19,7 @@ type Props = {
   };
   trace: Trace;
   runID: string;
-  rerunFromStep: React.ComponentProps<typeof TraceInfo>['rerunFromStep'];
+  rerunFromStep: RerunFromStep;
   leftWidth: number;
   handleMouseDown: (e: React.MouseEvent) => void;
 };

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Route } from 'next';
 
+import type { RerunFromStep } from '../Rerun/RerunModal';
 import { toMaybeDate } from '../utils/date';
 import { isLazyDone, type Lazy } from '../utils/lazyLoad';
 import { Trace } from './Trace';
@@ -12,7 +13,7 @@ type Props = {
   };
   runID: string;
   trace: Lazy<React.ComponentProps<typeof Trace>['trace']>;
-  rerunFromStep: React.ComponentProps<typeof Trace>['rerunFromStep'];
+  rerunFromStep: RerunFromStep;
 };
 
 export const Timeline = ({ getResult, pathCreator, runID, trace, rerunFromStep }: Props) => {
