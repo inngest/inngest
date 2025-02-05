@@ -105,7 +105,7 @@ export function AppCardContent({ url, app, pill, actions }: CardContentProps) {
         {app.connectionType === connectionTypes.Connect ? (
           // TODO: Wire workers data
           <Description
-            term="Method"
+            term="Connected workers"
             detail={<WorkersCounter counts={{ ACTIVE: 1, INACTIVE: 0, DISCONNECTED: 0 }} />}
           />
         ) : (
