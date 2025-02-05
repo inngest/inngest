@@ -244,3 +244,12 @@ func IncrConnectGatewayReceiveConnectionAttemptCounter(ctx context.Context, valu
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrConnectRouterNoHealthyConnectionCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_router.no_healthy_connections",
+		Description: "Total number of attempts to forward a message without finding healthy connections",
+		Tags:        opts.Tags,
+	})
+}
