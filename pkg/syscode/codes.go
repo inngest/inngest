@@ -14,6 +14,7 @@ const (
 	CodeSigVerificationFailed     = "sig_verification_failed"
 	CodeUnknown                   = "unknown"
 	CodeBatchKeyExpressionInvalid = "batch_key_expression_invalid"
+	CodeAnotherSyncInProgress     = "another_sync_in_progress"
 
 	// Connect
 	CodeConnectWorkerHelloTimeout             = "connect_worker_hello_timeout"
