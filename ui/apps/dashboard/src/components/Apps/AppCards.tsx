@@ -51,9 +51,10 @@ export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envS
                 <Button
                   appearance="outlined"
                   label="View details"
-                  onClick={() =>
-                    router.push(pathCreator.app({ envSlug, externalAppID: app.externalID }))
-                  }
+                  onClick={(e) => {
+                    e.preventDefault();
+                    router.push(pathCreator.app({ envSlug, externalAppID: app.externalID }));
+                  }}
                 />
                 <ActionsMenu
                   isArchived={app.isArchived}
