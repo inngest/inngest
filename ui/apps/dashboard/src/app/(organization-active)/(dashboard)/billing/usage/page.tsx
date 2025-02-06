@@ -62,7 +62,6 @@ export default function Billing({
 
   const stepCount = data?.account.entitlements.stepCount || { usage: 0, limit: 0 };
   const runCount = data?.account.entitlements.runCount || { usage: 0, limit: 0 };
-  const legacyNoRunsPlan = data?.account.entitlements.runCount.limit === null;
   const isStepPage = currentPage === 'step';
   const currentUsage = (() => {
     if (selectedPeriod.id === 'previous' && billableData.length) {
@@ -89,10 +88,9 @@ export default function Billing({
               setCurrentPage(value);
             }
           }}
-          disabled={legacyNoRunsPlan}
         >
           <ToggleGroup.Item value="step">Step</ToggleGroup.Item>
-          {!legacyNoRunsPlan && !fetching && <ToggleGroup.Item value="run">Run</ToggleGroup.Item>}
+          <ToggleGroup.Item value="run">Run</ToggleGroup.Item>
         </ToggleGroup>
         <Select
           onChange={(value: Option) => {
