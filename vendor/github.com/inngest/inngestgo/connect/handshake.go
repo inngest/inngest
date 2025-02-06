@@ -17,6 +17,10 @@ type reconnectError struct {
 	err error
 }
 
+func newReconnectErr(wrapped error) error {
+	return &reconnectError{wrapped}
+}
+
 func (e reconnectError) Unwrap() error {
 	return e.err
 }
@@ -26,8 +30,12 @@ func (e reconnectError) Error() string {
 }
 
 func shouldReconnect(err error) bool {
-	return errors.Is(err, reconnectError{})
+	var reconnectError *reconnectError
+	ok := errors.As(err, &reconnectError)
+	return ok
 }
+
+var ErrUnauthenticated = fmt.Errorf("authentication failed")
 
 func (h *connectHandler) performConnectHandshake(ctx context.Context, connectionId string, ws *websocket.Conn, startResponse *connectproto.StartResponse, data connectionEstablishData, startTime time.Time) error {
 	// Wait for gateway hello message
@@ -37,11 +45,11 @@ func (h *connectHandler) performConnectHandshake(ctx context.Context, connection
 		var helloMessage connectproto.ConnectMessage
 		err := wsproto.Read(initialMessageTimeout, ws, &helloMessage)
 		if err != nil {
-			return reconnectError{fmt.Errorf("did not receive gateway hello message: %w", err)}
+			return newReconnectErr(fmt.Errorf("did not receive gateway hello message: %w", err))
 		}
 
 		if helloMessage.Kind != connectproto.GatewayMessageType_GATEWAY_HELLO {
-			return reconnectError{fmt.Errorf("expected gateway hello message, got %s", helloMessage.Kind)}
+			return newReconnectErr(fmt.Errorf("expected gateway hello message, got %s", helloMessage.Kind))
 		}
 
 		h.logger.Debug("received gateway hello message")
@@ -51,7 +59,7 @@ func (h *connectHandler) performConnectHandshake(ctx context.Context, connection
 	{
 		data, err := proto.Marshal(&connectproto.WorkerConnectRequestData{
 			SessionId: &connectproto.SessionIdentifier{
-				BuildId:      h.opts.BuildId,
+				BuildId:      h.opts.BuildID,
 				InstanceId:   h.instanceId(),
 				ConnectionId: connectionId,
 			},
@@ -85,7 +93,7 @@ func (h *connectHandler) performConnectHandshake(ctx context.Context, connection
 			Payload: data,
 		})
 		if err != nil {
-			return reconnectError{fmt.Errorf("could not send initial message")}
+			return newReconnectErr(fmt.Errorf("could not send initial message"))
 		}
 	}
 
@@ -96,11 +104,11 @@ func (h *connectHandler) performConnectHandshake(ctx context.Context, connection
 		var connectionReadyMsg connectproto.ConnectMessage
 		err := wsproto.Read(connectionReadyTimeout, ws, &connectionReadyMsg)
 		if err != nil {
-			return reconnectError{fmt.Errorf("did not receive gateway connection ready message: %w", err)}
+			return newReconnectErr(fmt.Errorf("did not receive gateway connection ready message: %w", err))
 		}
 
 		if connectionReadyMsg.Kind != connectproto.GatewayMessageType_GATEWAY_CONNECTION_READY {
-			return reconnectError{fmt.Errorf("expected gateway connection ready message, got %s", connectionReadyMsg.Kind)}
+			return newReconnectErr(fmt.Errorf("expected gateway connection ready message, got %s", connectionReadyMsg.Kind))
 		}
 
 		h.logger.Debug("received gateway connection ready message")

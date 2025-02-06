@@ -84,6 +84,9 @@ type RegisterRequest struct {
 	// JSON payload to have a single source of truth.
 	Headers Headers `json:"headers"`
 
+	// IdempotencyKey is an optional input to deduplicate syncs.
+	IdempotencyKey string `json:"idempotencyKey"`
+
 	// checksum is a memoized field.
 	checksum string
 

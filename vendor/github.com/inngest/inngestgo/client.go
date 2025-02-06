@@ -98,10 +98,20 @@ func (a apiClient) GetEnv() string {
 }
 
 func (a apiClient) GetEventKey() string {
-	if a.EventKey == nil {
-		return os.Getenv("INNGEST_EVENT_KEY")
+	if a.EventKey != nil {
+		return *a.EventKey
 	}
-	return *a.EventKey
+
+	envVar := os.Getenv("INNGEST_EVENT_KEY")
+	if envVar != "" {
+		return envVar
+	}
+
+	if IsDev() {
+		return "NO_EVENT_KEY_SET"
+	}
+
+	return ""
 }
 
 type validatable interface {
