@@ -63,7 +63,6 @@ type Props = {
   pathCreator: React.ComponentProps<typeof RunDetailsV2>['pathCreator'];
   pollInterval?: number;
   rerun: React.ComponentProps<typeof RunDetailsV2>['rerun'];
-  rerunFromStep: React.ComponentProps<typeof RunDetailsV2>['rerunFromStep'];
   apps?: Option[];
   functions?: Option[];
   functionIsPaused?: boolean;
@@ -79,7 +78,6 @@ export function RunsPage({
   getTraceResult,
   getTrigger,
   rerun,
-  rerunFromStep,
   data,
   features,
   hasMore,
@@ -265,7 +263,6 @@ export function RunsPage({
               pathCreator={pathCreator}
               pollInterval={pollInterval}
               rerun={rerun}
-              rerunFromStep={rerunFromStep}
               runID={rowData.id}
               standalone={false}
             />

@@ -35,7 +35,6 @@ type Props = {
   run: Lazy<Run>;
   runID: string;
   result?: Result;
-  traceAIEnabled?: boolean;
 };
 
 type Run = {

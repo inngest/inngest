@@ -155,7 +155,6 @@ export const RunDetailsV3 = (props: Props) => {
               runID={runID}
               standalone={standalone}
               result={resultRes.data}
-              traceAIEnabled={false}
             />
             {showError && (
               <ErrorCard

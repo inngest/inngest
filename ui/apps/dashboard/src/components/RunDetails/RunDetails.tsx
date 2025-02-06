@@ -8,7 +8,6 @@ import { cn } from '@inngest/components/utils/classNames';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { useCancelRun } from '@/queries/useCancelRun';
 import { useRerun } from '@/queries/useRerun';
-import { useRerunFromStep } from '@/queries/useRerunFromStep';
 import { pathCreator } from '@/utils/urls';
 import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { useGetRun } from './useGetRun';
@@ -65,7 +64,6 @@ export function DashboardRunDetails({ runID, standalone = true }: Props) {
           getRun={getRun}
           getTrigger={getTrigger}
           rerun={rerun}
-          rerunFromStep={null}
           runID={runID}
         />
       )}
