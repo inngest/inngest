@@ -1,16 +1,17 @@
 'use client';
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext } from 'react';
 
-export interface InvokeRunPayload {
-  functionSlug: string;
-  data: Record<string, unknown>;
-  user: Record<string, unknown> | null;
-}
+import type { InvokeRunPayload } from './useInvokeRun';
+import type { RerunFromStepPayload, RerunFromStepResult } from './useRerunFromStep';
 
 export type SignalDefinitions = {
   invokeRun: {
     payload: InvokeRunPayload;
+    result: unknown;
+  };
+  rerunFromStep: {
+    payload: RerunFromStepPayload;
     result: unknown;
   };
 };

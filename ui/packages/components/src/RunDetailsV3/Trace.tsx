@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import type { Route } from 'next';
 import { RiArrowUpSLine } from '@remixicon/react';
 
-import type { RerunFromStep } from '../Rerun/RerunModal';
 import type { Result } from '../types/functionRun';
 import { toMaybeDate } from '../utils/date';
 import { InlineSpans } from './InlineSpans';
@@ -19,7 +18,6 @@ type Props = {
   };
   trace: Trace;
   runID: string;
-  rerunFromStep: RerunFromStep;
   leftWidth: number;
   handleMouseDown: (e: React.MouseEvent) => void;
 };
@@ -32,7 +30,6 @@ export function Trace({
   pathCreator,
   trace,
   runID,
-  rerunFromStep,
   leftWidth,
   handleMouseDown,
 }: Props) {
@@ -65,9 +62,7 @@ export function Trace({
     <>
       <div
         className="flex h-7 w-full cursor-pointer flex-row items-center justify-start gap-1"
-        onClick={() =>
-          selectStep(depth ? { trace, runID, result, rerunFromStep, pathCreator } : undefined)
-        }
+        onClick={() => selectStep(depth ? { trace, runID, result, pathCreator } : undefined)}
       >
         <div
           className="flex flex-row items-center justify-start gap-1"
@@ -117,7 +112,6 @@ export function Trace({
                 pathCreator={pathCreator}
                 trace={child}
                 runID={runID}
-                rerunFromStep={rerunFromStep}
                 leftWidth={leftWidth}
                 handleMouseDown={handleMouseDown}
               />

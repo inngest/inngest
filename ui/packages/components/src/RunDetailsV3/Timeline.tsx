@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Route } from 'next';
 
-import type { RerunFromStep } from '../Rerun/RerunModal';
 import { toMaybeDate } from '../utils/date';
 import { isLazyDone, type Lazy } from '../utils/lazyLoad';
 import { Trace } from './Trace';
@@ -13,10 +12,9 @@ type Props = {
   };
   runID: string;
   trace: Lazy<React.ComponentProps<typeof Trace>['trace']>;
-  rerunFromStep: RerunFromStep;
 };
 
-export const Timeline = ({ getResult, pathCreator, runID, trace, rerunFromStep }: Props) => {
+export const Timeline = ({ getResult, pathCreator, runID, trace }: Props) => {
   const [leftWidth, setLeftWidth] = useState(30);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -75,7 +73,6 @@ export const Timeline = ({ getResult, pathCreator, runID, trace, rerunFromStep }
         pathCreator={pathCreator}
         runID={runID}
         trace={{ ...trace, name: 'Run' }}
-        rerunFromStep={rerunFromStep}
         leftWidth={leftWidth}
         handleMouseDown={handleMouseDown}
       />

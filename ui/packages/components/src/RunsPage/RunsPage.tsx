@@ -252,7 +252,6 @@ export function RunsPage({
               pathCreator={pathCreator}
               pollInterval={pollInterval}
               rerun={rerun}
-              rerunFromStep={rerunFromStep}
               runID={rowData.id}
               standalone={false}
             />

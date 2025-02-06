@@ -4,7 +4,6 @@ import { RiArrowRightUpLine, RiArrowUpSLine } from '@remixicon/react';
 
 import { AITrace } from '../AI/AITrace';
 import { parseAIOutput } from '../AI/utils';
-import { CancelRunButton } from '../CancelRunButton';
 import {
   ElementWrapper,
   IDElement,
@@ -15,8 +14,6 @@ import {
   TimeElement,
 } from '../DetailsCard/Element';
 import { Link } from '../Link';
-import type { RerunFromStep } from '../Rerun/RerunModal';
-import { RerunButton } from '../RerunButtonV2';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { AICell } from '../Table/Cell';
 import type { Result } from '../types/functionRun';
@@ -34,7 +31,6 @@ type Props = {
     runPopout: (params: { runID: string }) => Route;
   };
   rerun: (args: { fnID: string; runID: string }) => Promise<unknown>;
-  rerunFromStep: RerunFromStep;
   initialRunData?: InitialRunData;
   run: Lazy<Run>;
   runID: string;

@@ -2,6 +2,12 @@ import { useState } from 'react';
 
 import { useSignals, type SignalDefinitions } from './SignalsContext';
 
+export interface InvokeRunPayload {
+  functionSlug: string;
+  data: Record<string, unknown>;
+  user: Record<string, unknown> | null;
+}
+
 export const useInvokeRun = () => {
   const signals = useSignals();
   const [loading, setLoading] = useState(false);

@@ -5,11 +5,7 @@ import { RiCloseLine } from '@remixicon/react';
 import { Button } from '../Button';
 import { CodeBlock } from '../CodeBlock/CodeBlock';
 import { Modal } from '../Modal/Modal';
-
-export type RerunFromStep = (args: {
-  runID: string;
-  fromStep: { stepID: string; input: string };
-}) => Promise<RerunResult>;
+import { useRerunFromStep } from '../Signals/useRerunFromStep';
 
 export type RerunModalType = {
   open: boolean;
@@ -17,7 +13,6 @@ export type RerunModalType = {
   runID: string;
   stepID: string;
   input: string;
-  rerunFromStep: RerunFromStep;
 };
 
 export type RerunResult = {
@@ -39,24 +34,17 @@ const patchInput = (newInput: string) => {
   }
 };
 
-export const RerunModal = ({
-  open,
-  setOpen,
-  runID,
-  stepID,
-  input,
-  rerunFromStep,
-}: RerunModalType) => {
+export const RerunModal = ({ open, setOpen, runID, stepID, input }: RerunModalType) => {
+  const { rerun, loading, error } = useRerunFromStep();
   const [newInput, setNewInput] = useState(input);
-  const router = useRouter();
   const [rerunning, setRerunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
   const pathname = usePathname();
   const parts = pathname.trim().split('/').slice(1);
 
   useEffect(() => {
     if (!open) {
-      setError(null);
       setRerunning(false);
     }
   }, [open]);
@@ -105,26 +93,23 @@ export const RerunModal = ({
         </div>
       </div>
       <div className="mt-6 flex flex-row items-center justify-end gap-2">
-        <div>{error && <span className="text-error">{error}</span>}</div>
+        <div>{error && <span className="text-error">{error.message}</span>}</div>
         <Button kind="secondary" appearance="ghost" label="Cancel" onClick={() => setOpen(false)} />
         <Button
           label="Rerun function"
-          loading={rerunning}
+          loading={loading || rerunning}
           onClick={async () => {
             setRerunning(true);
-            setError(null);
-
-            const result = await rerunFromStep({
+            const result = await rerun({
               runID,
               fromStep: { stepID, input: patchInput(newInput) },
             });
 
-            if (result.error) {
-              console.error('rerun from step error', result.error);
-              setError('Rerun failed, please try again later.');
+            if (error) {
+              console.error('rerun from step error', error);
             }
 
-            if (result.data?.rerun) {
+            if (result?.data?.rerun) {
               router.push(
                 parts[0] === 'env'
                   ? `/${parts[0]}/${parts[1]}/runs/${result.data.rerun}`

@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-import type { RerunFromStep } from '../Rerun/RerunModal';
 import { ErrorCard } from '../RunDetailsV2/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
+import { StatusCell } from '../Table/Cell';
 import { Trace as OldTrace } from '../TimelineV2';
 import { TriggerDetails } from '../TriggerDetails';
 import type { Result } from '../types/functionRun';
@@ -28,7 +28,6 @@ type Props = {
   pathCreator: React.ComponentProps<typeof RunInfo>['pathCreator'];
   pollInterval?: number;
   rerun: React.ComponentProps<typeof RunInfo>['rerun'];
-  rerunFromStep: RerunFromStep;
   runID: string;
 };
 
@@ -49,8 +48,7 @@ type Run = {
 
 export const RunDetailsV3 = (props: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { getResult, getRun, getTrigger, pathCreator, rerun, rerunFromStep, runID, standalone } =
-    props;
+  const { getResult, getRun, getTrigger, pathCreator, rerun, runID, standalone } = props;
   const [pollInterval, setPollInterval] = useState(props.pollInterval);
   const [leftWidth, setLeftWidth] = useState(55);
   const [isDragging, setIsDragging] = useState(false);
@@ -136,65 +134,72 @@ export const RunDetailsV3 = (props: Props) => {
       : runRes.error || resultRes.error;
 
   return (
-    <div ref={containerRef} className="flex h-full flex-row">
-      <div className="flex flex-col gap-2" style={{ width: `${leftWidth}%` }}>
-        <div className="px-4">
-          <RunInfo
-            cancelRun={cancelRun}
-            className="mb-4"
-            pathCreator={pathCreator}
-            rerun={rerun}
-            rerunFromStep={rerunFromStep}
-            initialRunData={props.initialRunData}
-            run={nullishToLazy(run)}
-            runID={runID}
-            standalone={standalone}
-            result={resultRes.data}
-            traceAIEnabled={false}
+    <>
+      {standalone && run && (
+        <div className="border-muted mb-2 flex flex-col gap-1 border-b px-4 pb-4">
+          <StatusCell status={run.trace.status} />
+          <p className="text-basis text-2xl font-medium">{run.fn.name}</p>
+          <p className="text-subtle font-mono">{runID}</p>
+        </div>
+      )}
+      <div ref={containerRef} className="flex h-full flex-row">
+        <div className="flex flex-col gap-2" style={{ width: `${leftWidth}%` }}>
+          <div className="px-4">
+            <RunInfo
+              cancelRun={cancelRun}
+              className="mb-4"
+              pathCreator={pathCreator}
+              rerun={rerun}
+              initialRunData={props.initialRunData}
+              run={nullishToLazy(run)}
+              runID={runID}
+              standalone={standalone}
+              result={resultRes.data}
+              traceAIEnabled={false}
+            />
+            {showError && (
+              <ErrorCard
+                error={runRes.error || resultRes.error}
+                reset={runRes.error ? () => runRes.refetch() : () => resultRes.refetch()}
+              />
+            )}
+          </div>
+          <Tabs
+            tabs={[
+              {
+                label: 'Trace',
+                node: run && (
+                  <Timeline
+                    getResult={getResult}
+                    pathCreator={pathCreator}
+                    runID={runID}
+                    trace={run?.trace}
+                  />
+                ),
+              },
+              { label: 'Workflow', node: <Workflow /> },
+            ]}
           />
-          {showError && (
-            <ErrorCard
-              error={runRes.error || resultRes.error}
-              reset={runRes.error ? () => runRes.refetch() : () => resultRes.refetch()}
+        </div>
+
+        <div
+          className="border-muted w-2 cursor-col-resize border-r-[.5px]"
+          onMouseDown={handleMouseDown}
+        />
+
+        <div className="border-muted flex h-full flex-col" style={{ width: `${100 - leftWidth}%` }}>
+          {selectedStep ? (
+            <StepInfo selectedStep={selectedStep} />
+          ) : (
+            <TopInfo
+              slug={run?.fn.slug}
+              getTrigger={getTrigger}
+              runID={runID}
+              result={resultRes.data}
             />
           )}
         </div>
-        <Tabs
-          tabs={[
-            {
-              label: 'Trace',
-              node: run && (
-                <Timeline
-                  getResult={getResult}
-                  pathCreator={pathCreator}
-                  runID={runID}
-                  trace={run?.trace}
-                  rerunFromStep={rerunFromStep}
-                />
-              ),
-            },
-            { label: 'Workflow', node: <Workflow /> },
-          ]}
-        />
       </div>
-
-      <div
-        className="border-muted w-2 cursor-col-resize border-r-[.5px]"
-        onMouseDown={handleMouseDown}
-      />
-
-      <div className="border-muted flex h-full flex-col" style={{ width: `${100 - leftWidth}%` }}>
-        {selectedStep ? (
-          <StepInfo selectedStep={selectedStep} />
-        ) : (
-          <TopInfo
-            slug={run?.fn.slug}
-            getTrigger={getTrigger}
-            runID={runID}
-            result={resultRes.data}
-          />
-        )}
-      </div>
-    </div>
+    </>
   );
 };

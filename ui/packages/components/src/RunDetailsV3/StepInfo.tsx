@@ -110,7 +110,7 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
   const [expanded, setExpanded] = useState(true);
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
 
-  const { runID, result, trace, rerunFromStep, pathCreator } = selectedStep;
+  const { runID, result, trace, pathCreator } = selectedStep;
 
   const delayText = formatMilliseconds(
     (toMaybeDate(trace.startedAt) ?? new Date()).getTime() - new Date(trace.queuedAt).getTime()
@@ -169,7 +169,6 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
               runID={runID}
               stepID={trace.stepID}
               input={prettyInput}
-              rerunFromStep={rerunFromStep}
             />
           </>
         )}
