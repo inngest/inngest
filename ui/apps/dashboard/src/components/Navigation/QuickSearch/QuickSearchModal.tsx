@@ -33,78 +33,80 @@ export function QuickSearchModal({ envSlug, isOpen, onClose }: Props) {
             'placeholder-disabled bg-canvasBase w-[656px] border-0 px-3 py-3 outline-none focus:ring-0'
           )}
         />
-        <Command.List className="text-subtle bg-canvasBase px-3 py-3">
-          {(isTyping || res.isFetching) && <Command.Loading>Searching...</Command.Loading>}
+        {debouncedTerm && (
+          <Command.List className="text-subtle bg-canvasBase px-3 py-3">
+            {(isTyping || res.isFetching) && <Command.Loading>Searching...</Command.Loading>}
 
-          {!isTyping && !res.isFetching && res.data && !res.error && (
-            <Command.Group>
-              {res.data.apps.map((app) => {
-                return (
+            {!isTyping && !res.isFetching && res.data && !res.error && (
+              <Command.Group>
+                {res.data.apps.map((app, i) => {
+                  return (
+                    <ResultItem
+                      key={`${app.name}-${i}`}
+                      kind="app"
+                      onClick={onClose}
+                      path={pathCreator.app({ envSlug, externalAppID: app.name })}
+                      value={app.name}
+                    />
+                  );
+                })}
+
+                {res.data.event && (
                   <ResultItem
-                    key={app.name}
-                    kind="app"
+                    kind="event"
                     onClick={onClose}
-                    path={pathCreator.app({ envSlug, externalAppID: app.name })}
-                    value={app.name}
+                    path={pathCreator.event({
+                      envSlug,
+                      eventName: res.data.event.name,
+                      eventID: res.data.event.id,
+                    })}
+                    value={res.data.event.name}
                   />
-                );
-              })}
+                )}
 
-              {res.data.event && (
-                <ResultItem
-                  kind="event"
-                  onClick={onClose}
-                  path={pathCreator.event({
-                    envSlug,
-                    eventName: res.data.event.name,
-                    eventID: res.data.event.id,
-                  })}
-                  value={res.data.event.name}
-                />
-              )}
+                {res.data.eventTypes.map((eventType) => {
+                  return (
+                    <ResultItem
+                      key={eventType.name}
+                      kind="eventType"
+                      onClick={onClose}
+                      path={pathCreator.eventType({ envSlug, eventName: eventType.name })}
+                      value={eventType.name}
+                    />
+                  );
+                })}
 
-              {res.data.eventTypes.map((eventType) => {
-                return (
+                {res.data.functions.map((fn) => {
+                  return (
+                    <ResultItem
+                      key={fn.name}
+                      kind="function"
+                      onClick={onClose}
+                      path={pathCreator.function({ envSlug, functionSlug: fn.slug })}
+                      value={fn.name}
+                    />
+                  );
+                })}
+
+                {res.data.run && (
                   <ResultItem
-                    key={eventType.name}
-                    kind="eventType"
+                    key={res.data.run.id}
+                    kind="run"
                     onClick={onClose}
-                    path={pathCreator.eventType({ envSlug, eventName: eventType.name })}
-                    value={eventType.name}
+                    path={pathCreator.runPopout({ envSlug, runID: res.data.run.id })}
+                    value={res.data.run.id}
                   />
-                );
-              })}
+                )}
+              </Command.Group>
+            )}
 
-              {res.data.functions.map((fn) => {
-                return (
-                  <ResultItem
-                    key={fn.name}
-                    kind="function"
-                    onClick={onClose}
-                    path={pathCreator.function({ envSlug, functionSlug: fn.slug })}
-                    value={fn.name}
-                  />
-                );
-              })}
+            <Command.Empty className={cn(!res.error && 'hidden')}>Error searching</Command.Empty>
 
-              {res.data.run && (
-                <ResultItem
-                  key={res.data.run.id}
-                  kind="run"
-                  onClick={onClose}
-                  path={pathCreator.runPopout({ envSlug, runID: res.data.run.id })}
-                  value={res.data.run.id}
-                />
-              )}
-            </Command.Group>
-          )}
-
-          <Command.Empty className={cn(!res.error && 'hidden')}>Error searching</Command.Empty>
-
-          <Command.Empty className={cn((isTyping || res.isPending || res.error) && 'hidden')}>
-            No results found
-          </Command.Empty>
-        </Command.List>
+            <Command.Empty className={cn((isTyping || res.isPending || res.error) && 'hidden')}>
+              No results found
+            </Command.Empty>
+          </Command.List>
+        )}
       </Command>
     </Modal>
   );
