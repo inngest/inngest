@@ -25,7 +25,7 @@ export default function EntitlementListItem({
   tooltipContent?: string | React.ReactNode;
   entitlement: {
     currentValue: number | boolean | null; // Current value of the entitlement relevant to this addon, including plan + any addons + account-level overrides
-    displayValue: string;
+    displayValue: string | React.ReactNode;
   };
   addon?: {
     available: boolean;
@@ -100,13 +100,19 @@ export default function EntitlementListItem({
     content = (
       <div className="flex items-end justify-between">
         <div>
-          <p className="text-subtle mb-1 flex items-center gap-1 text-sm font-medium">
+          <p className="text-subtle mb-0.5 flex items-center gap-1 text-sm font-medium">
             {title}
             {tooltip && tooltip}
           </p>
-          <p className="text-muted mb-0.5 text-sm italic">{description}</p>
+          <p className="text-muted mb-1 text-sm italic">{description}</p>
           {entitlement.displayValue && (
-            <p className="text-basis pr-3 text-sm font-medium">{entitlement.displayValue}</p>
+            <p
+              className={`text-basis pr-3 text-sm ${
+                typeof entitlement.displayValue === 'string' ? 'font-medium' : ''
+              }`}
+            >
+              {entitlement.displayValue}
+            </p>
           )}
         </div>
         <Button
