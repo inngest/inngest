@@ -17,7 +17,6 @@ import { useGetTrigger } from '@/components/RunDetails/useGetTrigger';
 import { GetFunctionPauseStateDocument, RunsOrderByField } from '@/gql/graphql';
 import { useCancelRun } from '@/queries/useCancelRun';
 import { useRerun } from '@/queries/useRerun';
-import { useRerunFromStep } from '@/queries/useRerunFromStep';
 import { pathCreator } from '@/utils/urls';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
 import { useBooleanFlag } from '../FeatureFlags/hooks';
@@ -80,7 +79,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 
   const cancelRun = useCancelRun({ envID: env.id });
   const rerun = useRerun({ envID: env.id, envSlug: env.slug });
-  const rerunFromStep = useRerunFromStep();
   const getTraceResult = useGetTraceResult();
   const getTrigger = useGetTrigger();
   const getRun = useGetRun();
@@ -240,7 +238,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       getTrigger={getTrigger}
       pathCreator={internalPathCreator}
       rerun={rerun}
-      rerunFromStep={rerunFromStep}
       functionIsPaused={pauseData?.environment.function?.isPaused ?? false}
       scope={scope}
       totalCount={totalCount}

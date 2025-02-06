@@ -11,10 +11,9 @@ type Props = {
   };
   runID: string;
   trace: Lazy<React.ComponentProps<typeof Trace>['trace']>;
-  rerunFromStep: React.ComponentProps<typeof Trace>['rerunFromStep'];
 };
 
-export function TimelineV2({ getResult, pathCreator, runID, trace, rerunFromStep }: Props) {
+export function TimelineV2({ getResult, pathCreator, runID, trace }: Props) {
   if (!isLazyDone(trace)) {
     // TODO: Properly handle loading state
     return null;
@@ -34,7 +33,6 @@ export function TimelineV2({ getResult, pathCreator, runID, trace, rerunFromStep
         pathCreator={pathCreator}
         runID={runID}
         trace={{ ...trace, childrenSpans: [], name: 'Run' }}
-        rerunFromStep={rerunFromStep}
       />
 
       {trace.childrenSpans?.map((child) => {
@@ -48,7 +46,6 @@ export function TimelineV2({ getResult, pathCreator, runID, trace, rerunFromStep
             pathCreator={pathCreator}
             runID={runID}
             trace={child}
-            rerunFromStep={rerunFromStep}
           />
         );
       })}

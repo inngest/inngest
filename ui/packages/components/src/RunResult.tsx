@@ -12,12 +12,11 @@ type Props = {
   className?: string;
   result: Result;
   runID: string;
-  rerunFromStep: React.ComponentProps<typeof RerunModal>['rerunFromStep'];
   stepID?: string | null;
   isSuccess?: boolean;
 };
 
-export function RunResult({ result, isSuccess, runID, rerunFromStep, stepID }: Props) {
+export function RunResult({ result, isSuccess, runID, stepID }: Props) {
   const prettyInput = usePrettyJson(result.input ?? '') || (result.input ?? '');
   const prettyOutput = usePrettyJson(result.data ?? '') || (result.data ?? '');
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
@@ -54,7 +53,6 @@ export function RunResult({ result, isSuccess, runID, rerunFromStep, stepID }: P
                   runID={runID}
                   stepID={stepID}
                   input={prettyInput}
-                  rerunFromStep={rerunFromStep}
                 />
               </>
             )}

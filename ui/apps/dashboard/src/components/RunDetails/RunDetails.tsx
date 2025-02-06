@@ -8,7 +8,6 @@ import { cn } from '@inngest/components/utils/classNames';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { useCancelRun } from '@/queries/useCancelRun';
 import { useRerun } from '@/queries/useRerun';
-import { useRerunFromStep } from '@/queries/useRerunFromStep';
 import { pathCreator } from '@/utils/urls';
 import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { useGetRun } from './useGetRun';
@@ -24,7 +23,6 @@ export function DashboardRunDetails({ runID, standalone = true }: Props) {
   const env = useEnvironment();
   const cancelRun = useCancelRun({ envID: env.id });
   const rerun = useRerun({ envID: env.id, envSlug: env.slug });
-  const rerunFromStep = useRerunFromStep();
   const getTraceResult = useGetTraceResult();
   const { value: traceAIEnabled, isReady } = useBooleanFlag('ai-traces');
 
@@ -55,7 +53,6 @@ export function DashboardRunDetails({ runID, standalone = true }: Props) {
           getRun={getRun}
           getTrigger={getTrigger}
           rerun={rerun}
-          rerunFromStep={rerunFromStep}
           runID={runID}
         />
       ) : (
@@ -67,7 +64,6 @@ export function DashboardRunDetails({ runID, standalone = true }: Props) {
           getRun={getRun}
           getTrigger={getTrigger}
           rerun={rerun}
-          rerunFromStep={rerunFromStep}
           runID={runID}
         />
       )}

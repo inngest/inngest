@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Alert } from '@inngest/components/Alert/Alert';
 
+import { Shared } from '@/app/Shared';
 import { ArchivedEnvBanner } from '@/components/ArchivedEnvBanner';
 import { getEnv } from '@/components/Environments/data';
 import { EnvironmentProvider } from '@/components/Environments/environment-context';
@@ -40,7 +41,9 @@ export default async function RootLayout({
   return (
     <>
       <Layout activeEnv={env}>
-        <Env env={env}>{children}</Env>
+        <Env env={env}>
+          <Shared>{children}</Shared>
+        </Env>
       </Layout>
       <Toaster />
     </>
