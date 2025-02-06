@@ -39,14 +39,15 @@ export function QuickSearchModal({ envSlug, isOpen, onClose }: Props) {
 
             {!isTyping && !res.isFetching && res.data && !res.error && (
               <Command.Group>
-                {res.data.apps.map((app) => {
+                {res.data.apps.map((app, i) => {
                   return (
                     <ResultItem
                       key={app.name}
                       kind="app"
                       onClick={onClose}
                       path={pathCreator.app({ envSlug, externalAppID: app.name })}
-                      value={app.name}
+                      text={app.name}
+                      value={`app-${i}-${app.name}`}
                     />
                   );
                 })}
@@ -60,30 +61,33 @@ export function QuickSearchModal({ envSlug, isOpen, onClose }: Props) {
                       eventName: res.data.event.name,
                       eventID: res.data.event.id,
                     })}
-                    value={res.data.event.name}
+                    text={res.data.event.name}
+                    value={`event-${res.data.event.name}`}
                   />
                 )}
 
-                {res.data.eventTypes.map((eventType) => {
+                {res.data.eventTypes.map((eventType, i) => {
                   return (
                     <ResultItem
                       key={eventType.name}
                       kind="eventType"
                       onClick={onClose}
                       path={pathCreator.eventType({ envSlug, eventName: eventType.name })}
-                      value={eventType.name}
+                      text={eventType.name}
+                      value={`eventType-${i}-${eventType.name}`}
                     />
                   );
                 })}
 
-                {res.data.functions.map((fn) => {
+                {res.data.functions.map((fn, i) => {
                   return (
                     <ResultItem
                       key={fn.name}
                       kind="function"
                       onClick={onClose}
                       path={pathCreator.function({ envSlug, functionSlug: fn.slug })}
-                      value={fn.name}
+                      text={fn.name}
+                      value={`function-${i}-${fn.name}`}
                     />
                   );
                 })}
@@ -94,7 +98,8 @@ export function QuickSearchModal({ envSlug, isOpen, onClose }: Props) {
                     kind="run"
                     onClick={onClose}
                     path={pathCreator.runPopout({ envSlug, runID: res.data.run.id })}
-                    value={res.data.run.id}
+                    text={res.data.run.id}
+                    value={`run-${res.data.run.id}`}
                   />
                 )}
               </Command.Group>
