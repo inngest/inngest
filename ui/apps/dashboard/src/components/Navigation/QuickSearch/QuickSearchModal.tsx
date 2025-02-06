@@ -39,10 +39,10 @@ export function QuickSearchModal({ envSlug, isOpen, onClose }: Props) {
 
             {!isTyping && !res.isFetching && res.data && !res.error && (
               <Command.Group>
-                {res.data.apps.map((app, i) => {
+                {res.data.apps.map((app) => {
                   return (
                     <ResultItem
-                      key={`${app.name}-${i}`}
+                      key={app.name}
                       kind="app"
                       onClick={onClose}
                       path={pathCreator.app({ envSlug, externalAppID: app.name })}
