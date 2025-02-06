@@ -43,7 +43,18 @@ export const Tabs = ({ tabs, defaultActive = 0 }: { tabs: TabsType; defaultActiv
           </Tab>
         ))}
       </div>
-      <div>{tabs[active]?.node}</div>
+      <div className="relative">
+        {tabs.map((tab, i) => (
+          <div
+            key={`content-${i}`}
+            className={`w-full transition-all duration-200 ${
+              active === i ? 'visible opacity-100' : 'invisible h-0 opacity-0'
+            }`}
+          >
+            {tab.node}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

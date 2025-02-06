@@ -109,6 +109,7 @@ export function Trace({
           {trace.childrenSpans?.map((child, i) => {
             return (
               <Trace
+                key={`${child.name}-${i}`}
                 depth={depth + 1}
                 getResult={getResult}
                 maxTime={maxTime}
