@@ -3,7 +3,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { URQLProvider } from '@/queries/URQLProvider';
-import { Shared } from '../Shared';
 
 const queryClient = new QueryClient();
 
