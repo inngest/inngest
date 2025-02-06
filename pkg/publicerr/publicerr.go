@@ -113,3 +113,17 @@ func (e Error) Error() string {
 func (e Error) Unwrap() error {
 	return e.Err
 }
+
+// HTTPErr returns a simple public Error with the given HTTP error code. The message
+// is the standard library's text for that code.
+func HTTPErr(status int) Error {
+	m := http.StatusText(status)
+	if m == "" {
+		m = http.StatusText(http.StatusInternalServerError)
+	}
+	
+	return Error{
+		Message: m,
+		Status:  status,
+	}
+}

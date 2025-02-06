@@ -4,8 +4,8 @@ package sns
 
 import (
 	"context"
+	"fmt"
 	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
-	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/smithy-go/middleware"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
@@ -43,63 +43,63 @@ type GetSubscriptionAttributesOutput struct {
 	// A map of the subscription's attributes. Attributes in this map include the
 	// following:
 	//
-	// * ConfirmationWasAuthenticated – true if the subscription
-	// confirmation request was authenticated.
+	//   - ConfirmationWasAuthenticated – true if the subscription confirmation request
+	//   was authenticated.
 	//
-	// * DeliveryPolicy – The JSON
-	// serialization of the subscription's delivery policy.
+	//   - DeliveryPolicy – The JSON serialization of the subscription's delivery
+	//   policy.
 	//
-	// * EffectiveDeliveryPolicy
-	// – The JSON serialization of the effective delivery policy that takes into
-	// account the topic delivery policy and account system defaults.
+	//   - EffectiveDeliveryPolicy – The JSON serialization of the effective delivery
+	//   policy that takes into account the topic delivery policy and account system
+	//   defaults.
 	//
-	// * FilterPolicy –
-	// The filter policy JSON that is assigned to the subscription. For more
-	// information, see Amazon SNS Message Filtering
-	// (https://docs.aws.amazon.com/sns/latest/dg/sns-message-filtering.html) in the
-	// Amazon SNS Developer Guide.
+	//   - FilterPolicy – The filter policy JSON that is assigned to the subscription.
+	//   For more information, see [Amazon SNS Message Filtering]in the Amazon SNS Developer Guide.
 	//
-	// * Owner – The Amazon Web Services account ID of the
-	// subscription's owner.
+	//   - FilterPolicyScope – This attribute lets you choose the filtering scope by
+	//   using one of the following string value types:
 	//
-	// * PendingConfirmation – true if the subscription hasn't
-	// been confirmed. To confirm a pending subscription, call the ConfirmSubscription
-	// action with a confirmation token.
+	//   - MessageAttributes (default) – The filter is applied on the message
+	//   attributes.
 	//
-	// * RawMessageDelivery – true if raw message
-	// delivery is enabled for the subscription. Raw messages are free of JSON
-	// formatting and can be sent to HTTP/S and Amazon SQS endpoints.
+	//   - MessageBody – The filter is applied on the message body.
 	//
-	// * RedrivePolicy
-	// – When specified, sends undeliverable messages to the specified Amazon SQS
-	// dead-letter queue. Messages that can't be delivered due to client errors (for
-	// example, when the subscribed endpoint is unreachable) or server errors (for
-	// example, when the service that powers the subscribed endpoint becomes
-	// unavailable) are held in the dead-letter queue for further analysis or
-	// reprocessing.
+	//   - Owner – The Amazon Web Services account ID of the subscription's owner.
 	//
-	// * SubscriptionArn – The subscription's ARN.
+	//   - PendingConfirmation – true if the subscription hasn't been confirmed. To
+	//   confirm a pending subscription, call the ConfirmSubscription action with a
+	//   confirmation token.
 	//
-	// * TopicArn – The
-	// topic ARN that the subscription is associated with.
+	//   - RawMessageDelivery – true if raw message delivery is enabled for the
+	//   subscription. Raw messages are free of JSON formatting and can be sent to HTTP/S
+	//   and Amazon SQS endpoints.
 	//
-	// The following attribute
-	// applies only to Amazon Kinesis Data Firehose delivery stream subscriptions:
+	//   - RedrivePolicy – When specified, sends undeliverable messages to the
+	//   specified Amazon SQS dead-letter queue. Messages that can't be delivered due to
+	//   client errors (for example, when the subscribed endpoint is unreachable) or
+	//   server errors (for example, when the service that powers the subscribed endpoint
+	//   becomes unavailable) are held in the dead-letter queue for further analysis or
+	//   reprocessing.
 	//
-	// *
-	// SubscriptionRoleArn – The ARN of the IAM role that has the following:
+	//   - SubscriptionArn – The subscription's ARN.
 	//
-	// *
-	// Permission to write to the Kinesis Data Firehose delivery stream
+	//   - TopicArn – The topic ARN that the subscription is associated with.
 	//
-	// * Amazon SNS
-	// listed as a trusted entity
+	// The following attribute applies only to Amazon Data Firehose delivery stream
+	// subscriptions:
 	//
-	// Specifying a valid ARN for this attribute is
-	// required for Kinesis Data Firehose delivery stream subscriptions. For more
-	// information, see Fanout to Kinesis Data Firehose delivery streams
-	// (https://docs.aws.amazon.com/sns/latest/dg/sns-firehose-as-subscriber.html) in
-	// the Amazon SNS Developer Guide.
+	//   - SubscriptionRoleArn – The ARN of the IAM role that has the following:
+	//
+	//   - Permission to write to the Firehose delivery stream
+	//
+	//   - Amazon SNS listed as a trusted entity
+	//
+	// Specifying a valid ARN for this attribute is required for Firehose delivery
+	//   stream subscriptions. For more information, see [Fanout to Firehose delivery streams]in the Amazon SNS Developer
+	//   Guide.
+	//
+	// [Amazon SNS Message Filtering]: https://docs.aws.amazon.com/sns/latest/dg/sns-message-filtering.html
+	// [Fanout to Firehose delivery streams]: https://docs.aws.amazon.com/sns/latest/dg/sns-firehose-as-subscriber.html
 	Attributes map[string]string
 
 	// Metadata pertaining to the operation's result.
@@ -109,6 +109,9 @@ type GetSubscriptionAttributesOutput struct {
 }
 
 func (c *Client) addOperationGetSubscriptionAttributesMiddlewares(stack *middleware.Stack, options Options) (err error) {
+	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+		return err
+	}
 	err = stack.Serialize.Add(&awsAwsquery_serializeOpGetSubscriptionAttributes{}, middleware.After)
 	if err != nil {
 		return err
@@ -117,34 +120,38 @@ func (c *Client) addOperationGetSubscriptionAttributesMiddlewares(stack *middlew
 	if err != nil {
 		return err
 	}
+	if err := addProtocolFinalizerMiddlewares(stack, options, "GetSubscriptionAttributes"); err != nil {
+		return fmt.Errorf("add protocol finalizers: %v", err)
+	}
+
+	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
+		return err
+	}
 	if err = addSetLoggerMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddClientRequestIDMiddleware(stack); err != nil {
+	if err = addClientRequestID(stack); err != nil {
 		return err
 	}
-	if err = smithyhttp.AddComputeContentLengthMiddleware(stack); err != nil {
+	if err = addComputeContentLength(stack); err != nil {
 		return err
 	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = v4.AddComputePayloadSHA256Middleware(stack); err != nil {
+	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetryMiddlewares(stack, options); err != nil {
+	if err = addRetry(stack, options); err != nil {
 		return err
 	}
-	if err = addHTTPSignerV4Middleware(stack, options); err != nil {
+	if err = addRawResponseToMetadata(stack); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddRawResponseToMetadata(stack); err != nil {
+	if err = addRecordResponseTiming(stack); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack); err != nil {
+	if err = addClientUserAgent(stack, options); err != nil {
 		return err
 	}
 	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
@@ -153,10 +160,22 @@ func (c *Client) addOperationGetSubscriptionAttributesMiddlewares(stack *middlew
 	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
 		return err
 	}
+	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
+		return err
+	}
+	if err = addTimeOffsetBuild(stack, c); err != nil {
+		return err
+	}
+	if err = addUserAgentRetryMode(stack, options); err != nil {
+		return err
+	}
 	if err = addOpGetSubscriptionAttributesValidationMiddleware(stack); err != nil {
 		return err
 	}
 	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opGetSubscriptionAttributes(options.Region), middleware.Before); err != nil {
+		return err
+	}
+	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -168,6 +187,9 @@ func (c *Client) addOperationGetSubscriptionAttributesMiddlewares(stack *middlew
 	if err = addRequestResponseLogging(stack, options); err != nil {
 		return err
 	}
+	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -175,7 +197,6 @@ func newServiceMetadataMiddleware_opGetSubscriptionAttributes(region string) *aw
 	return &awsmiddleware.RegisterServiceMetadata{
 		Region:        region,
 		ServiceID:     ServiceID,
-		SigningName:   "sns",
 		OperationName: "GetSubscriptionAttributes",
 	}
 }

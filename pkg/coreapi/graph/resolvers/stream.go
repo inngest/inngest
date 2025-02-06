@@ -52,9 +52,8 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 		ids[n] = evt.InternalID()
 	}
 
-	// Values don't matter in the Dev Server
-	accountID := uuid.New()
-	workspaceID := uuid.New()
+	accountID := consts.DevServerAccountId
+	workspaceID := consts.DevServerEnvId
 
 	fns, err := r.HistoryReader.GetFunctionRunsFromEvents(
 		ctx,

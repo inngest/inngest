@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
-	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/service/sns/types"
 	"github.com/aws/smithy-go/middleware"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
@@ -14,8 +13,9 @@ import (
 
 // Returns a list of the requester's topics. Each call returns a limited list of
 // topics, up to 100. If there are more topics, a NextToken is also returned. Use
-// the NextToken parameter in a new ListTopics call to get further results. This
-// action is throttled at 30 transactions per second (TPS).
+// the NextToken parameter in a new ListTopics call to get further results.
+//
+// This action is throttled at 30 transactions per second (TPS).
 func (c *Client) ListTopics(ctx context.Context, params *ListTopicsInput, optFns ...func(*Options)) (*ListTopicsOutput, error) {
 	if params == nil {
 		params = &ListTopicsInput{}
@@ -56,6 +56,9 @@ type ListTopicsOutput struct {
 }
 
 func (c *Client) addOperationListTopicsMiddlewares(stack *middleware.Stack, options Options) (err error) {
+	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+		return err
+	}
 	err = stack.Serialize.Add(&awsAwsquery_serializeOpListTopics{}, middleware.After)
 	if err != nil {
 		return err
@@ -64,34 +67,38 @@ func (c *Client) addOperationListTopicsMiddlewares(stack *middleware.Stack, opti
 	if err != nil {
 		return err
 	}
+	if err := addProtocolFinalizerMiddlewares(stack, options, "ListTopics"); err != nil {
+		return fmt.Errorf("add protocol finalizers: %v", err)
+	}
+
+	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
+		return err
+	}
 	if err = addSetLoggerMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddClientRequestIDMiddleware(stack); err != nil {
+	if err = addClientRequestID(stack); err != nil {
 		return err
 	}
-	if err = smithyhttp.AddComputeContentLengthMiddleware(stack); err != nil {
+	if err = addComputeContentLength(stack); err != nil {
 		return err
 	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = v4.AddComputePayloadSHA256Middleware(stack); err != nil {
+	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetryMiddlewares(stack, options); err != nil {
+	if err = addRetry(stack, options); err != nil {
 		return err
 	}
-	if err = addHTTPSignerV4Middleware(stack, options); err != nil {
+	if err = addRawResponseToMetadata(stack); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddRawResponseToMetadata(stack); err != nil {
+	if err = addRecordResponseTiming(stack); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack); err != nil {
+	if err = addClientUserAgent(stack, options); err != nil {
 		return err
 	}
 	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
@@ -100,7 +107,19 @@ func (c *Client) addOperationListTopicsMiddlewares(stack *middleware.Stack, opti
 	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
 		return err
 	}
+	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
+		return err
+	}
+	if err = addTimeOffsetBuild(stack, c); err != nil {
+		return err
+	}
+	if err = addUserAgentRetryMode(stack, options); err != nil {
+		return err
+	}
 	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opListTopics(options.Region), middleware.Before); err != nil {
+		return err
+	}
+	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -112,15 +131,11 @@ func (c *Client) addOperationListTopicsMiddlewares(stack *middleware.Stack, opti
 	if err = addRequestResponseLogging(stack, options); err != nil {
 		return err
 	}
+	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
 	return nil
 }
-
-// ListTopicsAPIClient is a client that implements the ListTopics operation.
-type ListTopicsAPIClient interface {
-	ListTopics(context.Context, *ListTopicsInput, ...func(*Options)) (*ListTopicsOutput, error)
-}
-
-var _ ListTopicsAPIClient = (*Client)(nil)
 
 // ListTopicsPaginatorOptions is the paginator options for ListTopics
 type ListTopicsPaginatorOptions struct {
@@ -173,6 +188,9 @@ func (p *ListTopicsPaginator) NextPage(ctx context.Context, optFns ...func(*Opti
 	params := *p.params
 	params.NextToken = p.nextToken
 
+	optFns = append([]func(*Options){
+		addIsPaginatorUserAgent,
+	}, optFns...)
 	result, err := p.client.ListTopics(ctx, &params, optFns...)
 	if err != nil {
 		return nil, err
@@ -192,11 +210,17 @@ func (p *ListTopicsPaginator) NextPage(ctx context.Context, optFns ...func(*Opti
 	return result, nil
 }
 
+// ListTopicsAPIClient is a client that implements the ListTopics operation.
+type ListTopicsAPIClient interface {
+	ListTopics(context.Context, *ListTopicsInput, ...func(*Options)) (*ListTopicsOutput, error)
+}
+
+var _ ListTopicsAPIClient = (*Client)(nil)
+
 func newServiceMetadataMiddleware_opListTopics(region string) *awsmiddleware.RegisterServiceMetadata {
 	return &awsmiddleware.RegisterServiceMetadata{
 		Region:        region,
 		ServiceID:     ServiceID,
-		SigningName:   "sns",
 		OperationName: "ListTopics",
 	}
 }
