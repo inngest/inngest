@@ -4,13 +4,13 @@ import { Alert } from '@inngest/components/Alert/Alert';
 import { FunctionList } from '@inngest/components/Apps/FunctionList';
 import { Button } from '@inngest/components/Button/Button';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
-import { WorkersTable } from '@inngest/components/Workers/WorkersTable';
 import { connectionTypes } from '@inngest/components/types/app';
 import { RiListCheck } from '@remixicon/react';
 
 import { AppGitCard } from '@/components/AppGitCard/AppGitCard';
 import { AppInfoCard } from '@/components/AppInfoCard';
 import { useEnvironment } from '@/components/Environments/environment-context';
+import WorkersSection from '@/components/Workers/WorkersSection';
 import { pathCreator } from '@/utils/urls';
 import { useApp } from './useApp';
 
@@ -74,12 +74,8 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
 
         {appRes.data.latestSync && <AppGitCard className="mb-4" sync={appRes.data.latestSync} />}
 
-        {/* TODO: Wire workers data */}
         {appRes.data.connectionType === connectionTypes.Connect && (
-          <div>
-            <h4 className="text-subtle mb-4 text-xl">Workers ({0})</h4>
-            <WorkersTable workers={[]} />
-          </div>
+          <WorkersSection envID={env.id} externalAppID={externalID} />
         )}
 
         <div>
