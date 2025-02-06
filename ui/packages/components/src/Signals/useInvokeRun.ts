@@ -3,10 +3,16 @@ import { useState } from 'react';
 import { useSignals, type SignalDefinitions } from './SignalsContext';
 
 export interface InvokeRunPayload {
+  envID?: string;
   functionSlug: string;
   data: Record<string, unknown>;
   user: Record<string, unknown> | null;
 }
+export type InvokeRunResult = {
+  error?: unknown;
+  loading?: boolean;
+  data?: unknown;
+};
 
 export const useInvokeRun = () => {
   const signals = useSignals();

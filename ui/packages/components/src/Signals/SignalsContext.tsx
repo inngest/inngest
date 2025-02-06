@@ -2,17 +2,17 @@
 
 import React, { createContext, useContext } from 'react';
 
-import type { InvokeRunPayload } from './useInvokeRun';
+import type { InvokeRunPayload, InvokeRunResult } from './useInvokeRun';
 import type { RerunFromStepPayload, RerunFromStepResult } from './useRerunFromStep';
 
 export type SignalDefinitions = {
   invokeRun: {
     payload: InvokeRunPayload;
-    result: unknown;
+    result: InvokeRunResult;
   };
   rerunFromStep: {
     payload: RerunFromStepPayload;
-    result: unknown;
+    result: RerunFromStepResult;
   };
 };
 

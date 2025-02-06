@@ -98,6 +98,7 @@ export const RerunModal = ({ open, setOpen, runID, stepID, input }: RerunModalTy
         <Button
           label="Rerun function"
           loading={loading || rerunning}
+          disabled={loading || rerunning}
           onClick={async () => {
             setRerunning(true);
             const result = await rerun({

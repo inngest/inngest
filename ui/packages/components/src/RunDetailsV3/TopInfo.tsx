@@ -88,6 +88,7 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
   const { isRunning, send } = useDevServer();
   const { invoke, loading: invokeLoading, error: invokeError } = useInvokeRun();
   const [invokeOpen, setInvokeOpen] = useState(false);
+
   const {
     data: trigger,
     error,
@@ -173,11 +174,9 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
               user,
             });
 
-            if (res) {
-              console.log('shit success');
+            if (res?.data) {
               setInvokeOpen(false);
               toast.success('Function invoked');
-              router.push('/runs');
             }
           }}
         />
