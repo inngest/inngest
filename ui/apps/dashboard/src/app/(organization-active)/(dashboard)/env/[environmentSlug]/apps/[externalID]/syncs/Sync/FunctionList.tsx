@@ -57,8 +57,8 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
         collapsible
       >
         <CollapsibleCardItem value="syncedFunctions">
-          <CollapsibleCardHeader className="data-[state=open]:border-muted text-basis flex h-11 items-center justify-between border-b border-transparent px-6 text-sm font-medium">
-            <p>Synced Functions ({syncedFunctions.length})</p>
+          <CollapsibleCardHeader className="data-[state=open]:border-subtle text-basis flex h-11 items-center justify-between border-b border-transparent px-6 text-sm font-medium">
+            <p>Synced functions ({syncedFunctions.length})</p>
             <CollapsibleCardTrigger
               asChild
               onClick={() => setIsSyncedFunctionsCardOpen(!isSyncedFunctionsCardOpen)}
@@ -87,7 +87,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                       <div
                         className={cn(
                           defaultLinkStyles,
-                          'border-muted hover:bg-canvasSubtle/50 group flex w-full items-center gap-2 py-3 pl-4 pr-2 text-sm font-medium',
+                          'border-subtle hover:bg-canvasSubtle/50 group flex w-full items-center gap-2 py-3 pl-4 pr-2 text-sm font-medium',
                           !isLast && 'border-b'
                         )}
                       >
@@ -98,7 +98,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                   );
                 })}
                 {syncedFunctions.length === 0 && (
-                  <div className="text-muted p-2 text-center text-sm">No synced functions</div>
+                  <div className="text-subtle p-2 text-center text-sm">No synced functions</div>
                 )}
               </CollapsibleCardContent>
             )}
@@ -111,8 +111,8 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
         collapsible
       >
         <CollapsibleCardItem value="RemovedFunctions">
-          <CollapsibleCardHeader className="data-[state=open]:border-muted text-basis flex h-11 items-center justify-between border-b border-transparent px-6 text-sm font-medium">
-            <p>Removed Functions ({removedFunctions.length})</p>
+          <CollapsibleCardHeader className="data-[state=open]:border-subtle text-basis flex h-11 items-center justify-between border-b border-transparent px-6 text-sm font-medium">
+            <p>Removed functions ({removedFunctions.length})</p>
             <CollapsibleCardTrigger
               asChild
               onClick={() => setIsRemovedFunctionsCardOpen(!isRemovedFunctionsCardOpen)}
@@ -140,7 +140,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                     <div
                       className={cn(
                         defaultLinkStyles,
-                        'border-muted hover:bg-canvasSubtle/50 group flex w-full items-center gap-2 py-3 pl-4 pr-2 text-sm font-medium',
+                        'border-subtle hover:bg-canvasSubtle/50 group flex w-full items-center gap-2 py-3 pl-4 pr-2 text-sm font-medium',
                         !isLast && 'border-b'
                       )}
                     >
@@ -152,7 +152,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
               })}
 
               {removedFunctions.length === 0 && (
-                <div className="text-muted p-2 text-center text-sm">No removed functions</div>
+                <div className="text-subtle p-2 text-center text-sm">No removed functions</div>
               )}
             </CollapsibleCardContent>
           )}
