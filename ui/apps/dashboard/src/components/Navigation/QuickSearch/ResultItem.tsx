@@ -9,10 +9,11 @@ type Props = {
   kind: 'app' | 'event' | 'eventType' | 'function' | 'run';
   onClick: () => unknown;
   path: Route;
+  text: string;
   value: string;
 };
 
-export function ResultItem({ kind, onClick, path, value }: Props) {
+export function ResultItem({ kind, onClick, path, text, value }: Props) {
   const router = useRouter();
 
   return (
@@ -24,7 +25,7 @@ export function ResultItem({ kind, onClick, path, value }: Props) {
       }}
       value={value}
     >
-      <p className="flex-1 truncate">{value}</p>
+      <p className="flex-1 truncate">{text}</p>
       <Pill>{toKindName(kind)}</Pill>
     </Command.Item>
   );
