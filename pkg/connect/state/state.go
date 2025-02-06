@@ -232,7 +232,7 @@ func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager, 
 			}
 
 			// Wait for other sync to complete and retry
-			if perr.Code == syscode.CodeAnotherSyncInProgress {
+			if perr.Code == syscode.CodeSyncAlreadyPending {
 				select {
 				case <-ctx.Done():
 					return fmt.Errorf("could not wait for sync to complete")
