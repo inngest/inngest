@@ -1,5 +1,6 @@
 'use client';
 
+import { Alert } from '@inngest/components/Alert/Alert';
 import { FunctionList } from '@inngest/components/Apps/FunctionList';
 import { Button } from '@inngest/components/Button/Button';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
@@ -10,7 +11,6 @@ import { RiListCheck } from '@remixicon/react';
 import { AppGitCard } from '@/components/AppGitCard/AppGitCard';
 import { AppInfoCard } from '@/components/AppInfoCard';
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { SyncErrorCard } from '@/components/SyncErrorCard';
 import { pathCreator } from '@/utils/urls';
 import { useApp } from './useApp';
 
@@ -65,7 +65,9 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
         </div>
 
         {appRes.data.latestSync?.error && (
-          <SyncErrorCard className="mb-4" error={appRes.data.latestSync.error} />
+          <Alert className="mb-4" severity="error">
+            {appRes.data.latestSync.error}
+          </Alert>
         )}
 
         <AppInfoCard app={appRes.data} sync={appRes.data.latestSync} />

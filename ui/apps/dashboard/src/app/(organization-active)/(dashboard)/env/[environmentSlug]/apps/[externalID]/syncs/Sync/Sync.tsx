@@ -6,7 +6,6 @@ import { RiErrorWarningLine } from '@remixicon/react';
 import { AppGitCard } from '@/components/AppGitCard/AppGitCard';
 import { AppInfoCard } from '@/components/AppInfoCard';
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { SyncErrorCard } from '@/components/SyncErrorCard';
 import { FunctionList } from './FunctionList';
 import { useSync } from './useSync';
 
@@ -50,7 +49,11 @@ export function Sync({ externalAppID, syncID }: Props) {
   return (
     <div className="h-full w-full overflow-y-auto">
       <div className="mx-auto w-full max-w-[1200px] p-4">
-        {sync.error && <SyncErrorCard className="mb-4" error={sync.error} />}
+        {sync.error && (
+          <Alert className="mb-4" severity="error">
+            {sync.error}
+          </Alert>
+        )}
 
         {sync.status === 'duplicate' && (
           <Alert className="mb-4" severity="info">
