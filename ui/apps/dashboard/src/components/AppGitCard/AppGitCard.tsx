@@ -23,7 +23,7 @@ export function AppGitCard({ className, sync }: Props) {
   if (commitHash) {
     if (repoURL) {
       commitHashValue = (
-        <Link href={`${repoURL}/commit/${commitHash}` as Route} target="_blank" size="medium">
+        <Link href={`${repoURL}/commit/${commitHash}` as Route} target="_blank" size="small">
           <span className="truncate">{commitHash.substring(0, 7)}</span>
         </Link>
       );
@@ -38,7 +38,7 @@ export function AppGitCard({ className, sync }: Props) {
   if (commitRef) {
     if (repoURL) {
       commitRefValue = (
-        <Link href={`${repoURL}/tree/${commitRef}` as Route} target="_blank" size="medium">
+        <Link href={`${repoURL}/tree/${commitRef}` as Route} target="_blank" size="small">
           <span className="truncate">{commitRef}</span>
         </Link>
       );
@@ -52,7 +52,7 @@ export function AppGitCard({ className, sync }: Props) {
   let repositoryValue;
   if (repoURL) {
     repositoryValue = (
-      <Link href={repoURL as Route} target="_blank" size="medium">
+      <Link href={repoURL as Route} target="_blank" size="small">
         <span className="truncate">{repoURL}</span>
       </Link>
     );

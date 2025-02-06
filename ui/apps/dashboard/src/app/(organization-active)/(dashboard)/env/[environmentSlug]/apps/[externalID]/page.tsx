@@ -1,13 +1,16 @@
 'use client';
 
+import { Alert } from '@inngest/components/Alert/Alert';
 import { FunctionList } from '@inngest/components/Apps/FunctionList';
 import { Button } from '@inngest/components/Button/Button';
+import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
+import { connectionTypes } from '@inngest/components/types/app';
 import { RiListCheck } from '@remixicon/react';
 
 import { AppGitCard } from '@/components/AppGitCard/AppGitCard';
 import { AppInfoCard } from '@/components/AppInfoCard';
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { SyncErrorCard } from '@/components/SyncErrorCard';
+import WorkersSection from '@/components/Workers/WorkersSection';
 import { pathCreator } from '@/utils/urls';
 import { useApp } from './useApp';
 
@@ -35,7 +38,10 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
   if (appRes.isLoading && !appRes.data) {
     return (
       <div className="h-full overflow-y-auto">
-        <div className="mx-auto w-full max-w-[1200px] py-4">
+        <div className="mx-auto my-12 flex w-full max-w-[1200px] flex-col gap-9 px-6">
+          <div>
+            <Skeleton className="mb-1 h-8 w-72" />
+          </div>
           <AppInfoCard className="mb-4" loading />
         </div>
       </div>
@@ -48,7 +54,6 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
         <div className="flex items-center justify-between">
           <div>
             <h2 className="mb-1 text-2xl">{appRes.data.name}</h2>
-            <p className="text-muted text-sm">Information about the latest successful sync.</p>
           </div>
           <Button
             appearance="outlined"
@@ -60,17 +65,21 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
         </div>
 
         {appRes.data.latestSync?.error && (
-          <SyncErrorCard className="mb-4" error={appRes.data.latestSync.error} />
+          <Alert className="mb-4" severity="error">
+            {appRes.data.latestSync.error}
+          </Alert>
         )}
 
         <AppInfoCard app={appRes.data} sync={appRes.data.latestSync} />
 
         {appRes.data.latestSync && <AppGitCard className="mb-4" sync={appRes.data.latestSync} />}
 
+        {appRes.data.connectionType === connectionTypes.Connect && (
+          <WorkersSection envID={env.id} appID={appRes.data.id} />
+        )}
+
         <div>
-          <h4 className="text-subtle mb-4 text-xl">
-            Function list ({appRes.data.functions.length})
-          </h4>
+          <h4 className="text-subtle mb-4 text-xl">Functions ({appRes.data.functions.length})</h4>
           <FunctionList
             envSlug={environmentSlug}
             functions={appRes.data.functions}

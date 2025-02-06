@@ -33,7 +33,7 @@ export function Card({ accentColor, accentPosition = 'top', children, className 
   return (
     <div className={cn('bg-canvasBase w-full overflow-hidden rounded-md', wrapperClass, className)}>
       {accentColor && <div className={cn('p-0.5', accentClass, accentColor)} />}
-      <div className={cn('border-muted w-full grow overflow-hidden border', contentClass)}>
+      <div className={cn('border-subtle w-full grow overflow-hidden border', contentClass)}>
         {children}
       </div>
     </div>
@@ -46,7 +46,9 @@ Card.Content = ({ children, className }: PropsWithChildren<{ className?: string 
 
 Card.Footer = ({ children, className }: PropsWithChildren<{ className?: string }>) => {
   return (
-    <div className={cn('border-muted bg-canvasBase border-t px-6 py-3', className)}>{children}</div>
+    <div className={cn('border-subtle bg-canvasBase border-t px-6 py-3', className)}>
+      {children}
+    </div>
   );
 };
 
@@ -54,7 +56,7 @@ Card.Header = ({ children, className }: PropsWithChildren<{ className?: string }
   return (
     <div
       className={cn(
-        'border-muted bg-canvasBase text-basis flex flex-col gap-1 border-b py-3 pl-6 pr-4 text-sm',
+        'border-subtle bg-canvasBase text-basis flex flex-col gap-1 border-b py-3 pl-6 pr-4 text-sm',
         className
       )}
     >

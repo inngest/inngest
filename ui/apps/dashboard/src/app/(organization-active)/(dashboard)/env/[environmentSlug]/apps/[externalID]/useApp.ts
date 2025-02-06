@@ -1,3 +1,9 @@
+import {
+  transformFramework,
+  transformLanguage,
+  transformPlatform,
+} from '@inngest/components/utils/appsParser';
+
 import { graphql } from '@/gql';
 import { transformTriggers } from '@/utils/triggers';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
@@ -20,6 +26,7 @@ const query = graphql(`
           slug
         }
         name
+        connectionType
         latestSync {
           commitAuthor
           commitHash
@@ -59,6 +66,9 @@ export function useApp({ envID, externalAppID }: { envID: string; externalAppID:
       latestSync = {
         ...app.latestSync,
         lastSyncedAt: new Date(app.latestSync.lastSyncedAt),
+        framework: transformFramework(app.latestSync.framework),
+        platform: transformPlatform(app.latestSync.platform),
+        sdkLanguage: transformLanguage(app.latestSync.sdkLanguage),
       };
     }
 

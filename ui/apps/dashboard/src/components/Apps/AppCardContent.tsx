@@ -54,7 +54,7 @@ const getAppCardContent = ({ app, envSlug }: { app: FlattenedApp; envSlug: strin
             return (
               <li key={func.id} className="grid grid-cols-3 gap-1 py-2">
                 <Link
-                  className="text-subtle hover:text-link col-span-2 duration-0"
+                  className="col-span-2"
                   href={pathCreator.function({ envSlug, functionSlug: func.slug })}
                   arrowOnHover
                 >

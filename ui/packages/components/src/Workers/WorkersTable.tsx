@@ -9,7 +9,13 @@ import { type Row, type SortingState } from '@tanstack/react-table';
 import CompactPaginatedTable from '../Table/CompactPaginatedTable';
 import { useColumns } from './columns';
 
-export function WorkersTable({ workers }: { workers: Worker[] }) {
+export function WorkersTable({
+  workers,
+  isLoading = false,
+}: {
+  workers: Worker[];
+  isLoading?: boolean;
+}) {
   const columns = useColumns();
   const [sorting, setSorting] = useState<SortingState>([
     {
@@ -22,7 +28,7 @@ export function WorkersTable({ workers }: { workers: Worker[] }) {
     <CompactPaginatedTable
       columns={columns}
       data={workers}
-      isLoading={false}
+      isLoading={isLoading}
       sorting={sorting}
       setSorting={setSorting}
       enableExpanding={true}

@@ -8,8 +8,6 @@ import { TextClickToCopy } from '@inngest/components/Text';
 import { Time } from '@inngest/components/Time';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { FrameworkInfo } from '@/components/FrameworkInfo';
-import { LanguageInfo } from '@/components/LanguageInfo';
 import { SyncStatusPill } from '@/components/SyncStatusPill';
 import { PlatformSection } from './PlatformSection';
 
@@ -38,9 +36,9 @@ type App = {
 };
 
 type Sync = {
-  framework: string | null;
+  framework?: string | null;
   lastSyncedAt: Date;
-  sdkLanguage: string | null;
+  sdkLanguage?: string | null;
   sdkVersion: string | null;
   status: string;
   url: string | null;
@@ -102,12 +100,12 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
 
         {/* Row 2 */}
         <CardItem
-          detail={<FrameworkInfo framework={sync?.framework} />}
+          detail={<div className="truncate">{sync?.framework ?? '-'}</div>}
           term="Framework"
           loading={loading}
         />
         <CardItem
-          detail={<LanguageInfo language={sync?.sdkLanguage} />}
+          detail={<div className="truncate">{sync?.sdkLanguage ?? '-'}</div>}
           term="Language"
           loading={loading}
         />
