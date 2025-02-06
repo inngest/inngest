@@ -14,6 +14,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"io"
 	"log/slog"
+	"net/url"
 	"os"
 	"runtime"
 	"time"
@@ -36,7 +37,7 @@ func Connect(ctx context.Context, opts Opts, invoker FunctionInvoker, logger *sl
 		messageBuffer:          newMessageBuffer(apiClient, logger),
 	}
 
-	wp := NewWorkerPool(ctx, opts.WorkerConcurrency, ch.processExecutorRequest)
+	wp := NewWorkerPool(ctx, opts.MaxConcurrency, ch.processExecutorRequest)
 	ch.workerPool = wp
 
 	defer func() {
@@ -65,18 +66,20 @@ type Opts struct {
 	HashedSigningKey         []byte
 	HashedSigningKeyFallback []byte
 
-	WorkerConcurrency int
+	MaxConcurrency int
 
 	APIBaseUrl   string
 	IsDev        bool
 	DevServerUrl string
 
-	InstanceId *string
 	BuildId    *string
+	InstanceId *string
 
 	Platform    *string
 	SDKVersion  string
 	SDKLanguage string
+
+	RewriteGatewayEndpoint func(endpoint url.URL) (url.URL, error)
 }
 
 type connectHandler struct {
@@ -172,23 +175,25 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 
 				// Some errors should be handled differently (e.g. auth failed)
 				if msg.err != nil {
+					if errors.Is(msg.err, ErrUnauthenticated) {
+						if auth.fallback {
+							return fmt.Errorf("failed to authenticate with fallback key, exiting")
+						}
+
+						signingKeyFallback := h.opts.HashedSigningKeyFallback
+						if len(signingKeyFallback) == 0 {
+							return fmt.Errorf("fallback signing key is required")
+						}
+
+						auth = authContext{hashedSigningKey: signingKeyFallback, fallback: true}
+					}
+
 					closeErr := websocket.CloseError{}
-					if errors.As(err, &closeErr) {
+					if errors.As(msg.err, &closeErr) {
 						switch closeErr.Reason {
 						// If auth failed, retry with fallback key
 						case syscode.CodeConnectAuthFailed:
-							if auth.fallback {
-								return fmt.Errorf("failed to authenticate with fallback key, exiting")
-							}
-
-							signingKeyFallback := h.opts.HashedSigningKeyFallback
-							if len(signingKeyFallback) == 0 {
-								return fmt.Errorf("fallback signing key is required")
-							}
-
-							auth = authContext{hashedSigningKey: signingKeyFallback, fallback: true}
-
-							// continue to reconnect logic
+							// already handled above
 
 						// Retry on the following error codes
 						case syscode.CodeConnectGatewayClosing, syscode.CodeConnectInternal, syscode.CodeConnectWorkerHelloTimeout:
@@ -209,7 +214,17 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 				}
 
 				// continue to reconnect logic
-				h.logger.Debug("reconnecting", "attempts", attempts)
+				delay := expBackoff(attempts)
+
+				h.logger.Debug("reconnecting", "delay", delay.String(), "attempts", attempts)
+
+				select {
+				case <-time.After(delay):
+					break
+				case <-ctx.Done():
+					h.logger.Info("canceled context while waiting to reconnect")
+					return nil
+				}
 
 			case <-h.initiateConnectionChan:
 			}
@@ -295,4 +310,16 @@ func (h *connectHandler) instanceId() string {
 
 	// TODO Is there any stable identifier that can be used as a fallback?
 	return "<missing-instance-id>"
+}
+
+func expBackoff(attempt int) time.Duration {
+	backoffTimes := []time.Duration{
+		time.Second, 2 * time.Second, 5 * time.Second, 10 * time.Second,
+		20 * time.Second, 30 * time.Second, time.Minute, 2 * time.Minute, 5 * time.Minute,
+	}
+
+	if attempt >= len(backoffTimes) {
+		return backoffTimes[len(backoffTimes)-1]
+	}
+	return backoffTimes[attempt]
 }

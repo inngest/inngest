@@ -21,6 +21,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/sdk"
+	"github.com/inngest/inngest/pkg/syscode"
 	sdkerrors "github.com/inngest/inngestgo/errors"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"github.com/inngest/inngestgo/internal/types"
@@ -51,8 +52,6 @@ var (
 		TrustProbe: sdk.TrustProbeV1,
 		Connect:    sdk.ConnectV1,
 	}
-
-	defaultWorkerConcurrency = 1_000
 )
 
 // Register adds the given functions to the default handler for serving.  You must register all
@@ -66,8 +65,8 @@ func Serve(w http.ResponseWriter, r *http.Request) {
 	DefaultHandler.ServeHTTP(w, r)
 }
 
-func Connect(ctx context.Context) error {
-	return DefaultHandler.Connect(ctx)
+func Connect(ctx context.Context, opts ConnectOpts) error {
+	return DefaultHandler.Connect(ctx, opts)
 }
 
 type HandlerOpts struct {
@@ -110,12 +109,6 @@ type HandlerOpts struct {
 	// This only needs to be set when self hosting.
 	RegisterURL *string
 
-	// InstanceId represents a stable identifier to be used for identifying connected SDKs.
-	// This can be a hostname or other identifier that remains stable across restarts.
-	//
-	// If nil, this defaults to the current machine's hostname.
-	InstanceId *string
-
 	// BuildId supplies an application version identifier. This should change
 	// whenever code within one of your Inngest function or any dependency thereof changes.
 	BuildId *string
@@ -134,10 +127,6 @@ type HandlerOpts struct {
 	// AllowInBandSync allows in-band syncs to occur. If nil, in-band syncs are
 	// disallowed.
 	AllowInBandSync *bool
-
-	// WorkerConcurrency defines the number of goroutines available to handle
-	// connnect workloads. Defaults to 1000
-	WorkerConcurrency int
 
 	Dev *bool
 }
@@ -251,13 +240,6 @@ func (h HandlerOpts) IsInBandSyncAllowed() bool {
 	return false
 }
 
-func (h HandlerOpts) GetWorkerConcurrency() int {
-	if h.WorkerConcurrency == 0 {
-		return defaultWorkerConcurrency
-	}
-	return h.WorkerConcurrency
-}
-
 func (h HandlerOpts) isDev() bool {
 	if h.Dev != nil {
 		return *h.Dev
@@ -284,7 +266,7 @@ type Handler interface {
 	Register(...ServableFunction)
 
 	// Connect establishes an outbound connection to Inngest
-	Connect(ctx context.Context) error
+	Connect(ctx context.Context, opts ConnectOpts) error
 }
 
 // NewHandler returns a new Handler for serving Inngest functions.
@@ -345,7 +327,7 @@ func (h *handler) Register(funcs ...ServableFunction) {
 	for _, f := range funcs {
 		slugs[f.Slug(h.appName)] = f
 	}
-	
+
 	newFuncs := make([]ServableFunction, len(slugs))
 	i := 0
 	for _, f := range slugs {
@@ -412,14 +394,20 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err := h.register(w, r); err != nil {
 			h.Logger.Error("error registering functions", "error", err.Error())
 
+			code := syscode.CodeUnknown
 			status := http.StatusInternalServerError
 			if err, ok := err.(publicerr.Error); ok {
 				status = err.Status
+
+				if err, ok := err.Err.(syscode.Error); ok {
+					code = err.Code
+				}
 			}
 			w.WriteHeader(status)
 
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]string{
+				"code":    code,
 				"message": err.Error(),
 			})
 		}
@@ -486,7 +474,10 @@ func (h *handler) inBandSync(
 	if !h.isDev() {
 		if sig = r.Header.Get(HeaderKeySignature); sig == "" {
 			return publicerr.Error{
-				Err:    fmt.Errorf("missing %s header", HeaderKeySignature),
+				Err: syscode.Error{
+					Code:    syscode.CodeHTTPMissingHeader,
+					Message: fmt.Sprintf("missing %s header", HeaderKeySignature),
+				},
 				Status: 401,
 			}
 		}
@@ -514,13 +505,19 @@ func (h *handler) inBandSync(
 	)
 	if err != nil {
 		return publicerr.Error{
-			Err:    fmt.Errorf("error validating signature"),
+			Err: syscode.Error{
+				Code:    syscode.CodeSigVerificationFailed,
+				Message: "error validating signature",
+			},
 			Status: 401,
 		}
 	}
 	if !valid {
 		return publicerr.Error{
-			Err:    fmt.Errorf("invalid signature"),
+			Err: syscode.Error{
+				Code:    syscode.CodeSigVerificationFailed,
+				Message: "invalid signature",
+			},
 			Status: 401,
 		}
 	}

@@ -523,14 +523,8 @@ github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
 github.com/inngest/expr v0.0.0-20241106234328-863dff7deec0 h1:cqaGD0mx745BYyVGZ3GJsiZETktC64h1r9zdDInmKIs=
 github.com/inngest/expr v0.0.0-20241106234328-863dff7deec0/go.mod h1:0Dllw9clwlMWWxfiSsHY9VdE+Zjt/8SVCMxK9r39aKE=
-github.com/inngest/inngestgo v0.7.5-0.20250124122022-10fdd744bf35 h1:8j01fa2LBcXgIrtTog64ATfthmLrHrURUnuU/K4FM38=
-github.com/inngest/inngestgo v0.7.5-0.20250124122022-10fdd744bf35/go.mod h1:Ilq2+IJJG1dSselO5N85fNZqHcquAHY/Bs63PLEU/G0=
-github.com/inngest/inngestgo v0.7.5-0.20250131124742-ae0eadde2a8e h1:8o6idiJ6P+9ImLPoxlN1EORrFl6j4Q8yLiwVetYi+M0=
-github.com/inngest/inngestgo v0.7.5-0.20250131124742-ae0eadde2a8e/go.mod h1:Ilq2+IJJG1dSselO5N85fNZqHcquAHY/Bs63PLEU/G0=
-github.com/inngest/inngestgo v0.7.5-0.20250131142046-6beb83ad6d58 h1:GjROmfEGUUoRxXgDhkijdIo+9DKEtElQRd+4hFdpWKk=
-github.com/inngest/inngestgo v0.7.5-0.20250131142046-6beb83ad6d58/go.mod h1:Ilq2+IJJG1dSselO5N85fNZqHcquAHY/Bs63PLEU/G0=
-github.com/inngest/inngestgo v0.7.5-0.20250204184103-27acb2c7d0c8 h1:e/VMDSiZ2CHq+a4ZOYQTszYgJDVjzkZRNAf7W/4j0LY=
-github.com/inngest/inngestgo v0.7.5-0.20250204184103-27acb2c7d0c8/go.mod h1:Ilq2+IJJG1dSselO5N85fNZqHcquAHY/Bs63PLEU/G0=
+github.com/inngest/inngestgo v0.7.5-0.20250206152555-95e5bff22e03 h1:yr8f2kwejmdA4i21+hVC6+83AnRYf3KAHThSIHg7Yz4=
+github.com/inngest/inngestgo v0.7.5-0.20250206152555-95e5bff22e03/go.mod h1:Ilq2+IJJG1dSselO5N85fNZqHcquAHY/Bs63PLEU/G0=
 github.com/jackc/chunkreader v1.0.0/go.mod h1:RT6O25fNZIuasFJRyZ4R/Y2BbhasbmZXF9QQ7T3kePo=
 github.com/jackc/chunkreader/v2 v2.0.0/go.mod h1:odVSm741yZoC3dpHEUXIqA9tQRhFrgOHwnPIn9lDKlk=
 github.com/jackc/chunkreader/v2 v2.0.1/go.mod h1:odVSm741yZoC3dpHEUXIqA9tQRhFrgOHwnPIn9lDKlk=
