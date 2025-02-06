@@ -69,12 +69,6 @@ func WithBuildId(buildId string) opt {
 	}
 }
 
-func WithInstanceId(instanceId string) opt {
-	return func(h *inngestgo.HandlerOpts) {
-		h.InstanceId = &instanceId
-	}
-}
-
 func NewSDKConnectHandler(t *testing.T, appID string, hopts ...opt) inngestgo.Handler {
 	t.Helper()
 
