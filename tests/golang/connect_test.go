@@ -54,7 +54,7 @@ func TestEndToEnd(t *testing.T) {
 
 	go func() {
 		err := h.Connect(connectCtx, inngestgo.ConnectOpts{
-			InstanceId: inngestgo.StrPtr("my-worker"),
+			InstanceID: inngestgo.StrPtr("my-worker"),
 		})
 		if err != nil {
 			// This is expected

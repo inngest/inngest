@@ -15,11 +15,11 @@ const (
 )
 
 type ConnectOpts struct {
-	// InstanceId represents a stable identifier to be used for identifying connected SDKs.
+	// InstanceID represents a stable identifier to be used for identifying connected SDKs.
 	// This can be a hostname or other identifier that remains stable across restarts.
 	//
 	// If nil, this defaults to the current machine's hostname.
-	InstanceId *string
+	InstanceID *string
 
 	RewriteGatewayEndpoint func(endpoint url.URL) (url.URL, error)
 
@@ -40,7 +40,7 @@ func (h *handler) Connect(ctx context.Context, opts ConnectOpts) error {
 		Host:   "connect",
 	}
 
-	if opts.InstanceId == nil {
+	if opts.InstanceID == nil {
 		return fmt.Errorf("missing required Instance ID")
 	}
 
@@ -80,8 +80,8 @@ func (h *handler) Connect(ctx context.Context, opts ConnectOpts) error {
 		APIBaseUrl:               h.GetAPIBaseURL(),
 		IsDev:                    h.isDev(),
 		DevServerUrl:             DevServerURL(),
-		InstanceId:               opts.InstanceId,
-		BuildId:                  h.BuildId,
+		InstanceID:               opts.InstanceID,
+		BuildID:                  h.BuildID,
 		Platform:                 Ptr(platform()),
 		SDKVersion:               SDKVersion,
 		SDKLanguage:              SDKLanguage,

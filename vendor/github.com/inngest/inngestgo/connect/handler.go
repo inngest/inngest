@@ -72,8 +72,8 @@ type Opts struct {
 	IsDev        bool
 	DevServerUrl string
 
-	BuildId    *string
-	InstanceId *string
+	BuildID    *string
+	InstanceID *string
 
 	Platform    *string
 	SDKVersion  string
@@ -299,8 +299,8 @@ func (h *connectHandler) processExecutorRequest(msg workerPoolMsg) {
 }
 
 func (h *connectHandler) instanceId() string {
-	if h.opts.InstanceId != nil {
-		return *h.opts.InstanceId
+	if h.opts.InstanceID != nil {
+		return *h.opts.InstanceID
 	}
 
 	hostname, _ := os.Hostname()
