@@ -21,11 +21,10 @@ export default function WorkersSection({ envID, externalAppID }: Props) {
 
   return (
     <div>
-      {/* TODO: Add total count in title */}
-      <h4 className="text-subtle mb-4 text-xl">Workers</h4>
+      <h4 className="text-subtle mb-4 text-xl">Workers ({workerRes.data?.total})</h4>
       <WorkersTable
         isLoading={workerRes.isLoading && !workerRes.data}
-        workers={workerRes.data || []}
+        workers={workerRes.data?.workers || []}
       />
     </div>
   );

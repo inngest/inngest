@@ -49,6 +49,7 @@ const query = graphql(`
           startCursor
           endCursor
         }
+        totalCount
       }
     }
   }
@@ -75,7 +76,11 @@ export function useWorkers({ envID, externalAppID }: { envID: string; externalAp
 
     return {
       ...res,
-      data: workers,
+      data: {
+        workers: workers,
+        total: res.data.environment.workerConnections.totalCount,
+        pageInfo: res.data.environment.workerConnections.pageInfo,
+      },
     };
   }
 
