@@ -8,6 +8,7 @@ import { EmptyActiveCard, EmptyArchivedCard } from '@/components/Apps/EmptyAppsC
 import { UnattachedSyncsCard } from '@/components/Apps/UnattachedSyncsCard';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { useApps } from './useApps';
+import { useLatestUnattachedSync } from './useUnattachedSyncs';
 
 type Props = {
   isArchived?: boolean;
@@ -15,12 +16,17 @@ type Props = {
 
 export function Apps({ isArchived = false }: Props) {
   const env = useEnvironment();
-
-  const res = useApps({ envID: env.id, isArchived });
-  if (res.error) {
-    throw res.error;
+  const unattachedSyncRes = useLatestUnattachedSync({ envID: env.id });
+  if (unattachedSyncRes.error) {
+    // Swallow error because we don't want to crash the page.
+    console.error(unattachedSyncRes.error);
   }
-  if (res.isLoading && !res.data) {
+
+  const appsRes = useApps({ envID: env.id, isArchived });
+  if (appsRes.error) {
+    throw appsRes.error;
+  }
+  if (appsRes.isLoading && !appsRes.data) {
     return (
       <div className="mb-4 flex items-center justify-center">
         <div className="w-full max-w-[1200px]">
@@ -30,20 +36,20 @@ export function Apps({ isArchived = false }: Props) {
     );
   }
 
-  const { apps, latestUnattachedSyncTime } = res.data;
+  const apps = appsRes.data;
   const hasApps = apps.length > 0;
 
   return (
     <div className="flex items-center justify-center">
       <div className="w-full max-w-[1200px]">
-        {!hasApps && !latestUnattachedSyncTime && !isArchived && (
+        {!hasApps && !unattachedSyncRes.data && !isArchived && (
           <EmptyActiveCard envSlug={env.slug} />
         )}
         {!hasApps && isArchived && <EmptyArchivedCard />}
         {hasApps && <AppCards apps={apps} envSlug={env.slug} />}
-        {latestUnattachedSyncTime && !isArchived && (
+        {unattachedSyncRes.data && !isArchived && (
           <>
-            <UnattachedSyncsCard envSlug={env.slug} latestSyncTime={latestUnattachedSyncTime} />
+            <UnattachedSyncsCard envSlug={env.slug} latestSyncTime={unattachedSyncRes.data} />
             {!hasApps && (
               <Alert
                 className="flex items-center justify-between text-sm"
