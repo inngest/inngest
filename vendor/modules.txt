@@ -843,6 +843,7 @@ github.com/twmb/franz-go/pkg/kgo
 github.com/twmb/franz-go/pkg/kgo/internal/sticky
 github.com/twmb/franz-go/pkg/kversion
 github.com/twmb/franz-go/pkg/sasl
+github.com/twmb/franz-go/pkg/sasl/scram
 # github.com/twmb/franz-go/pkg/kmsg v1.9.0
 ## explicit; go 1.21
 github.com/twmb/franz-go/pkg/kmsg
