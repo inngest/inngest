@@ -8,6 +8,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/pkg/sasl/scram"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"google.golang.org/protobuf/proto"
 )
@@ -26,6 +27,7 @@ type kafkaSpansExporterOpts struct {
 	topic           string
 	key             string
 	autoCreateTopic bool
+	scramAuth       *scram.Auth
 }
 
 type KafkaSpansExporterOpts func(k *kafkaSpansExporterOpts)
@@ -49,6 +51,15 @@ func WithKafkaExporterTopic(topic, key string) KafkaSpansExporterOpts {
 func WithKafkaExporterAutoCreateTopic() KafkaSpansExporterOpts {
 	return func(k *kafkaSpansExporterOpts) {
 		k.autoCreateTopic = true
+	}
+}
+
+func WithKafkaExporterScramAuth(user, pass string) KafkaSpansExporterOpts {
+	return func(k *kafkaSpansExporterOpts) {
+		k.scramAuth = &scram.Auth{
+			User: user,
+			Pass: pass,
+		}
 	}
 }
 
@@ -92,6 +103,10 @@ func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (
 
 	if conf.autoCreateTopic {
 		kclopts = append(kclopts, kgo.AllowAutoTopicCreation())
+	}
+
+	if conf.scramAuth != nil {
+		kclopts = append(kclopts, kgo.SASL(conf.scramAuth.AsSha512Mechanism()))
 	}
 
 	cl, err := kgo.NewClient(kclopts...)
