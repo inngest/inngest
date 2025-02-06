@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { convertWorkerStatus } from '@inngest/components/types/workers';
 
 import { graphql } from '@/gql';
@@ -7,7 +8,7 @@ import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 const query = graphql(`
   query GetWorkerConnections(
     $envID: ID!
-    $externalAppID: UUID!
+    $appID: UUID!
     $startTime: Time!
     $status: [ConnectV1ConnectionStatus!]
     $timeField: ConnectV1WorkerConnectionsOrderByField!
@@ -15,7 +16,7 @@ const query = graphql(`
   ) {
     environment: workspace(id: $envID) {
       workerConnections(
-        filter: { appIDs: [$externalAppID], from: $startTime, status: $status }
+        filter: { appIDs: [$appID], from: $startTime, status: $status }
         orderBy: [{ field: $timeField, direction: DESC }]
         after: $connectionCursor
       ) {
@@ -55,15 +56,16 @@ const query = graphql(`
   }
 `);
 
-export function useWorkers({ envID, externalAppID }: { envID: string; externalAppID: string }) {
+export function useWorkers({ envID, appID }: { envID: string; appID: string }) {
+  const [startTime] = useState(() => new Date().toISOString());
   const res = useGraphQLQuery({
     query,
     variables: {
       envID,
-      externalAppID,
+      appID,
       timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
       status: [],
-      startTime: new Date().toISOString(),
+      startTime: startTime,
     },
   });
 

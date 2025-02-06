@@ -75,7 +75,7 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
         {appRes.data.latestSync && <AppGitCard className="mb-4" sync={appRes.data.latestSync} />}
 
         {appRes.data.connectionType === connectionTypes.Connect && (
-          <WorkersSection envID={env.id} externalAppID={externalID} />
+          <WorkersSection envID={env.id} appID={appRes.data.id} />
         )}
 
         <div>

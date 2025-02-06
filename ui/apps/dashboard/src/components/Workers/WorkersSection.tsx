@@ -4,13 +4,13 @@ import { useWorkers } from './useWorker';
 
 type Props = {
   envID: string;
-  externalAppID: string;
+  appID: string;
 };
 
-export default function WorkersSection({ envID, externalAppID }: Props) {
+export default function WorkersSection({ envID, appID }: Props) {
   const workerRes = useWorkers({
     envID,
-    externalAppID,
+    appID,
   });
   if (workerRes.error) {
     if (!workerRes.data) {
