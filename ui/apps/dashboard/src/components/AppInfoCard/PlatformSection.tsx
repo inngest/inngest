@@ -2,11 +2,9 @@ import type { Route } from 'next';
 import { CardItem } from '@inngest/components/Apps/AppDetailsCard';
 import { Link } from '@inngest/components/Link';
 
-import { PlatformInfo } from '@/components/PlatformInfo';
-
 type Props = {
   sync: {
-    platform: string | null;
+    platform?: string | null;
     vercelDeploymentID: string | null;
     vercelDeploymentURL: string | null;
     vercelProjectID: string | null;
@@ -45,7 +43,7 @@ export function PlatformSection({ sync }: Props) {
 
   return (
     <>
-      <CardItem detail={<PlatformInfo platform={platform} />} term="Platform" />
+      <CardItem detail={<div className="truncate">{platform}</div>} term="Platform" />
       <CardItem detail={projectValue} term="Vercel project" />
       <CardItem detail={deploymentValue} term="Vercel deployment" />
     </>
