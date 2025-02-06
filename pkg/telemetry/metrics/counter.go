@@ -164,6 +164,15 @@ func IncrSpanExportedCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrSpanExportDataLoss(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_export_data_loss_total",
+		Description: "Total number of data loss detected",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrSpanBatchProcessorEnqueuedCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -241,6 +250,15 @@ func IncrConnectGatewayReceiveConnectionAttemptCounter(ctx context.Context, valu
 		PkgName:     opts.PkgName,
 		MetricName:  "connect_gateway.connection_attempts",
 		Description: "Total number of worker connection attempts received by a connect gateway",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConnectRouterNoHealthyConnectionCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_router.no_healthy_connections",
+		Description: "Total number of attempts to forward a message without finding healthy connections",
 		Tags:        opts.Tags,
 	})
 }

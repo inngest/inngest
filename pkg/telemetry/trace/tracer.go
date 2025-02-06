@@ -35,6 +35,7 @@ const (
 	TracerTypeJaeger
 	TracerTypeOTLPHTTP
 	TracerTypeNATS
+	TracerTypeKafka
 )
 
 var (
@@ -67,7 +68,8 @@ type TracerOpts struct {
 	TraceURLPath             string
 	TraceMaxPayloadSizeBytes int
 
-	NATS []exporters.NatsExporterOpts
+	NATS  []exporters.NatsExporterOpts
+	Kafka []exporters.KafkaSpansExporterOpts
 }
 
 func (o TracerOpts) Endpoint() string {
@@ -202,6 +204,8 @@ func newTracer(ctx context.Context, opts TracerOpts) (Tracer, error) {
 		return newIOTraceProvider(ctx, opts)
 	case TracerTypeNATS:
 		return newNatsTraceProvider(ctx, opts)
+	case TracerTypeKafka:
+		return newKafkaTraceExporter(ctx, opts)
 	default:
 		return newNoopTraceProvider(ctx, opts)
 	}
@@ -430,7 +434,64 @@ func newNatsTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) 
 		provider:   tp,
 		propagator: newTextMapPropagator(),
 		processor:  sp,
-		shutdown: func(context.Context) {
+		shutdown: func(ctx context.Context) {
+			_ = tp.ForceFlush(ctx)
+			_ = tp.Shutdown(ctx)
+			_ = exp.Shutdown(ctx)
+		},
+	}, nil
+}
+
+func newKafkaTraceExporter(ctx context.Context, opts TracerOpts) (Tracer, error) {
+	exp, err := exporters.NewKafkaSpanExporter(ctx, opts.Kafka...)
+	if err != nil {
+		return nil, fmt.Errorf("error creating Kafka trace client: %w", err)
+	}
+
+	bopts := []exporters.BatchSpanProcessorOpt{}
+	{
+		val := os.Getenv("SPAN_BATCH_PROCESSOR_BUFFER_SIZE")
+		if val != "" {
+			bufferSize, err := strconv.Atoi(val)
+			if err == nil && bufferSize > 0 {
+				bopts = append(bopts, exporters.WithBatchProcessorBufferSize(bufferSize))
+			}
+		}
+	}
+
+	{
+		val := os.Getenv("SPAN_BATCH_PROCESSOR_INTERVAL")
+		if val != "" {
+			if dur, err := time.ParseDuration(val); err == nil {
+				bopts = append(bopts, exporters.WithBatchProcessorInterval(dur))
+			}
+		}
+	}
+
+	{
+		val := os.Getenv("SPAN_BATCH_PROCESSOR_CONCURRENCY")
+		if val != "" {
+			c, err := strconv.Atoi(val)
+			if err == nil && c > 0 {
+				bopts = append(bopts, exporters.WithBatchProcessorConcurrency(c))
+			}
+		}
+	}
+
+	sp := exporters.NewBatchSpanProcessor(ctx, exp, bopts...)
+	tp := trace.NewTracerProvider(
+		trace.WithSpanProcessor(sp),
+		trace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String(opts.ServiceName),
+		)),
+	)
+
+	return &tracer{
+		provider:   tp,
+		propagator: newTextMapPropagator(),
+		processor:  sp,
+		shutdown: func(ctx context.Context) {
 			_ = tp.ForceFlush(ctx)
 			_ = tp.Shutdown(ctx)
 			_ = exp.Shutdown(ctx)

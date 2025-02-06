@@ -51,6 +51,17 @@ export const pathCreator = {
   createApp({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/apps/sync-new` as Route;
   },
+  event({
+    envSlug,
+    eventName,
+    eventID,
+  }: {
+    envSlug: string;
+    eventName: string;
+    eventID: string;
+  }): Route {
+    return `/env/${envSlug}/events/${encodeURIComponent(eventName)}/logs/${eventID}` as Route;
+  },
   events({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/events` as Route;
   },

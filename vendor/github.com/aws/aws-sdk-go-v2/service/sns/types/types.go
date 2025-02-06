@@ -45,21 +45,23 @@ type Endpoint struct {
 
 // The user-specified message attribute value. For string data types, the value
 // attribute has the same restrictions on the content as the message body. For more
-// information, see Publish
-// (https://docs.aws.amazon.com/sns/latest/api/API_Publish.html). Name, type, and
-// value must not be empty or null. In addition, the message body should not be
-// empty or null. All parts of the message attribute, including name, type, and
-// value, are included in the message size restriction, which is currently 256 KB
-// (262,144 bytes). For more information, see Amazon SNS message attributes
-// (https://docs.aws.amazon.com/sns/latest/dg/SNSMessageAttributes.html) and
-// Publishing to a mobile phone
-// (https://docs.aws.amazon.com/sns/latest/dg/sms_publish-to-phone.html) in the
-// Amazon SNS Developer Guide.
+// information, see [Publish].
+//
+// Name, type, and value must not be empty or null. In addition, the message body
+// should not be empty or null. All parts of the message attribute, including name,
+// type, and value, are included in the message size restriction, which is
+// currently 256 KB (262,144 bytes). For more information, see [Amazon SNS message attributes]and [Publishing to a mobile phone] in the Amazon
+// SNS Developer Guide.
+//
+// [Publishing to a mobile phone]: https://docs.aws.amazon.com/sns/latest/dg/sms_publish-to-phone.html
+// [Amazon SNS message attributes]: https://docs.aws.amazon.com/sns/latest/dg/SNSMessageAttributes.html
+// [Publish]: https://docs.aws.amazon.com/sns/latest/api/API_Publish.html
 type MessageAttributeValue struct {
 
 	// Amazon SNS supports the following logical data types: String, String.Array,
-	// Number, and Binary. For more information, see Message Attribute Data Types
-	// (https://docs.aws.amazon.com/sns/latest/dg/SNSMessageAttributes.html#SNSMessageAttributes.DataTypes).
+	// Number, and Binary. For more information, see [Message Attribute Data Types].
+	//
+	// [Message Attribute Data Types]: https://docs.aws.amazon.com/sns/latest/dg/SNSMessageAttributes.html#SNSMessageAttributes.DataTypes
 	//
 	// This member is required.
 	DataType *string
@@ -68,9 +70,9 @@ type MessageAttributeValue struct {
 	// encrypted data, or images.
 	BinaryValue []byte
 
-	// Strings are Unicode with UTF8 binary encoding. For a list of code values, see
-	// ASCII Printable Characters
-	// (https://en.wikipedia.org/wiki/ASCII#ASCII_printable_characters).
+	// Strings are Unicode with UTF8 binary encoding. For a list of code values, see [ASCII Printable Characters].
+	//
+	// [ASCII Printable Characters]: https://en.wikipedia.org/wiki/ASCII#ASCII_printable_characters
 	StringValue *string
 
 	noSmithyDocumentSerde
@@ -116,10 +118,12 @@ type PlatformApplication struct {
 // identifies a message within the batch.
 type PublishBatchRequestEntry struct {
 
-	// An identifier for the message in this batch. The Ids of a batch request must be
-	// unique within a request. This identifier can have up to 80 characters. The
-	// following characters are accepted: alphanumeric characters, hyphens(-), and
-	// underscores (_).
+	// An identifier for the message in this batch.
+	//
+	// The Ids of a batch request must be unique within a request.
+	//
+	// This identifier can have up to 80 characters. The following characters are
+	// accepted: alphanumeric characters, hyphens(-), and underscores (_).
 	//
 	// This member is required.
 	Id *string
@@ -129,69 +133,77 @@ type PublishBatchRequestEntry struct {
 	// This member is required.
 	Message *string
 
-	// Each message attribute consists of a Name, Type, and Value. For more
-	// information, see Amazon SNS message attributes
-	// (https://docs.aws.amazon.com/sns/latest/dg/sns-message-attributes.html) in the
-	// Amazon SNS Developer Guide.
+	// Each message attribute consists of a Name , Type , and Value . For more
+	// information, see [Amazon SNS message attributes]in the Amazon SNS Developer Guide.
+	//
+	// [Amazon SNS message attributes]: https://docs.aws.amazon.com/sns/latest/dg/sns-message-attributes.html
 	MessageAttributes map[string]MessageAttributeValue
 
-	// This parameter applies only to FIFO (first-in-first-out) topics. The token used
-	// for deduplication of messages within a 5-minute minimum deduplication interval.
-	// If a message with a particular MessageDeduplicationId is sent successfully,
-	// subsequent messages with the same MessageDeduplicationId are accepted
-	// successfully but aren't delivered.
+	// This parameter applies only to FIFO (first-in-first-out) topics.
 	//
-	// * Every message must have a unique
-	// MessageDeduplicationId.
+	// The token used for deduplication of messages within a 5-minute minimum
+	// deduplication interval. If a message with a particular MessageDeduplicationId
+	// is sent successfully, subsequent messages with the same MessageDeduplicationId
+	// are accepted successfully but aren't delivered.
 	//
-	// * You may provide a MessageDeduplicationId
-	// explicitly.
+	//   - Every message must have a unique MessageDeduplicationId .
 	//
-	// * If you aren't able to provide a MessageDeduplicationId and you
-	// enable ContentBasedDeduplication for your topic, Amazon SNS uses a SHA-256 hash
-	// to generate the MessageDeduplicationId using the body of the message (but not
-	// the attributes of the message).
+	//   - You may provide a MessageDeduplicationId explicitly.
 	//
-	// * If you don't provide a MessageDeduplicationId
-	// and the topic doesn't have ContentBasedDeduplication set, the action fails with
-	// an error.
+	//   - If you aren't able to provide a MessageDeduplicationId and you enable
+	//   ContentBasedDeduplication for your topic, Amazon SNS uses a SHA-256 hash to
+	//   generate the MessageDeduplicationId using the body of the message (but not the
+	//   attributes of the message).
 	//
-	// * If the topic has a ContentBasedDeduplication set, your
-	// MessageDeduplicationId overrides the generated one.
+	//   - If you don't provide a MessageDeduplicationId and the topic doesn't have
+	//   ContentBasedDeduplication set, the action fails with an error.
 	//
-	// * When
-	// ContentBasedDeduplication is in effect, messages with identical content sent
-	// within the deduplication interval are treated as duplicates and only one copy of
-	// the message is delivered.
+	//   - If the topic has a ContentBasedDeduplication set, your
+	//   MessageDeduplicationId overrides the generated one.
 	//
-	// * If you send one message with
-	// ContentBasedDeduplication enabled, and then another message with a
-	// MessageDeduplicationId that is the same as the one generated for the first
-	// MessageDeduplicationId, the two messages are treated as duplicates and only one
-	// copy of the message is delivered.
+	//   - When ContentBasedDeduplication is in effect, messages with identical content
+	//   sent within the deduplication interval are treated as duplicates and only one
+	//   copy of the message is delivered.
 	//
-	// The MessageDeduplicationId is available to
-	// the consumer of the message (this can be useful for troubleshooting delivery
-	// issues). If a message is sent successfully but the acknowledgement is lost and
-	// the message is resent with the same MessageDeduplicationId after the
-	// deduplication interval, Amazon SNS can't detect duplicate messages. Amazon SNS
-	// continues to keep track of the message deduplication ID even after the message
-	// is received and deleted. The length of MessageDeduplicationId is 128 characters.
+	//   - If you send one message with ContentBasedDeduplication enabled, and then
+	//   another message with a MessageDeduplicationId that is the same as the one
+	//   generated for the first MessageDeduplicationId , the two messages are treated
+	//   as duplicates and only one copy of the message is delivered.
+	//
+	// The MessageDeduplicationId is available to the consumer of the message (this
+	// can be useful for troubleshooting delivery issues).
+	//
+	// If a message is sent successfully but the acknowledgement is lost and the
+	// message is resent with the same MessageDeduplicationId after the deduplication
+	// interval, Amazon SNS can't detect duplicate messages.
+	//
+	// Amazon SNS continues to keep track of the message deduplication ID even after
+	// the message is received and deleted.
+	//
+	// The length of MessageDeduplicationId is 128 characters.
+	//
 	// MessageDeduplicationId can contain alphanumeric characters (a-z, A-Z, 0-9) and
-	// punctuation (!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~).
+	// punctuation (!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~) .
 	MessageDeduplicationId *string
 
-	// This parameter applies only to FIFO (first-in-first-out) topics. The tag that
-	// specifies that a message belongs to a specific message group. Messages that
-	// belong to the same message group are processed in a FIFO manner (however,
-	// messages in different message groups might be processed out of order). To
-	// interleave multiple ordered streams within a single topic, use MessageGroupId
+	// This parameter applies only to FIFO (first-in-first-out) topics.
+	//
+	// The tag that specifies that a message belongs to a specific message group.
+	// Messages that belong to the same message group are processed in a FIFO manner
+	// (however, messages in different message groups might be processed out of order).
+	// To interleave multiple ordered streams within a single topic, use MessageGroupId
 	// values (for example, session data for multiple users). In this scenario,
 	// multiple consumers can process the topic, but the session data of each user is
-	// processed in a FIFO fashion. You must associate a non-empty MessageGroupId with
-	// a message. If you don't provide a MessageGroupId, the action fails. The length
-	// of MessageGroupId is 128 characters. MessageGroupId can contain alphanumeric
-	// characters (a-z, A-Z, 0-9) and punctuation (!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~).
+	// processed in a FIFO fashion.
+	//
+	// You must associate a non-empty MessageGroupId with a message. If you don't
+	// provide a MessageGroupId , the action fails.
+	//
+	// The length of MessageGroupId is 128 characters.
+	//
+	// MessageGroupId can contain alphanumeric characters (a-z, A-Z, 0-9) and
+	// punctuation (!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~) .
+	//
 	// MessageGroupId is required for FIFO topics. You can't use it for standard
 	// topics.
 	MessageGroupId *string
@@ -199,17 +211,15 @@ type PublishBatchRequestEntry struct {
 	// Set MessageStructure to json if you want to send a different message for each
 	// protocol. For example, using one publish action, you can send a short message to
 	// your SMS subscribers and a longer message to your email subscribers. If you set
-	// MessageStructure to json, the value of the Message parameter must:
+	// MessageStructure to json , the value of the Message parameter must:
 	//
-	// * be a
-	// syntactically valid JSON object; and
+	//   - be a syntactically valid JSON object; and
 	//
-	// * contain at least a top-level JSON key of
-	// "default" with a value that is a string.
+	//   - contain at least a top-level JSON key of "default" with a value that is a
+	//   string.
 	//
-	// You can define other top-level keys
-	// that define the message you want to send to a specific transport protocol (e.g.
-	// http).
+	// You can define other top-level keys that define the message you want to send to
+	// a specific transport protocol (e.g. http).
 	MessageStructure *string
 
 	// The subject of the batch message.
@@ -227,25 +237,29 @@ type PublishBatchResultEntry struct {
 	// An identifier for the message.
 	MessageId *string
 
-	// This parameter applies only to FIFO (first-in-first-out) topics. The large,
-	// non-consecutive number that Amazon SNS assigns to each message. The length of
-	// SequenceNumber is 128 bits. SequenceNumber continues to increase for a
-	// particular MessageGroupId.
+	// This parameter applies only to FIFO (first-in-first-out) topics.
+	//
+	// The large, non-consecutive number that Amazon SNS assigns to each message.
+	//
+	// The length of SequenceNumber is 128 bits. SequenceNumber continues to increase
+	// for a particular MessageGroupId .
 	SequenceNumber *string
 
 	noSmithyDocumentSerde
 }
 
-// A verified or pending destination phone number in the SMS sandbox. When you
-// start using Amazon SNS to send SMS messages, your Amazon Web Services account is
-// in the SMS sandbox. The SMS sandbox provides a safe environment for you to try
-// Amazon SNS features without risking your reputation as an SMS sender. While your
-// Amazon Web Services account is in the SMS sandbox, you can use all of the
-// features of Amazon SNS. However, you can send SMS messages only to verified
+// A verified or pending destination phone number in the SMS sandbox.
+//
+// When you start using Amazon SNS to send SMS messages, your Amazon Web Services
+// account is in the SMS sandbox. The SMS sandbox provides a safe environment for
+// you to try Amazon SNS features without risking your reputation as an SMS sender.
+// While your Amazon Web Services account is in the SMS sandbox, you can use all of
+// the features of Amazon SNS. However, you can send SMS messages only to verified
 // destination phone numbers. For more information, including how to move out of
-// the sandbox to send messages without restrictions, see SMS sandbox
-// (https://docs.aws.amazon.com/sns/latest/dg/sns-sms-sandbox.html) in the Amazon
-// SNS Developer Guide.
+// the sandbox to send messages without restrictions, see [SMS sandbox]in the Amazon SNS
+// Developer Guide.
+//
+// [SMS sandbox]: https://docs.aws.amazon.com/sns/latest/dg/sns-sms-sandbox.html
 type SMSSandboxPhoneNumber struct {
 
 	// The destination phone number.
@@ -294,8 +308,8 @@ type Tag struct {
 	noSmithyDocumentSerde
 }
 
-// A wrapper type for the topic's Amazon Resource Name (ARN). To retrieve a topic's
-// attributes, use GetTopicAttributes.
+// A wrapper type for the topic's Amazon Resource Name (ARN). To retrieve a
+// topic's attributes, use GetTopicAttributes .
 type Topic struct {
 
 	// The topic's ARN.

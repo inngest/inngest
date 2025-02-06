@@ -6,18 +6,19 @@ import (
 	"context"
 	"fmt"
 	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
-	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/smithy-go/middleware"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Returns a list of phone numbers that are opted out, meaning you cannot send SMS
-// messages to them. The results for ListPhoneNumbersOptedOut are paginated, and
-// each page returns up to 100 phone numbers. If additional phone numbers are
-// available after the first page of results, then a NextToken string will be
-// returned. To receive the next page, you call ListPhoneNumbersOptedOut again
-// using the NextToken string received from the previous call. When there are no
-// more records to return, NextToken will be null.
+// messages to them.
+//
+// The results for ListPhoneNumbersOptedOut are paginated, and each page returns
+// up to 100 phone numbers. If additional phone numbers are available after the
+// first page of results, then a NextToken string will be returned. To receive the
+// next page, you call ListPhoneNumbersOptedOut again using the NextToken string
+// received from the previous call. When there are no more records to return,
+// NextToken will be null.
 func (c *Client) ListPhoneNumbersOptedOut(ctx context.Context, params *ListPhoneNumbersOptedOutInput, optFns ...func(*Options)) (*ListPhoneNumbersOptedOutOutput, error) {
 	if params == nil {
 		params = &ListPhoneNumbersOptedOutInput{}
@@ -46,8 +47,8 @@ type ListPhoneNumbersOptedOutInput struct {
 // The response from the ListPhoneNumbersOptedOut action.
 type ListPhoneNumbersOptedOutOutput struct {
 
-	// A NextToken string is returned when you call the ListPhoneNumbersOptedOut action
-	// if additional records are available after the first page of results.
+	// A NextToken string is returned when you call the ListPhoneNumbersOptedOut
+	// action if additional records are available after the first page of results.
 	NextToken *string
 
 	// A list of phone numbers that are opted out of receiving SMS messages. The list
@@ -61,6 +62,9 @@ type ListPhoneNumbersOptedOutOutput struct {
 }
 
 func (c *Client) addOperationListPhoneNumbersOptedOutMiddlewares(stack *middleware.Stack, options Options) (err error) {
+	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+		return err
+	}
 	err = stack.Serialize.Add(&awsAwsquery_serializeOpListPhoneNumbersOptedOut{}, middleware.After)
 	if err != nil {
 		return err
@@ -69,34 +73,38 @@ func (c *Client) addOperationListPhoneNumbersOptedOutMiddlewares(stack *middlewa
 	if err != nil {
 		return err
 	}
+	if err := addProtocolFinalizerMiddlewares(stack, options, "ListPhoneNumbersOptedOut"); err != nil {
+		return fmt.Errorf("add protocol finalizers: %v", err)
+	}
+
+	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
+		return err
+	}
 	if err = addSetLoggerMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddClientRequestIDMiddleware(stack); err != nil {
+	if err = addClientRequestID(stack); err != nil {
 		return err
 	}
-	if err = smithyhttp.AddComputeContentLengthMiddleware(stack); err != nil {
+	if err = addComputeContentLength(stack); err != nil {
 		return err
 	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = v4.AddComputePayloadSHA256Middleware(stack); err != nil {
+	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetryMiddlewares(stack, options); err != nil {
+	if err = addRetry(stack, options); err != nil {
 		return err
 	}
-	if err = addHTTPSignerV4Middleware(stack, options); err != nil {
+	if err = addRawResponseToMetadata(stack); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddRawResponseToMetadata(stack); err != nil {
+	if err = addRecordResponseTiming(stack); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack); err != nil {
+	if err = addClientUserAgent(stack, options); err != nil {
 		return err
 	}
 	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
@@ -105,7 +113,19 @@ func (c *Client) addOperationListPhoneNumbersOptedOutMiddlewares(stack *middlewa
 	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
 		return err
 	}
+	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
+		return err
+	}
+	if err = addTimeOffsetBuild(stack, c); err != nil {
+		return err
+	}
+	if err = addUserAgentRetryMode(stack, options); err != nil {
+		return err
+	}
 	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opListPhoneNumbersOptedOut(options.Region), middleware.Before); err != nil {
+		return err
+	}
+	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -117,16 +137,11 @@ func (c *Client) addOperationListPhoneNumbersOptedOutMiddlewares(stack *middlewa
 	if err = addRequestResponseLogging(stack, options); err != nil {
 		return err
 	}
+	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
 	return nil
 }
-
-// ListPhoneNumbersOptedOutAPIClient is a client that implements the
-// ListPhoneNumbersOptedOut operation.
-type ListPhoneNumbersOptedOutAPIClient interface {
-	ListPhoneNumbersOptedOut(context.Context, *ListPhoneNumbersOptedOutInput, ...func(*Options)) (*ListPhoneNumbersOptedOutOutput, error)
-}
-
-var _ ListPhoneNumbersOptedOutAPIClient = (*Client)(nil)
 
 // ListPhoneNumbersOptedOutPaginatorOptions is the paginator options for
 // ListPhoneNumbersOptedOut
@@ -181,6 +196,9 @@ func (p *ListPhoneNumbersOptedOutPaginator) NextPage(ctx context.Context, optFns
 	params := *p.params
 	params.NextToken = p.nextToken
 
+	optFns = append([]func(*Options){
+		addIsPaginatorUserAgent,
+	}, optFns...)
 	result, err := p.client.ListPhoneNumbersOptedOut(ctx, &params, optFns...)
 	if err != nil {
 		return nil, err
@@ -200,11 +218,18 @@ func (p *ListPhoneNumbersOptedOutPaginator) NextPage(ctx context.Context, optFns
 	return result, nil
 }
 
+// ListPhoneNumbersOptedOutAPIClient is a client that implements the
+// ListPhoneNumbersOptedOut operation.
+type ListPhoneNumbersOptedOutAPIClient interface {
+	ListPhoneNumbersOptedOut(context.Context, *ListPhoneNumbersOptedOutInput, ...func(*Options)) (*ListPhoneNumbersOptedOutOutput, error)
+}
+
+var _ ListPhoneNumbersOptedOutAPIClient = (*Client)(nil)
+
 func newServiceMetadataMiddleware_opListPhoneNumbersOptedOut(region string) *awsmiddleware.RegisterServiceMetadata {
 	return &awsmiddleware.RegisterServiceMetadata{
 		Region:        region,
 		ServiceID:     ServiceID,
-		SigningName:   "sns",
 		OperationName: "ListPhoneNumbersOptedOut",
 	}
 }

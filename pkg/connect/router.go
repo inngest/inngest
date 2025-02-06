@@ -8,12 +8,17 @@ import (
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"gonum.org/v1/gonum/stat/sampleuv"
 	"log/slog"
 	"time"
+)
+
+const (
+	pkgNameRouter = "connect.router"
 )
 
 type connectRouterSvc struct {
@@ -87,6 +92,9 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 
 			if routeTo == nil {
 				log.Warn("no healthy connections")
+				metrics.IncrConnectRouterNoHealthyConnectionCounter(ctx, 1, metrics.CounterOpt{
+					PkgName: pkgNameRouter,
+				})
 				return
 			}
 
