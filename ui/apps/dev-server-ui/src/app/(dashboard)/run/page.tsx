@@ -20,7 +20,7 @@ export default function Page() {
   const getTrigger = useGetTrigger();
   const rerun = useRerun();
 
-  const traceAIEnabled = true;
+  const traceAIEnabled = false;
 
   if (!runID) {
     throw new Error('missing runID in search params');

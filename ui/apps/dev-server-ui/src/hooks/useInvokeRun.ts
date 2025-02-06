@@ -1,4 +1,4 @@
-import type { InvokeRunPayload } from '@inngest/components/Signals/useInvokeRun';
+import type { InvokeRunPayload } from '@inngest/components/Shared/useInvokeRun';
 
 import { useInvokeFunctionMutation } from '@/store/generated';
 

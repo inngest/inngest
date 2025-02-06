@@ -18,7 +18,7 @@ import { InvokeModal } from '../InvokeButton';
 // NOTE - This component should be a shared component as part of the design system.
 // Until then, we re-use it from the RunDetailsV2 as these are part of the same parent UI.
 import { ErrorCard } from '../RunDetailsV2/ErrorCard';
-import { useInvokeRun } from '../Signals/useInvokeRun';
+import { useInvokeRun } from '../Shared/useInvokeRun';
 import { usePrettyJson } from '../hooks/usePrettyJson';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
 import type { Result } from '../types/functionRun';

@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { RerunFromStepPayload } from '@inngest/components/Signals/useRerunFromStep';
+import type { RerunFromStepPayload } from '@inngest/components/Shared/useRerunFromStep';
 
 import { useRerunFromStepMutation } from '@/store/generated';
 

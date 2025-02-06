@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { useSignals, type SignalDefinitions } from './SignalsContext';
+import { useShared, type SharedDefinitions } from './SharedContext';
 
 export type RerunFromStepPayload = {
   runID: string;
@@ -16,15 +16,15 @@ export type RerunFromStepResult = {
 };
 
 export const useRerunFromStep = () => {
-  const signals = useSignals();
+  const shared = useShared();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const rerun = async (payload: SignalDefinitions['rerunFromStep']['payload']) => {
+  const rerun = async (payload: SharedDefinitions['rerunFromStep']['payload']) => {
     try {
       setLoading(true);
       setError(null);
-      return await signals.rerunFromStep(payload);
+      return await shared.rerunFromStep(payload);
     } catch (err) {
       console.error('error rerunning from step', err);
       setError(err instanceof Error ? err : new Error('Error rerunning from step'));

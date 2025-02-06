@@ -5,7 +5,7 @@ import { RiCloseLine } from '@remixicon/react';
 import { Button } from '../Button';
 import { CodeBlock } from '../CodeBlock/CodeBlock';
 import { Modal } from '../Modal/Modal';
-import { useRerunFromStep } from '../Signals/useRerunFromStep';
+import { useRerunFromStep } from '../Shared/useRerunFromStep';
 
 export type RerunModalType = {
   open: boolean;

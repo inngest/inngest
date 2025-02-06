@@ -1,13 +1,13 @@
-import { SignalsProvider, type SignalHandlers } from '@inngest/components/Signals/SignalsContext';
+import { SharedProvider, type SharedHandlers } from '@inngest/components/Shared/SharedContext';
 
 import { useInvokeRun } from '@/hooks/useInvokeRun';
 import { useRerunFromStep } from '@/hooks/useRerunFromStep';
 import { convertError } from '@/store/error';
 
-export const Signals = ({ children }: { children: React.ReactNode }) => {
+export const Shared = ({ children }: { children: React.ReactNode }) => {
   const invokeRun = useInvokeRun();
   const rerunFromStep = useRerunFromStep();
-  const handlers: Partial<SignalHandlers> = {
+  const handlers: Partial<SharedHandlers> = {
     invokeRun,
     rerunFromStep: async (payload) => {
       //
@@ -20,5 +20,5 @@ export const Signals = ({ children }: { children: React.ReactNode }) => {
     },
   };
 
-  return <SignalsProvider handlers={handlers}>{children}</SignalsProvider>;
+  return <SharedProvider handlers={handlers}>{children}</SharedProvider>;
 };

@@ -1,4 +1,4 @@
-import type { InvokeRunPayload } from '@inngest/components/Signals/useInvokeRun';
+import type { InvokeRunPayload } from '@inngest/components/Shared/useInvokeRun';
 import { useMutation } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
