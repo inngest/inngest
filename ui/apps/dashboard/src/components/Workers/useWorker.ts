@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { convertWorkerStatus } from '@inngest/components/types/workers';
+import { getTimestampDaysAgo } from '@inngest/components/utils/date';
 
 import { graphql } from '@/gql';
 import { ConnectV1ConnectionStatus, ConnectV1WorkerConnectionsOrderByField } from '@/gql/graphql';
@@ -57,7 +58,10 @@ const query = graphql(`
 `);
 
 export function useWorkers({ envID, appID }: { envID: string; appID: string }) {
-  const [startTime] = useState(() => new Date().toISOString());
+  // TO DO: Pass startTime and status as prop to the hook and make two separate calls in table.
+  const [startTime] = useState(() =>
+    getTimestampDaysAgo({ currentDate: new Date(), days: 7 }).toISOString()
+  );
   const res = useGraphQLQuery({
     query,
     variables: {
@@ -117,10 +121,25 @@ export function useWorkerCount({
   appID: string;
   status: ConnectV1ConnectionStatus[];
 }) {
-  const [startTime] = useState(() => new Date().toISOString());
+  const [startTime, setStartTime] = useState(() =>
+    getTimestampDaysAgo({ currentDate: new Date(), days: 7 }).toISOString()
+  );
+
+  const pollIntervalInMilliseconds = 2_000;
+
+  useEffect(() => {
+    const updateStartTime = () => {
+      setStartTime(getTimestampDaysAgo({ currentDate: new Date(), days: 7 }).toISOString());
+    };
+
+    const intervalId = setInterval(updateStartTime, pollIntervalInMilliseconds);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
   const res = useGraphQLQuery({
     query: countQuery,
-    pollIntervalInMilliseconds: 2_000,
+    pollIntervalInMilliseconds: pollIntervalInMilliseconds,
     variables: {
       envID,
       appID,
