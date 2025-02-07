@@ -28,7 +28,7 @@ message ConnectMessage {
 message SessionIdentifier {
 	string instance_id = 1;
 	string connection_id = 2;
-	optional string build_id = 4;
+	optional string app_version = 4;
 }
 
 message SessionDetails {
@@ -138,7 +138,7 @@ message ConnGroup {
 	string hash = 3;
 	repeated ConnMetadata conns = 4;
 	optional string sync_id = 5;
-	optional string build_id = 6;
+	optional string app_version = 6;
 }
 
 enum WorkerDisconnectReason {

@@ -311,7 +311,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 		urls := map[string]struct{}{}
 		if apps, err := d.Data.GetApps(ctx, consts.DevServerEnvId, nil); err == nil {
 			for _, app := range apps {
-				if app.ConnectionType == enums.AppConnectionTypeConnect.String() {
+				if app.Method == enums.AppMethodConnect.String() {
 					continue
 				}
 

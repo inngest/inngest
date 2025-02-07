@@ -59,7 +59,7 @@ func (h *connectHandler) performConnectHandshake(ctx context.Context, connection
 	{
 		data, err := proto.Marshal(&connectproto.WorkerConnectRequestData{
 			SessionId: &connectproto.SessionIdentifier{
-				BuildId:      h.opts.BuildID,
+				AppVersion:      h.opts.BuildID,
 				InstanceId:   h.instanceId(),
 				ConnectionId: connectionId,
 			},

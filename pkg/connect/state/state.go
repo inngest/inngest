@@ -71,8 +71,8 @@ type WorkerGroup struct {
 	// If set, it means this worker group is already synced
 	AppID *uuid.UUID `json:"app_id,omitempty"`
 
-	// User-supplied build ID
-	BuildId *string `json:"build_id,omitempty"`
+	// User-supplied app version
+	AppVersion *string `json:"app_version,omitempty"`
 
 	// Typical metadata associated with the SDK
 	SDKLang     string `json:"sdk_lang"`

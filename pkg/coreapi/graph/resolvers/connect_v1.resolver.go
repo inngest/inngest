@@ -121,12 +121,14 @@ func connToNode(conn *cqrs.WorkerConnection) *models.ConnectV1WorkerConnection {
 
 		DisconnectReason: conn.DisconnectReason,
 
-		GroupHash:     conn.GroupHash,
-		SdkLang:       conn.SDKLang,
-		SdkVersion:    conn.SDKVersion,
-		SdkPlatform:   conn.SDKPlatform,
-		SyncID:        conn.SyncID,
-		BuildID:       conn.BuildId,
+		GroupHash:   conn.GroupHash,
+		SdkLang:     conn.SDKLang,
+		SdkVersion:  conn.SDKVersion,
+		SdkPlatform: conn.SDKPlatform,
+		SyncID:      conn.SyncID,
+		BuildID:     conn.AppVersion,
+		AppVersion:  conn.AppVersion,
+		
 		FunctionCount: conn.FunctionCount,
 
 		CPUCores: int(conn.CpuCores),

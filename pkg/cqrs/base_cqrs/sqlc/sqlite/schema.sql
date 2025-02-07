@@ -11,7 +11,7 @@ CREATE TABLE apps (
 	created_at TIMESTAMP NOT NULL,
 	archived_at TIMESTAMP,
 	url VARCHAR NOT NULL,
-    connection_type VARCHAR NOT NULL DEFAULT 'serverless'
+    method VARCHAR NOT NULL DEFAULT 'serve'
 );
 
 CREATE TABLE events (
@@ -177,7 +177,7 @@ CREATE TABLE worker_connections (
     sdk_version VARCHAR NOT NULL,
     sdk_platform VARCHAR NOT NULL,
     sync_id CHAR(36),
-    build_id VARCHAR,
+    app_version VARCHAR,
     function_count INT NOT NULL,
 
     cpu_cores INT NOT NULL,

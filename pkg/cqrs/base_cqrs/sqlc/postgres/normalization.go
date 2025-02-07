@@ -7,19 +7,19 @@ import (
 
 func (a *App) ToSQLite() (*sqlc.App, error) {
 	return &sqlc.App{
-		ID:             a.ID,
-		Name:           a.Name,
-		SdkLanguage:    a.SdkLanguage,
-		SdkVersion:     a.SdkVersion,
-		Framework:      a.Framework,
-		Metadata:       a.Metadata,
-		Status:         a.Status,
-		Error:          a.Error,
-		Checksum:       a.Checksum,
-		CreatedAt:      a.CreatedAt,
-		ArchivedAt:     a.ArchivedAt,
-		Url:            a.Url,
-		ConnectionType: a.ConnectionType,
+		ID:          a.ID,
+		Name:        a.Name,
+		SdkLanguage: a.SdkLanguage,
+		SdkVersion:  a.SdkVersion,
+		Framework:   a.Framework,
+		Metadata:    a.Metadata,
+		Status:      a.Status,
+		Error:       a.Error,
+		Checksum:    a.Checksum,
+		CreatedAt:   a.CreatedAt,
+		ArchivedAt:  a.ArchivedAt,
+		Url:         a.Url,
+		Method:      a.Method,
 	}, nil
 }
 
@@ -315,7 +315,7 @@ func (wc *WorkerConnection) ToSQLite() (*sqlc.WorkerConnection, error) {
 		SdkVersion:       wc.SdkVersion,
 		SdkPlatform:      wc.SdkPlatform,
 		SyncID:           wc.SyncID,
-		BuildID:          wc.BuildID,
+		AppVersion:       wc.AppVersion,
 		FunctionCount:    int64(wc.FunctionCount),
 		CpuCores:         int64(wc.CpuCores),
 		MemBytes:         wc.MemBytes,

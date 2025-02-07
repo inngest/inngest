@@ -98,14 +98,14 @@ func ToFunctionRunStatus(s enums.RunStatus) (FunctionRunStatus, error) {
 	}
 }
 
-func FromAppConnectionType(connectionType AppConnectionType) (enums.AppConnectionType, error) {
-	switch connectionType {
-	case AppConnectionTypeConnect:
-		return enums.AppConnectionTypeConnect, nil
-	case AppConnectionTypeServerless:
-		return enums.AppConnectionTypeServerless, nil
+func FromAppConnectionType(method AppMethod) (enums.AppMethod, error) {
+	switch method {
+	case AppMethodConnect:
+		return enums.AppMethodConnect, nil
+	case AppMethodServe:
+		return enums.AppMethodServe, nil
 	default:
-		return enums.AppConnectionType(0), fmt.Errorf("unknown connection type: %s", connectionType.String())
+		return enums.AppMethodServe, fmt.Errorf("unknown connection type: %s", method.String())
 	}
 }
 
@@ -115,24 +115,24 @@ func FromAppsFilter(in *AppsFilterV1) (*cqrs.FilterAppParam, error) {
 	}
 
 	filter := &cqrs.FilterAppParam{}
-	if in.ConnectionType != nil {
-		connType, err := FromAppConnectionType(*in.ConnectionType)
+	if in.Method != nil {
+		connType, err := FromAppConnectionType(*in.Method)
 		if err != nil {
 			return nil, err
 		}
-		filter.ConnectionType = &connType
+		filter.Method = &connType
 	}
 
 	return filter, nil
 }
 
-func ToAppConnectionType(connectionType enums.AppConnectionType) AppConnectionType {
-	switch connectionType {
-	case enums.AppConnectionTypeServerless:
-		return AppConnectionTypeServerless
-	case enums.AppConnectionTypeConnect:
-		return AppConnectionTypeConnect
+func ToAppMethod(method enums.AppMethod) AppMethod {
+	switch method {
+	case enums.AppMethodServe:
+		return AppMethodServe
+	case enums.AppMethodConnect:
+		return AppMethodConnect
 	default:
-		return AppConnectionTypeServerless
+		return AppMethodServe
 	}
 }

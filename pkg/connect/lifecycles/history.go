@@ -86,7 +86,7 @@ func (h *historyLifecycles) OnDisconnected(ctx context.Context, conn *state.Conn
 		SDKVersion:    conn.Group.SDKVersion,
 		SDKPlatform:   conn.Group.SDKPlatform,
 		SyncID:        conn.Group.SyncID,
-		BuildId:       conn.Session.SessionId.BuildId,
+		AppVersion:    conn.Session.SessionId.AppVersion,
 		FunctionCount: len(conn.Group.FunctionSlugs),
 
 		CpuCores: conn.Data.SystemAttributes.CpuCores,
@@ -129,7 +129,7 @@ func (h *historyLifecycles) upsertConnection(ctx context.Context, conn *state.Co
 		SDKLang:       conn.Group.SDKLang,
 		SDKVersion:    conn.Group.SDKVersion,
 		SDKPlatform:   conn.Group.SDKPlatform,
-		BuildId:       conn.Session.SessionId.BuildId,
+		AppVersion:    conn.Session.SessionId.AppVersion,
 		FunctionCount: len(conn.Group.FunctionSlugs),
 		SyncID:        conn.Group.SyncID,
 
