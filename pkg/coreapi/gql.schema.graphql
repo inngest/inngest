@@ -120,6 +120,8 @@ type App {
 
   method: AppMethod!
 
+  appVersion: String
+
   # These fields are UI convenience fields
   connected: Boolean!
   functionCount: Int!

@@ -221,6 +221,7 @@ func (q NormalizedQueries) UpsertApp(ctx context.Context, params sqlc_sqlite.Ups
 		Checksum:    params.Checksum,
 		Url:         params.Url,
 		Method:      params.Method,
+		AppVersion:  params.AppVersion,
 	}
 
 	app, err := q.db.UpsertApp(ctx, pgParams)

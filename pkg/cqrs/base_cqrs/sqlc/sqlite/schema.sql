@@ -11,7 +11,8 @@ CREATE TABLE apps (
 	created_at TIMESTAMP NOT NULL,
 	archived_at TIMESTAMP,
 	url VARCHAR NOT NULL,
-    method VARCHAR NOT NULL DEFAULT 'serve'
+    method VARCHAR NOT NULL DEFAULT 'serve',
+    app_version VARCHAR
 );
 
 CREATE TABLE events (

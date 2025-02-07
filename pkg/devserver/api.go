@@ -251,9 +251,10 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*cqrs.Sync
 				String: r.Framework,
 				Valid:  r.Framework != "",
 			},
-			Url:      r.URL,
-			Checksum: sum,
-			Method:   method.String(),
+			Url:        r.URL,
+			Checksum:   sum,
+			Method:     method.String(),
+			AppVersion: r.AppVersion,
 		}
 
 		// We want to save an app at the end, after handling each error.

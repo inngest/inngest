@@ -20,6 +20,7 @@ func (a *App) ToSQLite() (*sqlc.App, error) {
 		ArchivedAt:  a.ArchivedAt,
 		Url:         a.Url,
 		Method:      a.Method,
+		AppVersion:  a.AppVersion,
 	}, nil
 }
 

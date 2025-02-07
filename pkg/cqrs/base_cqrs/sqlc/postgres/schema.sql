@@ -11,7 +11,8 @@ CREATE TABLE apps (
 	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	archived_at TIMESTAMP,
 	url VARCHAR NOT NULL,
-    method VARCHAR(32) NOT NULL DEFAULT 'serve'
+    method VARCHAR(32) NOT NULL DEFAULT 'serve',
+    app_version VARCHAR(128)
 );
 
 -- XXX: - this is very basic right now.  it does not conform to the cloud.

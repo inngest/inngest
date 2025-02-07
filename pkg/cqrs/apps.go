@@ -23,6 +23,7 @@ type App struct {
 	DeletedAt   time.Time
 	Url         string
 	Method      string
+	AppVersion  string
 }
 
 type AppManager interface {
@@ -69,6 +70,7 @@ type UpsertAppParams struct {
 	Checksum    string
 	Url         string
 	Method      string
+	AppVersion  string
 }
 
 type UpdateAppErrorParams struct {
