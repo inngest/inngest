@@ -82,6 +82,7 @@ models:
       app:
         resolver: true
   RunsV2Connection:
+    model: github.com/inngest/inngest/pkg/coreapi/graph/models.RunsV2Connection
     fields:
       totalCount:
         resolver: true

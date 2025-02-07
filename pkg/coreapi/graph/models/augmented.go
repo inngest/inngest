@@ -8,3 +8,12 @@ type WorkerConnectionsConnection struct {
 	Filter  ConnectV1WorkerConnectionsFilter
 	OrderBy []*ConnectV1WorkerConnectionsOrderBy
 }
+
+type RunsV2Connection struct {
+	Edges    []*FunctionRunV2Edge `json:"edges"`
+	PageInfo *PageInfo            `json:"pageInfo"`
+ 
+	After   *string
+	Filter  RunsFilterV2
+	OrderBy []*RunsV2OrderBy
+}

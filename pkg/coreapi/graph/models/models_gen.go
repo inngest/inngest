@@ -271,12 +271,6 @@ type RunsFilterV2 struct {
 	Query       *string             `json:"query,omitempty"`
 }
 
-type RunsV2Connection struct {
-	Edges      []*FunctionRunV2Edge `json:"edges"`
-	PageInfo   *PageInfo            `json:"pageInfo"`
-	TotalCount int                  `json:"totalCount"`
-}
-
 type RunsV2OrderBy struct {
 	Field     RunsV2OrderByField   `json:"field"`
 	Direction RunsOrderByDirection `json:"direction"`
