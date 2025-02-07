@@ -109,9 +109,9 @@ type HandlerOpts struct {
 	// This only needs to be set when self hosting.
 	RegisterURL *string
 
-	// BuildID supplies an application version identifier. This should change
+	// AppVersion supplies an application version identifier. This should change
 	// whenever code within one of your Inngest function or any dependency thereof changes.
-	BuildID *string
+	AppVersion *string
 
 	// MaxBodySize is the max body size to read for incoming invoke requests
 	MaxBodySize int

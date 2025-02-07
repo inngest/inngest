@@ -81,7 +81,7 @@ func (h *handler) Connect(ctx context.Context, opts ConnectOpts) error {
 		IsDev:                    h.isDev(),
 		DevServerUrl:             DevServerURL(),
 		InstanceID:               opts.InstanceID,
-		BuildID:                  h.BuildID,
+		AppVersion:               h.AppVersion,
 		Platform:                 Ptr(platform()),
 		SDKVersion:               SDKVersion,
 		SDKLanguage:              SDKLanguage,

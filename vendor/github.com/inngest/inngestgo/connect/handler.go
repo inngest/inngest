@@ -72,7 +72,7 @@ type Opts struct {
 	IsDev        bool
 	DevServerUrl string
 
-	BuildID    *string
+	AppVersion *string
 	InstanceID *string
 
 	Platform    *string
