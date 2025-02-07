@@ -47,41 +47,46 @@ const getAppCardContent = ({ app, envSlug }: { app: FlattenedApp; envSlug: strin
         </Link>
       </>
     ) : (
-      <ul className="divide-subtle divide-y">
-        {[...app.functions]
-          .sort((a, b) => a.name.localeCompare(b.name))
-          .map((func) => {
-            return (
-              <li key={func.id} className="grid grid-cols-3 gap-1 py-2">
-                <Link
-                  className="col-span-2"
-                  href={pathCreator.function({ envSlug, functionSlug: func.slug })}
-                  arrowOnHover
-                >
-                  {func.name}
-                </Link>
-                <HorizontalPillList
-                  alwaysVisibleCount={2}
-                  pills={func.triggers.map((trigger) => {
-                    return (
-                      <Pill
-                        appearance="outlined"
-                        href={
-                          trigger.type === 'EVENT'
-                            ? pathCreator.eventType({ envSlug, eventName: trigger.value })
-                            : undefined
-                        }
-                        key={trigger.type + trigger.value}
-                      >
-                        <PillContent type={trigger.type}>{trigger.value}</PillContent>
-                      </Pill>
-                    );
-                  })}
-                />
-              </li>
-            );
-          })}
-      </ul>
+      <table className="w-full">
+        <tbody className="divide-subtle divide-y">
+          {[...app.functions]
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((func) => {
+              return (
+                <tr key={func.id} className="bg-canvaseBase hover:bg-canvasSubtle/50">
+                  <td className="py-2">
+                    <Link
+                      href={pathCreator.function({ envSlug, functionSlug: func.slug })}
+                      arrowOnHover
+                    >
+                      {func.name}
+                    </Link>
+                  </td>
+                  <td className="py-2">
+                    <HorizontalPillList
+                      alwaysVisibleCount={2}
+                      pills={func.triggers.map((trigger) => {
+                        return (
+                          <Pill
+                            appearance="outlined"
+                            href={
+                              trigger.type === 'EVENT'
+                                ? pathCreator.eventType({ envSlug, eventName: trigger.value })
+                                : undefined
+                            }
+                            key={trigger.type + trigger.value}
+                          >
+                            <PillContent type={trigger.type}>{trigger.value}</PillContent>
+                          </Pill>
+                        );
+                      })}
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+        </tbody>
+      </table>
     );
 
   return { appKind, status, footerHeaderTitle, footerHeaderSecondaryCTA, footerContent };
