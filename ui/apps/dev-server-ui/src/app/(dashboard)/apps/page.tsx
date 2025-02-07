@@ -15,6 +15,7 @@ import AddAppButton from '@/components/App/AddAppButton';
 import AppActions from '@/components/App/AppActions';
 import getAppCardContent from '@/components/App/AppCardContent';
 import AppFAQ from '@/components/App/AppFAQ';
+import WorkerCounter from '@/components/Workers/Counter';
 import { useInfoQuery } from '@/store/devApi';
 import { AppMethod, useGetAppsQuery } from '@/store/generated';
 
@@ -66,6 +67,7 @@ export default function AppList() {
                 {!app.autodiscovered && <AppActions id={app.id} name={app.name} />}
               </div>
             }
+            workerCounter={<WorkerCounter appID={app.id} />}
           />
           <AppCard.Footer
             kind={appKind}

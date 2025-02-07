@@ -6,15 +6,14 @@ import { FunctionList } from '@inngest/components/Apps/FunctionList';
 import { Header } from '@inngest/components/Header/Header';
 import { Pill } from '@inngest/components/Pill/Pill';
 import { Time } from '@inngest/components/Time';
-import WorkersCounter from '@inngest/components/Workers/WorkersCounter';
 import { WorkersTable } from '@inngest/components/Workers/WorkersTable';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import { methodTypes } from '@inngest/components/types/app';
 import { convertWorkerStatus } from '@inngest/components/types/workers';
 import { RiArrowLeftRightLine, RiInfinityLine } from '@remixicon/react';
 
+import WorkerCounter from '@/components/Workers/Counter';
 import {
-  ConnectV1ConnectionStatus,
   ConnectV1WorkerConnectionsOrderByField,
   useCountWorkerConnectionsQuery,
   useGetAppQuery,
@@ -39,7 +38,7 @@ function AppPage({ id }: { id: string }) {
     {
       timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
       startTime: null,
-      appIDs: [id],
+      appID: id,
       status: [],
     },
     { pollingInterval: refreshInterval }
@@ -47,37 +46,8 @@ function AppPage({ id }: { id: string }) {
 
   const { data: countAllWorkersData } = useCountWorkerConnectionsQuery(
     {
-      timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-      appIDs: [id],
+      appID: id,
       status: [],
-    },
-    { pollingInterval: refreshInterval }
-  );
-  const { data: countReadyWorkersData } = useCountWorkerConnectionsQuery(
-    {
-      timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-      appIDs: [id],
-      status: [ConnectV1ConnectionStatus.Ready],
-    },
-    { pollingInterval: refreshInterval }
-  );
-  const { data: countInactiveWorkersData } = useCountWorkerConnectionsQuery(
-    {
-      timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-      appIDs: [id],
-      status: [
-        ConnectV1ConnectionStatus.Connected,
-        ConnectV1ConnectionStatus.Disconnecting,
-        ConnectV1ConnectionStatus.Draining,
-      ],
-    },
-    { pollingInterval: refreshInterval }
-  );
-  const { data: countDisconnectedWorkersData } = useCountWorkerConnectionsQuery(
-    {
-      timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-      appIDs: [id],
-      status: [ConnectV1ConnectionStatus.Disconnected],
     },
     { pollingInterval: refreshInterval }
   );
@@ -95,26 +65,6 @@ function AppPage({ id }: { id: string }) {
       };
     });
   }, [workerConnsData]);
-
-  const connectionsCount = useMemo(() => {
-    if (
-      typeof countReadyWorkersData?.workerConnections?.totalCount !== 'number' ||
-      typeof countInactiveWorkersData?.workerConnections?.totalCount !== 'number' ||
-      typeof countDisconnectedWorkersData?.workerConnections?.totalCount !== 'number'
-    ) {
-      return {
-        ACTIVE: 0,
-        INACTIVE: 0,
-        DISCONNECTED: 0,
-      };
-    }
-
-    return {
-      ACTIVE: countReadyWorkersData.workerConnections.totalCount,
-      INACTIVE: countInactiveWorkersData.workerConnections.totalCount,
-      DISCONNECTED: countDisconnectedWorkersData.workerConnections.totalCount,
-    };
-  }, [countReadyWorkersData, countInactiveWorkersData]);
 
   if (!data || !data.app) {
     // TODO Render loading screen
@@ -143,10 +93,7 @@ function AppPage({ id }: { id: string }) {
             term="Last synced at"
             detail={lastSyncedAt ? <Time value={lastSyncedAt} /> : '-'}
           />
-          <CardItem
-            term="Connected workers"
-            detail={<WorkersCounter counts={connectionsCount} />}
-          />
+          {app?.method === methodTypes.Connect && <WorkerCounter appID={app.id} />}
           <CardItem
             term="Method"
             detail={
