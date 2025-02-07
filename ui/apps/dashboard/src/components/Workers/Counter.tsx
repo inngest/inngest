@@ -56,7 +56,7 @@ export default function WorkerCounter({ envID, appID }: Props) {
     <Description
       term="Connected workers"
       detail={
-        isLoading ? (
+        isLoading && (!countReadyWorkersData || !countInactiveWorkersData) ? (
           <Skeleton className="block h-5 w-36" />
         ) : (
           <WorkersCounter counts={workerCounts} />
