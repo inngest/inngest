@@ -14,6 +14,7 @@ const (
 	CodeSigVerificationFailed     = "sig_verification_failed"
 	CodeUnknown                   = "unknown"
 	CodeBatchKeyExpressionInvalid = "batch_key_expression_invalid"
+	CodeSyncAlreadyPending        = "sync_already_pending"
 	CodePlanUpgradeRequired       = "plan_upgrade_required"
 
 	// Connect

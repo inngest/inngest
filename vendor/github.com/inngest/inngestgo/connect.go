@@ -10,15 +10,37 @@ import (
 	"net/url"
 )
 
-func (h *handler) Connect(ctx context.Context) error {
-	concurrency := h.HandlerOpts.GetWorkerConcurrency()
+const (
+	defaultMaxWorkerConcurrency = 1_000
+)
+
+type ConnectOpts struct {
+	// InstanceID represents a stable identifier to be used for identifying connected SDKs.
+	// This can be a hostname or other identifier that remains stable across restarts.
+	//
+	// If nil, this defaults to the current machine's hostname.
+	InstanceID *string
+
+	RewriteGatewayEndpoint func(endpoint url.URL) (url.URL, error)
+
+	// MaxConcurrency defines the maximum number of requests the worker can process at once.
+	// This affects goroutines available to handle connnect workloads, as well as flow control.
+	// Defaults to 1000.
+	MaxConcurrency int
+}
+
+func (h *handler) Connect(ctx context.Context, opts ConnectOpts) error {
+	concurrency := opts.MaxConcurrency
+	if concurrency < 1 {
+		concurrency = defaultMaxWorkerConcurrency
+	}
 
 	connectPlaceholder := url.URL{
 		Scheme: "ws",
 		Host:   "connect",
 	}
 
-	if h.InstanceId == nil {
+	if opts.InstanceID == nil {
 		return fmt.Errorf("missing required Instance ID")
 	}
 
@@ -54,15 +76,16 @@ func (h *handler) Connect(ctx context.Context) error {
 		Capabilities:             capabilities,
 		HashedSigningKey:         hashedKey,
 		HashedSigningKeyFallback: hashedFallbackKey,
-		WorkerConcurrency:        concurrency,
+		MaxConcurrency:           concurrency,
 		APIBaseUrl:               h.GetAPIBaseURL(),
 		IsDev:                    h.isDev(),
 		DevServerUrl:             DevServerURL(),
-		InstanceId:               h.InstanceId,
-		BuildId:                  h.BuildId,
+		InstanceID:               opts.InstanceID,
+		BuildID:                  h.BuildID,
 		Platform:                 Ptr(platform()),
 		SDKVersion:               SDKVersion,
 		SDKLanguage:              SDKLanguage,
+		RewriteGatewayEndpoint:   opts.RewriteGatewayEndpoint,
 	}, h, h.Logger)
 }
 

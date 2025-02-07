@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/publicerr"
+	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 	"net/http"
@@ -181,6 +183,8 @@ func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager, 
 		},
 		Capabilities: cap,
 		Functions:    c.Group.SyncData.Functions,
+		// Deduplicate syncs in case multiple workers are coming up at the same time
+		IdempotencyKey: c.Group.Hash,
 	}
 
 	// NOTE: pick this up via SDK
@@ -192,24 +196,54 @@ func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager, 
 		return fmt.Errorf("error serializing function config: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, registerURL, bytes.NewReader(byt))
-	if err != nil {
-		return fmt.Errorf("error creating new sync request: %w", err)
-	}
+	maxRetryAttempts := 10
+	attempt := 0
 
-	// Set basic headers
-	req.Header.Set(headers.HeaderContentType, "application/json")
-	req.Header.Set(headers.HeaderKeySDK, sdkVersion)
-	req.Header.Set(headers.HeaderUserAgent, sdkVersion)
+	var resp *http.Response
+	for {
+		if attempt == maxRetryAttempts {
+			return fmt.Errorf("existing sync took too long to complete")
+		}
 
-	// Use sync token returned by initial Connect API handshake
-	if c.Group.SyncData.SyncToken != "" {
-		req.Header.Set(headers.HeaderAuthorization, fmt.Sprintf("Bearer %s", c.Group.SyncData.SyncToken))
-	}
+		req, err := http.NewRequest(http.MethodPost, registerURL, bytes.NewReader(byt))
+		if err != nil {
+			return fmt.Errorf("error creating new sync request: %w", err)
+		}
 
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("error making sync request: %w", err)
+		// Set basic headers
+		req.Header.Set(headers.HeaderContentType, "application/json")
+		req.Header.Set(headers.HeaderKeySDK, sdkVersion)
+		req.Header.Set(headers.HeaderUserAgent, sdkVersion)
+
+		// Use sync token returned by initial Connect API handshake
+		if c.Group.SyncData.SyncToken != "" {
+			req.Header.Set(headers.HeaderAuthorization, fmt.Sprintf("Bearer %s", c.Group.SyncData.SyncToken))
+		}
+
+		resp, err = http.DefaultClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("error making sync request: %w", err)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			var perr publicerr.Error
+			if err := json.NewDecoder(resp.Body).Decode(&perr); err != nil {
+				return fmt.Errorf("error parsing public err response: %w", err)
+			}
+
+			// Wait for other sync to complete and retry
+			if perr.Code == syscode.CodeSyncAlreadyPending {
+				select {
+				case <-ctx.Done():
+					return fmt.Errorf("could not wait for sync to complete")
+				case <-time.After(2 * time.Second):
+				}
+				attempt++
+				continue
+			}
+		}
+
+		break
 	}
 
 	// Retrieve the deploy ID for the sync and update state with it if available

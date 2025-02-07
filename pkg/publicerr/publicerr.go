@@ -81,6 +81,7 @@ func Errorf(status int, message string, opts ...interface{}) error {
 // in `gql.go` we create an ErrorPresenter middleware item which checks to see if the error
 // is a publicerr.Error and, if so, shows the friendly error directly.
 type Error struct {
+	Code string `json:"code"`
 	// Message represents the message to display
 	Message string `json:"error"`
 	// Data is a KV map of extra error data.
