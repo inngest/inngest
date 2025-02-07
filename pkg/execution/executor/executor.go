@@ -2000,7 +2000,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 }
 
 func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	// With the introduction of the StepError opcode, step errors are handled graceully and we can
+	// With the introduction of the StepError opcode, step errors are handled gracefully, and we can
 	// finally distinguish between application level errors (this function) and network errors/other
 	// errors (as the SDK didn't return this opcode).
 	//

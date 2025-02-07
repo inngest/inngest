@@ -1,6 +1,7 @@
 package v0
 
 import (
+	"github.com/inngest/inngest/pkg/logger"
 	"io"
 	"net/http"
 
@@ -30,6 +31,8 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 
 	res, err := a.RequestAuther.AuthenticateRequest(ctx, hashedSigningKey, envOverride)
 	if err != nil {
+		logger.StdlibLogger(ctx).Error("could not authenticate connect start request", "err", err, "key", hashedSigningKey, "env", envOverride)
+
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "authentication failed"))
 		return
 	}
@@ -41,6 +44,8 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 
 	allowed, err := a.ConnectionLimiter.CheckConnectionLimit(ctx, res)
 	if err != nil {
+		logger.StdlibLogger(ctx).Error("could not check connection limit during start request", "err", err, "key", hashedSigningKey, "env", envOverride)
+
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not check connection limit"))
 		return
 	}
@@ -66,6 +71,8 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 
 	token, err := a.Signer.SignSessionToken(res.AccountID, res.EnvID, auth.DefaultExpiry)
 	if err != nil {
+		logger.StdlibLogger(ctx).Error("could not sign connect session token", "err", err, "key", hashedSigningKey, "env", envOverride)
+
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not sign session token"))
 		return
 	}
@@ -77,6 +84,8 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 		RequestHost: r.Host,
 	})
 	if err != nil {
+		logger.StdlibLogger(ctx).Error("could not retrieve connect gateway", "err", err, "key", hashedSigningKey, "env", envOverride)
+
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not retrieve gateway"))
 		return
 	}
@@ -88,6 +97,8 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 		SyncToken:       hashedSigningKey,
 	})
 	if err != nil {
+		logger.StdlibLogger(ctx).Error("could not marshal start response", "err", err)
+
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not marshal response"))
 		return
 	}
@@ -116,6 +127,8 @@ func (a *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) {
 
 	res, err := a.RequestAuther.AuthenticateRequest(ctx, hashedSigningKey, envOverride)
 	if err != nil {
+		logger.StdlibLogger(ctx).Error("could not authenticate connect start request", "err", err, "key", hashedSigningKey, "env", envOverride)
+
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "authentication failed"))
 		return
 	}
@@ -147,11 +160,15 @@ func (a *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) {
 		RequestId: reqBody.RequestId,
 	})
 	if err != nil {
+		logger.StdlibLogger(ctx).Error("could not marshal flush response", "err", err)
+
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not marshal response"))
 		return
 	}
 
 	if err := a.ConnectResponseNotifier.NotifyExecutor(ctx, reqBody); err != nil {
+		logger.StdlibLogger(ctx).Error("could not notify executor to flush connect message", "err", err)
+
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not notify executor"))
 		return
 	}

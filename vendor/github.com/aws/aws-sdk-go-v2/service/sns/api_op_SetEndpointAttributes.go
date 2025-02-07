@@ -4,16 +4,17 @@ package sns
 
 import (
 	"context"
+	"fmt"
 	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
-	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/smithy-go/middleware"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Sets the attributes for an endpoint for a device on one of the supported push
 // notification services, such as GCM (Firebase Cloud Messaging) and APNS. For more
-// information, see Using Amazon SNS Mobile Push Notifications
-// (https://docs.aws.amazon.com/sns/latest/dg/SNSMobilePush.html).
+// information, see [Using Amazon SNS Mobile Push Notifications].
+//
+// [Using Amazon SNS Mobile Push Notifications]: https://docs.aws.amazon.com/sns/latest/dg/SNSMobilePush.html
 func (c *Client) SetEndpointAttributes(ctx context.Context, params *SetEndpointAttributesInput, optFns ...func(*Options)) (*SetEndpointAttributesOutput, error) {
 	if params == nil {
 		params = &SetEndpointAttributesInput{}
@@ -32,22 +33,19 @@ func (c *Client) SetEndpointAttributes(ctx context.Context, params *SetEndpointA
 // Input for SetEndpointAttributes action.
 type SetEndpointAttributesInput struct {
 
-	// A map of the endpoint attributes. Attributes in this map include the
-	// following:
+	// A map of the endpoint attributes. Attributes in this map include the following:
 	//
-	// * CustomUserData – arbitrary user data to associate with the
-	// endpoint. Amazon SNS does not use this data. The data must be in UTF-8 format
-	// and less than 2KB.
+	//   - CustomUserData – arbitrary user data to associate with the endpoint. Amazon
+	//   SNS does not use this data. The data must be in UTF-8 format and less than 2KB.
 	//
-	// * Enabled – flag that enables/disables delivery to the
-	// endpoint. Amazon SNS will set this to false when a notification service
-	// indicates to Amazon SNS that the endpoint is invalid. Users can set it back to
-	// true, typically after updating Token.
+	//   - Enabled – flag that enables/disables delivery to the endpoint. Amazon SNS
+	//   will set this to false when a notification service indicates to Amazon SNS that
+	//   the endpoint is invalid. Users can set it back to true, typically after updating
+	//   Token.
 	//
-	// * Token – device token, also referred to
-	// as a registration id, for an app and mobile device. This is returned from the
-	// notification service when an app and mobile device are registered with the
-	// notification service.
+	//   - Token – device token, also referred to as a registration id, for an app and
+	//   mobile device. This is returned from the notification service when an app and
+	//   mobile device are registered with the notification service.
 	//
 	// This member is required.
 	Attributes map[string]string
@@ -68,6 +66,9 @@ type SetEndpointAttributesOutput struct {
 }
 
 func (c *Client) addOperationSetEndpointAttributesMiddlewares(stack *middleware.Stack, options Options) (err error) {
+	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+		return err
+	}
 	err = stack.Serialize.Add(&awsAwsquery_serializeOpSetEndpointAttributes{}, middleware.After)
 	if err != nil {
 		return err
@@ -76,34 +77,38 @@ func (c *Client) addOperationSetEndpointAttributesMiddlewares(stack *middleware.
 	if err != nil {
 		return err
 	}
+	if err := addProtocolFinalizerMiddlewares(stack, options, "SetEndpointAttributes"); err != nil {
+		return fmt.Errorf("add protocol finalizers: %v", err)
+	}
+
+	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
+		return err
+	}
 	if err = addSetLoggerMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddClientRequestIDMiddleware(stack); err != nil {
+	if err = addClientRequestID(stack); err != nil {
 		return err
 	}
-	if err = smithyhttp.AddComputeContentLengthMiddleware(stack); err != nil {
+	if err = addComputeContentLength(stack); err != nil {
 		return err
 	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = v4.AddComputePayloadSHA256Middleware(stack); err != nil {
+	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetryMiddlewares(stack, options); err != nil {
+	if err = addRetry(stack, options); err != nil {
 		return err
 	}
-	if err = addHTTPSignerV4Middleware(stack, options); err != nil {
+	if err = addRawResponseToMetadata(stack); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddRawResponseToMetadata(stack); err != nil {
+	if err = addRecordResponseTiming(stack); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack); err != nil {
+	if err = addClientUserAgent(stack, options); err != nil {
 		return err
 	}
 	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
@@ -112,10 +117,22 @@ func (c *Client) addOperationSetEndpointAttributesMiddlewares(stack *middleware.
 	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
 		return err
 	}
+	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
+		return err
+	}
+	if err = addTimeOffsetBuild(stack, c); err != nil {
+		return err
+	}
+	if err = addUserAgentRetryMode(stack, options); err != nil {
+		return err
+	}
 	if err = addOpSetEndpointAttributesValidationMiddleware(stack); err != nil {
 		return err
 	}
 	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opSetEndpointAttributes(options.Region), middleware.Before); err != nil {
+		return err
+	}
+	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -127,6 +144,9 @@ func (c *Client) addOperationSetEndpointAttributesMiddlewares(stack *middleware.
 	if err = addRequestResponseLogging(stack, options); err != nil {
 		return err
 	}
+	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -134,7 +154,6 @@ func newServiceMetadataMiddleware_opSetEndpointAttributes(region string) *awsmid
 	return &awsmiddleware.RegisterServiceMetadata{
 		Region:        region,
 		ServiceID:     ServiceID,
-		SigningName:   "sns",
 		OperationName: "SetEndpointAttributes",
 	}
 }
