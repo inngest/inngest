@@ -10,6 +10,7 @@ import { RiListCheck } from '@remixicon/react';
 import { AppGitCard } from '@/components/AppGitCard/AppGitCard';
 import { AppInfoCard } from '@/components/AppInfoCard';
 import { useEnvironment } from '@/components/Environments/environment-context';
+import WorkerCounter from '@/components/Workers/Counter';
 import WorkersSection from '@/components/Workers/WorkersSection';
 import { pathCreator } from '@/utils/urls';
 import { useApp } from './useApp';
@@ -70,7 +71,11 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
           </Alert>
         )}
 
-        <AppInfoCard app={appRes.data} sync={appRes.data.latestSync} />
+        <AppInfoCard
+          app={appRes.data}
+          sync={appRes.data.latestSync}
+          workerCounter={<WorkerCounter appID={appRes.data.id} envID={env.id} />}
+        />
 
         {appRes.data.latestSync && <AppGitCard className="mb-4" sync={appRes.data.latestSync} />}
 

@@ -7,6 +7,8 @@ export type App = {
   connectionType?: ConnectionType;
   lastSyncedAt?: Date;
   url?: string | null;
+  externalID?: string;
+  version?: string;
 };
 
 export const connectionTypes = {
