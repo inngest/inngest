@@ -57,9 +57,18 @@ const query = graphql(`
   }
 `);
 
-export function useWorkers({ envID, appID }: { envID: string; appID: string }) {
-  // TO DO: Pass startTime and status as prop to the hook and make two separate calls in table.
-  const [startTime] = useState(() =>
+export function useWorkers({
+  envID,
+  appID,
+  startTime,
+  status = [],
+}: {
+  envID: string;
+  appID: string;
+  startTime?: string;
+  status?: ConnectV1ConnectionStatus[];
+}) {
+  const [defaultStartTime] = useState(() =>
     getTimestampDaysAgo({ currentDate: new Date(), days: 7 }).toISOString()
   );
   const res = useGraphQLQuery({
@@ -68,8 +77,8 @@ export function useWorkers({ envID, appID }: { envID: string; appID: string }) {
       envID,
       appID,
       timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-      status: [],
-      startTime: startTime,
+      status,
+      startTime: startTime || defaultStartTime,
     },
   });
 
