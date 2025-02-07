@@ -61,12 +61,6 @@ type ConnectV1WorkerConnectionEdge struct {
 	Cursor string                     `json:"cursor"`
 }
 
-type ConnectV1WorkerConnectionsConnection struct {
-	Edges      []*ConnectV1WorkerConnectionEdge `json:"edges"`
-	PageInfo   *PageInfo                        `json:"pageInfo"`
-	TotalCount int                              `json:"totalCount"`
-}
-
 type ConnectV1WorkerConnectionsFilter struct {
 	From      *time.Time                              `json:"from,omitempty"`
 	Until     *time.Time                              `json:"until,omitempty"`

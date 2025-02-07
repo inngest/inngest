@@ -432,7 +432,7 @@ type ConnectV1WorkerConnectionResolver interface {
 	App(ctx context.Context, obj *models.ConnectV1WorkerConnection) (*cqrs.App, error)
 }
 type ConnectV1WorkerConnectionsConnectionResolver interface {
-	TotalCount(ctx context.Context, obj *models.ConnectV1WorkerConnectionsConnection) (int, error)
+	TotalCount(ctx context.Context, obj *models.WorkerConnectionsConnection) (int, error)
 }
 type EventResolver interface {
 	Status(ctx context.Context, obj *models.Event) (*models.EventStatus, error)
@@ -486,7 +486,7 @@ type QueryResolver interface {
 	Run(ctx context.Context, runID string) (*models.FunctionRunV2, error)
 	RunTraceSpanOutputByID(ctx context.Context, outputID string) (*models.RunTraceSpanOutput, error)
 	RunTrigger(ctx context.Context, runID string) (*models.RunTraceTrigger, error)
-	WorkerConnections(ctx context.Context, first int, after *string, orderBy []*models.ConnectV1WorkerConnectionsOrderBy, filter models.ConnectV1WorkerConnectionsFilter) (*models.ConnectV1WorkerConnectionsConnection, error)
+	WorkerConnections(ctx context.Context, first int, after *string, orderBy []*models.ConnectV1WorkerConnectionsOrderBy, filter models.ConnectV1WorkerConnectionsFilter) (*models.WorkerConnectionsConnection, error)
 	WorkerConnection(ctx context.Context, connectionID ulid.ULID) (*models.ConnectV1WorkerConnection, error)
 }
 type RunsV2ConnectionResolver interface {
@@ -5208,7 +5208,7 @@ func (ec *executionContext) fieldContext_ConnectV1WorkerConnectionEdge_cursor(ct
 	return fc, nil
 }
 
-func (ec *executionContext) _ConnectV1WorkerConnectionsConnection_edges(ctx context.Context, field graphql.CollectedField, obj *models.ConnectV1WorkerConnectionsConnection) (ret graphql.Marshaler) {
+func (ec *executionContext) _ConnectV1WorkerConnectionsConnection_edges(ctx context.Context, field graphql.CollectedField, obj *models.WorkerConnectionsConnection) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ConnectV1WorkerConnectionsConnection_edges(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -5258,7 +5258,7 @@ func (ec *executionContext) fieldContext_ConnectV1WorkerConnectionsConnection_ed
 	return fc, nil
 }
 
-func (ec *executionContext) _ConnectV1WorkerConnectionsConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *models.ConnectV1WorkerConnectionsConnection) (ret graphql.Marshaler) {
+func (ec *executionContext) _ConnectV1WorkerConnectionsConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *models.WorkerConnectionsConnection) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ConnectV1WorkerConnectionsConnection_pageInfo(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -5312,7 +5312,7 @@ func (ec *executionContext) fieldContext_ConnectV1WorkerConnectionsConnection_pa
 	return fc, nil
 }
 
-func (ec *executionContext) _ConnectV1WorkerConnectionsConnection_totalCount(ctx context.Context, field graphql.CollectedField, obj *models.ConnectV1WorkerConnectionsConnection) (ret graphql.Marshaler) {
+func (ec *executionContext) _ConnectV1WorkerConnectionsConnection_totalCount(ctx context.Context, field graphql.CollectedField, obj *models.WorkerConnectionsConnection) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ConnectV1WorkerConnectionsConnection_totalCount(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -10638,9 +10638,9 @@ func (ec *executionContext) _Query_workerConnections(ctx context.Context, field 
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*models.ConnectV1WorkerConnectionsConnection)
+	res := resTmp.(*models.WorkerConnectionsConnection)
 	fc.Result = res
-	return ec.marshalNConnectV1WorkerConnectionsConnection2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐConnectV1WorkerConnectionsConnection(ctx, field.Selections, res)
+	return ec.marshalNConnectV1WorkerConnectionsConnection2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐWorkerConnectionsConnection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_workerConnections(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -18338,7 +18338,7 @@ func (ec *executionContext) _ConnectV1WorkerConnectionEdge(ctx context.Context, 
 
 var connectV1WorkerConnectionsConnectionImplementors = []string{"ConnectV1WorkerConnectionsConnection"}
 
-func (ec *executionContext) _ConnectV1WorkerConnectionsConnection(ctx context.Context, sel ast.SelectionSet, obj *models.ConnectV1WorkerConnectionsConnection) graphql.Marshaler {
+func (ec *executionContext) _ConnectV1WorkerConnectionsConnection(ctx context.Context, sel ast.SelectionSet, obj *models.WorkerConnectionsConnection) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, connectV1WorkerConnectionsConnectionImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
@@ -21198,11 +21198,11 @@ func (ec *executionContext) marshalNConnectV1WorkerConnectionEdge2ᚖgithubᚗco
 	return ec._ConnectV1WorkerConnectionEdge(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNConnectV1WorkerConnectionsConnection2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐConnectV1WorkerConnectionsConnection(ctx context.Context, sel ast.SelectionSet, v models.ConnectV1WorkerConnectionsConnection) graphql.Marshaler {
+func (ec *executionContext) marshalNConnectV1WorkerConnectionsConnection2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐWorkerConnectionsConnection(ctx context.Context, sel ast.SelectionSet, v models.WorkerConnectionsConnection) graphql.Marshaler {
 	return ec._ConnectV1WorkerConnectionsConnection(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNConnectV1WorkerConnectionsConnection2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐConnectV1WorkerConnectionsConnection(ctx context.Context, sel ast.SelectionSet, v *models.ConnectV1WorkerConnectionsConnection) graphql.Marshaler {
+func (ec *executionContext) marshalNConnectV1WorkerConnectionsConnection2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐWorkerConnectionsConnection(ctx context.Context, sel ast.SelectionSet, v *models.WorkerConnectionsConnection) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")

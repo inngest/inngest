@@ -86,6 +86,7 @@ models:
       totalCount:
         resolver: true
   ConnectV1WorkerConnectionsConnection:
+    model: github.com/inngest/inngest/pkg/coreapi/graph/models.WorkerConnectionsConnection
     fields:
       totalCount:
         resolver: true
