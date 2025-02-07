@@ -22,7 +22,6 @@ type Props = {
   };
   trace: Trace;
   runID: string;
-  rerunFromStep: React.ComponentProps<typeof TraceInfo>['rerunFromStep'];
 };
 
 export function Trace({
@@ -34,7 +33,6 @@ export function Trace({
   pathCreator,
   trace,
   runID,
-  rerunFromStep,
 }: Props) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [result, setResult] = useState<Result>();
@@ -119,7 +117,6 @@ export function Trace({
             result={result}
             runID={runID}
             aiOutput={aiOutput}
-            rerunFromStep={rerunFromStep}
           />
 
           {trace.childrenSpans?.map((child, i) => {
@@ -134,7 +131,6 @@ export function Trace({
                     pathCreator={pathCreator}
                     trace={child}
                     runID={runID}
-                    rerunFromStep={rerunFromStep}
                   />
                 </div>
               </div>

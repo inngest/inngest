@@ -197,7 +197,6 @@ export default function Page() {
         getTraceResult={getTraceResult}
         getTrigger={getTrigger}
         rerun={rerun}
-        rerunFromStep={rerunFromStep}
         pathCreator={pathCreator}
         pollInterval={pollInterval}
         scope="env"

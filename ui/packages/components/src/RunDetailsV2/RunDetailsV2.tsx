@@ -23,7 +23,6 @@ type Props = {
   pathCreator: React.ComponentProps<typeof RunInfo>['pathCreator'];
   pollInterval?: number;
   rerun: React.ComponentProps<typeof RunInfo>['rerun'];
-  rerunFromStep: React.ComponentProps<typeof RunInfo>['rerunFromStep'];
   runID: string;
 };
 
@@ -43,8 +42,7 @@ type Run = {
 };
 
 export function RunDetailsV2(props: Props) {
-  const { getResult, getRun, getTrigger, pathCreator, rerun, rerunFromStep, runID, standalone } =
-    props;
+  const { getResult, getRun, getTrigger, pathCreator, rerun, runID, standalone } = props;
   const [pollInterval, setPollInterval] = useState(props.pollInterval);
 
   const runRes = useQuery({
@@ -105,7 +103,6 @@ export function RunDetailsV2(props: Props) {
               className="mb-4"
               pathCreator={pathCreator}
               rerun={rerun}
-              rerunFromStep={rerunFromStep}
               initialRunData={props.initialRunData}
               run={nullishToLazy(run)}
               runID={runID}
@@ -126,7 +123,6 @@ export function RunDetailsV2(props: Props) {
               pathCreator={pathCreator}
               runID={runID}
               trace={run.trace}
-              rerunFromStep={rerunFromStep}
             />
           )}
         </div>

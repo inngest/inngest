@@ -33,7 +33,6 @@ type Props = {
     runPopout: (params: { runID: string }) => Route;
   };
   rerun: (args: { fnID: string; runID: string }) => Promise<unknown>;
-  rerunFromStep: React.ComponentProps<typeof RunResult>['rerunFromStep'];
   initialRunData?: InitialRunData;
   run: Lazy<Run>;
   runID: string;
@@ -67,7 +66,6 @@ export function RunInfo({
   className,
   pathCreator,
   rerun,
-  rerunFromStep,
   initialRunData,
   run,
   runID,
@@ -230,7 +228,6 @@ export function RunInfo({
             result={result}
             runID={runID}
             stepID={stepID}
-            rerunFromStep={rerunFromStep}
             isSuccess={isSuccess}
           />
         ) : (
