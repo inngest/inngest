@@ -453,7 +453,7 @@ export const GET_WORKER_CONNECTIONS = gql`
     $connectionCursor: String = null
   ) {
     workerConnections(
-      filter: { appIDs: [appID], from: $startTime, status: $status, timeField: $timeField }
+      filter: { appIDs: [$appID], from: $startTime, status: $status, timeField: $timeField }
       orderBy: [{ field: $timeField, direction: DESC }]
       after: $connectionCursor
     ) {

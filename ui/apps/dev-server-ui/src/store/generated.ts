@@ -1325,7 +1325,7 @@ export const GetTriggerDocument = `
 export const GetWorkerConnectionsDocument = `
     query GetWorkerConnections($appID: UUID!, $startTime: Time, $status: [ConnectV1ConnectionStatus!], $timeField: ConnectV1WorkerConnectionsOrderByField!, $connectionCursor: String = null) {
   workerConnections(
-    filter: {appIDs: [appID], from: $startTime, status: $status, timeField: $timeField}
+    filter: {appIDs: [$appID], from: $startTime, status: $status, timeField: $timeField}
     orderBy: [{field: $timeField, direction: DESC}]
     after: $connectionCursor
   ) {
