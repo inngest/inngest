@@ -83,7 +83,6 @@ export const actionConfigs = (
 };
 
 export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
-  const router = useRouter();
   const [expanded, setExpanded] = useState(true);
   const { isRunning, send } = useDevServer();
   const { invoke, loading: invokeLoading, error: invokeError } = useInvokeRun();
