@@ -60,11 +60,11 @@ export type PillContentProps = {
 
 export function PillContent({ children, type }: PillContentProps) {
   return (
-    <div className="flex items-center gap-2 truncate">
-      {type === 'EVENT' && <EventsIcon className="text-subtle h-4 w-4" />}
-      {type === 'CRON' && <RiTimeLine className="text-subtle h-4 w-4" />}
-      {type === 'FUNCTION' && <FunctionsIcon className="text-subtle h-4 w-4" />}
-      {type === 'APP' && <AppsIcon className="text-subtle h-4 w-4" />}
+    <div className="flex items-center gap-1 truncate">
+      {type === 'EVENT' && <EventsIcon className="text-subtle h-3 w-3" />}
+      {type === 'CRON' && <RiTimeLine className="text-subtle h-3 w-3" />}
+      {type === 'FUNCTION' && <FunctionsIcon className="text-subtle h-3 w-3" />}
+      {type === 'APP' && <AppsIcon className="text-subtle h-3 w-3" />}
       {children}
     </div>
   );
@@ -88,7 +88,7 @@ export const getPillColors = ({
   };
 
   const outlinedPillStyles = {
-    default: `border border-muted bg-canvasBase text-basis ${
+    default: `border border-subtle bg-canvasBase text-basis ${
       clickable ? 'hover:bg-canvasMuted' : ''
     }`,
     primary: `border border-success bg-success text-success ${

@@ -1,10 +1,10 @@
 'use client';
 
+import { Alert } from '@inngest/components/Alert/Alert';
 import { RiErrorWarningLine } from '@remixicon/react';
 
 import { AppGitCard } from '@/components/AppGitCard/AppGitCard';
 import { AppInfoCard } from '@/components/AppInfoCard';
-import { SyncErrorCard } from '@/components/SyncErrorCard';
 import { useSync } from './useSync';
 
 type Props = {
@@ -41,7 +41,11 @@ export function Sync({ syncID }: Props) {
   return (
     <div className="h-full w-full overflow-y-auto">
       <div className="mx-auto w-full max-w-[1200px] p-4">
-        {sync.error && <SyncErrorCard className="mb-4" error={sync.error} />}
+        {sync.error && (
+          <Alert className="mb-4" severity="error">
+            {sync.error}
+          </Alert>
+        )}
 
         <AppInfoCard className="mb-4" sync={sync} />
         <AppGitCard className="mb-4" sync={sync} />

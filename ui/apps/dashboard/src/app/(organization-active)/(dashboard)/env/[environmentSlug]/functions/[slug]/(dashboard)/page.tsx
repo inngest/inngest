@@ -123,7 +123,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                 <span
                   className={cn(
                     'text-xl font-medium',
-                    (usageMetrics?.totalRuns ?? 0) > 0 && 'text-error'
+                    failureRate === '0.00' ? 'text-subtle' : 'text-error'
                   )}
                 >{`${failureRate}%`}</span>
               </div>

@@ -25,11 +25,11 @@ export const convertWorkerStatus = (status: WorkerStatus): GroupedWorkerStatus =
 
 export type Worker = {
   appVersion: string;
-  connectedAt: Date;
+  connectedAt: string;
   cpuCores: number;
   id: string;
   instanceID: string | null;
-  lastHeartbeatAt: Date | null;
+  lastHeartbeatAt: string | null;
   memBytes: number;
   os: string;
   sdkLang: string;

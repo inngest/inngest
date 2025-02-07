@@ -29,7 +29,7 @@ export function Apps({ isArchived = false }: Props) {
   if (appsRes.isLoading && !appsRes.data) {
     return (
       <div className="mb-4 flex items-center justify-center">
-        <div className="w-full max-w-[1200px]">
+        <div className="w-full">
           <SkeletonCard />
         </div>
       </div>
@@ -41,12 +41,12 @@ export function Apps({ isArchived = false }: Props) {
 
   return (
     <div className="flex items-center justify-center">
-      <div className="w-full max-w-[1200px]">
+      <div className="w-full">
         {!hasApps && !unattachedSyncRes.data && !isArchived && (
           <EmptyActiveCard envSlug={env.slug} />
         )}
         {!hasApps && isArchived && <EmptyArchivedCard />}
-        {hasApps && <AppCards apps={apps} envSlug={env.slug} />}
+        {hasApps && <AppCards apps={apps} envSlug={env.slug} envID={env.id} />}
         {unattachedSyncRes.data && !isArchived && (
           <>
             <UnattachedSyncsCard envSlug={env.slug} latestSyncTime={unattachedSyncRes.data} />

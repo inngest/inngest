@@ -125,10 +125,10 @@ export default function AppsPage({
           )
         }
       />
-      <div className="bg-canvasBase mx-auto flex h-full w-full max-w-[1200px] flex-col px-6 pb-4 pt-16">
+      <div className="bg-canvasBase mx-auto flex h-full w-full max-w-4xl flex-col px-6 pb-4 pt-16">
         {isLoading ? (
           <div className="mb-4 flex items-center justify-center">
-            <div className="mt-[50px] w-full max-w-[1200px]">
+            <div className="mt-[50px] w-full max-w-4xl">
               <SkeletonCard />
             </div>
           </div>

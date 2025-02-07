@@ -1,12 +1,10 @@
 import type { Route } from 'next';
+import { CardItem } from '@inngest/components/Apps/AppDetailsCard';
 import { Link } from '@inngest/components/Link';
-
-import { PlatformInfo } from '@/components/PlatformInfo';
-import { CardItem } from './CardItem';
 
 type Props = {
   sync: {
-    platform: string | null;
+    platform?: string | null;
     vercelDeploymentID: string | null;
     vercelDeploymentURL: string | null;
     vercelProjectID: string | null;
@@ -24,7 +22,7 @@ export function PlatformSection({ sync }: Props) {
   let deploymentValue;
   if (vercelDeploymentID && vercelDeploymentURL) {
     deploymentValue = (
-      <Link href={vercelDeploymentURL as Route} target="_blank" size="medium">
+      <Link href={vercelDeploymentURL as Route} target="_blank" size="small">
         <span className="truncate">{vercelDeploymentID}</span>
       </Link>
     );
@@ -35,7 +33,7 @@ export function PlatformSection({ sync }: Props) {
   let projectValue;
   if (vercelProjectID && vercelProjectURL) {
     projectValue = (
-      <Link href={vercelProjectURL as Route} target="_blank" size="medium">
+      <Link href={vercelProjectURL as Route} target="_blank" size="small">
         <span className="truncate">{vercelProjectID}</span>
       </Link>
     );
@@ -45,9 +43,9 @@ export function PlatformSection({ sync }: Props) {
 
   return (
     <>
-      <CardItem detail={<PlatformInfo platform={platform} />} term="Platform" />
-      <CardItem detail={projectValue} term="Vercel Project" />
-      <CardItem detail={deploymentValue} term="Vercel Deployment" />
+      <CardItem detail={<div className="truncate">{platform}</div>} term="Platform" />
+      <CardItem detail={projectValue} term="Vercel project" />
+      <CardItem detail={deploymentValue} term="Vercel deployment" />
     </>
   );
 }

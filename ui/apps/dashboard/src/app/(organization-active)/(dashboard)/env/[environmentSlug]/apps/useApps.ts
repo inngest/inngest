@@ -1,4 +1,9 @@
 import type { Function } from '@inngest/components/types/function';
+import {
+  transformFramework,
+  transformLanguage,
+  transformPlatform,
+} from '@inngest/components/utils/appsParser';
 
 import { graphql } from '@/gql';
 import { type AppsQuery } from '@/gql/graphql';
@@ -72,9 +77,9 @@ export function useApps({ envID, isArchived }: { envID: string; isArchived: bool
           ? {
               lastSyncedAt: new Date(latestSync.lastSyncedAt),
               error: latestSync.error,
-              framework: latestSync.framework,
-              platform: latestSync.platform,
-              sdkLanguage: latestSync.sdkLanguage,
+              framework: transformFramework(latestSync.framework),
+              platform: transformPlatform(latestSync.platform),
+              sdkLanguage: transformLanguage(latestSync.sdkLanguage),
               sdkVersion: latestSync.sdkVersion,
               status: latestSync.status,
               url: latestSync.url,
