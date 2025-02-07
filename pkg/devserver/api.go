@@ -236,9 +236,9 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*cqrs.Sync
 	}
 
 	defer func() {
-		connectionType := enums.AppConnectionTypeServerless
+		method := enums.AppMethodServe
 		if r.IsConnect() {
-			connectionType = enums.AppConnectionTypeConnect
+			method = enums.AppMethodConnect
 		}
 
 		appParams := cqrs.UpsertAppParams{
@@ -251,9 +251,9 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*cqrs.Sync
 				String: r.Framework,
 				Valid:  r.Framework != "",
 			},
-			Url:            r.URL,
-			Checksum:       sum,
-			ConnectionType: connectionType.String(),
+			Url:      r.URL,
+			Checksum: sum,
+			Method:   method.String(),
 		}
 
 		// We want to save an app at the end, after handling each error.

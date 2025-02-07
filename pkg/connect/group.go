@@ -15,9 +15,9 @@ import (
 )
 
 func workerGroupHashFromConnRequest(req *connect.WorkerConnectRequestData, authResp *auth.Response, sessionDetails *connect.SessionDetails) (string, error) {
-	buildId := ""
-	if req.SessionId.BuildId != nil {
-		buildId = *req.SessionId.BuildId
+	appVersion := ""
+	if req.SessionId.AppVersion != nil {
+		appVersion = *req.SessionId.AppVersion
 	}
 
 	platform := "-"
@@ -32,7 +32,7 @@ func workerGroupHashFromConnRequest(req *connect.WorkerConnectRequestData, authR
 		req.SdkVersion,
 		platform,
 		sessionDetails.FunctionHash,
-		buildId,
+		appVersion,
 	)
 
 	h := sha256.New()
@@ -93,7 +93,7 @@ func NewWorkerGroupFromConnRequest(
 		SDKLang:       req.SdkLanguage,
 		SDKVersion:    req.SdkVersion,
 		SDKPlatform:   req.GetPlatform(),
-		BuildId:       req.SessionId.BuildId,
+		AppVersion:    req.SessionId.AppVersion,
 		FunctionSlugs: slugs,
 		Hash:          hash,
 		SyncData: state.SyncData{

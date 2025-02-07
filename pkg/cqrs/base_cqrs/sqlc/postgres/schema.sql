@@ -11,7 +11,7 @@ CREATE TABLE apps (
 	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	archived_at TIMESTAMP,
 	url VARCHAR NOT NULL,
-    connection_type VARCHAR(32) NOT NULL DEFAULT 'serverless'
+    method VARCHAR(32) NOT NULL DEFAULT 'serve'
 );
 
 -- XXX: - this is very basic right now.  it does not conform to the cloud.
@@ -180,7 +180,7 @@ CREATE TABLE worker_connections (
     sdk_version VARCHAR NOT NULL,
     sdk_platform VARCHAR NOT NULL,
     sync_id UUID,
-    build_id VARCHAR,
+    app_version VARCHAR,
     function_count integer NOT NULL,
 
     cpu_cores integer NOT NULL,

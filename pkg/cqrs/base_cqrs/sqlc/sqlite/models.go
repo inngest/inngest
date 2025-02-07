@@ -13,19 +13,19 @@ import (
 )
 
 type App struct {
-	ID             uuid.UUID
-	Name           string
-	SdkLanguage    string
-	SdkVersion     string
-	Framework      sql.NullString
-	Metadata       string
-	Status         string
-	Error          sql.NullString
-	Checksum       string
-	CreatedAt      time.Time
-	ArchivedAt     sql.NullTime
-	Url            string
-	ConnectionType string
+	ID          uuid.UUID
+	Name        string
+	SdkLanguage string
+	SdkVersion  string
+	Framework   sql.NullString
+	Metadata    string
+	Status      string
+	Error       sql.NullString
+	Checksum    string
+	CreatedAt   time.Time
+	ArchivedAt  sql.NullTime
+	Url         string
+	Method      string
 }
 
 type Event struct {
@@ -181,7 +181,7 @@ type WorkerConnection struct {
 	SdkVersion       string
 	SdkPlatform      string
 	SyncID           *uuid.UUID
-	BuildID          sql.NullString
+	AppVersion       sql.NullString
 	FunctionCount    int64
 	CpuCores         int64
 	MemBytes         int64

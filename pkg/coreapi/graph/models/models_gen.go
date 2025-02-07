@@ -30,6 +30,7 @@ type ActionVersionQuery struct {
 
 type AppsFilterV1 struct {
 	ConnectionType *AppConnectionType `json:"connectionType,omitempty"`
+	Method         *AppMethod         `json:"method,omitempty"`
 }
 
 type ConnectV1WorkerConnection struct {
@@ -50,6 +51,7 @@ type ConnectV1WorkerConnection struct {
 	SdkPlatform      string                    `json:"sdkPlatform"`
 	SyncID           *uuid.UUID                `json:"syncId,omitempty"`
 	BuildID          *string                   `json:"buildId,omitempty"`
+	AppVersion       *string                   `json:"appVersion,omitempty"`
 	FunctionCount    int                       `json:"functionCount"`
 	CPUCores         int                       `json:"cpuCores"`
 	MemBytes         int                       `json:"memBytes"`
@@ -380,6 +382,47 @@ func (e *AppConnectionType) UnmarshalGQL(v interface{}) error {
 }
 
 func (e AppConnectionType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type AppMethod string
+
+const (
+	AppMethodServe   AppMethod = "SERVE"
+	AppMethodConnect AppMethod = "CONNECT"
+)
+
+var AllAppMethod = []AppMethod{
+	AppMethodServe,
+	AppMethodConnect,
+}
+
+func (e AppMethod) IsValid() bool {
+	switch e {
+	case AppMethodServe, AppMethodConnect:
+		return true
+	}
+	return false
+}
+
+func (e AppMethod) String() string {
+	return string(e)
+}
+
+func (e *AppMethod) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = AppMethod(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid AppMethod", str)
+	}
+	return nil
+}
+
+func (e AppMethod) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

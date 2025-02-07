@@ -10,19 +10,19 @@ import (
 )
 
 type App struct {
-	ID             uuid.UUID
-	Name           string
-	SdkLanguage    string
-	SdkVersion     string
-	Framework      sql.NullString
-	Metadata       map[string]string
-	Status         string
-	Error          sql.NullString
-	Checksum       string
-	CreatedAt      time.Time
-	DeletedAt      time.Time
-	Url            string
-	ConnectionType string
+	ID          uuid.UUID
+	Name        string
+	SdkLanguage string
+	SdkVersion  string
+	Framework   sql.NullString
+	Metadata    map[string]string
+	Status      string
+	Error       sql.NullString
+	Checksum    string
+	CreatedAt   time.Time
+	DeletedAt   time.Time
+	Url         string
+	Method      string
 }
 
 type AppManager interface {
@@ -58,17 +58,17 @@ type AppWriter interface {
 }
 
 type UpsertAppParams struct {
-	ID             uuid.UUID
-	Name           string
-	SdkLanguage    string
-	SdkVersion     string
-	Framework      sql.NullString
-	Metadata       string
-	Status         string
-	Error          sql.NullString
-	Checksum       string
-	Url            string
-	ConnectionType string
+	ID          uuid.UUID
+	Name        string
+	SdkLanguage string
+	SdkVersion  string
+	Framework   sql.NullString
+	Metadata    string
+	Status      string
+	Error       sql.NullString
+	Checksum    string
+	Url         string
+	Method      string
 }
 
 type UpdateAppErrorParams struct {
@@ -82,5 +82,5 @@ type UpdateAppURLParams struct {
 }
 
 type FilterAppParam struct {
-	ConnectionType *enums.AppConnectionType
+	Method *enums.AppMethod
 }

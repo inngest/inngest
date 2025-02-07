@@ -45,7 +45,7 @@ type WorkerConnection struct {
 	SDKVersion    string     `json:"sdk_version"`
 	SDKPlatform   string     `json:"sdk_platform"`
 	SyncID        *uuid.UUID `json:"sync_id,omitempty"`
-	BuildId       *string    `json:"build_id,omitempty"`
+	AppVersion    *string    `json:"app_version,omitempty"`
 	FunctionCount int        `json:"function_count"`
 
 	// System attributes

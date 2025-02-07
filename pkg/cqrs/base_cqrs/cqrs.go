@@ -257,7 +257,7 @@ func (w wrapper) GetApps(ctx context.Context, envID uuid.UUID, filter *cqrs.Filt
 
 	filtered := make([]*cqrs.App, 0, len(apps))
 	for _, app := range apps {
-		if filter != nil && filter.ConnectionType != nil && filter.ConnectionType.String() != app.ConnectionType {
+		if filter != nil && filter.Method != nil && filter.Method.String() != app.Method {
 			continue
 		}
 		filtered = append(filtered, app)
@@ -307,8 +307,8 @@ func (w wrapper) UpsertApp(ctx context.Context, arg cqrs.UpsertAppParams) (*cqrs
 	// Normalize the URL before inserting into the DB.
 	arg.Url = util.NormalizeAppURL(arg.Url, forceHTTPS)
 
-	if arg.ConnectionType == "" {
-		arg.ConnectionType = enums.AppConnectionTypeServerless.String()
+	if arg.Method == "" {
+		arg.Method = enums.AppMethodServe.String()
 	}
 
 	return copyWriter(
@@ -1531,10 +1531,10 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 //
 
 func (w wrapper) InsertWorkerConnection(ctx context.Context, conn *cqrs.WorkerConnection) error {
-	buildId := sql.NullString{}
-	if conn.BuildId != nil {
-		buildId.Valid = true
-		buildId.String = *conn.BuildId
+	appVersion := sql.NullString{}
+	if conn.AppVersion != nil {
+		appVersion.Valid = true
+		appVersion.String = *conn.AppVersion
 	}
 
 	var lastHeartbeatAt, disconnectedAt sql.NullInt64
@@ -1585,7 +1585,7 @@ func (w wrapper) InsertWorkerConnection(ctx context.Context, conn *cqrs.WorkerCo
 		SdkVersion:    conn.SDKVersion,
 		SdkPlatform:   conn.SDKPlatform,
 		SyncID:        conn.SyncID,
-		BuildID:       buildId,
+		AppVersion:    appVersion,
 		FunctionCount: int64(conn.FunctionCount),
 
 		CpuCores: int64(conn.CpuCores),
@@ -1622,9 +1622,9 @@ func (w wrapper) GetWorkerConnection(ctx context.Context, id cqrs.WorkerConnecti
 		lastHeartbeatAt = ptr.Time(time.UnixMilli(conn.LastHeartbeatAt.Int64))
 	}
 
-	var buildId *string
-	if conn.BuildID.Valid {
-		buildId = &conn.BuildID.String
+	var appVersion *string
+	if conn.AppVersion.Valid {
+		appVersion = &conn.AppVersion.String
 	}
 
 	var disconnectReason *string
@@ -1656,7 +1656,7 @@ func (w wrapper) GetWorkerConnection(ctx context.Context, id cqrs.WorkerConnecti
 		SDKVersion:    conn.SdkVersion,
 		SDKPlatform:   conn.SdkPlatform,
 		SyncID:        conn.SyncID,
-		BuildId:       buildId,
+		AppVersion:    appVersion,
 		FunctionCount: int(conn.FunctionCount),
 
 		CpuCores: int32(conn.CpuCores),
@@ -1839,7 +1839,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			"sdk_version",
 			"sdk_platform",
 			"sync_id",
-			"build_id",
+			"app_version",
 			"function_count",
 
 			"cpu_cores",
@@ -1886,7 +1886,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			&data.SdkVersion,
 			&data.SdkPlatform,
 			&data.SyncID,
-			&data.BuildID,
+			&data.AppVersion,
 			&data.FunctionCount,
 
 			&data.CpuCores,
@@ -1935,9 +1935,9 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			lastHeartbeatAt = ptr.Time(time.UnixMilli(data.LastHeartbeatAt.Int64))
 		}
 
-		var buildId *string
-		if data.BuildID.Valid {
-			buildId = &data.BuildID.String
+		var appVersion *string
+		if data.AppVersion.Valid {
+			appVersion = &data.AppVersion.String
 		}
 
 		var disconnectReason *string
@@ -1970,7 +1970,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			SDKPlatform:   data.SdkPlatform,
 			SyncID:        data.SyncID,
 			FunctionCount: int(data.FunctionCount),
-			BuildId:       buildId,
+			AppVersion:    appVersion,
 
 			CpuCores: int32(data.CpuCores),
 			MemBytes: data.MemBytes,

@@ -52,7 +52,7 @@ func (q NormalizedQueries) InsertWorkerConnection(ctx context.Context, arg sqlc_
 		SdkVersion:       arg.SdkVersion,
 		SdkPlatform:      arg.SdkPlatform,
 		SyncID:           arg.SyncID,
-		BuildID:          arg.BuildID,
+		AppVersion:       arg.AppVersion,
 		FunctionCount:    int32(arg.FunctionCount),
 		CpuCores:         int32(arg.CpuCores),
 		MemBytes:         arg.MemBytes,
@@ -210,17 +210,17 @@ func (q NormalizedQueries) GetAllApps(ctx context.Context) ([]*sqlc_sqlite.App, 
 
 func (q NormalizedQueries) UpsertApp(ctx context.Context, params sqlc_sqlite.UpsertAppParams) (*sqlc_sqlite.App, error) {
 	pgParams := UpsertAppParams{
-		ID:             params.ID,
-		Name:           params.Name,
-		SdkLanguage:    params.SdkLanguage,
-		SdkVersion:     params.SdkVersion,
-		Framework:      params.Framework,
-		Metadata:       params.Metadata,
-		Status:         params.Status,
-		Error:          params.Error,
-		Checksum:       params.Checksum,
-		Url:            params.Url,
-		ConnectionType: params.ConnectionType,
+		ID:          params.ID,
+		Name:        params.Name,
+		SdkLanguage: params.SdkLanguage,
+		SdkVersion:  params.SdkVersion,
+		Framework:   params.Framework,
+		Metadata:    params.Metadata,
+		Status:      params.Status,
+		Error:       params.Error,
+		Checksum:    params.Checksum,
+		Url:         params.Url,
+		Method:      params.Method,
 	}
 
 	app, err := q.db.UpsertApp(ctx, pgParams)

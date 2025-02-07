@@ -1,0 +1,2 @@
+ALTER TABLE apps DROP COLUMN connection_type;
+ALTER TABLE "apps" ADD COLUMN "method" VARCHAR(32) NOT NULL DEFAULT 'serve';
