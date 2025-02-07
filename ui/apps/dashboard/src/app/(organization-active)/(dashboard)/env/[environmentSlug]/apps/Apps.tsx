@@ -40,7 +40,7 @@ export function Apps({ isArchived = false }: Props) {
           <EmptyActiveCard envSlug={env.slug} />
         )}
         {!hasApps && isArchived && <EmptyArchivedCard />}
-        {hasApps && <AppCards apps={apps} envSlug={env.slug} />}
+        {hasApps && <AppCards apps={apps} envSlug={env.slug} envID={env.id} />}
         {latestUnattachedSyncTime && !isArchived && (
           <>
             <UnattachedSyncsCard envSlug={env.slug} latestSyncTime={latestUnattachedSyncTime} />

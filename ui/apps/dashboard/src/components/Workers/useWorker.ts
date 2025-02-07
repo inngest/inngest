@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { convertWorkerStatus } from '@inngest/components/types/workers';
 
 import { graphql } from '@/gql';
-import { ConnectV1WorkerConnectionsOrderByField } from '@/gql/graphql';
+import { ConnectV1ConnectionStatus, ConnectV1WorkerConnectionsOrderByField } from '@/gql/graphql';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const query = graphql(`
@@ -82,6 +82,58 @@ export function useWorkers({ envID, appID }: { envID: string; appID: string }) {
         workers: workers,
         total: res.data.environment.workerConnections.totalCount,
         pageInfo: res.data.environment.workerConnections.pageInfo,
+      },
+    };
+  }
+
+  return { ...res, data: undefined };
+}
+
+const countQuery = graphql(`
+  query GetWorkerCountConnections(
+    $envID: ID!
+    $appID: UUID!
+    $startTime: Time!
+    $status: [ConnectV1ConnectionStatus!]
+    $timeField: ConnectV1WorkerConnectionsOrderByField!
+  ) {
+    environment: workspace(id: $envID) {
+      workerConnections(
+        filter: { appIDs: [$appID], from: $startTime, status: $status }
+        orderBy: [{ field: $timeField, direction: DESC }]
+      ) {
+        totalCount
+      }
+    }
+  }
+`);
+
+export function useWorkerCount({
+  envID,
+  appID,
+  status,
+}: {
+  envID: string;
+  appID: string;
+  status: ConnectV1ConnectionStatus[];
+}) {
+  const [startTime] = useState(() => new Date().toISOString());
+  const res = useGraphQLQuery({
+    query: countQuery,
+    variables: {
+      envID,
+      appID,
+      status,
+      startTime,
+      timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
+    },
+  });
+
+  if (res.data) {
+    return {
+      ...res,
+      data: {
+        total: res.data.environment.workerConnections.totalCount,
       },
     };
   }

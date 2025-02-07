@@ -11,9 +11,18 @@ import { ValidateModal } from '@/app/(organization-active)/(dashboard)/env/[envi
 import { type FlattenedApp } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/apps/useApps';
 import { ActionsMenu } from '@/components/Apps/ActionsMenu';
 import getAppCardContent from '@/components/Apps/AppCardContent';
+import WorkerCounter from '@/components/Workers/Counter';
 import { pathCreator } from '@/utils/urls';
 
-export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envSlug: string }) {
+export default function AppCards({
+  apps,
+  envSlug,
+  envID,
+}: {
+  apps: FlattenedApp[];
+  envSlug: string;
+  envID: string;
+}) {
   const [showArchive, setShowArchive] = useState(false);
   const [showValidate, setShowValidate] = useState(false);
   const router = useRouter();
@@ -65,6 +74,7 @@ export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envS
                 />
               </div>
             }
+            workerCounter={<WorkerCounter envID={envID} appID={app.id} />}
           />
           <AppCard.Footer
             kind={appKind}

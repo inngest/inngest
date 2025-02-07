@@ -4,8 +4,6 @@ import { Button } from '@inngest/components/Button';
 import { Pill } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
-import WorkersCounter from '@inngest/components/Workers/WorkersCounter';
-import { type GroupedWorkerStatus } from '@inngest/components/types/workers';
 import { RiArrowDownSLine, RiArrowLeftRightLine, RiInfinityLine } from '@remixicon/react';
 
 import { Card } from '../Card';
@@ -63,10 +61,10 @@ type CardContentProps = {
   pill: React.ReactNode;
   actions: React.ReactNode;
   url?: string;
-  workerCounts?: Record<GroupedWorkerStatus, number>;
+  workerCounter?: React.ReactNode;
 };
 
-export function AppCardContent({ url, app, pill, actions, workerCounts }: CardContentProps) {
+export function AppCardContent({ url, app, pill, actions, workerCounter }: CardContentProps) {
   const Wrapper = url ? 'a' : 'div';
 
   return (
@@ -101,11 +99,11 @@ export function AppCardContent({ url, app, pill, actions, workerCounts }: CardCo
         />
         <Description
           term="SDK version"
-          detail={app.sdkVersion?.trim() ? <Pill>{app.sdkVersion}</Pill> : '-'}
+          detail={app.sdkVersion ? <Pill>{app.sdkVersion}</Pill> : '-'}
         />
-        <Description term="Language" detail={app.sdkLanguage?.trim() ? app.sdkLanguage : '-'} />
-        {app.connectionType === connectionTypes.Connect && workerCounts ? (
-          <Description term="Connected workers" detail={<WorkersCounter counts={workerCounts} />} />
+        <Description term="Language" detail={app.sdkLanguage ?? '-'} />
+        {app.connectionType === connectionTypes.Connect ? (
+          <>{workerCounter}</>
         ) : (
           <Description term="Framework" detail={app.framework ?? '-'} />
         )}
@@ -114,7 +112,7 @@ export function AppCardContent({ url, app, pill, actions, workerCounts }: CardCo
   );
 }
 
-function Description({
+export function Description({
   className,
   detail,
   term,
