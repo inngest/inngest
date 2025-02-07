@@ -120,6 +120,7 @@ export function useWorkerCount({
   const [startTime] = useState(() => new Date().toISOString());
   const res = useGraphQLQuery({
     query: countQuery,
+    pollIntervalInMilliseconds: 2_000,
     variables: {
       envID,
       appID,
