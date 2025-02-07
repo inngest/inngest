@@ -4,18 +4,18 @@ export type App = {
   sdkVersion?: string;
   framework?: string | null;
   sdkLanguage?: string;
-  connectionType?: ConnectionType;
+  method?: ConnectionType;
   lastSyncedAt?: Date;
   url?: string | null;
   externalID?: string;
   version?: string;
 };
 
-export const connectionTypes = {
+export const methodTypes = {
   Connect: 'CONNECT',
-  Serverless: 'SERVERLESS',
+  Serve: 'SERVE',
 } as const;
 
-export type ConnectionType = (typeof connectionTypes)[keyof typeof connectionTypes];
+export type ConnectionType = (typeof methodTypes)[keyof typeof methodTypes];
 
 export type AppKind = 'default' | 'info' | 'warning' | 'primary' | 'error';

@@ -26,7 +26,7 @@ const query = graphql(`
           slug
         }
         name
-        connectionType
+        method
         latestSync {
           commitAuthor
           commitHash

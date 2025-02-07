@@ -37,8 +37,10 @@ export type App = {
   externalID: Scalars['String'];
   framework: Maybe<Scalars['String']>;
   functionCount: Scalars['Int'];
+  /** @deprecated connectionType is deprecated. Use method instead. */
   functions: Array<Function>;
   id: Scalars['ID'];
+  method: AppMethod;
   name: Scalars['String'];
   sdkLanguage: Scalars['String'];
   sdkVersion: Scalars['String'];
@@ -50,8 +52,15 @@ export enum AppConnectionType {
   Serverless = 'SERVERLESS'
 }
 
+export enum AppMethod {
+  Connect = 'CONNECT',
+  Serve = 'SERVE'
+}
+
 export type AppsFilterV1 = {
+  /** @deprecated connectionType is deprecated. Use method instead. */
   connectionType?: InputMaybe<AppConnectionType>;
+  method?: InputMaybe<AppMethod>;
 };
 
 export enum ConnectV1ConnectionStatus {
@@ -66,6 +75,7 @@ export type ConnectV1WorkerConnection = {
   __typename?: 'ConnectV1WorkerConnection';
   app: Maybe<App>;
   appID: Maybe<Scalars['UUID']>;
+  appVersion: Maybe<Scalars['String']>;
   buildId: Maybe<Scalars['String']>;
   connectedAt: Scalars['Time'];
   cpuCores: Scalars['Int'];
@@ -83,6 +93,7 @@ export type ConnectV1WorkerConnection = {
   sdkPlatform: Scalars['String'];
   sdkVersion: Scalars['String'];
   status: ConnectV1ConnectionStatus;
+  /** @deprecated buildId is deprecated. Use appVersion instead. */
   syncId: Maybe<Scalars['UUID']>;
   workerIp: Scalars['String'];
 };
@@ -755,14 +766,14 @@ export type GetFunctionsQuery = { __typename?: 'Query', functions: Array<{ __typ
 export type GetAppsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetAppsQuery = { __typename?: 'Query', apps: Array<{ __typename?: 'App', id: string, name: string, sdkLanguage: string, sdkVersion: string, framework: string | null, url: string | null, error: string | null, connected: boolean, functionCount: number, autodiscovered: boolean, connectionType: AppConnectionType, functions: Array<{ __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string }> }> };
+export type GetAppsQuery = { __typename?: 'Query', apps: Array<{ __typename?: 'App', id: string, name: string, sdkLanguage: string, sdkVersion: string, framework: string | null, url: string | null, error: string | null, connected: boolean, functionCount: number, autodiscovered: boolean, method: AppMethod, functions: Array<{ __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string }> }> };
 
 export type GetAppQueryVariables = Exact<{
   id: Scalars['UUID'];
 }>;
 
 
-export type GetAppQuery = { __typename?: 'Query', app: { __typename?: 'App', id: string, name: string, sdkLanguage: string, sdkVersion: string, framework: string | null, url: string | null, error: string | null, connected: boolean, functionCount: number, autodiscovered: boolean, connectionType: AppConnectionType, functions: Array<{ __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string, triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null }> } | null };
+export type GetAppQuery = { __typename?: 'Query', app: { __typename?: 'App', id: string, name: string, sdkLanguage: string, sdkVersion: string, framework: string | null, url: string | null, error: string | null, connected: boolean, functionCount: number, autodiscovered: boolean, method: AppMethod, functions: Array<{ __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string, triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null }> } | null };
 
 export type CreateAppMutationVariables = Exact<{
   input: CreateAppInput;
@@ -1082,7 +1093,7 @@ export const GetAppsDocument = `
     connected
     functionCount
     autodiscovered
-    connectionType
+    method
     functions {
       name
       id
@@ -1107,7 +1118,7 @@ export const GetAppDocument = `
     connected
     functionCount
     autodiscovered
-    connectionType
+    method
     functions {
       name
       id

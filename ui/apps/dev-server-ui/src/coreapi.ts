@@ -134,7 +134,7 @@ export const APPS = gql`
       connected
       functionCount
       autodiscovered
-      connectionType
+      method
       functions {
         name
         id
@@ -160,7 +160,7 @@ export const GET_APP = gql`
       connected
       functionCount
       autodiscovered
-      connectionType
+      method
       functions {
         name
         id

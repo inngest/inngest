@@ -7,7 +7,7 @@ import { Time } from '@inngest/components/Time';
 import { RiArrowDownSLine, RiArrowLeftRightLine, RiInfinityLine } from '@remixicon/react';
 
 import { Card } from '../Card';
-import { connectionTypes, type App } from '../types/app';
+import { methodTypes, type App } from '../types/app';
 import { cn } from '../utils/classNames';
 
 type CardKind = 'default' | 'warning' | 'primary' | 'error' | 'info';
@@ -88,12 +88,12 @@ export function AppCardContent({ url, app, pill, actions, workerCounter }: CardC
           term="Method"
           detail={
             <div className="flex items-center gap-1">
-              {app.connectionType === connectionTypes.Connect ? (
+              {app.method === methodTypes.Connect ? (
                 <RiInfinityLine className="h-4 w-4" />
               ) : (
                 <RiArrowLeftRightLine className="h-4 w-4" />
               )}
-              <div className="lowercase first-letter:capitalize">{app.connectionType}</div>
+              <div className="lowercase first-letter:capitalize">{app.method}</div>
             </div>
           }
         />
@@ -102,7 +102,7 @@ export function AppCardContent({ url, app, pill, actions, workerCounter }: CardC
           detail={app.sdkVersion ? <Pill>{app.sdkVersion}</Pill> : '-'}
         />
         <Description term="Language" detail={app.sdkLanguage ?? '-'} />
-        {app.connectionType === connectionTypes.Connect ? (
+        {app.method === methodTypes.Connect ? (
           <>{workerCounter}</>
         ) : (
           <Description term="Framework" detail={app.framework ?? '-'} />

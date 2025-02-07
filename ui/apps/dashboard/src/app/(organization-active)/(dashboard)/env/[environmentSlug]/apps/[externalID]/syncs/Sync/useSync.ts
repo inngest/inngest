@@ -14,7 +14,7 @@ const query = graphql(`
         id
         externalID
         name
-        connectionType
+        method
       }
     }
     sync: deploy(id: $syncID) {

@@ -35,7 +35,7 @@ const query = graphql(`
         functionCount
         isArchived
         name
-        connectionType
+        method
         isParentArchived
         latestSync {
           error

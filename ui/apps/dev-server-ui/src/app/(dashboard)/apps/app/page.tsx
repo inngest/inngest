@@ -9,7 +9,9 @@ import { Time } from '@inngest/components/Time';
 import WorkersCounter from '@inngest/components/Workers/WorkersCounter';
 import { WorkersTable } from '@inngest/components/Workers/WorkersTable';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
+import { methodTypes } from '@inngest/components/types/app';
 import { convertWorkerStatus } from '@inngest/components/types/workers';
+import { RiArrowLeftRightLine, RiInfinityLine } from '@remixicon/react';
 
 import {
   ConnectV1ConnectionStatus,
@@ -136,7 +138,7 @@ function AppPage({ id }: { id: string }) {
 
         <AppDetailsCard title="App information">
           <CardItem term="App ID" detail={app.id} />
-          <CardItem term="App version" detail={<Pill>{version || 'unknown'}</Pill>} />
+          <CardItem term="App version" detail={version ? <Pill>{version}</Pill> : '-'} />
           <CardItem
             term="Last synced at"
             detail={lastSyncedAt ? <Time value={lastSyncedAt} /> : '-'}
@@ -147,7 +149,16 @@ function AppPage({ id }: { id: string }) {
           />
           <CardItem
             term="Method"
-            detail={<p className="lowercase first-letter:capitalize">{app.connectionType}</p>}
+            detail={
+              <div className="flex items-center gap-1">
+                {app?.method === methodTypes.Connect ? (
+                  <RiInfinityLine className="h-4 w-4" />
+                ) : (
+                  <RiArrowLeftRightLine className="h-4 w-4" />
+                )}
+                <div className="lowercase first-letter:capitalize">{app?.method}</div>
+              </div>
+            }
           />
           <CardItem term="SDK version" detail={<Pill>{app.sdkVersion}</Pill>} />
           <CardItem term="Language" detail={app.sdkLanguage} />

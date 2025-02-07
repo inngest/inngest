@@ -4,7 +4,7 @@ import { Alert } from '@inngest/components/Alert/Alert';
 import { FunctionList } from '@inngest/components/Apps/FunctionList';
 import { Button } from '@inngest/components/Button/Button';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
-import { connectionTypes } from '@inngest/components/types/app';
+import { methodTypes } from '@inngest/components/types/app';
 import { RiListCheck } from '@remixicon/react';
 
 import { AppGitCard } from '@/components/AppGitCard/AppGitCard';
@@ -79,7 +79,7 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
 
         {appRes.data.latestSync && <AppGitCard className="mb-4" sync={appRes.data.latestSync} />}
 
-        {appRes.data.connectionType === connectionTypes.Connect && (
+        {appRes.data.method === methodTypes.Connect && (
           <WorkersSection envID={env.id} appID={appRes.data.id} />
         )}
 

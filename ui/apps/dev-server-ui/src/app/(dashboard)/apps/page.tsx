@@ -16,7 +16,7 @@ import AppActions from '@/components/App/AppActions';
 import getAppCardContent from '@/components/App/AppCardContent';
 import AppFAQ from '@/components/App/AppFAQ';
 import { useInfoQuery } from '@/store/devApi';
-import { AppConnectionType, useGetAppsQuery } from '@/store/generated';
+import { AppMethod, useGetAppsQuery } from '@/store/generated';
 
 export default function AppList() {
   const { data } = useGetAppsQuery(undefined, { pollingInterval: 1500 });
@@ -35,7 +35,7 @@ export default function AppList() {
           <AppCard.Content
             app={{
               ...app,
-              url: app.connectionType === AppConnectionType.Connect ? '' : app.url,
+              url: app.method === AppMethod.Connect ? '' : app.url,
               name: !app.name ? 'Syncing...' : !app.connected ? `Syncing to ${app.name}` : app.name,
             }}
             pill={
@@ -56,7 +56,7 @@ export default function AppList() {
             }
             actions={
               <div className="items-top flex gap-2">
-                {app.connectionType === AppConnectionType.Connect && (
+                {app.method === AppMethod.Connect && (
                   <Button
                     appearance="outlined"
                     label="View details"
