@@ -1,6 +1,6 @@
 -- name: UpsertApp :one
-INSERT INTO apps (id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url, method)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO apps (id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url, method, app_version)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
     name = excluded.name,
     sdk_language = excluded.sdk_language,
@@ -11,7 +11,8 @@ ON CONFLICT(id) DO UPDATE SET
     error = excluded.error,
     checksum = excluded.checksum,
     archived_at = NULL,
-    "method" = excluded.method
+    "method" = excluded.method,
+    app_version = excluded.app_version
 RETURNING *;
 
 -- name: GetApp :one

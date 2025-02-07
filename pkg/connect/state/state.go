@@ -183,6 +183,7 @@ func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager, 
 		},
 		Capabilities: cap,
 		Functions:    c.Group.SyncData.Functions,
+		AppVersion:   c.Session.SessionId.GetAppVersion(),
 		// Deduplicate syncs in case multiple workers are coming up at the same time
 		IdempotencyKey: c.Group.Hash,
 	}

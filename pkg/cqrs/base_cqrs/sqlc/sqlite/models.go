@@ -26,6 +26,7 @@ type App struct {
 	ArchivedAt  sql.NullTime
 	Url         string
 	Method      string
+	AppVersion  sql.NullString
 }
 
 type Event struct {

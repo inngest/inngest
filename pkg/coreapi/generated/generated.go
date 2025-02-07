@@ -62,6 +62,7 @@ type DirectiveRoot struct {
 
 type ComplexityRoot struct {
 	App struct {
+		AppVersion     func(childComplexity int) int
 		Autodiscovered func(childComplexity int) int
 		Checksum       func(childComplexity int) int
 		Connected      func(childComplexity int) int
@@ -427,6 +428,7 @@ type AppResolver interface {
 	Functions(ctx context.Context, obj *cqrs.App) ([]*models.Function, error)
 	ConnectionType(ctx context.Context, obj *cqrs.App) (models.AppConnectionType, error)
 	Method(ctx context.Context, obj *cqrs.App) (models.AppMethod, error)
+
 	Connected(ctx context.Context, obj *cqrs.App) (bool, error)
 	FunctionCount(ctx context.Context, obj *cqrs.App) (int, error)
 	Autodiscovered(ctx context.Context, obj *cqrs.App) (bool, error)
@@ -513,6 +515,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 	ec := executionContext{nil, e}
 	_ = ec
 	switch typeName + "." + field {
+
+	case "App.appVersion":
+		if e.complexity.App.AppVersion == nil {
+			break
+		}
+
+		return e.complexity.App.AppVersion(childComplexity), true
 
 	case "App.autodiscovered":
 		if e.complexity.App.Autodiscovered == nil {
@@ -2654,6 +2663,8 @@ type App {
 
   method: AppMethod!
 
+  appVersion: String
+
   # These fields are UI convenience fields
   connected: Boolean!
   functionCount: Int!
@@ -4087,6 +4098,47 @@ func (ec *executionContext) fieldContext_App_method(ctx context.Context, field g
 	return fc, nil
 }
 
+func (ec *executionContext) _App_appVersion(ctx context.Context, field graphql.CollectedField, obj *cqrs.App) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_App_appVersion(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.AppVersion, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalOString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_App_appVersion(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "App",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _App_connected(ctx context.Context, field graphql.CollectedField, obj *cqrs.App) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_App_connected(ctx, field)
 	if err != nil {
@@ -4496,6 +4548,8 @@ func (ec *executionContext) fieldContext_ConnectV1WorkerConnection_app(ctx conte
 				return ec.fieldContext_App_connectionType(ctx, field)
 			case "method":
 				return ec.fieldContext_App_method(ctx, field)
+			case "appVersion":
+				return ec.fieldContext_App_appVersion(ctx, field)
 			case "connected":
 				return ec.fieldContext_App_connected(ctx, field)
 			case "functionCount":
@@ -6432,6 +6486,8 @@ func (ec *executionContext) fieldContext_Function_app(ctx context.Context, field
 				return ec.fieldContext_App_connectionType(ctx, field)
 			case "method":
 				return ec.fieldContext_App_method(ctx, field)
+			case "appVersion":
+				return ec.fieldContext_App_appVersion(ctx, field)
 			case "connected":
 				return ec.fieldContext_App_connected(ctx, field)
 			case "functionCount":
@@ -7725,6 +7781,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_app(ctx context.Context, 
 				return ec.fieldContext_App_connectionType(ctx, field)
 			case "method":
 				return ec.fieldContext_App_method(ctx, field)
+			case "appVersion":
+				return ec.fieldContext_App_appVersion(ctx, field)
 			case "connected":
 				return ec.fieldContext_App_connected(ctx, field)
 			case "functionCount":
@@ -9318,6 +9376,8 @@ func (ec *executionContext) fieldContext_Mutation_createApp(ctx context.Context,
 				return ec.fieldContext_App_connectionType(ctx, field)
 			case "method":
 				return ec.fieldContext_App_method(ctx, field)
+			case "appVersion":
+				return ec.fieldContext_App_appVersion(ctx, field)
 			case "connected":
 				return ec.fieldContext_App_connected(ctx, field)
 			case "functionCount":
@@ -9405,6 +9465,8 @@ func (ec *executionContext) fieldContext_Mutation_updateApp(ctx context.Context,
 				return ec.fieldContext_App_connectionType(ctx, field)
 			case "method":
 				return ec.fieldContext_App_method(ctx, field)
+			case "appVersion":
+				return ec.fieldContext_App_appVersion(ctx, field)
 			case "connected":
 				return ec.fieldContext_App_connected(ctx, field)
 			case "functionCount":
@@ -9972,6 +10034,8 @@ func (ec *executionContext) fieldContext_Query_apps(ctx context.Context, field g
 				return ec.fieldContext_App_connectionType(ctx, field)
 			case "method":
 				return ec.fieldContext_App_method(ctx, field)
+			case "appVersion":
+				return ec.fieldContext_App_appVersion(ctx, field)
 			case "connected":
 				return ec.fieldContext_App_connected(ctx, field)
 			case "functionCount":
@@ -10056,6 +10120,8 @@ func (ec *executionContext) fieldContext_Query_app(ctx context.Context, field gr
 				return ec.fieldContext_App_connectionType(ctx, field)
 			case "method":
 				return ec.fieldContext_App_method(ctx, field)
+			case "appVersion":
+				return ec.fieldContext_App_appVersion(ctx, field)
 			case "connected":
 				return ec.fieldContext_App_connected(ctx, field)
 			case "functionCount":
@@ -18233,6 +18299,10 @@ func (ec *executionContext) _App(ctx context.Context, sel ast.SelectionSet, obj 
 				return innerFunc(ctx)
 
 			})
+		case "appVersion":
+
+			out.Values[i] = ec._App_appVersion(ctx, field, obj)
+
 		case "connected":
 			field := field
 
