@@ -1,4 +1,4 @@
-const languages = ['elixir', 'go', 'js', 'py'] as const;
+const languages = ['elixir', 'go', 'js', 'py', 'typescript', 'rust'] as const;
 
 type Language = (typeof languages)[number];
 
@@ -11,6 +11,8 @@ const languageMap: Record<Language, string> = {
   go: 'Go',
   js: 'JavaScript',
   py: 'Python',
+  typescript: 'TypeScript',
+  rust: 'Rust',
 };
 
 export function transformLanguage(language?: string): string | undefined {

@@ -23,7 +23,7 @@ export function Apps({ isArchived = false }: Props) {
   if (res.isLoading && !res.data) {
     return (
       <div className="mb-4 flex items-center justify-center">
-        <div className="w-full max-w-[1200px]">
+        <div className="w-full">
           <SkeletonCard />
         </div>
       </div>
@@ -35,7 +35,7 @@ export function Apps({ isArchived = false }: Props) {
 
   return (
     <div className="flex items-center justify-center">
-      <div className="w-full max-w-[1200px]">
+      <div className="w-full">
         {!hasApps && !latestUnattachedSyncTime && !isArchived && (
           <EmptyActiveCard envSlug={env.slug} />
         )}
