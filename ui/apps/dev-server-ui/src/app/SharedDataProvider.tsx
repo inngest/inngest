@@ -4,7 +4,7 @@ import { useInvokeRun } from '@/hooks/useInvokeRun';
 import { useRerunFromStep } from '@/hooks/useRerunFromStep';
 import { convertError } from '@/store/error';
 
-export const Shared = ({ children }: { children: React.ReactNode }) => {
+export const SharedDataProvider = ({ children }: { children: React.ReactNode }) => {
   const invokeRun = useInvokeRun();
   const rerunFromStep = useRerunFromStep();
   const handlers: Partial<SharedHandlers> = {
