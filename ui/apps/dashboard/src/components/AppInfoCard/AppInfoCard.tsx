@@ -127,20 +127,18 @@ export function AppInfoCard({
             term="Method"
             detail={
               <div className="flex items-center gap-1">
-                {app?.method === methodTypes.Connect ? (
+                {app.method === methodTypes.Connect ? (
                   <RiInfinityLine className="h-4 w-4" />
                 ) : (
                   <RiArrowLeftRightLine className="h-4 w-4" />
                 )}
-                <div className="lowercase first-letter:capitalize">{app?.method}</div>
+                <div className="lowercase first-letter:capitalize">{app.method}</div>
               </div>
             }
           />
         )}
         <CardItem
-          detail={
-            <div className="truncate">{app?.version ? <Pill>{app?.version}</Pill> : '-'}</div>
-          }
+          detail={<div className="truncate">{app?.version ? <Pill>{app.version}</Pill> : '-'}</div>}
           term="App version"
           loading={loading}
         />
