@@ -1,9 +1,13 @@
 import { Alert } from '@inngest/components/Alert';
 
-export default function NotEnabledMessage() {
+type Props = {
+  integrationName: string;
+};
+
+export default function IntegrationNotEnabledMessage({ integrationName }: Props) {
   return (
     <Alert severity="warning">
-      <p>Your Inngest plan does not support Prometheus integration.</p>
+      <p>Your Inngest plan does not support {integrationName} integration.</p>
       <p className="mt-2">
         To use this feature,{' '}
         <Alert.Link size="medium" severity="warning" href="/billing" className="inline underline">
