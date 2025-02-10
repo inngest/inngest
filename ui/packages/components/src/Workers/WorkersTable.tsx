@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { CardItem } from '@inngest/components/Apps/AppDetailsCard';
 import { Pill } from '@inngest/components/Pill/Pill';
 import { type Worker } from '@inngest/components/types/workers';
+import { transformLanguage } from '@inngest/components/utils/appsParser';
 import { type Row, type SortingState } from '@tanstack/react-table';
 
 import CompactPaginatedTable from '../Table/CompactPaginatedTable';
@@ -43,7 +44,7 @@ function SubComponent({ row }: { row: Row<Worker> }) {
     <dl className="bg-canvasSubtle mx-9 mb-6 mt-[10px] grid grid-cols-5 gap-2 p-4">
       <CardItem term="Worker IP" detail={row.original.workerIp} />
       <CardItem term="SDK version" detail={row.original.sdkVersion} />
-      <CardItem term="SDK language" detail={row.original.sdkLang} />
+      <CardItem term="SDK language" detail={transformLanguage(row.original.sdkLang)} />
       <CardItem term="No. of functions" detail={row.original.functionCount.toString()} />
       <CardItem
         term="System attributes"

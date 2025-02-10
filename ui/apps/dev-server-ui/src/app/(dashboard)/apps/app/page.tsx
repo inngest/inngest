@@ -10,6 +10,7 @@ import { WorkersTable } from '@inngest/components/Workers/WorkersTable';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import { methodTypes } from '@inngest/components/types/app';
 import { convertWorkerStatus } from '@inngest/components/types/workers';
+import { transformFramework, transformLanguage } from '@inngest/components/utils/appsParser';
 import { RiArrowLeftRightLine, RiInfinityLine } from '@remixicon/react';
 
 import WorkerCounter from '@/components/Workers/Counter';
@@ -108,8 +109,11 @@ function AppPage({ id }: { id: string }) {
             }
           />
           <CardItem term="SDK version" detail={<Pill>{app.sdkVersion}</Pill>} />
-          <CardItem term="Language" detail={app.sdkLanguage} />
-          <CardItem term="Framework" detail={app.framework ? app.framework : '-'} />
+          <CardItem term="Language" detail={transformLanguage(app.sdkLanguage)} />
+          <CardItem
+            term="Framework"
+            detail={app.framework ? transformFramework(app.framework) : '-'}
+          />
         </AppDetailsCard>
         <div>
           <h4 className="text-subtle mb-4 text-xl">

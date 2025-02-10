@@ -9,6 +9,7 @@ import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link';
 import { Pill } from '@inngest/components/Pill/Pill';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
+import { transformFramework, transformLanguage } from '@inngest/components/utils/appsParser';
 import { RiExternalLinkLine, RiInformationLine } from '@remixicon/react';
 
 import AddAppButton from '@/components/App/AddAppButton';
@@ -36,6 +37,8 @@ export default function AppList() {
           <AppCard.Content
             app={{
               ...app,
+              framework: transformFramework(app.framework),
+              sdkLanguage: transformLanguage(app.sdkLanguage),
               url: app.method === AppMethod.Connect ? '' : app.url,
               name: !app.name ? 'Syncing...' : !app.connected ? `Syncing to ${app.name}` : app.name,
             }}

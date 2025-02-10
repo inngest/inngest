@@ -19,7 +19,7 @@ const backgroundClasses: {
   SKIPPED_PAUSED: 'bg-accent-intense',
   PAUSED: 'bg-status-paused',
   SKIPPED: 'bg-status-paused',
-  INACTIVE: 'bg-accent-subtle dark:bg-accent-xIntense',
+  INACTIVE: 'bg-accent-subtle dark:bg-accent-intense',
   ACTIVE: 'bg-status-completed',
   DISCONNECTED: 'bg-status-cancelled',
 };
