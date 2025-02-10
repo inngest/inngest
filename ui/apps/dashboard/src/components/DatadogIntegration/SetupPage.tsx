@@ -201,11 +201,17 @@ export default function SetupPage({ metricsExportEnabled }: Props) {
                     <div>
                       <span className="font-medium">{findEnvName(envs, ddInt.envID)}</span>
                     </div>
-                    {ddInt.lastSentAt && (
+                    {ddInt.lastSentAt ? (
                       <div className="text-muted">
                         <span className="italic">Metrics last sent:</span>{' '}
                         <Time value={ddInt.lastSentAt} />
                       </div>
+                    ) : ddInt.statusOk ? (
+                      <div className="text-muted">
+                        <span className="italic">Setting up…</span>
+                      </div>
+                    ) : (
+                      <></>
                     )}
                   </div>
                 </div>
