@@ -149,7 +149,7 @@ export default function SetupPage({ metricsExportEnabled }: Props) {
       return;
     }
 
-    event.target.reset();
+    (event.target as HTMLFormElement).reset();
     refetchDdInt();
     toast.success(`Datadog integration configured for ${selectedEnvName}`);
     setFormError('');
