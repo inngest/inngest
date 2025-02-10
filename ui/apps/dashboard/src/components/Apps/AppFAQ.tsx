@@ -5,6 +5,7 @@ import { Button } from '@inngest/components/Button/Button';
 import { Link } from '@inngest/components/Link';
 
 import { ValidateModal } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/apps/[externalID]/ValidateButton/ValidateModal';
+import appActiveListDark from '@/images/app-active-list-dark.png';
 import appActiveListLight from '@/images/app-active-list-light.jpg';
 
 export default function AppFAQ() {
@@ -24,7 +25,12 @@ export default function AppFAQ() {
               <Image
                 src={appActiveListLight}
                 alt="screenshot of app list with synced app"
-                className="hidden w-1/3 md:block"
+                className="hidden w-1/3 md:block dark:md:hidden"
+              />
+              <Image
+                src={appActiveListDark}
+                alt="screenshot of app list with synced app"
+                className="hidden w-1/3 dark:md:block"
               />
               <div>
                 <p className="text-muted mb-4 text-sm">
@@ -43,6 +49,7 @@ export default function AppFAQ() {
                   appearance="outlined"
                   onClick={() => setShowValidate(true)}
                   label="Check app health"
+                  size="small"
                 />
               </div>
             </div>

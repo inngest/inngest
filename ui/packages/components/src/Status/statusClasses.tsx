@@ -44,7 +44,7 @@ const borderClasses: {
   SKIPPED_PAUSED: 'border-accent-intense',
   PAUSED: 'border-accent-paused',
   SKIPPED: 'border-accent-paused',
-  INACTIVE: 'border-accent-subtle dark:border-accent-xIntense',
+  INACTIVE: 'border-accent-subtle dark:border-accent-intense',
   ACTIVE: 'border-status-completed',
   DISCONNECTED: 'border-status-cancelled',
 };
