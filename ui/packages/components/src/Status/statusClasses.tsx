@@ -69,7 +69,7 @@ const textClasses: {
   SKIPPED_PAUSED: 'text-accent-intense',
   PAUSED: 'text-status-pausedText',
   SKIPPED: 'text-status-pausedText',
-  INACTIVE: 'text-accent-intense',
+  INACTIVE: 'text-accent-subtle dark:text-accent-intense',
   ACTIVE: 'text-status-completedText',
   DISCONNECTED: 'text-status-cancelledText',
 };
