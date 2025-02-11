@@ -26,6 +26,7 @@ const messages = {
   missing_signing_key: 'The app is not using a signing key.',
   no_functions: 'No functions found in the app.',
   not_sdk: 'The URL is not hosting an Inngest SDK',
+  response_not_signed: 'SDK response was not signed. Is it in dev mode?',
   server_kind_mismatch: 'The app is not in cloud mode',
   sig_verification_failed:
     'Signature verification failed. Is your app using the correct signing key?',
