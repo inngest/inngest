@@ -199,7 +199,7 @@ func TestInvokeGroup(t *testing.T) {
 
 			execOutput := c.RunSpanOutput(ctx, *exec.OutputID)
 			as.NotNil(t, execOutput)
-			c.ExpectSpanErrorOutput(t, "", "initial error", execOutput)
+			c.ExpectSpanErrorOutput(t, "initial error", "", execOutput)
 		})
 	})
 
