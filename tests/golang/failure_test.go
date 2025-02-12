@@ -162,7 +162,7 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 				assert.NotNil(t, failed.OutputID)
 				output := c.RunSpanOutput(ctx, *failed.OutputID)
 				assert.NotNil(t, output)
-				c.ExpectSpanErrorOutput(t, "", "nope!", output)
+				c.ExpectSpanErrorOutput(t, "nope!", "", output)
 			})
 		})
 	})
@@ -174,7 +174,7 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 		// output test
 		require.NotNil(t, run.Trace.OutputID)
 		runOutput := c.RunSpanOutput(ctx, *run.Trace.OutputID)
-		c.ExpectSpanErrorOutput(t, "", "nope!", runOutput)
+		c.ExpectSpanErrorOutput(t, "nope!", "", runOutput)
 
 		rootSpanID := run.Trace.SpanID
 
@@ -192,7 +192,7 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 			// output test
 			output := c.RunSpanOutput(ctx, *span.OutputID)
 			assert.NotNil(t, output)
-			c.ExpectSpanErrorOutput(t, "", "nope!", output)
+			c.ExpectSpanErrorOutput(t, "nope!", "", output)
 
 			t.Run("attempt 0", func(t *testing.T) {
 				one := span.ChildSpans[0]
