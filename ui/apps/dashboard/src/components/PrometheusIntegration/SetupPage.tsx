@@ -1,5 +1,6 @@
 'use client';
 
+import { Link } from '@inngest/components/Link';
 import { IconPrometheus } from '@inngest/components/icons/platforms/Prometheus';
 
 import ConfigSteps from '@/components/PrometheusIntegration/ConfigSteps';
@@ -22,8 +23,12 @@ export default function SetupPage({ metricsExportEnabled, metricsGranularitySeco
 
       <div className="text-muted mb-6 w-full text-base font-normal">
         This integration allows your Prometheus server to scrape metrics about your Inngest
-        environment.{" "}
-        <Link target="_blank" size="medium" href="http://inngest.com/docs/platform/monitor/prometheus-metrics-export-integration">
+        environment.{' '}
+        <Link
+          target="_blank"
+          size="medium"
+          href="https://www.inngest.com/docs/platform/monitor/prometheus-metrics-export-integration"
+        >
           Read documentation
         </Link>
       </div>
