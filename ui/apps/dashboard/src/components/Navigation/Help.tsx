@@ -89,7 +89,7 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
               </div>
             </Listbox.Option>
           </NextLink>
-          <NextLink href="https://roadmap.inngest.com/changelog" target="_blank">
+          <NextLink href="https://www.inngest.com/changelog" target="_blank">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="releaseNotes"
