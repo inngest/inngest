@@ -6,7 +6,6 @@ import {
   flexRender,
   getCoreRowModel,
   getExpandedRowModel,
-  getSortedRowModel,
   useReactTable,
   type ColumnDef,
   type OnChangeFn,
@@ -71,7 +70,7 @@ export default function CompactPaginatedTable<T>({
     getRowCanExpand,
     getExpandedRowModel: getExpandedRowModel(),
     enableExpanding,
-    getSortedRowModel: getSortedRowModel(),
+    manualSorting: true,
     onSortingChange: setSorting,
     state: {
       sorting,
@@ -110,8 +109,8 @@ export default function CompactPaginatedTable<T>({
                     >
                       {flexRender(header.column.columnDef.header, header.getContext())}
                       {{
-                        asc: <RiSortDesc className="h-4 w-4" />,
-                        desc: <RiSortAsc className="h-4 w-4" />,
+                        asc: <RiSortAsc className="h-4 w-4" />,
+                        desc: <RiSortDesc className="h-4 w-4" />,
                       }[header.column.getIsSorted() as string] ?? null}
                     </div>
                   )}

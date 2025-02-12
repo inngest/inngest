@@ -1,8 +1,11 @@
-import { useMemo } from 'react';
+import { useState } from 'react';
 import { WorkersTable } from '@inngest/components/Workers/WorkersTable';
-import { getTimestampDaysAgo } from '@inngest/components/utils/date';
+import {
+  ConnectV1WorkerConnectionsOrderByDirection,
+  ConnectV1WorkerConnectionsOrderByField,
+  type ConnectV1WorkerConnectionsOrderBy,
+} from '@inngest/components/types/workers';
 
-import { ConnectV1ConnectionStatus } from '@/gql/graphql';
 import { useWorkers } from './useWorker';
 
 type Props = {
@@ -11,56 +14,38 @@ type Props = {
 };
 
 export default function WorkersSection({ envID, appID }: Props) {
-  // We return the last 7 days of active and inactive workers, but only the last day of disconnected workers
-  const workerActiveAndInactiveRes = useWorkers({
+  const [orderBy, setOrderBy] = useState<ConnectV1WorkerConnectionsOrderBy[]>([
+    {
+      field: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
+      direction: ConnectV1WorkerConnectionsOrderByDirection.Asc,
+    },
+  ]);
+
+  const workerRes = useWorkers({
     envID,
     appID,
-    status: [
-      ConnectV1ConnectionStatus.Ready,
-      ConnectV1ConnectionStatus.Connected,
-      ConnectV1ConnectionStatus.Disconnecting,
-      ConnectV1ConnectionStatus.Draining,
-    ],
+    status: [],
+    orderBy,
   });
 
-  if (workerActiveAndInactiveRes.error) {
-    if (!workerActiveAndInactiveRes.data) {
-      throw workerActiveAndInactiveRes.error;
+  if (workerRes.error) {
+    if (!workerRes.data) {
+      throw workerRes.error;
     }
-    console.error(workerActiveAndInactiveRes.error);
+    console.error(workerRes.error);
   }
 
-  const workerDisconnectedRes = useWorkers({
-    envID,
-    appID,
-    status: [ConnectV1ConnectionStatus.Disconnected],
-    startTime: getTimestampDaysAgo({ currentDate: new Date(), days: 1 }).toISOString(),
-  });
-
-  if (workerActiveAndInactiveRes.error || workerDisconnectedRes.error) {
-    console.error(workerActiveAndInactiveRes.error || workerDisconnectedRes.error);
+  if (workerRes.error) {
+    console.error(workerRes.error);
   }
-
-  const workerRes = useMemo(() => {
-    const isLoading = workerActiveAndInactiveRes.isLoading || workerDisconnectedRes.isLoading;
-    const workers = [
-      ...(workerActiveAndInactiveRes.data?.workers || []),
-      ...(workerDisconnectedRes.data?.workers || []),
-    ];
-    const total = workers.length;
-
-    return {
-      isLoading,
-      data: { workers, total },
-    };
-  }, [workerActiveAndInactiveRes, workerDisconnectedRes]);
 
   return (
     <div>
-      <h4 className="text-subtle mb-4 text-xl">Workers ({workerRes.data.total})</h4>
+      <h4 className="text-subtle mb-4 text-xl">Workers ({workerRes.data?.total})</h4>
       <WorkersTable
         isLoading={workerRes.isLoading && !workerRes.data}
-        workers={workerRes.data.workers}
+        workers={workerRes.data?.workers || []}
+        onSortingChange={setOrderBy}
       />
     </div>
   );

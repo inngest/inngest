@@ -3,7 +3,11 @@ import { convertWorkerStatus } from '@inngest/components/types/workers';
 import { getTimestampDaysAgo } from '@inngest/components/utils/date';
 
 import { graphql } from '@/gql';
-import { ConnectV1ConnectionStatus, ConnectV1WorkerConnectionsOrderByField } from '@/gql/graphql';
+import {
+  ConnectV1ConnectionStatus,
+  ConnectV1WorkerConnectionsOrderByField,
+  type ConnectV1WorkerConnectionsOrderBy,
+} from '@/gql/graphql';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const query = graphql(`
@@ -14,11 +18,12 @@ const query = graphql(`
     $status: [ConnectV1ConnectionStatus!]
     $timeField: ConnectV1WorkerConnectionsOrderByField!
     $connectionCursor: String = null
+    $orderBy: [ConnectV1WorkerConnectionsOrderBy!] = []
   ) {
     environment: workspace(id: $envID) {
       workerConnections(
         filter: { appIDs: [$appID], from: $startTime, status: $status }
-        orderBy: [{ field: $timeField, direction: DESC }]
+        orderBy: $orderBy
         after: $connectionCursor
       ) {
         edges {
@@ -62,11 +67,13 @@ export function useWorkers({
   appID,
   startTime,
   status = [],
+  orderBy,
 }: {
   envID: string;
   appID: string;
   startTime?: string;
   status?: ConnectV1ConnectionStatus[];
+  orderBy: ConnectV1WorkerConnectionsOrderBy[];
 }) {
   const [defaultStartTime] = useState(() =>
     getTimestampDaysAgo({ currentDate: new Date(), days: 7 }).toISOString()
@@ -79,6 +86,7 @@ export function useWorkers({
       timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
       status,
       startTime: startTime || defaultStartTime,
+      orderBy,
     },
   });
 

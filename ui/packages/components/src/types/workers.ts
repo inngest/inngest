@@ -46,3 +46,19 @@ export type GroupedWorkerStatus = (typeof groupedWorkerStatuses)[number];
 export function isWorkerStatus(s: string): s is GroupedWorkerStatus {
   return groupedWorkerStatuses.includes(s as GroupedWorkerStatus);
 }
+
+export type ConnectV1WorkerConnectionsOrderBy = {
+  direction: ConnectV1WorkerConnectionsOrderByDirection;
+  field: ConnectV1WorkerConnectionsOrderByField;
+};
+
+export enum ConnectV1WorkerConnectionsOrderByDirection {
+  Asc = 'ASC',
+  Desc = 'DESC',
+}
+
+export enum ConnectV1WorkerConnectionsOrderByField {
+  ConnectedAt = 'CONNECTED_AT',
+  DisconnectedAt = 'DISCONNECTED_AT',
+  LastHeartbeatAt = 'LAST_HEARTBEAT_AT',
+}
