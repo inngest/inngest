@@ -63,6 +63,7 @@ function scrapeConfigTmpl(env: Environment | null, metricsGranularitySeconds: nu
   - job_name: 'inngest-${env.slug}'
     scrape_interval: '${scrapeInterval}'
     honor_labels: true
+    honor_timestamps: true
     static_configs:
       - targets: ['api.inngest.com:443']
     metrics_path: '/v1/prom/${env.slug}'
