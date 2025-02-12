@@ -22,6 +22,7 @@ type TableProps<T> = {
   enableExpanding: boolean;
   columns: ColumnDef<T, any>[];
   getRowCanExpand: (row: Row<T>) => boolean;
+  footer?: React.ReactElement;
 };
 
 export default function CompactPaginatedTable<T>({
@@ -33,6 +34,7 @@ export default function CompactPaginatedTable<T>({
   getRowCanExpand,
   renderSubComponent,
   columns,
+  footer,
 }: TableProps<T>) {
   // Render empty lines for skeletons when data is loading
   const tableData = useMemo(() => {
@@ -168,18 +170,11 @@ export default function CompactPaginatedTable<T>({
               </Fragment>
             ))}
         </tbody>
-        {/* TO DO: Add pagination footer */}
         {!isEmpty && (
           <tfoot>
             {table.getFooterGroups().map((footerGroup) => (
               <tr key={footerGroup.id}>
-                {footerGroup.headers.map((header) => (
-                  <th key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.footer, header.getContext())}
-                  </th>
-                ))}
+                <td colSpan={table.getAllColumns().length}>{footer}</td>
               </tr>
             ))}
           </tfoot>
