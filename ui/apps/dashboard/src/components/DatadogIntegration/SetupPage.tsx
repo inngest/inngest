@@ -294,7 +294,7 @@ export default function SetupPage({ metricsExportEnabled }: Props) {
                 </div>
               </form>
               {formError !== '' && (
-                <Alert severity="error" className="mx-auto max-w-xs">
+                <Alert severity="error" className="mx-auto mb-3 mt-3">
                   <p className="text-balance">{formError}</p>
                 </Alert>
               )}
