@@ -107,6 +107,9 @@ export function WorkersTable({
         },
       ];
       setOrderBy(orderBy);
+      // Back to first page when we sort changes
+      setCursor(null);
+      setPage(1);
     }
   }, [sorting, setOrderBy]);
 
