@@ -2,14 +2,14 @@ import { Link } from '@inngest/components/Link/Link';
 import { type AppKind } from '@inngest/components/types/app';
 import { RiExternalLinkLine } from '@remixicon/react';
 
-import { AppConnectionType, type GetAppsQuery } from '@/store/generated';
+import { AppMethod, type GetAppsQuery } from '@/store/generated';
 import UpdateApp from './UpdateApp';
 
 const getAppCardContent = ({ app }: { app: GetAppsQuery['apps'][number] }) => {
   const appKind: AppKind = !app.connected ? 'error' : app.functionCount > 0 ? 'primary' : 'warning';
 
   const status =
-    app.connectionType === AppConnectionType.Connect
+    app.method === AppMethod.Connect
       ? null
       : !app.connected
       ? 'Not Synced'

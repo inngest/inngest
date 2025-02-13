@@ -1,23 +1,20 @@
 'use client';
 
-import { useMemo } from 'react';
 import { AppDetailsCard, CardItem } from '@inngest/components/Apps/AppDetailsCard';
 import { FunctionList } from '@inngest/components/Apps/FunctionList';
 import { Header } from '@inngest/components/Header/Header';
 import { Pill } from '@inngest/components/Pill/Pill';
 import { Time } from '@inngest/components/Time';
-import WorkersCounter from '@inngest/components/Workers/WorkersCounter';
+import WorkerCounter from '@inngest/components/Workers/ConnectedWorkersDescription';
 import { WorkersTable } from '@inngest/components/Workers/WorkersTable';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
-import { convertWorkerStatus } from '@inngest/components/types/workers';
+import { methodTypes } from '@inngest/components/types/app';
+import { transformFramework, transformLanguage } from '@inngest/components/utils/appsParser';
+import { RiArrowLeftRightLine, RiInfinityLine } from '@remixicon/react';
 
-import {
-  ConnectV1ConnectionStatus,
-  ConnectV1WorkerConnectionsOrderByField,
-  useCountWorkerConnectionsQuery,
-  useGetAppQuery,
-  useGetWorkerConnectionsQuery,
-} from '@/store/generated';
+import { useGetWorkerCount } from '@/hooks/useGetWorkerCount';
+import { useGetWorkers } from '@/hooks/useGetWorkers';
+import { useGetAppQuery } from '@/store/generated';
 
 export default function AppPageWrapper() {
   const [id] = useSearchParam('id');
@@ -28,91 +25,10 @@ export default function AppPageWrapper() {
   return <AppPage id={id} />;
 }
 
-const refreshInterval = 5000;
-
 function AppPage({ id }: { id: string }) {
   const { data } = useGetAppQuery({ id: id });
-
-  const { data: workerConnsData } = useGetWorkerConnectionsQuery(
-    {
-      timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-      startTime: null,
-      appIDs: [id],
-      status: [],
-    },
-    { pollingInterval: refreshInterval }
-  );
-
-  const { data: countAllWorkersData } = useCountWorkerConnectionsQuery(
-    {
-      timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-      appIDs: [id],
-      status: [],
-    },
-    { pollingInterval: refreshInterval }
-  );
-  const { data: countReadyWorkersData } = useCountWorkerConnectionsQuery(
-    {
-      timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-      appIDs: [id],
-      status: [ConnectV1ConnectionStatus.Ready],
-    },
-    { pollingInterval: refreshInterval }
-  );
-  const { data: countInactiveWorkersData } = useCountWorkerConnectionsQuery(
-    {
-      timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-      appIDs: [id],
-      status: [
-        ConnectV1ConnectionStatus.Connected,
-        ConnectV1ConnectionStatus.Disconnecting,
-        ConnectV1ConnectionStatus.Draining,
-      ],
-    },
-    { pollingInterval: refreshInterval }
-  );
-  const { data: countDisconnectedWorkersData } = useCountWorkerConnectionsQuery(
-    {
-      timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-      appIDs: [id],
-      status: [ConnectV1ConnectionStatus.Disconnected],
-    },
-    { pollingInterval: refreshInterval }
-  );
-
-  const workers = useMemo(() => {
-    if (!workerConnsData?.workerConnections?.edges) {
-      return [];
-    }
-    return workerConnsData.workerConnections.edges.map((e) => {
-      return {
-        ...e.node,
-        status: convertWorkerStatus(e.node.status),
-        instanceID: e.node.instanceId,
-        appVersion: e.node.buildId || 'unknown',
-      };
-    });
-  }, [workerConnsData]);
-
-  const connectionsCount = useMemo(() => {
-    if (
-      typeof countReadyWorkersData?.workerConnections?.totalCount !== 'number' ||
-      typeof countInactiveWorkersData?.workerConnections?.totalCount !== 'number' ||
-      typeof countDisconnectedWorkersData?.workerConnections?.totalCount !== 'number'
-    ) {
-      return {
-        ACTIVE: 0,
-        INACTIVE: 0,
-        DISCONNECTED: 0,
-      };
-    }
-
-    return {
-      ACTIVE: countReadyWorkersData.workerConnections.totalCount,
-      INACTIVE: countInactiveWorkersData.workerConnections.totalCount,
-      DISCONNECTED: countDisconnectedWorkersData.workerConnections.totalCount,
-    };
-  }, [countReadyWorkersData, countInactiveWorkersData]);
+  const getWorkers = useGetWorkers();
+  const getWorkerCount = useGetWorkerCount();
 
   if (!data || !data.app) {
     // TODO Render loading screen
@@ -136,28 +52,36 @@ function AppPage({ id }: { id: string }) {
 
         <AppDetailsCard title="App information">
           <CardItem term="App ID" detail={app.id} />
-          <CardItem term="App version" detail={<Pill>{version || 'unknown'}</Pill>} />
+          <CardItem term="App version" detail={version ? <Pill>{version}</Pill> : '-'} />
           <CardItem
             term="Last synced at"
             detail={lastSyncedAt ? <Time value={lastSyncedAt} /> : '-'}
           />
-          <CardItem
-            term="Connected workers"
-            detail={<WorkersCounter counts={connectionsCount} />}
-          />
+          {app?.method === methodTypes.Connect && (
+            <WorkerCounter appID={app.id} getWorkerCount={getWorkerCount} />
+          )}
           <CardItem
             term="Method"
-            detail={<p className="lowercase first-letter:capitalize">{app.connectionType}</p>}
+            detail={
+              <div className="flex items-center gap-1">
+                {app?.method === methodTypes.Connect ? (
+                  <RiInfinityLine className="h-4 w-4" />
+                ) : (
+                  <RiArrowLeftRightLine className="h-4 w-4" />
+                )}
+                <div className="lowercase first-letter:capitalize">{app?.method}</div>
+              </div>
+            }
           />
           <CardItem term="SDK version" detail={<Pill>{app.sdkVersion}</Pill>} />
-          <CardItem term="Language" detail={app.sdkLanguage} />
-          <CardItem term="Framework" detail={app.framework ? app.framework : '-'} />
+          <CardItem term="Language" detail={transformLanguage(app.sdkLanguage)} />
+          <CardItem
+            term="Framework"
+            detail={app.framework ? transformFramework(app.framework) : '-'}
+          />
         </AppDetailsCard>
         <div>
-          <h4 className="text-subtle mb-4 text-xl">
-            Workers ({countAllWorkersData?.workerConnections?.totalCount || 0})
-          </h4>
-          <WorkersTable workers={workers} />
+          <WorkersTable appID={id} getWorkers={getWorkers} getWorkerCount={getWorkerCount} />
         </div>
         <div>
           <h4 className="text-subtle mb-4 text-xl">Function list ({app.functions.length})</h4>

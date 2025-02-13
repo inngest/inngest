@@ -53,7 +53,7 @@ const AccordionTrigger = forwardRef<
         ref={forwardedRef}
         className="hover:bg-canvasSubtle group w-full"
       >
-        <div className="flex items-center gap-1 px-3 py-2">
+        <div className="flex items-center gap-1 px-3 py-4">
           <RiArrowDownSLine className="transform-90 duration-50 h-5 w-5 transition-transform group-data-[state=open]:-rotate-180" />
           {children}
         </div>
