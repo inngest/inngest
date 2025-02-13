@@ -37,7 +37,6 @@ export function useGetWorkers() {
           ...e.node,
           status: convertWorkerStatus(e.node.status),
           instanceID: e.node.instanceId,
-          appVersion: e.node.buildId || 'unknown',
         };
       });
 

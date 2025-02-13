@@ -479,7 +479,7 @@ export const GET_WORKER_CONNECTIONS = gql`
           sdkVersion
           sdkPlatform
           syncId
-          buildId
+          appVersion
           functionCount
           cpuCores
           memBytes
