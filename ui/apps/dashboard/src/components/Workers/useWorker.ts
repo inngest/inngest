@@ -80,16 +80,20 @@ export function useWorkers() {
   return useCallback(
     async ({ appID, orderBy, cursor, pageSize }: QueryVariables) => {
       const result = await client
-        .query(query, {
-          timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-          orderBy,
-          startTime: startTime,
-          appID: appID,
-          status: [],
-          cursor,
-          first: pageSize,
-          envID,
-        })
+        .query(
+          query,
+          {
+            timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
+            orderBy,
+            startTime: startTime,
+            appID: appID,
+            status: [],
+            cursor,
+            first: pageSize,
+            envID,
+          },
+          { requestPolicy: 'network-only' }
+        )
         .toPromise();
 
       if (result.error) {
@@ -150,13 +154,17 @@ export function useWorkersCount() {
   return useCallback(
     async ({ appID, status }: CountQueryVariables) => {
       const result = await client
-        .query(countQuery, {
-          timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-          startTime: startTime,
-          appID: appID,
-          envID,
-          status,
-        })
+        .query(
+          countQuery,
+          {
+            timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
+            startTime: startTime,
+            appID: appID,
+            envID,
+            status,
+          },
+          { requestPolicy: 'network-only' }
+        )
         .toPromise();
 
       if (result.error) {

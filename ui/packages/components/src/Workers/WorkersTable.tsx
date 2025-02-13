@@ -63,7 +63,7 @@ export function WorkersTable({
 
   const [cursor, setCursor] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
+  const [pageSize] = useState(20);
 
   const {
     isPending, // first load, no data
@@ -123,30 +123,32 @@ export function WorkersTable({
         renderSubComponent={SubComponent}
         getRowCanExpand={() => true}
         footer={
-          <div className="flex items-center justify-end gap-2 px-6 py-3">
-            <Button
-              kind="secondary"
-              appearance="outlined"
-              disabled={page === 1}
-              // disabled={!pageInfo?.hasPreviousPage} TODO: use this once it's fixed in the BE
-              icon={<RiArrowLeftSLine />}
-              onClick={() => {
-                setCursor(pageInfo?.startCursor || null);
-                setPage(page - 1);
-              }}
-            />
-            {page}/{numberOfPages}
-            <Button
-              kind="secondary"
-              appearance="outlined"
-              disabled={!pageInfo?.hasNextPage}
-              icon={<RiArrowRightSLine />}
-              onClick={() => {
-                setCursor(pageInfo?.endCursor || null);
-                setPage(page + 1);
-              }}
-            />
-          </div>
+          (totalCount ?? 0) > pageSize ? (
+            <div className="flex items-center justify-end gap-2 px-6 py-3">
+              <Button
+                kind="secondary"
+                appearance="outlined"
+                disabled={page === 1}
+                // disabled={!pageInfo?.hasPreviousPage} TODO: use this once it's fixed in the BE
+                icon={<RiArrowLeftSLine />}
+                onClick={() => {
+                  setCursor(pageInfo?.startCursor || null);
+                  setPage(page - 1);
+                }}
+              />
+              {page}/{numberOfPages}
+              <Button
+                kind="secondary"
+                appearance="outlined"
+                disabled={!pageInfo?.hasNextPage}
+                icon={<RiArrowRightSLine />}
+                onClick={() => {
+                  setCursor(pageInfo?.endCursor || null);
+                  setPage(page + 1);
+                }}
+              />
+            </div>
+          ) : undefined
         }
       />
     </>
