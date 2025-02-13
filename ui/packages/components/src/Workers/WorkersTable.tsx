@@ -127,7 +127,8 @@ export function WorkersTable({
             <Button
               kind="secondary"
               appearance="outlined"
-              disabled={!pageInfo?.hasPreviousPage}
+              disabled={page === 1}
+              // disabled={!pageInfo?.hasPreviousPage} TODO: use this once it's fixed in the BE
               icon={<RiArrowLeftSLine />}
               onClick={() => {
                 setCursor(pageInfo?.startCursor || null);
