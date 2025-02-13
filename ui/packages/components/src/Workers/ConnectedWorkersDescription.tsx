@@ -12,7 +12,7 @@ type Props = {
     status,
   }: {
     appID: string;
-    status: workerStatuses[];
+    status: any[]; // TODO: Converge to workerStatuses
   }) => Promise<number>;
 };
 

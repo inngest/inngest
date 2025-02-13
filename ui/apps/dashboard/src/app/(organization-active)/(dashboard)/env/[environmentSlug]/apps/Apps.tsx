@@ -49,7 +49,7 @@ export function Apps({ isArchived = false }: Props) {
           </>
         )}
         {!hasApps && isArchived && <EmptyArchivedCard />}
-        {hasApps && <AppCards apps={apps} envSlug={env.slug} envID={env.id} />}
+        {hasApps && <AppCards apps={apps} envSlug={env.slug} />}
         {unattachedSyncRes.data && !isArchived && (
           <>
             <UnattachedSyncsCard envSlug={env.slug} latestSyncTime={unattachedSyncRes.data} />
