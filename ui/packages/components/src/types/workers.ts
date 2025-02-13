@@ -1,11 +1,12 @@
-export const workerStatuses = [
-  'CONNECTED',
-  'DISCONNECTED',
-  'DISCONNECTING',
-  'DRAINING',
-  'READY',
-] as const;
-type WorkerStatus = (typeof workerStatuses)[number];
+export enum workerStatuses {
+  Connected = 'CONNECTED',
+  Disconnected = 'DISCONNECTED',
+  Disconnecting = 'DISCONNECTING',
+  Draining = 'DRAINING',
+  Ready = 'READY',
+}
+
+export type WorkerStatus = `${workerStatuses}`;
 
 // We only display three statuses for workers: ACTIVE, INACTIVE, and DISCONNECTED
 export const convertWorkerStatus = (status: WorkerStatus): GroupedWorkerStatus => {

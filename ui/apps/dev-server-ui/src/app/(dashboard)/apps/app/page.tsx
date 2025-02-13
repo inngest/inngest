@@ -5,13 +5,13 @@ import { FunctionList } from '@inngest/components/Apps/FunctionList';
 import { Header } from '@inngest/components/Header/Header';
 import { Pill } from '@inngest/components/Pill/Pill';
 import { Time } from '@inngest/components/Time';
+import WorkerCounter from '@inngest/components/Workers/ConnectedWorkersDescription';
 import { WorkersTable } from '@inngest/components/Workers/WorkersTable';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import { methodTypes } from '@inngest/components/types/app';
 import { transformFramework, transformLanguage } from '@inngest/components/utils/appsParser';
 import { RiArrowLeftRightLine, RiInfinityLine } from '@remixicon/react';
 
-import WorkerCounter from '@/components/Workers/Counter';
 import { useGetWorkerCount } from '@/hooks/useGetWorkerCount';
 import { useGetWorkers } from '@/hooks/useGetWorkers';
 import { useGetAppQuery } from '@/store/generated';
@@ -57,7 +57,9 @@ function AppPage({ id }: { id: string }) {
             term="Last synced at"
             detail={lastSyncedAt ? <Time value={lastSyncedAt} /> : '-'}
           />
-          {app?.method === methodTypes.Connect && <WorkerCounter appID={app.id} />}
+          {app?.method === methodTypes.Connect && (
+            <WorkerCounter appID={app.id} getWorkerCount={getWorkerCount} />
+          )}
           <CardItem
             term="Method"
             detail={

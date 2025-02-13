@@ -9,7 +9,7 @@ import {
 
 type QueryVariables = {
   appID: string;
-  status?: ConnectV1ConnectionStatus;
+  status?: ConnectV1ConnectionStatus[];
 };
 
 export function useGetWorkerCount() {
