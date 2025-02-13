@@ -1,6 +1,5 @@
 'use client';
 
-import { useMemo, useState } from 'react';
 import { AppDetailsCard, CardItem } from '@inngest/components/Apps/AppDetailsCard';
 import { FunctionList } from '@inngest/components/Apps/FunctionList';
 import { Header } from '@inngest/components/Header/Header';
@@ -9,21 +8,13 @@ import { Time } from '@inngest/components/Time';
 import { WorkersTable } from '@inngest/components/Workers/WorkersTable';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import { methodTypes } from '@inngest/components/types/app';
-import {
-  ConnectV1WorkerConnectionsOrderByDirection,
-  convertWorkerStatus,
-  type ConnectV1WorkerConnectionsOrderBy,
-} from '@inngest/components/types/workers';
 import { transformFramework, transformLanguage } from '@inngest/components/utils/appsParser';
 import { RiArrowLeftRightLine, RiInfinityLine } from '@remixicon/react';
 
 import WorkerCounter from '@/components/Workers/Counter';
-import {
-  ConnectV1WorkerConnectionsOrderByField,
-  useCountWorkerConnectionsQuery,
-  useGetAppQuery,
-  useGetWorkerConnectionsQuery,
-} from '@/store/generated';
+import { useGetWorkerCount } from '@/hooks/useGetWorkerCount';
+import { useGetWorkers } from '@/hooks/useGetWorkers';
+import { useGetAppQuery } from '@/store/generated';
 
 export default function AppPageWrapper() {
   const [id] = useSearchParam('id');
@@ -34,49 +25,10 @@ export default function AppPageWrapper() {
   return <AppPage id={id} />;
 }
 
-const refreshInterval = 5000;
-
 function AppPage({ id }: { id: string }) {
   const { data } = useGetAppQuery({ id: id });
-  const [orderBy, setOrderBy] = useState<ConnectV1WorkerConnectionsOrderBy[]>([
-    {
-      field: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-      direction: ConnectV1WorkerConnectionsOrderByDirection.Asc,
-    },
-  ]);
-
-  const { data: workerConnsData } = useGetWorkerConnectionsQuery(
-    {
-      timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-      orderBy,
-      startTime: null,
-      appID: id,
-      status: [],
-    },
-    { pollingInterval: refreshInterval }
-  );
-
-  const { data: countAllWorkersData } = useCountWorkerConnectionsQuery(
-    {
-      appID: id,
-      status: [],
-    },
-    { pollingInterval: refreshInterval }
-  );
-
-  const workers = useMemo(() => {
-    if (!workerConnsData?.workerConnections?.edges) {
-      return [];
-    }
-    return workerConnsData.workerConnections.edges.map((e) => {
-      return {
-        ...e.node,
-        status: convertWorkerStatus(e.node.status),
-        instanceID: e.node.instanceId,
-        appVersion: e.node.buildId || 'unknown',
-      };
-    });
-  }, [workerConnsData]);
+  const getWorkers = useGetWorkers();
+  const getWorkerCount = useGetWorkerCount();
 
   if (!data || !data.app) {
     // TODO Render loading screen
@@ -127,10 +79,7 @@ function AppPage({ id }: { id: string }) {
           />
         </AppDetailsCard>
         <div>
-          <h4 className="text-subtle mb-4 text-xl">
-            Workers ({countAllWorkersData?.workerConnections?.totalCount || 0})
-          </h4>
-          <WorkersTable workers={workers} onSortingChange={setOrderBy} />
+          <WorkersTable appID={id} getWorkers={getWorkers} getWorkerCount={getWorkerCount} />
         </div>
         <div>
           <h4 className="text-subtle mb-4 text-xl">Function list ({app.functions.length})</h4>

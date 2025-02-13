@@ -62,3 +62,10 @@ export enum ConnectV1WorkerConnectionsOrderByField {
   DisconnectedAt = 'DISCONNECTED_AT',
   LastHeartbeatAt = 'LAST_HEARTBEAT_AT',
 }
+
+export type PageInfo = {
+  endCursor: string | null;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  startCursor: string | null;
+};

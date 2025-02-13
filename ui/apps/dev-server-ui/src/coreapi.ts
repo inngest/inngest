@@ -450,13 +450,15 @@ export const GET_WORKER_CONNECTIONS = gql`
     $startTime: Time
     $status: [ConnectV1ConnectionStatus!]
     $timeField: ConnectV1WorkerConnectionsOrderByField!
-    $connectionCursor: String = null
+    $cursor: String = null
     $orderBy: [ConnectV1WorkerConnectionsOrderBy!] = []
+    $first: Int!
   ) {
     workerConnections(
+      first: $first
       filter: { appIDs: [$appID], from: $startTime, status: $status, timeField: $timeField }
       orderBy: $orderBy
-      after: $connectionCursor
+      after: $cursor
     ) {
       edges {
         node {
@@ -490,6 +492,7 @@ export const GET_WORKER_CONNECTIONS = gql`
         startCursor
         endCursor
       }
+      totalCount
     }
   }
 `;

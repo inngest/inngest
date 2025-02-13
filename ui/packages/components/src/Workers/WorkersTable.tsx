@@ -1,15 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { CardItem } from '@inngest/components/Apps/AppDetailsCard';
+import { Button } from '@inngest/components/Button';
 import { Pill } from '@inngest/components/Pill/Pill';
 import {
   ConnectV1WorkerConnectionsOrderByDirection,
   ConnectV1WorkerConnectionsOrderByField,
   type ConnectV1WorkerConnectionsOrderBy,
+  type PageInfo,
   type Worker,
 } from '@inngest/components/types/workers';
 import { transformLanguage } from '@inngest/components/utils/appsParser';
+import { RiArrowLeftSLine, RiArrowRightSLine } from '@remixicon/react';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { type Row, type SortingState } from '@tanstack/react-table';
 
 import CompactPaginatedTable from '../Table/CompactPaginatedTable';
@@ -21,14 +25,26 @@ const columnToTimeField: Record<string, ConnectV1WorkerConnectionsOrderByField> 
   lastHeartbeatAt: ConnectV1WorkerConnectionsOrderByField.LastHeartbeatAt,
 };
 
+const refreshInterval = 5000;
+
 export function WorkersTable({
-  workers,
-  isLoading = false,
-  onSortingChange,
+  appID,
+  getWorkers,
+  getWorkerCount,
 }: {
-  workers: Worker[];
-  isLoading?: boolean;
-  onSortingChange?: (orderBy: ConnectV1WorkerConnectionsOrderBy[]) => void;
+  appID: string;
+  getWorkerCount: ({ appID }: { appID: string }) => Promise<number>;
+  getWorkers: ({
+    appID,
+    orderBy,
+    cursor,
+    pageSize,
+  }: {
+    appID: string;
+    orderBy: ConnectV1WorkerConnectionsOrderBy[];
+    cursor: string | null;
+    pageSize: number;
+  }) => Promise<{ workers: Worker[]; pageInfo: PageInfo }>;
 }) {
   const columns = useColumns();
   const [sorting, setSorting] = useState<SortingState>([
@@ -38,8 +54,44 @@ export function WorkersTable({
     },
   ]);
 
+  const [orderBy, setOrderBy] = useState<ConnectV1WorkerConnectionsOrderBy[]>([
+    {
+      field: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
+      direction: ConnectV1WorkerConnectionsOrderByDirection.Asc,
+    },
+  ]);
+
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(10);
+
+  const {
+    isPending, // first load, no data
+    error,
+    data: workerConnsData,
+    isFetching, // refetching
+  } = useQuery({
+    queryKey: ['worker-connections', { appID, orderBy, cursor, pageSize }],
+    queryFn: useCallback(() => {
+      return getWorkers({ appID, orderBy, cursor, pageSize });
+    }, [getWorkers, appID, orderBy, cursor, pageSize]),
+    placeholderData: keepPreviousData,
+    refetchInterval: !cursor || page === 1 ? refreshInterval : 0,
+  });
+
+  const pageInfo = workerConnsData?.pageInfo;
+
+  const { data: totalCount } = useQuery({
+    queryKey: ['worker-count', { appID }],
+    queryFn: useCallback(() => {
+      return getWorkerCount({ appID });
+    }, [getWorkerCount, appID]),
+    placeholderData: keepPreviousData,
+  });
+
+  const numberOfPages = Math.ceil((totalCount || 0) / pageSize);
+
   useEffect(() => {
-    if (!onSortingChange) return;
     const sortEntry = sorting[0];
     if (!sortEntry) return;
 
@@ -54,21 +106,49 @@ export function WorkersTable({
             : ConnectV1WorkerConnectionsOrderByDirection.Asc,
         },
       ];
-      onSortingChange(orderBy);
+      setOrderBy(orderBy);
     }
-  }, [sorting, onSortingChange]);
+  }, [sorting, setOrderBy]);
 
   return (
-    <CompactPaginatedTable
-      columns={columns}
-      data={workers}
-      isLoading={isLoading}
-      sorting={sorting}
-      setSorting={setSorting}
-      enableExpanding={true}
-      renderSubComponent={SubComponent}
-      getRowCanExpand={() => true}
-    />
+    <>
+      <h4 className="text-subtle mb-4 text-xl">Workers ({totalCount})</h4>
+      <CompactPaginatedTable
+        columns={columns}
+        data={workerConnsData?.workers || []}
+        isLoading={isPending}
+        sorting={sorting}
+        setSorting={setSorting}
+        enableExpanding={true}
+        renderSubComponent={SubComponent}
+        getRowCanExpand={() => true}
+        footer={
+          <div className="flex items-center justify-end gap-2 px-6 py-3">
+            <Button
+              kind="secondary"
+              appearance="outlined"
+              disabled={!pageInfo?.hasPreviousPage}
+              icon={<RiArrowLeftSLine />}
+              onClick={() => {
+                setCursor(pageInfo?.startCursor || null);
+                setPage(page - 1);
+              }}
+            />
+            {page}/{numberOfPages}
+            <Button
+              kind="secondary"
+              appearance="outlined"
+              disabled={!pageInfo?.hasNextPage}
+              icon={<RiArrowRightSLine />}
+              onClick={() => {
+                setCursor(pageInfo?.endCursor || null);
+                setPage(page + 1);
+              }}
+            />
+          </div>
+        }
+      />
+    </>
   );
 }
 
