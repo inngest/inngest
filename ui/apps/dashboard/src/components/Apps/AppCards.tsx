@@ -5,24 +5,18 @@ import { useRouter } from 'next/navigation';
 import { AppCard } from '@inngest/components/Apps/AppCard';
 import { Button } from '@inngest/components/Button/Button';
 import { Pill } from '@inngest/components/Pill/Pill';
+import WorkerCounter from '@inngest/components/Workers/ConnectedWorkersDescription';
 
 import { ArchiveModal } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/apps/[externalID]/ArchiveModal';
 import { ValidateModal } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/apps/[externalID]/ValidateButton/ValidateModal';
 import { type FlattenedApp } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/apps/useApps';
 import { ActionsMenu } from '@/components/Apps/ActionsMenu';
 import getAppCardContent from '@/components/Apps/AppCardContent';
-import WorkerCounter from '@/components/Workers/Counter';
 import { pathCreator } from '@/utils/urls';
+import { useWorkersCount } from '../Workers/useWorker';
 
-export default function AppCards({
-  apps,
-  envSlug,
-  envID,
-}: {
-  apps: FlattenedApp[];
-  envSlug: string;
-  envID: string;
-}) {
+export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envSlug: string }) {
+  const getWorkerCount = useWorkersCount();
   const [showArchive, setShowArchive] = useState(false);
   const [showValidate, setShowValidate] = useState(false);
   const router = useRouter();
@@ -74,7 +68,7 @@ export default function AppCards({
                 />
               </div>
             }
-            workerCounter={<WorkerCounter envID={envID} appID={app.id} />}
+            workerCounter={<WorkerCounter appID={app.id} getWorkerCount={getWorkerCount} />}
           />
           <AppCard.Footer
             kind={appKind}
