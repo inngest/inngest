@@ -3,12 +3,14 @@ package golang
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
+	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/assert"
@@ -223,5 +225,82 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 				c.ExpectSpanErrorOutput(t, "nope!", "", twoOutput)
 			})
 		})
+	})
+}
+
+func TestFunctionResponseTooLargeFailure(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	c := client.New(t)
+	h, server, registerFuncs := NewSDKHandler(t, "fail-large-response_output")
+	defer server.Close()
+
+	// Create our function.
+	var runID string
+	fn := inngestgo.CreateFunction(
+		inngestgo.FunctionOpts{
+			Name:    "test sdk response too large",
+			Retries: inngestgo.IntPtr(0),
+		},
+		inngestgo.EventTrigger("failure/run-response-too-large", nil),
+		func(ctx context.Context, input inngestgo.Input[FnRunTestEvt]) (any, error) {
+			runID = input.InputCtx.RunID
+			return strings.Repeat("A", consts.MaxSDKResponseBodySize*10), nil
+		},
+	)
+	h.Register(fn)
+
+	registerFuncs()
+
+	evt := inngestgo.Event{
+		Name: "failure/run-response-too-large",
+		Data: map[string]interface{}{
+			"foo": "bar",
+		},
+	}
+	_, err := inngestgo.Send(ctx, evt)
+	require.NoError(t, err)
+
+	t.Run("trace run should fail with output too large error", func(t *testing.T) {
+		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
+			Status:         models.FunctionStatusFailed,
+			Timeout:        30 * time.Second,
+			Interval:       2 * time.Second,
+			ChildSpanCount: 0,
+		})
+
+		require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
+		require.NotNil(t, run.Trace.OutputID)
+
+		rootSpanID := run.Trace.SpanID
+		require.NotEmpty(t, rootSpanID)
+
+		t.Run("attempt 1", func(t *testing.T) {
+			span := run.Trace.ChildSpans[0]
+
+			assert.Equal(t, "execute", span.Name)
+			assert.False(t, span.IsRoot)
+			assert.GreaterOrEqual(t, len(span.ChildSpans), 1)
+			assert.Equal(t, rootSpanID, span.ParentSpanID)
+			assert.Equal(t, models.RunTraceSpanStatusRunning.String(), span.Status)
+			assert.Nil(t, span.OutputID)
+
+			t.Run("failed", func(t *testing.T) {
+				failed := span.ChildSpans[0]
+
+				assert.Equal(t, "Attempt 0", failed.Name)
+				assert.False(t, span.IsRoot)
+				assert.Equal(t, models.RunTraceSpanStatusFailed.String(), failed.Status)
+
+				// output test
+				assert.NotNil(t, failed.OutputID)
+				output := c.RunSpanOutput(ctx, *failed.OutputID)
+				assert.NotNil(t, output)
+				c.ExpectSpanErrorOutput(t, "response too large", syscode.CodeOutputTooLarge, output)
+
+			})
+		})
+
 	})
 }
