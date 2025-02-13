@@ -8,6 +8,7 @@ import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link';
 import { Pill } from '@inngest/components/Pill/Pill';
+import WorkerCounter from '@inngest/components/Workers/ConnectedWorkersDescription';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { transformFramework, transformLanguage } from '@inngest/components/utils/appsParser';
 import { RiExternalLinkLine, RiInformationLine } from '@remixicon/react';
@@ -16,12 +17,13 @@ import AddAppButton from '@/components/App/AddAppButton';
 import AppActions from '@/components/App/AppActions';
 import getAppCardContent from '@/components/App/AppCardContent';
 import AppFAQ from '@/components/App/AppFAQ';
-import WorkerCounter from '@/components/Workers/Counter';
+import { useGetWorkerCount } from '@/hooks/useGetWorkerCount';
 import { useInfoQuery } from '@/store/devApi';
 import { AppMethod, useGetAppsQuery } from '@/store/generated';
 
 export default function AppList() {
   const { data } = useGetAppsQuery(undefined, { pollingInterval: 1500 });
+  const getWorkerCount = useGetWorkerCount();
   const apps = data?.apps || [];
 
   const syncedApps = apps.filter((app) => app.connected === true);
@@ -70,7 +72,7 @@ export default function AppList() {
                 {!app.autodiscovered && <AppActions id={app.id} name={app.name} />}
               </div>
             }
-            workerCounter={<WorkerCounter appID={app.id} />}
+            workerCounter={<WorkerCounter appID={app.id} getWorkerCount={getWorkerCount} />}
           />
           <AppCard.Footer
             kind={appKind}

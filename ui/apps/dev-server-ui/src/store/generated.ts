@@ -908,7 +908,9 @@ export type GetWorkerConnectionsQueryVariables = Exact<{
   startTime: InputMaybe<Scalars['Time']>;
   status: InputMaybe<Array<ConnectV1ConnectionStatus> | ConnectV1ConnectionStatus>;
   timeField: ConnectV1WorkerConnectionsOrderByField;
-  connectionCursor?: InputMaybe<Scalars['String']>;
+  cursor?: InputMaybe<Scalars['String']>;
+  orderBy?: InputMaybe<Array<ConnectV1WorkerConnectionsOrderBy> | ConnectV1WorkerConnectionsOrderBy>;
+  first: Scalars['Int'];
 }>;
 
 
@@ -1323,11 +1325,12 @@ export const GetTriggerDocument = `
 }
     `;
 export const GetWorkerConnectionsDocument = `
-    query GetWorkerConnections($appID: UUID!, $startTime: Time, $status: [ConnectV1ConnectionStatus!], $timeField: ConnectV1WorkerConnectionsOrderByField!, $connectionCursor: String = null) {
+    query GetWorkerConnections($appID: UUID!, $startTime: Time, $status: [ConnectV1ConnectionStatus!], $timeField: ConnectV1WorkerConnectionsOrderByField!, $cursor: String = null, $orderBy: [ConnectV1WorkerConnectionsOrderBy!] = [], $first: Int!) {
   workerConnections(
+    first: $first
     filter: {appIDs: [$appID], from: $startTime, status: $status, timeField: $timeField}
-    orderBy: [{field: $timeField, direction: DESC}]
-    after: $connectionCursor
+    orderBy: $orderBy
+    after: $cursor
   ) {
     edges {
       node {

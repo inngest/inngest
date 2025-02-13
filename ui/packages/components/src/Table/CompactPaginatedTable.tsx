@@ -6,7 +6,6 @@ import {
   flexRender,
   getCoreRowModel,
   getExpandedRowModel,
-  getSortedRowModel,
   useReactTable,
   type ColumnDef,
   type OnChangeFn,
@@ -23,6 +22,7 @@ type TableProps<T> = {
   enableExpanding: boolean;
   columns: ColumnDef<T, any>[];
   getRowCanExpand: (row: Row<T>) => boolean;
+  footer?: React.ReactElement;
 };
 
 export default function CompactPaginatedTable<T>({
@@ -34,6 +34,7 @@ export default function CompactPaginatedTable<T>({
   getRowCanExpand,
   renderSubComponent,
   columns,
+  footer,
 }: TableProps<T>) {
   // Render empty lines for skeletons when data is loading
   const tableData = useMemo(() => {
@@ -71,7 +72,7 @@ export default function CompactPaginatedTable<T>({
     getRowCanExpand,
     getExpandedRowModel: getExpandedRowModel(),
     enableExpanding,
-    getSortedRowModel: getSortedRowModel(),
+    manualSorting: true,
     onSortingChange: setSorting,
     state: {
       sorting,
@@ -110,8 +111,8 @@ export default function CompactPaginatedTable<T>({
                     >
                       {flexRender(header.column.columnDef.header, header.getContext())}
                       {{
-                        asc: <RiSortDesc className="h-4 w-4" />,
-                        desc: <RiSortAsc className="h-4 w-4" />,
+                        asc: <RiSortAsc className="h-4 w-4" />,
+                        desc: <RiSortDesc className="h-4 w-4" />,
                       }[header.column.getIsSorted() as string] ?? null}
                     </div>
                   )}
@@ -169,18 +170,11 @@ export default function CompactPaginatedTable<T>({
               </Fragment>
             ))}
         </tbody>
-        {/* TO DO: Add pagination footer */}
         {!isEmpty && (
           <tfoot>
             {table.getFooterGroups().map((footerGroup) => (
               <tr key={footerGroup.id}>
-                {footerGroup.headers.map((header) => (
-                  <th key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.footer, header.getContext())}
-                  </th>
-                ))}
+                <td colSpan={table.getAllColumns().length}>{footer}</td>
               </tr>
             ))}
           </tfoot>

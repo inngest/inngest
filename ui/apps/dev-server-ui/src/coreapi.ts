@@ -450,12 +450,15 @@ export const GET_WORKER_CONNECTIONS = gql`
     $startTime: Time
     $status: [ConnectV1ConnectionStatus!]
     $timeField: ConnectV1WorkerConnectionsOrderByField!
-    $connectionCursor: String = null
+    $cursor: String = null
+    $orderBy: [ConnectV1WorkerConnectionsOrderBy!] = []
+    $first: Int!
   ) {
     workerConnections(
+      first: $first
       filter: { appIDs: [$appID], from: $startTime, status: $status, timeField: $timeField }
-      orderBy: [{ field: $timeField, direction: DESC }]
-      after: $connectionCursor
+      orderBy: $orderBy
+      after: $cursor
     ) {
       edges {
         node {

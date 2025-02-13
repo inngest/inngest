@@ -1,10 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { convertWorkerStatus } from '@inngest/components/types/workers';
 import { getTimestampDaysAgo } from '@inngest/components/utils/date';
+import { useClient } from 'urql';
 
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
-import { ConnectV1ConnectionStatus, ConnectV1WorkerConnectionsOrderByField } from '@/gql/graphql';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import {
+  ConnectV1ConnectionStatus,
+  ConnectV1WorkerConnectionsOrderByField,
+  type ConnectV1WorkerConnectionsOrderBy,
+} from '@/gql/graphql';
 
 const query = graphql(`
   query GetWorkerConnections(
@@ -13,13 +18,16 @@ const query = graphql(`
     $startTime: Time!
     $status: [ConnectV1ConnectionStatus!]
     $timeField: ConnectV1WorkerConnectionsOrderByField!
-    $connectionCursor: String = null
+    $cursor: String = null
+    $orderBy: [ConnectV1WorkerConnectionsOrderBy!] = []
+    $first: Int!
   ) {
     environment: workspace(id: $envID) {
       workerConnections(
-        filter: { appIDs: [$appID], from: $startTime, status: $status }
-        orderBy: [{ field: $timeField, direction: DESC }]
-        after: $connectionCursor
+        first: $first
+        filter: { appIDs: [$appID], from: $startTime, status: $status, timeField: $timeField }
+        orderBy: $orderBy
+        after: $cursor
       ) {
         edges {
           node {
@@ -51,68 +59,84 @@ const query = graphql(`
           startCursor
           endCursor
         }
-        totalCount
       }
     }
   }
 `);
 
-export function useWorkers({
-  envID,
-  appID,
-  startTime,
-  status = [],
-}: {
-  envID: string;
+type QueryVariables = {
   appID: string;
-  startTime?: string;
-  status?: ConnectV1ConnectionStatus[];
-}) {
-  const [defaultStartTime] = useState(() =>
+  orderBy: ConnectV1WorkerConnectionsOrderBy[];
+  cursor: string | null;
+  pageSize: number;
+};
+
+export function useWorkers() {
+  const envID = useEnvironment().id;
+  const client = useClient();
+  const [startTime] = useState(() =>
     getTimestampDaysAgo({ currentDate: new Date(), days: 7 }).toISOString()
   );
-  const res = useGraphQLQuery({
-    query,
-    variables: {
-      envID,
-      appID,
-      timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-      status,
-      startTime: startTime || defaultStartTime,
+  return useCallback(
+    async ({ appID, orderBy, cursor, pageSize }: QueryVariables) => {
+      const result = await client
+        .query(
+          query,
+          {
+            timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
+            orderBy,
+            startTime: startTime,
+            appID: appID,
+            status: [],
+            cursor,
+            first: pageSize,
+            envID,
+          },
+          { requestPolicy: 'network-only' }
+        )
+        .toPromise();
+
+      if (result.error) {
+        throw new Error(result.error.message);
+      }
+
+      if (!result.data) {
+        throw new Error('no data returned');
+      }
+
+      const workersData = result.data.environment.workerConnections;
+
+      const workers = workersData.edges.map((e) => ({
+        ...e.node,
+        status: convertWorkerStatus(e.node.status),
+        appVersion: e.node.appVersion || 'unknown',
+      }));
+
+      return {
+        workers,
+        pageInfo: workersData.pageInfo,
+      };
     },
-  });
-
-  if (res.data) {
-    const workers = res.data.environment.workerConnections.edges.map((e) => ({
-      ...e.node,
-      status: convertWorkerStatus(e.node.status),
-      appVersion: e.node.appVersion || 'unknown',
-    }));
-
-    return {
-      ...res,
-      data: {
-        workers: workers,
-        total: res.data.environment.workerConnections.totalCount,
-        pageInfo: res.data.environment.workerConnections.pageInfo,
-      },
-    };
-  }
-
-  return { ...res, data: undefined };
+    [client, envID, startTime]
+  );
 }
+
+type CountQueryVariables = {
+  appID: string;
+  status?: ConnectV1ConnectionStatus[];
+};
 
 const countQuery = graphql(`
   query GetWorkerCountConnections(
     $envID: ID!
     $appID: UUID!
     $startTime: Time!
-    $status: [ConnectV1ConnectionStatus!]
+    $status: [ConnectV1ConnectionStatus!] = []
     $timeField: ConnectV1WorkerConnectionsOrderByField!
   ) {
     environment: workspace(id: $envID) {
       workerConnections(
-        filter: { appIDs: [$appID], from: $startTime, status: $status }
+        filter: { appIDs: [$appID], from: $startTime, status: $status, timeField: $timeField }
         orderBy: [{ field: $timeField, direction: DESC }]
       ) {
         totalCount
@@ -121,51 +145,40 @@ const countQuery = graphql(`
   }
 `);
 
-export function useWorkerCount({
-  envID,
-  appID,
-  status,
-}: {
-  envID: string;
-  appID: string;
-  status: ConnectV1ConnectionStatus[];
-}) {
-  const [startTime, setStartTime] = useState(() =>
+export function useWorkersCount() {
+  const envID = useEnvironment().id;
+  const client = useClient();
+  const [startTime] = useState(() =>
     getTimestampDaysAgo({ currentDate: new Date(), days: 7 }).toISOString()
   );
+  return useCallback(
+    async ({ appID, status }: CountQueryVariables) => {
+      const result = await client
+        .query(
+          countQuery,
+          {
+            timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
+            startTime: startTime,
+            appID: appID,
+            envID,
+            status,
+          },
+          { requestPolicy: 'network-only' }
+        )
+        .toPromise();
 
-  const pollIntervalInMilliseconds = 2_000;
+      if (result.error) {
+        throw new Error(result.error.message);
+      }
 
-  useEffect(() => {
-    const updateStartTime = () => {
-      setStartTime(getTimestampDaysAgo({ currentDate: new Date(), days: 7 }).toISOString());
-    };
+      if (!result.data) {
+        throw new Error('no data returned');
+      }
 
-    const intervalId = setInterval(updateStartTime, pollIntervalInMilliseconds);
+      const workersData = result.data.environment.workerConnections;
 
-    return () => clearInterval(intervalId);
-  }, []);
-
-  const res = useGraphQLQuery({
-    query: countQuery,
-    pollIntervalInMilliseconds: pollIntervalInMilliseconds,
-    variables: {
-      envID,
-      appID,
-      status,
-      startTime,
-      timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
+      return workersData.totalCount;
     },
-  });
-
-  if (res.data) {
-    return {
-      ...res,
-      data: {
-        total: res.data.environment.workerConnections.totalCount,
-      },
-    };
-  }
-
-  return { ...res, data: undefined };
+    [client, envID, startTime]
+  );
 }
