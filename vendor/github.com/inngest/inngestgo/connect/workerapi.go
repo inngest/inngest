@@ -56,6 +56,10 @@ func (a *workerApiClient) start(ctx context.Context, hashedSigningKey []byte, re
 			return nil, newReconnectErr(ErrUnauthenticated)
 		}
 
+		if httpRes.StatusCode == http.StatusTooManyRequests {
+			return nil, newReconnectErr(ErrTooManyConnections)
+		}
+
 		byt, err := io.ReadAll(httpRes.Body)
 		if err != nil {
 			return nil, fmt.Errorf("could not read start error: %w", err)

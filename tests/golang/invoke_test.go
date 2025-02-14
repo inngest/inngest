@@ -51,12 +51,14 @@ func TestInvoke(t *testing.T) {
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
 			runID = input.InputCtx.RunID
 
-			_, _ = step.Invoke[any](
+			_, err := step.Invoke[any](
 				ctx,
 				"invoke",
 				step.InvokeOpts{FunctionId: appID + "-" + invokedFnName},
 			)
-
+			if err != nil {
+				return nil, err
+			}
 			return "success", nil
 		},
 	)
@@ -151,12 +153,14 @@ func TestInvokeGroup(t *testing.T) {
 				return nil, inngestgo.RetryAtError(fmt.Errorf("initial error"), time.Now().Add(5*time.Second))
 			}
 
-			_, _ = step.Invoke[any](
+			_, err := step.Invoke[any](
 				ctx,
 				"invoke",
 				step.InvokeOpts{FunctionId: appID + "-" + invokedFnName},
 			)
-
+			if err != nil {
+				return nil, err
+			}
 			return "success", nil
 		},
 	)
@@ -199,7 +203,7 @@ func TestInvokeGroup(t *testing.T) {
 
 			execOutput := c.RunSpanOutput(ctx, *exec.OutputID)
 			as.NotNil(t, execOutput)
-			c.ExpectSpanErrorOutput(t, "", "initial error", execOutput)
+			c.ExpectSpanErrorOutput(t, "initial error", "", execOutput)
 		})
 	})
 
@@ -279,12 +283,14 @@ func TestInvokeTimeout(t *testing.T) {
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
 			runID = input.InputCtx.RunID
 
-			_, _ = step.Invoke[any](
+			_, err := step.Invoke[any](
 				ctx,
 				"invoke",
 				step.InvokeOpts{FunctionId: appID + "-" + invokedFnName, Timeout: 1 * time.Second},
 			)
-
+			if err != nil {
+				return nil, err
+			}
 			return nil, nil
 		},
 	)
@@ -381,11 +387,13 @@ func TestInvokeRateLimit(t *testing.T) {
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
 			runID = input.InputCtx.RunID
 
-			_, _ = step.Invoke[any](
+			_, err := step.Invoke[any](
 				ctx,
 				"invoke",
 				step.InvokeOpts{FunctionId: appID + "-" + invokedFnName})
-
+			if err != nil {
+				return nil, err
+			}
 			return nil, nil
 		},
 	)

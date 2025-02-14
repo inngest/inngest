@@ -222,7 +222,7 @@ func TestWaitGroup(t *testing.T) {
 
 			execOutput := c.RunSpanOutput(ctx, *exec.OutputID)
 			assert.NotNil(t, execOutput)
-			c.ExpectSpanErrorOutput(t, "", "initial error", execOutput)
+			c.ExpectSpanErrorOutput(t, "initial error", "", execOutput)
 		})
 
 		// Wait for the WaitForEvent to appear in history
