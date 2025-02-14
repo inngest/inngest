@@ -51,12 +51,14 @@ func TestInvoke(t *testing.T) {
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
 			runID = input.InputCtx.RunID
 
-			_, _ = step.Invoke[any](
+			_, err := step.Invoke[any](
 				ctx,
 				"invoke",
 				step.InvokeOpts{FunctionId: appID + "-" + invokedFnName},
 			)
-
+			if err != nil {
+				return nil, err
+			}
 			return "success", nil
 		},
 	)
@@ -151,12 +153,14 @@ func TestInvokeGroup(t *testing.T) {
 				return nil, inngestgo.RetryAtError(fmt.Errorf("initial error"), time.Now().Add(5*time.Second))
 			}
 
-			_, _ = step.Invoke[any](
+			_, err := step.Invoke[any](
 				ctx,
 				"invoke",
 				step.InvokeOpts{FunctionId: appID + "-" + invokedFnName},
 			)
-
+			if err != nil {
+				return nil, err
+			}
 			return "success", nil
 		},
 	)
@@ -245,163 +249,167 @@ func TestInvokeGroup(t *testing.T) {
 	})
 }
 
-// func TestInvokeTimeout(t *testing.T) {
-// 	ctx := context.Background()
-// 	r := require.New(t)
-// 	c := client.New(t)
+func TestInvokeTimeout(t *testing.T) {
+	ctx := context.Background()
+	r := require.New(t)
+	c := client.New(t)
 
-// 	appID := "InvokeTimeout-" + ulid.MustNew(ulid.Now(), nil).String()
-// 	h, server, registerFuncs := NewSDKHandler(t, appID)
-// 	defer server.Close()
+	appID := "InvokeTimeout-" + ulid.MustNew(ulid.Now(), nil).String()
+	h, server, registerFuncs := NewSDKHandler(t, appID)
+	defer server.Close()
 
-// 	invokedFnName := "invoked-fn"
-// 	invokedFn := inngestgo.CreateFunction(
-// 		inngestgo.FunctionOpts{
-// 			Name:    invokedFnName,
-// 			Retries: inngestgo.IntPtr(0),
-// 		},
-// 		inngestgo.EventTrigger("none", nil),
-// 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
-// 			step.Sleep(ctx, "sleep", 5*time.Second)
+	invokedFnName := "invoked-fn"
+	invokedFn := inngestgo.CreateFunction(
+		inngestgo.FunctionOpts{
+			Name:    invokedFnName,
+			Retries: inngestgo.IntPtr(0),
+		},
+		inngestgo.EventTrigger("none", nil),
+		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+			step.Sleep(ctx, "sleep", 5*time.Second)
 
-// 			return nil, nil
-// 		},
-// 	)
+			return nil, nil
+		},
+	)
 
-// 	// This function will invoke the other function
-// 	runID := ""
-// 	evtName := "my-event"
-// 	mainFn := inngestgo.CreateFunction(
-// 		inngestgo.FunctionOpts{
-// 			Name: "main-fn",
-// 		},
-// 		inngestgo.EventTrigger(evtName, nil),
-// 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
-// 			runID = input.InputCtx.RunID
+	// This function will invoke the other function
+	runID := ""
+	evtName := "my-event"
+	mainFn := inngestgo.CreateFunction(
+		inngestgo.FunctionOpts{
+			Name: "main-fn",
+		},
+		inngestgo.EventTrigger(evtName, nil),
+		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+			runID = input.InputCtx.RunID
 
-// 			_, _ = step.Invoke[any](
-// 				ctx,
-// 				"invoke",
-// 				step.InvokeOpts{FunctionId: appID + "-" + invokedFnName, Timeout: 1 * time.Second},
-// 			)
+			_, err := step.Invoke[any](
+				ctx,
+				"invoke",
+				step.InvokeOpts{FunctionId: appID + "-" + invokedFnName, Timeout: 1 * time.Second},
+			)
+			if err != nil {
+				return nil, err
+			}
+			return nil, nil
+		},
+	)
 
-// 			return nil, nil
-// 		},
-// 	)
+	h.Register(invokedFn, mainFn)
+	registerFuncs()
 
-// 	h.Register(invokedFn, mainFn)
-// 	registerFuncs()
+	// Trigger the main function and successfully invoke the other function
+	_, err := inngestgo.Send(ctx, &event.Event{Name: evtName})
+	r.NoError(err)
 
-// 	// Trigger the main function and successfully invoke the other function
-// 	_, err := inngestgo.Send(ctx, &event.Event{Name: evtName})
-// 	r.NoError(err)
+	// The invoke target times out and should fail the main run
+	c.WaitForRunStatus(ctx, t, "FAILED", &runID)
 
-// 	// The invoke target times out and should fail the main run
-// 	// c.WaitForRunStatus(ctx, t, "FAILED", &runID)
+	t.Run("trace run should have appropriate data", func(t *testing.T) {
+		errMsg := "Timed out waiting for invoked function to complete"
+		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusFailed})
 
-// 	t.Run("trace run should have appropriate data", func(t *testing.T) {
-// 		errMsg := "Timed out waiting for invoked function to complete"
-// 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusFailed})
+		require.NotNil(t, run.Trace)
+		require.True(t, run.Trace.IsRoot)
+		require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
 
-// 		require.NotNil(t, run.Trace)
-// 		require.True(t, run.Trace.IsRoot)
-// 		require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
+		// output test
+		require.NotNil(t, run.Trace.OutputID)
+		output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
+		require.NotNil(t, output)
 
-// 		// output test
-// 		require.NotNil(t, run.Trace.OutputID)
-// 		output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
-// 		require.NotNil(t, output)
+		rootSpanID := run.Trace.SpanID
 
-// 		rootSpanID := run.Trace.SpanID
+		t.Run("invoke", func(t *testing.T) {
+			r := require.New(t)
+			invoke := run.Trace.ChildSpans[0]
+			r.Equal("invoke", invoke.Name)
+			r.Equal(0, invoke.Attempts)
+			r.False(invoke.IsRoot)
+			r.Equal(rootSpanID, invoke.ParentSpanID)
+			r.Equal(models.StepOpInvoke.String(), invoke.StepOp)
+			r.NotNil(invoke.EndedAt)
 
-// 		t.Run("invoke", func(t *testing.T) {
-// 			r := require.New(t)
-// 			invoke := run.Trace.ChildSpans[0]
-// 			r.Equal("invoke", invoke.Name)
-// 			r.Equal(0, invoke.Attempts)
-// 			r.False(invoke.IsRoot)
-// 			r.Equal(rootSpanID, invoke.ParentSpanID)
-// 			r.Equal(models.StepOpInvoke.String(), invoke.StepOp)
-// 			r.NotNil(invoke.EndedAt)
+			// output test
+			assert.NotNil(t, invoke.OutputID)
+			r.EventuallyWithT(func(t *assert.CollectT) {
+				invokeOutput := c.RunSpanOutput(ctx, *invoke.OutputID)
+				c.ExpectSpanErrorOutput(t, errMsg, "", invokeOutput)
+			}, 10*time.Second, 1*time.Second)
 
-// 			// output test
-// 			assert.NotNil(t, invoke.OutputID)
-// 			r.EventuallyWithT(func(t *assert.CollectT) {
-// 				invokeOutput := c.RunSpanOutput(ctx, *invoke.OutputID)
-// 				c.ExpectSpanErrorOutput(t, errMsg, "", invokeOutput)
-// 			}, 10*time.Second, 1*time.Second)
+			var stepInfo models.InvokeStepInfo
+			byt, err := json.Marshal(invoke.StepInfo)
+			r.NoError(err)
+			r.NoError(json.Unmarshal(byt, &stepInfo))
 
-// 			var stepInfo models.InvokeStepInfo
-// 			byt, err := json.Marshal(invoke.StepInfo)
-// 			r.NoError(err)
-// 			r.NoError(json.Unmarshal(byt, &stepInfo))
+			r.True(*stepInfo.TimedOut)
+			r.Nil(stepInfo.ReturnEventID)
+			r.Nil(stepInfo.RunID)
+		})
 
-// 			r.True(*stepInfo.TimedOut)
-// 			r.Nil(stepInfo.ReturnEventID)
-// 			r.Nil(stepInfo.RunID)
-// 		})
+	})
+}
 
-// 	})
-// }
+func TestInvokeRateLimit(t *testing.T) {
+	ctx := context.Background()
+	r := require.New(t)
+	c := client.New(t)
 
-// func TestInvokeRateLimit(t *testing.T) {
-// 	ctx := context.Background()
-// 	r := require.New(t)
-// 	c := client.New(t)
+	appID := "InvokeRateLimit-" + ulid.MustNew(ulid.Now(), nil).String()
+	h, server, registerFuncs := NewSDKHandler(t, appID)
+	defer server.Close()
 
-// 	appID := "InvokeRateLimit-" + ulid.MustNew(ulid.Now(), nil).String()
-// 	h, server, registerFuncs := NewSDKHandler(t, appID)
-// 	defer server.Close()
+	// This function will be invoked by the main function
+	invokedFnName := "invoked-fn"
+	invokedFn := inngestgo.CreateFunction(
+		inngestgo.FunctionOpts{
+			Name: invokedFnName,
+			RateLimit: &inngestgo.RateLimit{
+				Limit:  1,
+				Period: 1 * time.Minute,
+			},
+			Retries: inngestgo.IntPtr(0),
+		},
+		inngestgo.EventTrigger("none", nil),
+		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+			return nil, nil
+		},
+	)
 
-// 	// This function will be invoked by the main function
-// 	invokedFnName := "invoked-fn"
-// 	invokedFn := inngestgo.CreateFunction(
-// 		inngestgo.FunctionOpts{
-// 			Name: invokedFnName,
-// 			RateLimit: &inngestgo.RateLimit{
-// 				Limit:  1,
-// 				Period: 1 * time.Minute,
-// 			},
-// 			Retries: inngestgo.IntPtr(0),
-// 		},
-// 		inngestgo.EventTrigger("none", nil),
-// 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
-// 			return nil, nil
-// 		},
-// 	)
+	// This function will invoke the other function
+	runID := ""
+	evtName := "my-event"
+	mainFn := inngestgo.CreateFunction(
+		inngestgo.FunctionOpts{
+			Name: "main-fn",
+		},
+		inngestgo.EventTrigger(evtName, nil),
+		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+			runID = input.InputCtx.RunID
 
-// 	// This function will invoke the other function
-// 	runID := ""
-// 	evtName := "my-event"
-// 	mainFn := inngestgo.CreateFunction(
-// 		inngestgo.FunctionOpts{
-// 			Name: "main-fn",
-// 		},
-// 		inngestgo.EventTrigger(evtName, nil),
-// 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
-// 			runID = input.InputCtx.RunID
+			_, err := step.Invoke[any](
+				ctx,
+				"invoke",
+				step.InvokeOpts{FunctionId: appID + "-" + invokedFnName})
+			if err != nil {
+				return nil, err
+			}
+			return nil, nil
+		},
+	)
 
-// 			_, _ = step.Invoke[any](
-// 				ctx,
-// 				"invoke",
-// 				step.InvokeOpts{FunctionId: appID + "-" + invokedFnName})
+	h.Register(invokedFn, mainFn)
+	registerFuncs()
 
-// 			return nil, nil
-// 		},
-// 	)
+	// Trigger the main function and successfully invoke the other function
+	_, err := inngestgo.Send(ctx, &event.Event{Name: evtName})
+	r.NoError(err)
+	c.WaitForRunStatus(ctx, t, "COMPLETED", &runID)
 
-// 	h.Register(invokedFn, mainFn)
-// 	registerFuncs()
-
-// 	// Trigger the main function and successfully invoke the other function
-// 	_, err := inngestgo.Send(ctx, &event.Event{Name: evtName})
-// 	r.NoError(err)
-// 	c.WaitForRunStatus(ctx, t, "COMPLETED", &runID)
-
-// 	// Trigger the main function. It'll fail because the invoked function is
-// 	// rate limited
-// 	runID = ""
-// 	_, err = inngestgo.Send(ctx, &event.Event{Name: evtName})
-// 	r.NoError(err)
-// 	c.WaitForRunStatus(ctx, t, "FAILED", &runID)
-// }
+	// Trigger the main function. It'll fail because the invoked function is
+	// rate limited
+	runID = ""
+	_, err = inngestgo.Send(ctx, &event.Event{Name: evtName})
+	r.NoError(err)
+	c.WaitForRunStatus(ctx, t, "FAILED", &runID)
+}
