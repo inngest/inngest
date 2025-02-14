@@ -8,12 +8,13 @@ import { getDefaultEnvironment, getTestEnvironments, type Environment } from '@/
 
 type EnvSelectMenuProps = {
   onSelect?: (env: Environment) => void;
+  className?: string;
 };
 
 // EnvSelectMenu is a dropdown menu that allows selecting a single environment.
 // It does not allow selecting branch or archived envs.
 // It defaults to the Production env.
-export default function EnvSelectMenu({ onSelect }: EnvSelectMenuProps) {
+export default function EnvSelectMenu({ onSelect, className }: EnvSelectMenuProps) {
   const [{ data: envs = [], error }] = useEnvironments();
   const [selection, setSelection] = useState<Environment | null>(null);
 
@@ -51,33 +52,35 @@ export default function EnvSelectMenu({ onSelect }: EnvSelectMenuProps) {
   }
 
   return (
-    <Listbox value={selection} onChange={internalOnSelect}>
-      {({ open }) => (
-        <div className="bg-canvasBase relative flex">
-          <Listbox.Button
-            className={`border-muted ${open && 'border-primary-intense'}
-            bg-canvasBase text-primary-intense hover:bg-canvasSubtle 
-            h-8 w-[258px] overflow-hidden rounded border px-2 text-sm`}
-          >
-            <div className="flex flex-row items-center justify-between">
-              <SelectedDisplay env={selection} />
-              <RiExpandUpDownLine className="text-muted h-4 w-4" aria-hidden="true" />
-            </div>
-          </Listbox.Button>
+    <div className={className || ''}>
+      <Listbox value={selection} onChange={internalOnSelect}>
+        {({ open }) => (
+          <div className="bg-canvasBase relative flex">
+            <Listbox.Button
+              className={`border-muted ${open && 'border-primary-intense'}
+              bg-canvasBase text-primary-intense hover:bg-canvasSubtle 
+              h-8 w-[258px] overflow-hidden rounded border px-2 text-sm`}
+            >
+              <div className="flex flex-row items-center justify-between">
+                <SelectedDisplay env={selection} />
+                <RiExpandUpDownLine className="text-muted h-4 w-4" aria-hidden="true" />
+              </div>
+            </Listbox.Button>
 
-          <Listbox.Options
-            className="bg-canvasBase border-subtle overflow-y-truncate absolute
-            left-0.5 top-9 z-50 w-[250px] divide-none rounded border shadow focus:outline-none"
-          >
-            {defaultEnvironment !== null && (
-              <EnvItem env={defaultEnvironment} key={defaultEnvironment.id} />
-            )}
-            {testEnvironments.length > 0 &&
-              testEnvironments.map((env) => <EnvItem key={env.id} env={env} />)}
-          </Listbox.Options>
-        </div>
-      )}
-    </Listbox>
+            <Listbox.Options
+              className="bg-canvasBase border-subtle overflow-y-truncate absolute
+              left-0.5 top-9 z-50 w-[250px] divide-none rounded border shadow focus:outline-none"
+            >
+              {defaultEnvironment !== null && (
+                <EnvItem env={defaultEnvironment} key={defaultEnvironment.id} />
+              )}
+              {testEnvironments.length > 0 &&
+                testEnvironments.map((env) => <EnvItem key={env.id} env={env} />)}
+            </Listbox.Options>
+          </div>
+        )}
+      </Listbox>
+    </div>
   );
 }
 
