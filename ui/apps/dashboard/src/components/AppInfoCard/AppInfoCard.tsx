@@ -53,6 +53,7 @@ export function AppInfoCard({
 }: Props | LoadingProps) {
   const env = useEnvironment();
   let lastSyncValue;
+  debugger;
   if (sync) {
     if (app) {
       lastSyncValue = (
@@ -138,7 +139,9 @@ export function AppInfoCard({
           />
         )}
         <CardItem
-          detail={<div className="truncate">{app?.version ? <Pill>{app.version}</Pill> : '-'}</div>}
+          detail={
+            <div className="truncate">{app?.appVersion ? <Pill>{app.appVersion}</Pill> : '-'}</div>
+          }
           term="App version"
           loading={loading}
         />

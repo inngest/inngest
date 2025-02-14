@@ -8,7 +8,7 @@ export type App = {
   lastSyncedAt?: Date;
   url?: string | null;
   externalID?: string;
-  version?: string;
+  appVersion?: string | null;
 };
 
 export const methodTypes = {

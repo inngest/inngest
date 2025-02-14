@@ -77,7 +77,14 @@ export function AppCardContent({ url, app, pill, actions, workerCounter }: CardC
           </div>
           {actions}
         </div>
-        <p className="text-muted mt-0.5 truncate">{app.url}</p>
+        <p className="text-muted mt-0.5 truncate">
+          {app.url ||
+            (app.appVersion && (
+              <>
+                Current app version: <span className="text-basis">{app.appVersion}</span>
+              </>
+            ))}
+        </p>
       </Wrapper>
 
       <div className="grid grid-cols-5 gap-4">

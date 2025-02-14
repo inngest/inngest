@@ -37,6 +37,7 @@ export default function AppList() {
       return (
         <AppCard key={app?.id} kind={appKind}>
           <AppCard.Content
+            url={app.method === AppMethod.Connect ? `/apps/app?id=${app.id}` : undefined}
             app={{
               ...app,
               framework: transformFramework(app.framework),

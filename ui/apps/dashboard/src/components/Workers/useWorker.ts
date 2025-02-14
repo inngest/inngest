@@ -46,7 +46,7 @@ const query = graphql(`
             sdkLang
             sdkVersion
             sdkPlatform
-            appVersion: buildId
+            appVersion
             functionCount
             cpuCores
             memBytes
@@ -109,7 +109,6 @@ export function useWorkers() {
       const workers = workersData.edges.map((e) => ({
         ...e.node,
         status: convertWorkerStatus(e.node.status),
-        appVersion: e.node.appVersion || 'unknown',
       }));
 
       return {

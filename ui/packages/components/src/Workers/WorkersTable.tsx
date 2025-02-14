@@ -114,7 +114,7 @@ export function WorkersTable({
   }, [sorting, setOrderBy]);
 
   return (
-    <>
+    <div>
       <h4 className="text-subtle mb-4 text-xl">Workers ({totalCount})</h4>
       <CompactPaginatedTable
         columns={columns}
@@ -154,7 +154,7 @@ export function WorkersTable({
           ) : undefined
         }
       />
-    </>
+    </div>
   );
 }
 
