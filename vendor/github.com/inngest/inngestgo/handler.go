@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/inngest/inngestgo/connect"
 	"io"
 	"log/slog"
 	"net/http"
@@ -65,7 +66,7 @@ func Serve(w http.ResponseWriter, r *http.Request) {
 	DefaultHandler.ServeHTTP(w, r)
 }
 
-func Connect(ctx context.Context, opts ConnectOpts) error {
+func Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, error) {
 	return DefaultHandler.Connect(ctx, opts)
 }
 
@@ -266,7 +267,7 @@ type Handler interface {
 	Register(...ServableFunction)
 
 	// Connect establishes an outbound connection to Inngest
-	Connect(ctx context.Context, opts ConnectOpts) error
+	Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, error)
 }
 
 // NewHandler returns a new Handler for serving Inngest functions.
@@ -621,6 +622,11 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 
 	pathAndParams := r.URL.String()
 
+	appVersion := ""
+	if h.AppVersion != nil {
+		appVersion = *h.AppVersion
+	}
+
 	config := sdk.RegisterRequest{
 		URL:        fmt.Sprintf("%s://%s%s", scheme, host, pathAndParams),
 		V:          "1",
@@ -632,6 +638,7 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 			Platform: platform(),
 		},
 		Capabilities: capabilities,
+		AppVersion:   appVersion,
 	}
 
 	fns, err := createFunctionConfigs(h.appName, h.funcs, *h.url(r), false)

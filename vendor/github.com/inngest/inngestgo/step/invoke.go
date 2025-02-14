@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngestgo/errors"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -69,7 +70,14 @@ func Invoke[T any](ctx context.Context, id string, opts InvokeOpts) (T, error) {
 				panic(ControlHijack{})
 			}
 
-			return output, fmt.Errorf("%s", errObj.Message)
+			errMsg := "invoking function failed"
+			if errObj.Message != "" {
+				errMsg += "; " + errObj.Message
+			}
+
+			customErr := errors.NoRetryError(fmt.Errorf("%s", errMsg))
+			mgr.SetErr(customErr)
+			panic(ControlHijack{})
 		}
 
 		mgr.SetErr(fmt.Errorf("error parsing invoke value for '%s'; unknown shape", opts.FunctionId))
