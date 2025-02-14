@@ -767,14 +767,14 @@ export type GetFunctionsQuery = { __typename?: 'Query', functions: Array<{ __typ
 export type GetAppsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetAppsQuery = { __typename?: 'Query', apps: Array<{ __typename?: 'App', id: string, name: string, sdkLanguage: string, sdkVersion: string, framework: string | null, url: string | null, error: string | null, connected: boolean, functionCount: number, autodiscovered: boolean, method: AppMethod, functions: Array<{ __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string }> }> };
+export type GetAppsQuery = { __typename?: 'Query', apps: Array<{ __typename?: 'App', id: string, name: string, appVersion: string | null, sdkLanguage: string, sdkVersion: string, framework: string | null, url: string | null, error: string | null, connected: boolean, functionCount: number, autodiscovered: boolean, method: AppMethod, functions: Array<{ __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string }> }> };
 
 export type GetAppQueryVariables = Exact<{
   id: Scalars['UUID'];
 }>;
 
 
-export type GetAppQuery = { __typename?: 'Query', app: { __typename?: 'App', id: string, name: string, sdkLanguage: string, sdkVersion: string, framework: string | null, url: string | null, error: string | null, connected: boolean, functionCount: number, autodiscovered: boolean, method: AppMethod, functions: Array<{ __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string, triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null }> } | null };
+export type GetAppQuery = { __typename?: 'Query', app: { __typename?: 'App', id: string, name: string, appVersion: string | null, sdkLanguage: string, sdkVersion: string, framework: string | null, url: string | null, error: string | null, connected: boolean, functionCount: number, autodiscovered: boolean, method: AppMethod, functions: Array<{ __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string, triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null }> } | null };
 
 export type CreateAppMutationVariables = Exact<{
   input: CreateAppInput;
@@ -1087,6 +1087,7 @@ export const GetAppsDocument = `
   apps {
     id
     name
+    appVersion
     sdkLanguage
     sdkVersion
     framework
@@ -1112,6 +1113,7 @@ export const GetAppDocument = `
   app(id: $id) {
     id
     name
+    appVersion
     sdkLanguage
     sdkVersion
     framework

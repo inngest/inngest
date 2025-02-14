@@ -126,6 +126,7 @@ export const APPS = gql`
     apps {
       id
       name
+      appVersion
       sdkLanguage
       sdkVersion
       framework
@@ -152,6 +153,7 @@ export const GET_APP = gql`
     app(id: $id) {
       id
       name
+      appVersion
       sdkLanguage
       sdkVersion
       framework
