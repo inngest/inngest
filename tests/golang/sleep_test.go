@@ -132,7 +132,7 @@ func TestSleep(t *testing.T) {
 
 				execOutput := c.RunSpanOutput(ctx, *exec.OutputID)
 				assert.NotNil(t, execOutput)
-				c.ExpectSpanErrorOutput(t, "", "throwing an initial error", execOutput)
+				c.ExpectSpanErrorOutput(t, "throwing an initial error", "", execOutput)
 			})
 		})
 	})
