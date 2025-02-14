@@ -27,6 +27,7 @@ const query = graphql(`
         }
         name
         method
+        appVersion
         latestSync {
           commitAuthor
           commitHash
