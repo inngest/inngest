@@ -1,0 +1,26 @@
+{
+  "name": "@inngest/dashboard2",
+  "description": "Inngest Dashboard",
+  "license": "UNLICENSED",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vinxi dev",
+    "build": "vinxi build",
+    "start": "vinxi start"
+  },
+  "dependencies": {
+    "@tanstack/react-router": "1.104.1",
+    "@tanstack/start": "1.104.2",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "vinxi": "0.5.3"
+  },
+  "devDependencies": {
+    "@types/react": "18.2.11",
+    "@types/react-dom": "18.2.4",
+    "@vitejs/plugin-react": "4.3.4",
+    "typescript": "5.1.3",
+    "vite-tsconfig-paths": "5.1.4"
+  }
+}
