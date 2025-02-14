@@ -3,9 +3,7 @@ package golang
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"sync/atomic"
@@ -52,25 +50,11 @@ func TestEndToEnd(t *testing.T) {
 	)
 	h.Register(a)
 
-	go func() {
-		err := h.Connect(connectCtx, inngestgo.ConnectOpts{
-			InstanceID: inngestgo.StrPtr("my-worker"),
-		})
-		if err != nil {
-			// This is expected
-			if errors.Is(err, context.Canceled) {
-				return
-			}
-
-			// This error may happen but should be fixed before releasing
-			// TODO Why is the reader attempting to read from a closed connection?
-			if errors.Is(err, net.ErrClosed) {
-				return
-			}
-
-			require.NoError(t, err)
-		}
-	}()
+	wc, err := h.Connect(connectCtx, inngestgo.ConnectOpts{
+		InstanceID: inngestgo.StrPtr("my-worker"),
+	})
+	require.NoError(t, err)
+	defer wc.Close()
 
 	var workerGroupID string
 	t.Run("verify connection is established", func(t *testing.T) {

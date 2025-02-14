@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"sync/atomic"
 	"time"
 )
 
@@ -24,8 +25,35 @@ const (
 	WorkerHeartbeatInterval = 10 * time.Second
 )
 
-func Connect(ctx context.Context, opts Opts, invoker FunctionInvoker, logger *slog.Logger) error {
+type ConnectionState string
+
+const (
+	ConnectionStateConnecting   ConnectionState = "CONNECTING"
+	ConnectionStateActive       ConnectionState = "ACTIVE"
+	ConnectionStatePaused       ConnectionState = "PAUSED"
+	ConnectionStateReconnecting ConnectionState = "RECONNECTING"
+	ConnectionStateClosing      ConnectionState = "CLOSING"
+	ConnectionStateClosed       ConnectionState = "CLOSED"
+)
+
+type WorkerConnection interface {
+	// State returns the current connection state.
+	State() ConnectionState
+
+	// Close connection gracefully.
+	Close() error
+}
+
+func Connect(ctx context.Context, opts Opts, invoker FunctionInvoker, logger *slog.Logger) (WorkerConnection, error) {
 	apiClient := newWorkerApiClient(opts.APIBaseUrl, opts.Env)
+
+	// While the worker is starting, it can be canceled using the passed context
+	startCtx, cancelStart := context.WithTimeout(ctx, time.Second*30)
+	defer cancelStart()
+
+	// Once the worker is running, it can only be stopped by calling Close()
+	doneCtx, cancelDone := context.WithCancel(context.Background())
+
 	ch := &connectHandler{
 		logger:                 logger,
 		invoker:                invoker,
@@ -35,6 +63,10 @@ func Connect(ctx context.Context, opts Opts, invoker FunctionInvoker, logger *sl
 		initiateConnectionChan: make(chan struct{}),
 		apiClient:              apiClient,
 		messageBuffer:          newMessageBuffer(apiClient, logger),
+		state:                  ConnectionStateConnecting,
+
+		workerCtx:       doneCtx,
+		cancelWorkerCtx: cancelDone,
 	}
 
 	wp := NewWorkerPool(ctx, opts.MaxConcurrency, ch.processExecutorRequest)
@@ -44,12 +76,12 @@ func Connect(ctx context.Context, opts Opts, invoker FunctionInvoker, logger *sl
 		// TODO Push remaining messages to another destination for processing?
 	}()
 
-	err := ch.Connect(ctx)
+	conn, err := ch.Connect(startCtx)
 	if err != nil {
-		return fmt.Errorf("could not establish connection: %w", err)
+		return nil, fmt.Errorf("could not establish connection: %w", err)
 	}
 
-	return nil
+	return conn, nil
 }
 
 type FunctionInvoker interface {
@@ -103,6 +135,15 @@ type connectHandler struct {
 	initiateConnectionChan chan struct{}
 
 	apiClient *workerApiClient
+
+	// Global connection state
+
+	state           ConnectionState
+	workerCtx       context.Context
+	cancelWorkerCtx context.CancelFunc
+	eg              errgroup.Group
+	auth            authContext
+	closed          atomic.Bool
 }
 
 // authContext is wrapper for information related to authentication
@@ -111,13 +152,13 @@ type authContext struct {
 	fallback         bool
 }
 
-func (h *connectHandler) Connect(ctx context.Context) error {
+func (h *connectHandler) Connect(ctx context.Context) (WorkerConnection, error) {
 	signingKey := h.opts.HashedSigningKey
 	if len(signingKey) == 0 {
-		return fmt.Errorf("hashed signing key is required")
+		return nil, fmt.Errorf("hashed signing key is required")
 	}
 
-	auth := authContext{hashedSigningKey: signingKey}
+	h.auth = authContext{hashedSigningKey: signingKey}
 
 	numCpuCores := runtime.NumCPU()
 	totalMem := memory.TotalMemory()
@@ -138,30 +179,39 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 
 	marshaledFns, err := json.Marshal(h.opts.Functions)
 	if err != nil {
-		return fmt.Errorf("failed to serialize connect config: %w", err)
+		return nil, fmt.Errorf("failed to serialize connect config: %w", err)
 	}
 
 	marshaledCapabilities, err := json.Marshal(h.opts.Capabilities)
 	if err != nil {
-		return fmt.Errorf("failed to serialize connect config: %w", err)
+		return nil, fmt.Errorf("failed to serialize connect config: %w", err)
 	}
 
 	var attempts int
+
+	isInitialConnection := true
+	initialConnectionDone := make(chan error)
 
 	// We construct a connection loop, which will attempt to reconnect on failure
 	// Instead of doing a simple, synchronous loop, we use channels to communicate connection status changes,
 	// allowing to instantiate a new connection while the previous one is still running.
 	// This is crucial for handling gateway draining scenarios.
-	eg := errgroup.Group{}
-	eg.Go(func() error {
+	runLoop := errgroup.Group{}
+	runLoop.Go(func() error {
 		for {
 			select {
 			// If the context is canceled, we should not attempt to reconnect
-			case <-ctx.Done():
+			case <-h.workerCtx.Done():
 				return nil
 
 			// Reset attempts when connection succeeded
 			case <-h.notifyConnectedChan:
+				h.logger.Debug("connected")
+				if isInitialConnection {
+					isInitialConnection = false
+					initialConnectionDone <- nil
+				}
+				h.state = ConnectionStateActive
 				attempts = 0
 				continue
 
@@ -170,22 +220,54 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 				h.logger.Error("connect failed", "err", err, "reconnect", msg.reconnect)
 
 				if !msg.reconnect {
+					h.state = ConnectionStateClosed
+
+					if isInitialConnection {
+						isInitialConnection = false
+						initialConnectionDone <- err
+					}
+
 					return err
 				}
 
+				h.state = ConnectionStateReconnecting
+
 				// Some errors should be handled differently (e.g. auth failed)
 				if msg.err != nil {
+					if errors.Is(msg.err, ErrTooManyConnections) {
+						// If limits are exceed in initial connection, return immediately
+						if isInitialConnection {
+							isInitialConnection = false
+							initialConnectionDone <- fmt.Errorf("too many connections, please disconnect other workers or upgrade your billing plan for more concurrent connections")
+							return err
+						}
+					}
+
 					if errors.Is(msg.err, ErrUnauthenticated) {
-						if auth.fallback {
-							return fmt.Errorf("failed to authenticate with fallback key, exiting")
+						if h.auth.fallback {
+							err := fmt.Errorf("failed to authenticate with fallback key, exiting")
+							if isInitialConnection {
+								isInitialConnection = false
+								initialConnectionDone <- err
+							}
+
+							return err
 						}
 
 						signingKeyFallback := h.opts.HashedSigningKeyFallback
+
 						if len(signingKeyFallback) == 0 {
-							return fmt.Errorf("fallback signing key is required")
+							err := fmt.Errorf("fallback signing key is required")
+
+							if isInitialConnection {
+								isInitialConnection = false
+								initialConnectionDone <- err
+							}
+
+							return err
 						}
 
-						auth = authContext{hashedSigningKey: signingKeyFallback, fallback: true}
+						h.auth = authContext{hashedSigningKey: signingKeyFallback, fallback: true}
 					}
 
 					closeErr := websocket.CloseError{}
@@ -199,6 +281,13 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 						case syscode.CodeConnectGatewayClosing, syscode.CodeConnectInternal, syscode.CodeConnectWorkerHelloTimeout:
 							// continue to reconnect logic
 						default:
+							err := fmt.Errorf("connect failed with error code %q", closeErr.Reason)
+
+							if isInitialConnection {
+								isInitialConnection = false
+								initialConnectionDone <- err
+							}
+
 							// If we received a reason that's non-retriable, stop here.
 							return fmt.Errorf("connect failed with error code %q", closeErr.Reason)
 						}
@@ -207,7 +296,7 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 
 				// Attempt to flush messages before reconnecting
 				if h.messageBuffer.hasMessages() {
-					err := h.messageBuffer.flush(auth.hashedSigningKey)
+					err := h.messageBuffer.flush(h.auth.hashedSigningKey)
 					if err != nil {
 						h.logger.Error("could not send buffered messages", "err", err)
 					}
@@ -221,7 +310,12 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 				select {
 				case <-time.After(delay):
 					break
-				case <-ctx.Done():
+				case <-h.workerCtx.Done():
+					if isInitialConnection {
+						isInitialConnection = false
+						initialConnectionDone <- nil
+					}
+
 					h.logger.Info("canceled context while waiting to reconnect")
 					return nil
 				}
@@ -230,13 +324,20 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 			}
 
 			if attempts == 5 {
-				return fmt.Errorf("could not establish connection after 5 attempts")
+				err := fmt.Errorf("could not establish connection after 5 attempts")
+
+				if isInitialConnection {
+					isInitialConnection = false
+					initialConnectionDone <- err
+				}
+
+				return err
 			}
 
 			attempts++
 
 			go h.connect(ctx, connectionEstablishData{
-				hashedSigningKey:      auth.hashedSigningKey,
+				hashedSigningKey:      h.auth.hashedSigningKey,
 				numCpuCores:           int32(numCpuCores),
 				totalMem:              int64(totalMem),
 				marshaledFns:          marshaledFns,
@@ -245,28 +346,82 @@ func (h *connectHandler) Connect(ctx context.Context) error {
 		}
 	})
 
+	// Handle run loop closure gracefully, this is also triggered on Close()
+	h.eg = errgroup.Group{}
+	h.eg.Go(func() error {
+		runLoopErr := runLoop.Wait()
+		if runLoopErr != nil {
+			h.logger.Error("could not connect", "err", runLoopErr)
+		}
+
+		h.logger.Debug("run loop ended")
+
+		// Wait until current connection is fully terminated
+		select {
+		case <-time.After(5 * time.Second):
+			h.logger.Warn("shutting down without final signal")
+		case <-h.notifyConnectDoneChan:
+			h.logger.Debug("got connection done signal")
+		}
+
+		// Always send out buffered messages using API
+		if h.messageBuffer.hasMessages() {
+			// Send buffered messages
+			err := h.messageBuffer.flush(h.auth.hashedSigningKey)
+			if err != nil {
+				h.logger.Error("could not send buffered messages", "err", err)
+			}
+
+			// TODO Push remaining messages to another destination for processing?
+		}
+
+		h.logger.Debug("connect handler done")
+		return nil
+	})
+
 	// Initiate the first connection
 	h.initiateConnectionChan <- struct{}{}
 
-	// Wait until connection loop finishes
-	egError := eg.Wait()
+	// Wait until connected (or context is closed)
+	select {
+	case <-ctx.Done():
+		_ = h.Close()
 
-	// Always send out buffered messages using API
-	if h.messageBuffer.hasMessages() {
-		// Send buffered messages
-		err := h.messageBuffer.flush(auth.hashedSigningKey)
+		return nil, fmt.Errorf("context canceled while establishing connection")
+	case err := <-initialConnectionDone:
 		if err != nil {
-			h.logger.Error("could not send buffered messages", "err", err)
+			return nil, fmt.Errorf("could not establish connection: %w", err)
 		}
-
-		// TODO Push remaining messages to another destination for processing?
 	}
 
-	if egError != nil {
-		return fmt.Errorf("could not establish connection: %w", err)
+	return h, nil
+}
+
+func (h *connectHandler) Close() error {
+	// If connection was already closed, this is a no-op.
+	if h.closed.Swap(true) {
+		return nil
 	}
+
+	if h.cancelWorkerCtx == nil {
+		return fmt.Errorf("connection was not fully set up")
+	}
+
+	h.cancelWorkerCtx()
+
+	// Wait until connection loop finishes
+	err := h.eg.Wait()
+	if err != nil {
+		return fmt.Errorf("failed to connect: %w", err)
+	}
+
+	h.state = ConnectionStateClosed
 
 	return nil
+}
+
+func (h *connectHandler) State() ConnectionState {
+	return h.state
 }
 
 var errGatewayDraining = errors.New("gateway is draining")
