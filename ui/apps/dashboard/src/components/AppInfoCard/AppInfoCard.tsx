@@ -54,7 +54,6 @@ export function AppInfoCard({
 }: Props | LoadingProps) {
   const env = useEnvironment();
   let lastSyncValue;
-  debugger;
   if (sync) {
     if (app) {
       lastSyncValue = (

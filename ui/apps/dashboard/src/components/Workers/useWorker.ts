@@ -74,18 +74,16 @@ type QueryVariables = {
 export function useWorkers() {
   const envID = useEnvironment().id;
   const client = useClient();
-  const [startTime] = useState(() =>
-    getTimestampDaysAgo({ currentDate: new Date(), days: 7 }).toISOString()
-  );
   return useCallback(
     async ({ appID, orderBy, cursor, pageSize }: QueryVariables) => {
+      const startTime = getTimestampDaysAgo({ currentDate: new Date(), days: 7 }).toISOString();
       const result = await client
         .query(
           query,
           {
             timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
             orderBy,
-            startTime: startTime,
+            startTime,
             appID: appID,
             status: [],
             cursor,
@@ -116,7 +114,7 @@ export function useWorkers() {
         pageInfo: workersData.pageInfo,
       };
     },
-    [client, envID, startTime]
+    [client, envID]
   );
 }
 
@@ -147,17 +145,15 @@ const countQuery = graphql(`
 export function useWorkersCount() {
   const envID = useEnvironment().id;
   const client = useClient();
-  const [startTime] = useState(() =>
-    getTimestampDaysAgo({ currentDate: new Date(), days: 7 }).toISOString()
-  );
   return useCallback(
     async ({ appID, status }: CountQueryVariables) => {
+      const startTime = getTimestampDaysAgo({ currentDate: new Date(), days: 7 }).toISOString();
       const result = await client
         .query(
           countQuery,
           {
             timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-            startTime: startTime,
+            startTime,
             appID: appID,
             envID,
             status,
@@ -178,6 +174,6 @@ export function useWorkersCount() {
 
       return workersData.totalCount;
     },
-    [client, envID, startTime]
+    [client, envID]
   );
 }
