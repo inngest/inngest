@@ -141,7 +141,11 @@ export function AppInfoCard({
         <CardItem
           detail={
             <div className="truncate">
-              {sync?.appVersion ? <Pill>{sync.appVersion}</Pill> : '-'}
+              {sync?.appVersion || app?.appVersion ? (
+                <Pill>{sync?.appVersion || app?.appVersion}</Pill>
+              ) : (
+                '-'
+              )}
             </div>
           }
           term="App version"
