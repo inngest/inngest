@@ -1,6 +1,6 @@
 'use client';
 
-import { AppDetailsCard, CardItem } from '@inngest/components/Apps/AppDetailsCard';
+import AppDetailsCard from '@inngest/components/Apps/AppDetailsCard';
 import { FunctionList } from '@inngest/components/Apps/FunctionList';
 import { Header } from '@inngest/components/Header/Header';
 import { Pill } from '@inngest/components/Pill/Pill';
@@ -50,19 +50,19 @@ function AppPage({ id }: { id: string }) {
         </div>
 
         <AppDetailsCard title="App information">
-          <CardItem term="App ID" detail={app.id} />
-          <CardItem
+          <AppDetailsCard.Item term="App ID" detail={app.id} />
+          <AppDetailsCard.Item
             term="App version"
             detail={app.appVersion ? <Pill>{app.appVersion}</Pill> : '-'}
           />
-          <CardItem
+          <AppDetailsCard.Item
             term="Last synced at"
             detail={lastSyncedAt ? <Time value={lastSyncedAt} /> : '-'}
           />
           {app?.method === methodTypes.Connect && (
             <WorkerCounter appID={app.id} getWorkerCount={getWorkerCount} />
           )}
-          <CardItem
+          <AppDetailsCard.Item
             term="Method"
             detail={
               <div className="flex items-center gap-1">
@@ -75,9 +75,9 @@ function AppPage({ id }: { id: string }) {
               </div>
             }
           />
-          <CardItem term="SDK version" detail={<Pill>{app.sdkVersion}</Pill>} />
-          <CardItem term="Language" detail={transformLanguage(app.sdkLanguage)} />
-          <CardItem
+          <AppDetailsCard.Item term="SDK version" detail={<Pill>{app.sdkVersion}</Pill>} />
+          <AppDetailsCard.Item term="Language" detail={transformLanguage(app.sdkLanguage)} />
+          <AppDetailsCard.Item
             term="Framework"
             detail={app.framework ? transformFramework(app.framework) : '-'}
           />

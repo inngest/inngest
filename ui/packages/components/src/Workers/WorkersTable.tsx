@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { CardItem } from '@inngest/components/Apps/AppDetailsCard';
+import DescriptionListItem from '@inngest/components/Apps/DescriptionListItem';
 import { Button } from '@inngest/components/Button';
 import { Pill } from '@inngest/components/Pill/Pill';
 import {
@@ -161,11 +161,11 @@ export function WorkersTable({
 function SubComponent({ row }: { row: Row<Worker> }) {
   return (
     <dl className="bg-canvasSubtle mx-9 mb-6 mt-[10px] grid grid-cols-5 gap-2 p-4">
-      <CardItem term="Worker IP" detail={row.original.workerIp} />
-      <CardItem term="SDK version" detail={row.original.sdkVersion} />
-      <CardItem term="SDK language" detail={transformLanguage(row.original.sdkLang)} />
-      <CardItem term="No. of functions" detail={row.original.functionCount.toString()} />
-      <CardItem
+      <DescriptionListItem term="Worker IP" detail={row.original.workerIp} />
+      <DescriptionListItem term="SDK version" detail={row.original.sdkVersion} />
+      <DescriptionListItem term="SDK language" detail={transformLanguage(row.original.sdkLang)} />
+      <DescriptionListItem term="No. of functions" detail={row.original.functionCount.toString()} />
+      <DescriptionListItem
         term="System attributes"
         detail={
           <div className="flex items-center gap-1">
