@@ -41,6 +41,7 @@ type Sync = {
   sdkVersion: string | null;
   status: string;
   url: string | null;
+  appVersion: string | null;
 } & React.ComponentProps<typeof PlatformSection>['sync'];
 
 export function AppInfoCard({
@@ -140,7 +141,9 @@ export function AppInfoCard({
         )}
         <CardItem
           detail={
-            <div className="truncate">{app?.appVersion ? <Pill>{app.appVersion}</Pill> : '-'}</div>
+            <div className="truncate">
+              {sync?.appVersion ? <Pill>{sync.appVersion}</Pill> : '-'}
+            </div>
           }
           term="App version"
           loading={loading}

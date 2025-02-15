@@ -25,9 +25,9 @@ const query = graphql(`
           name
           slug
         }
+        appVersion
         name
         method
-        appVersion
         latestSync {
           commitAuthor
           commitHash
@@ -47,6 +47,7 @@ const query = graphql(`
           vercelDeploymentURL
           vercelProjectID
           vercelProjectURL
+          appVersion
         }
       }
     }
