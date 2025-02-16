@@ -4,8 +4,7 @@
     "moduleResolution": "Bundler",
     "module": "ESNext",
     "paths": {
-      "@/*": ["./app/*"],
-      "@inngest/components/*": ["../../packages/components/src/*"]
+      "@/*": ["./app/*"]
     },
     "target": "ES2022",
     "skipLibCheck": true,

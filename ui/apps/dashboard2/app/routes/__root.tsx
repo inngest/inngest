@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { Outlet, createRootRoute } from '@tanstack/react-router';
+import { AppRoot } from '@inngest/components/AppRoot';
+import { Link, Outlet, createRootRoute } from '@tanstack/react-router';
 import { Meta, Scripts } from '@tanstack/start';
 
 export const Route = createRootRoute({
@@ -29,15 +30,20 @@ function RootComponent() {
 }
 
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
-  return (
-    <html>
-      <head>
-        <Meta />
-      </head>
-      <body>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  );
+  // return (
+  //   <html>
+  //     <head>
+  //       <Meta />
+  //     </head>
+  //     <body>
+  //       <div>
+  //         <Link to="/">Home</Link>
+  //         <Link to="/env">Env</Link>
+  //       </div>
+  //       {children}
+  //       <Scripts />
+  //     </body>
+  //   </html>
+  // );
+  return <AppRoot>{children}</AppRoot>;
 }

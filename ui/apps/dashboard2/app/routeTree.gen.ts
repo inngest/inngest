@@ -11,14 +11,35 @@
 // Import Routes
 
 import { Route as rootRoute } from './routes/__root';
+import { Route as EnvSlugIndexImport } from './routes/env/$slug/index';
+import { Route as EnvIndexImport } from './routes/env/index';
+import { Route as EnvRouteImport } from './routes/env/route';
 import { Route as IndexImport } from './routes/index';
 
 // Create/Update Routes
+
+const EnvRouteRoute = EnvRouteImport.update({
+  id: '/env',
+  path: '/env',
+  getParentRoute: () => rootRoute,
+} as any);
 
 const IndexRoute = IndexImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRoute,
+} as any);
+
+const EnvIndexRoute = EnvIndexImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => EnvRouteRoute,
+} as any);
+
+const EnvSlugIndexRoute = EnvSlugIndexImport.update({
+  id: '/$slug/',
+  path: '/$slug/',
+  getParentRoute: () => EnvRouteRoute,
 } as any);
 
 // Populate the FileRoutesByPath interface
@@ -32,39 +53,82 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexImport;
       parentRoute: typeof rootRoute;
     };
+    '/env': {
+      id: '/env';
+      path: '/env';
+      fullPath: '/env';
+      preLoaderRoute: typeof EnvRouteImport;
+      parentRoute: typeof rootRoute;
+    };
+    '/env/': {
+      id: '/env/';
+      path: '/';
+      fullPath: '/env/';
+      preLoaderRoute: typeof EnvIndexImport;
+      parentRoute: typeof EnvRouteImport;
+    };
+    '/env/$slug/': {
+      id: '/env/$slug/';
+      path: '/$slug';
+      fullPath: '/env/$slug';
+      preLoaderRoute: typeof EnvSlugIndexImport;
+      parentRoute: typeof EnvRouteImport;
+    };
   }
 }
 
 // Create and export the route tree
 
+interface EnvRouteRouteChildren {
+  EnvIndexRoute: typeof EnvIndexRoute;
+  EnvSlugIndexRoute: typeof EnvSlugIndexRoute;
+}
+
+const EnvRouteRouteChildren: EnvRouteRouteChildren = {
+  EnvIndexRoute: EnvIndexRoute,
+  EnvSlugIndexRoute: EnvSlugIndexRoute,
+};
+
+const EnvRouteRouteWithChildren = EnvRouteRoute._addFileChildren(EnvRouteRouteChildren);
+
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute;
+  '/env': typeof EnvRouteRouteWithChildren;
+  '/env/': typeof EnvIndexRoute;
+  '/env/$slug': typeof EnvSlugIndexRoute;
 }
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute;
+  '/env': typeof EnvIndexRoute;
+  '/env/$slug': typeof EnvSlugIndexRoute;
 }
 
 export interface FileRoutesById {
   __root__: typeof rootRoute;
   '/': typeof IndexRoute;
+  '/env': typeof EnvRouteRouteWithChildren;
+  '/env/': typeof EnvIndexRoute;
+  '/env/$slug/': typeof EnvSlugIndexRoute;
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: '/';
+  fullPaths: '/' | '/env' | '/env/' | '/env/$slug';
   fileRoutesByTo: FileRoutesByTo;
-  to: '/';
-  id: '__root__' | '/';
+  to: '/' | '/env' | '/env/$slug';
+  id: '__root__' | '/' | '/env' | '/env/' | '/env/$slug/';
   fileRoutesById: FileRoutesById;
 }
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
+  EnvRouteRoute: typeof EnvRouteRouteWithChildren;
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  EnvRouteRoute: EnvRouteRouteWithChildren,
 };
 
 export const routeTree = rootRoute
@@ -77,11 +141,27 @@ export const routeTree = rootRoute
     "__root__": {
       "filePath": "__root.tsx",
       "children": [
-        "/"
+        "/",
+        "/env"
       ]
     },
     "/": {
       "filePath": "index.tsx"
+    },
+    "/env": {
+      "filePath": "env/route.tsx",
+      "children": [
+        "/env/",
+        "/env/$slug/"
+      ]
+    },
+    "/env/": {
+      "filePath": "env/index.tsx",
+      "parent": "/env"
+    },
+    "/env/$slug/": {
+      "filePath": "env/$slug/index.tsx",
+      "parent": "/env"
     }
   }
 }
