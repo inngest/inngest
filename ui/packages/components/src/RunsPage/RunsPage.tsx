@@ -3,7 +3,6 @@
 import { useCallback, useMemo, useRef, useState, type UIEventHandler } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from '@inngest/components/Button';
-import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
 import { Pill } from '@inngest/components/Pill';
 import { SelectGroup, type Option } from '@inngest/components/Select/Select';
@@ -33,6 +32,7 @@ import {
   useValidatedSearchParam,
 } from '../hooks/useSearchParam';
 import type { Features } from '../types/features';
+import RunsStatusFilter from './RunsStatusFilter';
 import { TimeFilter } from './TimeFilter';
 import { isColumnID, useScopedColumns, type ColumnID } from './columns';
 import type { Run, ViewScope } from './types';
@@ -325,7 +325,7 @@ export function RunsPage({
                 }
               />
             </SelectGroup>
-            <StatusFilter
+            <RunsStatusFilter
               selectedStatuses={filteredStatus}
               onStatusesChange={onStatusFilterChange}
               functionIsPaused={functionIsPaused}
