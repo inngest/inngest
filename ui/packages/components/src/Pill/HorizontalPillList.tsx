@@ -1,5 +1,4 @@
-import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
-
+import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
 import { Pill } from './Pill';
 
 type FunctionsCellContentProps = {

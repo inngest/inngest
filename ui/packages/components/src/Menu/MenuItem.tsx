@@ -1,11 +1,13 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { usePathname } from 'next/navigation';
 import { OptionalLink } from '@inngest/components/Link/OptionalLink';
+// import { usePathname } from 'next/navigation';
+import reactUse from 'react-use';
 
 import { Pill } from '../Pill';
 import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
+import { useDI } from '../contexts/di';
 import { cn } from '../utils/classNames';
 
 export const MenuItem = ({
@@ -29,7 +31,9 @@ export const MenuItem = ({
   error?: boolean;
   className?: string;
 }) => {
+  const { usePathname } = useDI();
   const pathname = usePathname();
+  console.log('pathname', pathname);
   const active = href && pathname.startsWith(href);
 
   return (

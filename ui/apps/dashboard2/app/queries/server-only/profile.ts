@@ -1,11 +1,11 @@
 import {
-  auth,
   clerkClient,
-  currentUser,
+  getAuth,
   type Organization,
   type OrganizationMembership,
   type User,
 } from '@clerk/tanstack-start/server';
+import { getWebRequest } from 'vinxi/http';
 
 import { graphql } from '@/gql';
 import { Marketplace } from '@/gql/graphql';
@@ -58,13 +58,15 @@ export const getProfileDisplay = async (): Promise<ProfileDisplayType> => {
 };
 
 export const getProfile = async (): Promise<ProfileType> => {
-  const user = await currentUser();
-
-  if (!user) {
+  const { orgId, userId } = await getAuth(getWebRequest());
+  if (!userId) {
     throw new Error('User is not logged in');
   }
 
-  const { orgId } = auth();
+  const user = await clerkClient({
+    secretKey: process.env.CLERK_SECRET_KEY,
+  }).users.getUser(userId);
+
   return { user, org: orgId ? await getOrg(orgId) : undefined };
 };
 
@@ -74,7 +76,9 @@ export const getOrg = async (organizationId: string): Promise<Organization | und
   }
 
   const orgs = (
-    await clerkClient().organizations.getOrganizationMembershipList({
+    await clerkClient({
+      secretKey: process.env.CLERK_SECRET_KEY,
+    }).organizations.getOrganizationMembershipList({
       organizationId,
     })
   ).data.map((o: OrganizationMembership) => o.organization);

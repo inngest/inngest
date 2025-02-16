@@ -5,7 +5,8 @@
     "module": "ESNext",
     "paths": {
       "@/*": ["./app/*"],
-      "@inngest/components/*": ["../../packages/components/src/*"]
+      "@inngest/components/*": ["../../packages/components/src/*"],
+      "next/navigation": ["./app/stubs/navigation"]
     },
     "target": "ES2022",
     "skipLibCheck": true,

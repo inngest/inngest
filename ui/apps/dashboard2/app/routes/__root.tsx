@@ -1,10 +1,13 @@
 import type { ReactNode } from 'react';
-import { AppRoot } from '@inngest/components/AppRoot';
-import { Link, Outlet, createRootRoute } from '@tanstack/react-router';
-import { Meta, Scripts } from '@tanstack/start';
+import { TooltipProvider } from '@inngest/components/Tooltip';
+import { DIContext } from '@inngest/components/contexts/di';
+import { HeadContent, Outlet, createRootRoute, useLocation } from '@tanstack/react-router';
+
+import appCss from './global.css?url';
 
 export const Route = createRootRoute({
   head: () => ({
+    links: [{ rel: 'stylesheet', href: appCss }],
     meta: [
       {
         charSet: 'utf-8',
@@ -18,10 +21,10 @@ export const Route = createRootRoute({
       },
     ],
   }),
-  component: RootComponent,
+  component: Component,
 });
 
-function RootComponent() {
+function Component() {
   return (
     <RootDocument>
       <Outlet />
@@ -30,20 +33,21 @@ function RootComponent() {
 }
 
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
-  // return (
-  //   <html>
-  //     <head>
-  //       <Meta />
-  //     </head>
-  //     <body>
-  //       <div>
-  //         <Link to="/">Home</Link>
-  //         <Link to="/env">Env</Link>
-  //       </div>
-  //       {children}
-  //       <Scripts />
-  //     </body>
-  //   </html>
-  // );
-  return <AppRoot>{children}</AppRoot>;
+  return (
+    <html>
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        <DIContext.Provider value={{ usePathname }}>
+          <TooltipProvider delayDuration={0}>{children}</TooltipProvider>
+        </DIContext.Provider>
+      </body>
+    </html>
+  );
+}
+
+function usePathname() {
+  const location = useLocation();
+  return location.pathname;
 }
