@@ -83,6 +83,7 @@ function AppPage({ id }: { id: string }) {
           />
         </AppDetailsCard>
         <div>
+          {/* @ts-ignore TEMP*/}
           <WorkersTable appID={id} getWorkers={getWorkers} getWorkerCount={getWorkerCount} />
         </div>
         <div>

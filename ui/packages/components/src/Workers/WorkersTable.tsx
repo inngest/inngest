@@ -7,9 +7,12 @@ import { Pill } from '@inngest/components/Pill/Pill';
 import {
   ConnectV1WorkerConnectionsOrderByDirection,
   ConnectV1WorkerConnectionsOrderByField,
+  convertGroupedWorkerStatusToWorkerStatuses,
   type ConnectV1WorkerConnectionsOrderBy,
+  type GroupedWorkerStatus,
   type PageInfo,
   type Worker,
+  type WorkerStatus,
 } from '@inngest/components/types/workers';
 import { transformLanguage } from '@inngest/components/utils/appsParser';
 import { RiArrowLeftSLine, RiArrowRightSLine } from '@remixicon/react';
@@ -17,6 +20,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { type Row, type SortingState } from '@tanstack/react-table';
 
 import CompactPaginatedTable from '../Table/CompactPaginatedTable';
+import WorkerStatusFilter from './WorkerStatusFilter';
 import { useColumns } from './columns';
 
 const columnToTimeField: Record<string, ConnectV1WorkerConnectionsOrderByField> = {
@@ -39,11 +43,13 @@ export function WorkersTable({
     orderBy,
     cursor,
     pageSize,
+    status,
   }: {
     appID: string;
     orderBy: ConnectV1WorkerConnectionsOrderBy[];
     cursor: string | null;
     pageSize: number;
+    status: WorkerStatus[];
   }) => Promise<{ workers: Worker[]; pageInfo: PageInfo }>;
 }) {
   const columns = useColumns();
@@ -60,10 +66,22 @@ export function WorkersTable({
       direction: ConnectV1WorkerConnectionsOrderByDirection.Asc,
     },
   ]);
-
+  const [filteredStatus, setFilteredStatus] = useState<WorkerStatus[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
+
+  const onStatusFilterChange = useCallback(
+    (value: GroupedWorkerStatus[]) => {
+      // Convert GroupedWorkerStatus[] to WorkerStatus[]
+      const workerStatuses = value.flatMap(convertGroupedWorkerStatusToWorkerStatuses);
+      setFilteredStatus(workerStatuses);
+      // Back to first page when we sort changes
+      setCursor(null);
+      setPage(1);
+    },
+    [setFilteredStatus]
+  );
 
   const {
     isPending, // first load, no data
@@ -71,14 +89,14 @@ export function WorkersTable({
     data: workerConnsData,
     isFetching, // refetching
   } = useQuery({
-    queryKey: ['worker-connections', { appID, orderBy, cursor, pageSize }],
+    queryKey: ['worker-connections', { appID, orderBy, cursor, pageSize, status: filteredStatus }],
     queryFn: useCallback(() => {
-      return getWorkers({ appID, orderBy, cursor, pageSize });
-    }, [getWorkers, appID, orderBy, cursor, pageSize]),
+      return getWorkers({ appID, orderBy, cursor, pageSize, status: filteredStatus });
+    }, [getWorkers, appID, orderBy, cursor, pageSize, filteredStatus]),
     placeholderData: keepPreviousData,
     refetchInterval: !cursor || page === 1 ? refreshInterval : 0,
   });
-
+  console.log(filteredStatus);
   const pageInfo = workerConnsData?.pageInfo;
 
   const { data: totalCount } = useQuery({
@@ -116,6 +134,12 @@ export function WorkersTable({
   return (
     <div>
       <h4 className="text-subtle mb-4 text-xl">Workers ({totalCount})</h4>
+      <div className="mb-4 flex items-center">
+        <WorkerStatusFilter
+          selectedStatuses={filteredStatus}
+          onStatusesChange={onStatusFilterChange}
+        />
+      </div>
       <CompactPaginatedTable
         columns={columns}
         data={workerConnsData?.workers || []}
