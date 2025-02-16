@@ -6,8 +6,6 @@ export default function WorkersSection({ appID }: { appID: string }) {
   const getWorkers = useWorkers();
   const getWorkerCount = useWorkersCount();
 
-  {
-    /* @ts-ignore TEMP*/
-  }
+  /* @ts-ignore TEMP*/
   return <WorkersTable appID={appID} getWorkers={getWorkers} getWorkerCount={getWorkerCount} />;
 }

@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
-import { convertWorkerStatus } from '@inngest/components/types/workers';
 import { getTimestampDaysAgo } from '@inngest/components/utils/date';
+import { convertWorkerStatus } from '@inngest/components/utils/workerParser';
 import { useClient } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';

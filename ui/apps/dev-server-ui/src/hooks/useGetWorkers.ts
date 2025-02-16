@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { convertWorkerStatus } from '@inngest/components/types/workers';
+import { convertWorkerStatus } from '@inngest/components/utils/workerParser';
 
 import { client } from '@/store/baseApi';
 import {

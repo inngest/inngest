@@ -1,11 +1,11 @@
-import StatusFilter from '../Filter/StatusFilter';
+import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import {
-  convertWorkerStatus,
   groupedWorkerStatuses,
   isWorkerStatus,
   type GroupedWorkerStatus,
   type WorkerStatus,
-} from '../types/workers';
+} from '@inngest/components/types/workers';
+import { convertWorkerStatus } from '@inngest/components/utils/workerParser';
 
 type Props = {
   selectedStatuses: WorkerStatus[];

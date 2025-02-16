@@ -7,7 +7,6 @@ import { Pill } from '@inngest/components/Pill/Pill';
 import {
   ConnectV1WorkerConnectionsOrderByDirection,
   ConnectV1WorkerConnectionsOrderByField,
-  convertGroupedWorkerStatusToWorkerStatuses,
   type ConnectV1WorkerConnectionsOrderBy,
   type GroupedWorkerStatus,
   type PageInfo,
@@ -15,6 +14,7 @@ import {
   type WorkerStatus,
 } from '@inngest/components/types/workers';
 import { transformLanguage } from '@inngest/components/utils/appsParser';
+import { convertGroupedWorkerStatusToWorkerStatuses } from '@inngest/components/utils/workerParser';
 import { RiArrowLeftSLine, RiArrowRightSLine } from '@remixicon/react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { type Row, type SortingState } from '@tanstack/react-table';
@@ -73,7 +73,6 @@ export function WorkersTable({
 
   const onStatusFilterChange = useCallback(
     (value: GroupedWorkerStatus[]) => {
-      // Convert GroupedWorkerStatus[] to WorkerStatus[]
       const workerStatuses = value.flatMap(convertGroupedWorkerStatusToWorkerStatuses);
       setFilteredStatus(workerStatuses);
       // Back to first page when we sort changes
@@ -96,7 +95,6 @@ export function WorkersTable({
     placeholderData: keepPreviousData,
     refetchInterval: !cursor || page === 1 ? refreshInterval : 0,
   });
-  console.log(filteredStatus);
   const pageInfo = workerConnsData?.pageInfo;
 
   const { data: totalCount } = useQuery({
