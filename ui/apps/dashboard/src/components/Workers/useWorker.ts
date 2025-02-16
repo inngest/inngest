@@ -59,6 +59,7 @@ const query = graphql(`
           startCursor
           endCursor
         }
+        totalCount
       }
     }
   }
@@ -113,6 +114,7 @@ export function useWorkers() {
       return {
         workers,
         pageInfo: workersData.pageInfo,
+        totalCount: workersData.totalCount,
       };
     },
     [client, envID]

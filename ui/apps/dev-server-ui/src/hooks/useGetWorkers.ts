@@ -45,6 +45,7 @@ export function useGetWorkers() {
     return {
       workers,
       pageInfo: workersData.pageInfo,
+      totalCount: workersData.totalCount,
     };
   }, []);
 }

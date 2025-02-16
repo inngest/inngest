@@ -50,7 +50,7 @@ export function WorkersTable({
     cursor: string | null;
     pageSize: number;
     status: WorkerStatus[];
-  }) => Promise<{ workers: Worker[]; pageInfo: PageInfo }>;
+  }) => Promise<{ workers: Worker[]; pageInfo: PageInfo; totalCount: number }>;
 }) {
   const columns = useColumns();
   const [sorting, setSorting] = useState<SortingState>([
@@ -148,7 +148,7 @@ export function WorkersTable({
         renderSubComponent={SubComponent}
         getRowCanExpand={() => true}
         footer={
-          (totalCount ?? 0) > pageSize ? (
+          (workerConnsData?.totalCount ?? 0) > pageSize ? (
             <div className="flex items-center justify-end gap-2 px-6 py-3">
               <Button
                 kind="secondary"
