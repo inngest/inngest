@@ -13,8 +13,8 @@ type Props = {
 };
 
 export default function WorkerStatusFilter({ selectedStatuses, onStatusesChange }: Props) {
-  // Convert selectedStatuses from WorkerStatus[] to GroupedWorkerStatus[]
-  const convertedStatuses = selectedStatuses.map(convertWorkerStatus);
+  // Convert selectedStatuses from WorkerStatus[] to unique GroupedWorkerStatus[]
+  const convertedStatuses = Array.from(new Set(selectedStatuses.map(convertWorkerStatus)));
 
   return (
     <StatusFilter
