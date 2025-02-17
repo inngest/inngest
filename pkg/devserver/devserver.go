@@ -457,7 +457,7 @@ func start(ctx context.Context, opts StartOpts) error {
 				lifecycles.NewHistoryLifecycle(dbcqrs),
 			}),
 	)
-	connRouter := connect.NewConnectMessageRouterService(connectionManager, gatewayProxy)
+	connRouter := connect.NewConnectMessageRouterService(connectionManager, gatewayProxy, conditionalTracer)
 
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev

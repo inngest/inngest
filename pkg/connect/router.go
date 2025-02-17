@@ -306,9 +306,10 @@ func (c *connectRouterSvc) Stop(ctx context.Context) error {
 	return nil
 }
 
-func NewConnectMessageRouterService(stateManager state.StateManager, receiver pubsub.RequestReceiver) *connectRouterSvc {
+func NewConnectMessageRouterService(stateManager state.StateManager, receiver pubsub.RequestReceiver, tracer trace.ConditionalTracer) *connectRouterSvc {
 	return &connectRouterSvc{
 		stateManager: stateManager,
 		receiver:     receiver,
+		tracer:       tracer,
 	}
 }
