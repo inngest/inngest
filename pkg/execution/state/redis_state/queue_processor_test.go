@@ -4,12 +4,13 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/enums"
 	mrand "math/rand"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
@@ -49,17 +50,17 @@ func TestQueueRunSequential(t *testing.T) {
 
 	// Run the queue.  After running this worker should claim the sequential lease.
 	go func() {
-		_ = q1.Run(q1ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (bool, error) {
+		_ = q1.Run(q1ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
 			time, ok := GetItemStart(ctx)
 			require.True(t, ok)
 			require.NotZero(t, time)
-			return false, nil
+			return osqueue.RunResult{}, nil
 		})
 	}()
 	go func() {
 		<-time.After(100 * time.Millisecond)
-		_ = q2.Run(q2ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (bool, error) {
-			return false, nil
+		_ = q2.Run(q2ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
+			return osqueue.RunResult{}, nil
 		})
 	}()
 
@@ -159,12 +160,12 @@ func TestQueueRunBasic(t *testing.T) {
 
 	var handled int32
 	go func() {
-		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (bool, error) {
+		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
 			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
 			atomic.AddInt32(&handled, 1)
 			id := osqueue.JobIDFromContext(ctx)
 			require.NotEmpty(t, id, "No job ID was passed via context")
-			return false, nil
+			return osqueue.RunResult{}, nil
 		})
 	}()
 
@@ -226,13 +227,13 @@ func TestQueueRunRetry(t *testing.T) {
 
 	var counter int32
 	go func() {
-		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (bool, error) {
+		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
 			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
 			atomic.AddInt32(&counter, 1)
 			if atomic.LoadInt32(&counter) == 1 {
-				return false, fmt.Errorf("retry this step once")
+				return osqueue.RunResult{}, fmt.Errorf("retry this step once")
 			}
-			return false, nil
+			return osqueue.RunResult{}, nil
 		})
 	}()
 
@@ -331,12 +332,12 @@ func TestQueueRunExtended(t *testing.T) {
 				)
 
 				go func() {
-					_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (bool, error) {
+					_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
 						// Wait up to N seconds to complete.
 						<-time.After(time.Duration(mrand.Int31n(atomic.LoadInt32(&jobCompleteMax))) * time.Millisecond)
 						// Increase handled when job is done.
 						atomic.AddInt64(&handled, 1)
-						return false, nil
+						return osqueue.RunResult{}, nil
 					})
 				}()
 
@@ -362,12 +363,12 @@ func TestQueueRunExtended(t *testing.T) {
 	}
 
 	go func() {
-		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (bool, error) {
+		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
 			// Wait up to N seconds to complete.
 			<-time.After(time.Duration(mrand.Int31n(atomic.LoadInt32(&jobCompleteMax))) * time.Millisecond)
 			// Increase handled when job is done.
 			atomic.AddInt64(&handled, 1)
-			return false, nil
+			return osqueue.RunResult{}, nil
 		})
 	}()
 
@@ -507,9 +508,9 @@ func TestRunPriorityFactor(t *testing.T) {
 
 	var handled int32
 	go func() {
-		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (bool, error) {
+		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
 			atomic.AddInt32(&handled, 1)
-			return false, nil
+			return osqueue.RunResult{}, nil
 		})
 	}()
 
@@ -565,7 +566,7 @@ func TestQueueAllowList(t *testing.T) {
 
 	var handledAllow, handledOther int32
 	go func() {
-		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) error {
+		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
 			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
 			if item.QueueName != nil && *item.QueueName == allowedQueueName {
 				atomic.AddInt32(&handledAllow, 1)
@@ -574,7 +575,7 @@ func TestQueueAllowList(t *testing.T) {
 			}
 			id := osqueue.JobIDFromContext(ctx)
 			require.NotEmpty(t, id, "No job ID was passed via context")
-			return nil
+			return osqueue.RunResult{}, nil
 		})
 	}()
 
@@ -679,7 +680,7 @@ func TestQueueDenyList(t *testing.T) {
 
 	var handledDeny, handledOther int32
 	go func() {
-		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) error {
+		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
 			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
 			if item.QueueName != nil && *item.QueueName == deniedQueueName {
 				atomic.AddInt32(&handledDeny, 1)
@@ -688,7 +689,7 @@ func TestQueueDenyList(t *testing.T) {
 			}
 			id := osqueue.JobIDFromContext(ctx)
 			require.NotEmpty(t, id, "No job ID was passed via context")
-			return nil
+			return osqueue.RunResult{}, nil
 		})
 	}()
 
@@ -835,12 +836,12 @@ func TestQueueRunAccount(t *testing.T) {
 
 	var handled int32
 	go func() {
-		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) error {
+		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
 			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
 			atomic.AddInt32(&handled, 1)
 			id := osqueue.JobIDFromContext(ctx)
 			require.NotEmpty(t, id, "No job ID was passed via context")
-			return nil
+			return osqueue.RunResult{}, nil
 		})
 	}()
 
@@ -908,7 +909,7 @@ func TestQueueRunGuaranteedCapacity(t *testing.T) {
 
 	var handledPrio, handledRegular int32
 	go func() {
-		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) error {
+		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
 			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
 			if item.Identifier.AccountID == priorityAccountId {
 				atomic.AddInt32(&handledPrio, 1)
@@ -917,7 +918,7 @@ func TestQueueRunGuaranteedCapacity(t *testing.T) {
 			}
 			id := osqueue.JobIDFromContext(ctx)
 			require.NotEmpty(t, id, "No job ID was passed via context")
-			return nil
+			return osqueue.RunResult{}, nil
 		})
 	}()
 
