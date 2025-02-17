@@ -77,6 +77,8 @@ func (h *connectHandler) connectInvoke(ctx context.Context, ws *websocket.Conn, 
 
 	ackPayload, err := proto.Marshal(&connectproto.WorkerRequestAckData{
 		RequestId:      body.RequestId,
+		AccountId:      body.AccountId,
+		EnvId:          body.EnvId,
 		AppId:          body.AppId,
 		FunctionSlug:   body.FunctionSlug,
 		StepId:         body.StepId,
@@ -160,6 +162,7 @@ func (h *connectHandler) connectInvoke(ctx context.Context, ws *websocket.Conn, 
 		h.logger.Error("error calling function", "error", err)
 		return &connectproto.SDKResponse{
 			RequestId:      body.RequestId,
+			AccountId:      body.AccountId,
 			EnvId:          body.EnvId,
 			AppId:          body.AppId,
 			Status:         connectproto.SDKResponseStatus_ERROR,
