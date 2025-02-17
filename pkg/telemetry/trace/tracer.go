@@ -232,7 +232,7 @@ func TracerSetup(svc string, ttype TracerType) (func(), error) {
 func newTracer(ctx context.Context, opts TracerOpts) (Tracer, error) {
 	switch opts.Type {
 	case TracerTypeOTLP:
-		return newOLTPGRPCTraceProvider(ctx, opts)
+		return newOTLPGRPCTraceProvider(ctx, opts)
 	case TracerTypeOTLPHTTP:
 		return newOTLPHTTPTraceProvider(ctx, opts)
 	case TracerTypeJaeger:
@@ -353,7 +353,7 @@ func newOTLPHTTPTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, err
 	}, nil
 }
 
-func newOLTPGRPCTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
+func newOTLPGRPCTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
 	endpoint := opts.Endpoint()
 	maxPayloadSize := opts.MaxPayloadSizeBytes()
 
