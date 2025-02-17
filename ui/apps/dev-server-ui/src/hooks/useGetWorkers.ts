@@ -1,8 +1,9 @@
 import { useCallback } from 'react';
-import { convertWorkerStatus } from '@inngest/components/types/workers';
+import { convertWorkerStatus } from '@inngest/components/utils/workerParser';
 
 import { client } from '@/store/baseApi';
 import {
+  ConnectV1ConnectionStatus,
   ConnectV1WorkerConnectionsOrderByField,
   GetWorkerConnectionsDocument,
   type ConnectV1WorkerConnectionsOrderBy,
@@ -14,16 +15,17 @@ type QueryVariables = {
   orderBy: ConnectV1WorkerConnectionsOrderBy[];
   cursor: string | null;
   pageSize: number;
+  status: ConnectV1ConnectionStatus[];
 };
 
 export function useGetWorkers() {
-  return useCallback(async ({ appID, orderBy, cursor, pageSize }: QueryVariables) => {
+  return useCallback(async ({ appID, orderBy, cursor, pageSize, status }: QueryVariables) => {
     const data: GetWorkerConnectionsQuery = await client.request(GetWorkerConnectionsDocument, {
       timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
       orderBy,
       startTime: null,
       appID: appID,
-      status: [],
+      status,
       cursor,
       first: pageSize,
     });
@@ -43,6 +45,7 @@ export function useGetWorkers() {
     return {
       workers,
       pageInfo: workersData.pageInfo,
+      totalCount: workersData.totalCount,
     };
   }, []);
 }

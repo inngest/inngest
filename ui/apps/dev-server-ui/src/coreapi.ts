@@ -494,6 +494,7 @@ export const GET_WORKER_CONNECTIONS = gql`
         startCursor
         endCursor
       }
+      totalCount
     }
   }
 `;

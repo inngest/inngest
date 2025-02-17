@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
-import { convertWorkerStatus } from '@inngest/components/types/workers';
 import { getTimestampDaysAgo } from '@inngest/components/utils/date';
+import { convertWorkerStatus } from '@inngest/components/utils/workerParser';
 import { useClient } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -59,6 +59,7 @@ const query = graphql(`
           startCursor
           endCursor
         }
+        totalCount
       }
     }
   }
@@ -69,13 +70,14 @@ type QueryVariables = {
   orderBy: ConnectV1WorkerConnectionsOrderBy[];
   cursor: string | null;
   pageSize: number;
+  status: ConnectV1ConnectionStatus[];
 };
 
 export function useWorkers() {
   const envID = useEnvironment().id;
   const client = useClient();
   return useCallback(
-    async ({ appID, orderBy, cursor, pageSize }: QueryVariables) => {
+    async ({ appID, orderBy, cursor, pageSize, status }: QueryVariables) => {
       const startTime = getTimestampDaysAgo({ currentDate: new Date(), days: 7 }).toISOString();
       const result = await client
         .query(
@@ -85,7 +87,7 @@ export function useWorkers() {
             orderBy,
             startTime,
             appID: appID,
-            status: [],
+            status,
             cursor,
             first: pageSize,
             envID,
@@ -112,6 +114,7 @@ export function useWorkers() {
       return {
         workers,
         pageInfo: workersData.pageInfo,
+        totalCount: workersData.totalCount,
       };
     },
     [client, envID]
