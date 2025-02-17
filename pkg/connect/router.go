@@ -2,6 +2,7 @@ package connect
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
@@ -9,9 +10,13 @@ import (
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
 	"gonum.org/v1/gonum/stat/sampleuv"
 	"log/slog"
 	"time"
@@ -63,13 +68,6 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 
 			log.Debug("router received msg")
 
-			err = c.receiver.AckMessage(ctx, appId, data.RequestId, pubsub.AckSourceRouter)
-			if err != nil {
-				log.Error("failed to ack message", "err", err)
-				// TODO Log error, retry?
-				return
-			}
-
 			// We need to add an idempotency key to ensure only one router instance processes the message
 			err = c.stateManager.SetRequestIdempotency(ctx, appId, data.RequestId)
 			if err != nil {
@@ -82,7 +80,27 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 				return
 			}
 
+			err = c.receiver.AckMessage(ctx, appId, data.RequestId, pubsub.AckSourceRouter)
+			if err != nil {
+				log.Error("failed to ack message", "err", err)
+				// TODO Log error, retry?
+				return
+			}
+
 			// Now we're guaranteed to be the exclusive connection processing this message!
+
+			{
+				systemTraceCtx := propagation.MapCarrier{}
+				if err := json.Unmarshal(data.SystemTraceCtx, &systemTraceCtx); err != nil {
+					log.Error("could not unmarshal system trace ctx", "err", err)
+
+					return
+				}
+
+				ctx = trace.SystemTracer().Propagator().Extract(ctx, systemTraceCtx)
+			}
+			ctx, span := trace.ConnectTracer().Start(ctx, "RouteExecutorRequest")
+			defer span.End()
 
 			routeTo, err := c.getSuitableConnection(ctx, envId, appId, data.FunctionSlug, log)
 			if err != nil {
@@ -111,6 +129,10 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 			}
 
 			log = log.With("gateway_id", routeTo.GatewayId, "conn_id", routeTo.Id, "group_hash", routeTo.GroupId)
+			span.SetAttributes(
+				attribute.String("route_to_gateway_id", gatewayId.String()),
+				attribute.String("route_to_conn_id", connId.String()),
+			)
 
 			// TODO What if something goes wrong inbetween setting idempotency (claiming exclusivity) and forwarding the req?
 			// We'll potentially lose data here
@@ -120,6 +142,8 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 			if err != nil {
 				// TODO Should we retry? Log error?
 				log.Error("failed to route request to gateway", "err", err)
+				span.RecordError(err)
+				span.SetStatus(codes.Error, " could not forward request to gateway")
 				return
 			}
 

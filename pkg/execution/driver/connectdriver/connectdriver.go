@@ -48,10 +48,11 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 	traceCtx := context.Background()
 
 	traceCtx, span := itrace.ConnectTracer().Start(traceCtx, "Execute")
-	span.SetAttributes(attribute.Bool("inngest.system", true))
 	defer span.End()
 
 	span.SetAttributes(
+		// Ensure OTel Collector ships this to Honeycomb
+		attribute.Bool("inngest.system", true),
 		attribute.String("account_id", s.ID.Tenant.AccountID.String()),
 		attribute.String("env_id", s.ID.Tenant.EnvID.String()),
 		attribute.String("app_id", s.ID.Tenant.AppID.String()),
