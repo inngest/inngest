@@ -63,10 +63,6 @@ message WorkerConnectRequestData {
 	google.protobuf.Timestamp started_at = 12;
 }
 
-message GatewaySyncRequestData {
-	optional string deploy_id = 1;
-}
-
 message GatewayExecutorRequestData {
 	string request_id = 1;
 	string account_id = 2;
@@ -81,11 +77,13 @@ message GatewayExecutorRequestData {
 
 message WorkerRequestAckData {
 	string request_id = 1;
-	string app_id = 2;
-	string function_slug = 3;
-	optional string step_id = 4;
-	bytes system_trace_ctx = 5;
-	bytes user_trace_ctx = 6;
+	string account_id = 2;
+	string env_id = 3;
+	string app_id = 4;
+	string function_slug = 5;
+	optional string step_id = 6;
+	bytes system_trace_ctx = 7;
+	bytes user_trace_ctx = 8;
 }
 
 enum SDKResponseStatus {
