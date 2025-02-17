@@ -31,7 +31,7 @@ func NewWriter(ctx context.Context, opts WriterOptions) history.Driver {
 	l := log.From(ctx).With().Str("caller", "memory_writer").Logger()
 
 	// read data from file and populate memory_store.Singleton
-	file, err := os.ReadFile(fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerHistoryFile))
+	file, err := os.ReadFile(fmt.Sprintf("%s/%s", consts.DefaultInngestConfigDir, consts.DevServerHistoryFile))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return w
@@ -71,7 +71,7 @@ func (w *writer) Close(ctx context.Context) error {
 		return err
 	}
 
-	err = os.WriteFile(fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerHistoryFile), b, 0600)
+	err = os.WriteFile(fmt.Sprintf("%s/%s", consts.DefaultInngestConfigDir, consts.DevServerHistoryFile), b, 0600)
 	if err != nil {
 		l.Error().Err(err).Msg("error writing history data to file")
 		return err

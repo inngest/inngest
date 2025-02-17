@@ -9,10 +9,11 @@ type Mutation {
   invokeFunction(
     data: Map
     functionSlug: String!
+    user: Map
   ): Boolean
 
   cancelRun(runID: ULID!): FunctionRun!
-  rerun(runID: ULID!): ULID!
+  rerun(runID: ULID!, fromStep: RerunFromStepInput): ULID!
 }
 
 input CreateAppInput {
@@ -22,4 +23,9 @@ input CreateAppInput {
 input UpdateAppInput {
   id: String!
   url: String!
+}
+
+input RerunFromStepInput {
+  stepID: String!
+  input: Bytes
 }

@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -18,9 +19,10 @@ import (
 type SkipState struct {
 	// Reason represents the reason the function was skipped.
 	Reason enums.SkipReason
-
 	// CronSchedule, if present, is the cron schedule string that triggered the skipped function.
 	CronSchedule *string
+	// Events are the list of events being used when attempted to trigger a run
+	Events []json.RawMessage
 }
 
 var _ LifecycleListener = (*NoopLifecyceListener)(nil)
@@ -108,6 +110,20 @@ type LifecycleListener interface {
 		inngest.Edge,
 		*statev1.DriverResponse,
 		error,
+	)
+
+	// OnGatewayRequestFinished is called when a step's offloaded request finishes.
+	// The offloaded request may be a success or error; it does not matter.
+	OnStepGatewayRequestFinished(
+		context.Context,
+		statev2.Metadata,
+		queue.Item,
+		inngest.Edge,
+		// Opcode is the opcode for the offloaded request.
+		statev1.GeneratorOpcode,
+		// Resp is the HTTP response
+		*http.Response,
+		*state.UserError,
 	)
 
 	// OnWaitForEvent is called when a wait for event step is scheduled.  The
@@ -255,6 +271,19 @@ func (NoopLifecyceListener) OnStepFinished(
 	inngest.Edge,
 	*statev1.DriverResponse,
 	error,
+) {
+}
+
+func (NoopLifecyceListener) OnStepGatewayRequestFinished(
+	context.Context,
+	statev2.Metadata,
+	queue.Item,
+	inngest.Edge,
+	// Opcode is the opcode for the offloaded request.
+	statev1.GeneratorOpcode,
+	// Resp is the HTTP response
+	*http.Response,
+	*state.UserError,
 ) {
 }
 

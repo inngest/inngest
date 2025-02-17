@@ -2,10 +2,12 @@
 
 import { useState } from 'react';
 import { type Route } from 'next';
-import Link from 'next/link';
+import NextLink from 'next/link';
 import { usePathname, useRouter, useSelectedLayoutSegments } from 'next/navigation';
 import { Listbox } from '@headlessui/react';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
+import { cn } from '@inngest/components/utils/classNames';
 import {
   RiCloudFill,
   RiCloudLine,
@@ -15,16 +17,13 @@ import {
 } from '@remixicon/react';
 
 import { useEnvironments } from '@/queries';
-import cn from '@/utils/cn';
 import {
   EnvironmentType,
   getDefaultEnvironment,
-  getLegacyTestMode,
   getSortedBranchEnvironments,
   getTestEnvironments,
   type Environment,
 } from '@/utils/environments';
-import { OptionalTooltip } from './OptionalTooltip';
 
 // Some URLs cannot just swap between environments,
 // we need to redirect to a less specific resource URL that is shared across environments
@@ -39,6 +38,10 @@ const useSwitchablePathname = (): string => {
   // Accounts are not environment specific
   if (pathname.match(/^\/settings\//)) {
     return '/functions';
+  }
+
+  if (pathname.match(/^\/billing\/.+$/)) {
+    return '/apps';
   }
 
   // Deploys should always move to the root resource level
@@ -137,7 +140,6 @@ export default function EnvironmentSelectMenu({
 
   const defaultEnvironment = getDefaultEnvironment(envs);
   const includeArchived = false;
-  const legacyTestMode = getLegacyTestMode(envs, includeArchived);
   const mostRecentlyCreatedBranchEnvironments = getSortedBranchEnvironments(
     envs,
     includeArchived
@@ -172,7 +174,7 @@ export default function EnvironmentSelectMenu({
               >
                 <SelectedDisplay selected={selected} collapsed={collapsed} />
                 {!collapsed && (
-                  <RiExpandUpDownLine className="text-subtle h-4 w-4" aria-hidden="true" />
+                  <RiExpandUpDownLine className="text-muted h-4 w-4" aria-hidden="true" />
                 )}
               </div>
             </Listbox.Button>
@@ -180,12 +182,6 @@ export default function EnvironmentSelectMenu({
 
           <Listbox.Options className="bg-canvasBase border-subtle overflow-y-truncate absolute top-10 z-50 w-[188px] divide-none rounded border shadow focus:outline-none">
             {defaultEnvironment !== null && <EnvironmentItem environment={defaultEnvironment} />}
-
-            {legacyTestMode !== null && (
-              <div>
-                <EnvironmentItem environment={legacyTestMode} name="Test mode" />
-              </div>
-            )}
 
             {testEnvironments.length > 0 &&
               testEnvironments.map((env) => <EnvironmentItem key={env.id} environment={env} />)}
@@ -199,25 +195,25 @@ export default function EnvironmentSelectMenu({
                   <EnvironmentItem key={env.id} environment={env} variant="compact" />
                 ))
               ) : (
-                <Link
+                <NextLink
                   href="/env"
-                  className="bg-canvasBase hover:bg-canvasSubtle text-muted flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal"
+                  className="bg-canvasBase hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal"
                 >
                   <RiLoopLeftLine className="h-3 w-3" />
                   Sync a branch
-                </Link>
+                </NextLink>
               )}
             </div>
 
             <div>
-              <Link
+              <NextLink
                 prefetch={true}
                 href="/env"
-                className="hover:bg-canvasSubtle text-muted flex h-10 cursor-pointer items-center gap-2 whitespace-nowrap px-3 text-[13px] font-normal"
+                className="hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-2 whitespace-nowrap px-3 text-[13px] font-normal"
               >
                 <RiCloudFill className="h-3 w-3" />
                 View All Environments
-              </Link>
+              </NextLink>
             </div>
           </Listbox.Options>
         </div>
@@ -237,9 +233,9 @@ function EnvironmentItem({
 }) {
   let statusColorClass: string;
   if (environment.isArchived) {
-    statusColorClass = 'bg-slate-300';
+    statusColorClass = 'bg-surfaceMuted';
   } else {
-    statusColorClass = 'bg-teal-500';
+    statusColorClass = 'bg-primary-moderate';
   }
 
   return (
@@ -247,7 +243,7 @@ function EnvironmentItem({
       key={environment.id}
       value={environment}
       className={cn(
-        'bg-canvasBase hover:bg-canvasSubtle text-muted flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal',
+        'bg-canvasBase hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal',
         variant === 'compact' && 'py-2'
       )}
     >

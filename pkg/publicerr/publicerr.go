@@ -81,6 +81,7 @@ func Errorf(status int, message string, opts ...interface{}) error {
 // in `gql.go` we create an ErrorPresenter middleware item which checks to see if the error
 // is a publicerr.Error and, if so, shows the friendly error directly.
 type Error struct {
+	Code string `json:"code,omitempty"`
 	// Message represents the message to display
 	Message string `json:"error"`
 	// Data is a KV map of extra error data.
@@ -112,4 +113,18 @@ func (e Error) Error() string {
 // manage the original error, or to chain public errors.
 func (e Error) Unwrap() error {
 	return e.Err
+}
+
+// HTTPErr returns a simple public Error with the given HTTP error code. The message
+// is the standard library's text for that code.
+func HTTPErr(status int) Error {
+	m := http.StatusText(status)
+	if m == "" {
+		m = http.StatusText(http.StatusInternalServerError)
+	}
+
+	return Error{
+		Message: m,
+		Status:  status,
+	}
 }

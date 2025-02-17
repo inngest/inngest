@@ -67,7 +67,7 @@ export function ArchiveModal({ appID, isArchived, isOpen, onClose }: Props) {
         {!isArchived && (
           <>
             <li>New function runs will not trigger.</li>
-            <li>Existing function runs will continue until completion.</li>
+            <li>Existing function runs will be cancelled.</li>
             <li>Functions will still be visible, including their run history.</li>
             <li>You may unarchive at any time.</li>
           </>

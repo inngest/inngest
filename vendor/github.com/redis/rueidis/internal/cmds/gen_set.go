@@ -4,7 +4,7 @@ package cmds
 
 import "strconv"
 
-type Sadd Completed
+type Sadd Incomplete
 
 func (b Builder) Sadd() (c Sadd) {
 	c = Sadd{cs: get(), ks: b.ks}
@@ -22,14 +22,14 @@ func (c Sadd) Key(key string) SaddKey {
 	return (SaddKey)(c)
 }
 
-type SaddKey Completed
+type SaddKey Incomplete
 
 func (c SaddKey) Member(member ...string) SaddMember {
 	c.cs.s = append(c.cs.s, member...)
 	return (SaddMember)(c)
 }
 
-type SaddMember Completed
+type SaddMember Incomplete
 
 func (c SaddMember) Member(member ...string) SaddMember {
 	c.cs.s = append(c.cs.s, member...)
@@ -38,13 +38,13 @@ func (c SaddMember) Member(member ...string) SaddMember {
 
 func (c SaddMember) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Scard Completed
+type Scard Incomplete
 
 func (b Builder) Scard() (c Scard) {
-	c = Scard{cs: get(), ks: b.ks, cf: readonly}
+	c = Scard{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "SCARD")
 	return c
 }
@@ -59,22 +59,22 @@ func (c Scard) Key(key string) ScardKey {
 	return (ScardKey)(c)
 }
 
-type ScardKey Completed
+type ScardKey Incomplete
 
 func (c ScardKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c ScardKey) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Sdiff Completed
+type Sdiff Incomplete
 
 func (b Builder) Sdiff() (c Sdiff) {
-	c = Sdiff{cs: get(), ks: b.ks, cf: readonly}
+	c = Sdiff{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "SDIFF")
 	return c
 }
@@ -94,7 +94,7 @@ func (c Sdiff) Key(key ...string) SdiffKey {
 	return (SdiffKey)(c)
 }
 
-type SdiffKey Completed
+type SdiffKey Incomplete
 
 func (c SdiffKey) Key(key ...string) SdiffKey {
 	if c.ks&NoSlot == NoSlot {
@@ -113,10 +113,10 @@ func (c SdiffKey) Key(key ...string) SdiffKey {
 
 func (c SdiffKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Sdiffstore Completed
+type Sdiffstore Incomplete
 
 func (b Builder) Sdiffstore() (c Sdiffstore) {
 	c = Sdiffstore{cs: get(), ks: b.ks}
@@ -134,7 +134,7 @@ func (c Sdiffstore) Destination(destination string) SdiffstoreDestination {
 	return (SdiffstoreDestination)(c)
 }
 
-type SdiffstoreDestination Completed
+type SdiffstoreDestination Incomplete
 
 func (c SdiffstoreDestination) Key(key ...string) SdiffstoreKey {
 	if c.ks&NoSlot == NoSlot {
@@ -151,7 +151,7 @@ func (c SdiffstoreDestination) Key(key ...string) SdiffstoreKey {
 	return (SdiffstoreKey)(c)
 }
 
-type SdiffstoreKey Completed
+type SdiffstoreKey Incomplete
 
 func (c SdiffstoreKey) Key(key ...string) SdiffstoreKey {
 	if c.ks&NoSlot == NoSlot {
@@ -170,13 +170,13 @@ func (c SdiffstoreKey) Key(key ...string) SdiffstoreKey {
 
 func (c SdiffstoreKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Sinter Completed
+type Sinter Incomplete
 
 func (b Builder) Sinter() (c Sinter) {
-	c = Sinter{cs: get(), ks: b.ks, cf: readonly}
+	c = Sinter{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "SINTER")
 	return c
 }
@@ -196,7 +196,7 @@ func (c Sinter) Key(key ...string) SinterKey {
 	return (SinterKey)(c)
 }
 
-type SinterKey Completed
+type SinterKey Incomplete
 
 func (c SinterKey) Key(key ...string) SinterKey {
 	if c.ks&NoSlot == NoSlot {
@@ -215,13 +215,13 @@ func (c SinterKey) Key(key ...string) SinterKey {
 
 func (c SinterKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Sintercard Completed
+type Sintercard Incomplete
 
 func (b Builder) Sintercard() (c Sintercard) {
-	c = Sintercard{cs: get(), ks: b.ks, cf: readonly}
+	c = Sintercard{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "SINTERCARD")
 	return c
 }
@@ -231,7 +231,7 @@ func (c Sintercard) Numkeys(numkeys int64) SintercardNumkeys {
 	return (SintercardNumkeys)(c)
 }
 
-type SintercardKey Completed
+type SintercardKey Incomplete
 
 func (c SintercardKey) Key(key ...string) SintercardKey {
 	if c.ks&NoSlot == NoSlot {
@@ -255,17 +255,17 @@ func (c SintercardKey) Limit(limit int64) SintercardLimit {
 
 func (c SintercardKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SintercardLimit Completed
+type SintercardLimit Incomplete
 
 func (c SintercardLimit) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SintercardNumkeys Completed
+type SintercardNumkeys Incomplete
 
 func (c SintercardNumkeys) Key(key ...string) SintercardKey {
 	if c.ks&NoSlot == NoSlot {
@@ -282,7 +282,7 @@ func (c SintercardNumkeys) Key(key ...string) SintercardKey {
 	return (SintercardKey)(c)
 }
 
-type Sinterstore Completed
+type Sinterstore Incomplete
 
 func (b Builder) Sinterstore() (c Sinterstore) {
 	c = Sinterstore{cs: get(), ks: b.ks}
@@ -300,7 +300,7 @@ func (c Sinterstore) Destination(destination string) SinterstoreDestination {
 	return (SinterstoreDestination)(c)
 }
 
-type SinterstoreDestination Completed
+type SinterstoreDestination Incomplete
 
 func (c SinterstoreDestination) Key(key ...string) SinterstoreKey {
 	if c.ks&NoSlot == NoSlot {
@@ -317,7 +317,7 @@ func (c SinterstoreDestination) Key(key ...string) SinterstoreKey {
 	return (SinterstoreKey)(c)
 }
 
-type SinterstoreKey Completed
+type SinterstoreKey Incomplete
 
 func (c SinterstoreKey) Key(key ...string) SinterstoreKey {
 	if c.ks&NoSlot == NoSlot {
@@ -336,13 +336,13 @@ func (c SinterstoreKey) Key(key ...string) SinterstoreKey {
 
 func (c SinterstoreKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Sismember Completed
+type Sismember Incomplete
 
 func (b Builder) Sismember() (c Sismember) {
-	c = Sismember{cs: get(), ks: b.ks, cf: readonly}
+	c = Sismember{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "SISMEMBER")
 	return c
 }
@@ -357,29 +357,29 @@ func (c Sismember) Key(key string) SismemberKey {
 	return (SismemberKey)(c)
 }
 
-type SismemberKey Completed
+type SismemberKey Incomplete
 
 func (c SismemberKey) Member(member string) SismemberMember {
 	c.cs.s = append(c.cs.s, member)
 	return (SismemberMember)(c)
 }
 
-type SismemberMember Completed
+type SismemberMember Incomplete
 
 func (c SismemberMember) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c SismemberMember) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Smembers Completed
+type Smembers Incomplete
 
 func (b Builder) Smembers() (c Smembers) {
-	c = Smembers{cs: get(), ks: b.ks, cf: readonly}
+	c = Smembers{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "SMEMBERS")
 	return c
 }
@@ -394,22 +394,22 @@ func (c Smembers) Key(key string) SmembersKey {
 	return (SmembersKey)(c)
 }
 
-type SmembersKey Completed
+type SmembersKey Incomplete
 
 func (c SmembersKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c SmembersKey) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Smismember Completed
+type Smismember Incomplete
 
 func (b Builder) Smismember() (c Smismember) {
-	c = Smismember{cs: get(), ks: b.ks, cf: readonly}
+	c = Smismember{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "SMISMEMBER")
 	return c
 }
@@ -424,14 +424,14 @@ func (c Smismember) Key(key string) SmismemberKey {
 	return (SmismemberKey)(c)
 }
 
-type SmismemberKey Completed
+type SmismemberKey Incomplete
 
 func (c SmismemberKey) Member(member ...string) SmismemberMember {
 	c.cs.s = append(c.cs.s, member...)
 	return (SmismemberMember)(c)
 }
 
-type SmismemberMember Completed
+type SmismemberMember Incomplete
 
 func (c SmismemberMember) Member(member ...string) SmismemberMember {
 	c.cs.s = append(c.cs.s, member...)
@@ -440,15 +440,15 @@ func (c SmismemberMember) Member(member ...string) SmismemberMember {
 
 func (c SmismemberMember) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 func (c SmismemberMember) Cache() Cacheable {
 	c.cs.Build()
-	return Cacheable(c)
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Smove Completed
+type Smove Incomplete
 
 func (b Builder) Smove() (c Smove) {
 	c = Smove{cs: get(), ks: b.ks}
@@ -466,21 +466,21 @@ func (c Smove) Source(source string) SmoveSource {
 	return (SmoveSource)(c)
 }
 
-type SmoveDestination Completed
+type SmoveDestination Incomplete
 
 func (c SmoveDestination) Member(member string) SmoveMember {
 	c.cs.s = append(c.cs.s, member)
 	return (SmoveMember)(c)
 }
 
-type SmoveMember Completed
+type SmoveMember Incomplete
 
 func (c SmoveMember) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SmoveSource Completed
+type SmoveSource Incomplete
 
 func (c SmoveSource) Destination(destination string) SmoveDestination {
 	if c.ks&NoSlot == NoSlot {
@@ -492,7 +492,7 @@ func (c SmoveSource) Destination(destination string) SmoveDestination {
 	return (SmoveDestination)(c)
 }
 
-type Spop Completed
+type Spop Incomplete
 
 func (b Builder) Spop() (c Spop) {
 	c = Spop{cs: get(), ks: b.ks}
@@ -510,14 +510,14 @@ func (c Spop) Key(key string) SpopKey {
 	return (SpopKey)(c)
 }
 
-type SpopCount Completed
+type SpopCount Incomplete
 
 func (c SpopCount) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SpopKey Completed
+type SpopKey Incomplete
 
 func (c SpopKey) Count(count int64) SpopCount {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(count, 10))
@@ -526,13 +526,13 @@ func (c SpopKey) Count(count int64) SpopCount {
 
 func (c SpopKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Srandmember Completed
+type Srandmember Incomplete
 
 func (b Builder) Srandmember() (c Srandmember) {
-	c = Srandmember{cs: get(), ks: b.ks, cf: readonly}
+	c = Srandmember{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "SRANDMEMBER")
 	return c
 }
@@ -547,14 +547,14 @@ func (c Srandmember) Key(key string) SrandmemberKey {
 	return (SrandmemberKey)(c)
 }
 
-type SrandmemberCount Completed
+type SrandmemberCount Incomplete
 
 func (c SrandmemberCount) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SrandmemberKey Completed
+type SrandmemberKey Incomplete
 
 func (c SrandmemberKey) Count(count int64) SrandmemberCount {
 	c.cs.s = append(c.cs.s, strconv.FormatInt(count, 10))
@@ -563,10 +563,10 @@ func (c SrandmemberKey) Count(count int64) SrandmemberCount {
 
 func (c SrandmemberKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Srem Completed
+type Srem Incomplete
 
 func (b Builder) Srem() (c Srem) {
 	c = Srem{cs: get(), ks: b.ks}
@@ -584,14 +584,14 @@ func (c Srem) Key(key string) SremKey {
 	return (SremKey)(c)
 }
 
-type SremKey Completed
+type SremKey Incomplete
 
 func (c SremKey) Member(member ...string) SremMember {
 	c.cs.s = append(c.cs.s, member...)
 	return (SremMember)(c)
 }
 
-type SremMember Completed
+type SremMember Incomplete
 
 func (c SremMember) Member(member ...string) SremMember {
 	c.cs.s = append(c.cs.s, member...)
@@ -600,13 +600,13 @@ func (c SremMember) Member(member ...string) SremMember {
 
 func (c SremMember) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Sscan Completed
+type Sscan Incomplete
 
 func (b Builder) Sscan() (c Sscan) {
-	c = Sscan{cs: get(), ks: b.ks, cf: readonly}
+	c = Sscan{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "SSCAN")
 	return c
 }
@@ -621,14 +621,14 @@ func (c Sscan) Key(key string) SscanKey {
 	return (SscanKey)(c)
 }
 
-type SscanCount Completed
+type SscanCount Incomplete
 
 func (c SscanCount) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SscanCursor Completed
+type SscanCursor Incomplete
 
 func (c SscanCursor) Match(pattern string) SscanMatch {
 	c.cs.s = append(c.cs.s, "MATCH", pattern)
@@ -642,17 +642,17 @@ func (c SscanCursor) Count(count int64) SscanCount {
 
 func (c SscanCursor) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type SscanKey Completed
+type SscanKey Incomplete
 
 func (c SscanKey) Cursor(cursor uint64) SscanCursor {
 	c.cs.s = append(c.cs.s, strconv.FormatUint(cursor, 10))
 	return (SscanCursor)(c)
 }
 
-type SscanMatch Completed
+type SscanMatch Incomplete
 
 func (c SscanMatch) Count(count int64) SscanCount {
 	c.cs.s = append(c.cs.s, "COUNT", strconv.FormatInt(count, 10))
@@ -661,13 +661,13 @@ func (c SscanMatch) Count(count int64) SscanCount {
 
 func (c SscanMatch) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Sunion Completed
+type Sunion Incomplete
 
 func (b Builder) Sunion() (c Sunion) {
-	c = Sunion{cs: get(), ks: b.ks, cf: readonly}
+	c = Sunion{cs: get(), ks: b.ks, cf: int16(readonly)}
 	c.cs.s = append(c.cs.s, "SUNION")
 	return c
 }
@@ -687,7 +687,7 @@ func (c Sunion) Key(key ...string) SunionKey {
 	return (SunionKey)(c)
 }
 
-type SunionKey Completed
+type SunionKey Incomplete
 
 func (c SunionKey) Key(key ...string) SunionKey {
 	if c.ks&NoSlot == NoSlot {
@@ -706,10 +706,10 @@ func (c SunionKey) Key(key ...string) SunionKey {
 
 func (c SunionKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type Sunionstore Completed
+type Sunionstore Incomplete
 
 func (b Builder) Sunionstore() (c Sunionstore) {
 	c = Sunionstore{cs: get(), ks: b.ks}
@@ -727,7 +727,7 @@ func (c Sunionstore) Destination(destination string) SunionstoreDestination {
 	return (SunionstoreDestination)(c)
 }
 
-type SunionstoreDestination Completed
+type SunionstoreDestination Incomplete
 
 func (c SunionstoreDestination) Key(key ...string) SunionstoreKey {
 	if c.ks&NoSlot == NoSlot {
@@ -744,7 +744,7 @@ func (c SunionstoreDestination) Key(key ...string) SunionstoreKey {
 	return (SunionstoreKey)(c)
 }
 
-type SunionstoreKey Completed
+type SunionstoreKey Incomplete
 
 func (c SunionstoreKey) Key(key ...string) SunionstoreKey {
 	if c.ks&NoSlot == NoSlot {
@@ -763,5 +763,5 @@ func (c SunionstoreKey) Key(key ...string) SunionstoreKey {
 
 func (c SunionstoreKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }

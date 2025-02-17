@@ -10,6 +10,7 @@ const (
 	mtGetTag = uint16(1<<11) | readonly // make mtGetTag can also be retried
 	scrRoTag = uint16(1<<10) | readonly // make scrRoTag can also be retried
 	// InitSlot indicates that the command be sent to any redis node in cluster
+	// When SendToReplicas is set, InitSlot command will be sent to primary node
 	InitSlot = uint16(1 << 14)
 	// NoSlot indicates that the command has no key slot specified
 	NoSlot = uint16(1 << 15)
@@ -33,10 +34,7 @@ var (
 	RoleCmd = Completed{
 		cs: newCommandSlice([]string{"ROLE"}),
 	}
-	// QuitCmd is predefined QUIT
-	QuitCmd = Completed{
-		cs: newCommandSlice([]string{"QUIT"}),
-	}
+
 	// UnsubscribeCmd is predefined UNSUBSCRIBE
 	UnsubscribeCmd = Completed{
 		cs: newCommandSlice([]string{"UNSUBSCRIBE"}),
@@ -60,6 +58,10 @@ var (
 	SlotCmd = Completed{
 		cs: newCommandSlice([]string{"CLUSTER", "SLOTS"}),
 	}
+	// ShardsCmd is predefined CLUSTER SHARDS
+	ShardsCmd = Completed{
+		cs: newCommandSlice([]string{"CLUSTER", "SHARDS"}),
+	}
 	// AskingCmd is predefined CLUSTER ASKING
 	AskingCmd = Completed{
 		cs: newCommandSlice([]string{"ASKING"}),
@@ -74,6 +76,11 @@ var (
 		cs: newCommandSlice([]string{"UNSUBSCRIBE", "+sentinel", "+slave", "-sdown", "+sdown", "+switch-master", "+reboot"}),
 		cf: noRetTag,
 	}
+
+	// DiscardCmd is predefined DISCARD
+	DiscardCmd = Completed{
+		cs: newCommandSlice([]string{"DISCARD"}),
+	}
 )
 
 // ToBlock marks the command with blockTag
@@ -81,11 +88,18 @@ func ToBlock(c *Completed) {
 	c.cf |= blockTag
 }
 
+// Incomplete represents an incomplete Redis command. It should then be completed by calling the Build().
+type Incomplete struct {
+	cs *CommandSlice
+	cf int16 // use int16 instead of uint16 to make a difference with Completed
+	ks uint16
+}
+
 // Completed represents a completed Redis command, should be created by the Build() of command builder.
 type Completed struct {
 	cs *CommandSlice
-	cf uint16
-	ks uint16
+	cf uint16 // cmd flag
+	ks uint16 // key slot
 }
 
 // Pin prevents a Completed to be recycled
@@ -134,6 +148,16 @@ func (c *Completed) Commands() []string {
 // Slot returns the command key slot
 func (c *Completed) Slot() uint16 {
 	return c.ks
+}
+
+// SetSlot returns a new completed command with its key slot be overridden
+func (c Completed) SetSlot(key string) Completed {
+	if c.ks&NoSlot == NoSlot {
+		c.ks = NoSlot | slot(key)
+	} else {
+		c.ks = slot(key)
+	}
+	return c
 }
 
 // Cacheable represents a completed Redis command which supports server-assisted client side caching,

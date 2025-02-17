@@ -13,7 +13,7 @@ import { IconWrapText } from '@inngest/components/icons/WrapText';
 import { cn } from '@inngest/components/utils/classNames';
 import { FONT, LINE_HEIGHT, createColors, createRules } from '@inngest/components/utils/monaco';
 import Editor, { useMonaco } from '@monaco-editor/react';
-import { RiDownload2Line } from '@remixicon/react';
+import { RiCollapseDiagonalLine, RiDownload2Line, RiExpandDiagonalLine } from '@remixicon/react';
 import { type editor } from 'monaco-editor';
 import { useLocalStorage } from 'react-use';
 
@@ -46,11 +46,21 @@ interface CodeBlockProps {
   };
   actions?: CodeBlockAction[];
   minLines?: number;
+  allowFullScreen?: boolean;
+  resize?: boolean;
 }
 
-export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlockProps) {
+export function CodeBlock({
+  header,
+  tab,
+  actions = [],
+  minLines = 0,
+  allowFullScreen = false,
+  resize = false,
+}: CodeBlockProps) {
   const [dark, setDark] = useState(isDark());
   const [editorHeight, setEditorHeight] = useState(0);
+  const [fullScreen, setFullScreen] = useState(false);
   const editorRef = useRef<MonacoEditorType>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -86,7 +96,7 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
     if (editorRef.current) {
       updateEditorLayout(editorRef.current);
     }
-  }, [isWordWrap, isFullHeight]);
+  }, [isWordWrap, isFullHeight, fullScreen, resize]);
 
   function getTextWidth(text: string, font: string) {
     const canvas = document.createElement('canvas');
@@ -98,6 +108,10 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
     } else {
       return text.length;
     }
+  }
+
+  function handleEditorDidMount(editor: MonacoEditorType) {
+    editorRef.current = editor;
   }
 
   function updateEditorLayout(editor: MonacoEditorType) {
@@ -233,12 +247,8 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
   return (
     <>
       {monaco && (
-        <>
-          <div
-            className={cn(
-              'border-b-subtle bg-canvasBase border-b dark:border-slate-700/20  dark:shadow'
-            )}
-          >
+        <div className={cn('relative', fullScreen && 'bg-canvasBase fixed inset-0 z-50')}>
+          <div className={cn('bg-canvasBase border-subtle border-b')}>
             <div
               className={cn(
                 'flex items-center justify-between border-l-4 border-l-transparent',
@@ -248,7 +258,7 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
             >
               <p
                 className={cn(
-                  header?.status === 'error' ? 'text-status-failedText' : 'text-muted',
+                  header?.status === 'error' ? 'text-status-failedText' : 'text-subtle',
                   ' px-5 py-2.5 text-sm',
                   'max-h-24 text-ellipsis break-words' // Handle long titles
                 )}
@@ -261,13 +271,14 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
                     <Button
                       key={idx}
                       icon={icon}
-                      btnAction={onClick}
+                      onClick={onClick}
                       size="small"
                       aria-label={label}
                       title={title ?? label}
                       label={label}
                       disabled={disabled}
                       appearance="outlined"
+                      kind="secondary"
                     />
                   ))}
                   <CopyButton
@@ -279,28 +290,41 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
                   />
                   <Button
                     icon={isWordWrap ? <IconOverflowText /> : <IconWrapText />}
-                    btnAction={handleWrapText}
+                    onClick={handleWrapText}
                     size="small"
                     aria-label={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
                     title={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
                     tooltip={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
                     appearance="outlined"
+                    kind="secondary"
                   />
                   <Button
-                    btnAction={handleFullHeight}
+                    onClick={handleFullHeight}
                     size="small"
                     icon={isFullHeight ? <IconShrinkText /> : <IconExpandText />}
                     aria-label={isFullHeight ? 'Shrink text' : 'Expand text'}
                     title={isFullHeight ? 'Shrink text' : 'Expand text'}
                     tooltip={isFullHeight ? 'Shrink text' : 'Expand text'}
                     appearance="outlined"
+                    kind="secondary"
                   />
+                  {allowFullScreen && (
+                    <Button
+                      onClick={() => setFullScreen(!fullScreen)}
+                      size="small"
+                      icon={fullScreen ? <RiCollapseDiagonalLine /> : <RiExpandDiagonalLine />}
+                      aria-label="Full screen"
+                      title="Full screen"
+                      tooltip="Full screen"
+                      appearance="outlined"
+                      kind="secondary"
+                    />
+                  )}
                 </div>
               )}
             </div>
           </div>
-          {/* Content */}
-          <div ref={wrapperRef}>
+          <div ref={wrapperRef} className={cn('relative', fullScreen && 'h-screen')}>
             {isOutputTooLarge ? (
               <>
                 <Alert severity="warning">Output size is too large to render {`( > 1MB )`}</Alert>
@@ -308,15 +332,16 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
                   <Button
                     label="Download Raw"
                     icon={<RiDownload2Line />}
-                    btnAction={() => downloadJson({ content: content })}
+                    onClick={() => downloadJson({ content: content })}
                     appearance="outlined"
+                    kind="secondary"
                   />
                 </div>
               </>
             ) : (
               <Editor
-                className="absolute"
-                height={editorHeight}
+                className={cn('absolute', fullScreen && 'h-full')}
+                height={fullScreen ? '100%' : editorHeight}
                 defaultLanguage={language}
                 value={content}
                 theme="inngest-theme"
@@ -356,6 +381,7 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
                   wordWrap: isWordWrap ? 'on' : 'off',
                 }}
                 onMount={(editor) => {
+                  handleEditorDidMount(editor);
                   updateEditorLayout(editor);
                 }}
                 onChange={(value) => {
@@ -367,19 +393,12 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
               />
             )}
           </div>
-        </>
+        </div>
       )}
     </>
   );
 }
 
 CodeBlock.Wrapper = ({ children }: React.PropsWithChildren) => {
-  return (
-    <div
-      className="border-muted w-full overflow-hidden rounded-lg
-     border dark:border-slate-700/30 dark:shadow"
-    >
-      {children}
-    </div>
-  );
+  return <div className="border-subtle w-full overflow-hidden rounded-md border">{children}</div>;
 };

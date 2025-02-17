@@ -60,14 +60,11 @@ func (r *functionRunResolver) History(
 		return nil, fmt.Errorf("invalid run ID: %w", err)
 	}
 
-	// For required UUID fields that don't matter in OSS.
-	randomUUID := uuid.New()
-
 	return r.HistoryReader.GetRunHistory(
 		ctx,
 		runID,
 		history_reader.GetRunOpts{
-			AccountID: randomUUID,
+			AccountID: consts.DevServerAccountId,
 		},
 	)
 }
@@ -82,17 +79,17 @@ func (r *functionRunResolver) HistoryItemOutput(
 		return nil, fmt.Errorf("invalid run ID: %w", err)
 	}
 
-	// For required UUID fields that don't matter in OSS.
-	randomUUID := uuid.New()
-
 	return r.HistoryReader.GetRunHistoryItemOutput(
 		ctx,
 		historyID,
 		history_reader.GetHistoryOutputOpts{
-			AccountID:   randomUUID,
-			RunID:       runID,
-			WorkflowID:  randomUUID,
-			WorkspaceID: randomUUID,
+			AccountID: consts.DevServerAccountId,
+			RunID:     runID,
+
+			// TODO: Where should we get this?
+			WorkflowID: uuid.New(),
+
+			WorkspaceID: consts.DevServerEnvId,
 		},
 	)
 }
@@ -192,8 +189,8 @@ func (r *mutationResolver) CancelRun(
 	ctx context.Context,
 	runID ulid.ULID,
 ) (*models.FunctionRun, error) {
-	accountID := uuid.New()
-	workspaceID := uuid.New()
+	accountID := consts.DevServerAccountId
+	workspaceID := consts.DevServerEnvId
 	run, err := r.HistoryReader.GetFunctionRun(
 		ctx,
 		accountID,
@@ -265,10 +262,11 @@ func (r *mutationResolver) CancelRun(
 func (r *mutationResolver) Rerun(
 	ctx context.Context,
 	runID ulid.ULID,
+	fromStep *models.RerunFromStepInput,
 ) (ulid.ULID, error) {
 	zero := ulid.ULID{}
-	accountID := uuid.New()
-	workspaceID := uuid.New()
+	accountID := consts.DevServerAccountId
+	workspaceID := consts.DevServerEnvId
 
 	fnrun, err := r.Data.GetFunctionRun(
 		ctx,
@@ -304,13 +302,32 @@ func (r *mutationResolver) Rerun(
 		run.WithScope(consts.OtelScopeRerun),
 		run.WithNewRoot(),
 		run.WithSpanAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysAppID, fnCQRS.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, fn.ID.String()),
+			attribute.String(consts.OtelSysFunctionSlug, fnCQRS.Slug),
+			attribute.String(consts.OtelSysEventIDs, evt.GetInternalID().String()),
 		),
 	)
 	defer span.End()
 
+	var fromStepReq *execution.ScheduleRequestFromStep
+	if fromStep != nil {
+		fromStepReq = &execution.ScheduleRequestFromStep{
+			StepID: fromStep.StepID,
+		}
+
+		if fromStep.Input != nil {
+			if len(*fromStep.Input) == 0 || (*fromStep.Input)[0] != '[' {
+				return zero, fmt.Errorf("input is not a valid JSON array")
+			}
+
+			fromStepReq.Input = json.RawMessage(*fromStep.Input)
+		}
+	}
+
 	identifier, err := r.Executor.Schedule(ctx, execution.ScheduleRequest{
 		Function: *fn,
+		AppID:    fnCQRS.AppID,
 		Events: []event.TrackedEvent{
 			// We need NewOSSTrackedEventWithID to ensure that the tracked event
 			// has the same ID as the original event. Calling NewOSSTrackedEvent
@@ -318,6 +335,9 @@ func (r *mutationResolver) Rerun(
 			event.NewOSSTrackedEventWithID(evt.Event(), evt.InternalID()),
 		},
 		OriginalRunID: &fnrun.RunID,
+		AccountID:     consts.DevServerAccountId,
+		FromStep:      fromStepReq,
+		WorkspaceID:   consts.DevServerEnvId,
 	})
 	if err != nil {
 		return zero, err

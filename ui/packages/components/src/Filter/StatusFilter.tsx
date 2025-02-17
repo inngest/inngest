@@ -1,6 +1,8 @@
-import { RunStatusDot } from '../FunctionRunStatusIcons';
+import { useRef, useState } from 'react';
+
 import { Select, type Option } from '../Select/Select';
-import { getStatusBackgroundClass, getStatusBorderClass } from '../statusClasses';
+import { StatusDot } from '../Status/StatusDot';
+import { getStatusBackgroundClass, getStatusBorderClass } from '../Status/statusClasses';
 import {
   functionRunStatuses,
   isFunctionRunStatus,
@@ -19,11 +21,16 @@ export default function StatusFilter({
   onStatusesChange,
   functionIsPaused,
 }: StatusFilterProps) {
+  const [temporarySelectedStatuses, setTemporarySelectedStatuses] = useState(selectedStatuses);
+  const comboboxRef = useRef<HTMLButtonElement>(null);
   const availableStatuses: FunctionRunStatus[] = functionRunStatuses.filter((status) => {
     if (status === 'PAUSED') {
       return !!functionIsPaused;
     } else if (status === 'RUNNING') {
       return !functionIsPaused;
+      // Hide skipped runs from filter
+    } else if (status === 'SKIPPED') {
+      return false;
     }
     return true;
   });
@@ -32,24 +39,40 @@ export default function StatusFilter({
     name: status,
   }));
   const selectedValues = options.filter((option) =>
-    selectedStatuses.some((status) => isFunctionRunStatus(status) && status === option.id)
+    temporarySelectedStatuses.some((status) => isFunctionRunStatus(status) && status === option.id)
   );
   const areAllStatusesSelected = availableStatuses.every((status) =>
-    selectedStatuses.includes(status)
+    temporarySelectedStatuses.includes(status)
   );
-  const statusDots = selectedStatuses.map((status) => {
-    const isSelected = selectedStatuses.includes(status);
+  const statusDots = temporarySelectedStatuses.map((status) => {
+    const isSelected = temporarySelectedStatuses.includes(status);
     return (
       <span
         key={status}
         className={cn(
-          'inline-block h-[9px] w-[9px] flex-shrink-0 rounded-full border border-slate-50 bg-slate-50 ring-1 ring-inset ring-slate-300 group-hover:border-slate-100 [&:not(:first-child)]:-ml-1',
+          'border-subtle bg-canvasBase group-hover:border-subtle inline-block h-[9px] w-[9px] flex-shrink-0 rounded-full border [&:not(:first-child)]:-ml-1',
           isSelected && [getStatusBackgroundClass(status), getStatusBorderClass(status), 'ring-0']
         )}
         aria-hidden="true"
       />
     );
   });
+
+  const handleApply = () => {
+    onStatusesChange(temporarySelectedStatuses);
+    // Close the Select dropdown
+    if (comboboxRef.current) {
+      comboboxRef.current.click();
+    }
+  };
+
+  const isSelectionChanged = () => {
+    if (temporarySelectedStatuses.length !== selectedStatuses.length) return true;
+    const tempSet = new Set(temporarySelectedStatuses);
+    return selectedStatuses.some((status) => !tempSet.has(status));
+  };
+
+  const isDisabledApply = !isSelectionChanged();
 
   return (
     <Select
@@ -64,15 +87,17 @@ export default function StatusFilter({
             console.error(`invalid status: ${status.id}`);
           }
         });
-        onStatusesChange(newValue);
+        setTemporarySelectedStatuses(newValue);
       }}
       label="Status"
       isLabelVisible
     >
-      <Select.Button isLabelVisible>
+      <Select.Button isLabelVisible ref={comboboxRef}>
         <div className="w-7 text-left">
-          {selectedStatuses.length > 0 && !areAllStatusesSelected && <span>{statusDots}</span>}
-          {(selectedStatuses.length === 0 || areAllStatusesSelected) && <span>All</span>}
+          {temporarySelectedStatuses.length > 0 && !areAllStatusesSelected && (
+            <span>{statusDots}</span>
+          )}
+          {(temporarySelectedStatuses.length === 0 || areAllStatusesSelected) && <span>All</span>}
         </div>
       </Select.Button>
       <Select.Options>
@@ -81,12 +106,13 @@ export default function StatusFilter({
           return (
             <Select.CheckboxOption key={option.id} option={option}>
               <span className="flex items-center gap-1 lowercase">
-                <RunStatusDot status={option.id} className="h-2 w-2" />
+                <StatusDot status={option.id} className="h-2 w-2" />
                 <label className="text-sm first-letter:capitalize">{option.name}</label>
               </span>
             </Select.CheckboxOption>
           );
         })}
+        <Select.Footer onApply={handleApply} disabledApply={isDisabledApply} />
       </Select.Options>
     </Select>
   );

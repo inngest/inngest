@@ -1,7 +1,7 @@
-import { Badge } from '@inngest/components/Badge';
+import { Pill } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
-import { classNames } from '@inngest/components/utils/classNames';
+import { cn } from '@inngest/components/utils/classNames';
 import { RiInformationLine } from '@remixicon/react';
 
 export type MetadataItemProps = {
@@ -30,15 +30,15 @@ export function MetadataItem({
   loading = false,
 }: MetadataItemProps) {
   return (
-    <div className={classNames('flex flex-col-reverse p-1.5', className)}>
+    <div className={cn('flex flex-col-reverse p-1.5', className)}>
       <dt className="flex items-center gap-1">
-        <span className="text-sm capitalize text-slate-400 dark:text-slate-500">{label}</span>
+        <span className="text-subtle text-sm capitalize">{label}</span>
         {tooltip && (
           <Tooltip>
             <TooltipTrigger asChild>
               {/* Temporarily breaks accessibility https://github.com/radix-ui/primitives/discussions/560 */}
               <span>
-                <RiInformationLine className="h-4 w-4 text-slate-400" />
+                <RiInformationLine className="text-muted h-4 w-4" />
               </span>
             </TooltipTrigger>
             <TooltipContent className="whitespace-pre-line">{tooltip}</TooltipContent>
@@ -51,21 +51,13 @@ export function MetadataItem({
         ) : (
           <Tooltip>
             <TooltipTrigger
-              className={classNames(
-                type === 'code' && 'font-mono',
-                'truncate text-sm text-slate-800 dark:text-white'
-              )}
+              className={cn(type === 'code' && 'font-mono', 'text-basis truncate text-sm')}
             >
-              <span
-                className={classNames(
-                  type === 'code' && 'font-mono',
-                  'truncate text-sm text-slate-800 dark:text-white'
-                )}
-              >
+              <span className={cn(type === 'code' && 'font-mono', 'text-basis truncate text-sm')}>
                 {value}
               </span>
             </TooltipTrigger>
-            <TooltipContent className={classNames(type === 'code' && 'font-mono', 'text-xs')}>
+            <TooltipContent className={cn(type === 'code' && 'font-mono', 'text-xs')}>
               {title || `${value}`}
             </TooltipContent>
           </Tooltip>
@@ -74,7 +66,9 @@ export function MetadataItem({
           <Tooltip>
             <TooltipTrigger asChild>
               <span>
-                <Badge className="!px-1.5 !py-1">{badge.label}</Badge>
+                <Pill appearance="outlined" className="!px-1.5 !py-1">
+                  {badge.label}
+                </Pill>
               </span>
             </TooltipTrigger>
             {badge.description && <TooltipContent>{badge.description}</TooltipContent>}

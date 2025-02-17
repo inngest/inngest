@@ -1,23 +1,42 @@
+'use client';
+
 import { UserProfile } from '@clerk/nextjs';
 
-import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
-
-export default async function UserSettingsPage() {
-  const newIANav = await getBooleanFlag('new-ia-nav');
-
+export default function UserSettingsPage() {
   return (
-    <UserProfile
-      routing="path"
-      path="/settings/user"
-      appearance={{
-        elements: {
-          rootBox: 'h-full',
-          card: newIANav ? '' : 'divide-x divide-slate-100',
-          navbar: newIANav ? 'hidden' : 'p-8 border-none',
-          scrollBox: 'bg-white',
-          pageScrollBox: '[scrollbar-width:none]', // hides the Clerk's scrollbar
-        },
-      }}
-    />
+    <div className="flex flex-col justify-start">
+      <UserProfile
+        routing="path"
+        path="/settings/user"
+        appearance={{
+          layout: {
+            logoPlacement: 'none',
+          },
+          elements: {
+            navbar: 'hidden',
+            scrollBox: 'bg-canvasBase shadow-none',
+            pageScrollBox: 'pt-6 px-2',
+          },
+        }}
+      >
+        <UserProfile.Page label="security" />
+      </UserProfile>
+      <UserProfile
+        routing="path"
+        path="/settings/security"
+        appearance={{
+          layout: {
+            logoPlacement: 'none',
+          },
+          elements: {
+            navbar: 'hidden',
+            scrollBox: 'bg-canvasBase shadow-none',
+            pageScrollBox: 'pt-0 px-2',
+          },
+        }}
+      >
+        <UserProfile.Page label="account" />
+      </UserProfile>
+    </div>
   );
 }

@@ -6,9 +6,11 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/enums"
 	"io"
 	"io/fs"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -58,7 +60,7 @@ func (a *devapi) addRoutes() {
 		}
 		return http.HandlerFunc(fn)
 	})
-	a.Use(headers.StaticHeadersMiddleware(headers.ServerKindDev))
+	a.Use(headers.StaticHeadersMiddleware(a.devserver.Opts.Config.GetServerKind()))
 
 	a.Get("/dev", a.Info)
 	a.Post("/dev/traces", a.OTLPTrace)
@@ -127,11 +129,21 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 		funcs[n] = f
 	}
 
+	features := map[string]bool{}
+	for _, flag := range featureFlags {
+		enabled, _ := strconv.ParseBool(os.Getenv(flag))
+		features[flag] = enabled
+	}
+
 	ir := InfoResponse{
-		Version:   version.Print(),
-		StartOpts: a.devserver.Opts,
-		Functions: funcs,
-		Handlers:  a.devserver.handlers,
+		Version:             version.Print(),
+		StartOpts:           a.devserver.Opts,
+		Functions:           funcs,
+		Handlers:            a.devserver.handlers,
+		IsSingleNodeService: a.devserver.IsSingleNodeService(),
+		IsMissingSigningKey: a.devserver.Opts.RequireKeys && !a.devserver.HasSigningKey(),
+		IsMissingEventKeys:  a.devserver.Opts.RequireKeys && !a.devserver.HasEventKeys(),
+		Features:            features,
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	byt, _ := json.MarshalIndent(ir, "", "  ")
@@ -143,9 +155,11 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	ctx := r.Context()
 
+	logger.StdlibLogger(ctx).Debug("received register request")
+
 	expectedServerKind := r.Header.Get(headers.HeaderKeyExpectedServerKind)
-	if expectedServerKind != "" && expectedServerKind != headers.ServerKindDev {
-		a.err(ctx, w, 400, fmt.Errorf("Expected server kind %s, got %s", headers.ServerKindDev, expectedServerKind))
+	if expectedServerKind != "" && expectedServerKind != a.devserver.Opts.Config.GetServerKind() {
+		a.err(ctx, w, 400, fmt.Errorf("Expected server kind %s, got %s", a.devserver.Opts.Config.GetServerKind(), expectedServerKind))
 		return
 	}
 
@@ -159,7 +173,8 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := a.register(ctx, req); err != nil {
+	reply, err := a.register(ctx, req)
+	if err != nil {
 		logger.From(ctx).Warn().Msgf("Error registering functions:\n%s", err)
 		_ = publicerr.WriteHTTP(w, err)
 		return
@@ -172,20 +187,26 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, _ = w.Write([]byte(`{"ok":true}`))
-}
-
-func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error) {
-	sum, err := r.Checksum()
+	resp, err := json.Marshal(reply)
 	if err != nil {
-		return publicerr.Wrap(err, 400, "Invalid request")
+		_ = publicerr.WriteHTTP(w, err)
+		return
 	}
 
-	if app, err := a.devserver.Data.GetAppByChecksum(ctx, sum); err == nil {
+	_, _ = w.Write(resp)
+}
+
+func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*cqrs.SyncReply, error) {
+	sum, err := r.Checksum()
+	if err != nil {
+		return nil, publicerr.Wrap(err, 400, "Invalid request")
+	}
+
+	if app, err := a.devserver.Data.GetAppByChecksum(ctx, consts.DevServerEnvId, sum); err == nil {
 		if !app.Error.Valid {
 			// Skip registration since the app was already successfully
 			// registered.
-			return nil
+			return &cqrs.SyncReply{OK: true}, nil
 		}
 
 		// Clear app error.
@@ -197,41 +218,45 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 			},
 		)
 		if err != nil {
-			return publicerr.Wrap(err, 500, "Error updating app error")
+			return nil, publicerr.Wrap(err, 500, "Error updating app error")
 		}
 	}
 
+	syncID := uuid.New()
 	// Attempt to get the existing app by URL, and delete it if possible.
 	// We're going to recreate it below.
 	//
 	// We need to do this as we always create an app when entering the URL
 	// via the UI.  This is a dev-server specific quirk.
-	app, err := a.devserver.Data.GetAppByURL(ctx, r.URL)
-	if err == nil && app != nil {
-		_ = a.devserver.Data.DeleteApp(ctx, app.ID)
-	}
-
-	// We need a UUID to register functions with.
-	appParams := cqrs.InsertAppParams{
-		// Use a deterministic ID for the app in dev.
-		ID:          uuid.NewSHA1(uuid.NameSpaceOID, []byte(r.URL)),
-		Name:        r.AppName,
-		SdkLanguage: r.SDKLanguage(),
-		SdkVersion:  r.SDKVersion(),
-		Framework: sql.NullString{
-			String: r.Framework,
-			Valid:  r.Framework != "",
-		},
-		Url:      r.URL,
-		Checksum: sum,
-	}
+	appID := inngest.DeterministicAppUUID(r.URL)
 
 	tx, err := a.devserver.Data.WithTx(ctx)
 	if err != nil {
-		return publicerr.Wrap(err, 500, "Error starting registration tx")
+		return nil, publicerr.Wrap(err, 500, "Error starting registration tx")
 	}
 
 	defer func() {
+		method := enums.AppMethodServe
+		if r.IsConnect() {
+			method = enums.AppMethodConnect
+		}
+
+		appParams := cqrs.UpsertAppParams{
+			// Use a deterministic ID for the app in dev.
+			ID:          appID,
+			Name:        r.AppName,
+			SdkLanguage: r.SDKLanguage(),
+			SdkVersion:  r.SDKVersion(),
+			Framework: sql.NullString{
+				String: r.Framework,
+				Valid:  r.Framework != "",
+			},
+			Url:        r.URL,
+			Checksum:   sum,
+			Method:     method.String(),
+			AppVersion: r.AppVersion,
+		}
+
 		// We want to save an app at the end, after handling each error.
 		if err != nil {
 			appParams.Error = sql.NullString{
@@ -239,7 +264,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 				Valid:  true,
 			}
 		}
-		_, _ = tx.InsertApp(ctx, appParams)
+		_, _ = tx.UpsertApp(ctx, appParams)
 		err = tx.Commit(ctx)
 		if err != nil {
 			logger.From(ctx).Error().Err(err).Msg("error registering functions")
@@ -247,7 +272,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 	}()
 
 	// Get a list of all functions
-	existing, _ := tx.GetFunctionsByAppInternalID(ctx, uuid.UUID{}, appParams.ID)
+	existing, _ := tx.GetFunctionsByAppInternalID(ctx, consts.DevServerEnvId, appID)
 	// And get a list of functions that we've upserted.  We'll delete all existing functions not in
 	// this set.
 	seen := map[uuid.UUID]struct{}{}
@@ -256,30 +281,30 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 	// signing key and warn if the user has an invalid key.
 	funcs, err := r.Parse(ctx)
 	if err != nil && err != sdk.ErrNoFunctions {
-		return publicerr.Wrap(err, 400, "At least one function is invalid")
+		return nil, publicerr.Wrap(err, 400, "At least one function is invalid")
 	}
 
 	// For each function,
 	for _, fn := range funcs {
 		// Create a new UUID for the function.
-		fn.ID = inngest.DeterministicUUID(*fn)
+		fn.ID = fn.DeterministicUUID()
 
 		// Mark as seen.
 		seen[fn.ID] = struct{}{}
 
 		config, err := json.Marshal(fn)
 		if err != nil {
-			return publicerr.Wrap(err, 500, "Error marshalling function")
+			return nil, publicerr.Wrap(err, 500, "Error marshalling function")
 		}
 
-		if _, err := tx.GetFunctionByInternalUUID(ctx, uuid.UUID{}, fn.ID); err == nil {
+		if _, err := tx.GetFunctionByInternalUUID(ctx, consts.DevServerEnvId, fn.ID); err == nil {
 			// Update the function config.
 			_, err = tx.UpdateFunctionConfig(ctx, cqrs.UpdateFunctionConfigParams{
 				ID:     fn.ID,
 				Config: string(config),
 			})
 			if err != nil {
-				return publicerr.Wrap(err, 500, "Error updating function config")
+				return nil, publicerr.Wrap(err, 500, "Error updating function config")
 			}
 			continue
 		}
@@ -288,14 +313,21 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 			ID:        fn.ID,
 			Name:      fn.Name,
 			Slug:      fn.Slug,
-			AppID:     appParams.ID,
+			AppID:     appID,
 			Config:    string(config),
 			CreatedAt: time.Now(),
 		})
 		if err != nil {
 			err = fmt.Errorf("Function %s is invalid: %w", fn.Slug, err)
-			return publicerr.Wrap(err, 500, "Error saving function")
+			return nil, publicerr.Wrap(err, 500, "Error saving function")
 		}
+	}
+
+	reply := &cqrs.SyncReply{
+		OK:       true,
+		Modified: true,
+		AppID:    &appID,
+		SyncID:   &syncID,
 	}
 
 	// Remove all unseen functions.
@@ -306,13 +338,13 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		}
 	}
 	if len(deletes) == 0 {
-		return nil
+		return reply, nil
 	}
 
 	if err = tx.DeleteFunctionsByIDs(ctx, deletes); err != nil {
-		return publicerr.Wrap(err, 500, "Error deleting removed function")
+		return nil, publicerr.Wrap(err, 500, "Error deleting removed function")
 	}
-	return nil
+	return reply, nil
 }
 
 func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
@@ -345,6 +377,8 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+
+	hasAI := false
 
 	traces, err := encoder.UnmarshalTraces(body)
 	if err != nil {
@@ -386,6 +420,12 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 				if err != nil {
 					log.From(ctx).Warn().Err(err).Interface("span attr", span.Attributes().AsRaw()).Msg("error parsing span attributes")
 
+				}
+
+				if val, ok := sattr[consts.OtelSysFunctionHasAI]; ok {
+					if boolVal, err := strconv.ParseBool(val); err == nil && boolVal {
+						hasAI = true
+					}
 				}
 
 				evts := []cqrs.SpanEvent{}
@@ -469,6 +509,7 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 
 	for _, r := range handler.TraceRuns() {
 		// log.From(ctx).Debug().Interface("run", r).Msg("trace run")
+		r.HasAI = hasAI
 		if err := a.devserver.Data.InsertTraceRun(ctx, r); err != nil {
 			log.From(ctx).Error().Err(err).Interface("trace run", r).Msg("error inserting trace run")
 		}
@@ -480,7 +521,7 @@ func (a devapi) RemoveApp(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	url := r.FormValue("url")
 
-	app, err := a.devserver.Data.GetAppByURL(ctx, url)
+	app, err := a.devserver.Data.GetAppByURL(ctx, consts.DevServerEnvId, url)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 404, "App not found: %s", url))
 		return
@@ -553,9 +594,21 @@ func (a devapi) err(ctx context.Context, w http.ResponseWriter, status int, err 
 
 type InfoResponse struct {
 	// Version lists the version of the development server
-	Version       string             `json:"version"`
-	Authenticated bool               `json:"authed"`
-	StartOpts     StartOpts          `json:"startOpts"`
-	Functions     []inngest.Function `json:"functions"`
-	Handlers      []SDKHandler       `json:"handlers"`
+	Version             string             `json:"version"`
+	Authenticated       bool               `json:"authed"`
+	StartOpts           StartOpts          `json:"startOpts"`
+	Functions           []inngest.Function `json:"functions"`
+	Handlers            []SDKHandler       `json:"handlers"`
+	IsSingleNodeService bool               `json:"isSingleNodeService"`
+
+	// If true, the server is running in a mode where it requires a signing key
+	// to function and it is not set.
+	IsMissingSigningKey bool `json:"isMissingSigningKey"`
+
+	// If true, the server is running in a mode where it requires one or more
+	// event keys to function and they are not set.
+	IsMissingEventKeys bool `json:"isMissingEventKeys"`
+
+	// Features acts as an in-memory feature flag for the UI
+	Features map[string]bool `json:"features"`
 }

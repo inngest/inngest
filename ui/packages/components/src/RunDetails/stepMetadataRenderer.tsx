@@ -1,5 +1,5 @@
 import { type MetadataItemProps } from '@inngest/components/Metadata/MetadataItem';
-import { IconEvent } from '@inngest/components/icons/Event';
+import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { formatMilliseconds } from '@inngest/components/utils/date';
 import { type HistoryNode } from '@inngest/components/utils/historyParser';
 
@@ -71,7 +71,7 @@ export function renderStepMetadata({
         label: 'Event Name',
         value: (
           <>
-            <IconEvent className="inline-block" /> {node.waitForEventConfig.eventName}
+            <EventsIcon className="inline-block h-4 w-4" /> {node.waitForEventConfig.eventName}
           </>
         ),
       },

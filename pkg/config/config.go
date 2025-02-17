@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/inngest/inngest/pkg/config/registration"
+	"github.com/inngest/inngest/pkg/headers"
 )
 
 const devConfig = `package main
@@ -22,6 +23,8 @@ config.#Config & {
 		drivers: {
 			http: config.#HTTPDriver & {
 				signingKey: "dev-signing-key"
+			}
+			connect: config.#ConnectDriver & {
 			}
 		}
 	}
@@ -59,6 +62,18 @@ type Config struct {
 	Queue Queue
 	// State configures the execution state store.
 	State State
+	// ServerKind is the kind of server we are running, e.g. "dev" or "cloud".
+	ServerKind string
+}
+
+// GetServerKind returns the server kind, defaulting to "dev" if none is
+// specified.
+func (c *Config) GetServerKind() string {
+	if c.ServerKind != "" {
+		return c.ServerKind
+	}
+
+	return headers.ServerKindDev
 }
 
 // Log configures the logger used within Inngest services.

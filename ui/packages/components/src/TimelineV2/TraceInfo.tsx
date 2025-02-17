@@ -1,5 +1,7 @@
 import type { Route } from 'next';
 
+import { AITrace } from '../AI/AITrace';
+import type { ExperimentalAI } from '../AI/utils';
 import { Card } from '../Card';
 import {
   CodeElement,
@@ -21,10 +23,12 @@ type Props = {
     runPopout: (params: { runID: string }) => Route;
   };
   trace: Trace;
+  runID: string;
   result?: Result;
+  aiOutput?: ExperimentalAI;
 };
 
-export function TraceInfo({ className, pathCreator, trace, result }: Props) {
+export function TraceInfo({ className, pathCreator, trace, result, runID, aiOutput }: Props) {
   const delayText = formatMilliseconds(
     (toMaybeDate(trace.startedAt) ?? new Date()).getTime() - new Date(trace.queuedAt).getTime()
   );
@@ -57,11 +61,7 @@ export function TraceInfo({ className, pathCreator, trace, result }: Props) {
       <>
         <ElementWrapper label="Run">
           {trace.stepInfo.runID ? (
-            <LinkElement
-              href={pathCreator.runPopout({ runID: trace.stepInfo.runID })}
-              internalNavigation
-              showIcon={false}
-            >
+            <LinkElement href={pathCreator.runPopout({ runID: trace.stepInfo.runID })}>
               {trace.stepInfo.runID}
             </LinkElement>
           ) : (
@@ -143,9 +143,18 @@ export function TraceInfo({ className, pathCreator, trace, result }: Props) {
             </ElementWrapper>
 
             {stepKindInfo}
+
+            {aiOutput && <AITrace aiOutput={aiOutput} />}
           </dl>
         </Card.Content>
-        {result && <RunResult className="border-subtle border-t" result={result} />}
+        {result && (
+          <RunResult
+            className="border-subtle border-t"
+            result={result}
+            runID={runID}
+            stepID={trace.stepID ?? undefined}
+          />
+        )}
       </Card>
     </div>
   );

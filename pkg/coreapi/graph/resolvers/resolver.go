@@ -19,6 +19,16 @@ type Resolver struct {
 	Queue         queue.JobQueueReader
 	EventHandler  api.EventHandler
 	Executor      execution.Executor
+	ServerKind    string
+
+	// LocalSigningKey is the key used to sign events for self-hosted services.
+	LocalSigningKey string
+
+	// RequireKeys defines whether event and signing keys are required for the
+	// server to function. If this is true and signing keys are not defined,
+	// the server will still boot but core actions such as syncing, runs, and
+	// ingesting events will not work.
+	RequireKeys bool
 }
 
 // Query returns generated.QueryResolver implementation.
@@ -42,12 +52,23 @@ func (r *Resolver) RunsV2Connection() generated.RunsV2ConnectionResolver {
 	return &runsV2ConnResolver{r}
 }
 
+func (r *Resolver) ConnectV1WorkerConnection() generated.ConnectV1WorkerConnectionResolver {
+	return &connectV1workerConnectionConnResolver{r}
+}
+
+func (r *Resolver) ConnectV1WorkerConnectionsConnection() generated.ConnectV1WorkerConnectionsConnectionResolver {
+	return &connectV1workerConnectionResolver{r}
+}
+
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type eventResolver struct{ *Resolver }
 type appResolver struct{ *Resolver }
+
 type functionRunResolver struct{ *Resolver }
 type functionRunV2Resolver struct{ *Resolver }
+type connectV1workerConnectionConnResolver struct{ *Resolver }
+type connectV1workerConnectionResolver struct{ *Resolver }
 type functionResolver struct{ *Resolver }
 type streamItemResolver struct{ *Resolver }
 type runsV2ConnResolver struct{ *Resolver }

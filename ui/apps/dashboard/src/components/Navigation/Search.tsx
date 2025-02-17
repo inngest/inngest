@@ -4,11 +4,11 @@ import { useEffect, useState } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { useOrganization, useUser } from '@clerk/nextjs';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
-import { IconEvent } from '@inngest/components/icons/Event';
-import { IconFunction } from '@inngest/components/icons/Function';
+import { EventsIcon } from '@inngest/components/icons/sections/Events';
+import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowGoForwardLine } from '@remixicon/react';
 import { Command } from 'cmdk';
@@ -16,6 +16,7 @@ import { useQuery } from 'urql';
 
 import { graphql } from '@/gql';
 import { getEnvironmentSlug } from '@/utils/environments';
+import { pathCreator } from '@/utils/urls';
 
 const GetGlobalSearchDocument = graphql(`
   query GetGlobalSearch($opts: SearchInput!) {
@@ -37,6 +38,7 @@ const GetGlobalSearchDocument = graphql(`
             ... on FunctionRun {
               id
               functionID: workflowID
+              startedAt
             }
           }
         }
@@ -155,11 +157,9 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
   if (globalResults?.value.__typename === 'FunctionRun' && functionResults) {
     searchResult = {
       type: 'function',
-      href: `/env/${environmentSlug}/functions/${encodeURIComponent(functionResults.slug)}/logs/${
-        globalResults.value.id
-      }`,
+      href: pathCreator.runPopout({ envSlug: environmentSlug, runID: globalResults.value.id }),
       name: functionResults.name || '',
-      icon: <IconFunction className="w-4" />,
+      icon: <FunctionsIcon className="w-4" />,
     };
   } else if (globalResults?.value.__typename === 'ArchivedEvent') {
     searchResult = {
@@ -168,7 +168,7 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
         globalResults.value.id
       }`,
       name: globalResults.value.name,
-      icon: <IconEvent className="w-5" />,
+      icon: <EventsIcon className="w-4" />,
     };
   }
 
@@ -182,17 +182,15 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
           value={search}
           onValueChange={setSearch}
           className={cn(
-            search && 'border-b border-slate-200 focus:border-slate-200',
-            'w-[656px] border-0 px-3 py-3 placeholder-slate-500 outline-none focus:ring-0'
+            search && 'border-subtle focus:border-subtle border-b',
+            'placeholder-disabled bg-canvasBase w-[656px] border-0 px-3 py-3 outline-none focus:ring-0'
           )}
         />
         {search && (
-          <Command.List className="px-3 py-3 text-slate-600">
+          <Command.List className="text-subtle bg-canvasBase px-3 py-3">
             {isLoading && <Command.Loading>Searching...</Command.Loading>}
             {!isLoading && globalResults && (
-              <Command.Group
-                heading={<div className="pb-2 text-xs text-slate-500">Navigate To</div>}
-              >
+              <Command.Group heading={<div className="text-muted pb-2 text-xs">Navigate To</div>}>
                 <Command.Item
                   onSelect={() => {
                     router.push(searchResult.href as Route);
@@ -200,7 +198,7 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
                   }}
                   key={globalResults.env.id}
                   value={globalResults.env.name}
-                  className="group flex cursor-pointer items-center rounded-md px-3 py-3 data-[selected]:bg-slate-100"
+                  className="data-[selected]:bg-canvasSubtle/50 group flex cursor-pointer items-center rounded-md px-3 py-3"
                 >
                   <div className="flex items-center gap-2 truncate">
                     {searchResult.icon}
@@ -208,9 +206,9 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
                   </div>
                   <kbd
                     aria-label="press enter to jump to page"
-                    className="ml-auto hidden rounded bg-slate-200 p-1.5 text-white group-data-[selected]:block"
+                    className="bg-subtle ml-auto hidden rounded p-1.5 group-data-[selected]:block"
                   >
-                    <RiArrowGoForwardLine className="h-3 w-3 rotate-180 text-slate-600" />
+                    <RiArrowGoForwardLine className="text-subtle h-3 w-3 rotate-180" />
                   </kbd>
                 </Command.Item>
               </Command.Group>
@@ -248,7 +246,7 @@ export default function Search({ collapsed }: { collapsed: boolean }) {
       {collapsed ? null : (
         <Tooltip>
           <TooltipTrigger asChild>
-            <NewButton
+            <Button
               kind="secondary"
               appearance="outlined"
               size="medium"
@@ -257,8 +255,8 @@ export default function Search({ collapsed }: { collapsed: boolean }) {
               aria-label="Search by ID"
               icon={
                 <kbd className="mx-auto flex w-full items-center justify-center space-x-1">
-                  <kbd className={`text-subtle text-[20px]`}>⌘</kbd>
-                  <kbd className="text-subtle text-xs">K</kbd>
+                  <kbd className={`text-muted text-[20px]`}>⌘</kbd>
+                  <kbd className="text-muted text-xs">K</kbd>
                 </kbd>
               }
             />
@@ -266,7 +264,7 @@ export default function Search({ collapsed }: { collapsed: boolean }) {
           <TooltipContent
             side="bottom"
             sideOffset={2}
-            className="border-muted text-subtle rounded border text-xs"
+            className="border-muted text-muted rounded border text-xs"
           >
             Use <span className="font-bold">⌘ K</span> or <span className="font-bold">Ctrl K</span>{' '}
             to search

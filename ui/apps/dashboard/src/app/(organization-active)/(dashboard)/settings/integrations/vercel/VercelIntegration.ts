@@ -2,6 +2,7 @@ export enum VercelDeploymentProtection {
   Disabled = '',
   ProdDeploymentURLsAndAllPreviews = 'prod_deployment_urls_and_all_previews',
   Previews = 'preview',
+  All = 'all',
 }
 
 export type VercelProject = {
@@ -22,10 +23,6 @@ export type VercelProjectViaAPI = {
   ssoProtection?: {
     deploymentType: VercelDeploymentProtection;
   };
-};
-
-export type VercelProjectAPIResponse = {
-  projects: VercelProjectViaAPI[];
 };
 
 export type VercelIntegration = {

@@ -1,3 +1,9 @@
+import {
+  transformFramework,
+  transformLanguage,
+  transformPlatform,
+} from '@inngest/components/utils/appsParser';
+
 import { graphql } from '@/gql';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
@@ -8,6 +14,7 @@ const query = graphql(`
         id
         externalID
         name
+        method
       }
     }
     sync: deploy(id: $syncID) {
@@ -61,6 +68,9 @@ export function useSync({
     const sync = {
       ...res.data.sync,
       lastSyncedAt: new Date(res.data.sync.lastSyncedAt),
+      framework: transformFramework(res.data.sync.framework),
+      platform: transformPlatform(res.data.sync.platform),
+      sdkLanguage: transformLanguage(res.data.sync.sdkLanguage),
     };
 
     return {

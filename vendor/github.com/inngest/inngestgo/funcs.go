@@ -9,6 +9,13 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 )
 
+// Ptr converts the given type to a pointer.  Nil pointers are sometimes
+// used for optional arguments within configuration, meaning we need pointers
+// within struct values.  This util helps.
+func Ptr[T any](i T) *T { return &i }
+
+func BoolPtr(b bool) *bool { return &b }
+
 func StrPtr(i string) *string { return &i }
 
 func IntPtr(i int) *int { return &i }
@@ -48,6 +55,14 @@ func (f FunctionOpts) GetRateLimit() *inngest.RateLimit {
 		return nil
 	}
 	return f.RateLimit.Convert()
+}
+
+// GetTimeouts returns the inngest.Timeouts in a compatible type signature.
+func (f FunctionOpts) GetTimeouts() *inngest.Timeouts {
+	if f.Timeouts == nil {
+		return nil
+	}
+	return f.Timeouts.Convert()
 }
 
 // Debounce represents debounce configuration used when creating a new function within
@@ -115,7 +130,7 @@ type Timeouts struct {
 	// this is inclusive of time between retries.
 	//
 	// A function may exceed this duration because of concurrency limits, throttling, etc.
-	Start time.Duration `json:"start,omitempty"`
+	Start *time.Duration `json:"start,omitempty"`
 
 	// Finish represents the time between a function starting and the function finishing.
 	// If a function takes longer than this time to finish, the function is marked as cancelled.
@@ -124,7 +139,23 @@ type Timeouts struct {
 	//
 	// Note that if the final request to a function begins before this timeout, and completes
 	// after this timeout, the function will succeed.
-	Finish time.Duration `json:"finish,omitempty"`
+	Finish *time.Duration `json:"finish,omitempty"`
+}
+
+func (t Timeouts) Convert() *inngest.Timeouts {
+	var start, finish *string
+	if t.Start != nil {
+		s := t.Start.String()
+		start = &s
+	}
+	if t.Finish != nil {
+		f := t.Finish.String()
+		finish = &f
+	}
+	return &inngest.Timeouts{
+		Start:  start,
+		Finish: finish,
+	}
 }
 
 // CreateFunction creates a new function which can be registered within a handler.
@@ -207,7 +238,7 @@ type SDKFunction[T any] func(ctx context.Context, input Input[T]) (any, error)
 // This is created via CreateFunction in this package.
 type ServableFunction interface {
 	// Slug returns the function's human-readable ID, such as "sign-up-flow".
-	Slug() string
+	Slug(appName string) string
 
 	// Name returns the function name.
 	Name() string
@@ -253,11 +284,19 @@ func (s servableFunc) Config() FunctionOpts {
 	return s.fc
 }
 
-func (s servableFunc) Slug() string {
-	if s.fc.ID == "" {
-		return slug.Make(s.fc.Name)
+func (s servableFunc) Slug(appName string) string {
+	fnSlug := s.fc.ID
+	if fnSlug == "" {
+		fnSlug = slug.Make(s.fc.Name)
 	}
-	return s.fc.ID
+
+	// Old format which only includes the fn slug
+	// This should no longer be used.
+	if appName == "" {
+		return fnSlug
+	}
+
+	return appName + "-" + fnSlug
 }
 
 func (s servableFunc) Name() string {

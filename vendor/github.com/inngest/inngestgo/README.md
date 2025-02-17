@@ -3,7 +3,7 @@
   <br/>
   <br/>
   <p>
-    A durable event-driven workflow engine SDK for Golang.<br />
+    Write durable functions in Go via the <a href="https://www.inngest.com">Inngest</a> SDK.<br />
     Read the <a href="https://www.inngest.com/docs?ref=github-inngest-js-readme">documentation</a> and get started in minutes.
   </p>
   <p>
@@ -17,9 +17,10 @@
 	  
 <hr />
 
-# Inngest Go SDK
+# `inngestgo`: Durable execution in Go
 
-Inngest's Go SDK allows you to create event-driven, durable workflows in your existing API — without new infrastructure.
+`inngestgo` allows you to create durable functions in your existing HTTP handlers or via outbound TCP connections,
+without managing orchestrators, state, scheduling, or new infrastructure.
 
 It's useful if you want to build reliable software without worrying about queues, events, subscribers, workers, or other
 complex primitives such as concurrency, parallelism, event batching, or distributed debounce. These are all built in.
@@ -36,7 +37,7 @@ complex primitives such as concurrency, parallelism, event batching, or distribu
 
 # Examples
 
-The following is the bare minimum setup for a fully distributed durable workflow server:
+The following is the bare minimum setup for a fully distributed durable workflow:
 
 ```go
 package main

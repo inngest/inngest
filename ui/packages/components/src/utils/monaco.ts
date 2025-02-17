@@ -1,8 +1,10 @@
 'use-client';
 
+import { languages } from 'monaco-editor';
 import resolveConfig from 'tailwindcss/resolveConfig';
 
 import tailwindConfig from '../../tailwind.config';
+import { resolveColor as resolver } from './colors';
 
 const {
   theme: { backgroundColor, textColor, borderColor },
@@ -11,63 +13,8 @@ const {
 const defaultColor = '#f6f6f6'; // carbon 50
 
 // Transform css variables into format that monaco can read
-function resolveColor(colorValue: string, isDark: boolean): string {
-  if (typeof window === 'undefined') {
-    return defaultColor;
-  }
-
-  // Extract the CSS variable name from the color value
-  const match = colorValue.match(/var\((.*?)\)/);
-  if (!match || !match[1]) {
-    console.warn(`Invalid color value format: ${colorValue}`);
-    return defaultColor;
-  }
-  const variableName = match[1];
-
-  // Get the appropriate root element based on isDark
-  const root = isDark
-    ? document.querySelector('.dark') || document.documentElement
-    : document.documentElement;
-
-  // Get the computed style
-  const computedStyle = window.getComputedStyle(root);
-
-  // Get the RGB values
-  const rgbValues = computedStyle.getPropertyValue(variableName).trim();
-
-  if (!rgbValues) {
-    console.warn(`Could not resolve color for variable: ${variableName}`);
-    return defaultColor;
-  }
-
-  // Split the RGB values and convert to numbers
-  const rgbArray = rgbValues.split(' ').map(Number);
-
-  if (rgbArray.length !== 3 || rgbArray.some(isNaN)) {
-    console.warn(`Invalid RGB values: ${rgbValues}`);
-    return defaultColor;
-  }
-
-  const [r, g, b] = rgbArray;
-
-  if (typeof r !== 'number' || typeof g !== 'number' || typeof b !== 'number') {
-    console.warn(`Unexpected non-number values in RGB: ${rgbValues}`);
-    return defaultColor;
-  }
-
-  return rgbToHex(r, g, b);
-}
-
-function rgbToHex(r: number, g: number, b: number): string {
-  return (
-    '#' +
-    [r, g, b]
-      .map((x) => {
-        const hex = x.toString(16);
-        return hex.length === 1 ? '0' + hex : hex;
-      })
-      .join('')
-  );
+export function resolveColor(colorValue: string, isDark: boolean): string {
+  return resolver(colorValue, isDark, defaultColor);
 }
 
 export const createRules = (isDark: boolean) => [
@@ -116,6 +63,18 @@ export const createRules = (isDark: boolean) => [
     token: 'type',
     foreground: resolveColor(textColor.codeStringValueJson, isDark),
   },
+  {
+    token: 'predefined', // Matches built-in commands like 'npx', 'curl'
+    foreground: resolveColor(textColor.codeEntityNameFunction, isDark),
+  },
+  {
+    token: 'identifier',
+    foreground: resolveColor(textColor.codeKeyword, isDark),
+  },
+  {
+    token: 'delimiter',
+    foreground: resolveColor(textColor.codeDelimiterBracketJson, isDark),
+  },
 ];
 
 export const createColors = (isDark: boolean) => ({
@@ -135,4 +94,181 @@ export const FONT = {
   size: 13,
   type: 'monospace',
   font: 'CircularXXMono',
+};
+
+export const shellLanguageTokens: languages.IMonarchLanguage = {
+  defaultToken: '',
+  ignoreCase: true,
+  tokenPostfix: '.shell',
+  brackets: [
+    { token: 'delimiter.bracket', open: '{', close: '}' },
+    { token: 'delimiter.parenthesis', open: '(', close: ')' },
+    { token: 'delimiter.square', open: '[', close: ']' },
+  ],
+  keywords: [
+    'if',
+    'then',
+    'do',
+    'else',
+    'elif',
+    'while',
+    'until',
+    'for',
+    'in',
+    'esac',
+    'fi',
+    'fin',
+    'fil',
+    'done',
+    'exit',
+    'set',
+    'unset',
+    'export',
+    'function',
+  ],
+  builtins: [
+    'ab',
+    'awk',
+    'bash',
+    'beep',
+    'bun',
+    'cat',
+    'cc',
+    'cd',
+    'chown',
+    'chmod',
+    'chroot',
+    'clear',
+    'cp',
+    'curl',
+    'cut',
+    'diff',
+    'echo',
+    'find',
+    'gawk',
+    'gcc',
+    'get',
+    'git',
+    'grep',
+    'hg',
+    'kill',
+    'killall',
+    'ln',
+    'ls',
+    'make',
+    'mkdir',
+    'mv',
+    'nc',
+    'node',
+    'npm',
+    'npx',
+    'openssl',
+    'ping',
+    'pnpm',
+    'ps',
+    'restart',
+    'rm',
+    'rmdir',
+    'sed',
+    'service',
+    'sh',
+    'shopt',
+    'shred',
+    'source',
+    'sort',
+    'sleep',
+    'ssh',
+    'start',
+    'stop',
+    'su',
+    'sudo',
+    'svn',
+    'tee',
+    'telnet',
+    'top',
+    'touch',
+    'vi',
+    'vim',
+    'wall',
+    'wc',
+    'wget',
+    'who',
+    'write',
+    'yarn',
+    'yes',
+    'zsh',
+  ],
+  symbols: /[=><!~?&|+\-*\/\^;\.,]+/,
+  escapes: /\\(?:[abfnrtv\\"']|x[0-9A-Fa-f]{1,4}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})/,
+  tokenizer: {
+    root: [
+      [
+        /[a-zA-Z][\w-]*(@[a-zA-Z0-9.-]+)?/,
+        { cases: { '@builtins': 'predefined', '@default': 'type' } },
+      ],
+      [/[\w-]+/, 'identifier'],
+      [/[a-zA-Z][\w-@]*/, { cases: { '@builtins': 'predefined', '@default': 'identifier' } }],
+      { include: '@whitespace' },
+      { include: '@strings' },
+      [/[{}()\[\]]/, '@brackets'],
+      [/@symbols/, 'delimiter'],
+      [/\d*\.\d+([eE][-+]?\d+)?/, 'number.float'],
+      [/0[xX][0-9a-fA-F]+/, 'number.hex'],
+      [/\d+/, 'number'],
+      [/[;,.]/, 'delimiter'],
+    ],
+    whitespace: [
+      [/[ \t\r\n]+/, 'white'],
+      [/^\s*#.*$/, 'comment'],
+    ],
+    strings: [
+      [/'/, { token: 'string.quote', bracket: '@open', next: '@stringBody' }],
+      [/"/, { token: 'string.quote', bracket: '@open', next: '@dblStringBody' }],
+    ],
+    stringBody: [
+      [/'/, { token: 'string.quote', bracket: '@close', next: '@pop' }],
+      [/./, 'string'],
+    ],
+    dblStringBody: [
+      [/"/, { token: 'string.quote', bracket: '@close', next: '@pop' }],
+      [/./, 'string'],
+    ],
+  },
+};
+
+export const celLanguageTokens: languages.IMonarchLanguage = {
+  tokenizer: {
+    root: [
+      // Identifying keywords
+      [/\b(true|false|null)\b/, 'keyword.constant'],
+      [/\b(in|map|list|as|and|or|not)\b/, 'keyword.operator'],
+      [/\b(int|bool|string|double|bytes)\b/, 'keyword.type'],
+
+      // Identifying function calls (e.g. size, exists, all, etc.)
+      [/\b(size|exists|all|has)\b/, 'function'],
+
+      // Identifying identifiers (variables or field names)
+      [/[a-zA-Z_]\w*/, 'identifier'],
+
+      // Identifying string literals (single and double-quoted)
+      [/"([^"\\]|\\.)*"/, 'string'], // Double-quoted string with escaped characters
+      [/'([^'\\]|\\.)*'/, 'string'], // Single-quoted string with escaped characters
+
+      // Identifying numbers (only if not within a string)
+      [/\b\d+(\.\d+)?\b/, 'number'],
+
+      // Identifying comments (single-line and multi-line)
+      [/\/\/.*$/, 'comment'],
+      [/\/\*.*\*\//, 'comment'],
+
+      // Identifying operators
+      [/[=!<>]=|[-+*/%]/, 'operator'],
+
+      // Identifying parentheses, brackets, and curly braces
+      [/[\[\](){}]/, '@brackets'],
+
+      // Identifying whitespace
+      [/\s+/, 'white'],
+    ],
+  },
 };

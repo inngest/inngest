@@ -4,13 +4,18 @@ import { Button } from '@inngest/components/Button';
 import { CodeBlock } from '@inngest/components/CodeBlock';
 import { Modal } from '@inngest/components/Modal';
 
+import { parseCode } from './utils';
+
 const initialCode = JSON.stringify({ data: {} }, null, 2);
 
 type Props = {
   doesFunctionAcceptPayload: boolean;
   isOpen: boolean;
   onCancel: () => void;
-  onConfirm: (payload: { data: Record<string, unknown> }) => void;
+  onConfirm: (payload: {
+    data: Record<string, unknown>;
+    user: Record<string, unknown> | null;
+  }) => void;
 };
 
 export function InvokeModal({ doesFunctionAcceptPayload, isOpen, onCancel, onConfirm }: Props) {
@@ -21,11 +26,11 @@ export function InvokeModal({ doesFunctionAcceptPayload, isOpen, onCancel, onCon
     event.preventDefault();
 
     try {
-      let payload;
+      let payload: ReturnType<typeof parseCode>;
       if (doesFunctionAcceptPayload) {
         payload = parseCode(rawPayload);
       } else {
-        payload = { data: {} };
+        payload = { data: {}, user: null };
       }
 
       onConfirm(payload);
@@ -57,7 +62,7 @@ export function InvokeModal({ doesFunctionAcceptPayload, isOpen, onCancel, onCon
     );
   } else {
     content = (
-      <p className="dark:text-white">
+      <p className="text-basis">
         Cron functions without event triggers cannot include payload data.
       </p>
     );
@@ -81,45 +86,10 @@ export function InvokeModal({ doesFunctionAcceptPayload, isOpen, onCancel, onCon
         </Modal.Body>
 
         <Modal.Footer className="flex justify-end gap-2">
-          <Button appearance="outlined" btnAction={onCancel} label="Cancel" />
+          <Button kind="secondary" appearance="outlined" onClick={onCancel} label="Cancel" />
           <Button appearance="solid" kind="primary" label="Invoke Function" type="submit" />
         </Modal.Footer>
       </form>
     </Modal>
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function parseCode(code: string): { data: Record<string, unknown> } {
-  if (typeof code !== 'string') {
-    throw new Error("The payload form field isn't a string");
-  }
-
-  let payload: Record<string, unknown>;
-  const parsed: unknown = JSON.parse(code);
-  if (!isRecord(parsed)) {
-    throw new Error('Parsed JSON is not an object');
-  }
-
-  payload = parsed;
-
-  let { data } = payload;
-  if (data === null) {
-    data = {};
-  }
-  if (!isRecord(data)) {
-    throw new Error('The "data" field must be an object or null');
-  }
-
-  const supportedKeys = ['data'];
-  for (const key of Object.keys(payload)) {
-    if (!supportedKeys.includes(key)) {
-      throw new Error(`Property "${key}" is not supported when invoking a function`);
-    }
-  }
-
-  return { data };
 }

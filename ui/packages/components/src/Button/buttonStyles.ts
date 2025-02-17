@@ -28,14 +28,14 @@ export const getButtonColors = ({ kind, appearance, loading }: ButtonColorParams
 
   const outlinedButtonStyles = {
     primary: loading
-      ? 'border border-subtle text-btnPrimaryDisabled'
-      : 'border border-muted text-btnPrimary focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:border-disabled disabled:bg-disabled disabled:text-btnPrimaryDisabled',
+      ? 'border border-subtle text-btnPrimaryDisabled bg-canvasBase'
+      : 'border border-muted text-btnPrimary bg-canvasBase focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:border-disabled disabled:bg-disabled disabled:text-btnPrimaryDisabled',
     secondary: loading
-      ? 'border border-subtle text-foreground-subtle'
-      : 'border border-muted text-basis focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:border-disabled disabled:bg-disabled disabled:text-disabled',
+      ? 'border border-subtle text-foreground-subtle bg-canvasBase'
+      : 'border border-muted text-basis bg-canvasBase focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:border-disabled disabled:bg-disabled disabled:text-disabled',
     danger: loading
-      ? 'border border-subtle text-btnDangerDisabled'
-      : 'border border-muted text-btnDanger focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:border-disabled disabled:bg-disabled disabled:text-btnDangerDisabled',
+      ? 'border border-subtle text-btnDangerDisabled bg-canvasBase'
+      : 'border border-muted text-btnDanger bg-canvasBase focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:border-disabled disabled:bg-disabled disabled:text-btnDangerDisabled',
   };
 
   const ghostButtonStyles = {
@@ -59,22 +59,6 @@ export const getButtonColors = ({ kind, appearance, loading }: ButtonColorParams
   }
 };
 
-export const getKeyColor = ({ appearance, kind }: ButtonColorParams) => {
-  const defaultKeyStyles = {
-    primary: 'bg-indigo-500/80',
-    secondary: 'bg-emerald-600/80',
-    danger: 'bg-rose-700/80',
-  };
-  if (appearance === 'solid' && kind === 'primary') {
-    return 'bg-slate-900';
-  } else if (appearance === 'solid') {
-    return 'bg-slate-800/20';
-  } else if (appearance === 'outlined') {
-    return `text-white ${defaultKeyStyles[kind]}`;
-  }
-  return defaultKeyStyles[kind];
-};
-
 export const getButtonSizeStyles = ({ size, icon, label }: ButtonSizeStyleParams) => {
   const iconOnlySizeStyles = {
     small: 'h-6 p-1.5',
@@ -83,7 +67,7 @@ export const getButtonSizeStyles = ({ size, icon, label }: ButtonSizeStyleParams
   };
 
   const sizeStyles = {
-    small: 'h-6 text-xs leading-[18px] px-3 py-1.5',
+    small: 'h-6 text-xs leading-[18px] px-2 py-1.5',
     medium: 'h-8 text-xs leading-[18px] px-3 py-1.5',
     large: 'h-10 text-xs leading-[18px] px-3 py-1.5',
   };

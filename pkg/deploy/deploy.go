@@ -1,8 +1,10 @@
 package deploy
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -10,8 +12,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/publicerr"
+	"github.com/inngest/inngestgo"
 )
 
 var (
@@ -22,13 +26,15 @@ var (
 	DeployErrNoBranchName        = fmt.Errorf("missing_branch_env_name")
 	DeployErrInvalidSigningKey   = fmt.Errorf("invalid_signing_key")
 	DeployErrNoSigningKey        = fmt.Errorf("missing_signing_key")
+	DeployErrNoServerSigningKey  = fmt.Errorf("missing_server_signing_key")
 	DeployErrInvalidFunction     = fmt.Errorf("invalid_function")
 	DeployErrNoFunctions         = fmt.Errorf("no_functions")
 	DeployErrUnreachable         = fmt.Errorf("unreachable")
 	DeployErrUnsupportedProtocol = fmt.Errorf("unsupported_protocol")
 
 	Client = http.Client{
-		Timeout: 10 * time.Second,
+		Timeout:       10 * time.Second,
+		CheckRedirect: httpdriver.CheckRedirect,
 	}
 )
 
@@ -39,10 +45,23 @@ type pingResult struct {
 	IsSDK bool
 }
 
-func Ping(ctx context.Context, url string) pingResult {
+func Ping(ctx context.Context, url string, serverKind string, signingKey string, requireKeys bool) pingResult {
+	if requireKeys && signingKey == "" {
+		return pingResult{
+			Err: DeployErrNoServerSigningKey,
+		}
+	}
+
 	isSDK := false
 
-	req, err := http.NewRequest(http.MethodPut, url, nil)
+	reqByt, err := json.Marshal(map[string]string{"url": url})
+	if err != nil {
+		return pingResult{
+			Err: fmt.Errorf("failed to marshal request body: %w", err),
+		}
+	}
+
+	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(reqByt))
 	if err != nil {
 		return pingResult{
 			Err: publicerr.WrapWithData(
@@ -56,7 +75,19 @@ func Ping(ctx context.Context, url string) pingResult {
 			IsSDK: isSDK,
 		}
 	}
-	req.Header.Set(headers.HeaderKeyServerKind, headers.ServerKindDev)
+	req.Header.Set("content-type", "application/json")
+	req.Header.Set(headers.HeaderKeyServerKind, serverKind)
+
+	if signingKey != "" {
+		reqSig, err := inngestgo.Sign(ctx, time.Now(), []byte(signingKey), reqByt)
+		if err != nil {
+			return pingResult{
+				Err: fmt.Errorf("failed to sign request: %w", err),
+			}
+		}
+		req.Header.Set(headers.HeaderKeySignature, reqSig)
+	}
+
 	resp, err := Client.Do(req)
 	if err != nil {
 		err = handlePingError(err)
@@ -131,7 +162,7 @@ func GetDeployError(resp *http.Response) error {
 		} else if strings.Contains(r.Message, "No INNGEST_ENV branch name found") {
 			return DeployErrNoBranchName
 		}
-		return fmt.Errorf(r.Message)
+		return errors.New(r.Message)
 	}
 	if resp.StatusCode == http.StatusUnauthorized {
 		return DeployErrUnauthorized

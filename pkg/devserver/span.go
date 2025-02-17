@@ -89,7 +89,7 @@ func (sh *spanIngestionHandler) Add(ctx context.Context, span *cqrs.Span) {
 		}
 
 		// assign output
-		if run.Output == nil || len(run.Output) == 0 {
+		if len(run.Output) == 0 {
 			for _, e := range span.Events {
 				if spanAttr(e.Attributes, consts.OtelSysFunctionOutput) != "" {
 					run.Output = []byte(e.Name)

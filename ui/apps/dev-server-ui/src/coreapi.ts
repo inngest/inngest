@@ -134,6 +134,7 @@ export const APPS = gql`
       connected
       functionCount
       autodiscovered
+      method
       functions {
         name
         id
@@ -141,6 +142,36 @@ export const APPS = gql`
         config
         slug
         url
+      }
+    }
+  }
+`;
+
+export const GET_APP = gql`
+  query GetApp($id: UUID!) {
+    app(id: $id) {
+      id
+      name
+      sdkLanguage
+      sdkVersion
+      framework
+      url
+      error
+      connected
+      functionCount
+      autodiscovered
+      method
+      functions {
+        name
+        id
+        concurrency
+        config
+        slug
+        url
+        triggers {
+          type
+          value
+        }
       }
     }
   }
@@ -229,8 +260,8 @@ export const HISTORY_ITEM_OUTPUT = gql`
 `;
 
 export const INVOKE_FUNCTION = gql`
-  mutation InvokeFunction($functionSlug: String!, $data: Map) {
-    invokeFunction(data: $data, functionSlug: $functionSlug)
+  mutation InvokeFunction($functionSlug: String!, $data: Map, $user: Map) {
+    invokeFunction(data: $data, functionSlug: $functionSlug, user: $user)
   }
 `;
 
@@ -248,6 +279,12 @@ export const RERUN = gql`
   }
 `;
 
+export const RERUN_FROM_STEP = gql`
+  mutation RerunFromStep($runID: ULID!, $fromStep: RerunFromStepInput!) {
+    rerun(runID: $runID, fromStep: $fromStep)
+  }
+`;
+
 export const GET_RUNS = gql`
   query GetRuns(
     $appIDs: [UUID!]
@@ -255,9 +292,16 @@ export const GET_RUNS = gql`
     $status: [FunctionRunStatus!]
     $timeField: RunsV2OrderByField!
     $functionRunCursor: String = null
+    $celQuery: String = null
   ) {
     runs(
-      filter: { appIDs: $appIDs, from: $startTime, status: $status, timeField: $timeField }
+      filter: {
+        appIDs: $appIDs
+        from: $startTime
+        status: $status
+        timeField: $timeField
+        query: $celQuery
+      }
       orderBy: [{ field: $timeField, direction: DESC }]
       after: $functionRunCursor
     ) {
@@ -279,6 +323,7 @@ export const GET_RUNS = gql`
           endedAt
           startedAt
           status
+          hasAI
         }
       }
       pageInfo {
@@ -317,6 +362,7 @@ export const TRACE_DETAILS_FRAGMENT = gql`
     isRoot
     outputID
     spanID
+    stepID
     stepOp
     stepInfo {
       __typename
@@ -337,6 +383,9 @@ export const TRACE_DETAILS_FRAGMENT = gql`
         timeout
         foundEventID
         timedOut
+      }
+      ... on RunStepInfo {
+        type
       }
     }
   }
@@ -362,6 +411,7 @@ export const GET_RUN = gql`
           }
         }
       }
+      hasAI
     }
   }
 `;
@@ -369,6 +419,7 @@ export const GET_RUN = gql`
 export const GET_TRACE_RESULT = gql`
   query GetTraceResult($traceID: String!) {
     runTraceSpanOutputByID(outputID: $traceID) {
+      input
       data
       error {
         message
@@ -389,6 +440,69 @@ export const GET_TRIGGER = gql`
       isBatch
       batchID
       cron
+    }
+  }
+`;
+
+export const GET_WORKER_CONNECTIONS = gql`
+  query GetWorkerConnections(
+    $appID: UUID!
+    $startTime: Time
+    $status: [ConnectV1ConnectionStatus!]
+    $timeField: ConnectV1WorkerConnectionsOrderByField!
+    $cursor: String = null
+    $orderBy: [ConnectV1WorkerConnectionsOrderBy!] = []
+    $first: Int!
+  ) {
+    workerConnections(
+      first: $first
+      filter: { appIDs: [$appID], from: $startTime, status: $status, timeField: $timeField }
+      orderBy: $orderBy
+      after: $cursor
+    ) {
+      edges {
+        node {
+          id
+          gatewayId
+          instanceId
+          workerIp
+          app {
+            id
+          }
+          connectedAt
+          lastHeartbeatAt
+          disconnectedAt
+          disconnectReason
+          status
+          groupHash
+          sdkLang
+          sdkVersion
+          sdkPlatform
+          syncId
+          buildId
+          functionCount
+          cpuCores
+          memBytes
+          os
+        }
+      }
+      pageInfo {
+        hasNextPage
+        hasPreviousPage
+        startCursor
+        endCursor
+      }
+    }
+  }
+`;
+
+export const COUNT_WORKER_CONNECTIONS = gql`
+  query CountWorkerConnections($appID: UUID!, $status: [ConnectV1ConnectionStatus!]) {
+    workerConnections(
+      filter: { appIDs: [$appID], status: $status, timeField: CONNECTED_AT }
+      orderBy: [{ field: CONNECTED_AT, direction: DESC }]
+    ) {
+      totalCount
     }
   }
 `;

@@ -14,8 +14,9 @@ type Queue interface {
 	Consumer
 
 	JobQueueReader
+	Migrator
 
-	SetFunctionPaused(ctx context.Context, fnID uuid.UUID, paused bool) error
+	SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, paused bool) error
 }
 
 type RunInfo struct {
@@ -27,6 +28,8 @@ type RunInfo struct {
 	// via RunFunc returning true.  This allows us to prevent unbounded sequential processing
 	// on the same function by limiting the number of continues possible within a given chain.
 	ContinueCount uint
+
+	GuaranteedCapacityKey string
 }
 
 // RunFunc represents a function called to process each item in the queue.  This may be
@@ -38,11 +41,25 @@ type RunInfo struct {
 //
 // If the RunFunc returns an error, the Item will be nacked and retried depending on the
 // Item's retry policy.
-type RunFunc func(context.Context, RunInfo, Item) (bool, error)
+type RunFunc func(context.Context, RunInfo, Item) (RunResult, error)
+
+type RunResult struct {
+	// ScheduledImmediateJob indicates whether this run function scheduled another job
+	// in the same partition for immediate consumption.
+	ScheduledImmediateJob bool
+}
+
+type EnqueueOpts struct {
+	PassthroughJobId bool
+}
 
 type Producer interface {
 	// Enqueue allows an item to be enqueued ton run at the given time.
-	Enqueue(context.Context, Item, time.Time) error
+	Enqueue(context.Context, Item, time.Time, EnqueueOpts) error
+}
+
+type Enqueuer interface {
+	EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (QueueItem, error)
 }
 
 type Consumer interface {
@@ -56,6 +73,17 @@ type Consumer interface {
 	// re-enqueued if Retryable() returns true.  For all other errors, the
 	// job will automatically be retried.
 	Run(context.Context, RunFunc) error
+}
+
+type QueueMigrationHandler func(ctx context.Context, qi *QueueItem) error
+
+type Migrator interface {
+	// SetFunctionMigrate updates the function metadata to signal it's being migrated to
+	// another queue shard
+	SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID, migrate bool) error
+	// Migration does a peek operation like the normal peek, but ignores leases and other conditions a normal peek cares about.
+	// The sore goal is to grab things and migrate them to somewhere else
+	Migrate(ctx context.Context, shard string, fnID uuid.UUID, limit int64, handler QueueMigrationHandler) (int64, error)
 }
 
 // QuitError is an error that, when returned, quits the queue.  This always retries
@@ -139,6 +167,7 @@ type nonRetryable struct {
 func (nonRetryable) Retryable() bool { return false }
 
 // AlwaysRetryError always retries, ignoring max retry counts
+// This will not increase the job's attempt count
 func AlwaysRetryError(err error) error {
 	return alwaysRetry{error: err}
 }
@@ -148,6 +177,10 @@ type alwaysRetry struct {
 }
 
 func (a alwaysRetry) AlwaysRetryable() {}
+
+func IsAlwaysRetryable(err error) bool {
+	return errors.Is(err, alwaysRetry{})
+}
 
 type JobResponse struct {
 	// At represents the time the job is scheduled for.
@@ -187,10 +220,26 @@ type JobQueueReader interface {
 	// RunJobs reads items in the queue for a specific run.
 	RunJobs(
 		ctx context.Context,
+		queueShardName string,
 		workspaceID uuid.UUID,
 		workflowID uuid.UUID,
 		runID ulid.ULID,
 		limit,
 		offset int64,
 	) ([]JobResponse, error)
+}
+
+// MigratePayload stores the information to be used when migrating a queue shard to another one
+type MigratePayload struct {
+	AccountID  uuid.UUID
+	FunctionID uuid.UUID
+
+	// Source is the source queue where the migration will occur on
+	Source string
+	// Dest is the target destination the queue will be moved to
+	Dest string
+
+	// DisableFnPause is a flag to disable the function pausing during migration
+	// if it's considered okay to do so
+	DisableFnPause bool
 }

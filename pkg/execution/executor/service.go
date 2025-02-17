@@ -189,6 +189,9 @@ func (s *svc) Run(ctx context.Context) error {
 			err = s.handleDebounce(ctx, item)
 		case queue.KindScheduleBatch:
 			err = s.handleScheduledBatch(ctx, item)
+		case queue.KindQueueMigrate:
+			// NOOP:
+			// this kind don't work in the Dev server
 		default:
 			err = fmt.Errorf("unknown payload type: %T", item.Payload)
 		}
@@ -219,8 +222,12 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) (bool, error
 	resp, err := s.exec.Execute(ctx, item.Identifier, item, edge)
 	// Check if the execution is cancelled, and if so finalize and terminate early.
 	// This prevents steps from scheduling children.
-	if err == state.ErrFunctionCancelled {
+	if errors.Is(err, state.ErrFunctionCancelled) {
 		return false, nil
+	}
+
+	if errors.Is(err, state.ErrFunctionPaused) {
+		return false, queue.AlwaysRetryError(err)
 	}
 
 	if errors.Is(err, ErrHandledStepError) {
@@ -273,7 +280,9 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 		return nil
 	}
 
-	r := execution.ResumeRequest{}
+	r := execution.ResumeRequest{
+		IsTimeout: true,
+	}
 
 	// If the pause timeout is for an invocation, store an error to cause the
 	// step to fail.
@@ -303,7 +312,7 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 	}
 	if status == enums.BatchStatusAbsent.String() {
 		// just attempt clean up, don't care about the result
-		_ = s.batcher.ExpireKeys(ctx, opts.FunctionID, batchID)
+		_ = s.batcher.DeleteKeys(ctx, opts.FunctionID, batchID)
 		return nil
 	}
 
@@ -342,6 +351,10 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 		if f.ID == d.FunctionID {
 			di, err := s.debouncer.GetDebounceItem(ctx, d.DebounceID)
 			if err != nil {
+				return err
+			}
+
+			if err := s.debouncer.StartExecution(ctx, *di, f, d.DebounceID); err != nil {
 				return err
 			}
 

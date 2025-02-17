@@ -1,10 +1,9 @@
-import { useMemo } from 'react';
-import { Badge } from '@inngest/components/Badge/Badge';
 import { Button } from '@inngest/components/Button';
 import { CodeBlock, type CodeBlockAction } from '@inngest/components/CodeBlock';
 import { ContentCard } from '@inngest/components/ContentCard';
 import { FuncCard } from '@inngest/components/FuncCard';
 import { MetadataGrid } from '@inngest/components/Metadata';
+import { Pill } from '@inngest/components/Pill/Pill';
 import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
 import type { Event } from '@inngest/components/types/event';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
@@ -132,7 +131,12 @@ export function EventDetails({
           {!isInternalEvent && onReplayEvent && SendEventButton && (
             <>
               <div className="flex items-center gap-1">
-                <Button label="Replay" btnAction={onReplayEvent} />
+                <Button
+                  label="Replay"
+                  kind="secondary"
+                  appearance="outlined"
+                  onClick={onReplayEvent}
+                />
                 <SendEventButton />
               </div>
             </>
@@ -156,11 +160,11 @@ export function EventDetails({
 
       {functionRuns && onFunctionRunClick && (
         <>
-          <hr className="mt-8 border-slate-800/50" />
+          <hr className="border-subtle mt-8" />
           <div className="flex flex-col gap-6 px-5 py-4">
             <div className="flex items-center gap-2 pt-4">
-              <h3 className="text-sm text-slate-400">Functions</h3>
-              <Badge kind="outlined">{functionRuns.length.toString() || '0'}</Badge>
+              <h3 className="text-subtle text-sm">Functions</h3>
+              <Pill appearance="outlined">{functionRuns.length.toString() || '0'}</Pill>
             </div>
             {functionRuns
               .slice()

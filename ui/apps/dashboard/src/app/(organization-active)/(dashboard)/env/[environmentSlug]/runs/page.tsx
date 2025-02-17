@@ -1,10 +1,10 @@
 'use client';
 
 import { useRef } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
+import { Header } from '@inngest/components/Header/Header';
 import { RiRefreshLine } from '@remixicon/react';
 
-import { Header } from '@/components/Header/Header';
 import { Runs } from '@/components/Runs';
 import type { RefreshRunsRef } from '@/components/Runs/Runs';
 
@@ -15,7 +15,7 @@ export default function Page() {
       <Header
         breadcrumb={[{ text: 'Runs' }]}
         action={
-          <NewButton
+          <Button
             kind="primary"
             appearance="outlined"
             label="Refresh runs"
@@ -25,7 +25,7 @@ export default function Page() {
           />
         }
       />
-      <Runs scope="env" ref={ref} />;
+      <Runs scope="env" ref={ref} />
     </>
   );
 }

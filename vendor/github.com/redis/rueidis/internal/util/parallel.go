@@ -38,6 +38,8 @@ func closeThenParallel[V any](maxp int, ch chan V, fn func(k V)) {
 	for i := 1; i < concurrency; i++ {
 		go worker(&wg, ch, fn)
 	}
-	worker(&wg, ch, fn)
+	if concurrency > 0 {
+		worker(&wg, ch, fn)
+	}
 	wg.Wait()
 }

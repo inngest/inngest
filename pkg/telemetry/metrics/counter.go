@@ -65,6 +65,24 @@ func IncrQueueScanNoCapacityCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrQueueScanCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_scan_total",
+		Description: "The total number of times we scanned the queue",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueuePartitionScannedCounter(ctx context.Context, parts int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, parts, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_partitions_scanned_total",
+		Description: "The total number of partitions we peeked in a single scan loop",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrQueuePartitionProcessedCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -119,11 +137,128 @@ func IncrBatchScheduledCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrBatchProcessStartCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "batch_processing_started_total",
+		Description: "Total number of completed batches for event batching, either through timeout or full batch.",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrInstrumentationLeaseClaimsCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
 		MetricName:  "queue_instrumentation_lease_claims_total",
 		Description: "Total number of instrumentation lease claimed by executors",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrSpanExportedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_exported_total",
+		Description: "Total number of run spans exported",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrSpanExportDataLoss(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_export_data_loss_total",
+		Description: "Total number of data loss detected",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrSpanBatchProcessorEnqueuedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_batch_processor_enqueued_total",
+		Description: "Total number of spans enqueued for batch processing",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrSpanBatchProcessorAttemptCounter(ctx context.Context, incr int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, incr, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_batch_processor_attempt_total",
+		Description: "Total number of spans attempted to export",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrSpanBatchProcessorDeadLetterCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_batch_processor_deadletter_total",
+		Description: "Total number of spans that got passed into the deadletter stream",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrSpanBatchProcessorDeadLetterPublishStatusCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_batch_processor_deadletter_publish_status_total",
+		Description: "Total number of spans that got published to the deadletter stream and their status",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrAggregatePausesEvaluatedCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "aggr_pauses_evaluated_total",
+		Description: "Total number of pauses evaluated",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrAggregatePausesFoundCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "aggr_pauses_found_total",
+		Description: "Total number of pauses founded via evaluation",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConnectGatewayReceivedRouterPubSubMessageCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.router.received_pubsub_messages",
+		Description: "Total number of router PubSub messages received by a connect gateway",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConnectGatewayReceivedWorkerMessageCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.worker.received_messages",
+		Description: "Total number of worker messages received by a connect gateway",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConnectGatewayReceiveConnectionAttemptCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.connection_attempts",
+		Description: "Total number of worker connection attempts received by a connect gateway",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConnectRouterNoHealthyConnectionCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_router.no_healthy_connections",
+		Description: "Total number of attempts to forward a message without finding healthy connections",
 		Tags:        opts.Tags,
 	})
 }

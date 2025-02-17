@@ -5,17 +5,17 @@ import { RiQuestionLine } from '@remixicon/react';
 export const WebhookInfo = () => (
   <Tooltip>
     <TooltipTrigger>
-      <RiQuestionLine className="text-muted h-[18px] w-[18px]" />
+      <RiQuestionLine className="text-subtle h-[18px] w-[18px]" />
     </TooltipTrigger>
     <TooltipContent
       side="right"
       sideOffset={2}
-      className="border-muted text-subtle text-md mt-6 flex flex-col rounded-lg border p-0"
+      className="border-muted text-muted mt-6 flex flex-col rounded-md border p-0 text-sm"
     >
-      <div className="border-b px-4 py-2 ">Sources for events for developers.</div>
+      <div className="border-subtle border-b px-4 py-2 ">Sources for events for developers.</div>
 
       <div className="px-4 py-2">
-        <Link href={'https://www.inngest.com/docs/platform/webhooks'} className="text-md">
+        <Link href={'https://www.inngest.com/docs/platform/webhooks'} target="_blank">
           Learn how create a webhook
         </Link>
       </div>

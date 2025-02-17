@@ -39,6 +39,11 @@ export function URQLProvider({ children }: { children: React.ReactNode }) {
   const client = useMemo(() => {
     return createClient({
       url: `${process.env.NEXT_PUBLIC_API_URL}/gql`,
+      fetchOptions: {
+        // Necessary to include HTTP-only cookies. This is used for non-Clerk
+        // auth.
+        credentials: 'include',
+      },
       exchanges: [
         requestPolicyExchange({
           // The amount of time in ms that has to go by before we upgrade the operation's request policy to `cache-and-network`.

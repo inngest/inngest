@@ -10,6 +10,7 @@ const query = graphql(`
     workspace(id: $envID) {
       runTraceSpanOutputByID(outputID: $traceID) {
         data
+        input
         error {
           message
           name
@@ -43,7 +44,10 @@ export function useGetTraceResult(): (traceID: string) => Promise<Result> {
       if (!res.data) {
         throw new Error('no data returned');
       }
-      return res.data.workspace.runTraceSpanOutputByID;
+
+      return {
+        ...res.data.workspace.runTraceSpanOutputByID,
+      };
     },
     [client, envID]
   );

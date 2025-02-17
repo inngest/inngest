@@ -1,21 +1,27 @@
 import type { Route } from 'next';
 import NextLink from 'next/link';
-import { NewButton } from '@inngest/components/Button/index';
+import { Button } from '@inngest/components/Button/index';
 import { Link } from '@inngest/components/Link/Link';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { RiArrowRightSLine, RiExternalLinkLine } from '@remixicon/react';
 
-import { vercelIntegration } from '../data';
+import { getVercelIntegration } from '../data';
 import VercelProjects from './projects';
 
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
 export default async function VercelIntegrationPage() {
-  const integrations = await vercelIntegration();
+  const integration = await getVercelIntegration();
+  if (!integration) {
+    throw new Error('Failed to load Vercel integration');
+  }
 
   return (
     <div className="mx-auto mt-6 flex w-[800px] flex-col p-8">
       <div className="flex flex-row items-center justify-start">
         <NextLink href="/settings/integrations">
-          <div className="text-subtle text-base">All integrations</div>
+          <div className="text-muted text-base">All integrations</div>
         </NextLink>
         <RiArrowRightSLine className="text-disabled h-4" />
         <div className="text-basis text-base">Vercel</div>
@@ -27,9 +33,13 @@ export default async function VercelIntegrationPage() {
           </div>
           <div className="flex flex-col">
             <div className="text-basis mb-2 text-xl font-medium leading-7">Vercel</div>
-            <div className="text-subtle mb-7 text-base">
+            <div className="text-muted mb-7 text-base">
               You can manage all your projects on this page.{' '}
-              <Link showIcon={false} href={'https://www.inngest.com/docs/deploy/vercel' as Route}>
+              <Link
+                size="medium"
+                href={'https://www.inngest.com/docs/deploy/vercel' as Route}
+                target="_blank"
+              >
                 Learn more
               </Link>
             </div>
@@ -37,7 +47,7 @@ export default async function VercelIntegrationPage() {
         </div>
 
         <div className="place-self-start">
-          <NewButton
+          <Button
             appearance="outlined"
             kind="secondary"
             href={'https://vercel.com/integrations/inngest' as Route}
@@ -47,7 +57,7 @@ export default async function VercelIntegrationPage() {
           />
         </div>
       </div>
-      <VercelProjects integration={integrations} />
+      <VercelProjects integration={integration} />
     </div>
   );
 }

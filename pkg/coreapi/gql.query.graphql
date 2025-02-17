@@ -1,5 +1,6 @@
 type Query {
-  apps: [App!]!
+  apps(filter: AppsFilterV1): [App!]!
+	app(id: UUID!): App
 
   stream(query: StreamQuery!): [StreamItem!]!
 
@@ -25,6 +26,14 @@ type Query {
   run(runID: String!): FunctionRunV2
   runTraceSpanOutputByID(outputID: String!): RunTraceSpanOutput!
   runTrigger(runID: String!): RunTraceTrigger!
+
+  workerConnections(
+      first: Int! = 100
+      after: String
+      orderBy: [ConnectV1WorkerConnectionsOrderBy!]!
+      filter: ConnectV1WorkerConnectionsFilter!
+    ): ConnectV1WorkerConnectionsConnection!
+	workerConnection(connectionId: ULID!): ConnectV1WorkerConnection
 }
 
 input ActionVersionQuery {

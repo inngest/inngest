@@ -3,16 +3,15 @@
 import { useState } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { Button, NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
+import { Input } from '@inngest/components/Forms/Input';
 import { Modal } from '@inngest/components/Modal';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { RiAddLine } from '@remixicon/react';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
-import Input from '@/components/Forms/Input';
-import { OptionalTooltip } from '@/components/Navigation/OptionalTooltip';
 import { graphql } from '@/gql';
 import { defaultTransform } from './[keyID]/TransformEvent';
 import useManagePageTerminology from './useManagePageTerminology';
@@ -32,7 +31,6 @@ export default function CreateKeyButton() {
   const environment = useEnvironment();
   const [{ fetching }, createSourceKey] = useMutation(CreateSourceKey);
   const router = useRouter();
-  const newIANav = useBooleanFlag('new-ia-nav');
 
   if (!currentContent) {
     return null;
@@ -81,23 +79,13 @@ export default function CreateKeyButton() {
       <OptionalTooltip
         tooltip={environment.isArchived && 'Cannot create key. Environment is archived'}
       >
-        {newIANav.isReady && !newIANav.value ? (
-          <Button
-            icon={<RiAddLine />}
-            btnAction={() => setModalOpen(true)}
-            disabled={environment.isArchived}
-            kind="primary"
-            label={`Create ${currentContent.name}`}
-          />
-        ) : (
-          <NewButton
-            icon={<RiAddLine />}
-            onClick={() => setModalOpen(true)}
-            disabled={environment.isArchived}
-            kind="primary"
-            label={`Create ${currentContent.name}`}
-          />
-        )}
+        <Button
+          icon={<RiAddLine />}
+          onClick={() => setModalOpen(true)}
+          disabled={environment.isArchived}
+          kind="primary"
+          label={`Create ${currentContent.name}`}
+        />
       </OptionalTooltip>
 
       <Modal
@@ -109,8 +97,9 @@ export default function CreateKeyButton() {
           <div className="flex justify-end gap-2">
             <Button
               appearance="outlined"
+              kind="secondary"
               label="Cancel"
-              btnAction={() => {
+              onClick={() => {
                 setModalOpen(false);
               }}
             />
@@ -118,7 +107,7 @@ export default function CreateKeyButton() {
               kind="primary"
               label="Create"
               loading={fetching}
-              btnAction={() => {
+              onClick={() => {
                 handleClick();
                 setModalOpen(false);
               }}

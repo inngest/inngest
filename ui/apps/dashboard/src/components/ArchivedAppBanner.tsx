@@ -1,12 +1,11 @@
 'use client';
 
-import { Link } from '@inngest/components/Link';
+import { Banner } from '@inngest/components/Banner';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import { pathCreator } from '@/utils/urls';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
-import { Banner } from './Banner';
 
 const Query = graphql(`
   query GetArchivedAppBannerData($envID: ID!, $externalAppID: String!) {
@@ -45,16 +44,15 @@ export function ArchivedAppBanner({ externalAppID }: Props) {
   }
 
   return (
-    <Banner kind="warning">
+    <Banner severity="warning">
       <span className="font-semibold">App is archived.</span> You may unarchive it{' '}
-      <Link
+      <Banner.Link
+        severity="warning"
         className="inline-flex"
         href={pathCreator.app({ externalAppID, envSlug: env.slug })}
-        internalNavigation
-        showIcon={false}
       >
         here
-      </Link>
+      </Banner.Link>
       .
     </Banner>
   );

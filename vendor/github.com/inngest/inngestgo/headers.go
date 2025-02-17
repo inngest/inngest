@@ -15,6 +15,7 @@ const (
 	HeaderKeySDK                = "X-Inngest-SDK"
 	HeaderKeyServerKind         = "X-Inngest-Server-Kind"
 	HeaderKeySignature          = "X-Inngest-Signature"
+	HeaderKeySyncKind           = "x-inngest-sync-kind"
 	HeaderKeyUserAgent          = "User-Agent"
 )
 

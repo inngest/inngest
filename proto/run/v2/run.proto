@@ -31,10 +31,15 @@ message RunSpan {
   optional StepInfo step_info = 19;
 
   repeated RunSpan children = 20;
+  optional string step_id = 21;
 }
 
 enum SpanStatus {
   UNKNOWN = 0;
+  OK = 10;
+  ERORR = 20;
+
+  // inngest status
   SCHEDULED = 100;
   QUEUED = 110;
   RUNNING = 200;
@@ -42,6 +47,7 @@ enum SpanStatus {
   COMPLETED = 300;
   FAILED = 400;
   CANCELLED = 500;
+  SKIPPED = 600;
 }
 
 enum SpanStepOp {
@@ -49,6 +55,10 @@ enum SpanStepOp {
   INVOKE = 1;
   SLEEP = 2;
   WAIT_FOR_EVENT = 3;
+  STEP = 4;
+  STEP_ERROR = 5;
+  NONE = 6;
+  AI_GATEWAY = 7;
 }
 
 message StepInfo {
@@ -56,6 +66,7 @@ message StepInfo {
     StepInfoSleep sleep = 1;
     StepInfoWaitForEvent wait = 2;
     StepInfoInvoke invoke = 3;
+    StepInfoRun run = 4;
   }
 }
 
@@ -78,6 +89,10 @@ message StepInfoWaitForEvent {
   optional string expression = 3;
   optional string found_event_id = 4;
   optional bool timed_out = 5;
+}
+
+message StepInfoRun {
+  optional string type = 1;
 }
 
 message RunSpanOutput {

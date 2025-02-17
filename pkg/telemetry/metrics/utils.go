@@ -403,6 +403,13 @@ func parseAttributes(attrs map[string]any) []attribute.KeyValue {
 	for k, v := range attrs {
 		attr := attribute.KeyValue{Key: attribute.Key(k)}
 
+		isStringer, ok := v.(fmt.Stringer)
+		if ok {
+			attr.Value = attribute.StringValue(isStringer.String())
+			result = append(result, attr)
+			continue
+		}
+
 		t := reflect.TypeOf(v)
 		switch t.Kind() {
 		case reflect.String:

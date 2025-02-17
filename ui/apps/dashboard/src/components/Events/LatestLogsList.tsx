@@ -1,8 +1,8 @@
 import { type Route } from 'next';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import { Pill } from '@inngest/components/Pill';
-import { Time } from '@inngest/components/Time';
+import { IDCell, TimeCell } from '@inngest/components/Table/Cell';
 import { RiKey2Fill } from '@remixicon/react';
 import { useQuery } from 'urql';
 
@@ -33,6 +33,7 @@ type LatestLogsListProps = {
 
 export default function LatestLogsList({ environmentSlug, eventName }: LatestLogsListProps) {
   const environment = useEnvironment();
+  const router = useRouter();
 
   const [{ data: LatestLogsResponse, fetching: fetchingLatestLogs }] = useQuery({
     query: GetLatestEventLogs,
@@ -50,19 +51,19 @@ export default function LatestLogsList({ environmentSlug, eventName }: LatestLog
 
   return (
     <>
-      <header className="flex items-center gap-3 py-3 pl-4 pr-2">
-        <h1 className="font-semibold text-slate-700">Latest</h1>
+      <header className="flex items-center justify-between gap-3 py-3 pl-4 pr-2">
+        <h1 className="text-basis font-medium">Latest</h1>
         <Button
-          className="ml-auto"
           appearance="outlined"
+          kind="secondary"
           href={`/env/${environmentSlug}/events/${encodeURIComponent(eventName)}/logs` as Route}
-          label="View All Logs"
+          label="View all logs"
         />
       </header>
 
-      <main className="mx-2 min-h-0 flex-1 overflow-y-auto">
-        <div className="rounded-md border border-slate-200 text-sm text-slate-500">
-          <table className="w-full table-fixed divide-y divide-slate-200 rounded-lg bg-white">
+      <main className="text-basis mx-2 min-h-0 flex-1 overflow-y-auto">
+        <div className="border-subtle bg-canvasBase rounded-md border text-sm">
+          <table className="divide-subtle w-full divide-y rounded-md">
             <thead className="h-full text-left">
               <tr>
                 <th className="p-4 font-semibold" scope="col">
@@ -76,7 +77,7 @@ export default function LatestLogsList({ environmentSlug, eventName }: LatestLog
                 </th>
               </tr>
             </thead>
-            <tbody className="h-full divide-y divide-slate-200">
+            <tbody className="divide-subtle h-full divide-y">
               {!orderedList && fetchingLatestLogs && (
                 <tr>
                   <td className="p-4 text-center" colSpan={3}>
@@ -86,30 +87,27 @@ export default function LatestLogsList({ environmentSlug, eventName }: LatestLog
               )}
               {orderedList && orderedList.length > 0
                 ? orderedList.map((e) => (
-                    <tr className="truncate" key={e.id}>
-                      <td className="p-4">
-                        <Time
-                          className="inline-flex min-w-[112px] pr-6 font-semibold text-slate-700"
-                          format="relative"
-                          value={new Date(e.receivedAt)}
-                        />
-                        <Time value={new Date(e.receivedAt)} />
-                      </td>
-                      <td className="font-mono text-xs font-medium">
-                        <Link
-                          href={
-                            `/env/${environmentSlug}/events/${encodeURIComponent(eventName)}/logs/${
-                              e.id
-                            }` as Route
-                          }
-                          className="hover:underline"
-                        >
-                          {e.id}
-                        </Link>
+                    <tr
+                      className="hover:bg-canvasSubtle/50 cursor-pointer truncate transition-all"
+                      key={e.id}
+                      onClick={() =>
+                        router.push(
+                          `/env/${environmentSlug}/events/${encodeURIComponent(eventName)}/logs/${
+                            e.id
+                          }`
+                        )
+                      }
+                    >
+                      <td className="flex items-center gap-6 p-4">
+                        <TimeCell format="relative" date={new Date(e.receivedAt)} />
+                        <TimeCell date={new Date(e.receivedAt)} />
                       </td>
                       <td>
-                        <Pill>
-                          <RiKey2Fill className="h-4 pr-1 text-indigo-500" />
+                        <IDCell>{e.id}</IDCell>
+                      </td>
+                      <td>
+                        <Pill appearance="outlined">
+                          <RiKey2Fill className="text-basis h-4 pr-1" />
                           {e.source?.name}
                         </Pill>
                       </td>

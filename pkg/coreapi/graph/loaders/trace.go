@@ -105,7 +105,7 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 							)
 						}
 
-						if span.ChildrenSpans != nil && len(span.ChildrenSpans) > 0 {
+						if len(span.ChildrenSpans) > 0 {
 							primeTree(ctx, span.ChildrenSpans)
 						}
 					}
@@ -173,6 +173,9 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 		case rpbv2.SpanStepOp_WAIT_FOR_EVENT:
 			op := models.StepOpWaitForEvent
 			stepOp = &op
+		case rpbv2.SpanStepOp_AI_GATEWAY:
+			op := models.StepOpAiGateway
+			stepOp = &op
 		}
 	}
 
@@ -196,11 +199,16 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 		EndedAt:      endedAt,
 		OutputID:     pb.OutputId,
 		StepOp:       stepOp,
+		StepID:       pb.StepId,
 	}
 
 	if pb.GetStepInfo() != nil {
 		// step info
 		switch v := pb.GetStepInfo().GetInfo().(type) {
+		case *rpbv2.StepInfo_Run:
+			span.StepInfo = models.RunStepInfo{
+				Type: v.Run.Type,
+			}
 		case *rpbv2.StepInfo_Sleep:
 			span.StepInfo = models.SleepStepInfo{
 				SleepUntil: v.Sleep.SleepUntil.AsTime(),
@@ -252,7 +260,7 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 	}
 
 	// iterate over children recursively
-	if pb.Children != nil && len(pb.Children) > 0 {
+	if len(pb.Children) > 0 {
 		span.ChildrenSpans = []*models.RunTraceSpan{}
 
 		for _, cp := range pb.Children {

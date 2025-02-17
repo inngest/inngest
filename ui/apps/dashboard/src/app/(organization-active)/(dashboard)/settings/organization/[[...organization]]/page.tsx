@@ -1,21 +1,19 @@
 import { OrganizationProfile } from '@clerk/nextjs';
 
-import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
-
 export default async function OrganizationSettingsPage() {
-  const newIANav = await getBooleanFlag('new-ia-nav');
   return (
-    <div className="min-h-0 flex-1">
+    <div className="flex w-full flex-col justify-start">
       <OrganizationProfile
         routing="path"
         path="/settings/organization"
         appearance={{
+          layout: {
+            logoPlacement: 'none',
+          },
           elements: {
-            rootBox: 'h-full',
-            card: newIANav ? '' : 'divide-x divide-slate-100',
-            navbar: newIANav ? 'hidden' : 'p-8 border-none',
-            scrollBox: 'bg-white',
-            pageScrollBox: '[scrollbar-width:none]', // hides the Clerk's scrollbar
+            navbar: 'hidden',
+            scrollBox: 'bg-canvasBase shadow-none',
+            pageScrollBox: 'pt-6 px-2 w-full',
           },
         }}
       />

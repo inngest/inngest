@@ -19,7 +19,7 @@ jobs:
           version: "8.15.8"
       - uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "20"
       - name: Install
         run: pnpm install
         working-directory: ui/packages/components

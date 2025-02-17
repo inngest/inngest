@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useMemo, useRef, type UIEventHandler } from 'react';
+import { useCallback, useMemo, useRef, useState, type UIEventHandler } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from '@inngest/components/Button';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
+import { Pill } from '@inngest/components/Pill';
 import { SelectGroup, type Option } from '@inngest/components/Select/Select';
-import { LoadingMore, TableFilter } from '@inngest/components/Table';
+import { TableFilter } from '@inngest/components/Table';
 import { DEFAULT_TIME } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   FunctionRunTimeField,
@@ -14,14 +15,16 @@ import {
   isFunctionTimeField,
   type FunctionRunStatus,
 } from '@inngest/components/types/functionRun';
+import { cn } from '@inngest/components/utils/classNames';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
-import { RiLoopLeftLine } from '@remixicon/react';
+import { RiArrowRightUpLine, RiRefreshLine, RiSearchLine } from '@remixicon/react';
 import { type VisibilityState } from '@tanstack/react-table';
 import { useLocalStorage } from 'react-use';
 
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
-import { RunDetails } from '../RunDetailsV2';
+import { RunDetailsV2 } from '../RunDetailsV2';
+import { RunDetailsV3 } from '../RunDetailsV3/RunDetailsV3';
 import {
   useBatchedSearchParams,
   useSearchParam,
@@ -39,28 +42,33 @@ const RunsTable = dynamic(() => import('@inngest/components/RunsPage/RunsTable')
   ssr: false,
 });
 
+const CodeSearch = dynamic(() => import('@inngest/components/CodeSearch/CodeSearch'), {
+  ssr: false,
+});
+
 type Props = {
-  cancelRun: React.ComponentProps<typeof RunDetails>['cancelRun'];
+  cancelRun: React.ComponentProps<typeof RunDetailsV2>['cancelRun'];
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
   features: Pick<Features, 'history'>;
-  getRun: React.ComponentProps<typeof RunDetails>['getRun'];
-  getTraceResult: React.ComponentProps<typeof RunDetails>['getResult'];
-  getTrigger: React.ComponentProps<typeof RunDetails>['getTrigger'];
+  getRun: React.ComponentProps<typeof RunDetailsV2>['getRun'];
+  getTraceResult: React.ComponentProps<typeof RunDetailsV2>['getResult'];
+  getTrigger: React.ComponentProps<typeof RunDetailsV2>['getTrigger'];
   hasMore: boolean;
   isLoadingInitial: boolean;
   isLoadingMore: boolean;
   onRefresh?: () => void;
   onScroll: UIEventHandler<HTMLDivElement>;
   onScrollToTop: () => void;
-  pathCreator: React.ComponentProps<typeof RunDetails>['pathCreator'];
+  pathCreator: React.ComponentProps<typeof RunDetailsV2>['pathCreator'];
   pollInterval?: number;
-  rerun: React.ComponentProps<typeof RunDetails>['rerun'];
+  rerun: React.ComponentProps<typeof RunDetailsV2>['rerun'];
   apps?: Option[];
   functions?: Option[];
   functionIsPaused?: boolean;
   scope: ViewScope;
   totalCount: number | undefined;
+  traceAIEnabled?: boolean;
 };
 
 export function RunsPage({
@@ -85,10 +93,11 @@ export function RunsPage({
   functionIsPaused,
   scope,
   totalCount,
+  traceAIEnabled = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-
   const columns = useScopedColumns(scope);
+  const [showSearch, setShowSearch] = useState(false);
 
   const displayAllColumns = useMemo(() => {
     const out: Record<string, boolean> = {};
@@ -96,7 +105,13 @@ export function RunsPage({
       if (!isColumnID(column.id)) {
         continue;
       }
-
+      if (
+        scope === 'env' &&
+        (column.id === 'startedAt' || column.id === 'app' || column.id === 'durationMS')
+      ) {
+        out[column.id] = false;
+        continue;
+      }
       if (defaultVisibleColumns && !defaultVisibleColumns.includes(column.id)) {
         out[column.id] = false;
       } else {
@@ -104,7 +119,7 @@ export function RunsPage({
       }
     }
     return out;
-  }, [defaultVisibleColumns, columns]);
+  }, [defaultVisibleColumns, columns, scope]);
 
   const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
     `VisibleRunsColumns-${scope}`,
@@ -124,6 +139,8 @@ export function RunsPage({
     'timeField',
     isFunctionTimeField
   );
+
+  const [search, setSearch, removeSearch] = useSearchParam('search');
 
   const [lastDays] = useSearchParam('last');
   const [startTime] = useSearchParam('start');
@@ -207,21 +224,49 @@ export function RunsPage({
     [batchUpdate, scrollToTop]
   );
 
+  const onSearchChange = useCallback(
+    (value: string) => {
+      scrollToTop();
+      if (value.length > 0) {
+        setSearch(value);
+      } else {
+        removeSearch();
+      }
+    },
+    [scrollToTop, setSearch]
+  );
+
   const renderSubComponent = useCallback(
-    ({ id }: { id: string }) => {
+    (rowData: Run) => {
       return (
-        <div className="border-subtle border-l-4 pb-6">
-          <RunDetails
-            cancelRun={cancelRun}
-            getResult={getTraceResult}
-            getRun={getRun}
-            getTrigger={getTrigger}
-            pathCreator={pathCreator}
-            pollInterval={pollInterval}
-            rerun={rerun}
-            runID={id}
-            standalone={false}
-          />
+        <div className={`border-subtle  ${traceAIEnabled ? '' : 'border-l-4 pb-6'}`}>
+          {traceAIEnabled ? (
+            <RunDetailsV3
+              cancelRun={cancelRun}
+              getResult={getTraceResult}
+              getRun={getRun}
+              initialRunData={rowData}
+              getTrigger={getTrigger}
+              pathCreator={pathCreator}
+              pollInterval={pollInterval}
+              rerun={rerun}
+              runID={rowData.id}
+              standalone={false}
+            />
+          ) : (
+            <RunDetailsV2
+              cancelRun={cancelRun}
+              getResult={getTraceResult}
+              getRun={getRun}
+              initialRunData={rowData}
+              getTrigger={getTrigger}
+              pathCreator={pathCreator}
+              pollInterval={pollInterval}
+              rerun={rerun}
+              runID={rowData.id}
+              standalone={false}
+            />
+          )}
         </div>
       );
     },
@@ -243,99 +288,149 @@ export function RunsPage({
     return out;
   }, [columns]);
 
+  // Do not disable or show the button as loading if the poll interval is less than 1 second
+  // Changing state too quickly can cause the button to flicker
+  const disableRefreshButton =
+    pollInterval && pollInterval < 1000 ? isLoadingInitial : isLoadingMore || isLoadingInitial;
+
   return (
-    <main
-      className="bg-canvasBase text-basis h-full min-h-0 overflow-y-auto"
-      onScroll={onScroll}
-      ref={containerRef}
-    >
-      <div className="bg-canvasBase sticky top-0 z-10 flex items-center justify-between gap-2 px-8 py-2">
-        <div className="flex items-center gap-2">
-          <SelectGroup>
-            <TimeFieldFilter selectedTimeField={timeField} onTimeFieldChange={onTimeFieldChange} />
-            <TimeFilter
-              daysAgoMax={features.history}
-              onDaysChange={onDaysChange}
-              defaultValue={
-                lastDays
-                  ? {
-                      type: 'relative',
-                      duration: parseDuration(lastDays),
-                    }
-                  : startTime && endTime
-                  ? {
-                      type: 'absolute',
-                      start: new Date(startTime),
-                      end: new Date(endTime),
-                    }
-                  : {
-                      type: 'relative',
-                      duration: parseDuration(DEFAULT_TIME),
-                    }
-              }
+    <main className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
+      <div className="bg-canvasBase sticky top-0 z-10 flex flex-col">
+        <div className="border-subtle flex h-[58px] items-center justify-between gap-2 border-b px-3">
+          <div className="flex items-center gap-2">
+            <SelectGroup>
+              <TimeFieldFilter
+                selectedTimeField={timeField}
+                onTimeFieldChange={onTimeFieldChange}
+              />
+              <TimeFilter
+                daysAgoMax={features.history}
+                onDaysChange={onDaysChange}
+                defaultValue={
+                  lastDays
+                    ? {
+                        type: 'relative',
+                        duration: parseDuration(lastDays),
+                      }
+                    : startTime && endTime
+                    ? {
+                        type: 'absolute',
+                        start: new Date(startTime),
+                        end: new Date(endTime),
+                      }
+                    : {
+                        type: 'relative',
+                        duration: parseDuration(DEFAULT_TIME),
+                      }
+                }
+              />
+            </SelectGroup>
+            <StatusFilter
+              selectedStatuses={filteredStatus}
+              onStatusesChange={onStatusFilterChange}
+              functionIsPaused={functionIsPaused}
             />
-          </SelectGroup>
-          <StatusFilter
-            selectedStatuses={filteredStatus}
-            onStatusesChange={onStatusFilterChange}
-            functionIsPaused={functionIsPaused}
-          />
-          {apps && (
-            <EntityFilter
-              type="app"
-              onFilterChange={onAppFilterChange}
-              selectedEntities={filteredApp}
-              entities={apps}
-            />
-          )}
-          {functions && (
-            <EntityFilter
-              type="function"
-              onFilterChange={onFunctionFilterChange}
-              selectedEntities={filteredFunction}
-              entities={functions}
-            />
-          )}
+            {apps && (
+              <EntityFilter
+                type="app"
+                onFilterChange={onAppFilterChange}
+                selectedEntities={filteredApp}
+                entities={apps}
+              />
+            )}
+            {functions && (
+              <EntityFilter
+                type="function"
+                onFilterChange={onFunctionFilterChange}
+                selectedEntities={filteredFunction}
+                entities={functions}
+              />
+            )}
 
-          <TotalCount totalCount={totalCount} />
-        </div>
-        <div className="flex items-center gap-2">
-          <TableFilter
-            columnVisibility={columnVisibility}
-            setColumnVisibility={setColumnVisibility}
-            options={options}
-          />
-
-          {onRefresh && (
             <Button
-              label="Refresh"
-              appearance="text"
-              btnAction={onRefresh}
-              icon={<RiLoopLeftLine />}
+              icon={<RiSearchLine />}
+              size="large"
+              iconSide="left"
+              appearance="outlined"
+              label={showSearch ? 'Hide search' : 'Show search'}
+              onClick={() => setShowSearch((prev) => !prev)}
+              className={cn(
+                search
+                  ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
+                  : ''
+              )}
             />
-          )}
+            <TotalCount totalCount={totalCount} />
+          </div>
+          <div className="flex items-center gap-2">
+            <TableFilter
+              columnVisibility={columnVisibility}
+              setColumnVisibility={setColumnVisibility}
+              options={options}
+            />
+          </div>
         </div>
+
+        {showSearch && (
+          <>
+            <div className="bg-codeEditor flex items-center justify-between px-4 pt-4">
+              <div className="flex items-center gap-2">
+                <p className="text-subtle text-sm">Search your runs by using a CEL query</p>
+                <Pill kind="primary">Beta</Pill>
+              </div>
+              <Button
+                appearance="outlined"
+                label="Read the docs"
+                icon={<RiArrowRightUpLine />}
+                iconSide="right"
+                size="small"
+                href="https://www.inngest.com/docs/platform/monitor/inspecting-function-runs#searching-function-runs?ref=app-runs-search"
+              />
+            </div>
+            <CodeSearch
+              onSearch={onSearchChange}
+              placeholder="event.data.userId == “1234” or output.count > 10"
+              value={search}
+            />
+          </>
+        )}
       </div>
-      <RunsTable
-        data={data}
-        isLoading={isLoadingInitial}
-        renderSubComponent={renderSubComponent}
-        getRowCanExpand={() => true}
-        visibleColumns={columnVisibility}
-        scope={scope}
-      />
-      {isLoadingMore && <LoadingMore />}
-      {!hasMore && !isLoadingInitial && !isLoadingMore && data.length > 1 && (
-        <div className="flex flex-col items-center py-8">
-          <p className="text-subtle">No additional runs found.</p>
-          <Button
-            label="Back to top"
-            kind="primary"
-            appearance="text"
-            btnAction={() => scrollToTop(true)}
-          />
-        </div>
-      )}
+
+      <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
+        <RunsTable
+          data={data}
+          isLoading={isLoadingInitial}
+          renderSubComponent={renderSubComponent}
+          getRowCanExpand={() => true}
+          visibleColumns={columnVisibility}
+          scope={scope}
+        />
+        {!hasMore && data.length > 1 && (
+          <div className="flex flex-col items-center pt-8">
+            <p className="text-muted">No additional runs found.</p>
+            <Button
+              label="Back to top"
+              kind="primary"
+              appearance="ghost"
+              onClick={() => scrollToTop(true)}
+            />
+          </div>
+        )}
+        {onRefresh && (
+          <div className="flex flex-col items-center pt-2">
+            <Button
+              kind="secondary"
+              appearance="outlined"
+              label="Refresh runs"
+              icon={<RiRefreshLine />}
+              iconSide="left"
+              onClick={onRefresh}
+              loading={disableRefreshButton}
+              disabled={disableRefreshButton}
+            />
+          </div>
+        )}
+      </div>
     </main>
   );
 }

@@ -54,8 +54,8 @@ func TestFunctionFailureHandling(t *testing.T) {
 			error, ok := evt.Data["error"].(map[string]any)
 			require.True(t, ok, evt.Data)
 			require.NotNil(t, error)
-			require.Contains(t, error["error"], "error calling function", evt.Data)
-			require.Contains(t, error["error"], "nope", evt.Data)
+			require.Contains(t, error["message"], "Unhandled step error: nope", evt.Data)
+			require.Contains(t, error["error"], "NonRetriableError", evt.Data)
 
 			atomic.AddInt32(&bCount, 1)
 			return true, nil

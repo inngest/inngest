@@ -56,11 +56,11 @@ export default async function EventPage({ params }: EventPageProps) {
 
   return (
     <div className="flex h-full flex-col overflow-y-scroll">
-      <header className="space-y-1 bg-white p-5 shadow">
-        <h2 className="font-medium capitalize text-slate-800">
+      <header className="bg-canvasBase space-y-1 p-5 shadow">
+        <h2 className="font-medium capitalize">
           <Time format="relative" value={new Date(event.receivedAt)} />
         </h2>
-        <dl className="flex justify-between text-sm text-slate-400">
+        <dl className="text-subtle flex justify-between text-sm">
           <dt className="sr-only">Event Timestamp</dt>
           <dl>
             <Time value={new Date(event.receivedAt)} />
@@ -74,12 +74,12 @@ export default async function EventPage({ params }: EventPageProps) {
           <EventPayload event={event} />
         </div>
         <div className="relative">
-          <div className="absolute top-5 h-full border-r border-slate-200" />
+          <div className="border-subtle absolute top-5 h-full border-r" />
         </div>
         <div className="w-2/6 flex-shrink-0 space-y-4 overflow-y-auto p-5">
           {event.skippedFunctionRuns.length > 0 && (
             <>
-              <h3 className="font-medium text-slate-800">Skipped Functions</h3>
+              <h3 className="font-medium">Skipped Functions</h3>
               <ul className="space-y-3 pb-4">
                 {event.skippedFunctionRuns.map((skippedRun) => (
                   <li key={'skipped:' + skippedRun.id}>
@@ -95,12 +95,10 @@ export default async function EventPage({ params }: EventPageProps) {
               </ul>
             </>
           )}
-          <h3 className="font-medium text-slate-800">Triggered Functions</h3>
+          <h3 className="font-medium">Triggered Functions</h3>
           <ul className="space-y-3">
             {event.functionRuns.length === 0 ? (
-              <p className="my-4 text-sm leading-6 text-slate-700">
-                No functions triggered by this event.
-              </p>
+              <p className="my-4 text-sm leading-6">No functions triggered by this event.</p>
             ) : (
               event.functionRuns.map((functionRun) => (
                 <li key={functionRun.id}>

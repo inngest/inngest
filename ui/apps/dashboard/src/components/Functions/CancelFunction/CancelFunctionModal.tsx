@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { RangePicker } from '@inngest/components/DatePicker';
 import { Input } from '@inngest/components/Forms/Input';
 import { Modal } from '@inngest/components/Modal';
@@ -79,8 +79,12 @@ export function CancelFunctionModal(props: Props) {
       <Modal.Body>
         <div className="flex flex-col gap-4">
           <div>
+            <label className="text-basis mb-1 text-sm font-medium" htmlFor="cancellation-name">
+              Name (optional)
+            </label>
+            <p className="text-muted mb-1 text-sm">Provide a name for this cancellation group</p>
+
             <Input
-              label="Name"
               name="cancellation-name"
               onChange={(e) => {
                 setName(e.target.value);
@@ -92,10 +96,10 @@ export function CancelFunctionModal(props: Props) {
           </div>
 
           <div>
-            <label className="text-basis text-sm font-medium" htmlFor="time-range">
+            <label className="text-basis mb-1 text-sm font-medium" htmlFor="time-range">
               Date range
             </label>
-            <p className="text-subtle text-sm">
+            <p className="text-muted mb-1 text-sm">
               Choose the time range when the function runs were queued
             </p>
 
@@ -111,17 +115,21 @@ export function CancelFunctionModal(props: Props) {
             />
           </div>
 
-          <Alert severity="info">
+          <Alert severity="info" className="text-sm">
             This action will affect only queued and running function runs. All affected function
             runs will immediately cancel, but their status may not update immediately.
           </Alert>
 
           {countRes.error && (
-            <Alert severity="error">Failed to query run count: {countRes.error.message}</Alert>
+            <Alert severity="error" className="text-sm">
+              Failed to query run count: {countRes.error.message}
+            </Alert>
           )}
 
           {creationError && (
-            <Alert severity="error">Failed to create cancellation: {creationError.message}</Alert>
+            <Alert severity="error" className="text-sm">
+              Failed to create cancellation: {creationError.message}
+            </Alert>
           )}
         </div>
       </Modal.Body>
@@ -131,15 +139,15 @@ export function CancelFunctionModal(props: Props) {
           <FooterMessage count={countRes.data} />
         </div>
 
-        <NewButton
+        <Button
           appearance="outlined"
           disabled={isCreating}
           kind="secondary"
           label="Close"
           onClick={onClose}
         />
-        <NewButton
-          disabled={isCreating || !timeRange || countRes.data === 0}
+        <Button
+          disabled={isCreating || !timeRange || (countRes.data ?? 0) === 0}
           kind="danger"
           label="Submit"
           onClick={onSubmit}

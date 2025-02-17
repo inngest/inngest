@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/inngest/inngest/pkg/enums"
+
 	"github.com/alicebob/miniredis/v2"
 	"github.com/coocood/freecache"
 	"github.com/eko/gocache/lib/v4/cache"
@@ -17,9 +19,10 @@ import (
 	"github.com/inngest/inngest/pkg/api/apiv1"
 	"github.com/inngest/inngest/pkg/config"
 	_ "github.com/inngest/inngest/pkg/config/defaults"
+	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi"
-	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs"
+	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/event"
@@ -37,8 +40,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
-	"github.com/inngest/inngest/pkg/history_drivers/memory_writer"
-	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/run"
@@ -50,14 +52,28 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const defaultTick = time.Millisecond * 150
-
 var redisSingleton *miniredis.Miniredis
 
 // StartOpts configures the dev server
 type StartOpts struct {
-	Config  config.Config `json:"-"`
-	RootDir string        `json:"dir"`
+	Config        config.Config `json:"-"`
+	RootDir       string        `json:"dir"`
+	RedisURI      string        `json:"redis-uri"`
+	PostgresURI   string        `json:"postgres-uri"`
+	PollInterval  int           `json:"poll-interval"`
+	URLs          []string      `json:"urls"`
+	Tick          time.Duration `json:"tick"`
+	RetryInterval int           `json:"retry_interval"`
+	QueueWorkers  int           `json:"queue_workers"`
+
+	// SigningKey is used to decide that the server should sign requests and
+	// validate responses where applicable, modelling cloud behaviour.
+	SigningKey string `json:"signing_key"`
+	SQLiteDir  string `json:"sqlite-dir"`
+
+	// EventKey is used to authorize incoming events, ensuring they match the
+	// given key.
+	EventKey []string `json:"event_key"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -71,6 +87,12 @@ func New(ctx context.Context, opts StartOpts) error {
 		opts.Config.Execution.LogOutput = true
 	}
 
+	// Ensure that if we've been given a signing key, that cloud mode is
+	// enabled appropriately in config.
+	if opts.SigningKey != "" {
+		opts.Config.ServerKind = headers.ServerKindCloud
+	}
+
 	// NOTE: looks deprecated?
 	// Before running the development service, ensure that we change the http
 	// driver in development to use our AWS Gateway http client, attempting to
@@ -82,27 +104,39 @@ func New(ctx context.Context, opts StartOpts) error {
 }
 
 func start(ctx context.Context, opts StartOpts) error {
-	db, err := sqlitecqrs.New(sqlitecqrs.SqliteCQRSOptions{InMemory: false})
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{
+		InMemory:    false,
+		PostgresURI: opts.PostgresURI,
+		Directory:   opts.SQLiteDir,
+	})
 	if err != nil {
 		return err
 	}
 
-	tick := defaultTick
+	tick := opts.Tick
+	if tick < 1 {
+		tick = devserver.DefaultTickDuration
+	}
 
 	// Initialize the devserver
-	dbcqrs := sqlitecqrs.NewCQRS(db)
-	hd := sqlitecqrs.NewHistoryDriver(db)
+	dbDriver := "sqlite"
+	if opts.PostgresURI != "" {
+		dbDriver = "postgres"
+	}
+	dbcqrs := base_cqrs.NewCQRS(db, dbDriver)
+	hd := base_cqrs.NewHistoryDriver(db, dbDriver)
+	hr := base_cqrs.NewHistoryReader(db, dbDriver)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	stepLimitOverrides := make(map[string]int)
 	stateSizeLimitOverrides := make(map[string]int)
 
-	shardedRc, err := createInmemoryRedisConnection(ctx)
+	shardedRc, err := connectToOrCreateRedis(opts.RedisURI)
 	if err != nil {
 		return err
 	}
 
-	unshardedRc, err := createInmemoryRedisConnection(ctx)
+	unshardedRc, err := connectToOrCreateRedis(opts.RedisURI)
 	if err != nil {
 		return err
 	}
@@ -129,11 +163,21 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 	smv2 := redis_state.MustRunServiceV2(sm)
 
+	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.QueueShard, error) {
+		return queueShard, nil
+	}
+
+	queueShards := map[string]redis_state.QueueShard{
+		consts.DefaultQueueShardName: queueShard,
+	}
+
 	queueOpts := []redis_state.QueueOpt{
 		redis_state.WithIdempotencyTTL(time.Hour),
-		redis_state.WithNumWorkers(100),
+		redis_state.WithNumWorkers(int32(opts.QueueWorkers)),
 		redis_state.WithPollTick(tick),
-		redis_state.WithCustomConcurrencyKeyGenerator(func(ctx context.Context, i redis_state.QueueItem) []state.CustomConcurrency {
+		redis_state.WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i queue.QueueItem) []state.CustomConcurrency {
 			keys := i.Data.GetConcurrencyKeys()
 
 			fn, err := dbcqrs.GetFunctionByInternalUUID(ctx, i.Data.Identifier.WorkspaceID, i.Data.Identifier.WorkflowID)
@@ -167,43 +211,57 @@ func start(ctx context.Context, opts StartOpts) error {
 
 			return keys
 		}),
-		redis_state.WithAccountConcurrencyKeyGenerator(func(ctx context.Context, i redis_state.QueueItem) (string, int) {
-			// NOTE: In the dev server there are no account concurrency limits.
-			return i.Queue(), consts.DefaultConcurrencyLimit
-		}),
-		redis_state.WithPartitionConcurrencyKeyGenerator(func(ctx context.Context, p redis_state.QueuePartition) (string, int) {
-			// Ensure that we return the correct concurrency values per
-			// partition.
-			funcs, err := dbcqrs.GetFunctions(ctx)
-			if err != nil {
-				return p.Queue(), consts.DefaultConcurrencyLimit
-			}
-			for _, fn := range funcs {
-				f, _ := fn.InngestFunction()
-				if f.ID == uuid.Nil {
-					f.ID = inngest.DeterministicUUID(*f)
+		redis_state.WithConcurrencyLimitGetter(
+			func(ctx context.Context, p redis_state.QueuePartition) redis_state.PartitionConcurrencyLimits {
+				limits := redis_state.PartitionConcurrencyLimits{
+					AccountLimit:   redis_state.NoConcurrencyLimit,
+					FunctionLimit:  consts.DefaultConcurrencyLimit,
+					CustomKeyLimit: consts.DefaultConcurrencyLimit,
 				}
-				if f.ID == p.WorkflowID && f.Concurrency != nil && f.Concurrency.PartitionConcurrency() > 0 {
-					return p.Queue(), f.Concurrency.PartitionConcurrency()
+
+				// Ensure that we return the correct concurrency values per partition.
+				funcs, err := dbcqrs.GetFunctions(ctx)
+				if err != nil {
+					return limits
 				}
-			}
-			return p.Queue(), consts.DefaultConcurrencyLimit
-		}),
+				for _, fn := range funcs {
+					f, _ := fn.InngestFunction()
+					if f.ID == uuid.Nil {
+						f.ID = f.DeterministicUUID()
+					}
+					if p.FunctionID != nil && f.ID == *p.FunctionID && f.Concurrency != nil && f.Concurrency.PartitionConcurrency() > 0 {
+						limits.FunctionLimit = f.Concurrency.PartitionConcurrency()
+						return limits
+					}
+				}
+
+				return limits
+			}),
+		redis_state.WithShardSelector(shardSelector),
+		redis_state.WithQueueShardClients(queueShards),
 	}
 
-	rq := redis_state.NewQueue(unshardedClient.Queue(), queueOpts...)
+	rq := redis_state.NewQueue(queueShard, queueOpts...)
 
 	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
 
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq)
-	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), rq)
+	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
 
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
 
+	var sk *string
+	if opts.SigningKey != "" {
+		sk = &opts.SigningKey
+	}
+
 	var drivers = []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
-		d, err := driverConfig.NewDriver()
+		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
+			RequireLocalSigningKey: true,
+			LocalSigningKey:        sk,
+		})
 		if err != nil {
 			return err
 		}
@@ -213,8 +271,6 @@ func start(ctx context.Context, opts StartOpts) error {
 	if err != nil {
 		return fmt.Errorf("failed to create publisher: %w", err)
 	}
-
-	hmw := memory_writer.NewWriter(ctx, memory_writer.WriterOptions{DumpToFile: true})
 
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
@@ -230,7 +286,6 @@ func start(ctx context.Context, opts StartOpts) error {
 			history.NewLifecycleListener(
 				nil,
 				hd,
-				hmw,
 			),
 			devserver.Lifecycle{
 				Cqrs:       dbcqrs,
@@ -256,9 +311,11 @@ func start(ctx context.Context, opts StartOpts) error {
 			return consts.DefaultMaxStateSizeLimit
 		}),
 		executor.WithInvokeFailHandler(getInvokeFailHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
-		executor.WithSendingEventHandler(getSendingEventHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
+		executor.WithSendingEventHandler(getSendingEventHandler(pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithDebouncer(debouncer),
 		executor.WithBatcher(batcher),
+		executor.WithAssignedQueueShard(queueShard),
+		executor.WithShardSelector(shardSelector),
 	)
 	if err != nil {
 		return err
@@ -290,11 +347,35 @@ func start(ctx context.Context, opts StartOpts) error {
 	)
 
 	// The devserver embeds the event API.
-	persistenceInterval := time.Second * 60
-	ds := devserver.NewService(devserver.StartOpts{
-		Config:  opts.Config,
-		RootDir: opts.RootDir,
-	}, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hmw, &persistenceInterval)
+	pi := consts.StartDefaultPersistenceInterval
+	persistenceInterval := &pi
+	if opts.RedisURI != "" {
+		// If we're using an external Redis, we rely on that to persist and
+		// manage snapshotting
+		persistenceInterval = nil
+
+		logger.From(ctx).Info().Msgf("using external Redis %s; disabling in-memory persistence and snapshotting", opts.RedisURI)
+	}
+
+	dsOpts := devserver.StartOpts{
+		Config:      opts.Config,
+		RootDir:     opts.RootDir,
+		URLs:        opts.URLs,
+		Tick:        tick,
+		SigningKey:  sk,
+		EventKeys:   opts.EventKey,
+		RequireKeys: true,
+	}
+
+	if opts.PollInterval > 0 {
+		dsOpts.Poll = true
+		dsOpts.PollInterval = opts.PollInterval
+	}
+
+	// The devserver embeds the event API.
+	ds := devserver.NewService(dsOpts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hd, &devserver.SingleNodeServiceOpts{
+		PersistenceInterval: persistenceInterval,
+	})
 	// embed the tracker
 	ds.Tracker = t
 	ds.State = sm
@@ -311,50 +392,79 @@ func start(ctx context.Context, opts StartOpts) error {
 		caching := apiv1.NewCacheMiddleware(cache)
 
 		apiv1.AddRoutes(r, apiv1.Opts{
-			CachingMiddleware: caching,
-			EventReader:       ds.Data,
-			FunctionReader:    ds.Data,
-			FunctionRunReader: ds.Data,
-			JobQueueReader:    ds.Queue.(queue.JobQueueReader),
-			Executor:          ds.Executor,
+			CachingMiddleware:  caching,
+			EventReader:        ds.Data,
+			FunctionReader:     ds.Data,
+			FunctionRunReader:  ds.Data,
+			JobQueueReader:     ds.Queue.(queue.JobQueueReader),
+			Executor:           ds.Executor,
+			QueueShardSelector: shardSelector,
 		})
 	})
 
-	// ds.opts.Config.EventStream.Service.TopicName()
-
 	core, err := coreapi.NewCoreApi(coreapi.Options{
-		Data:         ds.Data,
-		Config:       ds.Opts.Config,
-		Logger:       logger.From(ctx),
-		Runner:       ds.Runner,
-		Tracker:      ds.Tracker,
-		State:        ds.State,
-		Queue:        ds.Queue,
-		EventHandler: ds.HandleEvent,
-		Executor:     ds.Executor,
+		Data:            ds.Data,
+		Config:          ds.Opts.Config,
+		Logger:          logger.From(ctx),
+		Runner:          ds.Runner,
+		Tracker:         ds.Tracker,
+		State:           ds.State,
+		Queue:           ds.Queue,
+		EventHandler:    ds.HandleEvent,
+		Executor:        ds.Executor,
+		HistoryReader:   hr,
+		LocalSigningKey: opts.SigningKey,
+		RequireKeys:     true,
 	})
 	if err != nil {
 		return err
 	}
+
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
 	// server UI, events, and API for loading data.
 	//
 	// Merge the dev server API (for handling files & registration) with the data
 	// API into the event API router.
-	ds.Apiservice = api.NewService(
-		ds.Opts.Config,
-		api.Mount{At: "/", Router: devAPI},
-		api.Mount{At: "/v0", Router: core.Router},
-		api.Mount{At: "/debug", Handler: middleware.Profiler()},
-	)
+	ds.Apiservice = api.NewService(api.APIServiceOptions{
+		Config: ds.Opts.Config,
+		Mounts: []api.Mount{
+			{At: "/", Router: devAPI},
+			{At: "/v0", Router: core.Router},
+			{At: "/debug", Handler: middleware.Profiler()},
+		},
+		LocalEventKeys: opts.EventKey,
+		RequireKeys:    true,
+	})
 
 	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice)
 }
 
+func connectToOrCreateRedis(redisURI string) (rueidis.Client, error) {
+	if redisURI == "" {
+		return createInmemoryRedisConnection()
+	}
+
+	opt, err := rueidis.ParseURL(redisURI)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing redis uri: %w", err)
+	}
+
+	// Set default overrides
+	opt.DisableCache = true
+	opt.BlockingPoolSize = 1
+
+	rc, err := rueidis.NewClient(opt)
+	if err != nil {
+		return nil, fmt.Errorf("error creating redis client: %w", err)
+	}
+
+	return rc, nil
+}
+
 // createInMemoryRedisConnection creates a new connection to the in-memory Redis
 // server. If the server is not yet running, it will start one.
-func createInmemoryRedisConnection(ctx context.Context) (rueidis.Client, error) {
+func createInmemoryRedisConnection() (rueidis.Client, error) {
 	if redisSingleton == nil {
 		redisSingleton = miniredis.NewMiniRedis()
 		err := redisSingleton.Start()
@@ -383,7 +493,7 @@ func createInmemoryRedisConnection(ctx context.Context) (rueidis.Client, error) 
 	return rc, nil
 }
 
-func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
+func getSendingEventHandler(pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
 	return func(ctx context.Context, evt event.Event, item queue.Item) error {
 		trackedEvent := event.NewOSSTrackedEvent(evt)
 		byt, err := json.Marshal(trackedEvent)

@@ -1,8 +1,7 @@
 'use client';
 
-import { Link } from '@inngest/components/Link';
+import { Banner, type Severity } from '@inngest/components/Banner';
 
-import { Banner, type Severity } from '@/components/Banner';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { useSystemStatus } from './support/statusPage';
 
@@ -15,18 +14,20 @@ export default function IncidentBanner() {
   let message = 'We are experiencing some issues.';
   let severity: Severity = 'warning';
 
-  if (status.indicator !== 'none') {
+  if (status.impact !== 'none') {
     message = `${status.description} -`;
-    if (status.indicator === 'minor') {
+    if (status.impact === 'degraded_performance' || status.impact === 'maintenance') {
       severity = 'info';
     }
   }
 
   return (
-    <Banner kind={severity}>
+    <Banner severity={severity}>
       {message} Please check the{' '}
       <span style={{ display: 'inline-flex' }}>
-        <Link href="https://status.inngest.com/">status page</Link>
+        <Banner.Link severity={severity} href="https://status.inngest.com/">
+          status page
+        </Banner.Link>
       </span>
     </Banner>
   );

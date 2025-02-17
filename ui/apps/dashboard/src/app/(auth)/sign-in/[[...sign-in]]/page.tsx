@@ -1,5 +1,4 @@
 import { type Metadata } from 'next';
-import Link from 'next/link';
 import { SignIn } from '@clerk/nextjs';
 import { Alert } from '@inngest/components/Alert';
 
@@ -33,7 +32,13 @@ export default function SignInPage({ searchParams }: SignInPageProps) {
   return (
     <SplitView>
       <div className="mx-auto my-auto text-center">
-        <SignIn />
+        <SignIn
+          appearance={{
+            elements: {
+              footer: 'bg-none',
+            },
+          }}
+        />
         {typeof searchParams.error === 'string' && (
           <Alert severity="error" className="mx-auto max-w-xs">
             <p className="text-balance">
@@ -42,9 +47,14 @@ export default function SignInPage({ searchParams }: SignInPageProps) {
                 : searchParams.error}
             </p>
             <p className="mt-2">
-              <Link href="/support" className="underline">
+              <Alert.Link
+                size="medium"
+                severity="error"
+                href="/support"
+                className="inline underline"
+              >
                 Contact support
-              </Link>{' '}
+              </Alert.Link>{' '}
               if this problem persists.
             </p>
           </Alert>

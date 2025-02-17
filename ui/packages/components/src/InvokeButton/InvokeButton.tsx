@@ -1,4 +1,4 @@
-import { useCallback, useState, type ComponentProps } from 'react';
+import { useCallback, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { InvokeModal } from '@inngest/components/InvokeButton';
 import { RiFlashlightFill } from '@remixicon/react';
@@ -6,22 +6,23 @@ import { RiFlashlightFill } from '@remixicon/react';
 type Props = {
   disabled?: boolean;
   doesFunctionAcceptPayload: boolean;
-  btnAction: (data: Record<string, unknown>) => void;
-  btnAppearance?: ComponentProps<typeof Button>['appearance'];
+  btnAction: (payload: {
+    data: Record<string, unknown>;
+    user: Record<string, unknown> | null;
+  }) => void;
 };
 
 export function InvokeButton({
   disabled,
   doesFunctionAcceptPayload: hasEventTrigger,
   btnAction,
-  btnAppearance,
 }: Props) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const onConfirm = useCallback(
-    ({ data }: { data: Record<string, unknown> }) => {
+    (payload: { data: Record<string, unknown>; user: Record<string, unknown> | null }) => {
       setIsModalOpen(false);
-      btnAction(data);
+      btnAction(payload);
     },
     [setIsModalOpen, btnAction]
   );
@@ -29,11 +30,13 @@ export function InvokeButton({
   return (
     <>
       <Button
-        btnAction={() => setIsModalOpen(true)}
+        kind="secondary"
+        appearance="outlined"
+        onClick={() => setIsModalOpen(true)}
         disabled={disabled}
         icon={<RiFlashlightFill className="text-sky-500" />}
+        iconSide="left"
         label="Invoke"
-        appearance={btnAppearance}
       />
 
       <InvokeModal

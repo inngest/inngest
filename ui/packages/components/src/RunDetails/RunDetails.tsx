@@ -1,11 +1,11 @@
 'use client';
 
 import { useCallback } from 'react';
-import { Badge } from '@inngest/components/Badge';
 import { ContentCard } from '@inngest/components/ContentCard';
 import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcons';
 import { MetadataGrid } from '@inngest/components/Metadata';
 import { OutputCard } from '@inngest/components/OutputCard';
+import { Pill } from '@inngest/components/Pill';
 import { Timeline } from '@inngest/components/Timeline';
 import type { Function } from '@inngest/components/types/function';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
@@ -95,10 +95,10 @@ export function RunDetails(props: Props) {
       badge={
         cron ? (
           <div className="py-2">
-            <Badge className="bg-orange-400/10 text-orange-400" kind="solid">
+            <Pill kind="warning" appearance="outlined">
               <RiTimeLine className="h-4 w-4" />
               {firstTrigger.value}
-            </Badge>
+            </Pill>
           </div>
         ) : null
       }
@@ -119,9 +119,9 @@ export function RunDetails(props: Props) {
             <SleepingSummary history={history} />
           </div>
 
-          <hr className="mt-8 border-slate-800/50" />
+          <hr className="border-muted mt-8" />
           <div className="px-5 pt-4">
-            <h3 className="py-4 text-sm text-slate-400">Timeline</h3>
+            <h3 className="text-muted py-4 text-sm">Timeline</h3>
             <Timeline
               getOutput={getHistoryItemOutput}
               history={history}

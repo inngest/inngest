@@ -60,6 +60,7 @@ This document presents the Open Source SDK Specification for Inngest, outlining 
     - [6.3.1](#631-function-run). Function run
     - [6.3.2](#632-event-send). Event send
   - [6.4](#64-glossary). Glossary
+- [7](#7-modes). Modes
 
 # 1. Introduction
 
@@ -208,9 +209,9 @@ An SDK MAY support these optional variables, as well as specify any of their own
 Recommended as an environment variable to use when debugging issues with an SDK, allowing a Developer to control the log level of the SDK’s internals.
 - `INNGEST_DEV`
 Recommended as a way for the user to inform an SDK that it should connect to an Inngest Dev Server, either by providing a value of `1` or an origin to use. See Targeting an Inngest Server [[4.2.1](#421-targeting-an-inngest-server)].
-- `INNGEST_API_ORIGIN`
+- `INNGEST_API_BASE_URL`
 Can be used to allow a Developer to inform the SDK of where it can access the target Inngest Server’s API [[4.2](#42-kinds-of-inngest-server)]. In most situations, use of `INNGEST_DEV` will suffice, but this environment variable provides more fine-grained control.
-- `INNGEST_EVENT_API_ORIGIN`
+- `INNGEST_EVENT_API_BASE_URL`
 Can be used to allow a Developer to inform the SDK of where it should send Events to [[4.2](#42-kinds-of-inngest-server)]. In most situations, use of `INNGEST_DEV` will suffice, but this environment variable provides more fine-grained control.
 - `INNGEST_SERVE_ORIGIN`
 Because an SDK exposes an HTTP endpoint for Inngest to contact, the SDK needs to know the URL at which it exists. Sometimes this can be inferred, but it may also be useful to allow a Developer to set this manually. This environment variable sets the origin and appends the discovered path or `INNGEST_SERVE_PATH`.
@@ -921,7 +922,7 @@ The following is schema version `2024-05-24`:
   // Will be null if the request was unsigned and false if the request was
   // signed but failed validation
   authentication_succeeded: false | null
-  
+
   extra?: Record<string, any>
 	function_count: number
 	has_event_key: boolean
@@ -1341,3 +1342,15 @@ There are two lifecycles groups to cover: a function run and sending an event.
 The vast majority of the time, "unmemoized code" is function-level code encountered after exhausting the memoized step data.
 
 However, a non-deterministic function may cause the SDK to encounter an unmemoized step before exhausting the memoized step data. In this case, the unmemoized step is the start of the unmemoized code.
+
+# 7. Modes
+
+The SDK can be in one of 2 modes: `cloud` or `dev`. The SDK defaults to `cloud` mode, but can be switched to `dev` mode by setting the `INNGEST_DEV` environment variable.
+
+When in `cloud` mode:
+- The SDK defaults to Inngest Cloud URLs (API is `https://api.inngest.com` and Event API is `https://inn.gs`).
+- All incoming request signatures are required and verified (unless stated otherwise in this spec).
+
+When in `dev` mode:
+- The SDK defaults to the Dev Server's default URL (`http://localhost:8288`).
+- Incoming request signatures are only validated if present and the SDK has a signing key.

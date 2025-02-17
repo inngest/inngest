@@ -3,8 +3,6 @@ import { Button } from '@inngest/components/Button';
 import { RiLoopLeftLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
-import { cn } from './utils/classNames';
-
 type Props = {
   onClick: () => Promise<unknown>;
 };
@@ -29,11 +27,13 @@ export function RerunButton(props: Props) {
 
   return (
     <Button
-      btnAction={onClick}
+      onClick={onClick}
       disabled={isLoading}
-      icon={<RiLoopLeftLine className={cn(' text-sky-500', isLoading && 'animate-spin')} />}
+      icon={<RiLoopLeftLine />}
+      iconSide="left"
       label="Rerun"
-      size="small"
+      appearance="outlined"
+      size="medium"
     />
   );
 }

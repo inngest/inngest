@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/99designs/gqlgen/graphql"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -31,7 +31,7 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 		ecursor *string
 	)
 	// eventID to run map
-	evtRunMap := map[ulid.ULID]*models.FunctionRunV2{}
+	evtRunMap := map[ulid.ULID][]*models.FunctionRunV2{}
 	// used for retrieving eventIDs
 	evtIDs := []ulid.ULID{}
 
@@ -93,6 +93,7 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 			IsBatch:        r.IsBatch,
 			BatchCreatedAt: batchTime,
 			CronSchedule:   r.CronSchedule,
+			HasAi:          r.HasAI,
 		}
 
 		triggerIDS := []ulid.ULID{}
@@ -102,7 +103,10 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 
 				// track evtID only if it's not batch nor cron
 				if !r.IsBatch && r.CronSchedule == nil {
-					evtRunMap[id] = node
+					if _, ok := evtRunMap[id]; !ok {
+						evtRunMap[id] = []*models.FunctionRunV2{}
+					}
+					evtRunMap[id] = append(evtRunMap[id], node)
 					evtIDs = append(evtIDs, id)
 				}
 			}
@@ -126,11 +130,13 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 		go func(evt *cqrs.Event) {
 			defer wg.Done()
 
-			run, ok := evtRunMap[evt.GetInternalID()]
+			runs, ok := evtRunMap[evt.GetInternalID()]
 			if !ok {
 				return
 			}
-			run.EventName = &evt.EventName
+			for _, run := range runs {
+				run.EventName = &evt.EventName
+			}
 		}(e)
 	}
 	wg.Wait()
@@ -144,6 +150,9 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 	return &models.RunsV2Connection{
 		Edges:    edges,
 		PageInfo: pageInfo,
+		After:    cur,
+		Filter:   filter,
+		OrderBy:  order,
 	}, nil
 }
 
@@ -217,6 +226,7 @@ func (r *queryResolver) Run(ctx context.Context, runID string) (*models.Function
 		BatchCreatedAt: batchTS,
 		CronSchedule:   run.CronSchedule,
 		Output:         output,
+		HasAi:          run.HasAI,
 	}
 
 	return &res, nil
@@ -228,28 +238,33 @@ func (r *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID str
 		return nil, fmt.Errorf("error parsing span identifier: %w", err)
 	}
 
-	output, err := r.Data.GetSpanOutput(ctx, *id)
+	spanData, err := r.Data.GetSpanOutput(ctx, *id)
 	if err != nil {
 		return nil, err
 	}
 
 	resp := models.RunTraceSpanOutput{}
-	if output.IsError {
+	if spanData.IsError {
 		var stepErr models.StepError
-		err := json.Unmarshal(output.Data, &stepErr)
+		err := json.Unmarshal(spanData.Data, &stepErr)
 		if err != nil {
-			return nil, fmt.Errorf("error deserializing step error: %w", err)
+			log.From(ctx).Error().Err(err).Msg("error deserializing step error")
 		}
 
 		if stepErr.Message == "" {
-			stack := string(output.Data)
+			stack := string(spanData.Data)
 			stepErr.Stack = &stack
 		}
 
 		resp.Error = &stepErr
 	} else {
-		d := string(output.Data)
+		d := string(spanData.Data)
 		resp.Data = &d
+	}
+
+	if len(spanData.Input) > 0 {
+		input := string(spanData.Input)
+		resp.Input = &input
 	}
 
 	return &resp, nil
@@ -341,22 +356,7 @@ func (r *queryResolver) RunTrigger(ctx context.Context, runID string) (*models.R
 }
 
 func (r *runsV2ConnResolver) TotalCount(ctx context.Context, obj *models.RunsV2Connection) (int, error) {
-	cursor, ok := graphql.GetFieldContext(ctx).Parent.Args["after"].(*string)
-	if !ok {
-		return 0, fmt.Errorf("failed to access cursor")
-	}
-
-	orderBy, ok := graphql.GetFieldContext(ctx).Parent.Args["orderBy"].([]*models.RunsV2OrderBy)
-	if !ok {
-		return 0, fmt.Errorf("failed to retrieve order")
-	}
-
-	filter, ok := graphql.GetFieldContext(ctx).Parent.Args["filter"].(models.RunsFilterV2)
-	if !ok {
-		return 0, fmt.Errorf("failed to access query filter")
-	}
-
-	opts := toRunsQueryOpt(0, cursor, orderBy, filter)
+	opts := toRunsQueryOpt(0, obj.After, obj.OrderBy, obj.Filter)
 	count, err := r.Data.GetTraceRunsCount(ctx, opts)
 	if err != nil {
 		return 0, fmt.Errorf("error retrieving count for runs: %w", err)

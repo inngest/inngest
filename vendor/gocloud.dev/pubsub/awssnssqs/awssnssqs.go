@@ -17,7 +17,7 @@
 // messages to SQS (Simple Queuing Service). It also provides an implementation
 // of pubsub.Subscription that receives messages from SQS.
 //
-// URLs
+// # URLs
 //
 // For pubsub.OpenTopic, awssnssqs registers for the scheme "awssns" for
 // an SNS topic, and "awssqs" for an SQS topic. For pubsub.OpenSubscription,
@@ -30,37 +30,37 @@
 // see URLOpener.
 // See https://gocloud.dev/concepts/urls/ for background information.
 //
-// Message Delivery Semantics
+// # Message Delivery Semantics
 //
 // AWS SQS supports at-least-once semantics; applications must call Message.Ack
 // after processing a message, or it will be redelivered.
 // See https://godoc.org/gocloud.dev/pubsub#hdr-At_most_once_and_At_least_once_Delivery
 // for more background.
 //
-// Escaping
+// # Escaping
 //
 // Go CDK supports all UTF-8 strings; to make this work with services lacking
 // full UTF-8 support, strings must be escaped (during writes) and unescaped
 // (during reads). The following escapes are required for awssnssqs:
-//  - Metadata keys: Characters other than "a-zA-z0-9_-.", and additionally "."
-//    when it's at the start of the key or the previous character was ".",
-//    are escaped using "__0x<hex>__". These characters were determined by
-//    experimentation.
-//  - Metadata values: Escaped using URL encoding.
-//  - Message body: AWS SNS/SQS only supports UTF-8 strings. See the
-//    BodyBase64Encoding enum in TopicOptions for strategies on how to send
-//    non-UTF-8 message bodies. By default, non-UTF-8 message bodies are base64
-//    encoded.
+//   - Metadata keys: Characters other than "a-zA-z0-9_-.", and additionally "."
+//     when it's at the start of the key or the previous character was ".",
+//     are escaped using "__0x<hex>__". These characters were determined by
+//     experimentation.
+//   - Metadata values: Escaped using URL encoding.
+//   - Message body: AWS SNS/SQS only supports UTF-8 strings. See the
+//     BodyBase64Encoding enum in TopicOptions for strategies on how to send
+//     non-UTF-8 message bodies. By default, non-UTF-8 message bodies are base64
+//     encoded.
 //
-// As
+// # As
 //
 // awssnssqs exposes the following types for As:
-//  - Topic: (V1) *sns.SNS for OpenSNSTopic, *sqs.SQS for OpenSQSTopic; (V2) *snsv2.Client for OpenSNSTopicV2, *sqsv2.Client for OpenSQSTopicV2
-//  - Subscription: (V1) *sqs.SQS; (V2) *sqsv2.Client
-//  - Message: (V1) *sqs.Message; (V2) sqstypesv2.Message
-//  - Message.BeforeSend: (V1) *sns.PublishInput for OpenSNSTopic, *sqs.SendMessageBatchRequestEntry or *sqs.SendMessageInput(deprecated) for OpenSQSTopic; (V2) *snsv2.PublishInput for OpenSNSTopicV2, sqstypesv2.SendMessageBatchRequestEntry for OpenSQSTopicV2
-//  - Message.AfterSend: (V1) *sns.PublishOutput for OpenSNSTopic, *sqs.SendMessageBatchResultEntry for OpenSQSTopic; (V2) *snsv2.PublishOutput for OpenSNSTopicV2, sqstypesv2.SendMessageBatchResultEntry for OpenSQSTopicV2
-//  - Error: (V1) awserr.Error, (V2) any error type returned by the service, notably smithy.APIError
+//   - Topic: (V1) *sns.SNS for OpenSNSTopic, *sqs.SQS for OpenSQSTopic; (V2) *snsv2.Client for OpenSNSTopicV2, *sqsv2.Client for OpenSQSTopicV2
+//   - Subscription: (V1) *sqs.SQS; (V2) *sqsv2.Client
+//   - Message: (V1) *sqs.Message; (V2) sqstypesv2.Message
+//   - Message.BeforeSend: (V1) *sns.PublishBatchRequestEntry or *sns.PublishInput (deprecated) for OpenSNSTopic, *sqs.SendMessageBatchRequestEntry or *sqs.SendMessageInput (deprecated) for OpenSQSTopic; (V2) *snsv2.PublishBatchRequestEntry or *snsv2.PublishInput (deprecated) for OpenSNSTopicV2, *sqstypesv2.SendMessageBatchRequestEntry for OpenSQSTopicV2
+//   - Message.AfterSend: (V1) sns.PublishBatchResultEntry or *sns.PublishOutput (deprecated) for OpenSNSTopic, *sqs.SendMessageBatchResultEntry for OpenSQSTopic; (V2) snstypesv2.PublishBatchResultEntry or *snsv2.PublishOutput (deprecated) for OpenSNSTopicV2, sqstypesv2.SendMessageBatchResultEntry for OpenSQSTopicV2
+//   - Error: (V1) awserr.Error, (V2) any error type returned by the service, notably smithy.APIError
 package awssnssqs // import "gocloud.dev/pubsub/awssnssqs"
 
 import (
@@ -106,7 +106,7 @@ const (
 )
 
 var sendBatcherOptsSNS = &batcher.Options{
-	MaxBatchSize: 1,   // SNS SendBatch only supports one message at a time
+	MaxBatchSize: 10,  // SNS SendBatch supports 10 message at a time
 	MaxHandlers:  100, // max concurrency for sends
 }
 
@@ -214,6 +214,8 @@ const SQSScheme = "awssqs"
 //
 //   - raw (for "awssqs" Subscriptions only): sets SubscriberOptions.Raw. The
 //     value must be parseable by `strconv.ParseBool`.
+//   - nacklazy (for "awssqs" Subscriptions only): sets SubscriberOptions.NackLazy. The
+//     value must be parseable by `strconv.ParseBool`.
 //   - waittime: sets SubscriberOptions.WaitTime, in time.ParseDuration formats.
 //
 // See gocloud.dev/aws/ConfigFromURLParams for other query parameters
@@ -283,6 +285,14 @@ func (o *URLOpener) OpenSubscriptionURL(ctx context.Context, u *url.URL) (*pubsu
 			return nil, fmt.Errorf("invalid value %q for raw: %v", rawStr, err)
 		}
 		q.Del("raw")
+	}
+	if nackLazyStr := q.Get("nacklazy"); nackLazyStr != "" {
+		var err error
+		opts.NackLazy, err = strconv.ParseBool(nackLazyStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid value %q for nacklazy: %v", nackLazyStr, err)
+		}
+		q.Del("nacklazy")
 	}
 	if waitTimeStr := q.Get("waittime"); waitTimeStr != "" {
 		var err error
@@ -357,31 +367,43 @@ type TopicOptions struct {
 	// BodyBase64Encoding determines when message bodies are base64 encoded.
 	// The default is NonUTF8Only.
 	BodyBase64Encoding BodyBase64Encoding
+
+	// BatcherOptions adds constraints to the default batching done for sends.
+	BatcherOptions batcher.Options
 }
 
 // OpenTopic is a shortcut for OpenSNSTopic, provided for backwards compatibility.
+//
+// Deprecated: AWS no longer supports their V1 API. Please migrate to OpenSNSTopicV2.
 func OpenTopic(ctx context.Context, sess client.ConfigProvider, topicARN string, opts *TopicOptions) *pubsub.Topic {
 	return OpenSNSTopic(ctx, sess, topicARN, opts)
 }
 
 // OpenSNSTopic opens a topic that sends to the SNS topic with the given Amazon
 // Resource Name (ARN).
+//
+// Deprecated: AWS no longer supports their V1 API. Please migrate to OpenSNSTopicV2.
 func OpenSNSTopic(ctx context.Context, sess client.ConfigProvider, topicARN string, opts *TopicOptions) *pubsub.Topic {
-	return pubsub.NewTopic(openSNSTopic(ctx, sns.New(sess), topicARN, opts), sendBatcherOptsSNS)
+	if opts == nil {
+		opts = &TopicOptions{}
+	}
+	bo := sendBatcherOptsSNS.NewMergedOptions(&opts.BatcherOptions)
+	return pubsub.NewTopic(openSNSTopic(ctx, sns.New(sess), topicARN, opts), bo)
 }
 
 // OpenSNSTopicV2 opens a topic that sends to the SNS topic with the given Amazon
 // Resource Name (ARN), using AWS SDK V2.
 func OpenSNSTopicV2(ctx context.Context, client *snsv2.Client, topicARN string, opts *TopicOptions) *pubsub.Topic {
-	return pubsub.NewTopic(openSNSTopicV2(ctx, client, topicARN, opts), sendBatcherOptsSNS)
+	if opts == nil {
+		opts = &TopicOptions{}
+	}
+	bo := sendBatcherOptsSNS.NewMergedOptions(&opts.BatcherOptions)
+	return pubsub.NewTopic(openSNSTopicV2(ctx, client, topicARN, opts), bo)
 }
 
 // openSNSTopic returns the driver for OpenSNSTopic. This function exists so the test
 // harness can get the driver interface implementation if it needs to.
 func openSNSTopic(ctx context.Context, client *sns.SNS, topicARN string, opts *TopicOptions) driver.Topic {
-	if opts == nil {
-		opts = &TopicOptions{}
-	}
 	return &snsTopic{
 		useV2:  false,
 		client: client,
@@ -393,9 +415,6 @@ func openSNSTopic(ctx context.Context, client *sns.SNS, topicARN string, opts *T
 // openSNSTopicV2 returns the driver for OpenSNSTopic. This function exists so the test
 // harness can get the driver interface implementation if it needs to.
 func openSNSTopicV2(ctx context.Context, client *snsv2.Client, topicARN string, opts *TopicOptions) driver.Topic {
-	if opts == nil {
-		opts = &TopicOptions{}
-	}
 	return &snsTopic{
 		useV2:    true,
 		clientV2: client,
@@ -439,24 +458,166 @@ func maybeEncodeBody(body []byte, opt BodyBase64Encoding) (string, bool) {
 	return string(body), false
 }
 
+// Defines values for Metadata keys used by the driver for setting message
+// attributes on SNS ([sns.PublishBatchRequestEntry]/[snstypesv2.PublishBatchRequestEntry])
+// and SQS ([sqs.SendMessageBatchRequestEntry]/[sqstypesv2.SendMessageBatchRequestEntry])
+// messages.
+//
+// For example, to set a deduplication ID and message group ID on a message:
+//
+//	import (
+//		"gocloud.dev/pubsub"
+//		"gocloud.dev/pubsub/awssnssqs"
+//	)
+//
+//	message := pubsub.Message{
+//		Body: []byte("Hello, World!"),
+//		Metadata: map[string]string{
+//			awssnssqs.MetadataKeyDeduplicationID: "my-dedup-id",
+//			awssnssqs.MetadataKeyMessageGroupID:  "my-group-id",
+//		},
+//	}
+const (
+	MetadataKeyDeduplicationID = "DeduplicationId"
+	MetadataKeyMessageGroupID  = "MessageGroupId"
+)
+
+// reviseSnsEntryAttributes sets attributes on a [sns.PublishBatchRequestEntry] based on [driver.Message.Metadata].
+func reviseSnsEntryAttributes(dm *driver.Message, entry *sns.PublishBatchRequestEntry) {
+	if dedupID, ok := dm.Metadata[MetadataKeyDeduplicationID]; ok {
+		entry.MessageDeduplicationId = aws.String(dedupID)
+	}
+	if groupID, ok := dm.Metadata[MetadataKeyMessageGroupID]; ok {
+		entry.MessageGroupId = aws.String(groupID)
+	}
+}
+
+// reviseSnsV2EntryAttributes sets attributes on a [snstypesv2.PublishBatchRequestEntry] based on [driver.Message.Metadata].
+func reviseSnsV2EntryAttributes(dm *driver.Message, entry *snstypesv2.PublishBatchRequestEntry) {
+	if dedupID, ok := dm.Metadata[MetadataKeyDeduplicationID]; ok {
+		entry.MessageDeduplicationId = aws.String(dedupID)
+	}
+	if groupID, ok := dm.Metadata[MetadataKeyMessageGroupID]; ok {
+		entry.MessageGroupId = aws.String(groupID)
+	}
+}
+
 // SendBatch implements driver.Topic.SendBatch.
 func (t *snsTopic) SendBatch(ctx context.Context, dms []*driver.Message) error {
-	if len(dms) != 1 {
-		panic("snsTopic.SendBatch should only get one message at a time")
-	}
-	dm := dms[0]
-
 	if t.useV2 {
-		attrs := map[string]snstypesv2.MessageAttributeValue{}
+		req := &snsv2.PublishBatchInput{
+			TopicArn: &t.arn,
+		}
+		for _, dm := range dms {
+			attrs := map[string]snstypesv2.MessageAttributeValue{}
+			for k, v := range encodeMetadata(dm.Metadata) {
+				attrs[k] = snstypesv2.MessageAttributeValue{
+					DataType:    stringDataType,
+					StringValue: aws.String(v),
+				}
+			}
+			body, didEncode := maybeEncodeBody(dm.Body, t.opts.BodyBase64Encoding)
+			if didEncode {
+				attrs[base64EncodedKey] = snstypesv2.MessageAttributeValue{
+					DataType:    stringDataType,
+					StringValue: aws.String("true"),
+				}
+			}
+			if len(attrs) == 0 {
+				attrs = nil
+			}
+			entry := &snstypesv2.PublishBatchRequestEntry{
+				Id:                aws.String(strconv.Itoa(len(req.PublishBatchRequestEntries))),
+				MessageAttributes: attrs,
+				Message:           aws.String(body),
+			}
+			reviseSnsV2EntryAttributes(dm, entry)
+			if dm.BeforeSend != nil {
+				// A previous revision used the non-batch API PublishInput, which takes
+				// a *snsv2.PublishInput. For backwards compatibility for As, continue
+				// to support that type. If it is requested, create a PublishInput
+				// with the fields from PublishBatchRequestEntry that were set, and
+				// then copy all of the matching fields back after calling dm.BeforeSend.
+				var pi *snsv2.PublishInput
+				asFunc := func(i interface{}) bool {
+					if p, ok := i.(**snsv2.PublishInput); ok {
+						pi = &snsv2.PublishInput{
+							// Id does not exist on PublishInput.
+							MessageAttributes: entry.MessageAttributes,
+							Message:           entry.Message,
+						}
+						*p = pi
+						return true
+					}
+					if p, ok := i.(**snstypesv2.PublishBatchRequestEntry); ok {
+						*p = entry
+						return true
+					}
+					return false
+				}
+				if err := dm.BeforeSend(asFunc); err != nil {
+					return err
+				}
+				if pi != nil {
+					// Copy all of the fields that may have been modified back to the entry.
+					entry.MessageAttributes = pi.MessageAttributes
+					entry.Message = pi.Message
+					entry.MessageDeduplicationId = pi.MessageDeduplicationId
+					entry.MessageGroupId = pi.MessageGroupId
+					entry.MessageStructure = pi.MessageStructure
+					entry.Subject = pi.Subject
+				}
+			}
+			req.PublishBatchRequestEntries = append(req.PublishBatchRequestEntries, *entry)
+		}
+		resp, err := t.clientV2.PublishBatch(ctx, req)
+		if err != nil {
+			return err
+		}
+		if numFailed := len(resp.Failed); numFailed > 0 {
+			first := resp.Failed[0]
+			return awserr.New(aws.StringValue(first.Code), fmt.Sprintf("sns.PublishBatch failed for %d message(s): %s", numFailed, aws.StringValue(first.Message)), nil)
+		}
+		if len(resp.Successful) == len(dms) {
+			for n, dm := range dms {
+				if dm.AfterSend != nil {
+					asFunc := func(i interface{}) bool {
+						if p, ok := i.(*snstypesv2.PublishBatchResultEntry); ok {
+							*p = resp.Successful[n]
+							return true
+						}
+						if p, ok := i.(**snsv2.PublishOutput); ok {
+							// For backwards compability.
+							*p = &snsv2.PublishOutput{
+								MessageId:      resp.Successful[n].MessageId,
+								SequenceNumber: resp.Successful[n].SequenceNumber,
+							}
+							return true
+						}
+						return false
+					}
+					if err := dm.AfterSend(asFunc); err != nil {
+						return err
+					}
+				}
+			}
+		}
+		return nil
+	}
+	req := &sns.PublishBatchInput{
+		TopicArn: &t.arn,
+	}
+	for _, dm := range dms {
+		attrs := map[string]*sns.MessageAttributeValue{}
 		for k, v := range encodeMetadata(dm.Metadata) {
-			attrs[k] = snstypesv2.MessageAttributeValue{
+			attrs[k] = &sns.MessageAttributeValue{
 				DataType:    stringDataType,
 				StringValue: aws.String(v),
 			}
 		}
 		body, didEncode := maybeEncodeBody(dm.Body, t.opts.BodyBase64Encoding)
 		if didEncode {
-			attrs[base64EncodedKey] = snstypesv2.MessageAttributeValue{
+			attrs[base64EncodedKey] = &sns.MessageAttributeValue{
 				DataType:    stringDataType,
 				StringValue: aws.String("true"),
 			}
@@ -464,15 +625,31 @@ func (t *snsTopic) SendBatch(ctx context.Context, dms []*driver.Message) error {
 		if len(attrs) == 0 {
 			attrs = nil
 		}
-		input := &snsv2.PublishInput{
-			Message:           aws.String(body),
+		entry := &sns.PublishBatchRequestEntry{
+			Id:                aws.String(strconv.Itoa(len(req.PublishBatchRequestEntries))),
 			MessageAttributes: attrs,
-			TopicArn:          &t.arn,
+			Message:           aws.String(body),
 		}
+		reviseSnsEntryAttributes(dm, entry)
 		if dm.BeforeSend != nil {
+			// A previous revision used the non-batch API PublishInput, which takes
+			// a *snsv2.PublishInput. For backwards compatibility for As, continue
+			// to support that type. If it is requested, create a PublishInput
+			// with the fields from PublishBatchRequestEntry that were set, and
+			// then copy all of the matching fields back after calling dm.BeforeSend.
+			var pi *sns.PublishInput
 			asFunc := func(i interface{}) bool {
-				if p, ok := i.(**snsv2.PublishInput); ok {
-					*p = input
+				if p, ok := i.(**sns.PublishInput); ok {
+					pi = &sns.PublishInput{
+						// Id does not exist on PublishInput.
+						MessageAttributes: entry.MessageAttributes,
+						Message:           entry.Message,
+					}
+					*p = pi
+					return true
+				}
+				if p, ok := i.(**sns.PublishBatchRequestEntry); ok {
+					*p = entry
 					return true
 				}
 				return false
@@ -480,73 +657,48 @@ func (t *snsTopic) SendBatch(ctx context.Context, dms []*driver.Message) error {
 			if err := dm.BeforeSend(asFunc); err != nil {
 				return err
 			}
-		}
-		po, err := t.clientV2.Publish(ctx, input)
-		if err != nil {
-			return err
-		}
-		if dm.AfterSend != nil {
-			asFunc := func(i interface{}) bool {
-				if p, ok := i.(**snsv2.PublishOutput); ok {
-					*p = po
-					return true
-				}
-				return false
-			}
-			if err := dm.AfterSend(asFunc); err != nil {
-				return err
+			if pi != nil {
+				// Copy all of the fields that may have been modified back to the entry.
+				entry.MessageAttributes = pi.MessageAttributes
+				entry.Message = pi.Message
+				entry.MessageDeduplicationId = pi.MessageDeduplicationId
+				entry.MessageGroupId = pi.MessageGroupId
+				entry.MessageStructure = pi.MessageStructure
+				entry.Subject = pi.Subject
 			}
 		}
-		return nil
+		req.PublishBatchRequestEntries = append(req.PublishBatchRequestEntries, entry)
 	}
-	attrs := map[string]*sns.MessageAttributeValue{}
-	for k, v := range encodeMetadata(dm.Metadata) {
-		attrs[k] = &sns.MessageAttributeValue{
-			DataType:    stringDataType,
-			StringValue: aws.String(v),
-		}
-	}
-	body, didEncode := maybeEncodeBody(dm.Body, t.opts.BodyBase64Encoding)
-	if didEncode {
-		attrs[base64EncodedKey] = &sns.MessageAttributeValue{
-			DataType:    stringDataType,
-			StringValue: aws.String("true"),
-		}
-	}
-	if len(attrs) == 0 {
-		attrs = nil
-	}
-	input := &sns.PublishInput{
-		Message:           aws.String(body),
-		MessageAttributes: attrs,
-		TopicArn:          &t.arn,
-	}
-	if dm.BeforeSend != nil {
-		asFunc := func(i interface{}) bool {
-			if p, ok := i.(**sns.PublishInput); ok {
-				*p = input
-				return true
-			}
-			return false
-		}
-		if err := dm.BeforeSend(asFunc); err != nil {
-			return err
-		}
-	}
-	po, err := t.client.PublishWithContext(ctx, input)
+	resp, err := t.client.PublishBatchWithContext(ctx, req)
 	if err != nil {
 		return err
 	}
-	if dm.AfterSend != nil {
-		asFunc := func(i interface{}) bool {
-			if p, ok := i.(**sns.PublishOutput); ok {
-				*p = po
-				return true
+	if numFailed := len(resp.Failed); numFailed > 0 {
+		first := resp.Failed[0]
+		return awserr.New(aws.StringValue(first.Code), fmt.Sprintf("sns.PublishBatch failed for %d message(s): %s", numFailed, aws.StringValue(first.Message)), nil)
+	}
+	if len(resp.Successful) == len(dms) {
+		for n, dm := range dms {
+			if dm.AfterSend != nil {
+				asFunc := func(i interface{}) bool {
+					if p, ok := i.(*sns.PublishBatchResultEntry); ok {
+						*p = *resp.Successful[n]
+						return true
+					}
+					if p, ok := i.(**sns.PublishOutput); ok {
+						// For backwards compability.
+						*p = &sns.PublishOutput{
+							MessageId:      resp.Successful[n].MessageId,
+							SequenceNumber: resp.Successful[n].SequenceNumber,
+						}
+						return true
+					}
+					return false
+				}
+				if err := dm.AfterSend(asFunc); err != nil {
+					return err
+				}
 			}
-			return false
-		}
-		if err := dm.AfterSend(asFunc); err != nil {
-			return err
 		}
 	}
 	return nil
@@ -599,22 +751,29 @@ type sqsTopic struct {
 
 // OpenSQSTopic opens a topic that sends to the SQS topic with the given SQS
 // queue URL.
+//
+// Deprecated: AWS no longer supports their V1 API. Please migrate to OpenSQSTopicV2.
 func OpenSQSTopic(ctx context.Context, sess client.ConfigProvider, qURL string, opts *TopicOptions) *pubsub.Topic {
-	return pubsub.NewTopic(openSQSTopic(ctx, sqs.New(sess), qURL, opts), sendBatcherOptsSQS)
+	if opts == nil {
+		opts = &TopicOptions{}
+	}
+	bo := sendBatcherOptsSQS.NewMergedOptions(&opts.BatcherOptions)
+	return pubsub.NewTopic(openSQSTopic(ctx, sqs.New(sess), qURL, opts), bo)
 }
 
 // OpenSQSTopicV2 opens a topic that sends to the SQS topic with the given SQS
 // queue URL, using AWS SDK V2.
 func OpenSQSTopicV2(ctx context.Context, client *sqsv2.Client, qURL string, opts *TopicOptions) *pubsub.Topic {
-	return pubsub.NewTopic(openSQSTopicV2(ctx, client, qURL, opts), sendBatcherOptsSQS)
+	if opts == nil {
+		opts = &TopicOptions{}
+	}
+	bo := sendBatcherOptsSQS.NewMergedOptions(&opts.BatcherOptions)
+	return pubsub.NewTopic(openSQSTopicV2(ctx, client, qURL, opts), bo)
 }
 
 // openSQSTopic returns the driver for OpenSQSTopic. This function exists so the test
 // harness can get the driver interface implementation if it needs to.
 func openSQSTopic(ctx context.Context, client *sqs.SQS, qURL string, opts *TopicOptions) driver.Topic {
-	if opts == nil {
-		opts = &TopicOptions{}
-	}
 	return &sqsTopic{
 		useV2:  false,
 		client: client,
@@ -626,14 +785,31 @@ func openSQSTopic(ctx context.Context, client *sqs.SQS, qURL string, opts *Topic
 // openSQSTopicV2 returns the driver for OpenSQSTopic. This function exists so the test
 // harness can get the driver interface implementation if it needs to.
 func openSQSTopicV2(ctx context.Context, client *sqsv2.Client, qURL string, opts *TopicOptions) driver.Topic {
-	if opts == nil {
-		opts = &TopicOptions{}
-	}
 	return &sqsTopic{
 		useV2:    true,
 		clientV2: client,
 		qURL:     qURL,
 		opts:     opts,
+	}
+}
+
+// reviseSqsEntryAttributes sets attributes on a [sqs.SendMessageBatchRequestEntry] based on [driver.Message.Metadata].
+func reviseSqsEntryAttributes(dm *driver.Message, entry *sqs.SendMessageBatchRequestEntry) {
+	if dedupID, ok := dm.Metadata[MetadataKeyDeduplicationID]; ok {
+		entry.MessageDeduplicationId = aws.String(dedupID)
+	}
+	if groupID, ok := dm.Metadata[MetadataKeyMessageGroupID]; ok {
+		entry.MessageGroupId = aws.String(groupID)
+	}
+}
+
+// reviseSqsV2EntryAttributes sets attributes on a [sqstypesv2.SendMessageBatchRequestEntry] based on [driver.Message.Metadata].
+func reviseSqsV2EntryAttributes(dm *driver.Message, entry *sqstypesv2.SendMessageBatchRequestEntry) {
+	if dedupID, ok := dm.Metadata[MetadataKeyDeduplicationID]; ok {
+		entry.MessageDeduplicationId = aws.String(dedupID)
+	}
+	if groupID, ok := dm.Metadata[MetadataKeyMessageGroupID]; ok {
+		entry.MessageGroupId = aws.String(groupID)
 	}
 }
 
@@ -661,15 +837,15 @@ func (t *sqsTopic) SendBatch(ctx context.Context, dms []*driver.Message) error {
 			if len(attrs) == 0 {
 				attrs = nil
 			}
-			entry := sqstypesv2.SendMessageBatchRequestEntry{
+			entry := &sqstypesv2.SendMessageBatchRequestEntry{
 				Id:                aws.String(strconv.Itoa(len(req.Entries))),
 				MessageAttributes: attrs,
 				MessageBody:       aws.String(body),
 			}
-			req.Entries = append(req.Entries, entry)
+			reviseSqsV2EntryAttributes(dm, entry)
 			if dm.BeforeSend != nil {
 				asFunc := func(i interface{}) bool {
-					if p, ok := i.(*sqstypesv2.SendMessageBatchRequestEntry); ok {
+					if p, ok := i.(**sqstypesv2.SendMessageBatchRequestEntry); ok {
 						*p = entry
 						return true
 					}
@@ -679,6 +855,7 @@ func (t *sqsTopic) SendBatch(ctx context.Context, dms []*driver.Message) error {
 					return err
 				}
 			}
+			req.Entries = append(req.Entries, *entry)
 		}
 		resp, err := t.clientV2.SendMessageBatch(ctx, req)
 		if err != nil {
@@ -732,6 +909,7 @@ func (t *sqsTopic) SendBatch(ctx context.Context, dms []*driver.Message) error {
 			MessageAttributes: attrs,
 			MessageBody:       aws.String(body),
 		}
+		reviseSqsEntryAttributes(dm, entry)
 		req.Entries = append(req.Entries, entry)
 		if dm.BeforeSend != nil {
 			// A previous revision used the non-batch API SendMessage, which takes
@@ -838,8 +1016,8 @@ func errorCode(err error) gcerrors.ErrorCode {
 	var ae smithy.APIError
 	if errors.As(err, &ae) {
 		code = ae.ErrorCode()
-	} else if ae, ok := err.(awserr.Error); ok {
-		code = ae.Code()
+	} else if awsErr, ok := err.(awserr.Error); ok {
+		code = awsErr.Code()
 	} else {
 		return gcerrors.Unknown
 	}
@@ -911,32 +1089,58 @@ type SubscriptionOptions struct {
 	// See https://aws.amazon.com/sns/faqs/#Raw_message_delivery.
 	Raw bool
 
+	// NackLazy determines what Nack does.
+	//
+	// By default, Nack uses ChangeMessageVisibility to set the VisibilityTimeout
+	// for the nacked message to 0, so that it will be redelivered immediately.
+	// Set NackLazy to true to bypass this behavior; Nack will do nothing,
+	// and the message will be redelivered after the existing VisibilityTimeout
+	// expires (defaults to 30s, but can be configured per queue).
+	//
+	// See https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html.
+	NackLazy bool
+
 	// WaitTime passed to ReceiveMessage to enable long polling.
 	// https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-short-and-long-polling.html#sqs-long-polling.
 	// Note that a non-zero WaitTime can delay delivery of messages
 	// by up to that duration.
 	WaitTime time.Duration
+
+	// ReceiveBatcherOptions adds constraints to the default batching done for receives.
+	ReceiveBatcherOptions batcher.Options
+
+	// AckBatcherOptions adds constraints to the default batching done for acks.
+	AckBatcherOptions batcher.Options
 }
 
 // OpenSubscription opens a subscription based on AWS SQS for the given SQS
 // queue URL. The queue is assumed to be subscribed to some SNS topic, though
 // there is no check for this.
+//
+// Deprecated: AWS no longer supports their V1 API. Please migrate to OpenSubscriptionV2.
 func OpenSubscription(ctx context.Context, sess client.ConfigProvider, qURL string, opts *SubscriptionOptions) *pubsub.Subscription {
-	return pubsub.NewSubscription(openSubscription(ctx, sqs.New(sess), qURL, opts), recvBatcherOpts, ackBatcherOpts)
+	if opts == nil {
+		opts = &SubscriptionOptions{}
+	}
+	rbo := recvBatcherOpts.NewMergedOptions(&opts.ReceiveBatcherOptions)
+	abo := ackBatcherOpts.NewMergedOptions(&opts.AckBatcherOptions)
+	return pubsub.NewSubscription(openSubscription(ctx, sqs.New(sess), qURL, opts), rbo, abo)
 }
 
 // OpenSubscriptionV2 opens a subscription based on AWS SQS for the given SQS
 // queue URL, using AWS SDK V2. The queue is assumed to be subscribed to some SNS topic, though
 // there is no check for this.
 func OpenSubscriptionV2(ctx context.Context, client *sqsv2.Client, qURL string, opts *SubscriptionOptions) *pubsub.Subscription {
-	return pubsub.NewSubscription(openSubscriptionV2(ctx, client, qURL, opts), recvBatcherOpts, ackBatcherOpts)
+	if opts == nil {
+		opts = &SubscriptionOptions{}
+	}
+	rbo := recvBatcherOpts.NewMergedOptions(&opts.ReceiveBatcherOptions)
+	abo := ackBatcherOpts.NewMergedOptions(&opts.AckBatcherOptions)
+	return pubsub.NewSubscription(openSubscriptionV2(ctx, client, qURL, opts), rbo, abo)
 }
 
 // openSubscription returns a driver.Subscription.
 func openSubscription(ctx context.Context, client *sqs.SQS, qURL string, opts *SubscriptionOptions) driver.Subscription {
-	if opts == nil {
-		opts = &SubscriptionOptions{}
-	}
 	return &subscription{
 		useV2:  false,
 		client: client,
@@ -946,9 +1150,6 @@ func openSubscription(ctx context.Context, client *sqs.SQS, qURL string, opts *S
 
 // openSubscriptionV2 returns a driver.Subscription.
 func openSubscriptionV2(ctx context.Context, client *sqsv2.Client, qURL string, opts *SubscriptionOptions) driver.Subscription {
-	if opts == nil {
-		opts = &SubscriptionOptions{}
-	}
 	return &subscription{
 		useV2:    true,
 		clientV2: client,
@@ -1182,6 +1383,9 @@ func (s *subscription) CanNack() bool { return true }
 
 // SendNacks implements driver.Subscription.SendNacks.
 func (s *subscription) SendNacks(ctx context.Context, ids []driver.AckID) error {
+	if s.opts.NackLazy {
+		return nil
+	}
 	if s.useV2 {
 		req := &sqsv2.ChangeMessageVisibilityBatchInput{QueueUrl: aws.String(s.qURL)}
 		for _, id := range ids {
@@ -1238,7 +1442,7 @@ func (s *subscription) SendNacks(ctx context.Context, ids []driver.AckID) error 
 		}
 		numFailed++
 	}
-	if numFailed > 0 {
+	if numFailed > 0 && firstFail != nil {
 		return awserr.New(aws.StringValue(firstFail.Code), fmt.Sprintf("sqs.ChangeMessageVisibilityBatch failed for %d message(s): %s", numFailed, aws.StringValue(firstFail.Message)), nil)
 	}
 	return nil

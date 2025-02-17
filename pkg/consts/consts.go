@@ -1,6 +1,8 @@
 package consts
 
-import "time"
+import (
+	"time"
+)
 
 const (
 	// DefaultRetryCount is used when no retry count for a step is specified.
@@ -25,8 +27,19 @@ const (
 	// our system.
 	MaxFunctionTimeout = 2 * time.Hour
 
-	// MaxBodySize is the maximum payload size read on any HTTP response.
-	MaxBodySize = 1024 * 1024 * 4 // 4MB
+	// MaxStepOutputSize is the maximum size of the output of a step.
+	MaxStepOutputSize = 1024 * 1024 * 4 // 4MB
+
+	// MaxStepInputSize is the maximum size of the input of a step.
+	MaxStepInputSize = 1024 * 1024 * 4 // 4MB
+
+	// MaxSDKResponseBodySize is the maximum payload size in the response from
+	// the SDK.
+	MaxSDKResponseBodySize = MaxStepOutputSize + MaxStepInputSize
+
+	// MaxSDKRequestBodySize is the maximum payload size in the request to the
+	// SDK.
+	MaxSDKRequestBodySize = 1024 * 1024 * 4 // 4MB
 
 	// DefaultMaxStateSizeLimit is the maximum number of bytes of output state per function run allowed.
 	DefaultMaxStateSizeLimit = 1024 * 1024 * 32 // 32MB
@@ -102,10 +115,10 @@ const (
 
 	DefaultQueueContinueLimit = uint(5)
 
-	DevServerTempDir     = ".inngest"
-	DevServerDbFile      = "dev_db.db"
-	DevServerRdbFile     = "dev_state.rdb"
-	DevServerHistoryFile = "dev_history.json"
+	PauseExpiredDeletionGracePeriod = time.Minute * 5
 
-	PauseExpiredDeletionGracePeriod = time.Second * 10
+	DefaultQueueShardName = "default"
+
+	// Minimum number of pauses before using the aggregate pause handler.
+	AggregatePauseThreshold = 50
 )

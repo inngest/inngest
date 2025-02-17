@@ -1,9 +1,8 @@
+import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import { MetricsIcon } from '@inngest/components/icons/sections/Metrics';
 import { RunsIcon } from '@inngest/components/icons/sections/Runs';
 
 import type { Environment as EnvType } from '@/utils/environments';
-import { useBooleanFlag } from '../FeatureFlags/hooks';
-import { MenuItem } from './MenuItem';
 import { getNavRoute } from './Navigation';
 
 export default function Monitor({
@@ -13,7 +12,6 @@ export default function Monitor({
   activeEnv: EnvType;
   collapsed: boolean;
 }) {
-  const { isReady, value: isRunsEnabled } = useBooleanFlag('env-level-runs-page');
   return (
     <div className={`flex w-full flex-col  ${collapsed ? 'mt-2' : 'mt-5'}`}>
       {collapsed ? (
@@ -25,21 +23,19 @@ export default function Monitor({
         href={getNavRoute(activeEnv, 'metrics')}
         collapsed={collapsed}
         text="Metrics"
-        icon={<MetricsIcon className="h-18px w-[18px]" />}
-        comingSoon={true}
+        icon={<MetricsIcon className="h-[18px] w-[18px]" />}
       />
       <MenuItem
         href={getNavRoute(activeEnv, 'runs')}
         collapsed={collapsed}
         text="Runs"
-        icon={<RunsIcon className="h-18px w-[18px]" />}
-        comingSoon={isReady && !isRunsEnabled}
+        icon={<RunsIcon className="h-[18px] w-[18px]" />}
       />
       {/* <MenuItem
         href={getNavRoute(activeEnv, 'events/monitor')}
         collapsed={collapsed}
         text="Event Logs"
-        icon={<EventLogsIcon className="h-18px w-[18px]" />}
+        icon={<EventLogsIcon className="h-[18px] w-[18px]" />}
         comingSoon={true}
       /> */}
     </div>

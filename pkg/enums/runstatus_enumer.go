@@ -10,11 +10,11 @@ import (
 	"strings"
 )
 
-const _RunStatusName = "RunningCompletedFailedCancelledOverflowedScheduledUnknown"
+const _RunStatusName = "RunningCompletedFailedCancelledOverflowedScheduledUnknownSkipped"
 
-var _RunStatusIndex = [...]uint8{0, 7, 16, 22, 31, 41, 50, 57}
+var _RunStatusIndex = [...]uint8{0, 7, 16, 22, 31, 41, 50, 57, 64}
 
-const _RunStatusLowerName = "runningcompletedfailedcancelledoverflowedscheduledunknown"
+const _RunStatusLowerName = "runningcompletedfailedcancelledoverflowedscheduledunknownskipped"
 
 func (i RunStatus) String() string {
 	if i < 0 || i >= RunStatus(len(_RunStatusIndex)-1) {
@@ -34,9 +34,10 @@ func _RunStatusNoOp() {
 	_ = x[RunStatusOverflowed-(4)]
 	_ = x[RunStatusScheduled-(5)]
 	_ = x[RunStatusUnknown-(6)]
+	_ = x[RunStatusSkipped-(7)]
 }
 
-var _RunStatusValues = []RunStatus{RunStatusRunning, RunStatusCompleted, RunStatusFailed, RunStatusCancelled, RunStatusOverflowed, RunStatusScheduled, RunStatusUnknown}
+var _RunStatusValues = []RunStatus{RunStatusRunning, RunStatusCompleted, RunStatusFailed, RunStatusCancelled, RunStatusOverflowed, RunStatusScheduled, RunStatusUnknown, RunStatusSkipped}
 
 var _RunStatusNameToValueMap = map[string]RunStatus{
 	_RunStatusName[0:7]:        RunStatusRunning,
@@ -53,6 +54,8 @@ var _RunStatusNameToValueMap = map[string]RunStatus{
 	_RunStatusLowerName[41:50]: RunStatusScheduled,
 	_RunStatusName[50:57]:      RunStatusUnknown,
 	_RunStatusLowerName[50:57]: RunStatusUnknown,
+	_RunStatusName[57:64]:      RunStatusSkipped,
+	_RunStatusLowerName[57:64]: RunStatusSkipped,
 }
 
 var _RunStatusNames = []string{
@@ -63,6 +66,7 @@ var _RunStatusNames = []string{
 	_RunStatusName[31:41],
 	_RunStatusName[41:50],
 	_RunStatusName[50:57],
+	_RunStatusName[57:64],
 }
 
 // RunStatusString retrieves an enum value from the enum constants string name.

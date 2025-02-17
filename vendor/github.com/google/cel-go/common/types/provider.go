@@ -276,7 +276,7 @@ func (p *Registry) NewValue(structType string, fields map[string]ref.Val) ref.Va
 		}
 		err := msgSetField(msg, field, value)
 		if err != nil {
-			return &Err{err}
+			return &Err{error: err}
 		}
 	}
 	return p.NativeToValue(msg.Interface())
@@ -585,17 +585,46 @@ func nativeToValue(a Adapter, value any) (ref.Val, bool) {
 		refKind := refValue.Kind()
 		switch refKind {
 		case reflect.Array, reflect.Slice:
+			if refValue.Type().Elem() == reflect.TypeOf(byte(0)) {
+				if refValue.CanAddr() {
+					return Bytes(refValue.Bytes()), true
+				}
+				tmp := reflect.New(refValue.Type())
+				tmp.Elem().Set(refValue)
+				return Bytes(tmp.Elem().Bytes()), true
+			}
 			return NewDynamicList(a, v), true
 		case reflect.Map:
 			return NewDynamicMap(a, v), true
 		// type aliases of primitive types cannot be asserted as that type, but rather need
 		// to be downcast to int32 before being converted to a CEL representation.
+		case reflect.Bool:
+			boolTupe := reflect.TypeOf(false)
+			return Bool(refValue.Convert(boolTupe).Interface().(bool)), true
+		case reflect.Int:
+			intType := reflect.TypeOf(int(0))
+			return Int(refValue.Convert(intType).Interface().(int)), true
+		case reflect.Int8:
+			intType := reflect.TypeOf(int8(0))
+			return Int(refValue.Convert(intType).Interface().(int8)), true
+		case reflect.Int16:
+			intType := reflect.TypeOf(int16(0))
+			return Int(refValue.Convert(intType).Interface().(int16)), true
 		case reflect.Int32:
 			intType := reflect.TypeOf(int32(0))
 			return Int(refValue.Convert(intType).Interface().(int32)), true
 		case reflect.Int64:
 			intType := reflect.TypeOf(int64(0))
 			return Int(refValue.Convert(intType).Interface().(int64)), true
+		case reflect.Uint:
+			uintType := reflect.TypeOf(uint(0))
+			return Uint(refValue.Convert(uintType).Interface().(uint)), true
+		case reflect.Uint8:
+			uintType := reflect.TypeOf(uint8(0))
+			return Uint(refValue.Convert(uintType).Interface().(uint8)), true
+		case reflect.Uint16:
+			uintType := reflect.TypeOf(uint16(0))
+			return Uint(refValue.Convert(uintType).Interface().(uint16)), true
 		case reflect.Uint32:
 			uintType := reflect.TypeOf(uint32(0))
 			return Uint(refValue.Convert(uintType).Interface().(uint32)), true
@@ -608,6 +637,9 @@ func nativeToValue(a Adapter, value any) (ref.Val, bool) {
 		case reflect.Float64:
 			doubleType := reflect.TypeOf(float64(0))
 			return Double(refValue.Convert(doubleType).Interface().(float64)), true
+		case reflect.String:
+			stringType := reflect.TypeOf("")
+			return String(refValue.Convert(stringType).Interface().(string)), true
 		}
 	}
 	return nil, false

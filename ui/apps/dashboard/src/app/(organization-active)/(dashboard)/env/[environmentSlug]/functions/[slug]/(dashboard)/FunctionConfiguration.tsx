@@ -1,6 +1,4 @@
 import { MetadataGrid, type MetadataItemProps } from '@inngest/components/Metadata';
-import { noCase } from 'change-case';
-import { titleCase } from 'title-case';
 
 import Block from '@/components/Block';
 import type { FunctionConfiguration } from '@/gql/graphql';
@@ -128,17 +126,20 @@ export default function FunctionConfiguration({ configuration }: FunctionConfigu
       <MetadataGrid columns={2} metadataItems={miscellaneousItems} />
       {eventBatchItems && (
         <>
-          <h3 className="pb-2 pt-6 text-sm font-medium text-slate-800">Events Batch</h3>
+          <h3 className="pb-2 pt-6 text-sm font-medium">Events Batch</h3>
           <MetadataGrid columns={2} metadataItems={eventBatchItems} />
         </>
       )}
-      <h3 className="pb-2 pt-6 text-sm font-medium text-slate-800">Concurrency</h3>
+      <h3 className="pb-2 pt-6 text-sm font-medium">Concurrency</h3>
       <div className="space-y-3">
         {configuration.concurrency.map((concurrencyItem, index) => {
           const items: MetadataItemProps[] = [
             {
               label: 'Scope',
-              value: titleCase(noCase(concurrencyItem.scope)),
+              title: concurrencyItem.scope,
+              value: (
+                <div className="lowercase first-letter:capitalize">{concurrencyItem.scope}</div>
+              ),
             },
             {
               label: 'Limit',
@@ -167,19 +168,19 @@ export default function FunctionConfiguration({ configuration }: FunctionConfigu
       </div>
       {rateLimitItems && (
         <>
-          <h3 className="pb-2 pt-6 text-sm font-medium text-slate-800">Rate Limit</h3>
+          <h3 className="pb-2 pt-6 text-sm font-medium">Rate Limit</h3>
           <MetadataGrid columns={2} metadataItems={rateLimitItems} />
         </>
       )}
       {debounceItems && (
         <>
-          <h3 className="pb-2 pt-6 text-sm font-medium text-slate-800">Debounce</h3>
+          <h3 className="pb-2 pt-6 text-sm font-medium">Debounce</h3>
           <MetadataGrid columns={2} metadataItems={debounceItems} />
         </>
       )}
       {throttleItems && (
         <>
-          <h3 className="pb-2 pt-6 text-sm font-medium text-slate-800">Throttle</h3>
+          <h3 className="pb-2 pt-6 text-sm font-medium">Throttle</h3>
           <MetadataGrid columns={2} metadataItems={throttleItems} />
         </>
       )}

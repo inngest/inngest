@@ -2,8 +2,8 @@
 
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
-import { IconFunction } from '@inngest/components/icons/Function';
-import { classNames } from '@inngest/components/utils/classNames';
+import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
+import { cn } from '@inngest/components/utils/classNames';
 
 import { SyncStatusPill } from '@/components/SyncStatusPill';
 
@@ -39,42 +39,39 @@ export function SyncList({
 }: Props | LoadingProps) {
   return (
     <div
-      className={classNames(
-        'border-muted w-2/5 max-w-2xl flex-shrink-0 overflow-y-auto border-r bg-white sm:w-1/3',
+      className={cn(
+        'border-muted bg-canvasBase w-2/5 max-w-2xl flex-shrink-0 overflow-y-auto border-r sm:w-1/3',
         className
       )}
     >
       {loading && (
-        <div className="border-b border-slate-100 px-4 py-3">
+        <div className="border-muted border-b px-4 py-3">
           <Skeleton className="mb-1 block h-11 w-full" />
         </div>
       )}
       {!loading && (
         <ul className="w-full">
           {syncs.map((sync) => {
-            let bgColor = 'bg-white';
+            let bgColor = 'bg-canvasBase';
             if (sync.id === selectedSyncID) {
-              bgColor = 'bg-slate-100';
+              bgColor = 'bg-canvasSubtle';
             }
 
             return (
               <li
-                className={classNames(
-                  'border-muted flex cursor-pointer items-center justify-between border-b text-slate-800 hover:bg-slate-100',
+                className={cn(
+                  'border-muted text-basis hover:bg-canvasMuted flex cursor-pointer items-center justify-between border-b',
                   bgColor
                 )}
                 key={sync.id}
                 onClick={() => onClick(sync.id)}
               >
-                <div className="flex items-center">
-                  <div className="hidden w-40 p-4 align-middle lg:block">
+                <div className="flex items-center gap-1">
+                  <div className="ml-1 hidden w-20 items-center sm:flex">
                     <SyncStatusPill status={sync.status} />
                   </div>
-                  <div className="px-2 py-4 align-middle lg:hidden">
-                    <SyncStatusPill status={sync.status} iconOnly />
-                  </div>
-                  <div className="py-4 align-middle">
-                    <Time value={sync.lastSyncedAt} />
+                  <div className="flex-1 py-4 pl-2 align-middle sm:pl-0">
+                    <Time className="text-wrap" value={sync.lastSyncedAt} />
                   </div>
                 </div>
                 <div
@@ -85,7 +82,7 @@ export function SyncList({
                 >
                   {sync.syncedFunctions.length > 0 && (
                     <>
-                      <IconFunction className="text-slate-500" />
+                      <FunctionsIcon className="text-muted h-4 w-4" />
                       {sync.syncedFunctions.length}
                     </>
                   )}

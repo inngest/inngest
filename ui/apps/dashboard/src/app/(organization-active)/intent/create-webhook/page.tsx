@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { Input } from '@inngest/components/Forms/Input';
 import { RiArrowRightLine } from '@remixicon/react';
 import slugify from '@sindresorhus/slugify';
 import { capitalCase } from 'change-case';
 import { useMutation } from 'urql';
 
-import Input from '@/components/Forms/Input';
 import { graphql } from '@/gql';
 import WebhookIcon from '@/icons/webhookIcon.svg';
 import { useDefaultEnvironment } from '@/queries';
@@ -151,7 +151,7 @@ export default function Page() {
               </pre>
             )}
             <button
-              className="text-sm text-indigo-500"
+              className="text-muted text-sm"
               onClick={() => {
                 setEditing(!isEditing);
                 if (customPrefix === '') {
@@ -166,8 +166,8 @@ export default function Page() {
       }
       graphic={
         <>
-          <RiArrowRightLine className="w-16 text-indigo-400" />
-          <WebhookIcon className="w-16 text-indigo-400" />
+          <RiArrowRightLine className="text-muted w-16" />
+          <WebhookIcon className="text-muted w-16" />
         </>
       }
       isLoading={loading}

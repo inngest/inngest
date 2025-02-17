@@ -20,6 +20,7 @@ const (
 	InternalNamePrefix = "inngest/"
 	FnFailedName       = InternalNamePrefix + "function.failed"
 	FnFinishedName     = InternalNamePrefix + "function.finished"
+	FnCancelledName    = InternalNamePrefix + "function.cancelled"
 	// InvokeEventName is the event name used to invoke specific functions via an
 	// API.  Note that invoking functions still sends an event in the usual manner.
 	InvokeFnName = InternalNamePrefix + "function.invoked"
@@ -247,7 +248,7 @@ func (o ossTrackedEvent) GetInternalID() ulid.ULID {
 
 func (o ossTrackedEvent) GetWorkspaceID() uuid.UUID {
 	// There are no workspaces in OSS yet.
-	return uuid.UUID{}
+	return consts.DevServerEnvId
 }
 
 type NewInvocationEventOpts struct {

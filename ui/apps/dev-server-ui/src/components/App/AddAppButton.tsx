@@ -4,16 +4,20 @@ import { RiAddLine } from '@remixicon/react';
 
 import AddAppModal from '@/components/App/AddAppModal';
 
-export default function AddAppButton() {
+export default function AddAppButton({ secondary }: { secondary?: boolean }) {
   const [isAddAppModalVisible, setAddAppModalVisible] = useState(false);
 
   return (
     <>
       <Button
-        label="Sync New App"
-        icon={<RiAddLine />}
-        btnAction={() => setAddAppModalVisible(true)}
+        kind={secondary ? 'secondary' : 'primary'}
+        label={secondary ? 'I want to sync manually' : 'Sync new app'}
+        appearance={secondary ? 'outlined' : 'solid'}
+        icon={secondary ? null : <RiAddLine />}
+        iconSide="left"
+        onClick={() => setAddAppModalVisible(true)}
       />
+
       {isAddAppModalVisible && (
         <AddAppModal isOpen={isAddAppModalVisible} onClose={() => setAddAppModalVisible(false)} />
       )}

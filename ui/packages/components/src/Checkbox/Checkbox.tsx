@@ -50,7 +50,7 @@ export function LabeledCheckbox({
       </CheckboxPrimitive.Root>
       <label className="text-basis text-sm" htmlFor={id}>
         {label}
-        {description && <span className="text-subtle block pt-0.5">{description}</span>}
+        {description && <span className="text-muted block pt-0.5">{description}</span>}
       </label>
     </div>
   );

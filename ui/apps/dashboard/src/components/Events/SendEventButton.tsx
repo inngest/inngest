@@ -1,18 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { OptionalTooltip } from '@/components/Navigation/OptionalTooltip';
 import { SendEventModal } from './SendEventModal';
 
 type SendEventButtonProps = {
   eventName?: string;
-  newIANav?: boolean;
 };
 
-export default function SendEventButton({ eventName, newIANav = false }: SendEventButtonProps) {
+export default function SendEventButton({ eventName }: SendEventButtonProps) {
   const { isArchived } = useEnvironment();
 
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -20,21 +19,12 @@ export default function SendEventButton({ eventName, newIANav = false }: SendEve
   return (
     <>
       <OptionalTooltip tooltip={isArchived && 'Cannot send events. Environment is archived'}>
-        {newIANav ? (
-          <NewButton
-            disabled={isArchived}
-            onClick={() => setIsModalVisible(true)}
-            kind="primary"
-            label="Send Event"
-          />
-        ) : (
-          <Button
-            disabled={isArchived}
-            btnAction={() => setIsModalVisible(true)}
-            kind="primary"
-            label="Send Event"
-          />
-        )}
+        <Button
+          disabled={isArchived}
+          onClick={() => setIsModalVisible(true)}
+          kind="primary"
+          label="Send event"
+        />
       </OptionalTooltip>
 
       <SendEventModal

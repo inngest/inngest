@@ -3,9 +3,9 @@ import * as Tabs from '@radix-ui/react-tabs';
 import { RiArrowRightSLine } from '@remixicon/react';
 import { isBefore, type Duration } from 'date-fns';
 
-import { Badge } from '../Badge';
-import { NewButton } from '../Button';
+import { Button } from '../Button';
 import { Input } from '../Forms/Input';
+import { Pill } from '../Pill';
 import { Popover, PopoverContent, PopoverTrigger } from '../Popover';
 import {
   DURATION_STRING_REGEX,
@@ -226,12 +226,9 @@ export const RangePicker = ({
                 >
                   {v}
                   {!planValid && (
-                    <Badge
-                      className="border-primary-intense text-primary-intense px-2 py-0.5 text-xs"
-                      kind="outlined"
-                    >
+                    <Pill kind="primary" appearance="outlined">
                       Upgrade Plan
-                    </Badge>
+                    </Pill>
                   )}
                 </div>
               );
@@ -247,10 +244,10 @@ export const RangePicker = ({
                 }}
               >
                 Absolute range
-                <RiArrowRightSLine className="text-muted h-6 w-6" />
+                <RiArrowRightSLine className="text-subtle h-6 w-6" />
               </div>
               {showAbsolute && (
-                <div className="text-subtle px-4 py-2 text-sm">{formatAbsolute(absoluteRange)}</div>
+                <div className="text-muted px-4 py-2 text-sm">{formatAbsolute(absoluteRange)}</div>
               )}
             </div>
           </div>
@@ -259,7 +256,7 @@ export const RangePicker = ({
               <Tabs.Root className="flex flex-col" value={tab} onValueChange={setTab}>
                 <Tabs.List className="flex shrink-0 px-4 pt-4" aria-label={`Select ${tab} date`}>
                   <Tabs.Trigger
-                    className="text-subtle data-[state=active]:text-basis data-[state=active]:border-contrast flex flex-1 
+                    className="text-muted data-[state=active]:text-basis data-[state=active]:border-contrast flex flex-1 
                       cursor-pointer select-none items-center justify-center border-b-2 border-transparent px-5 pb-1
                       text-sm outline-none"
                     value="start"
@@ -267,7 +264,7 @@ export const RangePicker = ({
                     Start
                   </Tabs.Trigger>
                   <Tabs.Trigger
-                    className="text-subtle data-[state=active]:text-basis data-[state=active]:border-contrast flex flex-1 
+                    className="text-muted data-[state=active]:text-basis data-[state=active]:border-contrast flex flex-1 
                       cursor-pointer select-none items-center justify-center border-b-2 border-transparent px-5 pb-1
                       text-sm outline-none"
                     value="end"
@@ -299,8 +296,8 @@ export const RangePicker = ({
                   <div className="flex flex-col">
                     {startError && <p className="text-error mx-4 mt-1 text-sm">{startError}</p>}
                     <div className="flox-row flex justify-between p-4">
-                      <NewButton label="Cancel" appearance="ghost" onClick={() => setOpen(false)} />
-                      <NewButton
+                      <Button label="Cancel" appearance="ghost" onClick={() => setOpen(false)} />
+                      <Button
                         label="Next"
                         kind="primary"
                         disabled={!absoluteRange?.start || !startValid}
@@ -330,16 +327,16 @@ export const RangePicker = ({
                   <div className="flex flex-col">
                     {endError && <p className="text-error mx-4 mt-1 text-sm">{endError}</p>}
                     <div className="flox-row flex justify-between p-4">
-                      <NewButton label="Cancel" appearance="ghost" onClick={() => setOpen(false)} />
+                      <Button label="Cancel" appearance="ghost" onClick={() => setOpen(false)} />
                       <div className="flex flex-row">
-                        <NewButton
+                        <Button
                           label="Previous"
                           kind="primary"
                           appearance="outlined"
                           onClick={() => setTab('start')}
                           className="mr-2"
                         />
-                        <NewButton
+                        <Button
                           label="Apply"
                           kind="primary"
                           disabled={

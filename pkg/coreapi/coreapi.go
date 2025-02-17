@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
 	"net/http"
 
 	"github.com/99designs/gqlgen/graphql/handler"
@@ -13,6 +12,8 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/config"
+	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/apiutil"
 	"github.com/inngest/inngest/pkg/coreapi/generated"
 	loader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
@@ -23,7 +24,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/headers"
-	"github.com/inngest/inngest/pkg/history_drivers/memory_reader"
+	"github.com/inngest/inngest/pkg/history_reader"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/oklog/ulid/v2"
@@ -33,18 +34,34 @@ import (
 type Options struct {
 	Data cqrs.Manager
 
-	Config       config.Config
-	Logger       *zerolog.Logger
-	Runner       runner.Runner
-	Tracker      *runner.Tracker
-	State        state.Manager
-	Queue        queue.JobQueueReader
-	EventHandler api.EventHandler
-	Executor     execution.Executor
+	Config        config.Config
+	Logger        *zerolog.Logger
+	Runner        runner.Runner
+	Tracker       *runner.Tracker
+	State         state.Manager
+	Queue         queue.JobQueueReader
+	EventHandler  api.EventHandler
+	Executor      execution.Executor
+	HistoryReader history_reader.Reader
+
+	// LocalSigningKey is the key used to sign events for self-hosted services.
+	LocalSigningKey string
+
+	// RequireKeys defines whether event and signing keys are required for the
+	// server to function. If this is true and signing keys are not defined,
+	// the server will still boot but core actions such as syncing, runs, and
+	// ingesting events will not work.
+	RequireKeys bool
+
+	ConnectOpts connectv0.Opts
 }
 
 func NewCoreApi(o Options) (*CoreAPI, error) {
 	logger := o.Logger.With().Str("caller", "coreapi").Logger()
+
+	if o.HistoryReader == nil {
+		return nil, fmt.Errorf("history reader is required")
+	}
 
 	a := &CoreAPI{
 		data:    o.Data,
@@ -64,19 +81,22 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	})
 	a.Use(
 		cors.Handler,
-		headers.StaticHeadersMiddleware(headers.ServerKindDev),
+		headers.StaticHeadersMiddleware(o.Config.GetServerKind()),
 		loader.Middleware(loader.LoaderParams{
 			DB: o.Data,
 		}),
 	)
 
 	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &resolvers.Resolver{
-		Data:          o.Data,
-		HistoryReader: memory_reader.NewReader(),
-		Runner:        o.Runner,
-		Queue:         o.Queue,
-		EventHandler:  o.EventHandler,
-		Executor:      o.Executor,
+		Data:            o.Data,
+		HistoryReader:   o.HistoryReader,
+		Runner:          o.Runner,
+		Queue:           o.Queue,
+		EventHandler:    o.EventHandler,
+		Executor:        o.Executor,
+		ServerKind:      o.Config.GetServerKind(),
+		LocalSigningKey: o.LocalSigningKey,
+		RequireKeys:     o.RequireKeys,
 	}}))
 
 	// TODO - Add option for enabling GraphQL Playground
@@ -88,6 +108,8 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	// NOTE: These are present in the 2.x and 3.x SDKs to enable large payload sizes.
 	a.Get("/runs/{runID}/batch", a.GetEventBatch)
 	a.Get("/runs/{runID}/actions", a.GetActions)
+
+	a.Mount("/connect", connectv0.New(a, o.ConnectOpts))
 
 	return a, nil
 }
@@ -134,10 +156,8 @@ func (a CoreAPI) GetActions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accountId := uuid.UUID{}
-
 	// Find this run
-	state, err := a.state.Load(ctx, accountId, *runID)
+	state, err := a.state.Load(ctx, consts.DevServerAccountId, *runID)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
 			Status:  410,
@@ -170,10 +190,8 @@ func (a CoreAPI) GetEventBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accountId := uuid.UUID{}
-
 	// Find this run
-	state, err := a.state.Load(ctx, accountId, *runID)
+	state, err := a.state.Load(ctx, consts.DevServerAccountId, *runID)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
 			Status:  410,
@@ -213,9 +231,7 @@ func (a CoreAPI) CancelRun(w http.ResponseWriter, r *http.Request) {
 		Str("run_id", runID.String()).
 		Msg("cancelling function")
 
-	accountId := uuid.UUID{}
-
-	if err := apiutil.CancelRun(ctx, a.state, accountId, *runID); err != nil {
+	if err := apiutil.CancelRun(ctx, a.state, consts.DevServerAccountId, *runID); err != nil {
 		_ = publicerr.WriteHTTP(w, err)
 		return
 	}

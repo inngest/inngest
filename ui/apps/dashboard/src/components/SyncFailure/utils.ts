@@ -1,4 +1,4 @@
-import { isErrorCode, type CodedError, type ErrorCode } from '@/codedError';
+import { isErrorCode, parseErrorData, type CodedError, type ErrorCode } from '@/codedError';
 
 const messages = {
   account_mismatch: "The app's signing key is for the wrong account.",
@@ -26,6 +26,7 @@ const messages = {
   missing_signing_key: 'The app is not using a signing key.',
   no_functions: 'No functions found in the app.',
   not_sdk: 'The URL is not hosting an Inngest SDK',
+  response_not_signed: 'SDK response was not signed. Is it in dev mode?',
   server_kind_mismatch: 'The app is not in cloud mode',
   sig_verification_failed:
     'Signature verification failed. Is your app using the correct signing key?',
@@ -46,6 +47,25 @@ export function getMessage(error: CodedError) {
 
   if (error.message) {
     return error.message;
+  }
+
+  const data = parseErrorData(error.data);
+  if (data) {
+    if ('errors' in data) {
+      // We're dealing with a "multi-error" (probably a config error). We'll
+      // return the unique messages for all the errors
+
+      const set = new Set();
+      for (const err of data.errors) {
+        if (err.message) {
+          set.add(err.message);
+        }
+      }
+
+      if (set.size > 0) {
+        return Array.from(set).join('\n');
+      }
+    }
   }
 
   return 'Something went wrong.';

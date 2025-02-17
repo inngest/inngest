@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import Link from 'next/link';
+import NextLink from 'next/link';
 import { Button } from '@inngest/components/Button';
 import { defaultLinkStyles } from '@inngest/components/Link';
 import type { Function } from '@inngest/components/types/function';
@@ -57,8 +57,8 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
         collapsible
       >
         <CollapsibleCardItem value="syncedFunctions">
-          <CollapsibleCardHeader className="data-[state=open]:border-muted flex h-11 items-center justify-between border-b border-transparent px-6 text-sm font-medium text-slate-600">
-            <p>Synced Functions ({syncedFunctions.length})</p>
+          <CollapsibleCardHeader className="data-[state=open]:border-subtle text-basis flex h-11 items-center justify-between border-b border-transparent px-6 text-sm font-medium">
+            <p>Synced functions ({syncedFunctions.length})</p>
             <CollapsibleCardTrigger
               asChild
               onClick={() => setIsSyncedFunctionsCardOpen(!isSyncedFunctionsCardOpen)}
@@ -66,8 +66,9 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
               <Button
                 className="group"
                 appearance="outlined"
+                kind="secondary"
                 icon={
-                  <RiArrowDownSLine className="transform-90 text-slate-500 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
+                  <RiArrowDownSLine className="transform-90 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
                 }
               />
             </CollapsibleCardTrigger>
@@ -79,23 +80,26 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                   const isLast = i === syncedFunctions.length - 1;
 
                   return (
-                    <Link
+                    <NextLink
                       href={pathCreator.function({ envSlug: env.slug, functionSlug: fn.slug })}
                       key={fn.id}
                     >
                       <div
                         className={cn(
                           defaultLinkStyles,
-                          'group flex w-full items-center gap-2 border-slate-200 py-3 pl-6 pr-2 text-sm font-medium hover:bg-slate-100',
+                          'border-subtle hover:bg-canvasSubtle/50 group flex w-full items-center gap-2 py-3 pl-4 pr-2 text-sm font-medium',
                           !isLast && 'border-b'
                         )}
                       >
                         {fn.name}
                         <RiArrowRightLine className="h-3 w-3 -translate-x-3 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
                       </div>
-                    </Link>
+                    </NextLink>
                   );
                 })}
+                {syncedFunctions.length === 0 && (
+                  <div className="text-subtle p-2 text-center text-sm">No synced functions</div>
+                )}
               </CollapsibleCardContent>
             )}
           </CollapsibleCardContentWrapper>
@@ -107,8 +111,8 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
         collapsible
       >
         <CollapsibleCardItem value="RemovedFunctions">
-          <CollapsibleCardHeader className="data-[state=open]:border-muted flex h-11 items-center justify-between border-b border-transparent px-6 text-sm font-medium text-slate-600">
-            <p>Removed Functions ({removedFunctions.length})</p>
+          <CollapsibleCardHeader className="data-[state=open]:border-subtle text-basis flex h-11 items-center justify-between border-b border-transparent px-6 text-sm font-medium">
+            <p>Removed functions ({removedFunctions.length})</p>
             <CollapsibleCardTrigger
               asChild
               onClick={() => setIsRemovedFunctionsCardOpen(!isRemovedFunctionsCardOpen)}
@@ -116,8 +120,9 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
               <Button
                 className="group"
                 appearance="outlined"
+                kind="secondary"
                 icon={
-                  <RiArrowDownSLine className="transform-90 text-slate-500 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
+                  <RiArrowDownSLine className="transform-90 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
                 }
               />
             </CollapsibleCardTrigger>
@@ -128,26 +133,26 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                 const isLast = i === removedFunctions.length - 1;
 
                 return (
-                  <Link
+                  <NextLink
                     href={pathCreator.function({ envSlug: env.slug, functionSlug: fn.slug })}
                     key={fn.id}
                   >
                     <div
                       className={cn(
                         defaultLinkStyles,
-                        'group flex w-full items-center gap-2 border-slate-200 py-3 pl-6 pr-2 text-sm font-medium hover:bg-slate-100',
+                        'border-subtle hover:bg-canvasSubtle/50 group flex w-full items-center gap-2 py-3 pl-4 pr-2 text-sm font-medium',
                         !isLast && 'border-b'
                       )}
                     >
                       {fn.name}
                       <RiArrowRightLine className="h-3 w-3 -translate-x-3 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
                     </div>
-                  </Link>
+                  </NextLink>
                 );
               })}
 
               {removedFunctions.length === 0 && (
-                <div className="p-2 text-center text-sm text-slate-600">No removed functions</div>
+                <div className="text-subtle p-2 text-center text-sm">No removed functions</div>
               )}
             </CollapsibleCardContent>
           )}

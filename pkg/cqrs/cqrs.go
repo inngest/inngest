@@ -22,6 +22,7 @@ type Manager interface {
 
 	// Embed the development function manager for now.
 	DevFunctionManager
+	QueueSnapshotManager
 
 	AppManager
 	FunctionRunManager
@@ -31,6 +32,9 @@ type Manager interface {
 	// Trace / dev only
 	TraceReadWriter
 	TraceWriterDev
+
+	// Connection history
+	ConnectionHistoryReadWriter
 
 	// Scoped allows creating a new manager using a transaction.
 	WithTx(ctx context.Context) (TxManager, error)

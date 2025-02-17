@@ -1,6 +1,11 @@
-import type { Function } from '@inngest/components/types/function';
+import {
+  transformFramework,
+  transformLanguage,
+  transformPlatform,
+} from '@inngest/components/utils/appsParser';
 
 import { graphql } from '@/gql';
+import { transformTriggers } from '@/utils/triggers';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const query = graphql(`
@@ -21,6 +26,7 @@ const query = graphql(`
           slug
         }
         name
+        method
         latestSync {
           commitAuthor
           commitHash
@@ -60,6 +66,9 @@ export function useApp({ envID, externalAppID }: { envID: string; externalAppID:
       latestSync = {
         ...app.latestSync,
         lastSyncedAt: new Date(app.latestSync.lastSyncedAt),
+        framework: transformFramework(app.latestSync.framework),
+        platform: transformPlatform(app.latestSync.platform),
+        sdkLanguage: transformLanguage(app.latestSync.sdkLanguage),
       };
     }
 
@@ -79,26 +88,4 @@ export function useApp({ envID, externalAppID }: { envID: string; externalAppID:
   }
 
   return { ...res, data: undefined };
-}
-
-function transformTriggers(
-  rawTriggers: { eventName: string | null; schedule: string | null }[]
-): Function['triggers'] {
-  const triggers: Function['triggers'] = [];
-
-  for (const trigger of rawTriggers) {
-    if (trigger.eventName) {
-      triggers.push({
-        type: 'EVENT',
-        value: trigger.eventName,
-      });
-    } else if (trigger.schedule) {
-      triggers.push({
-        type: 'CRON',
-        value: trigger.schedule,
-      });
-    }
-  }
-
-  return triggers;
 }

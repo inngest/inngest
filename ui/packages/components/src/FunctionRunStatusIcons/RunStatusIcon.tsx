@@ -7,9 +7,9 @@ import { IconStatusQueued } from '@inngest/components/icons/status/Queued';
 import { IconStatusRunning } from '@inngest/components/icons/status/Running';
 import { IconStatusSkipped } from '@inngest/components/icons/status/Skipped';
 
-import { getStatusTextClass } from '../statusClasses';
+import { getStatusTextClass } from '../Status/statusClasses';
+import { statusTitles } from '../Status/statusTitles';
 import { cn } from '../utils/classNames';
-import { statusTitles } from './statusTitles';
 
 const icons: Record<string, React.ComponentType> = {
   CANCELED: IconStatusCancelled,

@@ -1,4 +1,4 @@
-import { Badge } from '../Badge';
+import { Pill } from '../Pill';
 import { Select, type Option } from '../Select/Select';
 
 type RelativeTimeFilterProps = {
@@ -30,9 +30,9 @@ export default function RelativeTimeFilter({
               <span className="inline-flex w-full items-center justify-between gap-2">
                 <label className="text-sm lowercase first-letter:capitalize">{option.name}</label>
                 {option.disabled && (
-                  <Badge className="border-indigo-500 text-indigo-500" kind="outlined">
+                  <Pill kind="primary" appearance="outlined">
                     Upgrade Plan
-                  </Badge>
+                  </Pill>
                 )}
               </span>
             </Select.Option>

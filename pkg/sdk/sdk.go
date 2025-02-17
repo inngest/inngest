@@ -20,6 +20,13 @@ var (
 	ErrNoFunctions = fmt.Errorf("No functions registered within your app")
 )
 
+type DeployType string
+
+const (
+	DeployTypePing    DeployType = "ping"
+	DeployTypeConnect DeployType = "connect"
+)
+
 type FromReadCloserOpts struct {
 	Env        string
 	ForceHTTPS bool
@@ -59,7 +66,7 @@ type RegisterRequest struct {
 	// DeployType represents how this was deployed, eg. via a ping.
 	// This allows us to change flows in the future, or support
 	// multiple registration flows within a single fetch response.
-	DeployType string `json:"deployType"`
+	DeployType DeployType `json:"deployType"`
 	// SDK represents the SDK language and version used for these
 	// functions, in the format: "js:v0.1.0"
 	SDK string `json:"sdk"`
@@ -70,12 +77,18 @@ type RegisterRequest struct {
 	Framework string `json:"framework"`
 	// AppName represents a namespaced app name for each deployed function.
 	AppName string `json:"appName"`
+	// AppVersion represents an optional application version identifier. This should change
+	// whenever code within one of your Inngest function or any dependency thereof changes.
+	AppVersion string `json:"appVersion,omitempty"`
 	// Functions represents all functions hosted within this deploy.
 	Functions []SDKFunction `json:"functions"`
 	// Headers are fetched from the incoming HTTP request.  They are present
 	// on all calls to Inngest from the SDK, and are separate from the RegisterRequest
 	// JSON payload to have a single source of truth.
 	Headers Headers `json:"headers"`
+
+	// IdempotencyKey is an optional input to deduplicate syncs.
+	IdempotencyKey string `json:"idempotencyKey"`
 
 	// checksum is a memoized field.
 	checksum string
@@ -84,11 +97,15 @@ type RegisterRequest struct {
 }
 
 const (
+	InBandSyncV1 string = "v1"
 	TrustProbeV1 string = "v1"
+	ConnectV1    string = "v1"
 )
 
 type Capabilities struct {
+	InBandSync string `json:"in_band_sync"`
 	TrustProbe string `json:"trust_probe"`
+	Connect    string `json:"connect"`
 }
 
 type Headers struct {
@@ -123,6 +140,10 @@ func (f RegisterRequest) SDKVersion() string {
 		return parts[1]
 	}
 	return ""
+}
+
+func (f RegisterRequest) IsConnect() bool {
+	return f.Capabilities.Connect == ConnectV1 && f.DeployType == DeployTypeConnect
 }
 
 // Parse parses the incoming
@@ -161,7 +182,10 @@ func (f RegisterRequest) Parse(ctx context.Context) ([]*inngest.Function, error)
 			if ferr != nil {
 				err = multierror.Append(err, fmt.Errorf("Step '%s' has an invalid URI", step.ID))
 			}
-			if uri.Scheme != "http" && uri.Scheme != "https" {
+			switch uri.Scheme {
+			case "http", "https", "ws", "wss":
+				// noop
+			default:
 				err = multierror.Append(err, fmt.Errorf("Step '%s' has an invalid driver. Only HTTP drivers may be used with SDK functions.", step.ID))
 				continue
 			}

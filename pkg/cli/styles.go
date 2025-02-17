@@ -14,9 +14,10 @@ var (
 	Iris    = lipgloss.Color("#5D5FEF")
 	Fuschia = lipgloss.Color("#EF5DA8")
 
-	TextStyle  = lipgloss.NewStyle().Foreground(Color)
-	FeintStyle = TextStyle.Copy().Foreground(Feint)
-	BoldStyle  = TextStyle.Copy().Bold(true)
+	TextStyle    = lipgloss.NewStyle().Foreground(Color)
+	FeintStyle   = TextStyle.Copy().Foreground(Feint)
+	BoldStyle    = TextStyle.Copy().Bold(true)
+	WarningStyle = TextStyle.Copy().Foreground(Orange)
 )
 
 // RenderError returns a formatted error string.

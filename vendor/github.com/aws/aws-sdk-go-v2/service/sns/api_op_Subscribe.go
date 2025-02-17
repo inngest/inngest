@@ -4,18 +4,21 @@ package sns
 
 import (
 	"context"
+	"fmt"
 	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
-	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/smithy-go/middleware"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
-// Subscribes an endpoint to an Amazon SNS topic. If the endpoint type is HTTP/S or
-// email, or if the endpoint and the topic are not in the same Amazon Web Services
-// account, the endpoint owner must run the ConfirmSubscription action to confirm
-// the subscription. You call the ConfirmSubscription action with the token from
-// the subscription response. Confirmation tokens are valid for three days. This
-// action is throttled at 100 transactions per second (TPS).
+// Subscribes an endpoint to an Amazon SNS topic. If the endpoint type is HTTP/S
+// or email, or if the endpoint and the topic are not in the same Amazon Web
+// Services account, the endpoint owner must run the ConfirmSubscription action to
+// confirm the subscription.
+//
+// You call the ConfirmSubscription action with the token from the subscription
+// response. Confirmation tokens are valid for two days.
+//
+// This action is throttled at 100 transactions per second (TPS).
 func (c *Client) Subscribe(ctx context.Context, params *SubscribeInput, optFns ...func(*Options)) (*SubscribeOutput, error) {
 	if params == nil {
 		params = &SubscribeInput{}
@@ -36,31 +39,25 @@ type SubscribeInput struct {
 
 	// The protocol that you want to use. Supported protocols include:
 	//
-	// * http –
-	// delivery of JSON-encoded message via HTTP POST
+	//   - http – delivery of JSON-encoded message via HTTP POST
 	//
-	// * https – delivery of
-	// JSON-encoded message via HTTPS POST
+	//   - https – delivery of JSON-encoded message via HTTPS POST
 	//
-	// * email – delivery of message via SMTP
+	//   - email – delivery of message via SMTP
 	//
-	// *
-	// email-json – delivery of JSON-encoded message via SMTP
+	//   - email-json – delivery of JSON-encoded message via SMTP
 	//
-	// * sms – delivery of
-	// message via SMS
+	//   - sms – delivery of message via SMS
 	//
-	// * sqs – delivery of JSON-encoded message to an Amazon SQS
-	// queue
+	//   - sqs – delivery of JSON-encoded message to an Amazon SQS queue
 	//
-	// * application – delivery of JSON-encoded message to an EndpointArn for a
-	// mobile app and device
+	//   - application – delivery of JSON-encoded message to an EndpointArn for a
+	//   mobile app and device
 	//
-	// * lambda – delivery of JSON-encoded message to an Lambda
-	// function
+	//   - lambda – delivery of JSON-encoded message to an Lambda function
 	//
-	// * firehose – delivery of JSON-encoded message to an Amazon Kinesis
-	// Data Firehose delivery stream.
+	//   - firehose – delivery of JSON-encoded message to an Amazon Kinesis Data
+	//   Firehose delivery stream.
 	//
 	// This member is required.
 	Protocol *string
@@ -70,88 +67,110 @@ type SubscribeInput struct {
 	// This member is required.
 	TopicArn *string
 
-	// A map of attributes with their corresponding values. The following lists the
-	// names, descriptions, and values of the special request parameters that the
-	// Subscribe action uses:
+	// A map of attributes with their corresponding values.
 	//
-	// * DeliveryPolicy – The policy that defines how Amazon
-	// SNS retries failed deliveries to HTTP/S endpoints.
+	// The following lists the names, descriptions, and values of the special request
+	// parameters that the Subscribe action uses:
 	//
-	// * FilterPolicy – The simple
-	// JSON object that lets your subscriber receive only a subset of messages, rather
-	// than receiving every message published to the topic.
+	//   - DeliveryPolicy – The policy that defines how Amazon SNS retries failed
+	//   deliveries to HTTP/S endpoints.
 	//
-	// * RawMessageDelivery –
-	// When set to true, enables raw message delivery to Amazon SQS or HTTP/S
-	// endpoints. This eliminates the need for the endpoints to process JSON
-	// formatting, which is otherwise created for Amazon SNS metadata.
+	//   - FilterPolicy – The simple JSON object that lets your subscriber receive only
+	//   a subset of messages, rather than receiving every message published to the
+	//   topic.
 	//
-	// * RedrivePolicy
-	// – When specified, sends undeliverable messages to the specified Amazon SQS
-	// dead-letter queue. Messages that can't be delivered due to client errors (for
-	// example, when the subscribed endpoint is unreachable) or server errors (for
-	// example, when the service that powers the subscribed endpoint becomes
-	// unavailable) are held in the dead-letter queue for further analysis or
-	// reprocessing.
+	//   - FilterPolicyScope – This attribute lets you choose the filtering scope by
+	//   using one of the following string value types:
 	//
-	// The following attribute applies only to Amazon Kinesis Data
-	// Firehose delivery stream subscriptions:
+	//   - MessageAttributes (default) – The filter is applied on the message
+	//   attributes.
 	//
-	// * SubscriptionRoleArn – The ARN of the
-	// IAM role that has the following:
+	//   - MessageBody – The filter is applied on the message body.
 	//
-	// * Permission to write to the Kinesis Data
-	// Firehose delivery stream
+	//   - RawMessageDelivery – When set to true , enables raw message delivery to
+	//   Amazon SQS or HTTP/S endpoints. This eliminates the need for the endpoints to
+	//   process JSON formatting, which is otherwise created for Amazon SNS metadata.
 	//
-	// * Amazon SNS listed as a trusted entity
+	//   - RedrivePolicy – When specified, sends undeliverable messages to the
+	//   specified Amazon SQS dead-letter queue. Messages that can't be delivered due to
+	//   client errors (for example, when the subscribed endpoint is unreachable) or
+	//   server errors (for example, when the service that powers the subscribed endpoint
+	//   becomes unavailable) are held in the dead-letter queue for further analysis or
+	//   reprocessing.
 	//
-	// Specifying a
-	// valid ARN for this attribute is required for Kinesis Data Firehose delivery
-	// stream subscriptions. For more information, see Fanout to Kinesis Data Firehose
-	// delivery streams
-	// (https://docs.aws.amazon.com/sns/latest/dg/sns-firehose-as-subscriber.html) in
-	// the Amazon SNS Developer Guide.
+	// The following attribute applies only to Amazon Data Firehose delivery stream
+	// subscriptions:
+	//
+	//   - SubscriptionRoleArn – The ARN of the IAM role that has the following:
+	//
+	//   - Permission to write to the Firehose delivery stream
+	//
+	//   - Amazon SNS listed as a trusted entity
+	//
+	// Specifying a valid ARN for this attribute is required for Firehose delivery
+	//   stream subscriptions. For more information, see [Fanout to Firehose delivery streams]in the Amazon SNS Developer
+	//   Guide.
+	//
+	// The following attributes apply only to [FIFO topics]:
+	//
+	//   - ReplayPolicy – Adds or updates an inline policy document for a subscription
+	//   to replay messages stored in the specified Amazon SNS topic.
+	//
+	//   - ReplayStatus – Retrieves the status of the subscription message replay,
+	//   which can be one of the following:
+	//
+	//   - Completed – The replay has successfully redelivered all messages, and is now
+	//   delivering newly published messages. If an ending point was specified in the
+	//   ReplayPolicy then the subscription will no longer receive newly published
+	//   messages.
+	//
+	//   - In progress – The replay is currently replaying the selected messages.
+	//
+	//   - Failed – The replay was unable to complete.
+	//
+	//   - Pending – The default state while the replay initiates.
+	//
+	// [Fanout to Firehose delivery streams]: https://docs.aws.amazon.com/sns/latest/dg/sns-firehose-as-subscriber.html
+	// [FIFO topics]: https://docs.aws.amazon.com/sns/latest/dg/sns-fifo-topics.html
 	Attributes map[string]string
 
-	// The endpoint that you want to receive notifications. Endpoints vary by
-	// protocol:
+	// The endpoint that you want to receive notifications. Endpoints vary by protocol:
 	//
-	// * For the http protocol, the (public) endpoint is a URL beginning
-	// with http://.
+	//   - For the http protocol, the (public) endpoint is a URL beginning with http://
+	//   .
 	//
-	// * For the https protocol, the (public) endpoint is a URL
-	// beginning with https://.
+	//   - For the https protocol, the (public) endpoint is a URL beginning with
+	//   https:// .
 	//
-	// * For the email protocol, the endpoint is an email
-	// address.
+	//   - For the email protocol, the endpoint is an email address.
 	//
-	// * For the email-json protocol, the endpoint is an email address.
+	//   - For the email-json protocol, the endpoint is an email address.
 	//
-	// *
-	// For the sms protocol, the endpoint is a phone number of an SMS-enabled
-	// device.
+	//   - For the sms protocol, the endpoint is a phone number of an SMS-enabled
+	//   device.
 	//
-	// * For the sqs protocol, the endpoint is the ARN of an Amazon SQS
-	// queue.
+	//   - For the sqs protocol, the endpoint is the ARN of an Amazon SQS queue.
 	//
-	// * For the application protocol, the endpoint is the EndpointArn of a
-	// mobile app and device.
+	//   - For the application protocol, the endpoint is the EndpointArn of a mobile
+	//   app and device.
 	//
-	// * For the lambda protocol, the endpoint is the ARN of an
-	// Lambda function.
+	//   - For the lambda protocol, the endpoint is the ARN of an Lambda function.
 	//
-	// * For the firehose protocol, the endpoint is the ARN of an
-	// Amazon Kinesis Data Firehose delivery stream.
+	//   - For the firehose protocol, the endpoint is the ARN of an Amazon Kinesis Data
+	//   Firehose delivery stream.
 	Endpoint *string
 
 	// Sets whether the response from the Subscribe request includes the subscription
-	// ARN, even if the subscription is not yet confirmed. If you set this parameter to
-	// true, the response includes the ARN in all cases, even if the subscription is
-	// not yet confirmed. In addition to the ARN for confirmed subscriptions, the
-	// response also includes the pending subscription ARN value for subscriptions that
-	// aren't yet confirmed. A subscription becomes confirmed when the subscriber calls
-	// the ConfirmSubscription action with a confirmation token. The default value is
-	// false.
+	// ARN, even if the subscription is not yet confirmed.
+	//
+	// If you set this parameter to true , the response includes the ARN in all cases,
+	// even if the subscription is not yet confirmed. In addition to the ARN for
+	// confirmed subscriptions, the response also includes the pending subscription
+	// ARN value for subscriptions that aren't yet confirmed. A subscription becomes
+	// confirmed when the subscriber calls the ConfirmSubscription action with a
+	// confirmation token.
+	//
+	// The default value is false .
 	ReturnSubscriptionArn bool
 
 	noSmithyDocumentSerde
@@ -173,6 +192,9 @@ type SubscribeOutput struct {
 }
 
 func (c *Client) addOperationSubscribeMiddlewares(stack *middleware.Stack, options Options) (err error) {
+	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+		return err
+	}
 	err = stack.Serialize.Add(&awsAwsquery_serializeOpSubscribe{}, middleware.After)
 	if err != nil {
 		return err
@@ -181,34 +203,38 @@ func (c *Client) addOperationSubscribeMiddlewares(stack *middleware.Stack, optio
 	if err != nil {
 		return err
 	}
+	if err := addProtocolFinalizerMiddlewares(stack, options, "Subscribe"); err != nil {
+		return fmt.Errorf("add protocol finalizers: %v", err)
+	}
+
+	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
+		return err
+	}
 	if err = addSetLoggerMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddClientRequestIDMiddleware(stack); err != nil {
+	if err = addClientRequestID(stack); err != nil {
 		return err
 	}
-	if err = smithyhttp.AddComputeContentLengthMiddleware(stack); err != nil {
+	if err = addComputeContentLength(stack); err != nil {
 		return err
 	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = v4.AddComputePayloadSHA256Middleware(stack); err != nil {
+	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetryMiddlewares(stack, options); err != nil {
+	if err = addRetry(stack, options); err != nil {
 		return err
 	}
-	if err = addHTTPSignerV4Middleware(stack, options); err != nil {
+	if err = addRawResponseToMetadata(stack); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddRawResponseToMetadata(stack); err != nil {
+	if err = addRecordResponseTiming(stack); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack); err != nil {
+	if err = addClientUserAgent(stack, options); err != nil {
 		return err
 	}
 	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
@@ -217,10 +243,22 @@ func (c *Client) addOperationSubscribeMiddlewares(stack *middleware.Stack, optio
 	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
 		return err
 	}
+	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
+		return err
+	}
+	if err = addTimeOffsetBuild(stack, c); err != nil {
+		return err
+	}
+	if err = addUserAgentRetryMode(stack, options); err != nil {
+		return err
+	}
 	if err = addOpSubscribeValidationMiddleware(stack); err != nil {
 		return err
 	}
 	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opSubscribe(options.Region), middleware.Before); err != nil {
+		return err
+	}
+	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -232,6 +270,9 @@ func (c *Client) addOperationSubscribeMiddlewares(stack *middleware.Stack, optio
 	if err = addRequestResponseLogging(stack, options); err != nil {
 		return err
 	}
+	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -239,7 +280,6 @@ func newServiceMetadataMiddleware_opSubscribe(region string) *awsmiddleware.Regi
 	return &awsmiddleware.RegisterServiceMetadata{
 		Region:        region,
 		ServiceID:     ServiceID,
-		SigningName:   "sns",
 		OperationName: "Subscribe",
 	}
 }

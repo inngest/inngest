@@ -1,14 +1,14 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
-import { RiAddLine } from '@remixicon/react';
+import { SkeletonCard } from '@inngest/components/Apps/AppCard';
 
+import AppCards from '@/components/Apps/AppCards';
+import AppFAQ from '@/components/Apps/AppFAQ';
+import { EmptyActiveCard, EmptyArchivedCard } from '@/components/Apps/EmptyAppsCard';
+import { UnattachedSyncsCard } from '@/components/Apps/UnattachedSyncsCard';
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { pathCreator } from '@/utils/urls';
-import { AppCard, EmptyAppCard, SkeletonCard } from './AppCard';
-import { UnattachedSyncsCard } from './UnattachedSyncsCard';
 import { useApps } from './useApps';
+import { useLatestUnattachedSync } from './useUnattachedSyncs';
 
 type Props = {
   isArchived?: boolean;
@@ -16,65 +16,45 @@ type Props = {
 
 export function Apps({ isArchived = false }: Props) {
   const env = useEnvironment();
-  const router = useRouter();
-
-  const res = useApps({ envID: env.id, isArchived });
-  if (res.error) {
-    throw res.error;
+  const unattachedSyncRes = useLatestUnattachedSync({ envID: env.id });
+  if (unattachedSyncRes.error) {
+    // Swallow error because we don't want to crash the page.
+    console.error(unattachedSyncRes.error);
   }
-  if (res.isLoading && !res.data) {
+
+  const appsRes = useApps({ envID: env.id, isArchived });
+  if (appsRes.error) {
+    throw appsRes.error;
+  }
+  if (appsRes.isLoading && !appsRes.data) {
     return (
       <div className="mb-4 flex items-center justify-center">
-        <div className="w-full max-w-[1200px]">
+        <div className="w-full">
           <SkeletonCard />
         </div>
       </div>
     );
   }
 
-  const { apps, latestUnattachedSyncTime } = res.data;
+  const apps = appsRes.data;
   const hasApps = apps.length > 0;
-  // Sort apps by latest sync time
-  const sortedApps = apps.sort((a, b) => {
-    return (
-      (b.latestSync ? new Date(b.latestSync.lastSyncedAt).getTime() : 0) -
-      (a.latestSync ? new Date(a.latestSync.lastSyncedAt).getTime() : 0)
-    );
-  });
 
   return (
     <div className="flex items-center justify-center">
-      <div className="w-full max-w-[1200px]">
-        {!hasApps && !isArchived && (
-          <EmptyAppCard className="mb-4">
-            <div className="items-center md:items-start">
-              <Button
-                className="mt-4"
-                kind="primary"
-                label="Sync App"
-                btnAction={() => router.push(pathCreator.createApp({ envSlug: env.slug }))}
-                icon={<RiAddLine />}
-              />
-            </div>
-          </EmptyAppCard>
+      <div className="w-full">
+        {!hasApps && !unattachedSyncRes.data && !isArchived && (
+          <>
+            <EmptyActiveCard envSlug={env.slug} />
+            <AppFAQ />
+          </>
         )}
-        {!hasApps && isArchived && (
-          <p className="rounded-lg bg-slate-500 p-4 text-center text-white">No archived apps</p>
-        )}
-        {sortedApps.map((app) => {
-          return (
-            <AppCard
-              app={app}
-              className="mb-4"
-              envSlug={env.slug}
-              key={app.id}
-              isArchived={isArchived}
-            />
-          );
-        })}
-
-        {latestUnattachedSyncTime && !isArchived && (
-          <UnattachedSyncsCard envSlug={env.slug} latestSyncTime={latestUnattachedSyncTime} />
+        {!hasApps && isArchived && <EmptyArchivedCard />}
+        {hasApps && <AppCards apps={apps} envSlug={env.slug} />}
+        {unattachedSyncRes.data && !isArchived && (
+          <>
+            <UnattachedSyncsCard envSlug={env.slug} latestSyncTime={unattachedSyncRes.data} />
+            {!hasApps && <AppFAQ />}
+          </>
         )}
       </div>
     </div>

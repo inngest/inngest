@@ -2,7 +2,7 @@
 
 import { Fragment, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import { classNames } from '@inngest/components/utils/classNames';
+import { cn } from '@inngest/components/utils/classNames';
 
 type SlideOverProps = {
   children?: React.ReactNode;
@@ -23,7 +23,7 @@ export default function SlideOver({ children, onClose, size }: SlideOverProps) {
 
   return (
     <Transition.Root show={isOpen} appear={true} as={Fragment}>
-      <Dialog as="div" className="relative z-10" onClose={handleClose}>
+      <Dialog as="div" className="relative z-50" onClose={handleClose}>
         <Transition.Child
           as={Fragment}
           appear={true}
@@ -39,7 +39,7 @@ export default function SlideOver({ children, onClose, size }: SlideOverProps) {
         <div className="fixed inset-0 z-10 overflow-hidden">
           <div className="absolute inset-0 overflow-hidden">
             <div
-              className={classNames(
+              className={cn(
                 size === 'small' ? 'w-2/5' : 'w-4/5',
                 'pointer-events-none fixed inset-y-0 right-0 flex '
               )}
@@ -64,7 +64,7 @@ export default function SlideOver({ children, onClose, size }: SlideOverProps) {
                     leaveTo="opacity-0"
                   />
                   <div
-                    className={classNames(
+                    className={cn(
                       size === 'small' ? 'w-2/5' : 'w-4/5',
                       'bg-canvasBase flex h-full flex-col shadow-xl'
                     )}

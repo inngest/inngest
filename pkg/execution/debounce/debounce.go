@@ -20,6 +20,7 @@ import (
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/xhit/go-str2duration/v2"
@@ -124,18 +125,21 @@ type Debouncer interface {
 	Debounce(ctx context.Context, d DebounceItem, fn inngest.Function) error
 	GetDebounceItem(ctx context.Context, debounceID ulid.ULID) (*DebounceItem, error)
 	DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID) error
+	StartExecution(ctx context.Context, d DebounceItem, fn inngest.Function, debounceID ulid.ULID) error
 }
 
-func NewRedisDebouncer(d *redis_state.DebounceClient, q redis_state.QueueManager) Debouncer {
+func NewRedisDebouncer(d *redis_state.DebounceClient, defaultQueueShard redis_state.QueueShard, q redis_state.QueueManager) Debouncer {
 	return debouncer{
-		d: d,
-		q: q,
+		d:                 d,
+		q:                 q,
+		defaultQueueShard: defaultQueueShard,
 	}
 }
 
 type debouncer struct {
-	d *redis_state.DebounceClient
-	q redis_state.QueueManager
+	d                 *redis_state.DebounceClient
+	q                 redis_state.QueueManager
+	defaultQueueShard redis_state.QueueShard
 }
 
 // DeleteDebounceItem removes a debounce from the map.
@@ -167,6 +171,39 @@ func (d debouncer) GetDebounceItem(ctx context.Context, debounceID ulid.ULID) (*
 		return nil, fmt.Errorf("error unmarshalling debounce item: %w", err)
 	}
 	return di, nil
+}
+
+// StartExecution swaps out the underlying pointer of the debounce
+func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn inngest.Function, debounceID ulid.ULID) error {
+	dkey, err := d.debounceKey(ctx, di, fn)
+	if err != nil {
+		return err
+	}
+
+	newDebounceID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	keys := []string{d.d.KeyGenerator().DebouncePointer(ctx, fn.ID, dkey)}
+	args := []string{
+		newDebounceID.String(),
+		debounceID.String(),
+	}
+
+	res, err := scripts["start"].Exec(
+		ctx,
+		d.d.Client(),
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return err
+	}
+
+	switch res {
+	case 0, 1:
+		return nil
+	default:
+		return fmt.Errorf("invalid status returned when starting debounce: %d", res)
+	}
 }
 
 // Debounce debounces a given function with the given DebounceItem.
@@ -201,6 +238,7 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 	err = d.updateDebounce(ctx, di, fn, ttl, *debounceID)
 	if err == context.DeadlineExceeded || err == ErrDebounceInProgress || err == ErrDebounceNotFound {
 		if n == 5 {
+			logger.StdlibLogger(ctx).Error("unable to update debounce", "error", err)
 			// Only recurse 5 times.
 			return fmt.Errorf("unable to update debounce: %w", err)
 		}
@@ -272,7 +310,7 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 		// second lets an updateDebounce call on TTL 0 finish, as the buffer is the updateDebounce
 		// deadline.
 		qi := d.queueItem(ctx, di, debounceID)
-		err = d.q.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second))
+		err = d.q.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second), queue.EnqueueOpts{})
 		if err != nil {
 			return &debounceID, fmt.Errorf("error enqueueing debounce job: %w", err)
 		}
@@ -300,7 +338,7 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 	// NOTE: This function has a deadline to complete.  If this fn doesn't complete within the deadline,
 	// eg, network issues, we must check if the debounce expired and re-attempt the entire thing, allowing
 	// us to either update or create a new debounce depending on the current time.
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	keyPtr := d.d.KeyGenerator().DebouncePointer(ctx, fn.ID, key)
@@ -322,7 +360,7 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 			debounceID.String(),
 			string(byt),
 			strconv.Itoa(int(ttl.Seconds())),
-			redis_state.HashID(ctx, debounceID.String()),
+			queue.HashID(ctx, debounceID.String()),
 			strconv.Itoa(int(time.Now().UnixMilli())),
 			strconv.Itoa(int(di.Event.Timestamp)),
 		},
@@ -332,7 +370,6 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 	}
 	switch out {
 	case -1:
-		log.From(ctx).Warn().Msg(ErrDebounceInProgress.Error())
 		// The debounce is in progress or has just finished.  Requeue.
 		return ErrDebounceInProgress
 	case -2:
@@ -340,16 +377,17 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 		// Do nothing.
 		return nil
 	case -3:
-		log.From(ctx).Warn().Msg(ErrDebounceNotFound.Error())
-		// The debounce is in progress or has just finished.  Requeue.
-		return ErrDebounceNotFound
+		// The item is not found with the debounceID
+		// enqueue a new item
+		qi := d.queueItem(ctx, di, debounceID)
+		return d.q.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second), queue.EnqueueOpts{})
 	default:
 		// Debounces should have a maximum timeout;  updating the debounce returns
 		// the timeout to use.
 		actualTTL := time.Second * time.Duration(out)
 		err = d.q.RequeueByJobID(
 			ctx,
-			fn.ID.String(),
+			d.defaultQueueShard,
 			debounceID.String(),
 			now.Add(actualTTL).Add(buffer).Add(time.Second),
 		)

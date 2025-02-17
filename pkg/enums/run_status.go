@@ -37,6 +37,8 @@ const (
 	// This is unlikely to happen during normal execution, and more likely when converting between
 	// the status code
 	RunStatusUnknown RunStatus = 6
+	// RunStatusSkipped indicates that the function was skipped and not ran
+	RunStatusSkipped RunStatus = 7
 )
 
 var (
@@ -49,6 +51,7 @@ var (
 		RunStatusCompleted:  300,
 		RunStatusFailed:     400,
 		RunStatusCancelled:  500,
+		RunStatusSkipped:    600,
 	}
 
 	codeStatusMap = map[int64]RunStatus{}
@@ -64,7 +67,7 @@ func init() {
 // RunStatusEnded returns whether the function has ended based off of the
 // run status.
 func RunStatusEnded(s RunStatus) bool {
-	if s == RunStatusCancelled || s == RunStatusCompleted || s == RunStatusFailed || s == RunStatusOverflowed {
+	if s == RunStatusCancelled || s == RunStatusCompleted || s == RunStatusFailed || s == RunStatusOverflowed || s == RunStatusSkipped {
 		return true
 	}
 	return false

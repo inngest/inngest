@@ -4,8 +4,9 @@ import { useMemo } from 'react';
 import { type Route } from 'next';
 import { Link } from '@inngest/components/Link';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
+import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { type Trigger } from '@inngest/components/types/trigger';
-import { RiBarChart2Fill, RiErrorWarningLine } from '@remixicon/react';
+import { cn } from '@inngest/components/utils/classNames';
 import {
   createColumnHelper,
   flexRender,
@@ -15,8 +16,6 @@ import {
 
 import MiniStackedBarChart from '@/components/Charts/MiniStackedBarChart';
 import { useEnvironment } from '@/components/Environments/environment-context';
-import Placeholder from '@/components/Placeholder';
-import cn from '@/utils/cn';
 
 export type FunctionTableRow = {
   appName: string | null;
@@ -53,17 +52,16 @@ export function FunctionTable({ rows = [] }: Props) {
   });
 
   return (
-    <main className="flex min-h-0 flex-col overflow-y-auto bg-slate-100">
-      <table className="border-b border-slate-200 bg-white">
-        <thead className="shadow-outline-primary-light sticky top-0 z-10 bg-white">
+    <main className="bg-canvasBase flex min-h-0 flex-col overflow-y-auto">
+      <table className="border-subtle border-b">
+        <thead className="shadow-subtle sticky top-0 z-10 shadow-[0_1px_0]">
           {table.getHeaderGroups().map((headerGroup) => (
-            <tr key={headerGroup.id}>
+            <tr key={headerGroup.id} className="h-12">
               {headerGroup.headers.map((header, index) => (
                 <th
                   key={header.id}
                   className={cn(
-                    'w-fit whitespace-nowrap px-2 py-3 text-left text-xs font-semibold text-slate-600',
-                    index === 0 && 'pl-6',
+                    'text-muted w-fit whitespace-nowrap px-4 text-left text-sm font-semibold ',
                     index === columns.length - 1 && 'w-0'
                   )}
                 >
@@ -75,13 +73,13 @@ export function FunctionTable({ rows = [] }: Props) {
             </tr>
           ))}
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-subtle divide-y">
           {table.getRowModel().rows.map((row) => (
-            <tr key={row.id} className="hover:bg-slate-100">
+            <tr key={row.id} className="hover:bg-canvasSubtle/50">
               {row.getVisibleCells().map((cell, index) => (
                 <td
                   key={cell.id}
-                  className={cn('whitespace-nowrap', index === columns.length - 1 && 'pr-6')}
+                  className={cn('whitespace-nowrap', index === columns.length - 1 && 'pr-4')}
                 >
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </td>
@@ -91,9 +89,7 @@ export function FunctionTable({ rows = [] }: Props) {
         </tbody>
       </table>
 
-      {rows.length === 0 && (
-        <div className="p-3 text-center text-sm text-slate-700">No functions</div>
-      )}
+      {rows.length === 0 && <div className="text-subtle p-3 text-center text-sm">No functions</div>}
     </main>
   );
 }
@@ -101,7 +97,7 @@ export function FunctionTable({ rows = [] }: Props) {
 function Shimmer({ className }: { className?: string }) {
   return (
     <div className={`flex ${className}`}>
-      <Placeholder className="my-4 h-2.5 w-full bg-slate-200" />
+      <Skeleton className="block h-5 w-full" />
     </div>
   );
 }
@@ -116,17 +112,21 @@ function createColumns(environmentSlug: string) {
         const { isPaused, isArchived, slug } = info.row.original;
 
         return (
-          <div className="flex items-center pl-6">
+          <div className="flex items-center pl-4">
             <div
               className={cn(
                 'h-2.5 w-2.5 rounded-full',
-                isArchived ? 'bg-slate-300' : isPaused ? 'bg-amber-500' : 'bg-teal-500'
+                isArchived
+                  ? 'bg-surfaceMuted'
+                  : isPaused
+                  ? 'bg-accent-subtle'
+                  : 'bg-primary-moderate'
               )}
             />
             <Link
               key="name"
               href={`/env/${environmentSlug}/functions/${encodeURIComponent(slug)}` as Route}
-              internalNavigation
+              arrowOnHover
               className="w-full px-2 py-3 text-sm font-medium"
             >
               {name}
@@ -134,7 +134,7 @@ function createColumns(environmentSlug: string) {
           </div>
         );
       },
-      header: 'Function Name',
+      header: 'Function name',
     }),
     columnHelper.accessor('triggers', {
       cell: (props) => {
@@ -145,6 +145,7 @@ function createColumns(environmentSlug: string) {
             pills={triggers.map((trigger) => {
               return (
                 <Pill
+                  appearance="outlined"
                   href={
                     trigger.type === 'EVENT'
                       ? (`/env/${environmentSlug}/events/${encodeURIComponent(
@@ -171,9 +172,14 @@ function createColumns(environmentSlug: string) {
         }
 
         return (
-          <Pill href={`/env/${environmentSlug}/apps/${encodeURIComponent(appExternalID)}` as Route}>
-            <PillContent type="APP">{appExternalID}</PillContent>
-          </Pill>
+          <div className="flex items-center">
+            <Pill
+              appearance="outlined"
+              href={`/env/${environmentSlug}/apps/${encodeURIComponent(appExternalID)}` as Route}
+            >
+              <PillContent type="APP">{appExternalID}</PillContent>
+            </Pill>
+          </div>
         );
       },
       header: 'App',
@@ -182,38 +188,35 @@ function createColumns(environmentSlug: string) {
       cell: (info) => {
         const value = info.getValue();
         if (value === undefined) {
-          return <Shimmer className="w-12 px-2.5" />;
+          return <Shimmer className="px-2.5" />;
         }
 
-        let icon;
-        if (value > 0) {
-          icon = <RiErrorWarningLine className="-ml-1 mr-1 h-4 w-4 text-rose-500" />;
+        if (value === 0) {
+          return <div className="text-light px-2.5 text-sm">-</div>;
         }
 
         return (
-          <div className="flex items-center gap-1 px-2.5 text-sm text-slate-600">
-            {icon}
+          <div className={'text-tertiary-intense flex items-center gap-1 px-2.5 text-sm'}>
             {value}%
           </div>
         );
       },
-      header: 'Failure Rate (24hr)',
+      header: 'Failure rate (24hr)',
     }),
     columnHelper.accessor('usage', {
       cell: (info) => {
         const value = info.getValue();
         if (value === undefined) {
-          return <Shimmer className="w-[212px] px-2.5" />;
+          return <Shimmer className="px-2.5" />;
         }
 
         return (
           <div className="flex min-w-[212px] items-center justify-end gap-2">
             <span
               key="volume-count"
-              className="overflow-hidden whitespace-nowrap text-xs text-slate-600"
+              className="text-subtle overflow-hidden whitespace-nowrap text-xs"
             >
-              <div className="flex items-center gap-1 align-middle text-sm text-slate-600">
-                <RiBarChart2Fill className="-ml-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" />
+              <div className="flex items-center gap-1 align-middle text-sm">
                 {value.total.toLocaleString(undefined, {
                   notation: 'compact',
                   compactDisplay: 'short',

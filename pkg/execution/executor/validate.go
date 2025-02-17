@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/expressions"
 	"time"
+
+	"github.com/inngest/inngest/pkg/expressions"
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/event"
@@ -66,6 +67,11 @@ func (r *runValidator) validate(ctx context.Context) error {
 }
 
 func (r *runValidator) checkStepLimit(ctx context.Context) error {
+	l := logger.StdlibLogger(ctx).With(
+		"run_id", r.md.ID.RunID.String(),
+		"workflow_id", r.md.ID.FunctionID.String(),
+	)
+
 	var limit int
 
 	if r.e.steplimit != nil {
@@ -92,12 +98,13 @@ func (r *runValidator) checkStepLimit(ctx context.Context) error {
 		resp.Err = &gracefulErr
 		resp.SetFinal()
 
-		if performedFinalization, err := r.e.finalize(ctx, r.md, r.evts, r.f.GetSlug(), resp); err != nil {
-			logger.From(ctx).Error().Err(err).Msg("error running finish handler")
-		} else if performedFinalization {
-			for _, e := range r.e.lifecycles {
-				go e.OnFunctionFinished(context.WithoutCancel(ctx), r.md, r.item, r.evts, resp)
-			}
+		if err := r.e.finalize(ctx, r.md, r.evts, r.f.GetSlug(), r.e.assignedQueueShard, resp); err != nil {
+			l.Error("error running finish handler", "error", err)
+		}
+
+		// Can be reached multiple times for parallel discovery steps
+		for _, e := range r.e.lifecycles {
+			go e.OnFunctionFinished(context.WithoutCancel(ctx), r.md, r.item, r.evts, resp)
 		}
 
 		// Stop the function from running, but don't return an error as we don't
@@ -157,9 +164,9 @@ func (r *runValidator) checkCancellation(ctx context.Context) error {
 }
 
 func (r *runValidator) checkStartTimeout(ctx context.Context) error {
-	if r.f.Timeouts != nil {
+	if r.f.Timeouts != nil && r.f.Timeouts.Start != nil {
 		since := time.Since(ulid.Time(r.md.ID.RunID.Time()))
-		if r.f.Timeouts.Start > 0 && since > r.f.Timeouts.Start {
+		if *r.f.Timeouts.StartDuration() > 0 && since > *r.f.Timeouts.StartDuration() && r.md.Config.StartedAt.IsZero() {
 			logger.StdlibLogger(ctx).Debug("start timeout reached", "run_id", r.md.ID.RunID.String())
 			if err := r.e.Cancel(ctx, r.md.ID, execution.CancelRequest{}); err != nil {
 				return err
@@ -174,17 +181,17 @@ func (r *runValidator) checkStartTimeout(ctx context.Context) error {
 }
 
 func (r *runValidator) checkFinishTimeout(ctx context.Context) error {
-	if r.f.Timeouts != nil && r.f.Timeouts.Finish > 0 {
+	if r.f.Timeouts != nil && r.f.Timeouts.Finish != nil && *r.f.Timeouts.FinishDuration() > 0 {
 		started := r.md.Config.StartedAt
 
-		if started.IsZero() || started.Unix() == 0 || time.Since(started) <= r.f.Timeouts.Finish {
+		if started.IsZero() || started.Unix() == 0 || time.Since(started) <= *r.f.Timeouts.FinishDuration() {
 			return nil
 		}
 		logger.StdlibLogger(ctx).Info(
 			"finish timeout reached",
 			"run_id", r.md.ID.RunID,
 			"started_at", started.UTC(),
-			"timeout", r.f.Timeouts.Finish.String(),
+			"timeout", r.f.Timeouts.Finish,
 			"since", time.Since(started).String(),
 		)
 		if err := r.e.Cancel(ctx, r.md.ID, execution.CancelRequest{}); err != nil {

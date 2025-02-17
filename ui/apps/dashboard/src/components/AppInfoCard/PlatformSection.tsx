@@ -1,11 +1,10 @@
 import type { Route } from 'next';
+import { CardItem } from '@inngest/components/Apps/AppDetailsCard';
 import { Link } from '@inngest/components/Link';
-
-import { PlatformInfo } from '@/components/PlatformInfo';
 
 type Props = {
   sync: {
-    platform: string | null;
+    platform?: string | null;
     vercelDeploymentID: string | null;
     vercelDeploymentURL: string | null;
     vercelProjectID: string | null;
@@ -23,7 +22,7 @@ export function PlatformSection({ sync }: Props) {
   let deploymentValue;
   if (vercelDeploymentID && vercelDeploymentURL) {
     deploymentValue = (
-      <Link href={vercelDeploymentURL as Route} internalNavigation={false}>
+      <Link href={vercelDeploymentURL as Route} target="_blank" size="small">
         <span className="truncate">{vercelDeploymentID}</span>
       </Link>
     );
@@ -34,7 +33,7 @@ export function PlatformSection({ sync }: Props) {
   let projectValue;
   if (vercelProjectID && vercelProjectURL) {
     projectValue = (
-      <Link href={vercelProjectURL as Route} internalNavigation={false}>
+      <Link href={vercelProjectURL as Route} target="_blank" size="small">
         <span className="truncate">{vercelProjectID}</span>
       </Link>
     );
@@ -44,26 +43,9 @@ export function PlatformSection({ sync }: Props) {
 
   return (
     <>
-      <Description detail={<PlatformInfo platform={platform} />} term="Platform" />
-      <Description detail={projectValue} term="Vercel Project" />
-      <Description detail={deploymentValue} term="Vercel Deployment" />
+      <CardItem detail={<div className="truncate">{platform}</div>} term="Platform" />
+      <CardItem detail={projectValue} term="Vercel project" />
+      <CardItem detail={deploymentValue} term="Vercel deployment" />
     </>
-  );
-}
-
-function Description({
-  className,
-  detail,
-  term,
-}: {
-  className?: string;
-  detail: React.ReactNode;
-  term: string;
-}) {
-  return (
-    <div className={className}>
-      <dt className="pb-2 text-sm text-slate-400">{term}</dt>
-      <dd className="text-slate-800">{detail}</dd>
-    </div>
   );
 }

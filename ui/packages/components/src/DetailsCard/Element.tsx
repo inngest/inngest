@@ -1,4 +1,4 @@
-import { InlineCode } from '@inngest/components/InlineCode';
+import { InlineCode } from '@inngest/components/Code';
 import { Link, type LinkProps } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
@@ -15,7 +15,7 @@ export function ElementWrapper({
 }: React.PropsWithChildren<{ label: string; className?: string }>) {
   return (
     <div className={cn('w-64 text-sm', className)}>
-      <dt className="text-subtle text-xs">{label}</dt>
+      <dt className="text-muted text-xs">{label}</dt>
       <dd className="truncate">{children}</dd>
     </div>
   );
@@ -40,10 +40,45 @@ export function LazyElementWrapper<T>({
   }
 
   return (
-    <div className={cn('w-64 text-sm', className)}>
-      <dt className="text-subtle text-xs">{label}</dt>
-      <dd className="truncate">{content}</dd>
-    </div>
+    <ElementWrapper label={label} className={className}>
+      {content}
+    </ElementWrapper>
+  );
+}
+
+// Optimistically render an initial value while waiting for a
+// lazy loaded value to render the final component
+export function OptimisticElementWrapper<T, InitialType>({
+  children,
+  optimisticChildren,
+  className,
+  label,
+  lazy,
+  initial,
+}: {
+  children: (loaded: T) => React.ReactNode;
+  optimisticChildren: (loaded: InitialType) => React.ReactNode | undefined;
+  className?: string;
+  label: string;
+  lazy: Lazy<T>;
+  initial?: InitialType;
+}) {
+  let content;
+  if (isLazyDone(lazy)) {
+    content = children(lazy);
+  } else if (initial) {
+    content = optimisticChildren(initial);
+    if (!content) {
+      content = <SkeletonElement />;
+    }
+  } else {
+    content = <SkeletonElement />;
+  }
+
+  return (
+    <ElementWrapper label={label} className={className}>
+      {content}
+    </ElementWrapper>
   );
 }
 
@@ -63,7 +98,7 @@ export function TimeElement({ date }: { date: Date }) {
   );
 }
 
-export function LinkElement({ children, href, ...props }: LinkProps) {
+export function LinkElement({ children, href, ...props }: React.PropsWithChildren<LinkProps>) {
   return (
     <Link href={href} {...props}>
       {children}
@@ -72,7 +107,7 @@ export function LinkElement({ children, href, ...props }: LinkProps) {
 }
 
 export function CodeElement({ value }: { value: string }) {
-  return <InlineCode value={value} />;
+  return <InlineCode>{value}</InlineCode>;
 }
 
 export function SkeletonElement() {

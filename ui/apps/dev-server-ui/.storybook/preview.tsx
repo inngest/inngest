@@ -18,7 +18,7 @@ const preview: Preview = {
       values: [
         {
           name: 'dark',
-          value: '#080D19', // bg-slate-940
+          value: '#020202', // carbon-1000
         },
       ],
     },

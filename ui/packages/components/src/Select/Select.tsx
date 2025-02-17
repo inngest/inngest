@@ -1,7 +1,8 @@
+import { forwardRef } from 'react';
 import { Combobox, Listbox, type ComboboxInputProps } from '@headlessui/react';
 import { RiArrowDownSLine } from '@remixicon/react';
 
-import { NewButton as InngestButton } from '../Button';
+import { Button as InngestButton } from '../Button';
 import { Checkbox } from '../Checkbox';
 import { cn } from '../utils/classNames';
 
@@ -10,6 +11,7 @@ type SelectProps = {
   isLabelVisible?: boolean;
   children: React.ReactNode;
   className?: string;
+  size?: 'small' | 'medium';
 };
 
 export type Option = {
@@ -26,7 +28,7 @@ type MultiProps = {
 
 type SingleProps = {
   onChange: (value: Option) => void;
-  value?: Option;
+  value?: Option | null;
   multiple?: false;
 };
 
@@ -61,37 +63,45 @@ export function Select({
   );
 }
 
-function Button({
-  children,
-  isLabelVisible,
-  className,
-  as: Component,
-}: React.PropsWithChildren<{
+type ButtonProps = {
+  children: React.ReactNode;
   isLabelVisible?: boolean;
   className?: string;
   as: React.ElementType;
-}>) {
-  return (
-    <Component
-      className={cn(
-        !isLabelVisible && 'rounded-l-[5px]',
-        'bg-surfaceBase text-basis flex h-10 w-full items-center justify-between rounded-r-[5px] px-2',
-        className
-      )}
-    >
-      {children}
-      <RiArrowDownSLine
-        className="ui-open:-rotate-180 text-subtle h-4 w-4 transition-transform duration-500"
-        aria-hidden="true"
-      />
-    </Component>
-  );
-}
+  size?: 'small' | 'medium';
+};
 
-function Options({ children, as: Component }: React.PropsWithChildren<{ as: React.ElementType }>) {
+const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ children, isLabelVisible, className, as: Component, size = 'medium' }, ref) => {
+    return (
+      <Component
+        ref={ref}
+        className={cn(
+          !isLabelVisible && 'rounded-l-[5px]',
+          size === 'small' ? 'h-[30px]' : 'h-[38px]',
+          'bg-surfaceBase text-basis flex w-full items-center justify-between rounded-r-[5px] px-2',
+          className
+        )}
+      >
+        {children}
+        <RiArrowDownSLine
+          className="ui-open:-rotate-180 text-muted h-4 w-4 transition-transform duration-500"
+          aria-hidden="true"
+        />
+      </Component>
+    );
+  }
+);
+Button.displayName = 'Button';
+
+function Options({
+  children,
+  as: Component,
+  className,
+}: React.PropsWithChildren<{ as: React.ElementType; className?: string }>) {
   return (
-    <Component className="absolute z-10 mt-1 min-w-max">
-      <div className="border-muted bg-surfaceBase z-10 overflow-hidden rounded-md border py-1 drop-shadow-lg">
+    <Component className={cn('absolute z-10 mt-1 min-w-max', className)}>
+      <div className="border-muted bg-surfaceBase shadow-primary z-10 overflow-hidden rounded-md border py-1">
         {children}
       </div>
     </Component>
@@ -145,18 +155,46 @@ function CheckboxOption({
   );
 }
 
-function Footer({ onReset }: { onReset: () => void }) {
+function Footer({
+  onReset,
+  onApply,
+  disabledReset,
+  disabledApply,
+}: {
+  onReset?: () => void;
+  onApply?: () => void;
+  disabledReset?: boolean;
+  disabledApply?: boolean;
+}) {
   return (
-    <div className="border-muted mt-1 flex items-center justify-between border-t px-2 pb-1.5 pt-2.5">
-      {onReset && <InngestButton label="Reset" appearance="ghost" size="small" onClick={onReset} />}
+    <div
+      className={cn(
+        'border-muted mt-1 flex items-center border-t px-2 pb-1 pt-2',
+        onReset ? 'justify-between' : 'justify-end'
+      )}
+    >
+      {onReset && (
+        <InngestButton
+          label="Reset"
+          appearance="ghost"
+          size="small"
+          onClick={onReset}
+          disabled={disabledReset}
+        />
+      )}
+      {onApply && (
+        <InngestButton label="Apply" size="small" onClick={onApply} disabled={disabledApply} />
+      )}
     </div>
   );
 }
 
-Select.Button = (
-  props: React.PropsWithChildren<{ isLabelVisible?: boolean; className?: string }>
-) => <Button {...props} as={Listbox.Button} />;
-Select.Options = (props: React.PropsWithChildren) => <Options {...props} as={Listbox.Options} />;
+Select.Button = forwardRef<HTMLButtonElement, Omit<ButtonProps, 'as'>>((props, ref) => (
+  <Button {...props} ref={ref} as={Listbox.Button} />
+));
+Select.Options = (props: React.PropsWithChildren<{ className?: string }>) => (
+  <Options {...props} as={Listbox.Options} />
+);
 Select.Option = (props: React.PropsWithChildren<{ option: Option }>) => (
   <Option {...props} as={Listbox.Option} />
 );
@@ -211,17 +249,19 @@ export function SelectWithSearch({
 
 function Search<T>({ ...props }: ComboboxInputProps<'input', T>) {
   return (
-    <Combobox.Input
-      className="border-subtle text-basis bg-surfaceBase placeholder:text-disabled focus-visible:outline-primary-moderate mx-2 my-2 rounded-lg border px-4 py-2"
-      {...props}
-    />
+    <div className="mx-2 my-2">
+      <Combobox.Input
+        className="border-subtle text-basis bg-surfaceBase placeholder:text-disabled focus-visible:outline-primary-moderate w-full rounded-md border px-4 py-2 text-sm"
+        {...props}
+      />
+    </div>
   );
 }
 
-SelectWithSearch.Button = (
-  props: React.PropsWithChildren<{ isLabelVisible?: boolean; className?: string }>
-) => <Button {...props} as={Combobox.Button} />;
-SelectWithSearch.Options = (props: React.PropsWithChildren) => (
+SelectWithSearch.Button = forwardRef<HTMLButtonElement, Omit<ButtonProps, 'as'>>((props, ref) => (
+  <Button {...props} ref={ref} as={Combobox.Button} />
+));
+SelectWithSearch.Options = (props: React.PropsWithChildren<{ className?: string }>) => (
   <Options {...props} as={Combobox.Options} />
 );
 SelectWithSearch.Option = (props: React.PropsWithChildren<{ option: Option }>) => (

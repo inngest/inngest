@@ -7,6 +7,7 @@ export const functionRunStatuses = [
   'QUEUED',
   'COMPLETED',
   'CANCELLED',
+  'SKIPPED',
 ] as const;
 const FunctionRunEndedStatuses = ['CANCELLED', 'COMPLETED', 'FAILED'] as const;
 export type FunctionRunStatus = (typeof functionRunStatuses)[number];
@@ -53,6 +54,7 @@ export function isFunctionTimeField(s: string): s is FunctionRunTimeField {
 }
 
 export type Result = {
+  input: string | null;
   data: string | null;
   error: {
     message: string;

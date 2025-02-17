@@ -1,7 +1,6 @@
 'use client';
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from 'react';
-import { usePathname } from 'next/navigation';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import type { Run } from '@inngest/components/RunsPage/types';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
@@ -19,7 +18,8 @@ import { GetFunctionPauseStateDocument, RunsOrderByField } from '@/gql/graphql';
 import { useCancelRun } from '@/queries/useCancelRun';
 import { useRerun } from '@/queries/useRerun';
 import { pathCreator } from '@/utils/urls';
-import { usePlanFeatures } from '@/utils/usePlanFeatures';
+import { useAccountFeatures } from '@/utils/useAccountFeatures';
+import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { AppFilterDocument, CountRunsDocument, GetRunsDocument } from './queries';
 import { parseRunsData, toRunStatuses, toTimeField } from './utils';
 
@@ -44,10 +44,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   ref
 ) {
   const env = useEnvironment();
-  const pathName = usePathname();
-  //
-  // Don't do page level refresh on new runs section, it's a top nav action
-  const monitorRuns = pathName.includes(`/env/${env.slug}/runs`);
+  const { value: traceAIEnabled, isReady } = useBooleanFlag('ai-traces');
 
   const [{ data: pauseData }] = useQuery({
     pause: scope !== 'fn',
@@ -70,6 +67,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   const [lastDays] = useSearchParam('last');
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
+  const [search] = useSearchParam('search');
 
   const timeField = toTimeField(rawTimeField) ?? RunsOrderByField.QueuedAt;
 
@@ -84,7 +82,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   const getTraceResult = useGetTraceResult();
   const getTrigger = useGetTrigger();
   const getRun = useGetRun();
-  const features = usePlanFeatures();
+  const features = useAccountFeatures();
 
   const internalPathCreator = useMemo(() => {
     return {
@@ -113,6 +111,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     endTime: endTime ?? null,
     status: filteredStatus.length > 0 ? filteredStatus : null,
     timeField,
+    celQuery: search,
   };
 
   const [firstPageRes, fetchFirstPage] = useQuery({
@@ -150,7 +149,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   const nextPageRunsData = nextPageRes.data?.environment.runs.edges;
   const firstPageInfo = firstPageRes.data?.environment.runs.pageInfo;
   const nextPageInfo = nextPageRes.data?.environment.runs.pageInfo;
-  const hasNextPage = nextPageInfo?.hasNextPage || firstPageInfo?.hasNextPage;
+  const hasNextPage = isScrollRequest ? nextPageInfo?.hasNextPage : firstPageInfo?.hasNextPage;
   const isLoading = firstPageRes.fetching || nextPageRes.fetching;
 
   let totalCount = undefined;
@@ -232,7 +231,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       isLoadingInitial={firstPageRes.fetching}
       isLoadingMore={nextPageRes.fetching}
       getRun={getRun}
-      onRefresh={monitorRuns ? undefined : onRefresh}
+      onRefresh={onRefresh}
       onScroll={fetchMoreOnScroll}
       onScrollToTop={onScrollToTop}
       getTraceResult={getTraceResult}
@@ -242,6 +241,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       functionIsPaused={pauseData?.environment.function?.isPaused ?? false}
       scope={scope}
       totalCount={totalCount}
+      traceAIEnabled={isReady && traceAIEnabled}
     />
   );
 });

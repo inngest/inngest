@@ -4,8 +4,8 @@ import { ContentCard } from '@inngest/components/ContentCard';
 import { EventDetails } from '@inngest/components/EventDetails';
 import { Link } from '@inngest/components/Link';
 import { RunDetails } from '@inngest/components/RunDetails';
-import { classNames } from '@inngest/components/utils/classNames';
-import type { NavigateToRunFn } from 'node_modules/@inngest/components/src/Timeline/Timeline';
+import type { NavigateToRunFn } from '@inngest/components/Timeline/Timeline';
+import { cn } from '@inngest/components/utils/classNames';
 import { toast } from 'sonner';
 import { ulid } from 'ulid';
 
@@ -109,7 +109,7 @@ export default function StreamDetails() {
     });
 
     return (
-      <Link internalNavigation href={`/stream/trigger?${runParams.toString()}`}>
+      <Link size="small" arrowOnHover href={`/stream/trigger?${runParams.toString()}`}>
         Go to run
       </Link>
     );
@@ -123,12 +123,7 @@ export default function StreamDetails() {
   }
 
   return (
-    <div
-      className={classNames(
-        'grid h-full text-white',
-        eventResult.data ? 'grid-cols-2' : 'grid-cols-1'
-      )}
-    >
+    <div className={cn('text-basis grid h-full', eventResult.data ? 'grid-cols-2' : 'grid-cols-1')}>
       {eventResult.data && (
         <EventDetails
           batchCreatedAt={runResult.data?.run?.batchCreatedAt ?? undefined}
