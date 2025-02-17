@@ -168,7 +168,7 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, sv2.I
 
 func (s *svc) Run(ctx context.Context) error {
 	logger.From(ctx).Info().Msg("subscribing to function queue")
-	return s.queue.Run(ctx, func(ctx context.Context, info queue.RunInfo, item queue.Item) (bool, error) {
+	return s.queue.Run(ctx, func(ctx context.Context, info queue.RunInfo, item queue.Item) (queue.RunResult, error) {
 		// Don't stop the service on errors.
 		s.wg.Add(1)
 		defer s.wg.Done()
@@ -200,7 +200,9 @@ func (s *svc) Run(ctx context.Context) error {
 			logger.StdlibLogger(ctx).Error("error handling queue item", "error", err)
 		}
 
-		return continuation, err
+		return queue.RunResult{
+			ScheduledImmediateJob: continuation,
+		}, err
 	})
 }
 

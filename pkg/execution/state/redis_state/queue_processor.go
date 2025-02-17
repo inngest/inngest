@@ -414,7 +414,7 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 			// XXX: When jobs can have their own cancellation signals, move this into
 			// process itself.
 			processCtx, cancel := context.WithCancel(context.Background())
-			err := q.process(processCtx, i.P, i.I, i.G, f)
+			err := q.process(processCtx, i.P, i.PCtr, i.I, i.G, f)
 			q.sem.Release(1)
 			metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
 			cancel()

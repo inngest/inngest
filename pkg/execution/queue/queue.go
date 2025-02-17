@@ -20,10 +20,10 @@ type Queue interface {
 }
 
 type RunInfo struct {
-	Latency      time.Duration
-	SojournDelay time.Duration
-	Priority     uint
-	ShardName    string
+	Latency        time.Duration
+	SojournDelay   time.Duration
+	Priority       uint
+	QueueShardName string
 	// ContinueCount represents the total number of continues that the queue has processed
 	// via RunFunc returning true.  This allows us to prevent unbounded sequential processing
 	// on the same function by limiting the number of continues possible within a given chain.
