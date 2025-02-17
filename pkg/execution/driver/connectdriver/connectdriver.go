@@ -46,6 +46,14 @@ func (e executor) RuntimeType() string {
 }
 
 func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadata, item queue.Item, edge inngest.Edge, step inngest.Step, idx, attempt int) (*state.DriverResponse, error) {
+	if e.forwarder == nil {
+		return nil, fmt.Errorf("missing connect request forwarder")
+	}
+
+	if e.tracer == nil {
+		return nil, fmt.Errorf("missing connect tracer")
+	}
+
 	traceCtx := context.Background()
 
 	traceCtx, span := e.tracer.NewSpan(ctx, "Execute", s.ID.Tenant.AccountID, s.ID.Tenant.EnvID)
@@ -76,10 +84,6 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 	uri, err := url.Parse(step.URI)
 	if err != nil {
 		return nil, err
-	}
-
-	if e.forwarder == nil {
-		return nil, fmt.Errorf("missing connect request forwarder")
 	}
 
 	return ProxyRequest(ctx, traceCtx, e.forwarder, s.ID.Tenant, httpdriver.Request{
