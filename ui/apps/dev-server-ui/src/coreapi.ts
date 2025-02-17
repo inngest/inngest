@@ -134,7 +134,7 @@ export const APPS = gql`
       connected
       functionCount
       autodiscovered
-      connectionType
+      method
       functions {
         name
         id
@@ -160,7 +160,7 @@ export const GET_APP = gql`
       connected
       functionCount
       autodiscovered
-      connectionType
+      method
       functions {
         name
         id
@@ -446,16 +446,19 @@ export const GET_TRIGGER = gql`
 
 export const GET_WORKER_CONNECTIONS = gql`
   query GetWorkerConnections(
-    $appIDs: [UUID!]
+    $appID: UUID!
     $startTime: Time
     $status: [ConnectV1ConnectionStatus!]
     $timeField: ConnectV1WorkerConnectionsOrderByField!
-    $connectionCursor: String = null
+    $cursor: String = null
+    $orderBy: [ConnectV1WorkerConnectionsOrderBy!] = []
+    $first: Int!
   ) {
     workerConnections(
-      filter: { appIDs: $appIDs, from: $startTime, status: $status, timeField: $timeField }
-      orderBy: [{ field: $timeField, direction: DESC }]
-      after: $connectionCursor
+      first: $first
+      filter: { appIDs: [$appID], from: $startTime, status: $status, timeField: $timeField }
+      orderBy: $orderBy
+      after: $cursor
     ) {
       edges {
         node {
@@ -494,14 +497,10 @@ export const GET_WORKER_CONNECTIONS = gql`
 `;
 
 export const COUNT_WORKER_CONNECTIONS = gql`
-  query CountWorkerConnections(
-    $appIDs: [UUID!]
-    $status: [ConnectV1ConnectionStatus!]
-    $timeField: ConnectV1WorkerConnectionsOrderByField!
-  ) {
+  query CountWorkerConnections($appID: UUID!, $status: [ConnectV1ConnectionStatus!]) {
     workerConnections(
-      filter: { appIDs: $appIDs, status: $status, timeField: $timeField }
-      orderBy: [{ field: $timeField, direction: DESC }]
+      filter: { appIDs: [$appID], status: $status, timeField: CONNECTED_AT }
+      orderBy: [{ field: CONNECTED_AT, direction: DESC }]
     ) {
       totalCount
     }

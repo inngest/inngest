@@ -332,7 +332,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 					closeErr := websocket.CloseError{}
 					if errors.As(err, &closeErr) {
-						ch.log.Error("connection closed with reason", "reason", closeErr.Reason)
+						ch.log.Debug("connection closed with reason", "reason", closeErr.Reason)
 
 						// If client connection closed unexpectedly, we should store the reason, if set.
 						// If the reason is set, it may have been an intentional close, so the connection

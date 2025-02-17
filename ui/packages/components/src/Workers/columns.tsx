@@ -62,8 +62,7 @@ export function useColumns() {
         );
       },
       header: 'Worker',
-      enableSorting: true,
-      sortingFn: 'alphanumericCaseSensitive',
+      enableSorting: false,
       id: ensureColumnID('instanceID'),
     }),
     columnHelper.accessor('connectedAt', {
@@ -77,7 +76,7 @@ export function useColumns() {
         );
       },
       header: 'Connected at',
-      enableSorting: false,
+      enableSorting: true,
       id: ensureColumnID('connectedAt'),
     }),
     columnHelper.accessor<'status', GroupedWorkerStatus>('status', {
@@ -105,7 +104,7 @@ export function useColumns() {
         );
       },
       header: 'Last heartbeat',
-      enableSorting: false,
+      enableSorting: true,
       id: ensureColumnID('lastHeartbeatAt'),
     }),
 

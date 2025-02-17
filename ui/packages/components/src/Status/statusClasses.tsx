@@ -19,7 +19,7 @@ const backgroundClasses: {
   SKIPPED_PAUSED: 'bg-accent-intense',
   PAUSED: 'bg-status-paused',
   SKIPPED: 'bg-status-paused',
-  INACTIVE: 'bg-accent-subtle dark:bg-accent-xIntense',
+  INACTIVE: 'bg-accent-subtle dark:bg-accent-intense',
   ACTIVE: 'bg-status-completed',
   DISCONNECTED: 'bg-status-cancelled',
 };
@@ -44,7 +44,7 @@ const borderClasses: {
   SKIPPED_PAUSED: 'border-accent-intense',
   PAUSED: 'border-accent-paused',
   SKIPPED: 'border-accent-paused',
-  INACTIVE: 'border-accent-subtle dark:border-accent-xIntense',
+  INACTIVE: 'border-accent-subtle dark:border-accent-intense',
   ACTIVE: 'border-status-completed',
   DISCONNECTED: 'border-status-cancelled',
 };
@@ -69,7 +69,7 @@ const textClasses: {
   SKIPPED_PAUSED: 'text-accent-intense',
   PAUSED: 'text-status-pausedText',
   SKIPPED: 'text-status-pausedText',
-  INACTIVE: 'text-accent-intense',
+  INACTIVE: 'text-accent-subtle dark:text-accent-intense',
   ACTIVE: 'text-status-completedText',
   DISCONNECTED: 'text-status-cancelledText',
 };

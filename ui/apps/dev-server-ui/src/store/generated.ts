@@ -37,8 +37,10 @@ export type App = {
   externalID: Scalars['String'];
   framework: Maybe<Scalars['String']>;
   functionCount: Scalars['Int'];
+  /** @deprecated connectionType is deprecated. Use method instead. */
   functions: Array<Function>;
   id: Scalars['ID'];
+  method: AppMethod;
   name: Scalars['String'];
   sdkLanguage: Scalars['String'];
   sdkVersion: Scalars['String'];
@@ -50,8 +52,15 @@ export enum AppConnectionType {
   Serverless = 'SERVERLESS'
 }
 
+export enum AppMethod {
+  Connect = 'CONNECT',
+  Serve = 'SERVE'
+}
+
 export type AppsFilterV1 = {
+  /** @deprecated connectionType is deprecated. Use method instead. */
   connectionType?: InputMaybe<AppConnectionType>;
+  method?: InputMaybe<AppMethod>;
 };
 
 export enum ConnectV1ConnectionStatus {
@@ -66,6 +75,7 @@ export type ConnectV1WorkerConnection = {
   __typename?: 'ConnectV1WorkerConnection';
   app: Maybe<App>;
   appID: Maybe<Scalars['UUID']>;
+  appVersion: Maybe<Scalars['String']>;
   buildId: Maybe<Scalars['String']>;
   connectedAt: Scalars['Time'];
   cpuCores: Scalars['Int'];
@@ -83,6 +93,7 @@ export type ConnectV1WorkerConnection = {
   sdkPlatform: Scalars['String'];
   sdkVersion: Scalars['String'];
   status: ConnectV1ConnectionStatus;
+  /** @deprecated buildId is deprecated. Use appVersion instead. */
   syncId: Maybe<Scalars['UUID']>;
   workerIp: Scalars['String'];
 };
@@ -755,14 +766,14 @@ export type GetFunctionsQuery = { __typename?: 'Query', functions: Array<{ __typ
 export type GetAppsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetAppsQuery = { __typename?: 'Query', apps: Array<{ __typename?: 'App', id: string, name: string, sdkLanguage: string, sdkVersion: string, framework: string | null, url: string | null, error: string | null, connected: boolean, functionCount: number, autodiscovered: boolean, connectionType: AppConnectionType, functions: Array<{ __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string }> }> };
+export type GetAppsQuery = { __typename?: 'Query', apps: Array<{ __typename?: 'App', id: string, name: string, sdkLanguage: string, sdkVersion: string, framework: string | null, url: string | null, error: string | null, connected: boolean, functionCount: number, autodiscovered: boolean, method: AppMethod, functions: Array<{ __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string }> }> };
 
 export type GetAppQueryVariables = Exact<{
   id: Scalars['UUID'];
 }>;
 
 
-export type GetAppQuery = { __typename?: 'Query', app: { __typename?: 'App', id: string, name: string, sdkLanguage: string, sdkVersion: string, framework: string | null, url: string | null, error: string | null, connected: boolean, functionCount: number, autodiscovered: boolean, connectionType: AppConnectionType, functions: Array<{ __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string, triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null }> } | null };
+export type GetAppQuery = { __typename?: 'Query', app: { __typename?: 'App', id: string, name: string, sdkLanguage: string, sdkVersion: string, framework: string | null, url: string | null, error: string | null, connected: boolean, functionCount: number, autodiscovered: boolean, method: AppMethod, functions: Array<{ __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string, triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null }> } | null };
 
 export type CreateAppMutationVariables = Exact<{
   input: CreateAppInput;
@@ -893,20 +904,21 @@ export type GetTriggerQueryVariables = Exact<{
 export type GetTriggerQuery = { __typename?: 'Query', runTrigger: { __typename?: 'RunTraceTrigger', IDs: Array<any>, payloads: Array<any>, timestamp: any, eventName: string | null, isBatch: boolean, batchID: any | null, cron: string | null } };
 
 export type GetWorkerConnectionsQueryVariables = Exact<{
-  appIDs: InputMaybe<Array<Scalars['UUID']> | Scalars['UUID']>;
+  appID: Scalars['UUID'];
   startTime: InputMaybe<Scalars['Time']>;
   status: InputMaybe<Array<ConnectV1ConnectionStatus> | ConnectV1ConnectionStatus>;
   timeField: ConnectV1WorkerConnectionsOrderByField;
-  connectionCursor?: InputMaybe<Scalars['String']>;
+  cursor?: InputMaybe<Scalars['String']>;
+  orderBy?: InputMaybe<Array<ConnectV1WorkerConnectionsOrderBy> | ConnectV1WorkerConnectionsOrderBy>;
+  first: Scalars['Int'];
 }>;
 
 
 export type GetWorkerConnectionsQuery = { __typename?: 'Query', workerConnections: { __typename?: 'ConnectV1WorkerConnectionsConnection', edges: Array<{ __typename?: 'ConnectV1WorkerConnectionEdge', node: { __typename?: 'ConnectV1WorkerConnection', id: any, gatewayId: any, instanceId: string, workerIp: string, connectedAt: any, lastHeartbeatAt: any | null, disconnectedAt: any | null, disconnectReason: string | null, status: ConnectV1ConnectionStatus, groupHash: string, sdkLang: string, sdkVersion: string, sdkPlatform: string, syncId: any | null, buildId: string | null, functionCount: number, cpuCores: number, memBytes: number, os: string, app: { __typename?: 'App', id: string } | null } }>, pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, hasPreviousPage: boolean, startCursor: string | null, endCursor: string | null } } };
 
 export type CountWorkerConnectionsQueryVariables = Exact<{
-  appIDs: InputMaybe<Array<Scalars['UUID']> | Scalars['UUID']>;
+  appID: Scalars['UUID'];
   status: InputMaybe<Array<ConnectV1ConnectionStatus> | ConnectV1ConnectionStatus>;
-  timeField: ConnectV1WorkerConnectionsOrderByField;
 }>;
 
 
@@ -1082,7 +1094,7 @@ export const GetAppsDocument = `
     connected
     functionCount
     autodiscovered
-    connectionType
+    method
     functions {
       name
       id
@@ -1107,7 +1119,7 @@ export const GetAppDocument = `
     connected
     functionCount
     autodiscovered
-    connectionType
+    method
     functions {
       name
       id
@@ -1313,11 +1325,12 @@ export const GetTriggerDocument = `
 }
     `;
 export const GetWorkerConnectionsDocument = `
-    query GetWorkerConnections($appIDs: [UUID!], $startTime: Time, $status: [ConnectV1ConnectionStatus!], $timeField: ConnectV1WorkerConnectionsOrderByField!, $connectionCursor: String = null) {
+    query GetWorkerConnections($appID: UUID!, $startTime: Time, $status: [ConnectV1ConnectionStatus!], $timeField: ConnectV1WorkerConnectionsOrderByField!, $cursor: String = null, $orderBy: [ConnectV1WorkerConnectionsOrderBy!] = [], $first: Int!) {
   workerConnections(
-    filter: {appIDs: $appIDs, from: $startTime, status: $status, timeField: $timeField}
-    orderBy: [{field: $timeField, direction: DESC}]
-    after: $connectionCursor
+    first: $first
+    filter: {appIDs: [$appID], from: $startTime, status: $status, timeField: $timeField}
+    orderBy: $orderBy
+    after: $cursor
   ) {
     edges {
       node {
@@ -1355,10 +1368,10 @@ export const GetWorkerConnectionsDocument = `
 }
     `;
 export const CountWorkerConnectionsDocument = `
-    query CountWorkerConnections($appIDs: [UUID!], $status: [ConnectV1ConnectionStatus!], $timeField: ConnectV1WorkerConnectionsOrderByField!) {
+    query CountWorkerConnections($appID: UUID!, $status: [ConnectV1ConnectionStatus!]) {
   workerConnections(
-    filter: {appIDs: $appIDs, status: $status, timeField: $timeField}
-    orderBy: [{field: $timeField, direction: DESC}]
+    filter: {appIDs: [$appID], status: $status, timeField: CONNECTED_AT}
+    orderBy: [{field: CONNECTED_AT, direction: DESC}]
   ) {
     totalCount
   }

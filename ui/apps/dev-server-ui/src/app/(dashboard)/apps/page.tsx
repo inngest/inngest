@@ -8,18 +8,22 @@ import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link';
 import { Pill } from '@inngest/components/Pill/Pill';
+import WorkerCounter from '@inngest/components/Workers/ConnectedWorkersDescription';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
+import { transformFramework, transformLanguage } from '@inngest/components/utils/appsParser';
 import { RiExternalLinkLine, RiInformationLine } from '@remixicon/react';
 
 import AddAppButton from '@/components/App/AddAppButton';
 import AppActions from '@/components/App/AppActions';
 import getAppCardContent from '@/components/App/AppCardContent';
 import AppFAQ from '@/components/App/AppFAQ';
+import { useGetWorkerCount } from '@/hooks/useGetWorkerCount';
 import { useInfoQuery } from '@/store/devApi';
-import { AppConnectionType, useGetAppsQuery } from '@/store/generated';
+import { AppMethod, useGetAppsQuery } from '@/store/generated';
 
 export default function AppList() {
   const { data } = useGetAppsQuery(undefined, { pollingInterval: 1500 });
+  const getWorkerCount = useGetWorkerCount();
   const apps = data?.apps || [];
 
   const syncedApps = apps.filter((app) => app.connected === true);
@@ -35,7 +39,9 @@ export default function AppList() {
           <AppCard.Content
             app={{
               ...app,
-              url: app.connectionType === AppConnectionType.Connect ? '' : app.url,
+              framework: transformFramework(app.framework),
+              sdkLanguage: transformLanguage(app.sdkLanguage),
+              url: app.method === AppMethod.Connect ? '' : app.url,
               name: !app.name ? 'Syncing...' : !app.connected ? `Syncing to ${app.name}` : app.name,
             }}
             pill={
@@ -56,7 +62,7 @@ export default function AppList() {
             }
             actions={
               <div className="items-top flex gap-2">
-                {app.connectionType === AppConnectionType.Connect && (
+                {app.method === AppMethod.Connect && (
                   <Button
                     appearance="outlined"
                     label="View details"
@@ -66,6 +72,7 @@ export default function AppList() {
                 {!app.autodiscovered && <AppActions id={app.id} name={app.name} />}
               </div>
             }
+            workerCounter={<WorkerCounter appID={app.id} getWorkerCount={getWorkerCount} />}
           />
           <AppCard.Footer
             kind={appKind}

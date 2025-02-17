@@ -33,7 +33,7 @@ export default function EntitlementListItemSelfService({
   tooltip?: React.ReactNode;
   entitlement: {
     currentValue: number | boolean;
-    displayValue?: string;
+    displayValue?: string | React.ReactNode;
     planLimit: number;
     maxValue: number;
   };
@@ -97,11 +97,11 @@ export default function EntitlementListItemSelfService({
     <>
       <div className="flex items-end justify-between">
         <div>
-          <p className="text-subtle mb-1 flex items-center gap-1 text-sm font-medium">
+          <p className="text-subtle mb-0.5 flex items-center gap-1 text-sm font-medium">
             {title}
             {tooltip && tooltip}
           </p>
-          <p className="text-muted mb-0.5 text-sm italic">{description}</p>
+          <p className="text-muted mb-1 text-sm italic">{description}</p>
           {err && (
             <p className="text-error text-xs">
               <RiAlertFill className="-mt-0.5 inline h-4" /> Failed to update addon.{' '}
@@ -112,7 +112,13 @@ export default function EntitlementListItemSelfService({
             </p>
           )}
           {entitlement.displayValue && !openSelfService && (
-            <p className="text-basis pr-3 text-sm font-medium">{entitlement.displayValue}</p>
+            <p
+              className={`text-basis pr-3 text-sm ${
+                typeof entitlement.displayValue === 'string' ? 'font-medium' : ''
+              }`}
+            >
+              {entitlement.displayValue}
+            </p>
           )}
         </div>
         {!openSelfService && (

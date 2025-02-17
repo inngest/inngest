@@ -29,7 +29,7 @@ type ConnectOpts struct {
 	MaxConcurrency int
 }
 
-func (h *handler) Connect(ctx context.Context, opts ConnectOpts) error {
+func (h *handler) Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, error) {
 	concurrency := opts.MaxConcurrency
 	if concurrency < 1 {
 		concurrency = defaultMaxWorkerConcurrency
@@ -41,22 +41,22 @@ func (h *handler) Connect(ctx context.Context, opts ConnectOpts) error {
 	}
 
 	if opts.InstanceID == nil {
-		return fmt.Errorf("missing required Instance ID")
+		return nil, fmt.Errorf("missing required Instance ID")
 	}
 
 	fns, err := createFunctionConfigs(h.appName, h.funcs, connectPlaceholder, true)
 	if err != nil {
-		return fmt.Errorf("error creating function configs: %w", err)
+		return nil, fmt.Errorf("error creating function configs: %w", err)
 	}
 
 	signingKey := h.GetSigningKey()
 	if signingKey == "" {
-		return fmt.Errorf("signing key is required")
+		return nil, fmt.Errorf("signing key is required")
 	}
 
 	hashedKey, err := hashedSigningKey([]byte(signingKey))
 	if err != nil {
-		return fmt.Errorf("failed to hash signing key: %w", err)
+		return nil, fmt.Errorf("failed to hash signing key: %w", err)
 	}
 
 	var hashedFallbackKey []byte
@@ -64,7 +64,7 @@ func (h *handler) Connect(ctx context.Context, opts ConnectOpts) error {
 		if fallbackKey := h.GetSigningKeyFallback(); fallbackKey != "" {
 			hashedFallbackKey, err = hashedSigningKey([]byte(fallbackKey))
 			if err != nil {
-				return fmt.Errorf("failed to hash fallback signing key: %w", err)
+				return nil, fmt.Errorf("failed to hash fallback signing key: %w", err)
 			}
 		}
 	}
