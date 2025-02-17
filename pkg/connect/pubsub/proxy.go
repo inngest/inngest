@@ -3,11 +3,13 @@ package pubsub
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
 	"log/slog"
 	"sync"
 	"time"
@@ -121,12 +123,30 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, appId uuid.U
 		attribute.String("request_id", data.RequestId),
 	)
 
-	// TODO Include trace headers
-	// Add `traceparent` and `tracestate` headers to the request from `ctx`
-	// itrace.UserTracer().Propagator().Inject(traceCtx, propagation.HeaderCarrier(req.Header))
+	// Include trace context
+	{
+		// Add `traceparent` and `tracestate` headers to the request from `traceCtx`
+		systemTraceCtx := propagation.MapCarrier{}
+		// Note: The system context is stored in `traceCtx`
+		trace.SystemTracer().Propagator().Inject(traceCtx, systemTraceCtx)
+		marshaled, err := json.Marshal(systemTraceCtx)
+		if err != nil {
+			return nil, fmt.Errorf("could not marshal system trace ctx: %w", err)
+		}
+		data.SystemTraceCtx = marshaled
+	}
 
-	// data.UserTraceContext
-	// data.SystemTraceContext
+	{
+		userTraceCtx := propagation.MapCarrier{}
+		// Note: The user context is stored in `ctx`
+		trace.UserTracer().Propagator().Inject(ctx, userTraceCtx)
+		marshaled, err := json.Marshal(userTraceCtx)
+		if err != nil {
+			return nil, fmt.Errorf("could not marshal user trace ctx: %w", err)
+		}
+		// Include in request
+		data.UserTraceCtx = marshaled
+	}
 
 	dataBytes, err := proto.Marshal(data)
 	if err != nil {

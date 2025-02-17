@@ -74,6 +74,8 @@ message GatewayExecutorRequestData {
 	string function_slug = 4;
 	optional string step_id = 5;
 	bytes request_payload = 6;
+	bytes system_trace_ctx = 7;
+	bytes user_trace_ctx = 8;
 }
 
 message WorkerRequestAckData {
@@ -81,6 +83,8 @@ message WorkerRequestAckData {
 	string app_id = 2;
 	string function_slug = 3;
 	optional string step_id = 4;
+	bytes system_trace_ctx = 5;
+	bytes user_trace_ctx = 6;
 }
 
 enum SDKResponseStatus {
@@ -99,6 +103,8 @@ message SDKResponse {
 	optional string retry_after = 7;
 	string sdk_version = 9;
 	uint32 request_version = 10;
+	bytes system_trace_ctx = 11;
+	bytes user_trace_ctx = 12;
 }
 
 message WorkerReplyAckData {
