@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { Description } from '@inngest/components/Apps/AppCard';
+import DescriptionListItem from '@inngest/components/Apps/DescriptionListItem';
 import { Skeleton } from '@inngest/components/Skeleton';
 import WorkersCounter from '@inngest/components/Workers/WorkersCounter';
 import { workerStatuses } from '@inngest/components/types/workers';
@@ -87,7 +87,7 @@ export default function WorkerCounter({ appID, getWorkerCount }: Props) {
   );
 
   return (
-    <Description
+    <DescriptionListItem
       term="Connected workers"
       detail={
         isLoading &&

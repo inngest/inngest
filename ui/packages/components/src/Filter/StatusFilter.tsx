@@ -3,43 +3,30 @@ import { useRef, useState } from 'react';
 import { Select, type Option } from '../Select/Select';
 import { StatusDot } from '../Status/StatusDot';
 import { getStatusBackgroundClass, getStatusBorderClass } from '../Status/statusClasses';
-import {
-  functionRunStatuses,
-  isFunctionRunStatus,
-  type FunctionRunStatus,
-} from '../types/functionRun';
 import { cn } from '../utils/classNames';
 
-type StatusFilterProps = {
-  selectedStatuses: FunctionRunStatus[];
-  onStatusesChange: (value: FunctionRunStatus[]) => void;
-  functionIsPaused?: boolean;
+type StatusFilterProps<T extends string> = {
+  selectedStatuses: T[];
+  onStatusesChange: (value: T[]) => void;
+  availableStatuses: T[];
+  isValidStatus: (status: string) => status is T;
 };
 
-export default function StatusFilter({
+export default function StatusFilter<T extends string>({
   selectedStatuses,
   onStatusesChange,
-  functionIsPaused,
-}: StatusFilterProps) {
+  availableStatuses,
+  isValidStatus,
+}: StatusFilterProps<T>) {
   const [temporarySelectedStatuses, setTemporarySelectedStatuses] = useState(selectedStatuses);
   const comboboxRef = useRef<HTMLButtonElement>(null);
-  const availableStatuses: FunctionRunStatus[] = functionRunStatuses.filter((status) => {
-    if (status === 'PAUSED') {
-      return !!functionIsPaused;
-    } else if (status === 'RUNNING') {
-      return !functionIsPaused;
-      // Hide skipped runs from filter
-    } else if (status === 'SKIPPED') {
-      return false;
-    }
-    return true;
-  });
-  const options: Option[] = availableStatuses.map((status: FunctionRunStatus) => ({
+
+  const options: Option[] = availableStatuses.map((status: string) => ({
     id: status,
     name: status,
   }));
   const selectedValues = options.filter((option) =>
-    temporarySelectedStatuses.some((status) => isFunctionRunStatus(status) && status === option.id)
+    temporarySelectedStatuses.some((status) => isValidStatus(status) && status === option.id)
   );
   const areAllStatusesSelected = availableStatuses.every((status) =>
     temporarySelectedStatuses.includes(status)
@@ -79,9 +66,9 @@ export default function StatusFilter({
       multiple
       value={selectedValues}
       onChange={(value: Option[]) => {
-        const newValue: FunctionRunStatus[] = [];
+        const newValue: T[] = [];
         value.forEach((status) => {
-          if (isFunctionRunStatus(status.id)) {
+          if (isValidStatus(status.id)) {
             newValue.push(status.id);
           } else {
             console.error(`invalid status: ${status.id}`);
@@ -102,7 +89,7 @@ export default function StatusFilter({
       </Select.Button>
       <Select.Options>
         {options.map((option) => {
-          if (!isFunctionRunStatus(option.id)) return;
+          if (!isValidStatus(option.id)) return;
           return (
             <Select.CheckboxOption key={option.id} option={option}>
               <span className="flex items-center gap-1 lowercase">

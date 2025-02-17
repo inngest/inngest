@@ -18,6 +18,7 @@ const query = graphql(`
       }
     }
     sync: deploy(id: $syncID) {
+      appVersion
       commitAuthor
       commitHash
       commitMessage

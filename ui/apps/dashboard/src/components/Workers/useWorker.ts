@@ -1,6 +1,6 @@
-import { useCallback, useState } from 'react';
-import { convertWorkerStatus } from '@inngest/components/types/workers';
+import { useCallback } from 'react';
 import { getTimestampDaysAgo } from '@inngest/components/utils/date';
+import { convertWorkerStatus } from '@inngest/components/utils/workerParser';
 import { useClient } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -46,7 +46,7 @@ const query = graphql(`
             sdkLang
             sdkVersion
             sdkPlatform
-            appVersion: buildId
+            appVersion
             functionCount
             cpuCores
             memBytes
@@ -59,6 +59,7 @@ const query = graphql(`
           startCursor
           endCursor
         }
+        totalCount
       }
     }
   }
@@ -69,25 +70,24 @@ type QueryVariables = {
   orderBy: ConnectV1WorkerConnectionsOrderBy[];
   cursor: string | null;
   pageSize: number;
+  status: ConnectV1ConnectionStatus[];
 };
 
 export function useWorkers() {
   const envID = useEnvironment().id;
   const client = useClient();
-  const [startTime] = useState(() =>
-    getTimestampDaysAgo({ currentDate: new Date(), days: 7 }).toISOString()
-  );
   return useCallback(
-    async ({ appID, orderBy, cursor, pageSize }: QueryVariables) => {
+    async ({ appID, orderBy, cursor, pageSize, status }: QueryVariables) => {
+      const startTime = getTimestampDaysAgo({ currentDate: new Date(), days: 7 }).toISOString();
       const result = await client
         .query(
           query,
           {
             timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
             orderBy,
-            startTime: startTime,
+            startTime,
             appID: appID,
-            status: [],
+            status,
             cursor,
             first: pageSize,
             envID,
@@ -109,15 +109,15 @@ export function useWorkers() {
       const workers = workersData.edges.map((e) => ({
         ...e.node,
         status: convertWorkerStatus(e.node.status),
-        appVersion: e.node.appVersion || 'unknown',
       }));
 
       return {
         workers,
         pageInfo: workersData.pageInfo,
+        totalCount: workersData.totalCount,
       };
     },
-    [client, envID, startTime]
+    [client, envID]
   );
 }
 
@@ -148,17 +148,15 @@ const countQuery = graphql(`
 export function useWorkersCount() {
   const envID = useEnvironment().id;
   const client = useClient();
-  const [startTime] = useState(() =>
-    getTimestampDaysAgo({ currentDate: new Date(), days: 7 }).toISOString()
-  );
   return useCallback(
     async ({ appID, status }: CountQueryVariables) => {
+      const startTime = getTimestampDaysAgo({ currentDate: new Date(), days: 7 }).toISOString();
       const result = await client
         .query(
           countQuery,
           {
             timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-            startTime: startTime,
+            startTime,
             appID: appID,
             envID,
             status,
@@ -179,6 +177,6 @@ export function useWorkersCount() {
 
       return workersData.totalCount;
     },
-    [client, envID, startTime]
+    [client, envID]
   );
 }

@@ -25,6 +25,7 @@ const query = graphql(`
           name
           slug
         }
+        appVersion
         name
         method
         latestSync {
@@ -46,6 +47,7 @@ const query = graphql(`
           vercelDeploymentURL
           vercelProjectID
           vercelProjectURL
+          appVersion
         }
       }
     }
