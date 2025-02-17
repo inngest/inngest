@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	ossconnect "github.com/inngest/inngest/pkg/connect"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -44,7 +45,7 @@ type RequestForwarder interface {
 	//
 	// If no responsible gateway ack's the message within a 10-second timeout, an error is returned.
 	// If no response is received before the context is canceled, an error is returned.
-	Proxy(ctx, traceCtx context.Context, appId uuid.UUID, data *connect.GatewayExecutorRequestData) (*connect.SDKResponse, error)
+	Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*connect.SDKResponse, error)
 }
 
 type AckSource string
@@ -90,6 +91,7 @@ type redisPubSubConnector struct {
 	subscribersLock sync.RWMutex
 
 	logger *slog.Logger
+	tracer ossconnect.ConditionalTracer
 
 	RequestForwarder
 	RequestReceiver
@@ -104,23 +106,30 @@ func newRedisPubSubConnector(client rueidis.Client, logger *slog.Logger) *redisP
 	}
 }
 
+type ProxyOpts struct {
+	AccountID uuid.UUID
+	EnvID     uuid.UUID
+	AppID     uuid.UUID
+	Data      *connect.GatewayExecutorRequestData
+}
+
 // Proxy forwards a request to the executor and waits for a response.
 //
 // If the gateway does not ack the message within a 10-second timeout, an error is returned.
 // If no response is received before the context is canceled, an error is returned.
-func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, appId uuid.UUID, data *connect.GatewayExecutorRequestData) (*connect.SDKResponse, error) {
-	traceCtx, span := trace.ConnectTracer().Start(traceCtx, "Proxy")
+func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*connect.SDKResponse, error) {
+	traceCtx, span := i.tracer.NewSpan(traceCtx, "Proxy", opts.AccountID, opts.EnvID)
 	span.SetAttributes(attribute.Bool("inngest.system", true))
 	defer span.End()
 
 	proxyStartTime := time.Now()
 
-	if data.RequestId == "" {
-		data.RequestId = ulid.MustNew(ulid.Now(), rand.Reader).String()
+	if opts.Data.RequestId == "" {
+		opts.Data.RequestId = ulid.MustNew(ulid.Now(), rand.Reader).String()
 	}
 
 	span.SetAttributes(
-		attribute.String("request_id", data.RequestId),
+		attribute.String("request_id", opts.Data.RequestId),
 	)
 
 	// Include trace context
@@ -133,7 +142,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, appId uuid.U
 		if err != nil {
 			return nil, fmt.Errorf("could not marshal system trace ctx: %w", err)
 		}
-		data.SystemTraceCtx = marshaled
+		opts.Data.SystemTraceCtx = marshaled
 	}
 
 	{
@@ -145,10 +154,10 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, appId uuid.U
 			return nil, fmt.Errorf("could not marshal user trace ctx: %w", err)
 		}
 		// Include in request
-		data.UserTraceCtx = marshaled
+		opts.Data.UserTraceCtx = marshaled
 	}
 
-	dataBytes, err := proto.Marshal(data)
+	dataBytes, err := proto.Marshal(opts.Data)
 	if err != nil {
 		return nil, fmt.Errorf("could not marshal executor request: %w", err)
 	}
@@ -160,7 +169,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, appId uuid.U
 		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		go func() {
-			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(appId, data.RequestId, AckSourceRouter), func(_ string) {
+			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(opts.AppID, opts.Data.RequestId, AckSourceRouter), func(_ string) {
 				routerAcked = true
 
 				span.AddEvent("RouterAck")
@@ -181,7 +190,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, appId uuid.U
 		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		go func() {
-			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(appId, data.RequestId, AckSourceGateway), func(_ string) {
+			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(opts.AppID, opts.Data.RequestId, AckSourceGateway), func(_ string) {
 				gatewayAcked = true
 
 				span.AddEvent("GatewayAck")
@@ -202,7 +211,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, appId uuid.U
 		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		go func() {
-			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(appId, data.RequestId, AckSourceWorker), func(_ string) {
+			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(opts.AppID, opts.Data.RequestId, AckSourceWorker), func(_ string) {
 				workerAcked = true
 
 				span.AddEvent("WorkerAck")
@@ -222,7 +231,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, appId uuid.U
 	var reply connect.SDKResponse
 	go func() {
 		// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
-		err = i.subscribe(ctx, i.channelAppRequestsReply(appId, data.RequestId), func(msg string) {
+		err = i.subscribe(ctx, i.channelAppRequestsReply(opts.AppID, opts.Data.RequestId), func(msg string) {
 			span.AddEvent("ReplyReceived")
 
 			err := proto.Unmarshal([]byte(msg), &reply)
@@ -245,7 +254,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, appId uuid.U
 		return nil, fmt.Errorf("could not publish executor request: %w", err)
 	}
 
-	i.logger.Debug("published connect pubsub message", "channel", channelName, "request_id", data.RequestId)
+	i.logger.Debug("published connect pubsub message", "channel", channelName, "request_id", opts.Data.RequestId)
 
 	// Sanity check: Ensure the router received the message using a request-specific ack channel (ack must come in before SDK response)
 	{

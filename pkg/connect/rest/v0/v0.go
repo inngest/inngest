@@ -5,6 +5,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
@@ -21,6 +22,7 @@ type Opts struct {
 	RequestAuther           RequestAuther
 	ConnectGatewayRetriever ConnectGatewayRetriever
 	ConnectionLimiter       ConnectionLimiter
+	ConditionalTracer       connect.ConditionalTracer
 
 	Dev bool
 }

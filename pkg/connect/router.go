@@ -33,6 +33,8 @@ type connectRouterSvc struct {
 	receiver     pubsub.RequestReceiver
 
 	rnd *util.FrandRNG
+
+	tracer ConditionalTracer
 }
 
 func (c *connectRouterSvc) Name() string {
@@ -54,13 +56,19 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 		err := c.receiver.ReceiveExecutorMessages(ctx, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
 			log := c.logger.With("env_id", data.EnvId, "app_id", data.AppId, "req_id", data.RequestId)
 
-			appId, err := uuid.Parse(data.AppId)
+			appID, err := uuid.Parse(data.AppId)
 			if err != nil {
 				log.Error("could not parse app ID")
 				return
 			}
 
-			envId, err := uuid.Parse(data.EnvId)
+			accountID, err := uuid.Parse(data.AccountId)
+			if err != nil {
+				log.Error("could not parse account ID")
+				return
+			}
+
+			envID, err := uuid.Parse(data.EnvId)
 			if err != nil {
 				log.Error("could not parse env ID")
 				return
@@ -69,7 +77,7 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 			log.Debug("router received msg")
 
 			// We need to add an idempotency key to ensure only one router instance processes the message
-			err = c.stateManager.SetRequestIdempotency(ctx, appId, data.RequestId)
+			err = c.stateManager.SetRequestIdempotency(ctx, appID, data.RequestId)
 			if err != nil {
 				if errors.Is(err, state.ErrIdempotencyKeyExists) {
 					// Another connection was faster than us, we can ignore this message
@@ -80,7 +88,7 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 				return
 			}
 
-			err = c.receiver.AckMessage(ctx, appId, data.RequestId, pubsub.AckSourceRouter)
+			err = c.receiver.AckMessage(ctx, appID, data.RequestId, pubsub.AckSourceRouter)
 			if err != nil {
 				log.Error("failed to ack message", "err", err)
 				// TODO Log error, retry?
@@ -99,10 +107,10 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 
 				ctx = trace.SystemTracer().Propagator().Extract(ctx, systemTraceCtx)
 			}
-			ctx, span := trace.ConnectTracer().Start(ctx, "RouteExecutorRequest")
+			ctx, span := c.tracer.NewSpan(ctx, "RouteExecutorRequest", accountID, envID)
 			defer span.End()
 
-			routeTo, err := c.getSuitableConnection(ctx, envId, appId, data.FunctionSlug, log)
+			routeTo, err := c.getSuitableConnection(ctx, envID, appID, data.FunctionSlug, log)
 			if err != nil {
 				log.Error("could not retrieve suitable connection", "err", err)
 				return
@@ -138,7 +146,7 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 			// We'll potentially lose data here
 
 			// Forward message to the gateway
-			err = c.receiver.RouteExecutorRequest(ctx, gatewayId, appId, connId, data)
+			err = c.receiver.RouteExecutorRequest(ctx, gatewayId, appID, connId, data)
 			if err != nil {
 				// TODO Should we retry? Log error?
 				log.Error("failed to route request to gateway", "err", err)
@@ -166,8 +174,8 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 
 }
 
-func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, envId uuid.UUID, appId uuid.UUID, fnSlug string, log *slog.Logger) (*connect.ConnMetadata, error) {
-	conns, err := c.stateManager.GetConnectionsByAppID(ctx, envId, appId)
+func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, envID uuid.UUID, appID uuid.UUID, fnSlug string, log *slog.Logger) (*connect.ConnMetadata, error) {
+	conns, err := c.stateManager.GetConnectionsByAppID(ctx, envID, appID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get connections by app ID: %w", err)
 	}
@@ -178,7 +186,7 @@ func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, envId uuid
 
 	healthy := make([]*connect.ConnMetadata, 0, len(conns))
 	for _, conn := range conns {
-		isHealthy, err := c.isHealthy(ctx, envId, appId, fnSlug, conn, log)
+		isHealthy, err := c.isHealthy(ctx, envID, appID, fnSlug, conn, log)
 		if err != nil {
 			return nil, err
 		}
@@ -208,7 +216,7 @@ func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, envId uuid
 	return chosen, nil
 }
 
-func (c *connectRouterSvc) isHealthy(ctx context.Context, envId uuid.UUID, appId uuid.UUID, fnSlug string, conn *connect.ConnMetadata, log *slog.Logger) (isHealthy bool, err error) {
+func (c *connectRouterSvc) isHealthy(ctx context.Context, envID uuid.UUID, appID uuid.UUID, fnSlug string, conn *connect.ConnMetadata, log *slog.Logger) (isHealthy bool, err error) {
 	defer func() {
 		if isHealthy {
 			return
@@ -220,7 +228,7 @@ func (c *connectRouterSvc) isHealthy(ctx context.Context, envId uuid.UUID, appId
 		}
 
 		// Clean up unhealthy connection
-		err = c.stateManager.DeleteConnection(context.Background(), envId, &appId, conn.GroupId, connId)
+		err = c.stateManager.DeleteConnection(context.Background(), envID, &appID, conn.GroupId, connId)
 		if err != nil && !errors.Is(err, state.ConnDeletedWithGroupErr) {
 			log.Error("could not clean up inactive connection", "conn_id", conn.Id, "err", err)
 		}
@@ -247,7 +255,7 @@ func (c *connectRouterSvc) isHealthy(ctx context.Context, envId uuid.UUID, appId
 		return
 	}
 
-	group, err := c.stateManager.GetWorkerGroupByHash(ctx, envId, conn.GroupId)
+	group, err := c.stateManager.GetWorkerGroupByHash(ctx, envID, conn.GroupId)
 	if err != nil {
 		log.Error("could not get worker group for connection", "group_id", conn.GroupId)
 
