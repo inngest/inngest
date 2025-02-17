@@ -5,6 +5,9 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"github.com/inngest/inngest/pkg/telemetry/trace"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"log/slog"
 	"sync"
 	"time"
@@ -39,7 +42,7 @@ type RequestForwarder interface {
 	//
 	// If no responsible gateway ack's the message within a 10-second timeout, an error is returned.
 	// If no response is received before the context is canceled, an error is returned.
-	Proxy(ctx context.Context, appId uuid.UUID, data *connect.GatewayExecutorRequestData) (*connect.SDKResponse, error)
+	Proxy(ctx, traceCtx context.Context, appId uuid.UUID, data *connect.GatewayExecutorRequestData) (*connect.SDKResponse, error)
 }
 
 type AckSource string
@@ -103,12 +106,27 @@ func newRedisPubSubConnector(client rueidis.Client, logger *slog.Logger) *redisP
 //
 // If the gateway does not ack the message within a 10-second timeout, an error is returned.
 // If no response is received before the context is canceled, an error is returned.
-func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data *connect.GatewayExecutorRequestData) (*connect.SDKResponse, error) {
+func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, appId uuid.UUID, data *connect.GatewayExecutorRequestData) (*connect.SDKResponse, error) {
+	traceCtx, span := trace.ConnectTracer().Start(traceCtx, "Proxy")
+	span.SetAttributes(attribute.Bool("inngest.system", true))
+	defer span.End()
+
 	proxyStartTime := time.Now()
 
 	if data.RequestId == "" {
 		data.RequestId = ulid.MustNew(ulid.Now(), rand.Reader).String()
 	}
+
+	span.SetAttributes(
+		attribute.String("request_id", data.RequestId),
+	)
+
+	// TODO Include trace headers
+	// Add `traceparent` and `tracestate` headers to the request from `ctx`
+	// itrace.UserTracer().Propagator().Inject(traceCtx, propagation.HeaderCarrier(req.Header))
+
+	// data.UserTraceContext
+	// data.SystemTraceContext
 
 	dataBytes, err := proto.Marshal(data)
 	if err != nil {
@@ -124,6 +142,8 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data 
 		go func() {
 			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(appId, data.RequestId, AckSourceRouter), func(msg string) {
 				routerAcked = true
+
+				span.AddEvent("RouterAck")
 				metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
@@ -143,6 +163,8 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data 
 		go func() {
 			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(appId, data.RequestId, AckSourceGateway), func(msg string) {
 				gatewayAcked = true
+
+				span.AddEvent("GatewayAck")
 				metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
@@ -162,6 +184,8 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data 
 		go func() {
 			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(appId, data.RequestId, AckSourceWorker), func(msg string) {
 				workerAcked = true
+
+				span.AddEvent("WorkerAck")
 				metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
@@ -179,6 +203,8 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data 
 	go func() {
 		// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
 		err = i.subscribe(ctx, i.channelAppRequestsReply(appId, data.RequestId), func(msg string) {
+			span.AddEvent("ReplyReceived")
+
 			err := proto.Unmarshal([]byte(msg), &reply)
 			if err != nil {
 				// TODO This should never happen, push message into dead-letter channel and report
@@ -194,6 +220,8 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data 
 	// TODO Test whether this works with marshaled Protobuf bytes
 	err = i.client.Do(ctx, i.client.B().Publish().Channel(channelName).Message(string(dataBytes)).Build()).Error()
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "publishing message to router failed")
 		return nil, fmt.Errorf("could not publish executor request: %w", err)
 	}
 
@@ -204,10 +232,13 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data 
 		err := <-routerAckErrChan
 		close(routerAckErrChan)
 		if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "unexpected error waiting for router ack")
 			return nil, fmt.Errorf("could not receive executor request ack by router: %w", err)
 		}
 
 		if !routerAcked {
+			span.SetStatus(codes.Error, "router did not ack")
 			return nil, fmt.Errorf("router did not ack in time")
 		}
 	}
@@ -216,10 +247,13 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data 
 		err := <-gatewayAckErrChan
 		close(gatewayAckErrChan)
 		if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "unexpected error waiting for gateway ack")
 			return nil, fmt.Errorf("could not receive executor request ack by gateway: %w", err)
 		}
 
 		if !gatewayAcked {
+			span.SetStatus(codes.Error, "gateway did not ack")
 			return nil, fmt.Errorf("gateway did not ack in time")
 		}
 	}
@@ -228,10 +262,15 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data 
 		err := <-workerAckErrChan
 		close(workerAckErrChan)
 		if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "unexpected error waiting for worker ack")
+
 			return nil, fmt.Errorf("could not receive executor request ack by worker: %w", err)
 		}
 
 		if !workerAcked {
+			span.SetStatus(codes.Error, "worker did not ack")
+
 			return nil, fmt.Errorf("worker did not ack in time")
 		}
 	}
@@ -242,6 +281,9 @@ func (i *redisPubSubConnector) Proxy(ctx context.Context, appId uuid.UUID, data 
 		err := <-replyErrChan
 		close(replyErrChan)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "could not receive worker response")
+
 			return nil, fmt.Errorf("could not receive executor response: %w", err)
 		}
 	}

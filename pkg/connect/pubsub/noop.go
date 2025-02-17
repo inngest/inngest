@@ -12,7 +12,7 @@ import (
 // noopConnector is a blank implementation of the Connector interface
 type noopConnector struct{}
 
-func (noopConnector) Proxy(ctx context.Context, appID uuid.UUID, data *connpb.GatewayExecutorRequestData) (*connpb.SDKResponse, error) {
+func (noopConnector) Proxy(ctx, traceCtx context.Context, appID uuid.UUID, data *connpb.GatewayExecutorRequestData) (*connpb.SDKResponse, error) {
 	logger.StdlibLogger(ctx).Error("using no-op connector to proxy message", "data", data)
 
 	return &connpb.SDKResponse{}, nil
