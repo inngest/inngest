@@ -4,11 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
-	ossconnect "github.com/inngest/inngest/pkg/connect"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -37,7 +36,7 @@ func NewDriver(ctx context.Context, psf pubsub.RequestForwarder) driver.Driver {
 
 type executor struct {
 	forwarder pubsub.RequestForwarder
-	tracer    ossconnect.ConditionalTracer
+	tracer    itrace.ConditionalTracer
 }
 
 // RuntimeType fulfills the inngest.Runtime interface.
@@ -115,7 +114,12 @@ func ProxyRequest(ctx, traceCtx context.Context, forwarder pubsub.RequestForward
 		attribute.String("step_id", requestToForward.GetStepId()),
 	)
 
-	resp, err := do(ctx, traceCtx, forwarder, tenant.AppID, &requestToForward)
+	resp, err := do(ctx, traceCtx, forwarder, pubsub.ProxyOpts{
+		AccountID: tenant.AccountID,
+		EnvID:     tenant.EnvID,
+		AppID:     tenant.AppID,
+		Data:      &requestToForward,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -123,12 +127,12 @@ func ProxyRequest(ctx, traceCtx context.Context, forwarder pubsub.RequestForward
 	return httpdriver.HandleHttpResponse(ctx, r, resp)
 }
 
-func do(ctx, traceCtx context.Context, forwarder pubsub.RequestForwarder, appId uuid.UUID, data *connect.GatewayExecutorRequestData) (*httpdriver.Response, error) {
+func do(ctx, traceCtx context.Context, forwarder pubsub.RequestForwarder, opts pubsub.ProxyOpts) (*httpdriver.Response, error) {
 	ctx, cancel := context.WithTimeout(ctx, consts.MaxFunctionTimeout)
 	defer cancel()
 
 	pre := time.Now()
-	resp, err := forwarder.Proxy(ctx, traceCtx, appId, data)
+	resp, err := forwarder.Proxy(ctx, traceCtx, opts)
 	dur := time.Since(pre)
 
 	span := trace.SpanFromContext(traceCtx)

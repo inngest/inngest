@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	ossconnect "github.com/inngest/inngest/pkg/connect"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -91,18 +90,19 @@ type redisPubSubConnector struct {
 	subscribersLock sync.RWMutex
 
 	logger *slog.Logger
-	tracer ossconnect.ConditionalTracer
+	tracer trace.ConditionalTracer
 
 	RequestForwarder
 	RequestReceiver
 }
 
-func newRedisPubSubConnector(client rueidis.Client, logger *slog.Logger) *redisPubSubConnector {
+func newRedisPubSubConnector(client rueidis.Client, logger *slog.Logger, tracer trace.ConditionalTracer) *redisPubSubConnector {
 	return &redisPubSubConnector{
 		client:          client,
 		subscribers:     make(map[string]map[string]chan string),
 		subscribersLock: sync.RWMutex{},
 		logger:          logger,
+		tracer:          tracer,
 	}
 }
 

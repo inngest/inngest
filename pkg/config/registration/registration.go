@@ -2,8 +2,8 @@ package registration
 
 import (
 	"context"
-	"github.com/inngest/inngest/pkg/connect"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
+	"github.com/inngest/inngest/pkg/telemetry/trace"
 
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -62,7 +62,7 @@ type NewDriverOpts struct {
 	RequireLocalSigningKey bool
 
 	ConnectForwarder  pubsub.RequestForwarder
-	ConditionalTracer connect.ConditionalTracer
+	ConditionalTracer trace.ConditionalTracer
 }
 
 // DriverConfig is an interface used to determine driver config structs.

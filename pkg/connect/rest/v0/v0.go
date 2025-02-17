@@ -1,15 +1,15 @@
-package v0
+package connectv0
 
 import (
 	"context"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/headers"
+	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"net/url"
 )
 
@@ -22,7 +22,7 @@ type Opts struct {
 	RequestAuther           RequestAuther
 	ConnectGatewayRetriever ConnectGatewayRetriever
 	ConnectionLimiter       ConnectionLimiter
-	ConditionalTracer       connect.ConditionalTracer
+	ConditionalTracer       trace.ConditionalTracer
 
 	Dev bool
 }

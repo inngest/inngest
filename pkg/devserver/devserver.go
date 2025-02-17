@@ -277,8 +277,10 @@ func start(ctx context.Context, opts StartOpts) error {
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq)
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
 
+	conditionalTracer := itrace.NewConditionalTracer(itrace.ConnectTracer(), itrace.AlwaysTrace)
+
 	connectPubSubRedis := createConnectPubSubRedis()
-	gatewayProxy, err := pubsub2.NewConnector(ctx, pubsub2.WithRedis(connectPubSubRedis, logger.StdlibLoggerWithCustomVarName(ctx, "CONNECT_PUBSUB_LOG_LEVEL"), true))
+	gatewayProxy, err := pubsub2.NewConnector(ctx, pubsub2.WithRedis(connectPubSubRedis, logger.StdlibLoggerWithCustomVarName(ctx, "CONNECT_PUBSUB_LOG_LEVEL"), conditionalTracer, true))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
@@ -291,7 +293,8 @@ func start(ctx context.Context, opts StartOpts) error {
 	var drivers = []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
 		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
-			ConnectForwarder: gatewayProxy,
+			ConnectForwarder:  gatewayProxy,
+			ConditionalTracer: conditionalTracer,
 		})
 		if err != nil {
 			return err
@@ -434,6 +437,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			ConnectGatewayRetriever: ds,
 			Dev:                     true,
 			ConnectionLimiter:       ds,
+			ConditionalTracer:       conditionalTracer,
 		},
 	})
 	if err != nil {

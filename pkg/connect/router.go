@@ -34,7 +34,7 @@ type connectRouterSvc struct {
 
 	rnd *util.FrandRNG
 
-	tracer ConditionalTracer
+	tracer trace.ConditionalTracer
 }
 
 func (c *connectRouterSvc) Name() string {
