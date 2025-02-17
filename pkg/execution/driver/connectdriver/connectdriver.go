@@ -28,9 +28,10 @@ const (
 	pkgName = "connect.execution.driver"
 )
 
-func NewDriver(ctx context.Context, psf pubsub.RequestForwarder) driver.Driver {
+func NewDriver(ctx context.Context, psf pubsub.RequestForwarder, tracer itrace.ConditionalTracer) driver.Driver {
 	return &executor{
 		forwarder: psf,
+		tracer:    tracer,
 	}
 }
 
