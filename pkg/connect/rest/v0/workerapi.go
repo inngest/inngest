@@ -1,7 +1,11 @@
 package v0
 
 import (
+	"encoding/json"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/trace"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
 	"io"
 	"net/http"
 
@@ -155,12 +159,24 @@ func (a *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	systemTraceCtx := propagation.MapCarrier{}
+	if err := json.Unmarshal(reqBody.SystemTraceCtx, &systemTraceCtx); err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "could not unmarshal system trace ctx"))
+		return
+	}
+
+	traceCtx := trace.SystemTracer().Propagator().Extract(ctx, systemTraceCtx)
+	traceCtx, span := trace.ConnectTracer().Start(traceCtx, "FlushMessage")
+	defer span.End()
+
 	// Marshal response before notifying executor, marshaling should never fail
 	msg, err := proto.Marshal(&connect.FlushResponse{
 		RequestId: reqBody.RequestId,
 	})
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("could not marshal flush response", "err", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "could not marshal flush api response")
 
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not marshal response"))
 		return
@@ -168,8 +184,11 @@ func (a *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) {
 
 	if err := a.ConnectResponseNotifier.NotifyExecutor(ctx, reqBody); err != nil {
 		logger.StdlibLogger(ctx).Error("could not notify executor to flush connect message", "err", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "could not notify executor to flush connect sdk response")
 
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not notify executor"))
+
 		return
 	}
 

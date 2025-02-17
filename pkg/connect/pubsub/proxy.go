@@ -160,7 +160,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, appId uuid.U
 		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		go func() {
-			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(appId, data.RequestId, AckSourceRouter), func(msg string) {
+			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(appId, data.RequestId, AckSourceRouter), func(_ string) {
 				routerAcked = true
 
 				span.AddEvent("RouterAck")
@@ -181,7 +181,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, appId uuid.U
 		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		go func() {
-			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(appId, data.RequestId, AckSourceGateway), func(msg string) {
+			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(appId, data.RequestId, AckSourceGateway), func(_ string) {
 				gatewayAcked = true
 
 				span.AddEvent("GatewayAck")
@@ -202,7 +202,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, appId uuid.U
 		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		go func() {
-			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(appId, data.RequestId, AckSourceWorker), func(msg string) {
+			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(appId, data.RequestId, AckSourceWorker), func(_ string) {
 				workerAcked = true
 
 				span.AddEvent("WorkerAck")
