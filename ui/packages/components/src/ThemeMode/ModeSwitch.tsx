@@ -1,29 +1,27 @@
 import { RiMoonClearFill, RiSunLine, RiWindow2Line } from '@remixicon/react';
+import { useTheme } from 'next-themes';
 
 import SegmentedControl from '../SegmentedControl/SegmentedControl';
 
 export default function ModeSwitch() {
-  const handleThemeChange = (newTheme: string) => {
-    console.log(newTheme);
-    // TODO: Implement API call to update user's theme preference
-  };
+  const { theme, setTheme } = useTheme();
 
   return (
-    <SegmentedControl defaultValue="light">
+    <SegmentedControl defaultValue={theme}>
       <SegmentedControl.Button
         value="light"
         icon={<RiSunLine />}
-        onClick={() => handleThemeChange('light')}
+        onClick={() => setTheme('light')}
       />
       <SegmentedControl.Button
         value="dark"
         icon={<RiMoonClearFill />}
-        onClick={() => handleThemeChange('dark')}
+        onClick={() => setTheme('dark')}
       />
       <SegmentedControl.Button
         value="system"
         icon={<RiWindow2Line className="rotate-180" />}
-        onClick={() => handleThemeChange('system')}
+        onClick={() => setTheme('system')}
       />
     </SegmentedControl>
   );

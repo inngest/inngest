@@ -1,9 +1,9 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import NextLink from 'next/link';
 import { SignOutButton } from '@clerk/nextjs';
 import { Listbox } from '@headlessui/react';
-import ModeSwitch from '@inngest/components/ThemeMode/ModeSwitch';
 import {
   RiArrowLeftRightLine,
   RiBillLine,
@@ -15,6 +15,10 @@ import {
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { pathCreator } from '@/utils/urls';
+
+const ModeSwitch = dynamic(() => import('@inngest/components/ThemeMode/ModeSwitch'), {
+  ssr: false,
+});
 
 type Props = React.PropsWithChildren<{
   isMarketplace: boolean;
