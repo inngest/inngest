@@ -76,10 +76,14 @@ func (h *connectHandler) connectInvoke(ctx context.Context, ws *websocket.Conn, 
 	}
 
 	ackPayload, err := proto.Marshal(&connectproto.WorkerRequestAckData{
-		RequestId:    body.RequestId,
-		AppId:        body.AppId,
-		FunctionSlug: body.FunctionSlug,
-		StepId:       body.StepId,
+		RequestId:      body.RequestId,
+		AccountId:      body.AccountId,
+		EnvId:          body.EnvId,
+		AppId:          body.AppId,
+		FunctionSlug:   body.FunctionSlug,
+		StepId:         body.StepId,
+		SystemTraceCtx: body.SystemTraceCtx,
+		UserTraceCtx:   body.UserTraceCtx,
 	})
 	if err != nil {
 		h.logger.Error("error marshaling request ack", "error", err)
@@ -158,6 +162,7 @@ func (h *connectHandler) connectInvoke(ctx context.Context, ws *websocket.Conn, 
 		h.logger.Error("error calling function", "error", err)
 		return &connectproto.SDKResponse{
 			RequestId:      body.RequestId,
+			AccountId:      body.AccountId,
 			EnvId:          body.EnvId,
 			AppId:          body.AppId,
 			Status:         connectproto.SDKResponseStatus_ERROR,
@@ -166,6 +171,8 @@ func (h *connectHandler) connectInvoke(ctx context.Context, ws *websocket.Conn, 
 			RetryAfter:     retryAfterVal,
 			SdkVersion:     fmt.Sprintf("%s:v%s", h.opts.SDKLanguage, h.opts.SDKVersion),
 			RequestVersion: 0, // Go SDK currently only supports v0
+			SystemTraceCtx: body.SystemTraceCtx,
+			UserTraceCtx:   body.UserTraceCtx,
 		}, nil
 	}
 

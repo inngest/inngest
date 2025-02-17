@@ -139,6 +139,19 @@ func doDev(cmd *cobra.Command, args []string) {
 		_ = itrace.CloseUserTracer(ctx)
 	}()
 
+	if err := itrace.NewSystemTracer(ctx, itrace.TracerOpts{
+		ServiceName:   "tracing-system",
+		TraceEndpoint: "localhost:8288",
+		TraceURLPath:  "/dev/traces/system",
+		Type:          itrace.TracerTypeOTLPHTTP,
+	}); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	defer func() {
+		_ = itrace.CloseSystemTracer(ctx)
+	}()
+
 	conf.ServerKind = headers.ServerKindDev
 
 	opts := devserver.StartOpts{
