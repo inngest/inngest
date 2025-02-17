@@ -17,6 +17,7 @@ import { graphql } from '@/gql';
 import type { DatadogIntegration } from '@/gql/graphql';
 import { useEnvironments } from '@/queries';
 import type { Environment } from '@/utils/environments';
+import { useBooleanFlag } from '../FeatureFlags/hooks';
 
 type Props = {
   metricsExportEnabled: boolean;
@@ -109,6 +110,11 @@ export default function SetupPage({ metricsExportEnabled }: Props) {
   const [, setupDdInt] = useMutation(SetupDatadogIntegrationDocument);
   const [isFormDisabled, setFormDisabled] = useState(false);
   const [formError, setFormError] = useState('');
+  const { value: ddIntFlagEnabled } = useBooleanFlag('datadog-integration');
+
+  if (!ddIntFlagEnabled) {
+    return <IntegrationNotEnabledMessage integrationName="Datadog" />;
+  }
 
   if (envsErr) {
     console.error('error fetching envs', envsErr);
