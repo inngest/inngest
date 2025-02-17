@@ -827,13 +827,14 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, continu
 	parallel := parallelFn || parallelAccount || isSystemFn
 
 	iter := processor{
-		partition:          p,
-		items:              queue,
-		guaranteedCapacity: guaranteedCapacity,
-		queue:              q,
-		denies:             newLeaseDenyList(),
-		staticTime:         q.clock.Now(),
-		parallel:           parallel,
+		partition:            p,
+		items:                queue,
+		guaranteedCapacity:   guaranteedCapacity,
+		partitionContinueCtr: continuationCount,
+		queue:                q,
+		denies:               newLeaseDenyList(),
+		staticTime:           q.clock.Now(),
+		parallel:             parallel,
 	}
 
 	if processErr := iter.iterate(ctx); processErr != nil {
@@ -1647,7 +1648,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		PkgName: pkgName,
 		Tags:    map[string]any{"status": "success", "queue_shard": p.queue.primaryQueueShard.Name},
 	})
-	p.queue.workers <- processItem{P: *p.partition, I: *item, G: p.guaranteedCapacity}
+	p.queue.workers <- processItem{P: *p.partition, I: *item, G: p.guaranteedCapacity, PCtr: p.partitionContinueCtr}
 	return nil
 }
 
