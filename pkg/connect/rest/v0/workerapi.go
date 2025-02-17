@@ -166,7 +166,7 @@ func (a *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	traceCtx := trace.SystemTracer().Propagator().Extract(ctx, systemTraceCtx)
-	traceCtx, span := a.ConditionalTracer.NewSpan(traceCtx, "FlushMessage", res.AccountID, res.EnvID)
+	_, span := a.ConditionalTracer.NewSpan(traceCtx, "FlushMessage", res.AccountID, res.EnvID)
 	defer span.End()
 
 	// Marshal response before notifying executor, marshaling should never fail

@@ -56,7 +56,7 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 
 	traceCtx := context.Background()
 
-	traceCtx, span := e.tracer.NewSpan(ctx, "Execute", s.ID.Tenant.AccountID, s.ID.Tenant.EnvID)
+	traceCtx, span := e.tracer.NewSpan(traceCtx, "Execute", s.ID.Tenant.AccountID, s.ID.Tenant.EnvID)
 	defer span.End()
 
 	span.SetAttributes(
