@@ -111,13 +111,16 @@ export const getLineChartOptions = (
   data: Partial<ChartProps['option']>,
   legendData?: LegendComponentOption['data']
 ): ChartProps['option'] => {
+  const dark = isDark();
   return {
     tooltip: {
       trigger: 'axis',
       renderMode: 'html',
       enterable: true,
       position: 'top',
-
+      backgroundColor: resolveColor(backgroundColor.canvasBase, dark),
+      borderColor: resolveColor(borderColor.subtle, dark),
+      textStyle: { color: resolveColor(textColor.basis, dark) },
       //
       // Off by default because we don't like the tooltip
       // behavior for chart groups. We toggle this programmatically
@@ -140,7 +143,7 @@ export const getLineChartOptions = (
       icon: 'circle',
       itemWidth: 10,
       itemHeight: 10,
-      textStyle: { fontSize: '12px' },
+      textStyle: { fontSize: '12px', color: resolveColor(textColor.basis, dark) },
       data: legendData,
     },
     grid: {
