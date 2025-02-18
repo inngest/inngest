@@ -122,8 +122,14 @@ const (
 	// Minimum number of pauses before using the aggregate pause handler.
 	AggregatePauseThreshold = 50
 
+	// QueueContinuationCooldownPeriod is the cooldown period for a continuations, eg.
+	// how long we wait after a partition has continued the maximum times.
+	// This prevents partitions from greedily acquiring resources in each scan loop.
 	QueueContinuationCooldownPeriod = time.Second * 10
 	// QueueContinuationMaxPartitions represents the total capacity for partitions
 	// that can be continued.
 	QueueContinuationMaxPartitions = 50
+	// QueueContinuationSkipProbability is the probability of skipping a continuation
+	// scan loop.
+	QueueContinuationSkipProbability = 0.5
 )

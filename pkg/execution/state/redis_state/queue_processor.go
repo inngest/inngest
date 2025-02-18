@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 
 	"github.com/google/uuid"
@@ -648,6 +649,11 @@ func (q *queue) scan(ctx context.Context) error {
 func (q *queue) scanContinuations(ctx context.Context) error {
 	if !q.runMode.Continuations {
 		// continuations are not enabled.
+		return nil
+	}
+
+	// Have some chance of skipping continuations in this iteration.
+	if rand.Float64() <= consts.QueueContinuationSkipProbability {
 		return nil
 	}
 
