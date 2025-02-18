@@ -3,12 +3,13 @@ package trace
 import (
 	"context"
 	"fmt"
-	"github.com/inngest/inngest/pkg/logger"
-	oteltrace "go.opentelemetry.io/otel/trace"
 	"os"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/inngest/inngest/pkg/logger"
+	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/inngest/log"
@@ -181,7 +182,6 @@ type tracer struct {
 }
 
 func (t *tracer) Provider() *trace.TracerProvider {
-	logger.StdlibLogger(context.Background()).Warn("right before error")
 	return t.provider
 }
 

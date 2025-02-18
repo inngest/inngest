@@ -646,6 +646,11 @@ func (q *queue) scan(ctx context.Context) error {
 }
 
 func (q *queue) scanContinuations(ctx context.Context) error {
+	if !q.runMode.Continuations {
+		// continuations are not enabled.
+		return nil
+	}
+
 	eg := errgroup.Group{}
 	// If we have continued partitions, process those immediately.
 	q.continuesLock.Lock()
@@ -777,6 +782,12 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, continu
 		metrics.IncrPartitionGoneCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
 		return nil
 	}
+	if errors.Is(err, ErrPartitionPaused) {
+		// Don't return an error and remove continuations;  this isn't workable.
+		q.removeContinue(ctx, p, false)
+		return nil
+	}
+
 	if err != nil {
 		return fmt.Errorf("error leasing partition: %w", err)
 	}

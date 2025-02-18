@@ -681,6 +681,9 @@ type QueueRunMode struct {
 
 	// GuaranteedAccount determines whether accounts with guaranteed capacity are fetched, and one lease is acquired per instance to process the account
 	GuaranteedCapacity bool
+
+	// Continuations enables continuations
+	Continuations bool
 }
 
 // continuation represents a partition continuation, forcung the queue to continue working
@@ -3497,6 +3500,11 @@ func (q *queue) setPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) err
 // should be processed when a step finishes (to decrease inter-step latency on non-connect
 // workloads).
 func (q *queue) addContinue(ctx context.Context, p *QueuePartition, ctr uint) {
+	if !q.runMode.Continuations {
+		// continuations are not enabled.
+		return
+	}
+
 	if ctr >= q.continuationLimit {
 		q.removeContinue(ctx, p, true)
 		return
@@ -3532,6 +3540,11 @@ func (q *queue) addContinue(ctx context.Context, p *QueuePartition, ctr uint) {
 }
 
 func (q *queue) removeContinue(ctx context.Context, p *QueuePartition, cooldown bool) {
+	if !q.runMode.Continuations {
+		// continuations are not enabled.
+		return
+	}
+
 	// This is over the limit for conntinuing the partition, so force it to be
 	// removed in every case.
 	q.continuesLock.Lock()

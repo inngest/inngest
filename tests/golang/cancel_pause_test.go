@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"sync/atomic"
@@ -120,9 +121,12 @@ func TestPauseCancelFunction(t *testing.T) {
 
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 
-		r := map[string]any{}
-		err = json.NewDecoder(resp.Body).Decode(&r)
+		byt, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
+
+		r := map[string]any{}
+		err = json.Unmarshal(byt, &r)
+		require.NoError(t, err, "Test API may not be enabled! Error unmarshalling %s", byt)
 
 		count, ok := r["count"].(float64)
 		require.True(t, ok)
