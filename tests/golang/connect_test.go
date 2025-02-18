@@ -143,8 +143,6 @@ func TestEndToEnd(t *testing.T) {
 			}
 
 			failedRunId = runsForEvent[0].ID
-
-			return
 		}, 10*time.Second, 1*time.Second)
 		require.EqualValues(t, 0, atomic.LoadInt32(&counter))
 		require.NotEmpty(t, failedRunId)
