@@ -189,9 +189,10 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	queueOpts := []redis_state.QueueOpt{
 		redis_state.WithRunMode(redis_state.QueueRunMode{
-			Sequential: true,
-			Scavenger:  true,
-			Partition:  true,
+			Sequential:    true,
+			Scavenger:     true,
+			Partition:     true,
+			Continuations: true,
 		}),
 		redis_state.WithIdempotencyTTL(time.Hour),
 		redis_state.WithNumWorkers(int32(opts.QueueWorkers)),
