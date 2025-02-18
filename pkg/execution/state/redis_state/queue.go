@@ -655,7 +655,9 @@ type queue struct {
 
 	// continues stores a map of all partition IDs to continues for a partition.
 	// this lets us optimize running consecutive steps for a function, as a continuation, to a specific limit.
-	continues map[string]continuation
+	continues        map[string]continuation
+	continueCooldown map[string]time.Time
+
 	// continuesLock protects the continues map.
 	continuesLock     *sync.Mutex
 	continuationLimit uint
@@ -3494,28 +3496,61 @@ func (q *queue) setPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) err
 // peek and process this partition on the next loop, allowing us to hint that a partition
 // should be processed when a step finishes (to decrease inter-step latency on non-connect
 // workloads).
-func (q *queue) addContinue(p *QueuePartition, ctr uint) {
+func (q *queue) addContinue(ctx context.Context, p *QueuePartition, ctr uint) {
 	if ctr >= q.continuationLimit {
-		// This is over the limit for conntinuing the partition, so force it to be
-		// removed in every case.
-		q.continuesLock.Lock()
-		delete(q.continues, p.Queue())
-		q.continuesLock.Unlock()
-
-		// TODO: Cooldown;  block this partition from having a continuation for the next
-		// 5 seconds.
+		q.removeContinue(ctx, p, true)
 		return
 	}
 
 	q.continuesLock.Lock()
+	defer q.continuesLock.Unlock()
+
+	// If this is the first continuation, check if we're on a cooldown, or if we're
+	// beyond capacity.
+	if ctr == 1 {
+		if len(q.continues) > consts.QueueContinuationMaxPartitions {
+			metrics.IncrQueueContinuationMaxCapcityCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
+			return
+		}
+		if t, ok := q.continueCooldown[p.Queue()]; ok && t.After(time.Now()) {
+			metrics.IncrQueueContinuationCooldownCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
+			return
+		}
+
+		// Remove the continuation cooldown.
+		delete(q.continueCooldown, p.Queue())
+	}
+
 	c, ok := q.continues[p.Queue()]
 	if !ok || c.count < ctr {
 		// Update the continue count if it doesn't exist, or the current counter
 		// is higher.  This ensures that we always have the highest continuation
 		// count stored for queue processing.
 		q.continues[p.Queue()] = continuation{partition: p, count: ctr}
+		metrics.IncrQueueContinuationAddedCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
 	}
-	q.continuesLock.Unlock()
+}
+
+func (q *queue) removeContinue(ctx context.Context, p *QueuePartition, cooldown bool) {
+	// This is over the limit for conntinuing the partition, so force it to be
+	// removed in every case.
+	q.continuesLock.Lock()
+	defer q.continuesLock.Unlock()
+
+	metrics.IncrQueueContinuationRemovedCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
+
+	delete(q.continues, p.Queue())
+
+	if cooldown {
+		// Add a cooldown, preventing this partition from being added as a continuation
+		// for a given period of time.
+		//
+		// Note that this isn't shared across replicas;  cooldowns
+		// only exist in the current replica.
+		q.continueCooldown[p.Queue()] = time.Now().Add(
+			consts.QueueContinuationCooldownPeriod,
+		)
+	}
 }
 
 //nolint:all

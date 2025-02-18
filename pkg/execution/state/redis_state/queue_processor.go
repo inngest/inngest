@@ -432,7 +432,6 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 
 func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimit int64, peekUntil time.Time, guaranteedCapacity *GuaranteedCapacity, metricShardName string, accountId *uuid.UUID, reportPeekedPartitions *int64) error {
 	// Peek 1s into the future to pull jobs off ahead of time, minimizing 0 latency
-
 	partitions, err := durationWithTags(ctx, q.primaryQueueShard.Name, "partition_peek", q.clock.Now(), func(ctx context.Context) ([]*QueuePartition, error) {
 		return q.partitionPeek(ctx, partitionKey, q.isSequential(), peekUntil, peekLimit, accountId)
 	}, map[string]any{
@@ -664,12 +663,8 @@ func (q *queue) scanContinuations(ctx context.Context) error {
 				return nil
 			}
 
-			// TODO: Continuation metric
 			if err := q.processPartition(ctx, p, cont.count, nil, false); err != nil {
 				if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
-					// Another worker grabbed the partition, or the partition was deleted
-					// during the scan by an another worker.
-					// TODO: Increase internal metrics
 					return nil
 				}
 				if errors.Unwrap(err) != context.Canceled {
@@ -763,12 +758,22 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, continu
 	}
 	if errors.Is(err, ErrPartitionAlreadyLeased) {
 		metrics.IncrQueuePartitionLeaseContentionCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
+		// If this is a continuation, remove it from the continuation counter.
+		// This prevents us from keeping partitions as continuations forever until
+		// we hit the max limit.
+		q.removeContinue(p, false)
 		return nil
 	}
-	if errors.Is(err, ErrPartitionNotFound) {
+	if errors.Is(err, ErrPartitionNotFound) || errors.Is(err, ErrPartitionGarbageCollected) {
 		// Another worker must have processed this partition between
 		// this worker's peek and process.  Increase partition
 		// contention metric and continue.  This is unsolvable.
+
+		// If this is a continuation, remove it from the continuation counter.
+		// This prevents us from keeping partitions as continuations forever until
+		// we hit the max limit.
+		q.removeContinue(p, false)
+
 		metrics.IncrPartitionGoneCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
 		return nil
 	}
@@ -780,7 +785,10 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, continu
 	defer func() {
 		metrics.HistogramProcessPartitionDuration(ctx, q.clock.Since(begin).Milliseconds(), metrics.HistogramOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"queue_shard": q.primaryQueueShard.Name},
+			Tags: map[string]any{
+				"queue_shard":     q.primaryQueueShard.Name,
+				"is_continuation": continuationCount > 0,
+			},
 		})
 	}()
 
@@ -813,10 +821,23 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, continu
 	if err != nil {
 		return err
 	}
-	metrics.HistogramQueuePeekSize(ctx, int64(len(queue)), metrics.HistogramOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
+
+	metrics.HistogramQueuePeekSize(ctx, int64(len(queue)), metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard":     q.primaryQueueShard.Name,
+			"is_continuation": continuationCount > 0,
+		},
+	})
 
 	// Record the number of partitions we're leasing.
-	metrics.IncrQueuePartitionLeasedCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
+	metrics.IncrQueuePartitionLeasedCounter(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard":     q.primaryQueueShard.Name,
+			"is_continuation": continuationCount > 0,
+		},
+	})
 
 	// parallel all queue names with internal mappings for now.
 	// XXX: Allow parallel partitions for all functions except for fns opting into FIFO
@@ -860,7 +881,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, continu
 			log.From(ctx).Warn().Err(err).Msg("error requeuieng partition for random peek")
 		}
 
-		return q.processPartition(ctx, p, 0, guaranteedCapacity, true)
+		return q.processPartition(ctx, p, continuationCount, guaranteedCapacity, true)
 	}
 
 	// If we've hit concurrency issues OR we've only hit rate limit issues, re-enqueue the partition

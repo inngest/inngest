@@ -121,4 +121,9 @@ const (
 
 	// Minimum number of pauses before using the aggregate pause handler.
 	AggregatePauseThreshold = 50
+
+	QueueContinuationCooldownPeriod = time.Second * 10
+	// QueueContinuationMaxPartitions represents the total capacity for partitions
+	// that can be continued.
+	QueueContinuationMaxPartitions = 50
 )
