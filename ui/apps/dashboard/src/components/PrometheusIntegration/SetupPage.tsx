@@ -3,8 +3,8 @@
 import { Link } from '@inngest/components/Link';
 import { IconPrometheus } from '@inngest/components/icons/platforms/Prometheus';
 
+import IntegrationNotEnabledMessage from '@/components/IntegrationNotEnabledMessage';
 import ConfigSteps from '@/components/PrometheusIntegration/ConfigSteps';
-import NotEnabledMessage from '@/components/PrometheusIntegration/NotEnabledMessage';
 
 type Props = {
   metricsExportEnabled: boolean;
@@ -36,7 +36,7 @@ export default function SetupPage({ metricsExportEnabled, metricsGranularitySeco
       {metricsExportEnabled ? (
         <ConfigSteps metricsGranularitySeconds={metricsGranularitySeconds} />
       ) : (
-        <NotEnabledMessage />
+        <IntegrationNotEnabledMessage integrationName="Prometheus" />
       )}
     </div>
   );
