@@ -156,6 +156,9 @@ export const getLineChartOptions = (
     yAxis: {
       type: 'value',
       minInterval: 1,
+      splitLine: {
+        lineStyle: { color: resolveColor(borderColor.subtle, dark, '#E2E2E2') },
+      },
     },
     ...data,
   };
