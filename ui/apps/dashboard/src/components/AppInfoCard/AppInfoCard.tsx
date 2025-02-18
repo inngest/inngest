@@ -1,7 +1,7 @@
 'use client';
 
 import { type Route } from 'next';
-import { AppDetailsCard, CardItem } from '@inngest/components/Apps/AppDetailsCard';
+import AppDetailsCard from '@inngest/components/Apps/AppDetailsCard';
 import { Link } from '@inngest/components/Link';
 import { Pill } from '@inngest/components/Pill/Pill';
 import { TextClickToCopy } from '@inngest/components/Text';
@@ -41,6 +41,7 @@ type Sync = {
   sdkVersion: string | null;
   status: string;
   url: string | null;
+  appVersion: string | null;
 } & React.ComponentProps<typeof PlatformSection>['sync'];
 
 export function AppInfoCard({
@@ -83,12 +84,12 @@ export function AppInfoCard({
     <>
       <AppDetailsCard title="App information" className={className}>
         {/* Row 1 */}
-        <CardItem
+        <AppDetailsCard.Item
           detail={<div className="truncate">{app?.externalID ?? '-'}</div>}
           term="App ID"
           loading={loading}
         />
-        <CardItem
+        <AppDetailsCard.Item
           detail={
             <div className="truncate">
               {sync?.sdkVersion ? <Pill>{sync.sdkVersion}</Pill> : '-'}
@@ -97,7 +98,7 @@ export function AppInfoCard({
           term="SDK version"
           loading={loading}
         />
-        <CardItem
+        <AppDetailsCard.Item
           className="col-span-2"
           detail={<div className="truncate">{lastSyncValue ?? '-'}</div>}
           term="Last sync"
@@ -105,17 +106,17 @@ export function AppInfoCard({
         />
 
         {/* Row 2 */}
-        <CardItem
+        <AppDetailsCard.Item
           detail={<div className="truncate">{sync?.framework ?? '-'}</div>}
           term="Framework"
           loading={loading}
         />
-        <CardItem
+        <AppDetailsCard.Item
           detail={<div className="truncate">{sync?.sdkLanguage || '-'}</div>}
           term="Language"
           loading={loading}
         />
-        <CardItem
+        <AppDetailsCard.Item
           className="col-span-2"
           detail={<TextClickToCopy truncate>{sync?.url ?? '-'}</TextClickToCopy>}
           term="URL"
@@ -123,7 +124,7 @@ export function AppInfoCard({
         />
         {/* Row 3 */}
         {app?.method && (
-          <CardItem
+          <AppDetailsCard.Item
             term="Method"
             detail={
               <div className="flex items-center gap-1">
@@ -137,8 +138,16 @@ export function AppInfoCard({
             }
           />
         )}
-        <CardItem
-          detail={<div className="truncate">{app?.version ? <Pill>{app.version}</Pill> : '-'}</div>}
+        <AppDetailsCard.Item
+          detail={
+            <div className="truncate">
+              {sync?.appVersion || app?.appVersion ? (
+                <Pill>{sync?.appVersion || app?.appVersion}</Pill>
+              ) : (
+                '-'
+              )}
+            </div>
+          }
           term="App version"
           loading={loading}
         />

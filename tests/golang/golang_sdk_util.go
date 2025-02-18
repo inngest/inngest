@@ -3,7 +3,6 @@ package golang
 import (
 	"context"
 	"fmt"
-	"github.com/inngest/inngest/pkg/logger"
 	"log/slog"
 	"math/rand"
 	"net/http"
@@ -11,6 +10,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/inngest/inngest/pkg/logger"
 
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
@@ -131,8 +132,15 @@ func NewHTTPServer(f http.Handler) *HTTPServer {
 		MaxHeaderBytes: 1 << 20,
 	}
 	go func() {
-		_ = s.ListenAndServe()
+		err := s.ListenAndServe()
+		// Check if server is closed error
+		if err != nil && err != http.ErrServerClosed {
+			panic(err)
+		}
 	}()
+
+	// Give it ime to start.
+	<-time.After(20 * time.Millisecond)
 
 	return &HTTPServer{Server: s, Port: port}
 }

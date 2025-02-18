@@ -116,17 +116,14 @@ const INTEGRATIONS: Integration[] = [
     Icon: <IconDatadog className="text-onContrast h-6 w-6" />,
     actionButton: () => (
       <Button
-        icon={<RiExternalLinkLine />}
         iconSide="left"
-        kind="secondary"
-        appearance="outlined"
+        appearance="solid"
         size="medium"
-        label="Upvote"
-        href="https://roadmap.inngest.com/roadmap?id=b9303313-0234-4ece-8376-df862364c16b"
-        target="_blank"
+        label="Connect"
+        href="/settings/integrations/datadog"
       />
     ),
-    description: 'Let us know if a Datadog integration is important to you by upvoting!',
+    description: 'Send metrics from Inngest directly to Datadog',
   },
 ];
 
@@ -140,6 +137,7 @@ type Props = {
 
 export default function IntegrationsList({ integrations }: Props) {
   const { value: supabaseIntegration } = useBooleanFlag('supabase-integration');
+  const { value: ddIntegration } = useBooleanFlag('datadog-integration');
 
   const getIntegrationData = (slug: string) =>
     integrations.find((integration) => integration.slug === slug);
@@ -150,6 +148,7 @@ export default function IntegrationsList({ integrations }: Props) {
       <div className="grid w-[800px] grid-cols-2 gap-6">
         {INTEGRATIONS.map((i: Integration, n) => {
           if (i.title === 'Supabase' && !supabaseIntegration) return;
+          if (i.title === 'Datadog' && !ddIntegration) return;
 
           const integrationData = getIntegrationData(i.slug);
           const isEnabled =

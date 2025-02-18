@@ -17,9 +17,21 @@ import { useWorkersCount } from '../Workers/useWorker';
 
 export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envSlug: string }) {
   const getWorkerCount = useWorkersCount();
-  const [showArchive, setShowArchive] = useState(false);
-  const [showValidate, setShowValidate] = useState(false);
   const router = useRouter();
+
+  const [selectedApp, setSelectedApp] = useState<FlattenedApp | null>(null);
+  const [modalType, setModalType] = useState<'archive' | 'validate' | null>(null);
+
+  const handleShowModal = (app: FlattenedApp, type: 'archive' | 'validate') => {
+    setSelectedApp(app);
+    setModalType(type);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedApp(null);
+    setModalType(null);
+  };
+
   const sortedApps = useMemo(() => {
     return [...apps].sort((a, b) => {
       return (
@@ -29,68 +41,71 @@ export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envS
     });
   }, [apps]);
 
-  return sortedApps.map((app) => {
-    const { appKind, status, footerHeaderTitle, footerHeaderSecondaryCTA, footerContent } =
-      getAppCardContent({
-        app,
-        envSlug,
-      });
+  return (
+    <>
+      {sortedApps.map((app) => {
+        const { appKind, status, footerHeaderTitle, footerHeaderSecondaryCTA, footerContent } =
+          getAppCardContent({
+            app,
+            envSlug,
+          });
 
-    return (
-      <div className="mb-6" key={app.id}>
-        <AppCard kind={appKind}>
-          <AppCard.Content
-            url={pathCreator.app({ envSlug, externalAppID: app.externalID })}
-            app={app}
-            pill={
-              status ? (
-                <Pill appearance="outlined" kind={appKind}>
-                  {status}
-                </Pill>
-              ) : null
-            }
-            actions={
-              <div className="items-top flex gap-2">
-                <Button
-                  appearance="outlined"
-                  label="View details"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    router.push(pathCreator.app({ envSlug, externalAppID: app.externalID }));
-                  }}
-                />
-                <ActionsMenu
-                  isArchived={app.isArchived}
-                  showArchive={() => setShowArchive(true)}
-                  disableArchive={!app.url}
-                  showValidate={() => setShowValidate(true)}
-                  disableValidate={app.isParentArchived}
-                />
-              </div>
-            }
-            workerCounter={<WorkerCounter appID={app.id} getWorkerCount={getWorkerCount} />}
-          />
-          <AppCard.Footer
-            kind={appKind}
-            headerTitle={footerHeaderTitle}
-            headerSecondaryCTA={footerHeaderSecondaryCTA}
-            content={footerContent}
-          />
-        </AppCard>
-        {app.url && (
-          <ValidateModal
-            isOpen={showValidate}
-            onClose={() => setShowValidate(false)}
-            initialURL={app.url}
-          />
-        )}
+        return (
+          <div className="mb-6" key={app.id}>
+            <AppCard kind={appKind}>
+              <AppCard.Content
+                url={pathCreator.app({ envSlug, externalAppID: app.externalID })}
+                app={app}
+                pill={
+                  status ? (
+                    <Pill appearance="outlined" kind={appKind}>
+                      {status}
+                    </Pill>
+                  ) : null
+                }
+                actions={
+                  <div className="items-top flex gap-2">
+                    <Button
+                      appearance="outlined"
+                      label="View details"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        router.push(pathCreator.app({ envSlug, externalAppID: app.externalID }));
+                      }}
+                    />
+                    <ActionsMenu
+                      isArchived={app.isArchived}
+                      showArchive={() => handleShowModal(app, 'archive')}
+                      disableArchive={!app.url}
+                      showValidate={() => handleShowModal(app, 'validate')}
+                      disableValidate={app.isParentArchived}
+                    />
+                  </div>
+                }
+                workerCounter={<WorkerCounter appID={app.id} getWorkerCount={getWorkerCount} />}
+              />
+              <AppCard.Footer
+                kind={appKind}
+                headerTitle={footerHeaderTitle}
+                headerSecondaryCTA={footerHeaderSecondaryCTA}
+                content={footerContent}
+              />
+            </AppCard>
+          </div>
+        );
+      })}
+
+      {selectedApp?.url && modalType === 'validate' && (
+        <ValidateModal isOpen={true} onClose={handleCloseModal} initialURL={selectedApp.url} />
+      )}
+      {selectedApp && modalType === 'archive' && (
         <ArchiveModal
-          appID={app.id}
-          isArchived={app.isArchived}
-          isOpen={showArchive}
-          onClose={() => setShowArchive(false)}
+          appID={selectedApp.id}
+          isArchived={selectedApp.isArchived}
+          isOpen={true}
+          onClose={handleCloseModal}
         />
-      </div>
-    );
-  });
+      )}
+    </>
+  );
 }

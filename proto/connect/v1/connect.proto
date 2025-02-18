@@ -63,24 +63,27 @@ message WorkerConnectRequestData {
 	google.protobuf.Timestamp started_at = 12;
 }
 
-message GatewaySyncRequestData {
-	optional string deploy_id = 1;
-}
-
 message GatewayExecutorRequestData {
 	string request_id = 1;
-	string env_id = 2;
-	string app_id = 3;
-	string function_slug = 4;
-	optional string step_id = 5;
-	bytes request_payload = 6;
+	string account_id = 2;
+	string env_id = 3;
+	string app_id = 4;
+	string function_slug = 5;
+	optional string step_id = 6;
+	bytes request_payload = 7;
+	bytes system_trace_ctx = 8;
+	bytes user_trace_ctx = 9;
 }
 
 message WorkerRequestAckData {
 	string request_id = 1;
-	string app_id = 2;
-	string function_slug = 3;
-	optional string step_id = 4;
+	string account_id = 2;
+	string env_id = 3;
+	string app_id = 4;
+	string function_slug = 5;
+	optional string step_id = 6;
+	bytes system_trace_ctx = 7;
+	bytes user_trace_ctx = 8;
 }
 
 enum SDKResponseStatus {
@@ -91,14 +94,17 @@ enum SDKResponseStatus {
 
 message SDKResponse {
 	string request_id = 1;
-	string env_id = 2;
-	string app_id = 3;
-	SDKResponseStatus status = 4;
-	bytes body = 5;
-	bool no_retry = 6;
-	optional string retry_after = 7;
+	string account_id = 2;
+	string env_id = 3;
+	string app_id = 4;
+	SDKResponseStatus status = 5;
+	bytes body = 6;
+	bool no_retry = 7;
+	optional string retry_after = 8;
 	string sdk_version = 9;
 	uint32 request_version = 10;
+	bytes system_trace_ctx = 11;
+	bytes user_trace_ctx = 12;
 }
 
 message WorkerReplyAckData {

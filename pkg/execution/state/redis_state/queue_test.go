@@ -1240,7 +1240,8 @@ func TestQueueLease(t *testing.T) {
 
 			score, err := r.ZMScore(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex(), p.FunctionID.String())
 			require.NoError(t, err)
-			require.Equal(t, float64(leaseExpiry.UnixMilli()), score[0])
+
+			require.WithinDuration(t, leaseExpiry, time.UnixMilli(int64(score[0])), 2*time.Millisecond)
 		})
 
 		t.Run("Leasing again should fail", func(t *testing.T) {

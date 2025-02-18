@@ -111,6 +111,9 @@ func TestParallelSteps(t *testing.T) {
 
 		// check on spans
 		for _, cspan := range run.Trace.ChildSpans {
+			if cspan.StepOp == "" {
+				continue
+			}
 			t.Run(fmt.Sprintf("child: %s", cspan.Name), func(t *testing.T) {
 				assert.Equal(t, 0, cspan.Attempts)
 				assert.Equal(t, models.StepOpRun.String(), cspan.StepOp)

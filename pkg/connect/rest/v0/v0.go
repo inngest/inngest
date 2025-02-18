@@ -1,4 +1,4 @@
-package v0
+package connectv0
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/headers"
+	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"net/url"
 )
 
@@ -21,6 +22,7 @@ type Opts struct {
 	RequestAuther           RequestAuther
 	ConnectGatewayRetriever ConnectGatewayRetriever
 	ConnectionLimiter       ConnectionLimiter
+	ConditionalTracer       trace.ConditionalTracer
 
 	Dev bool
 }
