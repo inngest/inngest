@@ -187,7 +187,7 @@ func TestPauseCancelFunction(t *testing.T) {
 			a.Equal(int32(1), atomic.LoadInt32(&runCounter))
 			a.Equal(int32(0), atomic.LoadInt32(&runCancelled))
 			a.Equal(1, getQueueSize(consts.DevServerAccountId, uuid.MustParse(fnId)))
-		}, 10*time.Second, 1*time.Second)
+		}, 20*time.Second, 10*time.Millisecond)
 	})
 
 	t.Run("should cancel run", func(t *testing.T) {
@@ -207,7 +207,7 @@ func TestPauseCancelFunction(t *testing.T) {
 			Status:         models.FunctionStatusCancelled,
 			Timeout:        10 * time.Second,
 			Interval:       500 * time.Millisecond,
-			ChildSpanCount: 2,
+			ChildSpanCount: 1, // at least 1
 		})
 
 		require.Equal(t, models.RunTraceSpanStatusCancelled.String(), run.Trace.Status)

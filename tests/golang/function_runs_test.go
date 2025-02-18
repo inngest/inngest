@@ -249,10 +249,10 @@ func TestFunctionRunList(t *testing.T) {
 				Cursor: *pageInfo.EndCursor,
 			})
 
-			remain := failureTotal - items
-			assert.Equal(t, remain, len(edges))
+			remain := failureTotal - items // we should paginate and remove the 2 previous from the total.
 			assert.False(t, pageInfo.HasNextPage)
 			assert.Equal(t, failureTotal, total)
+			assert.Equal(t, remain, len(edges), "Got %#v and page info %#v", edges, pageInfo)
 		}, 10*time.Second, 2*time.Second)
 	})
 
