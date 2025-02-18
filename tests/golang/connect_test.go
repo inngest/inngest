@@ -158,6 +158,6 @@ func TestEndToEnd(t *testing.T) {
 		require.NotNil(t, run.Trace.OutputID)
 		output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
 		require.NotNil(t, output.Error.Stack)
-		require.Equal(t, syscode.CodeConnectNoHealthyConnection, *output.Error.Stack)
+		require.Equal(t, fmt.Sprintf("%q", syscode.CodeConnectNoHealthyConnection), *output.Error.Stack)
 	})
 }
