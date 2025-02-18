@@ -1222,6 +1222,12 @@ func (e *executor) executeDriverForStep(ctx context.Context, i *runInstance) (*s
 	if err != nil && response.Err == nil {
 		var serr syscode.Error
 		if errors.As(err, &serr) {
+			gracefulErr := state.StandardError{
+				Error:   fmt.Sprintf("%s: %s", serr.Code, serr.Message),
+				Name:    serr.Code,
+				Message: serr.Message,
+			}.Serialize(execution.StateErrorKey)
+			response.Output = gracefulErr
 			response.Err = &serr.Code
 		} else {
 			// Set the response error if it wasn't set, or if Execute had an internal error.
@@ -1229,7 +1235,6 @@ func (e *executor) executeDriverForStep(ctx context.Context, i *runInstance) (*s
 			errstr := err.Error()
 			response.Err = &errstr
 		}
-
 	}
 	// Ensure that the step is always set.  This removes the need for drivers to always
 	// set this.

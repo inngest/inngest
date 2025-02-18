@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/inngest/inngest/pkg/syscode"
 	"net/http"
 	"os"
 	"sync/atomic"
@@ -157,7 +156,13 @@ func TestEndToEnd(t *testing.T) {
 		// output test
 		require.NotNil(t, run.Trace.OutputID)
 		output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
+
+		errorMsg := "{\"error\":{\"error\":\"connect_no_healthy_connection: Could not find a healthy connection\",\"name\":\"connect_no_healthy_connection\",\"message\":\"Could not find a healthy connection\"}}"
+
 		require.NotNil(t, output.Error.Stack)
-		require.Equal(t, fmt.Sprintf("%q", syscode.CodeConnectNoHealthyConnection), *output.Error.Stack)
+		require.Equal(t, errorMsg, *output.Error.Stack)
+
+		r2 := c.Run(ctx, failedRunId)
+		require.Equal(t, errorMsg, r2.Output)
 	})
 }

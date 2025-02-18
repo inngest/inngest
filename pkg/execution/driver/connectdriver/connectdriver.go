@@ -153,16 +153,7 @@ func do(ctx, traceCtx context.Context, forwarder pubsub.RequestForwarder, opts p
 		}
 	}
 
-	// TODO Check if we need some of the request error handling logic from httpdriver.do()
 	if resp == nil && err != nil {
-		if sysErr != nil {
-			return &httpdriver.Response{
-				Body:       nil,
-				StatusCode: http.StatusBadRequest,
-				Duration:   dur,
-				SysErr:     sysErr,
-			}, err
-		}
 		return nil, err
 	}
 
