@@ -761,7 +761,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, continu
 		// If this is a continuation, remove it from the continuation counter.
 		// This prevents us from keeping partitions as continuations forever until
 		// we hit the max limit.
-		q.removeContinue(p, false)
+		q.removeContinue(ctx, p, false)
 		return nil
 	}
 	if errors.Is(err, ErrPartitionNotFound) || errors.Is(err, ErrPartitionGarbageCollected) {
@@ -772,7 +772,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, continu
 		// If this is a continuation, remove it from the continuation counter.
 		// This prevents us from keeping partitions as continuations forever until
 		// we hit the max limit.
-		q.removeContinue(p, false)
+		q.removeContinue(ctx, p, false)
 
 		metrics.IncrPartitionGoneCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
 		return nil
@@ -1091,7 +1091,7 @@ func (q *queue) process(
 		if res.ScheduledImmediateJob {
 			// Add the partition to be continued again.  Note that if we've already
 			// continued beyond the limit this is a noop.
-			q.addContinue(&p, continuationCtr+1)
+			q.addContinue(ctx, &p, continuationCtr+1)
 		}
 
 		// Closing this channel prevents the goroutine which extends lease from leaking,
