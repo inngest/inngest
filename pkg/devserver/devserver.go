@@ -108,7 +108,6 @@ func New(ctx context.Context, opts StartOpts) error {
 		opts.Config.Execution.LogOutput = true
 	}
 
-	// NOTE: looks deprecated?
 	// Before running the development service, ensure that we change the http
 	// driver in development to use our AWS Gateway http client, attempting to
 	// automatically transform dev requests to lambda invocations.
@@ -189,9 +188,10 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	queueOpts := []redis_state.QueueOpt{
 		redis_state.WithRunMode(redis_state.QueueRunMode{
-			Sequential: true,
-			Scavenger:  true,
-			Partition:  true,
+			Sequential:    true,
+			Scavenger:     true,
+			Partition:     true,
+			Continuations: true,
 		}),
 		redis_state.WithIdempotencyTTL(time.Hour),
 		redis_state.WithNumWorkers(int32(opts.QueueWorkers)),

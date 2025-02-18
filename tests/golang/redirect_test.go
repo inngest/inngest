@@ -47,6 +47,8 @@ func TestRedirect(t *testing.T) {
 		URL:         u,
 	})
 
+	fmt.Println(u.String())
+
 	var runID string
 	a := inngestgo.CreateFunction(
 		inngestgo.FunctionOpts{
