@@ -3,6 +3,7 @@ package pubsub
 import (
 	"context"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/oklog/ulid/v2"
 
 	"github.com/google/uuid"
@@ -38,6 +39,12 @@ func (noopConnector) ReceiveRoutedRequest(ctx context.Context, gatewayId ulid.UL
 
 func (noopConnector) AckMessage(ctx context.Context, appId uuid.UUID, requestId string, source AckSource) error {
 	logger.StdlibLogger(ctx).Error("using no-op connector to ack message", "request_id", requestId, "source", source)
+
+	return nil
+}
+
+func (noopConnector) NackMessage(ctx context.Context, appId uuid.UUID, requestId string, source AckSource, reason syscode.Error) error {
+	logger.StdlibLogger(ctx).Error("using no-op connector to nack message", "request_id", requestId, "source", source)
 
 	return nil
 }
