@@ -4,7 +4,7 @@ import { Card } from '@inngest/components/Card/Card';
 import { formatDayString } from '@inngest/components/utils/date';
 
 import EntitlementListItem from '@/components/Billing/Addons/EntitlementListItem';
-import MetricsExportValue from '@/components/Billing/Addons/MetricsExportCurrentValue';
+import MetricsExportEntitlementValue from '@/components/Billing/Addons/MetricsExportEntitlementValue';
 import BillingInformation from '@/components/Billing/BillingDetails/BillingInformation';
 import PaymentMethod from '@/components/Billing/BillingDetails/PaymentMethod';
 import { LimitBar, type Data } from '@/components/Billing/LimitBar';
@@ -183,7 +183,7 @@ export default async function Page() {
             entitlement={{
               currentValue: entitlements.metricsExport.enabled,
               displayValue: (
-                <MetricsExportValue
+                <MetricsExportEntitlementValue
                   metricsExportEnabled={entitlements.metricsExport.enabled}
                   granularitySeconds={entitlements.metricsExportGranularity.limit}
                   freshnessSeconds={entitlements.metricsExportFreshness.limit}
