@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/syscode"
 	"net/http"
 	"os"
 	"sync/atomic"
@@ -158,7 +159,6 @@ func TestEndToEnd(t *testing.T) {
 		// output test
 		require.NotNil(t, run.Trace.OutputID)
 		output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
-		c.ExpectSpanErrorOutput(t, "msg", "stack", output)
-
+		require.Equal(t, syscode.CodeConnectNoHealthyConnection, output.Error.Stack)
 	})
 }

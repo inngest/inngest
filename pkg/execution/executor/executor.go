@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/inngest/inngest/pkg/syscode"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -1219,10 +1220,16 @@ func (e *executor) executeDriverForStep(ctx context.Context, i *runInstance) (*s
 		}
 	}
 	if err != nil && response.Err == nil {
-		// Set the response error if it wasn't set, or if Execute had an internal error.
-		// This ensures that we only ever need to check resp.Err to handle errors.
-		errstr := err.Error()
-		response.Err = &errstr
+		var serr syscode.Error
+		if errors.As(err, &serr) {
+			response.Err = &serr.Code
+		} else {
+			// Set the response error if it wasn't set, or if Execute had an internal error.
+			// This ensures that we only ever need to check resp.Err to handle errors.
+			errstr := err.Error()
+			response.Err = &errstr
+		}
+
 	}
 	// Ensure that the step is always set.  This removes the need for drivers to always
 	// set this.
