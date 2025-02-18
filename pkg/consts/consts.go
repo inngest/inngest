@@ -131,5 +131,5 @@ const (
 	QueueContinuationMaxPartitions = 50
 	// QueueContinuationSkipProbability is the probability of skipping a continuation
 	// scan loop.
-	QueueContinuationSkipProbability = 0.5
+	QueueContinuationSkipProbability = 0.2
 )
