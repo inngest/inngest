@@ -126,6 +126,7 @@ export const APPS = gql`
     apps {
       id
       name
+      appVersion
       sdkLanguage
       sdkVersion
       framework
@@ -152,6 +153,7 @@ export const GET_APP = gql`
     app(id: $id) {
       id
       name
+      appVersion
       sdkLanguage
       sdkVersion
       framework
@@ -479,7 +481,7 @@ export const GET_WORKER_CONNECTIONS = gql`
           sdkVersion
           sdkPlatform
           syncId
-          buildId
+          appVersion
           functionCount
           cpuCores
           memBytes
@@ -492,6 +494,7 @@ export const GET_WORKER_CONNECTIONS = gql`
         startCursor
         endCursor
       }
+      totalCount
     }
   }
 `;

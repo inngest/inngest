@@ -1,5 +1,5 @@
 import type { Route } from 'next';
-import { CardItem } from '@inngest/components/Apps/AppDetailsCard';
+import AppDetailsCard from '@inngest/components/Apps/AppDetailsCard';
 import { Link } from '@inngest/components/Link';
 
 type Props = {
@@ -43,9 +43,9 @@ export function PlatformSection({ sync }: Props) {
 
   return (
     <>
-      <CardItem detail={<div className="truncate">{platform}</div>} term="Platform" />
-      <CardItem detail={projectValue} term="Vercel project" />
-      <CardItem detail={deploymentValue} term="Vercel deployment" />
+      <AppDetailsCard.Item detail={<div className="truncate">{platform}</div>} term="Platform" />
+      <AppDetailsCard.Item detail={projectValue} term="Vercel project" />
+      <AppDetailsCard.Item detail={deploymentValue} term="Vercel deployment" />
     </>
   );
 }

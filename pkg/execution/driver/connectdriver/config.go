@@ -24,6 +24,7 @@ func (c Config) NewDriver(opts ...registration.NewDriverOpts) (driver.Driver, er
 	e := &executor{}
 	if len(opts) > 0 {
 		e.forwarder = opts[0].ConnectForwarder
+		e.tracer = opts[0].ConditionalTracer
 	}
 
 	return e, nil

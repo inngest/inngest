@@ -3,6 +3,8 @@ package trace
 import (
 	"context"
 	"fmt"
+	"github.com/inngest/inngest/pkg/logger"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"os"
 	"strconv"
 	"sync"
@@ -40,7 +42,10 @@ const (
 
 var (
 	userTracer Tracer
-	o          sync.Once
+	onceUser   sync.Once
+
+	systemTracer Tracer
+	onceSystem   sync.Once
 )
 
 // Tracer is a wrapper around the otel's tracing library to allow combining
@@ -112,7 +117,9 @@ func (o TracerOpts) MaxPayloadSizeBytes() int {
 
 func NewUserTracer(ctx context.Context, opts TracerOpts) error {
 	var err error
-	o.Do(func() {
+	onceUser.Do(func() {
+		logger.StdlibLogger(context.Background()).Info("creating user tracer")
+
 		userTracer, err = newTracer(ctx, opts)
 	})
 	return err
@@ -137,6 +144,35 @@ func CloseUserTracer(ctx context.Context) error {
 	return nil
 }
 
+func NewSystemTracer(ctx context.Context, opts TracerOpts) error {
+	var err error
+	onceSystem.Do(func() {
+		logger.StdlibLogger(context.Background()).Info("creating system tracer")
+
+		systemTracer, err = newTracer(ctx, opts)
+	})
+	return err
+}
+
+func SystemTracer() Tracer {
+	if systemTracer == nil {
+		if err := NewSystemTracer(context.Background(), TracerOpts{
+			ServiceName: "default",
+			Type:        TracerTypeNoop,
+		}); err != nil {
+			panic("fail to setup default system tracer")
+		}
+	}
+	return systemTracer
+}
+
+func CloseSystemTracer(ctx context.Context) error {
+	if systemTracer != nil {
+		systemTracer.Shutdown(ctx)
+	}
+	return nil
+}
+
 type tracer struct {
 	provider   *trace.TracerProvider
 	propagator propagation.TextMapPropagator
@@ -145,6 +181,7 @@ type tracer struct {
 }
 
 func (t *tracer) Provider() *trace.TracerProvider {
+	logger.StdlibLogger(context.Background()).Warn("right before error")
 	return t.provider
 }
 
@@ -195,7 +232,7 @@ func TracerSetup(svc string, ttype TracerType) (func(), error) {
 func newTracer(ctx context.Context, opts TracerOpts) (Tracer, error) {
 	switch opts.Type {
 	case TracerTypeOTLP:
-		return newOLTPGRPCTraceProvider(ctx, opts)
+		return newOTLPGRPCTraceProvider(ctx, opts)
 	case TracerTypeOTLPHTTP:
 		return newOTLPHTTPTraceProvider(ctx, opts)
 	case TracerTypeJaeger:
@@ -316,7 +353,7 @@ func newOTLPHTTPTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, err
 	}, nil
 }
 
-func newOLTPGRPCTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
+func newOTLPGRPCTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
 	endpoint := opts.Endpoint()
 	maxPayloadSize := opts.MaxPayloadSizeBytes()
 
@@ -497,4 +534,25 @@ func newKafkaTraceExporter(ctx context.Context, opts TracerOpts) (Tracer, error)
 			_ = exp.Shutdown(ctx)
 		},
 	}, nil
+}
+
+func ConnectTracer() oteltrace.Tracer {
+	l := logger.StdlibLogger(context.Background())
+
+	systemTracer := SystemTracer()
+	if systemTracer == nil {
+		l.Error("system tracer is nil")
+	}
+
+	provider := systemTracer.Provider()
+	if provider == nil {
+		l.Error("trace provider is nil in system tracer")
+	}
+
+	tracer := provider.Tracer("connect")
+	if tracer == nil {
+		l.Error("connect tracer is nil")
+	}
+
+	return tracer
 }

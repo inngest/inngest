@@ -1,5 +1,6 @@
 import type React from 'react';
 import { AccordionList, AccordionPrimitive } from '@inngest/components/AccordionCard/AccordionList';
+import DescriptionListItem from '@inngest/components/Apps/DescriptionListItem';
 import { Button } from '@inngest/components/Button';
 import { Pill } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton';
@@ -34,11 +35,17 @@ export function SkeletonCard() {
         </div>
 
         <div className="grid grid-cols-5 gap-5 pt-1.5">
-          <Description term="Last synced at" detail={<Skeleton className="block h-5 w-36" />} />
-          <Description term="Method" detail={<Skeleton className="block h-5 w-28" />} />
-          <Description term="SDK version" detail={<Skeleton className="block h-5 w-14" />} />
-          <Description term="Language" detail={<Skeleton className="block h-5 w-28" />} />
-          <Description term="Framework" detail={<Skeleton className="block h-5 w-28" />} />
+          <DescriptionListItem
+            term="Last synced at"
+            detail={<Skeleton className="block h-5 w-36" />}
+          />
+          <DescriptionListItem term="Method" detail={<Skeleton className="block h-5 w-28" />} />
+          <DescriptionListItem
+            term="SDK version"
+            detail={<Skeleton className="block h-5 w-14" />}
+          />
+          <DescriptionListItem term="Language" detail={<Skeleton className="block h-5 w-28" />} />
+          <DescriptionListItem term="Framework" detail={<Skeleton className="block h-5 w-28" />} />
         </div>
       </div>
       <div className="border-muted border-t px-6 py-3">
@@ -48,6 +55,7 @@ export function SkeletonCard() {
   );
 }
 
+// Cards used in the Apps main list
 export function AppCard({ kind, children }: React.PropsWithChildren<{ kind: CardKind }>) {
   return (
     <Card accentColor={kindStyles[kind].background} accentPosition="left">
@@ -77,14 +85,21 @@ export function AppCardContent({ url, app, pill, actions, workerCounter }: CardC
           </div>
           {actions}
         </div>
-        <p className="text-muted mt-0.5 truncate">{app.url}</p>
+        <p className="text-muted mt-0.5 truncate">
+          {app.url ||
+            (app.appVersion && (
+              <>
+                Current app version: <span className="text-basis">{app.appVersion}</span>
+              </>
+            ))}
+        </p>
       </Wrapper>
 
-      <div className="grid grid-cols-5 gap-4">
+      <dl className="grid grid-cols-5 gap-4">
         {app.lastSyncedAt && (
-          <Description term="Last synced at" detail={<Time value={app.lastSyncedAt} />} />
+          <DescriptionListItem term="Last synced at" detail={<Time value={app.lastSyncedAt} />} />
         )}
-        <Description
+        <DescriptionListItem
           term="Method"
           detail={
             <div className="flex items-center gap-1">
@@ -97,34 +112,17 @@ export function AppCardContent({ url, app, pill, actions, workerCounter }: CardC
             </div>
           }
         />
-        <Description
+        <DescriptionListItem
           term="SDK version"
           detail={app.sdkVersion ? <Pill>{app.sdkVersion}</Pill> : '-'}
         />
-        <Description term="Language" detail={app.sdkLanguage ?? '-'} />
+        <DescriptionListItem term="Language" detail={app.sdkLanguage ?? '-'} />
         {app.method === methodTypes.Connect ? (
           <>{workerCounter}</>
         ) : (
-          <Description term="Framework" detail={app.framework ?? '-'} />
+          <DescriptionListItem term="Framework" detail={app.framework ?? '-'} />
         )}
-      </div>
-    </div>
-  );
-}
-
-export function Description({
-  className,
-  detail,
-  term,
-}: {
-  className?: string;
-  detail: React.ReactNode;
-  term: string;
-}) {
-  return (
-    <div className={className}>
-      <dt className="text-light pb-1 text-sm">{term}</dt>
-      <dd className="text-subtle truncate text-sm">{detail}</dd>
+      </dl>
     </div>
   );
 }

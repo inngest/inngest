@@ -1,22 +1,26 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { CardItem } from '@inngest/components/Apps/AppDetailsCard';
+import DescriptionListItem from '@inngest/components/Apps/DescriptionListItem';
 import { Button } from '@inngest/components/Button';
 import { Pill } from '@inngest/components/Pill/Pill';
 import {
   ConnectV1WorkerConnectionsOrderByDirection,
   ConnectV1WorkerConnectionsOrderByField,
   type ConnectV1WorkerConnectionsOrderBy,
+  type GroupedWorkerStatus,
   type PageInfo,
   type Worker,
+  type WorkerStatus,
 } from '@inngest/components/types/workers';
 import { transformLanguage } from '@inngest/components/utils/appsParser';
+import { convertGroupedWorkerStatusToWorkerStatuses } from '@inngest/components/utils/workerParser';
 import { RiArrowLeftSLine, RiArrowRightSLine } from '@remixicon/react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { type Row, type SortingState } from '@tanstack/react-table';
 
 import CompactPaginatedTable from '../Table/CompactPaginatedTable';
+import WorkerStatusFilter from './WorkerStatusFilter';
 import { useColumns } from './columns';
 
 const columnToTimeField: Record<string, ConnectV1WorkerConnectionsOrderByField> = {
@@ -39,12 +43,14 @@ export function WorkersTable({
     orderBy,
     cursor,
     pageSize,
+    status,
   }: {
     appID: string;
     orderBy: ConnectV1WorkerConnectionsOrderBy[];
     cursor: string | null;
     pageSize: number;
-  }) => Promise<{ workers: Worker[]; pageInfo: PageInfo }>;
+    status: WorkerStatus[];
+  }) => Promise<{ workers: Worker[]; pageInfo: PageInfo; totalCount: number }>;
 }) {
   const columns = useColumns();
   const [sorting, setSorting] = useState<SortingState>([
@@ -60,10 +66,21 @@ export function WorkersTable({
       direction: ConnectV1WorkerConnectionsOrderByDirection.Asc,
     },
   ]);
-
+  const [filteredStatus, setFilteredStatus] = useState<WorkerStatus[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
+
+  const onStatusFilterChange = useCallback(
+    (value: GroupedWorkerStatus[]) => {
+      const workerStatuses = value.flatMap(convertGroupedWorkerStatusToWorkerStatuses);
+      setFilteredStatus(workerStatuses);
+      // Back to first page when we sort changes
+      setCursor(null);
+      setPage(1);
+    },
+    [setFilteredStatus]
+  );
 
   const {
     isPending, // first load, no data
@@ -71,14 +88,13 @@ export function WorkersTable({
     data: workerConnsData,
     isFetching, // refetching
   } = useQuery({
-    queryKey: ['worker-connections', { appID, orderBy, cursor, pageSize }],
+    queryKey: ['worker-connections', { appID, orderBy, cursor, pageSize, status: filteredStatus }],
     queryFn: useCallback(() => {
-      return getWorkers({ appID, orderBy, cursor, pageSize });
-    }, [getWorkers, appID, orderBy, cursor, pageSize]),
+      return getWorkers({ appID, orderBy, cursor, pageSize, status: filteredStatus });
+    }, [getWorkers, appID, orderBy, cursor, pageSize, filteredStatus]),
     placeholderData: keepPreviousData,
     refetchInterval: !cursor || page === 1 ? refreshInterval : 0,
   });
-
   const pageInfo = workerConnsData?.pageInfo;
 
   const { data: totalCount } = useQuery({
@@ -114,8 +130,14 @@ export function WorkersTable({
   }, [sorting, setOrderBy]);
 
   return (
-    <>
+    <div>
       <h4 className="text-subtle mb-4 text-xl">Workers ({totalCount})</h4>
+      <div className="mb-4 flex items-center">
+        <WorkerStatusFilter
+          selectedStatuses={filteredStatus}
+          onStatusesChange={onStatusFilterChange}
+        />
+      </div>
       <CompactPaginatedTable
         columns={columns}
         data={workerConnsData?.workers || []}
@@ -126,7 +148,7 @@ export function WorkersTable({
         renderSubComponent={SubComponent}
         getRowCanExpand={() => true}
         footer={
-          (totalCount ?? 0) > pageSize ? (
+          (workerConnsData?.totalCount ?? 0) > pageSize ? (
             <div className="flex items-center justify-end gap-2 px-6 py-3">
               <Button
                 kind="secondary"
@@ -154,18 +176,18 @@ export function WorkersTable({
           ) : undefined
         }
       />
-    </>
+    </div>
   );
 }
 
 function SubComponent({ row }: { row: Row<Worker> }) {
   return (
     <dl className="bg-canvasSubtle mx-9 mb-6 mt-[10px] grid grid-cols-5 gap-2 p-4">
-      <CardItem term="Worker IP" detail={row.original.workerIp} />
-      <CardItem term="SDK version" detail={row.original.sdkVersion} />
-      <CardItem term="SDK language" detail={transformLanguage(row.original.sdkLang)} />
-      <CardItem term="No. of functions" detail={row.original.functionCount.toString()} />
-      <CardItem
+      <DescriptionListItem term="Worker IP" detail={row.original.workerIp} />
+      <DescriptionListItem term="SDK version" detail={row.original.sdkVersion} />
+      <DescriptionListItem term="SDK language" detail={transformLanguage(row.original.sdkLang)} />
+      <DescriptionListItem term="No. of functions" detail={row.original.functionCount.toString()} />
+      <DescriptionListItem
         term="System attributes"
         detail={
           <div className="flex items-center gap-1">
