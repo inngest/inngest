@@ -238,7 +238,7 @@ func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *stri
 		run, err := c.RunTraces(ctx, *runID)
 		a.NoError(err)
 		a.NotNil(run)
-		a.Equal(run.Status, opts.Status.String())
+		a.Equal(opts.Status.String(), run.Status)
 
 		if opts.ChildSpanCount > 0 {
 			a.NotNil(run.Trace)
