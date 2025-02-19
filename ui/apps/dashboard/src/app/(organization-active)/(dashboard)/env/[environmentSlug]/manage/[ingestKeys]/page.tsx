@@ -7,7 +7,7 @@ export default function EventKeysPage() {
 
   return (
     <div className="flex h-full w-full items-center justify-center">
-      <h2 className="text-sm font-semibold text-gray-900">
+      <h2 className="text-subtle text-sm font-semibold">
         {'Select a ' + currentContent?.type + ' on the left.'}
       </h2>
     </div>
