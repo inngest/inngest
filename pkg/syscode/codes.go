@@ -28,4 +28,5 @@ const (
 	CodeConnectRunInvalidMessage              = "connect_run_invalid_message"
 	CodeConnectInvalidFunctionConfig          = "connect_invalid_function_config"
 	CodeConnectWorkerRequestAckInvalidPayload = "connect_worker_request_ack_invalid_payload"
+	CodeConnectNoHealthyConnection            = "connect_no_healthy_connection"
 )

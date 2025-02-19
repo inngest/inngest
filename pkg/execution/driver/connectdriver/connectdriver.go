@@ -136,27 +136,25 @@ func do(ctx, traceCtx context.Context, forwarder pubsub.RequestForwarder, opts p
 	ctx, cancel := context.WithTimeout(ctx, consts.MaxFunctionTimeout)
 	defer cancel()
 
+	span := trace.SpanFromContext(traceCtx)
+
 	pre := time.Now()
 	resp, err := forwarder.Proxy(ctx, traceCtx, opts)
 	dur := time.Since(pre)
 
-	span := trace.SpanFromContext(traceCtx)
+	var sysErr *syscode.Error
+
 	if err != nil {
 		span.RecordError(err)
-	}
 
-	// TODO Check if we need some of the request error handling logic from httpdriver.do()
-	if err != nil && resp == nil {
-		return nil, err
-	}
-
-	// Return gateway-handled errors like  syscode.CodeOutputTooLarge
-	var sysErr *syscode.Error
-	{
 		syscodeError := &syscode.Error{}
 		if errors.As(err, &syscodeError) {
 			sysErr = syscodeError
 		}
+	}
+
+	if resp == nil && err != nil {
+		return nil, err
 	}
 
 	// TODO Should be handled above, verify this
