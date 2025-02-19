@@ -38,12 +38,17 @@ export const Profile = ({ collapsed, profile }: { collapsed: boolean; profile: P
           {!collapsed && (
             <div className="ml-2 flex flex-col items-start justify-start overflow-hidden">
               <div
-                className="text-subtle leading-1 max-w-full overflow-hidden text-ellipsis text-nowrap text-sm"
+                className="text-subtle leading-1 max-w-full truncate text-sm"
                 title={profile.orgName}
               >
                 {profile.orgName}
               </div>
-              <div className="text-muted text-xs leading-4">{profile.displayName}</div>
+              <div
+                className="text-muted max-w-full truncate text-xs leading-4"
+                title={profile.displayName}
+              >
+                {profile.displayName}
+              </div>
             </div>
           )}
         </div>
