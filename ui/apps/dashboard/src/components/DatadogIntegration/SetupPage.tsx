@@ -160,12 +160,15 @@ export default function SetupPage({
     }
     const ddSite = form.get('datadogSite') as string | null;
 
-    const result = await setupDdInt({
-      workspaceID: selectedEnv?.id || '',
-      appKey,
-      apiKey,
-      ddSite: ddSite || '',
-    });
+    const result = await setupDdInt(
+      {
+        workspaceID: selectedEnv?.id || '',
+        appKey,
+        apiKey,
+        ddSite: ddSite || '',
+      },
+      { additionalTypenames: ['DatadogIntegration'] }
+    );
 
     setFormDisabled(false);
     refetchAllDatadogInts();
@@ -190,7 +193,10 @@ export default function SetupPage({
   }
 
   const onIntRemove = async (integrationID: string) => {
-    const result = await removeDdInt({ integrationID });
+    const result = await removeDdInt(
+      { integrationID },
+      { additionalTypenames: ['DatadogIntegration'] }
+    );
     setSelectedIntegrationForRemove(null);
     refetchAllDatadogInts();
     refetchDdInt();
