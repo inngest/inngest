@@ -17,8 +17,7 @@ import { RerunModal } from '../Rerun/RerunModal';
 import { Time } from '../Time';
 import { usePrettyJson } from '../hooks/usePrettyJson';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
-import { Input } from './Input';
-import { Output } from './Output';
+import { IO } from './IO';
 import { Tabs } from './Tabs';
 import {
   isStepInfoInvoke,
@@ -211,10 +210,26 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
       )}
 
       <Tabs
-        defaultActive={0}
+        defaultActive={result?.error ? 2 : 0}
         tabs={[
-          { label: 'Input', node: <Input title="Step Input" raw={prettyInput} /> },
-          { label: 'Output', node: <Output raw={prettyOutput} /> },
+          { label: 'Input', node: <IO title="Input" raw={prettyInput} /> },
+          { label: 'Output', node: <IO title="Output" raw={prettyOutput} /> },
+          ...(result?.error
+            ? [
+                {
+                  label: 'Error',
+                  node: (
+                    <IO
+                      title={`${result.error.name || 'Error'} ${
+                        result.error.message ? `: ${result.error.message}` : ''
+                      }`}
+                      raw={result.error.stack ?? ''}
+                      error={true}
+                    />
+                  ),
+                },
+              ]
+            : []),
         ]}
       />
     </div>

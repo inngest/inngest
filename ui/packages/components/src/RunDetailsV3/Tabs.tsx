@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import { Timeline } from './Timeline';
 import { Workflow } from './Workflow';
@@ -33,6 +33,10 @@ export type TabsType = TabType[];
 
 export const Tabs = ({ tabs, defaultActive = 0 }: { tabs: TabsType; defaultActive?: number }) => {
   const [active, setActive] = useState(defaultActive);
+
+  useEffect(() => {
+    setActive(defaultActive);
+  }, [defaultActive]);
 
   return (
     <div className="flex w-full flex-col">
