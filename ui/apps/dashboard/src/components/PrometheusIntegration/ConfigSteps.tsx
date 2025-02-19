@@ -16,6 +16,8 @@ export default function ConfigSteps({ metricsGranularitySeconds }: Props) {
 
   return (
     <>
+      <div className="text-basis mb-4 justify-start text-xl font-medium">Installation Guide</div>
+
       <div className="text-basis text-lg font-normal">
         <div className="border-subtle ml-3 border-l">
           <div className="before:border-subtle before:text-basis before:bg-canvasBase relative ml-[32px] pb-7 before:absolute before:left-[-46px] before:h-[28px] before:w-[28px] before:rounded-full before:border before:text-center before:align-middle before:text-[13px] before:content-['1']">

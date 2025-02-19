@@ -11,7 +11,8 @@ import { IconDatadog } from '@inngest/components/icons/platforms/Datadog';
 import { toast } from 'sonner';
 import { useMutation, useQuery } from 'urql';
 
-import IntegrationNotEnabledMessage from '@/components/IntegrationNotEnabledMessage';
+import IntegrationNotEnabledMessage from '@/components/Integration/IntegrationNotEnabledMessage';
+import MetricsExportEntitlementBanner from '@/components/Integration/MetricsExportEntitlementsBanner';
 import EnvSelectMenu from '@/components/PrometheusIntegration/EnvSelectMenu';
 import { graphql } from '@/gql';
 import type { DatadogIntegration } from '@/gql/graphql';
@@ -21,6 +22,8 @@ import { useBooleanFlag } from '../FeatureFlags/hooks';
 
 type Props = {
   metricsExportEnabled: boolean;
+  metricsGranularitySeconds: number;
+  metricsFreshnessSeconds: number;
 };
 
 const GetDatadogIntegrationDocument = graphql(`
@@ -93,7 +96,11 @@ function findEnvName(envs: Environment[], id: string) {
   return env ? env.name : id;
 }
 
-export default function SetupPage({ metricsExportEnabled }: Props) {
+export default function SetupPage({
+  metricsExportEnabled,
+  metricsGranularitySeconds,
+  metricsFreshnessSeconds,
+}: Props) {
   const [{ data: envs = [], error: envsErr }] = useEnvironments();
   const [selectedEnv, setSelectedEnv] = useState<Environment | null>(null);
   const selectedEnvName = selectedEnv ? selectedEnv.name : '';
@@ -190,6 +197,11 @@ export default function SetupPage({ metricsExportEnabled }: Props) {
 
       {metricsExportEnabled && (
         <div className="text-sm font-normal">
+          <MetricsExportEntitlementBanner
+            granularitySeconds={metricsGranularitySeconds}
+            freshnessSeconds={metricsFreshnessSeconds}
+            className={'mb-6'}
+          />
           {allDatadogInts && allDatadogInts.account.datadogIntegrations.length > 0 && (
             <div className="mb-10">
               <div className="text-basis mb-4 justify-start text-xl font-medium">

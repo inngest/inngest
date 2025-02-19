@@ -1210,6 +1210,7 @@ export type MutationSetupDatadogIntegrationArgs = {
   appKey: Scalars['String'];
   datadogSite: Scalars['String'];
   envID: Scalars['UUID'];
+  testsOnlySkipApiKeyCheck: InputMaybe<Scalars['Boolean']>;
 };
 
 
