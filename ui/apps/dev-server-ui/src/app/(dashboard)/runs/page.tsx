@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button } from '@inngest/components/Button/Button';
 import { Header } from '@inngest/components/Header/Header';
+import { LegacyRunsToggle } from '@inngest/components/RunDetailsV3/LegacyRunsToggle';
 import { RunsActionMenu } from '@inngest/components/RunsPage/ActionMenu';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import { useLegacyTrace } from '@inngest/components/Shared/useLegacyTrace';
@@ -56,11 +56,6 @@ export default function Page() {
   const appsRes = useGetAppsQuery();
 
   const traceAIEnabled = false;
-  const {
-    enabled: legacyTraceEnabled,
-    ready: legacyTraceReady,
-    toggle: toggleLegacyTrace,
-  } = useLegacyTrace();
 
   const queryFn = useCallback(
     async ({ pageParam }: { pageParam: string | null }) => {
@@ -171,14 +166,8 @@ export default function Page() {
         breadcrumb={[{ text: 'Runs' }]}
         action={
           <div className="flex flex-row items-center gap-x-1">
-            {legacyTraceReady && (
-              <Button
-                kind="primary"
-                appearance="outlined"
-                label={legacyTraceEnabled ? 'New view' : 'Legacy view'}
-                onClick={() => toggleLegacyTrace()}
-              />
-            )}
+            <LegacyRunsToggle traceAIEnabled={traceAIEnabled} />
+
             <SendEventButton
               label="Send test event"
               data={JSON.stringify({

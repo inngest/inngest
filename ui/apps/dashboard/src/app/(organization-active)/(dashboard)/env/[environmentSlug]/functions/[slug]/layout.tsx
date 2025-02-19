@@ -2,10 +2,10 @@
 
 import React, { useCallback, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
 import { InvokeModal } from '@inngest/components/InvokeButton';
 import { Pill } from '@inngest/components/Pill';
+import { LegacyRunsToggle } from '@inngest/components/RunDetailsV3/LegacyRunsToggle';
 import { useLegacyTrace } from '@inngest/components/Shared/useLegacyTrace';
 import { RiPauseCircleLine } from '@remixicon/react';
 import { useMutation } from 'urql';
@@ -52,12 +52,6 @@ export default function FunctionLayout({
 
   const isBulkCancellationEnabled = useBooleanFlag('bulk-cancellation-ui');
   const { value: traceAIEnabled, isReady: featureFlagReady } = useBooleanFlag('ai-traces');
-
-  const {
-    enabled: legacyTraceEnabled,
-    ready: legacyTraceReady,
-    toggle: toggleLegacyTrace,
-  } = useLegacyTrace();
 
   const fn = data?.workspace.workflow;
   const { isArchived = false, isPaused } = fn ?? {};
@@ -137,17 +131,9 @@ export default function FunctionLayout({
         loading={fetching}
         action={
           <div className="flex flex-row items-center justify-end gap-2">
-            {pathname.endsWith('/runs') &&
-              featureFlagReady &&
-              traceAIEnabled &&
-              legacyTraceReady && (
-                <Button
-                  kind="primary"
-                  appearance="outlined"
-                  label={legacyTraceEnabled ? 'New view' : 'Legacy view'}
-                  onClick={() => toggleLegacyTrace()}
-                />
-              )}
+            {pathname.endsWith('/runs') && (
+              <LegacyRunsToggle traceAIEnabled={featureFlagReady && traceAIEnabled} />
+            )}
             <ActionsMenu
               showCancel={() => setCancelOpen(true)}
               showInvoke={() => setInvokeOpen(true)}

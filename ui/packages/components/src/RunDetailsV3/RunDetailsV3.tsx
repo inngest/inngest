@@ -12,6 +12,7 @@ import { Trace as OldTrace } from '../TimelineV2';
 import { TriggerDetails } from '../TriggerDetails';
 import type { Result } from '../types/functionRun';
 import { nullishToLazy } from '../utils/lazyLoad';
+import { LegacyRunsToggle } from './LegacyRunsToggle';
 import { RunInfo } from './RunInfo';
 import { StepInfo } from './StepInfo';
 import { Tabs } from './Tabs';
@@ -55,12 +56,6 @@ export const RunDetailsV3 = (props: Props) => {
   const [leftWidth, setLeftWidth] = useState(55);
   const [isDragging, setIsDragging] = useState(false);
   const { selectedStep } = useStepSelection();
-
-  const {
-    enabled: legacyTraceEnabled,
-    ready: legacyTraceReady,
-    toggle: toggleLegacyTrace,
-  } = useLegacyTrace();
 
   const handleMouseDown = useCallback(() => {
     setIsDragging(true);
@@ -150,14 +145,7 @@ export const RunDetailsV3 = (props: Props) => {
             <p className="text-basis text-2xl font-medium">{run.fn.name}</p>
             <p className="text-subtle font-mono">{runID}</p>
           </div>
-          {legacyTraceReady && (
-            <Button
-              kind="primary"
-              appearance="outlined"
-              label={legacyTraceEnabled ? 'New view' : 'Legacy view'}
-              onClick={toggleLegacyTrace}
-            />
-          )}
+          <LegacyRunsToggle traceAIEnabled={true} />
         </div>
       )}
       <div ref={containerRef} className="flex h-full flex-row">

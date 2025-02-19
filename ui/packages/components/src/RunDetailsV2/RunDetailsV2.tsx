@@ -1,11 +1,10 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { Button } from '@inngest/components/Button';
 import { useQuery } from '@tanstack/react-query';
 
+import { LegacyRunsToggle } from '../RunDetailsV3/LegacyRunsToggle';
 import type { Run as InitialRunData } from '../RunsPage/types';
-import { useLegacyTrace } from '../Shared/useLegacyTrace';
 import { StatusCell } from '../Table';
 import { Trace as OldTrace } from '../TimelineV2';
 import { TimelineV2 } from '../TimelineV2/Timeline';
@@ -26,6 +25,7 @@ type Props = {
   pollInterval?: number;
   rerun: React.ComponentProps<typeof RunInfo>['rerun'];
   runID: string;
+  traceAIEnabled?: boolean;
 };
 
 type Run = {
@@ -46,12 +46,6 @@ type Run = {
 export function RunDetailsV2(props: Props) {
   const { getResult, getRun, getTrigger, pathCreator, rerun, runID, standalone } = props;
   const [pollInterval, setPollInterval] = useState(props.pollInterval);
-
-  const {
-    enabled: legacyTraceEnabled,
-    ready: legacyTraceReady,
-    toggle: toggleLegacyTrace,
-  } = useLegacyTrace();
 
   const runRes = useQuery({
     queryKey: ['run', runID],
@@ -102,14 +96,7 @@ export function RunDetailsV2(props: Props) {
             <p className="text-basis text-2xl font-medium">{run.fn.name}</p>
             <p className="text-subtle font-mono">{runID}</p>
           </div>
-          {legacyTraceReady && (
-            <Button
-              kind="primary"
-              appearance="outlined"
-              label={legacyTraceEnabled ? 'New view' : 'Legacy view'}
-              onClick={toggleLegacyTrace}
-            />
-          )}
+          <LegacyRunsToggle traceAIEnabled={!!props.traceAIEnabled} />
         </div>
       )}
 

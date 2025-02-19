@@ -28,7 +28,6 @@ export function DashboardRunDetails({ runID, standalone = true }: Props) {
   const { value: traceAIEnabled, isReady } = useBooleanFlag('ai-traces');
 
   const { enabled: legacyTraceEnabled } = useLegacyTrace();
-  console.log('dashboard run details legacyTraceEnabled', legacyTraceEnabled);
 
   const internalPathCreator = useMemo(() => {
     return {
@@ -69,6 +68,7 @@ export function DashboardRunDetails({ runID, standalone = true }: Props) {
           getTrigger={getTrigger}
           rerun={rerun}
           runID={runID}
+          traceAIEnabled={traceAIEnabled}
         />
       )}
     </div>

@@ -268,6 +268,7 @@ export function RunsPage({
               rerun={rerun}
               runID={rowData.id}
               standalone={false}
+              traceAIEnabled={traceAIEnabled}
             />
           )}
         </div>

@@ -3,6 +3,7 @@
 import { useRef } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
+import { LegacyRunsToggle } from '@inngest/components/RunDetailsV3/LegacyRunsToggle';
 import { useLegacyTrace } from '@inngest/components/Shared/useLegacyTrace';
 import { RiRefreshLine } from '@remixicon/react';
 
@@ -14,11 +15,7 @@ export default function Page() {
   const ref = useRef<RefreshRunsRef>(null);
   const { value: traceAIEnabled, isReady: featureFlagReady } = useBooleanFlag('ai-traces');
 
-  const {
-    enabled: legacyTraceEnabled,
-    ready: legacyTraceReady,
-    toggle: toggleLegacyTrace,
-  } = useLegacyTrace();
+  const { enabled: legacyTraceEnabled, ready: legacyTraceReady } = useLegacyTrace();
 
   return (
     <>
@@ -26,14 +23,7 @@ export default function Page() {
         breadcrumb={[{ text: 'Runs' }]}
         action={
           <div className="flex flex-row items-center justify-end gap-2">
-            {featureFlagReady && traceAIEnabled && legacyTraceReady && (
-              <Button
-                kind="primary"
-                appearance="outlined"
-                label={legacyTraceEnabled ? 'New view' : 'Legacy view'}
-                onClick={() => toggleLegacyTrace()}
-              />
-            )}
+            <LegacyRunsToggle traceAIEnabled={featureFlagReady && traceAIEnabled} />
             <Button
               kind="primary"
               appearance="outlined"
