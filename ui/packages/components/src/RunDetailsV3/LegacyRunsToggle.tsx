@@ -1,4 +1,3 @@
-import { Button } from '../Button';
 import { Pill } from '../Pill';
 import { useLegacyTrace } from '../Shared/useLegacyTrace';
 import { Switch } from '../Switch';

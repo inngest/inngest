@@ -90,7 +90,7 @@ export function RunDetailsV2(props: Props) {
   return (
     <div>
       {standalone && run && (
-        <div className="border-muted flex flex-row items-start justify-between border-b px-4 pb-4">
+        <div className="flex flex-row items-start justify-between px-4 pb-4">
           <div className="flex flex-col gap-1">
             <StatusCell status={run.trace.status} />
             <p className="text-basis text-2xl font-medium">{run.fn.name}</p>
