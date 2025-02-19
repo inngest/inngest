@@ -27,7 +27,6 @@ export const legacyTraceToggle = () => {
 
   const toggle = () => {
     const toggled = !enabled;
-    console.log('[useLegacyTrace] toggling to:', toggled);
     window.localStorage.setItem(key, JSON.stringify(toggled));
     setEnabled(toggled);
   };
