@@ -1,9 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button } from '@inngest/components/Button/Button';
 import { Header } from '@inngest/components/Header/Header';
 import { RunsActionMenu } from '@inngest/components/RunsPage/ActionMenu';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
+import { useLegacyTrace } from '@inngest/components/Shared/useLegacyTrace';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   useSearchParam,
@@ -25,7 +27,6 @@ import { useGetRun } from '@/hooks/useGetRun';
 import { useGetTraceResult } from '@/hooks/useGetTraceResult';
 import { useGetTrigger } from '@/hooks/useGetTrigger';
 import { useRerun } from '@/hooks/useRerun';
-import { useRerunFromStep } from '@/hooks/useRerunFromStep';
 import { client } from '@/store/baseApi';
 import {
   CountRunsDocument,
@@ -53,6 +54,13 @@ export default function Page() {
   const [search] = useSearchParam('search');
   const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
   const appsRes = useGetAppsQuery();
+
+  const traceAIEnabled = false;
+  const {
+    enabled: legacyTraceEnabled,
+    ready: legacyTraceReady,
+    toggle: toggleLegacyTrace,
+  } = useLegacyTrace();
 
   const queryFn = useCallback(
     async ({ pageParam }: { pageParam: string | null }) => {
@@ -133,7 +141,7 @@ export default function Page() {
 
   const cancelRun = useCancelRun();
   const rerun = useRerun();
-  const rerunFromStep = useRerunFromStep();
+
   const getTraceResult = useGetTraceResult();
   const getTrigger = useGetTrigger();
   const getRun = useGetRun();
@@ -163,6 +171,14 @@ export default function Page() {
         breadcrumb={[{ text: 'Runs' }]}
         action={
           <div className="flex flex-row items-center gap-x-1">
+            {legacyTraceReady && (
+              <Button
+                kind="primary"
+                appearance="outlined"
+                label={legacyTraceEnabled ? 'New view' : 'Legacy view'}
+                onClick={() => toggleLegacyTrace()}
+              />
+            )}
             <SendEventButton
               label="Send test event"
               data={JSON.stringify({
@@ -201,7 +217,7 @@ export default function Page() {
         pollInterval={pollInterval}
         scope="env"
         totalCount={totalCount}
-        traceAIEnabled={false}
+        traceAIEnabled={traceAIEnabled}
       />
     </>
   );

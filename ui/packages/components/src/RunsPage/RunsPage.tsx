@@ -24,6 +24,7 @@ import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
 import { RunDetailsV2 } from '../RunDetailsV2';
 import { RunDetailsV3 } from '../RunDetailsV3/RunDetailsV3';
+import { useLegacyTrace } from '../Shared/useLegacyTrace';
 import {
   useBatchedSearchParams,
   useSearchParam,
@@ -98,6 +99,8 @@ export function RunsPage({
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useScopedColumns(scope);
   const [showSearch, setShowSearch] = useState(false);
+
+  const { enabled: legacyTraceEnabled } = useLegacyTrace();
 
   const displayAllColumns = useMemo(() => {
     const out: Record<string, boolean> = {};
@@ -240,7 +243,7 @@ export function RunsPage({
     (rowData: Run) => {
       return (
         <div className={`border-subtle  ${traceAIEnabled ? '' : 'border-l-4 pb-6'}`}>
-          {traceAIEnabled ? (
+          {traceAIEnabled && !legacyTraceEnabled ? (
             <RunDetailsV3
               cancelRun={cancelRun}
               getResult={getTraceResult}
@@ -270,7 +273,17 @@ export function RunsPage({
         </div>
       );
     },
-    [cancelRun, getRun, getTraceResult, getTrigger, pathCreator, pollInterval, rerun]
+    [
+      cancelRun,
+      getRun,
+      getTraceResult,
+      getTrigger,
+      pathCreator,
+      pollInterval,
+      rerun,
+      legacyTraceEnabled,
+      traceAIEnabled,
+    ]
   );
 
   const options = useMemo(() => {
