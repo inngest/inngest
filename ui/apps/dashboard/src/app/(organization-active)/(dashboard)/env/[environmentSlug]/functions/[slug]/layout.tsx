@@ -6,7 +6,6 @@ import { Header } from '@inngest/components/Header/Header';
 import { InvokeModal } from '@inngest/components/InvokeButton';
 import { Pill } from '@inngest/components/Pill';
 import { LegacyRunsToggle } from '@inngest/components/RunDetailsV3/LegacyRunsToggle';
-import { useLegacyTrace } from '@inngest/components/Shared/useLegacyTrace';
 import { RiPauseCircleLine } from '@remixicon/react';
 import { useMutation } from 'urql';
 
