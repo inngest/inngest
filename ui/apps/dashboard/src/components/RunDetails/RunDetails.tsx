@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { RunDetailsV2 } from '@inngest/components/RunDetailsV2';
 import { RunDetailsV3 } from '@inngest/components/RunDetailsV3/RunDetailsV3';
 import { useLegacyTrace } from '@inngest/components/Shared/useLegacyTrace';

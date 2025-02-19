@@ -1,7 +1,5 @@
 'use client';
 
-import { useLegacyTrace } from '@inngest/components/Shared/useLegacyTrace';
-
 import { Runs } from '@/components/Runs';
 
 export default function Page({
