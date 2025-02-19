@@ -7,6 +7,7 @@ export default async function Page() {
     <SetupPage
       metricsExportEnabled={metricsEntitlements.metricsExport.enabled}
       metricsGranularitySeconds={metricsEntitlements.metricsExportGranularity.limit}
+      metricsFreshnessSeconds={metricsEntitlements.metricsExportFreshness.limit}
     />
   );
 }
