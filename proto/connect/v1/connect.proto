@@ -27,8 +27,8 @@ message ConnectMessage {
 
 message AppConfiguration {
 	string app_name = 1;
-	bytes capabilities = 2;
-	bytes functions = 3;
+	optional string app_version = 2;
+	bytes functions = 4;
 }
 
 message AuthData {
@@ -41,17 +41,20 @@ message WorkerConnectRequestData {
 	string instance_id = 2;
 
 	AuthData auth_data = 3;
-	repeated AppConfiguration apps = 4;
-	bool worker_manual_readiness_ack = 5;
 
-	SystemAttributes system_attributes = 6;
-	optional string environment = 7;
-	string framework = 8;
-	optional string platform = 9;
-	string sdk_version = 10;
-	string sdk_language = 11;
+	bytes capabilities = 4;
+	repeated AppConfiguration apps = 5;
 
-	google.protobuf.Timestamp started_at = 12;
+	bool worker_manual_readiness_ack = 6;
+
+	SystemAttributes system_attributes = 7;
+	optional string environment = 8;
+	string framework = 9;
+	optional string platform = 10;
+	string sdk_version = 11;
+	string sdk_language = 12;
+
+	google.protobuf.Timestamp started_at = 13;
 }
 
 message GatewayExecutorRequestData {

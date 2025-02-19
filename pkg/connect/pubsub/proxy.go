@@ -71,17 +71,17 @@ type RequestReceiver interface {
 	ReceiveExecutorMessages(ctx context.Context, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error
 
 	// RouteExecutorRequest forwards an executor request to the respective gateway
-	RouteExecutorRequest(ctx context.Context, gatewayId ulid.ULID, appId uuid.UUID, connId ulid.ULID, data *connect.GatewayExecutorRequestData) error
+	RouteExecutorRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, data *connect.GatewayExecutorRequestData) error
 
 	// ReceiveRouterMessages listens for incoming PubSub messages for a specific gateway and app and calls the provided callback.
 	// This is a blocking call which only stops once the context is canceled.
-	ReceiveRoutedRequest(ctx context.Context, gatewayId ulid.ULID, appId uuid.UUID, connId ulid.ULID, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error
+	ReceiveRoutedRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error
 
 	// AckMessage sends an acknowledgment for a specific request.
-	AckMessage(ctx context.Context, appId uuid.UUID, requestId string, source AckSource) error
+	AckMessage(ctx context.Context, requestId string, source AckSource) error
 
 	// NackMessage sends a negative acknowledgment for a specific request.
-	NackMessage(ctx context.Context, appId uuid.UUID, requestId string, source AckSource, reason syscode.Error) error
+	NackMessage(ctx context.Context, requestId string, source AckSource, reason syscode.Error) error
 
 	// Wait blocks and listens for incoming PubSub messages for the internal subscribers. This must be run before
 	// subscribing to any channels to ensure that the PubSub client is connected and ready to receive messages.
@@ -124,6 +124,7 @@ type ProxyOpts struct {
 // If the gateway does not ack the message within a 10-second timeout, an error is returned.
 // If no response is received before the context is canceled, an error is returned.
 func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*connect.SDKResponse, error) {
+	l := i.logger.With("app_id", opts.AppID.String(), "env_id", opts.EnvID.String(), "account_id", opts.AccountID.String())
 	traceCtx, span := i.tracer.NewSpan(traceCtx, "Proxy", opts.AccountID, opts.EnvID)
 	span.SetAttributes(attribute.Bool("inngest.system", true))
 	defer span.End()
@@ -175,7 +176,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		go func() {
-			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(opts.AppID, opts.Data.RequestId, AckSourceRouter), func(msgData string) {
+			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(opts.Data.RequestId, AckSourceRouter), func(msgData string) {
 				err := proto.Unmarshal([]byte(msgData), &routerAcked)
 				if err != nil {
 					span.RecordError(err)
@@ -211,7 +212,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		go func() {
-			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(opts.AppID, opts.Data.RequestId, AckSourceGateway), func(_ string) {
+			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(opts.Data.RequestId, AckSourceGateway), func(_ string) {
 				gatewayAcked = true
 
 				span.AddEvent("GatewayAck")
@@ -232,7 +233,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		go func() {
-			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(opts.AppID, opts.Data.RequestId, AckSourceWorker), func(_ string) {
+			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(opts.Data.RequestId, AckSourceWorker), func(_ string) {
 				workerAcked = true
 
 				span.AddEvent("WorkerAck")
@@ -252,7 +253,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	var reply connect.SDKResponse
 	go func() {
 		// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
-		err = i.subscribe(ctx, i.channelAppRequestsReply(opts.AppID, opts.Data.RequestId), func(msg string) {
+		err = i.subscribe(ctx, i.channelAppRequestsReply(opts.Data.RequestId), func(msg string) {
 			span.AddEvent("ReplyReceived")
 
 			err := proto.Unmarshal([]byte(msg), &reply)
@@ -279,7 +280,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		return nil, fmt.Errorf("could not publish executor request: %w", err)
 	}
 
-	i.logger.Debug("published connect pubsub message", "channel", channelName, "request_id", opts.Data.RequestId)
+	l.Debug("published connect pubsub message", "channel", channelName, "request_id", opts.Data.RequestId)
 
 	// Sanity check: Ensure the router received the message using a request-specific ack channel (ack must come in before SDK response)
 	{
@@ -361,16 +362,16 @@ func (i *redisPubSubConnector) channelExecutorRequests() string {
 }
 
 // channelGatewayAppRequests returns the channel name for routed executor requests received by the gateway for a specific app and connection.
-func (i *redisPubSubConnector) channelGatewayAppRequests(gatewayId ulid.ULID, appId uuid.UUID, connId ulid.ULID) string {
-	return fmt.Sprintf("app_requests:%s:%s:%s", gatewayId, appId, connId)
+func (i *redisPubSubConnector) channelGatewayAppRequests(gatewayId ulid.ULID, connId ulid.ULID) string {
+	return fmt.Sprintf("app_requests:%s:%s", gatewayId, connId)
 }
 
-func (i *redisPubSubConnector) channelAppRequestsAck(appId uuid.UUID, requestId string, source AckSource) string {
-	return fmt.Sprintf("app_requests_ack:%s:%s:%s", appId, requestId, source)
+func (i *redisPubSubConnector) channelAppRequestsAck(requestId string, source AckSource) string {
+	return fmt.Sprintf("app_requests_ack:%s:%s", requestId, source)
 }
 
-func (i *redisPubSubConnector) channelAppRequestsReply(appId uuid.UUID, requestId string) string {
-	return fmt.Sprintf("app_requests_reply:%s:%s", appId, requestId)
+func (i *redisPubSubConnector) channelAppRequestsReply(requestId string) string {
+	return fmt.Sprintf("app_requests_reply:%s", requestId)
 }
 
 // subscribe sets up a subscription to a specific channel and calls the provided callback whenever a message is received.
@@ -448,8 +449,8 @@ func (i *redisPubSubConnector) subscribe(ctx context.Context, channel string, on
 
 // ReceiveExecutorMessages listens for incoming PubSub messages for a specific app and calls the provided callback.
 // This is a blocking call which only stops once the context is canceled.
-func (i *redisPubSubConnector) ReceiveRoutedRequest(ctx context.Context, gatewayId ulid.ULID, appId uuid.UUID, connId ulid.ULID, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error {
-	return i.subscribe(ctx, i.channelGatewayAppRequests(gatewayId, appId, connId), func(msg string) {
+func (i *redisPubSubConnector) ReceiveRoutedRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error {
+	return i.subscribe(ctx, i.channelGatewayAppRequests(gatewayId, connId), func(msg string) {
 		// TODO Test whether this works with marshaled Protobuf bytes
 		msgBytes := []byte(msg)
 
@@ -457,7 +458,7 @@ func (i *redisPubSubConnector) ReceiveRoutedRequest(ctx context.Context, gateway
 		err := proto.Unmarshal(msgBytes, &data)
 		if err != nil {
 			// TODO This should never happen, but PubSub will not redeliver, should we push the message into a dead-letter channel?
-			i.logger.Error("invalid protobuf received by gateway", "err", err, "msg", msgBytes, "gateway_id", gatewayId, "app_id", appId, "conn_id", connId)
+			i.logger.Error("invalid protobuf received by gateway", "err", err, "msg", msgBytes, "gateway_id", gatewayId, "conn_id", connId)
 			return
 		}
 
@@ -551,12 +552,7 @@ func (i *redisPubSubConnector) NotifyExecutor(ctx context.Context, resp *connect
 		return fmt.Errorf("could not serialize response: %w", err)
 	}
 
-	appId, err := uuid.Parse(resp.AppId)
-	if err != nil {
-		return fmt.Errorf("missing appId in sdk response: %w", err)
-	}
-
-	channelName := i.channelAppRequestsReply(appId, resp.RequestId)
+	channelName := i.channelAppRequestsReply(resp.RequestId)
 
 	// TODO Test whether this works with marshaled Protobuf bytes
 	err = i.client.Do(
@@ -577,7 +573,7 @@ func (i *redisPubSubConnector) NotifyExecutor(ctx context.Context, resp *connect
 }
 
 // AckMessage sends an acknowledgment for a specific request.
-func (i *redisPubSubConnector) AckMessage(ctx context.Context, appId uuid.UUID, requestId string, source AckSource) error {
+func (i *redisPubSubConnector) AckMessage(ctx context.Context, requestId string, source AckSource) error {
 	msgBytes, err := proto.Marshal(&connect.PubSubAckMessage{
 		Ts: timestamppb.Now(),
 	})
@@ -589,7 +585,7 @@ func (i *redisPubSubConnector) AckMessage(ctx context.Context, appId uuid.UUID, 
 		ctx,
 		i.client.B().
 			Publish().
-			Channel(i.channelAppRequestsAck(appId, requestId, source)).
+			Channel(i.channelAppRequestsAck(requestId, source)).
 			Message(string(msgBytes)).
 			Build()).
 		Error()
@@ -601,7 +597,7 @@ func (i *redisPubSubConnector) AckMessage(ctx context.Context, appId uuid.UUID, 
 }
 
 // NackMessage sends a negative acknowledgment for a specific request.
-func (i *redisPubSubConnector) NackMessage(ctx context.Context, appId uuid.UUID, requestId string, source AckSource, reason syscode.Error) error {
+func (i *redisPubSubConnector) NackMessage(ctx context.Context, requestId string, source AckSource, reason syscode.Error) error {
 	var marshaledData []byte
 	if reason.Data != nil {
 		marshaled, err := json.Marshal(reason.Data)
@@ -628,7 +624,7 @@ func (i *redisPubSubConnector) NackMessage(ctx context.Context, appId uuid.UUID,
 		ctx,
 		i.client.B().
 			Publish().
-			Channel(i.channelAppRequestsAck(appId, requestId, source)).
+			Channel(i.channelAppRequestsAck(requestId, source)).
 			Message(string(nackMessage)).
 			Build()).
 		Error()
@@ -640,22 +636,22 @@ func (i *redisPubSubConnector) NackMessage(ctx context.Context, appId uuid.UUID,
 }
 
 // RouteExecutorRequest forwards an executor request to the respective gateway
-func (i *redisPubSubConnector) RouteExecutorRequest(ctx context.Context, gatewayId ulid.ULID, appId uuid.UUID, connId ulid.ULID, data *connect.GatewayExecutorRequestData) error {
+func (i *redisPubSubConnector) RouteExecutorRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, data *connect.GatewayExecutorRequestData) error {
 	dataBytes, err := proto.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("could not marshal executor request: %w", err)
 	}
 
-	channelName := i.channelGatewayAppRequests(gatewayId, appId, connId)
+	channelName := i.channelGatewayAppRequests(gatewayId, connId)
 
 	// TODO Test whether this works with marshaled Protobuf bytes
 	err = i.client.Do(ctx, i.client.B().Publish().Channel(channelName).Message(string(dataBytes)).Build()).Error()
 	if err != nil {
-		i.logger.Error("could not forward request to gateway", "err", err, "gateway_id", gatewayId, "channel", channelName, "request_id", data.RequestId, "conn_id", connId, "app_id", appId)
+		i.logger.Error("could not forward request to gateway", "err", err, "gateway_id", gatewayId, "channel", channelName, "request_id", data.RequestId, "conn_id", connId, "app_id", data.AppId)
 		return fmt.Errorf("could not publish executor request: %w", err)
 	}
 
-	i.logger.Debug("forwarded connect request to gateway", "gateway_id", gatewayId, "channel", channelName, "request_id", data.RequestId, "conn_id", connId, "app_id", appId)
+	i.logger.Debug("forwarded connect request to gateway", "gateway_id", gatewayId, "channel", channelName, "request_id", data.RequestId, "conn_id", connId, "app_id", data.AppId)
 
 	return nil
 }

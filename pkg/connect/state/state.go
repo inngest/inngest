@@ -33,11 +33,12 @@ type StateManager interface {
 }
 
 type ConnectionManager interface {
+	GetConnection(ctx context.Context, envID uuid.UUID, connId ulid.ULID) (*connpb.ConnMetadata, error)
 	GetConnectionsByEnvID(ctx context.Context, envID uuid.UUID) ([]*connpb.ConnMetadata, error)
 	GetConnectionsByAppID(ctx context.Context, envId uuid.UUID, appID uuid.UUID) ([]*connpb.ConnMetadata, error)
 	GetConnectionsByGroupID(ctx context.Context, envID uuid.UUID, groupID string) ([]*connpb.ConnMetadata, error)
 	UpsertConnection(ctx context.Context, conn *Connection, status connpb.ConnectionStatus, lastHeartbeatAt time.Time) error
-	DeleteConnection(ctx context.Context, envID uuid.UUID, appID *uuid.UUID, groupID string, connId ulid.ULID) error
+	DeleteConnection(ctx context.Context, envID uuid.UUID, connId ulid.ULID) error
 }
 
 type WorkerGroupManager interface {
@@ -58,6 +59,7 @@ type AuthContext struct {
 
 type SyncData struct {
 	SyncToken string
+	AppConfig *connpb.AppConfiguration
 	Functions []sdk.SDKFunction
 }
 
@@ -67,9 +69,12 @@ type WorkerGroup struct {
 	// Identifiers
 	AccountID uuid.UUID `json:"acct_id"`
 	EnvID     uuid.UUID `json:"env_id"`
+
 	// AppID represents the app that this worker group is associated with.
 	// If set, it means this worker group is already synced
 	AppID *uuid.UUID `json:"app_id,omitempty"`
+
+	AppName string `json:"app_name"`
 
 	// User-supplied app version
 	AppVersion *string `json:"app_version,omitempty"`
@@ -126,31 +131,26 @@ type Connection struct {
 	WorkerIP     string
 
 	Data      *connpb.WorkerConnectRequestData
-	Session   *connpb.SessionDetails
-	Group     *WorkerGroup
+	Groups    map[string]*WorkerGroup
 	GatewayId ulid.ULID
 }
 
-// Sync attempts to sync the worker group configuration
-//
-// TODO:
-// this should be dedupped when there's a large number of workers coming up at once
-// so it doesn't attempt to sync multiple times prior to the worker group getting
-// a response
-func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager, apiBaseUrl string) error {
-	if c.Group == nil {
-		return fmt.Errorf("worker group is required for syncing")
-	}
+func (c *Connection) AppNames() []string {
+	appNames := make([]string, len(c.Data.Apps))
+}
 
+// Sync attempts to sync the worker group configuration
+func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager, apiBaseUrl string, initialReq *connpb.WorkerConnectRequestData) error {
 	// The group is expected to exist in the state, as UpsertConnection also creates the group if it doesn't exist
-	group, err := groupManager.GetWorkerGroupByHash(ctx, c.EnvID, c.Group.Hash)
+	existingGroup, err := groupManager.GetWorkerGroupByHash(ctx, g.EnvID, g.Hash)
 	if err != nil {
 		return fmt.Errorf("error attempting to retrieve worker group: %w", err)
 	}
 
 	// Don't attempt to sync if it's already sync'd
-	if group != nil && group.SyncID != nil && group.AppID != nil {
-		c.Group = group
+	if existingGroup != nil && existingGroup.SyncID != nil && existingGroup.AppID != nil {
+		g.AppID = existingGroup.AppID
+		g.SyncID = existingGroup.SyncID
 		return nil
 	}
 
@@ -164,11 +164,16 @@ func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager, 
 	// Construct sync request via off-band sync
 	// Can't do in-band
 	connURL := url.URL{Scheme: "ws", Host: "connect"}
-	sdkVersion := fmt.Sprintf("%s:%s", c.Group.SDKLang, c.Group.SDKVersion)
+	sdkVersion := fmt.Sprintf("%s:%s", g.SDKLang, g.SDKVersion)
 
 	var cap sdk.Capabilities
-	if err := json.Unmarshal(c.Data.Config.Capabilities, &cap); err != nil {
+	if err := json.Unmarshal(initialReq.Capabilities, &cap); err != nil {
 		return fmt.Errorf("error deserializing sync capabilities: %w", err)
+	}
+
+	appVersion := ""
+	if g.AppVersion != nil {
+		appVersion = *g.AppVersion
 	}
 
 	config := sdk.RegisterRequest{
@@ -176,16 +181,17 @@ func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager, 
 		URL:        connURL.String(),
 		DeployType: sdk.DeployTypeConnect,
 		SDK:        sdkVersion,
-		AppName:    c.Data.GetAppName(),
+		AppName:    g.AppName,
 		Headers: sdk.Headers{
-			Env:      c.Data.GetEnvironment(),
-			Platform: c.Data.GetPlatform(),
+			Env:      initialReq.GetEnvironment(),
+			Platform: initialReq.GetPlatform(),
 		},
 		Capabilities: cap,
-		Functions:    c.Group.SyncData.Functions,
-		AppVersion:   c.Session.SessionId.GetAppVersion(),
+		Functions:    g.SyncData.Functions,
+		AppVersion:   appVersion,
+
 		// Deduplicate syncs in case multiple workers are coming up at the same time
-		IdempotencyKey: c.Group.Hash,
+		IdempotencyKey: g.Hash,
 	}
 
 	// NOTE: pick this up via SDK
@@ -217,8 +223,8 @@ func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager, 
 		req.Header.Set(headers.HeaderUserAgent, sdkVersion)
 
 		// Use sync token returned by initial Connect API handshake
-		if c.Group.SyncData.SyncToken != "" {
-			req.Header.Set(headers.HeaderAuthorization, fmt.Sprintf("Bearer %s", c.Group.SyncData.SyncToken))
+		if g.SyncData.SyncToken != "" {
+			req.Header.Set(headers.HeaderAuthorization, fmt.Sprintf("Bearer %s", g.SyncData.SyncToken))
 		}
 
 		resp, err = http.DefaultClient.Do(req)
@@ -255,11 +261,12 @@ func (c *Connection) Sync(ctx context.Context, groupManager WorkerGroupManager, 
 
 	// Update the worker group to make sure it store the appropriate IDs
 	if syncReply.IsSuccess() {
-		c.Group.SyncID = syncReply.SyncID
-		c.Group.AppID = syncReply.AppID
+		g.AppID = syncReply.AppID
+		g.SyncID = syncReply.SyncID
+
 		// Update the worker group with the syncID so it's aware that it's already sync'd before
 		// Always update the worker group for consistency, even if the context is cancelled
-		if err := groupManager.UpdateWorkerGroup(context.Background(), c.EnvID, c.Group); err != nil {
+		if err := groupManager.UpdateWorkerGroup(context.Background(), g.EnvID, g); err != nil {
 			return fmt.Errorf("error updating worker group: %w", err)
 		}
 	}

@@ -181,7 +181,6 @@ type tracer struct {
 }
 
 func (t *tracer) Provider() *trace.TracerProvider {
-	logger.StdlibLogger(context.Background()).Warn("right before error")
 	return t.provider
 }
 
