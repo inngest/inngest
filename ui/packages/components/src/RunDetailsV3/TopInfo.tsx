@@ -257,7 +257,6 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
                         result.error.message ? `: ${result.error.message}` : ''
                       }`}
                       raw={result.error.stack ?? ''}
-                      actions={codeBlockActions}
                       error={true}
                     />
                   ),
