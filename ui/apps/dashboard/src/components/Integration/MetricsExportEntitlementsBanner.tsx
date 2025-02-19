@@ -55,7 +55,7 @@ export default function MetricsExportEntitlementBanner({
             <span className="text-light inline-block" style={{ marginLeft: '2.5rem' }}>
               <RiHistoryLine className="h-4 w-4" style={{ marginTop: '0.24rem' }} />
             </span>
-            <span className="text-muted inline-block">Freshness</span>
+            <span className="text-muted inline-block">Delay</span>
             <span className="inline-block font-medium" style={{ marginLeft: '0.5rem' }}>
               {entitlementSecondsToStr(freshnessSeconds)}
             </span>
