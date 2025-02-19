@@ -41,7 +41,7 @@ export default function MetricsExportEntitlementValue({
           className="border-subtle"
           style={{ borderLeftWidth: '1px', borderRightWidth: '1px' }}
         ></span>
-        <span className="text-muted">Freshness</span>
+        <span className="text-muted">Delay</span>
         <span className="font-medium">{entitlementSecondsToStr(freshnessSeconds)}</span>
       </div>
     </>
