@@ -4,6 +4,7 @@ import { RiArrowRightUpLine, RiArrowUpSLine } from '@remixicon/react';
 
 import { AITrace } from '../AI/AITrace';
 import { parseAIOutput } from '../AI/utils';
+import { CodeBlock } from '../CodeBlock';
 import {
   ElementWrapper,
   IDElement,

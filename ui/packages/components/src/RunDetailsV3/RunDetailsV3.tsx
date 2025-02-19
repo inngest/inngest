@@ -1,10 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Button } from '@inngest/components/Button';
 import { useQuery } from '@tanstack/react-query';
 
 import { ErrorCard } from '../RunDetailsV2/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
+import { useLegacyTrace } from '../Shared/useLegacyTrace';
 import { StatusCell } from '../Table/Cell';
 import { Trace as OldTrace } from '../TimelineV2';
 import { TriggerDetails } from '../TriggerDetails';
@@ -53,6 +55,12 @@ export const RunDetailsV3 = (props: Props) => {
   const [leftWidth, setLeftWidth] = useState(55);
   const [isDragging, setIsDragging] = useState(false);
   const { selectedStep } = useStepSelection();
+
+  const {
+    enabled: legacyTraceEnabled,
+    ready: legacyTraceReady,
+    toggle: toggleLegacyTrace,
+  } = useLegacyTrace();
 
   const handleMouseDown = useCallback(() => {
     setIsDragging(true);
@@ -136,10 +144,20 @@ export const RunDetailsV3 = (props: Props) => {
   return (
     <>
       {standalone && run && (
-        <div className="border-muted mb-2 flex flex-col gap-1 border-b px-4 pb-4">
-          <StatusCell status={run.trace.status} />
-          <p className="text-basis text-2xl font-medium">{run.fn.name}</p>
-          <p className="text-subtle font-mono">{runID}</p>
+        <div className="border-muted flex flex-row items-start justify-between border-b px-4 pb-4">
+          <div className="flex flex-col gap-1">
+            <StatusCell status={run.trace.status} />
+            <p className="text-basis text-2xl font-medium">{run.fn.name}</p>
+            <p className="text-subtle font-mono">{runID}</p>
+          </div>
+          {legacyTraceReady && (
+            <Button
+              kind="primary"
+              appearance="outlined"
+              label={legacyTraceEnabled ? 'New view' : 'Legacy view'}
+              onClick={toggleLegacyTrace}
+            />
+          )}
         </div>
       )}
       <div ref={containerRef} className="flex h-full flex-row">

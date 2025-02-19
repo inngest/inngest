@@ -1,9 +1,11 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { Button } from '@inngest/components/Button';
 import { useQuery } from '@tanstack/react-query';
 
 import type { Run as InitialRunData } from '../RunsPage/types';
+import { useLegacyTrace } from '../Shared/useLegacyTrace';
 import { StatusCell } from '../Table';
 import { Trace as OldTrace } from '../TimelineV2';
 import { TimelineV2 } from '../TimelineV2/Timeline';
@@ -44,6 +46,12 @@ type Run = {
 export function RunDetailsV2(props: Props) {
   const { getResult, getRun, getTrigger, pathCreator, rerun, runID, standalone } = props;
   const [pollInterval, setPollInterval] = useState(props.pollInterval);
+
+  const {
+    enabled: legacyTraceEnabled,
+    ready: legacyTraceReady,
+    toggle: toggleLegacyTrace,
+  } = useLegacyTrace();
 
   const runRes = useQuery({
     queryKey: ['run', runID],
@@ -88,10 +96,20 @@ export function RunDetailsV2(props: Props) {
   return (
     <div>
       {standalone && run && (
-        <div className="mx-8 flex flex-col gap-1 pb-6">
-          <StatusCell status={run.trace.status} />
-          <p className="text-basis text-2xl font-medium">{run.fn.name}</p>
-          <p className="text-subtle font-mono">{runID}</p>
+        <div className="border-muted flex flex-row items-start justify-between border-b px-4 pb-4">
+          <div className="flex flex-col gap-1">
+            <StatusCell status={run.trace.status} />
+            <p className="text-basis text-2xl font-medium">{run.fn.name}</p>
+            <p className="text-subtle font-mono">{runID}</p>
+          </div>
+          {legacyTraceReady && (
+            <Button
+              kind="primary"
+              appearance="outlined"
+              label={legacyTraceEnabled ? 'New view' : 'Legacy view'}
+              onClick={toggleLegacyTrace}
+            />
+          )}
         </div>
       )}
 

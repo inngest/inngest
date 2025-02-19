@@ -3,27 +3,19 @@
 import React, { createContext, useContext } from 'react';
 
 import type { InvokeRunPayload, InvokeRunResult } from './useInvokeRun';
+import type { LegacyTraceType } from './useLegacyTrace';
 import type { RerunFromStepPayload, RerunFromStepResult } from './useRerunFromStep';
 
+//
+// These can be either different implementations per app (invokeRun, rerunFromStep) or
+// one global implementation (legacyTrace)
 export type SharedDefinitions = {
-  invokeRun: {
-    payload: InvokeRunPayload;
-    result: InvokeRunResult;
-  };
-  rerunFromStep: {
-    payload: RerunFromStepPayload;
-    result: RerunFromStepResult;
-  };
+  invokeRun: (payload: InvokeRunPayload) => Promise<InvokeRunResult>;
+  rerunFromStep: (payload: RerunFromStepPayload) => Promise<RerunFromStepResult>;
+  legacyTrace: LegacyTraceType;
 };
 
-type SharedHandler<TPayload, TResult> = (payload: TPayload) => Promise<TResult>;
-
-export type SharedHandlers = {
-  [K in keyof SharedDefinitions]: SharedHandler<
-    SharedDefinitions[K]['payload'],
-    SharedDefinitions[K]['result']
-  >;
-};
+export type SharedHandlers = SharedDefinitions;
 
 const SharedContext = createContext<SharedHandlers | null>(null);
 
