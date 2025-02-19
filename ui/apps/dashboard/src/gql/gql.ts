@@ -86,6 +86,7 @@ const documents = {
     "\n  query GetDatadogIntegration($workspaceID: ID!) {\n    workspace(id: $workspaceID) {\n      datadogIntegration {\n        id\n        datadogSite\n        appKey\n        appKeyUpdatedAt\n        apiKey\n        apiKeyUpdatedAt\n      }\n    }\n  }\n": types.GetDatadogIntegrationDocument,
     "\n  query ListDatadogIntegrations {\n    account {\n      datadogIntegrations {\n        id\n        accountID\n        envID\n        datadogSite\n        appKey\n        appKeyUpdatedAt\n        apiKey\n        apiKeyUpdatedAt\n        lastSentAt\n        createdAt\n        updatedAt\n        statusOk\n      }\n    }\n  }\n": types.ListDatadogIntegrationsDocument,
     "\n  mutation SetupDatadogIntegration(\n    $workspaceID: UUID!\n    $apiKey: String!\n    $appKey: String!\n    $ddSite: String!\n  ) {\n    setupDatadogIntegration(\n      envID: $workspaceID\n      apiKey: $apiKey\n      appKey: $appKey\n      datadogSite: $ddSite\n    ) {\n      integration {\n        id\n      }\n      error\n    }\n  }\n": types.SetupDatadogIntegrationDocument,
+    "\n  mutation RemoveDatadogIntegration($integrationID: UUID!) {\n    removeDatadogIntegration(integrationID: $integrationID) {\n      removedIntegrationID\n      removedIntegrationEnvID\n    }\n  }\n": types.RemoveDatadogIntegrationDocument,
     "\n  mutation ArchiveEnvironment($id: ID!) {\n    archiveEnvironment(id: $id) {\n      id\n    }\n  }\n": types.ArchiveEnvironmentDocument,
     "\n  mutation UnarchiveEnvironment($id: ID!) {\n    unarchiveEnvironment(id: $id) {\n      id\n    }\n  }\n": types.UnarchiveEnvironmentDocument,
     "\n  mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {\n    disableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n": types.DisableEnvironmentAutoArchiveDocumentDocument,
@@ -451,6 +452,10 @@ export function graphql(source: "\n  query ListDatadogIntegrations {\n    accoun
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation SetupDatadogIntegration(\n    $workspaceID: UUID!\n    $apiKey: String!\n    $appKey: String!\n    $ddSite: String!\n  ) {\n    setupDatadogIntegration(\n      envID: $workspaceID\n      apiKey: $apiKey\n      appKey: $appKey\n      datadogSite: $ddSite\n    ) {\n      integration {\n        id\n      }\n      error\n    }\n  }\n"): (typeof documents)["\n  mutation SetupDatadogIntegration(\n    $workspaceID: UUID!\n    $apiKey: String!\n    $appKey: String!\n    $ddSite: String!\n  ) {\n    setupDatadogIntegration(\n      envID: $workspaceID\n      apiKey: $apiKey\n      appKey: $appKey\n      datadogSite: $ddSite\n    ) {\n      integration {\n        id\n      }\n      error\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation RemoveDatadogIntegration($integrationID: UUID!) {\n    removeDatadogIntegration(integrationID: $integrationID) {\n      removedIntegrationID\n      removedIntegrationEnvID\n    }\n  }\n"): (typeof documents)["\n  mutation RemoveDatadogIntegration($integrationID: UUID!) {\n    removeDatadogIntegration(integrationID: $integrationID) {\n      removedIntegrationID\n      removedIntegrationEnvID\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
