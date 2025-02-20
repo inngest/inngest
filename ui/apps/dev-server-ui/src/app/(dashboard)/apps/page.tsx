@@ -113,9 +113,9 @@ export default function AppList() {
         }
       />
 
-      <div className="mx-auto my-12 w-4/5 max-w-7xl">
+      <div className="mx-auto w-full max-w-4xl px-6 pb-4 pt-16">
         <h2 className="mb-1 text-xl">Synced Apps</h2>
-        <p className="text-muted text-sm">
+        <p className="text-subtle text-sm">
           Apps can be synced manually with the CLI's <InlineCode>-u</InlineCode> flag, a config
           file, the button below, or via auto-discovery.{' '}
           <Link
