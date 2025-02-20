@@ -557,10 +557,14 @@ func (r *redisConnectionStateManager) GetWorkerGroupsByHash(ctx context.Context,
 		return nil, err
 	}
 
+	if len(res) == 0 {
+		return nil, nil
+	}
+
 	groups := make([]WorkerGroup, 0)
-	for _, meta := range res {
+	for i, meta := range res {
 		if meta == "" {
-			return nil, WorkerGroupNotFoundErr
+			return nil, fmt.Errorf("could not find group %q: %w", hashes[i], WorkerGroupNotFoundErr)
 		}
 		var group WorkerGroup
 		if err := json.Unmarshal([]byte(meta), &group); err != nil {

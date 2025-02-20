@@ -526,6 +526,19 @@ func TestUpsertConnection(t *testing.T) {
 		require.NoError(t, err)
 		require.Nil(t, connsByGroup2)
 
+		_, err = connManager.GetWorkerGroupByHash(ctx, envId, group1Id)
+		require.Error(t, err)
+		require.ErrorIs(t, err, WorkerGroupNotFoundErr)
+
+		_, err = connManager.GetWorkerGroupByHash(ctx, envId, group2Id)
+		require.Error(t, err)
+		require.ErrorIs(t, err, WorkerGroupNotFoundErr)
+
+		_, err = connManager.GetWorkerGroupsByHash(ctx, envId, []string{group1Id, group2Id})
+		require.Error(t, err)
+		require.ErrorContains(t, err, "could not find group \"app-1-hash\": worker group not found")
+		require.ErrorIs(t, err, WorkerGroupNotFoundErr)
+
 		group1 := &WorkerGroup{
 			AccountID:     accountId,
 			EnvID:         envId,
@@ -662,6 +675,18 @@ func TestUpsertConnection(t *testing.T) {
 			connsByGroup2, err := connManager.GetConnectionsByGroupID(ctx, envId, group2Id)
 			require.NoError(t, err)
 			require.Equal(t, []*connect.ConnMetadata{expectedConn}, connsByGroup2)
+
+			retrievedGroup1, err := connManager.GetWorkerGroupByHash(ctx, envId, group1Id)
+			require.NoError(t, err)
+			require.Equal(t, group1, retrievedGroup1)
+
+			retrievedGroup2, err := connManager.GetWorkerGroupByHash(ctx, envId, group2Id)
+			require.NoError(t, err)
+			require.Equal(t, group2, retrievedGroup2)
+
+			workerGroups, err := connManager.GetWorkerGroupsByHash(ctx, envId, []string{group1Id, group2Id})
+			require.NoError(t, err)
+			require.Equal(t, []WorkerGroup{*group1, *group2}, workerGroups)
 		})
 
 		t.Run("subsequent upsert should update", func(t *testing.T) {
@@ -719,6 +744,18 @@ func TestUpsertConnection(t *testing.T) {
 			connsByGroup2, err := connManager.GetConnectionsByGroupID(ctx, envId, group2Id)
 			require.NoError(t, err)
 			require.Equal(t, []*connect.ConnMetadata{expectedConn}, connsByGroup2)
+
+			retrievedGroup1, err := connManager.GetWorkerGroupByHash(ctx, envId, group1Id)
+			require.NoError(t, err)
+			require.Equal(t, group1, retrievedGroup1)
+
+			retrievedGroup2, err := connManager.GetWorkerGroupByHash(ctx, envId, group2Id)
+			require.NoError(t, err)
+			require.Equal(t, group2, retrievedGroup2)
+
+			workerGroups, err := connManager.GetWorkerGroupsByHash(ctx, envId, []string{group1Id, group2Id})
+			require.NoError(t, err)
+			require.Equal(t, []WorkerGroup{*group1, *group2}, workerGroups)
 		})
 
 		t.Run("delete should drop all data", func(t *testing.T) {
@@ -755,6 +792,19 @@ func TestUpsertConnection(t *testing.T) {
 			connsByGroup2, err := connManager.GetConnectionsByGroupID(ctx, envId, group2Id)
 			require.NoError(t, err)
 			require.Nil(t, connsByGroup2)
+
+			_, err = connManager.GetWorkerGroupByHash(ctx, envId, group1Id)
+			require.Error(t, err)
+			require.ErrorIs(t, err, WorkerGroupNotFoundErr)
+
+			_, err = connManager.GetWorkerGroupByHash(ctx, envId, group2Id)
+			require.Error(t, err)
+			require.ErrorIs(t, err, WorkerGroupNotFoundErr)
+
+			_, err = connManager.GetWorkerGroupsByHash(ctx, envId, []string{group1Id, group2Id})
+			require.Error(t, err)
+			require.ErrorContains(t, err, "could not find group \"app-1-hash\": worker group not found")
+			require.ErrorIs(t, err, WorkerGroupNotFoundErr)
 		})
 	})
 
