@@ -248,22 +248,31 @@ func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn
 	}
 	r.sortGroups(sortedGroups)
 
-	workerGroups := make(map[string]string)
+	// Map App ID -> Worker Group hash (this is only available after syncing)
+	syncedWorkerGroups := make(map[string]string)
 	for _, group := range sortedGroups {
-		workerGroups[group.AppName] = group.Hash
+		if group.AppID != nil {
+			syncedWorkerGroups[group.AppID.String()] = group.Hash
+		}
+	}
+
+	// Map app name -> Worker group hash (this is set even when the group is not synced)
+	allWorkerGroups := make(map[string]string)
+	for _, group := range sortedGroups {
+		allWorkerGroups[group.AppName] = group.Hash
 	}
 
 	meta := &connpb.ConnMetadata{
-		Id:           conn.ConnectionId.String(),
-		WorkerGroups: workerGroups,
-
-		InstanceId:      conn.Data.InstanceId,
-		Status:          status,
-		SdkLanguage:     conn.Data.SdkLanguage,
-		SdkVersion:      conn.Data.SdkVersion,
-		Attributes:      conn.Data.SystemAttributes,
-		GatewayId:       conn.GatewayId.String(),
-		LastHeartbeatAt: timestamppb.New(lastHeartbeatAt),
+		Id:                 conn.ConnectionId.String(),
+		SyncedWorkerGroups: syncedWorkerGroups,
+		AllWorkerGroups:    allWorkerGroups,
+		InstanceId:         conn.Data.InstanceId,
+		Status:             status,
+		SdkLanguage:        conn.Data.SdkLanguage,
+		SdkVersion:         conn.Data.SdkVersion,
+		Attributes:         conn.Data.SystemAttributes,
+		GatewayId:          conn.GatewayId.String(),
+		LastHeartbeatAt:    timestamppb.New(lastHeartbeatAt),
 	}
 
 	// NOTE: redis_state.StrSlice format the data in a non JSON way, not sure why
@@ -410,8 +419,9 @@ func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, envI
 		return nil
 	}
 
-	groupHashes := make([]string, 0, len(existingConn.WorkerGroups))
-	for _, groupHash := range existingConn.WorkerGroups {
+	// Fetch all associated worker groups
+	groupHashes := make([]string, 0, len(existingConn.AllWorkerGroups))
+	for _, groupHash := range existingConn.AllWorkerGroups {
 		groupHashes = append(groupHashes, groupHash)
 	}
 

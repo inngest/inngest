@@ -56,7 +56,7 @@ func (c *connectRouterSvc) Pre(ctx context.Context) error {
 
 func (c *connectRouterSvc) Run(ctx context.Context) error {
 	go func() {
-		err := c.receiver.ReceiveExecutorMessages(ctx, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
+		err := c.receiver.ReceiveExecutorMessages(ctx, func(_ []byte, data *connect.GatewayExecutorRequestData) {
 			log := c.logger.With("env_id", data.EnvId, "app_id", data.AppId, "req_id", data.RequestId)
 
 			appID, err := uuid.Parse(data.AppId)
@@ -143,7 +143,7 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 				return
 			}
 
-			log = log.With("gateway_id", routeTo.GatewayId, "conn_id", routeTo.Id, "group_hash", routeTo.WorkerGroups[data.AppName])
+			log = log.With("gateway_id", routeTo.GatewayId, "conn_id", routeTo.Id, "group_hash", routeTo.SyncedWorkerGroups[data.AppId])
 			span.SetAttributes(
 				attribute.String("route_to_gateway_id", gatewayId.String()),
 				attribute.String("route_to_conn_id", connId.String()),
@@ -200,7 +200,7 @@ func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, envID uuid
 
 	healthy := make([]*connect.ConnMetadata, 0, len(conns))
 	for _, conn := range conns {
-		if c.isHealthy(ctx, envID, appName, fnSlug, conn, log) {
+		if c.isHealthy(ctx, envID, appID, fnSlug, conn, log) {
 			healthy = append(healthy, conn)
 		}
 	}
@@ -225,7 +225,7 @@ func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, envID uuid
 	return chosen, nil
 }
 
-func (c *connectRouterSvc) isHealthy(ctx context.Context, envID uuid.UUID, appName string, fnSlug string, conn *connect.ConnMetadata, log *slog.Logger) bool {
+func (c *connectRouterSvc) isHealthy(ctx context.Context, envID uuid.UUID, appID uuid.UUID, fnSlug string, conn *connect.ConnMetadata, log *slog.Logger) bool {
 	var shouldDeleteConnection bool
 
 	defer func() {
@@ -279,9 +279,9 @@ func (c *connectRouterSvc) isHealthy(ctx context.Context, envID uuid.UUID, appNa
 		return false
 	}
 
-	groupHash, ok := conn.WorkerGroups[appName]
+	groupHash, ok := conn.SyncedWorkerGroups[appID.String()]
 	if !ok {
-		log.Error("connection missing worker group hash for app", "app_name", appName, "worker_groups", conn.WorkerGroups)
+		log.Error("connection missing worker group hash for app", "app_id", appID.String(), "synced_worker_groups", conn.SyncedWorkerGroups)
 
 		return false
 	}

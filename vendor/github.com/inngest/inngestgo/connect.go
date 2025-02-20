@@ -14,12 +14,8 @@ const (
 	defaultMaxWorkerConcurrency = 1_000
 )
 
-type ConnectApp struct {
-	Client Handler
-}
-
 type ConnectOpts struct {
-	Apps []ConnectApp
+	Apps []Handler
 
 	// InstanceID represents a stable identifier to be used for identifying connected SDKs.
 	// This can be a hostname or other identifier that remains stable across restarts.
@@ -53,8 +49,8 @@ func Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, e
 	apps := make([]connect.ConnectApp, len(opts.Apps))
 	invokers := make(map[string]connect.FunctionInvoker, len(opts.Apps))
 	for i, app := range opts.Apps {
-		appName := app.Client.GetAppName()
-		fns, err := createFunctionConfigs(appName, app.Client.GetFunctions(), connectPlaceholder, true)
+		appName := app.GetAppName()
+		fns, err := createFunctionConfigs(appName, app.GetFunctions(), connectPlaceholder, true)
 		if err != nil {
 			return nil, fmt.Errorf("error creating function configs: %w", err)
 		}
@@ -62,10 +58,10 @@ func Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, e
 		apps[i] = connect.ConnectApp{
 			AppName:    appName,
 			Functions:  fns,
-			AppVersion: app.Client.GetAppVersion(),
+			AppVersion: app.GetAppVersion(),
 		}
 
-		invoker, ok := app.Client.(connect.FunctionInvoker)
+		invoker, ok := app.(connect.FunctionInvoker)
 		if !ok {
 			return nil, fmt.Errorf("client is unable to invoke functions")
 		}
@@ -76,7 +72,7 @@ func Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, e
 		return nil, fmt.Errorf("must specify at least one app")
 	}
 
-	defaultClient, ok := opts.Apps[0].Client.(*handler)
+	defaultClient, ok := opts.Apps[0].(*handler)
 	if !ok {
 		return nil, fmt.Errorf("invalid handler passed")
 	}

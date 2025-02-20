@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"io"
 	"log/slog"
 	"net"
@@ -278,6 +279,34 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 				return
 			}
+
+			// upsert connection to update WorkerGroups map
+			if err := c.stateManager.UpsertConnection(context.Background(), conn, connect.ConnectionStatus_CONNECTED, time.Now()); err != nil {
+				ch.log.Error("updating connection state after sync failed", "err", err)
+				c.closeWithConnectError(ws, &SocketError{
+					SysCode:    syscode.CodeConnectInternal,
+					StatusCode: websocket.StatusInternalError,
+					Msg:        "connection not stored",
+				})
+
+				return
+			}
+
+			appNames := make([]string, 0, len(conn.Groups))
+			appIds := make([]uuid.UUID, 0, len(conn.Groups))
+			syncIds := make([]uuid.UUID, 0, len(conn.Groups))
+
+			for _, group := range conn.Groups {
+				appNames = append(appNames, group.AppName)
+				if group.AppID != nil {
+					appIds = append(appIds, *group.AppID)
+				}
+				if group.SyncID != nil {
+					syncIds = append(syncIds, *group.SyncID)
+				}
+
+			}
+			ch.log.Debug("synced apps", "app_ids", appIds, "sync_ids", syncIds, "app_names", appNames)
 		}
 
 		eg := errgroup.Group{}

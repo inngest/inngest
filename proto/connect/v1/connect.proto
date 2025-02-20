@@ -125,12 +125,13 @@ message ConnMetadata {
 	string id = 1;
 	string gateway_id = 2;
 	string instance_id = 3;
-	map<string,string> worker_groups = 4;
-	ConnectionStatus status = 5;
-	google.protobuf.Timestamp last_heartbeat_at = 6;
-	string sdk_language = 7;
-	string sdk_version = 8;
-	SystemAttributes attributes = 9;
+	map<string,string> all_worker_groups = 4;
+	map<string,string> synced_worker_groups = 5;
+	ConnectionStatus status = 6;
+	google.protobuf.Timestamp last_heartbeat_at = 7;
+	string sdk_language = 8;
+	string sdk_version = 9;
+	SystemAttributes attributes = 10;
 }
 
 message SystemAttributes {

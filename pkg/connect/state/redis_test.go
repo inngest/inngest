@@ -143,7 +143,7 @@ func TestUpsertConnection(t *testing.T) {
 		group1Byt, err := json.Marshal(group1)
 		require.NoError(t, err)
 
-		groupIds := map[string]string{"app-1": group1Id}
+		allGroupIds := map[string]string{"app-1": group1Id}
 
 		attrs := &connect.SystemAttributes{
 			CpuCores: 10,
@@ -152,8 +152,8 @@ func TestUpsertConnection(t *testing.T) {
 		}
 
 		expectedConn := &connect.ConnMetadata{
-			Id:           connId.String(),
-			WorkerGroups: groupIds,
+			Id:              connId.String(),
+			AllWorkerGroups: allGroupIds,
 
 			InstanceId:      "my-worker",
 			Status:          connect.ConnectionStatus_READY,
@@ -327,8 +327,8 @@ func TestUpsertConnection(t *testing.T) {
 		}
 
 		expectedConn := &connect.ConnMetadata{
-			Id:           connId.String(),
-			WorkerGroups: groupIds,
+			Id:              connId.String(),
+			AllWorkerGroups: groupIds,
 
 			InstanceId:      "my-worker",
 			Status:          connect.ConnectionStatus_CONNECTED,
@@ -420,6 +420,7 @@ func TestUpsertConnection(t *testing.T) {
 			err = connManager.UpsertConnection(ctx, conn, connect.ConnectionStatus_READY, lastHeartbeat)
 			require.NoError(t, err)
 
+			expectedConn.SyncedWorkerGroups = map[string]string{appId1.String(): group1.Hash}
 			expectedConn.Status = connect.ConnectionStatus_READY
 			connByt, err := json.Marshal(expectedConn)
 			require.NoError(t, err)
@@ -567,7 +568,8 @@ func TestUpsertConnection(t *testing.T) {
 		group2Byt, err := json.Marshal(group2)
 		require.NoError(t, err)
 
-		groupIds := map[string]string{"app-1": group1Id, "app-2": group2Id}
+		allGroupIds := map[string]string{"app-1": group1Id, "app-2": group2Id}
+		syncedGroupIds := map[string]string{appId1.String(): group1Id}
 
 		require.Equal(t, -1, strings.Compare(group1Id, group2Id))
 
@@ -578,8 +580,9 @@ func TestUpsertConnection(t *testing.T) {
 		}
 
 		expectedConn := &connect.ConnMetadata{
-			Id:           connId.String(),
-			WorkerGroups: groupIds,
+			Id:                 connId.String(),
+			AllWorkerGroups:    allGroupIds,
+			SyncedWorkerGroups: syncedGroupIds,
 
 			InstanceId:      "my-worker",
 			Status:          connect.ConnectionStatus_READY,
