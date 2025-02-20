@@ -1819,6 +1819,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			"account_id",
 			"workspace_id",
 			"app_id",
+			"app_name",
 
 			"id",
 			"gateway_id",
@@ -1866,6 +1867,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			&data.AccountID,
 			&data.WorkspaceID,
 			&data.AppID,
+			&data.AppName,
 
 			&data.ID,
 			&data.GatewayID,
@@ -1949,6 +1951,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			AccountID:   data.AccountID,
 			WorkspaceID: data.WorkspaceID,
 			AppID:       data.AppID,
+			AppName:     data.AppName,
 
 			Id:         data.ID,
 			GatewayId:  data.GatewayID,
@@ -1991,10 +1994,10 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 // copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types
 // automatically.
 func copyWriter[
-	PARAMS_IN any,
-	INTERNAL_PARAMS any,
-	IN any,
-	OUT any,
+PARAMS_IN any,
+INTERNAL_PARAMS any,
+IN any,
+OUT any,
 ](
 	ctx context.Context,
 	f func(context.Context, INTERNAL_PARAMS) (IN, error),
@@ -2017,8 +2020,8 @@ func copyWriter[
 }
 
 func copyInto[
-	IN any,
-	OUT any,
+IN any,
+OUT any,
 ](
 	ctx context.Context,
 	f func(context.Context) (IN, error),

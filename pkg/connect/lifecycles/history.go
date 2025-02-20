@@ -109,10 +109,8 @@ func NewHistoryLifecycle(writer cqrs.ConnectionHistoryWriter) connect.ConnectGat
 }
 
 func (h *historyLifecycles) upsertConnection(ctx context.Context, conn *state.Connection, status connectpb.ConnectionStatus, lastHeartbeatAt time.Time) error {
-	// Persist history in history store
-	// TODO Should the implementation use a messaging system like NATS for batching internally?
-
 	for groupHash, group := range conn.Groups {
+		// Persist history in history store
 		err := h.writer.InsertWorkerConnection(ctx, &cqrs.WorkerConnection{
 			AccountID:   conn.AccountID,
 			WorkspaceID: conn.EnvID,

@@ -229,6 +229,9 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*cqrs.Sync
 	// We need to do this as we always create an app when entering the URL
 	// via the UI.  This is a dev-server specific quirk.
 	appID := inngest.DeterministicAppUUID(r.URL)
+	if r.IsConnect() {
+		appID = uuid.New()
+	}
 
 	tx, err := a.devserver.Data.WithTx(ctx)
 	if err != nil {
