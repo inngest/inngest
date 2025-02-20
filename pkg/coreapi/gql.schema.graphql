@@ -522,6 +522,7 @@ type ConnectV1WorkerConnection {
   instanceId: String!
   workerIp: String!
 
+	appName: String
   appID: UUID
   app: App
 

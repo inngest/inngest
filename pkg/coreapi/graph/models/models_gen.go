@@ -38,6 +38,7 @@ type ConnectV1WorkerConnection struct {
 	GatewayID        ulid.ULID                 `json:"gatewayId"`
 	InstanceID       string                    `json:"instanceId"`
 	WorkerIP         string                    `json:"workerIp"`
+	AppName          *string                   `json:"appName,omitempty"`
 	AppID            *uuid.UUID                `json:"appID,omitempty"`
 	App              *cqrs.App                 `json:"app,omitempty"`
 	ConnectedAt      time.Time                 `json:"connectedAt"`

@@ -51,8 +51,9 @@ func TestEndToEnd(t *testing.T) {
 	h.Register(a)
 
 	t.Run("with connection", func(t *testing.T) {
-		wc, err := h.Connect(connectCtx, inngestgo.ConnectOpts{
+		wc, err := inngestgo.Connect(connectCtx, inngestgo.ConnectOpts{
 			InstanceID: inngestgo.StrPtr("my-worker"),
+			Apps:       []inngestgo.Handler{h},
 		})
 		require.NoError(t, err)
 
@@ -71,7 +72,10 @@ func TestEndToEnd(t *testing.T) {
 				a.Equal(1, len(reply.Data))
 
 				if len(reply.Data) > 0 {
-					workerGroupID = reply.Data[0].GroupId
+					for _, wgHash := range reply.Data[0].AllWorkerGroups {
+						workerGroupID = wgHash
+						break
+					}
 				}
 			}, 5*time.Second, 500*time.Millisecond)
 		})

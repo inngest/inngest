@@ -35,6 +35,7 @@ func (q NormalizedQueries) InsertWorkerConnection(ctx context.Context, arg sqlc_
 	err := q.db.InsertWorkerConnection(ctx, InsertWorkerConnectionParams{
 		AccountID:        arg.AccountID,
 		WorkspaceID:      arg.WorkspaceID,
+		AppName:          arg.AppName,
 		AppID:            arg.AppID,
 		ID:               arg.ID,
 		GatewayID:        arg.GatewayID,

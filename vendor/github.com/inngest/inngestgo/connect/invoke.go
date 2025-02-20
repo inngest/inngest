@@ -66,6 +66,15 @@ func (h *connectHandler) connectInvoke(ctx context.Context, ws *websocket.Conn, 
 		return nil, fmt.Errorf("invalid gateway message data: %w", err)
 	}
 
+	if body.AppName == "" {
+		return nil, fmt.Errorf("missing app name in executor request")
+	}
+
+	invoker, ok := h.invokers[body.AppName]
+	if !ok {
+		return nil, fmt.Errorf("no invoker for app name %q", body.AppName)
+	}
+
 	// Note: This still uses JSON
 	// TODO Replace with Protobuf
 	var request sdkrequest.Request
@@ -123,7 +132,7 @@ func (h *connectHandler) connectInvoke(ctx context.Context, ws *websocket.Conn, 
 	}
 
 	// Invoke function, always complete regardless of
-	resp, ops, err := h.invoker.InvokeFunction(context.Background(), body.FunctionSlug, stepId, request)
+	resp, ops, err := invoker.InvokeFunction(context.Background(), body.FunctionSlug, stepId, request)
 
 	// NOTE: When triggering step errors, we should have an OpcodeStepError
 	// within ops alongside an error.  We can safely ignore that error, as it's

@@ -160,9 +160,10 @@ CREATE TABLE worker_connections (
     account_id UUID NOT NULL,
     workspace_id UUID NOT NULL,
 
+    app_name VARCHAR NOT NULL,
     app_id UUID,
 
-    id BYTEA PRIMARY KEY,
+    id BYTEA NOT NULL,
     gateway_id BYTEA NOT NULL,
     instance_id VARCHAR NOT NULL,
     status smallint NOT NULL,
@@ -186,5 +187,7 @@ CREATE TABLE worker_connections (
 
     cpu_cores integer NOT NULL,
     mem_bytes bigint NOT NULL,
-    os VARCHAR NOT NULL
+    os VARCHAR NOT NULL,
+
+    PRIMARY KEY(id, app_name)
 );
