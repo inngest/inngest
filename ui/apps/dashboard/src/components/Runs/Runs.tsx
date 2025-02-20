@@ -19,7 +19,6 @@ import { useCancelRun } from '@/queries/useCancelRun';
 import { useRerun } from '@/queries/useRerun';
 import { pathCreator } from '@/utils/urls';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
-import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { AppFilterDocument, CountRunsDocument, GetRunsDocument } from './queries';
 import { parseRunsData, toRunStatuses, toTimeField } from './utils';
 
@@ -37,14 +36,13 @@ type EnvProps = {
   scope: 'env';
 };
 
-type Props = FnProps | EnvProps;
+type Props = (FnProps | EnvProps) & { traceAIEnabled?: boolean };
 
 export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
-  { functionSlug, scope }: Props,
+  { functionSlug, scope, traceAIEnabled }: Props,
   ref
 ) {
   const env = useEnvironment();
-  const { value: traceAIEnabled, isReady } = useBooleanFlag('ai-traces');
 
   const [{ data: pauseData }] = useQuery({
     pause: scope !== 'fn',
@@ -241,7 +239,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       functionIsPaused={pauseData?.environment.function?.isPaused ?? false}
       scope={scope}
       totalCount={totalCount}
-      traceAIEnabled={isReady && traceAIEnabled}
+      traceAIEnabled={traceAIEnabled}
     />
   );
 });

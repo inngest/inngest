@@ -3,10 +3,10 @@
 import { useMemo } from 'react';
 import { ContextualBanner } from '@inngest/components/Banner';
 import { Button } from '@inngest/components/Button';
+import { useBooleanLocalStorage } from '@inngest/components/hooks/useBooleanLocalStorage';
 
 import { type EntitlementUsageQuery } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
-import { useBooleanLocalStorage } from './localStorage';
 import { parseEntitlementUsage } from './parse';
 
 export function BillingBannerView({

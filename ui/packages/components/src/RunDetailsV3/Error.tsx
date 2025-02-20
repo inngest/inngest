@@ -1,8 +1,8 @@
 import { CodeBlock, type CodeBlockAction } from '../CodeBlock';
 
-export type OutputProps = { actions?: CodeBlockAction[]; raw?: string };
+export type ErrorProps = { actions?: CodeBlockAction[]; raw?: string };
 
-export const Output = ({ actions, raw }: OutputProps) => {
+export const Error = ({ actions, raw }: ErrorProps) => {
   return (
     <div className="text-muted">
       <CodeBlock
