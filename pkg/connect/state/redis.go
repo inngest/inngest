@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/oklog/ulid/v2"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"io/fs"
 	"log/slog"
@@ -101,7 +100,7 @@ func NewRedisConnectionStateManager(client rueidis.Client) *redisConnectionState
 	}
 }
 
-func (r redisConnectionStateManager) SetRequestIdempotency(ctx context.Context, appId uuid.UUID, requestId string) error {
+func (r *redisConnectionStateManager) SetRequestIdempotency(ctx context.Context, appId uuid.UUID, requestId string) error {
 	idempotencyKey := fmt.Sprintf("{%s}:idempotency:%s", appId, requestId)
 	res := r.client.Do(
 		ctx,
@@ -119,7 +118,7 @@ func (r redisConnectionStateManager) SetRequestIdempotency(ctx context.Context, 
 }
 
 func (r *redisConnectionStateManager) GetConnection(ctx context.Context, envID uuid.UUID, connId ulid.ULID) (*connpb.ConnMetadata, error) {
-	key := r.connIndexByEnv(envID)
+	key := r.connectionHash(envID)
 	cmd := r.client.B().Hget().Key(key).Field(connId.String()).Build()
 
 	res, err := r.client.Do(ctx, cmd).ToString()
@@ -139,7 +138,7 @@ func (r *redisConnectionStateManager) GetConnection(ctx context.Context, envID u
 }
 
 func (r *redisConnectionStateManager) GetConnectionsByEnvID(ctx context.Context, envID uuid.UUID) ([]*connpb.ConnMetadata, error) {
-	key := r.connIndexByEnv(envID)
+	key := r.connectionHash(envID)
 	cmd := r.client.B().Hvals().Key(key).Build()
 
 	res, err := r.client.Do(ctx, cmd).AsStrSlice()
@@ -171,7 +170,7 @@ func (r *redisConnectionStateManager) GetConnectionsByAppID(ctx context.Context,
 		return nil, nil
 	}
 
-	res, err := r.client.Do(ctx, r.client.B().Hmget().Key(r.connIndexByEnv(envId)).Field(connIds...).Build()).AsStrSlice()
+	res, err := r.client.Do(ctx, r.client.B().Hmget().Key(r.connectionHash(envId)).Field(connIds...).Build()).AsStrSlice()
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +178,7 @@ func (r *redisConnectionStateManager) GetConnectionsByAppID(ctx context.Context,
 	conns := []*connpb.ConnMetadata{}
 	for _, meta := range res {
 		var conn connpb.ConnMetadata
-		if err := proto.Unmarshal([]byte(meta), &conn); err != nil {
+		if err := json.Unmarshal([]byte(meta), &conn); err != nil {
 			return nil, err
 		}
 		conns = append(conns, &conn)
@@ -190,7 +189,7 @@ func (r *redisConnectionStateManager) GetConnectionsByAppID(ctx context.Context,
 
 func (r *redisConnectionStateManager) GetConnectionsByGroupID(ctx context.Context, envID uuid.UUID, groupID string) ([]*connpb.ConnMetadata, error) {
 	keys := []string{
-		r.connIndexByEnv(envID),
+		r.connectionHash(envID),
 		r.connIndexByGroup(envID, groupID),
 	}
 	args := []string{}
@@ -208,7 +207,7 @@ func (r *redisConnectionStateManager) GetConnectionsByGroupID(ctx context.Contex
 	conns := []*connpb.ConnMetadata{}
 	for _, cs := range res {
 		var conn connpb.ConnMetadata
-		if err := proto.Unmarshal([]byte(cs), &conn); err != nil {
+		if err := json.Unmarshal([]byte(cs), &conn); err != nil {
 			return nil, fmt.Errorf("error deserializing conn metadata: %w", err)
 		}
 		conns = append(conns, &conn)
@@ -217,13 +216,8 @@ func (r *redisConnectionStateManager) GetConnectionsByGroupID(ctx context.Contex
 	return conns, nil
 }
 
-func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn *Connection, status connpb.ConnectionStatus, lastHeartbeatAt time.Time) error {
-	// Reduce variations by sorting groups based on syncs
-	sortedGroups := make([]*WorkerGroup, 0, len(conn.Groups))
-	for _, group := range conn.Groups {
-		sortedGroups = append(sortedGroups, group)
-	}
-	slices.SortStableFunc(sortedGroups, func(a, b *WorkerGroup) int {
+func (r *redisConnectionStateManager) sortGroups(groups []*WorkerGroup) {
+	slices.SortStableFunc(groups, func(a, b *WorkerGroup) int {
 		// If a is synced but b isn't, a should come first
 		if a.AppID != nil && b.AppID == nil {
 			return -1
@@ -236,9 +230,18 @@ func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn
 
 		return strings.Compare(a.Hash, b.Hash)
 	})
+}
+
+func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn *Connection, status connpb.ConnectionStatus, lastHeartbeatAt time.Time) error {
+	// Reduce variations by sorting groups based on syncs
+	sortedGroups := make([]*WorkerGroup, 0, len(conn.Groups))
+	for _, group := range conn.Groups {
+		sortedGroups = append(sortedGroups, group)
+	}
+	r.sortGroups(sortedGroups)
 
 	groupIds := make([]string, 0, len(conn.Groups))
-	for _, group := range conn.Groups {
+	for _, group := range sortedGroups {
 		groupIds = append(groupIds, group.Hash)
 	}
 
@@ -285,10 +288,10 @@ func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn
 	}
 	keys := []string{
 		// Upsert conn
-		r.connIndexByEnv(conn.EnvID),
+		r.connectionHash(conn.EnvID),
 
 		// Upsert worker groups
-		r.groupIndexByEnv(conn.EnvID),
+		r.workerGroupHash(conn.EnvID),
 	}
 
 	argDefs := []string{
@@ -399,26 +402,118 @@ func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, envI
 		return nil
 	}
 
+	groups, err := r.GetWorkerGroupsByHash(ctx, envID, existingConn.GroupIds)
+	if err != nil {
+		return fmt.Errorf("could not get worker groups for connection: %w", err)
+	}
+
+	/*
+		In this function, we dynamically build a Lua script. We do this because we want atomic
+		execution of connection upserts. If we relax this constraint, we could run individual commands in sequence.
+
+		There are rules to follow to avoid performance problems:
+		- We must limit the number of unique scripts:
+			Redis hashes and caches Lua scripts in memory. This cache is not cleared,
+			so adding an infinite number of unique scripts will lead to Redis running
+			out of memory. Thus, we must limit variations.
+
+		To this end:
+		- We must not include information that vary per request in the script template
+		- When building dynamic segments using a range loop, we must limit the max. number if iterations
+	*/
+	keysDefs := []string{
+		"local indexConnectionsByEnvIdKey = KEYS[1]",
+		"local indexWorkerGroupsByEnvIdKey = KEYS[2]",
+	}
 	keys := []string{
-		//r.connKey(envID),
-		//r.groupKey(envID),
-		//r.groupIDKey(envID, groupID),
-		//r.connIndexByApp(envID, appID),
+		// Upsert conn
+		r.connectionHash(envID),
+
+		// Upsert worker groups
+		r.workerGroupHash(envID),
 	}
 
+	argDefs := []string{
+		"local connID = ARGV[1]",
+	}
 	args := []string{
-		//connId.String(),
-		//groupID,
+		connID.String(),
 	}
 
-	status, err := scripts["delete_conn"].Exec(
+	indexUpdates := make([]string, 0)
+
+	emptyGroupCleanup := make([]string, 0, len(groups))
+
+	{
+		i := 0
+		for _, group := range groups {
+			// Push groupId
+			groupIdVarName := fmt.Sprintf("groupId%d", i)
+			argDefs = append(argDefs, fmt.Sprintf("local %s = ARGV[%d]", groupIdVarName, len(argDefs)+1))
+			args = append(args, group.Hash)
+
+			// Push index updates
+			connectionsByGroupIndexVarName := fmt.Sprintf("indexConnectionsByGroupIdKey%d", i)
+			keysDefs = append(keysDefs, fmt.Sprintf("local %s = KEYS[%d]", connectionsByGroupIndexVarName, len(keysDefs)+1))
+			keys = append(keys, r.connIndexByGroup(envID, group.Hash))
+			indexUpdates = append(indexUpdates, fmt.Sprintf(`-- Remove connection from group index %s
+redis.call("SREM", %s, connID)`, connectionsByGroupIndexVarName, connectionsByGroupIndexVarName))
+
+			emptyGroupCleanup = append(emptyGroupCleanup, fmt.Sprintf(`-- If the group is empty, remove it
+local scount = tonumber(redis.call("SCARD", %s))
+if scount == 0 then
+  redis.call("HDEL", indexWorkerGroupsByEnvIdKey, %s)
+
+  return 1
+end`, connectionsByGroupIndexVarName, groupIdVarName))
+
+			if group.AppID != nil {
+				indexVarName := fmt.Sprintf("indexConnectionsByAppIdKey%d", i)
+				keysDefs = append(keysDefs, fmt.Sprintf("local %s = KEYS[%d]", indexVarName, len(keysDefs)+1))
+				keys = append(keys, r.connIndexByApp(envID, *group.AppID))
+				indexUpdates = append(indexUpdates, fmt.Sprintf(`-- Remove connection from app index %s
+redis.call("SREM", %s, connID)`, indexVarName, indexVarName))
+			}
+
+			i++
+		}
+	}
+
+	script, err := createScript(fmt.Sprintf(`
+%s
+
+%s
+
+-- $include(ends_with.lua)
+
+-- Remove the connection from the map
+redis.call("HDEL", indexConnectionsByEnvIdKey, connID)
+
+%s
+
+%s
+
+return 0
+`,
+		strings.Join(keysDefs, "\n"),
+		strings.Join(argDefs, "\n"),
+
+		strings.Join(indexUpdates, "\n\n"),
+
+		strings.Join(emptyGroupCleanup, "\n\n"),
+	))
+	if err != nil {
+		return fmt.Errorf("could not create delete script: %w", err)
+	}
+
+	status, err := script.Exec(
 		ctx,
 		r.client,
 		keys,
 		args,
 	).AsInt64()
 	if err != nil {
-		return fmt.Errorf("error deleting connection: %w", err)
+		return fmt.Errorf("could not delete connection: %w", err)
 	}
 
 	switch status {
@@ -431,7 +526,7 @@ func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, envI
 }
 
 func (r *redisConnectionStateManager) GetWorkerGroupByHash(ctx context.Context, envID uuid.UUID, hash string) (*WorkerGroup, error) {
-	key := r.groupIndexByEnv(envID)
+	key := r.workerGroupHash(envID)
 	cmd := r.client.B().Hget().Key(key).Field(hash).Build()
 
 	byt, err := r.client.Do(ctx, cmd).AsBytes()
@@ -450,13 +545,34 @@ func (r *redisConnectionStateManager) GetWorkerGroupByHash(ctx context.Context, 
 	return &group, nil
 }
 
+func (r *redisConnectionStateManager) GetWorkerGroupsByHash(ctx context.Context, envID uuid.UUID, hashes []string) ([]WorkerGroup, error) {
+	res, err := r.client.Do(ctx, r.client.B().Hmget().Key(r.workerGroupHash(envID)).Field(hashes...).Build()).AsStrSlice()
+	if err != nil {
+		return nil, err
+	}
+
+	groups := make([]WorkerGroup, 0)
+	for _, meta := range res {
+		if meta == "" {
+			return nil, WorkerGroupNotFoundErr
+		}
+		var group WorkerGroup
+		if err := json.Unmarshal([]byte(meta), &group); err != nil {
+			return nil, err
+		}
+		groups = append(groups, group)
+	}
+
+	return groups, nil
+}
+
 func (r *redisConnectionStateManager) UpdateWorkerGroup(ctx context.Context, envID uuid.UUID, group *WorkerGroup) error {
 	byt, err := json.Marshal(group)
 	if err != nil {
 		return fmt.Errorf("error serializing worker group for update: %w", err)
 	}
 
-	key := r.groupIndexByEnv(envID)
+	key := r.workerGroupHash(envID)
 	cmd := r.client.B().Hset().Key(key).FieldValue().FieldValue(group.Hash, string(byt)).Build()
 
 	if err := r.client.Do(ctx, cmd).Error(); err != nil {
@@ -466,18 +582,18 @@ func (r *redisConnectionStateManager) UpdateWorkerGroup(ctx context.Context, env
 	return nil
 }
 
-// connIndexByEnv points to the index hash resolving connections by environment.
-func (r *redisConnectionStateManager) connIndexByEnv(envID uuid.UUID) string {
+// connectionHash points to the hash resolving connections by environment.
+func (r *redisConnectionStateManager) connectionHash(envID uuid.UUID) string {
 	return fmt.Sprintf("{%s}:conns", envID)
 }
 
-// connIndexByEnv points to the index hash resolving connections by app ID.
+// connectionHash points to the index hash resolving connections by app ID.
 func (r *redisConnectionStateManager) connIndexByApp(envID uuid.UUID, appId uuid.UUID) string {
 	return fmt.Sprintf("{%s}:conns_appid:%s", envID.String(), appId.String())
 }
 
-// connIndexByEnv points to the index hash resolving connections by environment ID.
-func (r *redisConnectionStateManager) groupIndexByEnv(envID uuid.UUID) string {
+// workerGroupHash points to the hash resolving worker groups by environment ID.
+func (r *redisConnectionStateManager) workerGroupHash(envID uuid.UUID) string {
 	return fmt.Sprintf("{%s}:groups", envID.String())
 }
 

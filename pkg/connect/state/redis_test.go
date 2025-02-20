@@ -11,9 +11,86 @@ import (
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestSortGroups(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	connManager := NewRedisConnectionStateManager(rc)
+
+	accountId, envId := uuid.New(), uuid.New()
+
+	appId1, syncId1 := uuid.New(), uuid.New() // pretend app 1 is synced,
+	app1Version, app2Version := "app-1-v.test", "app-2-v.test"
+
+	connectionsByEnvKey := connManager.connectionHash(envId)
+	connectionsByApp1Key := connManager.connIndexByApp(envId, appId1)
+	group1Id, group2Id := "app-1-hash", "app-2-hash"
+
+	connectionsByGroup1Key := connManager.connIndexByGroup(envId, group1Id)
+	connectionsByGroup2Key := connManager.connIndexByGroup(envId, group2Id)
+
+	groupsByEnvKey := connManager.workerGroupHash(envId)
+
+	// No groups created
+	require.False(t, r.Exists(groupsByEnvKey))
+
+	// No connections upserted
+	require.False(t, r.Exists(connectionsByEnvKey))
+
+	// No indexes created
+	require.False(t, r.Exists(connectionsByApp1Key))
+	require.False(t, r.Exists(connectionsByGroup1Key))
+	require.False(t, r.Exists(connectionsByGroup2Key))
+
+	group1 := &WorkerGroup{
+		AccountID:     accountId,
+		EnvID:         envId,
+		AppID:         &appId1,
+		SyncID:        &syncId1,
+		AppName:       "app-1",
+		AppVersion:    &app1Version,
+		SDKLang:       "go",
+		SDKVersion:    "v-test",
+		FunctionSlugs: []string{"fn-1", "fn-2"},
+		Hash:          group1Id,
+	}
+
+	group2 := &WorkerGroup{
+		AccountID:     accountId,
+		EnvID:         envId,
+		AppName:       "app-2",
+		AppVersion:    &app2Version,
+		SDKLang:       "go",
+		SDKVersion:    "v-test",
+		FunctionSlugs: []string{"fn-3", "fn-4"},
+		Hash:          group2Id,
+	}
+
+	t.Run("unsorted", func(t *testing.T) {
+		groupsToSort := []*WorkerGroup{group2, group1}
+		connManager.sortGroups(groupsToSort)
+		require.Equal(t, group1, groupsToSort[0])
+		require.Equal(t, group2, groupsToSort[1])
+	})
+
+	t.Run("already sorted", func(t *testing.T) {
+		groupsToSort := []*WorkerGroup{group1, group2}
+		connManager.sortGroups(groupsToSort)
+		require.Equal(t, group1, groupsToSort[0])
+		require.Equal(t, group2, groupsToSort[1])
+	})
+}
 
 func TestUpsertConnection(t *testing.T) {
 	t.Run("single unsynced app", func(t *testing.T) {
@@ -37,12 +114,12 @@ func TestUpsertConnection(t *testing.T) {
 
 		app1Version := "app-1-v.test"
 
-		connectionsByEnvKey := connManager.connIndexByEnv(envId)
+		connectionsByEnvKey := connManager.connectionHash(envId)
 		group1Id := "app-1-hash"
 
 		connectionsByGroup1Key := connManager.connIndexByGroup(envId, group1Id)
 
-		groupsByEnvKey := connManager.groupIndexByEnv(envId)
+		groupsByEnvKey := connManager.workerGroupHash(envId)
 
 		// No groups created
 		require.False(t, r.Exists(groupsByEnvKey))
@@ -185,12 +262,12 @@ func TestUpsertConnection(t *testing.T) {
 
 		app1Version := "app-1-v.test"
 
-		connectionsByEnvKey := connManager.connIndexByEnv(envId)
+		connectionsByEnvKey := connManager.connectionHash(envId)
 		group1Id := "app-1-hash"
 
 		connectionsByGroup1Key := connManager.connIndexByGroup(envId, group1Id)
 
-		groupsByEnvKey := connManager.groupIndexByEnv(envId)
+		groupsByEnvKey := connManager.workerGroupHash(envId)
 
 		// No groups created
 		require.False(t, r.Exists(groupsByEnvKey))
@@ -334,13 +411,13 @@ func TestUpsertConnection(t *testing.T) {
 		appId1, syncId1 := uuid.New(), uuid.New() // pretend app 1 is synced,
 		app1Version := "app-1-v.test"
 
-		connectionsByEnvKey := connManager.connIndexByEnv(envId)
+		connectionsByEnvKey := connManager.connectionHash(envId)
 		connectionsByApp1Key := connManager.connIndexByApp(envId, appId1)
 		group1Id := "app-1-hash"
 
 		connectionsByGroup1Key := connManager.connIndexByGroup(envId, group1Id)
 
-		groupsByEnvKey := connManager.groupIndexByEnv(envId)
+		groupsByEnvKey := connManager.workerGroupHash(envId)
 
 		// No groups created
 		require.False(t, r.Exists(groupsByEnvKey))
@@ -501,14 +578,14 @@ func TestUpsertConnection(t *testing.T) {
 		appId1, syncId1 := uuid.New(), uuid.New() // pretend app 1 is synced,
 		app1Version, app2Version := "app-1-v.test", "app-2-v.test"
 
-		connectionsByEnvKey := connManager.connIndexByEnv(envId)
+		connectionsByEnvKey := connManager.connectionHash(envId)
 		connectionsByApp1Key := connManager.connIndexByApp(envId, appId1)
 		group1Id, group2Id := "app-1-hash", "app-2-hash"
 
 		connectionsByGroup1Key := connManager.connIndexByGroup(envId, group1Id)
 		connectionsByGroup2Key := connManager.connIndexByGroup(envId, group2Id)
 
-		groupsByEnvKey := connManager.groupIndexByEnv(envId)
+		groupsByEnvKey := connManager.workerGroupHash(envId)
 
 		// No groups created
 		require.False(t, r.Exists(groupsByEnvKey))
@@ -550,6 +627,8 @@ func TestUpsertConnection(t *testing.T) {
 		require.NoError(t, err)
 
 		groupIds := []string{group1Id, group2Id}
+
+		require.Equal(t, -1, strings.Compare(group1Id, group2Id))
 
 		attrs := &connect.SystemAttributes{
 			CpuCores: 10,
