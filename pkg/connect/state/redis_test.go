@@ -515,6 +515,22 @@ func TestUpsertConnection(t *testing.T) {
 			membersByGroup1, err := r.SMembers(connectionsByGroup1Key)
 			require.NoError(t, err)
 			require.Equal(t, []string{connId.String()}, membersByGroup1)
+
+			retrievedConn, err := connManager.GetConnection(ctx, envId, connId)
+			require.NoError(t, err)
+			require.Equal(t, expectedConn, retrievedConn)
+
+			connsByEnv, err := connManager.GetConnectionsByEnvID(ctx, envId)
+			require.NoError(t, err)
+			require.Equal(t, []*connect.ConnMetadata{expectedConn}, connsByEnv)
+
+			connsByApp1, err := connManager.GetConnectionsByAppID(ctx, envId, appId1)
+			require.NoError(t, err)
+			require.Nil(t, connsByApp1)
+
+			connsByGroup1, err := connManager.GetConnectionsByGroupID(ctx, envId, group1Id)
+			require.NoError(t, err)
+			require.Equal(t, []*connect.ConnMetadata{expectedConn}, connsByGroup1)
 		})
 
 		t.Run("subsequent upsert after sync should update", func(t *testing.T) {
@@ -553,6 +569,22 @@ func TestUpsertConnection(t *testing.T) {
 			membersByGroup1, err := r.SMembers(connectionsByGroup1Key)
 			require.NoError(t, err)
 			require.Equal(t, []string{connId.String()}, membersByGroup1)
+
+			retrievedConn, err := connManager.GetConnection(ctx, envId, connId)
+			require.NoError(t, err)
+			require.Equal(t, expectedConn, retrievedConn)
+
+			connsByEnv, err := connManager.GetConnectionsByEnvID(ctx, envId)
+			require.NoError(t, err)
+			require.Equal(t, []*connect.ConnMetadata{expectedConn}, connsByEnv)
+
+			connsByApp1, err := connManager.GetConnectionsByAppID(ctx, envId, appId1)
+			require.NoError(t, err)
+			require.Equal(t, []*connect.ConnMetadata{expectedConn}, connsByApp1)
+
+			connsByGroup1, err := connManager.GetConnectionsByGroupID(ctx, envId, group1Id)
+			require.NoError(t, err)
+			require.Equal(t, []*connect.ConnMetadata{expectedConn}, connsByGroup1)
 		})
 	})
 
@@ -714,6 +746,26 @@ func TestUpsertConnection(t *testing.T) {
 			membersByGroup2, err := r.SMembers(connectionsByGroup2Key)
 			require.NoError(t, err)
 			require.Equal(t, []string{connId.String()}, membersByGroup2)
+
+			retrievedConn, err := connManager.GetConnection(ctx, envId, connId)
+			require.NoError(t, err)
+			require.Equal(t, expectedConn, retrievedConn)
+
+			connsByEnv, err := connManager.GetConnectionsByEnvID(ctx, envId)
+			require.NoError(t, err)
+			require.Equal(t, []*connect.ConnMetadata{expectedConn}, connsByEnv)
+
+			connsByApp1, err := connManager.GetConnectionsByAppID(ctx, envId, appId1)
+			require.NoError(t, err)
+			require.Equal(t, []*connect.ConnMetadata{expectedConn}, connsByApp1)
+
+			connsByGroup1, err := connManager.GetConnectionsByGroupID(ctx, envId, group1Id)
+			require.NoError(t, err)
+			require.Equal(t, []*connect.ConnMetadata{expectedConn}, connsByGroup1)
+
+			connsByGroup2, err := connManager.GetConnectionsByGroupID(ctx, envId, group2Id)
+			require.NoError(t, err)
+			require.Equal(t, []*connect.ConnMetadata{expectedConn}, connsByGroup2)
 		})
 
 		t.Run("subsequent upsert should update", func(t *testing.T) {
@@ -751,6 +803,26 @@ func TestUpsertConnection(t *testing.T) {
 			membersByGroup2, err := r.SMembers(connectionsByGroup2Key)
 			require.NoError(t, err)
 			require.Equal(t, []string{connId.String()}, membersByGroup2)
+
+			retrievedConn, err := connManager.GetConnection(ctx, envId, connId)
+			require.NoError(t, err)
+			require.Equal(t, expectedConn, retrievedConn)
+
+			connsByEnv, err := connManager.GetConnectionsByEnvID(ctx, envId)
+			require.NoError(t, err)
+			require.Equal(t, []*connect.ConnMetadata{expectedConn}, connsByEnv)
+
+			connsByApp1, err := connManager.GetConnectionsByAppID(ctx, envId, appId1)
+			require.NoError(t, err)
+			require.Equal(t, []*connect.ConnMetadata{expectedConn}, connsByApp1)
+
+			connsByGroup1, err := connManager.GetConnectionsByGroupID(ctx, envId, group1Id)
+			require.NoError(t, err)
+			require.Equal(t, []*connect.ConnMetadata{expectedConn}, connsByGroup1)
+
+			connsByGroup2, err := connManager.GetConnectionsByGroupID(ctx, envId, group2Id)
+			require.NoError(t, err)
+			require.Equal(t, []*connect.ConnMetadata{expectedConn}, connsByGroup2)
 		})
 	})
 
