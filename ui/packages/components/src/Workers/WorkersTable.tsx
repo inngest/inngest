@@ -131,7 +131,7 @@ export function WorkersTable({
 
   return (
     <div>
-      <h4 className="text-subtle mb-4 text-xl">Workers ({totalCount})</h4>
+      <h4 className="text-subtle mb-4 text-xl">Workers</h4>
       <div className="mb-4 flex items-center">
         <WorkerStatusFilter
           selectedStatuses={filteredStatus}
