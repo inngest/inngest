@@ -1,9 +1,11 @@
 package connectv0
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	"io"
@@ -17,6 +19,15 @@ import (
 
 func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	connectionId, err := ulid.New(ulid.Now(), rand.Reader)
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("could not generate connection id", "err", err)
+
+		_ = publicerr.WriteHTTP(w, publicerr.Errorf(500, "internal error"))
+		return
+	}
+
+	l := logger.StdlibLogger(ctx).With("connection_id", connectionId)
 
 	hashedSigningKey := r.Header.Get("Authorization")
 	{
@@ -33,22 +44,26 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 
 	envOverride := r.Header.Get("X-Inngest-Env")
 
+	l = l.With("key", hashedSigningKey, "env", envOverride)
+
 	res, err := a.RequestAuther.AuthenticateRequest(ctx, hashedSigningKey, envOverride)
 	if err != nil {
-		logger.StdlibLogger(ctx).Error("could not authenticate connect start request", "err", err, "key", hashedSigningKey, "env", envOverride)
+		l.Error("could not authenticate connect start request", "err", err)
 
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "authentication failed"))
 		return
 	}
 
 	if res == nil {
+		l.Debug("rejecting unauthorized connection")
+
 		_ = publicerr.WriteHTTP(w, publicerr.Errorf(401, "authentication failed"))
 		return
 	}
 
 	allowed, err := a.ConnectionLimiter.CheckConnectionLimit(ctx, res)
 	if err != nil {
-		logger.StdlibLogger(ctx).Error("could not check connection limit during start request", "err", err, "key", hashedSigningKey, "env", envOverride)
+		l.Error("could not check connection limit during start request", "err", err)
 
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not check connection limit"))
 		return
@@ -75,7 +90,7 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 
 	token, err := a.Signer.SignSessionToken(res.AccountID, res.EnvID, auth.DefaultExpiry)
 	if err != nil {
-		logger.StdlibLogger(ctx).Error("could not sign connect session token", "err", err, "key", hashedSigningKey, "env", envOverride)
+		l.Error("could not sign connect session token", "err", err)
 
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not sign session token"))
 		return
@@ -88,7 +103,7 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 		RequestHost: r.Host,
 	})
 	if err != nil {
-		logger.StdlibLogger(ctx).Error("could not retrieve connect gateway", "err", err, "key", hashedSigningKey, "env", envOverride)
+		l.Error("could not retrieve connect gateway", "err", err)
 
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not retrieve gateway"))
 		return
@@ -99,9 +114,10 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 		GatewayGroup:    gatewayGroup,
 		SessionToken:    token,
 		SyncToken:       hashedSigningKey,
+		ConnectionId:    connectionId.String(),
 	})
 	if err != nil {
-		logger.StdlibLogger(ctx).Error("could not marshal start response", "err", err)
+		l.Error("could not marshal start response", "err", err)
 
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not marshal response"))
 		return
