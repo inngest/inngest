@@ -353,14 +353,11 @@ redis.call("HSETNX", indexWorkerGroupsByEnvIdKey, %s, %s)`, i, groupIdVarName, w
 redis.call("SADD", %s, connID)`, indexVarName, indexVarName))
 
 			if group.AppID != nil {
-				fmt.Println("exposing per app id", conn.ConnectionId.String(), status.String())
 				indexVarName := fmt.Sprintf("indexConnectionsByAppIdKey%d", i)
 				keysDefs = append(keysDefs, fmt.Sprintf("local %s = KEYS[%d]", indexVarName, len(keysDefs)+1))
 				keys = append(keys, r.connIndexByApp(conn.EnvID, *group.AppID))
 				indexUpdates = append(indexUpdates, fmt.Sprintf(`-- Update index %s
 redis.call("SADD", %s, connID)`, indexVarName, indexVarName))
-			} else {
-				fmt.Println("upsert without", conn.ConnectionId.String(), status.String())
 			}
 
 			i++
