@@ -2,7 +2,6 @@ package connect
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"io"
@@ -13,7 +12,6 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
@@ -232,7 +230,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			// This is a transactional operation, it should always complete regardless of context cancellation
 			err := c.stateManager.DeleteConnection(context.Background(), conn.EnvID, conn.ConnectionId)
 			switch err {
-			case nil, state.ConnDeletedWithGroupErr:
+			case nil:
 				// no-op
 			default:
 				ch.log.Error("error deleting connection from state", "error", err)
@@ -411,8 +409,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		ch.log.Debug("connection is ready")
 		if c.devlogger != nil {
-			conn.Data.Apps
-			c.devlogger.Info().Str("app_names").Msg("worker connected")
+			c.devlogger.Info().Strs("app_names", conn.AppNames()).Msg("worker connected")
 		}
 
 		{
