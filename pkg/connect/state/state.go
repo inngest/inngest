@@ -135,10 +135,6 @@ type Connection struct {
 	GatewayId ulid.ULID
 }
 
-func (c *Connection) AppNames() []string {
-	appNames := make([]string, len(c.Data.Apps))
-}
-
 // Sync attempts to sync the worker group configuration
 func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager, apiBaseUrl string, initialReq *connpb.WorkerConnectRequestData) error {
 	// The group is expected to exist in the state, as UpsertConnection also creates the group if it doesn't exist

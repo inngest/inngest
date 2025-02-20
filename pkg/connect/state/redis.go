@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -235,11 +236,6 @@ func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn
 		LastHeartbeatAt: timestamppb.New(lastHeartbeatAt),
 	}
 
-	isHealthy := "0"
-	if status == connpb.ConnectionStatus_READY {
-		isHealthy = "1"
-	}
-
 	// NOTE: redis_state.StrSlice format the data in a non JSON way, not sure why
 	var serializedConnection string
 	{
@@ -250,6 +246,20 @@ func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn
 		serializedConnection = string(byt)
 	}
 
+	/*
+		In this function, we dynamically build a Lua script. We do this because we want atomic
+		execution of connection upserts. If we relax this constraint, we could run individual commands in sequence.
+
+		There are rules to follow to avoid performance problems:
+		- We must limit the number of unique scripts:
+			Redis hashes and caches Lua scripts in memory. This cache is not cleared,
+			so adding an infinite number of unique scripts will lead to Redis running
+			out of memory. Thus, we must limit variations.
+
+		To this end:
+		- We must not include information that vary per request in the script template
+		- When building dynamic segments using a range loop, we must limit the max. number if iterations
+	*/
 	keysDefs := []string{
 		"local indexConnectionsByEnvIdKey = KEYS[1]",
 		"local indexWorkerGroupsByEnvIdKey = KEYS[2]",
@@ -265,20 +275,37 @@ func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn
 	argDefs := []string{
 		"local connID = ARGV[1]",
 		"local serializedConn = ARGV[2]",
-		"local isHealthy = tonumber(ARGV[3])",
 	}
 	args := []string{
 		meta.Id,
 		serializedConnection,
-		isHealthy,
 	}
 
 	groupUpserts := make([]string, 0)
+	indexUpdates := make([]string, 0)
+
+	// Reduce variations by sorting groups based on syncs
+	sortedGroups := make([]*WorkerGroup, 0, len(conn.Groups))
+	for _, group := range conn.Groups {
+		sortedGroups = append(sortedGroups, group)
+	}
+	slices.SortStableFunc(sortedGroups, func(a, b *WorkerGroup) int {
+		// If a is synced but b isn't, a should come first
+		if a.AppID != nil && b.AppID == nil {
+			return -1
+		}
+
+		// If b is synced but a isn't, b should come first
+		if a.AppID == nil && b.AppID != nil {
+			return 1
+		}
+
+		return 0
+	})
 
 	{
-
 		i := 0
-		for _, group := range conn.Groups {
+		for _, group := range sortedGroups {
 			// Push groupId
 			groupIdVarName := fmt.Sprintf("groupId%d", i)
 			argDefs = append(argDefs, fmt.Sprintf("local %s = ARGV[%d]", groupIdVarName, len(argDefs)+1))
@@ -294,47 +321,26 @@ func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn
 			}
 			args = append(args, string(byt))
 
-			groupUpserts = append(groupUpserts, fmt.Sprintf(`
--- Upsert group %d
-
+			groupUpserts = append(groupUpserts, fmt.Sprintf(`-- Upsert group %d
 -- Store the group if it doesn't exist yet
-redis.call("HSETNX", indexWorkerGroupsByEnvIdKey, %s, %s)
-`, i, groupIdVarName, workerGroupVarName))
+redis.call("HSETNX", indexWorkerGroupsByEnvIdKey, %s, %s)`, i, groupIdVarName, workerGroupVarName))
 
-			i++
-		}
-	}
-
-	indexUpdates := make([]string, 0)
-
-	{
-		i := 0
-		for _, group := range conn.Groups {
+			// Push index updates
 			indexVarName := fmt.Sprintf("indexConnectionsByGroupIdKey%d", i)
 			keysDefs = append(keysDefs, fmt.Sprintf("local %s = KEYS[%d]", indexVarName, len(keysDefs)+1))
 			keys = append(keys, r.connIndexByGroup(conn.EnvID, group.Hash))
-			indexUpdates = append(indexUpdates, fmt.Sprintf(`
--- Update index %s
-if isHealthy == 1 then
-	redis.call("SADD", %s, connID)
-else
-	redis.call("SREM", %s, connID)
-end
-`, indexVarName, indexVarName, indexVarName))
+			indexUpdates = append(indexUpdates, fmt.Sprintf(`-- Update index %s
+redis.call("SADD", %s, connID)`, indexVarName, indexVarName))
 
 			if group.AppID != nil {
 				indexVarName := fmt.Sprintf("indexConnectionsByAppIdKey%d", i)
 				keysDefs = append(keysDefs, fmt.Sprintf("local %s = KEYS[%d]", indexVarName, len(keysDefs)+1))
 				keys = append(keys, r.connIndexByApp(conn.EnvID, *group.AppID))
-				indexUpdates = append(indexUpdates, fmt.Sprintf(`
--- Update index %s
-if isHealthy == 1 then
-	redis.call("SADD", %s, connID)
-else
-	redis.call("SREM", %s, connID)
-end
-`, indexVarName, indexVarName, indexVarName))
+				indexUpdates = append(indexUpdates, fmt.Sprintf(`-- Update index %s
+redis.call("SADD", %s, connID)`, indexVarName, indexVarName))
 			}
+
+			i++
 		}
 	}
 
@@ -357,7 +363,7 @@ return 0
 		strings.Join(keysDefs, "\n"),
 		strings.Join(argDefs, "\n"),
 
-		strings.Join(groupUpserts, "\n"),
+		strings.Join(groupUpserts, "\n\n"),
 		strings.Join(indexUpdates, "\n\n"),
 	))
 	if err != nil {
