@@ -78,7 +78,7 @@ export function useApps({ envID, isArchived }: { envID: string; isArchived: bool
       }
 
       if (!result.data) {
-        return undefined;
+        return [];
       }
 
       // We are flattening the latestSync data to match the structure used in the DevServer
@@ -121,5 +121,6 @@ export function useApps({ envID, isArchived }: { envID: string; isArchived: bool
       return apps;
     },
     refetchInterval: 2000,
+    initialData: [],
   });
 }
