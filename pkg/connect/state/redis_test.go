@@ -720,6 +720,42 @@ func TestUpsertConnection(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, []*connect.ConnMetadata{expectedConn}, connsByGroup2)
 		})
+
+		t.Run("delete should drop all data", func(t *testing.T) {
+			err := connManager.DeleteConnection(ctx, envId, connId)
+			require.NoError(t, err)
+
+			// No groups created
+			require.False(t, r.Exists(groupsByEnvKey))
+
+			// No connections upserted
+			require.False(t, r.Exists(connectionsByEnvKey))
+
+			// No indexes created
+			require.False(t, r.Exists(connectionsByApp1Key))
+			require.False(t, r.Exists(connectionsByGroup1Key))
+			require.False(t, r.Exists(connectionsByGroup2Key))
+
+			retrievedConn, err := connManager.GetConnection(ctx, envId, connId)
+			require.NoError(t, err)
+			require.Nil(t, retrievedConn)
+
+			connsByEnv, err := connManager.GetConnectionsByEnvID(ctx, envId)
+			require.NoError(t, err)
+			require.Nil(t, connsByEnv)
+
+			connsByApp1, err := connManager.GetConnectionsByAppID(ctx, envId, appId1)
+			require.NoError(t, err)
+			require.Nil(t, connsByApp1)
+
+			connsByGroup1, err := connManager.GetConnectionsByGroupID(ctx, envId, group1Id)
+			require.NoError(t, err)
+			require.Nil(t, connsByGroup1)
+
+			connsByGroup2, err := connManager.GetConnectionsByGroupID(ctx, envId, group2Id)
+			require.NoError(t, err)
+			require.Nil(t, connsByGroup2)
+		})
 	})
 
 }

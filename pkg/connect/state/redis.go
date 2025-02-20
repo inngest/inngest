@@ -146,6 +146,10 @@ func (r *redisConnectionStateManager) GetConnectionsByEnvID(ctx context.Context,
 		return nil, err
 	}
 
+	if len(res) == 0 {
+		return nil, nil
+	}
+
 	conns := []*connpb.ConnMetadata{}
 	for _, meta := range res {
 		var conn connpb.ConnMetadata
@@ -202,6 +206,10 @@ func (r *redisConnectionStateManager) GetConnectionsByGroupID(ctx context.Contex
 	).AsStrSlice()
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving conns by group: %w", err)
+	}
+
+	if len(res) == 0 {
+		return nil, nil
 	}
 
 	conns := []*connpb.ConnMetadata{}
@@ -463,8 +471,6 @@ redis.call("SREM", %s, connID)`, connectionsByGroupIndexVarName, connectionsByGr
 local scount = tonumber(redis.call("SCARD", %s))
 if scount == 0 then
   redis.call("HDEL", indexWorkerGroupsByEnvIdKey, %s)
-
-  return 1
 end`, connectionsByGroupIndexVarName, groupIdVarName))
 
 			if group.AppID != nil {
