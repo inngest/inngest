@@ -3,12 +3,14 @@ package state
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"testing"
 	"time"
 )
@@ -55,6 +57,57 @@ func TestUpsertConnection(t *testing.T) {
 	require.False(t, r.Exists(connectionsByGroup1Key))
 	require.False(t, r.Exists(connectionsByGroup2Key))
 
+	group1 := &WorkerGroup{
+		AccountID:     accountId,
+		EnvID:         envId,
+		AppID:         &appId1,
+		SyncID:        &syncId1,
+		AppName:       "app-1",
+		AppVersion:    &app1Version,
+		SDKLang:       "go",
+		SDKVersion:    "v-test",
+		FunctionSlugs: []string{"fn-1", "fn-2"},
+		Hash:          group1Id,
+	}
+	group1Byt, err := json.Marshal(group1)
+	require.NoError(t, err)
+
+	group2 := &WorkerGroup{
+		AccountID:     accountId,
+		EnvID:         envId,
+		AppName:       "app-2",
+		AppVersion:    &app2Version,
+		SDKLang:       "go",
+		SDKVersion:    "v-test",
+		FunctionSlugs: []string{"fn-3", "fn-4"},
+		Hash:          group2Id,
+	}
+	group2Byt, err := json.Marshal(group2)
+	require.NoError(t, err)
+
+	groupIds := []string{group1Id, group2Id}
+
+	attrs := &connect.SystemAttributes{
+		CpuCores: 10,
+		MemBytes: 1024 * 1024,
+		Os:       "testOS",
+	}
+
+	expectedConn := &connect.ConnMetadata{
+		Id:       connId.String(),
+		GroupIds: groupIds,
+
+		InstanceId:      "my-worker",
+		Status:          connect.ConnectionStatus_READY,
+		SdkLanguage:     "go",
+		SdkVersion:      "v-test",
+		Attributes:      attrs,
+		GatewayId:       gatewayId.String(),
+		LastHeartbeatAt: timestamppb.New(lastHeartbeat),
+	}
+	connByt, err := json.Marshal(expectedConn)
+	require.NoError(t, err)
+
 	err = connManager.UpsertConnection(ctx, &Connection{
 		AccountID:    accountId,
 		EnvID:        envId,
@@ -76,50 +129,44 @@ func TestUpsertConnection(t *testing.T) {
 				},
 			},
 			WorkerManualReadinessAck: false,
-			SystemAttributes: &connect.SystemAttributes{
-				CpuCores: 10,
-				MemBytes: 1024 * 1024,
-				Os:       "testOS",
-			},
-			SdkVersion:  "v-test",
-			SdkLanguage: "go",
+			SystemAttributes:         attrs,
+			SdkVersion:               "v-test",
+			SdkLanguage:              "go",
 		},
 		Groups: map[string]*WorkerGroup{
-			"app-1": {
-				AccountID:     accountId,
-				EnvID:         envId,
-				AppID:         &appId1,
-				SyncID:        &syncId1,
-				AppName:       "app-1",
-				AppVersion:    &app1Version,
-				SDKLang:       "go",
-				SDKVersion:    "v-test",
-				FunctionSlugs: []string{"fn-1", "fn-2"},
-				Hash:          group1Id,
-			},
-			"app-2": {
-				AccountID:     accountId,
-				EnvID:         envId,
-				AppName:       "app-2",
-				AppVersion:    &app2Version,
-				SDKLang:       "go",
-				SDKVersion:    "v-test",
-				FunctionSlugs: []string{"fn-3", "fn-4"},
-				Hash:          group2Id,
-			},
+			group1Id: group1,
+			group2Id: group2,
 		},
 		GatewayId: gatewayId,
-	}, connect.ConnectionStatus_CONNECTED, lastHeartbeat)
+	}, connect.ConnectionStatus_READY, lastHeartbeat)
 	require.NoError(t, err)
 
-	// No groups created
+	// Groups created
 	require.True(t, r.Exists(groupsByEnvKey))
+	require.Equal(t, string(group1Byt), r.HGet(groupsByEnvKey, group1Id))
+	require.Equal(t, string(group2Byt), r.HGet(groupsByEnvKey, group2Id))
 
-	// No connections upserted
+	// Connections upserted
 	require.True(t, r.Exists(connectionsByEnvKey))
+	hkeysByEnv, err := r.HKeys(connectionsByEnvKey)
+	require.NoError(t, err)
+	require.Equal(t, []string{connId.String()}, hkeysByEnv)
+	require.Equal(t, string(connByt), r.HGet(connectionsByEnvKey, connId.String()))
 
-	// No indexes created
+	// Indexes created
 	require.True(t, r.Exists(connectionsByApp1Key))
+	membersByApp1, err := r.SMembers(connectionsByApp1Key)
+	require.NoError(t, err)
+	require.Equal(t, []string{connId.String()}, membersByApp1)
+
 	require.True(t, r.Exists(connectionsByGroup1Key))
+	membersByGroup1, err := r.SMembers(connectionsByGroup1Key)
+	require.NoError(t, err)
+	require.Equal(t, []string{connId.String()}, membersByGroup1)
+
 	require.True(t, r.Exists(connectionsByGroup2Key))
+	membersByGroup2, err := r.SMembers(connectionsByGroup2Key)
+	require.NoError(t, err)
+	require.Equal(t, []string{connId.String()}, membersByGroup2)
+
 }

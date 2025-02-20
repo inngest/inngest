@@ -218,6 +218,25 @@ func (r *redisConnectionStateManager) GetConnectionsByGroupID(ctx context.Contex
 }
 
 func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn *Connection, status connpb.ConnectionStatus, lastHeartbeatAt time.Time) error {
+	// Reduce variations by sorting groups based on syncs
+	sortedGroups := make([]*WorkerGroup, 0, len(conn.Groups))
+	for _, group := range conn.Groups {
+		sortedGroups = append(sortedGroups, group)
+	}
+	slices.SortStableFunc(sortedGroups, func(a, b *WorkerGroup) int {
+		// If a is synced but b isn't, a should come first
+		if a.AppID != nil && b.AppID == nil {
+			return -1
+		}
+
+		// If b is synced but a isn't, b should come first
+		if a.AppID == nil && b.AppID != nil {
+			return 1
+		}
+
+		return strings.Compare(a.Hash, b.Hash)
+	})
+
 	groupIds := make([]string, 0, len(conn.Groups))
 	for _, group := range conn.Groups {
 		groupIds = append(groupIds, group.Hash)
@@ -283,25 +302,6 @@ func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn
 
 	groupUpserts := make([]string, 0)
 	indexUpdates := make([]string, 0)
-
-	// Reduce variations by sorting groups based on syncs
-	sortedGroups := make([]*WorkerGroup, 0, len(conn.Groups))
-	for _, group := range conn.Groups {
-		sortedGroups = append(sortedGroups, group)
-	}
-	slices.SortStableFunc(sortedGroups, func(a, b *WorkerGroup) int {
-		// If a is synced but b isn't, a should come first
-		if a.AppID != nil && b.AppID == nil {
-			return -1
-		}
-
-		// If b is synced but a isn't, b should come first
-		if a.AppID == nil && b.AppID != nil {
-			return 1
-		}
-
-		return 0
-	})
 
 	{
 		i := 0

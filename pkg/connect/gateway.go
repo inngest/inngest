@@ -246,12 +246,12 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		{
 			eg := errgroup.Group{}
 			eg.SetLimit(10) // Limit concurrent syncs
-			for appName, group := range conn.Groups {
+			for _, group := range conn.Groups {
 				group := group
 				eg.Go(func() error {
 					err := group.Sync(ctx, c.stateManager, c.apiBaseUrl, conn.Data)
 					if err != nil {
-						return fmt.Errorf("could not sync app %q: %w", appName, err)
+						return fmt.Errorf("could not sync app %q: %w", group.AppName, err)
 					}
 					return nil
 				})
@@ -784,7 +784,7 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 				}
 
 				lock.Lock()
-				workerGroups[app.AppName] = workerGroup
+				workerGroups[workerGroup.Hash] = workerGroup
 				lock.Unlock()
 
 				return nil
