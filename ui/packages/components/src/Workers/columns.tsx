@@ -29,7 +29,7 @@ export function useColumns() {
     columnHelper.display({
       id: 'expander',
       header: () => null,
-      size: 60,
+      size: 30,
       cell: ({ row }: { row: Row<Worker> }) => {
         return row.getCanExpand() ? (
           <Button
