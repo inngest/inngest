@@ -1871,7 +1871,7 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 
 	groups := opGroups(resp.Generator)
 
-	if stepCount > 1 && i.md.ShouldCoalesceParallelism() {
+	if stepCount > 1 && i.md.ShouldCoalesceParallelism(resp) {
 		if err := e.smv2.SavePending(ctx, i.md.ID, groups.IDs()); err != nil {
 			return fmt.Errorf("error saving pending steps: %w", err)
 		}
