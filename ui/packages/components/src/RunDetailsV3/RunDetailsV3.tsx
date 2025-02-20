@@ -10,6 +10,7 @@ import { Trace as OldTrace } from '../TimelineV2';
 import { TriggerDetails } from '../TriggerDetails';
 import type { Result } from '../types/functionRun';
 import { nullishToLazy } from '../utils/lazyLoad';
+import { LegacyRunsToggle } from './LegacyRunsToggle';
 import { RunInfo } from './RunInfo';
 import { StepInfo } from './StepInfo';
 import { Tabs } from './Tabs';
@@ -136,10 +137,13 @@ export const RunDetailsV3 = (props: Props) => {
   return (
     <>
       {standalone && run && (
-        <div className="border-muted mb-2 flex flex-col gap-1 border-b px-4 pb-4">
-          <StatusCell status={run.trace.status} />
-          <p className="text-basis text-2xl font-medium">{run.fn.name}</p>
-          <p className="text-subtle font-mono">{runID}</p>
+        <div className="border-muted flex flex-row items-start justify-between border-b px-4 pb-4">
+          <div className="flex flex-col gap-1">
+            <StatusCell status={run.trace.status} />
+            <p className="text-basis text-2xl font-medium">{run.fn.name}</p>
+            <p className="text-subtle font-mono">{runID}</p>
+          </div>
+          <LegacyRunsToggle traceAIEnabled={true} />
         </div>
       )}
       <div ref={containerRef} className="flex h-full flex-row">

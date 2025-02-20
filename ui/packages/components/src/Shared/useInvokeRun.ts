@@ -19,7 +19,7 @@ export const useInvokeRun = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const invoke = async (payload: SharedDefinitions['invokeRun']['payload']) => {
+  const invoke = async (payload: InvokeRunPayload) => {
     try {
       setLoading(true);
       setError(null);

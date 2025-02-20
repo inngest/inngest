@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import { RiArrowUpSLine } from '@remixicon/react';
 import { useQuery } from '@tanstack/react-query';
@@ -15,16 +14,13 @@ import {
   TimeElement,
 } from '../DetailsCard/Element';
 import { InvokeModal } from '../InvokeButton';
-// NOTE - This component should be a shared component as part of the design system.
-// Until then, we re-use it from the RunDetailsV2 as these are part of the same parent UI.
 import { ErrorCard } from '../RunDetailsV2/ErrorCard';
 import { useInvokeRun } from '../Shared/useInvokeRun';
 import { usePrettyJson } from '../hooks/usePrettyJson';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
 import type { Result } from '../types/functionRun';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
-import { Input } from './Input';
-import { Output } from './Output';
+import { IO } from './IO';
 import { Tabs } from './Tabs';
 
 type TopInfoProps = {
@@ -134,12 +130,12 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
   return (
     <div className="flex h-full flex-col gap-2">
       <div className="flex h-11 w-full flex-row items-center justify-between border-none px-4">
-        <div className="text-basis flex items-center justify-start gap-2">
+        <div
+          className="text-basis flex cursor-pointer items-center justify-start gap-2"
+          onClick={() => setExpanded(!expanded)}
+        >
           <RiArrowUpSLine
-            className={`cursor-pointer transition-transform duration-500 ${
-              expanded ? 'rotate-180' : ''
-            }`}
-            onClick={() => setExpanded(!expanded)}
+            className={`transition-transform duration-500 ${expanded ? 'rotate-180' : ''}`}
           />
           {isPending ? (
             <SkeletonElement />
@@ -242,13 +238,29 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
       )}
 
       <Tabs
-        defaultActive={0}
+        defaultActive={result?.error ? 2 : 0}
         tabs={[
           {
             label: 'Input',
-            node: <Input title="Function Payload" raw={prettyPayload} actions={codeBlockActions} />,
+            node: <IO title="Function Payload" raw={prettyPayload} actions={codeBlockActions} />,
           },
-          { label: 'Output', node: <Output raw={prettyOutput} /> },
+          { label: 'Output', node: <IO title="Output" raw={prettyOutput} /> },
+          ...(result?.error
+            ? [
+                {
+                  label: 'Error',
+                  node: (
+                    <IO
+                      title={`${result.error.name || 'Error'} ${
+                        result.error.message ? `: ${result.error.message}` : ''
+                      }`}
+                      raw={result.error.stack ?? ''}
+                      error={true}
+                    />
+                  ),
+                },
+              ]
+            : []),
         ]}
       />
     </div>

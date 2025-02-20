@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
+import { LegacyRunsToggle } from '../RunDetailsV3/LegacyRunsToggle';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { StatusCell } from '../Table';
 import { Trace as OldTrace } from '../TimelineV2';
@@ -24,6 +25,7 @@ type Props = {
   pollInterval?: number;
   rerun: React.ComponentProps<typeof RunInfo>['rerun'];
   runID: string;
+  traceAIEnabled?: boolean;
 };
 
 type Run = {
@@ -88,10 +90,13 @@ export function RunDetailsV2(props: Props) {
   return (
     <div>
       {standalone && run && (
-        <div className="mx-8 flex flex-col gap-1 pb-6">
-          <StatusCell status={run.trace.status} />
-          <p className="text-basis text-2xl font-medium">{run.fn.name}</p>
-          <p className="text-subtle font-mono">{runID}</p>
+        <div className="flex flex-row items-start justify-between px-4 pb-4">
+          <div className="flex flex-col gap-1">
+            <StatusCell status={run.trace.status} />
+            <p className="text-basis text-2xl font-medium">{run.fn.name}</p>
+            <p className="text-subtle font-mono">{runID}</p>
+          </div>
+          <LegacyRunsToggle traceAIEnabled={!!props.traceAIEnabled} />
         </div>
       )}
 
