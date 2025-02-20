@@ -1175,7 +1175,7 @@ func (q *Queries) GetTraceSpans(ctx context.Context, arg GetTraceSpansParams) ([
 const getWorkerConnection = `-- name: GetWorkerConnection :one
 ;
 
-SELECT account_id, workspace_id, app_id, id, gateway_id, instance_id, status, worker_ip, connected_at, last_heartbeat_at, disconnected_at, recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, app_version, function_count, cpu_cores, mem_bytes, os FROM worker_connections WHERE account_id = ?1 AND workspace_id = ?2 AND id = ?3
+SELECT account_id, workspace_id, app_name, app_id, id, gateway_id, instance_id, status, worker_ip, connected_at, last_heartbeat_at, disconnected_at, recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, app_version, function_count, cpu_cores, mem_bytes, os FROM worker_connections WHERE account_id = ?1 AND workspace_id = ?2 AND id = ?3
 `
 
 type GetWorkerConnectionParams struct {
@@ -1190,6 +1190,7 @@ func (q *Queries) GetWorkerConnection(ctx context.Context, arg GetWorkerConnecti
 	err := row.Scan(
 		&i.AccountID,
 		&i.WorkspaceID,
+		&i.AppName,
 		&i.AppID,
 		&i.ID,
 		&i.GatewayID,
@@ -1611,14 +1612,16 @@ func (q *Queries) InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) 
 const insertWorkerConnection = `-- name: InsertWorkerConnection :exec
 
 INSERT INTO worker_connections (
-    account_id, workspace_id, app_id, id, gateway_id, instance_id, status, worker_ip, connected_at, last_heartbeat_at, disconnected_at,
+    account_id, workspace_id, app_name, app_id, id, gateway_id, instance_id, status, worker_ip, connected_at, last_heartbeat_at, disconnected_at,
     recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, app_version, function_count, cpu_cores, mem_bytes, os
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id)
 DO UPDATE SET
     account_id = excluded.account_id,
     workspace_id = excluded.workspace_id,
+
+    app_name = excluded.app_name,
     app_id = excluded.app_id,
 
     id = excluded.id,
@@ -1651,6 +1654,7 @@ DO UPDATE SET
 type InsertWorkerConnectionParams struct {
 	AccountID        uuid.UUID
 	WorkspaceID      uuid.UUID
+	AppName          string
 	AppID            *uuid.UUID
 	ID               ulid.ULID
 	GatewayID        ulid.ULID
@@ -1680,6 +1684,7 @@ func (q *Queries) InsertWorkerConnection(ctx context.Context, arg InsertWorkerCo
 	_, err := q.db.ExecContext(ctx, insertWorkerConnection,
 		arg.AccountID,
 		arg.WorkspaceID,
+		arg.AppName,
 		arg.AppID,
 		arg.ID,
 		arg.GatewayID,

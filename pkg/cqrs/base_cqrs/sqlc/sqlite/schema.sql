@@ -157,6 +157,7 @@ CREATE TABLE worker_connections (
     account_id CHAR(36) NOT NULL,
     workspace_id CHAR(36) NOT NULL,
 
+    app_name VARCHAR NOT NULL,
     app_id CHAR(36),
 
     id CHAR(26) PRIMARY KEY,

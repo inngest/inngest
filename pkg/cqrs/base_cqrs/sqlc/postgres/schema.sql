@@ -160,6 +160,7 @@ CREATE TABLE worker_connections (
     account_id UUID NOT NULL,
     workspace_id UUID NOT NULL,
 
+    app_name VARCHAR NOT NULL,
     app_id UUID,
 
     id BYTEA PRIMARY KEY,
