@@ -26,7 +26,7 @@ export function useLatestUnattachedSync({ envID }: { envID: string }) {
       }
 
       if (!result.data?.environment.unattachedSyncs[0]) {
-        return undefined;
+        return null;
       }
 
       return new Date(result.data.environment.unattachedSyncs[0].lastSyncedAt);

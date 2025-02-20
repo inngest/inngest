@@ -77,50 +77,48 @@ export function useApps({ envID, isArchived }: { envID: string; isArchived: bool
         throw result.error;
       }
 
-      if (!result.data) {
-        return [];
+      if (result.data) {
+        // We are flattening the latestSync data to match the structure used in the DevServer
+        const apps = result.data.environment.apps
+          .map(({ latestSync, functions, ...app }) => {
+            const latestSyncData: Omit<FlattenedApp, keyof typeof app | 'functions'> = latestSync
+              ? {
+                  lastSyncedAt: new Date(latestSync.lastSyncedAt),
+                  error: latestSync.error,
+                  framework: transformFramework(latestSync.framework),
+                  platform: transformPlatform(latestSync.platform),
+                  sdkLanguage: transformLanguage(latestSync.sdkLanguage),
+                  sdkVersion: latestSync.sdkVersion,
+                  status: latestSync.status,
+                  url: latestSync.url,
+                }
+              : {
+                  lastSyncedAt: undefined,
+                  error: undefined,
+                  framework: undefined,
+                  platform: undefined,
+                  sdkLanguage: undefined,
+                  sdkVersion: undefined,
+                  status: undefined,
+                  url: undefined,
+                };
+
+            return {
+              ...app,
+              ...latestSyncData,
+              functions: functions.map((fn) => ({
+                ...fn,
+                triggers: transformTriggers(fn.triggers),
+              })),
+              __typename: 'App' as const,
+            };
+          })
+          .filter((app) => app.lastSyncedAt && app.isArchived === isArchived);
+
+        return apps;
       }
-
-      // We are flattening the latestSync data to match the structure used in the DevServer
-      const apps = result.data.environment.apps
-        .map(({ latestSync, functions, ...app }) => {
-          const latestSyncData: Omit<FlattenedApp, keyof typeof app | 'functions'> = latestSync
-            ? {
-                lastSyncedAt: new Date(latestSync.lastSyncedAt),
-                error: latestSync.error,
-                framework: transformFramework(latestSync.framework),
-                platform: transformPlatform(latestSync.platform),
-                sdkLanguage: transformLanguage(latestSync.sdkLanguage),
-                sdkVersion: latestSync.sdkVersion,
-                status: latestSync.status,
-                url: latestSync.url,
-              }
-            : {
-                lastSyncedAt: undefined,
-                error: undefined,
-                framework: undefined,
-                platform: undefined,
-                sdkLanguage: undefined,
-                sdkVersion: undefined,
-                status: undefined,
-                url: undefined,
-              };
-
-          return {
-            ...app,
-            ...latestSyncData,
-            functions: functions.map((fn) => ({
-              ...fn,
-              triggers: transformTriggers(fn.triggers),
-            })),
-            __typename: 'App' as const,
-          };
-        })
-        .filter((app) => app.lastSyncedAt && app.isArchived === isArchived);
-
-      return apps;
+      return [];
     },
     refetchInterval: 2000,
-    initialData: [],
   });
 }
