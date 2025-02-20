@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { RiArrowUpSLine } from '@remixicon/react';
 import { useQuery } from '@tanstack/react-query';
@@ -14,8 +14,6 @@ import {
   TimeElement,
 } from '../DetailsCard/Element';
 import { InvokeModal } from '../InvokeButton';
-// NOTE - This component should be a shared component as part of the design system.
-// Until then, we re-use it from the RunDetailsV2 as these are part of the same parent UI.
 import { ErrorCard } from '../RunDetailsV2/ErrorCard';
 import { useInvokeRun } from '../Shared/useInvokeRun';
 import { usePrettyJson } from '../hooks/usePrettyJson';
@@ -132,12 +130,12 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
   return (
     <div className="flex h-full flex-col gap-2">
       <div className="flex h-11 w-full flex-row items-center justify-between border-none px-4">
-        <div className="text-basis flex items-center justify-start gap-2">
+        <div
+          className="text-basis flex cursor-pointer items-center justify-start gap-2"
+          onClick={() => setExpanded(!expanded)}
+        >
           <RiArrowUpSLine
-            className={`cursor-pointer transition-transform duration-500 ${
-              expanded ? 'rotate-180' : ''
-            }`}
-            onClick={() => setExpanded(!expanded)}
+            className={`transition-transform duration-500 ${expanded ? 'rotate-180' : ''}`}
           />
           {isPending ? (
             <SkeletonElement />

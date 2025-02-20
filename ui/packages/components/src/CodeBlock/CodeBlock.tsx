@@ -247,7 +247,7 @@ export function CodeBlock({
   return (
     <>
       {monaco && (
-        <div className={cn('relative', fullScreen && 'bg-canvasBase fixed inset-0 z-50')}>
+        <div className={cn('relative', fullScreen && 'bg-canvasBase fixed inset-0 z-[52]')}>
           <div className={cn('bg-canvasBase border-subtle border-b')}>
             <div
               className={cn(

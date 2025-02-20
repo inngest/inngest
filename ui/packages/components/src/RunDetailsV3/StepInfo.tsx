@@ -12,8 +12,6 @@ import {
   TimeElement,
 } from '../DetailsCard/Element';
 import { RerunModal } from '../Rerun/RerunModal';
-// NOTE - This component should be a shared component as part of the design system.
-// Until then, we re-use it from the RunDetailsV2 as these are part of the same parent UI.
 import { Time } from '../Time';
 import { usePrettyJson } from '../hooks/usePrettyJson';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
@@ -143,12 +141,12 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
   return (
     <div className="flex h-full flex-col gap-2">
       <div className="flex h-11 w-full flex-row items-center justify-between border-none px-4">
-        <div className="text-basis flex items-center justify-start gap-2">
+        <div
+          className="text-basis flex cursor-pointer items-center justify-start gap-2"
+          onClick={() => setExpanded(!expanded)}
+        >
           <RiArrowUpSLine
-            className={`cursor-pointer transition-transform duration-500 ${
-              expanded ? 'rotate-180' : ''
-            }`}
-            onClick={() => setExpanded(!expanded)}
+            className={`transition-transform duration-500 ${expanded ? 'rotate-180' : ''}`}
           />
 
           <span className="text-basis text-sm font-normal">{trace.name}</span>
@@ -212,8 +210,8 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
       <Tabs
         defaultActive={result?.error ? 2 : 0}
         tabs={[
-          { label: 'Input', node: <IO title="Input" raw={prettyInput} /> },
-          { label: 'Output', node: <IO title="Output" raw={prettyOutput} /> },
+          { label: 'Input', node: <IO title="Step Input" raw={prettyInput} /> },
+          { label: 'Output', node: <IO title="Step Output" raw={prettyOutput} /> },
           ...(result?.error
             ? [
                 {

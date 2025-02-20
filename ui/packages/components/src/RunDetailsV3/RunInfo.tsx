@@ -82,17 +82,19 @@ export const RunInfo = ({
     <div className="flex flex-col gap-2">
       <div className="flex h-11 w-full flex-row items-center justify-between border-none">
         <div className="text-basis flex items-center justify-start gap-2">
-          <RiArrowUpSLine
-            className={`cursor-pointer transition-transform duration-500 ${
-              expanded ? 'rotate-180' : ''
-            }`}
+          <div
+            className="flex  cursor-pointer items-center gap-2"
             onClick={() => setExpanded(!expanded)}
-          />
-          {isLazyDone(run) ? (
-            <span className="text-basis text-sm font-normal">{run.fn.name}</span>
-          ) : (
-            <SkeletonElement />
-          )}
+          >
+            <RiArrowUpSLine
+              className={`transition-transform duration-500 ${expanded ? 'rotate-180' : ''}`}
+            />
+            {isLazyDone(run) ? (
+              <span className="text-basis text-sm font-normal">{run.fn.name}</span>
+            ) : (
+              <SkeletonElement />
+            )}
+          </div>
           {!standalone && (
             <Link
               size="medium"

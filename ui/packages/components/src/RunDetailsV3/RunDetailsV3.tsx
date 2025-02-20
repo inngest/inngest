@@ -1,12 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button } from '@inngest/components/Button';
 import { useQuery } from '@tanstack/react-query';
 
 import { ErrorCard } from '../RunDetailsV2/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
-import { useLegacyTrace } from '../Shared/useLegacyTrace';
 import { StatusCell } from '../Table/Cell';
 import { Trace as OldTrace } from '../TimelineV2';
 import { TriggerDetails } from '../TriggerDetails';
