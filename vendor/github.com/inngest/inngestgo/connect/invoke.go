@@ -66,6 +66,10 @@ func (h *connectHandler) connectInvoke(ctx context.Context, ws *websocket.Conn, 
 		return nil, fmt.Errorf("invalid gateway message data: %w", err)
 	}
 
+	if body.AppName == "" {
+		return nil, fmt.Errorf("missing app name in executor request")
+	}
+
 	invoker, ok := h.invokers[body.AppName]
 	if !ok {
 		return nil, fmt.Errorf("no invoker for app name %q", body.AppName)

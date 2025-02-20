@@ -255,8 +255,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					return nil
 				})
 			}
-			err := eg.Wait()
-			if err != nil {
+
+			if err := eg.Wait(); err != nil {
 				if ctx.Err() != nil {
 					c.closeDraining(ws)
 					return

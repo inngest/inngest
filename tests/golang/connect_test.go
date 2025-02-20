@@ -72,7 +72,7 @@ func TestEndToEnd(t *testing.T) {
 				a.Equal(1, len(reply.Data))
 
 				if len(reply.Data) > 0 {
-					for _, wgHash := range reply.Data[0].WorkerGroups {
+					for _, wgHash := range reply.Data[0].AllWorkerGroups {
 						workerGroupID = wgHash
 						break
 					}

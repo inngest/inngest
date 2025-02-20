@@ -139,11 +139,22 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 
 			connId, err := ulid.Parse(routeTo.Id)
 			if err != nil {
-				c.logger.Error("invalid connection ID", "conn_id", routeTo.Id, "err", err)
+				log.Error("invalid connection ID", "conn_id", routeTo.Id, "err", err)
 				return
 			}
 
-			log = log.With("gateway_id", routeTo.GatewayId, "conn_id", routeTo.Id, "group_hash", routeTo.SyncedWorkerGroups[data.AppId])
+			groupHash := routeTo.SyncedWorkerGroups[data.AppId]
+			log = log.With("gateway_id", routeTo.GatewayId, "conn_id", routeTo.Id, "group_hash", groupHash)
+
+			group, err := c.stateManager.GetWorkerGroupByHash(ctx, envID, groupHash)
+			if err != nil {
+				log.Error("failed to load worker group after successful connection selection", "err", err)
+				return
+			}
+
+			// Set app name: This is important to help the SDK find the respective function to invoke
+			data.AppName = group.AppName
+
 			span.SetAttributes(
 				attribute.String("route_to_gateway_id", gatewayId.String()),
 				attribute.String("route_to_conn_id", connId.String()),

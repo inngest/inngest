@@ -644,7 +644,6 @@ func (i *redisPubSubConnector) RouteExecutorRequest(ctx context.Context, gateway
 
 	channelName := i.channelGatewayAppRequests(gatewayId, connId)
 
-	// TODO Test whether this works with marshaled Protobuf bytes
 	err = i.client.Do(ctx, i.client.B().Publish().Channel(channelName).Message(string(dataBytes)).Build()).Error()
 	if err != nil {
 		i.logger.Error("could not forward request to gateway", "err", err, "gateway_id", gatewayId, "channel", channelName, "request_id", data.RequestId, "conn_id", connId, "app_id", data.AppId)
