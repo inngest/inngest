@@ -248,14 +248,14 @@ func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn
 	}
 	r.sortGroups(sortedGroups)
 
-	groupIds := make([]string, 0, len(conn.Groups))
+	workerGroups := make(map[string]string)
 	for _, group := range sortedGroups {
-		groupIds = append(groupIds, group.Hash)
+		workerGroups[group.AppName] = group.Hash
 	}
 
 	meta := &connpb.ConnMetadata{
-		Id:       conn.ConnectionId.String(),
-		GroupIds: groupIds,
+		Id:           conn.ConnectionId.String(),
+		WorkerGroups: workerGroups,
 
 		InstanceId:      conn.Data.InstanceId,
 		Status:          status,
@@ -410,7 +410,12 @@ func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, envI
 		return nil
 	}
 
-	groups, err := r.GetWorkerGroupsByHash(ctx, envID, existingConn.GroupIds)
+	groupHashes := make([]string, 0, len(existingConn.WorkerGroups))
+	for _, groupHash := range existingConn.WorkerGroups {
+		groupHashes = append(groupHashes, groupHash)
+	}
+
+	groups, err := r.GetWorkerGroupsByHash(ctx, envID, groupHashes)
 	if err != nil {
 		return fmt.Errorf("could not get worker groups for connection: %w", err)
 	}
