@@ -6,10 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
+	oteltrace "go.opentelemetry.io/otel/trace"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"log/slog"
 	"sync"
 	"time"
@@ -76,6 +79,9 @@ type RequestReceiver interface {
 
 	// AckMessage sends an acknowledgment for a specific request.
 	AckMessage(ctx context.Context, appId uuid.UUID, requestId string, source AckSource) error
+
+	// NackMessage sends a negative acknowledgment for a specific request.
+	NackMessage(ctx context.Context, appId uuid.UUID, requestId string, source AckSource, reason syscode.Error) error
 
 	// Wait blocks and listens for incoming PubSub messages for the internal subscribers. This must be run before
 	// subscribing to any channels to ensure that the PubSub client is connected and ready to receive messages.
@@ -164,15 +170,30 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 
 	// Await ack from router BEFORE response
 	routerAckErrChan := make(chan error)
-	var routerAcked bool
+	var routerAcked connect.PubSubAckMessage
 	{
 		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		go func() {
-			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(opts.AppID, opts.Data.RequestId, AckSourceRouter), func(_ string) {
-				routerAcked = true
+			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(opts.AppID, opts.Data.RequestId, AckSourceRouter), func(msgData string) {
+				err := proto.Unmarshal([]byte(msgData), &routerAcked)
+				if err != nil {
+					span.RecordError(err)
+					span.SetStatus(codes.Error, "unmarshaling router ack message failed")
+					return
+				}
 
-				span.AddEvent("RouterAck")
+				if routerAcked.GetNack() {
+					attrs := []attribute.KeyValue{}
+					if routerAcked.GetNackReason() != nil {
+						attrs = append(attrs, attribute.String("reason_code", routerAcked.GetNackReason().GetCode()))
+						attrs = append(attrs, attribute.String("reason_message", routerAcked.GetNackReason().GetMessage()))
+					}
+					span.AddEvent("RouterNack", oteltrace.WithAttributes(attrs...))
+				} else {
+					span.AddEvent("RouterAck")
+				}
+
 				metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
@@ -236,7 +257,12 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 
 			err := proto.Unmarshal([]byte(msg), &reply)
 			if err != nil {
-				// TODO This should never happen, push message into dead-letter channel and report
+				// This should never happen
+				span.SetAttributes(
+					attribute.String("msg", msg),
+				)
+				span.RecordError(err)
+				span.SetStatus(codes.Error, "unmarshaling sdk response proto failed")
 				return
 			}
 		}, true)
@@ -246,7 +272,6 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	// After setting up ack and reply subscriptions, publish the request to the router, which forwards to the most suitable gateway
 	channelName := i.channelExecutorRequests()
 
-	// TODO Test whether this works with marshaled Protobuf bytes
 	err = i.client.Do(ctx, i.client.B().Publish().Channel(channelName).Message(string(dataBytes)).Build()).Error()
 	if err != nil {
 		span.RecordError(err)
@@ -266,9 +291,19 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			return nil, fmt.Errorf("could not receive executor request ack by router: %w", err)
 		}
 
-		if !routerAcked {
+		if routerAcked.Ts == nil {
 			span.SetStatus(codes.Error, "router did not ack")
 			return nil, fmt.Errorf("router did not ack in time")
+		}
+
+		if routerAcked.GetNack() {
+			if routerAcked.GetNackReason() != nil {
+				return nil, syscode.Error{
+					Code:    routerAcked.GetNackReason().GetCode(),
+					Message: routerAcked.GetNackReason().GetMessage(),
+				}
+			}
+			return nil, fmt.Errorf("router sent nack without reason")
 		}
 	}
 
@@ -543,12 +578,58 @@ func (i *redisPubSubConnector) NotifyExecutor(ctx context.Context, resp *connect
 
 // AckMessage sends an acknowledgment for a specific request.
 func (i *redisPubSubConnector) AckMessage(ctx context.Context, appId uuid.UUID, requestId string, source AckSource) error {
-	err := i.client.Do(
+	msgBytes, err := proto.Marshal(&connect.PubSubAckMessage{
+		Ts: timestamppb.Now(),
+	})
+	if err != nil {
+		return fmt.Errorf("could not marshal ack message: %w", err)
+	}
+
+	err = i.client.Do(
 		ctx,
 		i.client.B().
 			Publish().
 			Channel(i.channelAppRequestsAck(appId, requestId, source)).
-			Message(time.Now().Format(time.RFC3339)).
+			Message(string(msgBytes)).
+			Build()).
+		Error()
+	if err != nil {
+		return fmt.Errorf("could not publish response: %w", err)
+	}
+
+	return nil
+}
+
+// NackMessage sends a negative acknowledgment for a specific request.
+func (i *redisPubSubConnector) NackMessage(ctx context.Context, appId uuid.UUID, requestId string, source AckSource, reason syscode.Error) error {
+	var marshaledData []byte
+	if reason.Data != nil {
+		marshaled, err := json.Marshal(reason.Data)
+		if err != nil {
+			return fmt.Errorf("could not marshal reason data: %w", err)
+		}
+		marshaledData = marshaled
+	}
+
+	nackMessage, err := proto.Marshal(&connect.PubSubAckMessage{
+		Ts:   timestamppb.Now(),
+		Nack: proto.Bool(true),
+		NackReason: &connect.SystemError{
+			Code:    reason.Code,
+			Data:    marshaledData,
+			Message: reason.Message,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("could not marshal nack message: %w", err)
+	}
+
+	err = i.client.Do(
+		ctx,
+		i.client.B().
+			Publish().
+			Channel(i.channelAppRequestsAck(appId, requestId, source)).
+			Message(string(nackMessage)).
 			Build()).
 		Error()
 	if err != nil {

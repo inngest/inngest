@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { useShared, type SharedDefinitions } from './SharedContext';
+import { useShared } from './SharedContext';
 
 export type RerunFromStepPayload = {
   runID: string;
@@ -20,7 +20,7 @@ export const useRerunFromStep = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const rerun = async (payload: SharedDefinitions['rerunFromStep']['payload']) => {
+  const rerun = async (payload: RerunFromStepPayload) => {
     try {
       setLoading(true);
       setError(null);

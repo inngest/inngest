@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { RunDetailsV2 } from '@inngest/components/RunDetailsV2';
 import { RunDetailsV3 } from '@inngest/components/RunDetailsV3/RunDetailsV3';
+import { useLegacyTrace } from '@inngest/components/Shared/useLegacyTrace';
 import { cn } from '@inngest/components/utils/classNames';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -26,6 +27,8 @@ export function DashboardRunDetails({ runID, standalone = true }: Props) {
   const getTraceResult = useGetTraceResult();
   const { value: traceAIEnabled, isReady } = useBooleanFlag('ai-traces');
 
+  const { enabled: legacyTraceEnabled } = useLegacyTrace();
+
   const internalPathCreator = useMemo(() => {
     return {
       // The shared component library is environment-agnostic, so it needs a way to
@@ -44,7 +47,7 @@ export function DashboardRunDetails({ runID, standalone = true }: Props) {
 
   return (
     <div className={cn('overflow-y-auto', standalone && 'pt-8')}>
-      {isReady && traceAIEnabled ? (
+      {isReady && traceAIEnabled && !legacyTraceEnabled ? (
         <RunDetailsV3
           pathCreator={internalPathCreator}
           standalone={standalone}
@@ -65,6 +68,7 @@ export function DashboardRunDetails({ runID, standalone = true }: Props) {
           getTrigger={getTrigger}
           rerun={rerun}
           runID={runID}
+          traceAIEnabled={traceAIEnabled}
         />
       )}
     </div>

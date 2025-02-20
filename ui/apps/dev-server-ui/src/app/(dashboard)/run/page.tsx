@@ -2,6 +2,7 @@
 
 import { RunDetailsV2 } from '@inngest/components/RunDetailsV2/RunDetailsV2';
 import { RunDetailsV3 } from '@inngest/components/RunDetailsV3/RunDetailsV3';
+import { useLegacyTrace } from '@inngest/components/Shared/useLegacyTrace';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import { cn } from '@inngest/components/utils/classNames';
 
@@ -21,6 +22,7 @@ export default function Page() {
   const rerun = useRerun();
 
   const traceAIEnabled = false;
+  const { enabled: legacyTraceEnabled } = useLegacyTrace();
 
   if (!runID) {
     throw new Error('missing runID in search params');
@@ -28,7 +30,7 @@ export default function Page() {
 
   return (
     <div className={cn('bg-canvasBase overflow-y-auto pt-8')}>
-      {traceAIEnabled ? (
+      {traceAIEnabled && !legacyTraceEnabled ? (
         <RunDetailsV3
           pathCreator={pathCreator}
           standalone
@@ -51,6 +53,7 @@ export default function Page() {
           pollInterval={2500}
           rerun={rerun}
           runID={runID}
+          traceAIEnabled={traceAIEnabled}
         />
       )}
     </div>
