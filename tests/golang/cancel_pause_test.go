@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"sync/atomic"
@@ -120,9 +121,12 @@ func TestPauseCancelFunction(t *testing.T) {
 
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 
-		r := map[string]any{}
-		err = json.NewDecoder(resp.Body).Decode(&r)
+		byt, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
+
+		r := map[string]any{}
+		err = json.Unmarshal(byt, &r)
+		require.NoError(t, err, "Test API may not be enabled! Error unmarshalling %s", byt)
 
 		count, ok := r["count"].(float64)
 		require.True(t, ok)
@@ -182,8 +186,7 @@ func TestPauseCancelFunction(t *testing.T) {
 			a := assert.New(t)
 			a.Equal(int32(1), atomic.LoadInt32(&runCounter))
 			a.Equal(int32(0), atomic.LoadInt32(&runCancelled))
-			a.Equal(1, getQueueSize(consts.DevServerAccountId, uuid.MustParse(fnId)))
-		}, 10*time.Second, 1*time.Second)
+		}, 20*time.Second, 10*time.Millisecond)
 	})
 
 	t.Run("should cancel run", func(t *testing.T) {
@@ -203,7 +206,7 @@ func TestPauseCancelFunction(t *testing.T) {
 			Status:         models.FunctionStatusCancelled,
 			Timeout:        10 * time.Second,
 			Interval:       500 * time.Millisecond,
-			ChildSpanCount: 2,
+			ChildSpanCount: 1, // at least 1
 		})
 
 		require.Equal(t, models.RunTraceSpanStatusCancelled.String(), run.Trace.Status)

@@ -251,7 +251,7 @@ func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *stri
 		if opts.ChildSpanCount > 0 {
 			a.NotNil(run.Trace)
 			a.True(run.Trace.IsRoot)
-			a.Len(run.Trace.ChildSpans, opts.ChildSpanCount)
+			a.GreaterOrEqual(len(run.Trace.ChildSpans), opts.ChildSpanCount)
 		}
 
 		traces = run

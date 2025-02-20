@@ -68,6 +68,11 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 			output = &s
 		}
 
+		// If this run ID is the same as the starting cursor, do not include it.
+		if scursor != nil && r.RunID == *scursor {
+			continue
+		}
+
 		runID := ulid.MustParse(r.RunID)
 		status, err := models.ToFunctionRunStatus(r.Status)
 		if err != nil {

@@ -2,8 +2,6 @@ package consts
 
 import (
 	"time"
-
-	"github.com/google/uuid"
 )
 
 const (
@@ -115,36 +113,23 @@ const (
 	// in which priority factors are taken into account.
 	FutureAtLimit = 2 * time.Second
 
-	// StartDefaultPersistenceInterval is the default interval at which the
-	// queue will be snapshotted and persisted to disk.
-	StartDefaultPersistenceInterval = time.Second * 60
-	// StartMaxQueueChunkSize is the default maximum size of a queue chunk.
-	// This is set to be comfortably within the 1GB limit of SQLite.
-	StartMaxQueueChunkSize = 1024 * 1024 * 800 // 800MB
-	// StartMaxQueueSnapshots is the maximum number of snapshots we keep.
-	StartMaxQueueSnapshots = 5
+	DefaultQueueContinueLimit = uint(5)
 
-	DefaultInngestConfigDir = ".inngest"
-	SQLiteDbFileName        = "main.db"
-	// DevServerHistoryFile is the file where the history is stored.
-	//
-	// @deprecated Used in the in-memory writer when persiting, though this
-	// should not be actively used any more.
-	DevServerHistoryFile = "dev_history.json"
-
-	PauseExpiredDeletionGracePeriod = time.Second * 10
+	PauseExpiredDeletionGracePeriod = time.Minute * 5
 
 	DefaultQueueShardName = "default"
 
 	// Minimum number of pauses before using the aggregate pause handler.
 	AggregatePauseThreshold = 50
-)
 
-var (
-	// DevServerAccountId is the fixed account ID used internally in the dev server.
-	DevServerAccountId = uuid.MustParse("00000000-0000-4000-a000-000000000000")
-	DevServerEnvId     = uuid.MustParse("00000000-0000-4000-b000-000000000000")
-
-	DevServerConnectJwtSecret  = []byte("this-does-not-need-to-be-secret")
-	DevServerRealtimeJWTSecret = []byte("dev-mode-is-not-secret")
+	// QueueContinuationCooldownPeriod is the cooldown period for a continuations, eg.
+	// how long we wait after a partition has continued the maximum times.
+	// This prevents partitions from greedily acquiring resources in each scan loop.
+	QueueContinuationCooldownPeriod = time.Second * 10
+	// QueueContinuationMaxPartitions represents the total capacity for partitions
+	// that can be continued.
+	QueueContinuationMaxPartitions = 50
+	// QueueContinuationSkipProbability is the probability of skipping a continuation
+	// scan loop.
+	QueueContinuationSkipProbability = 0.2
 )

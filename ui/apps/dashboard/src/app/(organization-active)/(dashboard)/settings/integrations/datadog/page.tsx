@@ -1,4 +1,4 @@
-import SetupPage from '@/components/PrometheusIntegration/SetupPage';
+import SetupPage from '@/components/DatadogIntegration/SetupPage';
 import { MetricsEntitlements } from '@/components/PrometheusIntegration/data';
 
 export default async function Page() {

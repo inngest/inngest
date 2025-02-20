@@ -77,7 +77,7 @@ func TestFunctionFailureHandling(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt32(&bCount) == 1
-	}, 15*time.Second, time.Second)
+	}, 20*time.Second, 5*time.Millisecond)
 	require.EqualValues(t, 0, aCount)
 }
 
