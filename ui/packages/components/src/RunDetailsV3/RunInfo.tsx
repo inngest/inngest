@@ -4,7 +4,6 @@ import { RiArrowRightUpLine, RiArrowUpSLine } from '@remixicon/react';
 
 import { AITrace } from '../AI/AITrace';
 import { parseAIOutput } from '../AI/utils';
-import { CodeBlock } from '../CodeBlock';
 import {
   ElementWrapper,
   IDElement,
@@ -118,117 +117,113 @@ export const RunInfo = ({
       </div>
 
       {expanded && (
-        <div>
-          <div>
-            <dl className="flex flex-wrap gap-4">
-              <ElementWrapper label="Run ID">
-                <IDElement>{runID}</IDElement>
-              </ElementWrapper>
+        <dl className="flex flex-wrap gap-4">
+          <ElementWrapper label="Run ID">
+            <IDElement>{runID}</IDElement>
+          </ElementWrapper>
 
-              <OptimisticElementWrapper
-                label="App"
-                lazy={run}
-                initial={initialRunData}
-                optimisticChildren={(initialRun: InitialRunData) => <>{initialRun.app.name}</>}
-              >
-                {(run: Run) => {
-                  return (
-                    <LinkElement href={pathCreator.app({ externalAppID: run.app.externalID })}>
-                      {run.app.name}
-                    </LinkElement>
-                  );
-                }}
-              </OptimisticElementWrapper>
+          <OptimisticElementWrapper
+            label="App"
+            lazy={run}
+            initial={initialRunData}
+            optimisticChildren={(initialRun: InitialRunData) => <>{initialRun.app.name}</>}
+          >
+            {(run: Run) => {
+              return (
+                <LinkElement href={pathCreator.app({ externalAppID: run.app.externalID })}>
+                  {run.app.name}
+                </LinkElement>
+              );
+            }}
+          </OptimisticElementWrapper>
 
-              <OptimisticElementWrapper
-                label="Function"
-                lazy={run}
-                initial={initialRunData}
-                optimisticChildren={(initialRun: InitialRunData) => <>{initialRun.function.name}</>}
-              >
-                {(run: Run) => {
-                  return (
-                    <LinkElement href={pathCreator.function({ functionSlug: run.fn.slug })}>
-                      {run.hasAI ? <AICell>{run.fn.name}</AICell> : run.fn.name}
-                    </LinkElement>
-                  );
-                }}
-              </OptimisticElementWrapper>
+          <OptimisticElementWrapper
+            label="Function"
+            lazy={run}
+            initial={initialRunData}
+            optimisticChildren={(initialRun: InitialRunData) => <>{initialRun.function.name}</>}
+          >
+            {(run: Run) => {
+              return (
+                <LinkElement href={pathCreator.function({ functionSlug: run.fn.slug })}>
+                  {run.hasAI ? <AICell>{run.fn.name}</AICell> : run.fn.name}
+                </LinkElement>
+              );
+            }}
+          </OptimisticElementWrapper>
 
-              <OptimisticElementWrapper
-                label="Duration"
-                lazy={run}
-                initial={initialRunData}
-                optimisticChildren={(initialRun: InitialRunData) => <TextElement>-</TextElement>}
-              >
-                {(run: Run) => {
-                  let durationText = '-';
+          <OptimisticElementWrapper
+            label="Duration"
+            lazy={run}
+            initial={initialRunData}
+            optimisticChildren={(initialRun: InitialRunData) => <TextElement>-</TextElement>}
+          >
+            {(run: Run) => {
+              let durationText = '-';
 
-                  const startedAt = toMaybeDate(run.trace.startedAt);
-                  if (startedAt) {
-                    durationText = formatMilliseconds(
-                      (toMaybeDate(run.trace.endedAt) ?? new Date()).getTime() - startedAt.getTime()
-                    );
-                  }
+              const startedAt = toMaybeDate(run.trace.startedAt);
+              if (startedAt) {
+                durationText = formatMilliseconds(
+                  (toMaybeDate(run.trace.endedAt) ?? new Date()).getTime() - startedAt.getTime()
+                );
+              }
 
-                  return <TextElement>{durationText}</TextElement>;
-                }}
-              </OptimisticElementWrapper>
+              return <TextElement>{durationText}</TextElement>;
+            }}
+          </OptimisticElementWrapper>
 
-              <OptimisticElementWrapper
-                label="Queued at"
-                lazy={run}
-                initial={initialRunData}
-                optimisticChildren={(initialRun: InitialRunData) =>
-                  initialRun.queuedAt ? (
-                    <TimeElement date={new Date(initialRun.queuedAt)} />
-                  ) : (
-                    <TextElement>-</TextElement>
-                  )
-                }
-              >
-                {(run: Run) => {
-                  return <TimeElement date={new Date(run.trace.queuedAt)} />;
-                }}
-              </OptimisticElementWrapper>
+          <OptimisticElementWrapper
+            label="Queued at"
+            lazy={run}
+            initial={initialRunData}
+            optimisticChildren={(initialRun: InitialRunData) =>
+              initialRun.queuedAt ? (
+                <TimeElement date={new Date(initialRun.queuedAt)} />
+              ) : (
+                <TextElement>-</TextElement>
+              )
+            }
+          >
+            {(run: Run) => {
+              return <TimeElement date={new Date(run.trace.queuedAt)} />;
+            }}
+          </OptimisticElementWrapper>
 
-              <OptimisticElementWrapper
-                label="Started at"
-                lazy={run}
-                initial={initialRunData}
-                optimisticChildren={(initialRun: InitialRunData) =>
-                  initialRun?.status === 'QUEUED' ? <TextElement>-</TextElement> : null
-                }
-              >
-                {(run: Run) => {
-                  const startedAt = toMaybeDate(run.trace.startedAt);
-                  if (!startedAt) {
-                    return <TextElement>-</TextElement>;
-                  }
-                  return <TimeElement date={startedAt} />;
-                }}
-              </OptimisticElementWrapper>
+          <OptimisticElementWrapper
+            label="Started at"
+            lazy={run}
+            initial={initialRunData}
+            optimisticChildren={(initialRun: InitialRunData) =>
+              initialRun?.status === 'QUEUED' ? <TextElement>-</TextElement> : null
+            }
+          >
+            {(run: Run) => {
+              const startedAt = toMaybeDate(run.trace.startedAt);
+              if (!startedAt) {
+                return <TextElement>-</TextElement>;
+              }
+              return <TimeElement date={startedAt} />;
+            }}
+          </OptimisticElementWrapper>
 
-              <OptimisticElementWrapper
-                label="Ended at"
-                lazy={run}
-                initial={initialRunData}
-                optimisticChildren={(initialRun: InitialRunData) =>
-                  initialRun?.status === 'QUEUED' ? <TextElement>-</TextElement> : null
-                }
-              >
-                {(run: Run) => {
-                  const endedAt = toMaybeDate(run.trace.endedAt);
-                  if (!endedAt) {
-                    return <TextElement>-</TextElement>;
-                  }
-                  return <TimeElement date={endedAt} />;
-                }}
-              </OptimisticElementWrapper>
-              {aiOutput && <AITrace aiOutput={aiOutput} />}
-            </dl>
-          </div>
-        </div>
+          <OptimisticElementWrapper
+            label="Ended at"
+            lazy={run}
+            initial={initialRunData}
+            optimisticChildren={(initialRun: InitialRunData) =>
+              initialRun?.status === 'QUEUED' ? <TextElement>-</TextElement> : null
+            }
+          >
+            {(run: Run) => {
+              const endedAt = toMaybeDate(run.trace.endedAt);
+              if (!endedAt) {
+                return <TextElement>-</TextElement>;
+              }
+              return <TimeElement date={endedAt} />;
+            }}
+          </OptimisticElementWrapper>
+          {aiOutput && <AITrace aiOutput={aiOutput} />}
+        </dl>
       )}
     </div>
   );

@@ -18,7 +18,7 @@ export const LegacyRunsToggle = ({ traceAIEnabled }: { traceAIEnabled: boolean }
         <span className="text-sm">New runs view</span>
         <Switch
           checked={!legacyTraceEnabled}
-          className="data-[state=checked]:bg-primary-moderate cursor-pointer"
+          className="cursor-pointer"
           onClick={() => toggleLegacyTrace()}
         />
       </div>
