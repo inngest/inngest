@@ -78,7 +78,7 @@ export function useWorkers() {
   const client = useClient();
   return useCallback(
     async ({ appID, orderBy, cursor, pageSize, status }: QueryVariables) => {
-      const startTime = getTimestampDaysAgo({ currentDate: new Date(), days: 7 }).toISOString();
+      const startTime = getTimestampDaysAgo({ currentDate: new Date(), days: 1 }).toISOString();
       const result = await client
         .query(
           query,
@@ -150,7 +150,7 @@ export function useWorkersCount() {
   const client = useClient();
   return useCallback(
     async ({ appID, status }: CountQueryVariables) => {
-      const startTime = getTimestampDaysAgo({ currentDate: new Date(), days: 7 }).toISOString();
+      const startTime = getTimestampDaysAgo({ currentDate: new Date(), days: 1 }).toISOString();
       const result = await client
         .query(
           countQuery,
