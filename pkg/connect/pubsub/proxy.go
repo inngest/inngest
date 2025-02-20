@@ -83,9 +83,6 @@ type RequestReceiver interface {
 	// NackMessage sends a negative acknowledgment for a specific request.
 	NackMessage(ctx context.Context, requestId string, source AckSource, reason syscode.Error) error
 
-	// NackMessage sends a negative acknowledgment for a specific request.
-	NackMessage(ctx context.Context, appId uuid.UUID, requestId string, source AckSource, reason syscode.Error) error
-
 	// Wait blocks and listens for incoming PubSub messages for the internal subscribers. This must be run before
 	// subscribing to any channels to ensure that the PubSub client is connected and ready to receive messages.
 	Wait(ctx context.Context) error

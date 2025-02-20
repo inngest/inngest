@@ -30,9 +30,8 @@ var (
 )
 
 var (
-	ConnDeletedWithGroupErr = fmt.Errorf("group deleted with conn")
-	WorkerGroupNotFoundErr  = fmt.Errorf("worker group not found")
-	GatewayNotFoundErr      = fmt.Errorf("gateway not found")
+	WorkerGroupNotFoundErr = fmt.Errorf("worker group not found")
+	GatewayNotFoundErr     = fmt.Errorf("gateway not found")
 )
 
 func init() {
@@ -41,6 +40,23 @@ func init() {
 		panic(fmt.Errorf("error reading redis lua dir: %w", err))
 	}
 	readRedisScripts("lua", entries)
+}
+
+func createScript(script string) (*rueidis.Lua, error) {
+	// Add any includes.
+	items := include.FindAllStringSubmatch(script, -1)
+	if len(items) > 0 {
+		// Replace each include
+		for _, include := range items {
+			byt, err := embedded.ReadFile(fmt.Sprintf("lua/includes/%s", include[1]))
+			if err != nil {
+				return nil, fmt.Errorf("error reading redis lua include: %w", err)
+			}
+			script = strings.ReplaceAll(script, include[0], string(byt))
+		}
+	}
+
+	return rueidis.NewLuaScript(script), nil
 }
 
 func readRedisScripts(path string, entries []fs.DirEntry) {
@@ -59,25 +75,16 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 			panic(fmt.Errorf("error reading redis lua script: %w", err))
 		}
 
+		val := string(byt)
+		script, err := createScript(val)
+		if err != nil {
+			panic(err)
+		}
+
 		name := path + "/" + e.Name()
 		name = strings.TrimPrefix(name, "lua/")
 		name = strings.TrimSuffix(name, ".lua")
-		val := string(byt)
-
-		// Add any includes.
-		items := include.FindAllStringSubmatch(val, -1)
-		if len(items) > 0 {
-			// Replace each include
-			for _, include := range items {
-				byt, err = embedded.ReadFile(fmt.Sprintf("lua/includes/%s", include[1]))
-				if err != nil {
-					panic(fmt.Errorf("error reading redis lua include: %w", err))
-				}
-				val = strings.ReplaceAll(val, include[0], string(byt))
-			}
-		}
-
-		scripts[name] = rueidis.NewLuaScript(val)
+		scripts[name] = script
 	}
 }
 
@@ -111,7 +118,7 @@ func (r redisConnectionStateManager) SetRequestIdempotency(ctx context.Context, 
 }
 
 func (r *redisConnectionStateManager) GetConnection(ctx context.Context, envID uuid.UUID, connId ulid.ULID) (*connpb.ConnMetadata, error) {
-	key := r.envConnsKey(envID)
+	key := r.connIndexByEnv(envID)
 	cmd := r.client.B().Hget().Key(key).Field(connId.String()).Build()
 
 	res, err := r.client.Do(ctx, cmd).ToString()
@@ -123,15 +130,15 @@ func (r *redisConnectionStateManager) GetConnection(ctx context.Context, envID u
 	}
 
 	conn := connpb.ConnMetadata{}
-	if err := proto.Unmarshal([]byte(res), &conn); err != nil {
-			return nil, err
-		}
+	if err := json.Unmarshal([]byte(res), &conn); err != nil {
+		return nil, err
+	}
 
 	return &conn, nil
 }
 
 func (r *redisConnectionStateManager) GetConnectionsByEnvID(ctx context.Context, envID uuid.UUID) ([]*connpb.ConnMetadata, error) {
-	key := r.connKey(envID)
+	key := r.connIndexByEnv(envID)
 	cmd := r.client.B().Hvals().Key(key).Build()
 
 	res, err := r.client.Do(ctx, cmd).AsStrSlice()
@@ -142,7 +149,7 @@ func (r *redisConnectionStateManager) GetConnectionsByEnvID(ctx context.Context,
 	conns := []*connpb.ConnMetadata{}
 	for _, meta := range res {
 		var conn connpb.ConnMetadata
-		if err := proto.Unmarshal([]byte(meta), &conn); err != nil {
+		if err := json.Unmarshal([]byte(meta), &conn); err != nil {
 			return nil, err
 		}
 		conns = append(conns, &conn)
@@ -151,10 +158,8 @@ func (r *redisConnectionStateManager) GetConnectionsByEnvID(ctx context.Context,
 	return conns, nil
 }
 
-
-
 func (r *redisConnectionStateManager) GetConnectionsByAppID(ctx context.Context, envId uuid.UUID, appID uuid.UUID) ([]*connpb.ConnMetadata, error) {
-	key := r.connIndexByApp(envId, &appID)
+	key := r.connIndexByApp(envId, appID)
 
 	connIds, err := r.client.Do(ctx, r.client.B().Smembers().Key(key).Build()).AsStrSlice()
 	if err != nil {
@@ -165,7 +170,7 @@ func (r *redisConnectionStateManager) GetConnectionsByAppID(ctx context.Context,
 		return nil, nil
 	}
 
-	res, err := r.client.Do(ctx, r.client.B().Hmget().Key(r.connKey(envId)).Field(connIds...).Build()).AsStrSlice()
+	res, err := r.client.Do(ctx, r.client.B().Hmget().Key(r.connIndexByEnv(envId)).Field(connIds...).Build()).AsStrSlice()
 	if err != nil {
 		return nil, err
 	}
@@ -184,8 +189,8 @@ func (r *redisConnectionStateManager) GetConnectionsByAppID(ctx context.Context,
 
 func (r *redisConnectionStateManager) GetConnectionsByGroupID(ctx context.Context, envID uuid.UUID, groupID string) ([]*connpb.ConnMetadata, error) {
 	keys := []string{
-		r.connKey(envID),
-		r.groupIDKey(envID, groupID),
+		r.connIndexByEnv(envID),
+		r.connIndexByGroup(envID, groupID),
 	}
 	args := []string{}
 
@@ -212,19 +217,19 @@ func (r *redisConnectionStateManager) GetConnectionsByGroupID(ctx context.Contex
 }
 
 func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn *Connection, status connpb.ConnectionStatus, lastHeartbeatAt time.Time) error {
-	groupIds := make([]string, 0,len(conn.Groups))
+	groupIds := make([]string, 0, len(conn.Groups))
 	for _, group := range conn.Groups {
 		groupIds = append(groupIds, group.Hash)
 	}
 
 	meta := &connpb.ConnMetadata{
-		Id:              conn.ConnectionId.String(),
+		Id:       conn.ConnectionId.String(),
 		GroupIds: groupIds,
 
 		InstanceId:      conn.Data.InstanceId,
 		Status:          status,
-		SdkLanguage:        conn.Data.SdkLanguage,
-		SdkVersion:         conn.Data.SdkVersion,
+		SdkLanguage:     conn.Data.SdkLanguage,
+		SdkVersion:      conn.Data.SdkVersion,
 		Attributes:      conn.Data.SystemAttributes,
 		GatewayId:       conn.GatewayId.String(),
 		LastHeartbeatAt: timestamppb.New(lastHeartbeatAt),
@@ -235,120 +240,131 @@ func (r *redisConnectionStateManager) UpsertConnection(ctx context.Context, conn
 		isHealthy = "1"
 	}
 
-
-	keys := []string{
-		// Upsert conn
-		r.connKey(conn.EnvID),
-
-		// Upsert group if it doesn't exist
-		r.groupKey(conn.EnvID),
+	// NOTE: redis_state.StrSlice format the data in a non JSON way, not sure why
+	var serializedConnection string
+	{
+		byt, err := json.Marshal(meta)
+		if err != nil {
+			return fmt.Errorf("error serializing connection metadata: %w", err)
+		}
+		serializedConnection = string(byt)
 	}
 
-	indexByGroupKeys := make([]string, 0)
-	indexByAppKeys := make([]string, 0)
+	keysDefs := []string{
+		"local indexConnectionsByEnvIdKey = KEYS[1]",
+		"local indexWorkerGroupsByEnvIdKey = KEYS[2]",
+	}
+	keys := []string{
+		// Upsert conn
+		r.connIndexByEnv(conn.EnvID),
 
-	keyOffset := len(keys)
-	indexKeyDefs := make([]string,0)
-	indexKeyUpdates := make([]string,0)
+		// Upsert worker groups
+		r.groupIndexByEnv(conn.EnvID),
+	}
 
- 	for _, group := range conn.Groups {
-		indexPos := keyOffset+len(indexKeyDefs)
-		indexVarName := fmt.Sprintf("indexConnectionsByGroupIdKey%d",indexPos)
-		indexKeyDefs = append(indexKeyDefs, fmt.Sprintf("local %s = KEYS[%d]", indexVarName, indexPos))
-		indexByGroupKeys = append(indexByGroupKeys, r.groupByIdKey(conn.EnvID, group.Hash))
-		indexKeyUpdates = append(indexKeyUpdates, fmt.Sprintf(`
--- Update index %s
-if isHealthy == 1 then
-	redis.call("SADD", %s, connID)
-else
-	redis.call("SREM", %s, connID)
-end
-`, indexVarName,indexVarName,indexVarName))
+	argDefs := []string{
+		"local connID = ARGV[1]",
+		"local serializedConn = ARGV[2]",
+		"local isHealthy = tonumber(ARGV[3])",
+	}
+	args := []string{
+		meta.Id,
+		serializedConnection,
+		isHealthy,
+	}
 
-		if group.AppID != nil {
-			indexVarName := fmt.Sprintf("indexConnectionsByAppIdKey%d",indexPos)
-			indexKeyDefs = append(indexKeyDefs, fmt.Sprintf("local %s = KEYS[%d]", indexVarName, indexPos))
-			indexByAppKeys = append(indexByAppKeys,r.connIndexByApp(conn.EnvID, *group.AppID))
-			indexKeyUpdates = append(indexKeyUpdates, fmt.Sprintf(`
--- Update index %s
-if isHealthy == 1 then
-	redis.call("SADD", %s, connID)
-else
-	redis.call("SREM", %s, connID)
-end
-`, indexVarName,indexVarName,indexVarName))
+	groupUpserts := make([]string, 0)
+
+	{
+
+		i := 0
+		for _, group := range conn.Groups {
+			// Push groupId
+			groupIdVarName := fmt.Sprintf("groupId%d", i)
+			argDefs = append(argDefs, fmt.Sprintf("local %s = ARGV[%d]", groupIdVarName, len(argDefs)+1))
+			args = append(args, group.Hash)
+
+			// Push serialized group
+			workerGroupVarName := fmt.Sprintf("workerGroup%d", i)
+			argDefs = append(argDefs, fmt.Sprintf("local %s = ARGV[%d]", workerGroupVarName, len(argDefs)+1))
+
+			byt, err := json.Marshal(group)
+			if err != nil {
+				return fmt.Errorf("error serializing worker group data: %w", err)
+			}
+			args = append(args, string(byt))
+
+			groupUpserts = append(groupUpserts, fmt.Sprintf(`
+-- Upsert group %d
+
+-- Store the group if it doesn't exist yet
+redis.call("HSETNX", indexWorkerGroupsByEnvIdKey, %s, %s)
+`, i, groupIdVarName, workerGroupVarName))
+
+			i++
 		}
 	}
 
-	keys = append(keys, indexByAppKeys...)
-	keys = append(keys, indexByGroupKeys...)
+	indexUpdates := make([]string, 0)
 
+	{
+		i := 0
+		for _, group := range conn.Groups {
+			indexVarName := fmt.Sprintf("indexConnectionsByGroupIdKey%d", i)
+			keysDefs = append(keysDefs, fmt.Sprintf("local %s = KEYS[%d]", indexVarName, len(keysDefs)+1))
+			keys = append(keys, r.connIndexByGroup(conn.EnvID, group.Hash))
+			indexUpdates = append(indexUpdates, fmt.Sprintf(`
+-- Update index %s
+if isHealthy == 1 then
+	redis.call("SADD", %s, connID)
+else
+	redis.call("SREM", %s, connID)
+end
+`, indexVarName, indexVarName, indexVarName))
 
-	for s, group := range conn.Groups {
-		fmt
-		local groupID = ARGV[3]
-		local workerGroup = ARGV[4]
-
+			if group.AppID != nil {
+				indexVarName := fmt.Sprintf("indexConnectionsByAppIdKey%d", i)
+				keysDefs = append(keysDefs, fmt.Sprintf("local %s = KEYS[%d]", indexVarName, len(keysDefs)+1))
+				keys = append(keys, r.connIndexByApp(conn.EnvID, *group.AppID))
+				indexUpdates = append(indexUpdates, fmt.Sprintf(`
+-- Update index %s
+if isHealthy == 1 then
+	redis.call("SADD", %s, connID)
+else
+	redis.call("SREM", %s, connID)
+end
+`, indexVarName, indexVarName, indexVarName))
+			}
+		}
 	}
 
-	script := fmt.Sprintf(`
-local connKey = KEYS[1]
-local groupKey = KEYS[2]
-
+	script, err := createScript(fmt.Sprintf(`
 %s
-
-local connID = ARGV[1]
-local connMeta = ARGV[2]
-local isHealthy = tonumber(ARGV[5])
 
 %s
 
 -- $include(ends_with.lua)
 
 -- Store the connection metadata in a map
-redis.call("HSET", connKey, connID, connMeta)
+redis.call("HSET", indexConnectionsByEnvIdKey, connID, serializedConn)
 
 %s
--- Store the group if it doesn't exist yet
-redis.call("HSETNX", groupKey, groupID, workerGroup)
 
--- Add connID into the group
-redis.call("SADD", groupIDKey, connID)
+%s
 
 return 0
-`,strings.Join(indexKeyDefs,"\n"),strings.Join(indexKeyUpdates,"\n"))
+`,
+		strings.Join(keysDefs, "\n"),
+		strings.Join(argDefs, "\n"),
 
-
-
-
-
-	// NOTE: redis_state.StrSlice format the data in a non JSON way, not sure why
-	var metaArg, groupArg string
-	{
-		byt, err := proto.Marshal(meta)
-		if err != nil {
-			return fmt.Errorf("error serializing connection metadata: %w", err)
-		}
-		metaArg = string(byt)
+		strings.Join(groupUpserts, "\n"),
+		strings.Join(indexUpdates, "\n\n"),
+	))
+	if err != nil {
+		return fmt.Errorf("could not create upsert script: %w", err)
 	}
 
-	{
-		byt, err := proto.Marshal(conn.)
-		if err != nil {
-			return fmt.Errorf("error serializing worker group data: %w", err)
-		}
-		groupArg = string(byt)
-	}
-
-	args := []string{
-		meta.Id,
-		metaArg,
-		groupID,
-		groupArg,
-		isHealthy,
-	}
-
-	resp, err := scripts["upsert_conn"].Exec(
+	resp, err := script.Exec(
 		ctx,
 		r.client,
 		keys,
@@ -367,19 +383,26 @@ return 0
 	}
 }
 
-func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, envID uuid.UUID, connId ulid.ULID) error {
-	existingConn := r.
+func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, envID uuid.UUID, connID ulid.ULID) error {
+	existingConn, err := r.GetConnection(ctx, envID, connID)
+	if err != nil {
+		return fmt.Errorf("could not get connection: %w", err)
+	}
+
+	if existingConn == nil {
+		return nil
+	}
 
 	keys := []string{
-		r.connKey(envID),
-		r.groupKey(envID),
-		r.groupIDKey(envID, groupID),
-		r.connIndexByApp(envID, appID),
+		//r.connKey(envID),
+		//r.groupKey(envID),
+		//r.groupIDKey(envID, groupID),
+		//r.connIndexByApp(envID, appID),
 	}
 
 	args := []string{
-		connId.String(),
-		groupID,
+		//connId.String(),
+		//groupID,
 	}
 
 	status, err := scripts["delete_conn"].Exec(
@@ -396,16 +419,13 @@ func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, envI
 	case 0:
 		return nil
 
-	case 1:
-		return ConnDeletedWithGroupErr
-
 	default:
 		return fmt.Errorf("unknow status when deleting connection: %w", err)
 	}
 }
 
 func (r *redisConnectionStateManager) GetWorkerGroupByHash(ctx context.Context, envID uuid.UUID, hash string) (*WorkerGroup, error) {
-	key := r.groupKey(envID)
+	key := r.groupIndexByEnv(envID)
 	cmd := r.client.B().Hget().Key(key).Field(hash).Build()
 
 	byt, err := r.client.Do(ctx, cmd).AsBytes()
@@ -430,7 +450,7 @@ func (r *redisConnectionStateManager) UpdateWorkerGroup(ctx context.Context, env
 		return fmt.Errorf("error serializing worker group for update: %w", err)
 	}
 
-	key := r.groupKey(envID)
+	key := r.groupIndexByEnv(envID)
 	cmd := r.client.B().Hset().Key(key).FieldValue().FieldValue(group.Hash, string(byt)).Build()
 
 	if err := r.client.Do(ctx, cmd).Error(); err != nil {
