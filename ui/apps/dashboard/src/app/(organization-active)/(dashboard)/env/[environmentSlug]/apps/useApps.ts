@@ -4,11 +4,12 @@ import {
   transformLanguage,
   transformPlatform,
 } from '@inngest/components/utils/appsParser';
+import { useQuery } from '@tanstack/react-query';
+import { useClient } from 'urql';
 
 import { graphql } from '@/gql';
 import { type AppsQuery } from '@/gql/graphql';
 import { transformTriggers } from '@/utils/triggers';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 export type FlattenedApp = Omit<
   AppsQuery['environment']['apps'][number],
@@ -63,60 +64,62 @@ const query = graphql(`
 `);
 
 export function useApps({ envID, isArchived }: { envID: string; isArchived: boolean }) {
-  const res = useGraphQLQuery({
-    pollIntervalInMilliseconds: 2_000,
-    query,
-    variables: { envID },
-  });
+  const client = useClient();
 
-  // We are flattening the latestSync data to match the structure used in the DevServer
-  if (res.data) {
-    const apps = res.data.environment.apps
-      .map(({ latestSync, functions, ...app }) => {
-        const latestSyncData: Omit<FlattenedApp, keyof typeof app | 'functions'> = latestSync
-          ? {
-              lastSyncedAt: new Date(latestSync.lastSyncedAt),
-              error: latestSync.error,
-              framework: transformFramework(latestSync.framework),
-              platform: transformPlatform(latestSync.platform),
-              sdkLanguage: transformLanguage(latestSync.sdkLanguage),
-              sdkVersion: latestSync.sdkVersion,
-              status: latestSync.status,
-              url: latestSync.url,
-            }
-          : {
-              lastSyncedAt: undefined,
-              error: undefined,
-              framework: undefined,
-              platform: undefined,
-              sdkLanguage: undefined,
-              sdkVersion: undefined,
-              status: undefined,
-              url: undefined,
-            };
+  return useQuery({
+    queryKey: ['apps', envID, isArchived],
+    queryFn: async () => {
+      const result = await client
+        .query(query, { envID }, { requestPolicy: 'network-only' })
+        .toPromise();
 
-        return {
-          ...app,
-          ...latestSyncData,
-          functions: functions.map((fn) => {
-            return {
+      if (result.error) {
+        throw result.error;
+      }
+
+      if (!result.data) {
+        return undefined;
+      }
+
+      // We are flattening the latestSync data to match the structure used in the DevServer
+      const apps = result.data.environment.apps
+        .map(({ latestSync, functions, ...app }) => {
+          const latestSyncData: Omit<FlattenedApp, keyof typeof app | 'functions'> = latestSync
+            ? {
+                lastSyncedAt: new Date(latestSync.lastSyncedAt),
+                error: latestSync.error,
+                framework: transformFramework(latestSync.framework),
+                platform: transformPlatform(latestSync.platform),
+                sdkLanguage: transformLanguage(latestSync.sdkLanguage),
+                sdkVersion: latestSync.sdkVersion,
+                status: latestSync.status,
+                url: latestSync.url,
+              }
+            : {
+                lastSyncedAt: undefined,
+                error: undefined,
+                framework: undefined,
+                platform: undefined,
+                sdkLanguage: undefined,
+                sdkVersion: undefined,
+                status: undefined,
+                url: undefined,
+              };
+
+          return {
+            ...app,
+            ...latestSyncData,
+            functions: functions.map((fn) => ({
               ...fn,
               triggers: transformTriggers(fn.triggers),
-            };
-          }),
-          __typename: 'App' as const,
-        };
-      })
-      .filter((app) => app.lastSyncedAt && app.isArchived === isArchived);
+            })),
+            __typename: 'App' as const,
+          };
+        })
+        .filter((app) => app.lastSyncedAt && app.isArchived === isArchived);
 
-    return {
-      ...res,
-      data: apps,
-    };
-  }
-
-  return {
-    ...res,
-    data: undefined,
-  };
+      return apps;
+    },
+    refetchInterval: 2000,
+  });
 }
