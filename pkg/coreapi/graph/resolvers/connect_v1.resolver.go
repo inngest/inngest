@@ -107,7 +107,8 @@ func connToNode(conn *cqrs.WorkerConnection) *models.ConnectV1WorkerConnection {
 	}
 
 	node := &models.ConnectV1WorkerConnection{
-		AppID: conn.AppID,
+		AppName: &conn.AppName,
+		AppID:   conn.AppID,
 
 		ID:         conn.Id,
 		GatewayID:  conn.GatewayId,
@@ -128,7 +129,7 @@ func connToNode(conn *cqrs.WorkerConnection) *models.ConnectV1WorkerConnection {
 		SyncID:      conn.SyncID,
 		BuildID:     conn.AppVersion,
 		AppVersion:  conn.AppVersion,
-		
+
 		FunctionCount: conn.FunctionCount,
 
 		CPUCores: int(conn.CpuCores),
