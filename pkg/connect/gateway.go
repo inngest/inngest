@@ -768,16 +768,8 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 			eg.Go(func() error {
 				workerGroup, err := NewWorkerGroupFromConnRequest(ctx, &initialMessageData, authResp, app)
 				if err != nil {
-					if ctx.Err() != nil {
-						return &ErrDraining
-					}
-
 					log.Error("could not create worker group for request", "err", err)
-					return &SocketError{
-						SysCode:    syscode.CodeConnectInternal,
-						StatusCode: websocket.StatusInternalError,
-						Msg:        "Internal error",
-					}
+					return err
 				}
 
 				lock.Lock()
@@ -786,6 +778,19 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 
 				return nil
 			})
+		}
+
+		err := eg.Wait()
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil, &ErrDraining
+			}
+
+			return nil, &SocketError{
+				SysCode:    syscode.CodeConnectInternal,
+				StatusCode: websocket.StatusInternalError,
+				Msg:        "Internal error",
+			}
 		}
 	}
 

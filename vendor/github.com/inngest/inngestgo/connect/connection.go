@@ -92,9 +92,9 @@ type connectionEstablishData struct {
 	hashedSigningKey      []byte
 	numCpuCores           int32
 	totalMem              int64
-	marshaledFns          []byte
 	marshaledCapabilities []byte
 	manualReadinessAck    bool
+	apps                  []*connectproto.AppConfiguration
 }
 
 type connection struct {

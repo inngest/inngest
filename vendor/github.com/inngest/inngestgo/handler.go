@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngestgo/connect"
 	"io"
 	"log/slog"
 	"net/http"
@@ -64,10 +63,6 @@ func Register(funcs ...ServableFunction) {
 // Serve serves all registered functions within the default handler.
 func Serve(w http.ResponseWriter, r *http.Request) {
 	DefaultHandler.ServeHTTP(w, r)
-}
-
-func Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, error) {
-	return DefaultHandler.Connect(ctx, opts)
 }
 
 type HandlerOpts struct {
@@ -266,8 +261,9 @@ type Handler interface {
 	// be invoked by Inngest.
 	Register(...ServableFunction)
 
-	// Connect establishes an outbound connection to Inngest
-	Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, error)
+	GetAppName() string
+	GetAppVersion() *string
+	GetFunctions() []ServableFunction
 }
 
 // NewHandler returns a new Handler for serving Inngest functions.
@@ -294,6 +290,18 @@ type handler struct {
 	funcs   []ServableFunction
 	// lock prevents reading the function maps while serving
 	l sync.RWMutex
+}
+
+func (h *handler) GetAppName() string {
+	return h.appName
+}
+
+func (h *handler) GetAppVersion() *string {
+	return h.AppVersion
+}
+
+func (h *handler) GetFunctions() []ServableFunction {
+	return h.funcs
 }
 
 func (h *handler) SetOptions(opts HandlerOpts) Handler {

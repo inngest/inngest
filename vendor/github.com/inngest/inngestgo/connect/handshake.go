@@ -59,31 +59,25 @@ func (h *connectHandler) performConnectHandshake(ctx context.Context, connection
 	// Send connect message
 	{
 		data, err := proto.Marshal(&connectproto.WorkerConnectRequestData{
-			SessionId: &connectproto.SessionIdentifier{
-				AppVersion:   h.opts.AppVersion,
-				InstanceId:   h.instanceId(),
-				ConnectionId: connectionId,
-			},
+			ConnectionId: startResponse.ConnectionId,
+			InstanceId:   h.instanceId(),
 			AuthData: &connectproto.AuthData{
 				SessionToken: startResponse.GetSessionToken(),
 				SyncToken:    startResponse.GetSyncToken(),
 			},
-			AppName: h.opts.AppName,
-			Config: &connectproto.ConfigDetails{
-				Capabilities: data.marshaledCapabilities,
-				Functions:    data.marshaledFns,
-			},
+			Capabilities:             data.marshaledCapabilities,
+			Apps:                     data.apps,
+			WorkerManualReadinessAck: data.manualReadinessAck,
 			SystemAttributes: &connectproto.SystemAttributes{
 				CpuCores: data.numCpuCores,
 				MemBytes: data.totalMem,
 				Os:       runtime.GOOS,
 			},
-			Environment:              h.opts.Env,
-			Platform:                 h.opts.Platform,
-			SdkVersion:               h.opts.SDKVersion,
-			SdkLanguage:              h.opts.SDKLanguage,
-			WorkerManualReadinessAck: data.manualReadinessAck,
-			StartedAt:                timestamppb.New(startTime),
+			Environment: h.opts.Env,
+			Platform:    h.opts.Platform,
+			SdkVersion:  h.opts.SDKVersion,
+			SdkLanguage: h.opts.SDKLanguage,
+			StartedAt:   timestamppb.New(startTime),
 		})
 		if err != nil {
 			return fmt.Errorf("could not serialize sdk connect message: %w", err)

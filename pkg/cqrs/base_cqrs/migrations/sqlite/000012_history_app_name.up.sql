@@ -1,1 +1,1 @@
-ALTER TABLE "worker_connection" ADD COLUMN "app_name" VARCHAR;
+ALTER TABLE "worker_connections" ADD COLUMN "app_name" VARCHAR;
