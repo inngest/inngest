@@ -54,6 +54,10 @@ type Metadata struct {
 	Stack []string
 }
 
+func (m Metadata) ShouldCoalesceParallelism() bool {
+	return true
+}
+
 func (m Metadata) IdempotencyKey() string {
 	key := m.Config.Idempotency
 	if key == "" {

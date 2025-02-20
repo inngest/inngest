@@ -5,7 +5,7 @@ depending on the response being saved.
 
 Output:
  -1: duplicate response
-  0: Successfully saved response
+  n: Successfully saved response; `n` is number of pending steps remaining
 
 ]]
 
@@ -13,6 +13,7 @@ local keyStep     = KEYS[1]
 local keyMetadata = KEYS[2]
 local keyStack 	  = KEYS[3]
 local keyStepInputs = KEYS[4]
+local keyStepsPending = KEYS[5]
 
 local stepID = ARGV[1]
 local outputData = ARGV[2]
@@ -34,4 +35,5 @@ redis.call("HINCRBY", keyMetadata, "step_count", 1)
 redis.call("HSET", keyStep, stepID, outputData)
 redis.call("RPUSH", keyStack, stepID)
 
-return 0
+redis.call("SREM", keyStepsPending, stepID)
+return redis.call("SCARD", keyStepsPending)

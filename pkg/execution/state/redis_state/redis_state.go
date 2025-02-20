@@ -704,7 +704,7 @@ func (m shardedMgr) StackIndex(ctx context.Context, accountId uuid.UUID, runID u
 	return 0, fmt.Errorf("step not found in stack: %s", stepID)
 }
 
-func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID, marshalledOuptut string) error {
+func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID, marshalledOuptut string) (int, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SaveResponse"), redis_telemetry.ScopeFnRunState)
 
 	fnRunState := m.s.FunctionRunState()
@@ -716,6 +716,7 @@ func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID
 		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
 		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
 		fnRunState.kg.ActionInputs(ctx, isSharded, i),
+		fnRunState.kg.Pending(ctx, isSharded, i),
 	}
 	args := []string{stepID, marshalledOuptut}
 
@@ -726,11 +727,40 @@ func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID
 		args,
 	).AsInt64()
 	if err != nil {
-		return fmt.Errorf("error saving response: %w", err)
+		return 0, fmt.Errorf("error saving response: %w", err)
 	}
 	if index == -1 {
 		// This is a duplicate response, so we don't need to do anything.
-		return state.ErrDuplicateResponse
+		return 0, state.ErrDuplicateResponse
+	}
+	return int(index), nil
+}
+
+func (m shardedMgr) SavePending(ctx context.Context, i state.Identifier, pending []string) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SavePending"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, i.AccountID, i.RunID)
+
+	byt, err := json.Marshal(pending)
+	if err != nil {
+		return fmt.Errorf("error marshalling pending steps: %w", err)
+	}
+
+	keys := []string{
+		fnRunState.kg.Pending(ctx, isSharded, i),
+	}
+
+	args := []string{string(byt)}
+
+	_, err = retriableScripts["savePending"].Exec(
+		redis_telemetry.WithScriptName(ctx, "savePending"),
+		r,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error saving pending: %w", err)
 	}
 	return nil
 }
@@ -1013,22 +1043,26 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 	}
 }
 
-func (m mgr) ConsumePause(ctx context.Context, pauseID uuid.UUID, data any) error {
+func (m mgr) ConsumePause(ctx context.Context, pauseID uuid.UUID, data any) (int, error) {
 	p, err := m.unshardedMgr.PauseByID(ctx, pauseID)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	err = m.shardedMgr.consumePause(ctx, p, data)
+	pendingSteps, err := m.shardedMgr.consumePause(ctx, p, data)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	// The pause was now consumed, so let's clean up
-	return m.unshardedMgr.DeletePause(ctx, *p)
+	err = m.unshardedMgr.DeletePause(ctx, *p)
+	if err != nil {
+		return 0, err
+	}
+	return int(pendingSteps), nil
 }
 
-func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) error {
+func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) (int, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "consumePause"), redis_telemetry.ScopePauses)
 
 	fnRunState := m.s.FunctionRunState()
@@ -1036,13 +1070,14 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) 
 
 	marshalledData, err := json.Marshal(data)
 	if err != nil {
-		return fmt.Errorf("cannot marshal data to store in state: %w", err)
+		return 0, fmt.Errorf("cannot marshal data to store in state: %w", err)
 	}
 
 	keys := []string{
 		fnRunState.kg.Actions(ctx, isSharded, p.Identifier),
 		fnRunState.kg.Stack(ctx, isSharded, p.Identifier.RunID),
 		fnRunState.kg.RunMetadata(ctx, isSharded, p.Identifier.RunID),
+		fnRunState.kg.Pending(ctx, isSharded, p.Identifier),
 	}
 
 	args, err := StrSlice([]any{
@@ -1050,26 +1085,19 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) 
 		string(marshalledData),
 	})
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	status, err := retriableScripts["consumePause"].Exec(
+	index, err := retriableScripts["consumePause"].Exec(
 		redis_telemetry.WithScriptName(ctx, "consumePause"),
 		client,
 		keys,
 		args,
 	).AsInt64()
 	if err != nil {
-		return fmt.Errorf("error consuming pause: %w", err)
+		return 0, fmt.Errorf("error consuming pause: %w", err)
 	}
-	switch status {
-	case 0:
-		return nil
-	case 1:
-		return nil // Pause already consumed
-	default:
-		return fmt.Errorf("unknown response leasing pause: %d", status)
-	}
+	return int(index), nil
 }
 
 func (m unshardedMgr) EventHasPauses(ctx context.Context, workspaceID uuid.UUID, event string) (bool, error) {

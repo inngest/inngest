@@ -397,7 +397,7 @@ type Mutater interface {
 		i Identifier,
 		stepID string,
 		marshalledOutput string,
-	) error
+	) (int, error)
 }
 
 type MemoizedStep struct {

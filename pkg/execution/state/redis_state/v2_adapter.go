@@ -192,11 +192,22 @@ func (v v2) UpdateMetadata(ctx context.Context, id state.ID, mutation state.Muta
 }
 
 // SaveStep saves step output for the given run ID and step ID.
-func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byte) error {
+func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byte) (int, error) {
 	v1id := statev1.Identifier{
 		RunID:      id.RunID,
 		WorkflowID: id.FunctionID,
 		AccountID:  id.Tenant.AccountID,
 	}
-	return v.mgr.SaveResponse(ctx, v1id, stepID, string(data))
+	i, err := v.mgr.SaveResponse(ctx, v1id, stepID, string(data))
+	return i, err
+}
+
+// SavePending saves pending step IDs for the given run ID.
+func (v v2) SavePending(ctx context.Context, id state.ID, pending []string) error {
+	v1id := statev1.Identifier{
+		RunID:      id.RunID,
+		WorkflowID: id.FunctionID,
+		AccountID:  id.Tenant.AccountID,
+	}
+	return v.mgr.SavePending(ctx, v1id, pending)
 }

@@ -3,13 +3,15 @@
 Consumes a pause.
 
 Output:
-  0: Successfully consumed
-  1: Pause already consumed
+  -1: Pause already consumed
+  n: Successfully consumed; `n` is number of pending steps remaining
+
 ]]
 
 local actionKey     = KEYS[1]
 local stackKey      = KEYS[2]
 local keyMetadata   = KEYS[3]
+local keyStepsPending = KEYS[4]
 
 local pauseDataKey = ARGV[1] -- used to set data in run state store
 local pauseDataVal = ARGV[2] -- data to set
@@ -17,7 +19,7 @@ local pauseDataVal = ARGV[2] -- data to set
 if actionKey ~= nil and pauseDataKey ~= "" then
   -- idempotency check: only ever consume a pause once
   if redis.call("HEXISTS", actionKey, pauseDataKey) == 1 then
-    return 1
+    return -1
   end
 
   redis.call("RPUSH", stackKey, pauseDataKey)
@@ -26,4 +28,5 @@ if actionKey ~= nil and pauseDataKey ~= "" then
   redis.call("HINCRBY", keyMetadata, "state_size", #pauseDataVal)
 end
 
-return 0
+redis.call("SREM", keyStepsPending, pauseDataKey)
+return redis.call("SCARD", keyStepsPending)
