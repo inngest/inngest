@@ -160,7 +160,7 @@ CREATE TABLE worker_connections (
     app_name VARCHAR NOT NULL,
     app_id CHAR(36),
 
-    id CHAR(26) PRIMARY KEY,
+    id CHAR(26) NOT NULL,
     gateway_id CHAR(26) NOT NULL,
     instance_id VARCHAR NOT NULL,
     status INT NOT NULL,
@@ -184,5 +184,7 @@ CREATE TABLE worker_connections (
 
     cpu_cores INT NOT NULL,
     mem_bytes INT NOT NULL,
-    os VARCHAR NOT NULL
+    os VARCHAR NOT NULL,
+
+    PRIMARY KEY(id, app_name)
 );

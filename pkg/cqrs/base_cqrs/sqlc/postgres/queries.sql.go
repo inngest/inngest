@@ -1616,7 +1616,7 @@ VALUES (
         $24,
         $25
         )
-    ON CONFLICT(id)
+    ON CONFLICT(id, app_name)
 DO UPDATE SET
     account_id = excluded.account_id,
            workspace_id = excluded.workspace_id,

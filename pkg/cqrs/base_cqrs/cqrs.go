@@ -1565,6 +1565,7 @@ func (w wrapper) InsertWorkerConnection(ctx context.Context, conn *cqrs.WorkerCo
 		AccountID:   conn.AccountID,
 		WorkspaceID: conn.WorkspaceID,
 		AppID:       conn.AppID,
+		AppName:     conn.AppName,
 
 		ID:         conn.Id,
 		GatewayID:  conn.GatewayId,

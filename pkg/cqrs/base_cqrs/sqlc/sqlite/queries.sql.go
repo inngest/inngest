@@ -1616,7 +1616,7 @@ INSERT INTO worker_connections (
     recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, app_version, function_count, cpu_cores, mem_bytes, os
 )
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(id)
+    ON CONFLICT(id, app_name)
 DO UPDATE SET
     account_id = excluded.account_id,
     workspace_id = excluded.workspace_id,
