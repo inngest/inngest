@@ -230,6 +230,12 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 		dr.SetError(err)
 	}
 
+	// If there's a RetryAt, ensure we wrap the status code correctly.
+	if resp.RetryAt != nil {
+		err = queue.RetryAtError(err, resp.RetryAt)
+		dr.SetError(err)
+	}
+
 	return dr, err
 }
 

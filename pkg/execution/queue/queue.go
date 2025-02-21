@@ -114,6 +114,14 @@ func RetryAtError(err error, at *time.Time) error {
 	return retryAtError{cause: err, at: at}
 }
 
+func AsRetryAtError(err error) *retryAtError {
+	at := retryAtError{}
+	if errors.As(err, &at) {
+		return &at
+	}
+	return nil
+}
+
 type retryAtError struct {
 	cause error
 	at    *time.Time
