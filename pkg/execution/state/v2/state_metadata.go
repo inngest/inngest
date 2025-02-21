@@ -61,8 +61,7 @@ func (m Metadata) ShouldCoalesceParallelism(resp *state.DriverResponse) bool {
 		reqVersion = resp.RequestVersion
 	}
 
-	// TODO 1 for testing; will be >=2 in practice
-	return reqVersion >= 1
+	return reqVersion >= 2
 }
 
 func (m Metadata) IdempotencyKey() string {
