@@ -62,39 +62,43 @@ func (h *historyLifecycles) OnDisconnected(ctx context.Context, conn *state.Conn
 		disconnectReason = ptr.String(closeReason)
 	}
 
-	// Persist history in history store
-	err := h.writer.InsertWorkerConnection(ctx, &cqrs.WorkerConnection{
-		AccountID:   conn.AccountID,
-		WorkspaceID: conn.EnvID,
-		AppID:       conn.Group.AppID,
+	for groupHash, group := range conn.Groups {
+		// Persist history in history store
+		err := h.writer.InsertWorkerConnection(ctx, &cqrs.WorkerConnection{
+			AccountID:   conn.AccountID,
+			WorkspaceID: conn.EnvID,
 
-		Id:         conn.ConnectionId,
-		GatewayId:  conn.GatewayId,
-		InstanceId: conn.Session.SessionId.GetInstanceId(),
-		Status:     connectpb.ConnectionStatus_DISCONNECTED,
-		WorkerIP:   conn.WorkerIP,
+			AppName: group.AppName,
+			AppID:   group.AppID,
 
-		ConnectedAt:     ulid.Time(conn.ConnectionId.Time()),
-		LastHeartbeatAt: ptr.Time(time.Now()),
-		DisconnectedAt:  ptr.Time(time.Now()),
-		RecordedAt:      time.Now(),
+			Id:         conn.ConnectionId,
+			GatewayId:  conn.GatewayId,
+			InstanceId: conn.Data.InstanceId,
+			Status:     connectpb.ConnectionStatus_DISCONNECTED,
+			WorkerIP:   conn.WorkerIP,
 
-		DisconnectReason: disconnectReason,
+			ConnectedAt:     ulid.Time(conn.ConnectionId.Time()),
+			LastHeartbeatAt: ptr.Time(time.Now()),
+			DisconnectedAt:  ptr.Time(time.Now()),
+			RecordedAt:      time.Now(),
 
-		GroupHash:     conn.Group.Hash,
-		SDKLang:       conn.Group.SDKLang,
-		SDKVersion:    conn.Group.SDKVersion,
-		SDKPlatform:   conn.Group.SDKPlatform,
-		SyncID:        conn.Group.SyncID,
-		AppVersion:    conn.Session.SessionId.AppVersion,
-		FunctionCount: len(conn.Group.FunctionSlugs),
+			DisconnectReason: disconnectReason,
 
-		CpuCores: conn.Data.SystemAttributes.CpuCores,
-		MemBytes: conn.Data.SystemAttributes.MemBytes,
-		Os:       conn.Data.SystemAttributes.Os,
-	})
-	if err != nil {
-		logger.StdlibLogger(ctx).Error("could not persist connection history", "error", err)
+			GroupHash:     groupHash,
+			SDKLang:       conn.Data.SdkLanguage,
+			SDKVersion:    conn.Data.SdkVersion,
+			SDKPlatform:   conn.Data.GetPlatform(),
+			SyncID:        group.SyncID,
+			AppVersion:    group.AppVersion,
+			FunctionCount: len(group.FunctionSlugs),
+
+			CpuCores: conn.Data.SystemAttributes.CpuCores,
+			MemBytes: conn.Data.SystemAttributes.MemBytes,
+			Os:       conn.Data.SystemAttributes.Os,
+		})
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("could not persist connection history", "error", err)
+		}
 	}
 }
 
@@ -105,40 +109,44 @@ func NewHistoryLifecycle(writer cqrs.ConnectionHistoryWriter) connect.ConnectGat
 }
 
 func (h *historyLifecycles) upsertConnection(ctx context.Context, conn *state.Connection, status connectpb.ConnectionStatus, lastHeartbeatAt time.Time) error {
-	// Persist history in history store
-	// TODO Should the implementation use a messaging system like NATS for batching internally?
-	err := h.writer.InsertWorkerConnection(ctx, &cqrs.WorkerConnection{
-		AccountID:   conn.AccountID,
-		WorkspaceID: conn.EnvID,
-		AppID:       conn.Group.AppID,
+	for groupHash, group := range conn.Groups {
+		// Persist history in history store
+		err := h.writer.InsertWorkerConnection(ctx, &cqrs.WorkerConnection{
+			AccountID:   conn.AccountID,
+			WorkspaceID: conn.EnvID,
 
-		Id:         conn.ConnectionId,
-		GatewayId:  conn.GatewayId,
-		InstanceId: conn.Session.SessionId.GetInstanceId(),
-		Status:     status,
-		WorkerIP:   conn.WorkerIP,
+			// App-specific details
+			GroupHash:     groupHash,
+			AppName:       group.AppName,
+			AppID:         group.AppID,
+			AppVersion:    group.AppVersion,
+			FunctionCount: len(group.FunctionSlugs),
+			SyncID:        group.SyncID,
 
-		ConnectedAt:     ulid.Time(conn.ConnectionId.Time()),
-		LastHeartbeatAt: ptr.Time(lastHeartbeatAt),
-		DisconnectedAt:  nil,
-		RecordedAt:      time.Now(),
+			Id:         conn.ConnectionId,
+			GatewayId:  conn.GatewayId,
+			InstanceId: conn.Data.InstanceId,
+			Status:     status,
+			WorkerIP:   conn.WorkerIP,
 
-		DisconnectReason: nil,
+			ConnectedAt:     ulid.Time(conn.ConnectionId.Time()),
+			LastHeartbeatAt: ptr.Time(lastHeartbeatAt),
+			DisconnectedAt:  nil,
+			RecordedAt:      time.Now(),
 
-		GroupHash:     conn.Group.Hash,
-		SDKLang:       conn.Group.SDKLang,
-		SDKVersion:    conn.Group.SDKVersion,
-		SDKPlatform:   conn.Group.SDKPlatform,
-		AppVersion:    conn.Session.SessionId.AppVersion,
-		FunctionCount: len(conn.Group.FunctionSlugs),
-		SyncID:        conn.Group.SyncID,
+			DisconnectReason: nil,
 
-		CpuCores: conn.Data.SystemAttributes.CpuCores,
-		MemBytes: conn.Data.SystemAttributes.MemBytes,
-		Os:       conn.Data.SystemAttributes.Os,
-	})
-	if err != nil {
-		return fmt.Errorf("could not persist connection history: %w", err)
+			SDKLang:     conn.Data.SdkLanguage,
+			SDKVersion:  conn.Data.SdkVersion,
+			SDKPlatform: conn.Data.GetPlatform(),
+
+			CpuCores: conn.Data.SystemAttributes.CpuCores,
+			MemBytes: conn.Data.SystemAttributes.MemBytes,
+			Os:       conn.Data.SystemAttributes.Os,
+		})
+		if err != nil {
+			return fmt.Errorf("could not persist connection history: %w", err)
+		}
 	}
 
 	return nil

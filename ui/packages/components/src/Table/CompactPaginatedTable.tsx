@@ -81,7 +81,7 @@ export default function CompactPaginatedTable<T>({
 
   const tableStyles = 'w-full';
   const tableHeadStyles = 'bg-canvasSubtle';
-  const tableColumnStyles = 'px-4';
+  const tableColumnStyles = 'pr-4';
   const expandedRowSideBorder =
     'before:bg-surfaceMuted relative before:absolute before:bottom-0 before:left-0 before:top-0 before:w-0.5';
 
@@ -98,6 +98,7 @@ export default function CompactPaginatedTable<T>({
                   key={header.id}
                   style={{
                     width: header.getSize(),
+                    maxWidth: header.getSize(),
                   }}
                   className={cn(tableColumnStyles, 'text-muted text-left text-sm font-normal')}
                 >
@@ -146,6 +147,7 @@ export default function CompactPaginatedTable<T>({
                         key={cell.id}
                         style={{
                           width: cell.column.getSize(),
+                          maxWidth: cell.column.getSize(),
                         }}
                         className={cn(
                           i === 0 && row.getIsExpanded() ? expandedRowSideBorder : '',

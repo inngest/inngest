@@ -1624,7 +1624,6 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 	if e.log != nil {
 		e.log.
 			Debug().
-			Interface("with", resumeData.With).
 			Str("pause.DataKey", pause.DataKey).
 			Msg("resuming pause from invoke")
 	}
