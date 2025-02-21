@@ -516,6 +516,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		clock:                           clockwork.NewRealClock(),
 		continuesLock:                   &sync.Mutex{},
 		continues:                       map[string]continuation{},
+		continueCooldown:                map[string]time.Time{},
 		continuationLimit:               consts.DefaultQueueContinueLimit,
 	}
 

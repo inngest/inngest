@@ -54,44 +54,27 @@ export default function WorkerCounter({ appID, getWorkerCount }: Props) {
     refetchInterval: refreshInterval,
   });
 
-  const {
-    isPending: pendingDisconnectedWorkers,
-    error: errorDisconnectedWorkers,
-    data: countDisconnectedWorkersData,
-  } = useQuery({
-    queryKey: ['worker-counter-disconnected', { appID, status: [workerStatuses.Disconnected] }],
-    queryFn: useCallback(() => {
-      return getWorkerCount({
-        appID,
-        status: [workerStatuses.Disconnected],
-      });
-    }, [getWorkerCount, appID]),
-    placeholderData: keepPreviousData,
-    refetchInterval: refreshInterval,
-  });
-
-  const isLoading = pendingReadyWorkers || pendingInactiveWorkers || pendingDisconnectedWorkers;
+  const isLoading = pendingReadyWorkers || pendingInactiveWorkers;
 
   // Absorve errors
-  if (errorReadyWorkers || errorInactiveWorkers || errorDisconnectedWorkers) {
-    console.error(errorReadyWorkers || errorInactiveWorkers || errorDisconnectedWorkers);
+  if (errorReadyWorkers || errorInactiveWorkers) {
+    console.error(errorReadyWorkers || errorInactiveWorkers);
   }
 
   const workerCounts = useMemo(
     () => ({
       ACTIVE: countReadyWorkersData || 0,
       INACTIVE: countInactiveWorkersData || 0,
-      DISCONNECTED: countDisconnectedWorkersData || 0,
+      DISCONNECTED: null,
     }),
-    [countReadyWorkersData, countInactiveWorkersData, countDisconnectedWorkersData]
+    [countReadyWorkersData, countInactiveWorkersData]
   );
 
   return (
     <DescriptionListItem
       term="Connected workers"
       detail={
-        isLoading &&
-        (!countReadyWorkersData || !countInactiveWorkersData || !countDisconnectedWorkersData) ? (
+        isLoading && (!countReadyWorkersData || !countInactiveWorkersData) ? (
           <Skeleton className="block h-5 w-36" />
         ) : (
           <WorkersCounter counts={workerCounts} />

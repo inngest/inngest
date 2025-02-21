@@ -1565,6 +1565,7 @@ func (w wrapper) InsertWorkerConnection(ctx context.Context, conn *cqrs.WorkerCo
 		AccountID:   conn.AccountID,
 		WorkspaceID: conn.WorkspaceID,
 		AppID:       conn.AppID,
+		AppName:     conn.AppName,
 
 		ID:         conn.Id,
 		GatewayID:  conn.GatewayId,
@@ -1819,6 +1820,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			"account_id",
 			"workspace_id",
 			"app_id",
+			"app_name",
 
 			"id",
 			"gateway_id",
@@ -1866,6 +1868,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			&data.AccountID,
 			&data.WorkspaceID,
 			&data.AppID,
+			&data.AppName,
 
 			&data.ID,
 			&data.GatewayID,
@@ -1949,6 +1952,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			AccountID:   data.AccountID,
 			WorkspaceID: data.WorkspaceID,
 			AppID:       data.AppID,
+			AppName:     data.AppName,
 
 			Id:         data.ID,
 			GatewayId:  data.GatewayID,

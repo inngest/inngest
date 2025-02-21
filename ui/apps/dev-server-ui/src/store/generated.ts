@@ -76,6 +76,7 @@ export type ConnectV1WorkerConnection = {
   __typename?: 'ConnectV1WorkerConnection';
   app: Maybe<App>;
   appID: Maybe<Scalars['UUID']>;
+  appName: Maybe<Scalars['String']>;
   appVersion: Maybe<Scalars['String']>;
   buildId: Maybe<Scalars['String']>;
   connectedAt: Scalars['Time'];

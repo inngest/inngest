@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/syscode"
+	connectproto "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"github.com/pbnjay/memory"
 	"golang.org/x/sync/errgroup"
@@ -44,7 +45,7 @@ type WorkerConnection interface {
 	Close() error
 }
 
-func Connect(ctx context.Context, opts Opts, invoker FunctionInvoker, logger *slog.Logger) (WorkerConnection, error) {
+func Connect(ctx context.Context, opts Opts, invokers map[string]FunctionInvoker, logger *slog.Logger) (WorkerConnection, error) {
 	apiClient := newWorkerApiClient(opts.APIBaseUrl, opts.Env)
 
 	// While the worker is starting, it can be canceled using the passed context
@@ -56,7 +57,7 @@ func Connect(ctx context.Context, opts Opts, invoker FunctionInvoker, logger *sl
 
 	ch := &connectHandler{
 		logger:                 logger,
-		invoker:                invoker,
+		invokers:               invokers,
 		opts:                   opts,
 		notifyConnectDoneChan:  make(chan connectReport),
 		notifyConnectedChan:    make(chan struct{}),
@@ -88,11 +89,16 @@ type FunctionInvoker interface {
 	InvokeFunction(ctx context.Context, slug string, stepId *string, request sdkrequest.Request) (any, []state.GeneratorOpcode, error)
 }
 
-type Opts struct {
-	AppName string
-	Env     *string
+type ConnectApp struct {
+	AppName    string
+	Functions  []sdk.SDKFunction
+	AppVersion *string
+}
 
-	Functions    []sdk.SDKFunction
+type Opts struct {
+	Env  *string
+	Apps []ConnectApp
+
 	Capabilities sdk.Capabilities
 
 	HashedSigningKey         []byte
@@ -104,7 +110,6 @@ type Opts struct {
 	IsDev        bool
 	DevServerUrl string
 
-	AppVersion *string
 	InstanceID *string
 
 	Platform    *string
@@ -117,7 +122,7 @@ type Opts struct {
 type connectHandler struct {
 	opts Opts
 
-	invoker FunctionInvoker
+	invokers map[string]FunctionInvoker
 
 	logger *slog.Logger
 
@@ -163,24 +168,35 @@ func (h *connectHandler) Connect(ctx context.Context) (WorkerConnection, error) 
 	numCpuCores := runtime.NumCPU()
 	totalMem := memory.TotalMemory()
 
-	functionSlugs := make(map[string][]string)
-	for _, function := range h.opts.Functions {
-		stepUrls := make([]string, len(function.Steps))
-		j := 0
-		for _, step := range function.Steps {
-			stepUrls[j] = step.Runtime["url"].(string)
-			j++
+	apps := make([]*connectproto.AppConfiguration, len(h.opts.Apps))
+	appSlugs := make(map[string]map[string][]string)
+	for i, app := range h.opts.Apps {
+		functionSlugs := make(map[string][]string)
+		for _, function := range app.Functions {
+			stepUrls := make([]string, len(function.Steps))
+			j := 0
+			for _, step := range function.Steps {
+				stepUrls[j] = step.Runtime["url"].(string)
+				j++
+			}
+
+			functionSlugs[function.Slug] = stepUrls
+		}
+		appSlugs[app.AppName] = functionSlugs
+
+		marshaledFns, err := json.Marshal(app.Functions)
+		if err != nil {
+			return nil, fmt.Errorf("failed to serialize connect config: %w", err)
 		}
 
-		functionSlugs[function.Slug] = stepUrls
+		apps[i] = &connectproto.AppConfiguration{
+			AppName:    app.AppName,
+			AppVersion: app.AppVersion,
+			Functions:  marshaledFns,
+		}
 	}
 
-	h.logger.Debug("using provided functions", "slugs", functionSlugs)
-
-	marshaledFns, err := json.Marshal(h.opts.Functions)
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize connect config: %w", err)
-	}
+	h.logger.Debug("using provided functions", "slugs", appSlugs)
 
 	marshaledCapabilities, err := json.Marshal(h.opts.Capabilities)
 	if err != nil {
@@ -340,8 +356,8 @@ func (h *connectHandler) Connect(ctx context.Context) (WorkerConnection, error) 
 				hashedSigningKey:      h.auth.hashedSigningKey,
 				numCpuCores:           int32(numCpuCores),
 				totalMem:              int64(totalMem),
-				marshaledFns:          marshaledFns,
 				marshaledCapabilities: marshaledCapabilities,
+				apps:                  apps,
 			})
 		}
 	})

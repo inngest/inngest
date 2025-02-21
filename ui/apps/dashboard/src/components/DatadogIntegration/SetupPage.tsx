@@ -5,6 +5,7 @@ import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
 import { Input } from '@inngest/components/Forms/Input';
+import { AlertModal } from '@inngest/components/Modal';
 import { StatusDot } from '@inngest/components/Status/StatusDot';
 import { Time } from '@inngest/components/Time';
 import { IconDatadog } from '@inngest/components/icons/platforms/Datadog';
@@ -57,6 +58,7 @@ const ListDatadogIntegrationsDocument = graphql(`
         createdAt
         updatedAt
         statusOk
+        error
       }
     }
   }
@@ -83,6 +85,15 @@ const SetupDatadogIntegrationDocument = graphql(`
   }
 `);
 
+const RemoveDatadogIntegrationDocument = graphql(`
+  mutation RemoveDatadogIntegration($integrationID: UUID!) {
+    removeDatadogIntegration(integrationID: $integrationID) {
+      removedIntegrationID
+      removedIntegrationEnvID
+    }
+  }
+`);
+
 function dotStatusForIntegration(integration: DatadogIntegration) {
   if (integration.statusOk) {
     return 'ACTIVE';
@@ -95,6 +106,11 @@ function findEnvName(envs: Environment[], id: string) {
   const env = envs.find((env) => env.id === id);
   return env ? env.name : id;
 }
+
+type IntegrationToRemove = {
+  envName: string;
+  integrationID: string;
+};
 
 export default function SetupPage({
   metricsExportEnabled,
@@ -111,12 +127,15 @@ export default function SetupPage({
     },
     pause: !selectedEnv,
   });
-  const [{ data: allDatadogInts }] = useQuery({
+  const [{ data: allDatadogInts }, refetchAllDatadogInts] = useQuery({
     query: ListDatadogIntegrationsDocument,
   });
   const [, setupDdInt] = useMutation(SetupDatadogIntegrationDocument);
   const [isFormDisabled, setFormDisabled] = useState(false);
   const [formError, setFormError] = useState('');
+  const [selectedIntegrationForRemove, setSelectedIntegrationForRemove] =
+    useState<IntegrationToRemove | null>(null);
+  const [, removeDdInt] = useMutation(RemoveDatadogIntegrationDocument);
   const { value: ddIntFlagEnabled } = useBooleanFlag('datadog-integration');
 
   if (!ddIntFlagEnabled) {
@@ -142,13 +161,18 @@ export default function SetupPage({
     }
     const ddSite = form.get('datadogSite') as string | null;
 
-    const result = await setupDdInt({
-      workspaceID: selectedEnv?.id || '',
-      appKey,
-      apiKey,
-      ddSite: ddSite || '',
-    });
+    const result = await setupDdInt(
+      {
+        workspaceID: selectedEnv?.id || '',
+        appKey,
+        apiKey,
+        ddSite: ddSite || '',
+      },
+      { additionalTypenames: ['DatadogIntegration'] }
+    );
+
     setFormDisabled(false);
+    refetchAllDatadogInts();
 
     if (result.error) {
       toast.error(`Failed: ${result.error}`);
@@ -168,6 +192,21 @@ export default function SetupPage({
     setFormError('');
     setSelectedEnv(selectedEnv);
   }
+
+  const onIntRemove = async (integrationID: string) => {
+    const result = await removeDdInt(
+      { integrationID },
+      { additionalTypenames: ['DatadogIntegration'] }
+    );
+    setSelectedIntegrationForRemove(null);
+    refetchAllDatadogInts();
+    refetchDdInt();
+    if (result.error) {
+      toast.error(`Failed: ${result.error}`);
+      console.error(result.error);
+      return;
+    }
+  };
 
   const onEnvSelect = (env: Environment) => {
     setSelectedEnv(env);
@@ -195,6 +234,22 @@ export default function SetupPage({
 
       {!metricsExportEnabled && <IntegrationNotEnabledMessage integrationName="Datadog" />}
 
+      <AlertModal
+        isOpen={selectedIntegrationForRemove !== null}
+        onClose={() => setSelectedIntegrationForRemove(null)}
+        title={
+          'Are you sure you want remove the Datadog integration for the “' +
+          selectedIntegrationForRemove?.envName +
+          '” environment?'
+        }
+        description={
+          'This action cannot be undone. To re-enable the integration, you will need access to an application key and API key for the Datadog account.'
+        }
+        onSubmit={() => {
+          onIntRemove(selectedIntegrationForRemove?.integrationID || '');
+        }}
+      />
+
       {metricsExportEnabled && (
         <div className="text-sm font-normal">
           <MetricsExportEntitlementBanner
@@ -215,11 +270,20 @@ export default function SetupPage({
                   key={i}
                 >
                   <StatusDot status={dotStatusForIntegration(ddInt)}></StatusDot>
-                  <div className="-mt-1 flex flex-col">
+                  <div className="-mt-1 flex flex-1 flex-col">
                     <div>
                       <span className="font-medium">{findEnvName(envs, ddInt.envID)}</span>
                     </div>
-                    {ddInt.lastSentAt ? (
+                    {ddInt.error ? (
+                      <div className="font-normal">
+                        <span className="text-error font-bold">Error:</span>{' '}
+                        <code>{ddInt.error}</code>
+                        <br />
+                        <span className="text-error">
+                          Please verify your Datadog API key, App key, and URL.
+                        </span>
+                      </div>
+                    ) : ddInt.lastSentAt ? (
                       <div className="text-muted">
                         <span className="italic">Metrics last sent:</span>{' '}
                         <Time value={ddInt.lastSentAt} />
@@ -229,8 +293,24 @@ export default function SetupPage({
                         <span className="italic">Setting up…</span>
                       </div>
                     ) : (
-                      <></>
+                      <div className="font-normal">
+                        <span className="text-error font-bold">Error:</span>{' '}
+                        <code>Please contact Inngest Support.</code>
+                      </div>
                     )}
+                  </div>
+                  <div>
+                    <Button
+                      appearance="outlined"
+                      kind="danger"
+                      label="Remove"
+                      onClick={() => {
+                        setSelectedIntegrationForRemove({
+                          envName: findEnvName(envs, ddInt.envID),
+                          integrationID: ddInt.id,
+                        });
+                      }}
+                    />
                   </div>
                 </div>
               ))}

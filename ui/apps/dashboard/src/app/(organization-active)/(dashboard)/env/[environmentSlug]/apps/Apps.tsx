@@ -26,7 +26,8 @@ export function Apps({ isArchived = false }: Props) {
   if (appsRes.error) {
     throw appsRes.error;
   }
-  if (appsRes.isLoading && !appsRes.data) {
+
+  if (appsRes.isPending) {
     return (
       <div className="mb-4 flex items-center justify-center">
         <div className="w-full">

@@ -296,11 +296,6 @@ func (c *connectGatewaySvc) instrument(ctx context.Context) {
 		case <-instrumentTicker.C:
 		}
 
-		c.logger.Debug("instrumenting gateway metrics",
-			"active_connections", c.connectionCount.Count(),
-			"is_draining", c.isDraining,
-		)
-
 		additionalTags := c.metricsTags()
 
 		metrics.GaugeConnectGatewayActiveConnections(ctx, int64(c.connectionCount.Count()), metrics.GaugeOpt{

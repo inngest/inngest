@@ -4,7 +4,6 @@
 
   Return:
     0: conn is deleted successfully
-    1: group is deleted as well
 ]]
 
 local connKey = KEYS[1]

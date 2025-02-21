@@ -165,6 +165,7 @@ type TraceRun struct {
 type WorkerConnection struct {
 	AccountID        uuid.UUID
 	WorkspaceID      uuid.UUID
+	AppName          string
 	AppID            *uuid.UUID
 	ID               ulid.ULID
 	GatewayID        ulid.ULID

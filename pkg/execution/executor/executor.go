@@ -7,13 +7,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/syscode"
 	"log/slog"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/inngest/inngest/pkg/syscode"
 
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
@@ -1617,7 +1618,6 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 	if e.log != nil {
 		e.log.
 			Debug().
-			Interface("with", resumeData.With).
 			Str("pause.DataKey", pause.DataKey).
 			Msg("resuming pause from invoke")
 	}

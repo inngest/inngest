@@ -131,7 +131,7 @@ export function WorkersTable({
 
   return (
     <div>
-      <h4 className="text-subtle mb-4 text-xl">Workers ({totalCount})</h4>
+      <h4 className="text-subtle mb-4 text-xl">Workers</h4>
       <div className="mb-4 flex items-center">
         <WorkerStatusFilter
           selectedStatuses={filteredStatus}
@@ -182,8 +182,7 @@ export function WorkersTable({
 
 function SubComponent({ row }: { row: Row<Worker> }) {
   return (
-    <dl className="bg-canvasSubtle mx-9 mb-6 mt-[10px] grid grid-cols-5 gap-2 p-4">
-      <DescriptionListItem term="Worker IP" detail={row.original.workerIp} />
+    <dl className="bg-canvasSubtle mx-9 mb-6 mt-[10px] grid grid-cols-4 gap-2 p-4">
       <DescriptionListItem term="SDK version" detail={row.original.sdkVersion} />
       <DescriptionListItem term="SDK language" detail={transformLanguage(row.original.sdkLang)} />
       <DescriptionListItem term="No. of functions" detail={row.original.functionCount.toString()} />
@@ -196,6 +195,7 @@ function SubComponent({ row }: { row: Row<Worker> }) {
           </div>
         }
       />
+      <DescriptionListItem className="col-span-3" term="Worker IP" detail={row.original.workerIp} />
     </dl>
   );
 }
