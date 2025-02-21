@@ -207,5 +207,6 @@ func TestStreamResponseTooLarge(t *testing.T) {
 	require.NotNil(t, r)
 	require.NotNil(t, r.SysErr)
 	require.Equal(t, r.SysErr.Code, syscode.CodeOutputTooLarge)
-	require.Nil(t, err)
+	require.NotNil(t, err)
+	require.Equal(t, err, syscode.CodeOutputTooLarge)
 }
