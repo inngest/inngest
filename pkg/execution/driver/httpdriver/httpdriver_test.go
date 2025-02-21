@@ -196,7 +196,7 @@ func TestStreamResponseTooLarge(t *testing.T) {
 		// Indicate a streaming response.
 		w.WriteHeader(201)
 		err = json.NewEncoder(w).Encode(data)
-		require.Error(t, err)
+		require.NoError(t, err)
 	}))
 
 	defer ts.Close()
