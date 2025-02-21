@@ -6,6 +6,7 @@ import { EnvironmentMenu } from '../Navigation/Environments';
 import { Help } from '../Navigation/Help';
 import Manage from '../Navigation/Manage';
 import Monitor from '../Navigation/Monitor';
+import Profile from '../Navigation/Profile';
 import Logo from './Logo';
 
 type SideBarProps = {
@@ -29,8 +30,11 @@ export default function SideBar({ collapsed, setCollapsed }: SideBarProps) {
           <Manage collapsed={collapsed} />
         </div>
 
-        <div className="mb mx-4 mb-2">
-          <Help collapsed={collapsed} />
+        <div>
+          <div className="mx-4">
+            <Help collapsed={collapsed} />
+          </div>
+          <Profile collapsed={collapsed} />
         </div>
       </div>
     </nav>
