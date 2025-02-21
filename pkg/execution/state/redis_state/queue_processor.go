@@ -1125,18 +1125,9 @@ func (q *queue) process(
 			at := q.backoffFunc(qi.Data.Attempt)
 
 			// Attempt to find any RetryAtSpecifier in the error tree.
-			unwrapped := err
-			for unwrapped != nil {
-				// If the error contains a NextRetryAt method, use that to indicate
-				// when we should retry.
-				if specifier, ok := unwrapped.(osqueue.RetryAtSpecifier); ok {
-					next := specifier.NextRetryAt()
-					if next != nil {
-						at = *next
-					}
-					break
-				}
-				unwrapped = errors.Unwrap(unwrapped)
+			if specifier := osqueue.AsRetryAtError(err); specifier != nil {
+				next := specifier.NextRetryAt()
+				at = *next
 			}
 
 			if !osqueue.IsAlwaysRetryable(err) {
