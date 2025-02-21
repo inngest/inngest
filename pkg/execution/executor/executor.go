@@ -1714,20 +1714,19 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			return nil
 		}
 
-		var pendingSteps int
-
 		if pause.OnTimeout && r.EventID != nil {
 			// Delete this pause, as an event has occured which matches
 			// the timeout.  We can do this prior to leasing a pause as it's the
 			// only work that needs to happen
-			pendingSteps, err = e.pm.ConsumePause(ctx, pause.ID, nil)
+			_, err = e.pm.ConsumePause(ctx, pause.ID, nil)
 			if err == nil || err == state.ErrPauseNotFound {
 				return nil
 			}
 			return fmt.Errorf("error consuming pause via timeout: %w", err)
 		}
 
-		if pendingSteps, err = e.pm.ConsumePause(ctx, pause.ID, r.With); err != nil {
+		pendingSteps, err := e.pm.ConsumePause(ctx, pause.ID, r.With)
+		if err != nil {
 			return fmt.Errorf("error consuming pause via event: %w", err)
 		}
 

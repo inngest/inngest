@@ -57,7 +57,7 @@ type Metadata struct {
 
 func (m Metadata) ShouldCoalesceParallelism(resp *state.DriverResponse) bool {
 	reqVersion := m.Config.RequestVersion
-	if m.Config.RequestVersion == -1 {
+	if reqVersion == -1 {
 		reqVersion = resp.RequestVersion
 	}
 
