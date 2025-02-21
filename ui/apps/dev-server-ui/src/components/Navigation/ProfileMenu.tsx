@@ -28,8 +28,6 @@ export const ProfileMenu = ({ children }: React.PropsWithChildren) => {
               <div>Theme</div>
               {isThemeModeSwitchEnabled ? <ModeSwitch /> : <Pill>Coming soon</Pill>}
             </Listbox.Option>
-
-            <hr className="border-subtle" />
           </>
         </Listbox.Options>
       </div>
