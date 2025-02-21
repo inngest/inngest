@@ -38,7 +38,7 @@ type PauseMutater interface {
 	//
 	// Any data passed when consuming a pause will be stored within function run state
 	// for future reference using the pause's DataKey.
-	ConsumePause(ctx context.Context, id uuid.UUID, data any) (int, error)
+	ConsumePause(ctx context.Context, id uuid.UUID, data any) (didConsume bool, hasPendingSteps bool, err error)
 
 	// DeletePause permanently deletes a pause.
 	DeletePause(ctx context.Context, p Pause) error

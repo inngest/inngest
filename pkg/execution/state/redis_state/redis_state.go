@@ -1049,26 +1049,23 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 	}
 }
 
-func (m mgr) ConsumePause(ctx context.Context, pauseID uuid.UUID, data any) (int, error) {
+func (m mgr) ConsumePause(ctx context.Context, pauseID uuid.UUID, data any) (didConsume bool, hasPendingSteps bool, err error) {
 	p, err := m.unshardedMgr.PauseByID(ctx, pauseID)
 	if err != nil {
-		return 0, err
+		return
 	}
 
-	pendingSteps, err := m.shardedMgr.consumePause(ctx, p, data)
+	didConsume, hasPendingSteps, err = m.shardedMgr.consumePause(ctx, p, data)
 	if err != nil {
-		return 0, err
+		return
 	}
 
 	// The pause was now consumed, so let's clean up
 	err = m.unshardedMgr.DeletePause(ctx, *p)
-	if err != nil {
-		return 0, err
-	}
-	return int(pendingSteps), nil
+	return
 }
 
-func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) (int, error) {
+func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) (didConsume bool, hasPendingSteps bool, err error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "consumePause"), redis_telemetry.ScopePauses)
 
 	fnRunState := m.s.FunctionRunState()
@@ -1076,7 +1073,8 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) 
 
 	marshalledData, err := json.Marshal(data)
 	if err != nil {
-		return 0, fmt.Errorf("cannot marshal data to store in state: %w", err)
+		err = fmt.Errorf("cannot marshal data to store in state: %w", err)
+		return
 	}
 
 	keys := []string{
@@ -1091,19 +1089,33 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) 
 		string(marshalledData),
 	})
 	if err != nil {
-		return 0, err
+		return
 	}
 
-	index, err := retriableScripts["consumePause"].Exec(
+	status, err := retriableScripts["consumePause"].Exec(
 		redis_telemetry.WithScriptName(ctx, "consumePause"),
 		client,
 		keys,
 		args,
 	).AsInt64()
 	if err != nil {
-		return 0, fmt.Errorf("error consuming pause: %w", err)
+		err = fmt.Errorf("error consuming pause: %w", err)
+		return
 	}
-	return int(index), nil
+	switch status {
+	case -1:
+		return
+	case 0:
+		didConsume = true
+		return
+	case 1:
+		didConsume = true
+		hasPendingSteps = true
+		return
+	default:
+		err = fmt.Errorf("unknown response leasing pause: %d", status)
+		return
+	}
 }
 
 func (m unshardedMgr) EventHasPauses(ctx context.Context, workspaceID uuid.UUID, event string) (bool, error) {
