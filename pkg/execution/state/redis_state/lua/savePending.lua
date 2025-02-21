@@ -1,4 +1,11 @@
--- SetPending updates pending steps for a run
+--[[
+
+Updates pending steps for a run.
+
+Output:
+  0: Success
+
+]]
 
 local keyStepsPending = KEYS[1]
 local stepsPending = cjson.decode(ARGV[1])

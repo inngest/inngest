@@ -5,7 +5,8 @@ depending on the response being saved.
 
 Output:
  -1: duplicate response
-  n: Successfully saved response; `n` is number of pending steps remaining
+  0: Successfully saved response; no pending steps
+  1: Successfully saved response; at least one pending step remains
 
 ]]
 
@@ -36,4 +37,4 @@ redis.call("HSET", keyStep, stepID, outputData)
 redis.call("RPUSH", keyStack, stepID)
 
 redis.call("SREM", keyStepsPending, stepID)
-return redis.call("SCARD", keyStepsPending)
+return redis.call("SCARD", keyStepsPending) > 0 and 1 or 0

@@ -4,7 +4,8 @@ Consumes a pause.
 
 Output:
   -1: Pause already consumed
-  n: Successfully consumed; `n` is number of pending steps remaining
+  0: Successfully consumed, no pending steps
+  1: Successfully consumed, at least one pending step remains
 
 ]]
 
@@ -29,4 +30,4 @@ if actionKey ~= nil and pauseDataKey ~= "" then
 end
 
 redis.call("SREM", keyStepsPending, pauseDataKey)
-return redis.call("SCARD", keyStepsPending)
+return redis.call("SCARD", keyStepsPending) > 0 and 1 or 0

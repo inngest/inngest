@@ -704,7 +704,7 @@ func (m shardedMgr) StackIndex(ctx context.Context, accountId uuid.UUID, runID u
 	return 0, fmt.Errorf("step not found in stack: %s", stepID)
 }
 
-func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID, marshalledOuptut string) (int, error) {
+func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID, marshalledOuptut string) (bool, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SaveResponse"), redis_telemetry.ScopeFnRunState)
 
 	fnRunState := m.s.FunctionRunState()
@@ -727,13 +727,19 @@ func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID
 		args,
 	).AsInt64()
 	if err != nil {
-		return 0, fmt.Errorf("error saving response: %w", err)
+		return false, fmt.Errorf("error saving response: %w", err)
 	}
-	if index == -1 {
+	switch index {
+	case -1:
 		// This is a duplicate response, so we don't need to do anything.
-		return 0, state.ErrDuplicateResponse
+		return false, state.ErrDuplicateResponse
+	case 0:
+		return false, nil
+	case 1:
+		return true, nil
+	default:
+		return false, fmt.Errorf("unknown response saving response: %d", index)
 	}
-	return int(index), nil
 }
 
 func (m shardedMgr) SavePending(ctx context.Context, i state.Identifier, pending []string) error {

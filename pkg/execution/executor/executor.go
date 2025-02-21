@@ -733,7 +733,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// for the outgoing edge ID.  This ensures that we properly increase the stack
 	// for `tools.sleep` within generator functions.
 	if item.Kind == queue.KindSleep && item.Attempt == 0 {
-		pendingSteps, err := e.smv2.SaveStep(ctx, sv2.ID{
+		hasPendingSteps, err := e.smv2.SaveStep(ctx, sv2.ID{
 			RunID:      id.RunID,
 			FunctionID: id.WorkflowID,
 			Tenant: sv2.Tenant{
@@ -746,7 +746,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			return nil, err
 		}
 
-		if pendingSteps > 0 {
+		if hasPendingSteps {
 			// Other steps are pending before we re-enter the function, so
 			// we're now done with this execution.
 			return nil, nil
@@ -1971,7 +1971,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		return err
 	}
 
-	pendingSteps, err := e.smv2.SaveStep(ctx, i.md.ID, gen.ID, []byte(output))
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, i.md.ID, gen.ID, []byte(output))
 	if err != nil {
 		return err
 	}
@@ -1997,7 +1997,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 	}
 
-	if pendingSteps == 0 {
+	if !hasPendingSteps {
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 		if err == redis_state.ErrQueueItemExists {
 			return nil
@@ -2087,7 +2087,7 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 		return err
 	}
 
-	pendingSteps, err := e.smv2.SaveStep(ctx, i.md.ID, gen.ID, []byte(output))
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, i.md.ID, gen.ID, []byte(output))
 	if err != nil {
 		return err
 	}
@@ -2117,7 +2117,7 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 	}
 
-	if pendingSteps == 0 {
+	if !hasPendingSteps {
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 		if err == redis_state.ErrQueueItemExists {
 			return nil
@@ -2331,7 +2331,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 	}
 
 	// Save the output as the step result.
-	pendingSteps, err := e.smv2.SaveStep(ctx, i.md.ID, gen.ID, output)
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, i.md.ID, gen.ID, output)
 	if err != nil {
 		return err
 	}
@@ -2364,7 +2364,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 	}
 
-	if pendingSteps == 0 {
+	if !hasPendingSteps {
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 		if err == redis_state.ErrQueueItemExists {
 			return nil
