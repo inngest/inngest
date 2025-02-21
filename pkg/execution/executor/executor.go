@@ -1233,6 +1233,13 @@ func (e *executor) executeDriverForStep(ctx context.Context, i *runInstance) (*s
 		} else {
 			// Set the response error if it wasn't set, or if Execute had an internal error.
 			// This ensures that we only ever need to check resp.Err to handle errors.
+			byt, e := json.Marshal(err.Error())
+			if e != nil {
+				response.Output = err
+			} else {
+				response.Output = string(byt)
+			}
+
 			errstr := err.Error()
 			response.Err = &errstr
 		}
