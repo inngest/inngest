@@ -27,7 +27,7 @@ if actionKey ~= nil and pauseDataKey ~= "" then
   redis.call("HSET", actionKey, pauseDataKey, pauseDataVal)
   redis.call("HINCRBY", keyMetadata, "step_count", 1)
   redis.call("HINCRBY", keyMetadata, "state_size", #pauseDataVal)
+  redis.call("SREM", keyStepsPending, pauseDataKey)
 end
 
-redis.call("SREM", keyStepsPending, pauseDataKey)
 return redis.call("SCARD", keyStepsPending) > 0 and 1 or 0
