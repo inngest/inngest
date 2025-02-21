@@ -13,7 +13,6 @@ import (
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -77,15 +76,15 @@ func TestFunctionFailure(t *testing.T) {
 
 		t.Run("failed run", func(t *testing.T) {
 			span := run.Trace.ChildSpans[0]
-			assert.Equal(t, consts.OtelExecFnErr, span.Name)
-			assert.False(t, span.IsRoot)
-			assert.Equal(t, rootSpanID, span.ParentSpanID)
-			assert.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
-			assert.NotNil(t, span.OutputID)
+			require.Equal(t, consts.OtelExecFnErr, span.Name)
+			require.False(t, span.IsRoot)
+			require.Equal(t, rootSpanID, span.ParentSpanID)
+			require.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
+			require.NotNil(t, span.OutputID)
 
 			// output test
 			output := c.RunSpanOutput(ctx, *span.OutputID)
-			assert.NotNil(t, output)
+			require.NotNil(t, output)
 			c.ExpectSpanErrorOutput(t, "nope!", "", output)
 		})
 	})
@@ -147,23 +146,23 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 		// test first attempt
 		t.Run("attempt 1", func(t *testing.T) {
 			span := run.Trace.ChildSpans[0]
-			assert.Equal(t, "execute", span.Name)
-			assert.False(t, span.IsRoot)
-			assert.GreaterOrEqual(t, len(span.ChildSpans), 1)
-			assert.Equal(t, rootSpanID, span.ParentSpanID)
-			assert.Equal(t, models.RunTraceSpanStatusRunning.String(), span.Status)
-			assert.Nil(t, span.OutputID)
+			require.Equal(t, "execute", span.Name)
+			require.False(t, span.IsRoot)
+			require.GreaterOrEqual(t, len(span.ChildSpans), 1)
+			require.Equal(t, rootSpanID, span.ParentSpanID)
+			require.Equal(t, models.RunTraceSpanStatusRunning.String(), span.Status)
+			require.Nil(t, span.OutputID)
 
 			t.Run("failed", func(t *testing.T) {
 				failed := span.ChildSpans[0]
-				assert.Equal(t, "Attempt 0", failed.Name)
-				assert.False(t, span.IsRoot)
-				assert.Equal(t, models.RunTraceSpanStatusFailed.String(), failed.Status)
+				require.Equal(t, "Attempt 0", failed.Name)
+				require.False(t, span.IsRoot)
+				require.Equal(t, models.RunTraceSpanStatusFailed.String(), failed.Status)
 
 				// output test
-				assert.NotNil(t, failed.OutputID)
+				require.NotNil(t, failed.OutputID)
 				output := c.RunSpanOutput(ctx, *failed.OutputID)
-				assert.NotNil(t, output)
+				require.NotNil(t, output)
 				c.ExpectSpanErrorOutput(t, "nope!", "", output)
 			})
 		})
@@ -183,27 +182,27 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 		// first attempt
 		t.Run("failed run", func(t *testing.T) {
 			span := run.Trace.ChildSpans[0]
-			assert.Equal(t, consts.OtelExecPlaceholder, span.Name)
-			assert.False(t, span.IsRoot)
-			assert.Equal(t, rootSpanID, span.ParentSpanID)
-			assert.Equal(t, 2, len(span.ChildSpans))
-			assert.Equal(t, 2, span.Attempts)
-			assert.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
-			assert.NotNil(t, span.OutputID)
+			require.Equal(t, consts.OtelExecPlaceholder, span.Name)
+			require.False(t, span.IsRoot)
+			require.Equal(t, rootSpanID, span.ParentSpanID)
+			require.Equal(t, 2, len(span.ChildSpans))
+			require.Equal(t, 2, span.Attempts)
+			require.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
+			require.NotNil(t, span.OutputID)
 
 			// output test
 			output := c.RunSpanOutput(ctx, *span.OutputID)
-			assert.NotNil(t, output)
+			require.NotNil(t, output)
 			c.ExpectSpanErrorOutput(t, "nope!", "", output)
 
 			t.Run("attempt 0", func(t *testing.T) {
 				one := span.ChildSpans[0]
-				assert.Equal(t, "Attempt 0", one.Name)
-				assert.False(t, one.IsRoot)
-				assert.Equal(t, rootSpanID, one.ParentSpanID)
-				assert.Equal(t, 0, one.Attempts)
-				assert.Equal(t, models.RunTraceSpanStatusFailed.String(), one.Status)
-				assert.NotNil(t, one.OutputID)
+				require.Equal(t, "Attempt 0", one.Name)
+				require.False(t, one.IsRoot)
+				require.Equal(t, rootSpanID, one.ParentSpanID)
+				require.Equal(t, 0, one.Attempts)
+				require.Equal(t, models.RunTraceSpanStatusFailed.String(), one.Status)
+				require.NotNil(t, one.OutputID)
 
 				// output test
 				oneOutput := c.RunSpanOutput(ctx, *one.OutputID)
@@ -213,12 +212,12 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 			// second attempt
 			t.Run("attempt 1", func(t *testing.T) {
 				two := span.ChildSpans[1]
-				assert.Equal(t, "Attempt 1", two.Name)
-				assert.False(t, two.IsRoot)
-				assert.Equal(t, rootSpanID, two.ParentSpanID)
-				assert.Equal(t, 1, two.Attempts)
-				assert.Equal(t, models.RunTraceSpanStatusFailed.String(), two.Status)
-				assert.NotNil(t, two.OutputID)
+				require.Equal(t, "Attempt 1", two.Name)
+				require.False(t, two.IsRoot)
+				require.Equal(t, rootSpanID, two.ParentSpanID)
+				require.Equal(t, 1, two.Attempts)
+				require.Equal(t, models.RunTraceSpanStatusFailed.String(), two.Status)
+				require.NotNil(t, two.OutputID)
 
 				// output test
 				twoOutput := c.RunSpanOutput(ctx, *two.OutputID)
@@ -278,23 +277,23 @@ func TestFunctionResponseTooLargeFailure(t *testing.T) {
 		t.Run("attempt 1", func(t *testing.T) {
 			span := run.Trace.ChildSpans[0]
 
-			assert.Equal(t, "function error", span.Name)
-			assert.False(t, span.IsRoot)
-			assert.GreaterOrEqual(t, len(span.ChildSpans), 1)
-			assert.Equal(t, rootSpanID, span.ParentSpanID)
-			assert.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
-			assert.NotNil(t, span.OutputID)
+			require.Equal(t, "function error", span.Name)
+			require.False(t, span.IsRoot)
+			require.GreaterOrEqual(t, len(span.ChildSpans), 1)
+			require.Equal(t, rootSpanID, span.ParentSpanID)
+			require.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
+			require.NotNil(t, span.OutputID)
 
 			t.Run("failed", func(t *testing.T) {
 				failed := span.ChildSpans[0]
 
-				assert.Equal(t, "Attempt 0", failed.Name)
-				assert.False(t, span.IsRoot)
-				assert.Equal(t, models.RunTraceSpanStatusFailed.String(), failed.Status)
+				require.Equal(t, "Attempt 0", failed.Name)
+				require.False(t, span.IsRoot)
+				require.Equal(t, models.RunTraceSpanStatusFailed.String(), failed.Status)
 
-				assert.NotNil(t, failed.OutputID)
+				require.NotNil(t, failed.OutputID)
 				output := c.RunSpanOutput(ctx, *failed.OutputID)
-				assert.NotNil(t, output)
+				require.NotNil(t, output)
 				require.NoError(t, err)
 				quoted := fmt.Sprintf("%q", syscode.CodeOutputTooLarge)
 				c.ExpectSpanErrorOutput(t, "", quoted, output)
@@ -348,23 +347,23 @@ func TestFunctionResponseTooLargeFailureWithRetry(t *testing.T) {
 		// test first attempt
 		t.Run("attempt 1", func(t *testing.T) {
 			span := run.Trace.ChildSpans[0]
-			assert.Equal(t, "execute", span.Name)
-			assert.False(t, span.IsRoot)
-			assert.GreaterOrEqual(t, len(span.ChildSpans), 1)
-			assert.Equal(t, rootSpanID, span.ParentSpanID)
-			assert.Equal(t, models.RunTraceSpanStatusRunning.String(), span.Status)
-			assert.Nil(t, span.OutputID)
+			require.Equal(t, "execute", span.Name)
+			require.False(t, span.IsRoot)
+			require.GreaterOrEqual(t, len(span.ChildSpans), 1)
+			require.Equal(t, rootSpanID, span.ParentSpanID)
+			require.Equal(t, models.RunTraceSpanStatusRunning.String(), span.Status)
+			require.Nil(t, span.OutputID)
 
 			t.Run("failed with output too large error", func(t *testing.T) {
 				failed := span.ChildSpans[0]
-				assert.Equal(t, "Attempt 0", failed.Name)
-				assert.False(t, span.IsRoot)
-				assert.Equal(t, models.RunTraceSpanStatusFailed.String(), failed.Status)
+				require.Equal(t, "Attempt 0", failed.Name)
+				require.False(t, span.IsRoot)
+				require.Equal(t, models.RunTraceSpanStatusFailed.String(), failed.Status)
 
 				// output test
-				assert.NotNil(t, failed.OutputID)
+				require.NotNil(t, failed.OutputID)
 				output := c.RunSpanOutput(ctx, *failed.OutputID)
-				assert.NotNil(t, output)
+				require.NotNil(t, output)
 				quoted := fmt.Sprintf("%q", syscode.CodeOutputTooLarge)
 				c.ExpectSpanErrorOutput(t, "", quoted, output)
 			})
