@@ -26,7 +26,7 @@ export const ProfileMenu = ({ children }: React.PropsWithChildren) => {
               className="text-muted mx-2 my-2 flex h-8 items-center justify-between px-2 text-[13px]"
             >
               <div>Theme</div>
-              {!isThemeModeSwitchEnabled ? <ModeSwitch /> : <Pill>Coming soon</Pill>}
+              {isThemeModeSwitchEnabled ? <ModeSwitch /> : <Pill>Coming soon</Pill>}
             </Listbox.Option>
 
             <hr className="border-subtle" />
