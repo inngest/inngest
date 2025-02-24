@@ -920,6 +920,7 @@ export type GetWorkerConnectionsQuery = { __typename?: 'Query', workerConnection
 
 export type CountWorkerConnectionsQueryVariables = Exact<{
   appID: Scalars['UUID'];
+  startTime: Scalars['Time'];
   status: InputMaybe<Array<ConnectV1ConnectionStatus> | ConnectV1ConnectionStatus>;
 }>;
 
@@ -1373,9 +1374,9 @@ export const GetWorkerConnectionsDocument = `
 }
     `;
 export const CountWorkerConnectionsDocument = `
-    query CountWorkerConnections($appID: UUID!, $status: [ConnectV1ConnectionStatus!]) {
+    query CountWorkerConnections($appID: UUID!, $startTime: Time!, $status: [ConnectV1ConnectionStatus!]) {
   workerConnections(
-    filter: {appIDs: [$appID], status: $status, timeField: CONNECTED_AT}
+    filter: {appIDs: [$appID], from: $startTime, status: $status, timeField: CONNECTED_AT}
     orderBy: [{field: CONNECTED_AT, direction: DESC}]
   ) {
     totalCount

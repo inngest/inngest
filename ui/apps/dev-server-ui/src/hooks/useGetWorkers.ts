@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { getTimestampDaysAgo } from '@inngest/components/utils/date';
 import { convertWorkerStatus } from '@inngest/components/utils/workerParser';
 
 import { client } from '@/store/baseApi';
@@ -20,10 +21,11 @@ type QueryVariables = {
 
 export function useGetWorkers() {
   return useCallback(async ({ appID, orderBy, cursor, pageSize, status }: QueryVariables) => {
+    const startTime = getTimestampDaysAgo({ currentDate: new Date(), days: 1 }).toISOString();
     const data: GetWorkerConnectionsQuery = await client.request(GetWorkerConnectionsDocument, {
       timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
       orderBy,
-      startTime: null,
+      startTime,
       appID: appID,
       status,
       cursor,
