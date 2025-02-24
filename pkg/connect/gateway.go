@@ -777,15 +777,8 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 
 	{
 		limit := MaxAppsPerConnection
-		if c.svc.entitlementRetriever != nil {
-			limit, err = c.svc.entitlementRetriever.AppsPerConnection(ctx, authResp.AccountID)
-			if err != nil {
-				return nil, &SocketError{
-					SysCode:    syscode.CodeConnectInternal,
-					StatusCode: websocket.StatusInternalError,
-					Msg:        "Internal error",
-				}
-			}
+		if authResp.Entitlements.AppsPerConnection != 0 {
+			limit = authResp.Entitlements.AppsPerConnection
 		}
 
 		if len(initialMessageData.Apps) > limit {

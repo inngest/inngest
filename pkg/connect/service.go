@@ -18,7 +18,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
-	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
@@ -31,11 +30,6 @@ const (
 )
 
 type gatewayOpt func(*connectGatewaySvc)
-
-type ConnectAppLoader interface {
-	// GetAppByName returns an app by name
-	GetAppByName(ctx context.Context, envID uuid.UUID, name string) (*cqrs.App, error)
-}
 
 type connectionCounter struct {
 	count  uint64
@@ -80,12 +74,10 @@ type connectGatewaySvc struct {
 
 	runCtx context.Context
 
-	auther               auth.Handler
-	stateManager         state.StateManager
-	receiver             pubsub.RequestReceiver
-	appLoader            ConnectAppLoader
-	apiBaseUrl           string
-	entitlementRetriever ConnectEntitlementRetriever
+	auther       auth.Handler
+	stateManager state.StateManager
+	receiver     pubsub.RequestReceiver
+	apiBaseUrl   string
 
 	hostname string
 
@@ -141,12 +133,6 @@ func WithRequestReceiver(r pubsub.RequestReceiver) gatewayOpt {
 	}
 }
 
-func WithAppLoader(l ConnectAppLoader) gatewayOpt {
-	return func(svc *connectGatewaySvc) {
-		svc.appLoader = l
-	}
-}
-
 func WithLifeCycles(lifecycles []ConnectGatewayLifecycleListener) gatewayOpt {
 	return func(svc *connectGatewaySvc) {
 		svc.lifecycles = lifecycles
@@ -180,12 +166,6 @@ func WithApiBaseUrl(url string) gatewayOpt {
 func WithGroupName(groupName string) gatewayOpt {
 	return func(svc *connectGatewaySvc) {
 		svc.groupName = groupName
-	}
-}
-
-func WithEntitlementRetriever(r ConnectEntitlementRetriever) gatewayOpt {
-	return func(svc *connectGatewaySvc) {
-		svc.entitlementRetriever = r
 	}
 }
 
