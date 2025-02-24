@@ -648,8 +648,10 @@ func (d *devserver) AuthenticateRequest(_ context.Context, _, _ string) (*auth.R
 	}, nil
 }
 
-func (d *devserver) CheckConnectionLimit(_ context.Context, _ *auth.Response) (bool, error) {
-	return true, nil
+func (d *devserver) RetrieveConnectEntitlements(_ context.Context, _ *auth.Response) (auth.Entitlements, error) {
+	return auth.Entitlements{
+		ConnectionAllowed: true,
+	}, nil
 }
 
 func (d *devserver) RetrieveGateway(_ context.Context, opts v0.RetrieveGatewayOpts) (string, *url.URL, error) {
