@@ -170,3 +170,45 @@ func HistogramConnectAppLoaderDuration(ctx context.Context, dur int64, opts Hist
 		Boundaries:  PausesBoundaries,
 	})
 }
+
+func HistogramHTTPDNSLookupDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "httpdriver_dns_lookup_duration",
+		Description: "Distribution of DNS lookup durations",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries: []float64{
+			5, 10, 25, 50, 100, 250, 500, 1000, // < 1s
+			2500, 5000, 10000,
+		},
+	})
+}
+
+func HistogramHTTPTLSHandshakeDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "httpdriver_tls_handshake_duration",
+		Description: "Distribution of TLS Handshake durations",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries: []float64{
+			5, 10, 25, 50, 100, 250, 500, 1000, // < 1s
+			2500, 5000, 10000,
+		},
+	})
+}
+
+func HistogramHTTPServerProcessingDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "httpdriver_request_sent_duration",
+		Description: "Distribution of the outbound request durations",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries: []float64{
+			5, 10, 25, 50, 100, 250, 500, 1000, // < 1s
+			2500, 5000, 10000,
+		},
+	})
+}
