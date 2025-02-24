@@ -30,7 +30,7 @@ const (
 	pkgName = "connect.gateway"
 )
 
-const MaxAppsPerConnection = 50
+const MaxAppsPerConnection = 10
 
 func (c *connectGatewaySvc) closeWithConnectError(ws *websocket.Conn, serr *SocketError) {
 	// reason must be limited to 125 bytes and should not be dynamic,
