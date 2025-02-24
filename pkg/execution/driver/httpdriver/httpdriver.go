@@ -286,12 +286,11 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 
 	var sysErr *syscode.Error
 	if errors.Is(err, ErrBodyTooLarge) {
-		// In this case, strangely, the actual reported error should be nil.  This
-		// has something to do with the DriverResponse.Err we return and should be
-		// refactored.
-		err = nil
-
 		sysErr = &syscode.Error{Code: syscode.CodeOutputTooLarge}
+		//
+		// downstream executor code expects system error codes here for traces
+		// and history to work properly
+		err = sysErr
 
 		// Override the output so the user sees the syserrV in the UI rather
 		// than a JSON parsing error
@@ -299,7 +298,6 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 	}
 
 	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-		err = nil
 		log.From(ctx).
 			Error().
 			Err(err).
