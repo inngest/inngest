@@ -69,26 +69,32 @@ export function Trace({
           style={{ width: `${leftWidth}%`, paddingLeft: `${depth * 40}px` }}
         >
           {(trace.childrenSpans?.length ?? 0) > 0 && (
-            <>
+            <div
+              className="flex flex-row items-center justify-start gap-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpanded(!expanded);
+              }}
+            >
               <div className="text-sm font-medium leading-tight">{trace.childrenSpans?.length}</div>
               <RiArrowUpSLine
                 className={`w-3 shrink-0 cursor-pointer transition-transform duration-500 ${
                   expanded ? 'rotate-180' : ''
                 }`}
-                onClick={() => setExpanded(!expanded)}
               />
-            </>
+            </div>
           )}
 
-          <div className="text-basis text-sm font-normal leading-tight">{trace.name}</div>
+          <div className="text-basis text-ellipsis whitespace-nowrap text-sm font-normal leading-tight">
+            {trace.name}
+          </div>
         </div>
 
-        <div
-          className="border-muted h-7 w-2 cursor-col-resize border-r-[.5px]"
-          onMouseDown={handleMouseDown}
-        />
+        <div style={{ width: `${100 - leftWidth}%` }} className="bg-canvasBase flex flex-row gap-1">
+          <div className="bg-canvasBase h-7 cursor-col-resize px-1" onMouseDown={handleMouseDown}>
+            <div className="bg-canvasMuted h-full w-[.5px]" />
+          </div>
 
-        <div style={{ width: `${100 - leftWidth}%` }}>
           <InlineSpans
             maxTime={maxTime}
             minTime={minTime}
