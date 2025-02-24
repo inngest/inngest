@@ -118,7 +118,9 @@ func New(ctx context.Context, opts StartOpts) error {
 }
 
 func start(ctx context.Context, opts StartOpts) error {
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true})
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{
+		PostgresURI: "postgresql://postgres:postgres@localhost:5432",
+	})
 	if err != nil {
 		return err
 	}
@@ -128,7 +130,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	// Initialize the devserver
-	dbDriver := "sqlite"
+	dbDriver := "postgres"
 	dbcqrs := base_cqrs.NewCQRS(db, dbDriver)
 	hd := base_cqrs.NewHistoryDriver(db, dbDriver)
 	loader := dbcqrs.(state.FunctionLoader)
@@ -146,7 +148,10 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
-	connectRc, err := createInmemoryRedis(ctx, opts.Tick)
+	connectRc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{"127.0.0.1:6379"},
+		DisableCache: true,
+	})
 	if err != nil {
 		return err
 	}

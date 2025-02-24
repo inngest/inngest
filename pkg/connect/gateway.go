@@ -746,14 +746,6 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 		}
 	}
 
-	if len(initialMessageData.Apps) > MaxAppsPerConnection {
-		return nil, &SocketError{
-			SysCode:    syscode.CodeConnectTooManyAppsPerConnection,
-			StatusCode: websocket.StatusPolicyViolation,
-			Msg:        fmt.Sprintf("You exceeded the max. number of allowed apps per connection (%d)", MaxAppsPerConnection),
-		}
-	}
-
 	var authResp *auth.Response
 	{
 		// Run auth, add to distributed state
@@ -781,6 +773,28 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 		}
 
 		c.log.Debug("SDK successfully authenticated", "authResp", authResp)
+	}
+
+	{
+		limit := MaxAppsPerConnection
+		if c.svc.entitlementRetriever != nil {
+			limit, err = c.svc.entitlementRetriever.AppsPerConnection(ctx, authResp.AccountID)
+			if err != nil {
+				return nil, &SocketError{
+					SysCode:    syscode.CodeConnectInternal,
+					StatusCode: websocket.StatusInternalError,
+					Msg:        "Internal error",
+				}
+			}
+		}
+
+		if len(initialMessageData.Apps) > limit {
+			return nil, &SocketError{
+				SysCode:    syscode.CodeConnectTooManyAppsPerConnection,
+				StatusCode: websocket.StatusPolicyViolation,
+				Msg:        fmt.Sprintf("You exceeded the max. number of allowed apps per connection (%d)", limit),
+			}
+		}
 	}
 
 	log := c.log.With("account_id", authResp.AccountID, "env_id", authResp.EnvID)

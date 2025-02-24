@@ -60,6 +60,10 @@ func (c *connectionCounter) Wait() {
 	c.waiter.Wait()
 }
 
+type ConnectEntitlementRetriever interface {
+	AppsPerConnection(ctx context.Context, accountId uuid.UUID) (int, error)
+}
+
 type connectGatewaySvc struct {
 	gatewayPublicPort int
 
@@ -76,11 +80,12 @@ type connectGatewaySvc struct {
 
 	runCtx context.Context
 
-	auther       auth.Handler
-	stateManager state.StateManager
-	receiver     pubsub.RequestReceiver
-	appLoader    ConnectAppLoader
-	apiBaseUrl   string
+	auther               auth.Handler
+	stateManager         state.StateManager
+	receiver             pubsub.RequestReceiver
+	appLoader            ConnectAppLoader
+	apiBaseUrl           string
+	entitlementRetriever ConnectEntitlementRetriever
 
 	hostname string
 
@@ -175,6 +180,12 @@ func WithApiBaseUrl(url string) gatewayOpt {
 func WithGroupName(groupName string) gatewayOpt {
 	return func(svc *connectGatewaySvc) {
 		svc.groupName = groupName
+	}
+}
+
+func WithEntitlementRetriever(r ConnectEntitlementRetriever) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.entitlementRetriever = r
 	}
 }
 
