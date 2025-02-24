@@ -30,7 +30,7 @@ const (
 	pkgName = "connect.gateway"
 )
 
-const MaxAppsPerConnection = 10
+const DefaultAppsPerConnection = 10
 
 func (c *connectGatewaySvc) closeWithConnectError(ws *websocket.Conn, serr *SocketError) {
 	// reason must be limited to 125 bytes and should not be dynamic,
@@ -776,7 +776,7 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 	}
 
 	{
-		limit := MaxAppsPerConnection
+		limit := DefaultAppsPerConnection
 		if authResp.Entitlements.AppsPerConnection != 0 {
 			limit = authResp.Entitlements.AppsPerConnection
 		}
