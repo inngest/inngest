@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import dynamic from 'next/dynamic';
 import { Alert } from '@inngest/components/Alert/Alert';
 
 import { SharedContextProvider } from '@/app/SharedContextProvider';
@@ -16,6 +17,9 @@ type RootLayoutProps = {
   children: ReactNode;
 };
 
+const DarkModePopover = dynamic(() => import('@/components/Temp/DarkModePopover'), {
+  ssr: false,
+});
 const NotFound = () => (
   <div className="mt-16 flex place-content-center">
     <Alert severity="warning">Environment not found.</Alert>
@@ -43,6 +47,7 @@ export default async function RootLayout({
       <Layout activeEnv={env}>
         <Env env={env}>
           <SharedContextProvider>{children}</SharedContextProvider>
+          <DarkModePopover />
         </Env>
       </Layout>
       <Toaster />
