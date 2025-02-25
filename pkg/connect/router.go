@@ -274,15 +274,52 @@ func (c *connectRouterSvc) cleanupUnhealthyConnection(envID uuid.UUID, conn *con
 	}
 }
 
-func pickConnection(candidates []connWithGroup, rnd *util.FrandRNG) (*connect.ConnMetadata, error) {
-	// First, sort candidate connections by CreatedAt timestamp (newest first)
+func getConnectionWeight(timeRange float64, oldestVersion time.Time, h connWithGroup) float64 {
+	weight := 1.0
+
+	// Calculate weights based on factors like version
+	if !h.group.CreatedAt.IsZero() && timeRange > 0 {
+		// Normalize to range [1, 10] where newer timestamps get higher weights
+		timeDiff := h.group.CreatedAt.Sub(oldestVersion).Seconds()
+		normalizedWeight := 1.0 + 9.0*(timeDiff/timeRange)
+		weight = normalizedWeight
+	}
+
+	return weight
+}
+
+type versionTimeDistribution struct {
+	oldestVersionCreatedAt time.Time
+	newestVersionCreatedAt time.Time
+	timeRange              float64
+}
+
+func getVersionTimeDistribution(sortedCandidates []connWithGroup) versionTimeDistribution {
+	oldestVersion := sortedCandidates[0].group.CreatedAt
+	newestVersion := sortedCandidates[len(sortedCandidates)-1].group.CreatedAt
+
+	timeRange := newestVersion.Sub(oldestVersion).Seconds()
+
+	return versionTimeDistribution{
+		oldestVersionCreatedAt: oldestVersion,
+		newestVersionCreatedAt: newestVersion,
+		timeRange:              timeRange,
+	}
+}
+
+func sortByGroupCreatedAt(candidates []connWithGroup) {
 	slices.SortStableFunc(candidates, func(a, b connWithGroup) int {
-		if a.group.CreatedAt.Before(b.group.CreatedAt) {
+		if a.group.CreatedAt.After(b.group.CreatedAt) {
 			return 1
 		}
 
 		return -1
 	})
+}
+
+func pickConnection(candidates []connWithGroup, rnd *util.FrandRNG) (*connect.ConnMetadata, error) {
+	// First, sort candidate connections by CreatedAt timestamp (newest first)
+	sortByGroupCreatedAt(candidates)
 
 	// Clamp candidates
 	if len(candidates) > 5 {
@@ -290,24 +327,11 @@ func pickConnection(candidates []connWithGroup, rnd *util.FrandRNG) (*connect.Co
 	}
 
 	// Get range of versions
-	oldestVersion := candidates[0].group.CreatedAt
-	newestVersion := candidates[len(candidates)-1].group.CreatedAt
-
-	timeRange := newestVersion.Sub(oldestVersion).Seconds()
+	versionTimeDistribution := getVersionTimeDistribution(candidates)
 
 	weights := make([]float64, len(candidates))
 	for i, h := range candidates {
-		weight := 10.0
-
-		// Calculate weights based on factors like version
-		if !h.group.CreatedAt.IsZero() && timeRange > 0 {
-			// Normalize to range [1, 10] where newer timestamps get higher weights
-			timeDiff := h.group.CreatedAt.Sub(oldestVersion).Seconds()
-			normalizedWeight := 10.0 + 90.0*(timeDiff/timeRange)
-			weight = normalizedWeight
-		}
-
-		weights[i] = weight
+		weights[i] = getConnectionWeight(versionTimeDistribution.timeRange, versionTimeDistribution.oldestVersionCreatedAt, h)
 	}
 
 	w := sampleuv.NewWeighted(weights, rnd)
