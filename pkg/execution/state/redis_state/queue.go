@@ -1937,7 +1937,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 //
 // Obtaining a lease updates the vesting time for the queue item until now() +
 // lease duration. This returns the newly acquired lease ID on success.
-func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, duration time.Duration, now time.Time, denies *leaseDenies) (*ulid.ULID, error) {
+func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration time.Duration, now time.Time, denies *leaseDenies) (*ulid.ULID, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Lease"), redis_telemetry.ScopeQueue)
 
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
@@ -1961,7 +1961,16 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, duration time
 	}
 
 	// Grab all partitions for the queue item
-	parts, acctLimit := q.ItemPartitions(ctx, q.primaryQueueShard, item)
+	var (
+		parts     []QueuePartition
+		acctLimit int
+	)
+
+	_, _ = duration(ctx, q.primaryQueueShard.Name, "lease_partitions", q.clock.Now(), func(ctx context.Context) (any, error) {
+		parts, acctLimit = q.ItemPartitions(ctx, q.primaryQueueShard, item)
+		return nil, nil
+	})
+
 	for _, partition := range parts {
 		// Check to see if this key has already been denied in the lease iteration.
 		// If so, fail early.
@@ -1970,7 +1979,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, duration time
 		}
 	}
 
-	leaseID, err := ulid.New(ulid.Timestamp(q.clock.Now().Add(duration).UTC()), rnd)
+	leaseID, err := ulid.New(ulid.Timestamp(q.clock.Now().Add(leaseDuration).UTC()), rnd)
 	if err != nil {
 		return nil, fmt.Errorf("error generating id: %w", err)
 	}
