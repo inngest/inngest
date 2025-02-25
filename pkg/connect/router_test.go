@@ -368,21 +368,72 @@ func TestFullConnectRouting(t *testing.T) {
 func TestIsHealthy(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
-	t.Run("ready connection should be marked as healthy", func(t *testing.T) {
-		_, stateMan, cleanup := setupRedis(t)
-		defer cleanup()
+	_, stateMan, cleanup := setupRedis(t)
+	defer cleanup()
 
-		setupRes := setup(t, stateMan, setupOpts{}, newTestConn(connect.ConnectionStatus_READY, time.Now()))
+	type testCase struct {
+		name           string
+		status         connect.ConnectionStatus
+		heartbeatDelay time.Duration
+		expected       isHealthyRes
+	}
 
-		conn, err := stateMan.GetConnection(context.Background(), setupRes.envId, setupRes.connIds[0])
-		require.NoError(t, err)
+	cases := []testCase{
+		{
+			name:   "ready connection should be marked as healthy",
+			status: connect.ConnectionStatus_READY,
+			expected: isHealthyRes{
+				isHealthy:                       true,
+				shouldDeleteUnhealthyConnection: false,
+				shouldDeleteUnhealthyGateway:    false,
+			},
+		},
+		{
+			name:           "ready but timed out connection should not be marked as healthy",
+			status:         connect.ConnectionStatus_READY,
+			heartbeatDelay: 3 * WorkerHeartbeatInterval,
+			expected: isHealthyRes{
+				isHealthy:                       false,
+				shouldDeleteUnhealthyConnection: true,
+				shouldDeleteUnhealthyGateway:    false,
+			},
+		},
+		{
+			name:   "non-ready connection should not be marked as healthy",
+			status: connect.ConnectionStatus_DISCONNECTING,
+			expected: isHealthyRes{
+				isHealthy:                       false,
+				shouldDeleteUnhealthyConnection: false,
+				shouldDeleteUnhealthyGateway:    false,
+			},
+		},
+		{
+			name:   "disconnected connection should be cleaned up",
+			status: connect.ConnectionStatus_DISCONNECTED,
+			expected: isHealthyRes{
+				isHealthy:                       false,
+				shouldDeleteUnhealthyConnection: true,
+				shouldDeleteUnhealthyGateway:    false,
+			},
+		},
+	}
 
-		res := isHealthy(context.Background(), stateMan, setupRes.envId, setupRes.appId, setupRes.fnSlug, conn, log)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			setupRes := setup(t, stateMan, setupOpts{},
+				newTestConn(tc.status, time.Now().Add(-tc.heartbeatDelay)),
+			)
 
-		require.True(t, res.isHealthy)
-		require.False(t, res.shouldDeleteUnhealthyConnection)
-		require.False(t, res.shouldDeleteUnhealthyGateway)
-	})
+			conn, err := stateMan.GetConnection(context.Background(), setupRes.envId, setupRes.connIds[0])
+			require.NoError(t, err)
+			res := isHealthy(context.Background(), stateMan, setupRes.envId, setupRes.appId, setupRes.fnSlug, conn, log)
+
+			require.Equal(t, tc.expected.isHealthy, res.isHealthy, "expected isHealthy to match")
+			require.Equal(t, tc.expected.shouldDeleteUnhealthyGateway, res.shouldDeleteUnhealthyGateway, "expected shouldDeleteUnhealthyGateway to match")
+			require.Equal(t, tc.expected.shouldDeleteUnhealthyConnection, res.shouldDeleteUnhealthyConnection, "expected shouldDeleteUnhealthyConnection to match")
+		})
+	}
+
 }
 
 func TestGetConnectionWeight(t *testing.T) {
