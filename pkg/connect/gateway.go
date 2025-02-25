@@ -233,10 +233,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		defer func() {
 			// This is a transactional operation, it should always complete regardless of context cancellation
 			err := c.stateManager.DeleteConnection(context.Background(), conn.EnvID, conn.ConnectionId)
-			switch err {
-			case nil:
-				// no-op
-			default:
+			if err != nil {
 				ch.log.Error("error deleting connection from state", "error", err)
 			}
 
