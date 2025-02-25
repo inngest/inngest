@@ -60,11 +60,14 @@ export function Trace({
 
   const hasChildren = (trace.childrenSpans?.length ?? 0) > 0;
 
+  console.log('shit trace', trace);
+
   return (
     <>
       <div
         className={`flex h-7 w-full cursor-pointer flex-row items-center justify-start gap-1 pl-4 ${
-          (!selectedStep && trace.isRoot) || selectedStep?.trace?.spanID === trace.spanID
+          (!selectedStep && trace.isRoot) ||
+          (selectedStep?.trace?.spanID === trace.spanID && selectedStep?.trace?.name === trace.name)
             ? 'bg-secondary-3xSubtle'
             : ''
         } hover:bg-canvasSubtle`}
@@ -91,7 +94,7 @@ export function Trace({
             </div>
           )}
 
-          <div className="text-basis text-ellipsis whitespace-nowrap text-sm font-normal leading-tight">
+          <div className="text-basis font-normalleading-tight max-w-full flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm">
             {trace.name}
           </div>
         </div>
