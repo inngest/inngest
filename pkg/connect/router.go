@@ -300,7 +300,7 @@ func pickConnection(candidates []connWithGroup, rnd *util.FrandRNG) (*connect.Co
 		weight := 1.0
 
 		// Calculate weights based on factors like version
-		if !h.group.CreatedAt.IsZero() {
+		if !h.group.CreatedAt.IsZero() && timeRange > 0 {
 			// Normalize to range [1, 10] where newer timestamps get higher weights
 			timeDiff := h.group.CreatedAt.Sub(oldestVersion).Seconds()
 			normalizedWeight := 1.0 + 9.0*(timeDiff/timeRange)
