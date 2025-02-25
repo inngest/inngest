@@ -55,7 +55,7 @@ export default function Page() {
   const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
   const appsRes = useGetAppsQuery();
 
-  const traceAIEnabled = true;
+  const traceAIEnabled = false;
 
   const queryFn = useCallback(
     async ({ pageParam }: { pageParam: string | null }) => {
