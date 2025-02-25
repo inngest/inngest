@@ -55,6 +55,11 @@ func TestFullConnectRouting(t *testing.T) {
 
 		appName := "app-1"
 
+		caps, err := json.Marshal(sdk.Capabilities{
+			Connect: sdk.ConnectV1,
+		})
+		require.NoError(t, err)
+
 		fn1 := sdk.SDKFunction{
 			Name: "Test Function",
 			Slug: fmt.Sprintf("%s-fn-1", appName),
@@ -80,8 +85,13 @@ func TestFullConnectRouting(t *testing.T) {
 				MemBytes: 1024 * 1024 * 16,
 				Os:       "linux",
 			},
-			SdkVersion:  "fake-ver",
-			SdkLanguage: "fake-sdk",
+			SdkVersion:   "fake-ver",
+			SdkLanguage:  "fake-sdk",
+			Capabilities: caps,
+			AuthData: &connect.AuthData{
+				SessionToken: "fake-session-token",
+				SyncToken:    "fake-sync-token",
+			},
 		}
 
 		group, err := NewWorkerGroupFromConnRequest(ctx, fakeReq, &auth.Response{
