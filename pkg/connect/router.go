@@ -239,6 +239,10 @@ func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, envID uuid
 		return nil, ErrNoHealthyConnection
 	}
 
+	if len(healthy) == 1 {
+		return healthy[0].conn, nil
+	}
+
 	return pickConnection(healthy, c.rnd)
 }
 
