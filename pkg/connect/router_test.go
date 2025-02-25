@@ -76,7 +76,21 @@ func TestFullConnectRouting(t *testing.T) {
 		}
 	}
 
-	setup := func(stateMan state.StateManager, fnId string, connsToCreate ...testConnection) setupRes {
+	type setupOpts struct {
+		// use fnId if provided, otherwise default to "fn-1"
+		fnId string
+
+		// use appName if provided, otherwise default to "app-1"
+		appName string
+
+		// use appId if provided, otherwise create new
+		appId uuid.UUID
+
+		// use syncId if provided, otherwise create new
+		syncId uuid.UUID
+	}
+
+	setup := func(stateMan state.StateManager, opts setupOpts, connsToCreate ...testConnection) setupRes {
 		lastHeartbeatAt := time.Now()
 
 		err := stateMan.UpsertGateway(context.Background(), &state.Gateway{
@@ -87,9 +101,24 @@ func TestFullConnectRouting(t *testing.T) {
 		})
 		require.NoError(t, err)
 
+		fnId := "fn-1"
+		if opts.fnId != "" {
+			fnId = opts.fnId
+		}
+
 		appId, syncId := uuid.New(), uuid.New()
+		if opts.appId != uuid.Nil {
+			appId = opts.appId
+		}
+
+		if opts.syncId != uuid.Nil {
+			syncId = opts.syncId
+		}
 
 		appName := "app-1"
+		if opts.appName != "" {
+			appName = opts.appName
+		}
 
 		caps, err := json.Marshal(sdk.Capabilities{
 			Connect: sdk.ConnectV1,
@@ -173,7 +202,7 @@ func TestFullConnectRouting(t *testing.T) {
 		svc, stateMan, cleanup := setupRedis(t)
 		defer cleanup()
 
-		setupRes := setup(stateMan, "fn-1",
+		setupRes := setup(stateMan, setupOpts{},
 			newTestConn(connect.ConnectionStatus_READY, time.Now()),
 		)
 
@@ -188,7 +217,7 @@ func TestFullConnectRouting(t *testing.T) {
 		svc, stateMan, cleanup := setupRedis(t)
 		defer cleanup()
 
-		setupRes := setup(stateMan, "fn-1",
+		setupRes := setup(stateMan, setupOpts{},
 			newTestConn(connect.ConnectionStatus_CONNECTED, time.Now()),
 			newTestConn(connect.ConnectionStatus_DISCONNECTING, time.Now()),
 			newTestConn(connect.ConnectionStatus_DISCONNECTED, time.Now()),
@@ -219,7 +248,7 @@ func TestFullConnectRouting(t *testing.T) {
 		svc, stateMan, cleanup := setupRedis(t)
 		defer cleanup()
 
-		setupRes := setup(stateMan, "fn-1",
+		setupRes := setup(stateMan, setupOpts{},
 			newTestConn(connect.ConnectionStatus_DISCONNECTING, time.Now()),
 			newTestConn(connect.ConnectionStatus_DISCONNECTED, time.Now()),
 		)
@@ -233,7 +262,7 @@ func TestFullConnectRouting(t *testing.T) {
 		svc, stateMan, cleanup := setupRedis(t)
 		defer cleanup()
 
-		setupRes := setup(stateMan, "fn-1",
+		setupRes := setup(stateMan, setupOpts{},
 			newTestConn(connect.ConnectionStatus_DISCONNECTING, time.Now()),
 			newTestConn(connect.ConnectionStatus_DISCONNECTED, time.Now()),
 		)
@@ -243,17 +272,47 @@ func TestFullConnectRouting(t *testing.T) {
 		require.ErrorIs(t, err, ErrNoHealthyConnection)
 	})
 
-	t.Run("connection without functions should be ignored, even if newer", func(t *testing.T) {
+	t.Run("connection without functions should be ignored", func(t *testing.T) {
 		svc, stateMan, cleanup := setupRedis(t)
 		defer cleanup()
 
-		setupRes := setup(stateMan, "fn-1",
+		setupRes := setup(stateMan, setupOpts{},
 			newTestConn(connect.ConnectionStatus_READY, time.Now()),
 			newTestConn(connect.ConnectionStatus_READY, time.Now()),
 		)
 
+		// Try to route message for fn-1 (this does not exist)
 		_, err := svc.getSuitableConnection(context.Background(), envId, setupRes.appId, "fn-2", log)
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrNoHealthyConnection)
+	})
+
+	t.Run("connection without functions should be ignored, even if newer", func(t *testing.T) {
+		svc, stateMan, cleanup := setupRedis(t)
+		defer cleanup()
+
+		setupOldVersion := setup(stateMan, setupOpts{
+			fnId: "fn-1",
+		},
+			newTestConn(connect.ConnectionStatus_READY, time.Now()),
+		)
+
+		<-time.After(1 * time.Second)
+
+		setupNewVersion := setup(stateMan, setupOpts{
+			fnId:    "fn-2", // note: different fn slug
+			appName: setupOldVersion.appName,
+			appId:   setupOldVersion.appId,
+			syncId:  setupOldVersion.syncId,
+		},
+			newTestConn(connect.ConnectionStatus_READY, time.Now()),
+			newTestConn(connect.ConnectionStatus_READY, time.Now()),
+		)
+
+		// Try to route message for fn-1 (this does not exist in newer version)
+		conn, err := svc.getSuitableConnection(context.Background(), envId, setupOldVersion.appId, setupOldVersion.fnSlug, log)
+		require.NoError(t, err)
+		require.NotEqual(t, setupNewVersion.connIds[0].String(), conn.Id)
+		require.Equal(t, setupOldVersion.connIds[0].String(), conn.Id)
 	})
 }
