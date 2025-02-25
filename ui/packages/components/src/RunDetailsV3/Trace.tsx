@@ -60,8 +60,6 @@ export function Trace({
 
   const hasChildren = (trace.childrenSpans?.length ?? 0) > 0;
 
-  console.log('shit trace', trace);
-
   return (
     <>
       <div
