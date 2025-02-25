@@ -107,7 +107,7 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 			ctx, span := c.tracer.NewSpan(ctx, "RouteExecutorRequest", accountID, envID)
 			defer span.End()
 
-			routeTo, err := c.getSuitableConnection(ctx, envID, appID, data.AppName, data.FunctionSlug, log)
+			routeTo, err := c.getSuitableConnection(ctx, envID, appID, data.FunctionSlug, log)
 			if err != nil && !errors.Is(err, ErrNoHealthyConnection) {
 				log.Error("could not retrieve suitable connection", "err", err)
 				return
@@ -205,7 +205,7 @@ type connWithGroup struct {
 	group *state.WorkerGroup
 }
 
-func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, envID uuid.UUID, appID uuid.UUID, appName string, fnSlug string, log *slog.Logger) (*connect.ConnMetadata, error) {
+func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, envID uuid.UUID, appID uuid.UUID, fnSlug string, log *slog.Logger) (*connect.ConnMetadata, error) {
 	conns, err := c.stateManager.GetConnectionsByAppID(ctx, envID, appID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get connections by app ID: %w", err)
@@ -297,13 +297,13 @@ func pickConnection(candidates []connWithGroup, rnd *util.FrandRNG) (*connect.Co
 
 	weights := make([]float64, len(candidates))
 	for i, h := range candidates {
-		weight := 1.0
+		weight := 10.0
 
 		// Calculate weights based on factors like version
 		if !h.group.CreatedAt.IsZero() && timeRange > 0 {
 			// Normalize to range [1, 10] where newer timestamps get higher weights
 			timeDiff := h.group.CreatedAt.Sub(oldestVersion).Seconds()
-			normalizedWeight := 1.0 + 9.0*(timeDiff/timeRange)
+			normalizedWeight := 10.0 + 90.0*(timeDiff/timeRange)
 			weight = normalizedWeight
 		}
 

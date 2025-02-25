@@ -46,6 +46,7 @@ func TestFullConnectRouting(t *testing.T) {
 			rcv,
 			cond,
 		)
+		require.NoError(t, svc.Pre(context.Background()))
 
 		return svc, stateMan, func() {
 			rc.Close()
@@ -176,7 +177,7 @@ func TestFullConnectRouting(t *testing.T) {
 			newTestConn(connect.ConnectionStatus_READY, time.Now()),
 		)
 
-		conn, err := svc.getSuitableConnection(context.Background(), envId, setupRes.appId, setupRes.appName, setupRes.fnSlug, log)
+		conn, err := svc.getSuitableConnection(context.Background(), envId, setupRes.appId, setupRes.fnSlug, log)
 		require.NoError(t, err)
 
 		require.Equal(t, setupRes.connIds[0].String(), conn.Id)
@@ -194,7 +195,7 @@ func TestFullConnectRouting(t *testing.T) {
 			newTestConn(connect.ConnectionStatus_READY, time.Now()),
 		)
 
-		conn, err := svc.getSuitableConnection(context.Background(), envId, setupRes.appId, setupRes.appName, setupRes.fnSlug, log)
+		conn, err := svc.getSuitableConnection(context.Background(), envId, setupRes.appId, setupRes.fnSlug, log)
 		require.NoError(t, err)
 
 		require.Equal(t, setupRes.connIds[3].String(), conn.Id)
@@ -223,7 +224,7 @@ func TestFullConnectRouting(t *testing.T) {
 			newTestConn(connect.ConnectionStatus_DISCONNECTED, time.Now()),
 		)
 
-		_, err := svc.getSuitableConnection(context.Background(), envId, setupRes.appId, setupRes.appName, setupRes.fnSlug, log)
+		_, err := svc.getSuitableConnection(context.Background(), envId, setupRes.appId, setupRes.fnSlug, log)
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrNoHealthyConnection)
 	})
@@ -237,7 +238,7 @@ func TestFullConnectRouting(t *testing.T) {
 			newTestConn(connect.ConnectionStatus_DISCONNECTED, time.Now()),
 		)
 
-		_, err := svc.getSuitableConnection(context.Background(), envId, setupRes.appId, setupRes.appName, setupRes.fnSlug, log)
+		_, err := svc.getSuitableConnection(context.Background(), envId, setupRes.appId, setupRes.fnSlug, log)
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrNoHealthyConnection)
 	})
@@ -251,7 +252,7 @@ func TestFullConnectRouting(t *testing.T) {
 			newTestConn(connect.ConnectionStatus_READY, time.Now()),
 		)
 
-		_, err := svc.getSuitableConnection(context.Background(), envId, setupRes.appId, "fn-2", setupRes.fnSlug, log)
+		_, err := svc.getSuitableConnection(context.Background(), envId, setupRes.appId, "fn-2", log)
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrNoHealthyConnection)
 	})
