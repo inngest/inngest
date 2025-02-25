@@ -135,7 +135,7 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
           onClick={() => setExpanded(!expanded)}
         >
           <RiArrowUpSLine
-            className={`transition-transform duration-500 ${expanded ? 'rotate-180' : ''}`}
+            className={`shrink-0 transition-transform duration-500 ${expanded ? 'rotate-180' : ''}`}
           />
           {isPending ? (
             <SkeletonElement />

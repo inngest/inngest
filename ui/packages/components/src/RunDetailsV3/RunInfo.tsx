@@ -87,7 +87,9 @@ export const RunInfo = ({
             onClick={() => setExpanded(!expanded)}
           >
             <RiArrowUpSLine
-              className={`transition-transform duration-500 ${expanded ? 'rotate-180' : ''}`}
+              className={`shrink-0 transition-transform duration-500 ${
+                expanded ? 'rotate-180' : ''
+              }`}
             />
             {isLazyDone(run) ? (
               <span className="text-basis text-sm font-normal">{run.fn.name}</span>

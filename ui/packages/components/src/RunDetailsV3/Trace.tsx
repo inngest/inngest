@@ -5,6 +5,7 @@ import { RiArrowUpSLine } from '@remixicon/react';
 import type { Result } from '../types/functionRun';
 import { toMaybeDate } from '../utils/date';
 import { InlineSpans } from './InlineSpans';
+import { TimelineHeader } from './TimelineHeader';
 import { type Trace } from './types';
 import { createSpanWidths, useStepSelection } from './utils';
 
@@ -18,21 +19,9 @@ type Props = {
   };
   trace: Trace;
   runID: string;
-  leftWidth: number;
-  handleMouseDown: (e: React.MouseEvent) => void;
 };
 
-export function Trace({
-  depth,
-  getResult,
-  maxTime,
-  minTime,
-  pathCreator,
-  trace,
-  runID,
-  leftWidth,
-  handleMouseDown,
-}: Props) {
+export function Trace({ depth, getResult, maxTime, minTime, pathCreator, trace, runID }: Props) {
   const [expanded, setExpanded] = useState(true);
   const [result, setResult] = useState<Result>();
   const { selectStep, selectedStep } = useStepSelection();
@@ -61,23 +50,25 @@ export function Trace({
   const hasChildren = (trace.childrenSpans?.length ?? 0) > 0;
 
   return (
-    <>
+    <div className="relative flex w-full flex-col">
+      <TimelineHeader trace={trace} minTime={minTime} maxTime={maxTime} />
+
       <div
         className={`flex h-7 w-full cursor-pointer flex-row items-center justify-start gap-1 pl-4 ${
           (!selectedStep && trace.isRoot) ||
           (selectedStep?.trace?.spanID === trace.spanID && selectedStep?.trace?.name === trace.name)
             ? 'bg-secondary-3xSubtle'
-            : ''
-        } hover:bg-canvasSubtle`}
+            : 'hover:bg-canvasSubtle'
+        } `}
         onClick={() => selectStep(depth ? { trace, runID, result, pathCreator } : undefined)}
       >
         <div
-          className="flex flex-row items-center justify-start gap-1"
-          style={{ width: `${leftWidth}%`, paddingLeft: `${depth * 40}px` }}
+          className="flex w-[30%] flex-row items-center justify-start gap-1 overflow-hidden"
+          style={{ paddingLeft: `${depth * 40}px` }}
         >
           {hasChildren && (
             <div
-              className="flex flex-row items-center justify-start gap-1"
+              className="flex shrink-0 flex-row items-center justify-start gap-1"
               onClick={(e) => {
                 e.stopPropagation();
                 setExpanded(!expanded);
@@ -92,16 +83,12 @@ export function Trace({
             </div>
           )}
 
-          <div className="text-basis font-normalleading-tight max-w-full flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm">
+          <div className="text-basis overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal leading-tight">
             {trace.name}
           </div>
         </div>
 
-        <div style={{ width: `${100 - leftWidth}%` }} className="flex flex-row gap-1 pr-4">
-          <div className="h-7 cursor-col-resize" onMouseDown={handleMouseDown}>
-            <div className="bg-canvasMuted h-full w-[.5px]" />
-          </div>
-
+        <div className="border-subtle flex w-[70%] flex-row border-l-[0.5px]">
           <InlineSpans
             maxTime={maxTime}
             minTime={minTime}
@@ -125,13 +112,11 @@ export function Trace({
                 pathCreator={pathCreator}
                 trace={child}
                 runID={runID}
-                leftWidth={leftWidth}
-                handleMouseDown={handleMouseDown}
               />
             );
           })}
         </>
       )}
-    </>
+    </div>
   );
 }
