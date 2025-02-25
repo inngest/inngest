@@ -24,8 +24,8 @@ export function InlineSpans({ className, minTime, maxTime, name, spans, widths }
   return (
     <Tooltip>
       <TooltipTrigger className="h-fit w-full grow">
-        <div className={cn('flex h-8 grow items-center', className)}>
-          <div className="bg-contrast h-px" style={{ flexGrow: widths.before }}></div>
+        <div className={cn('hover:bg-canvasSubtle flex h-7 grow items-center', className)}>
+          <div className="bg-canvasMuted h-[.5px]" style={{ flexGrow: widths.before }}></div>
 
           <div
             className="flex"
@@ -40,7 +40,7 @@ export function InlineSpans({ className, minTime, maxTime, name, spans, widths }
             })}
           </div>
 
-          <div className="bg-contrast h-px" style={{ flexGrow: widths.after }}></div>
+          <div className="bg-canvasMuted h-[.5px]" style={{ flexGrow: widths.after }}></div>
         </div>
       </TooltipTrigger>
       <TooltipContent>

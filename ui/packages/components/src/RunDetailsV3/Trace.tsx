@@ -35,7 +35,7 @@ export function Trace({
 }: Props) {
   const [expanded, setExpanded] = useState(true);
   const [result, setResult] = useState<Result>();
-  const { selectStep } = useStepSelection();
+  const { selectStep, selectedStep } = useStepSelection();
 
   useEffect(() => {
     if (expanded && !result && trace.outputID) {
@@ -58,17 +58,23 @@ export function Trace({
       ? trace.childrenSpans
       : [trace];
 
+  const hasChildren = (trace.childrenSpans?.length ?? 0) > 0;
+
   return (
     <>
       <div
-        className="flex h-7 w-full cursor-pointer flex-row items-center justify-start gap-1"
+        className={`flex h-7 w-full cursor-pointer flex-row items-center justify-start gap-1 pl-4 ${
+          (!selectedStep && trace.isRoot) || selectedStep?.trace?.spanID === trace.spanID
+            ? 'bg-secondary-3xSubtle'
+            : ''
+        } hover:bg-canvasSubtle`}
         onClick={() => selectStep(depth ? { trace, runID, result, pathCreator } : undefined)}
       >
         <div
           className="flex flex-row items-center justify-start gap-1"
           style={{ width: `${leftWidth}%`, paddingLeft: `${depth * 40}px` }}
         >
-          {(trace.childrenSpans?.length ?? 0) > 0 && (
+          {hasChildren && (
             <div
               className="flex flex-row items-center justify-start gap-1"
               onClick={(e) => {
@@ -90,8 +96,8 @@ export function Trace({
           </div>
         </div>
 
-        <div style={{ width: `${100 - leftWidth}%` }} className="bg-canvasBase flex flex-row gap-1">
-          <div className="bg-canvasBase h-7 cursor-col-resize px-1" onMouseDown={handleMouseDown}>
+        <div style={{ width: `${100 - leftWidth}%` }} className="flex flex-row gap-1 pr-4">
+          <div className="h-7 cursor-col-resize" onMouseDown={handleMouseDown}>
             <div className="bg-canvasMuted h-full w-[.5px]" />
           </div>
 
