@@ -1,11 +1,19 @@
 export function entitlementSecondsToStr(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
+
+  let sStr = `${s} sec`;
+
+  let mStr = `${m} mins`;
+  if (m == 1) {
+    mStr = `${m} min`;
+  }
+
   if (m == 0) {
-    return `${s} sec`;
+    return sStr;
   }
   if (s == 0) {
-    return `${m} mins`;
+    return mStr;
   }
-  return `${m} mins ${s} sec`;
+  return `${mStr} ${sStr}`;
 }

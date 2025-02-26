@@ -103,6 +103,9 @@ type WorkerGroup struct {
 	// - User provided identifier (e.g. git sha, release tag, etc)
 	Hash string `json:"hash"`
 
+	// CreatedAt records the time this worker group was first created
+	CreatedAt time.Time `json:"created_at"`
+
 	// used for syncing
 	SyncData SyncData `json:"-"`
 }
@@ -155,6 +158,7 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 	if existingGroup != nil && existingGroup.SyncID != nil && existingGroup.AppID != nil {
 		g.AppID = existingGroup.AppID
 		g.SyncID = existingGroup.SyncID
+		g.CreatedAt = existingGroup.CreatedAt
 		return nil
 	}
 

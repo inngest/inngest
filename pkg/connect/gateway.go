@@ -30,7 +30,10 @@ const (
 	pkgName = "connect.gateway"
 )
 
-const MaxAppsPerConnection = 50
+const (
+	DefaultAppsPerConnection = 10
+	MaxAppsPerConnection     = 100
+)
 
 func (c *connectGatewaySvc) closeWithConnectError(ws *websocket.Conn, serr *SocketError) {
 	// reason must be limited to 125 bytes and should not be dynamic,
@@ -230,10 +233,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		defer func() {
 			// This is a transactional operation, it should always complete regardless of context cancellation
 			err := c.stateManager.DeleteConnection(context.Background(), conn.EnvID, conn.ConnectionId)
-			switch err {
-			case nil:
-				// no-op
-			default:
+			if err != nil {
 				ch.log.Error("error deleting connection from state", "error", err)
 			}
 
@@ -746,14 +746,6 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 		}
 	}
 
-	if len(initialMessageData.Apps) > MaxAppsPerConnection {
-		return nil, &SocketError{
-			SysCode:    syscode.CodeConnectTooManyAppsPerConnection,
-			StatusCode: websocket.StatusPolicyViolation,
-			Msg:        fmt.Sprintf("You exceeded the max. number of allowed apps per connection (%d)", MaxAppsPerConnection),
-		}
-	}
-
 	var authResp *auth.Response
 	{
 		// Run auth, add to distributed state
@@ -781,6 +773,21 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 		}
 
 		c.log.Debug("SDK successfully authenticated", "authResp", authResp)
+	}
+
+	{
+		limit := DefaultAppsPerConnection
+		if authResp.Entitlements.AppsPerConnection != 0 {
+			limit = authResp.Entitlements.AppsPerConnection
+		}
+
+		if len(initialMessageData.Apps) > limit {
+			return nil, &SocketError{
+				SysCode:    syscode.CodeConnectTooManyAppsPerConnection,
+				StatusCode: websocket.StatusPolicyViolation,
+				Msg:        fmt.Sprintf("You exceeded the max. number of allowed apps per connection (%d)", limit),
+			}
+		}
 	}
 
 	log := c.log.With("account_id", authResp.AccountID, "env_id", authResp.EnvID)

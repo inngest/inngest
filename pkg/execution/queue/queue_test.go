@@ -3,6 +3,7 @@ package queue
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -65,4 +66,14 @@ func TestShouldRetry(t *testing.T) {
 		actual := ShouldRetry(test.err, test.att, test.max)
 		require.Equal(t, test.expected, actual)
 	}
+}
+
+func TestAsRetryAt(t *testing.T) {
+	now := time.Now()
+	base := RetryAtError(fmt.Errorf("lol"), &now)
+	wrapped := fmt.Errorf("wrap: %w", base)
+
+	require.NotNil(t, AsRetryAtError(base))
+	require.NotNil(t, AsRetryAtError(wrapped))
+	require.Nil(t, AsRetryAtError(fmt.Errorf("no")))
 }

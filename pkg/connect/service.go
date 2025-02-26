@@ -18,7 +18,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
-	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
@@ -31,11 +30,6 @@ const (
 )
 
 type gatewayOpt func(*connectGatewaySvc)
-
-type ConnectAppLoader interface {
-	// GetAppByName returns an app by name
-	GetAppByName(ctx context.Context, envID uuid.UUID, name string) (*cqrs.App, error)
-}
 
 type connectionCounter struct {
 	count  uint64
@@ -60,6 +54,10 @@ func (c *connectionCounter) Wait() {
 	c.waiter.Wait()
 }
 
+type ConnectEntitlementRetriever interface {
+	AppsPerConnection(ctx context.Context, accountId uuid.UUID) (int, error)
+}
+
 type connectGatewaySvc struct {
 	gatewayPublicPort int
 
@@ -79,7 +77,6 @@ type connectGatewaySvc struct {
 	auther       auth.Handler
 	stateManager state.StateManager
 	receiver     pubsub.RequestReceiver
-	appLoader    ConnectAppLoader
 	apiBaseUrl   string
 
 	hostname string
@@ -133,12 +130,6 @@ func WithConnectionStateManager(m state.StateManager) gatewayOpt {
 func WithRequestReceiver(r pubsub.RequestReceiver) gatewayOpt {
 	return func(c *connectGatewaySvc) {
 		c.receiver = r
-	}
-}
-
-func WithAppLoader(l ConnectAppLoader) gatewayOpt {
-	return func(svc *connectGatewaySvc) {
-		svc.appLoader = l
 	}
 }
 

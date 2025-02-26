@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/go-httpstat"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -23,6 +24,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/syscode"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/propagation"
@@ -230,6 +232,12 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 		dr.SetError(err)
 	}
 
+	// If there's a RetryAt, ensure we wrap the status code correctly.
+	if resp.RetryAt != nil {
+		err = queue.RetryAtError(err, resp.RetryAt)
+		dr.SetError(err)
+	}
+
 	return dr, err
 }
 
@@ -261,7 +269,14 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 	// Add `traceparent` and `tracestate` headers to the request from `ctx`
 	itrace.UserTracer().Propagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
 
+	// Track HTTP stats, eg. TLS handshake timeouts, DNS lookups, etc.
+	tracking := &httpstat.Result{}
+	req = req.WithContext(httpstat.WithHTTPStat(req.Context(), tracking))
+
+	// Perform the request.
 	resp, byt, dur, err := ExecuteRequest(ctx, c, req)
+
+	go trackRequestStats(ctx, tracking)
 
 	// Handle no response errors.
 	if errors.Is(err, ErrUnableToReach) {
@@ -280,12 +295,11 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 
 	var sysErr *syscode.Error
 	if errors.Is(err, ErrBodyTooLarge) {
-		// In this case, strangely, the actual reported error should be nil.  This
-		// has something to do with the DriverResponse.Err we return and should be
-		// refactored.
-		err = nil
-
 		sysErr = &syscode.Error{Code: syscode.CodeOutputTooLarge}
+		//
+		// downstream executor code expects system error codes here for traces
+		// and history to work properly
+		err = sysErr
 
 		// Override the output so the user sees the syserrV in the UI rather
 		// than a JSON parsing error
@@ -293,7 +307,6 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 	}
 
 	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-		err = nil
 		log.From(ctx).
 			Error().
 			Err(err).
@@ -417,4 +430,15 @@ type Response struct {
 
 	SysErr *syscode.Error
 	IsSDK  bool
+}
+
+func trackRequestStats(ctx context.Context, r *httpstat.Result) {
+	tags := map[string]any{"ipv6": r.IsIPv6}
+	opts := metrics.HistogramOpt{
+		PkgName: "httpdriver",
+		Tags:    tags,
+	}
+	metrics.HistogramHTTPDNSLookupDuration(ctx, r.DNSLookup.Milliseconds(), opts)
+	metrics.HistogramHTTPTLSHandshakeDuration(ctx, r.TLSHandshake.Milliseconds(), opts)
+	metrics.HistogramHTTPServerProcessingDuration(ctx, r.ServerProcessing.Milliseconds(), opts)
 }

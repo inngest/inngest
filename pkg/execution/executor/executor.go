@@ -895,7 +895,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 		return nil, err
 	}
-	err = e.HandleResponse(ctx, &instance)
+	if handleErr := e.HandleResponse(ctx, &instance); handleErr != nil {
+		return resp, handleErr
+	}
 	return resp, err
 }
 
@@ -965,8 +967,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 				i.item.Attempt += 1
 				go e.OnStepScheduled(context.WithoutCancel(ctx), i.md, i.item, &i.resp.Step.Name)
 			}
-
-			return i.resp
+			return nil
 		}
 
 		// If i.resp.Err != nil, we don't know whether to invoke the fn again
@@ -989,7 +990,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
 		}
 
-		return i.resp
+		return nil
 	}
 
 	// The generator length check is necessary because parallel steps in older
@@ -1239,6 +1240,13 @@ func (e *executor) executeDriverForStep(ctx context.Context, i *runInstance) (*s
 		} else {
 			// Set the response error if it wasn't set, or if Execute had an internal error.
 			// This ensures that we only ever need to check resp.Err to handle errors.
+			byt, e := json.Marshal(err.Error())
+			if e != nil {
+				response.Output = err
+			} else {
+				response.Output = string(byt)
+			}
+
 			errstr := err.Error()
 			response.Err = &errstr
 		}

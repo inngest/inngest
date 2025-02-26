@@ -61,7 +61,7 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	allowed, err := a.ConnectionLimiter.CheckConnectionLimit(ctx, res)
+	entitlements, err := a.EntitlementProvider.RetrieveConnectEntitlements(ctx, res)
 	if err != nil {
 		l.Error("could not check connection limit during start request", "err", err)
 
@@ -69,7 +69,7 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !allowed {
+	if !entitlements.ConnectionAllowed {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 429, "reached max allowed connections"))
 		return
 	}
@@ -88,7 +88,7 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	token, err := a.Signer.SignSessionToken(res.AccountID, res.EnvID, auth.DefaultExpiry)
+	token, err := a.Signer.SignSessionToken(res.AccountID, res.EnvID, auth.DefaultExpiry, entitlements)
 	if err != nil {
 		l.Error("could not sign connect session token", "err", err)
 

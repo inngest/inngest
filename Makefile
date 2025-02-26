@@ -2,9 +2,10 @@
 dev:
 	goreleaser build --single-target --snapshot --rm-dist
 
+# specifically for tests
 .PHONY: run
 run:
-	LOG_LEVEL=debug go run ./cmd/main.go dev -v $(PARAMS)
+	ENABLE_TEST_API=true LOG_LEVEL=debug go run ./cmd/main.go dev --tick=50 --no-poll --no-discovery -v $(PARAMS)
 
 xgo:
 	xgo -pkg cmd -ldflags="-s -w" -out build/inngest -targets "linux/arm64,linux/amd64,darwin/arm64,darwin/amd64" .
@@ -26,6 +27,11 @@ lint:
 .PHONY: e2e
 e2e:
 	./tests.sh
+
+
+.PHONY: e2e-golang
+e2e-golang:
+	SDK_URL=http://localhost:3000/api/inngest API_URL=http://localhost:8288 go test ./tests/golang -v -count=1
 
 .PHONY: gen
 gen:

@@ -58,6 +58,7 @@ const ListDatadogIntegrationsDocument = graphql(`
         createdAt
         updatedAt
         statusOk
+        error
       }
     }
   }
@@ -273,7 +274,16 @@ export default function SetupPage({
                     <div>
                       <span className="font-medium">{findEnvName(envs, ddInt.envID)}</span>
                     </div>
-                    {ddInt.lastSentAt ? (
+                    {ddInt.error ? (
+                      <div className="font-normal">
+                        <span className="text-error font-bold">Error:</span>{' '}
+                        <code>{ddInt.error}</code>
+                        <br />
+                        <span className="text-error">
+                          Please verify your Datadog API key, App key, and URL.
+                        </span>
+                      </div>
+                    ) : ddInt.lastSentAt ? (
                       <div className="text-muted">
                         <span className="italic">Metrics last sent:</span>{' '}
                         <Time value={ddInt.lastSentAt} />
@@ -283,7 +293,10 @@ export default function SetupPage({
                         <span className="italic">Setting up…</span>
                       </div>
                     ) : (
-                      <></>
+                      <div className="font-normal">
+                        <span className="text-error font-bold">Error:</span>{' '}
+                        <code>Please contact Inngest Support.</code>
+                      </div>
                     )}
                   </div>
                   <div>
