@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
+	"time"
 )
 
 func workerGroupHashFromConnRequest(req *connect.WorkerConnectRequestData, authResp *auth.Response, appConfig *connect.AppConfiguration, functionHash []byte) (string, error) {
@@ -59,6 +60,7 @@ func functionConfigHash(appConfig *connect.AppConfiguration) ([]byte, error) {
 	return functionHash, nil
 }
 
+// NewWorkerGroupFromConnRequest instantiates but does not store WorkerGroup for a new session.
 func NewWorkerGroupFromConnRequest(
 	ctx context.Context,
 	req *connect.WorkerConnectRequestData,
@@ -122,6 +124,7 @@ func NewWorkerGroupFromConnRequest(
 			SyncToken: req.AuthData.SyncToken,
 			AppConfig: appConfig,
 		},
+		CreatedAt: time.Now(),
 	}
 
 	return workerGroup, nil

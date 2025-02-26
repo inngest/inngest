@@ -2,18 +2,12 @@
 
 import dynamic from 'next/dynamic';
 import { Listbox } from '@headlessui/react';
-import { Pill } from '@inngest/components/Pill/Pill';
-
-import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 
 const ModeSwitch = dynamic(() => import('@inngest/components/ThemeMode/ModeSwitch'), {
   ssr: false,
 });
 
 export const ProfileMenu = ({ children }: React.PropsWithChildren) => {
-  const { featureFlags } = useFeatureFlags();
-  const isThemeModeSwitchEnabled = featureFlags.FEATURE_THEME_MODE;
-
   return (
     <Listbox>
       <Listbox.Button className="w-full cursor-pointer ring-0">{children}</Listbox.Button>
@@ -26,7 +20,7 @@ export const ProfileMenu = ({ children }: React.PropsWithChildren) => {
               className="text-muted mx-2 my-2 flex h-8 items-center justify-between px-2 text-[13px]"
             >
               <div>Theme</div>
-              {isThemeModeSwitchEnabled ? <ModeSwitch /> : <Pill>Coming soon</Pill>}
+              <ModeSwitch />
             </Listbox.Option>
           </>
         </Listbox.Options>

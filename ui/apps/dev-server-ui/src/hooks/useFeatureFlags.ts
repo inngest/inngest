@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 
 interface FeatureFlags {
   FEATURE_CEL_SEARCH?: boolean;
-  FEATURE_THEME_MODE?: boolean;
 }
 
 export function useFeatureFlags() {

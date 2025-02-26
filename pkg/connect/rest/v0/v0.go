@@ -21,7 +21,7 @@ type Opts struct {
 	Signer                  auth.SessionTokenSigner
 	RequestAuther           RequestAuther
 	ConnectGatewayRetriever ConnectGatewayRetriever
-	ConnectionLimiter       ConnectionLimiter
+	EntitlementProvider     EntitlementProvider
 	ConditionalTracer       trace.ConditionalTracer
 
 	Dev bool
@@ -31,8 +31,8 @@ type RequestAuther interface {
 	AuthenticateRequest(ctx context.Context, hashedSigningKey string, env string) (*auth.Response, error)
 }
 
-type ConnectionLimiter interface {
-	CheckConnectionLimit(ctx context.Context, resp *auth.Response) (bool, error)
+type EntitlementProvider interface {
+	RetrieveConnectEntitlements(ctx context.Context, resp *auth.Response) (auth.Entitlements, error)
 }
 
 type RetrieveGatewayOpts struct {

@@ -500,9 +500,13 @@ export const GET_WORKER_CONNECTIONS = gql`
 `;
 
 export const COUNT_WORKER_CONNECTIONS = gql`
-  query CountWorkerConnections($appID: UUID!, $status: [ConnectV1ConnectionStatus!]) {
+  query CountWorkerConnections(
+    $appID: UUID!
+    $startTime: Time!
+    $status: [ConnectV1ConnectionStatus!]
+  ) {
     workerConnections(
-      filter: { appIDs: [$appID], status: $status, timeField: CONNECTED_AT }
+      filter: { appIDs: [$appID], from: $startTime, status: $status, timeField: CONNECTED_AT }
       orderBy: [{ field: CONNECTED_AT, direction: DESC }]
     ) {
       totalCount

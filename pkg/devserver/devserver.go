@@ -436,7 +436,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			RequestAuther:           ds,
 			ConnectGatewayRetriever: ds,
 			Dev:                     true,
-			ConnectionLimiter:       ds,
+			EntitlementProvider:     ds,
 			ConditionalTracer:       conditionalTracer,
 		},
 	})
@@ -448,7 +448,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		connect.WithConnectionStateManager(connectionManager),
 		connect.WithRequestReceiver(gatewayProxy),
 		connect.WithGatewayAuthHandler(auth.NewJWTAuthHandler(consts.DevServerConnectJwtSecret)),
-		connect.WithAppLoader(dbcqrs),
 		connect.WithDev(),
 		connect.WithGatewayPublicPort(opts.ConnectGatewayPort),
 		connect.WithApiBaseUrl(fmt.Sprintf("http://127.0.0.1:%d", opts.Config.EventAPI.Port)),

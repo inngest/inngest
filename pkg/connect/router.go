@@ -20,6 +20,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"gonum.org/v1/gonum/stat/sampleuv"
 	"log/slog"
+	"slices"
 	"time"
 )
 
@@ -106,7 +107,7 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 			ctx, span := c.tracer.NewSpan(ctx, "RouteExecutorRequest", accountID, envID)
 			defer span.End()
 
-			routeTo, err := c.getSuitableConnection(ctx, envID, appID, data.AppName, data.FunctionSlug, log)
+			routeTo, err := c.getSuitableConnection(ctx, envID, appID, data.FunctionSlug, log)
 			if err != nil && !errors.Is(err, ErrNoHealthyConnection) {
 				log.Error("could not retrieve suitable connection", "err", err)
 				return
@@ -199,7 +200,12 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 
 }
 
-func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, envID uuid.UUID, appID uuid.UUID, appName string, fnSlug string, log *slog.Logger) (*connect.ConnMetadata, error) {
+type connWithGroup struct {
+	conn  *connect.ConnMetadata
+	group *state.WorkerGroup
+}
+
+func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, envID uuid.UUID, appID uuid.UUID, fnSlug string, log *slog.Logger) (*connect.ConnMetadata, error) {
 	conns, err := c.stateManager.GetConnectionsByAppID(ctx, envID, appID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get connections by app ID: %w", err)
@@ -209,10 +215,23 @@ func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, envID uuid
 		return nil, ErrNoHealthyConnection
 	}
 
-	healthy := make([]*connect.ConnMetadata, 0, len(conns))
+	healthy := make([]connWithGroup, 0, len(conns))
 	for _, conn := range conns {
-		if c.isHealthy(ctx, envID, appID, fnSlug, conn, log) {
-			healthy = append(healthy, conn)
+		res := isHealthy(ctx, c.stateManager, envID, appID, fnSlug, conn, log)
+		if res.isHealthy {
+			healthy = append(healthy, connWithGroup{
+				conn:  conn,
+				group: res.workerGroup,
+			})
+			continue
+		}
+
+		if res.shouldDeleteUnhealthyGateway {
+			c.cleanupUnhealthyGateway(conn, log)
+		}
+
+		if res.shouldDeleteUnhealthyConnection {
+			c.cleanupUnhealthyConnection(envID, conn, log)
 		}
 	}
 
@@ -220,42 +239,119 @@ func (c *connectRouterSvc) getSuitableConnection(ctx context.Context, envID uuid
 		return nil, ErrNoHealthyConnection
 	}
 
-	weights := make([]float64, len(healthy))
-	for i := range healthy {
-		// TODO Calculate weights based on factors like version
-		weights[i] = float64(10)
+	if len(healthy) == 1 {
+		return healthy[0].conn, nil
 	}
 
-	w := sampleuv.NewWeighted(weights, c.rnd)
+	return pickConnection(healthy, c.rnd)
+}
+
+func (c *connectRouterSvc) cleanupUnhealthyGateway(conn *connect.ConnMetadata, log *slog.Logger) {
+	gatewayId, err := ulid.Parse(conn.GatewayId)
+	if err != nil {
+		log.Error("could not clean up unhealthy gateway, invalid gateway ID", "gateway_id", conn.GatewayId, "err", err)
+		return
+	}
+
+	// Clean up unhealthy gateway
+	err = c.stateManager.DeleteGateway(context.Background(), gatewayId)
+	if err != nil {
+		c.logger.Error("could not clean up inactive gateway", "gateway_id", conn.GatewayId, "err", err)
+	}
+}
+
+func (c *connectRouterSvc) cleanupUnhealthyConnection(envID uuid.UUID, conn *connect.ConnMetadata, log *slog.Logger) {
+	connId, err := ulid.Parse(conn.Id)
+	if err != nil {
+		log.Error("could not clean up inactive connection, invalid connection ID", "conn_id", conn.Id, "err", err)
+		return
+	}
+
+	// Clean up unhealthy connection
+	err = c.stateManager.DeleteConnection(context.Background(), envID, connId)
+	if err != nil {
+		log.Error("could not clean up inactive connection", "conn_id", conn.Id, "err", err)
+	}
+}
+
+func getConnectionWeight(timeRange float64, oldestVersion time.Time, h connWithGroup) float64 {
+	weight := 1.0
+
+	// Calculate weights based on factors like version
+	if !h.group.CreatedAt.IsZero() && timeRange > 0 {
+		// Normalize to range [1, 10] where newer timestamps get higher weights
+		timeDiff := h.group.CreatedAt.Sub(oldestVersion).Seconds()
+		normalizedWeight := 1.0 + 9.0*(timeDiff/timeRange)
+		weight = normalizedWeight
+	}
+
+	return weight
+}
+
+type versionTimeDistribution struct {
+	oldestVersionCreatedAt time.Time
+	newestVersionCreatedAt time.Time
+	timeRange              float64
+}
+
+func getVersionTimeDistribution(sortedCandidates []connWithGroup) versionTimeDistribution {
+	oldestVersion := sortedCandidates[0].group.CreatedAt
+	newestVersion := sortedCandidates[len(sortedCandidates)-1].group.CreatedAt
+
+	timeRange := newestVersion.Sub(oldestVersion).Seconds()
+
+	return versionTimeDistribution{
+		oldestVersionCreatedAt: oldestVersion,
+		newestVersionCreatedAt: newestVersion,
+		timeRange:              timeRange,
+	}
+}
+
+func sortByGroupCreatedAt(candidates []connWithGroup) {
+	slices.SortStableFunc(candidates, func(a, b connWithGroup) int {
+		if a.group.CreatedAt.After(b.group.CreatedAt) {
+			return 1
+		}
+
+		return -1
+	})
+}
+
+func pickConnection(candidates []connWithGroup, rnd *util.FrandRNG) (*connect.ConnMetadata, error) {
+	// First, sort candidate connections by CreatedAt timestamp (newest first)
+	sortByGroupCreatedAt(candidates)
+
+	// Clamp candidates
+	if len(candidates) > 5 {
+		candidates = candidates[:5]
+	}
+
+	// Get range of versions
+	versionTimeDistribution := getVersionTimeDistribution(candidates)
+
+	weights := make([]float64, len(candidates))
+	for i, h := range candidates {
+		weights[i] = getConnectionWeight(versionTimeDistribution.timeRange, versionTimeDistribution.oldestVersionCreatedAt, h)
+	}
+
+	w := sampleuv.NewWeighted(weights, rnd)
 	idx, ok := w.Take()
 	if !ok {
 		return nil, util.ErrWeightedSampleRead
 	}
-	chosen := healthy[idx]
+	chosen := candidates[idx]
 
-	return chosen, nil
+	return chosen.conn, nil
 }
 
-func (c *connectRouterSvc) isHealthy(ctx context.Context, envID uuid.UUID, appID uuid.UUID, fnSlug string, conn *connect.ConnMetadata, log *slog.Logger) bool {
-	var shouldDeleteConnection bool
+type isHealthyRes struct {
+	isHealthy                       bool
+	shouldDeleteUnhealthyConnection bool
+	shouldDeleteUnhealthyGateway    bool
+	workerGroup                     *state.WorkerGroup
+}
 
-	defer func() {
-		if !shouldDeleteConnection {
-			return
-		}
-
-		connId, err := ulid.Parse(conn.Id)
-		if err != nil {
-			log.Error("could not clean up inactive connection, invalid connection ID", "conn_id", conn.Id, "err", err)
-		}
-
-		// Clean up unhealthy connection
-		err = c.stateManager.DeleteConnection(context.Background(), envID, connId)
-		if err != nil {
-			log.Error("could not clean up inactive connection", "conn_id", conn.Id, "err", err)
-		}
-	}()
-
+func isHealthy(ctx context.Context, stateManager state.StateManager, envID uuid.UUID, appID uuid.UUID, fnSlug string, conn *connect.ConnMetadata, log *slog.Logger) isHealthyRes {
 	log.Debug("evaluating connection", "connection_id", conn.Id, "status", conn.Status, "last_heartbeat_at", conn.LastHeartbeatAt.AsTime())
 
 	gatewayId, err := ulid.Parse(conn.GatewayId)
@@ -263,9 +359,9 @@ func (c *connectRouterSvc) isHealthy(ctx context.Context, envID uuid.UUID, appID
 		log.Error("connection gateway id could not be parsed", "err", err, "gateway_id", conn.GatewayId)
 
 		// Clean up invalid connection
-		shouldDeleteConnection = true
-
-		return false
+		return isHealthyRes{
+			shouldDeleteUnhealthyConnection: true,
+		}
 	}
 
 	if conn.Status != connect.ConnectionStatus_READY {
@@ -273,10 +369,12 @@ func (c *connectRouterSvc) isHealthy(ctx context.Context, envID uuid.UUID, appID
 
 		if conn.Status == connect.ConnectionStatus_DISCONNECTED {
 			// Clean up disconnected connection
-			shouldDeleteConnection = true
+			return isHealthyRes{
+				shouldDeleteUnhealthyConnection: true,
+			}
 		}
 
-		return false
+		return isHealthyRes{}
 	}
 
 	// If more than two consecutive heartbeats were missed, the connection is not healthy
@@ -285,25 +383,25 @@ func (c *connectRouterSvc) isHealthy(ctx context.Context, envID uuid.UUID, appID
 		log.Debug("last heartbeat is too old")
 
 		// Clean up outdated connection
-		shouldDeleteConnection = true
-
-		return false
+		return isHealthyRes{
+			shouldDeleteUnhealthyConnection: true,
+		}
 	}
 
 	groupHash, ok := conn.SyncedWorkerGroups[appID.String()]
 	if !ok {
 		log.Error("connection missing worker group hash for app", "app_id", appID.String(), "synced_worker_groups", conn.SyncedWorkerGroups)
 
-		return false
+		return isHealthyRes{}
 	}
 
-	group, err := c.stateManager.GetWorkerGroupByHash(ctx, envID, groupHash)
+	group, err := stateManager.GetWorkerGroupByHash(ctx, envID, groupHash)
 	if err != nil {
 		log.Error("could not get worker group for connection", "group_id", groupHash)
 
-		shouldDeleteConnection = true
-
-		return false
+		return isHealthyRes{
+			shouldDeleteUnhealthyConnection: true,
+		}
 	}
 
 	var hasFn bool
@@ -317,17 +415,17 @@ func (c *connectRouterSvc) isHealthy(ctx context.Context, envID uuid.UUID, appID
 	if !hasFn {
 		log.Debug("connection does not have function", "slug", fnSlug, "available", group.FunctionSlugs)
 
-		return false
+		return isHealthyRes{}
 	}
 
 	// Ensure gateway is healthy
-	gw, err := c.stateManager.GetGateway(ctx, gatewayId)
+	gw, err := stateManager.GetGateway(ctx, gatewayId)
 	if err != nil {
 		log.Error("could not get gateway", "gateway_id", gatewayId.String())
 
-		shouldDeleteConnection = true
-
-		return false
+		return isHealthyRes{
+			shouldDeleteUnhealthyConnection: true,
+		}
 	}
 
 	log.Debug("retrieved gateway for connection", "conn_id", conn.Id, "gateway_id", gatewayId.String(), "status", gw.Status, "last_heartbeat_at", gw.LastHeartbeatAt)
@@ -337,21 +435,24 @@ func (c *connectRouterSvc) isHealthy(ctx context.Context, envID uuid.UUID, appID
 	if !gatewayIsActive || gatewayHeartbeatTimedOut {
 		log.Debug("gateway is unhealthy", "conn_id", conn.Id, "gateway_id", gatewayId.String(), "status", gw.Status, "last_heartbeat_at", gw.LastHeartbeatAt)
 
+		// Only drop gateway if it's no longer heart-beating, as an inactive gateway may be draining
 		if gatewayHeartbeatTimedOut {
-			// Clean up unhealthy gateway
-			err = c.stateManager.DeleteGateway(ctx, gatewayId)
-			if err != nil {
-				c.logger.Error("could not clean up inactive gateway", "gateway_id", conn.GatewayId, "err", err)
+			return isHealthyRes{
+				shouldDeleteUnhealthyConnection: true,
+				shouldDeleteUnhealthyGateway:    true,
 			}
 		}
 
 		// Drop associated connection
-		shouldDeleteConnection = true
-
-		return false
+		return isHealthyRes{
+			shouldDeleteUnhealthyConnection: true,
+		}
 	}
 
-	return true
+	return isHealthyRes{
+		isHealthy:   true,
+		workerGroup: group,
+	}
 }
 
 func (c *connectRouterSvc) Stop(ctx context.Context) error {
