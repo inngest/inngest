@@ -11,7 +11,7 @@ type HelperCardProps = {
 
 export default function HelperCard({ title, description, icon, href }: HelperCardProps) {
   return (
-    <Card className="hover:bg-canvasSubtle">
+    <Card className="hover:bg-canvasSubtle flex flex-col">
       <NextLink className="block p-4" href={href}>
         {icon}
         <p className="mb-1 mt-3">{title}</p>

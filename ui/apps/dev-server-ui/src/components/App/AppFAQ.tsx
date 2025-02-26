@@ -18,7 +18,7 @@ export default function AppFAQ({ openByDefault = false }) {
           NEED HELP SETTING UP YOUR APP?
         </AccordionList.Trigger>
         <AccordionList.Content className="px-0">
-          <div className="mb-8 flex items-center gap-3">
+          <div className="mb-8 grid grid-cols-1 gap-3 md:grid-cols-3">
             <HelperCard
               href="/apps/choose-framework"
               icon={
