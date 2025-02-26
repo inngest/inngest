@@ -147,7 +147,7 @@ export const RunDetailsV3 = (props: Props) => {
           <LegacyRunsToggle traceAIEnabled={true} />
         </div>
       )}
-      <div ref={containerRef} className="flex h-full flex-row">
+      <div ref={containerRef} className="flex flex-row">
         <div className="flex flex-col gap-2" style={{ width: `${leftWidth}%` }}>
           <div className="px-4">
             <RunInfo
@@ -187,14 +187,9 @@ export const RunDetailsV3 = (props: Props) => {
         </div>
 
         <div className="relative cursor-col-resize" onMouseDown={handleMouseDown}>
-          <div className="bg-canvasMuted absolute inset-0 z-50 mx-auto h-full w-px" />
-          <DragDivider className="bg-canvasBase absolute top-80 z-50 -translate-x-1/2" />
+          <div className="bg-canvasMuted absolute inset-0 z-[1] mx-auto h-full w-px" />
+          <DragDivider className="bg-canvasBase absolute top-80 z-[1] -translate-x-1/2" />
         </div>
-        {/* 
-        <div className="relative h-full w-[2px] cursor-col-resize" onMouseDown={handleMouseDown}>
-          <div className="bg-canvasMuted absolute inset-0 mx-auto w-[1px]"></div>
-          <DragDivider className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" />
-        </div> */}
 
         <div className="border-muted flex h-full flex-col" style={{ width: `${100 - leftWidth}%` }}>
           {selectedStep ? (

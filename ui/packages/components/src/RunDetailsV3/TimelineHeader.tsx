@@ -61,7 +61,7 @@ export const TimelineHeader = ({ trace, minTime, maxTime }: TimelineHeaderProps)
         {xAxis.map((x, i) => (
           <div
             key={`x-axis-line-${i}`}
-            className="bg-canvasSubtle absolute bottom-0 top-0 w-0.5 bg-opacity-80"
+            className="bg-canvasSubtle absolute bottom-0 top-0 z-0 w-0.5 bg-opacity-80"
             style={{ left: `${x}%` }}
           />
         ))}

@@ -39,7 +39,7 @@ export const Tabs = ({ tabs, defaultActive = 0 }: { tabs: TabsType; defaultActiv
   }, [defaultActive]);
 
   return (
-    <div className="flex min-h-72 w-full flex-col">
+    <div className="flex w-full flex-col">
       <div className="border-muted flex w-full flex-row gap-4 border-b px-4">
         {tabs.map((t: TabType, i: number) => (
           <Tab key={`tab-${i}`} active={active === i} onClick={() => setActive(i)}>

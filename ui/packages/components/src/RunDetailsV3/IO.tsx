@@ -4,7 +4,7 @@ export type IOProps = { title: string; actions?: CodeBlockAction[]; raw?: string
 
 export const IO = ({ title, actions, raw, error }: IOProps) => {
   return (
-    <div className="text-muted">
+    <div className="text-muted z-[1]">
       <CodeBlock
         actions={actions}
         header={{ title, ...(error && { status: 'error' }) }}
