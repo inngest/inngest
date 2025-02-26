@@ -8,6 +8,7 @@ import type { Run as InitialRunData } from '../RunsPage/types';
 import { StatusCell } from '../Table/Cell';
 import { Trace as OldTrace } from '../TimelineV2';
 import { TriggerDetails } from '../TriggerDetails';
+import { DragDivider } from '../icons/DragDivider';
 import type { Result } from '../types/functionRun';
 import { nullishToLazy } from '../utils/lazyLoad';
 import { LegacyRunsToggle } from './LegacyRunsToggle';
@@ -185,10 +186,15 @@ export const RunDetailsV3 = (props: Props) => {
           />
         </div>
 
-        <div
-          className="border-muted w-2 cursor-col-resize border-r-[.5px]"
-          onMouseDown={handleMouseDown}
-        />
+        <div className="relative cursor-col-resize" onMouseDown={handleMouseDown}>
+          <div className="bg-canvasMuted absolute inset-0 z-50 mx-auto h-full w-px" />
+          <DragDivider className="bg-canvasBase absolute top-80 z-50 -translate-x-1/2" />
+        </div>
+        {/* 
+        <div className="relative h-full w-[2px] cursor-col-resize" onMouseDown={handleMouseDown}>
+          <div className="bg-canvasMuted absolute inset-0 mx-auto w-[1px]"></div>
+          <DragDivider className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" />
+        </div> */}
 
         <div className="border-muted flex h-full flex-col" style={{ width: `${100 - leftWidth}%` }}>
           {selectedStep ? (

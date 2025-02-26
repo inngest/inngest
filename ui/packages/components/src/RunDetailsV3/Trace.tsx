@@ -54,11 +54,11 @@ export function Trace({ depth, getResult, maxTime, minTime, pathCreator, trace, 
       <TimelineHeader trace={trace} minTime={minTime} maxTime={maxTime} />
 
       <div
-        className={`flex h-7 w-full cursor-pointer flex-row items-center justify-start gap-1 pl-4 ${
+        className={`flex h-7 w-full cursor-pointer flex-row items-center justify-start gap-1 bg-opacity-50 py-0.5 pl-4 ${
           (!selectedStep && trace.isRoot) ||
           (selectedStep?.trace?.spanID === trace.spanID && selectedStep?.trace?.name === trace.name)
             ? 'bg-secondary-3xSubtle'
-            : 'hover:bg-canvasSubtle'
+            : 'hover:bg-secondary-4xSubtle'
         } `}
         onClick={() => selectStep(depth ? { trace, runID, result, pathCreator } : undefined)}
       >
@@ -88,7 +88,7 @@ export function Trace({ depth, getResult, maxTime, minTime, pathCreator, trace, 
           </div>
         </div>
 
-        <div className="border-subtle flex w-[70%] flex-row border-l-[0.5px]">
+        <div className="border-light/80 flex w-[70%] flex-row border-l-2">
           <InlineSpans
             maxTime={maxTime}
             minTime={minTime}

@@ -19,8 +19,10 @@ const formatDuration = (ms: number): string => {
 
   for (const { label, value } of units) {
     if (ms >= value) {
-      const amount = Math.floor(ms / value);
-      return `${amount}${label}`;
+      const amount = ms / value;
+      const rounded = Math.round(amount * 10) / 10;
+      const display = rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1);
+      return `${display}${label}`;
     }
   }
 
@@ -59,7 +61,7 @@ export const TimelineHeader = ({ trace, minTime, maxTime }: TimelineHeaderProps)
         {xAxis.map((x, i) => (
           <div
             key={`x-axis-line-${i}`}
-            className="bg-canvasMuted absolute bottom-0 top-0 z-50 w-[.5px]"
+            className="bg-canvasSubtle absolute bottom-0 top-0 w-0.5 bg-opacity-80"
             style={{ left: `${x}%` }}
           />
         ))}

@@ -24,7 +24,7 @@ export function InlineSpans({ className, minTime, maxTime, name, spans, widths }
   return (
     <Tooltip>
       <TooltipTrigger className="h-fit w-full grow">
-        <div className={cn('hover:bg-canvasSubtle flex h-7 grow items-center', className)}>
+        <div className={cn('flex h-7 grow items-center', className)}>
           <div className="bg-canvasMuted h-0" style={{ flexGrow: widths.before }}></div>
 
           <div

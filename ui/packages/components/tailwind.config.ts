@@ -77,6 +77,7 @@ export default {
         },
       },
       borderColor: {
+        light: 'rgb(var(--color-border-light) / <alpha-value>)',
         subtle: 'rgb(var(--color-border-subtle) / <alpha-value>)',
         muted: 'rgb(var(--color-border-muted) / <alpha-value>)',
         contrast: 'rgb(var(--color-border-contrast) / <alpha-value>)',
@@ -178,6 +179,8 @@ export default {
       },
       stroke: {
         disabled: 'rgb(var(--color-border-disabled) / <alpha-value>)',
+        muted: 'rgb(var(--color-border-muted) / <alpha-value>)',
+        subtle: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
       },
       gridTemplateColumns: {
         dashboard: '1fr 1fr 1fr 432px',
