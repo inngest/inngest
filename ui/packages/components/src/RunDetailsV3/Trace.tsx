@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Route } from 'next';
-import { RiArrowUpSLine } from '@remixicon/react';
+import { RiArrowRightSLine } from '@remixicon/react';
 
 import type { Result } from '../types/functionRun';
 import { toMaybeDate } from '../utils/date';
@@ -75,9 +75,9 @@ export function Trace({ depth, getResult, maxTime, minTime, pathCreator, trace, 
               }}
             >
               <div className="text-sm font-medium leading-tight">{trace.childrenSpans?.length}</div>
-              <RiArrowUpSLine
-                className={`w-3 shrink-0 cursor-pointer transition-transform duration-500 ${
-                  expanded ? 'rotate-180' : ''
+              <RiArrowRightSLine
+                className={`shrink-0 transition-transform duration-500 ${
+                  expanded ? 'rotate-90' : ''
                 }`}
               />
             </div>

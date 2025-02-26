@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
-import { RiArrowUpSLine } from '@remixicon/react';
+import { RiArrowRightSLine } from '@remixicon/react';
 
 import { AITrace } from '../AI/AITrace';
 import { parseAIOutput } from '../AI/utils';
@@ -145,8 +145,8 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
           className="text-basis flex cursor-pointer items-center justify-start gap-2"
           onClick={() => setExpanded(!expanded)}
         >
-          <RiArrowUpSLine
-            className={`shrink-0 transition-transform duration-500 ${expanded ? 'rotate-180' : ''}`}
+          <RiArrowRightSLine
+            className={`shrink-0 transition-transform duration-500 ${expanded ? 'rotate-90' : ''}`}
           />
 
           <span className="text-basis text-sm font-normal">{trace.name}</span>
@@ -210,8 +210,12 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
       <Tabs
         defaultActive={result?.error ? 2 : 0}
         tabs={[
-          { label: 'Input', node: <IO title="Step Input" raw={prettyInput} /> },
-          { label: 'Output', node: <IO title="Step Output" raw={prettyOutput} /> },
+          ...(prettyInput
+            ? [{ label: 'Input', node: <IO title="Step Input" raw={prettyInput} /> }]
+            : []),
+          ...(prettyOutput
+            ? [{ label: 'Output', node: <IO title="Step Output" raw={prettyOutput} /> }]
+            : []),
           ...(result?.error
             ? [
                 {

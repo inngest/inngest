@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Button } from '@inngest/components/Button';
-import { RiArrowUpSLine } from '@remixicon/react';
+import { RiArrowRightSLine } from '@remixicon/react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -134,8 +134,8 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
           className="text-basis flex cursor-pointer items-center justify-start gap-2"
           onClick={() => setExpanded(!expanded)}
         >
-          <RiArrowUpSLine
-            className={`shrink-0 transition-transform duration-500 ${expanded ? 'rotate-180' : ''}`}
+          <RiArrowRightSLine
+            className={`shrink-0 transition-transform duration-500 ${expanded ? 'rotate-90' : ''}`}
           />
           {isPending ? (
             <SkeletonElement />

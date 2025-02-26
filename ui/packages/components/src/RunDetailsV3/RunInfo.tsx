@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Route } from 'next';
-import { RiArrowRightUpLine, RiArrowUpSLine } from '@remixicon/react';
+import { RiArrowRightSLine, RiArrowRightUpLine } from '@remixicon/react';
 
 import { AITrace } from '../AI/AITrace';
 import { parseAIOutput } from '../AI/utils';
@@ -86,9 +86,9 @@ export const RunInfo = ({
             className="flex  cursor-pointer items-center gap-2"
             onClick={() => setExpanded(!expanded)}
           >
-            <RiArrowUpSLine
+            <RiArrowRightSLine
               className={`shrink-0 transition-transform duration-500 ${
-                expanded ? 'rotate-180' : ''
+                expanded ? 'rotate-90' : ''
               }`}
             />
             {isLazyDone(run) ? (
