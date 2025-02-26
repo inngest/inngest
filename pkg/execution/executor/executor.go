@@ -1545,7 +1545,7 @@ func (e *executor) handlePause(
 			}
 
 			// Ensure we consume this pause, as this isn't handled by the higher-level cancel function.
-			_, _, err = e.pm.ConsumePause(context.Background(), pause.ID, nil)
+			_, err = e.pm.ConsumePause(context.Background(), pause.ID, nil)
 			if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
 				atomic.AddInt32(&res[1], 1)
 				_ = e.exprAggregator.RemovePause(ctx, pause)
@@ -1726,14 +1726,14 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			// Delete this pause, as an event has occured which matches
 			// the timeout.  We can do this prior to leasing a pause as it's the
 			// only work that needs to happen
-			_, _, err = e.pm.ConsumePause(ctx, pause.ID, nil)
+			_, err = e.pm.ConsumePause(ctx, pause.ID, nil)
 			if err == nil || err == state.ErrPauseNotFound {
 				return nil
 			}
 			return fmt.Errorf("error consuming pause via timeout: %w", err)
 		}
 
-		didConsume, hasPendingSteps, err := e.pm.ConsumePause(ctx, pause.ID, r.With)
+		consumeResult, err := e.pm.ConsumePause(ctx, pause.ID, r.With)
 		if err != nil {
 			return fmt.Errorf("error consuming pause via event: %w", err)
 		}
@@ -1748,7 +1748,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				Msg("resuming from pause")
 		}
 
-		if didConsume && !hasPendingSteps {
+		if consumeResult.DidConsume && !consumeResult.HasPendingSteps {
 			// Schedule an execution from the pause's entrypoint.  We do this after
 			// consuming the pause to guarantee the event data is stored via the pause
 			// for the next run.  If the ConsumePause call comes after enqueue, the TCP

@@ -1049,23 +1049,23 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 	}
 }
 
-func (m mgr) ConsumePause(ctx context.Context, pauseID uuid.UUID, data any) (didConsume bool, hasPendingSteps bool, err error) {
+func (m mgr) ConsumePause(ctx context.Context, pauseID uuid.UUID, data any) (state.ConsumePauseResult, error) {
 	p, err := m.unshardedMgr.PauseByID(ctx, pauseID)
 	if err != nil {
-		return
+		return state.ConsumePauseResult{}, err
 	}
 
-	didConsume, hasPendingSteps, err = m.shardedMgr.consumePause(ctx, p, data)
+	result, err := m.shardedMgr.consumePause(ctx, p, data)
 	if err != nil {
-		return
+		return state.ConsumePauseResult{}, err
 	}
 
 	// The pause was now consumed, so let's clean up
 	err = m.unshardedMgr.DeletePause(ctx, *p)
-	return
+	return result, err
 }
 
-func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) (didConsume bool, hasPendingSteps bool, err error) {
+func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) (state.ConsumePauseResult, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "consumePause"), redis_telemetry.ScopePauses)
 
 	fnRunState := m.s.FunctionRunState()
@@ -1073,8 +1073,7 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) 
 
 	marshalledData, err := json.Marshal(data)
 	if err != nil {
-		err = fmt.Errorf("cannot marshal data to store in state: %w", err)
-		return
+		return state.ConsumePauseResult{}, fmt.Errorf("cannot marshal data to store in state: %w", err)
 	}
 
 	keys := []string{
@@ -1089,7 +1088,7 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) 
 		string(marshalledData),
 	})
 	if err != nil {
-		return
+		return state.ConsumePauseResult{}, err
 	}
 
 	status, err := retriableScripts["consumePause"].Exec(
@@ -1099,22 +1098,17 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) 
 		args,
 	).AsInt64()
 	if err != nil {
-		err = fmt.Errorf("error consuming pause: %w", err)
-		return
+		return state.ConsumePauseResult{}, fmt.Errorf("error consuming pause: %w", err)
 	}
 	switch status {
 	case -1:
-		return
+		return state.ConsumePauseResult{}, nil
 	case 0:
-		didConsume = true
-		return
+		return state.ConsumePauseResult{DidConsume: true}, nil
 	case 1:
-		didConsume = true
-		hasPendingSteps = true
-		return
+		return state.ConsumePauseResult{DidConsume: true, HasPendingSteps: true}, nil
 	default:
-		err = fmt.Errorf("unknown response leasing pause: %d", status)
-		return
+		return state.ConsumePauseResult{}, fmt.Errorf("unknown response leasing pause: %d", status)
 	}
 }
 
