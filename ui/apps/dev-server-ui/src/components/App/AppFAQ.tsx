@@ -6,9 +6,13 @@ import { RiAddLine, RiFunctionLine, RiPlayFill } from '@remixicon/react';
 
 import HelperCard from './HelperCard';
 
-export default function AppFAQ() {
+export default function AppFAQ({ openByDefault = false }) {
   return (
-    <AccordionList className="rounded-none border-0" type="multiple" defaultValue={[]}>
+    <AccordionList
+      className="rounded-none border-0"
+      type="multiple"
+      defaultValue={openByDefault ? ['FAQ'] : []}
+    >
       <AccordionList.Item value="FAQ">
         <AccordionList.Trigger className="text-muted text-sm data-[state=open]:border-0">
           NEED HELP SETTING UP YOUR APP?

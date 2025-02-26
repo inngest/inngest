@@ -165,7 +165,7 @@ export default function AppList() {
         )}
 
         <div className="my-6 flex w-full flex-col gap-10">{memoizedAppCards}</div>
-        <AppFAQ />
+        <AppFAQ openByDefault={numberOfSyncedApps === 0} />
       </div>
     </div>
   );
