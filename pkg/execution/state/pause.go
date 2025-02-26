@@ -38,7 +38,7 @@ type PauseMutater interface {
 	//
 	// Any data passed when consuming a pause will be stored within function run state
 	// for future reference using the pause's DataKey.
-	ConsumePause(ctx context.Context, id uuid.UUID, data any) error
+	ConsumePause(ctx context.Context, id uuid.UUID, data any) (ConsumePauseResult, error)
 
 	// DeletePause permanently deletes a pause.
 	DeletePause(ctx context.Context, p Pause) error
@@ -77,6 +77,14 @@ type PauseGetter interface {
 	//
 	// This should not return consumed pauses.
 	PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.UUID, correlationID string) (*Pause, error)
+}
+
+type ConsumePauseResult struct {
+	// DidConsume indicates whether the pause was consumed.
+	DidConsume bool
+
+	// HasPendingSteps indicates whether the run still has pending steps.
+	HasPendingSteps bool
 }
 
 // PauseIterator allows the runner to iterate over all pauses returned by a PauseGetter.  This
