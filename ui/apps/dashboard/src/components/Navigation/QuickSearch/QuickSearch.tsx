@@ -29,39 +29,37 @@ export function QuickSearch({ collapsed, envSlug }: Props) {
     };
   }, []);
 
-  if (collapsed) {
-    return null;
-  }
-
   return (
     <>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            appearance="outlined"
-            aria-label="Search by ID"
-            className="h-[28px] w-[42px] overflow-hidden px-2"
-            icon={
-              <kbd className="mx-auto flex w-full items-center justify-center space-x-1">
-                <kbd className={`text-muted text-[20px]`}>⌘</kbd>
-                <kbd className="text-muted text-xs">K</kbd>
-              </kbd>
-            }
-            kind="secondary"
-            onClick={() => setIsOpen(true)}
-            size="medium"
-          />
-        </TooltipTrigger>
+      {collapsed ? null : (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              appearance="outlined"
+              aria-label="Search by ID"
+              className="h-[28px] w-[42px] overflow-hidden px-2"
+              icon={
+                <kbd className="mx-auto flex w-full items-center justify-center space-x-1">
+                  <kbd className={`text-muted text-[20px]`}>⌘</kbd>
+                  <kbd className="text-muted text-xs">K</kbd>
+                </kbd>
+              }
+              kind="secondary"
+              onClick={() => setIsOpen(true)}
+              size="medium"
+            />
+          </TooltipTrigger>
 
-        <TooltipContent
-          className="border-muted text-muted rounded border text-xs"
-          side="bottom"
-          sideOffset={2}
-        >
-          Use <span className="font-bold">⌘ K</span> or <span className="font-bold">Ctrl K</span> to
-          search
-        </TooltipContent>
-      </Tooltip>
+          <TooltipContent
+            className="border-muted text-muted rounded border text-xs"
+            side="bottom"
+            sideOffset={2}
+          >
+            Use <span className="font-bold">⌘ K</span> or <span className="font-bold">Ctrl K</span>{' '}
+            to search
+          </TooltipContent>
+        </Tooltip>
+      )}
 
       <QuickSearchModal envSlug={envSlug} isOpen={isOpen} onClose={() => setIsOpen(false)} />
     </>
