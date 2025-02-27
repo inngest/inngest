@@ -1,8 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
 
-import { Timeline } from './Timeline';
-import { Workflow } from './Workflow';
-
 export const Tab = ({
   active,
   children,
@@ -39,7 +36,7 @@ export const Tabs = ({ tabs, defaultActive = 0 }: { tabs: TabsType; defaultActiv
   }, [defaultActive]);
 
   return (
-    <div className="flex min-h-72 w-full flex-col">
+    <div className="flex w-full flex-col">
       <div className="border-muted flex w-full flex-row gap-4 border-b px-4">
         {tabs.map((t: TabType, i: number) => (
           <Tab key={`tab-${i}`} active={active === i} onClick={() => setActive(i)}>
@@ -51,9 +48,7 @@ export const Tabs = ({ tabs, defaultActive = 0 }: { tabs: TabsType; defaultActiv
         {tabs.map((tab, i) => (
           <div
             key={`content-${i}`}
-            className={`w-full transition-all duration-200 ${
-              active === i ? 'visible opacity-100' : 'invisible h-0 opacity-0'
-            }`}
+            className={`w-full ${active === i ? 'visible opacity-100' : 'invisible h-0 opacity-0'}`}
           >
             {tab.node}
           </div>

@@ -1,12 +1,6 @@
 import { useCallback, useMemo } from 'react';
-import { Button } from '@inngest/components/Button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
-import * as Collapsible from '@radix-ui/react-collapsible';
-import { RiContractRightFill, RiExpandLeftFill } from '@remixicon/react';
 import { useQuery } from '@tanstack/react-query';
-import { useLocalStorage } from 'react-use';
 
-import { Card } from '../Card';
 import { CodeBlock } from '../CodeBlock';
 import {
   CodeElement,
@@ -20,7 +14,6 @@ import {
 // Until then, we re-use it from the RunDetailsV2 as these are part of the same parent UI.
 import { ErrorCard } from '../RunDetailsV2/ErrorCard';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
-import { cn } from '../utils/classNames';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
 
 type Props = {
