@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Route } from 'next';
-import { RiArrowRightSLine, RiArrowRightUpLine } from '@remixicon/react';
+import { RiArrowRightSLine, RiArrowRightUpLine, RiExternalLinkLine } from '@remixicon/react';
 
 import { AITrace } from '../AI/AITrace';
 import { parseAIOutput } from '../AI/utils';
@@ -101,7 +101,7 @@ export const RunInfo = ({
             <Link
               size="medium"
               href={pathCreator.runPopout({ runID })}
-              iconAfter={<RiArrowRightUpLine className="h-4 w-4 shrink-0" />}
+              iconAfter={<RiExternalLinkLine className="h-4 w-4 shrink-0" />}
             />
           )}
         </div>

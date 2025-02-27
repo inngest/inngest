@@ -292,6 +292,7 @@ input[type='number'] {
     --color-background-btn-dangerPressed: var(--color-ruby-900);
     --color-background-btn-dangerDisabled: var(--color-ruby-300);
 
+    --color-border-light: var(--color-carbon-950);
     --color-border-subtle: var(--color-carbon-800);
     --color-border-muted: var(--color-carbon-700);
     --color-border-contrast: var(--color-carbon-300);

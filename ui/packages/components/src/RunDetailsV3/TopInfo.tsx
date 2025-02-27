@@ -238,7 +238,7 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
       )}
 
       <Tabs
-        defaultActive={result?.error ? 2 : 0}
+        defaultActive={result?.error ? 2 : prettyPayload ? 0 : 1}
         tabs={[
           {
             label: 'Input',

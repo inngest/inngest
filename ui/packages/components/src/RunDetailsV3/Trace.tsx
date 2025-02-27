@@ -58,7 +58,7 @@ export function Trace({ depth, getResult, maxTime, minTime, pathCreator, trace, 
           (!selectedStep && trace.isRoot) ||
           (selectedStep?.trace?.spanID === trace.spanID && selectedStep?.trace?.name === trace.name)
             ? 'bg-secondary-3xSubtle'
-            : 'hover:bg-secondary-4xSubtle'
+            : 'hover:bg-canvasSubtle'
         } `}
         onClick={() => selectStep(depth ? { trace, runID, result, pathCreator } : undefined)}
       >

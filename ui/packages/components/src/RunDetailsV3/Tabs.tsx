@@ -1,8 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
 
-import { Timeline } from './Timeline';
-import { Workflow } from './Workflow';
-
 export const Tab = ({
   active,
   children,

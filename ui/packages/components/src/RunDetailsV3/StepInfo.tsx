@@ -137,6 +137,7 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
   const aiOutput = result?.data ? parseAIOutput(result.data) : undefined;
   const prettyInput = usePrettyJson(result?.input ?? '') || (result?.input ?? '');
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
+  console.log('shit error', result?.error);
 
   return (
     <div className="flex h-full flex-col gap-2">
@@ -208,14 +209,10 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
       )}
 
       <Tabs
-        defaultActive={result?.error ? 2 : 0}
+        defaultActive={result?.error ? 2 : prettyInput ? 0 : 1}
         tabs={[
-          ...(prettyInput
-            ? [{ label: 'Input', node: <IO title="Step Input" raw={prettyInput} /> }]
-            : []),
-          ...(prettyOutput
-            ? [{ label: 'Output', node: <IO title="Step Output" raw={prettyOutput} /> }]
-            : []),
+          { label: 'Input', node: <IO title="Step Input" raw={prettyInput} /> },
+          { label: 'Output', node: <IO title="Step Output" raw={prettyOutput} /> },
           ...(result?.error
             ? [
                 {

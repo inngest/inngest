@@ -187,11 +187,14 @@ export const RunDetailsV3 = (props: Props) => {
         </div>
 
         <div className="relative cursor-col-resize" onMouseDown={handleMouseDown}>
-          <div className="bg-canvasMuted absolute inset-0 z-[1] mx-auto h-full w-px" />
+          <div className="bg-canvasMuted absolute inset-0 z-[1] h-full w-px" />
           <DragDivider className="bg-canvasBase absolute top-80 z-[1] -translate-x-1/2" />
         </div>
 
-        <div className="border-muted flex h-full flex-col" style={{ width: `${100 - leftWidth}%` }}>
+        <div
+          className="border-muted  flex h-full flex-col"
+          style={{ width: `${100 - leftWidth}%` }}
+        >
           {selectedStep ? (
             <StepInfo selectedStep={selectedStep} />
           ) : (
