@@ -84,7 +84,7 @@ input[type='number'] {
     --color-carbon-800: 53 53 53;
     --color-carbon-900: 36 36 36;
     --color-carbon-950: 18 18 18;
-    --color-carbon-1000: 2 2 2;
+    --color-carbon-1000: 8 8 8;
 
     /* Matcha Colors */
     --color-matcha-0: 239 249 242;
@@ -203,6 +203,7 @@ input[type='number'] {
     --color-primary-intense: var(--color-matcha-600);
     --color-primary-xIntense: var(--color-matcha-700);
     --color-primary-2xIntense: var(--color-matcha-800);
+    --color-primary-3xIntense: var(--color-matcha-900);
 
     --color-foreground-base: var(--color-carbon-900);
     --color-foreground-subtle: var(--color-carbon-700);
@@ -242,7 +243,9 @@ input[type='number'] {
     --color-secondary-intense: var(--color-breeze-600);
     --color-secondary-xIntense: var(--color-breeze-700);
     --color-secondary-2xIntense: var(--color-breeze-800);
+    --color-secondary-3xIntense: var(--color-breeze-900);
 
+    --color-tertiary-3xSubtle: var(--color-ruby-100);
     --color-tertiary-2xSubtle: var(--color-ruby-200);
     --color-tertiary-xSubtle: var(--color-ruby-300);
     --color-tertiary-subtle: var(--color-ruby-400);
@@ -250,11 +253,15 @@ input[type='number'] {
     --color-tertiary-intense: var(--color-ruby-600);
     --color-tertiary-xIntense: var(--color-ruby-700);
     --color-tertiary-2xIntense: var(--color-ruby-800);
+    --color-tertiary-3xIntense: var(--color-ruby-900);
 
+    --color-quaternary-cool-3xSubtle: var(--color-purplehaze-100);
     --color-quaternary-cool-xSubtle: var(--color-purplehaze-300);
     --color-quaternary-cool-moderate: var(--color-purplehaze-500);
     --color-quaternary-cool-xIntense: var(--color-purplehaze-700);
+    --color-quaternary-cool-3xIntense: var(--color-purplehaze-900);
 
+    --color-accent-3xSubtle: var(--color-honey-100);
     --color-accent-2xSubtle: var(--color-honey-200);
     --color-accent-xSubtle: var(--color-honey-300);
     --color-accent-subtle: var(--color-honey-400);
@@ -262,6 +269,7 @@ input[type='number'] {
     --color-accent-intense: var(--color-honey-600);
     --color-accent-xIntense: var(--color-honey-700);
     --color-accent-2xIntense: var(--color-honey-800);
+    --color-accent-3xIntense: var(--color-honey-900);
   }
 
   .dark {
@@ -308,6 +316,7 @@ input[type='number'] {
     --color-primary-intense: var(--color-matcha-400);
     --color-primary-xIntense: var(--color-matcha-300);
     --color-primary-2xIntense: var(--color-matcha-200);
+    --color-primary-3xIntense: var(--color-matcha-100);
 
     --color-foreground-base: var(--color-carbon-50);
     --color-foreground-subtle: var(--color-carbon-200);
@@ -324,7 +333,7 @@ input[type='number'] {
     --color-foreground-info: var(--color-breeze-300);
     --color-foreground-cancelled: var(--color-carbon-400);
     --color-foreground-paused: var(--color-carbon-400);
-    --color-foreground-btn-primary: var(--color-matcha-500);
+    --color-foreground-btn-primary: var(--color-matcha-400);
     --color-foreground-btn-primaryDisabled: var(--color-matcha-800);
     --color-foreground-btn-danger: var(--color-ruby-500);
     --color-foreground-btn-dangerDisabled: var(--color-ruby-900);
@@ -347,7 +356,9 @@ input[type='number'] {
     --color-secondary-intense: var(--color-breeze-400);
     --color-secondary-xIntense: var(--color-breeze-300);
     --color-secondary-2xIntense: var(--color-breeze-200);
+    --color-secondary-3xIntense: var(--color-breeze-100);
 
+    --color-tertiary-3xSubtle: var(--color-ruby-900);
     --color-tertiary-2xSubtle: var(--color-ruby-800);
     --color-tertiary-xSubtle: var(--color-ruby-700);
     --color-tertiary-subtle: var(--color-ruby-600);
@@ -355,11 +366,15 @@ input[type='number'] {
     --color-tertiary-intense: var(--color-ruby-400);
     --color-tertiary-xIntense: var(--color-ruby-300);
     --color-tertiary-2xIntense: var(--color-ruby-200);
+    --color-tertiary-3xIntense: var(--color-ruby-100);
 
+    --color-quaternary-cool-3xSubtle: var(--color-purplehaze-900);
     --color-quaternary-cool-xSubtle: var(--color-purplehaze-700);
     --color-quaternary-cool-moderate: var(--color-purplehaze-500);
     --color-quaternary-cool-xIntense: var(--color-purplehaze-300);
+    --color-quaternary-cool-3xIntense: var(--color-purplehaze-100);
 
+    --color-accent-3xSubtle: var(--color-honey-900);
     --color-accent-2xSubtle: var(--color-honey-800);
     --color-accent-xSubtle: var(--color-honey-700);
     --color-accent-subtle: var(--color-honey-600);
@@ -367,6 +382,7 @@ input[type='number'] {
     --color-accent-intense: var(--color-honey-400);
     --color-accent-xIntense: var(--color-honey-300);
     --color-accent-2xIntense: var(--color-honey-200);
+    --color-accent-3xIntense: var(--color-honey-100);
   }
 }
 

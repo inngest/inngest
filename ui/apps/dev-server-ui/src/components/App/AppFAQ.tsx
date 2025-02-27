@@ -2,15 +2,58 @@ import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
 import { InlineCode } from '@inngest/components/Code';
 import { CodeLine } from '@inngest/components/CodeLine';
 import { Link } from '@inngest/components/Link';
+import { RiAddLine, RiFunctionLine, RiPlayFill } from '@remixicon/react';
 
-export default function AppFAQ() {
+import HelperCard from './HelperCard';
+
+const enableOnboarding = false;
+
+export default function AppFAQ({ openByDefault = false }) {
   return (
-    <AccordionList className="rounded-none border-0" type="multiple" defaultValue={[]}>
+    <AccordionList
+      className="rounded-none border-0"
+      type="multiple"
+      defaultValue={openByDefault ? ['FAQ'] : []}
+    >
       <AccordionList.Item value="FAQ">
         <AccordionList.Trigger className="text-muted text-sm data-[state=open]:border-0">
           NEED HELP SETTING UP YOUR APP?
         </AccordionList.Trigger>
         <AccordionList.Content className="px-0">
+          {enableOnboarding && (
+            <div className="mb-8 grid grid-cols-1 gap-3 md:grid-cols-3">
+              <HelperCard
+                href="/apps/choose-framework"
+                icon={
+                  <div className="bg-primary-3xSubtle w-fit rounded-sm p-[10px]">
+                    <RiAddLine className="h-5 w-5" />
+                  </div>
+                }
+                title="Add Inngest to existing project"
+                description="Choose your preferred framework and build your app using inngest."
+              />
+              <HelperCard
+                href="/apps/choose-template"
+                icon={
+                  <div className="bg-tertiary-3xSubtle w-fit rounded-sm p-[10px]">
+                    <RiFunctionLine className="h-5 w-5" />
+                  </div>
+                }
+                title="Grab a starter template"
+                description="Choose from our pre-built templates for a faster start."
+              />
+              <HelperCard
+                href=""
+                icon={
+                  <div className="bg-quaternary-cool3xSubtle w-fit rounded-sm p-[10px]">
+                    <RiPlayFill className="h-5 w-5" />
+                  </div>
+                }
+                title="Run a demo"
+                description="Explore our demo project to see Inngest in action locally."
+              />
+            </div>
+          )}
           <AccordionList type="multiple" defaultValue={[]}>
             <AccordionList.Item value="app_definition">
               <AccordionList.Trigger>What is an app?</AccordionList.Trigger>

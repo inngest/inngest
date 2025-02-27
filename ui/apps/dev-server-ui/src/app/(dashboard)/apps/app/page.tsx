@@ -43,9 +43,9 @@ function AppPage({ id }: { id: string }) {
     <>
       <Header breadcrumb={[{ text: 'Apps', href: '/apps' }, { text: app.name }]} />
 
-      <div className="mx-auto my-12 flex w-4/5 max-w-7xl flex-col gap-9">
+      <div className="mx-auto flex w-full max-w-4xl flex-col gap-9 px-6 pb-4 pt-16">
         <div>
-          <h2 className="mb-1 text-2xl">{app.name}</h2>
+          <h2 className="mb-1 text-xl">{app.name}</h2>
           <p className="text-muted text-sm">Information about the latest successful sync.</p>
         </div>
 

@@ -77,12 +77,12 @@ export function AppCardContent({ url, app, pill, actions, workerCounter }: CardC
 
   return (
     <div className="text-basis flex h-44 flex-col justify-between p-6">
-      <Wrapper className="mb-6" href={url}>
+      <div className="mb-6">
         <div className="items-top flex justify-between">
-          <div className="inline text-xl">
+          <Wrapper className="inline text-xl" href={url}>
             {app.name}
             {pill ? <span className="ml-2 inline-flex align-middle">{pill}</span> : null}
-          </div>
+          </Wrapper>
           {actions}
         </div>
         <p className="text-muted mt-0.5 truncate">
@@ -93,7 +93,7 @@ export function AppCardContent({ url, app, pill, actions, workerCounter }: CardC
               </>
             ))}
         </p>
-      </Wrapper>
+      </div>
 
       <dl className="grid grid-cols-5 gap-4">
         {app.lastSyncedAt && (
