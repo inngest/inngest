@@ -132,4 +132,9 @@ const (
 	// QueueContinuationSkipProbability is the probability of skipping a continuation
 	// scan loop.
 	QueueContinuationSkipProbability = 0.2
+
+	//
+	// Streaming
+	//
+	MaxStreamingMessageSizeBytes = 1024 * 512 // 512KB
 )

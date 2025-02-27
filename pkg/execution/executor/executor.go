@@ -2033,7 +2033,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 			EnvID:      i.md.ID.Tenant.EnvID,
 			FnID:       i.md.ID.FunctionID,
 			FnSlug:     i.f.GetSlug(),
-			RunID:      i.md.ID.RunID,
+			Channel:    i.md.ID.RunID.String(),
 			CreatedAt:  time.Now(),
 		})
 	}

@@ -35,9 +35,9 @@ func TestBroadcaster(t *testing.T) {
 
 	t.Run("broadcasting", func(t *testing.T) {
 		msg := Message{
-			Kind:  MessageKindRun,
-			Data:  json.RawMessage(`"output"`),
-			RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+			Kind:    MessageKindRun,
+			Data:    json.RawMessage(`"output"`),
+			Channel: ulid.MustNew(ulid.Now(), rand.Reader).String(),
 		}
 
 		t.Run("no subscriptions", func(t *testing.T) {
@@ -155,9 +155,9 @@ func TestBroadcasterConds(t *testing.T) {
 			b   = NewInProcessBroadcaster().(*broadcaster)
 			sub = NewInmemorySubscription(uuid.New(), nil)
 			msg = Message{
-				Kind:  MessageKindRun,
-				Data:  json.RawMessage(`"output"`),
-				RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+				Kind:    MessageKindRun,
+				Data:    json.RawMessage(`"output"`),
+				Channel: ulid.MustNew(ulid.Now(), rand.Reader).String(),
 			}
 			unsubCalled int32
 			wg          sync.WaitGroup
@@ -201,9 +201,9 @@ func TestBroadcasterConds(t *testing.T) {
 			b   = NewInProcessBroadcaster().(*broadcaster)
 			sub = NewInmemorySubscription(uuid.New(), nil)
 			msg = Message{
-				Kind:  MessageKindRun,
-				Data:  json.RawMessage(`"output"`),
-				RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+				Kind:    MessageKindRun,
+				Data:    json.RawMessage(`"output"`),
+				Channel: ulid.MustNew(ulid.Now(), rand.Reader).String(),
 			}
 			unsubCalled int32
 			wg          sync.WaitGroup
@@ -245,4 +245,67 @@ func TestBroadcasterConds(t *testing.T) {
 		wg.Wait()
 	})
 
+}
+
+func TestBroadcasterStream(t *testing.T) {
+	ctx := context.Background()
+	b := NewInProcessBroadcaster()
+
+	var (
+		id       = uuid.New()
+		messages = []Message{}
+		streams  = [][]string{}
+		l        sync.Mutex
+	)
+	appender := func(m Message) error {
+		l.Lock()
+		messages = append(messages, m)
+		l.Unlock()
+		return nil
+	}
+
+	sub := NewInmemorySubscription(id, appender).(subMemory)
+	sub.streamWriter = func(streamID, data string) error {
+		l.Lock()
+		streams = append(streams, []string{streamID, data})
+		l.Unlock()
+		return nil
+	}
+
+	// Subscribe to our topics
+	msg := Message{
+		Kind:       MessageKindDataStreamStart,
+		Channel:    "user:123",
+		TopicNames: []string{"openai"},
+		Data:       json.RawMessage(`streamid123`),
+	}
+
+	err := b.Subscribe(ctx, sub, msg.Topics())
+	require.NoError(t, err)
+
+	// Publish a stream start.
+	t.Run("stream starts publish", func(t *testing.T) {
+		b.Publish(ctx, msg)
+		require.EqualValues(t, 1, len(messages), messages)
+		require.EqualValues(t, 0, len(streams))
+	})
+
+	t.Run("streaming data works", func(t *testing.T) {
+		b.PublishStream(ctx, msg, "a")
+		require.EqualValues(t, 1, len(messages), messages)
+		require.EqualValues(t, 1, len(streams), streams)
+		require.Equal(t, []string{"streamid123", "a"}, streams[0])
+
+		b.PublishStream(ctx, msg, "b")
+		require.EqualValues(t, 1, len(messages), messages)
+		require.EqualValues(t, 2, len(streams), streams)
+		require.Equal(t, []string{"streamid123", "b"}, streams[1])
+	})
+
+	// Publish a stream start.
+	t.Run("stream starts publish", func(t *testing.T) {
+		msg.Kind = MessageKindDataStreamEnd
+		b.Publish(ctx, msg)
+		require.EqualValues(t, 2, len(messages), messages)
+	})
 }

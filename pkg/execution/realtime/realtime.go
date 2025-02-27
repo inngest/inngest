@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/oklog/ulid/v2"
+	"github.com/inngest/inngest/pkg/util"
 )
 
 type (
@@ -29,6 +29,11 @@ const (
 	MessageKindRun = MessageKind("run")
 	// MessageKindData represents misc data published on a custom run channel
 	MessageKindData = MessageKind("data")
+	// MessageKindDataStreamStart represents misc data published on a custom run channel,
+	// streamed to subscribers via multiple messages with an arbitrary prefix.
+	MessageKindDataStreamStart = MessageKind("datastream-start")
+	// MessageKindDataStreamEnd acknowledges the end of a datastream.
+	MessageKindDataStreamEnd = MessageKind("datastream-end")
 	// MessageKindEvent represents event data
 	MessageKindEvent = MessageKind("event")
 	// MessageKindPing is a message kind sent as a keepalive.
@@ -39,7 +44,6 @@ const (
 	// MessageKindUnsubscribe is a message kind that indicates the subscription should
 	// stop listening to the given topics
 	MessageKindUnsubscribe = MessageKind("unsub")
-
 	// MessageKindClosing is a message kind sent when the server is closing the
 	// realtime connection.  The subscriber should attempt to reconnect immediately,
 	// as the broadcaster will stop broadcasting on the current connection within 5
@@ -73,6 +77,16 @@ type Publisher interface {
 	// the caller is no longer responsible for the lifetime of the message.  This
 	// simplifies all caller code.
 	Publish(ctx context.Context, m Message)
+
+	// PublishStream publishes streams of data to subscribers.
+	//
+	// A stream of data starts with a standard Publish() call using
+	// the kind "datastream", with a stream ID in the data channel.
+	//
+	// Data for this stream is then published via this method, which
+	// gets sent to subscribers with a "${streamID}:" prefix in plaintext
+	//
+	PublishStream(ctx context.Context, m Message, data string)
 }
 
 // Broadcaster manages all subscriptions to channels, and handles the forwarding of
@@ -123,13 +137,16 @@ type Subscription interface {
 	// If SendKeepalive fails consecutively, the subscription will be closed.
 	SendKeepalive(m Message) error
 
-	// Writer allows the writing of messages to the particular subscription.  This is
+	// WriteMessage allows the writing of messages to the particular subscription.  This is
 	// implementation agnostic;  messages may be written via websockets or HTTP connections
 	// for server-sent-events.
 	//
 	// Note that each subscription implementation may write different formats of a Message,
 	// so this cannot fulfil io.Writer.
 	WriteMessage(m Message) error
+
+	// WriteStream publishes data for a given stream ID to the subscription.
+	WriteStream(streamID, data string) error
 
 	// Closer closes the current subscription immediately, terminating any active connections.
 	io.Closer
@@ -149,18 +166,27 @@ type ReadWriteSubscription interface {
 // Each message is published to one or more topics.
 type Topic struct {
 	// Kind represents the topic kind, ie. whether this topic is for events or run data.
+	// This allows consumers to stream events and data from runs separately.
 	Kind TopicKind `json:"kind"`
-	// RunID represents the run that this topic represents, if this is a
-	// topic for a run.
-	RunID ulid.ULID `json:"run_id"`
+
 	// EnvID represents the environment ID that this topic is subscribed to.  This
 	// must always be present for both run and event topics.
 	//
-	// This will be auto-filled
+	// This will be auto-filled, and scopes data to individual environments.
 	EnvID uuid.UUID `json:"env_id"`
+
+	// Channel represents the channel - or grouping - for the stream.  Within a
+	// channel there can be many topics.
+	//
+	// Each run gets its own channel (using the Run ID as its channel).  The
+	// channel can be customized when streaming from SDKs, allowing subscribers
+	// to gather data from multiple runs at a time.
+	Channel string `json:"channel"`
+
 	// Name represents a topic name, such as "$step", "$result", "step-name",
 	// or eg. "api/event.name".
 	Name string `json:"name"`
+
 	// TODO: Implement event pub/sub and realtime message filtering.
 	// Expression is used to filter messages such as events, eg "event.data.value > 500".
 	// Expression *string
@@ -169,7 +195,8 @@ type Topic struct {
 func (t Topic) String() string {
 	switch t.Kind {
 	case TopicKindRun:
-		return fmt.Sprintf("%s:%s:%s", t.EnvID, t.RunID, t.Name)
+		// Hash the channel such that user-generated channels aren't too long.
+		return fmt.Sprintf("%s:%s:%s", t.EnvID, util.XXHash(t.Channel), t.Name)
 	case TopicKindEvent:
 		return fmt.Sprintf("%s:%s", t.EnvID, t.Name)
 	}
@@ -206,21 +233,39 @@ type Message struct {
 	Kind MessageKind `json:"kind"`
 	// Data represents the data in the message.
 	Data json.RawMessage `json:"data"`
+	// CreatedAt is the time that this message was created.
+	CreatedAt time.Time `json:"created_at"`
+
+	//
+	// Required tenant and grouping fields
+	//
+
+	// Channel is the channel (or run ID) that this message is related to.
+	Channel string `json:"channel,omitempty,omitzero"`
+	// EnvID is the environment ID that the message belongs to.
+	EnvID uuid.UUID `json:"env_id,omitempty,omitzero"`
+	// TopicNames represents the custom channels that this message should be broadcast
+	// on.  For steps, this must include the unhashed step ID.  For custom broadcasts,
+	// this is the chosen channel name in the SDK.
+	TopicNames []string `json:"topics"`
+
+	//
+	// Optional fields, set by the executor.
+	//
 
 	// FnID is the function ID that this message is related to.
 	FnID uuid.UUID `json:"fn_id,omitempty,omitzero"`
 	// FnSlug is the function slug that this message is related to.
 	FnSlug string `json:"fn_slug,omitempty,omitzero"`
-	// RunID is the run ID that this message is related to.
-	RunID ulid.ULID `json:"run_id,omitempty,omitzero"`
-	// EnvID is the environment ID that the message belongs to.
-	EnvID uuid.UUID `json:"env_id,omitempty,omitzero"`
-	// CreatedAt is the time that this message was created.
-	CreatedAt time.Time `json:"created_at"`
-	// TopicNames represents the custom channels that this message should be broadcast
-	// on.  For steps, this must include the unhashed step ID.  For custom broadcasts,
-	// this is the chosen channel name in the SDK.
-	TopicNames []string `json:"topics"`
+}
+
+func (m Message) Validate() error {
+	// Ensure that the Data is present for streams.
+	if m.Kind == MessageKindDataStreamStart || m.Kind == MessageKindDataStreamEnd {
+		// and assert that the stream ID exists and contains
+		// no "$" or ":" chars.
+	}
+	return nil
 }
 
 // Topics returns all topics for the given message.
@@ -233,18 +278,18 @@ func (m Message) Topics() []Topic {
 		// Always publish step outputs to the "$step" topic, alongside
 		// the topic names within the message (which includes the step name)
 		topics[0] = Topic{
-			Kind:  TopicKindRun,
-			Name:  TopicNameStep,
-			RunID: m.RunID,
-			EnvID: m.EnvID,
+			Kind:    TopicKindRun,
+			Name:    TopicNameStep,
+			Channel: m.Channel,
+			EnvID:   m.EnvID,
 		}
 
 		for n, v := range m.TopicNames {
 			topics[n+1] = Topic{
-				Kind:  TopicKindRun,
-				RunID: m.RunID,
-				EnvID: m.EnvID,
-				Name:  v,
+				Kind:    TopicKindRun,
+				Channel: m.Channel,
+				EnvID:   m.EnvID,
+				Name:    v,
 			}
 		}
 
@@ -256,18 +301,18 @@ func (m Message) Topics() []Topic {
 		// Always publish step outputs to the "$step" topic, alongside
 		// the topic names within the message (which includes the step name)
 		topics[0] = Topic{
-			Kind:  TopicKindRun,
-			Name:  TopicNameRun,
-			RunID: m.RunID,
-			EnvID: m.EnvID,
+			Kind:    TopicKindRun,
+			Name:    TopicNameRun,
+			Channel: m.Channel,
+			EnvID:   m.EnvID,
 		}
 
 		for n, v := range m.TopicNames {
 			topics[n+1] = Topic{
-				Kind:  TopicKindRun,
-				RunID: m.RunID,
-				EnvID: m.EnvID,
-				Name:  v,
+				Kind:    TopicKindRun,
+				Channel: m.Channel,
+				EnvID:   m.EnvID,
+				Name:    v,
 			}
 		}
 
@@ -277,11 +322,11 @@ func (m Message) Topics() []Topic {
 	// Default to topic kinds of Run
 	topics := make([]Topic, len(m.TopicNames))
 	for n, v := range m.TopicNames {
-		topics[n+1] = Topic{
-			Kind:  TopicKindRun,
-			RunID: m.RunID,
-			EnvID: m.EnvID,
-			Name:  v,
+		topics[n] = Topic{
+			Kind:    TopicKindRun,
+			Channel: m.Channel,
+			EnvID:   m.EnvID,
+			Name:    v,
 		}
 	}
 	return topics
