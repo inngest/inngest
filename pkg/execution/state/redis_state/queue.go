@@ -970,7 +970,9 @@ func (q *queue) ItemPartitions(ctx context.Context, shard QueueShard, i osqueue.
 	// queue items above may be outdated.
 	if q.customConcurrencyLimitRefresher != nil {
 		// As an optimization, allow fetching updated concurrency limits if desired.
-		updated := q.customConcurrencyLimitRefresher(ctx, i)
+		updated, _ := duration(ctx, q.primaryQueueShard.Name, "partition_custom_concurrency_getter", q.clock.Now(), func(ctx context.Context) ([]state.CustomConcurrency, error) {
+			return q.customConcurrencyLimitRefresher(ctx, i), nil
+		})
 		for _, update := range updated {
 			// This is quadratic, but concurrency keys are limited to 2 so it's
 			// okay.
@@ -989,9 +991,11 @@ func (q *queue) ItemPartitions(ctx context.Context, shard QueueShard, i osqueue.
 		AccountID:     i.Data.Identifier.AccountID,
 	}
 
-	// Get the function limit from the `concurrencyLimitGetter`.  If this returns
-	// a limit (> 0), create a new PartitionTypeDefault queue partition for the function.
-	limits := q.concurrencyLimitGetter(ctx, fnPartition)
+	limits, _ := duration(ctx, q.primaryQueueShard.Name, "partition_fn_concurrency_getter", q.clock.Now(), func(ctx context.Context) (PartitionConcurrencyLimits, error) {
+		// Get the function limit from the `concurrencyLimitGetter`.  If this returns
+		// a limit (> 0), create a new PartitionTypeDefault queue partition for the function.
+		return q.concurrencyLimitGetter(ctx, fnPartition), nil
+	})
 
 	// The concurrency limit for fns MUST be added for leasing.
 	fnPartition.ConcurrencyLimit = limits.FunctionLimit
@@ -1966,7 +1970,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		acctLimit int
 	)
 
-	_, _ = duration(ctx, q.primaryQueueShard.Name, "lease_partitions", q.clock.Now(), func(ctx context.Context) (any, error) {
+	_, _ = duration(ctx, q.primaryQueueShard.Name, "lease_item_partitions", q.clock.Now(), func(ctx context.Context) (any, error) {
 		parts, acctLimit = q.ItemPartitions(ctx, q.primaryQueueShard, item)
 		return nil, nil
 	})
