@@ -142,8 +142,8 @@ func connToNode(conn *cqrs.WorkerConnection) *models.ConnectV1WorkerConnection {
 
 func (r *queryResolver) WorkerConnection(ctx context.Context, connectionID ulid.ULID) (*models.ConnectV1WorkerConnection, error) {
 	conn, err := r.Data.GetWorkerConnection(ctx, cqrs.WorkerConnectionIdentifier{
-		AccountID:    consts.DevServerAccountId,
-		WorkspaceID:  consts.DevServerEnvId,
+		AccountID:    consts.DevServerAccountID,
+		WorkspaceID:  consts.DevServerEnvID,
 		ConnectionID: connectionID,
 	})
 	if err != nil {
@@ -242,8 +242,8 @@ func toWorkerConnectionsQueryOpt(
 
 	return cqrs.GetWorkerConnectionOpt{
 		Filter: cqrs.GetWorkerConnectionFilter{
-			AccountID:   consts.DevServerAccountId,
-			WorkspaceID: consts.DevServerEnvId,
+			AccountID:   consts.DevServerAccountID,
+			WorkspaceID: consts.DevServerEnvID,
 			AppID:       filter.AppIDs,
 			TimeField:   tsfield,
 			From:        from,

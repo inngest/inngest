@@ -16,7 +16,7 @@ func (c *connectApiRouter) showWorkerGroup(w http.ResponseWriter, r *http.Reques
 	var envID uuid.UUID
 	switch c.Dev {
 	case true:
-		envID = consts.DevServerEnvId
+		envID = consts.DevServerEnvID
 
 	case false:
 		// Expect UUID

@@ -257,7 +257,7 @@ func (d *devserver) runDiscovery(ctx context.Context) {
 			return
 		}
 		// If we have found any app, disable auto-discovery
-		apps, err := d.Data.GetApps(ctx, consts.DevServerEnvId, nil)
+		apps, err := d.Data.GetApps(ctx, consts.DevServerEnvID, nil)
 		if err == nil && len(apps) > 0 {
 			logger.From(ctx).Info().Msg("apps synced, disabling auto-discovery")
 			d.Opts.Autodiscover = false
@@ -309,7 +309,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 		}
 
 		urls := map[string]struct{}{}
-		if apps, err := d.Data.GetApps(ctx, consts.DevServerEnvId, nil); err == nil {
+		if apps, err := d.Data.GetApps(ctx, consts.DevServerEnvID, nil); err == nil {
 			for _, app := range apps {
 				if app.Method == enums.AppMethodConnect.String() {
 					continue
@@ -643,8 +643,8 @@ func (d *devserver) importRedisSnapshot(ctx context.Context) (imported bool, err
 
 func (d *devserver) AuthenticateRequest(_ context.Context, _, _ string) (*auth.Response, error) {
 	return &auth.Response{
-		AccountID: consts.DevServerAccountId,
-		EnvID:     consts.DevServerEnvId,
+		AccountID: consts.DevServerAccountID,
+		EnvID:     consts.DevServerEnvID,
 	}, nil
 }
 
