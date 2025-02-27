@@ -318,10 +318,51 @@ func (b *broadcaster) Publish(ctx context.Context, m Message) {
 	wg.Wait()
 }
 
+// PublishStream publishes streams of data to any subscribers for a given datastream.
+func (b *broadcaster) PublishStream(ctx context.Context, m Message, data string) {
+	b.l.RLock()
+	defer b.l.RUnlock()
+
+	wg := sync.WaitGroup{}
+	for _, t := range m.Topics() {
+		tid := t.String()
+		found, ok := b.topics[tid]
+		if !ok {
+			continue
+		}
+
+		wg.Add(1)
+		go func(t topicsub) {
+			defer wg.Done()
+			t.eachSubscription(func(s Subscription) {
+				b.publishStreamTo(ctx, s, m, data)
+			})
+		}(found)
+	}
+
+	wg.Wait()
+}
+
 // publishTo publishes a message to a subscription, keeping track of retries if the
 // write fails.
 func (b *broadcaster) publishTo(ctx context.Context, s Subscription, m Message) {
-	if err := s.WriteMessage(m); err == nil {
+	b.doPublish(ctx, s, func() error {
+		return s.WriteMessage(m)
+	})
+}
+
+// publishStreamTo publishes a message to a subscription, keeping track of retries if the
+// write fails.
+func (b *broadcaster) publishStreamTo(ctx context.Context, s Subscription, m Message, data string) {
+	b.doPublish(ctx, s, func() error {
+		return s.WriteStream(string(m.Data), data)
+	})
+}
+
+// doPublish publishes a message or stream to a subscription,
+// keeping track of retries if the write fails.
+func (b *broadcaster) doPublish(ctx context.Context, s Subscription, f func() error) {
+	if err := f(); err == nil {
 		return
 	}
 
@@ -331,7 +372,7 @@ func (b *broadcaster) publishTo(ctx context.Context, s Subscription, m Message) 
 		var err error
 		for att := 1; att < MaxWriteAttempts; att++ {
 			<-time.After(WriteRetryInterval)
-			if err = s.WriteMessage(m); err == nil {
+			if err = f(); err == nil {
 				return
 			}
 		}

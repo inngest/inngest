@@ -202,7 +202,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*cqrs.Sync
 		return nil, publicerr.Wrap(err, 400, "Invalid request")
 	}
 
-	if app, err := a.devserver.Data.GetAppByChecksum(ctx, consts.DevServerEnvId, sum); err == nil {
+	if app, err := a.devserver.Data.GetAppByChecksum(ctx, consts.DevServerEnvID, sum); err == nil {
 		if !app.Error.Valid {
 			// Skip registration since the app was already successfully
 			// registered.
@@ -275,7 +275,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*cqrs.Sync
 	}()
 
 	// Get a list of all functions
-	existing, _ := tx.GetFunctionsByAppInternalID(ctx, consts.DevServerEnvId, appID)
+	existing, _ := tx.GetFunctionsByAppInternalID(ctx, consts.DevServerEnvID, appID)
 	// And get a list of functions that we've upserted.  We'll delete all existing functions not in
 	// this set.
 	seen := map[uuid.UUID]struct{}{}
@@ -300,7 +300,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*cqrs.Sync
 			return nil, publicerr.Wrap(err, 500, "Error marshalling function")
 		}
 
-		if _, err := tx.GetFunctionByInternalUUID(ctx, consts.DevServerEnvId, fn.ID); err == nil {
+		if _, err := tx.GetFunctionByInternalUUID(ctx, consts.DevServerEnvID, fn.ID); err == nil {
 			// Update the function config.
 			_, err = tx.UpdateFunctionConfig(ctx, cqrs.UpdateFunctionConfigParams{
 				ID:     fn.ID,
@@ -524,7 +524,7 @@ func (a devapi) RemoveApp(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	url := r.FormValue("url")
 
-	app, err := a.devserver.Data.GetAppByURL(ctx, consts.DevServerEnvId, url)
+	app, err := a.devserver.Data.GetAppByURL(ctx, consts.DevServerEnvID, url)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 404, "App not found: %s", url))
 		return

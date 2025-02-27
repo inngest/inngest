@@ -24,9 +24,9 @@ func NilAuthFinder(ctx context.Context) (V1Auth, error) {
 type nilAuth struct{}
 
 func (nilAuth) AccountID() uuid.UUID {
-	return consts.DevServerAccountId
+	return consts.DevServerAccountID
 }
 
 func (nilAuth) WorkspaceID() uuid.UUID {
-	return consts.DevServerEnvId
+	return consts.DevServerEnvID
 }

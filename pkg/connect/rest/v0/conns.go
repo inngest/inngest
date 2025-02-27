@@ -24,7 +24,7 @@ func (c *connectApiRouter) showConnections(w http.ResponseWriter, r *http.Reques
 	)
 	switch c.Dev {
 	case true:
-		envID = consts.DevServerEnvId
+		envID = consts.DevServerEnvID
 
 	case false:
 		// Expect UUID

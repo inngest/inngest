@@ -248,7 +248,7 @@ func (o ossTrackedEvent) GetInternalID() ulid.ULID {
 
 func (o ossTrackedEvent) GetWorkspaceID() uuid.UUID {
 	// There are no workspaces in OSS yet.
-	return consts.DevServerEnvId
+	return consts.DevServerEnvID
 }
 
 type NewInvocationEventOpts struct {

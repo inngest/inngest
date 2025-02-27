@@ -75,11 +75,29 @@ func (s SubscriptionWS) Protocol() string {
 }
 
 func (s SubscriptionWS) WriteMessage(m Message) error {
+	// Ensure that the data is valid JSON.  NOte that sometimes
+	// m.Data is set as a raw string - eg. the channel ID.
+	if !json.Valid(m.Data) {
+		enc, err := json.Marshal(string(m.Data))
+		if err != nil {
+			return err
+		}
+		m.Data = enc
+	}
+
 	byt, err := json.Marshal(m)
 	if err != nil {
 		return err
 	}
 	return s.ws.Write(context.Background(), websocket.MessageText, byt)
+}
+
+func (s SubscriptionWS) WriteStream(streamID, data string) error {
+	return s.ws.Write(
+		context.Background(),
+		websocket.MessageText,
+		[]byte(streamID+":"+data),
+	)
 }
 
 func (s SubscriptionWS) SendKeepalive(m Message) error {
@@ -101,13 +119,8 @@ func (s SubscriptionWS) Poll(ctx context.Context) error {
 	for {
 		mt, byt, err := s.ws.Read(ctx)
 		if err != nil {
-			fmt.Println("read err", err)
 			return err
 		}
-
-		fmt.Println("")
-		fmt.Println(mt, string(byt))
-		fmt.Println("")
 
 		if mt == websocket.MessageBinary {
 			// We do not handle binary data in realtime connections.

@@ -18,7 +18,7 @@ func (r *functionRunV2Resolver) App(
 }
 
 func (r *functionRunV2Resolver) Function(ctx context.Context, fn *models.FunctionRunV2) (*models.Function, error) {
-	fun, err := r.Data.GetFunctionByInternalUUID(ctx, consts.DevServerEnvId, fn.FunctionID)
+	fun, err := r.Data.GetFunctionByInternalUUID(ctx, consts.DevServerEnvID, fn.FunctionID)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving function: %w", err)
 	}

@@ -60,9 +60,9 @@ func TestRedisBroadcaster(t *testing.T) {
 
 	// Create two messages with two separate topics.
 	msg1 := NewMessage(MessageKindRun, "output")
-	msg1.RunID = ulid.MustNew(ulid.Now(), rand.Reader)
+	msg1.Channel = ulid.MustNew(ulid.Now(), rand.Reader).String()
 	msg2 := NewMessage(MessageKindRun, "output")
-	msg2.RunID = ulid.MustNew(ulid.Now(), rand.Reader)
+	msg2.Channel = ulid.MustNew(ulid.Now(), rand.Reader).String()
 
 	t.Run("publishing on b1 broadcasts on b2 subscriber", func(t *testing.T) {
 		// Subscribing on msg1 and msg2 works, which tests multiplexing of many

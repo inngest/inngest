@@ -64,7 +64,7 @@ func (r *functionRunResolver) History(
 		ctx,
 		runID,
 		history_reader.GetRunOpts{
-			AccountID: consts.DevServerAccountId,
+			AccountID: consts.DevServerAccountID,
 		},
 	)
 }
@@ -83,13 +83,13 @@ func (r *functionRunResolver) HistoryItemOutput(
 		ctx,
 		historyID,
 		history_reader.GetHistoryOutputOpts{
-			AccountID: consts.DevServerAccountId,
+			AccountID: consts.DevServerAccountID,
 			RunID:     runID,
 
 			// TODO: Where should we get this?
 			WorkflowID: uuid.New(),
 
-			WorkspaceID: consts.DevServerEnvId,
+			WorkspaceID: consts.DevServerEnvID,
 		},
 	)
 }
@@ -189,8 +189,8 @@ func (r *mutationResolver) CancelRun(
 	ctx context.Context,
 	runID ulid.ULID,
 ) (*models.FunctionRun, error) {
-	accountID := consts.DevServerAccountId
-	workspaceID := consts.DevServerEnvId
+	accountID := consts.DevServerAccountID
+	workspaceID := consts.DevServerEnvID
 	run, err := r.HistoryReader.GetFunctionRun(
 		ctx,
 		accountID,
@@ -265,8 +265,8 @@ func (r *mutationResolver) Rerun(
 	fromStep *models.RerunFromStepInput,
 ) (ulid.ULID, error) {
 	zero := ulid.ULID{}
-	accountID := consts.DevServerAccountId
-	workspaceID := consts.DevServerEnvId
+	accountID := consts.DevServerAccountID
+	workspaceID := consts.DevServerEnvID
 
 	fnrun, err := r.Data.GetFunctionRun(
 		ctx,
@@ -335,9 +335,9 @@ func (r *mutationResolver) Rerun(
 			event.NewOSSTrackedEventWithID(evt.Event(), evt.InternalID()),
 		},
 		OriginalRunID: &fnrun.RunID,
-		AccountID:     consts.DevServerAccountId,
+		AccountID:     consts.DevServerAccountID,
 		FromStep:      fromStepReq,
-		WorkspaceID:   consts.DevServerEnvId,
+		WorkspaceID:   consts.DevServerEnvID,
 	})
 	if err != nil {
 		return zero, err
