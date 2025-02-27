@@ -80,6 +80,17 @@
     "language": "TypeScript"
   },
   {
+    "framework": "FastAPI",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=python#exposing-inngest-functions"
+    },
+    "language": "Python"
+  },
+  {
     "framework": "Fastify",
     "logo": {
       "dark": "",
@@ -90,6 +101,17 @@
       "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-fastify"
     },
     "language": "TypeScript"
+  },
+  {
+    "framework": "Flask",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=python#exposing-inngest-functions"
+    },
+    "language": "Python"
   },
   {
     "framework": "Fresh (Deno)",

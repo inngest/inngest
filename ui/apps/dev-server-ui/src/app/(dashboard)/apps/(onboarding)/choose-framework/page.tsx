@@ -4,6 +4,16 @@ import { Pill } from '@inngest/components/Pill/Pill';
 
 import frameworksData from './frameworks.json';
 
+function getPillAppearance(language: string) {
+  if (language.toLowerCase() === 'typescript') {
+    return 'primary';
+  } else if (language.toLowerCase() === 'python') {
+    return 'info';
+  } else {
+    return 'default';
+  }
+}
+
 export default function Page() {
   return (
     <div>
@@ -46,10 +56,8 @@ export default function Page() {
                 <p className="mr-1">{framework.framework}</p>
                 {framework.version_supported && <Pill>{framework.version_supported}</Pill>}
               </div>
-              <Pill
-                appearance="outlined"
-                kind={framework.language.toLowerCase() === 'typescript' ? 'primary' : 'default'}
-              >
+
+              <Pill appearance="outlined" kind={getPillAppearance(framework.language)}>
                 {framework.language}
               </Pill>
             </NextLink>
