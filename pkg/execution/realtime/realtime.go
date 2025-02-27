@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/oklog/ulid/v2"
 )
 
 type (
@@ -175,6 +176,9 @@ type Topic struct {
 	// This will be auto-filled, and scopes data to individual environments.
 	EnvID uuid.UUID `json:"env_id"`
 
+	// RunID is used for debugging purposes only, and does not constrain topics.
+	RunID ulid.ULID `json:"run_id,omitempty,omitzero"`
+
 	// Channel represents the channel - or grouping - for the stream.  Within a
 	// channel there can be many topics.
 	//
@@ -257,6 +261,8 @@ type Message struct {
 	FnID uuid.UUID `json:"fn_id,omitempty,omitzero"`
 	// FnSlug is the function slug that this message is related to.
 	FnSlug string `json:"fn_slug,omitempty,omitzero"`
+	// RunID is used for debugging purposes only, and does not constrain topics.
+	RunID ulid.ULID `json:"run_id,omitempty,omitzero"`
 }
 
 func (m Message) Validate() error {

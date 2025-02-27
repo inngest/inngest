@@ -2035,6 +2035,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 			FnSlug:     i.f.GetSlug(),
 			Channel:    i.md.ID.RunID.String(),
 			CreatedAt:  time.Now(),
+			RunID:      i.md.ID.RunID,
 		})
 	}
 
