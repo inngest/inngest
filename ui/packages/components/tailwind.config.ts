@@ -24,6 +24,7 @@ export default {
           intense: 'rgb(var(--color-primary-intense) / <alpha-value>)',
           xIntense: 'rgb(var(--color-primary-xIntense) / <alpha-value>)',
           '2xIntense': 'rgb(var(--color-primary-2xIntense) / <alpha-value>)',
+          '3xIntense': 'rgb(var(--color-primary-3xIntense) / <alpha-value>)',
         },
         secondary: {
           '4xSubtle': 'rgb(var(--color-secondary-4xSubtle) / <alpha-value>)',
@@ -35,8 +36,10 @@ export default {
           intense: 'rgb(var(--color-secondary-intense) / <alpha-value>)',
           xIntense: 'rgb(var(--color-secondary-xIntense) / <alpha-value>)',
           '2xIntense': 'rgb(var(--color-secondary-2xIntense) / <alpha-value>)',
+          '3xIntense': 'rgb(var(--color-secondary-3xIntense) / <alpha-value>)',
         },
         tertiary: {
+          '3xSubtle': 'rgb(var(--color-tertiary-3xSubtle) / <alpha-value>)',
           '2xSubtle': 'rgb(var(--color-tertiary-2xSubtle) / <alpha-value>)',
           xSubtle: 'rgb(var(--color-tertiary-xSubtle) / <alpha-value>)',
           subtle: 'rgb(var(--color-tertiary-subtle) / <alpha-value>)',
@@ -44,13 +47,17 @@ export default {
           intense: 'rgb(var(--color-tertiary-intense) / <alpha-value>)',
           xIntense: 'rgb(var(--color-tertiary-xIntense) / <alpha-value>)',
           '2xIntense': 'rgb(var(--color-tertiary-2xIntense) / <alpha-value>)',
+          '3xIntense': 'rgb(var(--color-tertiary-3xIntense) / <alpha-value>)',
         },
         quaternary: {
+          cool3xSubtle: 'rgb(var(--color-quaternary-cool-3xSubtle) / <alpha-value>)',
           coolxSubtle: 'rgb(var(--color-quaternary-cool-xSubtle) / <alpha-value>)',
           coolModerate: 'rgb(var(--color-quaternary-cool-moderate) / <alpha-value>)',
           coolxIntense: 'rgb(var(--color-quaternary-cool-xIntense) / <alpha-value>)',
+          cool3xIntense: 'rgb(var(--color-quaternary-cool-3xIntense) / <alpha-value>)',
         },
         accent: {
+          '3xSubtle': 'rgb(var(--color-accent-3xSubtle) / <alpha-value>)',
           '2xSubtle': 'rgb(var(--color-accent-2xSubtle) / <alpha-value>)',
           xSubtle: 'rgb(var(--color-accent-xSubtle) / <alpha-value>)',
           subtle: 'rgb(var(--color-accent-subtle) / <alpha-value>)',
@@ -58,6 +65,7 @@ export default {
           intense: 'rgb(var(--color-accent-intense) / <alpha-value>)',
           xIntense: 'rgb(var(--color-accent-xIntense) / <alpha-value>)',
           '2xIntense': 'rgb(var(--color-accent-2xIntense) / <alpha-value>)',
+          '3xIntense': 'rgb(var(--color-accent-3xIntense) / <alpha-value>)',
         },
         status: {
           failed: 'rgb(var(--color-tertiary-subtle) / <alpha-value>)',

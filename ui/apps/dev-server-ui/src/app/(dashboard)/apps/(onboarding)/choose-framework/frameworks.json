@@ -1,0 +1,18 @@
+{
+  "frameworks": [
+    {
+      "name": "Astro",
+      "logo": "",
+      "sdk_version_supported": "v3.8.0+",
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-astro",
+      "sdk_language": "TypeScript"
+    },
+    {
+      "name": "AWS Lambda",
+      "logo": "",
+      "sdk_version_supported": "v1.5.0+",
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-aws-lambda",
+      "sdk_language": "TypeScript"
+    }
+  ]
+}
