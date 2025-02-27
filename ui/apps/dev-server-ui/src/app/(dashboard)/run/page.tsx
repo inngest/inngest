@@ -21,7 +21,7 @@ export default function Page() {
   const getTrigger = useGetTrigger();
   const rerun = useRerun();
 
-  const traceAIEnabled = true;
+  const traceAIEnabled = false;
   const { enabled: legacyTraceEnabled } = useLegacyTrace();
 
   if (!runID) {
