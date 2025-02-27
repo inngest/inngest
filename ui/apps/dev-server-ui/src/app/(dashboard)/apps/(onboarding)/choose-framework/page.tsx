@@ -32,23 +32,25 @@ export default function Page() {
       </p>
 
       <ul className="mt-8 flex flex-col gap-4">
-        {frameworksData.frameworks.map((framework) => (
-          <li key={framework.name} className="border-subtle rounded-sm border">
+        {frameworksData.map((framework) => (
+          <li key={framework.framework} className="border-subtle rounded-sm border">
             <NextLink
-              href={framework.url}
+              href={framework.link.url}
               target="_blank"
               className="hover:bg-canvasSubtle flex items-center justify-between p-3"
             >
               <div className="flex items-center">
-                <div className="bg-canvasMuted mr-3 h-12 w-12 rounded-sm">{framework.logo}</div>
-                <p className="mr-1">{framework.name}</p>
-                {framework.sdk_version_supported && <Pill>{framework.sdk_version_supported}</Pill>}
+                <div className="bg-canvasMuted mr-3 h-12 w-12 rounded-sm">
+                  {framework.logo.light}
+                </div>
+                <p className="mr-1">{framework.framework}</p>
+                {framework.version_supported && <Pill>{framework.version_supported}</Pill>}
               </div>
               <Pill
                 appearance="outlined"
-                kind={framework.sdk_language.toLowerCase() === 'typescript' ? 'primary' : 'default'}
+                kind={framework.language.toLowerCase() === 'typescript' ? 'primary' : 'default'}
               >
-                {framework.sdk_language}
+                {framework.language}
               </Pill>
             </NextLink>
           </li>
