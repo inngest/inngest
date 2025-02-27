@@ -68,7 +68,9 @@ func (a *api) setup() {
 
 		// This can ONLY use the AuthMiddleware as we MUST use a signing key for
 		// authentication for publishing to streams.
-		r.Use(a.opts.AuthMiddleware)
+		if a.opts.AuthMiddleware != nil {
+			r.Use(a.opts.AuthMiddleware)
+		}
 
 		r.Post("/realtime/publish", a.PostPublish)
 	})
@@ -175,9 +177,9 @@ func (a *api) PostPublish(w http.ResponseWriter, r *http.Request) {
 	//
 	// This is only usable within an Inngest function.
 
-	// NOTE: If the content type is of "text/event-stream", this creates a new
-	// stream to buffer messages to subscribers every 333ms.
-	if r.Header.Get("content-type") != "text/event-stream" {
+	// NOTE: If the content type is of "text/stream", this creates a new
+	// stream to buffer messages to subscribers in 1KB chunks
+	if r.Header.Get("content-type") == "text/stream" {
 		// Read body in goroutine, publishing a stream to subscribers
 		// until the message is done.
 		a.publishStream(w, r)
@@ -193,10 +195,20 @@ func (a *api) PostPublish(w http.ResponseWriter, r *http.Request) {
 	// This msg is arbitrary data.
 	msg.Kind = MessageKindData
 	// Read all data from the request body.
-	msg.Data, err = io.ReadAll(io.LimitReader(r.Body, consts.MaxStreamingMessageSizeBytes))
+	byt, err := io.ReadAll(io.LimitReader(r.Body, consts.MaxStreamingMessageSizeBytes))
 	_ = r.Body.Close()
 	if err != nil {
 		// TODO: Handle error
+	}
+
+	// Is byt valid JSON?  If so, we don't want to double-encode it.
+	if json.Valid(byt) {
+		msg.Data = byt
+	} else {
+		msg.Data, err = json.Marshal(string(byt))
+		if err != nil {
+			// TODO: handle err
+		}
 	}
 
 	if err := msg.Validate(); err != nil {
@@ -237,9 +249,9 @@ func (a *api) publishStream(w http.ResponseWriter, r *http.Request) {
 		a.opts.Broadcaster.Publish(ctx, msg)
 	}(msg)
 
-	// Read the body in chunks
-	for {
-		buf := make([]byte, consts.MaxStreamingMessageSizeBytes)
+	// Read the body in chunks, up to  chui
+	for i := 0; i < consts.MaxStreamingChunks; i++ {
+		buf := make([]byte, consts.StreamingChunkSize)
 		n, err := r.Body.Read(buf)
 
 		if n > 0 {

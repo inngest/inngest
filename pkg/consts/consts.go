@@ -137,4 +137,6 @@ const (
 	// Streaming
 	//
 	MaxStreamingMessageSizeBytes = 1024 * 512 // 512KB
+	StreamingChunkSize           = 1024       // 1KB
+	MaxStreamingChunks           = 1000       // Allow up to 1000 chunks per stream
 )

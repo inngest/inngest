@@ -68,9 +68,9 @@ func TestRealtime(t *testing.T) {
 		require.Eventually(t, func() bool { return atomic.LoadInt32(&started) > 0 }, 5*time.Second, 5*time.Millisecond)
 
 		jwt, err := NewToken(t, realtime.Topic{
-			Kind:  realtime.TopicKindRun,
-			RunID: ulid.MustParse(runID),
-			Name:  realtime.TopicNameStep, // all step outputs
+			Kind:    realtime.TopicKindRun,
+			Channel: ulid.MustParse(runID).String(),
+			Name:    realtime.TopicNameStep, // all step outputs
 		})
 		require.NoError(t, err)
 
@@ -109,7 +109,7 @@ func TestRealtime(t *testing.T) {
 		require.Equal(t, 1, len(messages))
 		require.Equal(t, realtime.MessageKindStep, messages[0].Kind)
 		require.Equal(t, json.RawMessage(`"step 1 data"`), messages[0].Data)
-		require.Equal(t, runID, messages[0].RunID.String())
+		require.Equal(t, runID, messages[0].Channel)
 	})
 
 }

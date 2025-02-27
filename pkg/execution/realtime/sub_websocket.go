@@ -75,6 +75,16 @@ func (s SubscriptionWS) Protocol() string {
 }
 
 func (s SubscriptionWS) WriteMessage(m Message) error {
+	// Ensure that the data is valid JSON.  NOte that sometimes
+	// m.Data is set as a raw string - eg. the channel ID.
+	if !json.Valid(m.Data) {
+		enc, err := json.Marshal(string(m.Data))
+		if err != nil {
+			return err
+		}
+		m.Data = enc
+	}
+
 	byt, err := json.Marshal(m)
 	if err != nil {
 		return err
