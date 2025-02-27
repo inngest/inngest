@@ -1,4 +1,5 @@
 import NextLink from 'next/link';
+import { ThemeImage } from '@inngest/components/Image/Image';
 import { Link } from '@inngest/components/Link/Link';
 import { Pill } from '@inngest/components/Pill/Pill';
 
@@ -50,8 +51,16 @@ export default function Page() {
               className="hover:bg-canvasSubtle flex items-center justify-between p-3"
             >
               <div className="flex items-center">
-                <div className="bg-canvasMuted mr-3 h-12 w-12 rounded-sm">
-                  {framework.logo.light}
+                <div className="bg-canvasMuted mr-3 flex h-12 w-12 items-center justify-center rounded-sm">
+                  {framework.logo.light && framework.logo.dark && (
+                    <ThemeImage
+                      width={30}
+                      height={30}
+                      lightSrc={framework.logo.light}
+                      darkSrc={framework.logo.dark}
+                      alt={framework.framework + 'logo'}
+                    />
+                  )}
                 </div>
                 <p className="mr-1">{framework.framework}</p>
                 {framework.version_supported && <Pill>{framework.version_supported}</Pill>}
