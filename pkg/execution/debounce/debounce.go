@@ -135,6 +135,9 @@ func NewRedisDebouncer(d *redis_state.DebounceClient, defaultQueueShard redis_st
 		d:                 d,
 		q:                 q,
 		defaultQueueShard: defaultQueueShard,
+		shouldMigrate: func(ctx context.Context) bool {
+			return false
+		},
 	}
 }
 

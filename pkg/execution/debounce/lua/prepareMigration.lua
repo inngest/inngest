@@ -29,7 +29,7 @@ end
 local debounceItem = cjson.decode(existingDebounceItemStr)
 
 -- Prevent this debounce from running on the default cluster (we're moving it to the new system queue)
-redis.call("SET", debouncePointerKey, newDebounceID)
+redis.call("SET", keyPtr, newDebounceID)
 
 -- Return debounce ID and current timeout (carried over from first event)
-return { 1, debounceID, debounceItem.t }
+return { 1, existingDebounceID, debounceItem.t }
