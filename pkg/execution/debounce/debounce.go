@@ -138,11 +138,51 @@ func NewRedisDebouncer(d *redis_state.DebounceClient, defaultQueueShard redis_st
 	}
 }
 
+type DebouncerOpts struct {
+	// Source/Old: Default queue cluster
+	DefaultDebounceClient *redis_state.DebounceClient
+	DefaultQueue          redis_state.QueueManager
+	DefaultQueueShard     redis_state.QueueShard
+
+	// Destination/Target: New system queue + colocated debounce state shard
+	SystemDebounceClient *redis_state.DebounceClient
+	SystemQueue          redis_state.QueueManager
+	SystemQueueShard     redis_state.QueueShard
+
+	ShouldMigrate func(ctx context.Context) bool
+}
+
+func NewRedisDebouncerWithMigration(o DebouncerOpts) Debouncer {
+	return debouncer{
+		c: clockwork.NewRealClock(),
+
+		// Old
+		d:                 o.DefaultDebounceClient,
+		q:                 o.DefaultQueue,
+		defaultQueueShard: o.DefaultQueueShard,
+
+		// New
+		systemShardDebounceClient: o.SystemDebounceClient,
+		systemQueueManager:        o.SystemQueue,
+		systemQueueShard:          o.SystemQueueShard,
+
+		shouldMigrate: o.ShouldMigrate,
+	}
+}
+
 type debouncer struct {
 	c                 clockwork.Clock
 	d                 *redis_state.DebounceClient
 	q                 redis_state.QueueManager
 	defaultQueueShard redis_state.QueueShard
+
+	// New: system queue
+	systemShardDebounceClient *redis_state.DebounceClient
+	systemQueueManager        redis_state.QueueManager
+	systemQueueShard          redis_state.QueueShard
+
+	// shouldMigrate determines if old debounces should be migrated to new cluster on the fly
+	shouldMigrate func(ctx context.Context) bool
 }
 
 // DeleteDebounceItem removes a debounce from the map.
@@ -218,27 +258,69 @@ func (d debouncer) Debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 	if err != nil {
 		return fmt.Errorf("invalid debounce duration: %w", err)
 	}
-	return d.debounce(ctx, di, fn, ttl, 0)
+
+	shouldMigrate := d.shouldMigrate(ctx)
+
+	return d.debounce(ctx, di, fn, ttl, 0, shouldMigrate)
 }
 
-func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Function, ttl time.Duration, n int) error {
+func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Function, ttl time.Duration, n int, shouldMigrate bool) error {
+	newDebounceID := ulid.MustNew(ulid.Timestamp(d.c.Now()), rand.Reader)
+
+	//
+	// Enable debounce migration
+	// 1. Check if debounce exists on old default cluster and atomically disable execution on old debounce, if exists
+	// 2. Write new debounce to new system cluster with debounce ID, timeout, ttl
+	// 3. Enqueue new timeout item on new system queue
+	// 4. Dequeue (delete) old timeout item from default queue shard
+	//
+	// Notes
+	// - New debounces will be created on _new_ system cluster.
+	// - `shouldMigrate` should only be set to true once this code is running on all services invoking `Debounce()`
+	// - Subsequent calls to this method will attempt to create/update debounces on the new system, this is desired.
+	// - We must carry over the previous timeout to ensure debounces don't run longer than intended.
+	//
+	if shouldMigrate {
+		debounceID, debounceTimeout, err := d.prepareMigration(ctx, di, fn)
+		if err != nil {
+			return fmt.Errorf("could not prepare debounce migration: %w", err)
+		}
+
+		if debounceID != nil {
+			newDebounceID = *debounceID
+			di.Timeout = debounceTimeout
+		}
+	}
+
 	// Call new debounce immediately.  If this returns ErrDebounceExists then
 	// update the debounce.  This ensures that checking and creating a debounce
 	// is atomic, and two individual threads/workers cannot create debounces simultaneously.
-	debounceID, err := d.newDebounce(ctx, di, fn, ttl)
+	existingDebounceID, err := d.newDebounce(ctx, di, fn, ttl, shouldMigrate, newDebounceID)
 	if err == nil {
+		if shouldMigrate {
+			// TODO Delete old debounce
+		}
+
 		return nil
 	}
 	if err != ErrDebounceExists {
+		if shouldMigrate {
+			// TODO Recover debounce
+		}
+
 		// There was an unkown error creating the debounce.
 		return err
 	}
-	if debounceID == nil {
+	if existingDebounceID == nil {
+		if shouldMigrate {
+			// TODO Recover debounce
+		}
+
 		return fmt.Errorf("expected debounce ID when debounce exists")
 	}
 
 	// A debounce must already exist for this fn.  Update it.
-	err = d.updateDebounce(ctx, di, fn, ttl, *debounceID)
+	err = d.updateDebounce(ctx, di, fn, ttl, *existingDebounceID, shouldMigrate)
 	if err == context.DeadlineExceeded || err == ErrDebounceInProgress || err == ErrDebounceNotFound {
 		if n == 5 {
 			logger.StdlibLogger(ctx).Error("unable to update debounce", "error", err)
@@ -251,7 +333,7 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 		// TODO: Instead of this, make debounce creation and updating atomic within the queue.
 		// This needs to modify queue items and partitions directly.
 		<-time.After(750 * time.Millisecond)
-		return d.debounce(ctx, di, fn, ttl, n+1)
+		return d.debounce(ctx, di, fn, ttl, n+1, shouldMigrate)
 	}
 
 	return err
@@ -275,9 +357,8 @@ func (d debouncer) queueItem(ctx context.Context, di DebounceItem, debounceID ul
 	}
 }
 
-func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.Function, ttl time.Duration) (*ulid.ULID, error) {
+func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.Function, ttl time.Duration, shouldMigrate bool, newDebounceID ulid.ULID) (*ulid.ULID, error) {
 	now := d.c.Now()
-	debounceID := ulid.MustNew(ulid.Now(), rand.Reader)
 
 	key, err := d.debounceKey(ctx, di, fn)
 	if err != nil {
@@ -285,8 +366,20 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 	}
 
 	// Ensure we set the debounce's max lifetime.
-	if timeout := fn.Debounce.TimeoutDuration(); timeout != nil {
-		di.Timeout = now.Add(*timeout).UnixMilli()
+	if di.Timeout == 0 {
+		if timeout := fn.Debounce.TimeoutDuration(); timeout != nil {
+			di.Timeout = now.Add(*timeout).UnixMilli()
+		}
+	}
+
+	// In case the timeout is shorter than the debounce period, adjust the ttl
+	// This is required for carrying over timeouts during a migration.
+	// Example: Existing debounce with a timeout in 5s exists in the old cluster. We send another event,
+	// which migrates the debounce over, keeping the timeout intact. If we have a debounce period of 10s,
+	// we still want to run the debounce timeout job after 5s.
+	untilTimeout := time.UnixMilli(di.Timeout).Sub(now) // how much time until timeout
+	if ttl > untilTimeout {
+		ttl = untilTimeout
 	}
 
 	keyPtr := d.d.KeyGenerator().DebouncePointer(ctx, fn.ID, key)
@@ -297,11 +390,17 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 		return nil, fmt.Errorf("error marshalling debounce: %w", err)
 	}
 
+	client := d.d.Client()
+	if shouldMigrate {
+		// Write debounce to new shard
+		client = d.systemShardDebounceClient.Client()
+	}
+
 	out, err := scripts["newDebounce"].Exec(
 		ctx,
-		d.d.Client(),
+		client,
 		[]string{keyPtr, keyDbc},
-		[]string{debounceID.String(), string(byt), strconv.Itoa(int(ttl.Seconds()))},
+		[]string{newDebounceID.String(), string(byt), strconv.Itoa(int(ttl.Seconds()))},
 	).ToString()
 	if err != nil {
 		return nil, fmt.Errorf("error creating debounce: %w", err)
@@ -312,12 +411,18 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 		// attempt to start a debounce during the debounce's expiry (race conditions), and the extra
 		// second lets an updateDebounce call on TTL 0 finish, as the buffer is the updateDebounce
 		// deadline.
-		qi := d.queueItem(ctx, di, debounceID)
-		err = d.q.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second), queue.EnqueueOpts{})
-		if err != nil {
-			return &debounceID, fmt.Errorf("error enqueueing debounce job: %w", err)
+		qi := d.queueItem(ctx, di, newDebounceID)
+
+		queueManager := d.q
+		if shouldMigrate {
+			queueManager = d.systemQueueManager
 		}
-		return &debounceID, nil
+
+		err = queueManager.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second), queue.EnqueueOpts{})
+		if err != nil {
+			return &newDebounceID, fmt.Errorf("error enqueueing debounce job: %w", err)
+		}
+		return &newDebounceID, nil
 	}
 
 	existingID, err := ulid.Parse(out)
@@ -328,9 +433,75 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 	return &existingID, ErrDebounceExists
 }
 
+func (d debouncer) prepareMigration(ctx context.Context, di DebounceItem, fn inngest.Function) (*ulid.ULID, int64, error) {
+	// Replace existing debounce pointer with fake debounce ID so timeout jobs don't
+	now := d.c.Now()
+	fakeDebounceID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+
+	key, err := d.debounceKey(ctx, di, fn)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	keyPtr := d.d.KeyGenerator().DebouncePointer(ctx, fn.ID, key)
+	keyDbc := d.d.KeyGenerator().Debounce(ctx)
+
+	out, err := scripts["prepareMigration"].Exec(
+		ctx,
+		d.d.Client(),
+		[]string{keyPtr, keyDbc},
+		[]string{fakeDebounceID.String()},
+	).ToAny()
+
+	if err != nil {
+		return nil, 0, fmt.Errorf("error running script: %w", err)
+	}
+
+	returnedSet, ok := out.([]any)
+	if !ok {
+		return nil, 0, fmt.Errorf("expected to receive one or more set items")
+	}
+
+	if len(returnedSet) < 1 {
+		return nil, 0, fmt.Errorf("expected at least one item")
+	}
+
+	status, ok := returnedSet[0].(int64)
+	if !ok {
+		return nil, 0, fmt.Errorf("unexpected return value, expected status int")
+	}
+
+	// No previous debounce exists
+	if status == 0 {
+		return nil, 0, nil
+	}
+
+	if status != 1 || len(returnedSet) != 3 {
+		return nil, 0, fmt.Errorf("expected status 1 with three return items")
+	}
+
+	debounceIdStr, ok := returnedSet[1].(string)
+	if !ok {
+		return nil, 0, fmt.Errorf("expected debounceID as second item")
+	}
+
+	existingID, err := ulid.Parse(debounceIdStr)
+	if err != nil {
+		// This was not a ULID, so we have no idea what was returned.
+		return nil, 0, fmt.Errorf("unknown new debounce return value: %s", debounceIdStr)
+	}
+
+	timeoutUnixMillis, ok := returnedSet[2].(int64)
+	if !ok {
+		return nil, 0, fmt.Errorf("expected timeout int")
+	}
+
+	return &existingID, timeoutUnixMillis, nil
+}
+
 // updateDebounce updates the currently pending debounce to point to the new event ID.  It pushes
 // out the debounce's TTL, and re-enqueues the job to initialize fns from the debounce.
-func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn inngest.Function, ttl time.Duration, debounceID ulid.ULID) error {
+func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn inngest.Function, ttl time.Duration, debounceID ulid.ULID, shouldMigrate bool) error {
 	now := d.c.Now()
 
 	key, err := d.debounceKey(ctx, di, fn)
@@ -351,9 +522,18 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 		return fmt.Errorf("error marshalling debounce: %w", err)
 	}
 
+	client := d.d.Client()
+	queueManager := d.q
+	shard := d.defaultQueueShard
+	if shouldMigrate {
+		client = d.systemShardDebounceClient.Client()
+		queueManager = d.systemQueueManager
+		shard = d.systemQueueShard
+	}
+
 	out, err := scripts["updateDebounce"].Exec(
 		ctx,
-		d.d.Client(),
+		client,
 		[]string{
 			keyPtr,
 			keyDbc,
@@ -383,14 +563,15 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 		// The item is not found with the debounceID
 		// enqueue a new item
 		qi := d.queueItem(ctx, di, debounceID)
-		return d.q.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second), queue.EnqueueOpts{})
+
+		return queueManager.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second), queue.EnqueueOpts{})
 	default:
 		// Debounces should have a maximum timeout;  updating the debounce returns
 		// the timeout to use.
 		actualTTL := time.Second * time.Duration(out)
-		err = d.q.RequeueByJobID(
+		err = queueManager.RequeueByJobID(
 			ctx,
-			d.defaultQueueShard,
+			shard,
 			debounceID.String(),
 			now.Add(actualTTL).Add(buffer).Add(time.Second),
 		)
