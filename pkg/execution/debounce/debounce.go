@@ -464,7 +464,7 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 		// we still want to run the debounce timeout job after 5s.
 		untilTimeout := time.UnixMilli(di.Timeout).Sub(now) // how much time until timeout
 		if ttl > untilTimeout {
-			ttl = untilTimeout.Round(time.Second)
+			ttl = untilTimeout.Round(time.Second) // round to the nearest second
 		}
 		if ttl <= 0 {
 			ttl = 1 * time.Second
