@@ -7,7 +7,7 @@ import { toMaybeDate } from '../utils/date';
 import { InlineSpans } from './InlineSpans';
 import { TimelineHeader } from './TimelineHeader';
 import { type Trace } from './types';
-import { createSpanWidths, useStepSelection } from './utils';
+import { createSpanWidths, useStepSelection, type StepInfoType } from './utils';
 
 type Props = {
   depth: number;
@@ -24,7 +24,7 @@ type Props = {
 export function Trace({ depth, getResult, maxTime, minTime, pathCreator, trace, runID }: Props) {
   const [expanded, setExpanded] = useState(true);
   const [result, setResult] = useState<Result>();
-  const { selectStep, selectedStep } = useStepSelection();
+  const { selectStep, selectedStep } = useStepSelection(runID);
 
   useEffect(() => {
     if (expanded && !result && trace.outputID) {
@@ -60,7 +60,7 @@ export function Trace({ depth, getResult, maxTime, minTime, pathCreator, trace, 
             ? 'bg-secondary-3xSubtle'
             : 'hover:bg-canvasSubtle'
         } `}
-        onClick={() => selectStep(depth ? { trace, runID, result, pathCreator } : undefined)}
+        onClick={() => selectStep({ trace, runID, result, pathCreator })}
       >
         <div
           className="flex w-[30%] flex-row items-center justify-start gap-1 overflow-hidden"

@@ -10,7 +10,7 @@ import {
   LinkElement,
   TextElement,
   TimeElement,
-} from '../DetailsCard/Element';
+} from '../DetailsCard/NewElement';
 import { RerunModal } from '../Rerun/RerunModal';
 import { Time } from '../Time';
 import { usePrettyJson } from '../hooks/usePrettyJson';
@@ -137,7 +137,6 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
   const aiOutput = result?.data ? parseAIOutput(result.data) : undefined;
   const prettyInput = usePrettyJson(result?.input ?? '') || (result?.input ?? '');
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
-  console.log('shit error', result?.error);
 
   return (
     <div className="flex h-full flex-col gap-2">
@@ -173,7 +172,7 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
       </div>
 
       {expanded && (
-        <dl className="flex flex-wrap gap-4 px-4">
+        <div className="flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4 px-4">
           <ElementWrapper label="Queued at">
             <TimeElement date={new Date(trace.queuedAt)} />
           </ElementWrapper>
@@ -205,7 +204,7 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
           {stepKindInfo}
 
           {aiOutput && <AITrace aiOutput={aiOutput} />}
-        </dl>
+        </div>
       )}
 
       <Tabs

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Route } from 'next';
-import { RiArrowRightSLine, RiArrowRightUpLine, RiExternalLinkLine } from '@remixicon/react';
+import { RiArrowRightSLine, RiExternalLinkLine } from '@remixicon/react';
 
 import { AITrace } from '../AI/AITrace';
 import { parseAIOutput } from '../AI/utils';
@@ -12,7 +12,7 @@ import {
   SkeletonElement,
   TextElement,
   TimeElement,
-} from '../DetailsCard/Element';
+} from '../DetailsCard/NewElement';
 import { Link } from '../Link';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { AICell } from '../Table/Cell';
@@ -121,7 +121,7 @@ export const RunInfo = ({
       </div>
 
       {expanded && (
-        <dl className="flex flex-wrap gap-4">
+        <div className="flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4">
           <ElementWrapper label="Run ID">
             <IDElement>{runID}</IDElement>
           </ElementWrapper>
@@ -227,7 +227,7 @@ export const RunInfo = ({
             }}
           </OptimisticElementWrapper>
           {aiOutput && <AITrace aiOutput={aiOutput} />}
-        </dl>
+        </div>
       )}
     </div>
   );

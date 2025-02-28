@@ -84,30 +84,38 @@ export type StepInfoType = {
   pathCreator: PathCreator;
 };
 
-type Listener = (step: StepInfoType | undefined) => void;
+type Listener = {
+  callback: (step: StepInfoType | undefined) => void;
+  runID?: string;
+};
 
 const stepSelectionEmitter = {
   listeners: new Set<Listener>(),
 
-  subscribe(listener: Listener) {
+  subscribe(callback: (step: StepInfoType | undefined) => void, runID?: string) {
+    const listener = { callback, runID };
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   },
 
   emit(step: StepInfoType | undefined) {
-    this.listeners.forEach((listener) => listener(step));
+    this.listeners.forEach((listener) => {
+      if (!listener.runID || !step || listener.runID === step.runID) {
+        listener.callback(step);
+      }
+    });
   },
 };
 
-export const useStepSelection = () => {
+export const useStepSelection = (runID?: string) => {
   const [selectedStep, setSelectedStep] = useState<StepInfoType | undefined>(undefined);
 
   useEffect(() => {
-    const cleanup = stepSelectionEmitter.subscribe(setSelectedStep);
+    const cleanup = stepSelectionEmitter.subscribe(setSelectedStep, runID);
     return () => {
       cleanup();
     };
-  }, []);
+  }, [runID]);
 
   const selectStep = useCallback((step: StepInfoType | undefined) => {
     stepSelectionEmitter.emit(step);

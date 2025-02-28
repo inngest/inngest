@@ -48,6 +48,7 @@ interface CodeBlockProps {
   minLines?: number;
   allowFullScreen?: boolean;
   resize?: boolean;
+  alwaysFullHeight?: boolean;
 }
 
 export function CodeBlock({
@@ -57,6 +58,7 @@ export function CodeBlock({
   minLines = 0,
   allowFullScreen = false,
   resize = false,
+  alwaysFullHeight = false,
 }: CodeBlockProps) {
   const [dark, setDark] = useState(isDark());
   const [editorHeight, setEditorHeight] = useState(0);
@@ -200,7 +202,7 @@ export function CodeBlock({
         }
       }
 
-      if (totalLinesThatFit > MAX_LINES && !isFullHeight) {
+      if (totalLinesThatFit > MAX_LINES && !isFullHeight && !alwaysFullHeight) {
         editor.layout({ height: MAX_HEIGHT, width: containerWidthWithLineNumbers });
         setEditorHeight(MAX_HEIGHT);
       } else {
@@ -298,16 +300,18 @@ export function CodeBlock({
                     appearance="outlined"
                     kind="secondary"
                   />
-                  <Button
-                    onClick={handleFullHeight}
-                    size="small"
-                    icon={isFullHeight ? <IconShrinkText /> : <IconExpandText />}
-                    aria-label={isFullHeight ? 'Shrink text' : 'Expand text'}
-                    title={isFullHeight ? 'Shrink text' : 'Expand text'}
-                    tooltip={isFullHeight ? 'Shrink text' : 'Expand text'}
-                    appearance="outlined"
-                    kind="secondary"
-                  />
+                  {!alwaysFullHeight && (
+                    <Button
+                      onClick={handleFullHeight}
+                      size="small"
+                      icon={isFullHeight ? <IconShrinkText /> : <IconExpandText />}
+                      aria-label={isFullHeight ? 'Shrink text' : 'Expand text'}
+                      title={isFullHeight ? 'Shrink text' : 'Expand text'}
+                      tooltip={isFullHeight ? 'Shrink text' : 'Expand text'}
+                      appearance="outlined"
+                      kind="secondary"
+                    />
+                  )}
                   {allowFullScreen && (
                     <Button
                       onClick={() => setFullScreen(!fullScreen)}
@@ -324,7 +328,10 @@ export function CodeBlock({
               )}
             </div>
           </div>
-          <div ref={wrapperRef} className={cn('relative', fullScreen && 'h-screen')}>
+          <div
+            ref={wrapperRef}
+            className={cn('relative', (alwaysFullHeight || fullScreen) && 'h-screen')}
+          >
             {isOutputTooLarge ? (
               <>
                 <Alert severity="warning">Output size is too large to render {`( > 1MB )`}</Alert>
@@ -340,8 +347,8 @@ export function CodeBlock({
               </>
             ) : (
               <Editor
-                className={cn('absolute', fullScreen && 'h-full')}
-                height={fullScreen ? '100%' : editorHeight}
+                className={cn('relative', (alwaysFullHeight || fullScreen) && 'h-full')}
+                height={alwaysFullHeight || fullScreen ? '100%' : editorHeight}
                 defaultLanguage={language}
                 value={content}
                 theme="inngest-theme"
