@@ -188,7 +188,7 @@ func (a *api) PostPublish(w http.ResponseWriter, r *http.Request) {
 
 	msg, err := a.getStreamMessage(r)
 	if err != nil {
-		// TODO: HTTP error
+		http.Error(w, err.Error(), 400)
 		return
 	}
 
@@ -198,7 +198,8 @@ func (a *api) PostPublish(w http.ResponseWriter, r *http.Request) {
 	byt, err := io.ReadAll(io.LimitReader(r.Body, consts.MaxStreamingMessageSizeBytes))
 	_ = r.Body.Close()
 	if err != nil {
-		// TODO: Handle error
+		http.Error(w, err.Error(), 400)
+		return
 	}
 
 	// Is byt valid JSON?  If so, we don't want to double-encode it.
@@ -207,12 +208,14 @@ func (a *api) PostPublish(w http.ResponseWriter, r *http.Request) {
 	} else {
 		msg.Data, err = json.Marshal(string(byt))
 		if err != nil {
-			// TODO: handle err
+			http.Error(w, err.Error(), 500)
+			return
 		}
 	}
 
 	if err := msg.Validate(); err != nil {
-		// TODO: Handle error
+		http.Error(w, err.Error(), 400)
+		return
 	}
 
 	a.opts.Broadcaster.Publish(r.Context(), msg)
@@ -225,7 +228,7 @@ func (a *api) publishStream(w http.ResponseWriter, r *http.Request) {
 
 	msg, err := a.getStreamMessage(r)
 	if err != nil {
-		// TODO: HTTP error
+		http.Error(w, err.Error(), 400)
 		return
 	}
 
@@ -236,7 +239,8 @@ func (a *api) publishStream(w http.ResponseWriter, r *http.Request) {
 	msg.Data = []byte(sID)
 
 	if err := msg.Validate(); err != nil {
-		// TODO: Handle error
+		http.Error(w, err.Error(), 400)
+		return
 	}
 
 	// Publish the stream start message
@@ -287,5 +291,5 @@ func (a *api) getStreamMessage(r *http.Request) (Message, error) {
 		EnvID:      auth.WorkspaceID(),
 		CreatedAt:  time.Now(),
 	}
-	return msg, msg.Validate()
+	return msg, nil
 }

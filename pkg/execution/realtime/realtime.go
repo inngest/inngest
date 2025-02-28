@@ -1,6 +1,7 @@
 package realtime
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -268,8 +269,13 @@ type Message struct {
 func (m Message) Validate() error {
 	// Ensure that the Data is present for streams.
 	if m.Kind == MessageKindDataStreamStart || m.Kind == MessageKindDataStreamEnd {
-		// and assert that the stream ID exists and contains
-		// no "$" or ":" chars.
+		// and assert that the stream ID exists and contains no colon
+		if len(m.Data) == 0 {
+			return fmt.Errorf("datastream kinds must have a stream id set")
+		}
+		if bytes.Contains(m.Data, []byte(":")) {
+			return fmt.Errorf("datstream stream id must not contain colons (:)")
+		}
 	}
 	return nil
 }

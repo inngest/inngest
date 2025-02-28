@@ -59,18 +59,7 @@ func (b *redisBroadcaster) Publish(ctx context.Context, m Message) {
 
 	for _, t := range m.Topics() {
 		go func(t Topic) {
-			cmd := b.pubc.B().Publish().Channel(t.String()).Message(string(content)).Build()
-			for i := 0; i < redisPublishAttempts; i++ {
-				err := b.pubc.Do(ctx, cmd).Error()
-				if err == nil {
-					break
-				}
-				logger.StdlibLogger(ctx).Error(
-					"error publishing to realtime redis pubsub",
-					"error", err,
-				)
-				<-time.After(redisRetryInterval)
-			}
+			b.publish(ctx, t.String(), string(content))
 		}(t)
 	}
 }
@@ -78,22 +67,35 @@ func (b *redisBroadcaster) Publish(ctx context.Context, m Message) {
 func (b *redisBroadcaster) PublishStream(ctx context.Context, m Message, data string) {
 	for _, t := range m.Topics() {
 		go func(t Topic) {
-			cmd := b.pubc.B().Publish().Channel(t.String()).Message(
-				string(m.Data) + ":" + data,
-			).Build()
-			for i := 0; i < redisPublishAttempts; i++ {
-				err := b.pubc.Do(ctx, cmd).Error()
-				if err == nil {
-					break
-				}
-				logger.StdlibLogger(ctx).Error(
-					"error publishing to realtime redis pubsub",
-					"error", err,
-				)
-				<-time.After(redisRetryInterval)
-			}
+			b.publish(ctx, t.String(), string(m.Data)+":"+data)
 		}(t)
 	}
+}
+
+func (b *redisBroadcaster) publish(ctx context.Context, channel, message string) {
+	cmd := b.pubc.B().Publish().Channel(channel).Message(message).Build()
+	for i := 0; i < redisPublishAttempts; i++ {
+		if i > 0 {
+			<-time.After(redisRetryInterval)
+		}
+		if ctx.Err() != nil {
+			return
+		}
+		err := b.pubc.Do(ctx, cmd).Error()
+		if err == nil {
+			return
+		}
+		logger.StdlibLogger(ctx).Warn(
+			"error publishing to realtime redis pubsub",
+			"channel", channel,
+			"error", err,
+			"attempt", i,
+		)
+	}
+	logger.StdlibLogger(ctx).Warn(
+		"failed to publish via realtime redis pubsub",
+		"channel", channel,
+	)
 }
 
 // Subscribe is called with an active Websocket connection to subscribe the conn to multiple topics.
