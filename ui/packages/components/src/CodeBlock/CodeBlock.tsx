@@ -95,10 +95,10 @@ export function CodeBlock({
   }, [monaco, dark]);
 
   useEffect(() => {
-    if (editorRef.current) {
+    if (editorRef.current && !alwaysFullHeight) {
       updateEditorLayout(editorRef.current);
     }
-  }, [isWordWrap, isFullHeight, fullScreen, resize]);
+  }, [isWordWrap, isFullHeight, fullScreen, resize, alwaysFullHeight]);
 
   function getTextWidth(text: string, font: string) {
     const canvas = document.createElement('canvas');
@@ -389,12 +389,12 @@ export function CodeBlock({
                 }}
                 onMount={(editor) => {
                   handleEditorDidMount(editor);
-                  updateEditorLayout(editor);
+                  !alwaysFullHeight && updateEditorLayout(editor);
                 }}
                 onChange={(value) => {
                   if (value !== undefined) {
                     handleChange && handleChange(value);
-                    updateEditorLayout(editorRef.current);
+                    !alwaysFullHeight && updateEditorLayout(editorRef.current);
                   }
                 }}
               />
