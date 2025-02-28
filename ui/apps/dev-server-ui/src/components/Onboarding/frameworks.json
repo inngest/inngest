@@ -2,8 +2,8 @@
   {
     "framework": "Astro",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://astro.build/assets/press/astro-icon-light.svg",
+      "light": "https://astro.build/assets/press/astro-icon-light.svg"
     },
     "version_supported": "v3.8.0+",
     "link": {

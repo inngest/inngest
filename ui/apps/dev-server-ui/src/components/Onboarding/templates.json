@@ -1,0 +1,13 @@
+[
+  {
+    "framework": "Astro",
+    "logo": {
+      "dark": "https://astro.build/assets/press/astro-icon-light.svg",
+      "light": "https://astro.build/assets/press/astro-icon-light.svg"
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-astro"
+    },
+    "language": "TypeScript"
+  }
+]
