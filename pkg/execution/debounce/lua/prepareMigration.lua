@@ -5,6 +5,7 @@ debounce currently exists.
 
 Return values:
 - [0] - No existing debounce
+- [1, debounceID (string)] if debounceItem.t is not set
 - [1, debounceID (string), debounce timeout (unix millis)]
 ]]--
 
@@ -30,6 +31,11 @@ local debounceItem = cjson.decode(existingDebounceItemStr)
 
 -- Prevent this debounce from running on the default cluster (we're moving it to the new system queue)
 redis.call("SET", keyPtr, newDebounceID)
+
+-- If timeout is not provided, only return debounce ID
+if debounceItem.t == nil or debounceItem.t <= 0 then
+	return { 1, existingDebounceID }
+end
 
 -- Return debounce ID and current timeout (carried over from first event)
 return { 1, existingDebounceID, debounceItem.t }
