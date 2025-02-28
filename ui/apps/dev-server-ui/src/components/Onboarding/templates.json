@@ -9,5 +9,148 @@
       "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-astro"
     },
     "language": "TypeScript"
+  },
+  {
+    "framework": "Bun",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/bun"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Express",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-express"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Fastify",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-fastify"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Google Functions Framework",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-google-functions-framework"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Hono",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-hono"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Koa",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-koa"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "NestJS",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-nestjs"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Next.js (App Router)",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-nextjs-app-router"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Next.js (Pages Router)",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-nextjs-pages-router"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Nitro",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-nitro"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Nuxt",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-nuxt"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Remix",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-remix"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "SvelteKit",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-sveltekit"
+    },
+    "language": "TypeScript"
   }
 ]
