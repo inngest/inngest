@@ -22,6 +22,28 @@
     "language": "TypeScript"
   },
   {
+    "framework": "DigitalOcean",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-py/tree/main/examples/digital_ocean"
+    },
+    "language": "Python"
+  },
+  {
+    "framework": "Django",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-py/tree/main/examples/django"
+    },
+    "language": "Python"
+  },
+  {
     "framework": "Express",
     "logo": {
       "dark": "",
@@ -33,6 +55,17 @@
     "language": "TypeScript"
   },
   {
+    "framework": "FastAPI",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-py/tree/main/examples/fast_api"
+    },
+    "language": "Python"
+  },
+  {
     "framework": "Fastify",
     "logo": {
       "dark": "",
@@ -42,6 +75,17 @@
       "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-fastify"
     },
     "language": "TypeScript"
+  },
+  {
+    "framework": "Flask",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-py/tree/main/examples/flask"
+    },
+    "language": "Python"
   },
   {
     "framework": "Google Functions Framework",
@@ -152,5 +196,16 @@
       "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-sveltekit"
     },
     "language": "TypeScript"
+  },
+  {
+    "framework": "Tornado",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-py/tree/main/examples/tornado"
+    },
+    "language": "Python"
   }
 ]
