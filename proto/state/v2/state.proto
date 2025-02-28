@@ -94,7 +94,9 @@ message SaveStepRequest {
   bytes  data    = 3;
 }
 
-message SaveStepResponse{}
+message SaveStepResponse{
+  bool has_pending_steps = 1;
+}
 
 message ExistsRequest {
   ID id = 1;
