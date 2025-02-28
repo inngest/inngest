@@ -869,7 +869,7 @@ func toCQRSRun(run sqlc.FunctionRun, finish sqlc.FunctionFinish) *cqrs.FunctionR
 	}
 	if finish.Status.Valid {
 		copied.Status, _ = enums.RunStatusString(finish.Status.String)
-		copied.Output = json.RawMessage(finish.Output.String)
+		copied.Output = util.EnsureJSON(json.RawMessage(finish.Output.String))
 		copied.EndedAt = &finish.CreatedAt.Time
 	}
 	return &copied
