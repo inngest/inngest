@@ -45,6 +45,9 @@ func TestDebounce(t *testing.T) {
 		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.QueueShard, error) {
 			return defaultQueueShard, nil
 		}),
+		redis_state.WithKindToQueueMapping(map[string]string{
+			queue.KindDebounce: queue.KindDebounce,
+		}),
 	)
 
 	fakeClock := clockwork.NewFakeClock()
@@ -133,7 +136,7 @@ func TestDebounce(t *testing.T) {
 
 			require.Equal(t, expectedPayload, payload)
 
-			itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, functionId.String(), ""), qi.ID)
+			itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
 			require.NoError(t, err)
 			expectedQueueScore := eventTime.
 				Add(10 * time.Second). // Debounce period
@@ -217,7 +220,7 @@ func TestDebounce(t *testing.T) {
 
 			require.Equal(t, expectedPayload, payload)
 
-			itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, functionId.String(), ""), qi.ID)
+			itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
 			require.NoError(t, err)
 
 			initialScore := evt0Time.
@@ -309,6 +312,9 @@ func TestDebounceWithMigration(t *testing.T) {
 		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.QueueShard, error) {
 			return defaultQueueShard, nil
 		}),
+		redis_state.WithKindToQueueMapping(map[string]string{
+			queue.KindDebounce: queue.KindDebounce,
+		}),
 	)
 
 	newQueue := redis_state.NewQueue(
@@ -326,6 +332,9 @@ func TestDebounceWithMigration(t *testing.T) {
 			}
 
 			return defaultQueueShard, nil
+		}),
+		redis_state.WithKindToQueueMapping(map[string]string{
+			queue.KindDebounce: queue.KindDebounce,
 		}),
 	)
 
@@ -429,7 +438,7 @@ func TestDebounceWithMigration(t *testing.T) {
 
 			require.Equal(t, expectedPayload, payload)
 
-			itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, functionId.String(), ""), qi.ID)
+			itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
 			require.NoError(t, err)
 			expectedQueueScore := eventTime.
 				Add(10 * time.Second). // Debounce period
@@ -513,7 +522,7 @@ func TestDebounceWithMigration(t *testing.T) {
 
 			require.Equal(t, expectedPayload, payload)
 
-			itemScore, err := newSystemCluster.ZScore(newSystemShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, functionId.String(), ""), qi.ID)
+			itemScore, err := newSystemCluster.ZScore(newSystemShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
 			require.NoError(t, err)
 
 			initialScore := evt0Time.
