@@ -6,6 +6,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"github.com/jonboulle/clockwork"
 	"io/fs"
 	"regexp"
 	"strconv"
@@ -130,6 +131,7 @@ type Debouncer interface {
 
 func NewRedisDebouncer(d *redis_state.DebounceClient, defaultQueueShard redis_state.QueueShard, q redis_state.QueueManager) Debouncer {
 	return debouncer{
+		c:                 clockwork.NewRealClock(),
 		d:                 d,
 		q:                 q,
 		defaultQueueShard: defaultQueueShard,
@@ -137,6 +139,7 @@ func NewRedisDebouncer(d *redis_state.DebounceClient, defaultQueueShard redis_st
 }
 
 type debouncer struct {
+	c                 clockwork.Clock
 	d                 *redis_state.DebounceClient
 	q                 redis_state.QueueManager
 	defaultQueueShard redis_state.QueueShard
@@ -273,7 +276,7 @@ func (d debouncer) queueItem(ctx context.Context, di DebounceItem, debounceID ul
 }
 
 func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.Function, ttl time.Duration) (*ulid.ULID, error) {
-	now := time.Now()
+	now := d.c.Now()
 	debounceID := ulid.MustNew(ulid.Now(), rand.Reader)
 
 	key, err := d.debounceKey(ctx, di, fn)
@@ -283,7 +286,7 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 
 	// Ensure we set the debounce's max lifetime.
 	if timeout := fn.Debounce.TimeoutDuration(); timeout != nil {
-		di.Timeout = time.Now().Add(*timeout).UnixMilli()
+		di.Timeout = now.Add(*timeout).UnixMilli()
 	}
 
 	keyPtr := d.d.KeyGenerator().DebouncePointer(ctx, fn.ID, key)
@@ -328,7 +331,7 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 // updateDebounce updates the currently pending debounce to point to the new event ID.  It pushes
 // out the debounce's TTL, and re-enqueues the job to initialize fns from the debounce.
 func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn inngest.Function, ttl time.Duration, debounceID ulid.ULID) error {
-	now := time.Now()
+	now := d.c.Now()
 
 	key, err := d.debounceKey(ctx, di, fn)
 	if err != nil {
@@ -361,7 +364,7 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 			string(byt),
 			strconv.Itoa(int(ttl.Seconds())),
 			queue.HashID(ctx, debounceID.String()),
-			strconv.Itoa(int(time.Now().UnixMilli())),
+			strconv.Itoa(int(now.UnixMilli())),
 			strconv.Itoa(int(di.Event.Timestamp)),
 		},
 	).AsInt64()
