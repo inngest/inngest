@@ -104,34 +104,37 @@ func TestDebounce(t *testing.T) {
 		require.NotEmpty(t, debounceIds[0])
 		require.Equal(t, expectedDi, di)
 
-		queueItemIds, err := unshardedCluster.HKeys(defaultQueueShard.RedisClient.KeyGenerator().QueueItem())
-		require.NoError(t, err)
-		require.Len(t, queueItemIds, 1)
+		// Queue state should match
+		{
+			queueItemIds, err := unshardedCluster.HKeys(defaultQueueShard.RedisClient.KeyGenerator().QueueItem())
+			require.NoError(t, err)
+			require.Len(t, queueItemIds, 1)
 
-		var qi queue.QueueItem
-		err = json.Unmarshal([]byte(unshardedCluster.HGet(defaultQueueShard.RedisClient.KeyGenerator().QueueItem(), queueItemIds[0])), &qi)
-		require.NoError(t, err)
+			var qi queue.QueueItem
+			err = json.Unmarshal([]byte(unshardedCluster.HGet(defaultQueueShard.RedisClient.KeyGenerator().QueueItem(), queueItemIds[0])), &qi)
+			require.NoError(t, err)
 
-		require.Equal(t, queue.KindDebounce, qi.Data.Kind)
+			require.Equal(t, queue.KindDebounce, qi.Data.Kind)
 
-		expectedPayload := di.QueuePayload()
-		expectedPayload.DebounceID = debounceId
+			expectedPayload := di.QueuePayload()
+			expectedPayload.DebounceID = debounceId
 
-		rawPayload := qi.Data.Payload.(json.RawMessage)
+			rawPayload := qi.Data.Payload.(json.RawMessage)
 
-		var payload DebouncePayload
-		err = json.Unmarshal(rawPayload, &payload)
-		require.NoError(t, err)
+			var payload DebouncePayload
+			err = json.Unmarshal(rawPayload, &payload)
+			require.NoError(t, err)
 
-		require.Equal(t, expectedPayload, payload)
+			require.Equal(t, expectedPayload, payload)
 
-		itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, functionId.String(), ""), qi.ID)
-		require.NoError(t, err)
-		expectedQueueScore := eventTime.
-			Add(10 * time.Second).       // Debounce period
-			Add(50 * time.Millisecond).  // Buffer
-			Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
-		require.Equal(t, expectedQueueScore, int64(itemScore))
+			itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, functionId.String(), ""), qi.ID)
+			require.NoError(t, err)
+			expectedQueueScore := eventTime.
+				Add(10 * time.Second). // Debounce period
+				Add(50 * time.Millisecond). // Buffer
+				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
+			require.Equal(t, expectedQueueScore, int64(itemScore))
+		}
 	})
 
 	t.Run("update debounce should work", func(t *testing.T) {
@@ -176,12 +179,53 @@ func TestDebounce(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, debounceIds, 1)
 
+		debounceId := ulid.MustParse(debounceIds[0])
+
 		var di DebounceItem
 		err = json.Unmarshal([]byte(unshardedCluster.HGet(debounceClient.KeyGenerator().Debounce(ctx), debounceIds[0])), &di)
 		require.NoError(t, err)
 
 		require.NotEmpty(t, debounceIds[0])
 		require.Equal(t, expectedDi, di)
+
+		// Queue state should match
+		{
+			queueItemIds, err := unshardedCluster.HKeys(defaultQueueShard.RedisClient.KeyGenerator().QueueItem())
+			require.NoError(t, err)
+			require.Len(t, queueItemIds, 1)
+
+			var qi queue.QueueItem
+			err = json.Unmarshal([]byte(unshardedCluster.HGet(defaultQueueShard.RedisClient.KeyGenerator().QueueItem(), queueItemIds[0])), &qi)
+			require.NoError(t, err)
+
+			require.Equal(t, queue.KindDebounce, qi.Data.Kind)
+
+			expectedPayload := di.QueuePayload()
+			expectedPayload.DebounceID = debounceId
+
+			rawPayload := qi.Data.Payload.(json.RawMessage)
+
+			var payload DebouncePayload
+			err = json.Unmarshal(rawPayload, &payload)
+			require.NoError(t, err)
+
+			require.Equal(t, expectedPayload, payload)
+
+			itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, functionId.String(), ""), qi.ID)
+			require.NoError(t, err)
+
+			initialScore := evt0Time.
+				Add(10 * time.Second). // Debounce period
+				Add(50 * time.Millisecond). // Buffer
+				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
+			expectedRequeueScore := eventTime.
+				Add(10 * time.Second). // Debounce period
+				Add(50 * time.Millisecond). // Buffer
+				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
+
+			require.NotEqual(t, initialScore, expectedRequeueScore)
+			require.Equal(t, expectedRequeueScore, int64(itemScore))
+		}
 	})
 
 	t.Run("start debounce should work", func(t *testing.T) {
