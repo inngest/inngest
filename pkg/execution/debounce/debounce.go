@@ -378,6 +378,9 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 				return nil
 			}
 
+			// Note: We do not Dequeue the debounce timeout job, as it gracefully handles missing debounces.
+			// For more details, see handleDebounce() in executor/service.go#349.
+
 			l.Debug("deleted migrated debounce")
 		}
 
@@ -445,21 +448,27 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 		return nil, err
 	}
 
-	// Ensure we set the debounce's max lifetime.
+	// Set initial timeout value on the debounce item if configured for the function and not already set by the migration flow
 	if di.Timeout == 0 {
+		// Ensure we set the debounce's max lifetime.
 		if timeout := fn.Debounce.TimeoutDuration(); timeout != nil {
 			di.Timeout = now.Add(*timeout).UnixMilli()
 		}
 	}
 
-	// In case the timeout is shorter than the debounce period, adjust the ttl
-	// This is required for carrying over timeouts during a migration.
-	// Example: Existing debounce with a timeout in 5s exists in the old cluster. We send another event,
-	// which migrates the debounce over, keeping the timeout intact. If we have a debounce period of 10s,
-	// we still want to run the debounce timeout job after 5s.
-	untilTimeout := time.UnixMilli(di.Timeout).Sub(now) // how much time until timeout
-	if ttl > untilTimeout {
-		ttl = untilTimeout
+	if di.Timeout != 0 {
+		// In case the timeout is shorter than the debounce period, adjust the ttl
+		// This is required for carrying over timeouts during a migration.
+		// Example: Existing debounce with a timeout in 5s exists in the old cluster. We send another event,
+		// which migrates the debounce over, keeping the timeout intact. If we have a debounce period of 10s,
+		// we still want to run the debounce timeout job after 5s.
+		untilTimeout := time.UnixMilli(di.Timeout).Sub(now) // how much time until timeout
+		if ttl > untilTimeout {
+			ttl = untilTimeout.Round(time.Second)
+		}
+		if ttl <= 0 {
+			ttl = 1 * time.Second
+		}
 	}
 
 	client := d.client(shouldMigrate)
@@ -549,8 +558,8 @@ func (d debouncer) prepareMigration(ctx context.Context, di DebounceItem, fn inn
 		return nil, 0, nil
 	}
 
-	if status != 1 || len(returnedSet) != 3 {
-		return nil, 0, fmt.Errorf("expected status 1 with three return items")
+	if status != 1 || len(returnedSet) < 2 {
+		return nil, 0, fmt.Errorf("expected status 1 with at least two return items")
 	}
 
 	debounceIdStr, ok := returnedSet[1].(string)
@@ -564,9 +573,13 @@ func (d debouncer) prepareMigration(ctx context.Context, di DebounceItem, fn inn
 		return nil, 0, fmt.Errorf("unknown new debounce return value: %s", debounceIdStr)
 	}
 
-	timeoutUnixMillis, ok := returnedSet[2].(int64)
-	if !ok {
-		return nil, 0, fmt.Errorf("expected timeout int")
+	var timeoutUnixMillis int64
+
+	if len(returnedSet) == 3 {
+		timeoutUnixMillis, ok = returnedSet[2].(int64)
+		if !ok {
+			return nil, 0, fmt.Errorf("expected timeout int")
+		}
 	}
 
 	return &existingID, timeoutUnixMillis, nil
