@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/util"
@@ -94,12 +95,43 @@ func TestDebounce(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, debounceIds, 1)
 
+		debounceId := ulid.MustParse(debounceIds[0])
+
 		var di DebounceItem
 		err = json.Unmarshal([]byte(unshardedCluster.HGet(debounceClient.KeyGenerator().Debounce(ctx), debounceIds[0])), &di)
 		require.NoError(t, err)
 
 		require.NotEmpty(t, debounceIds[0])
 		require.Equal(t, expectedDi, di)
+
+		queueItemIds, err := unshardedCluster.HKeys(defaultQueueShard.RedisClient.KeyGenerator().QueueItem())
+		require.NoError(t, err)
+		require.Len(t, queueItemIds, 1)
+
+		var qi queue.QueueItem
+		err = json.Unmarshal([]byte(unshardedCluster.HGet(defaultQueueShard.RedisClient.KeyGenerator().QueueItem(), queueItemIds[0])), &qi)
+		require.NoError(t, err)
+
+		require.Equal(t, queue.KindDebounce, qi.Data.Kind)
+
+		expectedPayload := di.QueuePayload()
+		expectedPayload.DebounceID = debounceId
+
+		rawPayload := qi.Data.Payload.(json.RawMessage)
+
+		var payload DebouncePayload
+		err = json.Unmarshal(rawPayload, &payload)
+		require.NoError(t, err)
+
+		require.Equal(t, expectedPayload, payload)
+
+		itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, functionId.String(), ""), qi.ID)
+		require.NoError(t, err)
+		expectedQueueScore := eventTime.
+			Add(10 * time.Second).       // Debounce period
+			Add(50 * time.Millisecond).  // Buffer
+			Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
+		require.Equal(t, expectedQueueScore, int64(itemScore))
 	})
 
 	t.Run("update debounce should work", func(t *testing.T) {
