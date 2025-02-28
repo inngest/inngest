@@ -98,6 +98,13 @@ message SaveStepResponse{
   bool has_pending_steps = 1;
 }
 
+message SavePendingRequest {
+  ID id = 1;
+  repeated string pending = 2;
+}
+
+message SavePendingResponse {}
+
 message ExistsRequest {
   ID id = 1;
 }
@@ -139,6 +146,7 @@ service RunService {
   rpc Exists(ExistsRequest) returns (ExistsResponse) {}
   rpc UpdateMetadata(UpdateMetadataRequest) returns (UpdateMetadataResponse) {}
   rpc SaveStep(SaveStepRequest) returns (SaveStepResponse) {}
+  rpc SavePending(SavePendingRequest) returns (SavePendingResponse) {}
 
   rpc LoadMetadata(LoadMetadataRequest) returns (LoadMetadataResponse) {}
   rpc LoadEvents(LoadEventsRequest) returns (LoadEventsResponse) {}
