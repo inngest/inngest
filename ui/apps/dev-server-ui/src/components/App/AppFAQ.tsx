@@ -40,7 +40,7 @@ export default function AppFAQ({ openByDefault = false }) {
               description="Choose from our pre-built templates for a faster start."
             />
             <HelperCard
-              href=""
+              href="https://github.com/inngest/inngest-demo"
               icon={
                 <div className="bg-quaternary-cool3xSubtle w-fit rounded-sm p-[10px]">
                   <RiPlayFill className="h-5 w-5" />
