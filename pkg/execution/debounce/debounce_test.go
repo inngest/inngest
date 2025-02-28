@@ -344,13 +344,14 @@ func TestDebounceWithMigration(t *testing.T) {
 	oldRedisDebouncer.c = fakeClock
 
 	newRedisDebouncer := NewRedisDebouncerWithMigration(DebouncerOpts{
-		DefaultDebounceClient: unshardedDebounceClient,
-		DefaultQueue:          oldQueue,
-		DefaultQueueShard:     defaultQueueShard,
+		PrimaryDebounceClient: newSystemDebounceClient,
+		PrimaryQueue:          newQueue,
+		PrimaryQueueShard:     newSystemShard,
 
-		SystemDebounceClient: newSystemDebounceClient,
-		SystemQueue:          newQueue,
-		SystemQueueShard:     newSystemShard,
+		SecondaryDebounceClient: unshardedDebounceClient,
+		SecondaryQueue:          oldQueue,
+		SecondaryQueueShard:     defaultQueueShard,
+
 		ShouldMigrate: func(ctx context.Context) bool {
 			return true
 		},
