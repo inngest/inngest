@@ -39,7 +39,7 @@ func TestWebsocketMessage(t *testing.T) {
 		send := Message{
 			Kind:       MessageKindRun,
 			Data:       json.RawMessage(`"foo"`),
-			CreatedAt:  time.Now().Truncate(time.Millisecond),
+			CreatedAt:  time.Now().Truncate(time.Millisecond).UTC(),
 			Channel:    "user:123",
 			TopicNames: []string{"ai"},
 			EnvID:      consts.DevServerEnvID,
