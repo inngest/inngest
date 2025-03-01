@@ -24,7 +24,7 @@ export const Timeline = ({ getResult, pathCreator, runID, trace }: Props) => {
   const maxTime = toMaybeDate(trace.endedAt) ?? new Date();
 
   return (
-    <div className={`w-full pb-4 pr-4`}>
+    <div className={`w-full pb-4 pr-8`}>
       <Trace
         depth={0}
         getResult={getResult}
