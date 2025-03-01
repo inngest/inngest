@@ -2,7 +2,7 @@
   description = "Inngest Dev Server";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
+    nixpkgs.url = "github:nixos/nixpkgs?ref=master";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -12,7 +12,7 @@
         pkgs = import nixpkgs { inherit system; };
         corepack = pkgs.stdenv.mkDerivation {
           name = "corepack";
-          buildInputs = [ pkgs.nodejs_20 ];
+          buildInputs = [ pkgs.nodejs_22 ];
           phases = [ "installPhase" ];
           installPhase = ''
             mkdir -p $out/bin
