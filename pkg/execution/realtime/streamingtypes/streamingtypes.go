@@ -270,7 +270,7 @@ type Chunk struct {
 	// StreamID is the stream ID for the chunk
 	StreamID string `json:"stream_id"`
 	// Data is the data in the chunk
-	Data string `data:"data"`
+	Data string `json:"data"`
 
 	//
 	// Optional fields, set by the executor.
