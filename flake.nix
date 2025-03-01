@@ -40,7 +40,7 @@
 
             # Node
             typescript
-            nodejs_20
+            nodejs_22
 
             # LSPs
             gopls
