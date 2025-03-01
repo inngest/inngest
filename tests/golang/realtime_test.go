@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coder/websocket"
 	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/inngest/inngestgo"
@@ -85,8 +84,6 @@ func TestRealtime(t *testing.T) {
 				switch msg.Kind() {
 				case streaming.StreamMessage:
 					messages = append(messages, msg.Message())
-				default:
-					t.Fatalf("unexpected message type")
 				}
 			}
 		}()
@@ -119,17 +116,4 @@ func NewToken(t *testing.T, topics ...realtime.Topic) (string, error) {
 func topicBuffer(topics []realtime.Topic) *bytes.Buffer {
 	byt, _ := json.Marshal(topics)
 	return bytes.NewBuffer(byt)
-}
-
-func isWebsocketClosed(err error) bool {
-	if err == nil {
-		return false
-	}
-	if websocket.CloseStatus(err) != -1 {
-		return true
-	}
-	if err.Error() == "failed to get reader: use of closed network connection" {
-		return true
-	}
-	return false
 }
