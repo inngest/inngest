@@ -357,6 +357,7 @@ export type ConnectV1WorkerConnection = {
   __typename?: 'ConnectV1WorkerConnection';
   app: Maybe<App>;
   appID: Maybe<Scalars['UUID']>;
+  appName: Maybe<Scalars['String']>;
   appVersion: Maybe<Scalars['String']>;
   buildId: Maybe<Scalars['String']>;
   connectedAt: Scalars['Time'];
@@ -565,6 +566,11 @@ export type EntitlementConcurrency = {
   usage: Scalars['Int'];
 };
 
+export type EntitlementConnectAppsPerConnection = {
+  __typename?: 'EntitlementConnectAppsPerConnection';
+  limit: Maybe<Scalars['Int']>;
+};
+
 export type EntitlementConnectWorkerConnections = {
   __typename?: 'EntitlementConnectWorkerConnections';
   limit: Maybe<Scalars['Int']>;
@@ -621,6 +627,7 @@ export type Entitlements = {
   accountID: Maybe<Scalars['UUID']>;
   concurrency: EntitlementConcurrency;
   connect: EntitlementBool;
+  connectAppsPerConnection: EntitlementConnectAppsPerConnection;
   connectWorkerConnections: EntitlementConnectWorkerConnections;
   eventBatchCount: EntitlementInt;
   eventBatchTimeout: EntitlementInt;

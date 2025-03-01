@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Route } from 'next';
-import { RiArrowRightUpLine, RiArrowUpSLine } from '@remixicon/react';
+import { RiArrowRightSLine, RiExternalLinkLine } from '@remixicon/react';
 
 import { AITrace } from '../AI/AITrace';
 import { parseAIOutput } from '../AI/utils';
@@ -12,7 +12,7 @@ import {
   SkeletonElement,
   TextElement,
   TimeElement,
-} from '../DetailsCard/Element';
+} from '../DetailsCard/NewElement';
 import { Link } from '../Link';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { AICell } from '../Table/Cell';
@@ -86,8 +86,10 @@ export const RunInfo = ({
             className="flex  cursor-pointer items-center gap-2"
             onClick={() => setExpanded(!expanded)}
           >
-            <RiArrowUpSLine
-              className={`transition-transform duration-500 ${expanded ? 'rotate-180' : ''}`}
+            <RiArrowRightSLine
+              className={`shrink-0 transition-transform duration-500 ${
+                expanded ? 'rotate-90' : ''
+              }`}
             />
             {isLazyDone(run) ? (
               <span className="text-basis text-sm font-normal">{run.fn.name}</span>
@@ -99,7 +101,7 @@ export const RunInfo = ({
             <Link
               size="medium"
               href={pathCreator.runPopout({ runID })}
-              iconAfter={<RiArrowRightUpLine className="h-4 w-4 shrink-0" />}
+              iconAfter={<RiExternalLinkLine className="h-4 w-4 shrink-0" />}
             />
           )}
         </div>
@@ -119,7 +121,7 @@ export const RunInfo = ({
       </div>
 
       {expanded && (
-        <dl className="flex flex-wrap gap-4">
+        <div className="flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4">
           <ElementWrapper label="Run ID">
             <IDElement>{runID}</IDElement>
           </ElementWrapper>
@@ -225,7 +227,7 @@ export const RunInfo = ({
             }}
           </OptimisticElementWrapper>
           {aiOutput && <AITrace aiOutput={aiOutput} />}
-        </dl>
+        </div>
       )}
     </div>
   );

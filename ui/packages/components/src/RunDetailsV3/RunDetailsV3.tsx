@@ -8,6 +8,7 @@ import type { Run as InitialRunData } from '../RunsPage/types';
 import { StatusCell } from '../Table/Cell';
 import { Trace as OldTrace } from '../TimelineV2';
 import { TriggerDetails } from '../TriggerDetails';
+import { DragDivider } from '../icons/DragDivider';
 import type { Result } from '../types/functionRun';
 import { nullishToLazy } from '../utils/lazyLoad';
 import { LegacyRunsToggle } from './LegacyRunsToggle';
@@ -49,11 +50,12 @@ type Run = {
 
 export const RunDetailsV3 = (props: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const leftColumnRef = useRef<HTMLDivElement>(null);
   const { getResult, getRun, getTrigger, pathCreator, rerun, runID, standalone } = props;
   const [pollInterval, setPollInterval] = useState(props.pollInterval);
   const [leftWidth, setLeftWidth] = useState(55);
   const [isDragging, setIsDragging] = useState(false);
-  const { selectedStep } = useStepSelection();
+  const { selectedStep } = useStepSelection(runID);
 
   const handleMouseDown = useCallback(() => {
     setIsDragging(true);
@@ -146,8 +148,8 @@ export const RunDetailsV3 = (props: Props) => {
           <LegacyRunsToggle traceAIEnabled={true} />
         </div>
       )}
-      <div ref={containerRef} className="flex h-full flex-row">
-        <div className="flex flex-col gap-2" style={{ width: `${leftWidth}%` }}>
+      <div ref={containerRef} className="flex h-auto max-h-screen flex-row">
+        <div ref={leftColumnRef} className="flex flex-col gap-2" style={{ width: `${leftWidth}%` }}>
           <div className="px-4">
             <RunInfo
               cancelRun={cancelRun}
@@ -185,13 +187,16 @@ export const RunDetailsV3 = (props: Props) => {
           />
         </div>
 
-        <div
-          className="border-muted w-2 cursor-col-resize border-r-[.5px]"
-          onMouseDown={handleMouseDown}
-        />
+        <div className="relative cursor-col-resize" onMouseDown={handleMouseDown}>
+          <div className="bg-canvasMuted absolute inset-0 z-[1] h-full w-px" />
+          <DragDivider className="bg-canvasBase absolute top-80 z-[1] -translate-x-1/2" />
+        </div>
 
-        <div className="border-muted flex h-full flex-col" style={{ width: `${100 - leftWidth}%` }}>
-          {selectedStep ? (
+        <div
+          className="border-muted flex flex-col overflow-hidden"
+          style={{ width: `${100 - leftWidth}%`, height: leftColumnRef.current?.clientHeight }}
+        >
+          {selectedStep && !selectedStep.trace.isRoot ? (
             <StepInfo selectedStep={selectedStep} />
           ) : (
             <TopInfo
@@ -199,6 +204,7 @@ export const RunDetailsV3 = (props: Props) => {
               getTrigger={getTrigger}
               runID={runID}
               result={resultRes.data}
+              height={leftColumnRef.current?.clientHeight}
             />
           )}
         </div>

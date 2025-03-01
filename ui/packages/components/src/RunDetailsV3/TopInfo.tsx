@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Button } from '@inngest/components/Button';
-import { RiArrowUpSLine } from '@remixicon/react';
+import { RiArrowRightSLine } from '@remixicon/react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -12,7 +12,7 @@ import {
   SkeletonElement,
   TextElement,
   TimeElement,
-} from '../DetailsCard/Element';
+} from '../DetailsCard/NewElement';
 import { InvokeModal } from '../InvokeButton';
 import { ErrorCard } from '../RunDetailsV2/ErrorCard';
 import { useInvokeRun } from '../Shared/useInvokeRun';
@@ -28,6 +28,7 @@ type TopInfoProps = {
   getTrigger: (runID: string) => Promise<Trigger>;
   result?: Result;
   runID: string;
+  height?: number;
 };
 
 export type Trigger = {
@@ -128,14 +129,14 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
   }
 
   return (
-    <div className="flex h-full flex-col gap-2">
+    <div className="flex flex-col gap-2">
       <div className="flex h-11 w-full flex-row items-center justify-between border-none px-4">
         <div
           className="text-basis flex cursor-pointer items-center justify-start gap-2"
           onClick={() => setExpanded(!expanded)}
         >
-          <RiArrowUpSLine
-            className={`transition-transform duration-500 ${expanded ? 'rotate-180' : ''}`}
+          <RiArrowRightSLine
+            className={`shrink-0 transition-transform duration-500 ${expanded ? 'rotate-90' : ''}`}
           />
           {isPending ? (
             <SkeletonElement />
@@ -178,7 +179,7 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
       </div>
 
       {expanded && (
-        <dl className="flex flex-wrap gap-4 px-4">
+        <div className="flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4 px-4">
           {type === 'EVENT' && (
             <>
               <ElementWrapper label="Event name">
@@ -234,11 +235,11 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
               </ElementWrapper>
             </>
           )}
-        </dl>
+        </div>
       )}
 
       <Tabs
-        defaultActive={result?.error ? 2 : 0}
+        defaultActive={result?.error ? 2 : prettyPayload ? 0 : 1}
         tabs={[
           {
             label: 'Input',

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
-import { RiArrowUpSLine } from '@remixicon/react';
+import { RiArrowRightSLine } from '@remixicon/react';
 
 import { AITrace } from '../AI/AITrace';
 import { parseAIOutput } from '../AI/utils';
@@ -10,7 +10,7 @@ import {
   LinkElement,
   TextElement,
   TimeElement,
-} from '../DetailsCard/Element';
+} from '../DetailsCard/NewElement';
 import { RerunModal } from '../Rerun/RerunModal';
 import { Time } from '../Time';
 import { usePrettyJson } from '../hooks/usePrettyJson';
@@ -145,8 +145,8 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
           className="text-basis flex cursor-pointer items-center justify-start gap-2"
           onClick={() => setExpanded(!expanded)}
         >
-          <RiArrowUpSLine
-            className={`transition-transform duration-500 ${expanded ? 'rotate-180' : ''}`}
+          <RiArrowRightSLine
+            className={`shrink-0 transition-transform duration-500 ${expanded ? 'rotate-90' : ''}`}
           />
 
           <span className="text-basis text-sm font-normal">{trace.name}</span>
@@ -172,7 +172,7 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
       </div>
 
       {expanded && (
-        <dl className="flex flex-wrap gap-4 px-4">
+        <div className="flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4 px-4">
           <ElementWrapper label="Queued at">
             <TimeElement date={new Date(trace.queuedAt)} />
           </ElementWrapper>
@@ -204,11 +204,11 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
           {stepKindInfo}
 
           {aiOutput && <AITrace aiOutput={aiOutput} />}
-        </dl>
+        </div>
       )}
 
       <Tabs
-        defaultActive={result?.error ? 2 : 0}
+        defaultActive={result?.error ? 2 : prettyInput ? 0 : 1}
         tabs={[
           { label: 'Input', node: <IO title="Step Input" raw={prettyInput} /> },
           { label: 'Output', node: <IO title="Step Output" raw={prettyOutput} /> },
