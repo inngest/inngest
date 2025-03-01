@@ -52,8 +52,8 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 		ids[n] = evt.InternalID()
 	}
 
-	accountID := consts.DevServerAccountId
-	workspaceID := consts.DevServerEnvId
+	accountID := consts.DevServerAccountID
+	workspaceID := consts.DevServerEnvID
 
 	fns, err := r.HistoryReader.GetFunctionRunsFromEvents(
 		ctx,
@@ -67,7 +67,7 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 	fnsByID := map[ulid.ULID][]*models.FunctionRun{}
 	for _, fn := range fns {
 		run := models.MakeFunctionRun(fn)
-		_, err := r.Data.GetFunctionByInternalUUID(ctx, consts.DevServerEnvId, uuid.MustParse(run.FunctionID))
+		_, err := r.Data.GetFunctionByInternalUUID(ctx, consts.DevServerEnvID, uuid.MustParse(run.FunctionID))
 		if err == sql.ErrNoRows {
 			// Skip run since its function doesn't exist. This can happen when
 			// deleting a function or changing its ID.
