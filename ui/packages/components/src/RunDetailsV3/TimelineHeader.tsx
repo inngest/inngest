@@ -50,7 +50,7 @@ export const TimelineHeader = ({ trace, minTime, maxTime }: TimelineHeaderProps)
           <div
             key={`x-axis-label-${i}`}
             className="absolute h-7"
-            style={{ left: `calc(${x}% - 0.5rem)` }}
+            style={{ left: `${x}%`, transform: 'translateX(-50%)' }}
           >
             {durations[i]}
           </div>
