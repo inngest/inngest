@@ -30,6 +30,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/realtime"
+	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -2027,7 +2028,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 	// step output to any realtime subscribers.
 	if e.rtpub != nil {
 		e.rtpub.Publish(ctx, realtime.Message{
-			Kind:       realtime.MessageKindStep,
+			Kind:       streamingtypes.MessageKindStep,
 			Data:       gen.Data,
 			TopicNames: []string{gen.UserDefinedName()},
 			EnvID:      i.md.ID.Tenant.EnvID,

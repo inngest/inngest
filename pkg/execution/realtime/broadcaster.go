@@ -9,6 +9,7 @@ import (
 
 	"github.com/MauriceGit/skiplist"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
 )
@@ -69,7 +70,7 @@ type broadcaster struct {
 	conds map[string]*sync.Cond
 }
 
-func (b *broadcaster) Subscribe(ctx context.Context, s Subscription, topics []Topic) error {
+func (b *broadcaster) Subscribe(ctx context.Context, s Subscription, topics []streamingtypes.Topic) error {
 	if len(topics) == 0 {
 		return nil
 	}
@@ -267,7 +268,7 @@ func (b *broadcaster) Close(ctx context.Context) error {
 	atomic.StoreInt32(&b.closing, 1)
 
 	msg := Message{
-		Kind:      MessageKindClosing,
+		Kind:      streamingtypes.MessageKindClosing,
 		CreatedAt: time.Now(),
 	}
 
@@ -319,7 +320,7 @@ func (b *broadcaster) Publish(ctx context.Context, m Message) {
 }
 
 // PublishStream publishes streams of data to any subscribers for a given datastream.
-func (b *broadcaster) PublishStream(ctx context.Context, m Message, data string) {
+func (b *broadcaster) PublishChunk(ctx context.Context, m Message, c Chunk) {
 	b.l.RLock()
 	defer b.l.RUnlock()
 
@@ -335,7 +336,7 @@ func (b *broadcaster) PublishStream(ctx context.Context, m Message, data string)
 		go func(t topicsub) {
 			defer wg.Done()
 			t.eachSubscription(func(s Subscription) {
-				b.publishStreamTo(ctx, s, m, data)
+				b.publishStreamTo(ctx, s, c)
 			})
 		}(found)
 	}
@@ -353,9 +354,9 @@ func (b *broadcaster) publishTo(ctx context.Context, s Subscription, m Message) 
 
 // publishStreamTo publishes a message to a subscription, keeping track of retries if the
 // write fails.
-func (b *broadcaster) publishStreamTo(ctx context.Context, s Subscription, m Message, data string) {
+func (b *broadcaster) publishStreamTo(ctx context.Context, s Subscription, c Chunk) {
 	b.doPublish(ctx, s, func() error {
-		return s.WriteStream(string(m.Data), data)
+		return s.WriteChunk(c)
 	})
 }
 
@@ -402,7 +403,7 @@ func (b *broadcaster) keepalive(ctx context.Context, subID uuid.UUID) {
 		b.l.RUnlock()
 
 		err := sub.SendKeepalive(Message{
-			Kind:      MessageKindPing,
+			Kind:      streamingtypes.MessageKindPing,
 			CreatedAt: time.Now(),
 		})
 		if err == nil {

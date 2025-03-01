@@ -14,6 +14,7 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/stretchr/testify/require"
 )
 
@@ -27,7 +28,7 @@ func TestWebsocketMessage(t *testing.T) {
 	}))
 
 	c := wsConnect(t, s, Topic{
-		Kind:    TopicKindRun,
+		Kind:    streamingtypes.TopicKindRun,
 		Channel: "user:123",
 		Name:    "ai",
 	})
@@ -37,7 +38,7 @@ func TestWebsocketMessage(t *testing.T) {
 	// Broadcasting should publish.
 	t.Run("broadcasting publishes to websocket", func(t *testing.T) {
 		send := Message{
-			Kind:       MessageKindRun,
+			Kind:       streamingtypes.MessageKindRun,
 			Data:       json.RawMessage(`"foo"`),
 			CreatedAt:  time.Now().Truncate(time.Millisecond).UTC(),
 			Channel:    "user:123",
@@ -59,7 +60,7 @@ func TestWebsocketPostRealtimeMessage(t *testing.T) {
 	}))
 
 	c := wsConnect(t, s, Topic{
-		Kind:    TopicKindRun,
+		Kind:    streamingtypes.TopicKindRun,
 		Channel: "user:123",
 		Name:    "ai",
 	})
@@ -88,7 +89,7 @@ func TestWebsocketPostStreamingMessage(t *testing.T) {
 	}))
 
 	c := wsConnect(t, s, Topic{
-		Kind:    TopicKindRun,
+		Kind:    streamingtypes.TopicKindRun,
 		Channel: "user:123",
 		Name:    "ai",
 	})
@@ -142,9 +143,16 @@ func TestWebsocketPostStreamingMessage(t *testing.T) {
 	err = json.Unmarshal(start.Data, &streamID)
 	require.NoError(t, err)
 
-	require.EqualValues(t, MessageKindDataStreamStart, start.Kind)
-	require.EqualValues(t, MessageKindDataStreamEnd, end.Kind)
-	require.EqualValues(t, streamID+":"+data, contents[1])
+	require.EqualValues(t, streamingtypes.MessageKindDataStreamStart, start.Kind)
+	require.EqualValues(t, streamingtypes.MessageKindDataStreamEnd, end.Kind)
+
+	byt, _ := json.Marshal(Chunk{
+		Kind:     string(streamingtypes.MessageKindDataStreamChunk),
+		StreamID: streamID,
+		Data:     data,
+	})
+
+	require.EqualValues(t, byt, contents[1])
 }
 
 func readMessageWithin(t *testing.T, c *websocket.Conn, dur time.Duration) *Message {

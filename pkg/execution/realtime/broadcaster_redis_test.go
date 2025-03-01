@@ -10,6 +10,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/assert"
@@ -59,9 +60,9 @@ func TestRedisBroadcaster(t *testing.T) {
 	})
 
 	// Create two messages with two separate topics.
-	msg1 := NewMessage(MessageKindRun, "output")
+	msg1 := streamingtypes.NewMessage(streamingtypes.MessageKindRun, "output")
 	msg1.Channel = ulid.MustNew(ulid.Now(), rand.Reader).String()
-	msg2 := NewMessage(MessageKindRun, "output")
+	msg2 := streamingtypes.NewMessage(streamingtypes.MessageKindRun, "output")
 	msg2.Channel = ulid.MustNew(ulid.Now(), rand.Reader).String()
 
 	t.Run("publishing on b1 broadcasts on b2 subscriber", func(t *testing.T) {

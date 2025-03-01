@@ -19,8 +19,8 @@ type subMemory struct {
 	streamCalls int32
 	id          uuid.UUID
 
-	writer       func(m Message) error
-	streamWriter func(streamID, data string) error
+	writer      func(m Message) error
+	chunkWriter func(c Chunk) error
 }
 
 func (s subMemory) ID() uuid.UUID {
@@ -39,10 +39,10 @@ func (s subMemory) WriteMessage(m Message) error {
 	return nil
 }
 
-func (s subMemory) WriteStream(streamID, data string) error {
+func (s subMemory) WriteChunk(c Chunk) error {
 	atomic.AddInt32(&s.streamCalls, 1)
-	if s.streamWriter != nil {
-		return s.streamWriter(streamID, data)
+	if s.chunkWriter != nil {
+		return s.chunkWriter(c)
 	}
 	return nil
 }

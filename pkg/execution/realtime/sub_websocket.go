@@ -7,6 +7,7 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/inngest/inngest/pkg/logger"
 )
 
@@ -92,11 +93,15 @@ func (s SubscriptionWS) WriteMessage(m Message) error {
 	return s.ws.Write(context.Background(), websocket.MessageText, byt)
 }
 
-func (s SubscriptionWS) WriteStream(streamID, data string) error {
+func (s SubscriptionWS) WriteChunk(c Chunk) error {
+	byt, err := json.Marshal(c)
+	if err != nil {
+		return err
+	}
 	return s.ws.Write(
 		context.Background(),
 		websocket.MessageText,
-		[]byte(streamID+":"+data),
+		byt,
 	)
 }
 
@@ -106,7 +111,7 @@ func (s SubscriptionWS) SendKeepalive(m Message) error {
 }
 
 func (s SubscriptionWS) Close() error {
-	return s.ws.Close(websocket.CloseStatus(nil), string(MessageKindClosing))
+	return s.ws.Close(websocket.CloseStatus(nil), string(streamingtypes.MessageKindClosing))
 }
 
 func (s SubscriptionWS) Poll(ctx context.Context) error {
@@ -138,7 +143,7 @@ func (s SubscriptionWS) Poll(ctx context.Context) error {
 		}
 
 		switch msg.Kind {
-		case MessageKindSubscribe:
+		case streamingtypes.MessageKindSubscribe:
 			// Subscribe messages must always have a JWT as the data;
 			// the JWT embeds the topics that will be subscribed to.
 			var jwt string
@@ -163,7 +168,7 @@ func (s SubscriptionWS) Poll(ctx context.Context) error {
 
 			// TODO: Reply with successful subscribe msg
 			continue
-		case MessageKindUnsubscribe:
+		case streamingtypes.MessageKindUnsubscribe:
 			// Unsub from the given topics.  Assume that the unsubscribe data
 			// is a list of topics.
 			topics := []Topic{}

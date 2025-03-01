@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/util"
@@ -193,7 +194,7 @@ func (a *api) PostPublish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// This msg is arbitrary data.
-	msg.Kind = MessageKindData
+	msg.Kind = streamingtypes.MessageKindData
 	// Read all data from the request body.
 	byt, err := io.ReadAll(io.LimitReader(r.Body, consts.MaxStreamingMessageSizeBytes))
 	_ = r.Body.Close()
@@ -232,7 +233,7 @@ func (a *api) publishStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	msg.Kind = MessageKindDataStreamStart
+	msg.Kind = streamingtypes.MessageKindDataStreamStart
 	// We must create a new random stream ID for the data stream, allowing
 	// all published chunks to be associated with each other.
 	sID := util.XXHash(time.Now())
@@ -249,7 +250,7 @@ func (a *api) publishStream(w http.ResponseWriter, r *http.Request) {
 	// And always publish a stream end.
 	defer r.Body.Close()
 	defer func(msg Message) {
-		msg.Kind = MessageKindDataStreamEnd
+		msg.Kind = streamingtypes.MessageKindDataStreamEnd
 		a.opts.Broadcaster.Publish(ctx, msg)
 	}(msg)
 
@@ -260,7 +261,14 @@ func (a *api) publishStream(w http.ResponseWriter, r *http.Request) {
 
 		if n > 0 {
 			// Spit this chunk out!
-			a.opts.Broadcaster.PublishStream(ctx, msg, string(buf[:n]))
+			a.opts.Broadcaster.PublishChunk(
+				ctx,
+				msg,
+				streamingtypes.ChunkFromMessage(
+					msg,
+					string(buf[:n]),
+				),
+			)
 		}
 
 		if errors.Is(err, io.EOF) {
