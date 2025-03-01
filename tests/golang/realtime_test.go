@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -17,8 +16,8 @@ import (
 	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
+	"github.com/inngest/inngestgo/streaming"
 	"github.com/oklog/ulid/v2"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -75,37 +74,26 @@ func TestRealtime(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		url := strings.Replace(os.Getenv("API_URL")+"/v1/realtime/connect", "http://", "ws://", 1)
-		c, _, err := websocket.Dial(ctx, url, &websocket.DialOptions{
-			HTTPHeader: http.Header{
-				"Authorization": []string{"Bearer " + jwt},
-			},
-		})
-		assert.NoError(t, err)
-		if c != nil {
-			assert.NoError(t, err)
-		}
+		url := os.Getenv("API_URL") + "/v1/realtime/connect"
+		stream, err := streaming.SubscribeWithURL(ctx, url, jwt)
+		require.NoError(t, err)
 
 		messages := []realtime.Message{}
 
 		go func() {
-			for {
-				_, resp, err := c.Read(ctx)
-				if isWebsocketClosed(err) {
-					return
+			for msg := range stream {
+				switch msg.Kind() {
+				case streaming.StreamMessage:
+					messages = append(messages, msg.Message())
+				default:
+					t.Fatalf("unexpected message type")
 				}
-				require.NoError(t, err)
-				msg := realtime.Message{}
-				err = json.Unmarshal(resp, &msg)
-				require.NoError(t, err)
-				messages = append(messages, msg)
 			}
 		}()
 
 		l.Unlock()
 
 		require.Eventually(t, func() bool { return atomic.LoadInt32(&finished) == 1 }, 5*time.Second, 5*time.Millisecond)
-		require.NoError(t, c.CloseNow())
 
 		require.Equal(t, 1, len(messages))
 		require.Equal(t, streamingtypes.MessageKindStep, messages[0].Kind)
