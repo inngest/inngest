@@ -1,0 +1,211 @@
+[
+  {
+    "framework": "Astro",
+    "logo": {
+      "dark": "https://astro.build/assets/press/astro-icon-light.svg",
+      "light": "https://astro.build/assets/press/astro-icon-light.svg"
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-astro"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Bun",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/bun"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "DigitalOcean",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-py/tree/main/examples/digital_ocean"
+    },
+    "language": "Python"
+  },
+  {
+    "framework": "Django",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-py/tree/main/examples/django"
+    },
+    "language": "Python"
+  },
+  {
+    "framework": "Express",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-express"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "FastAPI",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-py/tree/main/examples/fast_api"
+    },
+    "language": "Python"
+  },
+  {
+    "framework": "Fastify",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-fastify"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Flask",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-py/tree/main/examples/flask"
+    },
+    "language": "Python"
+  },
+  {
+    "framework": "Google Functions Framework",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-google-functions-framework"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Hono",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-hono"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Koa",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-koa"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "NestJS",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-nestjs"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Next.js (App Router)",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-nextjs-app-router"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Next.js (Pages Router)",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-nextjs-pages-router"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Nitro",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-nitro"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Nuxt",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-nuxt"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Remix",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-remix"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "SvelteKit",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-sveltekit"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Tornado",
+    "logo": {
+      "dark": "",
+      "light": ""
+    },
+    "link": {
+      "url": "https://github.com/inngest/inngest-py/tree/main/examples/tornado"
+    },
+    "language": "Python"
+  }
+]
