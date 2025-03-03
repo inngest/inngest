@@ -25,7 +25,6 @@ export default function MetricsExportEntitlementValue({
         }}
       >
         <span className="font-medium">Enabled</span>
-
         {granularitySeconds && (
           <span>
             <span
