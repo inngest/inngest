@@ -15,12 +15,6 @@ export default function MetricsExportEntitlementValue({
     return 'Not enabled';
   }
 
-  if (!granularitySeconds || !freshnessSeconds) {
-    throw new Error(
-      'granularitySeconds and freshnessSeconds must be given when metrics export is enabled'
-    );
-  }
-
   return (
     <>
       <div
@@ -31,18 +25,27 @@ export default function MetricsExportEntitlementValue({
         }}
       >
         <span className="font-medium">Enabled</span>
-        <span
-          className="border-subtle"
-          style={{ borderLeftWidth: '1px', borderRightWidth: '1px' }}
-        ></span>
-        <span className="text-muted">Granularity</span>
-        <span className="font-medium">{entitlementSecondsToStr(granularitySeconds)}</span>
-        <span
-          className="border-subtle"
-          style={{ borderLeftWidth: '1px', borderRightWidth: '1px' }}
-        ></span>
-        <span className="text-muted">Delay</span>
-        <span className="font-medium">{entitlementSecondsToStr(freshnessSeconds)}</span>
+
+        {granularitySeconds && (
+          <span>
+            <span
+              className="border-subtle"
+              style={{ borderLeftWidth: '1px', borderRightWidth: '1px' }}
+            ></span>
+            <span className="text-muted">Granularity</span>
+            <span className="font-medium">{entitlementSecondsToStr(granularitySeconds)}</span>
+          </span>
+        )}
+        {freshnessSeconds && (
+          <span>
+            <span
+              className="border-subtle"
+              style={{ borderLeftWidth: '1px', borderRightWidth: '1px' }}
+            ></span>
+            <span className="text-muted">Delay</span>
+            <span className="font-medium">{entitlementSecondsToStr(freshnessSeconds)}</span>
+          </span>
+        )}
       </div>
     </>
   );
