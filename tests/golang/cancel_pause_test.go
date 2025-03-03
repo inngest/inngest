@@ -110,7 +110,7 @@ func TestPauseCancelFunction(t *testing.T) {
 		require.NoError(t, err)
 
 		fv := reqUrl.Query()
-		fv.Add("accountId", consts.DevServerAccountId.String())
+		fv.Add("accountId", consts.DevServerAccountID.String())
 		fv.Add("fnId", fnId.String())
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqUrl.String()+"?"+fv.Encode(), nil)
@@ -140,7 +140,7 @@ func TestPauseCancelFunction(t *testing.T) {
 		require.NoError(t, err)
 
 		fv := reqUrl.Query()
-		fv.Add("accountId", consts.DevServerAccountId.String())
+		fv.Add("accountId", consts.DevServerAccountID.String())
 		fv.Add("fnId", fnId.String())
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqUrl.String()+"?"+fv.Encode(), nil)
@@ -159,7 +159,7 @@ func TestPauseCancelFunction(t *testing.T) {
 		require.NoError(t, err)
 
 		fv := reqUrl.Query()
-		fv.Add("accountId", consts.DevServerAccountId.String())
+		fv.Add("accountId", consts.DevServerAccountID.String())
 		fv.Add("fnId", fnId.String())
 		fv.Add("runId", runId.String())
 
@@ -190,15 +190,15 @@ func TestPauseCancelFunction(t *testing.T) {
 	})
 
 	t.Run("should cancel run", func(t *testing.T) {
-		pauseFn(consts.DevServerAccountId, uuid.MustParse(fnId))
-		cancelFnRun(consts.DevServerAccountId, uuid.MustParse(fnId), ulid.MustParse(runID))
+		pauseFn(consts.DevServerAccountID, uuid.MustParse(fnId))
+		cancelFnRun(consts.DevServerAccountID, uuid.MustParse(fnId), ulid.MustParse(runID))
 
 		<-time.After(5 * time.Second)
 
 		require.Equal(t, int32(1), atomic.LoadInt32(&runCounter))
 		require.Equal(t, int32(1), atomic.LoadInt32(&runCancelled))
 
-		require.Equal(t, 0, getQueueSize(consts.DevServerAccountId, uuid.MustParse(fnId)))
+		require.Equal(t, 0, getQueueSize(consts.DevServerAccountID, uuid.MustParse(fnId)))
 	})
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
