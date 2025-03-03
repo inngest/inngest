@@ -15,46 +15,6 @@ type Props = {
 };
 
 export const Timeline = ({ getResult, pathCreator, runID, trace }: Props) => {
-  const [leftWidth, setLeftWidth] = useState(30);
-  const [isDragging, setIsDragging] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const handleMouseDown = useCallback(() => {
-    setIsDragging(true);
-  }, []);
-
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
-
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (!isDragging) return;
-
-      const container = containerRef.current;
-      if (!container) {
-        return;
-      }
-
-      const containerRect = container.getBoundingClientRect();
-      const newWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
-      setLeftWidth(Math.min(Math.max(newWidth, 20), 80));
-    },
-    [isDragging]
-  );
-
-  useEffect(() => {
-    if (isDragging) {
-      document.body.style.userSelect = 'none';
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-    }
-    return () => {
-      document.body.style.userSelect = '';
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging, handleMouseMove, handleMouseUp]);
   if (!isLazyDone(trace)) {
     // TODO: Properly handle loading state
     return null;
@@ -64,7 +24,7 @@ export const Timeline = ({ getResult, pathCreator, runID, trace }: Props) => {
   const maxTime = toMaybeDate(trace.endedAt) ?? new Date();
 
   return (
-    <div className={`w-full p-4`} ref={containerRef}>
+    <div className={`w-full pb-4 pr-8`}>
       <Trace
         depth={0}
         getResult={getResult}
@@ -73,8 +33,6 @@ export const Timeline = ({ getResult, pathCreator, runID, trace }: Props) => {
         pathCreator={pathCreator}
         runID={runID}
         trace={{ ...trace, name: 'Run' }}
-        leftWidth={leftWidth}
-        handleMouseDown={handleMouseDown}
       />
     </div>
   );

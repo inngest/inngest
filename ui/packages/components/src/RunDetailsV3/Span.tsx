@@ -55,7 +55,7 @@ export function Span({ className, isInline, maxTime, minTime, trace }: Props) {
       {widths.running > 0 && (
         <div
           className={cn(
-            'h-5 rounded transition-shadow hover:shadow-lg',
+            'rounded-sm z-0 h-5 transition-shadow hover:shadow-lg',
             getStatusBackgroundClass(trace.status),
             getStatusBorderClass(trace.status)
           )}
