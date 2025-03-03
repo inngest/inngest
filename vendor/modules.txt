@@ -431,7 +431,7 @@ github.com/golang-migrate/migrate/v4/database/sqlite
 github.com/golang-migrate/migrate/v4/internal/url
 github.com/golang-migrate/migrate/v4/source
 github.com/golang-migrate/migrate/v4/source/iofs
-# github.com/golang/glog v1.2.2
+# github.com/golang/glog v1.2.4
 ## explicit; go 1.19
 github.com/golang/glog
 github.com/golang/glog/internal/logsink
