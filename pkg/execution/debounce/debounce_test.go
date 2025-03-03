@@ -260,7 +260,7 @@ func TestDebounce(t *testing.T) {
 		err = redisDebouncer.DeleteDebounceItem(ctx, debounceId)
 		require.NoError(t, err)
 
-		debounceIds, err = unshardedCluster.HKeys(debounceClient.KeyGenerator().Debounce(ctx))
+		_, err = unshardedCluster.HKeys(debounceClient.KeyGenerator().Debounce(ctx))
 		require.Error(t, err)
 		require.ErrorContains(t, err, "no such key")
 	})
