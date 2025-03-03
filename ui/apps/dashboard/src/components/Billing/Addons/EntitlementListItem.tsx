@@ -105,15 +105,7 @@ export default function EntitlementListItem({
             {tooltip && tooltip}
           </p>
           <p className="text-muted mb-1 text-sm italic">{description}</p>
-          {entitlement.displayValue && (
-            <p
-              className={`text-basis pr-3 text-sm ${
-                typeof entitlement.displayValue === 'string' ? 'font-medium' : ''
-              }`}
-            >
-              {entitlement.displayValue}
-            </p>
-          )}
+          <div className="text-basis pr-3 text-sm font-medium">{entitlement.displayValue}</div>
         </div>
         <Button
           appearance="ghost"
