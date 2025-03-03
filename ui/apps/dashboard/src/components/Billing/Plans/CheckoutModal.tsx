@@ -4,12 +4,20 @@ import { useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal/Modal';
+import { resolveColor } from '@inngest/components/utils/colors';
+import { isDark } from '@inngest/components/utils/theme';
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
+import resolveConfig from 'tailwindcss/resolveConfig';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
 import { type StripeSubscriptionItemsInput } from '@/gql/graphql';
+import tailwindConfig from '../../../../tailwind.config';
+
+const {
+  theme: { colors, textColor, backgroundColor, placeholderColor },
+} = resolveConfig(tailwindConfig);
 
 export type CheckoutItem = {
   /* Inngest plan id */
@@ -45,6 +53,17 @@ export default function CheckoutModal({ items, onCancel, onSuccess }: CheckoutMo
             mode: 'subscription',
             amount: amount,
             currency: 'usd',
+            appearance: {
+              variables: {
+                colorText: resolveColor(textColor.basis, isDark()),
+                colorPrimary: resolveColor(colors.primary.moderate, isDark()),
+                colorBackground: resolveColor(backgroundColor.canvasBase, isDark()),
+                colorTextSecondary: resolveColor(textColor.subtle, isDark()),
+                colorDanger: resolveColor(textColor.error, isDark()),
+                colorWarning: resolveColor(textColor.warning, isDark()),
+                colorTextPlaceholder: resolveColor(placeholderColor.disabled, isDark()),
+              },
+            },
           }}
         >
           <CheckoutForm items={items} onSuccess={onSuccess} />
