@@ -68,7 +68,7 @@ export function Trace({ depth, getResult, maxTime, minTime, pathCreator, trace, 
         >
           {hasChildren && (
             <div
-              className="flex shrink-0 flex-row items-center justify-start gap-1"
+              className="border-subtle flex flex-row items-center justify-center rounded border p-0 pl-1"
               onClick={(e) => {
                 e.stopPropagation();
                 setExpanded(!expanded);
@@ -76,14 +76,18 @@ export function Trace({ depth, getResult, maxTime, minTime, pathCreator, trace, 
             >
               <div className="text-sm font-medium leading-tight">{trace.childrenSpans?.length}</div>
               <RiArrowRightSLine
-                className={`shrink-0 transition-transform duration-500 ${
+                className={`text-subtle m-0 h-3.5 w-3.5 shrink-0 transition-transform duration-[250ms] ${
                   expanded ? 'rotate-90' : ''
                 }`}
               />
             </div>
           )}
 
-          <div className="text-basis overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal leading-tight">
+          <div
+            className={`text-basis overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal leading-tight ${
+              !hasChildren && 'pl-1.5'
+            }`}
+          >
             {trace.name}
           </div>
         </div>

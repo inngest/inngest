@@ -146,7 +146,9 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
           onClick={() => setExpanded(!expanded)}
         >
           <RiArrowRightSLine
-            className={`shrink-0 transition-transform duration-500 ${expanded ? 'rotate-90' : ''}`}
+            className={`shrink-0 transition-transform duration-[250ms] ${
+              expanded ? 'rotate-90' : ''
+            }`}
           />
 
           <span className="text-basis text-sm font-normal">{trace.name}</span>
