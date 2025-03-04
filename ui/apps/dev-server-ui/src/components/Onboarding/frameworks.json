@@ -2,8 +2,8 @@
   {
     "framework": "Astro",
     "logo": {
-      "dark": "https://astro.build/assets/press/astro-icon-light.svg",
-      "light": "https://astro.build/assets/press/astro-icon-light.svg"
+      "dark": "https://cdn.inngest.com/logos/frameworks/astro-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/astro-light.svg"
     },
     "version_supported": "v3.8.0+",
     "link": {
@@ -14,8 +14,8 @@
   {
     "framework": "AWS Lambda",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/aws-lambda-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/aws-lambda-light.svg"
     },
     "version_supported": "v1.5.0+",
     "link": {
@@ -26,8 +26,8 @@
   {
     "framework": "Bun",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/bun.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/bun.svg"
     },
     "link": {
       "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-bun"
@@ -37,8 +37,8 @@
   {
     "framework": "Cloudflare Pages",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/cloudflare-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/cloudflare-light.svg"
     },
     "link": {
       "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-cloudflare-pages"
@@ -48,8 +48,8 @@
   {
     "framework": "Cloudflare Workers",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/cloudflare-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/cloudflare-light.svg"
     },
     "version_supported": "v3.19.15+",
     "link": {
@@ -60,8 +60,8 @@
   {
     "framework": "DigitalOcean Functions",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/digital-ocean-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/digital-ocean-light.svg"
     },
     "link": {
       "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-digitalocean-functions"
@@ -71,8 +71,8 @@
   {
     "framework": "Express",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/express-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/express-light.svg"
     },
     "link": {
       "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-express"
@@ -82,8 +82,8 @@
   {
     "framework": "FastAPI",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/fast-api-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/fast-api-light.svg"
     },
     "link": {
       "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=python#exposing-inngest-functions"
@@ -93,8 +93,8 @@
   {
     "framework": "Fastify",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/fastify-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/fastify-light.svg"
     },
     "version_supported": "v2.6.0+",
     "link": {
@@ -105,8 +105,8 @@
   {
     "framework": "Flask",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/flask.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/flask.svg"
     },
     "link": {
       "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=python#exposing-inngest-functions"
@@ -116,8 +116,8 @@
   {
     "framework": "Fresh (Deno)",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/deno-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/deno-light.svg"
     },
     "link": {
       "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-fresh-deno"
@@ -127,8 +127,8 @@
   {
     "framework": "Google Cloud Run Functions",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/google-cloud-functions.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/google-cloud-functions.svg"
     },
     "link": {
       "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-google-cloud-run-functions"
@@ -138,8 +138,8 @@
   {
     "framework": "Firebase Cloud Functions",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/firebase-cloud-functions.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/firebase-cloud-functions.svg"
     },
     "link": {
       "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-firebase-cloud-functions"
@@ -149,8 +149,8 @@
   {
     "framework": "H3",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/h3.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/h3.svg"
     },
     "version_supported": "v2.7.0+",
     "link": {
@@ -161,8 +161,8 @@
   {
     "framework": "Hono",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/hono.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/hono.svg"
     },
     "link": {
       "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-hono"
@@ -172,8 +172,8 @@
   {
     "framework": "Koa",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/koa-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/koa-light.svg"
     },
     "version_supported": "v3.6.0+",
     "link": {
@@ -184,8 +184,8 @@
   {
     "framework": "NestJS",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/nest-js.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/nest-js.svg"
     },
     "link": {
       "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-nestjs"
@@ -195,8 +195,8 @@
   {
     "framework": "Next.js",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/nextjs-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/nextjs-light.svg"
     },
     "link": {
       "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-nextjs"
@@ -206,8 +206,8 @@
   {
     "framework": "Nitro",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/nitro.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/nitro.svg"
     },
     "version_supported": "v3.24.0+",
     "link": {
@@ -218,8 +218,8 @@
   {
     "framework": "Nuxt",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/nuxt-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/nuxt-light.svg"
     },
     "version_supported": "v0.9.2+",
     "link": {
@@ -230,8 +230,8 @@
   {
     "framework": "Redwood",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/redwood-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/redwood-light.svg"
     },
     "link": {
       "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-redwood"
@@ -241,8 +241,8 @@
   {
     "framework": "Remix",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/remix-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/remix-light.svg"
     },
     "link": {
       "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-remix"
@@ -252,8 +252,8 @@
   {
     "framework": "SvelteKit",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/svelte.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/svelte.svg"
     },
     "version_supported": "v3.5.0+",
     "link": {

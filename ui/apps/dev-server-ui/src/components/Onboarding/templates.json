@@ -2,8 +2,8 @@
   {
     "framework": "Astro",
     "logo": {
-      "dark": "https://astro.build/assets/press/astro-icon-light.svg",
-      "light": "https://astro.build/assets/press/astro-icon-light.svg"
+      "dark": "https://cdn.inngest.com/logos/frameworks/astro-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/astro-light.svg"
     },
     "link": {
       "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-astro"
@@ -13,8 +13,8 @@
   {
     "framework": "Bun",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/bun.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/bun.svg"
     },
     "link": {
       "url": "https://github.com/inngest/inngest-js/tree/main/examples/bun"
@@ -24,8 +24,8 @@
   {
     "framework": "DigitalOcean",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/digital-ocean-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/digital-ocean-light.svg"
     },
     "link": {
       "url": "https://github.com/inngest/inngest-py/tree/main/examples/digital_ocean"
@@ -35,8 +35,8 @@
   {
     "framework": "Django",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/django-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/django-light.svg"
     },
     "link": {
       "url": "https://github.com/inngest/inngest-py/tree/main/examples/django"
@@ -46,8 +46,8 @@
   {
     "framework": "Express",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/express-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/express-light.svg"
     },
     "link": {
       "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-express"
@@ -57,8 +57,8 @@
   {
     "framework": "FastAPI",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/fast-api-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/fast-api-light.svg"
     },
     "link": {
       "url": "https://github.com/inngest/inngest-py/tree/main/examples/fast_api"
@@ -68,8 +68,8 @@
   {
     "framework": "Fastify",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/fastify-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/fastify-light.svg"
     },
     "link": {
       "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-fastify"
@@ -79,8 +79,8 @@
   {
     "framework": "Flask",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/flask.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/flask.svg"
     },
     "link": {
       "url": "https://github.com/inngest/inngest-py/tree/main/examples/flask"
@@ -90,8 +90,8 @@
   {
     "framework": "Google Functions Framework",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/google-cloud-functions.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/google-cloud-functions.svg"
     },
     "link": {
       "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-google-functions-framework"
@@ -101,8 +101,8 @@
   {
     "framework": "Hono",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/hono.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/hono.svg"
     },
     "link": {
       "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-hono"
@@ -112,8 +112,8 @@
   {
     "framework": "Koa",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/koa-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/koa-light.svg"
     },
     "link": {
       "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-koa"
@@ -123,8 +123,8 @@
   {
     "framework": "NestJS",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/nest-js.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/nest-js.svg"
     },
     "link": {
       "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-nestjs"
@@ -134,8 +134,8 @@
   {
     "framework": "Next.js (App Router)",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/nextjs-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/nextjs-light.svg"
     },
     "link": {
       "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-nextjs-app-router"
@@ -145,8 +145,8 @@
   {
     "framework": "Next.js (Pages Router)",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/nextjs-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/nextjs-light.svg"
     },
     "link": {
       "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-nextjs-pages-router"
@@ -156,8 +156,8 @@
   {
     "framework": "Nitro",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/nitro.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/nitro.svg"
     },
     "link": {
       "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-nitro"
@@ -167,8 +167,8 @@
   {
     "framework": "Nuxt",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/nuxt-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/nuxt-light.svg"
     },
     "link": {
       "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-nuxt"
@@ -178,8 +178,8 @@
   {
     "framework": "Remix",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/remix-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/remix-light.svg"
     },
     "link": {
       "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-remix"
@@ -189,8 +189,8 @@
   {
     "framework": "SvelteKit",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/svelte.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/svelte.svg"
     },
     "link": {
       "url": "https://github.com/inngest/inngest-js/tree/main/examples/framework-sveltekit"
@@ -200,8 +200,8 @@
   {
     "framework": "Tornado",
     "logo": {
-      "dark": "",
-      "light": ""
+      "dark": "https://cdn.inngest.com/logos/frameworks/tornado.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/tornado.svg"
     },
     "link": {
       "url": "https://github.com/inngest/inngest-py/tree/main/examples/tornado"
