@@ -6,6 +6,8 @@ import { ThemeImage } from '@inngest/components/Image/Image';
 import { Pill } from '@inngest/components/Pill/Pill';
 import { Select, type Option } from '@inngest/components/Select/Select';
 
+import { useTracking } from '@/hooks/useTracking';
+
 type Framework = {
   framework: string;
   logo: {
@@ -36,6 +38,7 @@ function getPillAppearance(language: string) {
 }
 
 export default function FrameworkList({ frameworksData, title, description }: FrameworkListProps) {
+  const { trackEvent } = useTracking();
   // Extract unique languages from frameworks data
   const languageOptions = useMemo(() => {
     const uniqueLanguages = Array.from(
@@ -100,6 +103,15 @@ export default function FrameworkList({ frameworksData, title, description }: Fr
         {filteredFrameworks.map((framework) => (
           <li key={framework.framework} className="border-subtle rounded-sm border">
             <NextLink
+              onClick={() =>
+                trackEvent('app/onboarding.action', {
+                  metadata: {
+                    type: 'btn-click',
+                    label: 'choose-framework-from-list',
+                    framework: framework.framework,
+                  },
+                })
+              }
               href={framework.link.url}
               target="_blank"
               className="hover:bg-canvasSubtle flex items-center justify-between p-3"

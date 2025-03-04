@@ -4,9 +4,11 @@ import { CodeLine } from '@inngest/components/CodeLine';
 import { Link } from '@inngest/components/Link';
 import { RiAddLine, RiFunctionLine, RiPlayFill } from '@remixicon/react';
 
+import { useTracking } from '@/hooks/useTracking';
 import HelperCard from './HelperCard';
 
 export default function AppFAQ({ openByDefault = false }) {
+  const { trackEvent } = useTracking();
   return (
     <AccordionList
       className="rounded-none border-0"
@@ -20,6 +22,14 @@ export default function AppFAQ({ openByDefault = false }) {
         <AccordionList.Content className="px-0">
           <div className="mb-8 grid grid-cols-1 gap-3 md:grid-cols-3">
             <HelperCard
+              onClick={() =>
+                trackEvent('app/onboarding.action', {
+                  metadata: {
+                    type: 'btn-click',
+                    label: 'choose-framework',
+                  },
+                })
+              }
               href="/apps/choose-framework"
               icon={
                 <div className="bg-primary-3xSubtle w-fit rounded-sm p-[10px]">
@@ -30,6 +40,14 @@ export default function AppFAQ({ openByDefault = false }) {
               description="Choose your preferred framework and build your app using inngest."
             />
             <HelperCard
+              onClick={() =>
+                trackEvent('app/onboarding.action', {
+                  metadata: {
+                    type: 'btn-click',
+                    label: 'choose-template',
+                  },
+                })
+              }
               href="/apps/choose-template"
               icon={
                 <div className="bg-tertiary-3xSubtle w-fit rounded-sm p-[10px]">
@@ -40,6 +58,14 @@ export default function AppFAQ({ openByDefault = false }) {
               description="Choose from our pre-built templates for a faster start."
             />
             <HelperCard
+              onClick={() =>
+                trackEvent('app/onboarding.action', {
+                  metadata: {
+                    type: 'btn-click',
+                    label: 'run-demo',
+                  },
+                })
+              }
               href="https://github.com/inngest/inngest-demo"
               icon={
                 <div className="bg-quaternary-cool3xSubtle w-fit rounded-sm p-[10px]">
