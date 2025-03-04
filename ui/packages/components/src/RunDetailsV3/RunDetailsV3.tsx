@@ -48,12 +48,16 @@ type Run = {
   hasAI: boolean;
 };
 
+const MIN_HEIGHT = 586;
+
 export const RunDetailsV3 = (props: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
+  const runInfoRef = useRef<HTMLDivElement>(null);
   const { getResult, getRun, getTrigger, pathCreator, rerun, runID, standalone } = props;
   const [pollInterval, setPollInterval] = useState(props.pollInterval);
   const [leftWidth, setLeftWidth] = useState(55);
+  const [height, setHeight] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const { selectedStep } = useStepSelection(runID);
 
@@ -82,6 +86,13 @@ export const RunDetailsV3 = (props: Props) => {
     },
     [isDragging]
   );
+
+  useEffect(() => {
+    //
+    // left column height is dynamic and should determine right column height
+    const h = leftColumnRef.current?.clientHeight ?? 0;
+    setHeight(h > MIN_HEIGHT ? h : MIN_HEIGHT);
+  }, [leftColumnRef.current?.clientHeight]);
 
   useEffect(() => {
     if (isDragging) {
@@ -148,9 +159,9 @@ export const RunDetailsV3 = (props: Props) => {
           <LegacyRunsToggle traceAIEnabled={true} />
         </div>
       )}
-      <div ref={containerRef} className="flex h-auto max-h-screen flex-row">
+      <div ref={containerRef} className="flex flex-row">
         <div ref={leftColumnRef} className="flex flex-col gap-2" style={{ width: `${leftWidth}%` }}>
-          <div className="px-4">
+          <div ref={runInfoRef} className="px-4">
             <RunInfo
               cancelRun={cancelRun}
               className="mb-4"
@@ -189,12 +200,21 @@ export const RunDetailsV3 = (props: Props) => {
 
         <div className="relative cursor-col-resize" onMouseDown={handleMouseDown}>
           <div className="bg-canvasMuted absolute inset-0 z-[1] h-full w-px" />
-          <DragDivider className="bg-canvasBase absolute top-80 z-[1] -translate-x-1/2" />
+          <div
+            className="absolute z-[1] -translate-x-1/2"
+            style={{
+              top:
+                (runInfoRef.current?.clientHeight ?? 0) +
+                (height - (runInfoRef.current?.clientHeight ?? 0)) / 2,
+            }}
+          >
+            <DragDivider className="bg-canvasBase" />
+          </div>
         </div>
 
         <div
           className="border-muted flex flex-col overflow-hidden"
-          style={{ width: `${100 - leftWidth}%`, height: leftColumnRef.current?.clientHeight }}
+          style={{ width: `${100 - leftWidth}%`, height }}
         >
           {selectedStep && !selectedStep.trace.isRoot ? (
             <StepInfo selectedStep={selectedStep} />
@@ -204,7 +224,6 @@ export const RunDetailsV3 = (props: Props) => {
               getTrigger={getTrigger}
               runID={runID}
               result={resultRes.data}
-              height={leftColumnRef.current?.clientHeight}
             />
           )}
         </div>

@@ -365,7 +365,7 @@ export function CodeBlock({
                   },
                   lineNumbers: 'on',
                   contextmenu: false,
-                  scrollBeyondLastLine: false,
+                  scrollBeyondLastLine: alwaysFullHeight ? true : false,
                   fontFamily: FONT.font,
                   fontSize: FONT.size,
                   fontWeight: 'light',

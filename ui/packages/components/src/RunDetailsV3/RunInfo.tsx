@@ -87,7 +87,7 @@ export const RunInfo = ({
             onClick={() => setExpanded(!expanded)}
           >
             <RiArrowRightSLine
-              className={`shrink-0 transition-transform duration-500 ${
+              className={`shrink-0 transition-transform duration-[250ms] ${
                 expanded ? 'rotate-90' : ''
               }`}
             />
