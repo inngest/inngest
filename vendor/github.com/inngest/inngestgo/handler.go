@@ -922,7 +922,7 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	// Invoke the function, then immediately stop the streaming buffer.
-	resp, ops, err := invoke(r.Context(), fn, request, stepID)
+	resp, ops, err := invoke(r.Context(), fn, h.GetSigningKey(), request, stepID)
 	streamCancel()
 
 	// NOTE: When triggering step errors, we should have an OpcodeStepError
@@ -1252,6 +1252,7 @@ type StreamResponse struct {
 func invoke(
 	ctx context.Context,
 	sf ServableFunction,
+	signignKey string,
 	input *sdkrequest.Request,
 	stepID *string,
 ) (any, []state.GeneratorOpcode, error) {
@@ -1270,7 +1271,7 @@ func invoke(
 	}
 
 	// This must be a pointer so that it can be mutated from within function tools.
-	mgr := sdkrequest.NewManager(cancel, input)
+	mgr := sdkrequest.NewManager(cancel, input, signignKey)
 	fCtx = sdkrequest.SetManager(fCtx, mgr)
 
 	// Create a new Input type.  We don't know ahead of time the type signature as

@@ -38,14 +38,22 @@ func TestRealtime(t *testing.T) {
 			runID = input.InputCtx.RunID
 			atomic.AddInt32(&started, 1)
 
-			_, _ = step.Run(ctx, "step-1", func(ctx context.Context) (string, error) {
-
+			data, _ := step.Run(ctx, "step-1", func(ctx context.Context) (string, error) {
 				// Wait for the lock so that we respond on demand.
 				l.Lock()
 				defer l.Unlock()
 
 				return "step 1 data", nil
 			})
+
+			err := streaming.PublishWithURL(
+				ctx,
+				os.Getenv("API_URL")+"/v1/realtime/publish",
+				input.InputCtx.RunID,
+				"step-1",
+				[]byte(data),
+			)
+			require.NoError(t, err)
 
 			defer atomic.AddInt32(&finished, 1)
 			return map[string]any{"output": "fn result", "done": true}, nil
@@ -54,7 +62,7 @@ func TestRealtime(t *testing.T) {
 	h.Register(fun)
 	registerFuncs()
 
-	t.Run("It shows step results", func(t *testing.T) {
+	t.Run("It shows step results via step channel", func(t *testing.T) {
 
 		// Lock the mutex so that the step doesn't finish until we let it.
 		l.Lock()
@@ -69,7 +77,7 @@ func TestRealtime(t *testing.T) {
 		jwt, err := NewToken(t, realtime.Topic{
 			Kind:    streamingtypes.TopicKindRun,
 			Channel: ulid.MustParse(runID).String(),
-			Name:    streamingtypes.TopicNameStep, // all step outputs
+			Name:    "step-1",
 		})
 		require.NoError(t, err)
 
@@ -93,7 +101,7 @@ func TestRealtime(t *testing.T) {
 		require.Eventually(t, func() bool { return atomic.LoadInt32(&finished) == 1 }, 5*time.Second, 5*time.Millisecond)
 
 		require.Equal(t, 1, len(messages))
-		require.Equal(t, streamingtypes.MessageKindStep, messages[0].Kind)
+		require.Equal(t, streamingtypes.MessageKindData, messages[0].Kind)
 		require.Equal(t, json.RawMessage(`"step 1 data"`), messages[0].Data)
 		require.Equal(t, runID, messages[0].Channel)
 	})
