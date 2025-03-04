@@ -111,15 +111,9 @@ export default function EntitlementListItemSelfService({
               if this problem persists.
             </p>
           )}
-          {entitlement.displayValue && !openSelfService && (
-            <p
-              className={`text-basis pr-3 text-sm ${
-                typeof entitlement.displayValue === 'string' ? 'font-medium' : ''
-              }`}
-            >
-              {entitlement.displayValue}
-            </p>
-          )}
+          {entitlement.displayValue && !openSelfService ? (
+            <div className="text-basis pr-3 text-sm font-medium">{entitlement.displayValue}</div>
+          ) : null}
         </div>
         {!openSelfService && (
           <Button

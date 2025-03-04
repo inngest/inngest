@@ -15,9 +15,12 @@ func NewInmemorySubscription(id uuid.UUID, writer func(m Message) error) Subscri
 
 // subMemory represents an in-memory noop subscription
 type subMemory struct {
-	calls  int32
-	id     uuid.UUID
-	writer func(m Message) error
+	writeCalls  int32
+	streamCalls int32
+	id          uuid.UUID
+
+	writer      func(m Message) error
+	chunkWriter func(c Chunk) error
 }
 
 func (s subMemory) ID() uuid.UUID {
@@ -29,9 +32,17 @@ func (s subMemory) Protocol() string {
 }
 
 func (s subMemory) WriteMessage(m Message) error {
-	atomic.AddInt32(&s.calls, 1)
+	atomic.AddInt32(&s.writeCalls, 1)
 	if s.writer != nil {
 		return s.writer(m)
+	}
+	return nil
+}
+
+func (s subMemory) WriteChunk(c Chunk) error {
+	atomic.AddInt32(&s.streamCalls, 1)
+	if s.chunkWriter != nil {
+		return s.chunkWriter(c)
 	}
 	return nil
 }

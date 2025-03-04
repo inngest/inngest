@@ -4,11 +4,19 @@ import { useState } from 'react';
 import { Alert } from '@inngest/components/Alert/Alert';
 import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal/Modal';
+import { resolveColor } from '@inngest/components/utils/colors';
+import { isDark } from '@inngest/components/utils/theme';
 import { CardElement, Elements, useElements, useStripe } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
+import resolveConfig from 'tailwindcss/resolveConfig';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
+import tailwindConfig from '../../../../tailwind.config';
+
+const {
+  theme: { textColor, placeholderColor },
+} = resolveConfig(tailwindConfig);
 
 type CheckoutModalProps = {
   onCancel: () => void;
@@ -105,7 +113,21 @@ function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
   return (
     <form onSubmit={handleSubmit}>
       <div className="min-h-[50px]">
-        <CardElement options={{}} />
+        <CardElement
+          options={{
+            style: {
+              base: {
+                color: resolveColor(textColor.basis, isDark()),
+                iconColor: resolveColor(textColor.basis, isDark()),
+                '::placeholder': { color: resolveColor(placeholderColor.disabled, isDark()) },
+              },
+              invalid: {
+                color: resolveColor(textColor.error, isDark()),
+                iconColor: resolveColor(textColor.error, isDark()),
+              },
+            },
+          }}
+        />
       </div>
       <div className="mt-6 flex flex-row justify-end">
         <Button
