@@ -3,11 +3,12 @@ package inngestgo
 import (
 	"context"
 	"fmt"
+	"net/url"
+
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngestgo/connect"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
-	"net/url"
 )
 
 const (
@@ -143,7 +144,7 @@ func (h *handler) InvokeFunction(ctx context.Context, slug string, stepId *strin
 	}
 
 	// Invoke function, always complete regardless of
-	resp, ops, err := invoke(context.Background(), fn, &request, stepId)
+	resp, ops, err := invoke(context.Background(), fn, h.GetSigningKey(), &request, stepId)
 
 	return resp, ops, err
 }

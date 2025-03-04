@@ -13,6 +13,7 @@ type ctxKey string
 const (
 	targetStepIDKey = ctxKey("stepID")
 	ParallelKey     = ctxKey("parallelKey")
+	isWithinStepKey = ctxKey("in-step")
 )
 
 var (
@@ -67,4 +68,15 @@ func preflight(ctx context.Context) sdkrequest.InvocationManager {
 		panic(ErrNotInFunction)
 	}
 	return mgr
+}
+
+func IsWithinStep(ctx context.Context) bool {
+	if v := ctx.Value(isWithinStepKey); v != nil {
+		return true
+	}
+	return false
+}
+
+func setWithinStep(ctx context.Context) context.Context {
+	return context.WithValue(ctx, isWithinStepKey, &struct{}{})
 }
