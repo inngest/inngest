@@ -61,9 +61,9 @@ export const getButtonColors = ({ kind, appearance, loading }: ButtonColorParams
 
 export const getButtonSizeStyles = ({ size, icon, label }: ButtonSizeStyleParams) => {
   const iconOnlySizeStyles = {
-    small: 'h-6 p-1',
-    medium: 'h-8 p-1.5',
-    large: 'h-10 p-1.5',
+    small: 'h-6 w-6',
+    medium: 'h-8 w-8',
+    large: 'h-10 w-10',
   };
 
   const sizeStyles = {
