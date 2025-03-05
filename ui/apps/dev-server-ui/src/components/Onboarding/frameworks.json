@@ -7,7 +7,7 @@
     },
     "version_supported": "v3.8.0+",
     "link": {
-      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-astro"
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-astro?ref=dev-server"
     },
     "language": "TypeScript"
   },
@@ -19,7 +19,7 @@
     },
     "version_supported": "v1.5.0+",
     "link": {
-      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-aws-lambda"
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-aws-lambda?ref=dev-server"
     },
     "language": "TypeScript"
   },
@@ -30,7 +30,7 @@
       "light": "https://cdn.inngest.com/logos/frameworks/bun.svg"
     },
     "link": {
-      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-bun"
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-bun?ref=dev-server"
     },
     "language": "TypeScript"
   },
@@ -41,7 +41,7 @@
       "light": "https://cdn.inngest.com/logos/frameworks/cloudflare-light.svg"
     },
     "link": {
-      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-cloudflare-pages"
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-cloudflare-pages?ref=dev-server"
     },
     "language": "TypeScript"
   },
@@ -53,7 +53,7 @@
     },
     "version_supported": "v3.19.15+",
     "link": {
-      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-cloudflare-workers"
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-cloudflare-workers?ref=dev-server"
     },
     "language": "TypeScript"
   },
@@ -64,7 +64,7 @@
       "light": "https://cdn.inngest.com/logos/frameworks/digital-ocean-light.svg"
     },
     "link": {
-      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-digitalocean-functions"
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-digitalocean-functions?ref=dev-server"
     },
     "language": "TypeScript"
   },
@@ -75,7 +75,7 @@
       "light": "https://cdn.inngest.com/logos/frameworks/express-light.svg"
     },
     "link": {
-      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-express"
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-express?ref=dev-server"
     },
     "language": "TypeScript"
   },
@@ -86,7 +86,7 @@
       "light": "https://cdn.inngest.com/logos/frameworks/fast-api-light.svg"
     },
     "link": {
-      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=python#exposing-inngest-functions"
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=python#exposing-inngest-functions?ref=dev-server"
     },
     "language": "Python"
   },
@@ -98,7 +98,7 @@
     },
     "version_supported": "v2.6.0+",
     "link": {
-      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-fastify"
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-fastify?ref=dev-server"
     },
     "language": "TypeScript"
   },
@@ -109,7 +109,7 @@
       "light": "https://cdn.inngest.com/logos/frameworks/flask.svg"
     },
     "link": {
-      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=python#exposing-inngest-functions"
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=python#exposing-inngest-functions?ref=dev-server"
     },
     "language": "Python"
   },
@@ -120,7 +120,7 @@
       "light": "https://cdn.inngest.com/logos/frameworks/deno-light.svg"
     },
     "link": {
-      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-fresh-deno"
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-fresh-deno?ref=dev-server"
     },
     "language": "TypeScript"
   },
@@ -131,7 +131,7 @@
       "light": "https://cdn.inngest.com/logos/frameworks/google-cloud-functions.svg"
     },
     "link": {
-      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-google-cloud-run-functions"
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-google-cloud-run-functions?ref=dev-server"
     },
     "language": "TypeScript"
   },
@@ -142,7 +142,7 @@
       "light": "https://cdn.inngest.com/logos/frameworks/firebase-cloud-functions.svg"
     },
     "link": {
-      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-firebase-cloud-functions"
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-firebase-cloud-functions?ref=dev-server"
     },
     "language": "TypeScript"
   },
@@ -154,7 +154,7 @@
     },
     "version_supported": "v2.7.0+",
     "link": {
-      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-h3"
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-h3?ref=dev-server"
     },
     "language": "TypeScript"
   },
@@ -165,7 +165,7 @@
       "light": "https://cdn.inngest.com/logos/frameworks/hono.svg"
     },
     "link": {
-      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-hono"
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-hono?ref=dev-server"
     },
     "language": "TypeScript"
   },
@@ -177,7 +177,7 @@
     },
     "version_supported": "v3.6.0+",
     "link": {
-      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-koa"
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-koa?ref=dev-server"
     },
     "language": "TypeScript"
   },
@@ -188,7 +188,7 @@
       "light": "https://cdn.inngest.com/logos/frameworks/nest-js.svg"
     },
     "link": {
-      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-nestjs"
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-nestjs?ref=dev-server"
     },
     "language": "TypeScript"
   },
@@ -199,7 +199,7 @@
       "light": "https://cdn.inngest.com/logos/frameworks/nextjs-light.svg"
     },
     "link": {
-      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-nextjs"
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-nextjs?ref=dev-server"
     },
     "language": "TypeScript"
   },
@@ -211,7 +211,7 @@
     },
     "version_supported": "v3.24.0+",
     "link": {
-      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-nitro"
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-nitro?ref=dev-server"
     },
     "language": "TypeScript"
   },
@@ -223,7 +223,7 @@
     },
     "version_supported": "v0.9.2+",
     "link": {
-      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-nuxt"
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-nuxt?ref=dev-server"
     },
     "language": "TypeScript"
   },
@@ -234,7 +234,7 @@
       "light": "https://cdn.inngest.com/logos/frameworks/redwood-light.svg"
     },
     "link": {
-      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-redwood"
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-redwood?ref=dev-server"
     },
     "language": "TypeScript"
   },
@@ -245,7 +245,7 @@
       "light": "https://cdn.inngest.com/logos/frameworks/remix-light.svg"
     },
     "link": {
-      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-remix"
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-remix?ref=dev-server"
     },
     "language": "TypeScript"
   },
@@ -257,7 +257,7 @@
     },
     "version_supported": "v3.5.0+",
     "link": {
-      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-sveltekit"
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript#framework-sveltekit?ref=dev-server"
     },
     "language": "TypeScript"
   }
