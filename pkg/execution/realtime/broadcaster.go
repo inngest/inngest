@@ -308,12 +308,18 @@ func (b *broadcaster) Publish(ctx context.Context, m Message) {
 		}
 
 		wg.Add(1)
-		go func(t topicsub) {
+		go func(msg Message, t topicsub) {
+			// Ensure we set the correct topic name for the given topic.
+			// Messages always have a custom topic name (eg. the step name),
+			// but are broadcast to internal topics such as "$step";  we need
+			// to update that for each topic here.
+			msg.Topic = t.Name
+
 			defer wg.Done()
 			t.eachSubscription(func(s Subscription) {
 				b.publishTo(ctx, s, m)
 			})
-		}(found)
+		}(m, found)
 	}
 
 	wg.Wait()
