@@ -104,7 +104,7 @@ export default function FrameworkList({ frameworksData, title, description }: Fr
           <li key={framework.framework} className="border-subtle rounded-sm border">
             <NextLink
               onClick={() =>
-                trackEvent('app/onboarding.action', {
+                trackEvent('cli/onboarding.action', {
                   metadata: {
                     type: 'btn-click',
                     label: 'choose-framework-from-list',

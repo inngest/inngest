@@ -23,7 +23,7 @@ export default function AppFAQ({ openByDefault = false }) {
           <div className="mb-8 grid grid-cols-1 gap-3 md:grid-cols-3">
             <HelperCard
               onClick={() =>
-                trackEvent('app/onboarding.action', {
+                trackEvent('cli/onboarding.action', {
                   metadata: {
                     type: 'btn-click',
                     label: 'choose-framework',
@@ -41,7 +41,7 @@ export default function AppFAQ({ openByDefault = false }) {
             />
             <HelperCard
               onClick={() =>
-                trackEvent('app/onboarding.action', {
+                trackEvent('cli/onboarding.action', {
                   metadata: {
                     type: 'btn-click',
                     label: 'choose-template',
@@ -59,7 +59,7 @@ export default function AppFAQ({ openByDefault = false }) {
             />
             <HelperCard
               onClick={() =>
-                trackEvent('app/onboarding.action', {
+                trackEvent('cli/onboarding.action', {
                   metadata: {
                     type: 'btn-click',
                     label: 'run-demo',
