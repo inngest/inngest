@@ -23,14 +23,21 @@ var (
 )
 
 var (
-	client = inngestgo.NewClient(inngestgo.ClientOpts{
-		EventKey: &key,
-	})
-	wg *sync.WaitGroup
+	client inngestgo.Client
+	wg     *sync.WaitGroup
 )
 
 func init() {
 	wg = &sync.WaitGroup{}
+
+	var err error
+	client, err = inngestgo.NewClient(inngestgo.ClientOpts{
+		AppID:    "tel",
+		EventKey: &key,
+	})
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Metadata holds telemetry context.

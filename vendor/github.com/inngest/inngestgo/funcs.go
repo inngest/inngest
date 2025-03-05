@@ -2,12 +2,21 @@ package inngestgo
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"reflect"
 	"time"
 
 	"github.com/gosimple/slug"
 	"github.com/inngest/inngest/pkg/inngest"
 )
+
+// Slugify converts a string to a slug. This is only useful for replicating the
+// legacy slugification logic for function IDs, aiding in migration to a newer
+// SDK version.
+func Slugify(s string) string {
+	return slug.Make(s)
+}
 
 // Ptr converts the given type to a pointer.  Nil pointers are sometimes
 // used for optional arguments within configuration, meaning we need pointers
@@ -45,6 +54,14 @@ type FunctionOpts struct {
 	RateLimit *RateLimit
 	// BatchEvents represents batching
 	BatchEvents *inngest.EventBatchConfig
+}
+
+func (f FunctionOpts) validate() error {
+	var err error
+	if f.ID == "" {
+		err = errors.Join(err, errors.New("id is required"))
+	}
+	return err
 }
 
 // GetRateLimit returns the inngest.RateLimit for function configuration.  The
@@ -181,16 +198,23 @@ func (t Timeouts) Convert() *inngest.Timeouts {
 //		},
 //	)
 func CreateFunction[T any](
+	c Client,
 	fc FunctionOpts,
 	trigger inngest.Trigger,
 	f SDKFunction[T],
-) ServableFunction {
+) (ServableFunction, error) {
 	// Validate that the input type is a concrete type, and not an interface.
 	//
 	// The only exception is `any`, when users don't care about the input event
 	// eg. for cron based functions.
 
+	err := fc.validate()
+	if err != nil {
+		return nil, err
+	}
+
 	sf := servableFunc{
+		appID:   c.AppID(),
 		fc:      fc,
 		trigger: trigger,
 		f:       f,
@@ -198,9 +222,16 @@ func CreateFunction[T any](
 
 	zt := sf.ZeroType()
 	if zt.Interface() == nil && zt.NumMethod() > 0 {
-		panic("You cannot use an interface type as the input within an Inngest function.")
+		return nil, errors.New("You cannot use an interface type as the input within an Inngest function.")
 	}
-	return sf
+
+	// TODO: This feels wrong but is necessary since there isn't a
+	// function-adding method on the client interface.
+	if v, ok := c.(*apiClient); ok {
+		v.h.Register(sf)
+	}
+
+	return sf, nil
 }
 
 func EventTrigger(name string, expression *string) inngest.Trigger {
@@ -237,8 +268,9 @@ type SDKFunction[T any] func(ctx context.Context, input Input[T]) (any, error)
 //
 // This is created via CreateFunction in this package.
 type ServableFunction interface {
-	// Slug returns the function's human-readable ID, such as "sign-up-flow".
-	Slug(appName string) string
+	FullyQualifiedID() string
+
+	ID() string
 
 	// Name returns the function name.
 	Name() string
@@ -275,6 +307,7 @@ type InputCtx struct {
 }
 
 type servableFunc struct {
+	appID   string
 	fc      FunctionOpts
 	trigger inngest.Trigger
 	f       any
@@ -284,22 +317,18 @@ func (s servableFunc) Config() FunctionOpts {
 	return s.fc
 }
 
-func (s servableFunc) Slug(appName string) string {
-	fnSlug := s.fc.ID
-	if fnSlug == "" {
-		fnSlug = slug.Make(s.fc.Name)
-	}
+func (s servableFunc) ID() string {
+	return s.fc.ID
+}
 
-	// Old format which only includes the fn slug
-	// This should no longer be used.
-	if appName == "" {
-		return fnSlug
-	}
-
-	return appName + "-" + fnSlug
+func (s servableFunc) FullyQualifiedID() string {
+	return fmt.Sprintf("%s-%s", s.appID, s.ID())
 }
 
 func (s servableFunc) Name() string {
+	if s.fc.Name == "" {
+		return s.ID()
+	}
 	return s.fc.Name
 }
 

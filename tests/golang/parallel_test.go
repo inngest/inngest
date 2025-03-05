@@ -24,7 +24,7 @@ func TestParallelSteps(t *testing.T) {
 	ctx := context.Background()
 
 	c := client.New(t)
-	h, server, registerFuncs := NewSDKHandler(t, "parallel")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "parallel")
 	defer server.Close()
 
 	var (
@@ -32,8 +32,9 @@ func TestParallelSteps(t *testing.T) {
 		runID   string
 	)
 
-	a := inngestgo.CreateFunction(
-		inngestgo.FunctionOpts{Name: "concurrent", Concurrency: []inngest.Concurrency{
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{ID: "concurrent", Concurrency: []inngest.Concurrency{
 			{Limit: 2, Scope: enums.ConcurrencyScopeFn},
 		}},
 		inngestgo.EventTrigger("test/parallel", nil),
@@ -76,11 +77,10 @@ func TestParallelSteps(t *testing.T) {
 			return res, nil
 		},
 	)
-
-	h.Register(a)
+	require.NoError(t, err)
 	registerFuncs()
 
-	_, err := inngestgo.Send(ctx, inngestgo.Event{
+	_, err = inngestClient.Send(ctx, inngestgo.Event{
 		Name: "test/parallel",
 		Data: map[string]any{"hello": "world"},
 	})

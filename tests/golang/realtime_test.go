@@ -22,7 +22,7 @@ import (
 
 func TestRealtime(t *testing.T) {
 	ctx := context.Background()
-	h, server, registerFuncs := NewSDKHandler(t, "realtime")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "realtime")
 	defer server.Close()
 
 	var (
@@ -31,8 +31,9 @@ func TestRealtime(t *testing.T) {
 		l                 sync.Mutex
 	)
 
-	fun := inngestgo.CreateFunction(
-		inngestgo.FunctionOpts{Name: "realtime"},
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{ID: "realtime"},
 		inngestgo.EventTrigger("test/realtime", nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			runID = input.InputCtx.RunID
@@ -59,7 +60,7 @@ func TestRealtime(t *testing.T) {
 			return map[string]any{"output": "fn result", "done": true}, nil
 		},
 	)
-	h.Register(fun)
+	require.NoError(t, err)
 	registerFuncs()
 
 	t.Run("It shows step results via step channel", func(t *testing.T) {
@@ -67,7 +68,7 @@ func TestRealtime(t *testing.T) {
 		// Lock the mutex so that the step doesn't finish until we let it.
 		l.Lock()
 
-		_, err := inngestgo.Send(ctx, inngestgo.Event{
+		_, err = inngestClient.Send(ctx, inngestgo.Event{
 			Name: "test/realtime",
 			Data: map[string]any{"number": 10},
 		})

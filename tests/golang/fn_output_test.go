@@ -20,14 +20,15 @@ func TestFnOutputTooLarge(t *testing.T) {
 	c := client.New(t)
 
 	appID := "TestFnOutputTooLarge"
-	h, server, registerFuncs := NewSDKHandler(t, appID)
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appID)
 	defer server.Close()
 
 	runID := ""
 	evtName := "my-event"
-	fn := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name:    "my-fn",
+			ID:      "my-fn",
 			Retries: inngestgo.IntPtr(0),
 		},
 		inngestgo.EventTrigger(evtName, nil),
@@ -36,12 +37,11 @@ func TestFnOutputTooLarge(t *testing.T) {
 			return strings.Repeat("A", consts.MaxSDKResponseBodySize+1), nil
 		},
 	)
-
-	h.Register(fn)
+	r.NoError(err)
 	registerFuncs()
 
 	// Trigger the main function and successfully invoke the other function
-	_, err := inngestgo.Send(ctx, &event.Event{Name: evtName})
+	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
 	run := c.WaitForRunStatus(ctx, t, "FAILED", &runID)
 	var output string
