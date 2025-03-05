@@ -2028,15 +2028,15 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 	// step output to any realtime subscribers.
 	if e.rtpub != nil {
 		e.rtpub.Publish(ctx, realtime.Message{
-			Kind:       streamingtypes.MessageKindStep,
-			Data:       gen.Data,
-			TopicNames: []string{gen.UserDefinedName()},
-			EnvID:      i.md.ID.Tenant.EnvID,
-			FnID:       i.md.ID.FunctionID,
-			FnSlug:     i.f.GetSlug(),
-			Channel:    i.md.ID.RunID.String(),
-			CreatedAt:  time.Now(),
-			RunID:      i.md.ID.RunID,
+			Kind:      streamingtypes.MessageKindStep,
+			Data:      gen.Data,
+			Topic:     gen.UserDefinedName(),
+			EnvID:     i.md.ID.Tenant.EnvID,
+			FnID:      i.md.ID.FunctionID,
+			FnSlug:    i.f.GetSlug(),
+			Channel:   i.md.ID.RunID.String(),
+			CreatedAt: time.Now(),
+			RunID:     i.md.ID.RunID,
 		})
 	}
 

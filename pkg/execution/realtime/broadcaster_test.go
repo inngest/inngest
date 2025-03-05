@@ -275,10 +275,10 @@ func TestBroadcasterStream(t *testing.T) {
 
 	// Subscribe to our topics
 	msg := Message{
-		Kind:       streamingtypes.MessageKindDataStreamStart,
-		Channel:    "user:123",
-		TopicNames: []string{"openai"},
-		Data:       json.RawMessage(`streamid123`),
+		Kind:    streamingtypes.MessageKindDataStreamStart,
+		Channel: "user:123",
+		Topic:   "openai",
+		Data:    json.RawMessage(`streamid123`),
 	}
 
 	err := b.Subscribe(ctx, sub, msg.Topics())
