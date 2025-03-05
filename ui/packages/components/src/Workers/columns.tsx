@@ -33,15 +33,15 @@ export function useColumns() {
       cell: ({ row }: { row: Row<Worker> }) => {
         return row.getCanExpand() ? (
           <Button
-            className="group"
             appearance="ghost"
             kind="secondary"
+            size="small"
             onClick={row.getToggleExpandedHandler()}
             icon={
               <RiArrowRightSLine
                 className={cn(
                   row.getIsExpanded() ? 'rotate-90' : undefined,
-                  'transform-90 h-5 w-5 transition-transform duration-500'
+                  'transform-90 transition-transform duration-500'
                 )}
               />
             }

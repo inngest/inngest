@@ -149,9 +149,9 @@ export function AppCardFooter({ kind, headerTitle, headerSecondaryCTA, content }
             <AccordionPrimitive.Trigger asChild>
               <span className="group flex items-center gap-1 text-sm font-medium">
                 <Button
-                  className="h-6 p-1"
                   appearance="ghost"
                   kind="secondary"
+                  size="small"
                   icon={
                     <RiArrowDownSLine
                       className={cn(
