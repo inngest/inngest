@@ -77,7 +77,7 @@ export const getButtonSizeStyles = ({ size, icon, label }: ButtonSizeStyleParams
 
 export const getIconSizeStyles = ({ size }: ButtonSizeParams) => {
   const sizeStyles = {
-    small: 'h-4 w-4',
+    small: 'h-[12px] w-[12px]',
     medium: 'h-4 w-4',
     large: 'h-4 w-4',
   };
