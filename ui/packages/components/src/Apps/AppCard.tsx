@@ -27,25 +27,25 @@ const kindStyles = {
 export function SkeletonCard() {
   return (
     <Card>
-      <div className="text-basis mb-px ml-1 flex h-44 flex-col justify-between p-6">
+      <div className="text-basis mb-px ml-1 flex flex-col justify-between p-6">
         <div className="mb-6">
           <div className="pb-3">
             <Skeleton className="mb-2 block h-8 w-96" />
           </div>
         </div>
 
-        <div className="grid grid-cols-5 gap-5 pt-1.5">
+        <div className="flex flex-wrap items-center gap-x-12 gap-y-6 pt-1.5">
           <DescriptionListItem
             term="Last synced at"
             detail={<Skeleton className="block h-5 w-36" />}
           />
-          <DescriptionListItem term="Method" detail={<Skeleton className="block h-5 w-28" />} />
+          <DescriptionListItem term="Method" detail={<Skeleton className="block h-5 w-20" />} />
           <DescriptionListItem
             term="SDK version"
-            detail={<Skeleton className="block h-5 w-14" />}
+            detail={<Skeleton className="block h-5 w-12" />}
           />
-          <DescriptionListItem term="Language" detail={<Skeleton className="block h-5 w-28" />} />
-          <DescriptionListItem term="Framework" detail={<Skeleton className="block h-5 w-28" />} />
+          <DescriptionListItem term="Language" detail={<Skeleton className="block h-5 w-20" />} />
+          <DescriptionListItem term="Framework" detail={<Skeleton className="block h-5 w-20" />} />
         </div>
       </div>
       <div className="border-muted border-t px-6 py-3">
@@ -76,7 +76,7 @@ export function AppCardContent({ url, app, pill, actions, workerCounter }: CardC
   const Wrapper = url ? 'a' : 'div';
 
   return (
-    <div className="text-basis flex h-44 flex-col justify-between p-6">
+    <div className="text-basis flex flex-col justify-between p-6">
       <div className="mb-6">
         <div className="items-top flex justify-between">
           <Wrapper className="inline text-xl" href={url}>
@@ -95,7 +95,7 @@ export function AppCardContent({ url, app, pill, actions, workerCounter }: CardC
         </p>
       </div>
 
-      <dl className="grid grid-cols-5 gap-4">
+      <dl className="flex flex-wrap items-center gap-x-12 gap-y-6">
         {app.lastSyncedAt && (
           <DescriptionListItem term="Last synced at" detail={<Time value={app.lastSyncedAt} />} />
         )}
