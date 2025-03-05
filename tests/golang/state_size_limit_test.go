@@ -3,13 +3,14 @@ package golang
 import (
 	"context"
 	"fmt"
-	"github.com/inngest/inngestgo/step"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/url"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/inngest/inngestgo/step"
+	"github.com/stretchr/testify/require"
 
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
@@ -22,16 +23,17 @@ func TestFunctionStateSizeLimit(t *testing.T) {
 	ctx := context.Background()
 
 	c := client.New(t)
-	h, server, registerFuncs := NewSDKHandler(t, "fnrun")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "fnrun")
 	defer server.Close()
 
 	var (
 		ok        int32
 		lastRunId string
 	)
-	fn1 := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "fn-state-size-limit",
+			ID: "fn-state-size-limit",
 		},
 		inngestgo.EventTrigger("test/state-size.limit", nil),
 		func(ctx context.Context, input inngestgo.Input[FnRunTestEvt]) (any, error) {
@@ -56,8 +58,7 @@ func TestFunctionStateSizeLimit(t *testing.T) {
 			return nil, nil
 		},
 	)
-
-	h.Register(fn1)
+	require.NoError(t, err)
 	registerFuncs()
 
 	functions, err := c.Functions(ctx)
@@ -107,7 +108,7 @@ func TestFunctionStateSizeLimit(t *testing.T) {
 	t.Run("should fail due to state size limit reached", func(t *testing.T) {
 		setStateSizeLimit(t, 1)
 
-		_, _ = inngestgo.Send(ctx, inngestgo.Event{Name: "test/state-size.limit", Data: map[string]any{"success": true}})
+		_, _ = inngestClient.Send(ctx, inngestgo.Event{Name: "test/state-size.limit", Data: map[string]any{"success": true}})
 
 		<-time.After(3 * time.Second)
 

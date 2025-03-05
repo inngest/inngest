@@ -23,7 +23,7 @@ func TestFunctionSteps(t *testing.T) {
 	ctx := context.Background()
 
 	c := client.New(t)
-	h, server, registerFuncs := NewSDKHandler(t, "my-app")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "my-app")
 	defer server.Close()
 
 	var (
@@ -31,8 +31,9 @@ func TestFunctionSteps(t *testing.T) {
 		runID   string
 	)
 
-	a := inngestgo.CreateFunction(
-		inngestgo.FunctionOpts{Name: "test sdk"},
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{ID: "test-sdk"},
 		inngestgo.EventTrigger("test/sdk-steps", nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			runID = input.InputCtx.RunID
@@ -76,7 +77,7 @@ func TestFunctionSteps(t *testing.T) {
 			return true, nil
 		},
 	)
-	h.Register(a)
+	require.NoError(t, err)
 	registerFuncs()
 
 	evt := inngestgo.Event{
@@ -86,7 +87,7 @@ func TestFunctionSteps(t *testing.T) {
 			"id":   "1",
 		},
 	}
-	_, err := inngestgo.Send(ctx, evt)
+	_, err = inngestClient.Send(ctx, evt)
 	require.NoError(t, err)
 
 	<-time.After(3 * time.Second)
@@ -125,7 +126,7 @@ func TestFunctionSteps(t *testing.T) {
 
 	t.Run("waitForEvents succeed", func(t *testing.T) {
 		// Send the first event to trigger the wait.
-		_, err = inngestgo.Send(ctx, inngestgo.Event{
+		_, err = inngestClient.Send(ctx, inngestgo.Event{
 			Name: "api/new.event",
 			Data: map[string]any{
 				"test": true,
@@ -136,7 +137,7 @@ func TestFunctionSteps(t *testing.T) {
 		<-time.After(time.Second)
 
 		// And the second event to trigger the next wait.
-		_, err = inngestgo.Send(ctx, inngestgo.Event{
+		_, err = inngestClient.Send(ctx, inngestgo.Event{
 			Name: "api/new.event",
 			Data: map[string]any{
 				"ok": "yes",

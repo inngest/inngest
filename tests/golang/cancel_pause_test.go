@@ -31,7 +31,7 @@ func TestPauseCancelFunction(t *testing.T) {
 
 	appName := "app-test-pause-cancel" + randomSuffix
 	c := client.New(t)
-	h, server, registerFuncs := NewSDKHandler(t, appName)
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appName)
 	defer server.Close()
 
 	var (
@@ -42,9 +42,10 @@ func TestPauseCancelFunction(t *testing.T) {
 
 	triggerEvtName := uuid.New().String()
 
-	a := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "function-test-pause-cancel",
+			ID: "function-test-pause-cancel",
 		},
 		inngestgo.EventTrigger(triggerEvtName, nil),
 		func(ctx context.Context, input inngestgo.Input[testCancelEvt]) (any, error) {
@@ -66,11 +67,13 @@ func TestPauseCancelFunction(t *testing.T) {
 			return true, nil
 		},
 	)
+	require.NoError(t, err)
 
 	fnSlug := appName + "-function-test-pause-cancel"
 
-	cf := inngestgo.CreateFunction(
-		inngestgo.FunctionOpts{Name: "handle-cancel"},
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{ID: "handle-cancel"},
 		inngestgo.EventTrigger(
 			"inngest/function.cancelled",
 			inngestgo.StrPtr(fmt.Sprintf("event.data.function_id == '%s'", fnSlug)),
@@ -84,7 +87,7 @@ func TestPauseCancelFunction(t *testing.T) {
 		},
 	)
 
-	h.Register(a, cf)
+	require.NoError(t, err)
 	registerFuncs()
 
 	fnId := ""
@@ -177,7 +180,7 @@ func TestPauseCancelFunction(t *testing.T) {
 		Name: triggerEvtName,
 		Data: map[string]any{"cancel": 1},
 	}
-	_, err := inngestgo.Send(ctx, evt)
+	_, err = inngestClient.Send(ctx, evt)
 	require.NoError(t, err)
 
 	t.Run("check run", func(t *testing.T) {

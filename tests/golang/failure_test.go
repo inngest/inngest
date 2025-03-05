@@ -21,7 +21,7 @@ func TestFunctionFailure(t *testing.T) {
 	ctx := context.Background()
 
 	c := client.New(t)
-	h, server, registerFuncs := NewSDKHandler(t, "fnfail")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "fnfail")
 	defer server.Close()
 
 	// Create our function.
@@ -29,9 +29,10 @@ func TestFunctionFailure(t *testing.T) {
 		counter int32
 		runID   string
 	)
-	fn := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name:    "test sdk",
+			ID:      "test-sdk",
 			Retries: inngestgo.IntPtr(0),
 		},
 		inngestgo.EventTrigger("failure/run", nil),
@@ -43,7 +44,7 @@ func TestFunctionFailure(t *testing.T) {
 			return true, fmt.Errorf("nope!")
 		},
 	)
-	h.Register(fn)
+	require.NoError(t, err)
 
 	// Register the fns via the test SDK harness above.
 	registerFuncs()
@@ -55,7 +56,7 @@ func TestFunctionFailure(t *testing.T) {
 			"foo": "bar",
 		},
 	}
-	_, err := inngestgo.Send(ctx, evt)
+	_, err = inngestClient.Send(ctx, evt)
 	require.NoError(t, err)
 
 	<-time.After(5 * time.Second)
@@ -95,7 +96,7 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 	ctx := context.Background()
 
 	c := client.New(t)
-	h, server, registerFuncs := NewSDKHandler(t, "fnfail-retry")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "fnfail-retry")
 	defer server.Close()
 
 	// Create our function.
@@ -103,9 +104,10 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 		counter int32
 		runID   string
 	)
-	fn := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name:    "test sdk fail with retry",
+			ID:      "test-sdk-fail-with-retry",
 			Retries: inngestgo.IntPtr(1),
 		},
 		inngestgo.EventTrigger("failure/run-retry", nil),
@@ -116,7 +118,7 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 			return true, fmt.Errorf("nope!")
 		},
 	)
-	h.Register(fn)
+	require.NoError(t, err)
 
 	// Register the fns via the test SDK harness above.
 	registerFuncs()
@@ -128,7 +130,7 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 			"foo": "bar",
 		},
 	}
-	_, err := inngestgo.Send(ctx, evt)
+	_, err = inngestClient.Send(ctx, evt)
 	require.NoError(t, err)
 
 	<-time.After(5 * time.Second)
@@ -232,13 +234,14 @@ func TestFunctionResponseTooLargeFailure(t *testing.T) {
 	ctx := context.Background()
 
 	c := client.New(t)
-	h, server, registerFuncs := NewSDKHandler(t, "fail-large-response_output")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "fail-large-response_output")
 	defer server.Close()
 
 	var runID string
-	fn := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name:    "test-sdk-response-too-large",
+			ID:      "test-sdk-response-too-large",
 			Retries: inngestgo.IntPtr(0),
 		},
 		inngestgo.EventTrigger("failure/run-response-too-large", nil),
@@ -247,7 +250,7 @@ func TestFunctionResponseTooLargeFailure(t *testing.T) {
 			return strings.Repeat("A", consts.MaxSDKResponseBodySize*10), nil
 		},
 	)
-	h.Register(fn)
+	require.NoError(t, err)
 
 	registerFuncs()
 
@@ -257,7 +260,7 @@ func TestFunctionResponseTooLargeFailure(t *testing.T) {
 			"foo": "bar",
 		},
 	}
-	_, err := inngestgo.Send(ctx, evt)
+	_, err = inngestClient.Send(ctx, evt)
 	require.NoError(t, err)
 
 	t.Run("trace run should fail with output too large error", func(t *testing.T) {
@@ -308,13 +311,14 @@ func TestFunctionResponseTooLargeFailureWithRetry(t *testing.T) {
 	ctx := context.Background()
 
 	c := client.New(t)
-	h, server, registerFuncs := NewSDKHandler(t, "fail-large-response_output")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "fail-large-response_output")
 	defer server.Close()
 
 	var runID string
-	fn := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name:    "test sdk response too large",
+			ID:      "test-sdk-response-too-large",
 			Retries: inngestgo.IntPtr(1),
 		},
 		inngestgo.EventTrigger("failure/run-response-too-large-retry", nil),
@@ -323,7 +327,7 @@ func TestFunctionResponseTooLargeFailureWithRetry(t *testing.T) {
 			return strings.Repeat("A", consts.MaxSDKResponseBodySize*10), nil
 		},
 	)
-	h.Register(fn)
+	require.NoError(t, err)
 
 	registerFuncs()
 
@@ -333,7 +337,7 @@ func TestFunctionResponseTooLargeFailureWithRetry(t *testing.T) {
 			"foo": "bar",
 		},
 	}
-	_, err := inngestgo.Send(ctx, evt)
+	_, err = inngestClient.Send(ctx, evt)
 	require.NoError(t, err)
 
 	t.Run("in progress run with large response body", func(t *testing.T) {

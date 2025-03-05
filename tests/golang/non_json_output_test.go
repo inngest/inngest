@@ -38,20 +38,22 @@ func TestNonJSONOutput(t *testing.T) {
 		eventName := fmt.Sprintf("my-event-%s", ulid.MustNew(ulid.Now(), nil).String())
 
 		// Start app
-		ekey := "test"
-		inngestgo.DefaultClient = inngestgo.NewClient(
-			inngestgo.ClientOpts{EventKey: &ekey},
-		)
 		_ = os.Setenv("INNGEST_DEV", DEV_URL)
-		opts := inngestgo.HandlerOpts{
-			Logger:      slog.Default(),
-			RegisterURL: inngestgo.StrPtr(fmt.Sprintf("%s/fn/register", DEV_URL)),
-			URL:         proxyURL,
-		}
-		h := inngestgo.NewHandler("my-app", opts)
-		fn := inngestgo.CreateFunction(
+		ekey := "test"
+		inngestClient, err := inngestgo.NewClient(
+			inngestgo.ClientOpts{
+				AppID:       "my-app",
+				Logger:      slog.Default(),
+				RegisterURL: inngestgo.StrPtr(fmt.Sprintf("%s/fn/register", DEV_URL)),
+				URL:         proxyURL,
+				EventKey:    &ekey,
+			},
+		)
+		r.NoError(err)
+		_, err = inngestgo.CreateFunction(
+			inngestClient,
 			inngestgo.FunctionOpts{
-				Name:    "my-fn",
+				ID:      "my-fn",
 				Retries: inngestgo.IntPtr(0),
 			},
 			inngestgo.EventTrigger(eventName, nil),
@@ -59,8 +61,8 @@ func TestNonJSONOutput(t *testing.T) {
 				return nil, nil
 			},
 		)
-		h.Register(fn)
-		server := NewHTTPServer(h)
+		r.NoError(err)
+		server := NewHTTPServer(inngestClient.Serve())
 		defer server.Close()
 
 		// Sync
@@ -74,7 +76,7 @@ func TestNonJSONOutput(t *testing.T) {
 			_ = resp.Body.Close()
 		}, 5*time.Second, 100*time.Millisecond)
 
-		eventID, err := inngestgo.Send(
+		eventID, err := inngestClient.Send(
 			ctx,
 			inngestgo.Event{Data: map[string]any{"foo": 1}, Name: eventName},
 		)

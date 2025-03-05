@@ -14,7 +14,7 @@ import (
 )
 
 func TestConcurrency_ScopeFunction(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t, "concurrency")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "concurrency")
 	defer server.Close()
 
 	var (
@@ -26,9 +26,10 @@ func TestConcurrency_ScopeFunction(t *testing.T) {
 
 	trigger := "test/concurrency-fn"
 
-	a := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "fn concurrency",
+			ID: "fn-concurrency",
 			Concurrency: []inngest.Concurrency{
 				{
 					Limit: 1,
@@ -51,12 +52,12 @@ func TestConcurrency_ScopeFunction(t *testing.T) {
 			return true, nil
 		},
 	)
-	h.Register(a)
+	require.NoError(t, err)
 	registerFuncs()
 
 	for i := 0; i < numEvents; i++ {
 		go func() {
-			_, err := inngestgo.Send(context.Background(), inngestgo.Event{
+			_, err := inngestClient.Send(context.Background(), inngestgo.Event{
 				Name: trigger,
 				Data: map[string]any{
 					"test": true,
@@ -82,7 +83,7 @@ func TestConcurrency_ScopeFunction(t *testing.T) {
 // TestConcurrency_ScopeFunction_FanOut tests function limits with two functions,
 // both of which should run.
 func TestConcurrency_ScopeFunction_FanOut(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t, "concurrency")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "concurrency")
 	defer server.Close()
 
 	var (
@@ -95,9 +96,10 @@ func TestConcurrency_ScopeFunction_FanOut(t *testing.T) {
 
 	trigger := "test/concurrency-acct"
 
-	a := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "acct concurrency",
+			ID: "acct-concurrency",
 			Concurrency: []inngest.Concurrency{
 				{
 					Limit: 1,
@@ -116,9 +118,11 @@ func TestConcurrency_ScopeFunction_FanOut(t *testing.T) {
 			return true, nil
 		},
 	)
-	b := inngestgo.CreateFunction(
+	require.NoError(t, err)
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "acct concurrency v2",
+			ID: "acct-concurrency-v2",
 			Concurrency: []inngest.Concurrency{
 				{
 					Limit: 1,
@@ -137,13 +141,12 @@ func TestConcurrency_ScopeFunction_FanOut(t *testing.T) {
 			return true, nil
 		},
 	)
-
-	h.Register(a, b)
+	require.NoError(t, err)
 	registerFuncs()
 
 	for i := 0; i < numEvents; i++ {
 		go func() {
-			_, err := inngestgo.Send(context.Background(), inngestgo.Event{
+			_, err := inngestClient.Send(context.Background(), inngestgo.Event{
 				Name: trigger,
 				Data: map[string]any{
 					"test": true,
@@ -170,7 +173,7 @@ func TestConcurrency_ScopeFunction_FanOut(t *testing.T) {
 
 // TestConcurrency_ScopeFunction_Key asserts that keys in function concurrency work as expected.
 func TestConcurrency_ScopeFunction_Key(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t, "concurrency")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "concurrency")
 	defer server.Close()
 
 	var (
@@ -182,9 +185,10 @@ func TestConcurrency_ScopeFunction_Key(t *testing.T) {
 
 	trigger := "test/concurrency-key-fn"
 
-	a := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "fn concurrency",
+			ID: "fn-concurrency",
 			Concurrency: []inngest.Concurrency{
 				{
 					Limit: 1,
@@ -207,7 +211,7 @@ func TestConcurrency_ScopeFunction_Key(t *testing.T) {
 			return true, nil
 		},
 	)
-	h.Register(a)
+	require.NoError(t, err)
 	registerFuncs()
 
 	// Send events 0, 1, 2.  Because the "num" is a concurrency key and 0 is already
@@ -215,7 +219,7 @@ func TestConcurrency_ScopeFunction_Key(t *testing.T) {
 	for i := 0; i < numEvents; i++ {
 		int := i
 		go func() {
-			_, err := inngestgo.Send(context.Background(), inngestgo.Event{
+			_, err := inngestClient.Send(context.Background(), inngestgo.Event{
 				Name: trigger,
 				Data: map[string]any{
 					"num": int,
@@ -227,7 +231,7 @@ func TestConcurrency_ScopeFunction_Key(t *testing.T) {
 
 	// Send a dupe 0 event.
 	go func() {
-		_, err := inngestgo.Send(context.Background(), inngestgo.Event{
+		_, err := inngestClient.Send(context.Background(), inngestgo.Event{
 			Name: trigger,
 			Data: map[string]any{
 				"num": 0,
@@ -255,7 +259,7 @@ func TestConcurrency_ScopeFunction_Key(t *testing.T) {
 // TestConcurrency_ScopeFunction_Key_Fn asserts that keys in function concurrency work as expected,
 // when mixed with function concurrency overall.
 func TestConcurrency_ScopeFunction_Key_Fn(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t, "concurrency")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "concurrency")
 	defer server.Close()
 
 	var (
@@ -269,9 +273,10 @@ func TestConcurrency_ScopeFunction_Key_Fn(t *testing.T) {
 
 	trigger := "test/concurrency-key-fn-mixed"
 
-	a := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "multiple fn concurrency",
+			ID: "multiple-fn-concurrency",
 			Concurrency: []inngest.Concurrency{
 				{
 					Limit: limit,
@@ -298,7 +303,7 @@ func TestConcurrency_ScopeFunction_Key_Fn(t *testing.T) {
 			return true, nil
 		},
 	)
-	h.Register(a)
+	require.NoError(t, err)
 	registerFuncs()
 
 	// Send events 0, 1, 2.  Because the "num" is a concurrency key and 0 is already
@@ -306,7 +311,7 @@ func TestConcurrency_ScopeFunction_Key_Fn(t *testing.T) {
 	for i := 0; i < numEvents; i++ {
 		int := i
 		go func() {
-			_, err := inngestgo.Send(context.Background(), inngestgo.Event{
+			_, err := inngestClient.Send(context.Background(), inngestgo.Event{
 				Name: trigger,
 				Data: map[string]any{
 					"num": int,
@@ -318,7 +323,7 @@ func TestConcurrency_ScopeFunction_Key_Fn(t *testing.T) {
 
 	// Send a dupe 0 event.
 	go func() {
-		_, err := inngestgo.Send(context.Background(), inngestgo.Event{
+		_, err := inngestClient.Send(context.Background(), inngestgo.Event{
 			Name: trigger,
 			Data: map[string]any{
 				"num": 0,

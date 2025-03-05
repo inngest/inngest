@@ -15,7 +15,7 @@ import (
 )
 
 func TestConcurrency_ScopeAccount(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t, "concurrency")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "concurrency")
 	defer server.Close()
 
 	var (
@@ -39,9 +39,10 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 		return true, nil
 	}
 
-	a := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "acct concurrency",
+			ID: "acct-concurrency",
 			Concurrency: []inngest.Concurrency{
 				{
 					Limit: 1,
@@ -53,9 +54,11 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 		inngestgo.EventTrigger(trigger, nil),
 		handler,
 	)
-	b := inngestgo.CreateFunction(
+	require.NoError(t, err)
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "acct concurrency v2",
+			ID: "acct-concurrency-v2",
 			Concurrency: []inngest.Concurrency{
 				{
 					Limit: 1,
@@ -67,12 +70,12 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 		inngestgo.EventTrigger(trigger, nil),
 		handler,
 	)
-	h.Register(a, b)
+	require.NoError(t, err)
 	registerFuncs()
 
 	for i := 0; i < numEvents; i++ {
 		go func() {
-			_, err := inngestgo.Send(context.Background(), inngestgo.Event{
+			_, err := inngestClient.Send(context.Background(), inngestgo.Event{
 				Name: trigger,
 				Data: map[string]any{
 					"test": true,
