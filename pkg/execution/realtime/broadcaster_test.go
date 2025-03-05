@@ -36,9 +36,10 @@ func TestBroadcaster(t *testing.T) {
 
 	t.Run("broadcasting", func(t *testing.T) {
 		msg := Message{
-			Kind:    streamingtypes.MessageKindRun,
+			Kind:    streamingtypes.MessageKindData,
 			Data:    json.RawMessage(`"output"`),
 			Channel: ulid.MustNew(ulid.Now(), rand.Reader).String(),
+			Topic:   "sometopic",
 		}
 
 		t.Run("no subscriptions", func(t *testing.T) {
@@ -156,7 +157,7 @@ func TestBroadcasterConds(t *testing.T) {
 			b   = NewInProcessBroadcaster().(*broadcaster)
 			sub = NewInmemorySubscription(uuid.New(), nil)
 			msg = Message{
-				Kind:    streamingtypes.MessageKindRun,
+				Kind:    streamingtypes.MessageKindData,
 				Data:    json.RawMessage(`"output"`),
 				Channel: ulid.MustNew(ulid.Now(), rand.Reader).String(),
 			}
@@ -202,7 +203,7 @@ func TestBroadcasterConds(t *testing.T) {
 			b   = NewInProcessBroadcaster().(*broadcaster)
 			sub = NewInmemorySubscription(uuid.New(), nil)
 			msg = Message{
-				Kind:    streamingtypes.MessageKindRun,
+				Kind:    streamingtypes.MessageKindData,
 				Data:    json.RawMessage(`"output"`),
 				Channel: ulid.MustNew(ulid.Now(), rand.Reader).String(),
 			}

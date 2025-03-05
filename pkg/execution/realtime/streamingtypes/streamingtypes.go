@@ -204,41 +204,44 @@ func (m Message) Topics() []Topic {
 
 		topics[1] = Topic{
 			Kind:    TopicKindRun,
+			Name:    m.Topic,
 			Channel: m.Channel,
 			EnvID:   m.EnvID,
-			Name:    m.Topic,
 		}
 
 		return topics
 	case MessageKindRun:
 		// This message is a run output.
-		topics := make([]Topic, 2)
-
-		// Always publish step outputs to the "$step" topic, alongside
-		// the topic names within the message (which includes the step name)
-		topics[0] = Topic{
+		// Always publish step outputs to the "$run" topic.
+		builtin := Topic{
 			Kind:    TopicKindRun,
 			Name:    TopicNameRun,
 			Channel: m.Channel,
 			EnvID:   m.EnvID,
 		}
 
-		topics[1] = Topic{
-			Kind:    TopicKindRun,
-			Channel: m.Channel,
-			EnvID:   m.EnvID,
-			Name:    m.Topic,
+		if m.Topic == "" {
+			// No topic name for run ends;  use the builtin only.
+			return []Topic{builtin}
 		}
 
+		topics := make([]Topic, 2)
+		topics[0] = builtin
+		topics[1] = Topic{
+			Kind:    TopicKindRun,
+			Name:    m.Topic,
+			Channel: m.Channel,
+			EnvID:   m.EnvID,
+		}
 		return topics
 	}
 
 	// Default to topic kinds of Run
 	return []Topic{Topic{
 		Kind:    TopicKindRun,
+		Name:    m.Topic,
 		Channel: m.Channel,
 		EnvID:   m.EnvID,
-		Name:    m.Topic,
 	}}
 }
 
