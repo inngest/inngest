@@ -29,23 +29,32 @@ type InvocationManager interface {
 	// AppendOp pushes a new generator op to the stack for future execution.
 	AppendOp(op state.GeneratorOpcode)
 	// Ops returns all pushed generator ops to the stack for future execution.
+	// These represent new steps that have not been previously memoized.
 	Ops() []state.GeneratorOpcode
 	// Step returns step data for the given unhashed operation, if present in the
 	// incoming request data.
 	Step(op UnhashedOp) (json.RawMessage, bool)
+	// ReplayedStep returns whether we've replayed the given hashed step ID yet.
+	ReplayedStep(hashedID string) bool
 	// NewOp generates a new unhashed op for creating a state.GeneratorOpcode.  This
 	// is required for future execution of a step.
 	NewOp(op enums.Opcode, id string, opts map[string]any) UnhashedOp
+	// SigningKey returns the signing key used for this request.  This lets us
+	// retrieve creds for eg. publishing or API alls.
+	SigningKey() string
 }
 
 // NewManager returns an InvocationManager to manage the incoming executor request.  This
 // is required for step tooling to process.
-func NewManager(cancel context.CancelFunc, request *Request) InvocationManager {
+func NewManager(cancel context.CancelFunc, request *Request, signingKey string) InvocationManager {
 	return &requestCtxManager{
-		cancel:  cancel,
-		request: request,
-		indexes: map[string]int{},
-		l:       &sync.RWMutex{},
+		cancel:     cancel,
+		request:    request,
+		indexes:    map[string]int{},
+		l:          &sync.RWMutex{},
+		signingKey: signingKey,
+		seen:       map[string]struct{}{},
+		seenLock:   &sync.RWMutex{},
 	}
 }
 
@@ -59,6 +68,8 @@ func Manager(ctx context.Context) (InvocationManager, bool) {
 }
 
 type requestCtxManager struct {
+	// key is the signing key
+	signingKey string
 	// cancel ends the context and prevents any other tools from running.
 	cancel func()
 	// err stores the error from any step ran.
@@ -71,6 +82,15 @@ type requestCtxManager struct {
 	// Indexes represents a map of indexes for each unhashed op.
 	indexes map[string]int
 	l       *sync.RWMutex
+
+	// seen represents all ops seen in this request, by calling Step(ctx)
+	// to retrieve step data.
+	seen     map[string]struct{}
+	seenLock *sync.RWMutex
+}
+
+func (r *requestCtxManager) SigningKey() string {
+	return r.signingKey
 }
 
 func (r *requestCtxManager) Cancel() {
@@ -110,10 +130,23 @@ func (r *requestCtxManager) Ops() []state.GeneratorOpcode {
 }
 
 func (r *requestCtxManager) Step(op UnhashedOp) (json.RawMessage, bool) {
+	hash := op.MustHash()
 	r.l.RLock()
 	defer r.l.RUnlock()
-	val, ok := r.request.Steps[op.MustHash()]
+	val, ok := r.request.Steps[hash]
+	if ok {
+		r.seenLock.Lock()
+		r.seen[hash] = struct{}{}
+		r.seenLock.Unlock()
+	}
 	return val, ok
+}
+
+func (r *requestCtxManager) ReplayedStep(hashedID string) bool {
+	r.seenLock.RLock()
+	_, ok := r.seen[hashedID]
+	r.seenLock.RUnlock()
+	return ok
 }
 
 func (r *requestCtxManager) NewOp(op enums.Opcode, id string, opts map[string]any) UnhashedOp {

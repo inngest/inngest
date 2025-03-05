@@ -15,33 +15,16 @@ type Topic = streamingtypes.Topic
 type Chunk = streamingtypes.Chunk
 
 var (
-	DefaultURL = "https://api.inngest.com/v1/realtime/connect"
+	DefaultSubscribeURL = "https://api.inngest.com/v1/realtime/connect"
 )
-
-func do() {
-	stream, err := Subscribe(context.Background(), "")
-	if err != nil {
-		return
-	}
-
-	for item := range stream {
-		switch item.Kind() {
-		case StreamMessage:
-		case StreamChunk:
-		case StreamError:
-			break
-		}
-	}
-}
 
 // Subscribe subscribes to a given set of channels and topics as granted by
 // the current token.
 func Subscribe(ctx context.Context, token string) (chan StreamItem, error) {
-	return SubscribeWithURL(ctx, DefaultURL, token)
+	return SubscribeWithURL(ctx, DefaultSubscribeURL, token)
 }
 
 func SubscribeWithURL(ctx context.Context, url, token string) (chan StreamItem, error) {
-	// TODO: URL from client
 	c, _, err := websocket.Dial(ctx, url, &websocket.DialOptions{
 		HTTPHeader: http.Header{
 			"Authorization": []string{"Bearer " + token},
