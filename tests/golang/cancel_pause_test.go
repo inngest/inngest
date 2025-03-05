@@ -67,6 +67,7 @@ func TestPauseCancelFunction(t *testing.T) {
 			return true, nil
 		},
 	)
+	require.NoError(t, err)
 
 	fnSlug := appName + "-function-test-pause-cancel"
 
