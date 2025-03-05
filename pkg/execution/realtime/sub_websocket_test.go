@@ -38,12 +38,12 @@ func TestWebsocketMessage(t *testing.T) {
 	// Broadcasting should publish.
 	t.Run("broadcasting publishes to websocket", func(t *testing.T) {
 		send := Message{
-			Kind:       streamingtypes.MessageKindRun,
-			Data:       json.RawMessage(`"foo"`),
-			CreatedAt:  time.Now().Truncate(time.Millisecond).UTC(),
-			Channel:    "user:123",
-			TopicNames: []string{"ai"},
-			EnvID:      consts.DevServerEnvID,
+			Kind:      streamingtypes.MessageKindRun,
+			Data:      json.RawMessage(`"foo"`),
+			CreatedAt: time.Now().Truncate(time.Millisecond).UTC(),
+			Channel:   "user:123",
+			Topic:     "ai",
+			EnvID:     consts.DevServerEnvID,
 		}
 		b.Publish(ctx, send)
 

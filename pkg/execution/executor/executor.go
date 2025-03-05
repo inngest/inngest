@@ -2023,16 +2023,13 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		go l.OnStepScheduled(ctx, i.md, nextItem, stepName)
 	}
 
-	// Ensure we publish the step outputs to any publishers connected.  This broadcasts the
-	// step output to any realtime subscribers.
-	//
 	// NOTE: Default topics are not yet implemented and are a V2 realtime feature.
 	//
 	// if e.rtpub != nil {
 	// 	e.rtpub.Publish(ctx, realtime.Message{
 	// 		Kind:       streamingtypes.MessageKindStep,
 	// 		Data:       gen.Data,
-	// 		TopicNames: []string{gen.UserDefinedName()},
+	// 		Topic:      gen.UserDefinedName(),
 	// 		EnvID:      i.md.ID.Tenant.EnvID,
 	// 		FnID:       i.md.ID.FunctionID,
 	// 		FnSlug:     i.f.GetSlug(),

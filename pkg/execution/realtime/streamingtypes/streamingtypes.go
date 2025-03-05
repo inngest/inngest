@@ -155,10 +155,10 @@ type Message struct {
 	Channel string `json:"channel,omitempty,omitzero"`
 	// EnvID is the environment ID that the message belongs to.
 	EnvID uuid.UUID `json:"env_id,omitempty,omitzero"`
-	// TopicNames represents the custom channels that this message should be broadcast
+	// TOpic represents the custom topic that this message should be broadcast
 	// on.  For steps, this must include the unhashed step ID.  For custom broadcasts,
-	// this is the chosen channel name in the SDK.
-	TopicNames []string `json:"topics"`
+	// this is the chosen topic name in the SDK.
+	Topic string `json:"topic"`
 
 	//
 	// Optional fields, set by the executor.
@@ -191,7 +191,7 @@ func (m Message) Topics() []Topic {
 	switch m.Kind {
 	case MessageKindStep:
 		// This message is a step output.
-		topics := make([]Topic, len(m.TopicNames)+1)
+		topics := make([]Topic, 2)
 
 		// Always publish step outputs to the "$step" topic, alongside
 		// the topic names within the message (which includes the step name)
@@ -202,52 +202,47 @@ func (m Message) Topics() []Topic {
 			EnvID:   m.EnvID,
 		}
 
-		for n, v := range m.TopicNames {
-			topics[n+1] = Topic{
-				Kind:    TopicKindRun,
-				Channel: m.Channel,
-				EnvID:   m.EnvID,
-				Name:    v,
-			}
+		topics[1] = Topic{
+			Kind:    TopicKindRun,
+			Name:    m.Topic,
+			Channel: m.Channel,
+			EnvID:   m.EnvID,
 		}
 
 		return topics
 	case MessageKindRun:
 		// This message is a run output.
-		topics := make([]Topic, len(m.TopicNames)+1)
-
-		// Always publish step outputs to the "$step" topic, alongside
-		// the topic names within the message (which includes the step name)
-		topics[0] = Topic{
+		// Always publish step outputs to the "$run" topic.
+		builtin := Topic{
 			Kind:    TopicKindRun,
 			Name:    TopicNameRun,
 			Channel: m.Channel,
 			EnvID:   m.EnvID,
 		}
 
-		for n, v := range m.TopicNames {
-			topics[n+1] = Topic{
-				Kind:    TopicKindRun,
-				Channel: m.Channel,
-				EnvID:   m.EnvID,
-				Name:    v,
-			}
+		if m.Topic == "" {
+			// No topic name for run ends;  use the builtin only.
+			return []Topic{builtin}
 		}
 
+		topics := make([]Topic, 2)
+		topics[0] = builtin
+		topics[1] = Topic{
+			Kind:    TopicKindRun,
+			Name:    m.Topic,
+			Channel: m.Channel,
+			EnvID:   m.EnvID,
+		}
 		return topics
 	}
 
 	// Default to topic kinds of Run
-	topics := make([]Topic, len(m.TopicNames))
-	for n, v := range m.TopicNames {
-		topics[n] = Topic{
-			Kind:    TopicKindRun,
-			Channel: m.Channel,
-			EnvID:   m.EnvID,
-			Name:    v,
-		}
-	}
-	return topics
+	return []Topic{Topic{
+		Kind:    TopicKindRun,
+		Name:    m.Topic,
+		Channel: m.Channel,
+		EnvID:   m.EnvID,
+	}}
 }
 
 func ChunkFromMessage(m Message, data string) Chunk {
