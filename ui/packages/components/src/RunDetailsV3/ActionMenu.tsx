@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@inngest/components/Button';
+import { SplitButton } from '@inngest/components/Button/SplitButton';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,11 +21,10 @@ export const ActionsMenu = ({ cancel, reRun, allowCancel }: RunActions) => {
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger className="h-7" />
-      <Button
+      <SplitButton
         kind="primary"
         appearance="outlined"
         size="medium"
-        split={true}
         icon={
           <RiArrowDownSLine
             className="transform-90 transition-transform duration-500 group-data-[state=open]:-rotate-180"
@@ -35,7 +34,6 @@ export const ActionsMenu = ({ cancel, reRun, allowCancel }: RunActions) => {
             }}
           />
         }
-        iconSide="right"
         label="Rerun"
         className="group text-sm"
         onClick={reRun}

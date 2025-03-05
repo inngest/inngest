@@ -17,48 +17,15 @@ export type ButtonKind = 'primary' | 'secondary' | 'danger';
 export type ButtonAppearance = 'solid' | 'outlined' | 'ghost';
 export type ButtonSize = 'small' | 'medium' | 'large';
 
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+export interface SplitButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   kind?: ButtonKind;
   appearance?: ButtonAppearance;
   size?: ButtonSize;
   loading?: boolean;
-  href?: string | UrlObject;
-  target?: string;
   tooltip?: ReactNode;
   label?: ReactNode;
   icon?: ReactNode;
-  iconSide?: 'right' | 'left';
-  keys?: string[];
-  prefetch?: boolean;
-  scroll?: boolean;
 }
-
-type LinkWrapperProps = {
-  children: ReactNode;
-  href?: string | UrlObject;
-  target?: string;
-  prefetch?: boolean;
-  scroll?: boolean;
-} & Omit<NextLinkProps, 'href'>;
-
-export const LinkWrapper = forwardRef<HTMLAnchorElement, LinkWrapperProps>(
-  ({ children, href, target, prefetch = false, scroll = true, ...props }, ref) =>
-    href ? (
-      <NextLink
-        href={href as Route}
-        target={target}
-        prefetch={prefetch}
-        scroll={scroll}
-        ref={ref}
-        {...props}
-      >
-        {children}
-      </NextLink>
-    ) : (
-      children
-    )
-);
-LinkWrapper.displayName = 'LinkWrapper';
 
 export const TooltipWrapper = ({
   children,
@@ -76,7 +43,7 @@ export const TooltipWrapper = ({
     children
   );
 
-export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+export const SplitButton = forwardRef<HTMLButtonElement, SplitButtonProps>(
   (
     {
       kind = 'primary',
@@ -84,19 +51,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       size = 'medium',
       label,
       icon,
-      iconSide,
       loading = false,
-      href,
       type = 'button',
-      keys,
       className,
       tooltip,
       disabled,
-      target,
-      prefetch = false,
-      scroll = true,
       ...props
-    }: ButtonProps,
+    }: SplitButtonProps,
     ref
   ) => {
     const buttonColors = getButtonColors({ kind, appearance, loading });
@@ -115,29 +76,20 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         {loading && (
           <IconSpinner className={cn(spinnerStyles, iconSizes, 'top-50% left-50% absolute')} />
         )}
-        {icon && iconSide === 'left' && (
-          <span className={cn(size === 'small' ? 'pr-1' : 'pr-1.5')}>{iconElement}</span>
-        )}
-        {label ? (
-          <span className={loading ? 'invisible' : 'visible'}>{label}</span>
-        ) : (
-          icon && !iconSide && iconElement
-        )}
-        {icon && iconSide === 'right' && (
-          <span className={cn(size === 'small' ? 'pl-1' : 'pl-1.5')}>{iconElement}</span>
-        )}
+
+        {label && <span className={loading ? 'invisible' : 'visible'}>{label}</span>}
       </>
     );
 
     return (
       <TooltipWrapper tooltip={tooltip}>
-        <LinkWrapper href={href} target={target} prefetch={prefetch} scroll={scroll}>
+        <div className="flex flex-row items-center justify-center">
           <button
             ref={ref}
             className={cn(
               buttonColors,
               buttonSizes,
-              'flex items-center justify-center whitespace-nowrap rounded-md disabled:cursor-not-allowed',
+              'mr-0 flex items-center justify-end whitespace-nowrap rounded-md rounded-r-none disabled:cursor-not-allowed',
               className
             )}
             type={type}
@@ -146,7 +98,21 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           >
             {children}
           </button>
-        </LinkWrapper>
+          <button
+            ref={ref}
+            className={cn(
+              buttonColors,
+              buttonSizes,
+              'ml-0 flex items-center justify-end whitespace-nowrap rounded-md rounded-l-none border-l-0 px-1 py-1.5 disabled:cursor-not-allowed',
+              className
+            )}
+            type={type}
+            disabled={disabled}
+            {...props}
+          >
+            <span className={cn(size === 'small' ? '' : '')}>{iconElement}</span>
+          </button>
+        </div>
       </TooltipWrapper>
     );
   }
