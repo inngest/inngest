@@ -194,7 +194,6 @@ export const RunDetailsV3 = (props: Props) => {
                   />
                 ),
               },
-              { label: 'Workflow', id: 'workflow', node: <Workflow /> },
             ]}
           />
         </div>
