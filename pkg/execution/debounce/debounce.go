@@ -304,6 +304,24 @@ func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn innge
 	}
 }
 
+// Migrate debounces a given function with the given DebounceItem.
+func (d debouncer) Migrate(ctx context.Context, debounceId ulid.ULID, di DebounceItem, fn inngest.Function) error {
+	if fn.Debounce == nil {
+		return fmt.Errorf("fn has no debounce config")
+	}
+	ttl, err := str2duration.ParseDuration(fn.Debounce.Period)
+	if err != nil {
+		return fmt.Errorf("invalid debounce duration: %w", err)
+	}
+
+	shouldMigrate := d.shouldMigrate(ctx)
+	if !shouldMigrate {
+		return fmt.Errorf("expected migration mode to be enable")
+	}
+
+	return d.debounce(ctx, di, fn, ttl, 0, shouldMigrate)
+}
+
 // Debounce debounces a given function with the given DebounceItem.
 func (d debouncer) Debounce(ctx context.Context, di DebounceItem, fn inngest.Function) error {
 	if fn.Debounce == nil {
