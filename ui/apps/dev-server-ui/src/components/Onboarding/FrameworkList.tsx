@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import NextLink from 'next/link';
+import { Search } from '@inngest/components/Forms/Search';
 import { ThemeImage } from '@inngest/components/Image/Image';
 import { Pill } from '@inngest/components/Pill/Pill';
 import { Select, type Option } from '@inngest/components/Select/Select';
@@ -52,22 +53,39 @@ export default function FrameworkList({ frameworksData, title, description }: Fr
   }, []);
 
   const [selectedValues, setSelectedValues] = useState<Option[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const filteredFrameworks = useMemo(() => {
-    if (selectedValues.length === 0) {
-      return frameworksData; // Show all frameworks if no language is selected
+    // First filter by language selection
+    let filtered = frameworksData;
+
+    if (selectedValues.length > 0) {
+      filtered = filtered.filter((framework) =>
+        selectedValues.some((option) => option.id === framework.language.toLowerCase())
+      );
     }
 
-    return frameworksData.filter((framework) =>
-      selectedValues.some((option) => option.id === framework.language.toLowerCase())
-    );
-  }, [selectedValues]);
+    // Then filter by search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((framework) => framework.framework.toLowerCase().includes(query));
+    }
+
+    return filtered;
+  }, [frameworksData, selectedValues, searchQuery]);
 
   return (
     <div>
       <h2 className="mb-2 text-xl">{title}</h2>
       <p className="text-subtle text-sm">{description}</p>
-      <div className="mb-4 mt-6 flex items-center justify-end ">
+      <div className="mb-4 mt-6 flex items-center justify-between ">
+        <Search
+          name="search"
+          placeholder="Search framework name"
+          value={searchQuery}
+          onUpdate={(value) => setSearchQuery(value)}
+          className="w-80"
+        />
         <Select
           size="small"
           multiple
@@ -100,44 +118,50 @@ export default function FrameworkList({ frameworksData, title, description }: Fr
       </div>
 
       <ul className="flex flex-col gap-4">
-        {filteredFrameworks.map((framework) => (
-          <li key={framework.framework} className="border-subtle rounded-sm border">
-            <NextLink
-              onClick={() =>
-                trackEvent('cli/onboarding.action', {
-                  metadata: {
-                    type: 'btn-click',
-                    label: 'choose-framework-from-list',
-                    framework: framework.framework,
-                  },
-                })
-              }
-              href={framework.link.url}
-              target="_blank"
-              className="hover:bg-canvasSubtle flex items-center justify-between p-3"
-            >
-              <div className="flex items-center">
-                <div className="bg-canvasMuted mr-3 flex h-12 w-12 items-center justify-center rounded-sm">
-                  {framework.logo.light && framework.logo.dark && (
-                    <ThemeImage
-                      width={30}
-                      height={30}
-                      lightSrc={framework.logo.light}
-                      darkSrc={framework.logo.dark}
-                      alt={framework.framework + ' logo'}
-                    />
-                  )}
+        {filteredFrameworks.length > 0 ? (
+          filteredFrameworks.map((framework) => (
+            <li key={framework.framework} className="border-subtle rounded-sm border">
+              <NextLink
+                onClick={() =>
+                  trackEvent('cli/onboarding.action', {
+                    metadata: {
+                      type: 'btn-click',
+                      label: 'choose-framework-from-list',
+                      framework: framework.framework,
+                    },
+                  })
+                }
+                href={framework.link.url}
+                target="_blank"
+                className="hover:bg-canvasSubtle flex items-center justify-between p-3"
+              >
+                <div className="flex items-center">
+                  <div className="bg-canvasMuted mr-3 flex h-12 w-12 items-center justify-center rounded-sm">
+                    {framework.logo.light && framework.logo.dark && (
+                      <ThemeImage
+                        width={30}
+                        height={30}
+                        lightSrc={framework.logo.light}
+                        darkSrc={framework.logo.dark}
+                        alt={framework.framework + ' logo'}
+                      />
+                    )}
+                  </div>
+                  <p className="mr-1">{framework.framework}</p>
+                  {framework.version_supported && <Pill>{framework.version_supported}</Pill>}
                 </div>
-                <p className="mr-1">{framework.framework}</p>
-                {framework.version_supported && <Pill>{framework.version_supported}</Pill>}
-              </div>
 
-              <Pill appearance="outlined" kind={getPillAppearance(framework.language)}>
-                {framework.language}
-              </Pill>
-            </NextLink>
+                <Pill appearance="outlined" kind={getPillAppearance(framework.language)}>
+                  {framework.language}
+                </Pill>
+              </NextLink>
+            </li>
+          ))
+        ) : (
+          <li className="text-muted py-4 text-center text-sm">
+            No frameworks match your search criteria
           </li>
-        ))}
+        )}
       </ul>
     </div>
   );
