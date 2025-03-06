@@ -27,6 +27,7 @@ export function ResyncButton({
       <Button
         onClick={() => setIsModalVisible(true)}
         disabled={disabled}
+        appearance={appMethod === methodTypes.Connect ? 'outlined' : 'solid'}
         kind="primary"
         label={appMethod === methodTypes.Connect ? 'Migrate' : 'Resync'}
         icon={<RiRefreshLine />}
