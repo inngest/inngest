@@ -486,9 +486,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		LocalEventKeys: opts.EventKeys,
 	})
 
-	svcs := []service.Service{ds, runner, executorSvc, ds.Apiservice}
-	svcs = append(svcs, connGateway, connRouter)
-	return service.StartAll(ctx, svcs...)
+	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice, connGateway, connRouter)
 }
 
 func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Client, error) {

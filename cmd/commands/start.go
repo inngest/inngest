@@ -54,6 +54,7 @@ func NewCmdStart(rootCmd *cobra.Command) *cobra.Command {
 	advancedFlags.Int("retry-interval", 0, "Retry interval in seconds for linear backoff when retrying functions - must be 1 or above")
 	advancedFlags.Int("queue-workers", devserver.DefaultQueueWorkers, "Number of executor workers to execute steps from the queue")
 	advancedFlags.Int("tick", devserver.DefaultTick, "The interval (in milliseconds) at which the executor polls the queue")
+	advancedFlags.Int("connect-gateway-port", devserver.DefaultConnectGatewayPort, "Port to expose connect gateway endpoint")
 	cmd.Flags().AddFlagSet(advancedFlags)
 	groups = append(groups, FlagGroup{name: "Advanced Flags:", fs: advancedFlags})
 
@@ -143,17 +144,18 @@ func doStart(cmd *cobra.Command, args []string) {
 	}
 
 	opts := lite.StartOpts{
-		Config:        *conf,
-		PollInterval:  viper.GetInt("poll-interval"),
-		RedisURI:      viper.GetString("redis-uri"),
-		PostgresURI:   viper.GetString("postgres-uri"),
-		RetryInterval: viper.GetInt("retry-interval"),
-		QueueWorkers:  viper.GetInt("queue-workers"),
-		Tick:          time.Duration(tick) * time.Millisecond,
-		URLs:          viper.GetStringSlice("sdk-url"),
-		SQLiteDir:     viper.GetString("sqlite-dir"),
-		SigningKey:    viper.GetString("signing-key"),
-		EventKey:      viper.GetStringSlice("event-key"),
+		Config:             *conf,
+		PollInterval:       viper.GetInt("poll-interval"),
+		RedisURI:           viper.GetString("redis-uri"),
+		PostgresURI:        viper.GetString("postgres-uri"),
+		RetryInterval:      viper.GetInt("retry-interval"),
+		QueueWorkers:       viper.GetInt("queue-workers"),
+		Tick:               time.Duration(tick) * time.Millisecond,
+		URLs:               viper.GetStringSlice("sdk-url"),
+		SQLiteDir:          viper.GetString("sqlite-dir"),
+		SigningKey:         viper.GetString("signing-key"),
+		EventKey:           viper.GetStringSlice("event-key"),
+		ConnectGatewayPort: viper.GetInt("connect-gateway-port"),
 	}
 
 	err = lite.New(ctx, opts)

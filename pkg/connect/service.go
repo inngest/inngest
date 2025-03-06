@@ -295,20 +295,20 @@ func (c *connectGatewaySvc) instrument(ctx context.Context) {
 		})
 
 		if c.isDraining {
-			metrics.GaugeConnectDrainingGateway(ctx, 1, metrics.CounterOpt{
+			metrics.GaugeConnectDrainingGateway(ctx, 1, metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    additionalTags,
 			})
-			metrics.GaugeConnectActiveGateway(ctx, 0, metrics.CounterOpt{
+			metrics.GaugeConnectActiveGateway(ctx, 0, metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    additionalTags,
 			})
 		} else {
-			metrics.GaugeConnectActiveGateway(ctx, 1, metrics.CounterOpt{
+			metrics.GaugeConnectActiveGateway(ctx, 1, metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    additionalTags,
 			})
-			metrics.GaugeConnectDrainingGateway(ctx, 0, metrics.CounterOpt{
+			metrics.GaugeConnectDrainingGateway(ctx, 0, metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    additionalTags,
 			})

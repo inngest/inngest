@@ -4,6 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/connect"
+	"github.com/inngest/inngest/pkg/connect/auth"
+	"github.com/inngest/inngest/pkg/connect/lifecycles"
+	connectpubsub "github.com/inngest/inngest/pkg/connect/pubsub"
+	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
+	connstate "github.com/inngest/inngest/pkg/connect/state"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -74,6 +80,8 @@ type StartOpts struct {
 	// EventKey is used to authorize incoming events, ensuring they match the
 	// given key.
 	EventKey []string `json:"event_key"`
+
+	ConnectGatewayPort int `json:"connect-gateway-port"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -150,6 +158,16 @@ func start(ctx context.Context, opts StartOpts) error {
 		BatchClient:            shardedRc,
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
 	})
+
+	connectRcOpt, err := connectToOrCreateRedisOption(opts.RedisURI)
+	if err != nil {
+		return err
+	}
+
+	connectRc, err := rueidis.NewClient(connectRcOpt)
+	if err != nil {
+		return err
+	}
 
 	var sm state.Manager
 	t := runner.NewTracker()
@@ -251,6 +269,15 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
 
+	conditionalTracer := itrace.NewConditionalTracer(itrace.ConnectTracer(), itrace.AlwaysTrace)
+
+	gatewayProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, logger.StdlibLoggerWithCustomVarName(ctx, "CONNECT_PUBSUB_LOG_LEVEL"), conditionalTracer, false))
+	if err != nil {
+		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
+	}
+
+	connectionManager := connstate.NewRedisConnectionStateManager(connectRc)
+
 	var sk *string
 	if opts.SigningKey != "" {
 		sk = &opts.SigningKey
@@ -261,6 +288,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
 			RequireLocalSigningKey: true,
 			LocalSigningKey:        sk,
+			ConnectForwarder:       gatewayProxy,
+			ConditionalTracer:      conditionalTracer,
 		})
 		if err != nil {
 			return err
@@ -358,13 +387,14 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	dsOpts := devserver.StartOpts{
-		Config:      opts.Config,
-		RootDir:     opts.RootDir,
-		URLs:        opts.URLs,
-		Tick:        tick,
-		SigningKey:  sk,
-		EventKeys:   opts.EventKey,
-		RequireKeys: true,
+		Config:             opts.Config,
+		RootDir:            opts.RootDir,
+		URLs:               opts.URLs,
+		Tick:               tick,
+		SigningKey:         sk,
+		EventKeys:          opts.EventKey,
+		RequireKeys:        true,
+		ConnectGatewayPort: opts.ConnectGatewayPort,
 	}
 
 	if opts.PollInterval > 0 {
@@ -415,10 +445,34 @@ func start(ctx context.Context, opts StartOpts) error {
 		HistoryReader:   hr,
 		LocalSigningKey: opts.SigningKey,
 		RequireKeys:     true,
+		ConnectOpts: connectv0.Opts{
+			GroupManager:            connectionManager,
+			ConnectManager:          connectionManager,
+			ConnectResponseNotifier: gatewayProxy,
+			Signer:                  auth.NewJWTSessionTokenSigner(consts.DevServerConnectJwtSecret),
+			RequestAuther:           ds,
+			ConnectGatewayRetriever: ds,
+			EntitlementProvider:     ds,
+			ConditionalTracer:       conditionalTracer,
+		},
 	})
 	if err != nil {
 		return err
 	}
+
+	connGateway := connect.NewConnectGatewayService(
+		connect.WithConnectionStateManager(connectionManager),
+		connect.WithRequestReceiver(gatewayProxy),
+		connect.WithGatewayAuthHandler(auth.NewJWTAuthHandler(consts.DevServerConnectJwtSecret)),
+		connect.WithDev(),
+		connect.WithGatewayPublicPort(opts.ConnectGatewayPort),
+		connect.WithApiBaseUrl(fmt.Sprintf("http://127.0.0.1:%d", opts.Config.EventAPI.Port)),
+		connect.WithLifeCycles(
+			[]connect.ConnectGatewayLifecycleListener{
+				lifecycles.NewHistoryLifecycle(dbcqrs),
+			}),
+	)
+	connRouter := connect.NewConnectMessageRouterService(connectionManager, gatewayProxy, conditionalTracer)
 
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
@@ -437,22 +491,15 @@ func start(ctx context.Context, opts StartOpts) error {
 		RequireKeys:    true,
 	})
 
-	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice)
+	// waiterSvc := connectpubsub.NewConnectorWaiterSvc(gatewayProxy, connGateway, connRouter)
+	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice, connGateway, connRouter)
 }
 
 func connectToOrCreateRedis(redisURI string) (rueidis.Client, error) {
-	if redisURI == "" {
-		return createInmemoryRedisConnection()
-	}
-
-	opt, err := rueidis.ParseURL(redisURI)
+	opt, err := connectToOrCreateRedisOption(redisURI)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing redis uri: %w", err)
+		return nil, fmt.Errorf("could not create redis options: %w", err)
 	}
-
-	// Set default overrides
-	opt.DisableCache = true
-	opt.BlockingPoolSize = 1
 
 	rc, err := rueidis.NewClient(opt)
 	if err != nil {
@@ -462,14 +509,31 @@ func connectToOrCreateRedis(redisURI string) (rueidis.Client, error) {
 	return rc, nil
 }
 
-// createInMemoryRedisConnection creates a new connection to the in-memory Redis
+func connectToOrCreateRedisOption(redisURI string) (rueidis.ClientOption, error) {
+	if redisURI == "" {
+		return createInmemoryRedisConnectionOpt()
+	}
+
+	opt, err := rueidis.ParseURL(redisURI)
+	if err != nil {
+		return rueidis.ClientOption{}, fmt.Errorf("error parsing redis uri: %w", err)
+	}
+
+	// Set default overrides
+	opt.DisableCache = true
+	opt.BlockingPoolSize = 1
+
+	return opt, nil
+}
+
+// createInmemoryRedisConnectionOpt creates the options for a new connection to the in-memory Redis
 // server. If the server is not yet running, it will start one.
-func createInmemoryRedisConnection() (rueidis.Client, error) {
+func createInmemoryRedisConnectionOpt() (rueidis.ClientOption, error) {
 	if redisSingleton == nil {
 		redisSingleton = miniredis.NewMiniRedis()
 		err := redisSingleton.Start()
 		if err != nil {
-			return nil, fmt.Errorf("error starting in-memory redis: %w", err)
+			return rueidis.ClientOption{}, fmt.Errorf("error starting in-memory redis: %w", err)
 		}
 
 		poll := time.Second
@@ -480,17 +544,12 @@ func createInmemoryRedisConnection() (rueidis.Client, error) {
 		}()
 	}
 
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
+	return rueidis.ClientOption{
 		InitAddress:       []string{redisSingleton.Addr()},
 		DisableCache:      true,
 		BlockingPoolSize:  1,
 		ForceSingleClient: true,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("error creating in-memory redis client: %w", err)
-	}
-
-	return rc, nil
+	}, nil
 }
 
 func getSendingEventHandler(pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
