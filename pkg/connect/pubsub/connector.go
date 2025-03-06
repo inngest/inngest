@@ -2,10 +2,7 @@ package pubsub
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"log/slog"
 
@@ -46,35 +43,4 @@ func WithNoop() ConnectorOpt {
 	return func(ctx context.Context) (Connector, error) {
 		return noopConnector{}, nil
 	}
-}
-
-// connectorWaiterSvc is a simple service that waits and shuts down the wait loop on context cancelation.
-// This is used by Inngest Lite to handle graceful shutdowns for the forwarder.
-type connectorWaiterSvc struct {
-	connector Connector
-	nested    []service.Service
-}
-
-func (c connectorWaiterSvc) Name() string {
-	return "connector-waiter"
-}
-
-func (c connectorWaiterSvc) Pre(ctx context.Context) error {
-	return nil
-}
-
-func (c connectorWaiterSvc) Run(ctx context.Context) error {
-	if err := c.connector.Wait(ctx); err != nil && !errors.Is(err, context.Canceled) {
-		logger.From(ctx).Error().Err(err).Msg("error waiting for pubsub messages")
-	}
-
-	return service.StartAll(ctx, c.nested...)
-}
-
-func (c connectorWaiterSvc) Stop(ctx context.Context) error {
-	return nil
-}
-
-func NewConnectorWaiterSvc(connector Connector, nested ...service.Service) service.Service {
-	return &connectorWaiterSvc{connector: connector, nested: nested}
 }

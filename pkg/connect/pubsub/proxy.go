@@ -91,6 +91,7 @@ type RequestReceiver interface {
 type redisPubSubConnector struct {
 	client       rueidis.Client
 	pubSubClient rueidis.DedicatedClient
+	setup        chan struct{}
 
 	subscribers     map[string]map[string]chan string
 	subscribersLock sync.RWMutex
@@ -109,6 +110,7 @@ func newRedisPubSubConnector(client rueidis.Client, logger *slog.Logger, tracer 
 		subscribersLock: sync.RWMutex{},
 		logger:          logger,
 		tracer:          tracer,
+		setup:           make(chan struct{}),
 	}
 }
 
@@ -124,6 +126,8 @@ type ProxyOpts struct {
 // If the gateway does not ack the message within a 10-second timeout, an error is returned.
 // If no response is received before the context is canceled, an error is returned.
 func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*connect.SDKResponse, error) {
+	<-i.setup
+
 	l := i.logger.With("app_id", opts.AppID.String(), "env_id", opts.EnvID.String(), "account_id", opts.AccountID.String())
 	traceCtx, span := i.tracer.NewSpan(traceCtx, "Proxy", opts.AccountID, opts.EnvID)
 	span.SetAttributes(attribute.Bool("inngest.system", true))
@@ -380,6 +384,8 @@ func (i *redisPubSubConnector) channelAppRequestsReply(requestId string) string 
 // Upon return, the subscription is cleaned up and if the subscription was the last one for the channel, the PubSub client
 // is unsubscribed from the channel.
 func (i *redisPubSubConnector) subscribe(ctx context.Context, channel string, onMessage func(msg string), once bool) error {
+	<-i.setup
+
 	msgs := make(chan string)
 
 	subId := ulid.MustNew(ulid.Now(), rand.Reader).String()
@@ -511,6 +517,7 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 	}()
 
 	i.pubSubClient = c
+	i.setup <- struct{}{}
 
 	wait := c.SetPubSubHooks(rueidis.PubSubHooks{
 		OnMessage: func(m rueidis.PubSubMessage) {

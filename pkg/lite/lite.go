@@ -491,7 +491,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		RequireKeys:    true,
 	})
 
-	// waiterSvc := connectpubsub.NewConnectorWaiterSvc(gatewayProxy, connGateway, connRouter)
 	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice, connGateway, connRouter)
 }
 

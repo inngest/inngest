@@ -353,6 +353,9 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 		// Start listening for messages, this will block until the context is cancelled
 		err := c.receiver.Wait(ctx)
 		if err != nil {
+			if ctx.Err() != nil {
+				return nil
+			}
 			// TODO Should we retry? Exit here? This will interrupt existing connections!
 			return fmt.Errorf("could not listen for pubsub messages: %w", err)
 		}
