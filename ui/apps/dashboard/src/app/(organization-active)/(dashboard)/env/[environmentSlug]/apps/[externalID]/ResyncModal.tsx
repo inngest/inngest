@@ -130,7 +130,7 @@ export default function ResyncModal({
           {isConnect ? (
             <p className="my-6">
               Apps using connect automatically sync every time they connect to Inngest - a manual
-              resync is not necessary. Migrate the app to serve by overriding the current URL.
+              resync is not necessary. Migrate the app to use HTTP via "serve" by setting your URL.
             </p>
           ) : (
             <p className="my-6">
