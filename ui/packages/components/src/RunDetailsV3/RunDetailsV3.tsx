@@ -184,6 +184,7 @@ export const RunDetailsV3 = (props: Props) => {
             tabs={[
               {
                 label: 'Trace',
+                id: 'trace',
                 node: run && (
                   <Timeline
                     getResult={getResult}
@@ -193,7 +194,6 @@ export const RunDetailsV3 = (props: Props) => {
                   />
                 ),
               },
-              { label: 'Workflow', node: <Workflow /> },
             ]}
           />
         </div>
