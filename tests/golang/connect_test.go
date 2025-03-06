@@ -26,7 +26,7 @@ func TestEndToEnd(t *testing.T) {
 	type ConnectEvent = inngestgo.GenericEvent[any, any]
 	ctx := context.Background()
 	c := client.New(t)
-	h := NewSDKConnectHandler(t, "connect")
+	inngestClient := NewSDKConnectHandler(t, "connect")
 
 	var (
 		counter int32
@@ -36,8 +36,9 @@ func TestEndToEnd(t *testing.T) {
 	connectCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	a := inngestgo.CreateFunction(
-		inngestgo.FunctionOpts{Name: "connect test", Retries: inngestgo.IntPtr(0)},
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{ID: "connect-test", Retries: inngestgo.IntPtr(0)},
 		inngestgo.EventTrigger("test/connect", nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			if runID == "" {
@@ -48,12 +49,12 @@ func TestEndToEnd(t *testing.T) {
 			return "connect done", nil
 		},
 	)
-	h.Register(a)
+	require.NoError(t, err)
 
 	t.Run("with connection", func(t *testing.T) {
 		wc, err := inngestgo.Connect(connectCtx, inngestgo.ConnectOpts{
 			InstanceID: inngestgo.StrPtr("my-worker"),
-			Apps:       []inngestgo.Handler{h},
+			Apps:       []inngestgo.Client{inngestClient},
 		})
 		require.NoError(t, err)
 
@@ -97,7 +98,7 @@ func TestEndToEnd(t *testing.T) {
 		})
 
 		t.Run("trigger function", func(t *testing.T) {
-			_, err := inngestgo.Send(ctx, ConnectEvent{
+			_, err := inngestClient.Send(ctx, ConnectEvent{
 				Name: "test/connect",
 				Data: map[string]interface{}{},
 			})
@@ -129,7 +130,7 @@ func TestEndToEnd(t *testing.T) {
 		// Reset counter
 		atomic.StoreInt32(&counter, 0)
 
-		eventId, err := inngestgo.Send(ctx, ConnectEvent{
+		eventId, err := inngestClient.Send(ctx, ConnectEvent{
 			Name: "test/connect",
 			Data: map[string]interface{}{},
 		})

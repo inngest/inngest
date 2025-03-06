@@ -20,7 +20,7 @@ import (
 // that the second function won't start before the start timeout and
 // should be cancelled.
 func TestTimeoutStart(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t, "concurrency")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "concurrency")
 	defer server.Close()
 
 	var (
@@ -31,9 +31,10 @@ func TestTimeoutStart(t *testing.T) {
 	trigger := "test/timeouts-start"
 	timeoutStart := 3 * time.Second
 
-	a := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name:        "fn concurrency",
+			ID:          "fn-concurrency",
 			Concurrency: []inngest.Concurrency{{Limit: 1}},
 			Timeouts: &inngestgo.Timeouts{
 				Start: &timeoutStart,
@@ -47,12 +48,12 @@ func TestTimeoutStart(t *testing.T) {
 			return true, nil
 		},
 	)
-	h.Register(a)
+	require.NoError(t, err)
 	registerFuncs()
 
 	for i := 0; i < 3; i++ {
 		go func() {
-			_, err := inngestgo.Send(context.Background(), inngestgo.Event{
+			_, err := inngestClient.Send(context.Background(), inngestgo.Event{
 				Name: trigger,
 				Data: map[string]any{
 					"test": true,
@@ -74,7 +75,7 @@ func TestTimeoutFinish(t *testing.T) {
 	// finish timeout is 3 seconds, so the function should be cancelled after the
 	// first step.
 	t.Run("When steps take too long", func(t *testing.T) {
-		h, server, registerFuncs := NewSDKHandler(t, "concurrency")
+		inngestClient, server, registerFuncs := NewSDKHandler(t, "concurrency")
 		defer server.Close()
 
 		var (
@@ -86,9 +87,10 @@ func TestTimeoutFinish(t *testing.T) {
 		timeoutStart := 1 * time.Second
 		timeoutFinish := 3 * time.Second
 
-		a := inngestgo.CreateFunction(
+		_, err := inngestgo.CreateFunction(
+			inngestClient,
 			inngestgo.FunctionOpts{
-				Name: "timeouts-finish",
+				ID: "timeouts-finish",
 				Timeouts: &inngestgo.Timeouts{
 					Start:  &timeoutStart,
 					Finish: &timeoutFinish,
@@ -119,12 +121,12 @@ func TestTimeoutFinish(t *testing.T) {
 				return true, nil
 			},
 		)
-		h.Register(a)
+		require.NoError(t, err)
 		registerFuncs()
 
 		for i := 0; i < 3; i++ {
 			go func() {
-				_, err := inngestgo.Send(context.Background(), inngestgo.Event{
+				_, err := inngestClient.Send(context.Background(), inngestgo.Event{
 					Name: trigger,
 					Data: map[string]any{
 						"test": true,

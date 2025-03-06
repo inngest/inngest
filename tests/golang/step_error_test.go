@@ -14,13 +14,14 @@ import (
 )
 
 func TestStepErrors(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t, "fail-app")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "fail-app")
 	defer server.Close()
 
 	require := require.New(t)
 
 	var aCount int32
-	a := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:      "always-fail",
 			Name:    "Always fail",
@@ -52,10 +53,10 @@ func TestStepErrors(t *testing.T) {
 			return val, err
 		},
 	)
-	h.Register(a)
+	require.NoError(err)
 	registerFuncs()
 
-	_, err := inngestgo.Send(context.Background(), inngestgo.Event{
+	_, err = inngestClient.Send(context.Background(), inngestgo.Event{
 		Name: "test/fail",
 		Data: map[string]any{
 			"test": true,
@@ -72,13 +73,14 @@ func TestStepErrors(t *testing.T) {
 }
 
 func TestStepErrorCalledOnce(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t, "fail-app")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "fail-app")
 	defer server.Close()
 
 	require := require.New(t)
 
 	var stepCount, fnCount int32
-	a := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:      "always-fail",
 			Name:    "Always fail",
@@ -99,10 +101,10 @@ func TestStepErrorCalledOnce(t *testing.T) {
 			return val, err
 		},
 	)
-	h.Register(a)
+	require.NoError(err)
 	registerFuncs()
 
-	_, err := inngestgo.Send(context.Background(), inngestgo.Event{
+	_, err = inngestClient.Send(context.Background(), inngestgo.Event{
 		Name: "test/fail",
 		Data: map[string]any{
 			"test": true,

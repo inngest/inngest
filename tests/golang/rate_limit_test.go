@@ -12,13 +12,14 @@ import (
 
 func TestFunctionWithRateLimit(t *testing.T) {
 	ctx := context.Background()
-	h, server, registerFuncs := NewSDKHandler(t, "rate-limit")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "rate-limit")
 	defer server.Close()
 
 	var counter int32
-	fun := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name:      "rate-limit",
+			ID:        "rate-limit",
 			RateLimit: &inngestgo.RateLimit{Limit: 1, Period: 24 * time.Hour, Key: inngestgo.StrPtr("event.data.number")},
 		},
 		inngestgo.EventTrigger("test/ratelimit", nil),
@@ -27,10 +28,10 @@ func TestFunctionWithRateLimit(t *testing.T) {
 			return true, nil
 		},
 	)
-	h.Register(fun)
+	require.NoError(t, err)
 	registerFuncs()
 
-	_, err := inngestgo.Send(ctx, inngestgo.Event{
+	_, err = inngestClient.Send(ctx, inngestgo.Event{
 		Name: "test/ratelimit",
 		Data: map[string]any{"number": 10},
 	})
@@ -41,7 +42,7 @@ func TestFunctionWithRateLimit(t *testing.T) {
 	require.Eventually(t, func() bool { return atomic.LoadInt32(&counter) == 1 }, 5*time.Second, time.Second)
 
 	// send another, it should be rate limited
-	_, err = inngestgo.Send(ctx, inngestgo.Event{
+	_, err = inngestClient.Send(ctx, inngestgo.Event{
 		Name: "test/ratelimit",
 		Data: map[string]any{"number": 10},
 	})
@@ -51,7 +52,7 @@ func TestFunctionWithRateLimit(t *testing.T) {
 	require.Eventually(t, func() bool { return atomic.LoadInt32(&counter) == 1 }, 5*time.Second, time.Second)
 
 	// send a different payload
-	_, err = inngestgo.Send(ctx, inngestgo.Event{
+	_, err = inngestClient.Send(ctx, inngestgo.Event{
 		Name: "test/ratelimit",
 		Data: map[string]any{"number": 1},
 	})

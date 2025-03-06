@@ -21,7 +21,7 @@ func TestSleep(t *testing.T) {
 	ctx := context.Background()
 
 	c := client.New(t)
-	h, server, registerFuncs := NewSDKHandler(t, "sleep-test")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "sleep-test")
 	defer server.Close()
 
 	// Create our function.
@@ -33,8 +33,9 @@ func TestSleep(t *testing.T) {
 	)
 	evtName := "test/sleep"
 
-	a := inngestgo.CreateFunction(
-		inngestgo.FunctionOpts{Name: "test sleep"},
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{ID: "test-sleep"},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			if runID == "" {
@@ -73,12 +74,12 @@ func TestSleep(t *testing.T) {
 			return true, nil
 		},
 	)
-	h.Register(a)
+	require.NoError(t, err)
 
 	// Register the fns via the test SDK harness above.
 	registerFuncs()
 
-	_, err := inngestgo.Send(ctx, inngestgo.Event{
+	_, err = inngestClient.Send(ctx, inngestgo.Event{
 		Name: evtName,
 		Data: map[string]any{"sleep": "ok"},
 	})

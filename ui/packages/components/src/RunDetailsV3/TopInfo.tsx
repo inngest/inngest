@@ -28,7 +28,6 @@ type TopInfoProps = {
   getTrigger: (runID: string) => Promise<Trigger>;
   result?: Result;
   runID: string;
-  height?: number;
 };
 
 export type Trigger = {
@@ -136,7 +135,9 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
           onClick={() => setExpanded(!expanded)}
         >
           <RiArrowRightSLine
-            className={`shrink-0 transition-transform duration-500 ${expanded ? 'rotate-90' : ''}`}
+            className={`shrink-0 transition-transform duration-[250ms] ${
+              expanded ? 'rotate-90' : ''
+            }`}
           />
           {isPending ? (
             <SkeletonElement />

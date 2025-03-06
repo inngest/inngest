@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/oklog/ulid/v2"
 )
 
 type APIOpts struct {
@@ -294,10 +295,14 @@ func (a *api) getStreamMessage(r *http.Request) (Message, error) {
 	}
 
 	msg := Message{
-		Channel:    r.URL.Query().Get("channel"),
-		TopicNames: []string{r.URL.Query().Get("topic")},
-		EnvID:      auth.WorkspaceID(),
-		CreatedAt:  time.Now(),
+		Channel:   r.URL.Query().Get("channel"),
+		Topic:     r.URL.Query().Get("topic"),
+		EnvID:     auth.WorkspaceID(),
+		CreatedAt: time.Now(),
 	}
+	if runID := r.URL.Query().Get("run_id"); runID != "" {
+		msg.RunID, _ = ulid.Parse(runID)
+	}
+
 	return msg, nil
 }

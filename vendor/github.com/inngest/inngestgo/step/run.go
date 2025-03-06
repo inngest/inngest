@@ -96,7 +96,7 @@ func Run[T any](
 	// other tools run.
 	defer mgr.Cancel()
 
-	result, err := f(ctx)
+	result, err := f(setWithinStep(ctx))
 	if err != nil {
 		// If tihs is a StepFailure already, fail fast.
 		if errors.IsStepError(err) {

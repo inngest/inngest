@@ -3,11 +3,12 @@ package inngestgo
 import (
 	"context"
 	"fmt"
+	"net/url"
+
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngestgo/connect"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
-	"net/url"
 )
 
 const (
@@ -15,7 +16,7 @@ const (
 )
 
 type ConnectOpts struct {
-	Apps []Handler
+	Apps []Client
 
 	// InstanceID represents a stable identifier to be used for identifying connected SDKs.
 	// This can be a hostname or other identifier that remains stable across restarts.
@@ -48,9 +49,14 @@ func Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, e
 
 	apps := make([]connect.ConnectApp, len(opts.Apps))
 	invokers := make(map[string]connect.FunctionInvoker, len(opts.Apps))
-	for i, app := range opts.Apps {
-		appName := app.GetAppName()
-		fns, err := createFunctionConfigs(appName, app.GetFunctions(), connectPlaceholder, true)
+	for i, a := range opts.Apps {
+		app, ok := a.(*apiClient)
+		if !ok {
+			return nil, fmt.Errorf("invalid handler passed")
+		}
+
+		appName := app.AppID()
+		fns, err := createFunctionConfigs(appName, app.h.GetFunctions(), connectPlaceholder, true)
 		if err != nil {
 			return nil, fmt.Errorf("error creating function configs: %w", err)
 		}
@@ -58,26 +64,22 @@ func Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, e
 		apps[i] = connect.ConnectApp{
 			AppName:    appName,
 			Functions:  fns,
-			AppVersion: app.GetAppVersion(),
+			AppVersion: app.h.GetAppVersion(),
 		}
 
-		invoker, ok := app.(connect.FunctionInvoker)
-		if !ok {
-			return nil, fmt.Errorf("client is unable to invoke functions")
-		}
-		invokers[appName] = invoker
+		invokers[appName] = app.h
 	}
 
 	if len(opts.Apps) < 1 {
 		return nil, fmt.Errorf("must specify at least one app")
 	}
 
-	defaultClient, ok := opts.Apps[0].(*handler)
+	defaultClient, ok := opts.Apps[0].(*apiClient)
 	if !ok {
 		return nil, fmt.Errorf("invalid handler passed")
 	}
 
-	signingKey := defaultClient.GetSigningKey()
+	signingKey := defaultClient.h.GetSigningKey()
 	if signingKey == "" {
 		return nil, fmt.Errorf("signing key is required")
 	}
@@ -89,7 +91,7 @@ func Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, e
 
 	var hashedFallbackKey []byte
 	{
-		if fallbackKey := defaultClient.GetSigningKeyFallback(); fallbackKey != "" {
+		if fallbackKey := defaultClient.h.GetSigningKeyFallback(); fallbackKey != "" {
 			hashedFallbackKey, err = hashedSigningKey([]byte(fallbackKey))
 			if err != nil {
 				return nil, fmt.Errorf("failed to hash fallback signing key: %w", err)
@@ -104,8 +106,8 @@ func Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, e
 		HashedSigningKey:         hashedKey,
 		HashedSigningKeyFallback: hashedFallbackKey,
 		MaxConcurrency:           concurrency,
-		APIBaseUrl:               defaultClient.GetAPIBaseURL(),
-		IsDev:                    defaultClient.isDev(),
+		APIBaseUrl:               defaultClient.h.GetAPIBaseURL(),
+		IsDev:                    defaultClient.h.isDev(),
 		DevServerUrl:             DevServerURL(),
 		InstanceID:               opts.InstanceID,
 		Platform:                 Ptr(platform()),
@@ -119,7 +121,7 @@ func (h *handler) getServableFunctionBySlug(slug string) ServableFunction {
 	h.l.RLock()
 	var fn ServableFunction
 	for _, f := range h.funcs {
-		if f.Slug(h.appName) == slug {
+		if f.FullyQualifiedID() == slug {
 			fn = f
 			break
 		}
@@ -143,7 +145,7 @@ func (h *handler) InvokeFunction(ctx context.Context, slug string, stepId *strin
 	}
 
 	// Invoke function, always complete regardless of
-	resp, ops, err := invoke(context.Background(), fn, &request, stepId)
+	resp, ops, err := invoke(context.Background(), fn, h.GetSigningKey(), &request, stepId)
 
 	return resp, ops, err
 }

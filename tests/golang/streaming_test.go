@@ -25,10 +25,12 @@ func TestStreaming(t *testing.T) {
 		ctx := context.Background()
 		r := require.New(t)
 		c := client.New(t)
-		inngestClient := inngestgo.NewClient(inngestgo.ClientOpts{
+		inngestClient, err := inngestgo.NewClient(inngestgo.ClientOpts{
+			AppID:    "my-app",
 			EventKey: toPtr("test"),
 			EventURL: toPtr("http://localhost:8288"),
 		})
+		r.NoError(err)
 
 		var appURL *string
 		var runID *string
@@ -139,7 +141,7 @@ func TestStreaming(t *testing.T) {
 		r.NoError(sync())
 
 		// _, err := inngestgo.Send(ctx, inngestgo.Event{
-		_, err := inngestClient.Send(ctx, inngestgo.Event{
+		_, err = inngestClient.Send(ctx, inngestgo.Event{
 			Name: "my-event",
 			Data: map[string]any{"foo": "bar"},
 		})

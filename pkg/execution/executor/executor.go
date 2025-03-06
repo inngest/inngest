@@ -30,7 +30,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/realtime"
-	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -2024,21 +2023,21 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		go l.OnStepScheduled(ctx, i.md, nextItem, stepName)
 	}
 
-	// Ensure we publish the step outputs to any publishers connected.  This broadcasts the
-	// step output to any realtime subscribers.
-	if e.rtpub != nil {
-		e.rtpub.Publish(ctx, realtime.Message{
-			Kind:       streamingtypes.MessageKindStep,
-			Data:       gen.Data,
-			TopicNames: []string{gen.UserDefinedName()},
-			EnvID:      i.md.ID.Tenant.EnvID,
-			FnID:       i.md.ID.FunctionID,
-			FnSlug:     i.f.GetSlug(),
-			Channel:    i.md.ID.RunID.String(),
-			CreatedAt:  time.Now(),
-			RunID:      i.md.ID.RunID,
-		})
-	}
+	// NOTE: Default topics are not yet implemented and are a V2 realtime feature.
+	//
+	// if e.rtpub != nil {
+	// 	e.rtpub.Publish(ctx, realtime.Message{
+	// 		Kind:       streamingtypes.MessageKindStep,
+	// 		Data:       gen.Data,
+	// 		Topic:      gen.UserDefinedName(),
+	// 		EnvID:      i.md.ID.Tenant.EnvID,
+	// 		FnID:       i.md.ID.FunctionID,
+	// 		FnSlug:     i.f.GetSlug(),
+	// 		Channel:    i.md.ID.RunID.String(),
+	// 		CreatedAt:  time.Now(),
+	// 		RunID:      i.md.ID.RunID,
+	// 	})
+	// }
 
 	return nil
 }

@@ -20,7 +20,7 @@ func TestStepPauseDeadlockRegression(t *testing.T) {
 	c := client.New(t)
 
 	appID := "TestStepPauseDeadlockRegression"
-	h, server, registerFuncs := NewSDKHandler(t, appID)
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appID)
 	defer server.Close()
 
 	runID := ""
@@ -28,19 +28,21 @@ func TestStepPauseDeadlockRegression(t *testing.T) {
 	var afterStepAttempts int32 = 0
 	evtName := "my-event"
 
-	invokeeFn := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "invokee-fn",
+			ID: "invokee-fn",
 		},
 		inngestgo.EventTrigger("youll-never-guess", nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			return "ok", nil
 		},
 	)
-
-	fn := inngestgo.CreateFunction(
+	r.NoError(err)
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name:    "my-fn",
+			ID:      "my-fn",
 			Retries: inngestgo.IntPtr(0),
 		},
 		inngestgo.EventTrigger(evtName, nil),
@@ -65,12 +67,11 @@ func TestStepPauseDeadlockRegression(t *testing.T) {
 			return nil, err
 		},
 	)
-
-	h.Register(invokeeFn, fn)
+	r.NoError(err)
 	registerFuncs()
 
 	// Trigger the main function and successfully invoke the other function
-	_, err := inngestgo.Send(ctx, &event.Event{Name: evtName})
+	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
 	c.WaitForRunStatus(ctx, t, "FAILED", &runID)
 	r.Exactly(int32(1), afterStepAttempts, "after step should have been attempted exactly once")
