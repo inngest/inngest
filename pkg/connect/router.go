@@ -193,6 +193,9 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 
 	err := c.receiver.Wait(ctx)
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil
+		}
 		return fmt.Errorf("could not listen for pubsub messages: %w", err)
 	}
 

@@ -119,8 +119,6 @@ func (o TracerOpts) MaxPayloadSizeBytes() int {
 func NewUserTracer(ctx context.Context, opts TracerOpts) error {
 	var err error
 	onceUser.Do(func() {
-		logger.StdlibLogger(context.Background()).Info("creating user tracer")
-
 		userTracer, err = newTracer(ctx, opts)
 	})
 	return err
@@ -148,8 +146,6 @@ func CloseUserTracer(ctx context.Context) error {
 func NewSystemTracer(ctx context.Context, opts TracerOpts) error {
 	var err error
 	onceSystem.Do(func() {
-		logger.StdlibLogger(context.Background()).Info("creating system tracer")
-
 		systemTracer, err = newTracer(ctx, opts)
 	})
 	return err

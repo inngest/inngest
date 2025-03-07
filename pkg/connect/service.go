@@ -3,6 +3,7 @@ package connect
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -295,20 +296,20 @@ func (c *connectGatewaySvc) instrument(ctx context.Context) {
 		})
 
 		if c.isDraining {
-			metrics.GaugeConnectDrainingGateway(ctx, 1, metrics.CounterOpt{
+			metrics.GaugeConnectDrainingGateway(ctx, 1, metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    additionalTags,
 			})
-			metrics.GaugeConnectActiveGateway(ctx, 0, metrics.CounterOpt{
+			metrics.GaugeConnectActiveGateway(ctx, 0, metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    additionalTags,
 			})
 		} else {
-			metrics.GaugeConnectActiveGateway(ctx, 1, metrics.CounterOpt{
+			metrics.GaugeConnectActiveGateway(ctx, 1, metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    additionalTags,
 			})
-			metrics.GaugeConnectDrainingGateway(ctx, 0, metrics.CounterOpt{
+			metrics.GaugeConnectDrainingGateway(ctx, 0, metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    additionalTags,
 			})
@@ -337,15 +338,21 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 
 		c.logger.Info("waiting for connections to drain")
 		c.connectionCount.Wait()
+
 		c.logger.Info("shutting down gateway api")
 		_ = server.Shutdown(ctx)
 	}()
 
-	eg, ctx := errgroup.WithContext(ctx)
+	eg := errgroup.Group{}
 
 	eg.Go(func() error {
 		c.logger.Info(fmt.Sprintf("starting gateway api at %s", addr))
-		return server.ListenAndServe()
+		err := server.ListenAndServe()
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+
+		return err
 	})
 
 	eg.Go(func() error {
@@ -353,9 +360,14 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 		// Start listening for messages, this will block until the context is cancelled
 		err := c.receiver.Wait(ctx)
 		if err != nil {
+			if ctx.Err() != nil {
+				return nil
+			}
 			// TODO Should we retry? Exit here? This will interrupt existing connections!
 			return fmt.Errorf("could not listen for pubsub messages: %w", err)
 		}
+
+		c.logger.Debug("receiver wait finished")
 
 		return nil
 	})
