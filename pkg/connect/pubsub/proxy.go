@@ -519,7 +519,7 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 	}()
 
 	i.pubSubClient = c
-	i.setup <- struct{}{}
+	close(i.setup)
 
 	wait := c.SetPubSubHooks(rueidis.PubSubHooks{
 		OnMessage: func(m rueidis.PubSubMessage) {
