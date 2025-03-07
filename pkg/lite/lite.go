@@ -271,11 +271,6 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	conditionalTracer := itrace.NewConditionalTracer(itrace.ConnectTracer(), itrace.AlwaysTrace)
 
-	gatewayProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, logger.StdlibLoggerWithCustomVarName(ctx, "CONNECT_PUBSUB_LOG_LEVEL"), conditionalTracer, false))
-	if err != nil {
-		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
-	}
-
 	connectionManager := connstate.NewRedisConnectionStateManager(connectRc)
 
 	var sk *string
@@ -283,12 +278,19 @@ func start(ctx context.Context, opts StartOpts) error {
 		sk = &opts.SigningKey
 	}
 
+	connectPubSubLogger := logger.StdlibLoggerWithCustomVarName(ctx, "CONNECT_PUBSUB_LOG_LEVEL")
+
+	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, connectPubSubLogger, conditionalTracer, false))
+	if err != nil {
+		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
+	}
+
 	var drivers = []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
 		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
 			RequireLocalSigningKey: true,
 			LocalSigningKey:        sk,
-			ConnectForwarder:       gatewayProxy,
+			ConnectForwarder:       executorProxy,
 			ConditionalTracer:      conditionalTracer,
 		})
 		if err != nil {
@@ -432,6 +434,11 @@ func start(ctx context.Context, opts StartOpts) error {
 		})
 	})
 
+	apiGatewayProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, connectPubSubLogger, conditionalTracer, false))
+	if err != nil {
+		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
+	}
+
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		Data:            ds.Data,
 		Config:          ds.Opts.Config,
@@ -448,7 +455,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		ConnectOpts: connectv0.Opts{
 			GroupManager:            connectionManager,
 			ConnectManager:          connectionManager,
-			ConnectResponseNotifier: gatewayProxy,
+			ConnectResponseNotifier: apiGatewayProxy,
 			Signer:                  auth.NewJWTSessionTokenSigner(consts.DevServerConnectJwtSecret),
 			RequestAuther:           ds,
 			ConnectGatewayRetriever: ds,
@@ -460,9 +467,14 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
+	gatewayRequestReceiver, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, connectPubSubLogger, conditionalTracer, false))
+	if err != nil {
+		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
+	}
+
 	connGateway := connect.NewConnectGatewayService(
 		connect.WithConnectionStateManager(connectionManager),
-		connect.WithRequestReceiver(gatewayProxy),
+		connect.WithRequestReceiver(gatewayRequestReceiver),
 		connect.WithGatewayAuthHandler(auth.NewJWTAuthHandler(consts.DevServerConnectJwtSecret)),
 		connect.WithDev(),
 		connect.WithGatewayPublicPort(opts.ConnectGatewayPort),
@@ -472,7 +484,13 @@ func start(ctx context.Context, opts StartOpts) error {
 				lifecycles.NewHistoryLifecycle(dbcqrs),
 			}),
 	)
-	connRouter := connect.NewConnectMessageRouterService(connectionManager, gatewayProxy, conditionalTracer)
+
+	routerRequestReceiver, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, connectPubSubLogger, conditionalTracer, false))
+	if err != nil {
+		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
+	}
+
+	connRouter := connect.NewConnectMessageRouterService(connectionManager, routerRequestReceiver, conditionalTracer)
 
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
@@ -520,7 +538,7 @@ func connectToOrCreateRedisOption(redisURI string) (rueidis.ClientOption, error)
 
 	// Set default overrides
 	opt.DisableCache = true
-	opt.BlockingPoolSize = 1
+	opt.BlockingPoolSize = consts.RedisBlockingPoolSize
 
 	return opt, nil
 }
@@ -546,7 +564,7 @@ func createInmemoryRedisConnectionOpt() (rueidis.ClientOption, error) {
 	return rueidis.ClientOption{
 		InitAddress:       []string{redisSingleton.Addr()},
 		DisableCache:      true,
-		BlockingPoolSize:  1,
+		BlockingPoolSize:  consts.RedisBlockingPoolSize,
 		ForceSingleClient: true,
 	}, nil
 }

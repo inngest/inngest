@@ -496,7 +496,7 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 	c, cancel := i.client.Dedicate()
 	defer cancel()
 
-	// TODO: Check whether this graceful shutdown routine makes sense here
+	done := make(chan bool)
 	go func() {
 		<-ctx.Done()
 
@@ -513,7 +513,9 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 			c.Do(ctx, c.B().Unsubscribe().Channel(channelName).Build())
 		}
 
-		c.Close()
+		cancel()
+
+		done <- true
 	}()
 
 	i.pubSubClient = c
@@ -544,12 +546,22 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 			}()
 		},
 	})
-	err := <-wait // disconnected with err
-	if err != nil {
-		return err
-	}
 
-	return nil
+	for {
+		select {
+		case err := <-wait: // disconnected with err
+			i.logger.Debug("wait channel sent message", "err", err)
+
+			if err != nil {
+				return err
+			}
+			continue
+		case <-done:
+			i.logger.Debug("wait is done")
+
+			return nil
+		}
+	}
 }
 
 // NotifyExecutor sends a response to the executor for a specific request.

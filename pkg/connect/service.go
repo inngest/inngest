@@ -3,6 +3,7 @@ package connect
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -337,15 +338,21 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 
 		c.logger.Info("waiting for connections to drain")
 		c.connectionCount.Wait()
+
 		c.logger.Info("shutting down gateway api")
 		_ = server.Shutdown(ctx)
 	}()
 
-	eg, ctx := errgroup.WithContext(ctx)
+	eg := errgroup.Group{}
 
 	eg.Go(func() error {
 		c.logger.Info(fmt.Sprintf("starting gateway api at %s", addr))
-		return server.ListenAndServe()
+		err := server.ListenAndServe()
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+
+		return err
 	})
 
 	eg.Go(func() error {
@@ -359,6 +366,8 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 			// TODO Should we retry? Exit here? This will interrupt existing connections!
 			return fmt.Errorf("could not listen for pubsub messages: %w", err)
 		}
+
+		c.logger.Debug("receiver wait finished")
 
 		return nil
 	})
