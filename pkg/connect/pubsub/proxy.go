@@ -493,6 +493,11 @@ func (i *redisPubSubConnector) ReceiveExecutorMessages(ctx context.Context, onMe
 // Wait blocks and listens for incoming PubSub messages for the internal subscribers. This must be run before
 // subscribing to any channels to ensure that the PubSub client is connected and ready to receive messages.
 func (i *redisPubSubConnector) Wait(ctx context.Context) error {
+	// If we already set this up, return immediately
+	if i.pubSubClient != nil {
+		return nil
+	}
+
 	c, cancel := i.client.Dedicate()
 	defer cancel()
 
