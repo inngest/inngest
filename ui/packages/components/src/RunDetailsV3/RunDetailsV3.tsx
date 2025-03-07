@@ -214,7 +214,7 @@ export const RunDetailsV3 = (props: Props) => {
 
         <div
           className="border-muted flex flex-col overflow-hidden"
-          style={{ width: `${100 - leftWidth}%`, height }}
+          style={{ width: `${100 - leftWidth}%`, height: standalone ? '85vh' : height }}
         >
           {selectedStep && !selectedStep.trace.isRoot ? (
             <StepInfo selectedStep={selectedStep} />
