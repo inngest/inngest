@@ -55,6 +55,7 @@ func NewCmdStart(rootCmd *cobra.Command) *cobra.Command {
 	advancedFlags.Int("queue-workers", devserver.DefaultQueueWorkers, "Number of executor workers to execute steps from the queue")
 	advancedFlags.Int("tick", devserver.DefaultTick, "The interval (in milliseconds) at which the executor polls the queue")
 	advancedFlags.Int("connect-gateway-port", devserver.DefaultConnectGatewayPort, "Port to expose connect gateway endpoint")
+	advancedFlags.String("connect-gateway-host", devserver.DefaultConnectGatewayHost, "Host to expose connect gateway endpoint")
 	cmd.Flags().AddFlagSet(advancedFlags)
 	groups = append(groups, FlagGroup{name: "Advanced Flags:", fs: advancedFlags})
 
@@ -156,6 +157,7 @@ func doStart(cmd *cobra.Command, args []string) {
 		SigningKey:         viper.GetString("signing-key"),
 		EventKey:           viper.GetStringSlice("event-key"),
 		ConnectGatewayPort: viper.GetInt("connect-gateway-port"),
+		ConnectGatewayHost: viper.GetString("connect-gateway-host"),
 	}
 
 	err = lite.New(ctx, opts)

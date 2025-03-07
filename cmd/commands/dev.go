@@ -46,6 +46,8 @@ func NewCmdDev(rootCmd *cobra.Command) *cobra.Command {
 	advancedFlags.Int("queue-workers", devserver.DefaultQueueWorkers, "Number of executor workers to execute steps from the queue")
 	advancedFlags.Int("tick", devserver.DefaultTick, "The interval (in milliseconds) at which the executor polls the queue")
 	advancedFlags.Int("connect-gateway-port", devserver.DefaultConnectGatewayPort, "Port to expose connect gateway endpoint")
+	advancedFlags.String("connect-gateway-host", devserver.DefaultConnectGatewayHost, "Host to expose connect gateway endpoint")
+
 	cmd.Flags().AddFlagSet(advancedFlags)
 	groups = append(groups, FlagGroup{name: "Advanced Flags:", fs: advancedFlags})
 
@@ -125,6 +127,7 @@ func doDev(cmd *cobra.Command, args []string) {
 	queueWorkers := viper.GetInt("queue-workers")
 	tick := viper.GetInt("tick")
 	connectGatewayPort := viper.GetInt("connect-gateway-port")
+	connectGatewayHost := viper.GetString("connect-gateway-host")
 
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
 		ServiceName:   "tracing",
@@ -164,6 +167,7 @@ func doDev(cmd *cobra.Command, args []string) {
 		Tick:               time.Duration(tick) * time.Millisecond,
 		URLs:               urls,
 		ConnectGatewayPort: connectGatewayPort,
+		ConnectGatewayHost: connectGatewayHost,
 	}
 
 	err = devserver.New(ctx, opts)

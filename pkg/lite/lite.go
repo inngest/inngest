@@ -81,7 +81,8 @@ type StartOpts struct {
 	// given key.
 	EventKey []string `json:"event_key"`
 
-	ConnectGatewayPort int `json:"connect-gateway-port"`
+	ConnectGatewayPort int    `json:"connect-gateway-port"`
+	ConnectGatewayHost string `json:"connect-gateway-host"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -397,6 +398,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		EventKeys:          opts.EventKey,
 		RequireKeys:        true,
 		ConnectGatewayPort: opts.ConnectGatewayPort,
+		ConnectGatewayHost: opts.ConnectGatewayHost,
 	}
 
 	if opts.PollInterval > 0 {
@@ -478,7 +480,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		connect.WithGatewayAuthHandler(auth.NewJWTAuthHandler(consts.DevServerConnectJwtSecret)),
 		connect.WithDev(),
 		connect.WithGatewayPublicPort(opts.ConnectGatewayPort),
-		connect.WithApiBaseUrl(fmt.Sprintf("http://127.0.0.1:%d", opts.Config.EventAPI.Port)),
+		connect.WithApiBaseUrl(fmt.Sprintf("http://%s:%d", opts.Config.CoreAPI.Addr, opts.Config.CoreAPI.Port)),
 		connect.WithLifeCycles(
 			[]connect.ConnectGatewayLifecycleListener{
 				lifecycles.NewHistoryLifecycle(dbcqrs),

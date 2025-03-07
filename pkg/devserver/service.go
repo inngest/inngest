@@ -655,7 +655,7 @@ func (d *devserver) RetrieveConnectEntitlements(_ context.Context, _ *auth.Respo
 }
 
 func (d *devserver) RetrieveGateway(_ context.Context, opts v0.RetrieveGatewayOpts) (string, *url.URL, error) {
-	parsed, err := url.Parse(fmt.Sprintf("ws://127.0.0.1:%d/v0/connect", d.Opts.ConnectGatewayPort))
+	parsed, err := url.Parse(fmt.Sprintf("ws://%s:%d/v0/connect", d.Opts.ConnectGatewayHost, d.Opts.ConnectGatewayPort))
 	if err != nil {
 		return "", nil, err
 	}
