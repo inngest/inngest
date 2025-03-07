@@ -81,8 +81,7 @@ type StartOpts struct {
 	// given key.
 	EventKey []string `json:"event_key"`
 
-	ConnectGatewayPort int    `json:"connect-gateway-port"`
-	ConnectGatewayHost string `json:"connect-gateway-host"`
+	ConnectGatewayPort int `json:"connect-gateway-port"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -398,7 +397,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		EventKeys:          opts.EventKey,
 		RequireKeys:        true,
 		ConnectGatewayPort: opts.ConnectGatewayPort,
-		ConnectGatewayHost: opts.ConnectGatewayHost,
+		ConnectGatewayHost: opts.Config.CoreAPI.Addr,
 	}
 
 	if opts.PollInterval > 0 {

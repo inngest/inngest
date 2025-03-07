@@ -65,7 +65,6 @@ const (
 	DefaultTickDuration       = time.Millisecond * DefaultTick
 	DefaultPollInterval       = 5
 	DefaultQueueWorkers       = 100
-	DefaultConnectGatewayHost = "127.0.0.1"
 	DefaultConnectGatewayPort = 8289
 )
 
@@ -95,8 +94,8 @@ type StartOpts struct {
 	// ingesting events will not work.
 	RequireKeys bool `json:"require_keys"`
 
-	ConnectGatewayHost string `json:"connectGatewayHost"`
 	ConnectGatewayPort int    `json:"connectGatewayPort"`
+	ConnectGatewayHost string `json:"connectGatewayHost"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
