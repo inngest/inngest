@@ -90,6 +90,13 @@ type Function struct {
 	// Actions represents the actions to take for this function.  If empty, this assumes
 	// that we have a single action specified in the current directory using
 	Steps []Step `json:"steps,omitempty"`
+
+	Migrate *Migrate `json:"migrate,omitempty"`
+}
+
+type Migrate struct {
+	FromFunction   string `json:"fromFunction"`
+	RolloutPercent int    `json:"rolloutPercent,omitempty"`
 }
 
 type RateLimit struct {

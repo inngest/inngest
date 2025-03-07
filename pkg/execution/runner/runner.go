@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	mathRand "math/rand"
+	"slices"
 	"sync"
 	"time"
 
@@ -520,6 +522,8 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 		return nil
 	}
 
+	fns, err = deduplicateMigrations(mathRand.New(mathRand.NewSource(time.Now().UnixMilli())), fns)
+
 	logger.From(ctx).Debug().Int("len", len(fns)).Msg("scheduling functions")
 
 	// Do this once instead of many times when evaluating expressions.
@@ -781,4 +785,47 @@ func (t *Tracker) Runs(ctx context.Context, eventId ulid.ULID) ([]ulid.ULID, err
 	t.l.RLock()
 	defer t.l.RUnlock()
 	return t.evtIDs[eventId.String()], nil
+}
+
+func deduplicateMigrations(r *mathRand.Rand, fns []inngest.Function) ([]inngest.Function, error) {
+	// Pre-process functions with migrations first
+	slices.SortStableFunc(fns, func(a, b inngest.Function) int {
+		if a.Migrate != nil && b.Migrate == nil {
+			return -1
+		}
+
+		if a.Migrate == nil && b.Migrate != nil {
+			return 1
+		}
+
+		return 0
+	})
+
+	final := make([]inngest.Function, 0, len(fns))
+	skipFns := map[string]struct{}{}
+	for _, fn := range fns {
+		// If this function is supposed to be skipped, exit early
+		if _, ok := skipFns[fn.GetSlug()]; ok {
+			continue
+		}
+
+		// If we shouldn't skip and the function isn't migrating, add it to the result set and continue
+		if fn.Migrate == nil {
+			final = append(final, fn)
+			continue
+		}
+
+		// If we're migrating, we should decide whether to use the new or old function based on the rollout percentage
+		// 100% means only the new function is used, 0% means only the old function is used.
+		fromSlug := fn.Migrate.FromFunction
+		runNewFunction := fn.Migrate.RolloutPercent > r.Intn(100)
+
+		if runNewFunction {
+			skipFns[fromSlug] = struct{}{}
+			final = append(final, fn)
+			continue
+		}
+	}
+
+	return final, nil
 }
