@@ -434,7 +434,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		})
 	})
 
-	apiGatewayProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, connectPubSubLogger, conditionalTracer, false))
+	apiConnectProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, connectPubSubLogger, conditionalTracer, false))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
@@ -455,7 +455,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		ConnectOpts: connectv0.Opts{
 			GroupManager:            connectionManager,
 			ConnectManager:          connectionManager,
-			ConnectResponseNotifier: apiGatewayProxy,
+			ConnectResponseNotifier: apiConnectProxy,
 			Signer:                  auth.NewJWTSessionTokenSigner(consts.DevServerConnectJwtSecret),
 			RequestAuther:           ds,
 			ConnectGatewayRetriever: ds,
