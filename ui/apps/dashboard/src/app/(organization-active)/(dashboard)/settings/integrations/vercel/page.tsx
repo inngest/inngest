@@ -16,6 +16,9 @@ export default async function VercelIntegrationPage() {
   if (!integration) {
     throw new Error('Failed to load Vercel integration');
   }
+  if (integration instanceof Error) {
+    throw integration;
+  }
 
   return (
     <div className="mx-auto mt-6 flex w-[800px] flex-col p-8">
