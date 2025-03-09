@@ -20,6 +20,7 @@ import type { Result } from '../types/functionRun';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
 import { isLazyDone, type Lazy } from '../utils/lazyLoad';
 import { ActionsMenu } from './ActionMenu';
+import { formatDuration } from './TimelineHeader';
 
 type Props = {
   standalone: boolean;
@@ -155,10 +156,10 @@ export const RunInfo = ({
             {(run: Run) => {
               let durationText = '-';
 
-              const startedAt = toMaybeDate(run.trace.startedAt);
-              if (startedAt) {
-                durationText = formatMilliseconds(
-                  (toMaybeDate(run.trace.endedAt) ?? new Date()).getTime() - startedAt.getTime()
+              const queuedAt = toMaybeDate(run.trace.queuedAt);
+              if (queuedAt) {
+                durationText = formatDuration(
+                  (toMaybeDate(run.trace.endedAt) ?? new Date()).getTime() - queuedAt.getTime()
                 );
               }
 
