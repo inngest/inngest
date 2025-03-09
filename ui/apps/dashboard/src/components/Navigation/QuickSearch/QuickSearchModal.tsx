@@ -33,7 +33,7 @@ export function QuickSearchModal({ envSlug, isOpen, onClose }: Props) {
           value={term}
           onValueChange={setTerm}
           className={cn(
-            'border-subtle placeholder-disabled bg-canvasBase w-[656px] border-x-0 border-b border-t-0 px-4 py-3 outline-none focus:ring-0'
+            'border-subtle focus:border-subtle placeholder-disabled bg-canvasBase w-[656px] border-x-0 border-b border-t-0 px-4 py-3 outline-none focus:ring-0'
           )}
         />
         <Command.List className="text-subtle bg-canvasBase h-[min(330px,calc(var(--cmdk-list-height)+24px))] overflow-scroll px-4 py-3">
