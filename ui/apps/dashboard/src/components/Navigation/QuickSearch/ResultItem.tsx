@@ -3,47 +3,57 @@
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { Pill } from '@inngest/components/Pill/Pill';
+import { AppsIcon } from '@inngest/components/icons/sections/Apps';
+import { EventLogsIcon } from '@inngest/components/icons/sections/EventLogs';
+import { EventsIcon } from '@inngest/components/icons/sections/Events';
+import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
+import { RunsIcon } from '@inngest/components/icons/sections/Runs';
+import { RiQuestionMark } from '@remixicon/react';
 import { Command } from 'cmdk';
 
 type Props = {
-  kind: 'app' | 'event' | 'eventType' | 'function' | 'run';
+  kind?: 'app' | 'event' | 'eventType' | 'function' | 'run';
   onClick: () => unknown;
   path: Route;
   text: string;
   value: string;
+  icon?: React.ReactNode;
 };
 
-export function ResultItem({ kind, onClick, path, text, value }: Props) {
+export function ResultItem({ kind, onClick, path, text, value, icon }: Props) {
   const router = useRouter();
 
   return (
     <Command.Item
-      className="data-[selected]:bg-canvasSubtle/50 group flex cursor-pointer items-center rounded-md px-3 py-3"
+      className="data-[selected=true]:bg-canvasSubtle/50 text-basis group flex h-10 cursor-pointer items-center gap-2 rounded-md px-2 text-sm"
       onSelect={() => {
         router.push(path);
         onClick();
       }}
       value={value}
     >
+      <span className="text-light flex h-4 w-4 items-center justify-center">
+        {kind ? getKindDetails(kind).icon : icon}
+      </span>
       <p className="flex-1 truncate">{text}</p>
-      <Pill>{toKindName(kind)}</Pill>
+      {kind && <Pill>{getKindDetails(kind).name}</Pill>}
     </Command.Item>
   );
 }
 
-function toKindName(kind: Props['kind']) {
+function getKindDetails(kind: Props['kind']) {
   switch (kind) {
     case 'app':
-      return 'App';
+      return { name: 'App', icon: <AppsIcon /> };
     case 'event':
-      return 'Event';
+      return { name: 'Event', icon: <EventsIcon /> };
     case 'eventType':
-      return 'Event Type';
+      return { name: 'Event Type', icon: <EventLogsIcon /> };
     case 'function':
-      return 'Function';
+      return { name: 'Function', icon: <FunctionsIcon /> };
     case 'run':
-      return 'Run';
+      return { name: 'Run', icon: <RunsIcon /> };
     default:
-      return 'Unknown';
+      return { name: 'Unknown', icon: <RiQuestionMark /> };
   }
 }
