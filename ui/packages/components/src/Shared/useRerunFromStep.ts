@@ -9,33 +9,17 @@ export type RerunFromStepPayload = {
 
 export type RerunFromStepResult = {
   error?: Error;
-  loading?: boolean;
   data?: {
     rerun: unknown;
   };
+  redirect?: string;
 };
 
 export const useRerunFromStep = () => {
   const shared = useShared();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-
-  const rerun = async (payload: RerunFromStepPayload) => {
-    try {
-      setLoading(true);
-      setError(null);
-      return await shared.rerunFromStep(payload);
-    } catch (err) {
-      console.error('error rerunning from step', err);
-      setError(err instanceof Error ? err : new Error('Error rerunning from step'));
-    } finally {
-      setLoading(false);
-    }
-  };
+  const rerun = async (payload: RerunFromStepPayload) => shared.rerunFromStep(payload);
 
   return {
     rerun,
-    loading,
-    error,
   };
 };

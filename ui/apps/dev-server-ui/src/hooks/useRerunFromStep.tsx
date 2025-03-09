@@ -1,15 +1,35 @@
 import { useCallback } from 'react';
-import type { RerunFromStepPayload } from '@inngest/components/Shared/useRerunFromStep';
+import type {
+  RerunFromStepPayload,
+  RerunFromStepResult,
+} from '@inngest/components/Shared/useRerunFromStep';
 
 import { useRerunFromStepMutation } from '@/store/generated';
+import { pathCreator } from '@/utils/pathCreator';
 
-export function useRerunFromStep() {
+export const useRerunFromStep = () => {
   const [rerunFromStep] = useRerunFromStepMutation();
 
   return useCallback(
-    async ({ runID, fromStep }: RerunFromStepPayload) => {
-      return await rerunFromStep({ runID, fromStep });
+    async ({ runID, fromStep }: RerunFromStepPayload): Promise<RerunFromStepResult> => {
+      try {
+        const res = await rerunFromStep({ runID, fromStep });
+        if ('error' in res) {
+          throw res.error;
+        }
+
+        return {
+          ...res,
+          redirect: res.data?.rerun ? pathCreator.runPopout({ runID: res.data.rerun }) : undefined,
+        };
+      } catch (error) {
+        console.error('error rerunning from step', error);
+        return {
+          error: error instanceof Error ? error : new Error('Error rerunning from step'),
+          data: undefined,
+        };
+      }
     },
     [rerunFromStep]
   );
-}
+};

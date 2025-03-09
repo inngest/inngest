@@ -8,7 +8,7 @@ type TimelineHeaderProps = {
 
 const xAxis = [25, 50, 75, 100];
 
-const formatDuration = (ms: number): string => {
+export const formatDuration = (ms: number): string => {
   const units = [
     { label: 'd', value: 86400000 }, // 24 * 60 * 60 * 1000
     { label: 'h', value: 3600000 }, // 60 * 60 * 1000

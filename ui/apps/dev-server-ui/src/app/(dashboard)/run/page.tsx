@@ -39,7 +39,6 @@ export default function Page() {
           getRun={getRun}
           getTrigger={getTrigger}
           pollInterval={2500}
-          rerun={rerun}
           runID={runID}
         />
       ) : (
@@ -51,7 +50,6 @@ export default function Page() {
           getRun={getRun}
           getTrigger={getTrigger}
           pollInterval={2500}
-          rerun={rerun}
           runID={runID}
           traceAIEnabled={traceAIEnabled}
         />

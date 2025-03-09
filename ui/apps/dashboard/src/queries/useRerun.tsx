@@ -1,7 +1,7 @@
-import { Link } from '@inngest/components/Link';
-import { toast } from 'sonner';
+import type { RerunPayload, RerunResult } from '@inngest/components/Shared/useRerun';
 import { useMutation } from 'urql';
 
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import { pathCreator } from '@/utils/urls';
 
@@ -16,35 +16,38 @@ const mutation = graphql(`
   }
 `);
 
-export function useRerun({ envID, envSlug }: { envID: string; envSlug: string }) {
+export const useRerun = () => {
+  const env = useEnvironment();
   const [, mutate] = useMutation(mutation);
 
-  async function rerun({ fnID, runID }: { fnID: string; runID: string }): Promise<void> {
+  async function rerun({ fnID, runID }: RerunPayload): Promise<RerunResult> {
     try {
-      const response = await mutate({
-        environmentID: envID,
+      if (!fnID || !runID) {
+        throw new Error('envID, fnID, and runID are required');
+      }
+
+      const { data, error } = await mutate({
+        environmentID: env.id,
         functionID: fnID,
         functionRunID: runID,
       });
-      if (response.error) {
-        throw response.error;
-      }
-      const newRunID = response.data?.retryWorkflowRun?.id;
-      if (!newRunID) {
-        throw new Error('missing new run ID');
-      }
 
-      // Give user a link to the new run
-      toast.success(
-        <Link href={pathCreator.runPopout({ envSlug, runID: newRunID })} target="_blank">
-          Successfully queued rerun
-        </Link>
-      );
-    } catch (e) {
-      toast.error('Failed to queue rerun');
-      throw e;
+      const newRunID = data?.retryWorkflowRun?.id;
+      return {
+        error,
+        data: { newRunID },
+        redirect: newRunID
+          ? pathCreator.runPopout({ envSlug: env.slug, runID: newRunID })
+          : undefined,
+      };
+    } catch (error) {
+      console.error('error rerunning function', error);
+      return {
+        error: error instanceof Error ? error : new Error('Error re-running function'),
+        data: undefined,
+      };
     }
   }
 
   return rerun;
-}
+};

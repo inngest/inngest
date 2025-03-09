@@ -410,7 +410,11 @@ export function RunsPage({
         )}
       </div>
 
-      <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
+      <div
+        className="h-[calc(100%-58px)] overflow-y-auto pb-2"
+        onScroll={onScroll}
+        ref={containerRef}
+      >
         <RunsTable
           data={data}
           isLoading={isLoadingInitial}

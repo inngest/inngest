@@ -161,6 +161,7 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
               size="medium"
               label="Rerun from step"
               onClick={() => setRerunModalOpen(true)}
+              className="mt-2"
             />
             <RerunModal
               open={rerunModalOpen}

@@ -1,5 +1,6 @@
 import type { Route } from 'next';
 import { RiArrowRightUpLine } from '@remixicon/react';
+import { toast } from 'sonner';
 
 import { AITrace } from '../AI/AITrace';
 import { parseAIOutput } from '../AI/utils';
@@ -17,6 +18,7 @@ import { Link } from '../Link';
 import { RerunButton } from '../RerunButtonV2';
 import { RunResult } from '../RunResult';
 import type { Run as InitialRunData } from '../RunsPage/types';
+import { useRerun } from '../Shared/useRerun';
 import { AICell } from '../Table/Cell';
 import type { Result } from '../types/functionRun';
 import { cn } from '../utils/classNames';
@@ -32,7 +34,6 @@ type Props = {
     function: (params: { functionSlug: string }) => Route;
     runPopout: (params: { runID: string }) => Route;
   };
-  rerun: (args: { fnID: string; runID: string }) => Promise<unknown>;
   initialRunData?: InitialRunData;
   run: Lazy<Run>;
   runID: string;
@@ -65,13 +66,13 @@ export function RunInfo({
   cancelRun,
   className,
   pathCreator,
-  rerun,
   initialRunData,
   run,
   runID,
   standalone,
   result,
 }: Props) {
+  const { rerun, error, loading } = useRerun();
   let allowCancel = false;
   let isSuccess = false;
   let stepID = null;
@@ -102,11 +103,22 @@ export function RunInfo({
           <CancelRunButton disabled={!allowCancel} onClick={cancelRun} />
           <RerunButton
             disabled={!isLazyDone(run)}
-            onClick={async () => {
+            loading={loading}
+            rerun={async () => {
               if (!isLazyDone(run)) {
                 return;
               }
-              await rerun({ fnID: run.fn.id, runID });
+              const result = await rerun({ runID, fnID: run.fn.id });
+              if (result?.data?.newRunID) {
+                toast.success(
+                  <Link
+                    href={pathCreator.runPopout({ runID: result.data.newRunID })}
+                    target="_blank"
+                  >
+                    Successfully queued rerun
+                  </Link>
+                );
+              }
             }}
           />
         </Card.Header>

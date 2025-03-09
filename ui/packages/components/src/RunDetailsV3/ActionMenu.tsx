@@ -8,47 +8,72 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu/DropdownMenu';
-import { RiArrowDownSLine, RiCloseCircleLine } from '@remixicon/react';
+import {
+  RiArrowDownSLine,
+  RiArrowLeftSLine,
+  RiArrowRightSLine,
+  RiCloseCircleLine,
+} from '@remixicon/react';
+import { toast } from 'sonner';
+
+import { Button } from '../Button';
+import { Link } from '../Link';
+import { useRerun } from '../Shared/useRerun';
+import { RerunModal } from './RerunModal';
 
 export type RunActions = {
   cancel: () => void;
-  reRun: () => void;
   allowCancel?: boolean;
+  runID: string;
+  fnID?: string;
 };
 
-export const ActionsMenu = ({ cancel, reRun, allowCancel }: RunActions) => {
-  const [open, setOpen] = useState(false);
+export const ActionsMenu = ({ cancel, allowCancel, runID, fnID }: RunActions) => {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [rerunOpen, setRerunOpen] = useState(false);
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger className="h-7" />
-      <SplitButton
-        kind="primary"
-        appearance="outlined"
-        size="medium"
-        icon={
-          <RiArrowDownSLine
-            className="transform-90 transition-transform duration-500 group-data-[state=open]:-rotate-180"
-            onClick={(e) => {
-              setOpen(!open);
-              e.stopPropagation();
-            }}
-          />
-        }
-        label="Rerun"
-        className="group text-sm"
-        onClick={reRun}
-      />
+    <>
+      <RerunModal runID={runID} fnID={fnID} open={rerunOpen} onClose={() => setRerunOpen(false)} />
 
-      <DropdownMenuContent align="start">
-        <DropdownMenuItem
-          onSelect={cancel}
-          className={`text-error ${!allowCancel && 'cursor-not-allowed'}`}
-          disabled={!allowCancel}
-        >
-          <RiCloseCircleLine className="h-4 w-4" />
-          Cancel
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+        <DropdownMenuTrigger className="h-7" />
+        <SplitButton
+          left={
+            <Button
+              kind="primary"
+              appearance="outlined"
+              size="medium"
+              label="Rerun"
+              onClick={(e) => {
+                setRerunOpen(!rerunOpen);
+              }}
+            />
+          }
+          right={
+            <Button
+              kind="primary"
+              appearance="outlined"
+              size="medium"
+              icon={menuOpen ? <RiArrowLeftSLine /> : <RiArrowDownSLine />}
+              className="*:transform-90 *:transition-transform *:duration-500"
+              onClick={(e) => {
+                setMenuOpen(!menuOpen);
+              }}
+            />
+          }
+        />
+
+        <DropdownMenuContent align="start">
+          <DropdownMenuItem
+            onSelect={cancel}
+            className={`text-error ${!allowCancel && 'cursor-not-allowed'}`}
+            disabled={!allowCancel}
+          >
+            <RiCloseCircleLine className="h-4 w-4" />
+            Cancel
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
   );
 };
