@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Route } from 'next';
 import { RiArrowRightUpLine } from '@remixicon/react';
 import { toast } from 'sonner';
@@ -72,7 +73,9 @@ export function RunInfo({
   standalone,
   result,
 }: Props) {
-  const { rerun, error, loading } = useRerun();
+  const { rerun } = useRerun();
+  const [loading, setLoading] = useState(false);
+
   let allowCancel = false;
   let isSuccess = false;
   let stepID = null;
@@ -108,6 +111,7 @@ export function RunInfo({
               if (!isLazyDone(run)) {
                 return;
               }
+              setLoading(true);
               const result = await rerun({ runID, fnID: run.fn.id });
               if (result?.data?.newRunID) {
                 toast.success(
@@ -119,6 +123,7 @@ export function RunInfo({
                   </Link>
                 );
               }
+              setLoading(false);
             }}
           />
         </Card.Header>
