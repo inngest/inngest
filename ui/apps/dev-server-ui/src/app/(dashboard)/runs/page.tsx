@@ -5,7 +5,6 @@ import { Header } from '@inngest/components/Header/Header';
 import { LegacyRunsToggle } from '@inngest/components/RunDetailsV3/LegacyRunsToggle';
 import { RunsActionMenu } from '@inngest/components/RunsPage/ActionMenu';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
-import { useLegacyTrace } from '@inngest/components/Shared/useLegacyTrace';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   useSearchParam,
@@ -26,7 +25,6 @@ import { useCancelRun } from '@/hooks/useCancelRun';
 import { useGetRun } from '@/hooks/useGetRun';
 import { useGetTraceResult } from '@/hooks/useGetTraceResult';
 import { useGetTrigger } from '@/hooks/useGetTrigger';
-import { useRerun } from '@/hooks/useRerun';
 import { client } from '@/store/baseApi';
 import {
   CountRunsDocument,
@@ -135,7 +133,6 @@ export default function Page() {
   }, [data?.pages]);
 
   const cancelRun = useCancelRun();
-  const rerun = useRerun();
 
   const getTraceResult = useGetTraceResult();
   const getTrigger = useGetTrigger();
@@ -201,7 +198,6 @@ export default function Page() {
         onRefresh={fetchNextPage}
         getTraceResult={getTraceResult}
         getTrigger={getTrigger}
-        rerun={rerun}
         pathCreator={pathCreator}
         pollInterval={pollInterval}
         scope="env"
