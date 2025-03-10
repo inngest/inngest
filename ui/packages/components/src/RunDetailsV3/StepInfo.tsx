@@ -153,7 +153,7 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
 
           <span className="text-basis text-sm font-normal">{trace.name}</span>
         </div>
-        {runID && trace.stepID && (
+        {runID && trace.stepID && prettyInput && (
           <>
             <Button
               kind="primary"
@@ -210,14 +210,25 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
       )}
 
       <Tabs
-        defaultActive={result?.error ? 2 : prettyInput ? 0 : 1}
+        defaultActive={result?.error ? 'error' : prettyInput ? 'input' : 'output'}
         tabs={[
-          { label: 'Input', node: <IO title="Step Input" raw={prettyInput} /> },
-          { label: 'Output', node: <IO title="Step Output" raw={prettyOutput} /> },
+          ...(prettyInput
+            ? [{ label: 'Input', id: 'input', node: <IO title="Step Input" raw={prettyInput} /> }]
+            : []),
+          ...(prettyOutput
+            ? [
+                {
+                  label: 'Output',
+                  id: 'output',
+                  node: <IO title="Step Output" raw={prettyOutput} />,
+                },
+              ]
+            : []),
           ...(result?.error
             ? [
                 {
                   label: 'Error',
+                  id: 'error',
                   node: (
                     <IO
                       title={`${result.error.name || 'Error'} ${

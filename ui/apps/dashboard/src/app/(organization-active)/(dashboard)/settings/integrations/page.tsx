@@ -8,14 +8,26 @@ export default async function IntegrationsPage() {
 
   const integration = await getVercelIntegration();
   if (integration) {
-    allIntegrations = [
-      {
-        slug: 'vercel',
-        enabled: true,
-        projects: integration.projects,
-      },
-      ...allIntegrations,
-    ];
+    if (integration instanceof Error) {
+      allIntegrations = [
+        {
+          enabled: true,
+          error: integration.message,
+          projects: [],
+          slug: 'vercel',
+        },
+        ...allIntegrations,
+      ];
+    } else {
+      allIntegrations = [
+        {
+          enabled: true,
+          projects: integration.projects,
+          slug: 'vercel',
+        },
+        ...allIntegrations,
+      ];
+    }
   }
 
   return <IntegrationsList integrations={allIntegrations} />;

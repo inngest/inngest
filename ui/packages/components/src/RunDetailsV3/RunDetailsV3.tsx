@@ -184,6 +184,7 @@ export const RunDetailsV3 = (props: Props) => {
             tabs={[
               {
                 label: 'Trace',
+                id: 'trace',
                 node: run && (
                   <Timeline
                     getResult={getResult}
@@ -193,7 +194,6 @@ export const RunDetailsV3 = (props: Props) => {
                   />
                 ),
               },
-              { label: 'Workflow', node: <Workflow /> },
             ]}
           />
         </div>
@@ -214,7 +214,7 @@ export const RunDetailsV3 = (props: Props) => {
 
         <div
           className="border-muted flex flex-col overflow-hidden"
-          style={{ width: `${100 - leftWidth}%`, height }}
+          style={{ width: `${100 - leftWidth}%`, height: standalone ? '85vh' : height }}
         >
           {selectedStep && !selectedStep.trace.isRoot ? (
             <StepInfo selectedStep={selectedStep} />

@@ -240,17 +240,33 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
       )}
 
       <Tabs
-        defaultActive={result?.error ? 2 : prettyPayload ? 0 : 1}
+        defaultActive={result?.error ? 'error' : prettyPayload ? 'input' : 'output'}
         tabs={[
-          {
-            label: 'Input',
-            node: <IO title="Function Payload" raw={prettyPayload} actions={codeBlockActions} />,
-          },
-          { label: 'Output', node: <IO title="Output" raw={prettyOutput} /> },
+          ...(prettyPayload
+            ? [
+                {
+                  label: 'Input',
+                  id: 'input',
+                  node: (
+                    <IO title="Function Payload" raw={prettyPayload} actions={codeBlockActions} />
+                  ),
+                },
+              ]
+            : []),
+          ...(prettyOutput
+            ? [
+                {
+                  label: 'Output',
+                  id: 'output',
+                  node: <IO title="Output" raw={prettyOutput} />,
+                },
+              ]
+            : []),
           ...(result?.error
             ? [
                 {
                   label: 'Error',
+                  id: 'error',
                   node: (
                     <IO
                       title={`${result.error.name || 'Error'} ${

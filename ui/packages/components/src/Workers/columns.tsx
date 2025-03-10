@@ -33,15 +33,15 @@ export function useColumns() {
       cell: ({ row }: { row: Row<Worker> }) => {
         return row.getCanExpand() ? (
           <Button
-            className="group"
             appearance="ghost"
             kind="secondary"
+            size="small"
             onClick={row.getToggleExpandedHandler()}
             icon={
               <RiArrowRightSLine
                 className={cn(
                   row.getIsExpanded() ? 'rotate-90' : undefined,
-                  'transform-90 h-5 w-5 transition-transform duration-500'
+                  'transform-90 transition-transform duration-500'
                 )}
               />
             }
@@ -65,20 +65,6 @@ export function useColumns() {
       enableSorting: false,
       id: ensureColumnID('instanceID'),
     }),
-    columnHelper.accessor('connectedAt', {
-      cell: (info) => {
-        const time = info.getValue();
-
-        return (
-          <div className="flex items-center">
-            <TimeCell date={new Date(time)} />
-          </div>
-        );
-      },
-      header: 'Connected at',
-      enableSorting: true,
-      id: ensureColumnID('connectedAt'),
-    }),
     columnHelper.accessor<'status', GroupedWorkerStatus>('status', {
       cell: (info) => {
         const status = info.getValue();
@@ -92,6 +78,20 @@ export function useColumns() {
       header: 'Status',
       enableSorting: false,
       id: ensureColumnID('status'),
+    }),
+    columnHelper.accessor('connectedAt', {
+      cell: (info) => {
+        const time = info.getValue();
+
+        return (
+          <div className="flex items-center">
+            <TimeCell date={new Date(time)} />
+          </div>
+        );
+      },
+      header: 'Connected at',
+      enableSorting: true,
+      id: ensureColumnID('connectedAt'),
     }),
     columnHelper.accessor('lastHeartbeatAt', {
       cell: (info) => {

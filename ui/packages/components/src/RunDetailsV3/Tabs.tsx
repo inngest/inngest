@@ -23,12 +23,13 @@ export const Tab = ({
 
 export type TabType = {
   label: string;
+  id: string;
   node: ReactNode;
 };
 
 export type TabsType = TabType[];
 
-export const Tabs = ({ tabs, defaultActive = 0 }: { tabs: TabsType; defaultActive?: number }) => {
+export const Tabs = ({ tabs, defaultActive = '' }: { tabs: TabsType; defaultActive?: string }) => {
   const [active, setActive] = useState(defaultActive);
 
   useEffect(() => {
@@ -39,7 +40,11 @@ export const Tabs = ({ tabs, defaultActive = 0 }: { tabs: TabsType; defaultActiv
     <div className="flex w-full flex-col">
       <div className="border-muted flex w-full flex-row gap-4 border-b px-4">
         {tabs.map((t: TabType, i: number) => (
-          <Tab key={`tab-${i}`} active={active === i} onClick={() => setActive(i)}>
+          <Tab
+            key={`tab-${i}`}
+            active={active === t.id || (active == '' && i === 0)}
+            onClick={() => setActive(t.id)}
+          >
             {t.label}
           </Tab>
         ))}
@@ -48,7 +53,11 @@ export const Tabs = ({ tabs, defaultActive = 0 }: { tabs: TabsType; defaultActiv
         {tabs.map((tab, i) => (
           <div
             key={`content-${i}`}
-            className={`w-full ${active === i ? 'visible opacity-100' : 'invisible h-0 opacity-0'}`}
+            className={`w-full ${
+              active === tab.id || (active == '' && i === 0)
+                ? 'visible opacity-100'
+                : 'invisible h-0 opacity-0'
+            }`}
           >
             {tab.node}
           </div>

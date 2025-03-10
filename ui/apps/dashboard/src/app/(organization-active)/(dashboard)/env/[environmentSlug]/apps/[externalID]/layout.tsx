@@ -96,7 +96,7 @@ export default function Layout({ children, params: { externalID } }: Props) {
             {res.data?.latestSync?.url && !res.data.isArchived && (
               <ResyncButton
                 appExternalID={externalAppID}
-                disabled={res.data.isArchived}
+                appMethod={res.data.method}
                 platform={res.data.latestSync.platform}
                 latestSyncUrl={res.data.latestSync.url}
               />
