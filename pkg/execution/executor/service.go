@@ -367,7 +367,7 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 						"fn_id", d.FunctionID.String(),
 						"debounce_id", d.DebounceID.String(),
 					)
-					return nil
+					continue
 				}
 
 				return err
