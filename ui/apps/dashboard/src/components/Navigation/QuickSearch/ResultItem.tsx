@@ -14,7 +14,7 @@ import { Command } from 'cmdk';
 type Props = {
   kind?: 'app' | 'event' | 'eventType' | 'function' | 'run';
   onClick: () => unknown;
-  path: Route;
+  path?: Route;
   text: string;
   value: string;
   icon?: React.ReactNode;
@@ -27,7 +27,9 @@ export function ResultItem({ kind, onClick, path, text, value, icon }: Props) {
     <Command.Item
       className="data-[selected=true]:bg-canvasSubtle/50 text-basis group flex h-10 cursor-pointer items-center gap-2 rounded-md px-2 text-sm"
       onSelect={() => {
-        router.push(path);
+        if (path) {
+          router.push(path);
+        }
         onClick();
       }}
       value={value}

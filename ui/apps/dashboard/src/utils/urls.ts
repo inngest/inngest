@@ -87,11 +87,11 @@ export const pathCreator = {
   }): Route {
     return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}/cancellations` as Route;
   },
+  integrations(): Route {
+    return `/settings/integrations` as Route;
+  },
   keys({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/manage/keys` as Route;
-  },
-  neon(): Route {
-    return `/settings/integrations/neon` as Route;
   },
   pgIntegrationStep({ integration, step }: { integration: string; step?: string }): Route {
     return `/settings/integrations/${integration}${step ? `/${step}` : ''}` as Route;
