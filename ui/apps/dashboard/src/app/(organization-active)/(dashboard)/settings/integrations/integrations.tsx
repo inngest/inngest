@@ -17,7 +17,7 @@ type Integration = {
   title: string;
   slug: string;
   Icon: ReactNode;
-  actionButton: (enabled: boolean, loading?: boolean) => ReactNode;
+  actionButton: (args: { enabled: boolean; hasError?: boolean }) => ReactNode;
   description: string;
   upvoteId?: string;
 };
@@ -27,12 +27,12 @@ const INTEGRATIONS: Integration[] = [
     title: 'Vercel',
     slug: 'vercel',
     Icon: <IconVercel className="text-onContrast h-6 w-6" />,
-    actionButton: (enabled, loading) => (
+    actionButton: ({ enabled, hasError }) => (
       <Button
+        disabled={hasError}
         kind="primary"
         appearance="solid"
         size="medium"
-        loading={loading}
         href={enabled ? '/settings/integrations/vercel' : '/settings/integrations/vercel/connect'}
         label={enabled ? 'Manage' : 'Connect'}
         prefetch={true}
@@ -45,12 +45,12 @@ const INTEGRATIONS: Integration[] = [
     title: 'Neon',
     slug: 'neon',
     Icon: <IconNeon className="text-onContrast h-6 w-6" />,
-    actionButton: (enabled, loading) => (
+    actionButton: ({ enabled, hasError }) => (
       <Button
+        disabled={hasError}
         kind="primary"
         appearance="solid"
         size="medium"
-        loading={loading}
         href={enabled ? '/settings/integrations/neon' : '/settings/integrations/neon/connect'}
         label={enabled ? 'Manage' : 'Connect'}
         prefetch={true}
@@ -62,12 +62,12 @@ const INTEGRATIONS: Integration[] = [
     title: 'Supabase',
     slug: 'supabase',
     Icon: <IconSupabase className="text-onContrast h-6 w-6" />,
-    actionButton: (enabled, loading) => (
+    actionButton: ({ enabled, hasError }) => (
       <Button
+        disabled={hasError}
         kind="primary"
         appearance="solid"
         size="medium"
-        loading={loading}
         href={
           enabled ? '/settings/integrations/supabase' : '/settings/integrations/supabase/connect'
         }
@@ -129,6 +129,7 @@ const INTEGRATIONS: Integration[] = [
 
 type Props = {
   integrations: {
+    error?: string;
     slug: string;
     enabled: boolean;
     projects: unknown[];
@@ -151,28 +152,33 @@ export default function IntegrationsList({ integrations }: Props) {
           if (i.title === 'Datadog' && !ddIntegration) return;
 
           const integrationData = getIntegrationData(i.slug);
-          const isEnabled =
-            i.slug === 'vercel'
-              ? Boolean(integrationData?.enabled && integrationData.projects.length > 0)
-              : integrationData?.enabled ?? false;
+          const isEnabled = Boolean(integrationData?.enabled);
 
           return (
             <Card key={`integration-card-${n}`}>
-              <div className="flex h-[189px] w-[388px] flex-col p-6">
+              <div className="flex w-[388px] flex-col p-6">
                 <div className="align-center flex flex-row items-center justify-between">
                   <div className="bg-contrast flex h-12 w-12 items-center justify-center rounded">
                     {i.Icon}
                   </div>
-                  {i.actionButton(isEnabled)}
+                  {i.actionButton({
+                    enabled: isEnabled,
+                    hasError: Boolean(integrationData?.error),
+                  })}
                 </div>
                 <div className="text-basis mt-[18px] text-lg font-medium">{i.title}</div>
                 <div className="text-muted mt-2 text-sm leading-tight">{i.description}</div>
+                {integrationData?.error && (
+                  <div className="text-error mt-2 text-sm leading-tight">
+                    {integrationData.error}
+                  </div>
+                )}
               </div>
             </Card>
           );
         })}
         <Card className="col-span-2">
-          <div className="bg-canvasSubtle flex h-[189px] w-[800px] flex-col p-6">
+          <div className="bg-canvasSubtle flex w-[800px] flex-col p-6">
             <div className="text-basis text-lg font-medium">Can&apos;t find what you need?</div>
             <div className="text-basis mt-3 text-sm leading-tight">
               Write to our team about the integration you are looking for and we will get back to
