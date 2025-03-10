@@ -311,8 +311,11 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		eg := errgroup.Group{}
 
+		onSubscribed := make(chan struct{})
 		// Wait for relevant messages and forward them over the WebSocket connection
-		go ch.receiveRouterMessages(ctx)
+		go ch.receiveRouterMessages(ctx, onSubscribed)
+
+		<-onSubscribed
 
 		// Run loop
 		eg.Go(func() error {
@@ -599,7 +602,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 	return nil
 }
 
-func (c *connectionHandler) receiveRouterMessages(ctx context.Context) {
+func (c *connectionHandler) receiveRouterMessages(ctx context.Context, onSubscribed chan struct{}) {
 	additionalMetricsTags := c.svc.metricsTags()
 
 	// Receive execution-related messages for the app, forwarded by the router.
@@ -658,7 +661,7 @@ func (c *connectionHandler) receiveRouterMessages(ctx context.Context) {
 		}
 
 		log.Debug("forwarded message to worker")
-	})
+	}, onSubscribed)
 	if err != nil {
 		c.log.Error("failed to receive routed requests", "err", err)
 

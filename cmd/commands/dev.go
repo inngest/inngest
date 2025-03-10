@@ -46,6 +46,7 @@ func NewCmdDev(rootCmd *cobra.Command) *cobra.Command {
 	advancedFlags.Int("queue-workers", devserver.DefaultQueueWorkers, "Number of executor workers to execute steps from the queue")
 	advancedFlags.Int("tick", devserver.DefaultTick, "The interval (in milliseconds) at which the executor polls the queue")
 	advancedFlags.Int("connect-gateway-port", devserver.DefaultConnectGatewayPort, "Port to expose connect gateway endpoint")
+
 	cmd.Flags().AddFlagSet(advancedFlags)
 	groups = append(groups, FlagGroup{name: "Advanced Flags:", fs: advancedFlags})
 
@@ -109,10 +110,12 @@ func doDev(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 	conf.EventAPI.Port = port
+	conf.CoreAPI.Port = port
 
 	host := viper.GetString("host")
 	if host != "" {
 		conf.EventAPI.Addr = host
+		conf.CoreAPI.Addr = host
 	}
 
 	urls := viper.GetStringSlice("sdk-url")
@@ -164,6 +167,7 @@ func doDev(cmd *cobra.Command, args []string) {
 		Tick:               time.Duration(tick) * time.Millisecond,
 		URLs:               urls,
 		ConnectGatewayPort: connectGatewayPort,
+		ConnectGatewayHost: conf.CoreAPI.Addr,
 	}
 
 	err = devserver.New(ctx, opts)
