@@ -361,6 +361,15 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 		if f.ID == d.FunctionID {
 			di, err := s.debouncer.GetDebounceItem(ctx, d.DebounceID)
 			if err != nil {
+				if errors.Is(err, debounce.ErrDebounceNotFound) {
+					// This is expected after migrating items to a new primary cluster
+					logger.StdlibLogger(ctx).Info("debounce not found during timeout job, skipping",
+						"fn_id", d.FunctionID.String(),
+						"debounce_id", d.DebounceID.String(),
+					)
+					continue
+				}
+
 				return err
 			}
 
