@@ -75,7 +75,7 @@ export default function Shortcuts({
           onClick={onClose}
           path={pathCreator.createApp({ envSlug })}
           text="Sync new app"
-          value="action-sync-new-app"
+          value="sync-new-app"
           icon={<RiAddLine />}
         />
         {theme !== 'dark' && (
@@ -85,7 +85,7 @@ export default function Shortcuts({
               onClose();
             }}
             text="Switch to dark mode"
-            value="action-dark-mode"
+            value="dark-mode"
             icon={<RiMoonClearFill />}
           />
         )}
@@ -96,7 +96,7 @@ export default function Shortcuts({
               onClose();
             }}
             text="Switch to light mode"
-            value="action-light-mode"
+            value="light-mode"
             icon={<RiSunLine />}
           />
         )}
@@ -107,7 +107,7 @@ export default function Shortcuts({
               onClose();
             }}
             text="Switch to system mode"
-            value="action-system-mode"
+            value="system-mode"
             icon={<RiWindow2Line />}
           />
         )}
@@ -120,21 +120,21 @@ export default function Shortcuts({
           onClick={onClose}
           path={'https://www.inngest.com/docs?ref=app-cmdk'}
           text="Go to documentation"
-          value="help-go-to-documentation-docs"
+          value="go-to-documentation-docs"
           icon={<RiExternalLinkLine />}
         />
         <ResultItem
           onClick={onClose}
           path={pathCreator.support()}
           text="Contact support"
-          value="help-contact-support"
+          value="contact-support"
           icon={<RiChat2Line />}
         />
         <ResultItem
           onClick={onClose}
           path={DISCORD_URL}
           text="Join community"
-          value="help-join-community"
+          value="join-community"
           icon={<RiDiscordLine />}
         />
       </Command.Group>
