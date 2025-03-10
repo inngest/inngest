@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { RunDetailsV2 } from '@inngest/components/RunDetailsV2';
 import { RunDetailsV3 } from '@inngest/components/RunDetailsV3/RunDetailsV3';
-import { useLegacyTrace } from '@inngest/components/Shared/useLegacyTrace';
+import { useLegacyTrace } from '@inngest/components/SharedContext/useLegacyTrace';
 import { cn } from '@inngest/components/utils/classNames';
 
 import { useEnvironment } from '@/components/Environments/environment-context';

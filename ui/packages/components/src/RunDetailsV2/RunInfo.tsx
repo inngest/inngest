@@ -19,7 +19,7 @@ import { Link } from '../Link';
 import { RerunButton } from '../RerunButtonV2';
 import { RunResult } from '../RunResult';
 import type { Run as InitialRunData } from '../RunsPage/types';
-import { useRerun } from '../Shared/useRerun';
+import { useRerun } from '../SharedContext/useRerun';
 import { AICell } from '../Table/Cell';
 import type { Result } from '../types/functionRun';
 import { cn } from '../utils/classNames';

@@ -1,4 +1,4 @@
-import type { RerunFromStepPayload } from '@inngest/components/Shared/useRerunFromStep';
+import type { RerunFromStepPayload } from '@inngest/components/SharedContext/useRerunFromStep';
 import { useMutation } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';

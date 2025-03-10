@@ -17,7 +17,7 @@ import { Link } from '../Link';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { AICell } from '../Table/Cell';
 import type { Result } from '../types/functionRun';
-import { formatMilliseconds, toMaybeDate } from '../utils/date';
+import { toMaybeDate } from '../utils/date';
 import { isLazyDone, type Lazy } from '../utils/lazyLoad';
 import { ActionsMenu } from './ActionMenu';
 import { formatDuration } from './TimelineHeader';

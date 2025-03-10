@@ -1,5 +1,8 @@
-import { SharedProvider, type SharedHandlers } from '@inngest/components/Shared/SharedContext';
-import { legacyTraceToggle } from '@inngest/components/Shared/useLegacyTrace';
+import {
+  SharedProvider,
+  type SharedHandlers,
+} from '@inngest/components/SharedContext/SharedContext';
+import { legacyTraceToggle } from '@inngest/components/SharedContext/useLegacyTrace';
 
 import { useInvokeRun } from '@/hooks/useInvokeRun';
 import { useRerun } from '@/hooks/useRerun';

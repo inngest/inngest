@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { RerunResult } from '@inngest/components/Shared/useRerun';
+import type { RerunResult } from '@inngest/components/SharedContext/useRerun';
 
 import { useRerunMutation } from '@/store/generated';
 import { pathCreator } from '@/utils/pathCreator';

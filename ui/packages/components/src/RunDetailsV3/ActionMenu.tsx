@@ -54,8 +54,7 @@ export const ActionsMenu = ({ cancel, allowCancel, runID, fnID }: RunActions) =>
               kind="primary"
               appearance="outlined"
               size="medium"
-              icon={menuOpen ? <RiArrowLeftSLine /> : <RiArrowDownSLine />}
-              className="*:transform-90 *:transition-transform *:duration-500"
+              icon={<RiArrowDownSLine />}
               onClick={(e) => {
                 setMenuOpen(!menuOpen);
               }}

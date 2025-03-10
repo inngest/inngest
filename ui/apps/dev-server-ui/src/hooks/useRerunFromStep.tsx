@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import type {
   RerunFromStepPayload,
   RerunFromStepResult,
-} from '@inngest/components/Shared/useRerunFromStep';
+} from '@inngest/components/SharedContext/useRerunFromStep';
 
 import { useRerunFromStepMutation } from '@/store/generated';
 import { pathCreator } from '@/utils/pathCreator';

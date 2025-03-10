@@ -15,7 +15,7 @@ import {
 } from '../DetailsCard/NewElement';
 import { InvokeModal } from '../InvokeButton';
 import { ErrorCard } from '../RunDetailsV2/ErrorCard';
-import { useInvokeRun } from '../Shared/useInvokeRun';
+import { useInvokeRun } from '../SharedContext/useInvokeRun';
 import { usePrettyJson } from '../hooks/usePrettyJson';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
 import type { Result } from '../types/functionRun';

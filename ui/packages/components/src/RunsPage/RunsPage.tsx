@@ -24,7 +24,7 @@ import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
 import { RunDetailsV2 } from '../RunDetailsV2';
 import { RunDetailsV3 } from '../RunDetailsV3/RunDetailsV3';
-import { useLegacyTrace } from '../Shared/useLegacyTrace';
+import { useLegacyTrace } from '../SharedContext/useLegacyTrace';
 import {
   useBatchedSearchParams,
   useSearchParam,
