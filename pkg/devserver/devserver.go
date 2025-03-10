@@ -456,6 +456,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
 
+	fmt.Printf("%s:%d\n", opts.Config.CoreAPI.Addr, opts.Config.CoreAPI.Port)
+
 	connGateway := connect.NewConnectGatewayService(
 		connect.WithConnectionStateManager(connectionManager),
 		connect.WithRequestReceiver(connectGatewayProxy),
