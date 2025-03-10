@@ -106,10 +106,12 @@ func doStart(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 	conf.EventAPI.Port = port
+	conf.CoreAPI.Port = port
 
 	host := viper.GetString("host")
 	if host != "" {
 		conf.EventAPI.Addr = host
+		conf.CoreAPI.Addr = host
 	}
 
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
