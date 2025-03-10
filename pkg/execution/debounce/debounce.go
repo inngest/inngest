@@ -6,6 +6,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/jonboulle/clockwork"
 	"io/fs"
 	"regexp"
@@ -118,6 +119,14 @@ type DebouncePayload struct {
 	FunctionID uuid.UUID `json:"fnID"`
 	// FunctionVersion represents the version of the function that was debounced.
 	FunctionVersion int `json:"fnV"`
+}
+
+// DebounceMigrator exposes functionality to gracefully move existing debounces
+// from one queue shard to another, maintaining the existing ttl and timeout.
+type DebounceMigrator interface {
+	// Migrate existing debounce to primary shard. This requires primary/secondary clusters
+	// to be configured in advance.
+	Migrate(ctx context.Context, debounceId ulid.ULID, di DebounceItem, remainingTtl time.Duration, fn inngest.Function) error
 }
 
 // Debouncer represents an implementation-agnostic function debouncer, delaying function runs
@@ -305,13 +314,9 @@ func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn innge
 }
 
 // Migrate debounces a given function with the given DebounceItem.
-func (d debouncer) Migrate(ctx context.Context, debounceId ulid.ULID, di DebounceItem, fn inngest.Function) error {
+func (d debouncer) Migrate(ctx context.Context, debounceId ulid.ULID, di DebounceItem, remainingTtl time.Duration, fn inngest.Function) error {
 	if fn.Debounce == nil {
 		return fmt.Errorf("fn has no debounce config")
-	}
-	ttl, err := str2duration.ParseDuration(fn.Debounce.Period)
-	if err != nil {
-		return fmt.Errorf("invalid debounce duration: %w", err)
 	}
 
 	shouldMigrate := d.shouldMigrate(ctx)
@@ -319,7 +324,7 @@ func (d debouncer) Migrate(ctx context.Context, debounceId ulid.ULID, di Debounc
 		return fmt.Errorf("expected migration mode to be enable")
 	}
 
-	return d.debounce(ctx, di, fn, ttl, 0, shouldMigrate)
+	return d.debounce(ctx, di, fn, remainingTtl, 0, shouldMigrate)
 }
 
 // Debounce debounces a given function with the given DebounceItem.
@@ -379,7 +384,30 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 
 			foundDebounce = true
 			newDebounceID = *debounceID
+
+			// Preserve previous timeout
 			di.Timeout = debounceTimeout
+
+			// Delete debounce state from old cluster
+			err := d.deleteDebounceItem(ctx, newDebounceID, d.secondaryDebounceClient)
+			if err != nil {
+				l.Error("unable to delete old debounce after migration", "err", err)
+				return nil
+			}
+
+			// Delete debounce timeout from old cluster
+			queueItemId := queue.HashID(ctx, debounceID.String())
+			err = d.secondaryQueueManager.RemoveQueueItem(
+				ctx,
+				d.secondaryQueueShard.Name,
+				d.secondaryQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, di.FunctionID.String(), ""),
+				queueItemId,
+			)
+			if err != nil {
+				l.Error("could not remove queue item", "item_id", queueItemId)
+			} else {
+				l.Debug("deleted migrated debounce")
+			}
 		}
 	}
 
@@ -388,20 +416,6 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 	// is atomic, and two individual threads/workers cannot create debounces simultaneously.
 	existingDebounceID, err := d.newDebounce(ctx, di, fn, ttl, shouldMigrate, newDebounceID)
 	if err == nil {
-		if shouldMigrate && foundDebounce {
-			// Delete debounce from old cluster
-			err := d.deleteDebounceItem(ctx, newDebounceID, d.secondaryDebounceClient)
-			if err != nil {
-				l.Error("unable to delete old debounce after migration", "err", err)
-				return nil
-			}
-
-			// Note: We do not Dequeue the debounce timeout job, as it gracefully handles missing debounces.
-			// For more details, see handleDebounce() in executor/service.go#349.
-
-			l.Debug("deleted migrated debounce")
-		}
-
 		return nil
 	}
 	if err != ErrDebounceExists {
@@ -659,7 +673,7 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 		// Do nothing.
 		return nil
 	case -3:
-		// The item is not found with the debounceID
+		// The queue item is not found with the debounceID
 		// enqueue a new item
 		qi := d.queueItem(ctx, di, debounceID)
 

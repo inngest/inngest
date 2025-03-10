@@ -153,6 +153,7 @@ func init() {
 type QueueManager interface {
 	osqueue.JobQueueReader
 	osqueue.Queue
+	osqueue.QueueDirectAccess
 
 	Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem) error
 	Requeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, at time.Time) error
@@ -1609,6 +1610,14 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 	}
 
 	return processed, nil
+}
+
+func (q *queue) RemoveQueueItem(ctx context.Context, shardName string, partitionKey string, itemID string) error {
+	queueShard, ok := q.queueShardClients[shardName]
+	if !ok {
+		return fmt.Errorf("queue shard not found %q", shardName)
+	}
+	return q.removeQueueItem(ctx, queueShard, partitionKey, itemID)
 }
 
 // removeQueueItem attempts to remove a specific item in the target queue shard

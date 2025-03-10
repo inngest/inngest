@@ -86,6 +86,10 @@ type Migrator interface {
 	Migrate(ctx context.Context, shard string, fnID uuid.UUID, limit int64, handler QueueMigrationHandler) (int64, error)
 }
 
+type QueueDirectAccess interface {
+	RemoveQueueItem(ctx context.Context, shard string, partitionKey string, itemID string) error
+}
+
 // QuitError is an error that, when returned, quits the queue.  This always retries
 // an error.
 type QuitError interface {
