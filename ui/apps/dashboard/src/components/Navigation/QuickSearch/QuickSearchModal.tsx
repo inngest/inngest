@@ -31,7 +31,9 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
     <Modal alignTop isOpen={isOpen} onClose={onClose} className="max-w-2xl align-baseline">
       <Command label="Type a command or search" shouldFilter={true}>
         <div className="border-subtle border-b px-4 py-3">
-          <Pill className="mb-3">{envName}</Pill>
+          <Pill appearance="solidBright" className="mb-3">
+            {envName}
+          </Pill>
           <Command.Input
             placeholder="Type a command or search..."
             value={term}

@@ -38,7 +38,7 @@ export function ResultItem({ kind, onClick, path, text, value, icon }: Props) {
         {kind ? getKindDetails(kind).icon : icon}
       </span>
       <p className="flex-1 truncate">{text}</p>
-      {kind && <Pill>{getKindDetails(kind).name}</Pill>}
+      {kind && <Pill appearance="solidBright">{getKindDetails(kind).name}</Pill>}
     </Command.Item>
   );
 }
