@@ -2,7 +2,7 @@
 
 import { RunDetailsV2 } from '@inngest/components/RunDetailsV2/RunDetailsV2';
 import { RunDetailsV3 } from '@inngest/components/RunDetailsV3/RunDetailsV3';
-import { useLegacyTrace } from '@inngest/components/Shared/useLegacyTrace';
+import { useLegacyTrace } from '@inngest/components/SharedContext/useLegacyTrace';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import { cn } from '@inngest/components/utils/classNames';
 
@@ -39,7 +39,6 @@ export default function Page() {
           getRun={getRun}
           getTrigger={getTrigger}
           pollInterval={2500}
-          rerun={rerun}
           runID={runID}
         />
       ) : (
@@ -51,7 +50,6 @@ export default function Page() {
           getRun={getRun}
           getTrigger={getTrigger}
           pollInterval={2500}
-          rerun={rerun}
           runID={runID}
           traceAIEnabled={traceAIEnabled}
         />

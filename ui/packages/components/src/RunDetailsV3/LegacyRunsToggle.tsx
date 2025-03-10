@@ -1,5 +1,5 @@
 import { Pill } from '../Pill';
-import { useLegacyTrace } from '../Shared/useLegacyTrace';
+import { useLegacyTrace } from '../SharedContext/useLegacyTrace';
 import { Switch } from '../Switch';
 
 export const LegacyRunsToggle = ({ traceAIEnabled }: { traceAIEnabled: boolean }) => {

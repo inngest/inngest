@@ -17,7 +17,6 @@ import { StepInfo } from './StepInfo';
 import { Tabs } from './Tabs';
 import { Timeline } from './Timeline';
 import { TopInfo } from './TopInfo';
-import { Workflow } from './Workflow';
 import { useStepSelection } from './utils';
 
 type Props = {
@@ -29,7 +28,6 @@ type Props = {
   getTrigger: React.ComponentProps<typeof TriggerDetails>['getTrigger'];
   pathCreator: React.ComponentProps<typeof RunInfo>['pathCreator'];
   pollInterval?: number;
-  rerun: React.ComponentProps<typeof RunInfo>['rerun'];
   runID: string;
 };
 
@@ -54,7 +52,7 @@ export const RunDetailsV3 = (props: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
   const runInfoRef = useRef<HTMLDivElement>(null);
-  const { getResult, getRun, getTrigger, pathCreator, rerun, runID, standalone } = props;
+  const { getResult, getRun, getTrigger, pathCreator, runID, standalone } = props;
   const [pollInterval, setPollInterval] = useState(props.pollInterval);
   const [leftWidth, setLeftWidth] = useState(55);
   const [height, setHeight] = useState(0);
@@ -166,7 +164,6 @@ export const RunDetailsV3 = (props: Props) => {
               cancelRun={cancelRun}
               className="mb-4"
               pathCreator={pathCreator}
-              rerun={rerun}
               initialRunData={props.initialRunData}
               run={nullishToLazy(run)}
               runID={runID}

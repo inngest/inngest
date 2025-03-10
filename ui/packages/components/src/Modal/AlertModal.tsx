@@ -18,6 +18,7 @@ type AlertModalProps = {
   confirmButtonLabel?: string | React.ReactNode;
   cancelButtonLabel?: string | React.ReactNode;
   confirmButtonKind?: ButtonKind;
+  autoClose?: boolean;
 };
 
 export function AlertModal({
@@ -32,6 +33,7 @@ export function AlertModal({
   confirmButtonLabel = 'Yes',
   cancelButtonLabel = 'No',
   confirmButtonKind = 'danger',
+  autoClose = true,
 }: AlertModalProps) {
   let container = null;
   if (globalThis.document) {
@@ -98,8 +100,10 @@ export function AlertModal({
                     onClick={async () => {
                       try {
                         await onSubmit();
-                        onClose();
-                      } catch {}
+                        autoClose && onClose();
+                      } catch (e) {
+                        console.error('error submiting alert modal', e);
+                      }
                     }}
                   />
                 </div>

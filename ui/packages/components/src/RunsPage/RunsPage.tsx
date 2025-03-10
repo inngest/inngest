@@ -24,7 +24,7 @@ import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
 import { RunDetailsV2 } from '../RunDetailsV2';
 import { RunDetailsV3 } from '../RunDetailsV3/RunDetailsV3';
-import { useLegacyTrace } from '../Shared/useLegacyTrace';
+import { useLegacyTrace } from '../SharedContext/useLegacyTrace';
 import {
   useBatchedSearchParams,
   useSearchParam,
@@ -63,7 +63,6 @@ type Props = {
   onScrollToTop: () => void;
   pathCreator: React.ComponentProps<typeof RunDetailsV2>['pathCreator'];
   pollInterval?: number;
-  rerun: React.ComponentProps<typeof RunDetailsV2>['rerun'];
   apps?: Option[];
   functions?: Option[];
   functionIsPaused?: boolean;
@@ -78,7 +77,6 @@ export function RunsPage({
   getRun,
   getTraceResult,
   getTrigger,
-  rerun,
   data,
   features,
   hasMore,
@@ -252,7 +250,6 @@ export function RunsPage({
               getTrigger={getTrigger}
               pathCreator={pathCreator}
               pollInterval={pollInterval}
-              rerun={rerun}
               runID={rowData.id}
               standalone={false}
             />
@@ -265,7 +262,6 @@ export function RunsPage({
               getTrigger={getTrigger}
               pathCreator={pathCreator}
               pollInterval={pollInterval}
-              rerun={rerun}
               runID={rowData.id}
               standalone={false}
               traceAIEnabled={traceAIEnabled}
@@ -281,7 +277,6 @@ export function RunsPage({
       getTrigger,
       pathCreator,
       pollInterval,
-      rerun,
       legacyTraceEnabled,
       traceAIEnabled,
     ]
@@ -410,7 +405,11 @@ export function RunsPage({
         )}
       </div>
 
-      <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
+      <div
+        className="h-[calc(100%-58px)] overflow-y-auto pb-2"
+        onScroll={onScroll}
+        ref={containerRef}
+      >
         <RunsTable
           data={data}
           isLoading={isLoadingInitial}

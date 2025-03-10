@@ -4,7 +4,7 @@ import { useRef } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
 import { LegacyRunsToggle } from '@inngest/components/RunDetailsV3/LegacyRunsToggle';
-import { useLegacyTrace } from '@inngest/components/Shared/useLegacyTrace';
+import { useLegacyTrace } from '@inngest/components/SharedContext/useLegacyTrace';
 import { RiRefreshLine } from '@remixicon/react';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';

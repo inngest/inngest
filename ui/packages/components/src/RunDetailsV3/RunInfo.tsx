@@ -17,9 +17,10 @@ import { Link } from '../Link';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { AICell } from '../Table/Cell';
 import type { Result } from '../types/functionRun';
-import { formatMilliseconds, toMaybeDate } from '../utils/date';
+import { toMaybeDate } from '../utils/date';
 import { isLazyDone, type Lazy } from '../utils/lazyLoad';
 import { ActionsMenu } from './ActionMenu';
+import { formatDuration } from './TimelineHeader';
 
 type Props = {
   standalone: boolean;
@@ -30,7 +31,6 @@ type Props = {
     function: (params: { functionSlug: string }) => Route;
     runPopout: (params: { runID: string }) => Route;
   };
-  rerun: (args: { fnID: string; runID: string }) => Promise<unknown>;
   initialRunData?: InitialRunData;
   run: Lazy<Run>;
   runID: string;
@@ -62,7 +62,6 @@ type Run = {
 export const RunInfo = ({
   cancelRun,
   pathCreator,
-  rerun,
   initialRunData,
   run,
   runID,
@@ -70,11 +69,7 @@ export const RunInfo = ({
   result,
 }: Props) => {
   const [expanded, setExpanded] = useState(true);
-  let allowCancel = false;
-
-  if (isLazyDone(run)) {
-    allowCancel = !Boolean(run.trace.endedAt);
-  }
+  const allowCancel = isLazyDone(run) && !Boolean(run.trace.endedAt);
 
   const aiOutput = result?.data ? parseAIOutput(result.data) : undefined;
 
@@ -109,12 +104,8 @@ export const RunInfo = ({
         <div className="flex items-center gap-2">
           <ActionsMenu
             cancel={cancelRun}
-            reRun={async () => {
-              if (!isLazyDone(run)) {
-                return;
-              }
-              await rerun({ fnID: run.fn.id, runID });
-            }}
+            runID={runID}
+            fnID={isLazyDone(run) ? run.fn.id : undefined}
             allowCancel={allowCancel}
           />
         </div>
@@ -165,10 +156,10 @@ export const RunInfo = ({
             {(run: Run) => {
               let durationText = '-';
 
-              const startedAt = toMaybeDate(run.trace.startedAt);
-              if (startedAt) {
-                durationText = formatMilliseconds(
-                  (toMaybeDate(run.trace.endedAt) ?? new Date()).getTime() - startedAt.getTime()
+              const queuedAt = toMaybeDate(run.trace.queuedAt);
+              if (queuedAt) {
+                durationText = formatDuration(
+                  (toMaybeDate(run.trace.endedAt) ?? new Date()).getTime() - queuedAt.getTime()
                 );
               }
 

@@ -23,7 +23,6 @@ type Props = {
   getTrigger: React.ComponentProps<typeof TriggerDetails>['getTrigger'];
   pathCreator: React.ComponentProps<typeof RunInfo>['pathCreator'];
   pollInterval?: number;
-  rerun: React.ComponentProps<typeof RunInfo>['rerun'];
   runID: string;
   traceAIEnabled?: boolean;
 };
@@ -44,7 +43,7 @@ type Run = {
 };
 
 export function RunDetailsV2(props: Props) {
-  const { getResult, getRun, getTrigger, pathCreator, rerun, runID, standalone } = props;
+  const { getResult, getRun, getTrigger, pathCreator, runID, standalone } = props;
   const [pollInterval, setPollInterval] = useState(props.pollInterval);
 
   const runRes = useQuery({
@@ -107,7 +106,6 @@ export function RunDetailsV2(props: Props) {
               cancelRun={cancelRun}
               className="mb-4"
               pathCreator={pathCreator}
-              rerun={rerun}
               initialRunData={props.initialRunData}
               run={nullishToLazy(run)}
               runID={runID}

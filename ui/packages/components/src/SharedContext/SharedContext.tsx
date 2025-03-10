@@ -4,6 +4,7 @@ import React, { createContext, useContext } from 'react';
 
 import type { InvokeRunPayload, InvokeRunResult } from './useInvokeRun';
 import type { LegacyTraceType } from './useLegacyTrace';
+import type { RerunPayload, RerunResult } from './useRerun';
 import type { RerunFromStepPayload, RerunFromStepResult } from './useRerunFromStep';
 
 //
@@ -12,6 +13,7 @@ import type { RerunFromStepPayload, RerunFromStepResult } from './useRerunFromSt
 export type SharedDefinitions = {
   invokeRun: (payload: InvokeRunPayload) => Promise<InvokeRunResult>;
   rerunFromStep: (payload: RerunFromStepPayload) => Promise<RerunFromStepResult>;
+  rerun: (payload: RerunPayload) => Promise<RerunResult>;
   legacyTrace: LegacyTraceType;
 };
 

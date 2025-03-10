@@ -16,7 +16,6 @@ import { useGetTraceResult } from '@/components/RunDetails/useGetTraceResult';
 import { useGetTrigger } from '@/components/RunDetails/useGetTrigger';
 import { GetFunctionPauseStateDocument, RunsOrderByField } from '@/gql/graphql';
 import { useCancelRun } from '@/queries/useCancelRun';
-import { useRerun } from '@/queries/useRerun';
 import { pathCreator } from '@/utils/urls';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
 import { AppFilterDocument, CountRunsDocument, GetRunsDocument } from './queries';
@@ -76,7 +75,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   const [isScrollRequest, setIsScrollRequest] = useState(false);
 
   const cancelRun = useCancelRun({ envID: env.id });
-  const rerun = useRerun({ envID: env.id, envSlug: env.slug });
   const getTraceResult = useGetTraceResult();
   const getTrigger = useGetTrigger();
   const getRun = useGetRun();
@@ -235,7 +233,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       getTraceResult={getTraceResult}
       getTrigger={getTrigger}
       pathCreator={internalPathCreator}
-      rerun={rerun}
       functionIsPaused={pauseData?.environment.function?.isPaused ?? false}
       scope={scope}
       totalCount={totalCount}

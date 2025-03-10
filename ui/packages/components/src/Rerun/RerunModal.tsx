@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { RiCloseLine } from '@remixicon/react';
 
 import { Button } from '../Button';
 import { CodeBlock } from '../CodeBlock/CodeBlock';
 import { Modal } from '../Modal/Modal';
-import { useRerunFromStep } from '../Shared/useRerunFromStep';
+import { useRerunFromStep } from '../SharedContext/useRerunFromStep';
 
 export type RerunModalType = {
   open: boolean;
@@ -35,19 +35,17 @@ const patchInput = (newInput: string) => {
 };
 
 export const RerunModal = ({ open, setOpen, runID, stepID, input }: RerunModalType) => {
-  const { rerun, loading, error } = useRerunFromStep();
+  const { rerun } = useRerunFromStep();
   const [newInput, setNewInput] = useState(input);
-  const [rerunning, setRerunning] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
   const router = useRouter();
 
-  const pathname = usePathname();
-  const parts = pathname.trim().split('/').slice(1);
-
-  useEffect(() => {
-    if (!open) {
-      setRerunning(false);
-    }
-  }, [open]);
+  const close = () => {
+    setLoading(false);
+    setError(null);
+    setOpen(false);
+  };
 
   return (
     <Modal className="flex max-w-[1200px] flex-col p-6" isOpen={open} onClose={close}>
@@ -60,10 +58,7 @@ export const RerunModal = ({ open, setOpen, runID, stepID, input }: RerunModalTy
             rerun.
           </span>
         </div>
-        <RiCloseLine
-          className="text-subtle h-5 w-5 cursor-pointer"
-          onClick={() => setOpen(false)}
-        />
+        <RiCloseLine className="text-subtle h-5 w-5 cursor-pointer" onClick={close} />
       </div>
 
       <div className="bg-canvasSubtle flex h-full w-full flex-row items-start">
@@ -97,26 +92,24 @@ export const RerunModal = ({ open, setOpen, runID, stepID, input }: RerunModalTy
         <Button kind="secondary" appearance="ghost" label="Cancel" onClick={() => setOpen(false)} />
         <Button
           label="Rerun function"
-          loading={loading || rerunning}
-          disabled={loading || rerunning}
+          loading={loading}
+          disabled={loading}
           onClick={async () => {
-            setRerunning(true);
+            setLoading(true);
             const result = await rerun({
               runID,
               fromStep: { stepID, input: patchInput(newInput) },
             });
 
-            if (error) {
+            if (result.error) {
               console.error('rerun from step error', error);
             }
 
-            if (result?.data?.rerun) {
-              router.push(
-                parts[0] === 'env'
-                  ? `/${parts[0]}/${parts[1]}/runs/${result.data.rerun}`
-                  : `/run?runID=${result.data.rerun}`
-              );
+            if (result.redirect) {
+              router.push(result.redirect);
             }
+
+            close();
           }}
         />
       </div>
