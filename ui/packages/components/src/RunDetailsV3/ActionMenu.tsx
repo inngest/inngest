@@ -18,7 +18,7 @@ import { toast } from 'sonner';
 
 import { Button } from '../Button';
 import { Link } from '../Link';
-import { useRerun } from '../Shared/useRerun';
+import { useRerun } from '../SharedContext/useRerun';
 import { RerunModal } from './RerunModal';
 
 export type RunActions = {

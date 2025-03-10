@@ -1,4 +1,4 @@
-import type { RerunPayload, RerunResult } from '@inngest/components/Shared/useRerun';
+import type { RerunPayload, RerunResult } from '@inngest/components/SharedContext/useRerun';
 import { useMutation } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
