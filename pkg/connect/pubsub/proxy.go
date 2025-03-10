@@ -68,14 +68,14 @@ type RequestReceiver interface {
 
 	// ReceiveExecutorMessages listens for incoming PubSub messages for the connect router.
 	// This is a blocking call which only stops once the context is canceled.
-	ReceiveExecutorMessages(ctx context.Context, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error
+	ReceiveExecutorMessages(ctx context.Context, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData), onSubscribed chan struct{}) error
 
 	// RouteExecutorRequest forwards an executor request to the respective gateway
 	RouteExecutorRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, data *connect.GatewayExecutorRequestData) error
 
 	// ReceiveRouterMessages listens for incoming PubSub messages for a specific gateway and app and calls the provided callback.
 	// This is a blocking call which only stops once the context is canceled.
-	ReceiveRoutedRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error
+	ReceiveRoutedRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData), onSubscribed chan struct{}) error
 
 	// AckMessage sends an acknowledgment for a specific request.
 	AckMessage(ctx context.Context, requestId string, source AckSource) error
@@ -177,6 +177,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	routerAckErrChan := make(chan error)
 	var routerAcked connect.PubSubAckMessage
 	{
+		routerAckSubscribed := make(chan struct{})
 		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		go func() {
@@ -205,14 +206,16 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 						"kind": "router",
 					},
 				})
-			}, true)
+			}, true, routerAckSubscribed)
 			routerAckErrChan <- err
 		}()
+		<-routerAckSubscribed
 	}
 
 	gatewayAckErrChan := make(chan error)
 	var gatewayAcked bool
 	{
+		gatewayAckSubscribed := make(chan struct{})
 		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		go func() {
@@ -226,14 +229,16 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 						"kind": "gateway",
 					},
 				})
-			}, true)
+			}, true, gatewayAckSubscribed)
 			gatewayAckErrChan <- err
 		}()
+		<-gatewayAckSubscribed
 	}
 
 	workerAckErrChan := make(chan error)
 	var workerAcked bool
 	{
+		workerAckSubscribed := make(chan struct{})
 		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		go func() {
@@ -247,32 +252,37 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 						"kind": "worker",
 					},
 				})
-			}, true)
+			}, true, workerAckSubscribed)
 			workerAckErrChan <- err
 		}()
+		<-workerAckSubscribed
 	}
 
 	// Await SDK response forwarded by gateway
 	replyErrChan := make(chan error)
 	var reply connect.SDKResponse
-	go func() {
-		// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
-		err = i.subscribe(ctx, i.channelAppRequestsReply(opts.Data.RequestId), func(msg string) {
-			span.AddEvent("ReplyReceived")
+	{
+		replySubscribed := make(chan struct{})
+		go func() {
+			// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
+			err = i.subscribe(ctx, i.channelAppRequestsReply(opts.Data.RequestId), func(msg string) {
+				span.AddEvent("ReplyReceived")
 
-			err := proto.Unmarshal([]byte(msg), &reply)
-			if err != nil {
-				// This should never happen
-				span.SetAttributes(
-					attribute.String("msg", msg),
-				)
-				span.RecordError(err)
-				span.SetStatus(codes.Error, "unmarshaling sdk response proto failed")
-				return
-			}
-		}, true)
-		replyErrChan <- err
-	}()
+				err := proto.Unmarshal([]byte(msg), &reply)
+				if err != nil {
+					// This should never happen
+					span.SetAttributes(
+						attribute.String("msg", msg),
+					)
+					span.RecordError(err)
+					span.SetStatus(codes.Error, "unmarshaling sdk response proto failed")
+					return
+				}
+			}, true, replySubscribed)
+			replyErrChan <- err
+		}()
+		<-replySubscribed
+	}
 
 	// After setting up ack and reply subscriptions, publish the request to the router, which forwards to the most suitable gateway
 	channelName := i.channelExecutorRequests()
@@ -383,7 +393,7 @@ func (i *redisPubSubConnector) channelAppRequestsReply(requestId string) string 
 //
 // Upon return, the subscription is cleaned up and if the subscription was the last one for the channel, the PubSub client
 // is unsubscribed from the channel.
-func (i *redisPubSubConnector) subscribe(ctx context.Context, channel string, onMessage func(msg string), once bool) error {
+func (i *redisPubSubConnector) subscribe(ctx context.Context, channel string, onMessage func(msg string), once bool, onSubscribed chan struct{}) error {
 	<-i.setup
 
 	msgs := make(chan string)
@@ -449,13 +459,17 @@ func (i *redisPubSubConnector) subscribe(ctx context.Context, channel string, on
 		i.logger.Debug("connect pubsub client subscribed to channel", "channel", channel)
 	}
 
+	if onSubscribed != nil {
+		close(onSubscribed)
+	}
+
 	<-done
 	return nil
 }
 
 // ReceiveExecutorMessages listens for incoming PubSub messages for a specific app and calls the provided callback.
 // This is a blocking call which only stops once the context is canceled.
-func (i *redisPubSubConnector) ReceiveRoutedRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error {
+func (i *redisPubSubConnector) ReceiveRoutedRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData), onSubscribed chan struct{}) error {
 	return i.subscribe(ctx, i.channelGatewayAppRequests(gatewayId, connId), func(msg string) {
 		// TODO Test whether this works with marshaled Protobuf bytes
 		msgBytes := []byte(msg)
@@ -469,12 +483,12 @@ func (i *redisPubSubConnector) ReceiveRoutedRequest(ctx context.Context, gateway
 		}
 
 		onMessage(msgBytes, &data)
-	}, false)
+	}, false, onSubscribed)
 }
 
 // ReceiveExecutorMessages listens for incoming PubSub messages for a specific app and calls the provided callback.
 // This is a blocking call which only stops once the context is canceled.
-func (i *redisPubSubConnector) ReceiveExecutorMessages(ctx context.Context, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData)) error {
+func (i *redisPubSubConnector) ReceiveExecutorMessages(ctx context.Context, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData), onSubscribed chan struct{}) error {
 	return i.subscribe(ctx, i.channelExecutorRequests(), func(msg string) {
 		// TODO Test whether this works with marshaled Protobuf bytes
 		msgBytes := []byte(msg)
@@ -487,7 +501,7 @@ func (i *redisPubSubConnector) ReceiveExecutorMessages(ctx context.Context, onMe
 		}
 
 		onMessage(msgBytes, &data)
-	}, false)
+	}, false, onSubscribed)
 }
 
 // Wait blocks and listens for incoming PubSub messages for the internal subscribers. This must be run before

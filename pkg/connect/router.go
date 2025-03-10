@@ -18,6 +18,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
+	"golang.org/x/sync/errgroup"
 	"gonum.org/v1/gonum/stat/sampleuv"
 	"log/slog"
 	"slices"
@@ -56,6 +57,8 @@ func (c *connectRouterSvc) Pre(ctx context.Context) error {
 }
 
 func (c *connectRouterSvc) Run(ctx context.Context) error {
+	onSubscribed := make(chan struct{})
+
 	go func() {
 		err := c.receiver.ReceiveExecutorMessages(ctx, func(_ []byte, data *connect.GatewayExecutorRequestData) {
 			log := c.logger.With("env_id", data.EnvId, "app_id", data.AppId, "req_id", data.RequestId)
@@ -182,7 +185,7 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 				// TODO Log error, retry?
 				return
 			}
-		})
+		}, onSubscribed)
 		if err != nil {
 			// TODO Log error, retry?
 			return
@@ -191,15 +194,23 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 
 	// TODO Periodically ping random gateways via PubSub and only consider them active if they respond in time -> Multiple routers will do this
 
-	err := c.receiver.Wait(ctx)
-	if err != nil {
-		if ctx.Err() != nil {
-			return nil
+	eg := errgroup.Group{}
+	eg.Go(func() error {
+		err := c.receiver.Wait(ctx)
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil
+			}
+			return fmt.Errorf("could not listen for pubsub messages: %w", err)
 		}
-		return fmt.Errorf("could not listen for pubsub messages: %w", err)
-	}
+		return nil
+	})
 
-	return nil
+	<-onSubscribed
+
+	c.logger.Debug("connect router is ready")
+
+	return eg.Wait()
 
 }
 

@@ -18,7 +18,7 @@ func (noopConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*conn
 	return &connpb.SDKResponse{}, nil
 }
 
-func (noopConnector) ReceiveExecutorMessages(ctx context.Context, onMessage func(byt []byte, data *connpb.GatewayExecutorRequestData)) error {
+func (noopConnector) ReceiveExecutorMessages(ctx context.Context, onMessage func(byt []byte, data *connpb.GatewayExecutorRequestData), onSubscribed chan struct{}) error {
 	logger.StdlibLogger(ctx).Error("using no-op connector to receive executor messages")
 
 	return nil
@@ -30,7 +30,7 @@ func (noopConnector) RouteExecutorRequest(ctx context.Context, gatewayId ulid.UL
 	return nil
 }
 
-func (noopConnector) ReceiveRoutedRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, onMessage func(rawBytes []byte, data *connpb.GatewayExecutorRequestData)) error {
+func (noopConnector) ReceiveRoutedRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, onMessage func(rawBytes []byte, data *connpb.GatewayExecutorRequestData), onSubscribed chan struct{}) error {
 	logger.StdlibLogger(ctx).Error("using no-op connector receive routed request", "gateway_id", gatewayId, "conn_id", connId)
 
 	return nil

@@ -288,7 +288,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
 
-	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, connectPubSubLogger, conditionalTracer, false))
+	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, connectPubSubLogger.With("svc", "executor"), conditionalTracer, true))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
@@ -419,7 +419,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	})
 
 	// ds.opts.Config.EventStream.Service.TopicName()
-	apiConnectProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, connectPubSubLogger, conditionalTracer, false))
+	apiConnectProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, connectPubSubLogger.With("svc", "api"), conditionalTracer, false))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
@@ -451,7 +451,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
-	connectGatewayProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, connectPubSubLogger, conditionalTracer, false))
+	connectGatewayProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, connectPubSubLogger.With("svc", "connect-gateway"), conditionalTracer, false))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
@@ -469,7 +469,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			}),
 	)
 
-	connectRouterProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, connectPubSubLogger, conditionalTracer, false))
+	connectRouterProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, connectPubSubLogger.With("svc", "connect-router"), conditionalTracer, false))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
