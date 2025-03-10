@@ -64,6 +64,7 @@ export default function SideBar({
         collapsed={collapsed}
         enableQuickSearchV2={enableQuickSearchV2}
         envSlug={activeEnv?.slug ?? 'production'}
+        envName={activeEnv?.name ?? 'Production'}
         setCollapsed={setCollapsed}
       />
       <div className="flex grow flex-col justify-between">

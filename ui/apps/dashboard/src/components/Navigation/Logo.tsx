@@ -14,10 +14,17 @@ type LogoProps = {
   collapsed: boolean;
   enableQuickSearchV2: boolean;
   envSlug: string;
+  envName: string;
   setCollapsed: (arg: boolean) => void;
 };
 
-const NavToggle = ({ collapsed, setCollapsed }: LogoProps) => {
+const NavToggle = ({
+  collapsed,
+  setCollapsed,
+}: {
+  collapsed: boolean;
+  setCollapsed: (arg: boolean) => void;
+}) => {
   const toggle = async () => {
     const toggled = !collapsed;
     setCollapsed(toggled);
@@ -47,7 +54,13 @@ const NavToggle = ({ collapsed, setCollapsed }: LogoProps) => {
   );
 };
 
-export default function Logo({ collapsed, enableQuickSearchV2, envSlug, setCollapsed }: LogoProps) {
+export default function Logo({
+  collapsed,
+  enableQuickSearchV2,
+  envSlug,
+  envName,
+  setCollapsed,
+}: LogoProps) {
   return (
     <div
       className={`${
@@ -66,15 +79,12 @@ export default function Logo({ collapsed, enableQuickSearchV2, envSlug, setColla
             </NextLink>
           </>
         )}
-        {enableQuickSearchV2 && <QuickSearch collapsed={collapsed} envSlug={envSlug} />}
+        {enableQuickSearchV2 && (
+          <QuickSearch collapsed={collapsed} envSlug={envSlug} envName={envName} />
+        )}
         {!enableQuickSearchV2 && <Search collapsed={collapsed} />}
       </div>
-      <NavToggle
-        collapsed={collapsed}
-        enableQuickSearchV2={enableQuickSearchV2}
-        envSlug={envSlug}
-        setCollapsed={setCollapsed}
-      />
+      <NavToggle collapsed={collapsed} setCollapsed={setCollapsed} />
     </div>
   );
 }

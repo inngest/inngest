@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Modal } from '@inngest/components/Modal';
+import { Pill } from '@inngest/components/Pill/Pill';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiSearchLine } from '@remixicon/react';
@@ -13,11 +14,12 @@ import { useDebounce } from './hooks';
 
 type Props = {
   envSlug: string;
+  envName: string;
   isOpen: boolean;
   onClose: () => unknown;
 };
 
-export function QuickSearchModal({ envSlug, isOpen, onClose }: Props) {
+export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
   const [term, setTerm] = useState('');
   const debouncedTerm = useDebounce(term, 1000);
   const isTyping = term !== debouncedTerm;
@@ -28,14 +30,17 @@ export function QuickSearchModal({ envSlug, isOpen, onClose }: Props) {
   return (
     <Modal alignTop isOpen={isOpen} onClose={onClose} className="max-w-2xl align-baseline">
       <Command label="Type a command or search" shouldFilter={true}>
-        <Command.Input
-          placeholder="Type a command or search..."
-          value={term}
-          onValueChange={setTerm}
-          className={cn(
-            'border-subtle focus:border-subtle placeholder-disabled bg-canvasBase w-[656px] border-x-0 border-b border-t-0 px-4 py-3 outline-none focus:ring-0'
-          )}
-        />
+        <div className="border-subtle border-b px-4 py-3">
+          <Pill className="mb-3">{envName}</Pill>
+          <Command.Input
+            placeholder="Type a command or search..."
+            value={term}
+            onValueChange={setTerm}
+            className={cn(
+              'placeholder-disabled bg-canvasBase w-[656px] border-0 p-0 outline-none focus:ring-0'
+            )}
+          />
+        </div>
         <Command.List className="text-subtle bg-canvasBase h-[min(330px,calc(var(--cmdk-list-height)+24px))] overflow-scroll px-4 py-3">
           {(isTyping || res.isFetching) && (
             <Command.Loading className="text-muted text-xs">
