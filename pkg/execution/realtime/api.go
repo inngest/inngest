@@ -131,7 +131,9 @@ func (a *api) GetWebsocketUpgrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ws, err := websocket.Accept(w, r, nil)
+	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		InsecureSkipVerify: true, // We don't care about verifying the origin.
+	})
 	if err != nil {
 		w.WriteHeader(400)
 		logger.StdlibLogger(ctx).Error("error upgrading ws connection", "error", err)
