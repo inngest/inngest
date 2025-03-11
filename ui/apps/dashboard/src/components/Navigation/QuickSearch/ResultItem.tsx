@@ -2,7 +2,6 @@
 
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { Pill } from '@inngest/components/Pill/Pill';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventLogsIcon } from '@inngest/components/icons/sections/EventLogs';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
@@ -38,7 +37,6 @@ export function ResultItem({ kind, onClick, path, text, value, icon }: Props) {
         {kind ? getKindDetails(kind).icon : icon}
       </span>
       <p className="flex-1 truncate">{text}</p>
-      {kind && <Pill appearance="solidBright">{getKindDetails(kind).name}</Pill>}
     </Command.Item>
   );
 }

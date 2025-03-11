@@ -57,75 +57,96 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
           )}
 
           {!isTyping && !res.isFetching && res.data && !res.error && (
-            <Command.Group>
-              {res.data.apps.map((app, i) => {
-                return (
-                  <ResultItem
-                    key={app.name}
-                    kind="app"
-                    onClick={onClose}
-                    path={pathCreator.app({ envSlug, externalAppID: app.name })}
-                    text={app.name}
-                    value={`app-${i}-${app.name}`}
-                  />
-                );
-              })}
-
+            <>
+              <Command.Group
+                heading="Apps"
+                className="text-muted mb-4 text-xs [&_[cmdk-group-heading]]:mb-1"
+              >
+                {res.data.apps.map((app, i) => {
+                  return (
+                    <ResultItem
+                      key={app.name}
+                      kind="app"
+                      onClick={onClose}
+                      path={pathCreator.app({ envSlug, externalAppID: app.name })}
+                      text={app.name}
+                      value={`app-${i}-${app.name}`}
+                    />
+                  );
+                })}
+              </Command.Group>
               {res.data.event && (
-                <ResultItem
-                  kind="event"
-                  onClick={onClose}
-                  path={pathCreator.event({
-                    envSlug,
-                    eventName: res.data.event.name,
-                    eventID: res.data.event.id,
-                  })}
-                  text={res.data.event.name}
-                  value={`event-${res.data.event.name}`}
-                />
+                <Command.Group
+                  heading="Events"
+                  className="text-muted mb-4 text-xs [&_[cmdk-group-heading]]:mb-1"
+                >
+                  <ResultItem
+                    kind="event"
+                    onClick={onClose}
+                    path={pathCreator.event({
+                      envSlug,
+                      eventName: res.data.event.name,
+                      eventID: res.data.event.id,
+                    })}
+                    text={res.data.event.name}
+                    value={`event-${res.data.event.name}`}
+                  />
+                </Command.Group>
               )}
+              <Command.Group
+                heading="Event Types"
+                className="text-muted mb-4 text-xs [&_[cmdk-group-heading]]:mb-1"
+              >
+                {res.data.eventTypes.map((eventType, i) => {
+                  return (
+                    <ResultItem
+                      key={eventType.name}
+                      kind="eventType"
+                      onClick={onClose}
+                      path={pathCreator.eventType({ envSlug, eventName: eventType.name })}
+                      text={eventType.name}
+                      value={`eventType-${i}-${eventType.name}`}
+                    />
+                  );
+                })}
+              </Command.Group>
 
-              {res.data.eventTypes.map((eventType, i) => {
-                return (
-                  <ResultItem
-                    key={eventType.name}
-                    kind="eventType"
-                    onClick={onClose}
-                    path={pathCreator.eventType({ envSlug, eventName: eventType.name })}
-                    text={eventType.name}
-                    value={`eventType-${i}-${eventType.name}`}
-                  />
-                );
-              })}
-
-              {res.data.functions.map((fn, i) => {
-                return (
-                  <ResultItem
-                    key={fn.name}
-                    kind="function"
-                    onClick={onClose}
-                    path={pathCreator.function({ envSlug, functionSlug: fn.slug })}
-                    text={fn.name}
-                    value={`function-${i}-${fn.name}`}
-                  />
-                );
-              })}
+              <Command.Group
+                heading="Functions"
+                className="text-muted mb-4 text-xs [&_[cmdk-group-heading]]:mb-1"
+              >
+                {res.data.functions.map((fn, i) => {
+                  return (
+                    <ResultItem
+                      key={fn.name}
+                      kind="function"
+                      onClick={onClose}
+                      path={pathCreator.function({ envSlug, functionSlug: fn.slug })}
+                      text={fn.name}
+                      value={`function-${i}-${fn.name}`}
+                    />
+                  );
+                })}
+              </Command.Group>
 
               {res.data.run && (
-                <ResultItem
-                  key={res.data.run.id}
-                  kind="run"
-                  onClick={onClose}
-                  path={pathCreator.runPopout({ envSlug, runID: res.data.run.id })}
-                  text={res.data.run.id}
-                  value={`run-${res.data.run.id}`}
-                />
+                <Command.Group
+                  heading="Runs"
+                  className="text-muted mb-4 text-xs [&_[cmdk-group-heading]]:mb-1"
+                >
+                  <ResultItem
+                    key={res.data.run.id}
+                    kind="run"
+                    onClick={onClose}
+                    path={pathCreator.runPopout({ envSlug, runID: res.data.run.id })}
+                    text={res.data.run.id}
+                    value={`run-${res.data.run.id}`}
+                  />
+                </Command.Group>
               )}
-            </Command.Group>
+            </>
           )}
-          {!isTyping && !res.isFetching && (
-            <Shortcuts onClose={onClose} envSlug={envSlug} hasSearchTerm={hasSearchTerm} />
-          )}
+          {!isTyping && !res.isFetching && <Shortcuts onClose={onClose} envSlug={envSlug} />}
 
           <Command.Empty
             className={cn(
