@@ -808,6 +808,7 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) error {
 		pause.kg.PauseIndex(ctx, "add", p.WorkspaceID, evt),
 		pause.kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
 		pause.kg.RunPauses(ctx, p.Identifier.RunID),
+		pause.kg.GlobalPauseIndex(ctx),
 	}
 
 	args, err := StrSlice([]any{
@@ -1026,6 +1027,7 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 		pause.kg.PauseIndex(ctx, "add", p.WorkspaceID, evt),
 		pause.kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
 		runPausesKey,
+		pause.kg.GlobalPauseIndex(ctx),
 	}
 
 	status, err := scripts["deletePause"].Exec(
