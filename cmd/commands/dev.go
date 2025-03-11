@@ -129,9 +129,10 @@ func doDev(cmd *cobra.Command, args []string) {
 	tick := viper.GetInt("tick")
 	connectGatewayPort := viper.GetInt("connect-gateway-port")
 
+	traceEndpoint := fmt.Sprintf("localhost:%d", port)
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
 		ServiceName:   "tracing",
-		TraceEndpoint: "localhost:8288",
+		TraceEndpoint: traceEndpoint,
 		TraceURLPath:  "/dev/traces",
 		Type:          itrace.TracerTypeOTLPHTTP,
 	}); err != nil {
@@ -144,7 +145,7 @@ func doDev(cmd *cobra.Command, args []string) {
 
 	if err := itrace.NewSystemTracer(ctx, itrace.TracerOpts{
 		ServiceName:   "tracing-system",
-		TraceEndpoint: "localhost:8288",
+		TraceEndpoint: traceEndpoint,
 		TraceURLPath:  "/dev/traces/system",
 		Type:          itrace.TracerTypeOTLPHTTP,
 	}); err != nil {
