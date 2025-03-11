@@ -1,4 +1,3 @@
-import { cn } from '@inngest/components/utils/classNames';
 import {
   RiAddLine,
   RiChat2Line,
@@ -16,24 +15,13 @@ import { useTheme } from 'next-themes';
 import { DISCORD_URL, pathCreator } from '@/utils/urls';
 import { ResultItem } from './ResultItem';
 
-export default function Shortcuts({
-  onClose,
-  envSlug,
-  hasSearchTerm,
-}: {
-  onClose: () => void;
-  envSlug: string;
-  hasSearchTerm: boolean;
-}) {
+export default function Shortcuts({ onClose, envSlug }: { onClose: () => void; envSlug: string }) {
   const { theme, setTheme } = useTheme();
   return (
     <>
       <Command.Group
-        heading={!hasSearchTerm ? 'Navigation' : undefined}
-        className={cn(
-          'text-muted mb-4 text-xs [&_[cmdk-group-heading]]:mb-1',
-          hasSearchTerm && 'mb-0'
-        )}
+        heading="Navigation"
+        className="text-muted mb-4 text-xs [&_[cmdk-group-heading]]:mb-1"
       >
         <ResultItem
           onClick={onClose}
@@ -65,11 +53,8 @@ export default function Shortcuts({
         />
       </Command.Group>
       <Command.Group
-        heading={!hasSearchTerm ? 'Actions' : undefined}
-        className={cn(
-          'text-muted mb-4 text-xs [&_[cmdk-group-heading]]:mb-1',
-          hasSearchTerm && 'mb-0'
-        )}
+        heading="Actions"
+        className="text-muted mb-4 text-xs [&_[cmdk-group-heading]]:mb-1"
       >
         <ResultItem
           onClick={onClose}
@@ -112,10 +97,7 @@ export default function Shortcuts({
           />
         )}
       </Command.Group>
-      <Command.Group
-        heading={!hasSearchTerm ? 'Help' : undefined}
-        className={cn('text-muted text-xs [&_[cmdk-group-heading]]:mb-1', hasSearchTerm && 'mb-0')}
-      >
+      <Command.Group heading="Help" className="text-muted text-xs [&_[cmdk-group-heading]]:mb-1">
         <ResultItem
           onClick={onClose}
           path={'https://www.inngest.com/docs?ref=app-cmdk'}
