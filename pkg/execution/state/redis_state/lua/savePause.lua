@@ -11,6 +11,7 @@ local pauseInvokeKey = KEYS[3]
 local keyPauseAddIdx = KEYS[4]
 local keyPauseExpIdx = KEYS[5]
 local keyRunPauses   = KEYS[6]
+local keyPausesIdx   = KEYS[7]
 
 local pause          = ARGV[1]
 local pauseID        = ARGV[2]
@@ -23,6 +24,9 @@ local nowUnixSeconds = tonumber(ARGV[6])
 if redis.call("SETNX", pauseKey, pause) == 0 then
 	return 1
 end
+
+-- Populate global index
+redis.call("SADD", keyPausesIdx, pauseID)
 
 redis.call("EXPIRE", pauseKey, extendedExpiry)
 

@@ -416,6 +416,9 @@ type PauseKeyGenerator interface {
 	// Pause returns the key used to store an individual pause from its ID.
 	Pause(ctx context.Context, pauseID uuid.UUID) string
 
+	// GlobalPauseIndex returns the key used to index all pauses.
+	GlobalPauseIndex(ctx context.Context) string
+
 	// RunPauses stores pause IDs for each run as a zset
 	RunPauses(ctx context.Context, runID ulid.ULID) string
 
@@ -449,6 +452,10 @@ type pauseKeyGenerator struct {
 
 func (u pauseKeyGenerator) Pause(ctx context.Context, pauseID uuid.UUID) string {
 	return fmt.Sprintf("{%s}:pauses:%s", u.stateDefaultKey, pauseID.String())
+}
+
+func (u pauseKeyGenerator) GlobalPauseIndex(ctx context.Context) string {
+	return fmt.Sprintf("{%s}:pauses-idx", u.stateDefaultKey)
 }
 
 func (u pauseKeyGenerator) RunPauses(ctx context.Context, runID ulid.ULID) string {
