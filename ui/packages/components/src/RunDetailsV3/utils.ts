@@ -4,11 +4,7 @@ import type { Result } from '@inngest/components/types/functionRun';
 
 import type { Trace } from './types';
 
-type Span = {
-  endedAt: Date | null;
-  queuedAt: Date;
-  startedAt: Date | null;
-};
+export const FINAL_SPAN_NAME = 'Finalization';
 
 export type SpanWidths = {
   after: number;
@@ -122,4 +118,29 @@ export const useStepSelection = (runID?: string) => {
   }, []);
 
   return { selectedStep, selectStep };
+};
+
+export const formatDuration = (ms: number): string => {
+  const units = [
+    { label: 'd', value: 86400000 }, // 24 * 60 * 60 * 1000
+    { label: 'h', value: 3600000 }, // 60 * 60 * 1000
+    { label: 'm', value: 60000 }, // 60 * 1000
+    { label: 's', value: 1000 }, // 1000
+    { label: 'ms', value: 1 },
+  ];
+
+  for (const { label, value } of units) {
+    if (ms >= value) {
+      const amount = ms / value;
+      const rounded = Math.round(amount * 10) / 10;
+      const display = rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1);
+      return `${display}${label}`;
+    }
+  }
+
+  return '0ms';
+};
+
+export const getSpanName = (name: string) => {
+  return name === 'function success' ? FINAL_SPAN_NAME : name;
 };

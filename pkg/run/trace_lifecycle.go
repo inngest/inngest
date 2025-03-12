@@ -172,7 +172,11 @@ func (l traceLifecycle) OnFunctionStarted(
 	// reassign here to make sure we have the right traceID and such
 	ctx = l.extractTraceCtx(ctx, md, true)
 
-	start := time.Now()
+	start, ok := redis_state.GetItemStart(ctx)
+	if !ok {
+		start = time.Now()
+	}
+
 	if !md.Config.StartedAt.IsZero() {
 		start = md.Config.StartedAt
 	}

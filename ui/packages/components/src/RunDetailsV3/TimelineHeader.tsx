@@ -1,4 +1,5 @@
 import { type Trace } from './types';
+import { formatDuration } from './utils';
 
 type TimelineHeaderProps = {
   trace: Trace;
@@ -7,27 +8,6 @@ type TimelineHeaderProps = {
 };
 
 const xAxis = [25, 50, 75, 100];
-
-export const formatDuration = (ms: number): string => {
-  const units = [
-    { label: 'd', value: 86400000 }, // 24 * 60 * 60 * 1000
-    { label: 'h', value: 3600000 }, // 60 * 60 * 1000
-    { label: 'm', value: 60000 }, // 60 * 1000
-    { label: 's', value: 1000 }, // 1000
-    { label: 'ms', value: 1 },
-  ];
-
-  for (const { label, value } of units) {
-    if (ms >= value) {
-      const amount = ms / value;
-      const rounded = Math.round(amount * 10) / 10;
-      const display = rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1);
-      return `${display}${label}`;
-    }
-  }
-
-  return '0ms';
-};
 
 const getEventDurations = (start: Date, end: Date, count: number): string[] => {
   const totalMs = end.getTime() - start.getTime();
