@@ -14,7 +14,8 @@ import (
 )
 
 var (
-	defaultMsgKey = "fn_id"
+	defaultMsgKey       = "fn_id"
+	defaultMaxProduceMB = 30 // 30MB
 )
 
 type kafkaSpanExporter struct {
@@ -28,6 +29,7 @@ type kafkaSpansExporterOpts struct {
 	key             string
 	autoCreateTopic bool
 	scramAuth       *scram.Auth
+	maxProduceMB    int
 }
 
 type KafkaSpansExporterOpts func(k *kafkaSpansExporterOpts)
@@ -63,8 +65,16 @@ func WithKafkaExporterScramAuth(user, pass string) KafkaSpansExporterOpts {
 	}
 }
 
+func WithKafkaExporterMaxProduceMB(size int) KafkaSpansExporterOpts {
+	return func(k *kafkaSpansExporterOpts) {
+		k.maxProduceMB = size
+	}
+}
+
 func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (trace.SpanExporter, error) {
-	conf := &kafkaSpansExporterOpts{}
+	conf := &kafkaSpansExporterOpts{
+		maxProduceMB: defaultMaxProduceMB,
+	}
 
 	for _, apply := range opts {
 		apply(conf)
@@ -87,6 +97,7 @@ func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (
 		kgo.DefaultProduceTopic(conf.topic),
 		kgo.RequiredAcks(kgo.AllISRAcks()), // Most durable with some perf hits
 
+		kgo.ProducerBatchMaxBytes(int32(conf.maxProduceMB * 1024 * 1024)),
 		// Increment metrics on data loss detection
 		kgo.ProducerOnDataLossDetected(func(topic string, partition int32) {
 			// record data loss when happened.
