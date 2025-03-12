@@ -27,28 +27,28 @@ export default function Shortcuts({ onClose, envSlug }: { onClose: () => void; e
           onClick={onClose}
           path={pathCreator.signingKeys({ envSlug })}
           text="Go to signing keys"
-          value="nav-go-to-signing-keys"
+          value="go-to-signing-keys"
           icon={<RiKey2Fill />}
         />
         <ResultItem
           onClick={onClose}
           path={pathCreator.keys({ envSlug })}
           text="Go to event keys"
-          value="nav-go-to-event-keys"
+          value="go-to-event-keys"
           icon={<RiKey2Fill />}
         />
         <ResultItem
           onClick={onClose}
           path={pathCreator.integrations()}
           text="Go to Vercel"
-          value="nav-go-to-vercel-integration"
+          value="go-to-vercel-integration"
           icon={<RiPlugLine />}
         />
         <ResultItem
           onClick={onClose}
           path={pathCreator.integrations()}
           text="Go to Neon"
-          value="nav-go-to-neon-integration"
+          value="go-to-neon-integration"
           icon={<RiPlugLine />}
         />
       </Command.Group>

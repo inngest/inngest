@@ -23,7 +23,6 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
   const [term, setTerm] = useState('');
   const debouncedTerm = useDebounce(term, 1000);
   const isTyping = term !== debouncedTerm;
-  const hasSearchTerm = debouncedTerm !== '';
 
   const res = useQuickSearch({ envSlug, term: debouncedTerm });
 
@@ -45,15 +44,13 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
         </div>
         <Command.List className="text-subtle bg-canvasBase h-[min(330px,calc(var(--cmdk-list-height)+24px))] overflow-scroll px-4 py-3">
           {(isTyping || res.isFetching) && (
-            <Command.Loading className="text-muted text-xs">
-              Searching for results matching &quot;{term}&quot;...
+            <Command.Loading className="text-light mb-4 text-xs">
+              <div className="flex items-center gap-2 px-2">
+                <RiSearchLine className="text-light h-4 w-4" />
+                Searching for results matching &quot;{term}&quot;...
+              </div>
               <Skeleton className="mt-1 h-10 w-full" />
             </Command.Loading>
-          )}
-          {!isTyping && !res.isFetching && hasSearchTerm && (
-            <div className="text-muted mb-1 text-xs">
-              Search results found for &quot;{debouncedTerm}&quot;
-            </div>
           )}
 
           {!isTyping && !res.isFetching && res.data && !res.error && (
