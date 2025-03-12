@@ -803,9 +803,16 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, err
 	}
 
-	// for recording function start time after a successful step.
+	//
+	// record function start time using the same method as step started,
+	// ensures ui timeline alignment
+	start, ok := redis_state.GetItemStart(ctx)
+	if !ok {
+		start = time.Now()
+	}
+
 	if md.Config.StartedAt.IsZero() {
-		md.Config.StartedAt = time.Now()
+		md.Config.StartedAt = start
 	}
 
 	if v.stopWithoutRetry {
