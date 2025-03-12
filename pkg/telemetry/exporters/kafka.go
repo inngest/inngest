@@ -72,7 +72,9 @@ func WithKafkaExporterMaxProduceMB(size int) KafkaSpansExporterOpts {
 }
 
 func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (trace.SpanExporter, error) {
-	conf := &kafkaSpansExporterOpts{}
+	conf := &kafkaSpansExporterOpts{
+		maxProduceMB: defaultMaxProduceMB,
+	}
 
 	for _, apply := range opts {
 		apply(conf)
