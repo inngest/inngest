@@ -20,7 +20,7 @@ import type { Result } from '../types/functionRun';
 import { toMaybeDate } from '../utils/date';
 import { isLazyDone, type Lazy } from '../utils/lazyLoad';
 import { ActionsMenu } from './ActionMenu';
-import { formatDuration } from './TimelineHeader';
+import { formatDuration } from './utils';
 
 type Props = {
   standalone: boolean;

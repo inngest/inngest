@@ -7,7 +7,7 @@ import { toMaybeDate } from '../utils/date';
 import { InlineSpans } from './InlineSpans';
 import { TimelineHeader } from './TimelineHeader';
 import { type Trace } from './types';
-import { createSpanWidths, useStepSelection, type StepInfoType } from './utils';
+import { createSpanWidths, getSpanName, useStepSelection, type StepInfoType } from './utils';
 
 type Props = {
   depth: number;
@@ -88,7 +88,7 @@ export function Trace({ depth, getResult, maxTime, minTime, pathCreator, trace, 
               !hasChildren && 'pl-1.5'
             }`}
           >
-            {trace.name}
+            {getSpanName(trace.name)}
           </div>
         </div>
 

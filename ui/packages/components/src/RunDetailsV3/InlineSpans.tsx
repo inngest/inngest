@@ -3,9 +3,9 @@ import { Fragment } from 'react';
 import { ElementWrapper } from '../DetailsCard/Element';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
 import { cn } from '../utils/classNames';
-import { formatMilliseconds, toMaybeDate } from '../utils/date';
+import { toMaybeDate } from '../utils/date';
 import { Span } from './Span';
-import { formatDuration } from './TimelineHeader';
+import { formatDuration, getSpanName } from './utils';
 
 type Props = {
   className?: string;
@@ -22,6 +22,7 @@ type Props = {
 };
 
 export function InlineSpans({ className, minTime, maxTime, name, spans, widths }: Props) {
+  const spanName = getSpanName(name);
   return (
     <Tooltip>
       <TooltipTrigger className="h-fit w-full grow">
@@ -46,14 +47,16 @@ export function InlineSpans({ className, minTime, maxTime, name, spans, widths }
       </TooltipTrigger>
       <TooltipContent>
         <div className="text-basis">
-          {spans[0] && <Times isDelayVisible={spans.length === 1} name={name} span={spans[0]} />}
+          {spans[0] && (
+            <Times isDelayVisible={spans.length === 1} name={spanName} span={spans[0]} />
+          )}
 
           {spans.length > 1 &&
             spans.map((span) => {
               return (
                 <Fragment key={span.spanID}>
                   <hr className="my-2" />
-                  <Times name={span.name} span={span} />
+                  <Times name={spanName} span={span} />
                   {span.spanID}
                 </Fragment>
               );
