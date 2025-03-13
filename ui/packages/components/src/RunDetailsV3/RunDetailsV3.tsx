@@ -17,6 +17,7 @@ import { StepInfo } from './StepInfo';
 import { Tabs } from './Tabs';
 import { Timeline } from './Timeline';
 import { TopInfo } from './TopInfo';
+import { Waiting } from './Waiting';
 import { useStepSelection } from './utils';
 
 type Props = {
@@ -134,11 +135,9 @@ export const RunDetailsV3 = (props: Props) => {
   }
 
   // Do not show the error if queued and the error is no spans
-  const isNoSpansFoundError = !!runRes.error?.toString().match(/no function run span found/gi);
-  const showError =
-    props.initialRunData?.status === 'QUEUED' && isNoSpansFoundError
-      ? false
-      : runRes.error || resultRes.error;
+  const noSpansFoundError = !!runRes.error?.toString().match(/no function run span found/gi);
+  const waiting = props.initialRunData?.status === 'QUEUED' && noSpansFoundError;
+  const showError = waiting ? false : runRes.error || resultRes.error;
 
   return (
     <>
@@ -176,14 +175,16 @@ export const RunDetailsV3 = (props: Props) => {
               {
                 label: 'Trace',
                 id: 'trace',
-                node: run && (
+                node: waiting ? (
+                  <Waiting />
+                ) : run ? (
                   <Timeline
                     getResult={getResult}
                     pathCreator={pathCreator}
                     runID={runID}
                     trace={run?.trace}
                   />
-                ),
+                ) : null,
               },
             ]}
           />
