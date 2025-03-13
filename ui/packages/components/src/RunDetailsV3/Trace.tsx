@@ -7,7 +7,7 @@ import { toMaybeDate } from '../utils/date';
 import { InlineSpans } from './InlineSpans';
 import { TimelineHeader } from './TimelineHeader';
 import { type Trace } from './types';
-import { createSpanWidths, getSpanName, useStepSelection, type StepInfoType } from './utils';
+import { FINAL_SPAN_NAME, createSpanWidths, getSpanName, useStepSelection } from './utils';
 
 type Props = {
   depth: number;
@@ -47,7 +47,14 @@ export function Trace({ depth, getResult, maxTime, minTime, pathCreator, trace, 
       ? trace.childrenSpans
       : [trace];
 
-  const hasChildren = (trace.childrenSpans?.length ?? 0) > 0;
+  //
+  // Don't show finalization for single trace timelines
+  const hasChildren =
+    depth === 0 &&
+    trace.childrenSpans?.length === 1 &&
+    trace.childrenSpans[0]?.name === FINAL_SPAN_NAME
+      ? false
+      : (trace.childrenSpans?.length ?? 0) > 0;
 
   return (
     <div className="relative flex w-full flex-col">
@@ -103,7 +110,7 @@ export function Trace({ depth, getResult, maxTime, minTime, pathCreator, trace, 
         </div>
       </div>
 
-      {expanded && (
+      {expanded && hasChildren && (
         <>
           {trace.childrenSpans?.map((child, i) => {
             return (
