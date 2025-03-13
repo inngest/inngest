@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, useCallback, useRef, useState } from 'react';
 
 import { ElementWrapper } from '../DetailsCard/Element';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
@@ -22,29 +22,49 @@ type Props = {
 };
 
 export function InlineSpans({ className, minTime, maxTime, name, spans, widths }: Props) {
+  const [open, setOpen] = useState(false);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout>();
   const spanName = getSpanName(name);
-  return (
-    <Tooltip>
-      <TooltipTrigger className="h-fit w-full grow">
-        <div className={cn('flex h-7 grow items-center', className)}>
-          <div className="bg-canvasMuted h-0" style={{ flexGrow: widths.before }}></div>
 
-          <div
-            className="flex"
-            style={{
-              flexGrow: widths.queued + widths.running,
-            }}
-          >
+  const handleMouseEnter = useCallback(() => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    setOpen(true);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      setOpen(false);
+    }, 100);
+  }, []);
+
+  return (
+    <Tooltip open={open}>
+      <div
+        className={cn('flex h-7 grow items-center', className)}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        <div className="bg-canvasMuted h-0" style={{ flexGrow: widths.before }}></div>
+
+        <div
+          className="flex"
+          style={{
+            flexGrow: widths.queued + widths.running,
+          }}
+        >
+          <TooltipTrigger className="flex w-full flex-row">
             {spans.map((item) => {
               return (
                 <Span isInline key={item.spanID} maxTime={maxTime} minTime={minTime} trace={item} />
               );
             })}
-          </div>
-
-          <div className="bg-canvasMuted h-0" style={{ flexGrow: widths.after }}></div>
+          </TooltipTrigger>
         </div>
-      </TooltipTrigger>
+
+        <div className="bg-canvasMuted h-0" style={{ flexGrow: widths.after }}></div>
+      </div>
       <TooltipContent>
         <div className="text-basis">
           {spans[0] && (
