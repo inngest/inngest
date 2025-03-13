@@ -4,7 +4,8 @@ import type { Result } from '@inngest/components/types/functionRun';
 
 import type { Trace } from './types';
 
-export const FINAL_SPAN_NAME = 'Finalization';
+export const FINAL_SPAN_DISPLAY = 'Finalization';
+export const FINAL_SPAN_NAME = 'function success';
 
 export type SpanWidths = {
   after: number;
@@ -142,5 +143,5 @@ export const formatDuration = (ms: number): string => {
 };
 
 export const getSpanName = (name: string) => {
-  return name === 'function success' ? FINAL_SPAN_NAME : name;
+  return name === FINAL_SPAN_NAME ? FINAL_SPAN_DISPLAY : name;
 };

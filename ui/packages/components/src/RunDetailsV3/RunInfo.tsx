@@ -19,12 +19,11 @@ import { AICell } from '../Table/Cell';
 import type { Result } from '../types/functionRun';
 import { toMaybeDate } from '../utils/date';
 import { isLazyDone, type Lazy } from '../utils/lazyLoad';
-import { ActionsMenu } from './ActionMenu';
+import { Actions } from './Actions';
 import { formatDuration } from './utils';
 
 type Props = {
   standalone: boolean;
-  cancelRun: () => Promise<unknown>;
   className?: string;
   pathCreator: {
     app: (params: { externalAppID: string }) => Route;
@@ -59,15 +58,7 @@ type Run = {
   hasAI: boolean;
 };
 
-export const RunInfo = ({
-  cancelRun,
-  pathCreator,
-  initialRunData,
-  run,
-  runID,
-  standalone,
-  result,
-}: Props) => {
+export const RunInfo = ({ pathCreator, initialRunData, run, runID, standalone, result }: Props) => {
   const [expanded, setExpanded] = useState(true);
   const allowCancel = isLazyDone(run) && !Boolean(run.trace.endedAt);
 
@@ -102,8 +93,7 @@ export const RunInfo = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <ActionsMenu
-            cancel={cancelRun}
+          <Actions
             runID={runID}
             fnID={isLazyDone(run) ? run.fn.id : undefined}
             allowCancel={allowCancel}

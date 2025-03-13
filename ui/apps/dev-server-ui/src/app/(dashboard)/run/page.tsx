@@ -6,20 +6,16 @@ import { useLegacyTrace } from '@inngest/components/SharedContext/useLegacyTrace
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import { cn } from '@inngest/components/utils/classNames';
 
-import { useCancelRun } from '@/hooks/useCancelRun';
 import { useGetRun } from '@/hooks/useGetRun';
 import { useGetTraceResult } from '@/hooks/useGetTraceResult';
 import { useGetTrigger } from '@/hooks/useGetTrigger';
-import { useRerun } from '@/hooks/useRerun';
 import { pathCreator } from '@/utils/pathCreator';
 
 export default function Page() {
   const [runID] = useSearchParam('runID');
-  const cancelRun = useCancelRun();
   const getRun = useGetRun();
   const getTraceResult = useGetTraceResult();
   const getTrigger = useGetTrigger();
-  const rerun = useRerun();
 
   const traceAIEnabled = true;
   const { enabled: legacyTraceEnabled } = useLegacyTrace();
@@ -34,7 +30,6 @@ export default function Page() {
         <RunDetailsV3
           pathCreator={pathCreator}
           standalone
-          cancelRun={cancelRun}
           getResult={getTraceResult}
           getRun={getRun}
           getTrigger={getTrigger}
@@ -45,7 +40,6 @@ export default function Page() {
         <RunDetailsV2
           pathCreator={pathCreator}
           standalone
-          cancelRun={cancelRun}
           getResult={getTraceResult}
           getRun={getRun}
           getTrigger={getTrigger}

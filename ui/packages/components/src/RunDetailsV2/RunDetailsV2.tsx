@@ -16,7 +16,6 @@ import { RunInfo } from './RunInfo';
 
 type Props = {
   standalone: boolean;
-  cancelRun: (runID: string) => Promise<unknown>;
   getResult: (outputID: string) => Promise<Result>;
   getRun: (runID: string) => Promise<Run>;
   initialRunData?: InitialRunData;
@@ -69,10 +68,6 @@ export function RunDetailsV2(props: Props) {
     }, [getResult, outputID]),
   });
 
-  const cancelRun = useCallback(async () => {
-    return await props.cancelRun(runID);
-  }, [props.cancelRun]);
-
   const run = runRes.data;
   if (run?.trace.endedAt && pollInterval) {
     // Stop polling since ended runs are immutable
@@ -103,7 +98,6 @@ export function RunDetailsV2(props: Props) {
         <div className="grow">
           <div className="ml-8">
             <RunInfo
-              cancelRun={cancelRun}
               className="mb-4"
               pathCreator={pathCreator}
               initialRunData={props.initialRunData}

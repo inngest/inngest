@@ -82,9 +82,7 @@ export function RunDetails(props: Props) {
       button={
         !loading && (
           <div className="flex gap-2">
-            {cancelRun && (
-              <CancelRunButton disabled={Boolean(run?.endedAt)} hasIcon onClick={cancelRun} />
-            )}
+            {runID && <CancelRunButton disabled={Boolean(run?.endedAt)} hasIcon runID={runID} />}
             {rerun && <RerunButton onClick={rerun} />}
           </div>
         )

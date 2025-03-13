@@ -7,7 +7,6 @@ import { useLegacyTrace } from '@inngest/components/SharedContext/useLegacyTrace
 import { cn } from '@inngest/components/utils/classNames';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { useCancelRun } from '@/queries/useCancelRun';
 import { pathCreator } from '@/utils/urls';
 import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { useGetRun } from './useGetRun';
@@ -21,7 +20,6 @@ type Props = {
 
 export function DashboardRunDetails({ runID, standalone = true }: Props) {
   const env = useEnvironment();
-  const cancelRun = useCancelRun({ envID: env.id });
   const getTraceResult = useGetTraceResult();
   const { value: traceAIEnabled, isReady } = useBooleanFlag('ai-traces');
 
@@ -49,7 +47,6 @@ export function DashboardRunDetails({ runID, standalone = true }: Props) {
         <RunDetailsV3
           pathCreator={internalPathCreator}
           standalone={standalone}
-          cancelRun={cancelRun}
           getResult={getTraceResult}
           getRun={getRun}
           getTrigger={getTrigger}
@@ -59,7 +56,6 @@ export function DashboardRunDetails({ runID, standalone = true }: Props) {
         <RunDetailsV2
           pathCreator={internalPathCreator}
           standalone={standalone}
-          cancelRun={cancelRun}
           getResult={getTraceResult}
           getRun={getRun}
           getTrigger={getTrigger}
