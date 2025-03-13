@@ -29,7 +29,7 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
   return (
     <Modal alignTop isOpen={isOpen} onClose={onClose} className="max-w-2xl align-baseline">
       <Command label="Type a command or search" shouldFilter={true}>
-        <div className="border-subtle border-b px-4 py-3">
+        <div className="border-subtle bg-modalBase border-b px-4 py-3">
           <Pill appearance="solidBright" className="mb-3">
             {envName}
           </Pill>
@@ -38,11 +38,11 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
             value={term}
             onValueChange={setTerm}
             className={cn(
-              'placeholder-disabled bg-canvasBase w-[656px] border-0 p-0 outline-none focus:ring-0'
+              'placeholder-disabled bg-modalBase w-[656px] border-0 p-0 outline-none focus:ring-0'
             )}
           />
         </div>
-        <Command.List className="text-subtle bg-canvasBase h-[min(330px,calc(var(--cmdk-list-height)+24px))] overflow-scroll px-4 py-3">
+        <Command.List className="text-subtle bg-modalBase h-[min(330px,calc(var(--cmdk-list-height)+24px))] overflow-scroll px-4 py-3">
           {(isTyping || res.isFetching) && (
             <Command.Loading className="text-light mb-4 text-xs">
               <div className="flex items-center gap-2 px-2">
