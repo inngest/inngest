@@ -166,6 +166,7 @@ input[type='number'] {
     --color-background-surface-base: var(--color-carbon-0);
     --color-background-surface-subtle: var(--color-carbon-200);
     --color-background-surface-muted: var(--color-carbon-300);
+    --color-background-modal-base: var(--color-carbon-0);
     --color-background-disabled: var(--color-carbon-50);
     --color-background-contrast: var(--color-carbon-1000);
     --color-background-success: var(--color-matcha-0);
@@ -280,6 +281,7 @@ input[type='number'] {
     --color-background-surface-base: var(--color-carbon-1000);
     --color-background-surface-subtle: var(--color-carbon-950);
     --color-background-surface-muted: var(--color-carbon-700);
+    --color-background-modal-base: var(--color-carbon-900);
     --color-background-disabled: var(--color-carbon-900);
     --color-background-contrast: var(--color-carbon-0);
     --color-background-success: var(--color-matcha-800);

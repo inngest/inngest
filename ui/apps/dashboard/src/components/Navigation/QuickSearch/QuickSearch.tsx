@@ -9,9 +9,10 @@ import { QuickSearchModal } from './QuickSearchModal';
 type Props = {
   collapsed: boolean;
   envSlug: string;
+  envName: string;
 };
 
-export function QuickSearch({ collapsed, envSlug }: Props) {
+export function QuickSearch({ collapsed, envSlug, envName }: Props) {
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
@@ -61,7 +62,12 @@ export function QuickSearch({ collapsed, envSlug }: Props) {
         </Tooltip>
       )}
 
-      <QuickSearchModal envSlug={envSlug} isOpen={isOpen} onClose={() => setIsOpen(false)} />
+      <QuickSearchModal
+        envSlug={envSlug}
+        envName={envName}
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+      />
     </>
   );
 }

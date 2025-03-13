@@ -8,7 +8,7 @@ import { cn } from '@inngest/components/utils/classNames';
 import { RiTimeLine } from '@remixicon/react';
 
 export type PillKind = 'default' | 'info' | 'warning' | 'primary' | 'error';
-export type PillAppearance = 'solid' | 'outlined';
+export type PillAppearance = 'solid' | 'outlined' | 'solidBright';
 
 export function Pill({
   children,
@@ -103,9 +103,19 @@ export const getPillColors = ({
     info: `border border-info bg-info text-info ${clickable ? 'hover:bg-secondary-xSubtle' : ''}`,
   };
 
+  const solidBrightPillStyles = {
+    default: `bg-canvasSubtle text-subtle ${clickable ? 'hover:bg-surfaceSubtle' : ''}`,
+    primary: `bg-success text-primary-2xIntense ${clickable ? 'hover:bg-primary-2xSubtle' : ''}`,
+    warning: `bg-warning text-accent-2xIntense ${clickable ? 'hover:bg-accent-2xSubtle' : ''}`,
+    error: `bg-error text-tertiary-2xIntense ${clickable ? 'hover:bg-tertiary-2xSubtle' : ''}`,
+    info: `bg-info text-secondary-2xIntense ${clickable ? 'hover:bg-secondary-2xSubtle' : ''}`,
+  };
+
   if (appearance === 'solid') {
     return solidPillStyles[kind];
   } else if (appearance === 'outlined') {
     return outlinedPillStyles[kind];
+  } else if (appearance === 'solidBright') {
+    return solidBrightPillStyles[kind];
   }
 };

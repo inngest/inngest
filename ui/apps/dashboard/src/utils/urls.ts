@@ -2,6 +2,7 @@ import type { Route } from 'next';
 
 export const WEBSITE_PRICING_URL = 'https://www.inngest.com/pricing';
 export const WEBSITE_CONTACT_URL = 'https://www.inngest.com/contact';
+export const DISCORD_URL = 'https://www.inngest.com/discord';
 
 export const DOCS_URLS = {
   SERVE: 'https://www.inngest.com/docs/sdk/serve',
@@ -86,6 +87,9 @@ export const pathCreator = {
   }): Route {
     return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}/cancellations` as Route;
   },
+  integrations(): Route {
+    return `/settings/integrations` as Route;
+  },
   keys({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/manage/keys` as Route;
   },
@@ -113,6 +117,9 @@ export const pathCreator = {
   },
   runs({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/runs` as Route;
+  },
+  signingKeys({ envSlug }: { envSlug: string }): Route {
+    return `/env/${envSlug}/manage/signing-key` as Route;
   },
   support({ ref }: { ref?: string } = {}): Route {
     return `/support${ref ? `?ref=${ref}` : ''}` as Route;

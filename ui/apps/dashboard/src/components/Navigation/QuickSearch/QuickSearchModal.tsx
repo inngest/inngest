@@ -1,20 +1,25 @@
 import { useState } from 'react';
 import { Modal } from '@inngest/components/Modal';
+import { Pill } from '@inngest/components/Pill/Pill';
+import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { cn } from '@inngest/components/utils/classNames';
+import { RiSearchLine } from '@remixicon/react';
 import { Command } from 'cmdk';
 
 import { pathCreator } from '@/utils/urls';
 import { ResultItem } from './ResultItem';
+import Shortcuts from './Shortcuts';
 import { useQuickSearch } from './data';
 import { useDebounce } from './hooks';
 
 type Props = {
   envSlug: string;
+  envName: string;
   isOpen: boolean;
   onClose: () => unknown;
 };
 
-export function QuickSearchModal({ envSlug, isOpen, onClose }: Props) {
+export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
   const [term, setTerm] = useState('');
   const debouncedTerm = useDebounce(term, 1000);
   const isTyping = term !== debouncedTerm;
@@ -23,22 +28,37 @@ export function QuickSearchModal({ envSlug, isOpen, onClose }: Props) {
 
   return (
     <Modal alignTop isOpen={isOpen} onClose={onClose} className="max-w-2xl align-baseline">
-      <Command label="Search by ID menu" shouldFilter={false} className="p-2">
-        <Command.Input
-          placeholder="Search by ID or name..."
-          value={term}
-          onValueChange={setTerm}
-          className={cn(
-            debouncedTerm && 'border-subtle focus:border-subtle border-b',
-            'placeholder-disabled bg-canvasBase w-[656px] border-0 px-3 py-3 outline-none focus:ring-0'
+      <Command label="Type a command or search" shouldFilter={true}>
+        <div className="border-subtle bg-modalBase border-b px-4 py-3">
+          <Pill appearance="solidBright" className="mb-3">
+            {envName}
+          </Pill>
+          <Command.Input
+            placeholder="Type a command or search..."
+            value={term}
+            onValueChange={setTerm}
+            className={cn(
+              'placeholder-disabled bg-modalBase w-[656px] border-0 p-0 outline-none focus:ring-0'
+            )}
+          />
+        </div>
+        <Command.List className="text-subtle bg-modalBase h-[min(330px,calc(var(--cmdk-list-height)+24px))] overflow-scroll px-4 py-3">
+          {(isTyping || res.isFetching) && (
+            <Command.Loading className="text-light mb-4 text-xs">
+              <div className="flex items-center gap-2 px-2">
+                <RiSearchLine className="text-light h-4 w-4" />
+                Searching for results matching &quot;{term}&quot;...
+              </div>
+              <Skeleton className="mt-1 h-10 w-full" />
+            </Command.Loading>
           )}
-        />
-        {debouncedTerm && (
-          <Command.List className="text-subtle bg-canvasBase px-3 py-3">
-            {(isTyping || res.isFetching) && <Command.Loading>Searching...</Command.Loading>}
 
-            {!isTyping && !res.isFetching && res.data && !res.error && (
-              <Command.Group>
+          {!isTyping && !res.isFetching && res.data && !res.error && (
+            <>
+              <Command.Group
+                heading="Apps"
+                className="text-muted mb-4 text-xs [&_[cmdk-group-heading]]:mb-1"
+              >
                 {res.data.apps.map((app, i) => {
                   return (
                     <ResultItem
@@ -51,8 +71,12 @@ export function QuickSearchModal({ envSlug, isOpen, onClose }: Props) {
                     />
                   );
                 })}
-
-                {res.data.event && (
+              </Command.Group>
+              {res.data.event && (
+                <Command.Group
+                  heading="Events"
+                  className="text-muted mb-4 text-xs [&_[cmdk-group-heading]]:mb-1"
+                >
                   <ResultItem
                     kind="event"
                     onClick={onClose}
@@ -64,8 +88,12 @@ export function QuickSearchModal({ envSlug, isOpen, onClose }: Props) {
                     text={res.data.event.name}
                     value={`event-${res.data.event.name}`}
                   />
-                )}
-
+                </Command.Group>
+              )}
+              <Command.Group
+                heading="Event Types"
+                className="text-muted mb-4 text-xs [&_[cmdk-group-heading]]:mb-1"
+              >
                 {res.data.eventTypes.map((eventType, i) => {
                   return (
                     <ResultItem
@@ -78,7 +106,12 @@ export function QuickSearchModal({ envSlug, isOpen, onClose }: Props) {
                     />
                   );
                 })}
+              </Command.Group>
 
+              <Command.Group
+                heading="Functions"
+                className="text-muted mb-4 text-xs [&_[cmdk-group-heading]]:mb-1"
+              >
                 {res.data.functions.map((fn, i) => {
                   return (
                     <ResultItem
@@ -91,8 +124,13 @@ export function QuickSearchModal({ envSlug, isOpen, onClose }: Props) {
                     />
                   );
                 })}
+              </Command.Group>
 
-                {res.data.run && (
+              {res.data.run && (
+                <Command.Group
+                  heading="Runs"
+                  className="text-muted mb-4 text-xs [&_[cmdk-group-heading]]:mb-1"
+                >
                   <ResultItem
                     key={res.data.run.id}
                     kind="run"
@@ -101,17 +139,32 @@ export function QuickSearchModal({ envSlug, isOpen, onClose }: Props) {
                     text={res.data.run.id}
                     value={`run-${res.data.run.id}`}
                   />
-                )}
-              </Command.Group>
+                </Command.Group>
+              )}
+            </>
+          )}
+          {!isTyping && !res.isFetching && <Shortcuts onClose={onClose} envSlug={envSlug} />}
+
+          <Command.Empty
+            className={cn(
+              'text-muted flex h-10 items-center gap-2 px-2 text-sm',
+              !res.error && 'hidden'
             )}
+          >
+            <RiSearchLine className="text-light h-4 w-4" />
+            Error searching
+          </Command.Empty>
 
-            <Command.Empty className={cn(!res.error && 'hidden')}>Error searching</Command.Empty>
-
-            <Command.Empty className={cn((isTyping || res.isPending || res.error) && 'hidden')}>
-              No results found
-            </Command.Empty>
-          </Command.List>
-        )}
+          <Command.Empty
+            className={cn(
+              'text-muted flex h-10 items-center gap-2 px-2 text-sm',
+              (isTyping || res.isPending || res.error) && 'hidden'
+            )}
+          >
+            <RiSearchLine className="text-light h-4 w-4" />
+            No results found for <span className="text-basis">&quot;{debouncedTerm}&quot;</span>
+          </Command.Empty>
+        </Command.List>
       </Command>
     </Modal>
   );
