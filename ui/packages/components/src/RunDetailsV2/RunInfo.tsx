@@ -28,7 +28,6 @@ import { isLazyDone, type Lazy } from '../utils/lazyLoad';
 
 type Props = {
   standalone: boolean;
-  cancelRun: () => Promise<unknown>;
   className?: string;
   pathCreator: {
     app: (params: { externalAppID: string }) => Route;
@@ -64,7 +63,6 @@ type Run = {
 };
 
 export function RunInfo({
-  cancelRun,
   className,
   pathCreator,
   initialRunData,
@@ -103,7 +101,7 @@ export function RunInfo({
             )}
           </div>
 
-          <CancelRunButton disabled={!allowCancel} onClick={cancelRun} />
+          <CancelRunButton disabled={!allowCancel} runID={runID} />
           <RerunButton
             disabled={!isLazyDone(run)}
             loading={loading}

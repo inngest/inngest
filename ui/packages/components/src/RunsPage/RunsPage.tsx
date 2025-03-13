@@ -48,7 +48,6 @@ const CodeSearch = dynamic(() => import('@inngest/components/CodeSearch/CodeSear
 });
 
 type Props = {
-  cancelRun: React.ComponentProps<typeof RunDetailsV2>['cancelRun'];
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
   features: Pick<Features, 'history'>;
@@ -72,7 +71,6 @@ type Props = {
 };
 
 export function RunsPage({
-  cancelRun,
   defaultVisibleColumns,
   getRun,
   getTraceResult,
@@ -243,7 +241,6 @@ export function RunsPage({
         <div className={`border-subtle  ${traceAIEnabled ? '' : 'border-l-4 pb-6'}`}>
           {traceAIEnabled && !legacyTraceEnabled ? (
             <RunDetailsV3
-              cancelRun={cancelRun}
               getResult={getTraceResult}
               getRun={getRun}
               initialRunData={rowData}
@@ -255,7 +252,6 @@ export function RunsPage({
             />
           ) : (
             <RunDetailsV2
-              cancelRun={cancelRun}
               getResult={getTraceResult}
               getRun={getRun}
               initialRunData={rowData}
@@ -271,7 +267,6 @@ export function RunsPage({
       );
     },
     [
-      cancelRun,
       getRun,
       getTraceResult,
       getTrigger,

@@ -15,7 +15,6 @@ import { useGetRun } from '@/components/RunDetails/useGetRun';
 import { useGetTraceResult } from '@/components/RunDetails/useGetTraceResult';
 import { useGetTrigger } from '@/components/RunDetails/useGetTrigger';
 import { GetFunctionPauseStateDocument, RunsOrderByField } from '@/gql/graphql';
-import { useCancelRun } from '@/queries/useCancelRun';
 import { pathCreator } from '@/utils/urls';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
 import { AppFilterDocument, CountRunsDocument, GetRunsDocument } from './queries';
@@ -74,7 +73,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   const [runs, setRuns] = useState<Run[]>([]);
   const [isScrollRequest, setIsScrollRequest] = useState(false);
 
-  const cancelRun = useCancelRun({ envID: env.id });
   const getTraceResult = useGetTraceResult();
   const getTrigger = useGetTrigger();
   const getRun = useGetRun();
@@ -218,7 +216,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
         id: app.id,
         name: app.externalID,
       }))}
-      cancelRun={cancelRun}
       data={runs}
       features={{
         history: features.data?.history ?? 7,
