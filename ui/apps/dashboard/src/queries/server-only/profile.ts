@@ -36,7 +36,7 @@ export const getProfileDisplay = async (): Promise<ProfileDisplayType> => {
 
   const res = await graphqlAPI.request(ProfileQuery);
   if (res.account.marketplace) {
-    // Vercel Marketplace users are not authed with Clerk.
+    // Marketplace users are not authed with Clerk.
 
     orgName = res.account.name ?? undefined;
     displayName = 'System';
