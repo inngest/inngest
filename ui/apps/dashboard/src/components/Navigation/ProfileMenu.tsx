@@ -127,7 +127,5 @@ function SignOut({ isMarketplace }: { isMarketplace: boolean }) {
   }
 
   // Sign out via our backend.
-  return (
-    <NextLink href={`${process.env.NEXT_PUBLIC_API_URL}/vercel-market/logout`}>{content}</NextLink>
-  );
+  return <NextLink href={`${process.env.NEXT_PUBLIC_API_URL}/v1/logout`}>{content}</NextLink>;
 }

@@ -8,7 +8,6 @@ import {
 } from '@clerk/nextjs/server';
 
 import { graphql } from '@/gql';
-import { Marketplace } from '@/gql/graphql';
 import graphqlAPI from '../graphqlAPI';
 
 export type ProfileType = {
@@ -36,8 +35,8 @@ export const getProfileDisplay = async (): Promise<ProfileDisplayType> => {
   let displayName: string;
 
   const res = await graphqlAPI.request(ProfileQuery);
-  if (res.account.marketplace === Marketplace.Vercel) {
-    // Vercel Marketplace users are not authed with Clerk.
+  if (res.account.marketplace) {
+    // Marketplace users are not authed with Clerk.
 
     orgName = res.account.name ?? undefined;
     displayName = 'System';
@@ -51,7 +50,7 @@ export const getProfileDisplay = async (): Promise<ProfileDisplayType> => {
   }
 
   return {
-    isMarketplace: res.account.marketplace === Marketplace.Vercel,
+    isMarketplace: Boolean(res.account.marketplace),
     orgName,
     displayName,
   };
