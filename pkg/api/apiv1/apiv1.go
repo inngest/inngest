@@ -115,6 +115,8 @@ func (a *router) setup() {
 			r.Delete("/cancellations/{id}", a.deleteCancellation)
 
 			r.Get("/prom/{env}", a.promScrape)
+
+			r.Post("/traces", a.traces)
 		})
 	})
 }
