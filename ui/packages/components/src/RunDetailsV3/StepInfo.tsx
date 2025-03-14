@@ -139,7 +139,7 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
 
   return (
-    <div className="flex h-full flex-col gap-2">
+    <div className="flex h-full flex-col justify-start gap-2">
       <div className="flex h-11 w-full flex-row items-center justify-between border-none px-4">
         <div
           className="text-basis flex cursor-pointer items-center justify-start gap-2"
@@ -161,7 +161,6 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
               size="medium"
               label="Rerun from step"
               onClick={() => setRerunModalOpen(true)}
-              className="mt-2"
             />
             <RerunModal
               open={rerunModalOpen}
@@ -210,40 +209,42 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
         </div>
       )}
 
-      <Tabs
-        defaultActive={result?.error ? 'error' : prettyInput ? 'input' : 'output'}
-        tabs={[
-          ...(prettyInput
-            ? [{ label: 'Input', id: 'input', node: <IO title="Step Input" raw={prettyInput} /> }]
-            : []),
-          ...(prettyOutput
-            ? [
-                {
-                  label: 'Output',
-                  id: 'output',
-                  node: <IO title="Step Output" raw={prettyOutput} />,
-                },
-              ]
-            : []),
-          ...(result?.error
-            ? [
-                {
-                  label: 'Error',
-                  id: 'error',
-                  node: (
-                    <IO
-                      title={`${result.error.name || 'Error'} ${
-                        result.error.message ? `: ${result.error.message}` : ''
-                      }`}
-                      raw={result.error.stack ?? ''}
-                      error={true}
-                    />
-                  ),
-                },
-              ]
-            : []),
-        ]}
-      />
+      <div className="min-h-full">
+        <Tabs
+          defaultActive={result?.error ? 'error' : prettyInput ? 'input' : 'output'}
+          tabs={[
+            ...(prettyInput
+              ? [{ label: 'Input', id: 'input', node: <IO title="Step Input" raw={prettyInput} /> }]
+              : []),
+            ...(prettyOutput
+              ? [
+                  {
+                    label: 'Output',
+                    id: 'output',
+                    node: <IO title="Step Output" raw={prettyOutput} />,
+                  },
+                ]
+              : []),
+            ...(result?.error
+              ? [
+                  {
+                    label: 'Error',
+                    id: 'error',
+                    node: (
+                      <IO
+                        title={`${result.error.name || 'Error'} ${
+                          result.error.message ? `: ${result.error.message}` : ''
+                        }`}
+                        raw={result.error.stack ?? ''}
+                        error={true}
+                      />
+                    ),
+                  },
+                ]
+              : []),
+          ]}
+        />
+      </div>
     </div>
   );
 };
