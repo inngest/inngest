@@ -128,7 +128,7 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col justify-start gap-2">
       <div className="flex h-11 w-full flex-row items-center justify-between border-none px-4">
         <div
           className="text-basis flex cursor-pointer items-center justify-start gap-2"
@@ -239,48 +239,50 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
         </div>
       )}
 
-      <Tabs
-        defaultActive={result?.error ? 'error' : prettyPayload ? 'input' : 'output'}
-        tabs={[
-          ...(prettyPayload
-            ? [
-                {
-                  label: 'Input',
-                  id: 'input',
-                  node: (
-                    <IO title="Function Payload" raw={prettyPayload} actions={codeBlockActions} />
-                  ),
-                },
-              ]
-            : []),
-          ...(prettyOutput
-            ? [
-                {
-                  label: 'Output',
-                  id: 'output',
-                  node: <IO title="Output" raw={prettyOutput} />,
-                },
-              ]
-            : []),
-          ...(result?.error
-            ? [
-                {
-                  label: 'Error',
-                  id: 'error',
-                  node: (
-                    <IO
-                      title={`${result.error.name || 'Error'} ${
-                        result.error.message ? `: ${result.error.message}` : ''
-                      }`}
-                      raw={result.error.stack ?? ''}
-                      error={true}
-                    />
-                  ),
-                },
-              ]
-            : []),
-        ]}
-      />
+      <div className="min-h-full">
+        <Tabs
+          defaultActive={result?.error ? 'error' : prettyPayload ? 'input' : 'output'}
+          tabs={[
+            ...(prettyPayload
+              ? [
+                  {
+                    label: 'Input',
+                    id: 'input',
+                    node: (
+                      <IO title="Function Payload" raw={prettyPayload} actions={codeBlockActions} />
+                    ),
+                  },
+                ]
+              : []),
+            ...(prettyOutput
+              ? [
+                  {
+                    label: 'Output',
+                    id: 'output',
+                    node: <IO title="Output" raw={prettyOutput} />,
+                  },
+                ]
+              : []),
+            ...(result?.error
+              ? [
+                  {
+                    label: 'Error',
+                    id: 'error',
+                    node: (
+                      <IO
+                        title={`${result.error.name || 'Error'} ${
+                          result.error.message ? `: ${result.error.message}` : ''
+                        }`}
+                        raw={result.error.stack ?? ''}
+                        error={true}
+                      />
+                    ),
+                  },
+                ]
+              : []),
+          ]}
+        />
+      </div>
     </div>
   );
 };

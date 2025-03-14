@@ -115,8 +115,12 @@ export const getAIInfo = (obj: Object): ResultType => {
     return acc;
   }, {});
 
-  if (!info.totalTokens) {
-    info.totalTokens = toNumber(info.promptTokens) + toNumber(info.completionTokens);
+  if (
+    !info.totalTokens &&
+    typeof info.promptTokens === 'number' &&
+    typeof info.completionTokens === 'number'
+  ) {
+    info.totalTokens = info.promptTokens + info.completionTokens;
   }
 
   return info;
