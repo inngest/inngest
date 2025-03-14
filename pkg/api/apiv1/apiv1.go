@@ -44,6 +44,8 @@ type Opts struct {
 	Broadcaster realtime.Broadcaster
 	// RealtimeJWTSecret is the realtime JWT secret for the V1 API
 	RealtimeJWTSecret []byte
+	// TraceReader reads traces from a backing store.
+	TraceReader cqrs.TraceReader
 }
 
 // AddRoutes adds a new API handler to the given router.

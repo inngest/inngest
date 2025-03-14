@@ -214,6 +214,8 @@ type TraceWriterDev interface {
 }
 
 type TraceReader interface {
+	// GetTraceRoot retrieves the root span for the specified trace
+	GetTraceRoot(ctx context.Context, id TraceRunIdentifier) (*Span, error)
 	// GetTraceRuns retrieves a list of TraceRun based on the options specified
 	GetTraceRuns(ctx context.Context, opt GetTraceRunOpt) ([]*TraceRun, error)
 	// GetTraceRunsCount returns the total number of items applicable to the specified filter

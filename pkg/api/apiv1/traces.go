@@ -3,12 +3,16 @@ package apiv1
 import (
 	"compress/gzip"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
+	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/run"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -31,7 +35,7 @@ type TraceParent struct {
 
 func (a router) traces(w http.ResponseWriter, r *http.Request) {
 	// Auth the app
-	_, err := a.opts.AuthFinder(r.Context())
+	auth, err := a.opts.AuthFinder(r.Context())
 	if err != nil {
 		respondError(w, r, http.StatusUnauthorized, "No auth found")
 		return
@@ -59,7 +63,7 @@ func (a router) traces(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rejectedSpans := convertOTLPAndSend(req)
+	rejectedSpans := a.convertOTLPAndSend(auth, req)
 
 	resp := &collecttrace.ExportTraceServiceResponse{}
 	if rejectedSpans > 0 {
@@ -105,7 +109,7 @@ func respondError(w http.ResponseWriter, r *http.Request, code int, msg string) 
 	w.Write(data)
 }
 
-func convertOTLPAndSend(req *collecttrace.ExportTraceServiceRequest) (rejectedSpans int64) {
+func (a router) convertOTLPAndSend(auth apiv1auth.V1Auth, req *collecttrace.ExportTraceServiceRequest) (rejectedSpans int64) {
 	ctx := context.Background()
 
 	for _, rs := range req.ResourceSpans {
@@ -125,15 +129,53 @@ func convertOTLPAndSend(req *collecttrace.ExportTraceServiceRequest) (rejectedSp
 					continue
 				}
 
+				// TODO This needs to change to channels and each traceRoot will
+				// also check the trace ID against the authed account and
+				// workspace. Just need to fetch the root traceRoot. Once we have
+				// that, we also have all attributes we need like run ID,
+				// which we should set all of here.
+				//
+				// For now we do this synchronously while testing
+				traceRoot, err := a.opts.TraceReader.GetTraceRoot(ctx, cqrs.TraceRunIdentifier{
+					AccountID:   auth.AccountID(),
+					WorkspaceID: auth.WorkspaceID(),
+					TraceID:     tp.TraceID.String(),
+				})
+				if err != nil {
+					// If we can't find the trace ID, we can't create a
+					// span. So let's skip it.
+					rejectedSpans++
+					continue
+				}
+
 				opts := []run.SpanOpt{
 					run.WithTraceID(tp.TraceID),
 					run.WithName(s.Name),
 					run.WithSpanKind(trace.SpanKind(s.Kind)),
 					run.WithScope(scope),
-					run.WithSpanAttributes(convertAttributes(s.Attributes)...),
 					run.WithLinks(convertLinks(s.Links)...),
 					run.WithTimestamp(time.Unix(0, int64(s.StartTimeUnixNano))),
 				}
+
+				attrs := convertAttributes(s.Attributes)
+
+				// Add built-in inngest attributes to the span (run ID etc)
+				for k, v := range traceRoot.SpanAttributes {
+					if _, ok := copyableAttrs[k]; ok {
+						attrs = append(attrs, attribute.KeyValue{
+							Key:   attribute.Key(k),
+							Value: attribute.StringValue(v),
+						})
+					}
+				}
+
+				// Always mark the span as userland
+				attrs = append(attrs, attribute.KeyValue{
+					Key:   attribute.Key(consts.OtelScopeUserland),
+					Value: attribute.BoolValue(true),
+				})
+
+				opts = append(opts, run.WithSpanAttributes(attrs...))
 
 				if len(s.SpanId) == 8 {
 					opts = append(opts, run.WithSpanID(trace.SpanID(s.SpanId)))
@@ -174,10 +216,8 @@ func convertOTLPAndSend(req *collecttrace.ExportTraceServiceRequest) (rejectedSp
 func getInngestTraceparent(s *tracev1.Span) (*TraceParent, error) {
 	for _, kv := range s.Attributes {
 		if kv.Key == "inngest.traceparent" {
-			// This is the traceparent attribute, so we can
-			// use it to get the trace ID and span ID
-
-			// Parse the traceparent header to get the trace ID and span ID.
+			// This is the traceparent attribute, so we can use it to get the
+			// trace ID and span ID
 			parts := strings.Split(kv.GetValue().GetStringValue(), "-")
 			if len(parts) < 3 {
 				return nil, fmt.Errorf("Invalid traceparent header format")
@@ -187,15 +227,21 @@ func getInngestTraceparent(s *tracev1.Span) (*TraceParent, error) {
 			if len(traceIDStr) != 32 {
 				return nil, fmt.Errorf("Invalid trace ID length %d", len(traceIDStr))
 			}
-
-			traceID := trace.TraceID([]byte(traceIDStr))
+			var traceID trace.TraceID
+			_, err := hex.Decode(traceID[:], []byte(traceIDStr))
+			if err != nil {
+				return nil, fmt.Errorf("Invalid trace ID hex string: %v", err)
+			}
 
 			spanIDStr := parts[2]
 			if len(spanIDStr) != 16 {
 				return nil, fmt.Errorf("Invalid span ID length %d", len(spanIDStr))
 			}
-
-			spanID := trace.SpanID([]byte(spanIDStr))
+			var spanID trace.SpanID
+			_, err = hex.Decode(spanID[:], []byte(spanIDStr))
+			if err != nil {
+				return nil, fmt.Errorf("Invalid span ID hex string: %v", err)
+			}
 
 			return &TraceParent{
 				TraceID: traceID,
@@ -295,4 +341,15 @@ func traceStatusCode(code tracev1.Status_StatusCode) codes.Code {
 	default:
 		return codes.Unset
 	}
+}
+
+var copyableAttrs = map[string]struct{}{
+	consts.OtelSysAccountID:       {},
+	consts.OtelSysWorkspaceID:     {},
+	consts.OtelSysAppID:           {},
+	consts.OtelSysFunctionID:      {},
+	consts.OtelSysFunctionSlug:    {},
+	consts.OtelSysFunctionVersion: {},
+	consts.OtelAttrSDKRunID:       {},
+	consts.OtelSysStepGroupID:     {},
 }
