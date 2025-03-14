@@ -86,7 +86,7 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
                       eventID: res.data.event.id,
                     })}
                     text={res.data.event.name}
-                    value={`event-${res.data.event.name}`}
+                    value={`event-${res.data.event.id}`}
                   />
                 </Command.Group>
               )}
