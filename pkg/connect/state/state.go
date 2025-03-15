@@ -146,7 +146,13 @@ func (c *Connection) AppNames() []string {
 	return appNames
 }
 
-// Sync attempts to sync the worker group configuration
+// Sync attempts to sync the worker group configuration.
+//
+// - If a previous worker group with the same hash exists, the current worker group is updated, so App ID and Sync ID are provided.
+// - In case no previous worker group with the same hash exists (or all existing connections disconnected and triggered a cleanup),
+// an out-of-band Sync request is sent to the API. This is expected to handle idempotency, so subsequent calls return the same App ID and Sync ID
+// given the same idempotency key.
+// - To enable rollback functionality, the API should trigger a new sync if, and only if, the requested idempotency key does not match the current deploy.
 func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager, apiBaseUrl string, initialReq *connpb.WorkerConnectRequestData) error {
 	// The group is expected to exist in the state, as UpsertConnection also creates the group if it doesn't exist
 	existingGroup, err := groupManager.GetWorkerGroupByHash(ctx, g.EnvID, g.Hash)
@@ -154,9 +160,6 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 		return fmt.Errorf("error attempting to retrieve worker group: %w", err)
 	}
 
-	if existingGroup != nil {
-		fmt.Println("SYNC: Found existing group", g.AppName, g.Hash, existingGroup.AppID, existingGroup.SyncID)
-	}
 	// Don't attempt to sync if it's already sync'd
 	if existingGroup != nil && existingGroup.SyncID != nil && existingGroup.AppID != nil {
 		g.AppID = existingGroup.AppID
@@ -272,15 +275,12 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 
 	// Update the worker group to make sure it store the appropriate IDs
 	if !syncReply.IsSuccess() {
+		// We always expect the App ID & Sync ID to be included in a sync result, representing either the idempotent reply or the new sync.
 		return fmt.Errorf("invalid sync result")
 	}
 
 	g.AppID = syncReply.AppID
 	g.SyncID = syncReply.SyncID
-
-	if existingGroup != nil {
-		fmt.Println("SYNC SUCCESS", g.AppName, g.Hash, g.AppID, g.SyncID)
-	}
 
 	// Update the worker group with the syncID so it's aware that it's already sync'd before
 	// Always update the worker group for consistency, even if the context is cancelled
