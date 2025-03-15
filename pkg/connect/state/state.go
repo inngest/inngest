@@ -154,6 +154,9 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 		return fmt.Errorf("error attempting to retrieve worker group: %w", err)
 	}
 
+	if existingGroup != nil {
+		fmt.Println("SYNC: Found existing group", g.AppName, g.Hash, existingGroup.AppID, existingGroup.SyncID)
+	}
 	// Don't attempt to sync if it's already sync'd
 	if existingGroup != nil && existingGroup.SyncID != nil && existingGroup.AppID != nil {
 		g.AppID = existingGroup.AppID
@@ -268,15 +271,21 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 	}
 
 	// Update the worker group to make sure it store the appropriate IDs
-	if syncReply.IsSuccess() {
-		g.AppID = syncReply.AppID
-		g.SyncID = syncReply.SyncID
+	if !syncReply.IsSuccess() {
+		return fmt.Errorf("invalid sync result")
+	}
 
-		// Update the worker group with the syncID so it's aware that it's already sync'd before
-		// Always update the worker group for consistency, even if the context is cancelled
-		if err := groupManager.UpdateWorkerGroup(context.Background(), g.EnvID, g); err != nil {
-			return fmt.Errorf("error updating worker group: %w", err)
-		}
+	g.AppID = syncReply.AppID
+	g.SyncID = syncReply.SyncID
+
+	if existingGroup != nil {
+		fmt.Println("SYNC SUCCESS", g.AppName, g.Hash, g.AppID, g.SyncID)
+	}
+
+	// Update the worker group with the syncID so it's aware that it's already sync'd before
+	// Always update the worker group for consistency, even if the context is cancelled
+	if err := groupManager.UpdateWorkerGroup(context.Background(), g.EnvID, g); err != nil {
+		return fmt.Errorf("error updating worker group: %w", err)
 	}
 
 	return nil
