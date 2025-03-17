@@ -114,7 +114,7 @@ func TransformRequest(r *http.Request) (*http.Request, error) {
 		HTTPMethod:            r.Method,
 		Headers:               headersToMap(headers),
 		QueryStringParameters: queryParams,
-		MultiValueHeaders:     r.URL.Query(),
+		MultiValueHeaders:     headers,
 		Body:                  base64.RawStdEncoding.EncodeToString(body),
 		IsBase64Encoded:       true,
 	}
