@@ -150,6 +150,7 @@ func (a router) convertOTLPAndSend(auth apiv1auth.V1Auth, req *collecttrace.Expo
 
 				opts := []run.SpanOpt{
 					run.WithTraceID(tp.TraceID),
+					run.WithSpanID(trace.SpanID(s.SpanId)),
 					run.WithName(s.Name),
 					run.WithSpanKind(trace.SpanKind(s.Kind)),
 					run.WithScope(scope),
@@ -176,10 +177,6 @@ func (a router) convertOTLPAndSend(auth apiv1auth.V1Auth, req *collecttrace.Expo
 				})
 
 				opts = append(opts, run.WithSpanAttributes(attrs...))
-
-				if len(s.SpanId) == 8 {
-					opts = append(opts, run.WithSpanID(trace.SpanID(s.SpanId)))
-				}
 
 				if scope == "inngest" && s.Name == "inngest.execution" {
 					// This is the "root" span created by an SDK, so let's
