@@ -21,7 +21,7 @@ type Props = {
 
 export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
   const [term, setTerm] = useState('');
-  const debouncedTerm = useDebounce(term, 1000);
+  const debouncedTerm = useDebounce(term, 200);
   const isTyping = term !== debouncedTerm;
 
   const res = useQuickSearch({ envSlug, term: debouncedTerm });
