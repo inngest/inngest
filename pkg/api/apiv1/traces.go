@@ -184,7 +184,7 @@ func (a router) convertOTLPAndSend(auth apiv1auth.V1Auth, req *collecttrace.Expo
 					opts = append(opts, run.WithParentSpanID(trace.SpanID(tp.SpanID)))
 				}
 
-				if len(s.ParentSpanId) == 8 {
+				if len(s.ParentSpanId) == 12 {
 					opts = append(opts, run.WithParentSpanID(trace.SpanID(s.ParentSpanId)))
 				}
 
