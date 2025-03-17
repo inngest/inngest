@@ -3,21 +3,6 @@ package gateway
 import (
 	"bytes"
 	"net/http"
-
-	// NOTE: We don't use the default `openai` package because Stainless SDKs don't
-	// support Unmarshal() on Param structs, due to their Field handling.
-	// See https://play.golang.com/p/UX60snrf3gp for more info.
-
-	"github.com/davecgh/go-spew/spew"
-	openai "github.com/sashabaranov/go-openai"
-)
-
-const (
-	// FormatOpenAIChat represents the default OpenAI chat completion request.
-	FormatOpenAIChat = "openai-chat"
-	FormatAnthropic  = "anthropic"
-	FormatGemini     = "gemini"
-	FormatBedrock    = "bedrock"
 )
 
 type Request struct {
@@ -46,8 +31,6 @@ func (r Request) HTTPRequest() (*http.Request, error) {
 		method = r.Method
 	}
 
-	spew.Dump("Gonna send", r.Body, []byte(r.Body))
-
 	// If the body is empty, we need to set it to an empty JSON object.
 	req, err := http.NewRequest(method, r.URL, bytes.NewReader([]byte(r.Body)))
 	if err != nil {
@@ -73,8 +56,3 @@ type Response struct {
 	// StatusCode is the HTTP status code of the response.
 	StatusCode int `json:"status_code"`
 }
-
-type (
-	// OpenAIChatCompletionRequest represents an OpenAI compatible format.
-	OpenAIChatCompletionRequest openai.ChatCompletionRequest
-)
