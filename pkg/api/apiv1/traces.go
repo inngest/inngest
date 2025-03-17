@@ -217,27 +217,27 @@ func getInngestTraceparent(s *tracev1.Span) (*TraceParent, error) {
 			// trace ID and span ID
 			parts := strings.Split(kv.GetValue().GetStringValue(), "-")
 			if len(parts) < 3 {
-				return nil, fmt.Errorf("Invalid traceparent header format")
+				return nil, fmt.Errorf("invalid traceparent header format")
 			}
 
 			traceIDStr := parts[1]
 			if len(traceIDStr) != 32 {
-				return nil, fmt.Errorf("Invalid trace ID length %d", len(traceIDStr))
+				return nil, fmt.Errorf("invalid trace ID length %d", len(traceIDStr))
 			}
 			var traceID trace.TraceID
 			_, err := hex.Decode(traceID[:], []byte(traceIDStr))
 			if err != nil {
-				return nil, fmt.Errorf("Invalid trace ID hex string: %v", err)
+				return nil, fmt.Errorf("invalid trace ID hex string: %v", err)
 			}
 
 			spanIDStr := parts[2]
 			if len(spanIDStr) != 16 {
-				return nil, fmt.Errorf("Invalid span ID length %d", len(spanIDStr))
+				return nil, fmt.Errorf("invalid span ID length %d", len(spanIDStr))
 			}
 			var spanID trace.SpanID
 			_, err = hex.Decode(spanID[:], []byte(spanIDStr))
 			if err != nil {
-				return nil, fmt.Errorf("Invalid span ID hex string: %v", err)
+				return nil, fmt.Errorf("invalid span ID hex string: %v", err)
 			}
 
 			return &TraceParent{
@@ -247,7 +247,7 @@ func getInngestTraceparent(s *tracev1.Span) (*TraceParent, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("No traceparent attribute found")
+	return nil, fmt.Errorf("no traceparent attribute found")
 }
 
 func convertAttributes(attrs []*commonv1.KeyValue) []attribute.KeyValue {
