@@ -39,14 +39,14 @@ export default function Shortcuts({ onClose, envSlug }: { onClose: () => void; e
         />
         <ResultItem
           onClick={onClose}
-          path={pathCreator.integrations()}
+          path={pathCreator.vercel()}
           text="Go to Vercel"
           value="go-to-vercel-integration"
           icon={<RiPlugLine />}
         />
         <ResultItem
           onClick={onClose}
-          path={pathCreator.integrations()}
+          path={pathCreator.neon()}
           text="Go to Neon"
           value="go-to-neon-integration"
           icon={<RiPlugLine />}
