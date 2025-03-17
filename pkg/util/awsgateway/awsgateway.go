@@ -131,7 +131,6 @@ func headersToMap(header http.Header) map[string]string {
 	headerMap := make(map[string]string)
 	for key, values := range header {
 		if len(values) > 0 {
-			fmt.Println("key", key, "value", values[0])
 			headerMap[strings.ToLower(key)] = values[0]
 		}
 	}
