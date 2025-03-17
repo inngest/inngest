@@ -130,4 +130,10 @@ export const pathCreator = {
   vercel(): Route {
     return `/settings/integrations/vercel` as Route;
   },
+  vercelSetup(): Route {
+    return `/settings/integrations/vercel/connect` as Route;
+  },
+  neon(): Route {
+    return `/settings/integrations/neon` as Route;
+  },
 };
