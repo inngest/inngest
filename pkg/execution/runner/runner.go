@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -533,7 +534,22 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+
+			defer func() {
+				if r := recover(); r != nil {
+					logger.From(ctx).Error().
+						Str("error", fmt.Sprintf("%v", r)).
+						Str("function", copied.Name).
+						Str("stack", string(debug.Stack())).
+						Msg("panic initializing function")
+				}
+			}()
+
 			for _, t := range copied.Triggers {
+				if t.EventTrigger == nil {
+					continue
+				}
+
 				// Evaluate all expressions for matching triggers
 				if t.Expression != nil {
 					// Execute expressions here, ensuring that each function is only triggered
