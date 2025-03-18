@@ -41,7 +41,7 @@ export default function NewUser() {
             arrowOnHover={true}
             target="_blank"
           >
-            Let's talk
+            Let&apos;s talk
           </Link>
         </div>
       </div>
