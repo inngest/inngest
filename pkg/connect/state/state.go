@@ -4,11 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/inngest/inngest/pkg/backoff"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
+	"io"
 	"net/http"
 	"net/url"
 	"time"
@@ -220,10 +224,24 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 	maxRetryAttempts := 10
 	attempt := 0
 
-	var resp *http.Response
+	// Retrieve the deploy ID for the sync and update state with it if available
+	var syncReply cqrs.SyncReply
 	for {
+		attempt++
+
 		if attempt == maxRetryAttempts {
 			return fmt.Errorf("existing sync took too long to complete")
+		}
+
+		// Apply exponential backoff for retries
+		if attempt > 1 {
+			backOffDur := backoff.ExponentialJitterBackoff(attempt).Sub(time.Now())
+
+			select {
+			case <-ctx.Done():
+				return fmt.Errorf("could not wait for sync to complete")
+			case <-time.After(backOffDur):
+			}
 		}
 
 		req, err := http.NewRequest(http.MethodPost, registerURL, bytes.NewReader(byt))
@@ -241,7 +259,7 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 			req.Header.Set(headers.HeaderAuthorization, fmt.Sprintf("Bearer %s", g.SyncData.SyncToken))
 		}
 
-		resp, err = http.DefaultClient.Do(req)
+		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			return fmt.Errorf("error making sync request: %w", err)
 		}
@@ -254,28 +272,27 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 
 			// Wait for other sync to complete and retry
 			if perr.Code == syscode.CodeSyncAlreadyPending {
-				select {
-				case <-ctx.Done():
-					return fmt.Errorf("could not wait for sync to complete")
-				case <-time.After(2 * time.Second):
-				}
-				attempt++
 				continue
 			}
+		}
+
+		if err := json.NewDecoder(resp.Body).Decode(&syncReply); err != nil {
+			if errors.Is(err, io.EOF) {
+				logger.StdlibLogger(ctx).Warn("got EOF for connect sync, retrying", "err", err, "")
+				continue
+			}
+			return fmt.Errorf("error parsing sync response: %w", err)
 		}
 
 		break
 	}
 
-	// Retrieve the deploy ID for the sync and update state with it if available
-	var syncReply cqrs.SyncReply
-	if err := json.NewDecoder(resp.Body).Decode(&syncReply); err != nil {
-		return fmt.Errorf("error parsing sync response: %w", err)
-	}
-
-	// Update the worker group to make sure it store the appropriate IDs
+	// We always expect the App ID & Sync ID to be included in a sync result, representing either the idempotent reply or the new sync.
 	if !syncReply.IsSuccess() {
-		// We always expect the App ID & Sync ID to be included in a sync result, representing either the idempotent reply or the new sync.
+		if syncReply.Error != nil {
+			return fmt.Errorf("invalid sync result: %s", *syncReply.Error)
+		}
+
 		return fmt.Errorf("invalid sync result")
 	}
 
