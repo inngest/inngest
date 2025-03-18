@@ -202,11 +202,18 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*cqrs.Sync
 		return nil, publicerr.Wrap(err, 400, "Invalid request")
 	}
 
+	// TODO Retrieve same syncID for connect, if r.IdempotencyKey is the same
+	syncID := uuid.New()
+
 	if app, err := a.devserver.Data.GetAppByChecksum(ctx, consts.DevServerEnvID, sum); err == nil {
 		if !app.Error.Valid {
 			// Skip registration since the app was already successfully
 			// registered.
-			return &cqrs.SyncReply{OK: true}, nil
+			return &cqrs.SyncReply{
+				OK:     true,
+				AppID:  &app.ID,
+				SyncID: &syncID,
+			}, nil
 		}
 
 		// Clear app error.
@@ -222,7 +229,6 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*cqrs.Sync
 		}
 	}
 
-	syncID := uuid.New()
 	// Attempt to get the existing app by URL, and delete it if possible.
 	// We're going to recreate it below.
 	//
