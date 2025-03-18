@@ -21,7 +21,7 @@ export default function NewUser() {
     open && (
       <div className="bg-canvasBase border-subtle absolute bottom-0 right-0 mb-6 mr-4 w-[430px] rounded border">
         <div className="gap-x flex flex-row items-center justify-between p-3">
-          <div className="text-sm leading-tight">Share Feedback</div>
+          <div className="text-sm leading-tight">We&apos;d love your feedback on Inngest!</div>
           <Button
             icon={<RiCloseLine className="text-subtle h-5 w-5" />}
             kind="secondary"
@@ -32,15 +32,16 @@ export default function NewUser() {
           />
         </div>
         <div className="text-muted px-3 pb-3 text-sm">
-          Inngest&apos;s Product Design team would like to hear about your experience using Inngest!
+          The product design team is looking for users interested in talking to us about their
+          experience with Inngest. Your feedback will help shape what we build next.
         </div>
         <div className="border-subtle border-t px-3 py-2">
           <Link
-            href="https://docs.google.com/forms/d/e/1FAIpQLSfjbvBZ7Ji6gVroClCbZ2aiYCfp9fal42aVLdP1I534tX87zw/viewform"
+            href="https://savvycal.com/inngest/Inngest-Product"
             arrowOnHover={true}
             target="_blank"
           >
-            Share your feedback
+            Let's talk
           </Link>
         </div>
       </div>
