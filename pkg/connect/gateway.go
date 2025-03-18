@@ -274,7 +274,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				c.closeWithConnectError(ws, &SocketError{
 					SysCode:    syscode.CodeConnectInternal,
 					StatusCode: websocket.StatusInternalError,
-					Msg:        "Internal error",
+					Msg:        "Internal error while syncing",
 				})
 
 				return

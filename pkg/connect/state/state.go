@@ -278,7 +278,13 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 
 		if err := json.NewDecoder(resp.Body).Decode(&syncReply); err != nil {
 			if errors.Is(err, io.EOF) {
-				logger.StdlibLogger(ctx).Warn("got EOF for connect sync, retrying", "err", err)
+				logger.StdlibLogger(ctx).Warn(
+					"got EOF for connect sync, retrying",
+					"err", err,
+					"conn_id", initialReq.ConnectionId,
+					"account_id", g.AccountID,
+					"env_id", g.EnvID,
+				)
 				continue
 			}
 			return fmt.Errorf("error parsing sync response: %w", err)
