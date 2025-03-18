@@ -58,8 +58,6 @@ export const Actions = ({ allowCancel, runID, fnID }: RunActions) => {
                 Successfully queued rerun
               </Link>
             );
-
-            close();
           }
           setRerunLoading(false);
         }}
