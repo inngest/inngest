@@ -235,7 +235,7 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 
 		// Apply exponential backoff for retries
 		if attempt > 1 {
-			backOffDur := backoff.ExponentialJitterBackoff(attempt).Sub(time.Now())
+			backOffDur := time.Until(backoff.ExponentialJitterBackoff(attempt))
 
 			select {
 			case <-ctx.Done():
