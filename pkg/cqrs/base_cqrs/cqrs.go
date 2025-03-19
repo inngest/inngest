@@ -382,6 +382,10 @@ func (w wrapper) DeleteApp(ctx context.Context, id uuid.UUID) error {
 	return w.q.DeleteApp(ctx, id)
 }
 
+func (w wrapper) UnarchiveApp(ctx context.Context, id uuid.UUID) error {
+	return w.q.UnarchiveApp(ctx, id)
+}
+
 //
 // Functions
 //
@@ -1990,6 +1994,26 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 	}
 
 	return res, nil
+}
+
+func (w wrapper) GetEnvByName(ctx context.Context, name string) (*cqrs.Env, error) {
+	// Dummy implementation for the Dev Server.
+	return &cqrs.Env{
+		EnvType: "test",
+		ID:      consts.DevServerEnvID,
+		Name:    "default",
+		Slug:    "default",
+	}, nil
+}
+
+func (w wrapper) ArchiveEnv(ctx context.Context, id uuid.UUID) error {
+	// Dummy implementation for the Dev Server.
+	return nil
+}
+
+func (w wrapper) UnarchiveEnv(ctx context.Context, id uuid.UUID) error {
+	// Dummy implementation for the Dev Server.
+	return nil
 }
 
 // copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types

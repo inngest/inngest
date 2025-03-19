@@ -3,13 +3,15 @@ package cqrs
 import (
 	"context"
 	"database/sql"
-	"github.com/inngest/inngest/pkg/enums"
 	"time"
+
+	"github.com/inngest/inngest/pkg/enums"
 
 	"github.com/google/uuid"
 )
 
 type App struct {
+	ArchivedAt  sql.NullTime
 	ID          uuid.UUID
 	Name        string
 	SdkLanguage string
@@ -56,6 +58,8 @@ type AppWriter interface {
 	UpdateAppURL(ctx context.Context, arg UpdateAppURLParams) (*App, error)
 	// DeleteApp deletes an app.
 	DeleteApp(ctx context.Context, id uuid.UUID) error
+
+	UnarchiveApp(ctx context.Context, id uuid.UUID) error
 }
 
 type UpsertAppParams struct {

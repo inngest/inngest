@@ -1,0 +1,9 @@
+package: "apiv2"
+generate:
+  chi-server: true
+
+  # Required for OpenAPI validation middleware.
+  embedded-spec: true
+
+  models: true
+output: "oapi.gen.go"

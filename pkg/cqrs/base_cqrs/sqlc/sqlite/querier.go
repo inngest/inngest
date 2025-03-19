@@ -79,6 +79,7 @@ type Querier interface {
 	// Worker Connections
 	//
 	InsertWorkerConnection(ctx context.Context, arg InsertWorkerConnectionParams) error
+	UnarchiveApp(ctx context.Context, id uuid.UUID) error
 	UpdateAppError(ctx context.Context, arg UpdateAppErrorParams) (*App, error)
 	UpdateAppURL(ctx context.Context, arg UpdateAppURLParams) (*App, error)
 	UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionConfigParams) (*Function, error)

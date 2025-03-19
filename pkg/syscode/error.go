@@ -8,7 +8,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 )
 
-func fromError(err error) Error {
+func FromError(err error) Error {
 	e := &Error{}
 	if !errors.As(err, e) && !errors.As(err, &e) {
 		e = &Error{
@@ -92,12 +92,12 @@ func (e *DataMultiErr) Append(err error) {
 
 	if me, ok := err.(*multierror.Error); ok {
 		for i := range me.Errors {
-			e.Append(fromError(me.Errors[i]))
+			e.Append(FromError(me.Errors[i]))
 		}
 		return
 	}
 
-	e.Errors = append(e.Errors, fromError(err))
+	e.Errors = append(e.Errors, FromError(err))
 }
 
 func (e *DataMultiErr) ToMap() map[string]any {

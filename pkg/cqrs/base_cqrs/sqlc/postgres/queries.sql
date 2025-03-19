@@ -31,13 +31,16 @@ SELECT * FROM apps WHERE id = $1 LIMIT 1;
 SELECT * FROM apps WHERE url = $1 AND archived_at IS NULL LIMIT 1;
 
 -- name: GetAppByName :one
-SELECT * FROM apps WHERE name = $1 AND archived_at IS NULL LIMIT 1;
+SELECT * FROM apps WHERE name = $1 LIMIT 1;
 
 -- name: GetAllApps :many
 SELECT * FROM apps WHERE archived_at IS NULL;
 
 -- name: DeleteApp :exec
 UPDATE apps SET archived_at = CURRENT_TIMESTAMP WHERE id = $1;
+
+-- name: UnarchiveApp :exec
+UPDATE apps SET archived_at = NULL WHERE id = $1;
 
 -- name: UpdateAppURL :one
 UPDATE apps SET url = $1 WHERE id = $2 RETURNING *;

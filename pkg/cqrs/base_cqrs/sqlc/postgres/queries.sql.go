@@ -192,7 +192,7 @@ func (q *Queries) GetAppByID(ctx context.Context, id uuid.UUID) (*App, error) {
 }
 
 const getAppByName = `-- name: GetAppByName :one
-SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url, method, app_version FROM apps WHERE name = $1 AND archived_at IS NULL LIMIT 1
+SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url, method, app_version FROM apps WHERE name = $1 LIMIT 1
 `
 
 func (q *Queries) GetAppByName(ctx context.Context, name string) (*App, error) {
@@ -1707,6 +1707,15 @@ func (q *Queries) InsertWorkerConnection(ctx context.Context, arg InsertWorkerCo
 		arg.MemBytes,
 		arg.Os,
 	)
+	return err
+}
+
+const unarchiveApp = `-- name: UnarchiveApp :exec
+UPDATE apps SET archived_at = NULL WHERE id = $1
+`
+
+func (q *Queries) UnarchiveApp(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, unarchiveApp, id)
 	return err
 }
 

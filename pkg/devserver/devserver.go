@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/apiv1"
+	"github.com/inngest/inngest/pkg/api/apiv2"
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
 	_ "github.com/inngest/inngest/pkg/config/defaults"
@@ -416,6 +417,18 @@ func start(ctx context.Context, opts StartOpts) error {
 			Broadcaster:        broadcaster,
 			RealtimeJWTSecret:  consts.DevServerRealtimeJWTSecret,
 		})
+	})
+
+	apiv2, err := apiv2.New(ctx, apiv2.NewOpts{
+		AppSvc:   ds.Data,
+		BasePath: "/v2",
+		EnvSvc:   ds.Data,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create apiv2: %w", err)
+	}
+	devAPI.Route("/v2", func(r chi.Router) {
+		r.Mount("/", apiv2)
 	})
 
 	// ds.opts.Config.EventStream.Service.TopicName()

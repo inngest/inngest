@@ -1,0 +1,149 @@
+openapi: "3.0.0"
+info:
+  title: "Inngest API"
+  version: "2.0"
+paths:
+  /envs/{env_id}:
+    get:
+      operationId: "GetEnv"
+      parameters:
+        - $ref: "#/components/parameters/EnvID"
+      responses:
+        "200":
+          description: "Get an env"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Env"
+
+  /envs/{env_id}/archive:
+    delete:
+      operationId: "UnarchiveEnv"
+      parameters:
+        - $ref: "#/components/parameters/EnvID"
+
+    put:
+      operationId: "ArchiveEnv"
+      parameters:
+        - $ref: "#/components/parameters/EnvID"
+
+  /envs/{env_id}/apps:
+    get:
+      operationId: "GetApps"
+      parameters:
+        - $ref: "#/components/parameters/EnvID"
+      responses:
+        "200":
+          description: "Get apps"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppsResponse"
+
+  /envs/{env_id}/apps/{app_id}:
+    get:
+      operationId: "GetApp"
+      parameters:
+        - $ref: "#/components/parameters/EnvID"
+        - $ref: "#/components/parameters/AppID"
+      responses:
+        "200":
+          description: "Get an app"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/App"
+
+  /envs/{env_id}/apps/{app_id}/archive:
+    delete:
+      operationId: "UnarchiveApp"
+      parameters:
+        - $ref: "#/components/parameters/EnvID"
+        - $ref: "#/components/parameters/AppID"
+    
+    put:
+      operationId: "ArchiveApp"
+      parameters:
+        - $ref: "#/components/parameters/EnvID"
+        - $ref: "#/components/parameters/AppID"
+
+components:
+  parameters:
+    AppID:
+      name: "app_id"
+      in: "path"
+      required: true
+      schema:
+        type: "string"
+
+    EnvID:
+      name: "env_id"
+      in: "path"
+      required: true
+      schema:
+        type: "string"
+        
+
+  schemas:
+    App:
+      type: "object"
+      properties:
+        archived_at:
+          type: "string"
+          format: "date-time"
+          nullable: true
+        created_at:
+          type: "string"
+          format: "date-time"
+        id:
+          type: "string"
+          x-go-name: "ID"
+        internal_id:
+          type: "string"
+          format: "uuid"
+          x-go-name: "InternalID"
+      required:
+        - "created_at"
+        - "id"
+        - "internal_id"
+
+    AppsResponse:
+      type: "object"
+      properties:
+        data:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/App"
+      required:
+        - "data"
+
+    Env:
+      type: "object"
+      properties:
+        archived_at:
+          type: "string"
+          format: "date-time"
+          nullable: true
+        auto_archive_enabled:
+          type: "boolean"
+        created_at:
+          type: "string"
+          format: "date-time"
+        env_type:
+          type: "string"
+        internal_id:
+          type: "string"
+          format: "uuid"
+          x-go-name: "InternalID"
+        name:
+          type: "string"
+        slug:
+          type: "string"
+      required:
+        - "archived_at"
+        - "auto_archive_enabled"
+        - "created_at"
+        - "env_type"
+        - "internal_id"
+        - "name"
+        - "slug"

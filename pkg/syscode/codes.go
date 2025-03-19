@@ -9,6 +9,7 @@ const (
 	CodeHTTPMissingHeader         = "http_missing_header"
 	CodeHTTPNotOK                 = "http_not_ok"
 	CodeHTTPUnreachable           = "http_unreachable"
+	CodeNotFound                  = "not_found"
 	CodeNotSDK                    = "not_sdk"
 	CodeOutputTooLarge            = "output_too_large"
 	CodeSigVerificationFailed     = "sig_verification_failed"

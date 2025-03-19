@@ -25,6 +25,7 @@ type Manager interface {
 	QueueSnapshotManager
 
 	AppManager
+	EnvManager
 	FunctionRunManager
 	EventManager
 	HistoryManager
