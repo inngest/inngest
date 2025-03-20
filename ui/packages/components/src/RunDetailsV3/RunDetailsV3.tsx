@@ -5,7 +5,6 @@ import { useQuery } from '@tanstack/react-query';
 
 import { ErrorCard } from '../RunDetailsV2/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
-import { useShared } from '../SharedContext/SharedContext';
 import { StatusCell } from '../Table/Cell';
 import { Trace as OldTrace } from '../TimelineV2';
 import { TriggerDetails } from '../TriggerDetails';
