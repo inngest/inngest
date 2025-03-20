@@ -59,7 +59,6 @@ export const RunDetailsV3 = (props: Props) => {
   const [height, setHeight] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const { selectedStep } = useStepSelection(runID);
-  const { cloud } = useShared();
 
   const handleMouseDown = useCallback(() => {
     setIsDragging(true);
@@ -119,7 +118,7 @@ export const RunDetailsV3 = (props: Props) => {
   const outputID = runRes?.data?.trace.outputID;
   const resultRes = useQuery({
     enabled: Boolean(outputID),
-    refetchInterval: cloud ? false : pollInterval,
+    refetchInterval: pollInterval,
     queryKey: ['run-result', runID],
     queryFn: useCallback(() => {
       if (!outputID) {
