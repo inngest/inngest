@@ -83,7 +83,7 @@ type Migrator interface {
 	SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID, migrate bool) error
 	// Migration does a peek operation like the normal peek, but ignores leases and other conditions a normal peek cares about.
 	// The sore goal is to grab things and migrate them to somewhere else
-	Migrate(ctx context.Context, shard string, fnID uuid.UUID, limit int64, handler QueueMigrationHandler) (int64, error)
+	Migrate(ctx context.Context, shard string, fnID uuid.UUID, limit int64, concurrency int, handler QueueMigrationHandler) (int64, error)
 }
 
 type QueueDirectAccess interface {
