@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { ErrorCard } from '../RunDetailsV2/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
+import { useShared } from '../SharedContext/SharedContext';
 import { StatusCell } from '../Table/Cell';
 import { Trace as OldTrace } from '../TimelineV2';
 import { TriggerDetails } from '../TriggerDetails';
@@ -58,6 +59,7 @@ export const RunDetailsV3 = (props: Props) => {
   const [height, setHeight] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const { selectedStep } = useStepSelection(runID);
+  const { cloud } = useShared();
 
   const handleMouseDown = useCallback(() => {
     setIsDragging(true);
@@ -117,6 +119,7 @@ export const RunDetailsV3 = (props: Props) => {
   const outputID = runRes?.data?.trace.outputID;
   const resultRes = useQuery({
     enabled: Boolean(outputID),
+    refetchInterval: cloud ? false : pollInterval,
     queryKey: ['run-result', runID],
     queryFn: useCallback(() => {
       if (!outputID) {
