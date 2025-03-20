@@ -254,4 +254,7 @@ type MigratePayload struct {
 	// DisableFnPause is a flag to disable the function pausing during migration
 	// if it's considered okay to do so
 	DisableFnPause bool
+
+	// Concurrency optionally specifies the concurrency for running the migrate handler over each batch of queue items.
+	Concurrency int
 }
