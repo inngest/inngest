@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net"
+
+	"github.com/inngest/inngest/pkg/logger"
 )
 
 var privateIPBlocks []*net.IPNet
@@ -47,6 +49,7 @@ type SecureDialerOpts struct {
 	AllowHostDocker bool
 	AllowPrivate    bool
 	AllowNAT64      bool
+	Log             bool
 }
 
 type DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error)
@@ -73,6 +76,13 @@ func SecureDialer(o SecureDialerOpts) DialFunc {
 		addrs, err := net.DefaultResolver.LookupHost(ctx, host)
 		if err != nil {
 			return nil, err
+		}
+
+		if o.Log {
+			logger.StdlibLogger(ctx).Debug("domain resolved",
+				"address", addr,
+				"hosts", addrs,
+			)
 		}
 
 		for _, a := range addrs {

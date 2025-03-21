@@ -66,7 +66,9 @@ func TestSecureDialer(t *testing.T) {
 		for _, h := range hosts {
 
 			t.Run(fmt.Sprintf("disabled: %s", h), func(t *testing.T) {
-				c := client(SecureDialer(SecureDialerOpts{}))
+				c := client(SecureDialer(SecureDialerOpts{
+					Log: true,
+				}))
 				r, err := c.Get(fmt.Sprintf("http://%s", h))
 				require.Nil(t, r)
 				require.NotNil(t, err)
@@ -84,6 +86,7 @@ func TestSecureDialer(t *testing.T) {
 			t.Run(fmt.Sprintf("enabled: %s", h), func(t *testing.T) {
 				c := client(SecureDialer(SecureDialerOpts{
 					AllowPrivate: true,
+					Log:          true,
 				}))
 				_, err := c.Get(fmt.Sprintf("http://%s", h))
 
