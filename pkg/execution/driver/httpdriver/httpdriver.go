@@ -453,6 +453,7 @@ func trackRequestStats(ctx context.Context, r *httpstat.Result) {
 		Tags:    tags,
 	}
 	metrics.HistogramHTTPDNSLookupDuration(ctx, r.DNSLookup.Milliseconds(), opts)
+	metrics.HistogramHTTPTCPConnDuration(ctx, r.TCPConnection.Milliseconds(), opts)
 	metrics.HistogramHTTPTLSHandshakeDuration(ctx, r.TLSHandshake.Milliseconds(), opts)
 	metrics.HistogramHTTPServerProcessingDuration(ctx, r.ServerProcessing.Milliseconds(), opts)
 }

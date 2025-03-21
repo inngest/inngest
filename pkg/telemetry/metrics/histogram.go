@@ -185,6 +185,20 @@ func HistogramHTTPDNSLookupDuration(ctx context.Context, dur int64, opts Histogr
 	})
 }
 
+func HistogramHTTPTCPConnDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "httpdriver_tcp_conn_duration",
+		Description: "Distribution of TCP Handshake durations",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries: []float64{
+			5, 10, 25, 50, 100, 250, 500, 1000, // < 1s
+			2500, 5000, 10000, 30_000,
+		},
+	})
+}
+
 func HistogramHTTPTLSHandshakeDuration(ctx context.Context, dur int64, opts HistogramOpt) {
 	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
 		PkgName:     opts.PkgName,
