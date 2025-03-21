@@ -69,7 +69,7 @@ func SecureDialer(o SecureDialerOpts) DialFunc {
 			return nil, fmt.Errorf("Unable to make request to %s at IP %s: accessing docker host", addr, host)
 		}
 
-		// Ensure that the current hostname is not
+		// Ensure that the current hostname is not a domain name.
 		addrs, err := net.DefaultResolver.LookupHost(ctx, host)
 		if err != nil {
 			return nil, err
@@ -94,7 +94,8 @@ func isDockerHost(host string) bool {
 }
 
 func isPrivateHost(host string) bool {
-	if host == "localhost" || host == "0.0.0.0" {
+	// fast path;  non-exhaustive for fast lookups.  Basic string matching.
+	if host == "localhost" || host == "0.0.0.0" || host == "localhost.localdomain" {
 		return true
 	}
 	ip := net.ParseIP(host)
@@ -105,7 +106,11 @@ func isPrivateHost(host string) bool {
 }
 
 func isPrivateIP(ip net.IP) bool {
-	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+	if ip.IsLoopback() ||
+		ip.IsUnspecified() ||
+		ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() ||
+		ip.IsMulticast() {
 		return true
 	}
 
@@ -114,6 +119,7 @@ func isPrivateIP(ip net.IP) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
