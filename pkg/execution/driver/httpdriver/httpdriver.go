@@ -288,6 +288,8 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 
 	if !r.SkipStats { // opt-out
 		go trackRequestStats(ctx, tracking)
+		statbyt, _ := json.Marshal(tracking)
+		resp.Header.Add("x-inngest-request-stats", string(statbyt))
 	}
 
 	// Handle no response errors.
