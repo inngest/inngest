@@ -117,6 +117,7 @@ export const RunDetailsV3 = (props: Props) => {
   const outputID = runRes?.data?.trace.outputID;
   const resultRes = useQuery({
     enabled: Boolean(outputID),
+    refetchInterval: pollInterval,
     queryKey: ['run-result', runID],
     queryFn: useCallback(() => {
       if (!outputID) {
@@ -205,9 +206,10 @@ export const RunDetailsV3 = (props: Props) => {
         </div>
 
         <div
-          className="border-muted flex flex-col justify-start overflow-hidden pt-2"
+          className="border-muted flex flex-col justify-start"
           style={{ width: `${100 - leftWidth}%`, height: standalone ? '85vh' : height }}
         >
+          <div className="sticky top-0"></div>
           {selectedStep && !selectedStep.trace.isRoot ? (
             <StepInfo selectedStep={selectedStep} />
           ) : (
