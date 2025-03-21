@@ -4,10 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math"
+
 	"github.com/google/uuid"
 	sqlc_sqlite "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
 	"github.com/oklog/ulid/v2"
-	"math"
 )
 
 func NewNormalized(db DBTX) sqlc_sqlite.Querier {
@@ -679,6 +680,14 @@ func (q NormalizedQueries) InsertTraceRun(ctx context.Context, span sqlc_sqlite.
 	}
 
 	return q.db.InsertTraceRun(ctx, pgSpan)
+}
+
+func (q NormalizedQueries) GetTraceRoot(ctx context.Context, traceID string) (*sqlc_sqlite.Trace, error) {
+	root, err := q.db.GetTraceRoot(ctx, traceID)
+	if err != nil {
+		return nil, err
+	}
+	return root.ToSQLite()
 }
 
 func (q NormalizedQueries) GetTraceSpans(ctx context.Context, arg sqlc_sqlite.GetTraceSpansParams) ([]*sqlc_sqlite.Trace, error) {
