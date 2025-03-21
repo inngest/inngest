@@ -112,6 +112,9 @@ type Request struct {
 	Input      []byte
 	Edge       inngest.Edge
 	Step       inngest.Step
+
+	// statter is a function added in testing, called with httpstat info
+	statter func(s *httpstat.Result)
 }
 
 // DoRequest executes the HTTP request with the given input.
@@ -275,6 +278,11 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 
 	// Perform the request.
 	resp, byt, dur, err := ExecuteRequest(ctx, c, req)
+	tracking.End(time.Now())
+
+	if r.statter != nil {
+		r.statter(tracking)
+	}
 
 	go trackRequestStats(ctx, tracking)
 
