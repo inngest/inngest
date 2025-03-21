@@ -49,12 +49,22 @@ type SecureDialerOpts struct {
 	AllowHostDocker bool
 	AllowPrivate    bool
 	AllowNAT64      bool
-	Log             bool
+
+	// log is used in testing.
+	log bool
+	// dial is a function used to actually dial, allowed to override in testing
+	// for success.
+	dial DialFunc
 }
 
 type DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error)
 
 func SecureDialer(o SecureDialerOpts) DialFunc {
+	if o.dial == nil {
+		// Always use the default dialer.  Only allow overrides in testing.
+		o.dial = dialer.DialContext
+	}
+
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
 		// network will be one of the well defined networks as per
 		// https://pkg.go.dev/net#Dial, eg "tcp", "tcp4", "tcp6", etc.
@@ -78,7 +88,7 @@ func SecureDialer(o SecureDialerOpts) DialFunc {
 			return nil, err
 		}
 
-		if o.Log {
+		if o.log {
 			logger.StdlibLogger(ctx).Info("domain resolved",
 				"address", addr,
 				"hosts", addrs,
@@ -95,7 +105,7 @@ func SecureDialer(o SecureDialerOpts) DialFunc {
 		}
 
 		// Return the default dialer in the http package
-		return dialer.DialContext(ctx, network, addr)
+		return o.dial(ctx, network, addr)
 	}
 }
 

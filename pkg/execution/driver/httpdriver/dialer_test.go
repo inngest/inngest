@@ -1,7 +1,9 @@
 package httpdriver
 
 import (
+	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"testing"
 	"time"
@@ -12,7 +14,7 @@ import (
 func TestSecureDialer(t *testing.T) {
 	client := func(dial DialFunc) http.Client {
 		return http.Client{
-			Timeout: 50 * time.Millisecond,
+			Timeout: 500 * time.Millisecond,
 			Transport: &http.Transport{
 				DialContext: dial,
 			},
@@ -21,7 +23,11 @@ func TestSecureDialer(t *testing.T) {
 
 	t.Run("host.docker.internal", func(t *testing.T) {
 		t.Run("disabled", func(t *testing.T) {
-			c := client(SecureDialer(SecureDialerOpts{}))
+			c := client(SecureDialer(SecureDialerOpts{
+				dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
+					panic("should not resolve!")
+				},
+			}))
 			r, err := c.Get("http://host.docker.internal")
 			require.Nil(t, r)
 			require.NotNil(t, err)
@@ -29,6 +35,9 @@ func TestSecureDialer(t *testing.T) {
 
 			c = client(SecureDialer(SecureDialerOpts{
 				AllowHostDocker: false,
+				dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
+					panic("should not resolve!")
+				},
 			}))
 			r, err = c.Get("http://host.docker.internal")
 			require.Nil(t, r)
@@ -64,10 +73,12 @@ func TestSecureDialer(t *testing.T) {
 		}
 
 		for _, h := range hosts {
-
 			t.Run(fmt.Sprintf("disabled: %s", h), func(t *testing.T) {
 				c := client(SecureDialer(SecureDialerOpts{
-					Log: true,
+					log: true,
+					dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
+						panic("should not resolve!")
+					},
 				}))
 				r, err := c.Get(fmt.Sprintf("http://%s", h))
 				require.Nil(t, r)
@@ -76,6 +87,9 @@ func TestSecureDialer(t *testing.T) {
 
 				c = client(SecureDialer(SecureDialerOpts{
 					AllowPrivate: false,
+					dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
+						panic("should not resolve!")
+					},
 				}))
 				r, err = c.Get(fmt.Sprintf("http://%s", h))
 				require.Nil(t, r)
@@ -86,7 +100,11 @@ func TestSecureDialer(t *testing.T) {
 			t.Run(fmt.Sprintf("enabled: %s", h), func(t *testing.T) {
 				c := client(SecureDialer(SecureDialerOpts{
 					AllowPrivate: true,
-					Log:          true,
+					log:          true,
+					dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
+						// do nothing.
+						return nil, nil
+					},
 				}))
 				_, err := c.Get(fmt.Sprintf("http://%s", h))
 
@@ -109,7 +127,11 @@ func TestSecureDialer(t *testing.T) {
 		for _, h := range hosts {
 
 			t.Run(fmt.Sprintf("disabled: %s", h), func(t *testing.T) {
-				c := client(SecureDialer(SecureDialerOpts{}))
+				c := client(SecureDialer(SecureDialerOpts{
+					dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
+						panic("should not resolve!")
+					},
+				}))
 				r, err := c.Get(fmt.Sprintf("http://%s", h))
 				require.Nil(t, r)
 				require.NotNil(t, err)
@@ -117,6 +139,9 @@ func TestSecureDialer(t *testing.T) {
 
 				c = client(SecureDialer(SecureDialerOpts{
 					AllowNAT64: false,
+					dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
+						panic("should not resolve!")
+					},
 				}))
 				r, err = c.Get(fmt.Sprintf("http://%s", h))
 				require.Nil(t, r)
@@ -127,6 +152,9 @@ func TestSecureDialer(t *testing.T) {
 			t.Run(fmt.Sprintf("enabled: %s", h), func(t *testing.T) {
 				c := client(SecureDialer(SecureDialerOpts{
 					AllowNAT64: true,
+					dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
+						return nil, nil
+					},
 				}))
 				_, err := c.Get(fmt.Sprintf("http://%s", h))
 
