@@ -113,6 +113,8 @@ type Request struct {
 	Edge       inngest.Edge
 	Step       inngest.Step
 
+	// SkipStats prevents statistics from being tracked.
+	SkipStats bool
 	// statter is a function added in testing, called with httpstat info
 	statter func(s *httpstat.Result)
 }
@@ -284,7 +286,9 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 		r.statter(tracking)
 	}
 
-	go trackRequestStats(ctx, tracking)
+	if !r.SkipStats { // opt-out
+		go trackRequestStats(ctx, tracking)
+	}
 
 	// Handle no response errors.
 	if errors.Is(err, ErrUnableToReach) {

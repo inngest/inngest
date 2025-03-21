@@ -194,7 +194,7 @@ func HistogramHTTPTLSHandshakeDuration(ctx context.Context, dur int64, opts Hist
 		Unit:        "ms",
 		Boundaries: []float64{
 			5, 10, 25, 50, 100, 250, 500, 1000, // < 1s
-			2500, 5000, 10000,
+			2500, 5000, 10000, 30_000,
 		},
 	})
 }
@@ -208,7 +208,8 @@ func HistogramHTTPServerProcessingDuration(ctx context.Context, dur int64, opts 
 		Unit:        "ms",
 		Boundaries: []float64{
 			5, 10, 25, 50, 100, 250, 500, 1000, // < 1s
-			2500, 5000, 10000,
+			5000, 10000, 30_000, 60_000, 120_000,
+			300_000, 900_000, 1_800_000, // 5m, 15m, 30m
 		},
 	})
 }
