@@ -52,7 +52,7 @@ func TestSecureDialer(t *testing.T) {
 	t.Run("private ipv4/ipv6", func(t *testing.T) {
 		hosts := []string{
 			"localhost",
-			"localtest.me", // public to 127.0.0.1
+			"fbi.com", // public to 127.0.0.1
 			"0.0.0.0",
 			"127.0.0.1",
 			"10.1.1.1",
