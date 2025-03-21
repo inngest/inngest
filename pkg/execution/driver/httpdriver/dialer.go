@@ -79,7 +79,7 @@ func SecureDialer(o SecureDialerOpts) DialFunc {
 		}
 
 		if o.Log {
-			logger.StdlibLogger(ctx).Debug("domain resolved",
+			logger.StdlibLogger(ctx).Info("domain resolved",
 				"address", addr,
 				"hosts", addrs,
 			)
