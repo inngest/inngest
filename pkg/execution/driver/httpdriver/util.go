@@ -32,6 +32,7 @@ var (
 	ErrUnexpectedEnd        = fmt.Errorf("Your server reset the connection while we were reading the reply: Unexpected EOF ending response")
 	ErrInvalidEmptyResponse = fmt.Errorf("Error performing request to SDK URL")
 	ErrBodyTooLarge         = fmt.Errorf("http response size is greater than the limit")
+	ErrTLSHandshakeTImeout  = fmt.Errorf("Your server didn't complete the TLS handshake in time")
 )
 
 // ExecuteRequest executes an HTTP request.  This returns the HTTP response, the body (limited by
