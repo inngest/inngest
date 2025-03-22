@@ -139,7 +139,7 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
 
   return (
-    <div className="flex h-full flex-col justify-start gap-2">
+    <div className="sticky top-14 flex flex-col justify-start gap-2 overflow-hidden">
       <div className="flex h-11 w-full flex-row items-center justify-between border-none px-4">
         <div
           className="text-basis flex cursor-pointer items-center justify-start gap-2"
@@ -209,7 +209,7 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
         </div>
       )}
 
-      <div className="min-h-full">
+      <div className="">
         <Tabs
           defaultActive={result?.error ? 'error' : prettyInput ? 'input' : 'output'}
           tabs={[
