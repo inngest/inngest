@@ -117,6 +117,7 @@ export const RunDetailsV3 = (props: Props) => {
   const outputID = runRes?.data?.trace.outputID;
   const resultRes = useQuery({
     enabled: Boolean(outputID),
+    refetchInterval: pollInterval,
     queryKey: ['run-result', runID],
     queryFn: useCallback(() => {
       if (!outputID) {
