@@ -52,7 +52,9 @@ export type Account = {
   appliedAddons: AppliedAddons;
   billingEmail: Scalars['String'];
   createdAt: Scalars['Time'];
+  datadogConnections: Array<DatadogConnectionStatus>;
   datadogIntegrations: Array<DatadogIntegration>;
+  datadogOrganizations: Array<DatadogOrganization>;
   entitlementUsage: EntitlementUsage;
   entitlements: Entitlements;
   id: Scalars['ID'];
@@ -465,6 +467,19 @@ export type CreateVercelAppResponse = {
   success: Scalars['Boolean'];
 };
 
+export type DatadogConnectionStatus = {
+  __typename?: 'DatadogConnectionStatus';
+  accountID: Scalars['UUID'];
+  datadogOrgName: Scalars['String'];
+  datadogOrganization: Scalars['UUID'];
+  envID: Scalars['UUID'];
+  envName: Scalars['String'];
+  healthy: Scalars['Boolean'];
+  id: Scalars['UUID'];
+  lastErrorMessage: Maybe<Scalars['String']>;
+  lastSentAt: Maybe<Scalars['Time']>;
+};
+
 export type DatadogIntegration = {
   __typename?: 'DatadogIntegration';
   accountID: Scalars['UUID'];
@@ -492,6 +507,18 @@ export type DatadogIntegrationSetupResponse = {
   __typename?: 'DatadogIntegrationSetupResponse';
   error: Maybe<Scalars['String']>;
   integration: Maybe<DatadogIntegration>;
+};
+
+export type DatadogOrganization = {
+  __typename?: 'DatadogOrganization';
+  accountID: Scalars['UUID'];
+  createdAt: Scalars['Time'];
+  datadogDomain: Scalars['String'];
+  datadogOrgName: Maybe<Scalars['String']>;
+  datadogSite: Scalars['String'];
+  id: Scalars['UUID'];
+  setupComplete: Scalars['Boolean'];
+  updatedAt: Scalars['Time'];
 };
 
 export type DebounceConfiguration = {
@@ -994,15 +1021,20 @@ export type Mutation = {
   createUser: Maybe<CreateUserPayload>;
   createVercelApp: Maybe<CreateVercelAppResponse>;
   createWorkspace: Array<Maybe<Workspace>>;
+  datadogOAuthCompleted: DatadogOrganization;
+  datadogOAuthRedirectURL: Scalars['String'];
   deleteCancellation: Scalars['ULID'];
   deleteIngestKey: Maybe<DeleteResponse>;
   deleteSigningKey: SigningKey;
+  disableDatadogConnection: Scalars['UUID'];
   disableEnvironmentAutoArchive: Workspace;
   editWorkflow: Maybe<WorkflowVersionResponse>;
+  enableDatadogConnection: DatadogConnectionStatus;
   enableEnvironmentAutoArchive: Workspace;
   invokeFunction: Maybe<Scalars['Boolean']>;
   pauseFunction: Workflow;
   removeDatadogIntegration: Maybe<DatadogIntegrationRemoveResponse>;
+  removeDatadogOrganization: Scalars['UUID'];
   removeVercelApp: Maybe<RemoveVercelAppResponse>;
   rerun: Scalars['ULID'];
   resyncApp: SyncResponse;
@@ -1127,6 +1159,18 @@ export type MutationCreateWorkspaceArgs = {
 };
 
 
+export type MutationDatadogOAuthCompletedArgs = {
+  authCode: Scalars['String'];
+  orgName: Scalars['String'];
+};
+
+
+export type MutationDatadogOAuthRedirectUrlArgs = {
+  ddDomain: Scalars['String'];
+  ddSite: Scalars['String'];
+};
+
+
 export type MutationDeleteCancellationArgs = {
   cancellationID: Scalars['ULID'];
   envID: Scalars['UUID'];
@@ -1143,6 +1187,11 @@ export type MutationDeleteSigningKeyArgs = {
 };
 
 
+export type MutationDisableDatadogConnectionArgs = {
+  connectionID: Scalars['UUID'];
+};
+
+
 export type MutationDisableEnvironmentAutoArchiveArgs = {
   id: Scalars['ID'];
 };
@@ -1150,6 +1199,12 @@ export type MutationDisableEnvironmentAutoArchiveArgs = {
 
 export type MutationEditWorkflowArgs = {
   input: EditWorkflowInput;
+};
+
+
+export type MutationEnableDatadogConnectionArgs = {
+  datadogOrganizationID: Scalars['UUID'];
+  envID: Scalars['UUID'];
 };
 
 
@@ -1174,6 +1229,11 @@ export type MutationPauseFunctionArgs = {
 
 export type MutationRemoveDatadogIntegrationArgs = {
   integrationID: Scalars['UUID'];
+};
+
+
+export type MutationRemoveDatadogOrganizationArgs = {
+  datadogOrganizationID: Scalars['UUID'];
 };
 
 
@@ -2891,6 +2951,14 @@ export type RemoveDatadogIntegrationMutationVariables = Exact<{
 
 export type RemoveDatadogIntegrationMutation = { __typename?: 'Mutation', removeDatadogIntegration: { __typename?: 'DatadogIntegrationRemoveResponse', removedIntegrationID: string, removedIntegrationEnvID: string } | null };
 
+export type StartDatadogIntegrationMutationVariables = Exact<{
+  ddSite: Scalars['String'];
+  ddDomain: Scalars['String'];
+}>;
+
+
+export type StartDatadogIntegrationMutation = { __typename?: 'Mutation', datadogOAuthRedirectURL: string };
+
 export type ArchiveEnvironmentMutationVariables = Exact<{
   id: Scalars['ID'];
 }>;
@@ -3442,6 +3510,7 @@ export const GetDatadogIntegrationDocument = {"kind":"Document","definitions":[{
 export const ListDatadogIntegrationsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ListDatadogIntegrations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"datadogIntegrations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"accountID"}},{"kind":"Field","name":{"kind":"Name","value":"envID"}},{"kind":"Field","name":{"kind":"Name","value":"datadogSite"}},{"kind":"Field","name":{"kind":"Name","value":"appKey"}},{"kind":"Field","name":{"kind":"Name","value":"appKeyUpdatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"apiKey"}},{"kind":"Field","name":{"kind":"Name","value":"apiKeyUpdatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"lastSentAt"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"statusOk"}},{"kind":"Field","name":{"kind":"Name","value":"error"}}]}}]}}]}}]} as unknown as DocumentNode<ListDatadogIntegrationsQuery, ListDatadogIntegrationsQueryVariables>;
 export const SetupDatadogIntegrationDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SetupDatadogIntegration"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UUID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"apiKey"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"appKey"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"ddSite"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"setupDatadogIntegration"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"envID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}}},{"kind":"Argument","name":{"kind":"Name","value":"apiKey"},"value":{"kind":"Variable","name":{"kind":"Name","value":"apiKey"}}},{"kind":"Argument","name":{"kind":"Name","value":"appKey"},"value":{"kind":"Variable","name":{"kind":"Name","value":"appKey"}}},{"kind":"Argument","name":{"kind":"Name","value":"datadogSite"},"value":{"kind":"Variable","name":{"kind":"Name","value":"ddSite"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"integration"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}},{"kind":"Field","name":{"kind":"Name","value":"error"}}]}}]}}]} as unknown as DocumentNode<SetupDatadogIntegrationMutation, SetupDatadogIntegrationMutationVariables>;
 export const RemoveDatadogIntegrationDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"RemoveDatadogIntegration"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"integrationID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UUID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"removeDatadogIntegration"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"integrationID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"integrationID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"removedIntegrationID"}},{"kind":"Field","name":{"kind":"Name","value":"removedIntegrationEnvID"}}]}}]}}]} as unknown as DocumentNode<RemoveDatadogIntegrationMutation, RemoveDatadogIntegrationMutationVariables>;
+export const StartDatadogIntegrationDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"StartDatadogIntegration"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"ddSite"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"ddDomain"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"datadogOAuthRedirectURL"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"ddSite"},"value":{"kind":"Variable","name":{"kind":"Name","value":"ddSite"}}},{"kind":"Argument","name":{"kind":"Name","value":"ddDomain"},"value":{"kind":"Variable","name":{"kind":"Name","value":"ddDomain"}}}]}]}}]} as unknown as DocumentNode<StartDatadogIntegrationMutation, StartDatadogIntegrationMutationVariables>;
 export const ArchiveEnvironmentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ArchiveEnvironment"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"archiveEnvironment"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<ArchiveEnvironmentMutation, ArchiveEnvironmentMutationVariables>;
 export const UnarchiveEnvironmentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UnarchiveEnvironment"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"unarchiveEnvironment"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<UnarchiveEnvironmentMutation, UnarchiveEnvironmentMutationVariables>;
 export const DisableEnvironmentAutoArchiveDocumentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DisableEnvironmentAutoArchiveDocument"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"disableEnvironmentAutoArchive"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DisableEnvironmentAutoArchiveDocumentMutation, DisableEnvironmentAutoArchiveDocumentMutationVariables>;
