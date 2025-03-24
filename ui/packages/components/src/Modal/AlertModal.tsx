@@ -69,11 +69,11 @@ export function AlertModal({
               <AlertDialog.Content
                 className={cn(
                   className,
-                  'bg-canvasBase text-basis transform overflow-hidden rounded-md shadow-xl transition-all'
+                  'bg-modalBase text-basis transform overflow-hidden rounded-md shadow-xl transition-all'
                 )}
               >
                 {(title || description) && (
-                  <div className="border-subtle bg-canvasBase border-b p-6">
+                  <div className="border-subtle bg-modalBase border-b p-6">
                     <AlertDialog.Title className="text-basis text-xl font-semibold">
                       {title}
                     </AlertDialog.Title>
