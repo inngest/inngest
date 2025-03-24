@@ -62,7 +62,7 @@ export function Modal({
                 <Dialog.Content
                   className={cn(
                     className,
-                    'bg-canvasBase shadow-tooltip border-subtle max-h-full overflow-y-auto overflow-x-hidden rounded-md border shadow-2xl'
+                    'bg-modalBase shadow-tooltip border-subtle max-h-full overflow-y-auto overflow-x-hidden rounded-md border shadow-2xl'
                   )}
                 >
                   {(title || description) && <Header description={description}>{title}</Header>}
@@ -91,7 +91,7 @@ function Header({
   description,
 }: React.PropsWithChildren<{ description?: React.ReactNode }>) {
   return (
-    <div className="bg-canvasBase border-subtle border-b p-6">
+    <div className="bg-modalBase border-subtle border-b p-6">
       <Dialog.Title className="text-basis text-xl">{children}</Dialog.Title>
 
       {description && (
