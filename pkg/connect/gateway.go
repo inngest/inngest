@@ -202,7 +202,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				go l.OnStartDraining(context.Background(), conn)
 			}
 
-			closeReason = "gateway-draining"
+			closeReason = connect.WorkerDisconnectReason_GATEWAY_DRAINING.String()
 
 			// Close WS connection once worker established another connection
 			defer func() {
@@ -342,15 +342,26 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 						// If client connection closed unexpectedly, we should store the reason, if set.
 						// If the reason is set, it may have been an intentional close, so the connection
 						// may not be re-established.
+						// Workers should always close with code: 1000 and reason: WORKER_SHUTDOWN.
 						closeReasonLock.Lock()
-						closeReason = closeErr.Reason
+						if closeErr.Reason != "" {
+							closeReason = closeErr.Reason
+						} else {
+							closeReason = connect.WorkerDisconnectReason_UNEXPECTED.String()
+						}
 						closeReasonLock.Unlock()
-						return closeErr
+
+						// Do not return an error. We already capture the close reason above.
+						return nil
 					}
 
 					// connection was closed (this may not be expected but should not be logged as an error)
 					// this is expected when the gateway is draining
 					if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
+						closeReasonLock.Lock()
+						closeReason = connect.WorkerDisconnectReason_UNEXPECTED.String()
+						closeReasonLock.Unlock()
+
 						return nil
 					}
 

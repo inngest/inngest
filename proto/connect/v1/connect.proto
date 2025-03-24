@@ -156,6 +156,8 @@ message ConnGroup {
 
 enum WorkerDisconnectReason {
 	WORKER_SHUTDOWN = 0;
+	UNEXPECTED = 1;
+	GATEWAY_DRAINING = 2;
 }
 
 message StartResponse {
