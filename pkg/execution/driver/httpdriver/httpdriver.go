@@ -34,7 +34,11 @@ var (
 	dialer = &net.Dialer{KeepAlive: 15 * time.Second}
 
 	DefaultTransport = &http.Transport{
-		DialContext:           dialer.DialContext,
+		DialContext: SecureDialer(SecureDialerOpts{
+			AllowHostDocker: false,
+			AllowPrivate:    false,
+			AllowNAT64:      false,
+		}),
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          5,
 		IdleConnTimeout:       2 * time.Second,
