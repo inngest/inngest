@@ -240,6 +240,9 @@ export default {
         'slide-right-and-fade': 'slide-right-and-fade 400ms cubic-bezier(0.16, 1, 0.3, 1)',
         underline: 'underline 2s linear infinite',
       },
+      spacing: {
+        'cmdk-margin': 'calc((100vh - (84.5px + 330px)) / 2)',
+      },
     },
   },
   // eslint-disable-next-line @typescript-eslint/no-require-imports
