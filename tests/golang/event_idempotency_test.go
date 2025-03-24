@@ -30,7 +30,7 @@ func TestEventIdempotency(t *testing.T) {
 	registerFuncs()
 
 	sendEvent := func(id string) {
-		_, err := inngestClient.Send(ctx, inngestgo.GenericEvent[any, any]{
+		_, err := inngestClient.Send(ctx, inngestgo.Event{
 			ID:   &id,
 			Name: "test",
 		})

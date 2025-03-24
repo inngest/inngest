@@ -23,6 +23,9 @@ import (
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/syscode"
 	sdkerrors "github.com/inngest/inngestgo/errors"
+	"github.com/inngest/inngestgo/internal"
+	"github.com/inngest/inngestgo/internal/event"
+	"github.com/inngest/inngestgo/internal/middleware"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"github.com/inngest/inngestgo/internal/types"
 	"github.com/inngest/inngestgo/step"
@@ -135,14 +138,14 @@ func (h handlerOpts) GetSigningKeyFallback() string {
 
 // GetAPIOrigin returns the host to use for sending API requests
 func (h handlerOpts) GetAPIBaseURL() string {
-	if h.isDev() {
-		return DevServerURL()
-	}
-
 	if h.APIBaseURL == nil {
 		base := os.Getenv("INNGEST_API_BASE_URL")
 		if base != "" {
 			return base
+		}
+
+		if h.isDev() {
+			return DevServerURL()
 		}
 
 		return defaultAPIOrigin
@@ -798,6 +801,12 @@ func createFunctionConfigs(
 // invoke handles incoming POST calls to invoke a function, delegating to invoke() after validating
 // the request.
 func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
+	cImpl, ok := h.client.(*apiClient)
+	if !ok {
+		return errors.New("invalid client type")
+	}
+	mw := middleware.NewMiddlewareManager().Add(cImpl.Middleware...)
+
 	var sig string
 	defer r.Body.Close()
 
@@ -883,7 +892,15 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	// Invoke the function, then immediately stop the streaming buffer.
-	resp, ops, err := invoke(r.Context(), fn, h.GetSigningKey(), request, stepID)
+	resp, ops, err := invoke(
+		r.Context(),
+		h.client,
+		mw,
+		fn,
+		h.GetSigningKey(),
+		request,
+		stepID,
+	)
 	streamCancel()
 
 	// NOTE: When triggering step errors, we should have an OpcodeStepError
@@ -1212,8 +1229,10 @@ type StreamResponse struct {
 // be fully typed.
 func invoke(
 	ctx context.Context,
+	client Client,
+	mw *middleware.MiddlewareManager,
 	sf ServableFunction,
-	signignKey string,
+	signingKey string,
 	input *sdkrequest.Request,
 	stepID *string,
 ) (any, []state.GeneratorOpcode, error) {
@@ -1226,13 +1245,18 @@ func invoke(
 	// Create a new context.  This context is cancellable and stores the opcode that ran
 	// within a step.  This allows us to prevent any execution of future tools after a
 	// tool has run.
-	fCtx, cancel := context.WithCancel(context.Background())
+	fCtx, cancel := context.WithCancel(
+		internal.ContextWithMiddlewareManager(
+			internal.ContextWithEventSender(ctx, client),
+			mw,
+		),
+	)
 	if stepID != nil {
 		fCtx = step.SetTargetStepID(fCtx, *stepID)
 	}
 
 	// This must be a pointer so that it can be mutated from within function tools.
-	mgr := sdkrequest.NewManager(cancel, input, signignKey)
+	mgr := sdkrequest.NewManager(sf, mw, cancel, input, signingKey)
 	fCtx = sdkrequest.SetManager(fCtx, mgr)
 
 	// Create a new Input type.  We don't know ahead of time the type signature as
@@ -1241,53 +1265,13 @@ func invoke(
 	fVal := reflect.ValueOf(sf.Func())
 	inputVal := reflect.New(fVal.Type().In(1)).Elem()
 
-	// If we have an actual value to add to the event, vs `Input[any]`, set it.
-	if sf.ZeroEvent() != nil {
-		eventType := reflect.TypeOf(sf.ZeroEvent())
-
-		// Create a new copy of the event.
-		evtPtr := reflect.New(eventType).Interface()
-		if err := json.Unmarshal(input.Event, evtPtr); err != nil {
-			return nil, nil, fmt.Errorf("error unmarshalling event for function: %w", err)
-		}
-		evt := reflect.ValueOf(evtPtr).Elem()
-		inputVal.FieldByName("Event").Set(evt)
-
-		// events
-		sliceType := reflect.SliceOf(eventType)
-		evtList := reflect.MakeSlice(sliceType, 0, len(input.Events))
-
-		for _, rawjson := range input.Events {
-			newEvent := reflect.New(eventType).Interface()
-
-			if err := json.Unmarshal(rawjson, &newEvent); err != nil {
-				return nil, nil, fmt.Errorf("non-zero event: error unmarshalling event in event list: %w", err)
-			}
-
-			evtList = reflect.Append(evtList, reflect.ValueOf(newEvent).Elem())
-		}
-		inputVal.FieldByName("Events").Set(evtList)
-	} else {
-		// Use a raw map to hold the input.
-		val := map[string]any{}
-		if err := json.Unmarshal(input.Event, &val); err != nil {
-			return nil, nil, fmt.Errorf("error unmarshalling event for function: %w", err)
-		}
-		inputVal.FieldByName("Event").Set(reflect.ValueOf(val))
-
-		// events
-		events := make([]any, len(input.Events))
-		for i, rawjson := range input.Events {
-			var val map[string]any
-
-			if err := json.Unmarshal(rawjson, &val); err != nil {
-				return nil, nil, fmt.Errorf("zero event: error unmarshalling event in event list: %w", err)
-			}
-
-			events[i] = val
-		}
-		inputVal.FieldByName("Events").Set(reflect.ValueOf(events))
-	}
+	updateInput(
+		mgr,
+		sf,
+		inputVal,
+		input.Event,
+		types.ToAnySlice(input.Events),
+	)
 
 	// Set InputCtx
 	callCtx := InputCtx{
@@ -1300,48 +1284,217 @@ func invoke(
 	inputVal.FieldByName("InputCtx").Set(reflect.ValueOf(callCtx))
 
 	var (
-		res       []reflect.Value
-		panickErr error
+		res      []reflect.Value
+		panicErr error
+
+		// fnResponse is the actual response from the fn
+		fnResponse any
+		// fnError is the actual error from the fn.
+		fnError error
 	)
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
+				callCtx := mgr.MiddlewareCallCtx()
+
 				// Was this us attepmting to prevent functions from continuing, using
 				// panic as a crappy control flow because go doesn't have generators?
 				//
 				// XXX: I'm not very happy with using this;  it is dirty
 				if _, ok := r.(step.ControlHijack); ok {
+					// Step attempt ended (completed or errored).
+					//
+					// Note that if this is a step.Run, middleware has already been invoked
+					// via step.Run and this is skipped due to idempotency in the middleware manager.
+					// Because this isn't a step.Run, it's safe to call this with nil data and error.
+					mw.AfterExecution(ctx, callCtx, nil, nil)
 					return
 				}
-				stack := string(debug.Stack())
-				panickErr = fmt.Errorf("function panicked: %v.  stack:\n%s", r, stack)
+
+				panicStack := string(debug.Stack())
+				panicErr = fmt.Errorf("function panicked: %v.  stack:\n%s", r, panicStack)
+
+				mw.AfterExecution(ctx, callCtx, nil, nil)
+				mw.OnPanic(ctx, callCtx, r, panicStack)
 			}
 		}()
+
+		// Run the TransformInput middleware hook.
+		{
+			// Build TransformableInput.
+			var evt Event
+			_ = json.Unmarshal(input.Event, &evt)
+			evts := make([]*event.Event, len(input.Events))
+			for i, rawjson := range input.Events {
+				var evt event.Event
+				if err := json.Unmarshal(rawjson, &evt); err != nil {
+					mgr.SetErr(fmt.Errorf("error unmarshalling event for function: %w", err))
+					panic(step.ControlHijack{})
+				}
+				evts[i] = &evt
+			}
+			mwInput := &middleware.TransformableInput{
+				Event:  &evt,
+				Events: evts,
+			}
+			mwInput.WithContext(fCtx)
+
+			// Run hook.
+			mw.TransformInput(ctx, mgr.MiddlewareCallCtx(), mwInput)
+
+			// Update the context in case the hook changed it.
+			fCtx = mwInput.Context()
+
+			// Update the input we're passing to the Inngest function.
+			updateInput(
+				mgr,
+				sf,
+				inputVal,
+				mwInput.Event,
+				types.ToAnySlice(mwInput.Events),
+			)
+		}
+
+		if len(input.Steps) == 0 {
+			// There are no memoized steps, so the start of the function is "new
+			// code".
+			mw.BeforeExecution(fCtx, mgr.MiddlewareCallCtx())
+		}
 
 		// Call the defined function with the input data.
 		res = fVal.Call([]reflect.Value{
 			reflect.ValueOf(fCtx),
 			inputVal,
 		})
+
+		// Set the function response.
+		if len(res) >= 1 {
+			fnResponse = res[0].Interface()
+		}
+
+		// Function ended.  Get the types for the middleare call.
+		if len(res) >= 2 && !res[1].IsNil() {
+			fnError = res[1].Interface().(error)
+		}
+
+		mw.AfterExecution(ctx, mgr.MiddlewareCallCtx(), fnResponse, fnError)
+
+		{
+			// Transform output via MW
+			out := &middleware.TransformableOutput{
+				Result: fnResponse,
+				Error:  fnError,
+			}
+			mw.TransformOutput(ctx, mgr.MiddlewareCallCtx(), out)
+			// And update the vars
+			fnResponse = out.Result
+			fnError = out.Error
+		}
 	}()
 
-	var err error
-	if panickErr != nil {
-		err = panickErr
+	// Override errors here.
+	if panicErr != nil {
+		fnError = panicErr
 	} else if mgr.Err() != nil {
 		// This is higher precedence than a return error.
-		err = mgr.Err()
-	} else if res != nil && !res[1].IsNil() {
-		// The function returned an error.
-		err = res[1].Interface().(error)
+		fnError = mgr.Err()
 	}
 
-	var response any
-	if res != nil {
-		// Panicking in tools interferes with grabbing the response;  it's always
-		// an empty array if tools panic to hijack control flow.
-		response = res[0].Interface()
-	}
+	return fnResponse, mgr.Ops(), fnError
+}
 
-	return response, mgr.Ops(), err
+// updateInput applies the middleware input to the function input.
+func updateInput(
+	mgr sdkrequest.InvocationManager,
+	fn ServableFunction,
+	fnInput reflect.Value,
+	// mwInput *middleware.TransformableInput,
+	event any,
+	events []any,
+) {
+	// If we have an actual value to add to the event, vs `Input[any]`, set it.
+	if fn.ZeroEvent() != nil {
+		eventType := reflect.TypeOf(fn.ZeroEvent())
+
+		// Apply event.
+		{
+			// byt, err := json.Marshal(mwInput.Event)
+			byt, err := json.Marshal(event)
+			if err != nil {
+				mgr.SetErr(fmt.Errorf("error marshalling event for function: %w", err))
+				panic(step.ControlHijack{})
+			}
+
+			// The same type as the event.
+			newEvent := reflect.New(eventType).Interface()
+
+			if err := json.Unmarshal(byt, newEvent); err != nil {
+				mgr.SetErr(fmt.Errorf("error unmarshalling event for function: %w", err))
+				panic(step.ControlHijack{})
+			}
+			fnInput.FieldByName("Event").Set(reflect.ValueOf(newEvent).Elem())
+		}
+
+		// Apply events.
+		{
+			eventsType := reflect.SliceOf(eventType)
+			newEvents := reflect.MakeSlice(eventsType, 0, len(events))
+			for _, evt := range events {
+				// events := reflect.MakeSlice(eventsType, 0, len(mwInput.Events))
+				// for _, evt := range mwInput.Events {
+				byt, err := json.Marshal(evt)
+				if err != nil {
+					mgr.SetErr(fmt.Errorf("error marshalling event for function: %w", err))
+					panic(step.ControlHijack{})
+				}
+
+				// The same type as the event.
+				newEvent := reflect.New(eventType).Interface()
+				if err := json.Unmarshal(byt, newEvent); err != nil {
+					mgr.SetErr(fmt.Errorf("error unmarshalling event for function: %w", err))
+					panic(step.ControlHijack{})
+				}
+
+				newEvents = reflect.Append(newEvents, reflect.ValueOf(newEvent).Elem())
+			}
+			fnInput.FieldByName("Events").Set(newEvents)
+		}
+	} else {
+		// Apply event.
+		{
+			byt, err := json.Marshal(event)
+			if err != nil {
+				mgr.SetErr(fmt.Errorf("error marshalling event for function: %w", err))
+				panic(step.ControlHijack{})
+			}
+
+			newEvent := map[string]any{}
+			if err := json.Unmarshal(byt, &newEvent); err != nil {
+				mgr.SetErr(fmt.Errorf("error unmarshalling event for function: %w", err))
+				panic(step.ControlHijack{})
+			}
+			fnInput.FieldByName("Event").Set(reflect.ValueOf(newEvent))
+		}
+
+		// Apply events.
+		{
+			newEvents := make([]any, len(events))
+			for i, evt := range events {
+				byt, err := json.Marshal(evt)
+				if err != nil {
+					mgr.SetErr(fmt.Errorf("error marshalling event for function: %w", err))
+					panic(step.ControlHijack{})
+				}
+
+				var newEvent map[string]any
+				if err := json.Unmarshal(byt, &newEvent); err != nil {
+					mgr.SetErr(fmt.Errorf("error unmarshalling event for function: %w", err))
+					panic(step.ControlHijack{})
+				}
+
+				newEvents[i] = newEvent
+			}
+			fnInput.FieldByName("Events").Set(reflect.ValueOf(newEvents))
+		}
+	}
 }

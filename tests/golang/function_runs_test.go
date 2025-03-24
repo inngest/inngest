@@ -20,7 +20,7 @@ type FnRunTestEvtData struct {
 	Success bool `json:"success"`
 	Index   int  `json:"idx"`
 }
-type FnRunTestEvt inngestgo.GenericEvent[FnRunTestEvtData, any]
+type FnRunTestEvt inngestgo.GenericEvent[FnRunTestEvtData]
 
 func TestFunctionRunList(t *testing.T) {
 	ctx := context.Background()
@@ -45,7 +45,7 @@ func TestFunctionRunList(t *testing.T) {
 			ID: "fn-run-ok",
 		},
 		inngestgo.EventTrigger(okEventName, nil),
-		func(ctx context.Context, input inngestgo.Input[FnRunTestEvt]) (any, error) {
+		func(ctx context.Context, input inngestgo.Input[FnRunTestEvtData]) (any, error) {
 			atomic.AddInt32(&ok, 1)
 			return map[string]any{"num": input.Event.Data.Index * 2}, nil
 		},

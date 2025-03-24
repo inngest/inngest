@@ -54,7 +54,7 @@ func WaitForEvent[T any](ctx context.Context, stepID string, opts WaitForEventOp
 	}
 
 	op := mgr.NewOp(enums.OpcodeWaitForEvent, stepID, args)
-	if val, ok := mgr.Step(op); ok {
+	if val, ok := mgr.Step(ctx, op); ok {
 		var output T
 		if val == nil || bytes.Equal(val, []byte{0x6e, 0x75, 0x6c, 0x6c}) {
 			return output, ErrEventNotReceived

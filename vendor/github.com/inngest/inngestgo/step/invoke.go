@@ -43,7 +43,7 @@ func Invoke[T any](ctx context.Context, id string, opts InvokeOpts) (T, error) {
 	}
 
 	op := mgr.NewOp(enums.OpcodeInvokeFunction, id, args)
-	if val, ok := mgr.Step(op); ok {
+	if val, ok := mgr.Step(ctx, op); ok {
 		var output T
 		var valMap map[string]json.RawMessage
 		if err := json.Unmarshal(val, &valMap); err != nil {

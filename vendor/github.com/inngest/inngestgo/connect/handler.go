@@ -5,6 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
+	"net/url"
+	"os"
+	"runtime"
+	"sync/atomic"
+	"time"
+
 	"github.com/coder/websocket"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/sdk"
@@ -13,13 +21,6 @@ import (
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"github.com/pbnjay/memory"
 	"golang.org/x/sync/errgroup"
-	"io"
-	"log/slog"
-	"net/url"
-	"os"
-	"runtime"
-	"sync/atomic"
-	"time"
 )
 
 const (
@@ -159,7 +160,7 @@ type authContext struct {
 
 func (h *connectHandler) Connect(ctx context.Context) (WorkerConnection, error) {
 	signingKey := h.opts.HashedSigningKey
-	if len(signingKey) == 0 {
+	if len(signingKey) == 0 && !h.opts.IsDev {
 		return nil, fmt.Errorf("hashed signing key is required")
 	}
 

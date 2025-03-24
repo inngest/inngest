@@ -11,13 +11,27 @@ type Result struct {
 	Value any
 }
 
+type Results []Result
+
+// AnyError returns an error if any of the results have an error.
+func (r Results) AnyError() error {
+	for _, result := range r {
+		if result.Error != nil {
+			return result.Error
+		}
+	}
+	return nil
+}
+
+// Parallel runs steps in parallel. Its arguments are callbacks that include
+// steps.
 func Parallel(
 	ctx context.Context,
-	fns ...func(ctx context.Context,
-	) (any, error)) []Result {
+	fns ...func(ctx context.Context) (any, error),
+) Results {
 	ctx = context.WithValue(ctx, step.ParallelKey, true)
 
-	results := []Result{}
+	results := Results{}
 	isPlanned := false
 	ch := make(chan struct{}, 1)
 	var unexpectedPanic any

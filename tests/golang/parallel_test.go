@@ -12,13 +12,11 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
-	"github.com/inngest/inngestgo/experimental/group"
+	"github.com/inngest/inngestgo/group"
 	"github.com/inngest/inngestgo/step"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-type parallelTestEvt inngestgo.GenericEvent[any, any]
 
 func TestParallelSteps(t *testing.T) {
 	ctx := context.Background()
@@ -38,7 +36,7 @@ func TestParallelSteps(t *testing.T) {
 			{Limit: 2, Scope: enums.ConcurrencyScopeFn},
 		}},
 		inngestgo.EventTrigger("test/parallel", nil),
-		func(ctx context.Context, input inngestgo.Input[parallelTestEvt]) (any, error) {
+		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			if runID == "" {
 				runID = input.InputCtx.RunID
 			}
