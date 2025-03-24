@@ -46,7 +46,7 @@ export function AlertModal({
         <AlertDialog.Portal container={container}>
           <AlertDialog.Overlay asChild>
             <div
-              className="fixed inset-0 z-[100] backdrop-blur backdrop-invert-[10%] transition-opacity"
+              className="bg-overlay/20 dark:bg-overlay/50 fixed inset-0 z-[100] transition-opacity"
               aria-hidden="true"
             />
           </AlertDialog.Overlay>

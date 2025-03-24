@@ -109,6 +109,7 @@ export default {
         surfaceSubtle: 'rgb(var(--color-background-surface-subtle) / <alpha-value>)',
         surfaceMuted: 'rgb(var(--color-background-surface-muted) / <alpha-value>)',
         modalBase: 'rgb(var(--color-background-modal-base) / <alpha-value>)',
+        overlay: 'rgb(var(--color-background-overlay) / <alpha-value>)',
         disabled: 'rgb(var(--color-background-disabled) / <alpha-value>)',
         alwaysWhite: 'rgb(var(--color-foreground-alwaysWhite) / <alpha-value>)',
         contrast: 'rgb(var(--color-background-contrast) / <alpha-value>)',

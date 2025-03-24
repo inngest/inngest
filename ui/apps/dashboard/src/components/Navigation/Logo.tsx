@@ -41,6 +41,7 @@ const NavToggle = ({
     <Button
       kind="primary"
       appearance="ghost"
+      size="small"
       onClick={toggle}
       className={'hidden group-hover:block'}
       icon={
@@ -75,7 +76,7 @@ export default function Logo({
         ) : (
           <>
             <NextLink href={process.env.NEXT_PUBLIC_HOME_PATH as Route} scroll={false}>
-              <InngestLogo className="text-basis mr-2" width={92} />
+              <InngestLogo className="text-basis mr-2 mt-1" width={82} />
             </NextLink>
           </>
         )}
