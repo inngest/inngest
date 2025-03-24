@@ -48,11 +48,13 @@ export function Trace({ depth, getResult, maxTime, minTime, pathCreator, trace, 
       : [trace];
 
   //
-  // Don't show finalization for single trace timelines
+  // Don't show single finalization step for successful runs
+  // unless they have children (e.g. failed attempts)
   const hasChildren =
     depth === 0 &&
     trace.childrenSpans?.length === 1 &&
-    trace.childrenSpans[0]?.name === FINAL_SPAN_NAME
+    trace.childrenSpans[0]?.name === FINAL_SPAN_NAME &&
+    (trace.childrenSpans[0]?.childrenSpans?.length ?? 0) == 0
       ? false
       : (trace.childrenSpans?.length ?? 0) > 0;
 
