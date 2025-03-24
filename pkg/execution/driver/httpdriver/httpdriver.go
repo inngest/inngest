@@ -112,6 +112,11 @@ type Request struct {
 	Input      []byte
 	Edge       inngest.Edge
 	Step       inngest.Step
+
+	// SkipStats prevents statistics from being tracked.
+	SkipStats bool
+	// statter is a function added in testing, called with httpstat info
+	statter func(s *httpstat.Result)
 }
 
 // DoRequest executes the HTTP request with the given input.
@@ -275,8 +280,19 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 
 	// Perform the request.
 	resp, byt, dur, err := ExecuteRequest(ctx, c, req)
+	tracking.End(time.Now())
 
-	go trackRequestStats(ctx, tracking)
+	if r.statter != nil {
+		r.statter(tracking)
+	}
+
+	if !r.SkipStats { // opt-out
+		go trackRequestStats(ctx, tracking)
+		statbyt, _ := json.Marshal(tracking)
+		if resp != nil {
+			resp.Header.Add("x-inngest-request-stats", string(statbyt))
+		}
+	}
 
 	// Handle no response errors.
 	if errors.Is(err, ErrUnableToReach) {
@@ -439,6 +455,7 @@ func trackRequestStats(ctx context.Context, r *httpstat.Result) {
 		Tags:    tags,
 	}
 	metrics.HistogramHTTPDNSLookupDuration(ctx, r.DNSLookup.Milliseconds(), opts)
+	metrics.HistogramHTTPTCPConnDuration(ctx, r.TCPConnection.Milliseconds(), opts)
 	metrics.HistogramHTTPTLSHandshakeDuration(ctx, r.TLSHandshake.Milliseconds(), opts)
 	metrics.HistogramHTTPServerProcessingDuration(ctx, r.ServerProcessing.Milliseconds(), opts)
 }

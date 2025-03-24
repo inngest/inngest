@@ -23,7 +23,6 @@ func TestEndToEnd(t *testing.T) {
 	os.Setenv("INNGEST_SIGNING_KEY", "signkey-test-12345678")
 	os.Setenv("INNGEST_SIGNING_KEY_FALLBACK", "signkey-test-00000000")
 
-	type ConnectEvent = inngestgo.GenericEvent[any, any]
 	ctx := context.Background()
 	c := client.New(t)
 	inngestClient := NewSDKConnectHandler(t, "connect")
@@ -98,7 +97,7 @@ func TestEndToEnd(t *testing.T) {
 		})
 
 		t.Run("trigger function", func(t *testing.T) {
-			_, err := inngestClient.Send(ctx, ConnectEvent{
+			_, err := inngestClient.Send(ctx, inngestgo.Event{
 				Name: "test/connect",
 				Data: map[string]interface{}{},
 			})
@@ -130,7 +129,7 @@ func TestEndToEnd(t *testing.T) {
 		// Reset counter
 		atomic.StoreInt32(&counter, 0)
 
-		eventId, err := inngestClient.Send(ctx, ConnectEvent{
+		eventId, err := inngestClient.Send(ctx, inngestgo.Event{
 			Name: "test/connect",
 			Data: map[string]interface{}{},
 		})

@@ -37,7 +37,7 @@ func TestConcurrency_ScopeFunction(t *testing.T) {
 			},
 		},
 		inngestgo.EventTrigger(trigger, nil),
-		func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[any, any]]) (any, error) {
+		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			fmt.Println("Running func", *input.Event.ID, input.Event.Data)
 			atomic.AddInt32(&total, 1)
 
@@ -108,7 +108,7 @@ func TestConcurrency_ScopeFunction_FanOut(t *testing.T) {
 			},
 		},
 		inngestgo.EventTrigger(trigger, nil),
-		func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[any, any]]) (any, error) {
+		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			fmt.Println("Running func", *input.Event.ID, input.Event.Data)
 			atomic.AddInt32(&totalA, 1)
 			next := atomic.AddInt32(&inProgressA, 1)
@@ -131,7 +131,7 @@ func TestConcurrency_ScopeFunction_FanOut(t *testing.T) {
 			},
 		},
 		inngestgo.EventTrigger(trigger, nil),
-		func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[any, any]]) (any, error) {
+		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			fmt.Println("Running func", *input.Event.ID, input.Event.Data)
 			atomic.AddInt32(&totalB, 1)
 			next := atomic.AddInt32(&inProgressB, 1)
@@ -197,7 +197,7 @@ func TestConcurrency_ScopeFunction_Key(t *testing.T) {
 			},
 		},
 		inngestgo.EventTrigger(trigger, nil),
-		func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[any, any]]) (any, error) {
+		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			fmt.Println("Running func", *input.Event.ID, input.Event.Data)
 			atomic.AddInt32(&total, 1)
 
@@ -289,7 +289,7 @@ func TestConcurrency_ScopeFunction_Key_Fn(t *testing.T) {
 			Retries: inngestgo.IntPtr(0),
 		},
 		inngestgo.EventTrigger(trigger, nil),
-		func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[any, any]]) (any, error) {
+		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			fmt.Println("Running func", *input.Event.ID, input.Event.Data)
 			atomic.AddInt32(&total, 1)
 

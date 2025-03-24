@@ -37,7 +37,7 @@ export function Modal({
         <Dialog.Portal container={container}>
           <Dialog.Overlay
             asChild
-            className="fixed inset-0 z-[100] backdrop-blur backdrop-invert-[10%] transition-opacity"
+            className="bg-overlay/20 dark:bg-overlay/50 fixed inset-0 z-[100] transition-opacity"
             aria-hidden="true"
           >
             {/* Full-screen container to center the panel */}

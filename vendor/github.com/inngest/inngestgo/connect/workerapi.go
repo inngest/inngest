@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/inngest/inngest/proto/gen/connect/v1"
-	"google.golang.org/protobuf/proto"
 	"io"
 	"log/slog"
 	"net/http"
+
+	"github.com/inngest/inngest/proto/gen/connect/v1"
+	"google.golang.org/protobuf/proto"
 )
 
 type workerApiClient struct {
@@ -36,7 +37,9 @@ func (a *workerApiClient) start(ctx context.Context, hashedSigningKey []byte, re
 	}
 
 	httpReq.Header.Set("Content-Type", "application/protobuf")
-	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", string(hashedSigningKey)))
+	if hashedSigningKey != nil {
+		httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", string(hashedSigningKey)))
+	}
 
 	if a.env != nil {
 		httpReq.Header.Add("X-Inngest-Env", *a.env)
@@ -96,7 +99,9 @@ func (a *workerApiClient) sendBufferedMessage(ctx context.Context, hashedSigning
 	}
 
 	httpReq.Header.Set("Content-Type", "application/protobuf")
-	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", string(hashedSigningKey)))
+	if hashedSigningKey != nil {
+		httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", string(hashedSigningKey)))
+	}
 
 	if a.env != nil {
 		httpReq.Header.Add("X-Inngest-Env", *a.env)

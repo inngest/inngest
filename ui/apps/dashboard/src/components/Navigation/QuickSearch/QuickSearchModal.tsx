@@ -27,7 +27,7 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
   const res = useQuickSearch({ envSlug, term: debouncedTerm });
 
   return (
-    <Modal alignTop isOpen={isOpen} onClose={onClose} className="max-w-2xl align-baseline">
+    <Modal isOpen={isOpen} onClose={onClose} className="max-w-2xl">
       <Command label="Search by functions, events, apps and IDs" shouldFilter={true}>
         <div className="border-subtle bg-modalBase border-b px-4 py-3">
           <Pill appearance="solidBright" className="mb-3">
@@ -55,6 +55,21 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
 
           {!isTyping && !res.isFetching && res.data && !res.error && (
             <>
+              {res.data.run && (
+                <Command.Group
+                  heading="Runs"
+                  className="text-muted mb-4 text-xs [&_[cmdk-group-heading]]:mb-1"
+                >
+                  <ResultItem
+                    key={res.data.run.id}
+                    kind="run"
+                    onClick={onClose}
+                    path={pathCreator.runPopout({ envSlug, runID: res.data.run.id })}
+                    text={res.data.run.id}
+                    value={`run-${res.data.run.id}`}
+                  />
+                </Command.Group>
+              )}
               <Command.Group
                 heading="Apps"
                 className="text-muted mb-4 text-xs [&_[cmdk-group-heading]]:mb-1"
@@ -68,6 +83,23 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
                       path={pathCreator.app({ envSlug, externalAppID: app.name })}
                       text={app.name}
                       value={`app-${i}-${app.name}`}
+                    />
+                  );
+                })}
+              </Command.Group>
+              <Command.Group
+                heading="Functions"
+                className="text-muted mb-4 text-xs [&_[cmdk-group-heading]]:mb-1"
+              >
+                {res.data.functions.map((fn, i) => {
+                  return (
+                    <ResultItem
+                      key={fn.name}
+                      kind="function"
+                      onClick={onClose}
+                      path={pathCreator.function({ envSlug, functionSlug: fn.slug })}
+                      text={fn.name}
+                      value={`function-${i}-${fn.name}`}
                     />
                   );
                 })}
@@ -107,40 +139,6 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
                   );
                 })}
               </Command.Group>
-
-              <Command.Group
-                heading="Functions"
-                className="text-muted mb-4 text-xs [&_[cmdk-group-heading]]:mb-1"
-              >
-                {res.data.functions.map((fn, i) => {
-                  return (
-                    <ResultItem
-                      key={fn.name}
-                      kind="function"
-                      onClick={onClose}
-                      path={pathCreator.function({ envSlug, functionSlug: fn.slug })}
-                      text={fn.name}
-                      value={`function-${i}-${fn.name}`}
-                    />
-                  );
-                })}
-              </Command.Group>
-
-              {res.data.run && (
-                <Command.Group
-                  heading="Runs"
-                  className="text-muted mb-4 text-xs [&_[cmdk-group-heading]]:mb-1"
-                >
-                  <ResultItem
-                    key={res.data.run.id}
-                    kind="run"
-                    onClick={onClose}
-                    path={pathCreator.runPopout({ envSlug, runID: res.data.run.id })}
-                    text={res.data.run.id}
-                    value={`run-${res.data.run.id}`}
-                  />
-                </Command.Group>
-              )}
             </>
           )}
           {!isTyping && !res.isFetching && <Shortcuts onClose={onClose} envSlug={envSlug} />}

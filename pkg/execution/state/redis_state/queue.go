@@ -1574,7 +1574,7 @@ func (q *queue) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID
 	}
 }
 
-func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.UUID, limit int64, handler osqueue.QueueMigrationHandler) (int64, error) {
+func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.UUID, limit int64, concurrency int, handler osqueue.QueueMigrationHandler) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "MigrationPeek"), redis_telemetry.ScopeQueue)
 
 	shard, ok := q.queueShardClients[sourceShardName]
@@ -1599,14 +1599,42 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 
 	// Should process in order because we don't want out of order execution when moved over
 	var processed int64
-	for _, qi := range items {
+
+	process := func(qi *osqueue.QueueItem) error {
 		if err := handler(ctx, qi); err != nil {
-			return processed, err
+			return err
 		}
 		if err := q.removeQueueItem(ctx, shard, partitionKey, qi.ID); err != nil {
 			logger.StdlibLogger(ctx).Error("error cleaning up queue item after migration", "error", err)
 		}
-		processed++
+
+		atomic.AddInt64(&processed, 1)
+		return nil
+	}
+
+	if concurrency > 0 {
+		eg := errgroup.Group{}
+		eg.SetLimit(concurrency)
+
+		for _, qi := range items {
+			qi := qi
+			eg.Go(func() error {
+				return process(qi)
+			})
+		}
+
+		err := eg.Wait()
+		if err != nil {
+			return atomic.LoadInt64(&processed), err
+		}
+
+		return atomic.LoadInt64(&processed), nil
+	}
+
+	for _, qi := range items {
+		if err := process(qi); err != nil {
+			return processed, err
+		}
 	}
 
 	return processed, nil
