@@ -8,6 +8,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngestgo/connect"
+	"github.com/inngest/inngestgo/internal/middleware"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 )
 
@@ -79,18 +80,21 @@ func Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, e
 		return nil, fmt.Errorf("invalid handler passed")
 	}
 
+	var hashedKey []byte
+	var hashedFallbackKey []byte
 	signingKey := defaultClient.h.GetSigningKey()
 	if signingKey == "" {
-		return nil, fmt.Errorf("signing key is required")
-	}
+		if !defaultClient.h.isDev() {
+			// Signing key is only required in cloud mode.
+			return nil, fmt.Errorf("signing key is required")
+		}
+	} else {
+		var err error
+		hashedKey, err = hashedSigningKey([]byte(signingKey))
+		if err != nil {
+			return nil, fmt.Errorf("failed to hash signing key: %w", err)
+		}
 
-	hashedKey, err := hashedSigningKey([]byte(signingKey))
-	if err != nil {
-		return nil, fmt.Errorf("failed to hash signing key: %w", err)
-	}
-
-	var hashedFallbackKey []byte
-	{
 		if fallbackKey := defaultClient.h.GetSigningKeyFallback(); fallbackKey != "" {
 			hashedFallbackKey, err = hashedSigningKey([]byte(fallbackKey))
 			if err != nil {
@@ -144,8 +148,21 @@ func (h *handler) InvokeFunction(ctx context.Context, slug string, stepId *strin
 		}
 	}
 
-	// Invoke function, always complete regardless of
-	resp, ops, err := invoke(context.Background(), fn, h.GetSigningKey(), &request, stepId)
+	cImpl, ok := h.client.(*apiClient)
+	if !ok {
+		return nil, nil, fmt.Errorf("invalid client")
+	}
+	mw := middleware.NewMiddlewareManager().Add(cImpl.Middleware...)
 
+	// Invoke function, always complete regardless of
+	resp, ops, err := invoke(
+		context.Background(),
+		h.client,
+		mw,
+		fn,
+		h.GetSigningKey(),
+		&request,
+		stepId,
+	)
 	return resp, ops, err
 }

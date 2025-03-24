@@ -411,7 +411,7 @@ func TestManyWaitInvalidExpressions(t *testing.T) {
 		inngestgo.EventTrigger(evtName, nil),
 		func(
 			ctx context.Context,
-			input inngestgo.Input[inngestgo.GenericEvent[eventData, any]],
+			input inngestgo.Input[eventData],
 		) (any, error) {
 			atomic.AddInt32(&counter, 1)
 

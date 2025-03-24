@@ -61,7 +61,7 @@ func (c *connectRouterSvc) Run(ctx context.Context) error {
 
 	go func() {
 		err := c.receiver.ReceiveExecutorMessages(ctx, func(_ []byte, data *connect.GatewayExecutorRequestData) {
-			log := c.logger.With("env_id", data.EnvId, "app_id", data.AppId, "req_id", data.RequestId)
+			log := c.logger.With("env_id", data.EnvId, "app_id", data.AppId, "req_id", data.RequestId, "run_id", data.RunId)
 
 			appID, err := uuid.Parse(data.AppId)
 			if err != nil {

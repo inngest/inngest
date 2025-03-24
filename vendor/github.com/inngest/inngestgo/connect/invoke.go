@@ -93,6 +93,7 @@ func (h *connectHandler) connectInvoke(ctx context.Context, ws *websocket.Conn, 
 		StepId:         body.StepId,
 		SystemTraceCtx: body.SystemTraceCtx,
 		UserTraceCtx:   body.UserTraceCtx,
+		RunId:          body.RunId,
 	})
 	if err != nil {
 		h.logger.Error("error marshaling request ack", "error", err)
@@ -182,6 +183,7 @@ func (h *connectHandler) connectInvoke(ctx context.Context, ws *websocket.Conn, 
 			RequestVersion: 0, // Go SDK currently only supports v0
 			SystemTraceCtx: body.SystemTraceCtx,
 			UserTraceCtx:   body.UserTraceCtx,
+			RunId:          body.RunId,
 		}, nil
 	}
 

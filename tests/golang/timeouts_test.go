@@ -41,7 +41,7 @@ func TestTimeoutStart(t *testing.T) {
 			},
 		},
 		inngestgo.EventTrigger(trigger, nil),
-		func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[any, any]]) (any, error) {
+		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			fmt.Println("Running func", *input.Event.ID, input.Event.Data)
 			atomic.AddInt32(&total, 1)
 			<-time.After(time.Duration(fnDuration) * time.Second)
@@ -97,7 +97,7 @@ func TestTimeoutFinish(t *testing.T) {
 				},
 			},
 			inngestgo.EventTrigger(trigger, nil),
-			func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[any, any]]) (any, error) {
+			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 				fmt.Println("Running func", *input.Event.ID, input.Event.Data)
 
 				_, _ = step.Run(ctx, "a", func(ctx context.Context) (any, error) {

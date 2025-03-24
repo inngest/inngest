@@ -22,7 +22,7 @@ type BatchEventData struct {
 	Time time.Time `json:"time"`
 }
 
-type BatchEvent = inngestgo.GenericEvent[BatchEventData, any]
+type BatchEvent = inngestgo.GenericEvent[BatchEventData]
 
 func TestBatchEvents(t *testing.T) {
 	ctx := context.Background()
@@ -194,7 +194,7 @@ func TestBatchEventsWithKeys(t *testing.T) {
 		Time   time.Time `json:"time"`
 		UserId string    `json:"userId"`
 	}
-	type BatchEventWithKey = inngestgo.GenericEvent[BatchEventDataWithUserId, any]
+	type BatchEventWithKey = inngestgo.GenericEvent[BatchEventDataWithUserId]
 
 	ctx := context.Background()
 	inngestClient, server, registerFuncs := NewSDKHandler(t, "user-notifications")
@@ -214,7 +214,7 @@ func TestBatchEventsWithKeys(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{ID: "batch-test", Name: "batch test", BatchEvents: &inngest.EventBatchConfig{MaxSize: 3, Timeout: "5s", Key: &batchKey}},
 		inngestgo.EventTrigger("test/notification.send", nil),
-		func(ctx context.Context, input inngestgo.Input[BatchEventWithKey]) (any, error) {
+		func(ctx context.Context, input inngestgo.Input[BatchEventDataWithUserId]) (any, error) {
 			mut.Lock()
 			batchInvokedCounter[input.Events[0].Data.UserId] += 1
 			batchEventsCounter[input.Events[0].Data.UserId] += len(input.Events)

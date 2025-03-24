@@ -980,6 +980,7 @@ func (q *queue) process(
 						Str("partition_id", p.ID).
 						Msg("cannot extend lease since lease ID is nil")
 					// Don't extend lease since one doesn't exist
+					errCh <- fmt.Errorf("cannot extend lease since lease ID is nil")
 					return
 				}
 				leaseID, err = q.ExtendLease(ctx, qi, *leaseID, QueueLeaseDuration)

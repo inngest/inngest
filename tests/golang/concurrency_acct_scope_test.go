@@ -27,7 +27,7 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 
 	trigger := "test/concurrency-acct"
 
-	handler := func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[any, any]]) (any, error) {
+	handler := func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 		fmt.Println("Running func", *input.Event.ID, input.Event.Data, time.Now().Format(time.RFC3339))
 		atomic.AddInt32(&total, 1)
 

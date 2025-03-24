@@ -43,7 +43,7 @@ func TestFunctionPriorityRun(t *testing.T) {
 			},
 		},
 		inngestgo.EventTrigger("test/priority", nil),
-		func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[map[string]any, any]]) (any, error) {
+		func(ctx context.Context, input inngestgo.Input[map[string]any]) (any, error) {
 			priority, _ := input.Event.Data["priority"].(string)
 			results <- result{
 				runID:    ulid.MustParse(input.InputCtx.RunID),
