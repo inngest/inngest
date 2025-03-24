@@ -888,6 +888,7 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connect.Con
 		"status", data.Status.String(),
 		"no_retry", data.NoRetry,
 		"retry_after", data.RetryAfter,
+		"app_id", data.AppId,
 		"req_id", data.RequestId,
 		"run_id", data.RunId,
 	)
