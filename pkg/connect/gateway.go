@@ -358,6 +358,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					// connection was closed (this may not be expected but should not be logged as an error)
 					// this is expected when the gateway is draining
 					if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
+						closeReasonLock.Lock()
+						closeReason = connect.WorkerDisconnectReason_UNEXPECTED.String()
+						closeReasonLock.Unlock()
+
 						return nil
 					}
 
