@@ -50,7 +50,7 @@ export function QuickSearch({ collapsed, envSlug, envName }: Props) {
           </TooltipTrigger>
 
           <TooltipContent
-            className="border-muted text-muted max-w-32 rounded border text-xs"
+            className="border-muted text-muted w-32 rounded border text-xs"
             side="bottom"
             sideOffset={2}
           >
