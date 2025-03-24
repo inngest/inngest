@@ -202,7 +202,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				go l.OnStartDraining(context.Background(), conn)
 			}
 
-			closeReason = "gateway-draining"
+			closeReason = connect.WorkerDisconnectReason_GATEWAY_DRAINING.String()
 
 			// Close WS connection once worker established another connection
 			defer func() {
