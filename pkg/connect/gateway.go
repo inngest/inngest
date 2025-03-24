@@ -342,16 +342,17 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 						// If client connection closed unexpectedly, we should store the reason, if set.
 						// If the reason is set, it may have been an intentional close, so the connection
 						// may not be re-established.
+						// Workers should always close with code: 1000 and reason: WORKER_SHUTDOWN.
 						closeReasonLock.Lock()
-						closeReason = closeErr.Reason
+						if closeErr.Reason != "" {
+							closeReason = closeErr.Reason
+						} else {
+							closeReason = connect.WorkerDisconnectReason_UNEXPECTED.String()
+						}
 						closeReasonLock.Unlock()
 
-						// If neither status nor code are supplied, do not return the error
-						if closeErr.Code == websocket.StatusNoStatusRcvd && closeErr.Reason == "" {
-							return nil
-						}
-
-						return closeErr
+						// Do not return an error. We already capture the close reason above.
+						return nil
 					}
 
 					// connection was closed (this may not be expected but should not be logged as an error)
