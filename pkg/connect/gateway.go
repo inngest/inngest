@@ -345,6 +345,12 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 						closeReasonLock.Lock()
 						closeReason = closeErr.Reason
 						closeReasonLock.Unlock()
+
+						// If neither status nor code are supplied, do not return the error
+						if closeErr.Code == websocket.StatusNoStatusRcvd && closeErr.Reason == "" {
+							return nil
+						}
+
 						return closeErr
 					}
 
