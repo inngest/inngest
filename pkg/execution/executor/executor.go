@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -720,6 +721,7 @@ type runInstance struct {
 	item       queue.Item
 	edge       inngest.Edge
 	resp       *state.DriverResponse
+	httpClient *http.Client
 	stackIndex int
 }
 
@@ -888,6 +890,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		item:       item,
 		edge:       edge,
 		stackIndex: stackIndex,
+		httpClient: httpdriver.DefaultClient,
 	}
 
 	resp, err := e.run(ctx, &instance)
@@ -2263,7 +2266,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, i *runInstance, g
 
 	var output []byte
 
-	hr, body, _, err := httpdriver.ExecuteRequest(ctx, httpdriver.DefaultClient, req)
+	hr, body, _, err := httpdriver.ExecuteRequest(ctx, i.httpClient, req)
 	if err != nil {
 		// Request failed entirely. Create an error.
 		userLandErr := state.UserError{
@@ -2379,7 +2382,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		return fmt.Errorf("error creating ai gateway request: %w", err)
 	}
 
-	hr, output, _, err := httpdriver.ExecuteRequest(ctx, httpdriver.DefaultClient, req)
+	hr, output, _, err := httpdriver.ExecuteRequest(ctx, i.httpClient, req)
 	failure := err != nil || (hr != nil && hr.StatusCode > 299)
 
 	// Update the driver response appropriately for the trace lifecycles.
