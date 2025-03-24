@@ -22,5 +22,10 @@
     "apps/*"
   ],
   "packageManager": "pnpm@8.15.8",
-  "private": true
+  "private": true,
+  "pnpm": {
+    "overrides": {
+      "elliptic@<6.6.0": ">=6.6.1"
+    }
+  }
 }

@@ -121,7 +121,7 @@ const checks: Record<string, (appInfo: AppCheckResult) => CheckResult | undefine
       return;
     }
 
-    if (!['https://inn.gs/', 'https://inn.gs/'].includes(appInfo.eventAPIOrigin.value)) {
+    if (!['https://inn.gs', 'https://inn.gs/'].includes(appInfo.eventAPIOrigin.value)) {
       return {
         message: `Non-standard event API origin: ${appInfo.eventAPIOrigin.value}`,
         severity: 'error',

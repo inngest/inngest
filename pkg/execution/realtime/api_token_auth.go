@@ -41,7 +41,8 @@ func realtimeAuthMW(jwtSecret []byte, mw func(http.Handler) http.Handler) func(h
 
 			// Call the original middelware.
 			if mw != nil {
-				mw(next)
+				res := mw(next)
+				res.ServeHTTP(w, r)
 				return
 			}
 			next.ServeHTTP(w, r)
