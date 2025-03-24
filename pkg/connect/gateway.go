@@ -574,6 +574,11 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 				}
 			}
 
+			c.log.Debug("worker acked message",
+				"req_id", data.RequestId,
+				"run_id", data.RunId,
+			)
+
 			// TODO Should we send a reverse ack to the worker to start processing the request?
 
 			return nil
@@ -615,6 +620,7 @@ func (c *connectionHandler) receiveRouterMessages(ctx context.Context, onSubscri
 			"req_id", data.RequestId,
 			"fn_slug", data.FunctionSlug,
 			"step_id", data.StepId,
+			"run_id", data.RunId,
 		)
 
 		log.Debug("gateway received msg")
@@ -877,7 +883,14 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connect.Con
 		return fmt.Errorf("invalid response type: %w", err)
 	}
 
-	c.log.Debug("notifying executor about response", "status", data.Status.String(), "no_retry", data.NoRetry, "retry_after", data.RetryAfter)
+	c.log.Debug(
+		"notifying executor about response",
+		"status", data.Status.String(),
+		"no_retry", data.NoRetry,
+		"retry_after", data.RetryAfter,
+		"req_id", data.RequestId,
+		"run_id", data.RunId,
+	)
 
 	err := c.svc.receiver.NotifyExecutor(ctx, &data)
 	if err != nil {
