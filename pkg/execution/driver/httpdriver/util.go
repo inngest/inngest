@@ -25,12 +25,14 @@ const (
 )
 
 var (
-	ErrUnableToReach        = fmt.Errorf("Unable to reach SDK URL")
-	ErrBodyTooLarge         = fmt.Errorf("http response size is greater than the limit")
-	ErrServerClosed         = fmt.Errorf("Your server closed the request before finishing.")
-	ErrConnectionReset      = fmt.Errorf("Your server reset the request connection.")
-	ErrUnexpectedEnd        = fmt.Errorf("Invalid response from SDK server: Unexpected EOF ending response")
-	ErrInvalidEmptyResponse = fmt.Errorf("Error performing request to SDK URL")
+	ErrUnableToReach       = fmt.Errorf("Unable to reach SDK URL")
+	ErrDenied              = fmt.Errorf("Your server blocked the connection") // "connection timed out"
+	ErrServerClosed        = fmt.Errorf("Your server closed the request before finishing.")
+	ErrConnectionReset     = fmt.Errorf("Your server reset the connection while we were sending the request.")
+	ErrUnexpectedEnd       = fmt.Errorf("Your server reset the connection while we were reading the reply: Unexpected ending response")
+	ErrInvalidResponse     = fmt.Errorf("Error performing request to SDK URL")
+	ErrBodyTooLarge        = fmt.Errorf("http response size is greater than the limit")
+	ErrTLSHandshakeTimeout = fmt.Errorf("Your server didn't complete the TLS handshake in time")
 )
 
 // ExecuteRequest executes an HTTP request.  This returns the HTTP response, the body (limited by
@@ -61,33 +63,49 @@ func ExecuteRequest(ctx context.Context, c HTTPDoer, req *http.Request) (*http.R
 		return resp, nil, dur, ErrUnableToReach
 	}
 
-	if err != nil && !errors.Is(err, io.EOF) {
-		if urlErr, ok := err.(*url.Error); ok && urlErr.Err == context.DeadlineExceeded {
-			// This timed out.
-			return resp, nil, dur, context.DeadlineExceeded
-		}
-		if errors.Is(err, syscall.EPIPE) {
-			return resp, nil, dur, ErrServerClosed
-		}
-		if errors.Is(err, syscall.ECONNRESET) {
-			return resp, nil, dur, ErrConnectionReset
-		}
-		// Unexpected EOFs are valid and returned from servers when chunked encoding may
-		// be invalid.  Handle any other error by returning immediately.
-		if !errors.Is(err, io.ErrUnexpectedEOF) {
-			return resp, nil, dur, ErrInvalidEmptyResponse
-		}
-		// If we get an unexpected EOF and the response is nil, error immediately.
-		if errors.Is(err, io.ErrUnexpectedEOF) && resp == nil {
-			return resp, nil, dur, ErrUnexpectedEnd
-		}
-	}
-
 	if len(byt) > consts.MaxSDKResponseBodySize {
 		return resp, byt, dur, ErrBodyTooLarge
 	}
 
-	return resp, byt, dur, nil
+	// parse errors into common responses
+	err = CommonHTTPErrors(err)
+
+	return resp, byt, dur, err
+}
+
+func CommonHTTPErrors(err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, io.EOF) {
+		return err
+	}
+
+	{
+		// timeouts
+		if urlErr, ok := err.(*url.Error); ok && urlErr.Err == context.DeadlineExceeded {
+			// This timed out.
+			return context.DeadlineExceeded
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			// timed out
+			return context.DeadlineExceeded
+		}
+	}
+
+	if errors.Is(err, syscall.EPIPE) {
+		return ErrServerClosed
+	}
+	if errors.Is(err, syscall.ECONNRESET) {
+		return ErrConnectionReset
+	}
+	// If we get an unexpected EOF and the response is nil, error immediately.
+	if errors.Is(err, io.ErrUnexpectedEOF) {
+		return ErrUnexpectedEnd
+	}
+
+	// use the error as-is, wrapped with a prefix for users.
+	return fmt.Errorf("%s: %w", ErrInvalidResponse, err)
 }
 
 // Sign signs the body with a private key, ensuring that HTTP handlers can verify
