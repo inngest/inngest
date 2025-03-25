@@ -1,5 +1,4 @@
 import { useCallback } from 'react';
-import { getTimestampDaysAgo } from '@inngest/components/utils/date';
 import { convertWorkerStatus } from '@inngest/components/utils/workerParser';
 import { useClient } from 'urql';
 
