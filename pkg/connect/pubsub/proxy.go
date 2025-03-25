@@ -128,16 +128,23 @@ type ProxyOpts struct {
 func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*connect.SDKResponse, error) {
 	<-i.setup
 
-	l := i.logger.With("app_id", opts.AppID.String(), "env_id", opts.EnvID.String(), "account_id", opts.AccountID.String())
+	if opts.Data.RequestId == "" {
+		opts.Data.RequestId = ulid.MustNew(ulid.Now(), rand.Reader).String()
+	}
+
+	l := i.logger.With(
+		"app_id", opts.AppID.String(),
+		"env_id", opts.EnvID.String(),
+		"account_id", opts.AccountID.String(),
+		"run_id", opts.Data.RunId,
+		"req_id", opts.Data.RequestId,
+	)
+
 	traceCtx, span := i.tracer.NewSpan(traceCtx, "Proxy", opts.AccountID, opts.EnvID)
 	span.SetAttributes(attribute.Bool("inngest.system", true))
 	defer span.End()
 
 	proxyStartTime := time.Now()
-
-	if opts.Data.RequestId == "" {
-		opts.Data.RequestId = ulid.MustNew(ulid.Now(), rand.Reader).String()
-	}
 
 	span.SetAttributes(
 		attribute.String("request_id", opts.Data.RequestId),

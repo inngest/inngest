@@ -42,7 +42,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         <div className="flex">
           <input
             ref={ref}
-            className={cn(`bg-canvasBase border-muted placeholder-disabled text-basis outline-primary-moderate w-full rounded-md border text-sm leading-none outline-2 transition-all focus:outline
+            className={cn(`border-muted placeholder-disabled text-basis outline-primary-moderate w-full rounded-md border bg-transparent text-sm leading-none outline-2 transition-all focus:outline
             ${sizeStyles[inngestSize]}
             ${
               props.readOnly &&

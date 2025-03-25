@@ -74,6 +74,8 @@ message GatewayExecutorRequestData {
 
 	bytes system_trace_ctx = 10;
 	bytes user_trace_ctx = 11;
+
+	string run_id = 12;
 }
 
 message WorkerRequestAckData {
@@ -85,6 +87,7 @@ message WorkerRequestAckData {
 	optional string step_id = 6;
 	bytes system_trace_ctx = 7;
 	bytes user_trace_ctx = 8;
+	string run_id = 9;
 }
 
 enum SDKResponseStatus {
@@ -106,6 +109,7 @@ message SDKResponse {
 	uint32 request_version = 10;
 	bytes system_trace_ctx = 11;
 	bytes user_trace_ctx = 12;
+	string run_id = 13;
 }
 
 message WorkerReplyAckData {
@@ -152,6 +156,8 @@ message ConnGroup {
 
 enum WorkerDisconnectReason {
 	WORKER_SHUTDOWN = 0;
+	UNEXPECTED = 1;
+	GATEWAY_DRAINING = 2;
 }
 
 message StartResponse {

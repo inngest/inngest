@@ -109,6 +109,7 @@ export default {
         surfaceSubtle: 'rgb(var(--color-background-surface-subtle) / <alpha-value>)',
         surfaceMuted: 'rgb(var(--color-background-surface-muted) / <alpha-value>)',
         modalBase: 'rgb(var(--color-background-modal-base) / <alpha-value>)',
+        overlay: 'rgb(var(--color-background-overlay) / <alpha-value>)',
         disabled: 'rgb(var(--color-background-disabled) / <alpha-value>)',
         alwaysWhite: 'rgb(var(--color-foreground-alwaysWhite) / <alpha-value>)',
         contrast: 'rgb(var(--color-background-contrast) / <alpha-value>)',
@@ -238,6 +239,9 @@ export default {
         'slide-up-and-fade': 'slide-up-and-fade 400ms cubic-bezier(0.16, 1, 0.3, 1)',
         'slide-right-and-fade': 'slide-right-and-fade 400ms cubic-bezier(0.16, 1, 0.3, 1)',
         underline: 'underline 2s linear infinite',
+      },
+      spacing: {
+        'cmdk-margin': 'calc((100vh - (84.5px + 330px)) / 2)',
       },
     },
   },

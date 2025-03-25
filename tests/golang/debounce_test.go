@@ -18,7 +18,7 @@ type DebounceEventData struct {
 	Name    string `json:"name"`
 }
 
-type DebounceEvent = inngestgo.GenericEvent[DebounceEventData, any]
+type DebounceEvent = inngestgo.GenericEvent[DebounceEventData]
 
 func TestDebounceWithSingleKey(t *testing.T) {
 	inngestClient, server, registerFuncs := NewSDKHandler(t, "debounce")
@@ -26,7 +26,7 @@ func TestDebounceWithSingleKey(t *testing.T) {
 
 	var (
 		counter    int32
-		calledWith DebounceEvent
+		calledWith inngestgo.GenericEvent[DebounceEventData]
 	)
 
 	period := 5 * time.Second
@@ -42,7 +42,7 @@ func TestDebounceWithSingleKey(t *testing.T) {
 			},
 		},
 		inngestgo.EventTrigger("test/sdk", nil),
-		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+		func(ctx context.Context, input inngestgo.Input[DebounceEventData]) (any, error) {
 			// We expect that this function is called after at least the debounce period
 			// of 5 seconds.
 			now := time.Now()

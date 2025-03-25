@@ -47,7 +47,7 @@ func TestFunctionFailureHandling(t *testing.T) {
 			"inngest/function.finished",
 			inngestgo.StrPtr("event.data.function_id == 'fail-app-always-fail'"),
 		),
-		func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[map[string]any, any]]) (any, error) {
+		func(ctx context.Context, input inngestgo.Input[map[string]any]) (any, error) {
 			evt := input.Event
 
 			// Assert that failure handlers are called with valid data.
@@ -113,7 +113,7 @@ func TestFunctionFailureHandlingWithRateLimit(t *testing.T) {
 			RateLimit: &inngestgo.RateLimit{Limit: 1, Period: 24 * time.Hour, Key: inngestgo.StrPtr("event.data.number")},
 		},
 		inngestgo.EventTrigger("inngest/function.failed", inngestgo.StrPtr(`event.data.function_id == "failed-rate-limit-failed"`)),
-		func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[map[string]any, any]]) (any, error) {
+		func(ctx context.Context, input inngestgo.Input[map[string]any]) (any, error) {
 			atomic.AddInt32(&handled, 1)
 			return "handled", nil
 		},

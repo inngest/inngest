@@ -202,7 +202,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				go l.OnStartDraining(context.Background(), conn)
 			}
 
-			closeReason = "gateway-draining"
+			closeReason = connect.WorkerDisconnectReason_GATEWAY_DRAINING.String()
 
 			// Close WS connection once worker established another connection
 			defer func() {
@@ -342,15 +342,26 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 						// If client connection closed unexpectedly, we should store the reason, if set.
 						// If the reason is set, it may have been an intentional close, so the connection
 						// may not be re-established.
+						// Workers should always close with code: 1000 and reason: WORKER_SHUTDOWN.
 						closeReasonLock.Lock()
-						closeReason = closeErr.Reason
+						if closeErr.Reason != "" {
+							closeReason = closeErr.Reason
+						} else {
+							closeReason = connect.WorkerDisconnectReason_UNEXPECTED.String()
+						}
 						closeReasonLock.Unlock()
-						return closeErr
+
+						// Do not return an error. We already capture the close reason above.
+						return nil
 					}
 
 					// connection was closed (this may not be expected but should not be logged as an error)
 					// this is expected when the gateway is draining
 					if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
+						closeReasonLock.Lock()
+						closeReason = connect.WorkerDisconnectReason_UNEXPECTED.String()
+						closeReasonLock.Unlock()
+
 						return nil
 					}
 
@@ -574,6 +585,11 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 				}
 			}
 
+			c.log.Debug("worker acked message",
+				"req_id", data.RequestId,
+				"run_id", data.RunId,
+			)
+
 			// TODO Should we send a reverse ack to the worker to start processing the request?
 
 			return nil
@@ -615,6 +631,7 @@ func (c *connectionHandler) receiveRouterMessages(ctx context.Context, onSubscri
 			"req_id", data.RequestId,
 			"fn_slug", data.FunctionSlug,
 			"step_id", data.StepId,
+			"run_id", data.RunId,
 		)
 
 		log.Debug("gateway received msg")
@@ -877,7 +894,15 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connect.Con
 		return fmt.Errorf("invalid response type: %w", err)
 	}
 
-	c.log.Debug("notifying executor about response", "status", data.Status.String(), "no_retry", data.NoRetry, "retry_after", data.RetryAfter)
+	c.log.Debug(
+		"notifying executor about response",
+		"status", data.Status.String(),
+		"no_retry", data.NoRetry,
+		"retry_after", data.RetryAfter,
+		"app_id", data.AppId,
+		"req_id", data.RequestId,
+		"run_id", data.RunId,
+	)
 
 	err := c.svc.receiver.NotifyExecutor(ctx, &data)
 	if err != nil {
