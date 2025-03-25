@@ -609,21 +609,21 @@ func (r *redisConnectionStateManager) UpdateWorkerGroup(ctx context.Context, env
 
 // connectionHash points to the hash resolving connections by environment.
 func (r *redisConnectionStateManager) connectionHash(envID uuid.UUID) string {
-	return fmt.Sprintf("{%s}:conns", envID)
+	return fmt.Sprintf("{connect:%s}:conns", envID)
 }
 
 // connectionHash points to the index hash resolving connections by app ID.
 func (r *redisConnectionStateManager) connIndexByApp(envID uuid.UUID, appId uuid.UUID) string {
-	return fmt.Sprintf("{%s}:conns_appid:%s", envID.String(), appId.String())
+	return fmt.Sprintf("{connect:%s}:conns_appid:%s", envID.String(), appId.String())
 }
 
 // workerGroupHash points to the hash resolving worker groups by environment ID.
 func (r *redisConnectionStateManager) workerGroupHash(envID uuid.UUID) string {
-	return fmt.Sprintf("{%s}:groups", envID.String())
+	return fmt.Sprintf("{connect:%s}:groups", envID.String())
 }
 
 func (r *redisConnectionStateManager) connIndexByGroup(envID uuid.UUID, groupID string) string {
-	return fmt.Sprintf("{%s}:groups:%s", envID.String(), groupID)
+	return fmt.Sprintf("{connect:%s}:groups:%s", envID.String(), groupID)
 }
 
 // gatewaysHashKey returns the key for the global gateways hash.
