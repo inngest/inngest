@@ -1,4 +1,4 @@
-package v0
+package connectv0
 
 import (
 	"encoding/json"
@@ -10,13 +10,13 @@ import (
 	"net/http"
 )
 
-func (c *router) showWorkerGroup(w http.ResponseWriter, r *http.Request) {
+func (c *connectApiRouter) showWorkerGroup(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var envID uuid.UUID
 	switch c.Dev {
 	case true:
-		envID = consts.DevServerEnvId
+		envID = consts.DevServerEnvID
 
 	case false:
 		// Expect UUID

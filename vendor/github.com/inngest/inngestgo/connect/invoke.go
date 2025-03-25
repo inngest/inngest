@@ -15,6 +15,10 @@ import (
 	"time"
 )
 
+const (
+	ResponseAcknowlegeDeadline = time.Second * 5
+)
+
 func (h *connectHandler) handleInvokeMessage(ctx context.Context, ws *websocket.Conn, msg *connectproto.ConnectMessage) error {
 	resp, err := h.connectInvoke(ctx, ws, msg)
 	if err != nil {
@@ -35,14 +39,17 @@ func (h *connectHandler) handleInvokeMessage(ctx context.Context, ws *websocket.
 		Payload: data,
 	}
 
+	// Add message to pending messages to ensure it is acknowledged by the gateway.
+	// This is necessary because even if Write() below does not error, there's no guarantee
+	// that the message was truly passed on to the executor _unless_ we receive the ack message.
+	h.messageBuffer.addPending(ctx, resp, ResponseAcknowlegeDeadline)
+
 	err = wsproto.Write(ctx, ws, responseMessage)
 	if err != nil {
 		h.logger.Error("failed to send sdk response", "err", err)
 
-		// Buffer message to retry
-		h.messageBufferLock.Lock()
-		h.messageBuffer = append(h.messageBuffer, responseMessage)
-		h.messageBufferLock.Unlock()
+		// We received an error, the message definitely was not sent: Buffer message to retry
+		h.messageBuffer.append(resp)
 
 		return fmt.Errorf("could not send sdk response: %w", err)
 	}
@@ -59,6 +66,15 @@ func (h *connectHandler) connectInvoke(ctx context.Context, ws *websocket.Conn, 
 		return nil, fmt.Errorf("invalid gateway message data: %w", err)
 	}
 
+	if body.AppName == "" {
+		return nil, fmt.Errorf("missing app name in executor request")
+	}
+
+	invoker, ok := h.invokers[body.AppName]
+	if !ok {
+		return nil, fmt.Errorf("no invoker for app name %q", body.AppName)
+	}
+
 	// Note: This still uses JSON
 	// TODO Replace with Protobuf
 	var request sdkrequest.Request
@@ -69,10 +85,15 @@ func (h *connectHandler) connectInvoke(ctx context.Context, ws *websocket.Conn, 
 	}
 
 	ackPayload, err := proto.Marshal(&connectproto.WorkerRequestAckData{
-		RequestId:    body.RequestId,
-		AppId:        body.AppId,
-		FunctionSlug: body.FunctionSlug,
-		StepId:       body.StepId,
+		RequestId:      body.RequestId,
+		AccountId:      body.AccountId,
+		EnvId:          body.EnvId,
+		AppId:          body.AppId,
+		FunctionSlug:   body.FunctionSlug,
+		StepId:         body.StepId,
+		SystemTraceCtx: body.SystemTraceCtx,
+		UserTraceCtx:   body.UserTraceCtx,
+		RunId:          body.RunId,
 	})
 	if err != nil {
 		h.logger.Error("error marshaling request ack", "error", err)
@@ -112,7 +133,7 @@ func (h *connectHandler) connectInvoke(ctx context.Context, ws *websocket.Conn, 
 	}
 
 	// Invoke function, always complete regardless of
-	resp, ops, err := h.invoker.InvokeFunction(context.Background(), body.FunctionSlug, stepId, request)
+	resp, ops, err := invoker.InvokeFunction(context.Background(), body.FunctionSlug, stepId, request)
 
 	// NOTE: When triggering step errors, we should have an OpcodeStepError
 	// within ops alongside an error.  We can safely ignore that error, as it's
@@ -150,11 +171,19 @@ func (h *connectHandler) connectInvoke(ctx context.Context, ws *websocket.Conn, 
 	if err != nil {
 		h.logger.Error("error calling function", "error", err)
 		return &connectproto.SDKResponse{
-			RequestId:  body.RequestId,
-			Status:     connectproto.SDKResponseStatus_ERROR,
-			Body:       []byte(fmt.Sprintf("error calling function: %s", err.Error())),
-			NoRetry:    noRetry,
-			RetryAfter: retryAfterVal,
+			RequestId:      body.RequestId,
+			AccountId:      body.AccountId,
+			EnvId:          body.EnvId,
+			AppId:          body.AppId,
+			Status:         connectproto.SDKResponseStatus_ERROR,
+			Body:           []byte(fmt.Sprintf("error calling function: %s", err.Error())),
+			NoRetry:        noRetry,
+			RetryAfter:     retryAfterVal,
+			SdkVersion:     fmt.Sprintf("%s:v%s", h.opts.SDKLanguage, h.opts.SDKVersion),
+			RequestVersion: 0, // Go SDK currently only supports v0
+			SystemTraceCtx: body.SystemTraceCtx,
+			UserTraceCtx:   body.UserTraceCtx,
+			RunId:          body.RunId,
 		}, nil
 	}
 
@@ -171,6 +200,8 @@ func (h *connectHandler) connectInvoke(ctx context.Context, ws *websocket.Conn, 
 		// over function return values as the function has not yet finished.
 		return &connectproto.SDKResponse{
 			RequestId:  body.RequestId,
+			EnvId:      body.EnvId,
+			AppId:      body.AppId,
 			Status:     connectproto.SDKResponseStatus_NOT_COMPLETED,
 			Body:       serializedOps,
 			NoRetry:    noRetry,
@@ -188,6 +219,8 @@ func (h *connectHandler) connectInvoke(ctx context.Context, ws *websocket.Conn, 
 	// Return the function response.
 	return &connectproto.SDKResponse{
 		RequestId:  body.RequestId,
+		EnvId:      body.EnvId,
+		AppId:      body.AppId,
 		Status:     connectproto.SDKResponseStatus_DONE,
 		Body:       serializedResp,
 		NoRetry:    noRetry,

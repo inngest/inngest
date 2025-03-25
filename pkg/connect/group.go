@@ -7,18 +7,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/coder/websocket"
+	"github.com/gowebpki/jcs"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
-	"strings"
+	"time"
 )
 
-func workerGroupHashFromConnRequest(req *connect.WorkerConnectRequestData, authResp *auth.Response, sessionDetails *connect.SessionDetails) (string, error) {
-	buildId := ""
-	if req.SessionId.BuildId != nil {
-		buildId = *req.SessionId.BuildId
+func workerGroupHashFromConnRequest(req *connect.WorkerConnectRequestData, authResp *auth.Response, appConfig *connect.AppConfiguration, functionHash []byte) (string, error) {
+	appVersion := ""
+	if appConfig.AppVersion != nil {
+		appVersion = *appConfig.AppVersion
 	}
 
 	platform := "-"
@@ -32,8 +33,8 @@ func workerGroupHashFromConnRequest(req *connect.WorkerConnectRequestData, authR
 		req.SdkLanguage,
 		req.SdkVersion,
 		platform,
-		sessionDetails.FunctionHash,
-		buildId,
+		functionHash,
+		appVersion,
 	)
 
 	h := sha256.New()
@@ -45,13 +46,33 @@ func workerGroupHashFromConnRequest(req *connect.WorkerConnectRequestData, authR
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
+func functionConfigHash(appConfig *connect.AppConfiguration) ([]byte, error) {
+	var functionHash []byte
+
+	b, err := jcs.Transform(appConfig.Functions)
+	if err != nil {
+		return nil, fmt.Errorf("could not canonicalize function config: %w", err)
+	}
+
+	res := sha256.Sum256(b)
+	functionHash = res[:]
+
+	return functionHash, nil
+}
+
+// NewWorkerGroupFromConnRequest instantiates but does not store WorkerGroup for a new session.
 func NewWorkerGroupFromConnRequest(
 	ctx context.Context,
 	req *connect.WorkerConnectRequestData,
 	authResp *auth.Response,
-	sessionDetails *connect.SessionDetails,
+	appConfig *connect.AppConfiguration,
 ) (*state.WorkerGroup, error) {
-	hash, err := workerGroupHashFromConnRequest(req, authResp, sessionDetails)
+	functionHash, err := functionConfigHash(appConfig)
+	if err != nil {
+		return nil, fmt.Errorf("could not compute function config hash: %w", err)
+	}
+
+	hash, err := workerGroupHashFromConnRequest(req, authResp, appConfig, functionHash)
 	if err != nil {
 		return nil, &SocketError{
 			SysCode:    syscode.CodeConnectInternal,
@@ -66,7 +87,7 @@ func NewWorkerGroupFromConnRequest(
 		functions    []sdk.SDKFunction
 		capabilities sdk.Capabilities
 	)
-	if err := json.Unmarshal(req.Config.Functions, &functions); err != nil {
+	if err := json.Unmarshal(appConfig.Functions, &functions); err != nil {
 		return nil, SocketError{
 			SysCode:    syscode.CodeConnectInvalidFunctionConfig,
 			Msg:        "Invalid function config",
@@ -74,7 +95,7 @@ func NewWorkerGroupFromConnRequest(
 		}
 	}
 
-	if err := json.Unmarshal(req.Config.Capabilities, &capabilities); err != nil {
+	if err := json.Unmarshal(req.Capabilities, &capabilities); err != nil {
 		return nil, &SocketError{
 			SysCode:    syscode.CodeConnectInternal,
 			StatusCode: websocket.StatusInternalError,
@@ -84,22 +105,26 @@ func NewWorkerGroupFromConnRequest(
 
 	slugs := make([]string, len(functions))
 	for i, fn := range functions {
-		slugs[i] = strings.TrimPrefix(fn.Slug, fmt.Sprintf("%s-", req.AppName))
+		// Use slug as is
+		slugs[i] = fn.Slug
 	}
 
 	workerGroup := &state.WorkerGroup{
 		AccountID:     authResp.AccountID,
 		EnvID:         authResp.EnvID,
+		AppName:       appConfig.AppName,
 		SDKLang:       req.SdkLanguage,
 		SDKVersion:    req.SdkVersion,
 		SDKPlatform:   req.GetPlatform(),
-		BuildId:       req.SessionId.BuildId,
+		AppVersion:    appConfig.AppVersion,
 		FunctionSlugs: slugs,
 		Hash:          hash,
 		SyncData: state.SyncData{
 			Functions: functions,
 			SyncToken: req.AuthData.SyncToken,
+			AppConfig: appConfig,
 		},
+		CreatedAt: time.Now(),
 	}
 
 	return workerGroup, nil

@@ -11,7 +11,8 @@ CREATE TABLE apps (
 	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	archived_at TIMESTAMP,
 	url VARCHAR NOT NULL,
-	is_connect BOOLEAN
+    method VARCHAR(32) NOT NULL DEFAULT 'serve',
+    app_version VARCHAR(128)
 );
 
 -- XXX: - this is very basic right now.  it does not conform to the cloud.
@@ -159,19 +160,20 @@ CREATE TABLE worker_connections (
     account_id UUID NOT NULL,
     workspace_id UUID NOT NULL,
 
+    app_name VARCHAR NOT NULL,
     app_id UUID,
 
-    id CHAR(26) PRIMARY KEY,
-    gateway_id CHAR(26) NOT NULL,
+    id BYTEA NOT NULL,
+    gateway_id BYTEA NOT NULL,
     instance_id VARCHAR NOT NULL,
     status smallint NOT NULL,
     worker_ip VARCHAR NOT NULL,
 
-    connected_at TIMESTAMP NOT NULL,
-    last_heartbeat_at TIMESTAMP,
-    disconnected_at TIMESTAMP,
-    recorded_at TIMESTAMP NOT NULL,
-    inserted_at TIMESTAMP NOT NULL,
+    connected_at BIGINT NOT NULL,
+    last_heartbeat_at BIGINT,
+    disconnected_at BIGINT,
+    recorded_at BIGINT NOT NULL,
+    inserted_at BIGINT NOT NULL,
 
     disconnect_reason VARCHAR,
 
@@ -180,10 +182,12 @@ CREATE TABLE worker_connections (
     sdk_version VARCHAR NOT NULL,
     sdk_platform VARCHAR NOT NULL,
     sync_id UUID,
-    build_id VARCHAR,
+    app_version VARCHAR,
     function_count integer NOT NULL,
 
     cpu_cores integer NOT NULL,
     mem_bytes bigint NOT NULL,
-    os VARCHAR NOT NULL
+    os VARCHAR NOT NULL,
+
+    PRIMARY KEY(id, app_name)
 );

@@ -3,14 +3,21 @@ package realtime
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
+	"time"
 
 	"github.com/coder/websocket"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
+	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
+	"github.com/inngest/inngest/pkg/util"
+	"github.com/oklog/ulid/v2"
 )
 
 type APIOpts struct {
@@ -43,7 +50,6 @@ func NewAPI(o APIOpts) http.Handler {
 
 type api struct {
 	chi.Router
-
 	opts APIOpts
 }
 
@@ -57,6 +63,18 @@ func (a *api) setup() {
 
 		r.Get("/realtime/connect", a.GetWebsocketUpgrade)
 		r.Post("/realtime/token", a.PostCreateJWT)
+	})
+
+	a.Group(func(r chi.Router) {
+		r.Use(middleware.Recoverer)
+
+		// This can ONLY use the AuthMiddleware as we MUST use a signing key for
+		// authentication for publishing to streams.
+		if a.opts.AuthMiddleware != nil {
+			r.Use(a.opts.AuthMiddleware)
+		}
+
+		r.Post("/realtime/publish", a.PostPublish)
 	})
 }
 
@@ -78,7 +96,7 @@ func (a *api) PostCreateJWT(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Set the env ID from the authentication context.
-	for n, _ := range topics {
+	for n := range topics {
 		topics[n].EnvID = auth.WorkspaceID()
 	}
 
@@ -113,7 +131,9 @@ func (a *api) GetWebsocketUpgrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ws, err := websocket.Accept(w, r, nil)
+	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		InsecureSkipVerify: true, // We don't care about verifying the origin.
+	})
 	if err != nil {
 		w.WriteHeader(400)
 		logger.StdlibLogger(ctx).Error("error upgrading ws connection", "error", err)
@@ -153,4 +173,138 @@ func (a *api) GetWebsocketUpgrade(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = ws.CloseNow()
+}
+
+func (a *api) PostPublish(w http.ResponseWriter, r *http.Request) {
+	// Allow publishing of arbitrary data using the environment signing
+	// key as the auth token.
+	//
+	// This is only usable within an Inngest function.
+
+	// NOTE: If the content type is of "text/stream", this creates a new
+	// stream to buffer messages to subscribers in 1KB chunks
+	if r.Header.Get("content-type") == "text/stream" {
+		// Read body in goroutine, publishing a stream to subscribers
+		// until the message is done.
+		a.publishStream(w, r)
+		return
+	}
+
+	msg, err := a.getStreamMessage(r)
+	if err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+
+	// This msg is arbitrary data.
+	msg.Kind = streamingtypes.MessageKindData
+	// Read all data from the request body.
+	byt, err := io.ReadAll(io.LimitReader(r.Body, consts.MaxStreamingMessageSizeBytes))
+	_ = r.Body.Close()
+	if err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+
+	// Is byt valid JSON?  If so, we don't want to double-encode it.
+	if json.Valid(byt) {
+		msg.Data = byt
+	} else {
+		msg.Data, err = json.Marshal(string(byt))
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+	}
+
+	if err := msg.Validate(); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+
+	a.opts.Broadcaster.Publish(r.Context(), msg)
+}
+
+// publishStream handles publishing a stream of data sent to Inngest over seconds
+// to minutes.
+func (a *api) publishStream(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	msg, err := a.getStreamMessage(r)
+	if err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+
+	msg.Kind = streamingtypes.MessageKindDataStreamStart
+	// We must create a new random stream ID for the data stream, allowing
+	// all published chunks to be associated with each other.
+	sID := util.XXHash(time.Now())
+	msg.Data = []byte(sID)
+
+	if err := msg.Validate(); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+
+	// Publish the stream start message
+	a.opts.Broadcaster.Publish(ctx, msg)
+
+	// And always publish a stream end.
+	defer r.Body.Close()
+	defer func(msg Message) {
+		msg.Kind = streamingtypes.MessageKindDataStreamEnd
+		a.opts.Broadcaster.Publish(ctx, msg)
+	}(msg)
+
+	// Read the body in chunks, up to  chui
+	for i := 0; i < consts.MaxStreamingChunks; i++ {
+		buf := make([]byte, consts.StreamingChunkSize)
+		n, err := r.Body.Read(buf)
+
+		if n > 0 {
+			// Spit this chunk out!
+			a.opts.Broadcaster.PublishChunk(
+				ctx,
+				msg,
+				streamingtypes.ChunkFromMessage(
+					msg,
+					string(buf[:n]),
+				),
+			)
+		}
+
+		if errors.Is(err, io.EOF) {
+			// Read it all
+			break
+		}
+		if err != nil {
+			// Some other error; log and respond with an error message.
+			logger.StdlibLogger(ctx).Warn(
+				"error reading streaming publish",
+				"error", err,
+				"stream_message", msg,
+			)
+			return
+		}
+	}
+}
+
+func (a *api) getStreamMessage(r *http.Request) (Message, error) {
+	auth, err := a.opts.AuthFinder(r.Context())
+	if err != nil {
+		return Message{}, err
+	}
+
+	msg := Message{
+		Channel:   r.URL.Query().Get("channel"),
+		Topic:     r.URL.Query().Get("topic"),
+		EnvID:     auth.WorkspaceID(),
+		CreatedAt: time.Now(),
+	}
+	if runID := r.URL.Query().Get("run_id"); runID != "" {
+		msg.RunID, _ = ulid.Parse(runID)
+	}
+
+	return msg, nil
 }

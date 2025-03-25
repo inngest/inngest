@@ -9,7 +9,7 @@ import type { FunctionStatusMetricsQuery, ScopedMetricsResponse } from '@/gql/gr
 import tailwindConfig from '../../../tailwind.config';
 
 const {
-  theme: { backgroundColor, colors },
+  theme: { backgroundColor, colors, textColor },
 } = resolveConfig(tailwindConfig);
 
 export type MetricsData = {
@@ -61,18 +61,23 @@ const mapMetrics = (totals: FunctionTotals) => {
   ];
 };
 
-const holeLabel = {
-  rich: {
-    name: {
-      fontSize: 12,
-      lineHeight: 16,
+const holeLabel = () => {
+  const dark = isDark();
+  return {
+    rich: {
+      name: {
+        fontSize: 12,
+        lineHeight: 16,
+        color: resolveColor(textColor.basis, dark),
+      },
+      value: {
+        fontSize: 16,
+        lineHeight: 20,
+        fontWeight: 500,
+        color: resolveColor(textColor.basis, dark),
+      },
     },
-    value: {
-      fontSize: 16,
-      lineHeight: 20,
-      fontWeight: 500,
-    },
-  },
+  };
 };
 
 const totalRuns = (totals: Array<{ value: number }>) =>
@@ -92,6 +97,7 @@ const getChartOptions = (data: PieChartData, loading: boolean = false): ChartPro
       top: 'center',
       icon: 'circle',
       selectedMode: true,
+      textStyle: { fontSize: '12px', color: resolveColor(textColor.basis, dark) },
       formatter: (name: string) =>
         [
           name,
@@ -121,7 +127,7 @@ const getChartOptions = (data: PieChartData, loading: boolean = false): ChartPro
               ? [`{name| Loading}`, `{value| ...}`].join('\n')
               : [`{name| Total runs}`, `{value| ${sum}}`].join('\n');
           },
-          ...holeLabel,
+          ...holeLabel(),
         },
         emphasis: {
           label: {
@@ -131,7 +137,7 @@ const getChartOptions = (data: PieChartData, loading: boolean = false): ChartPro
             },
             backgroundColor: resolveColor(backgroundColor.canvasBase, dark, '#fff'),
             width: 80,
-            ...holeLabel,
+            ...holeLabel(),
           },
         },
         labelLine: {

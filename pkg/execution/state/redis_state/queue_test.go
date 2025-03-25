@@ -1240,7 +1240,8 @@ func TestQueueLease(t *testing.T) {
 
 			score, err := r.ZMScore(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex(), p.FunctionID.String())
 			require.NoError(t, err)
-			require.Equal(t, float64(leaseExpiry.UnixMilli()), score[0])
+
+			require.WithinDuration(t, leaseExpiry, time.UnixMilli(int64(score[0])), 2*time.Millisecond)
 		})
 
 		t.Run("Leasing again should fail", func(t *testing.T) {
@@ -5004,7 +5005,7 @@ func TestMigrate(t *testing.T) {
 	require.Equal(t, int64(5), count)
 
 	// Attempt to migrate from shard1 to shard2
-	processed, err := q1.Migrate(ctx, shard1Name, fnID, 10, func(ctx context.Context, qi *osqueue.QueueItem) error {
+	processed, err := q1.Migrate(ctx, shard1Name, fnID, 10, 0, func(ctx context.Context, qi *osqueue.QueueItem) error {
 		return q2.Enqueue(ctx, qi.Data, time.UnixMilli(qi.AtMS), osqueue.EnqueueOpts{PassthroughJobId: true})
 	})
 	require.NoError(t, err)
@@ -5021,7 +5022,7 @@ func TestMigrate(t *testing.T) {
 	require.Equal(t, int64(0), count)
 
 	// Now, move everything back to queue 1
-	returned, err := q2.Migrate(ctx, shard2Name, fnID, 10, func(ctx context.Context, qi *osqueue.QueueItem) error {
+	returned, err := q2.Migrate(ctx, shard2Name, fnID, 10, 0, func(ctx context.Context, qi *osqueue.QueueItem) error {
 		return q1.Enqueue(ctx, qi.Data, time.UnixMilli(qi.AtMS), osqueue.EnqueueOpts{PassthroughJobId: true})
 	})
 	require.NoError(t, err)

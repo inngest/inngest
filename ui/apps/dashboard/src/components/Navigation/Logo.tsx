@@ -7,14 +7,24 @@ import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
 import { InngestLogoSmallBW } from '@inngest/components/icons/logos/InngestLogoSmall';
 import { RiContractLeftLine, RiContractRightLine } from '@remixicon/react';
 
+import { QuickSearch } from './QuickSearch/QuickSearch';
 import Search from './Search';
 
 type LogoProps = {
   collapsed: boolean;
+  enableQuickSearchV2: boolean;
+  envSlug: string;
+  envName: string;
   setCollapsed: (arg: boolean) => void;
 };
 
-const NavToggle = ({ collapsed, setCollapsed }: LogoProps) => {
+const NavToggle = ({
+  collapsed,
+  setCollapsed,
+}: {
+  collapsed: boolean;
+  setCollapsed: (arg: boolean) => void;
+}) => {
   const toggle = async () => {
     const toggled = !collapsed;
     setCollapsed(toggled);
@@ -31,6 +41,7 @@ const NavToggle = ({ collapsed, setCollapsed }: LogoProps) => {
     <Button
       kind="primary"
       appearance="ghost"
+      size="small"
       onClick={toggle}
       className={'hidden group-hover:block'}
       icon={
@@ -44,7 +55,13 @@ const NavToggle = ({ collapsed, setCollapsed }: LogoProps) => {
   );
 };
 
-export default function Logo({ collapsed, setCollapsed }: LogoProps) {
+export default function Logo({
+  collapsed,
+  enableQuickSearchV2,
+  envSlug,
+  envName,
+  setCollapsed,
+}: LogoProps) {
   return (
     <div
       className={`${
@@ -59,11 +76,14 @@ export default function Logo({ collapsed, setCollapsed }: LogoProps) {
         ) : (
           <>
             <NextLink href={process.env.NEXT_PUBLIC_HOME_PATH as Route} scroll={false}>
-              <InngestLogo className="text-basis mr-2" width={92} />
+              <InngestLogo className="text-basis mr-2 mt-1" width={82} />
             </NextLink>
           </>
         )}
-        <Search collapsed={collapsed} />
+        {enableQuickSearchV2 && (
+          <QuickSearch collapsed={collapsed} envSlug={envSlug} envName={envName} />
+        )}
+        {!enableQuickSearchV2 && <Search collapsed={collapsed} />}
       </div>
       <NavToggle collapsed={collapsed} setCollapsed={setCollapsed} />
     </div>

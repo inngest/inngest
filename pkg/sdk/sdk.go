@@ -77,12 +77,18 @@ type RegisterRequest struct {
 	Framework string `json:"framework"`
 	// AppName represents a namespaced app name for each deployed function.
 	AppName string `json:"appName"`
+	// AppVersion represents an optional application version identifier. This should change
+	// whenever code within one of your Inngest function or any dependency thereof changes.
+	AppVersion string `json:"appVersion,omitempty"`
 	// Functions represents all functions hosted within this deploy.
 	Functions []SDKFunction `json:"functions"`
 	// Headers are fetched from the incoming HTTP request.  They are present
 	// on all calls to Inngest from the SDK, and are separate from the RegisterRequest
 	// JSON payload to have a single source of truth.
 	Headers Headers `json:"headers"`
+
+	// IdempotencyKey is an optional input to deduplicate syncs.
+	IdempotencyKey string `json:"idempotencyKey"`
 
 	// checksum is a memoized field.
 	checksum string

@@ -28,11 +28,17 @@ type ActionVersionQuery struct {
 	VersionMinor *int   `json:"versionMinor,omitempty"`
 }
 
+type AppsFilterV1 struct {
+	ConnectionType *AppConnectionType `json:"connectionType,omitempty"`
+	Method         *AppMethod         `json:"method,omitempty"`
+}
+
 type ConnectV1WorkerConnection struct {
 	ID               ulid.ULID                 `json:"id"`
 	GatewayID        ulid.ULID                 `json:"gatewayId"`
 	InstanceID       string                    `json:"instanceId"`
 	WorkerIP         string                    `json:"workerIp"`
+	AppName          *string                   `json:"appName,omitempty"`
 	AppID            *uuid.UUID                `json:"appID,omitempty"`
 	App              *cqrs.App                 `json:"app,omitempty"`
 	ConnectedAt      time.Time                 `json:"connectedAt"`
@@ -46,6 +52,7 @@ type ConnectV1WorkerConnection struct {
 	SdkPlatform      string                    `json:"sdkPlatform"`
 	SyncID           *uuid.UUID                `json:"syncId,omitempty"`
 	BuildID          *string                   `json:"buildId,omitempty"`
+	AppVersion       *string                   `json:"appVersion,omitempty"`
 	FunctionCount    int                       `json:"functionCount"`
 	CPUCores         int                       `json:"cpuCores"`
 	MemBytes         int                       `json:"memBytes"`
@@ -57,14 +64,8 @@ type ConnectV1WorkerConnectionEdge struct {
 	Cursor string                     `json:"cursor"`
 }
 
-type ConnectV1WorkerConnectionsConnection struct {
-	Edges      []*ConnectV1WorkerConnectionEdge `json:"edges"`
-	PageInfo   *PageInfo                        `json:"pageInfo"`
-	TotalCount int                              `json:"totalCount"`
-}
-
 type ConnectV1WorkerConnectionsFilter struct {
-	From      time.Time                               `json:"from"`
+	From      *time.Time                              `json:"from,omitempty"`
 	Until     *time.Time                              `json:"until,omitempty"`
 	TimeField *ConnectV1WorkerConnectionsOrderByField `json:"timeField,omitempty"`
 	Status    []ConnectV1ConnectionStatus             `json:"status,omitempty"`
@@ -273,12 +274,6 @@ type RunsFilterV2 struct {
 	Query       *string             `json:"query,omitempty"`
 }
 
-type RunsV2Connection struct {
-	Edges      []*FunctionRunV2Edge `json:"edges"`
-	PageInfo   *PageInfo            `json:"pageInfo"`
-	TotalCount int                  `json:"totalCount"`
-}
-
 type RunsV2OrderBy struct {
 	Field     RunsV2OrderByField   `json:"field"`
 	Direction RunsOrderByDirection `json:"direction"`
@@ -348,6 +343,88 @@ func (WaitForEventStepInfo) IsStepInfo() {}
 
 type Workspace struct {
 	ID string `json:"id"`
+}
+
+type AppConnectionType string
+
+const (
+	AppConnectionTypeServerless AppConnectionType = "SERVERLESS"
+	AppConnectionTypeConnect    AppConnectionType = "CONNECT"
+)
+
+var AllAppConnectionType = []AppConnectionType{
+	AppConnectionTypeServerless,
+	AppConnectionTypeConnect,
+}
+
+func (e AppConnectionType) IsValid() bool {
+	switch e {
+	case AppConnectionTypeServerless, AppConnectionTypeConnect:
+		return true
+	}
+	return false
+}
+
+func (e AppConnectionType) String() string {
+	return string(e)
+}
+
+func (e *AppConnectionType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = AppConnectionType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid AppConnectionType", str)
+	}
+	return nil
+}
+
+func (e AppConnectionType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type AppMethod string
+
+const (
+	AppMethodServe   AppMethod = "SERVE"
+	AppMethodConnect AppMethod = "CONNECT"
+)
+
+var AllAppMethod = []AppMethod{
+	AppMethodServe,
+	AppMethodConnect,
+}
+
+func (e AppMethod) IsValid() bool {
+	switch e {
+	case AppMethodServe, AppMethodConnect:
+		return true
+	}
+	return false
+}
+
+func (e AppMethod) String() string {
+	return string(e)
+}
+
+func (e *AppMethod) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = AppMethod(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid AppMethod", str)
+	}
+	return nil
+}
+
+func (e AppMethod) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 type ConnectV1ConnectionStatus string

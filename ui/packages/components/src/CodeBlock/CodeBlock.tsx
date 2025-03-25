@@ -13,7 +13,7 @@ import { IconWrapText } from '@inngest/components/icons/WrapText';
 import { cn } from '@inngest/components/utils/classNames';
 import { FONT, LINE_HEIGHT, createColors, createRules } from '@inngest/components/utils/monaco';
 import Editor, { useMonaco } from '@monaco-editor/react';
-import { RiDownload2Line } from '@remixicon/react';
+import { RiCollapseDiagonalLine, RiDownload2Line, RiExpandDiagonalLine } from '@remixicon/react';
 import { type editor } from 'monaco-editor';
 import { useLocalStorage } from 'react-use';
 
@@ -46,11 +46,23 @@ interface CodeBlockProps {
   };
   actions?: CodeBlockAction[];
   minLines?: number;
+  allowFullScreen?: boolean;
+  resize?: boolean;
+  alwaysFullHeight?: boolean;
 }
 
-export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlockProps) {
+export function CodeBlock({
+  header,
+  tab,
+  actions = [],
+  minLines = 0,
+  allowFullScreen = false,
+  resize = false,
+  alwaysFullHeight = false,
+}: CodeBlockProps) {
   const [dark, setDark] = useState(isDark());
   const [editorHeight, setEditorHeight] = useState(0);
+  const [fullScreen, setFullScreen] = useState(false);
   const editorRef = useRef<MonacoEditorType>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -83,10 +95,10 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
   }, [monaco, dark]);
 
   useEffect(() => {
-    if (editorRef.current) {
+    if (editorRef.current && !alwaysFullHeight) {
       updateEditorLayout(editorRef.current);
     }
-  }, [isWordWrap, isFullHeight]);
+  }, [isWordWrap, isFullHeight, fullScreen, resize, alwaysFullHeight]);
 
   function getTextWidth(text: string, font: string) {
     const canvas = document.createElement('canvas');
@@ -190,7 +202,7 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
         }
       }
 
-      if (totalLinesThatFit > MAX_LINES && !isFullHeight) {
+      if (totalLinesThatFit > MAX_LINES && !isFullHeight && !alwaysFullHeight) {
         editor.layout({ height: MAX_HEIGHT, width: containerWidthWithLineNumbers });
         setEditorHeight(MAX_HEIGHT);
       } else {
@@ -237,7 +249,7 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
   return (
     <>
       {monaco && (
-        <>
+        <div className={cn('relative', fullScreen && 'bg-canvasBase fixed inset-0 z-[52]')}>
           <div className={cn('bg-canvasBase border-subtle border-b')}>
             <div
               className={cn(
@@ -288,22 +300,38 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
                     appearance="outlined"
                     kind="secondary"
                   />
-                  <Button
-                    onClick={handleFullHeight}
-                    size="small"
-                    icon={isFullHeight ? <IconShrinkText /> : <IconExpandText />}
-                    aria-label={isFullHeight ? 'Shrink text' : 'Expand text'}
-                    title={isFullHeight ? 'Shrink text' : 'Expand text'}
-                    tooltip={isFullHeight ? 'Shrink text' : 'Expand text'}
-                    appearance="outlined"
-                    kind="secondary"
-                  />
+                  {!alwaysFullHeight && (
+                    <Button
+                      onClick={handleFullHeight}
+                      size="small"
+                      icon={isFullHeight ? <IconShrinkText /> : <IconExpandText />}
+                      aria-label={isFullHeight ? 'Shrink text' : 'Expand text'}
+                      title={isFullHeight ? 'Shrink text' : 'Expand text'}
+                      tooltip={isFullHeight ? 'Shrink text' : 'Expand text'}
+                      appearance="outlined"
+                      kind="secondary"
+                    />
+                  )}
+                  {allowFullScreen && (
+                    <Button
+                      onClick={() => setFullScreen(!fullScreen)}
+                      size="small"
+                      icon={fullScreen ? <RiCollapseDiagonalLine /> : <RiExpandDiagonalLine />}
+                      aria-label="Full screen"
+                      title="Full screen"
+                      tooltip="Full screen"
+                      appearance="outlined"
+                      kind="secondary"
+                    />
+                  )}
                 </div>
               )}
             </div>
           </div>
-          {/* Content */}
-          <div ref={wrapperRef}>
+          <div
+            ref={wrapperRef}
+            className={cn('relative', (alwaysFullHeight || fullScreen) && 'h-screen')}
+          >
             {isOutputTooLarge ? (
               <>
                 <Alert severity="warning">Output size is too large to render {`( > 1MB )`}</Alert>
@@ -319,8 +347,8 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
               </>
             ) : (
               <Editor
-                className="absolute"
-                height={editorHeight}
+                className={cn('relative', (alwaysFullHeight || fullScreen) && 'h-full')}
+                height={alwaysFullHeight || fullScreen ? '100%' : editorHeight}
                 defaultLanguage={language}
                 value={content}
                 theme="inngest-theme"
@@ -337,7 +365,7 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
                   },
                   lineNumbers: 'on',
                   contextmenu: false,
-                  scrollBeyondLastLine: false,
+                  scrollBeyondLastLine: alwaysFullHeight ? true : false,
                   fontFamily: FONT.font,
                   fontSize: FONT.size,
                   fontWeight: 'light',
@@ -361,18 +389,18 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
                 }}
                 onMount={(editor) => {
                   handleEditorDidMount(editor);
-                  updateEditorLayout(editor);
+                  !alwaysFullHeight && updateEditorLayout(editor);
                 }}
                 onChange={(value) => {
                   if (value !== undefined) {
                     handleChange && handleChange(value);
-                    updateEditorLayout(editorRef.current);
+                    !alwaysFullHeight && updateEditorLayout(editorRef.current);
                   }
                 }}
               />
             )}
           </div>
-        </>
+        </div>
       )}
     </>
   );

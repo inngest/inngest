@@ -1,18 +1,19 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { SkeletonCard } from '@inngest/components/Apps/AppCard';
 import { Button } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
 import { Link } from '@inngest/components/Link/Link';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiAddLine, RiQuestionLine } from '@remixicon/react';
 
+import AppFAQ from '@/components/Apps/AppFAQ';
+import { EmptyOnboardingCard } from '@/components/Apps/EmptyAppsCard';
 import { StatusMenu } from '@/components/Apps/StatusMenu';
-import EmptyAppsCard from '@/components/Onboarding/EmptyAppsCard';
 import { getProdApps } from '@/components/Onboarding/actions';
 import { staticSlugs } from '@/utils/environments';
 import { pathCreator } from '@/utils/urls';
-import { SkeletonCard } from './AppCard';
 import { Apps } from './Apps';
 
 const AppInfo = () => (
@@ -98,17 +99,20 @@ export default function AppsPage({
           )
         }
       />
-      <div className="bg-canvasBase mx-auto flex h-full w-full max-w-[1200px] flex-col px-6 pb-4 pt-16">
+      <div className="bg-canvasBase mx-auto flex h-full w-full max-w-4xl flex-col px-6 pb-4 pt-16">
         {isLoading ? (
           <div className="mb-4 flex items-center justify-center">
-            <div className="mt-[50px] w-full max-w-[1200px]">
+            <div className="mt-[50px] w-full max-w-4xl">
               <SkeletonCard />
             </div>
           </div>
         ) : (
           <>
             {displayOnboarding ? (
-              <EmptyAppsCard />
+              <>
+                <EmptyOnboardingCard />
+                <AppFAQ />
+              </>
             ) : (
               <>
                 <div className="relative flex w-full flex-row justify-start">

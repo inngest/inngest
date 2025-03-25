@@ -5,12 +5,12 @@ import { type Route } from 'next';
 import { Link } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { Table, TextCell } from '@inngest/components/Table';
+import { formatDayString } from '@inngest/components/utils/date';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 import { useQuery } from 'urql';
 
 import PaymentStatusPill from '@/components/Billing/Payments/PaymentStatusPill';
 import { graphql } from '@/gql';
-import { day } from '@/utils/date';
 
 const GetPaymentIntentsDocument = graphql(`
   query GetPaymentIntents {
@@ -112,7 +112,7 @@ export default function Payments() {
       (payment): TableRow => ({
         status: payment.status,
         description: payment.description,
-        createdAt: day(payment.createdAt),
+        createdAt: formatDayString(new Date(payment.createdAt)),
         amount: payment.amountLabel,
         url: payment.invoiceURL,
       })

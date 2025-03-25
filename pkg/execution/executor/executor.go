@@ -14,6 +14,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/inngest/inngest/pkg/syscode"
+
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -711,14 +713,13 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 }
 
 type runInstance struct {
-	md           sv2.Metadata
-	f            inngest.Function
-	events       []json.RawMessage
-	item         queue.Item
-	edge         inngest.Edge
-	resp         *state.DriverResponse
-	stackIndex   int
-	appIsConnect bool
+	md         sv2.Metadata
+	f          inngest.Function
+	events     []json.RawMessage
+	item       queue.Item
+	edge       inngest.Edge
+	resp       *state.DriverResponse
+	stackIndex int
 }
 
 // Execute loads a workflow and the current run state, then executes the
@@ -732,7 +733,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// for the outgoing edge ID.  This ensures that we properly increase the stack
 	// for `tools.sleep` within generator functions.
 	if item.Kind == queue.KindSleep && item.Attempt == 0 {
-		err := e.smv2.SaveStep(ctx, sv2.ID{
+		hasPendingSteps, err := e.smv2.SaveStep(ctx, sv2.ID{
 			RunID:      id.RunID,
 			FunctionID: id.WorkflowID,
 			Tenant: sv2.Tenant{
@@ -743,6 +744,12 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}, edge.Outgoing, []byte("null"))
 		if !errors.Is(err, state.ErrDuplicateResponse) && err != nil {
 			return nil, err
+		}
+
+		if hasPendingSteps {
+			// Other steps are pending before we re-enter the function, so
+			// we're now done with this execution.
+			return nil, nil
 		}
 		// After the sleep, we start a new step.  This means we also want to start a new
 		// group ID, ensuring that we correlate the next step _after_ this sleep (to be
@@ -796,9 +803,16 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, err
 	}
 
-	// for recording function start time after a successful step.
+	//
+	// record function start time using the same method as step started,
+	// ensures ui timeline alignment
+	start, ok := redis_state.GetItemStart(ctx)
+	if !ok {
+		start = time.Now()
+	}
+
 	if md.Config.StartedAt.IsZero() {
-		md.Config.StartedAt = time.Now()
+		md.Config.StartedAt = start
 	}
 
 	if v.stopWithoutRetry {
@@ -867,13 +881,12 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	instance := runInstance{
-		md:           md,
-		f:            *ef.Function,
-		events:       events,
-		item:         item,
-		edge:         edge,
-		stackIndex:   stackIndex,
-		appIsConnect: ef.AppIsConnect,
+		md:         md,
+		f:          *ef.Function,
+		events:     events,
+		item:       item,
+		edge:       edge,
+		stackIndex: stackIndex,
 	}
 
 	resp, err := e.run(ctx, &instance)
@@ -889,7 +902,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 		return nil, err
 	}
-	err = e.HandleResponse(ctx, &instance)
+	if handleErr := e.HandleResponse(ctx, &instance); handleErr != nil {
+		return resp, handleErr
+	}
 	return resp, err
 }
 
@@ -959,8 +974,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 				i.item.Attempt += 1
 				go e.OnStepScheduled(context.WithoutCancel(ctx), i.md, i.item, &i.resp.Step.Name)
 			}
-
-			return i.resp
+			return nil
 		}
 
 		// If i.resp.Err != nil, we don't know whether to invoke the fn again
@@ -983,7 +997,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
 		}
 
-		return i.resp
+		return nil
 	}
 
 	// The generator length check is necessary because parallel steps in older
@@ -1204,9 +1218,6 @@ func (e *executor) executeDriverForStep(ctx context.Context, i *runInstance) (*s
 	url, _ := i.f.URI()
 
 	driverName := inngest.SchemeDriver(url.Scheme)
-	if i.appIsConnect {
-		driverName = "connect"
-	}
 
 	d, ok := e.runtimeDrivers[driverName]
 	if !ok {
@@ -1224,10 +1235,28 @@ func (e *executor) executeDriverForStep(ctx context.Context, i *runInstance) (*s
 		}
 	}
 	if err != nil && response.Err == nil {
-		// Set the response error if it wasn't set, or if Execute had an internal error.
-		// This ensures that we only ever need to check resp.Err to handle errors.
-		errstr := err.Error()
-		response.Err = &errstr
+		var serr syscode.Error
+		if errors.As(err, &serr) {
+			gracefulErr := state.StandardError{
+				Error:   fmt.Sprintf("%s: %s", serr.Code, serr.Message),
+				Name:    serr.Code,
+				Message: serr.Message,
+			}.Serialize(execution.StateErrorKey)
+			response.Output = gracefulErr
+			response.Err = &serr.Code
+		} else {
+			// Set the response error if it wasn't set, or if Execute had an internal error.
+			// This ensures that we only ever need to check resp.Err to handle errors.
+			byt, e := json.Marshal(err.Error())
+			if e != nil {
+				response.Output = err
+			} else {
+				response.Output = string(byt)
+			}
+
+			errstr := err.Error()
+			response.Err = &errstr
+		}
 	}
 	// Ensure that the step is always set.  This removes the need for drivers to always
 	// set this.
@@ -1523,7 +1552,7 @@ func (e *executor) handlePause(
 			}
 
 			// Ensure we consume this pause, as this isn't handled by the higher-level cancel function.
-			err = e.pm.ConsumePause(context.Background(), pause.ID, nil)
+			_, err = e.pm.ConsumePause(context.Background(), pause.ID, nil)
 			if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
 				atomic.AddInt32(&res[1], 1)
 				_ = e.exprAggregator.RemovePause(ctx, pause)
@@ -1610,7 +1639,6 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 	if e.log != nil {
 		e.log.
 			Debug().
-			Interface("with", resumeData.With).
 			Str("pause.DataKey", pause.DataKey).
 			Msg("resuming pause from invoke")
 	}
@@ -1705,14 +1733,15 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			// Delete this pause, as an event has occured which matches
 			// the timeout.  We can do this prior to leasing a pause as it's the
 			// only work that needs to happen
-			err := e.pm.ConsumePause(ctx, pause.ID, nil)
+			_, err = e.pm.ConsumePause(ctx, pause.ID, nil)
 			if err == nil || err == state.ErrPauseNotFound {
 				return nil
 			}
 			return fmt.Errorf("error consuming pause via timeout: %w", err)
 		}
 
-		if err = e.pm.ConsumePause(ctx, pause.ID, r.With); err != nil {
+		consumeResult, err := e.pm.ConsumePause(ctx, pause.ID, r.With)
+		if err != nil {
 			return fmt.Errorf("error consuming pause via event: %w", err)
 		}
 
@@ -1726,27 +1755,29 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				Msg("resuming from pause")
 		}
 
-		// Schedule an execution from the pause's entrypoint.  We do this after
-		// consuming the pause to guarantee the event data is stored via the pause
-		// for the next run.  If the ConsumePause call comes after enqueue, the TCP
-		// conn may drop etc. and running the job may occur prior to saving state data.
-		jobID := fmt.Sprintf("%s-%s", pause.Identifier.IdempotencyKey(), pause.DataKey)
-		err = e.queue.Enqueue(ctx, queue.Item{
-			JobID: &jobID,
-			// Add a new group ID for the child;  this will be a new step.
-			GroupID:               uuid.New().String(),
-			WorkspaceID:           pause.WorkspaceID,
-			Kind:                  queue.KindEdge,
-			Identifier:            pause.Identifier,
-			PriorityFactor:        md.Config.PriorityFactor,
-			CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
-			MaxAttempts:           pause.MaxAttempts,
-			Payload: queue.PayloadEdge{
-				Edge: pause.Edge(),
-			},
-		}, time.Now(), queue.EnqueueOpts{})
-		if err != nil && err != redis_state.ErrQueueItemExists {
-			return fmt.Errorf("error enqueueing after pause: %w", err)
+		if consumeResult.DidConsume && !consumeResult.HasPendingSteps {
+			// Schedule an execution from the pause's entrypoint.  We do this after
+			// consuming the pause to guarantee the event data is stored via the pause
+			// for the next run.  If the ConsumePause call comes after enqueue, the TCP
+			// conn may drop etc. and running the job may occur prior to saving state data.
+			jobID := fmt.Sprintf("%s-%s", pause.Identifier.IdempotencyKey(), pause.DataKey)
+			err = e.queue.Enqueue(ctx, queue.Item{
+				JobID: &jobID,
+				// Add a new group ID for the child;  this will be a new step.
+				GroupID:               uuid.New().String(),
+				WorkspaceID:           pause.WorkspaceID,
+				Kind:                  queue.KindEdge,
+				Identifier:            pause.Identifier,
+				PriorityFactor:        md.Config.PriorityFactor,
+				CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
+				MaxAttempts:           pause.MaxAttempts,
+				Payload: queue.PayloadEdge{
+					Edge: pause.Edge(),
+				},
+			}, time.Now(), queue.EnqueueOpts{})
+			if err != nil && err != redis_state.ErrQueueItemExists {
+				return fmt.Errorf("error enqueueing after pause: %w", err)
+			}
 		}
 
 		// And dequeue the timeout job to remove unneeded work from the queue, etc.
@@ -1839,7 +1870,9 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 		}
 	}
 
-	if len(resp.Generator) > consts.DefaultMaxStepLimit {
+	stepCount := len(resp.Generator)
+
+	if stepCount > consts.DefaultMaxStepLimit {
 		// Disallow parallel plans that exceed the step limit
 		return state.WrapInStandardError(
 			state.ErrFunctionOverflowed,
@@ -1849,8 +1882,15 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 		)
 	}
 
-	groups := opGroups(resp.Generator).All()
-	for _, group := range groups {
+	groups := opGroups(resp.Generator)
+
+	if stepCount > 1 && i.md.ShouldCoalesceParallelism(resp) {
+		if err := e.smv2.SavePending(ctx, i.md.ID, groups.IDs()); err != nil {
+			return fmt.Errorf("error saving pending steps: %w", err)
+		}
+	}
+
+	for _, group := range groups.All() {
 		if err := e.handleGeneratorGroup(ctx, i, group, resp); err != nil {
 			return err
 		}
@@ -1946,7 +1986,8 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		return err
 	}
 
-	if err := e.smv2.SaveStep(ctx, i.md.ID, gen.ID, []byte(output)); err != nil {
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, i.md.ID, gen.ID, []byte(output))
+	if err != nil {
 		return err
 	}
 
@@ -1970,13 +2011,16 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 	}
-	err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
-	if err == redis_state.ErrQueueItemExists {
-		return nil
-	}
-	if err != nil {
-		logger.StdlibLogger(ctx).Error("error scheduling step queue item", "error", err)
-		return err
+
+	if !hasPendingSteps {
+		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
+		if err == redis_state.ErrQueueItemExists {
+			return nil
+		}
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error scheduling step queue item", "error", err)
+			return err
+		}
 	}
 
 	for _, l := range e.lifecycles {
@@ -1986,26 +2030,27 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		go l.OnStepScheduled(ctx, i.md, nextItem, stepName)
 	}
 
-	// Ensure we publish the step outputs to any publishers connected.  This broadcasts the
-	// step output to any realtime subscribers.
-	if e.rtpub != nil {
-		e.rtpub.Publish(ctx, realtime.Message{
-			Kind:       realtime.MessageKindStep,
-			Data:       gen.Data,
-			TopicNames: []string{gen.UserDefinedName()},
-			EnvID:      i.md.ID.Tenant.EnvID,
-			FnID:       i.md.ID.FunctionID,
-			FnSlug:     i.f.GetSlug(),
-			RunID:      i.md.ID.RunID,
-			CreatedAt:  time.Now(),
-		})
-	}
+	// NOTE: Default topics are not yet implemented and are a V2 realtime feature.
+	//
+	// if e.rtpub != nil {
+	// 	e.rtpub.Publish(ctx, realtime.Message{
+	// 		Kind:       streamingtypes.MessageKindStep,
+	// 		Data:       gen.Data,
+	// 		Topic:      gen.UserDefinedName(),
+	// 		EnvID:      i.md.ID.Tenant.EnvID,
+	// 		FnID:       i.md.ID.FunctionID,
+	// 		FnSlug:     i.f.GetSlug(),
+	// 		Channel:    i.md.ID.RunID.String(),
+	// 		CreatedAt:  time.Now(),
+	// 		RunID:      i.md.ID.RunID,
+	// 	})
+	// }
 
 	return nil
 }
 
 func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	// With the introduction of the StepError opcode, step errors are handled graceully and we can
+	// With the introduction of the StepError opcode, step errors are handled gracefully, and we can
 	// finally distinguish between application level errors (this function) and network errors/other
 	// errors (as the SDK didn't return this opcode).
 	//
@@ -2057,7 +2102,9 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 	if err != nil {
 		return err
 	}
-	if err := e.smv2.SaveStep(ctx, i.md.ID, gen.ID, []byte(output)); err != nil {
+
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, i.md.ID, gen.ID, []byte(output))
+	if err != nil {
 		return err
 	}
 
@@ -2085,9 +2132,12 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 	}
-	err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
-	if err == redis_state.ErrQueueItemExists {
-		return nil
+
+	if !hasPendingSteps {
+		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
+		if err == redis_state.ErrQueueItemExists {
+			return nil
+		}
 	}
 
 	for _, l := range e.lifecycles {
@@ -2297,7 +2347,8 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 	}
 
 	// Save the output as the step result.
-	if err := e.smv2.SaveStep(ctx, i.md.ID, gen.ID, output); err != nil {
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, i.md.ID, gen.ID, output)
+	if err != nil {
 		return err
 	}
 
@@ -2328,9 +2379,12 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 	}
-	err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
-	if err == redis_state.ErrQueueItemExists {
-		return nil
+
+	if !hasPendingSteps {
+		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
+		if err == redis_state.ErrQueueItemExists {
+			return nil
+		}
 	}
 
 	for _, l := range e.lifecycles {

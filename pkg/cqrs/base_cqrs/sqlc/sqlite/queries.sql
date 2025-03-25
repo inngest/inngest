@@ -1,6 +1,6 @@
 -- name: UpsertApp :one
-INSERT INTO apps (id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url, is_connect)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO apps (id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url, method, app_version)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
     name = excluded.name,
     sdk_language = excluded.sdk_language,
@@ -11,7 +11,8 @@ ON CONFLICT(id) DO UPDATE SET
     error = excluded.error,
     checksum = excluded.checksum,
     archived_at = NULL,
-    is_connect = excluded.is_connect
+    "method" = excluded.method,
+    app_version = excluded.app_version
 RETURNING *;
 
 -- name: GetApp :one
@@ -90,8 +91,8 @@ UPDATE functions SET archived_at = datetime('now') WHERE id IN (sqlc.slice('ids'
 
 -- name: InsertFunctionRun :exec
 INSERT INTO function_runs
-	(run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id, cron) VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?);
+	(run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id, cron, workspace_id) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: InsertFunctionFinish :exec
 INSERT INTO function_finishes
@@ -281,14 +282,16 @@ WHERE snapshot_id NOT IN (
 
 -- name: InsertWorkerConnection :exec
 INSERT INTO worker_connections (
-    account_id, workspace_id, app_id, id, gateway_id, instance_id, status, worker_ip, connected_at, last_heartbeat_at, disconnected_at,
-    recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, build_id, function_count, cpu_cores, mem_bytes, os
+    account_id, workspace_id, app_name, app_id, id, gateway_id, instance_id, status, worker_ip, connected_at, last_heartbeat_at, disconnected_at,
+    recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, app_version, function_count, cpu_cores, mem_bytes, os
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(id)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id, app_name)
 DO UPDATE SET
     account_id = excluded.account_id,
     workspace_id = excluded.workspace_id,
+
+    app_name = excluded.app_name,
     app_id = excluded.app_id,
 
     id = excluded.id,
@@ -310,7 +313,7 @@ DO UPDATE SET
     sdk_version = excluded.sdk_version,
     sdk_platform = excluded.sdk_platform,
     sync_id = excluded.sync_id,
-    build_id = excluded.build_id,
+    app_version = excluded.app_version,
     function_count = excluded.function_count,
 
     cpu_cores = excluded.cpu_cores,

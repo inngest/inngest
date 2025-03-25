@@ -8,6 +8,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
+	sdkerrors "github.com/inngest/inngestgo/errors"
 	"github.com/xhit/go-str2duration/v2"
 )
 
@@ -42,7 +43,7 @@ func Invoke[T any](ctx context.Context, id string, opts InvokeOpts) (T, error) {
 	}
 
 	op := mgr.NewOp(enums.OpcodeInvokeFunction, id, args)
-	if val, ok := mgr.Step(op); ok {
+	if val, ok := mgr.Step(ctx, op); ok {
 		var output T
 		var valMap map[string]json.RawMessage
 		if err := json.Unmarshal(val, &valMap); err != nil {
@@ -69,7 +70,7 @@ func Invoke[T any](ctx context.Context, id string, opts InvokeOpts) (T, error) {
 				panic(ControlHijack{})
 			}
 
-			return output, fmt.Errorf("%s", errObj.Message)
+			return output, sdkerrors.NoRetryError(fmt.Errorf("%s", errObj.Message))
 		}
 
 		mgr.SetErr(fmt.Errorf("error parsing invoke value for '%s'; unknown shape", opts.FunctionId))

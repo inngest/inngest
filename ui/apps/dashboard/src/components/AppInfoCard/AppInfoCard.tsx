@@ -1,14 +1,15 @@
 'use client';
 
 import { type Route } from 'next';
-import { AppDetailsCard, CardItem } from '@inngest/components/Apps/AppDetailsCard';
+import AppDetailsCard from '@inngest/components/Apps/AppDetailsCard';
 import { Link } from '@inngest/components/Link';
+import { Pill } from '@inngest/components/Pill/Pill';
 import { TextClickToCopy } from '@inngest/components/Text';
 import { Time } from '@inngest/components/Time';
+import { methodTypes, type App } from '@inngest/components/types/app';
+import { RiArrowLeftRightLine, RiInfinityLine } from '@remixicon/react';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { FrameworkInfo } from '@/components/FrameworkInfo';
-import { LanguageInfo } from '@/components/LanguageInfo';
 import { SyncStatusPill } from '@/components/SyncStatusPill';
 import { PlatformSection } from './PlatformSection';
 
@@ -21,6 +22,7 @@ type Props = {
   sync: Sync | null;
   linkToSyncs?: boolean;
   loading?: false;
+  workerCounter?: React.ReactNode;
 };
 
 type LoadingProps = {
@@ -29,23 +31,27 @@ type LoadingProps = {
   sync?: undefined;
   linkToSyncs?: boolean;
   loading: true;
-};
-
-type App = {
-  externalID: string;
-  name: string;
+  workerCounter?: React.ReactNode;
 };
 
 type Sync = {
-  framework: string | null;
+  framework?: string | null;
   lastSyncedAt: Date;
-  sdkLanguage: string | null;
+  sdkLanguage?: string | null;
   sdkVersion: string | null;
   status: string;
   url: string | null;
+  appVersion: string | null;
 } & React.ComponentProps<typeof PlatformSection>['sync'];
 
-export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Props | LoadingProps) {
+export function AppInfoCard({
+  app,
+  className,
+  sync,
+  linkToSyncs,
+  loading,
+  workerCounter,
+}: Props | LoadingProps) {
   const env = useEnvironment();
   let lastSyncValue;
   if (sync) {
@@ -54,10 +60,10 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
         <div className="flex items-center gap-2">
           <SyncStatusPill status={sync.status} />
           {linkToSyncs && <Time value={sync.lastSyncedAt} />}
-          {!linkToSyncs && (
+          {!linkToSyncs && app.externalID && (
             <Link
               href={`/env/${env.slug}/apps/${encodeURIComponent(app.externalID)}/syncs` as Route}
-              size="medium"
+              size="small"
             >
               <Time value={sync.lastSyncedAt} />
             </Link>
@@ -78,17 +84,21 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
     <>
       <AppDetailsCard title="App information" className={className}>
         {/* Row 1 */}
-        <CardItem
+        <AppDetailsCard.Item
           detail={<div className="truncate">{app?.externalID ?? '-'}</div>}
-          term="ID"
+          term="App ID"
           loading={loading}
         />
-        <CardItem
-          detail={<div className="truncate">{sync?.sdkVersion ?? '-'}</div>}
+        <AppDetailsCard.Item
+          detail={
+            <div className="truncate">
+              {sync?.sdkVersion ? <Pill>{sync.sdkVersion}</Pill> : '-'}
+            </div>
+          }
           term="SDK version"
           loading={loading}
         />
-        <CardItem
+        <AppDetailsCard.Item
           className="col-span-2"
           detail={<div className="truncate">{lastSyncValue ?? '-'}</div>}
           term="Last sync"
@@ -96,24 +106,54 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
         />
 
         {/* Row 2 */}
-        <CardItem
-          detail={<FrameworkInfo framework={sync?.framework} />}
+        <AppDetailsCard.Item
+          detail={<div className="truncate">{sync?.framework ?? '-'}</div>}
           term="Framework"
           loading={loading}
         />
-        <CardItem
-          detail={<LanguageInfo language={sync?.sdkLanguage} />}
+        <AppDetailsCard.Item
+          detail={<div className="truncate">{sync?.sdkLanguage || '-'}</div>}
           term="Language"
           loading={loading}
         />
-        <CardItem
+        <AppDetailsCard.Item
           className="col-span-2"
           detail={<TextClickToCopy truncate>{sync?.url ?? '-'}</TextClickToCopy>}
           term="URL"
           loading={loading}
         />
-
         {/* Row 3 */}
+        {app?.method && (
+          <AppDetailsCard.Item
+            term="Method"
+            detail={
+              <div className="flex items-center gap-1">
+                {app.method === methodTypes.Connect ? (
+                  <RiInfinityLine className="h-4 w-4" />
+                ) : (
+                  <RiArrowLeftRightLine className="h-4 w-4" />
+                )}
+                <div className="lowercase first-letter:capitalize">{app.method}</div>
+              </div>
+            }
+          />
+        )}
+        <AppDetailsCard.Item
+          detail={
+            <div className="truncate">
+              {sync?.appVersion || app?.appVersion ? (
+                <Pill>{sync?.appVersion || app?.appVersion}</Pill>
+              ) : (
+                '-'
+              )}
+            </div>
+          }
+          term="App version"
+          loading={loading}
+        />
+        {app?.method === methodTypes.Connect && workerCounter && <>{workerCounter}</>}
+
+        {/* Row 4 */}
         {sync && <PlatformSection sync={sync} />}
       </AppDetailsCard>
     </>

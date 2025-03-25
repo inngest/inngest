@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 	"github.com/inngest/inngest/pkg/api"
+	"github.com/inngest/inngest/pkg/api/tel"
 	"github.com/inngest/inngest/pkg/config"
 	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
 	"github.com/inngest/inngest/pkg/consts"
@@ -108,6 +109,7 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	// NOTE: These are present in the 2.x and 3.x SDKs to enable large payload sizes.
 	a.Get("/runs/{runID}/batch", a.GetEventBatch)
 	a.Get("/runs/{runID}/actions", a.GetActions)
+	a.Post("/telemetry", a.TrackEvent)
 
 	a.Mount("/connect", connectv0.New(a, o.ConnectOpts))
 
@@ -157,7 +159,7 @@ func (a CoreAPI) GetActions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Find this run
-	state, err := a.state.Load(ctx, consts.DevServerAccountId, *runID)
+	state, err := a.state.Load(ctx, consts.DevServerAccountID, *runID)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
 			Status:  410,
@@ -169,6 +171,27 @@ func (a CoreAPI) GetActions(w http.ResponseWriter, r *http.Request) {
 
 	actions := state.Actions()
 	_ = json.NewEncoder(w).Encode(actions)
+}
+
+func (a CoreAPI) TrackEvent(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	metadata := tel.NewMetadata(ctx)
+
+	var requestBody map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&requestBody); err == nil {
+		for k, v := range requestBody {
+			metadata.Context[k] = v
+		}
+	}
+
+	eventName, ok := requestBody["eventName"].(string)
+	if ok {
+		tel.SendEvent(ctx, eventName, metadata)
+	} else {
+		tel.SendMetadata(ctx, metadata)
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func (a CoreAPI) GetEventBatch(w http.ResponseWriter, r *http.Request) {
@@ -191,7 +214,7 @@ func (a CoreAPI) GetEventBatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Find this run
-	state, err := a.state.Load(ctx, consts.DevServerAccountId, *runID)
+	state, err := a.state.Load(ctx, consts.DevServerAccountID, *runID)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
 			Status:  410,
@@ -231,7 +254,7 @@ func (a CoreAPI) CancelRun(w http.ResponseWriter, r *http.Request) {
 		Str("run_id", runID.String()).
 		Msg("cancelling function")
 
-	if err := apiutil.CancelRun(ctx, a.state, consts.DevServerAccountId, *runID); err != nil {
+	if err := apiutil.CancelRun(ctx, a.state, consts.DevServerAccountID, *runID); err != nil {
 		_ = publicerr.WriteHTTP(w, err)
 		return
 	}

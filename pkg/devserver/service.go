@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/connect/auth"
+	v0 "github.com/inngest/inngest/pkg/connect/rest/v0"
+	"github.com/inngest/inngest/pkg/enums"
 	"net"
 	"net/url"
 	"os"
@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/inngest/inngest/pkg/connect/auth"
 
 	"github.com/inngest/inngest/pkg/cli"
 	"github.com/inngest/inngest/pkg/consts"
@@ -246,16 +248,22 @@ func (d *devserver) startPersistenceRoutine(ctx context.Context) {
 // runDiscovery attempts to run autodiscovery while the dev server is running.
 //
 // This lets the dev server start and wait for the SDK server to come up at
-
 // any point.
 func (d *devserver) runDiscovery(ctx context.Context) {
 	logger.From(ctx).Info().Msg("autodiscovering locally hosted SDKs")
 	pollInterval := time.Duration(d.Opts.PollInterval) * time.Second
-	for {
+	for d.Opts.Autodiscover {
 		if ctx.Err() != nil {
 			return
 		}
-		_ = discovery.Autodiscover(ctx)
+		// If we have found any app, disable auto-discovery
+		apps, err := d.Data.GetApps(ctx, consts.DevServerEnvID, nil)
+		if err == nil && len(apps) > 0 {
+			logger.From(ctx).Info().Msg("apps synced, disabling auto-discovery")
+			d.Opts.Autodiscover = false
+		} else {
+			_ = discovery.Autodiscover(ctx)
+		}
 
 		<-time.After(pollInterval)
 	}
@@ -301,8 +309,12 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 		}
 
 		urls := map[string]struct{}{}
-		if apps, err := d.Data.GetApps(ctx, consts.DevServerEnvId); err == nil {
+		if apps, err := d.Data.GetApps(ctx, consts.DevServerEnvID, nil); err == nil {
 			for _, app := range apps {
+				if app.Method == enums.AppMethodConnect.String() {
+					continue
+				}
+
 				// We've seen this URL.
 				urls[app.Url] = struct{}{}
 
@@ -631,15 +643,31 @@ func (d *devserver) importRedisSnapshot(ctx context.Context) (imported bool, err
 
 func (d *devserver) AuthenticateRequest(_ context.Context, _, _ string) (*auth.Response, error) {
 	return &auth.Response{
-		AccountID: consts.DevServerAccountId,
-		EnvID:     consts.DevServerEnvId,
+		AccountID: consts.DevServerAccountID,
+		EnvID:     consts.DevServerEnvID,
 	}, nil
 }
 
-func (d *devserver) RetrieveGateway(_ context.Context, _, _ uuid.UUID, _ []string) (string, *url.URL, error) {
-	parsed, err := url.Parse("ws://127.0.0.1:8289/v0/connect")
+func (d *devserver) RetrieveConnectEntitlements(_ context.Context, _ *auth.Response) (auth.Entitlements, error) {
+	return auth.Entitlements{
+		ConnectionAllowed: true,
+	}, nil
+}
+
+func (d *devserver) RetrieveGateway(_ context.Context, opts v0.RetrieveGatewayOpts) (string, *url.URL, error) {
+	parsed, err := url.Parse(fmt.Sprintf("ws://%s:%d/v0/connect", d.Opts.ConnectGatewayHost, d.Opts.ConnectGatewayPort))
 	if err != nil {
 		return "", nil, err
+	}
+
+	// Devserver-specific convenience implementation: If request host was included in the Start request,
+	// use this instead of the default loopback address. This is important for scenarios where the devserver
+	// needs to be accessed from within a Docker container.
+	if opts.RequestHost != "" {
+		parts := strings.Split(opts.RequestHost, ":")
+		if len(parts) > 0 {
+			parsed.Host = fmt.Sprintf("%s:%d", parts[0], d.Opts.ConnectGatewayPort)
+		}
 	}
 
 	return "gw-dev", parsed, nil

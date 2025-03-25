@@ -14,6 +14,8 @@ const (
 	CodeSigVerificationFailed     = "sig_verification_failed"
 	CodeUnknown                   = "unknown"
 	CodeBatchKeyExpressionInvalid = "batch_key_expression_invalid"
+	CodeSyncAlreadyPending        = "sync_already_pending"
+	CodePlanUpgradeRequired       = "plan_upgrade_required"
 
 	// Connect
 	CodeConnectWorkerHelloTimeout             = "connect_worker_hello_timeout"
@@ -26,4 +28,6 @@ const (
 	CodeConnectRunInvalidMessage              = "connect_run_invalid_message"
 	CodeConnectInvalidFunctionConfig          = "connect_invalid_function_config"
 	CodeConnectWorkerRequestAckInvalidPayload = "connect_worker_request_ack_invalid_payload"
+	CodeConnectNoHealthyConnection            = "connect_no_healthy_connection"
+	CodeConnectTooManyAppsPerConnection       = "connect_too_many_apps_per_connection"
 )

@@ -115,6 +115,13 @@ type App {
   error: String
   functions: [Function!]!
 
+	@deprecated(reason: "connectionType is deprecated. Use method instead.")
+  connectionType: AppConnectionType!
+
+  method: AppMethod!
+
+  appVersion: String
+
   # These fields are UI convenience fields
   connected: Boolean!
   functionCount: Int!
@@ -485,7 +492,7 @@ enum ConnectV1ConnectionStatus {
 }
 
 input ConnectV1WorkerConnectionsFilter {
-  from: Time!
+  from: Time
   until: Time
   timeField: ConnectV1WorkerConnectionsOrderByField = CONNECTED_AT
 
@@ -515,6 +522,7 @@ type ConnectV1WorkerConnection {
   instanceId: String!
   workerIp: String!
 
+	appName: String
   appID: UUID
   app: App
 
@@ -532,7 +540,11 @@ type ConnectV1WorkerConnection {
   sdkVersion: String!
   sdkPlatform: String!
   syncId: UUID
+
+	@deprecated(reason: "buildId is deprecated. Use appVersion instead.")
   buildId: String
+  appVersion: String
+
   functionCount: Int!
 
   cpuCores: Int!
@@ -549,4 +561,20 @@ type ConnectV1WorkerConnectionsConnection {
 type ConnectV1WorkerConnectionEdge {
   node: ConnectV1WorkerConnection!
   cursor: String!
+}
+
+enum AppConnectionType {
+	SERVERLESS
+	CONNECT
+}
+
+enum AppMethod {
+	SERVE
+	CONNECT
+}
+
+input AppsFilterV1 {
+	connectionType: AppConnectionType @deprecated(reason: "connectionType is deprecated. Use method instead.")
+
+	method: AppMethod
 }

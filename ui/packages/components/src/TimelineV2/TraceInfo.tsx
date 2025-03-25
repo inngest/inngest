@@ -26,18 +26,9 @@ type Props = {
   runID: string;
   result?: Result;
   aiOutput?: ExperimentalAI;
-  rerunFromStep: React.ComponentProps<typeof RunResult>['rerunFromStep'];
 };
 
-export function TraceInfo({
-  className,
-  pathCreator,
-  trace,
-  result,
-  runID,
-  rerunFromStep,
-  aiOutput,
-}: Props) {
+export function TraceInfo({ className, pathCreator, trace, result, runID, aiOutput }: Props) {
   const delayText = formatMilliseconds(
     (toMaybeDate(trace.startedAt) ?? new Date()).getTime() - new Date(trace.queuedAt).getTime()
   );
@@ -160,8 +151,6 @@ export function TraceInfo({
           <RunResult
             className="border-subtle border-t"
             result={result}
-            stepAIEnabled={!!aiOutput}
-            rerunFromStep={rerunFromStep}
             runID={runID}
             stepID={trace.stepID ?? undefined}
           />

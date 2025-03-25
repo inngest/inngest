@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution/state"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
@@ -52,6 +53,15 @@ type Metadata struct {
 	Metrics RunMetrics
 	// Stack stores the order of the step IDs as a stack
 	Stack []string
+}
+
+func (m Metadata) ShouldCoalesceParallelism(resp *state.DriverResponse) bool {
+	reqVersion := m.Config.RequestVersion
+	if reqVersion == -1 {
+		reqVersion = resp.RequestVersion
+	}
+
+	return reqVersion >= 2
 }
 
 func (m Metadata) IdempotencyKey() string {

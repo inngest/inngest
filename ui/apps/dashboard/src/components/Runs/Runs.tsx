@@ -15,12 +15,8 @@ import { useGetRun } from '@/components/RunDetails/useGetRun';
 import { useGetTraceResult } from '@/components/RunDetails/useGetTraceResult';
 import { useGetTrigger } from '@/components/RunDetails/useGetTrigger';
 import { GetFunctionPauseStateDocument, RunsOrderByField } from '@/gql/graphql';
-import { useCancelRun } from '@/queries/useCancelRun';
-import { useRerun } from '@/queries/useRerun';
-import { useRerunFromStep } from '@/queries/useRerunFromStep';
 import { pathCreator } from '@/utils/urls';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
-import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { AppFilterDocument, CountRunsDocument, GetRunsDocument } from './queries';
 import { parseRunsData, toRunStatuses, toTimeField } from './utils';
 
@@ -38,14 +34,13 @@ type EnvProps = {
   scope: 'env';
 };
 
-type Props = FnProps | EnvProps;
+type Props = (FnProps | EnvProps) & { traceAIEnabled?: boolean };
 
 export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
-  { functionSlug, scope }: Props,
+  { functionSlug, scope, traceAIEnabled }: Props,
   ref
 ) {
   const env = useEnvironment();
-  const { value: stepAIEnabled, isReady } = useBooleanFlag('step.ai');
 
   const [{ data: pauseData }] = useQuery({
     pause: scope !== 'fn',
@@ -78,9 +73,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   const [runs, setRuns] = useState<Run[]>([]);
   const [isScrollRequest, setIsScrollRequest] = useState(false);
 
-  const cancelRun = useCancelRun({ envID: env.id });
-  const rerun = useRerun({ envID: env.id, envSlug: env.slug });
-  const rerunFromStep = useRerunFromStep();
   const getTraceResult = useGetTraceResult();
   const getTrigger = useGetTrigger();
   const getRun = useGetRun();
@@ -224,7 +216,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
         id: app.id,
         name: app.externalID,
       }))}
-      cancelRun={cancelRun}
       data={runs}
       features={{
         history: features.data?.history ?? 7,
@@ -239,12 +230,10 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       getTraceResult={getTraceResult}
       getTrigger={getTrigger}
       pathCreator={internalPathCreator}
-      rerun={rerun}
-      rerunFromStep={rerunFromStep}
       functionIsPaused={pauseData?.environment.function?.isPaused ?? false}
       scope={scope}
       totalCount={totalCount}
-      stepAIEnabled={isReady && stepAIEnabled}
+      traceAIEnabled={traceAIEnabled}
     />
   );
 });

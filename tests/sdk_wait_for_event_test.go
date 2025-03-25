@@ -42,6 +42,7 @@ func TestSDKWaitForEvent_WithEvent(t *testing.T) {
 			"resume": true,
 		},
 		Timestamp: time.Now().UnixMilli(),
+		User:      map[string]interface{}{},
 	}
 
 	t.Run("With an event during the timeout", func(t *testing.T) {

@@ -1,35 +1,20 @@
-export const workerStatuses = [
-  'CONNECTED',
-  'DISCONNECTED',
-  'DISCONNECTING',
-  'DRAINING',
-  'READY',
-] as const;
-type WorkerStatus = (typeof workerStatuses)[number];
+export enum workerStatuses {
+  Connected = 'CONNECTED',
+  Disconnected = 'DISCONNECTED',
+  Disconnecting = 'DISCONNECTING',
+  Draining = 'DRAINING',
+  Ready = 'READY',
+}
 
-// We only display three statuses for workers: ACTIVE, INACTIVE, and FAILED
-export const convertWorkerStatus = (status: WorkerStatus): GroupedWorkerStatus | 'UNKNOWN' => {
-  switch (status) {
-    case 'READY':
-      return 'ACTIVE';
-    case 'DISCONNECTED':
-      return 'FAILED';
-    case 'DISCONNECTING':
-    case 'CONNECTED':
-    case 'DRAINING':
-      return 'INACTIVE';
-    default:
-      return 'UNKNOWN';
-  }
-};
+export type WorkerStatus = `${workerStatuses}`;
 
 export type Worker = {
-  appVersion: string;
-  connectedAt: Date;
+  appVersion: string | null;
+  connectedAt: string;
   cpuCores: number;
   id: string;
   instanceID: string | null;
-  lastHeartbeatAt: Date | null;
+  lastHeartbeatAt: string | null;
   memBytes: number;
   os: string;
   sdkLang: string;
@@ -39,10 +24,33 @@ export type Worker = {
   functionCount: number;
 };
 
-export const groupedWorkerStatuses = ['ACTIVE', 'INACTIVE', 'FAILED'] as const;
+export const groupedWorkerStatuses = ['ACTIVE', 'INACTIVE', 'DISCONNECTED'] as const;
 
 export type GroupedWorkerStatus = (typeof groupedWorkerStatuses)[number];
 
 export function isWorkerStatus(s: string): s is GroupedWorkerStatus {
   return groupedWorkerStatuses.includes(s as GroupedWorkerStatus);
 }
+
+export type ConnectV1WorkerConnectionsOrderBy = {
+  direction: ConnectV1WorkerConnectionsOrderByDirection;
+  field: ConnectV1WorkerConnectionsOrderByField;
+};
+
+export enum ConnectV1WorkerConnectionsOrderByDirection {
+  Asc = 'ASC',
+  Desc = 'DESC',
+}
+
+export enum ConnectV1WorkerConnectionsOrderByField {
+  ConnectedAt = 'CONNECTED_AT',
+  DisconnectedAt = 'DISCONNECTED_AT',
+  LastHeartbeatAt = 'LAST_HEARTBEAT_AT',
+}
+
+export type PageInfo = {
+  endCursor: string | null;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  startCursor: string | null;
+};

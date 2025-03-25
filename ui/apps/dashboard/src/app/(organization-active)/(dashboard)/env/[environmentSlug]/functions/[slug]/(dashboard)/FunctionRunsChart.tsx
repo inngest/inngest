@@ -2,7 +2,7 @@
 
 import { useQuery } from 'urql';
 
-import type { TimeRange } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
+import type { TimeRange } from '@/types/TimeRangeFilter';
 import StackedBarChart from '@/components/Charts/StackedBarChart';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';

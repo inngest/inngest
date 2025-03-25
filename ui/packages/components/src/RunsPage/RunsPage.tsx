@@ -3,7 +3,6 @@
 import { useCallback, useMemo, useRef, useState, type UIEventHandler } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from '@inngest/components/Button';
-import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
 import { Pill } from '@inngest/components/Pill';
 import { SelectGroup, type Option } from '@inngest/components/Select/Select';
@@ -24,6 +23,8 @@ import { useLocalStorage } from 'react-use';
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
 import { RunDetailsV2 } from '../RunDetailsV2';
+import { RunDetailsV3 } from '../RunDetailsV3/RunDetailsV3';
+import { useLegacyTrace } from '../SharedContext/useLegacyTrace';
 import {
   useBatchedSearchParams,
   useSearchParam,
@@ -32,6 +33,7 @@ import {
   useValidatedSearchParam,
 } from '../hooks/useSearchParam';
 import type { Features } from '../types/features';
+import RunsStatusFilter from './RunsStatusFilter';
 import { TimeFilter } from './TimeFilter';
 import { isColumnID, useScopedColumns, type ColumnID } from './columns';
 import type { Run, ViewScope } from './types';
@@ -46,7 +48,6 @@ const CodeSearch = dynamic(() => import('@inngest/components/CodeSearch/CodeSear
 });
 
 type Props = {
-  cancelRun: React.ComponentProps<typeof RunDetailsV2>['cancelRun'];
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
   features: Pick<Features, 'history'>;
@@ -61,24 +62,19 @@ type Props = {
   onScrollToTop: () => void;
   pathCreator: React.ComponentProps<typeof RunDetailsV2>['pathCreator'];
   pollInterval?: number;
-  rerun: React.ComponentProps<typeof RunDetailsV2>['rerun'];
-  rerunFromStep: React.ComponentProps<typeof RunDetailsV2>['rerunFromStep'];
   apps?: Option[];
   functions?: Option[];
   functionIsPaused?: boolean;
   scope: ViewScope;
   totalCount: number | undefined;
-  stepAIEnabled?: boolean;
+  traceAIEnabled?: boolean;
 };
 
 export function RunsPage({
-  cancelRun,
   defaultVisibleColumns,
   getRun,
   getTraceResult,
   getTrigger,
-  rerun,
-  rerunFromStep,
   data,
   features,
   hasMore,
@@ -94,11 +90,13 @@ export function RunsPage({
   functionIsPaused,
   scope,
   totalCount,
-  stepAIEnabled = false,
+  traceAIEnabled = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useScopedColumns(scope);
   const [showSearch, setShowSearch] = useState(false);
+
+  const { enabled: legacyTraceEnabled } = useLegacyTrace();
 
   const displayAllColumns = useMemo(() => {
     const out: Record<string, boolean> = {};
@@ -240,25 +238,43 @@ export function RunsPage({
   const renderSubComponent = useCallback(
     (rowData: Run) => {
       return (
-        <div className="border-subtle border-l-4 pb-6">
-          <RunDetailsV2
-            cancelRun={cancelRun}
-            getResult={getTraceResult}
-            getRun={getRun}
-            initialRunData={rowData}
-            getTrigger={getTrigger}
-            pathCreator={pathCreator}
-            pollInterval={pollInterval}
-            rerun={rerun}
-            rerunFromStep={rerunFromStep}
-            runID={rowData.id}
-            standalone={false}
-            stepAIEnabled={stepAIEnabled}
-          />
+        <div className={`border-subtle  ${traceAIEnabled ? '' : 'border-l-4 pb-6'}`}>
+          {traceAIEnabled && !legacyTraceEnabled ? (
+            <RunDetailsV3
+              getResult={getTraceResult}
+              getRun={getRun}
+              initialRunData={rowData}
+              getTrigger={getTrigger}
+              pathCreator={pathCreator}
+              pollInterval={pollInterval}
+              runID={rowData.id}
+              standalone={false}
+            />
+          ) : (
+            <RunDetailsV2
+              getResult={getTraceResult}
+              getRun={getRun}
+              initialRunData={rowData}
+              getTrigger={getTrigger}
+              pathCreator={pathCreator}
+              pollInterval={pollInterval}
+              runID={rowData.id}
+              standalone={false}
+              traceAIEnabled={traceAIEnabled}
+            />
+          )}
         </div>
       );
     },
-    [cancelRun, getRun, getTraceResult, getTrigger, pathCreator, pollInterval, rerun]
+    [
+      getRun,
+      getTraceResult,
+      getTrigger,
+      pathCreator,
+      pollInterval,
+      legacyTraceEnabled,
+      traceAIEnabled,
+    ]
   );
 
   const options = useMemo(() => {
@@ -313,7 +329,7 @@ export function RunsPage({
                 }
               />
             </SelectGroup>
-            <StatusFilter
+            <RunsStatusFilter
               selectedStatuses={filteredStatus}
               onStatusesChange={onStatusFilterChange}
               functionIsPaused={functionIsPaused}
@@ -384,7 +400,11 @@ export function RunsPage({
         )}
       </div>
 
-      <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
+      <div
+        className="h-[calc(100%-58px)] overflow-y-auto pb-2"
+        onScroll={onScroll}
+        ref={containerRef}
+      >
         <RunsTable
           data={data}
           isLoading={isLoadingInitial}

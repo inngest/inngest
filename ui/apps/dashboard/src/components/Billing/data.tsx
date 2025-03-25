@@ -12,6 +12,26 @@ export const entitlementUsageDocument = graphql(`
   query EntitlementUsage {
     account {
       id
+      addons {
+        concurrency {
+          available
+          baseValue
+          maxValue
+          name
+          price
+          purchaseCount
+          quantityPer
+        }
+        userCount {
+          available
+          baseValue
+          maxValue
+          name
+          price
+          purchaseCount
+          quantityPer
+        }
+      }
       entitlements {
         runCount {
           usage
@@ -40,6 +60,15 @@ export const entitlementUsageDocument = graphql(`
         hipaa {
           enabled
         }
+        metricsExport {
+          enabled
+        }
+        metricsExportFreshness {
+          limit
+        }
+        metricsExportGranularity {
+          limit
+        }
       }
       plan {
         name
@@ -57,7 +86,7 @@ export const entitlementUsage = async () => {
     const isCustomPlan = (res.account.plan?.name ?? '').toLowerCase().includes('enterprise');
 
     return {
-      ...res.account.entitlements,
+      ...res.account,
       isCustomPlan,
     };
   } catch (error) {
@@ -89,6 +118,23 @@ export const currentPlanDocument = graphql(`
           }
           stepCount {
             limit
+          }
+          userCount {
+            limit
+          }
+        }
+        addons {
+          concurrency {
+            available
+            price
+            purchaseCount
+            quantityPer
+          }
+          userCount {
+            available
+            price
+            purchaseCount
+            quantityPer
           }
         }
       }

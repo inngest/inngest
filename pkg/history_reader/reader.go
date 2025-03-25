@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/usage"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -278,8 +279,7 @@ func (r Run) ToCQRS() *cqrs.FunctionRun {
 		Cron:            r.Cron,
 	}
 	if r.Output != nil {
-		bytes := json.RawMessage(*r.Output)
-		run.Output = bytes
+		run.Output = util.EnsureJSON(json.RawMessage(*r.Output))
 	}
 	return run
 }

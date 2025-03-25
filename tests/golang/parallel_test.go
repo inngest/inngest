@@ -12,19 +12,17 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
-	"github.com/inngest/inngestgo/experimental/group"
+	"github.com/inngest/inngestgo/group"
 	"github.com/inngest/inngestgo/step"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-type parallelTestEvt inngestgo.GenericEvent[any, any]
-
 func TestParallelSteps(t *testing.T) {
 	ctx := context.Background()
 
 	c := client.New(t)
-	h, server, registerFuncs := NewSDKHandler(t, "parallel")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "parallel")
 	defer server.Close()
 
 	var (
@@ -32,12 +30,13 @@ func TestParallelSteps(t *testing.T) {
 		runID   string
 	)
 
-	a := inngestgo.CreateFunction(
-		inngestgo.FunctionOpts{Name: "concurrent", Concurrency: []inngest.Concurrency{
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{ID: "concurrent", Concurrency: []inngest.Concurrency{
 			{Limit: 2, Scope: enums.ConcurrencyScopeFn},
 		}},
 		inngestgo.EventTrigger("test/parallel", nil),
-		func(ctx context.Context, input inngestgo.Input[parallelTestEvt]) (any, error) {
+		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			if runID == "" {
 				runID = input.InputCtx.RunID
 			}
@@ -76,11 +75,10 @@ func TestParallelSteps(t *testing.T) {
 			return res, nil
 		},
 	)
-
-	h.Register(a)
+	require.NoError(t, err)
 	registerFuncs()
 
-	_, err := inngestgo.Send(ctx, inngestgo.Event{
+	_, err = inngestClient.Send(ctx, inngestgo.Event{
 		Name: "test/parallel",
 		Data: map[string]any{"hello": "world"},
 	})
@@ -111,6 +109,9 @@ func TestParallelSteps(t *testing.T) {
 
 		// check on spans
 		for _, cspan := range run.Trace.ChildSpans {
+			if cspan.StepOp == "" {
+				continue
+			}
 			t.Run(fmt.Sprintf("child: %s", cspan.Name), func(t *testing.T) {
 				assert.Equal(t, 0, cspan.Attempts)
 				assert.Equal(t, models.StepOpRun.String(), cspan.StepOp)

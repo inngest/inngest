@@ -18,6 +18,7 @@ type AlertModalProps = {
   confirmButtonLabel?: string | React.ReactNode;
   cancelButtonLabel?: string | React.ReactNode;
   confirmButtonKind?: ButtonKind;
+  autoClose?: boolean;
 };
 
 export function AlertModal({
@@ -32,6 +33,7 @@ export function AlertModal({
   confirmButtonLabel = 'Yes',
   cancelButtonLabel = 'No',
   confirmButtonKind = 'danger',
+  autoClose = true,
 }: AlertModalProps) {
   let container = null;
   if (globalThis.document) {
@@ -44,7 +46,7 @@ export function AlertModal({
         <AlertDialog.Portal container={container}>
           <AlertDialog.Overlay asChild>
             <div
-              className="fixed inset-0 z-[100] backdrop-blur backdrop-invert-[10%] transition-opacity"
+              className="bg-overlay/20 dark:bg-overlay/50 fixed inset-0 z-[100] transition-opacity"
               aria-hidden="true"
             />
           </AlertDialog.Overlay>
@@ -67,11 +69,11 @@ export function AlertModal({
               <AlertDialog.Content
                 className={cn(
                   className,
-                  'bg-canvasBase text-basis transform overflow-hidden rounded-md shadow-xl transition-all'
+                  'bg-modalBase text-basis transform overflow-hidden rounded-md shadow-xl transition-all'
                 )}
               >
                 {(title || description) && (
-                  <div className="border-subtle bg-canvasBase border-b p-6">
+                  <div className="border-subtle bg-modalBase border-b p-6">
                     <AlertDialog.Title className="text-basis text-xl font-semibold">
                       {title}
                     </AlertDialog.Title>
@@ -98,8 +100,10 @@ export function AlertModal({
                     onClick={async () => {
                       try {
                         await onSubmit();
-                        onClose();
-                      } catch {}
+                        autoClose && onClose();
+                      } catch (e) {
+                        console.error('error submiting alert modal', e);
+                      }
                     }}
                   />
                 </div>

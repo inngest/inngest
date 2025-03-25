@@ -3,9 +3,11 @@ package connect
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"github.com/rs/zerolog"
 	"log/slog"
 	"net/http"
 	"os"
@@ -17,7 +19,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
-	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
@@ -30,11 +31,6 @@ const (
 )
 
 type gatewayOpt func(*connectGatewaySvc)
-
-type ConnectAppLoader interface {
-	// GetAppByName returns an app by name
-	GetAppByName(ctx context.Context, envID uuid.UUID, name string) (*cqrs.App, error)
-}
 
 type connectionCounter struct {
 	count  uint64
@@ -59,6 +55,10 @@ func (c *connectionCounter) Wait() {
 	c.waiter.Wait()
 }
 
+type ConnectEntitlementRetriever interface {
+	AppsPerConnection(ctx context.Context, accountId uuid.UUID) (int, error)
+}
+
 type connectGatewaySvc struct {
 	gatewayPublicPort int
 
@@ -70,14 +70,14 @@ type connectGatewaySvc struct {
 	gatewayId ulid.ULID
 	dev       bool
 
-	logger *slog.Logger
+	logger    *slog.Logger
+	devlogger *zerolog.Logger
 
 	runCtx context.Context
 
 	auther       auth.Handler
 	stateManager state.StateManager
 	receiver     pubsub.RequestReceiver
-	appLoader    ConnectAppLoader
 	apiBaseUrl   string
 
 	hostname string
@@ -131,12 +131,6 @@ func WithConnectionStateManager(m state.StateManager) gatewayOpt {
 func WithRequestReceiver(r pubsub.RequestReceiver) gatewayOpt {
 	return func(c *connectGatewaySvc) {
 		c.receiver = r
-	}
-}
-
-func WithAppLoader(l ConnectAppLoader) gatewayOpt {
-	return func(svc *connectGatewaySvc) {
-		svc.appLoader = l
 	}
 }
 
@@ -229,6 +223,15 @@ func (c *connectGatewaySvc) Name() string {
 func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 	// Set up gateway-specific logger with info for correlations
 	c.logger = logger.StdlibLogger(ctx).With("gateway_id", c.gatewayId)
+	if c.dev {
+		// Initialize prettier logger for dev server
+		c.devlogger = logger.From(ctx)
+
+		// Hide verbose connect gateway logs in dev server by default
+		if os.Getenv("CONNECT_GATEWAY_FULL_LOGS") != "true" {
+			c.logger = logger.VoidLogger()
+		}
+	}
 
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -293,20 +296,20 @@ func (c *connectGatewaySvc) instrument(ctx context.Context) {
 		})
 
 		if c.isDraining {
-			metrics.GaugeConnectDrainingGateway(ctx, 1, metrics.CounterOpt{
+			metrics.GaugeConnectDrainingGateway(ctx, 1, metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    additionalTags,
 			})
-			metrics.GaugeConnectActiveGateway(ctx, 0, metrics.CounterOpt{
+			metrics.GaugeConnectActiveGateway(ctx, 0, metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    additionalTags,
 			})
 		} else {
-			metrics.GaugeConnectActiveGateway(ctx, 1, metrics.CounterOpt{
+			metrics.GaugeConnectActiveGateway(ctx, 1, metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    additionalTags,
 			})
-			metrics.GaugeConnectDrainingGateway(ctx, 0, metrics.CounterOpt{
+			metrics.GaugeConnectDrainingGateway(ctx, 0, metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    additionalTags,
 			})
@@ -335,15 +338,21 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 
 		c.logger.Info("waiting for connections to drain")
 		c.connectionCount.Wait()
+
 		c.logger.Info("shutting down gateway api")
 		_ = server.Shutdown(ctx)
 	}()
 
-	eg, ctx := errgroup.WithContext(ctx)
+	eg := errgroup.Group{}
 
 	eg.Go(func() error {
 		c.logger.Info(fmt.Sprintf("starting gateway api at %s", addr))
-		return server.ListenAndServe()
+		err := server.ListenAndServe()
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+
+		return err
 	})
 
 	eg.Go(func() error {
@@ -351,9 +360,14 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 		// Start listening for messages, this will block until the context is cancelled
 		err := c.receiver.Wait(ctx)
 		if err != nil {
+			if ctx.Err() != nil {
+				return nil
+			}
 			// TODO Should we retry? Exit here? This will interrupt existing connections!
 			return fmt.Errorf("could not listen for pubsub messages: %w", err)
 		}
+
+		c.logger.Debug("receiver wait finished")
 
 		return nil
 	})

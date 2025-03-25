@@ -14,11 +14,12 @@ import (
 )
 
 func TestFunctionFailureHandling(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t, "fail-app")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "fail-app")
 	defer server.Close()
 
 	var aCount, bCount int32
-	a := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:      "always-fail",
 			Name:    "Always fail",
@@ -38,13 +39,15 @@ func TestFunctionFailureHandling(t *testing.T) {
 			return nil, err
 		},
 	)
-	b := inngestgo.CreateFunction(
-		inngestgo.FunctionOpts{Name: "handle-failures", Retries: inngestgo.IntPtr(0)},
+	require.NoError(t, err)
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{ID: "handle-failures", Retries: inngestgo.IntPtr(0)},
 		inngestgo.EventTrigger(
 			"inngest/function.finished",
 			inngestgo.StrPtr("event.data.function_id == 'fail-app-always-fail'"),
 		),
-		func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[map[string]any, any]]) (any, error) {
+		func(ctx context.Context, input inngestgo.Input[map[string]any]) (any, error) {
 			evt := input.Event
 
 			// Assert that failure handlers are called with valid data.
@@ -54,17 +57,17 @@ func TestFunctionFailureHandling(t *testing.T) {
 			error, ok := evt.Data["error"].(map[string]any)
 			require.True(t, ok, evt.Data)
 			require.NotNil(t, error)
-			require.Contains(t, error["error"], "error calling function", evt.Data)
-			require.Contains(t, error["error"], "nope", evt.Data)
+			require.Contains(t, error["message"], "Unhandled step error: nope", evt.Data)
+			require.Contains(t, error["error"], "NonRetriableError", evt.Data)
 
 			atomic.AddInt32(&bCount, 1)
 			return true, nil
 		},
 	)
-	h.Register(a, b)
+	require.NoError(t, err)
 	registerFuncs()
 
-	_, err := inngestgo.Send(context.Background(), inngestgo.Event{
+	_, err = inngestClient.Send(context.Background(), inngestgo.Event{
 		Name: "test/fail",
 		Data: map[string]any{
 			"test": true,
@@ -77,21 +80,22 @@ func TestFunctionFailureHandling(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt32(&bCount) == 1
-	}, 15*time.Second, time.Second)
+	}, 20*time.Second, 5*time.Millisecond)
 	require.EqualValues(t, 0, aCount)
 }
 
 func TestFunctionFailureHandlingWithRateLimit(t *testing.T) {
 	ctx := context.Background()
-	h, server, registerFuncs := NewSDKHandler(t, "failed-rate-limit")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "failed-rate-limit")
 	defer server.Close()
 
 	evtName := "fail/rate-limit"
 
 	var failed, handled int32
-	fun := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name:      "failed",
+			ID:        "failed",
 			RateLimit: &inngestgo.RateLimit{Limit: 1, Period: 24 * time.Hour, Key: inngestgo.StrPtr("event.data.number")},
 		},
 		inngestgo.EventTrigger(evtName, nil),
@@ -100,22 +104,24 @@ func TestFunctionFailureHandlingWithRateLimit(t *testing.T) {
 			return nil, inngestgo.NoRetryError(fmt.Errorf("failed"))
 		},
 	)
+	require.NoError(t, err)
 	// mimic a `onFailure` handler, with the original function defining rate limits
-	fail := inngestgo.CreateFunction(
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name:      "failed-failure",
+			ID:        "failed-failure",
 			RateLimit: &inngestgo.RateLimit{Limit: 1, Period: 24 * time.Hour, Key: inngestgo.StrPtr("event.data.number")},
 		},
 		inngestgo.EventTrigger("inngest/function.failed", inngestgo.StrPtr(`event.data.function_id == "failed-rate-limit-failed"`)),
-		func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[map[string]any, any]]) (any, error) {
+		func(ctx context.Context, input inngestgo.Input[map[string]any]) (any, error) {
 			atomic.AddInt32(&handled, 1)
 			return "handled", nil
 		},
 	)
-	h.Register(fun, fail)
+	require.NoError(t, err)
 	registerFuncs()
 
-	_, err := inngestgo.Send(ctx, inngestgo.Event{
+	_, err = inngestClient.Send(ctx, inngestgo.Event{
 		Name: evtName,
 		Data: map[string]any{"number": 10},
 	})
@@ -127,7 +133,7 @@ func TestFunctionFailureHandlingWithRateLimit(t *testing.T) {
 	require.Equal(t, int32(1), atomic.LoadInt32(&handled))
 
 	// send another, it should be rate limited
-	_, err = inngestgo.Send(ctx, inngestgo.Event{
+	_, err = inngestClient.Send(ctx, inngestgo.Event{
 		Name: evtName,
 		Data: map[string]any{"number": 10},
 	})
@@ -138,7 +144,7 @@ func TestFunctionFailureHandlingWithRateLimit(t *testing.T) {
 	require.Equal(t, int32(1), atomic.LoadInt32(&handled))
 
 	// send a different payload
-	_, err = inngestgo.Send(ctx, inngestgo.Event{
+	_, err = inngestClient.Send(ctx, inngestgo.Event{
 		Name: evtName,
 		Data: map[string]any{"number": 1},
 	})

@@ -7,12 +7,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/aws/smithy-go/ptr"
-	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/aws/smithy-go/ptr"
 	sq "github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
@@ -29,6 +28,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/util"
+	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/jinzhu/copier"
 	"github.com/oklog/ulid/v2"
 )
@@ -93,15 +93,9 @@ func (w wrapper) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*stat
 		return nil, err
 	}
 
-	app, err := w.GetAppByID(ctx, fn.AppID)
-	if err != nil {
-		return nil, err
-	}
-
 	return &state.ExecutorFunction{
-		Function:     def,
-		Paused:       false, // dev server does not support pausing
-		AppIsConnect: app.IsConnect.Bool,
+		Function: def,
+		Paused:   false, // dev server does not support pausing
 	}, nil
 }
 
@@ -251,8 +245,25 @@ func (w wrapper) InsertQueueSnapshotChunk(ctx context.Context, params cqrs.Inser
 //
 
 // GetApps returns apps that have not been deleted.
-func (w wrapper) GetApps(ctx context.Context, envID uuid.UUID) ([]*cqrs.App, error) {
-	return copyInto(ctx, w.q.GetApps, []*cqrs.App{})
+func (w wrapper) GetApps(ctx context.Context, envID uuid.UUID, filter *cqrs.FilterAppParam) ([]*cqrs.App, error) {
+	f := func(ctx context.Context) ([]*sqlc.App, error) {
+		return w.q.GetApps(ctx)
+	}
+
+	apps, err := copyInto(ctx, f, []*cqrs.App{})
+	if err != nil {
+		return nil, fmt.Errorf("could not get apps: %w", err)
+	}
+
+	filtered := make([]*cqrs.App, 0, len(apps))
+	for _, app := range apps {
+		if filter != nil && filter.Method != nil && filter.Method.String() != app.Method {
+			continue
+		}
+		filtered = append(filtered, app)
+	}
+
+	return filtered, nil
 }
 
 func (w wrapper) GetAppByChecksum(ctx context.Context, envID uuid.UUID, checksum string) (*cqrs.App, error) {
@@ -295,6 +306,10 @@ func (w wrapper) GetAllApps(ctx context.Context, envID uuid.UUID) ([]*cqrs.App, 
 func (w wrapper) UpsertApp(ctx context.Context, arg cqrs.UpsertAppParams) (*cqrs.App, error) {
 	// Normalize the URL before inserting into the DB.
 	arg.Url = util.NormalizeAppURL(arg.Url, forceHTTPS)
+
+	if arg.Method == "" {
+		arg.Method = enums.AppMethodServe.String()
+	}
 
 	return copyWriter(
 		ctx,
@@ -841,6 +856,7 @@ func toCQRSRun(run sqlc.FunctionRun, finish sqlc.FunctionFinish) *cqrs.FunctionR
 		FunctionID:      run.FunctionID,
 		FunctionVersion: run.FunctionVersion,
 		EventID:         run.EventID,
+		WorkspaceID:     run.WorkspaceID,
 	}
 	if run.BatchID != nilULID {
 		copied.BatchID = &run.BatchID
@@ -853,7 +869,7 @@ func toCQRSRun(run sqlc.FunctionRun, finish sqlc.FunctionFinish) *cqrs.FunctionR
 	}
 	if finish.Status.Valid {
 		copied.Status, _ = enums.RunStatusString(finish.Status.String)
-		copied.Output = json.RawMessage(finish.Output.String)
+		copied.Output = util.EnsureJSON(json.RawMessage(finish.Output.String))
 		copied.EndedAt = &finish.CreatedAt.Time
 	}
 	return &copied
@@ -1081,6 +1097,7 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 		BatchID:      batchID,
 		IsBatch:      isBatch,
 		CronSchedule: cron,
+		HasAI:        run.HasAi,
 	}
 
 	return &trun, nil
@@ -1180,8 +1197,9 @@ func (w wrapper) GetSpanStack(ctx context.Context, opts cqrs.SpanIdentifier) ([]
 		}
 
 		for _, evt := range evts {
-			if stack, ok := evt.Attributes[consts.OtelSysStepStack]; ok {
-				return strings.Split(stack, ","), nil
+			if _, isStackEvt := evt.Attributes[consts.OtelSysStepStack]; isStackEvt {
+				// Data is kept in the `Name` field
+				return strings.Split(evt.Name, ","), nil
 			}
 		}
 	}
@@ -1513,10 +1531,10 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 //
 
 func (w wrapper) InsertWorkerConnection(ctx context.Context, conn *cqrs.WorkerConnection) error {
-	buildId := sql.NullString{}
-	if conn.BuildId != nil {
-		buildId.Valid = true
-		buildId.String = *conn.BuildId
+	appVersion := sql.NullString{}
+	if conn.AppVersion != nil {
+		appVersion.Valid = true
+		appVersion.String = *conn.AppVersion
 	}
 
 	var lastHeartbeatAt, disconnectedAt sql.NullInt64
@@ -1547,6 +1565,7 @@ func (w wrapper) InsertWorkerConnection(ctx context.Context, conn *cqrs.WorkerCo
 		AccountID:   conn.AccountID,
 		WorkspaceID: conn.WorkspaceID,
 		AppID:       conn.AppID,
+		AppName:     conn.AppName,
 
 		ID:         conn.Id,
 		GatewayID:  conn.GatewayId,
@@ -1559,7 +1578,7 @@ func (w wrapper) InsertWorkerConnection(ctx context.Context, conn *cqrs.WorkerCo
 		DisconnectedAt:  disconnectedAt,
 		RecordedAt:      conn.RecordedAt.UnixMilli(),
 		InsertedAt:      time.Now().UnixMilli(),
-		
+
 		DisconnectReason: disconnectReason,
 
 		GroupHash:     []byte(conn.GroupHash),
@@ -1567,7 +1586,7 @@ func (w wrapper) InsertWorkerConnection(ctx context.Context, conn *cqrs.WorkerCo
 		SdkVersion:    conn.SDKVersion,
 		SdkPlatform:   conn.SDKPlatform,
 		SyncID:        conn.SyncID,
-		BuildID:       buildId,
+		AppVersion:    appVersion,
 		FunctionCount: int64(conn.FunctionCount),
 
 		CpuCores: int64(conn.CpuCores),
@@ -1604,9 +1623,9 @@ func (w wrapper) GetWorkerConnection(ctx context.Context, id cqrs.WorkerConnecti
 		lastHeartbeatAt = ptr.Time(time.UnixMilli(conn.LastHeartbeatAt.Int64))
 	}
 
-	var buildId *string
-	if conn.BuildID.Valid {
-		buildId = &conn.BuildID.String
+	var appVersion *string
+	if conn.AppVersion.Valid {
+		appVersion = &conn.AppVersion.String
 	}
 
 	var disconnectReason *string
@@ -1638,7 +1657,7 @@ func (w wrapper) GetWorkerConnection(ctx context.Context, id cqrs.WorkerConnecti
 		SDKVersion:    conn.SdkVersion,
 		SDKPlatform:   conn.SdkPlatform,
 		SyncID:        conn.SyncID,
-		BuildId:       buildId,
+		AppVersion:    appVersion,
 		FunctionCount: int(conn.FunctionCount),
 
 		CpuCores: int32(conn.CpuCores),
@@ -1795,12 +1814,13 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 	// TODO:
 	// change this to a continuous loop with limits instead of just attempting to grab everything.
 	// might not matter though since this is primarily meant for local development
-	sql, args, err := sq.Dialect("sqlite3").
+	sql, args, err := sq.Dialect(w.dialect()).
 		From("worker_connections").
 		Select(
 			"account_id",
 			"workspace_id",
 			"app_id",
+			"app_name",
 
 			"id",
 			"gateway_id",
@@ -1821,7 +1841,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			"sdk_version",
 			"sdk_platform",
 			"sync_id",
-			"build_id",
+			"app_version",
 			"function_count",
 
 			"cpu_cores",
@@ -1848,6 +1868,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			&data.AccountID,
 			&data.WorkspaceID,
 			&data.AppID,
+			&data.AppName,
 
 			&data.ID,
 			&data.GatewayID,
@@ -1868,7 +1889,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			&data.SdkVersion,
 			&data.SdkPlatform,
 			&data.SyncID,
-			&data.BuildID,
+			&data.AppVersion,
 			&data.FunctionCount,
 
 			&data.CpuCores,
@@ -1917,9 +1938,9 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			lastHeartbeatAt = ptr.Time(time.UnixMilli(data.LastHeartbeatAt.Int64))
 		}
 
-		var buildId *string
-		if data.BuildID.Valid {
-			buildId = &data.BuildID.String
+		var appVersion *string
+		if data.AppVersion.Valid {
+			appVersion = &data.AppVersion.String
 		}
 
 		var disconnectReason *string
@@ -1931,6 +1952,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			AccountID:   data.AccountID,
 			WorkspaceID: data.WorkspaceID,
 			AppID:       data.AppID,
+			AppName:     data.AppName,
 
 			Id:         data.ID,
 			GatewayId:  data.GatewayID,
@@ -1952,7 +1974,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			SDKPlatform:   data.SdkPlatform,
 			SyncID:        data.SyncID,
 			FunctionCount: int(data.FunctionCount),
-			BuildId:       buildId,
+			AppVersion:    appVersion,
 
 			CpuCores: int32(data.CpuCores),
 			MemBytes: data.MemBytes,
@@ -1973,10 +1995,10 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 // copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types
 // automatically.
 func copyWriter[
-PARAMS_IN any,
-INTERNAL_PARAMS any,
-IN any,
-OUT any,
+	PARAMS_IN any,
+	INTERNAL_PARAMS any,
+	IN any,
+	OUT any,
 ](
 	ctx context.Context,
 	f func(context.Context, INTERNAL_PARAMS) (IN, error),
@@ -1999,8 +2021,8 @@ OUT any,
 }
 
 func copyInto[
-IN any,
-OUT any,
+	IN any,
+	OUT any,
 ](
 	ctx context.Context,
 	f func(context.Context) (IN, error),

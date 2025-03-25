@@ -120,8 +120,8 @@ func GaugeConnectGatewayActiveConnections(ctx context.Context, val int64, opts G
 	})
 }
 
-func GaugeConnectActiveGateway(ctx context.Context, value int64, opts CounterOpt) {
-	RecordCounterMetric(ctx, value, CounterOpt{
+func GaugeConnectActiveGateway(ctx context.Context, value int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, value, GaugeOpt{
 		PkgName:     opts.PkgName,
 		MetricName:  "connect_gateway.gateways.active",
 		Description: "Total number of active connect gateways",
@@ -129,8 +129,8 @@ func GaugeConnectActiveGateway(ctx context.Context, value int64, opts CounterOpt
 	})
 }
 
-func GaugeConnectDrainingGateway(ctx context.Context, value int64, opts CounterOpt) {
-	RecordCounterMetric(ctx, value, CounterOpt{
+func GaugeConnectDrainingGateway(ctx context.Context, value int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, value, GaugeOpt{
 		PkgName:     opts.PkgName,
 		MetricName:  "connect_gateway.gateways.draining",
 		Description: "Total number of draining connect gateways",

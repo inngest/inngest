@@ -3,6 +3,8 @@ package resolvers
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
@@ -10,8 +12,16 @@ import (
 	"github.com/inngest/inngest/pkg/devserver/discovery"
 )
 
-func (a queryResolver) Apps(ctx context.Context) ([]*cqrs.App, error) {
-	return a.Data.GetApps(ctx, consts.DevServerEnvId)
+func (a queryResolver) Apps(ctx context.Context, filter *models.AppsFilterV1) ([]*cqrs.App, error) {
+	cqrsFilter, err := models.FromAppsFilter(filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse filter: %w", err)
+	}
+	return a.Data.GetApps(ctx, consts.DevServerEnvID, cqrsFilter)
+}
+
+func (a queryResolver) App(ctx context.Context, id uuid.UUID) (*cqrs.App, error) {
+	return a.Data.GetAppByID(ctx, id)
 }
 
 func (a appResolver) ID(ctx context.Context, obj *cqrs.App) (string, error) {
@@ -56,7 +66,7 @@ func (a appResolver) Functions(ctx context.Context, obj *cqrs.App) ([]*models.Fu
 		return nil, fmt.Errorf("no app defined")
 	}
 	// Local dev doesn't have a workspace ID.
-	funcs, err := a.Data.GetFunctionsByAppInternalID(ctx, consts.DevServerEnvId, obj.ID)
+	funcs, err := a.Data.GetFunctionsByAppInternalID(ctx, consts.DevServerEnvID, obj.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -82,9 +92,34 @@ func (a appResolver) Autodiscovered(ctx context.Context, obj *cqrs.App) (bool, e
 }
 
 func (a appResolver) FunctionCount(ctx context.Context, obj *cqrs.App) (int, error) {
-	funcs, err := a.Data.GetFunctionsByAppInternalID(ctx, consts.DevServerEnvId, obj.ID)
+	funcs, err := a.Data.GetFunctionsByAppInternalID(ctx, consts.DevServerEnvID, obj.ID)
 	if err != nil {
 		return 0, err
 	}
 	return len(funcs), nil
+}
+
+func (a appResolver) ConnectionType(ctx context.Context, obj *cqrs.App) (models.AppConnectionType, error) {
+	method, err := enums.AppMethodString(obj.Method)
+	if err != nil {
+		return models.AppConnectionTypeConnect, fmt.Errorf("unknown connection type")
+	}
+
+	switch method {
+	case enums.AppMethodServe:
+		return models.AppConnectionTypeServerless, nil
+	case enums.AppMethodConnect:
+		return models.AppConnectionTypeConnect, nil
+	}
+
+	return models.AppConnectionTypeServerless, nil
+}
+
+func (a appResolver) Method(ctx context.Context, obj *cqrs.App) (models.AppMethod, error) {
+	method, err := enums.AppMethodString(obj.Method)
+	if err != nil {
+		return models.AppMethodServe, fmt.Errorf("unknown connection type")
+	}
+
+	return models.ToAppMethod(method), nil
 }

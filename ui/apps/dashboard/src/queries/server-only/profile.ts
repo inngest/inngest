@@ -7,26 +7,51 @@ import {
   type User,
 } from '@clerk/nextjs/server';
 
+import { graphql } from '@/gql';
+import graphqlAPI from '../graphqlAPI';
+
 export type ProfileType = {
   user: User;
   org?: Organization;
 };
 
 export type ProfileDisplayType = {
+  isMarketplace: boolean;
   orgName?: string;
   displayName: string;
 };
 
-export const getProfileDisplay = async (): Promise<ProfileDisplayType> => {
-  const { user, org } = await getProfile();
+const ProfileQuery = graphql(`
+  query Profile {
+    account {
+      name
+      marketplace
+    }
+  }
+`);
 
-  const displayName =
-    user.firstName || user.lastName
-      ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()
-      : user.username ?? '';
+export const getProfileDisplay = async (): Promise<ProfileDisplayType> => {
+  let orgName: string | undefined;
+  let displayName: string;
+
+  const res = await graphqlAPI.request(ProfileQuery);
+  if (res.account.marketplace) {
+    // Marketplace users are not authed with Clerk.
+
+    orgName = res.account.name ?? undefined;
+    displayName = 'System';
+  } else {
+    const { user, org } = await getProfile();
+    orgName = org?.name;
+    displayName =
+      user.firstName || user.lastName
+        ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()
+        : user.username ?? '';
+  }
 
   return {
-    orgName: org?.name,
+    isMarketplace: Boolean(res.account.marketplace),
+    orgName,
     displayName,
   };
 };

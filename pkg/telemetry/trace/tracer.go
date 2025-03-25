@@ -8,6 +8,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/inngest/inngest/pkg/logger"
+	oteltrace "go.opentelemetry.io/otel/trace"
+
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/telemetry/exporters"
@@ -35,11 +38,15 @@ const (
 	TracerTypeJaeger
 	TracerTypeOTLPHTTP
 	TracerTypeNATS
+	TracerTypeKafka
 )
 
 var (
 	userTracer Tracer
-	o          sync.Once
+	onceUser   sync.Once
+
+	systemTracer Tracer
+	onceSystem   sync.Once
 )
 
 // Tracer is a wrapper around the otel's tracing library to allow combining
@@ -67,7 +74,8 @@ type TracerOpts struct {
 	TraceURLPath             string
 	TraceMaxPayloadSizeBytes int
 
-	NATS []exporters.NatsExporterOpts
+	NATS  []exporters.NatsExporterOpts
+	Kafka []exporters.KafkaSpansExporterOpts
 }
 
 func (o TracerOpts) Endpoint() string {
@@ -110,7 +118,7 @@ func (o TracerOpts) MaxPayloadSizeBytes() int {
 
 func NewUserTracer(ctx context.Context, opts TracerOpts) error {
 	var err error
-	o.Do(func() {
+	onceUser.Do(func() {
 		userTracer, err = newTracer(ctx, opts)
 	})
 	return err
@@ -131,6 +139,33 @@ func UserTracer() Tracer {
 func CloseUserTracer(ctx context.Context) error {
 	if userTracer != nil {
 		userTracer.Shutdown(ctx)
+	}
+	return nil
+}
+
+func NewSystemTracer(ctx context.Context, opts TracerOpts) error {
+	var err error
+	onceSystem.Do(func() {
+		systemTracer, err = newTracer(ctx, opts)
+	})
+	return err
+}
+
+func SystemTracer() Tracer {
+	if systemTracer == nil {
+		if err := NewSystemTracer(context.Background(), TracerOpts{
+			ServiceName: "default",
+			Type:        TracerTypeNoop,
+		}); err != nil {
+			panic("fail to setup default system tracer")
+		}
+	}
+	return systemTracer
+}
+
+func CloseSystemTracer(ctx context.Context) error {
+	if systemTracer != nil {
+		systemTracer.Shutdown(ctx)
 	}
 	return nil
 }
@@ -193,7 +228,7 @@ func TracerSetup(svc string, ttype TracerType) (func(), error) {
 func newTracer(ctx context.Context, opts TracerOpts) (Tracer, error) {
 	switch opts.Type {
 	case TracerTypeOTLP:
-		return newOLTPGRPCTraceProvider(ctx, opts)
+		return newOTLPGRPCTraceProvider(ctx, opts)
 	case TracerTypeOTLPHTTP:
 		return newOTLPHTTPTraceProvider(ctx, opts)
 	case TracerTypeJaeger:
@@ -202,6 +237,8 @@ func newTracer(ctx context.Context, opts TracerOpts) (Tracer, error) {
 		return newIOTraceProvider(ctx, opts)
 	case TracerTypeNATS:
 		return newNatsTraceProvider(ctx, opts)
+	case TracerTypeKafka:
+		return newKafkaTraceExporter(ctx, opts)
 	default:
 		return newNoopTraceProvider(ctx, opts)
 	}
@@ -312,7 +349,7 @@ func newOTLPHTTPTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, err
 	}, nil
 }
 
-func newOLTPGRPCTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
+func newOTLPGRPCTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
 	endpoint := opts.Endpoint()
 	maxPayloadSize := opts.MaxPayloadSizeBytes()
 
@@ -430,10 +467,88 @@ func newNatsTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) 
 		provider:   tp,
 		propagator: newTextMapPropagator(),
 		processor:  sp,
-		shutdown: func(context.Context) {
+		shutdown: func(ctx context.Context) {
 			_ = tp.ForceFlush(ctx)
 			_ = tp.Shutdown(ctx)
 			_ = exp.Shutdown(ctx)
 		},
 	}, nil
+}
+
+func newKafkaTraceExporter(ctx context.Context, opts TracerOpts) (Tracer, error) {
+	exp, err := exporters.NewKafkaSpanExporter(ctx, opts.Kafka...)
+	if err != nil {
+		return nil, fmt.Errorf("error creating Kafka trace client: %w", err)
+	}
+
+	bopts := []exporters.BatchSpanProcessorOpt{}
+	{
+		val := os.Getenv("SPAN_BATCH_PROCESSOR_BUFFER_SIZE")
+		if val != "" {
+			bufferSize, err := strconv.Atoi(val)
+			if err == nil && bufferSize > 0 {
+				bopts = append(bopts, exporters.WithBatchProcessorBufferSize(bufferSize))
+			}
+		}
+	}
+
+	{
+		val := os.Getenv("SPAN_BATCH_PROCESSOR_INTERVAL")
+		if val != "" {
+			if dur, err := time.ParseDuration(val); err == nil {
+				bopts = append(bopts, exporters.WithBatchProcessorInterval(dur))
+			}
+		}
+	}
+
+	{
+		val := os.Getenv("SPAN_BATCH_PROCESSOR_CONCURRENCY")
+		if val != "" {
+			c, err := strconv.Atoi(val)
+			if err == nil && c > 0 {
+				bopts = append(bopts, exporters.WithBatchProcessorConcurrency(c))
+			}
+		}
+	}
+
+	sp := exporters.NewBatchSpanProcessor(ctx, exp, bopts...)
+	tp := trace.NewTracerProvider(
+		trace.WithSpanProcessor(sp),
+		trace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String(opts.ServiceName),
+		)),
+	)
+
+	return &tracer{
+		provider:   tp,
+		propagator: newTextMapPropagator(),
+		processor:  sp,
+		shutdown: func(ctx context.Context) {
+			_ = tp.ForceFlush(ctx)
+			_ = tp.Shutdown(ctx)
+			_ = exp.Shutdown(ctx)
+		},
+	}, nil
+}
+
+func ConnectTracer() oteltrace.Tracer {
+	l := logger.StdlibLogger(context.Background())
+
+	systemTracer := SystemTracer()
+	if systemTracer == nil {
+		l.Error("system tracer is nil")
+	}
+
+	provider := systemTracer.Provider()
+	if provider == nil {
+		l.Error("trace provider is nil in system tracer")
+	}
+
+	tracer := provider.Tracer("connect")
+	if tracer == nil {
+		l.Error("connect tracer is nil")
+	}
+
+	return tracer
 }

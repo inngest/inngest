@@ -8,7 +8,7 @@ import { cn } from '@inngest/components/utils/classNames';
 import { RiTimeLine } from '@remixicon/react';
 
 export type PillKind = 'default' | 'info' | 'warning' | 'primary' | 'error';
-export type PillAppearance = 'solid' | 'outlined';
+export type PillAppearance = 'solid' | 'outlined' | 'solidBright';
 
 export function Pill({
   children,
@@ -60,11 +60,11 @@ export type PillContentProps = {
 
 export function PillContent({ children, type }: PillContentProps) {
   return (
-    <div className="flex items-center gap-2 truncate">
-      {type === 'EVENT' && <EventsIcon className="text-subtle h-4 w-4" />}
-      {type === 'CRON' && <RiTimeLine className="text-subtle h-4 w-4" />}
-      {type === 'FUNCTION' && <FunctionsIcon className="text-subtle h-4 w-4" />}
-      {type === 'APP' && <AppsIcon className="text-subtle h-4 w-4" />}
+    <div className="flex items-center gap-1 truncate">
+      {type === 'EVENT' && <EventsIcon className="text-subtle h-3 w-3" />}
+      {type === 'CRON' && <RiTimeLine className="text-subtle h-3 w-3" />}
+      {type === 'FUNCTION' && <FunctionsIcon className="text-subtle h-3 w-3" />}
+      {type === 'APP' && <AppsIcon className="text-subtle h-3 w-3" />}
       {children}
     </div>
   );
@@ -88,7 +88,7 @@ export const getPillColors = ({
   };
 
   const outlinedPillStyles = {
-    default: `border border-muted bg-canvasBase text-basis ${
+    default: `border border-subtle bg-canvasBase text-basis ${
       clickable ? 'hover:bg-canvasMuted' : ''
     }`,
     primary: `border border-success bg-success text-success ${
@@ -103,9 +103,19 @@ export const getPillColors = ({
     info: `border border-info bg-info text-info ${clickable ? 'hover:bg-secondary-xSubtle' : ''}`,
   };
 
+  const solidBrightPillStyles = {
+    default: `bg-canvasSubtle text-subtle ${clickable ? 'hover:bg-surfaceSubtle' : ''}`,
+    primary: `bg-success text-primary-2xIntense ${clickable ? 'hover:bg-primary-2xSubtle' : ''}`,
+    warning: `bg-warning text-accent-2xIntense ${clickable ? 'hover:bg-accent-2xSubtle' : ''}`,
+    error: `bg-error text-tertiary-2xIntense ${clickable ? 'hover:bg-tertiary-2xSubtle' : ''}`,
+    info: `bg-info text-secondary-2xIntense ${clickable ? 'hover:bg-secondary-2xSubtle' : ''}`,
+  };
+
   if (appearance === 'solid') {
     return solidPillStyles[kind];
   } else if (appearance === 'outlined') {
     return outlinedPillStyles[kind];
+  } else if (appearance === 'solidBright') {
+    return solidBrightPillStyles[kind];
   }
 };

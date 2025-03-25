@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/99designs/gqlgen/graphql"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
@@ -67,6 +66,11 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 		if len(r.Output) > 0 {
 			s := string(r.Output)
 			output = &s
+		}
+
+		// If this run ID is the same as the starting cursor, do not include it.
+		if scursor != nil && r.RunID == *scursor {
+			continue
 		}
 
 		runID := ulid.MustParse(r.RunID)
@@ -151,6 +155,9 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 	return &models.RunsV2Connection{
 		Edges:    edges,
 		PageInfo: pageInfo,
+		After:    cur,
+		Filter:   filter,
+		OrderBy:  order,
 	}, nil
 }
 
@@ -224,6 +231,7 @@ func (r *queryResolver) Run(ctx context.Context, runID string) (*models.Function
 		BatchCreatedAt: batchTS,
 		CronSchedule:   run.CronSchedule,
 		Output:         output,
+		HasAi:          run.HasAI,
 	}
 
 	return &res, nil
@@ -353,22 +361,7 @@ func (r *queryResolver) RunTrigger(ctx context.Context, runID string) (*models.R
 }
 
 func (r *runsV2ConnResolver) TotalCount(ctx context.Context, obj *models.RunsV2Connection) (int, error) {
-	cursor, ok := graphql.GetFieldContext(ctx).Parent.Args["after"].(*string)
-	if !ok {
-		return 0, fmt.Errorf("failed to access cursor")
-	}
-
-	orderBy, ok := graphql.GetFieldContext(ctx).Parent.Args["orderBy"].([]*models.RunsV2OrderBy)
-	if !ok {
-		return 0, fmt.Errorf("failed to retrieve order")
-	}
-
-	filter, ok := graphql.GetFieldContext(ctx).Parent.Args["filter"].(models.RunsFilterV2)
-	if !ok {
-		return 0, fmt.Errorf("failed to access query filter")
-	}
-
-	opts := toRunsQueryOpt(0, cursor, orderBy, filter)
+	opts := toRunsQueryOpt(0, obj.After, obj.OrderBy, obj.Filter)
 	count, err := r.Data.GetTraceRunsCount(ctx, opts)
 	if err != nil {
 		return 0, fmt.Errorf("error retrieving count for runs: %w", err)

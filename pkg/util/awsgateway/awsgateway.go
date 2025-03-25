@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -26,9 +27,9 @@ func NewTransformTripper(tripper http.RoundTripper) http.RoundTripper {
 
 // transformTripper disobeys the standard library documentation by:
 //
-// - automatically upgrading to lambda-like gateway requests whenever
-//   we see lambda-like error responses.
-// - automatically parsing API gateway responses into regular responses.
+//   - automatically upgrading to lambda-like gateway requests whenever
+//     we see lambda-like error responses.
+//   - automatically parsing API gateway responses into regular responses.
 type transformTripper struct {
 	http.RoundTripper
 }
@@ -102,15 +103,17 @@ func TransformRequest(r *http.Request) (*http.Request, error) {
 		}
 	}
 
+	headers := r.Header.Clone()
+	headers.Set("host", r.URL.Host)
+	headers.Set("x-forwarded-proto", r.URL.Scheme)
+	headers.Set("content-length", strconv.Itoa(len(body)))
+
 	t := events.APIGatewayProxyRequest{
-		Path:       r.URL.Path,
-		HTTPMethod: r.Method,
-		Headers: map[string]string{
-			"host":              r.URL.Host,
-			"x-forwarded-proto": r.URL.Scheme,
-		},
+		Path:                  r.URL.Path,
+		HTTPMethod:            r.Method,
+		Headers:               headersToMap(headers),
 		QueryStringParameters: queryParams,
-		MultiValueHeaders:     r.URL.Query(),
+		MultiValueHeaders:     headers,
 		Body:                  base64.RawStdEncoding.EncodeToString(body),
 		IsBase64Encoded:       true,
 	}
@@ -121,4 +124,14 @@ func TransformRequest(r *http.Request) (*http.Request, error) {
 	}
 
 	return http.NewRequest(http.MethodPost, r.URL.String(), buf)
+}
+
+func headersToMap(header http.Header) map[string]string {
+	headerMap := make(map[string]string)
+	for key, values := range header {
+		if len(values) > 0 {
+			headerMap[strings.ToLower(key)] = values[0]
+		}
+	}
+	return headerMap
 }

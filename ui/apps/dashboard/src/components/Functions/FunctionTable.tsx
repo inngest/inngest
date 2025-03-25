@@ -172,12 +172,14 @@ function createColumns(environmentSlug: string) {
         }
 
         return (
-          <Pill
-            appearance="outlined"
-            href={`/env/${environmentSlug}/apps/${encodeURIComponent(appExternalID)}` as Route}
-          >
-            <PillContent type="APP">{appExternalID}</PillContent>
-          </Pill>
+          <div className="flex items-center">
+            <Pill
+              appearance="outlined"
+              href={`/env/${environmentSlug}/apps/${encodeURIComponent(appExternalID)}` as Route}
+            >
+              <PillContent type="APP">{appExternalID}</PillContent>
+            </Pill>
+          </div>
         );
       },
       header: 'App',

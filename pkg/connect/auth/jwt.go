@@ -19,7 +19,8 @@ const DefaultExpiry = time.Minute * 5
 
 type claims struct {
 	jwt.RegisteredClaims
-	Env uuid.UUID `json:"env"`
+	Env          uuid.UUID    `json:"env"`
+	Entitlements Entitlements `json:"entitlements"`
 }
 
 func VerifySessionToken(jwtSecret []byte, tokenString string) (*Response, error) {
@@ -58,8 +59,9 @@ func VerifySessionToken(jwtSecret []byte, tokenString string) (*Response, error)
 	}
 
 	return &Response{
-		AccountID: accountId,
-		EnvID:     customClaims.Env,
+		AccountID:    accountId,
+		EnvID:        customClaims.Env,
+		Entitlements: customClaims.Entitlements,
 	}, nil
 }
 
@@ -67,15 +69,15 @@ type jwtSessionTokenSigner struct {
 	jwtSecret []byte
 }
 
-func (j jwtSessionTokenSigner) SignSessionToken(accountId uuid.UUID, envId uuid.UUID, expireAfter time.Duration) (string, error) {
-	return signSessionToken(j.jwtSecret, accountId, envId, expireAfter)
+func (j jwtSessionTokenSigner) SignSessionToken(accountId uuid.UUID, envId uuid.UUID, expireAfter time.Duration, entitlements Entitlements) (string, error) {
+	return signSessionToken(j.jwtSecret, accountId, envId, expireAfter, entitlements)
 }
 
 func NewJWTSessionTokenSigner(jwtSecret []byte) SessionTokenSigner {
 	return &jwtSessionTokenSigner{jwtSecret: jwtSecret}
 }
 
-func signSessionToken(jwtSecret []byte, accountId uuid.UUID, envId uuid.UUID, expireAfter time.Duration) (string, error) {
+func signSessionToken(jwtSecret []byte, accountId uuid.UUID, envId uuid.UUID, expireAfter time.Duration, entitlements Entitlements) (string, error) {
 	now := time.Now()
 
 	id, err := ulid.New(ulid.Now(), rand.Reader)
@@ -92,7 +94,8 @@ func signSessionToken(jwtSecret []byte, accountId uuid.UUID, envId uuid.UUID, ex
 			IssuedAt:  jwt.NewNumericDate(now),
 			ID:        id.String(),
 		},
-		Env: envId,
+		Env:          envId,
+		Entitlements: entitlements,
 	})
 	signed, err := t.SignedString(jwtSecret)
 	if err != nil {
@@ -115,8 +118,9 @@ func NewJWTAuthHandler(jwtSecret []byte) Handler {
 		}
 
 		return &Response{
-			AccountID: verified.AccountID,
-			EnvID:     verified.EnvID,
+			AccountID:    verified.AccountID,
+			EnvID:        verified.EnvID,
+			Entitlements: verified.Entitlements,
 		}, nil
 	}
 }

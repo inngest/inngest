@@ -24,6 +24,7 @@ export default {
           intense: 'rgb(var(--color-primary-intense) / <alpha-value>)',
           xIntense: 'rgb(var(--color-primary-xIntense) / <alpha-value>)',
           '2xIntense': 'rgb(var(--color-primary-2xIntense) / <alpha-value>)',
+          '3xIntense': 'rgb(var(--color-primary-3xIntense) / <alpha-value>)',
         },
         secondary: {
           '4xSubtle': 'rgb(var(--color-secondary-4xSubtle) / <alpha-value>)',
@@ -35,8 +36,10 @@ export default {
           intense: 'rgb(var(--color-secondary-intense) / <alpha-value>)',
           xIntense: 'rgb(var(--color-secondary-xIntense) / <alpha-value>)',
           '2xIntense': 'rgb(var(--color-secondary-2xIntense) / <alpha-value>)',
+          '3xIntense': 'rgb(var(--color-secondary-3xIntense) / <alpha-value>)',
         },
         tertiary: {
+          '3xSubtle': 'rgb(var(--color-tertiary-3xSubtle) / <alpha-value>)',
           '2xSubtle': 'rgb(var(--color-tertiary-2xSubtle) / <alpha-value>)',
           xSubtle: 'rgb(var(--color-tertiary-xSubtle) / <alpha-value>)',
           subtle: 'rgb(var(--color-tertiary-subtle) / <alpha-value>)',
@@ -44,13 +47,17 @@ export default {
           intense: 'rgb(var(--color-tertiary-intense) / <alpha-value>)',
           xIntense: 'rgb(var(--color-tertiary-xIntense) / <alpha-value>)',
           '2xIntense': 'rgb(var(--color-tertiary-2xIntense) / <alpha-value>)',
+          '3xIntense': 'rgb(var(--color-tertiary-3xIntense) / <alpha-value>)',
         },
         quaternary: {
+          cool3xSubtle: 'rgb(var(--color-quaternary-cool-3xSubtle) / <alpha-value>)',
           coolxSubtle: 'rgb(var(--color-quaternary-cool-xSubtle) / <alpha-value>)',
           coolModerate: 'rgb(var(--color-quaternary-cool-moderate) / <alpha-value>)',
           coolxIntense: 'rgb(var(--color-quaternary-cool-xIntense) / <alpha-value>)',
+          cool3xIntense: 'rgb(var(--color-quaternary-cool-3xIntense) / <alpha-value>)',
         },
         accent: {
+          '3xSubtle': 'rgb(var(--color-accent-3xSubtle) / <alpha-value>)',
           '2xSubtle': 'rgb(var(--color-accent-2xSubtle) / <alpha-value>)',
           xSubtle: 'rgb(var(--color-accent-xSubtle) / <alpha-value>)',
           subtle: 'rgb(var(--color-accent-subtle) / <alpha-value>)',
@@ -58,6 +65,7 @@ export default {
           intense: 'rgb(var(--color-accent-intense) / <alpha-value>)',
           xIntense: 'rgb(var(--color-accent-xIntense) / <alpha-value>)',
           '2xIntense': 'rgb(var(--color-accent-2xIntense) / <alpha-value>)',
+          '3xIntense': 'rgb(var(--color-accent-3xIntense) / <alpha-value>)',
         },
         status: {
           failed: 'rgb(var(--color-tertiary-subtle) / <alpha-value>)',
@@ -77,6 +85,7 @@ export default {
         },
       },
       borderColor: {
+        light: 'rgb(var(--color-border-light) / <alpha-value>)',
         subtle: 'rgb(var(--color-border-subtle) / <alpha-value>)',
         muted: 'rgb(var(--color-border-muted) / <alpha-value>)',
         contrast: 'rgb(var(--color-border-contrast) / <alpha-value>)',
@@ -99,6 +108,8 @@ export default {
         surfaceBase: 'rgb(var(--color-background-surface-base) / <alpha-value>)',
         surfaceSubtle: 'rgb(var(--color-background-surface-subtle) / <alpha-value>)',
         surfaceMuted: 'rgb(var(--color-background-surface-muted) / <alpha-value>)',
+        modalBase: 'rgb(var(--color-background-modal-base) / <alpha-value>)',
+        overlay: 'rgb(var(--color-background-overlay) / <alpha-value>)',
         disabled: 'rgb(var(--color-background-disabled) / <alpha-value>)',
         alwaysWhite: 'rgb(var(--color-foreground-alwaysWhite) / <alpha-value>)',
         contrast: 'rgb(var(--color-background-contrast) / <alpha-value>)',
@@ -178,6 +189,8 @@ export default {
       },
       stroke: {
         disabled: 'rgb(var(--color-border-disabled) / <alpha-value>)',
+        muted: 'rgb(var(--color-border-muted) / <alpha-value>)',
+        subtle: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
       },
       gridTemplateColumns: {
         dashboard: '1fr 1fr 1fr 432px',
@@ -226,6 +239,9 @@ export default {
         'slide-up-and-fade': 'slide-up-and-fade 400ms cubic-bezier(0.16, 1, 0.3, 1)',
         'slide-right-and-fade': 'slide-right-and-fade 400ms cubic-bezier(0.16, 1, 0.3, 1)',
         underline: 'underline 2s linear infinite',
+      },
+      spacing: {
+        'cmdk-margin': 'calc((100vh - (84.5px + 330px)) / 2)',
       },
     },
   },

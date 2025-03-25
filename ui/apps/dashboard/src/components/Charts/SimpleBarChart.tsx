@@ -3,9 +3,8 @@
 import { useMemo } from 'react';
 import { Pill } from '@inngest/components/Pill/Pill';
 import { cn } from '@inngest/components/utils/classNames';
+import { minuteTime } from '@inngest/components/utils/date';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-
-import { calendarTime, hourTime } from '@/utils/date';
 
 type BarChartProps = {
   className?: string;
@@ -44,7 +43,7 @@ type AxisProps = {
 function CustomizedXAxisTick(props: AxisProps) {
   return (
     <text x={props.x} y={props.y} dy={16} fontSize={12} className="fill-muted" textAnchor="middle">
-      {hourTime(props.payload.value)}
+      {minuteTime(new Date(props.payload.value))}
     </text>
   );
 }
@@ -123,7 +122,7 @@ export default function SimpleBarChart({
                   const { label, payload } = props;
                   return (
                     <div className="bg-canvasBase shadow-tooltip rounded-md px-3 pb-2 pt-1 text-sm shadow-md">
-                      <div className="text-muted pb-2">{calendarTime(label)}</div>
+                      <div className="text-muted pb-2">{new Date(label).toLocaleString()}</div>
                       {payload?.map((p, idx) => {
                         const l = legend.find((l) => l.dataKey == p.name);
                         return (

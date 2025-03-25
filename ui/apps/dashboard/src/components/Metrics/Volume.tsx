@@ -126,7 +126,7 @@ const GetVolumeMetrics = graphql(`
     workspace(id: $workspaceId) {
       stepThroughput: scopedMetrics(
         filter: {
-          name: "step_output_bytes_total"
+          name: "steps_running"
           scope: $scope
           from: $from
           functionIDs: $functionIDs

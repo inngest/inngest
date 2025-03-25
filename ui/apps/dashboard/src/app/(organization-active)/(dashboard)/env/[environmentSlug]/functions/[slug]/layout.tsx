@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useCallback, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { Header } from '@inngest/components/Header/Header';
 import { InvokeModal } from '@inngest/components/InvokeButton';
 import { Pill } from '@inngest/components/Pill';
+import { LegacyRunsToggle } from '@inngest/components/RunDetailsV3/LegacyRunsToggle';
 import { RiPauseCircleLine } from '@remixicon/react';
 import { useMutation } from 'urql';
 
@@ -14,9 +16,9 @@ import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { ActionsMenu } from '@/components/Functions/ActionMenu';
 import { CancelFunctionModal } from '@/components/Functions/CancelFunction/CancelFunctionModal';
 import { PauseFunctionModal } from '@/components/Functions/PauseFunction/PauseModal';
+import NewReplayModal from '@/components/Replay/NewReplayModal';
 import { graphql } from '@/gql';
 import { useFunction } from '@/queries';
-import NewReplayModal from './logs/NewReplayModal';
 
 const InvokeFunctionDocument = graphql(`
   mutation InvokeFunction($envID: UUID!, $data: Map, $functionSlug: String!, $user: Map) {
@@ -36,6 +38,7 @@ export default function FunctionLayout({
   children,
   params: { environmentSlug, slug },
 }: FunctionLayoutProps) {
+  const pathname = usePathname();
   const [invokOpen, setInvokeOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -47,7 +50,7 @@ export default function FunctionLayout({
   const env = useEnvironment();
 
   const isBulkCancellationEnabled = useBooleanFlag('bulk-cancellation-ui');
-  const isOldRunsPageEnabled = useBooleanFlag('old-runs-page');
+  const { value: traceAIEnabled, isReady: featureFlagReady } = useBooleanFlag('ai-traces');
 
   const fn = data?.workspace.workflow;
   const { isArchived = false, isPaused } = fn ?? {};
@@ -126,7 +129,10 @@ export default function FunctionLayout({
         }
         loading={fetching}
         action={
-          <div className="flex flex-row items-center justify-end">
+          <div className="flex flex-row items-center justify-end gap-2">
+            {pathname.endsWith('/runs') && (
+              <LegacyRunsToggle traceAIEnabled={featureFlagReady && traceAIEnabled} />
+            )}
             <ActionsMenu
               showCancel={() => setCancelOpen(true)}
               showInvoke={() => setInvokeOpen(true)}
@@ -144,19 +150,6 @@ export default function FunctionLayout({
             exactRouteMatch: true,
           },
           { children: 'Runs', href: `/env/${environmentSlug}/functions/${slug}/runs` },
-          ...(isOldRunsPageEnabled.isReady && isOldRunsPageEnabled.value
-            ? [
-                {
-                  children: (
-                    <div className="m-0 flex flex-row items-center justify-start space-x-1 p-0">
-                      <div>Old runs</div>
-                      <Pill kind="info">Legacy</Pill>
-                    </div>
-                  ),
-                  href: `/env/${environmentSlug}/functions/${slug}/logs`,
-                },
-              ]
-            : []),
           { children: 'Replay history', href: `/env/${environmentSlug}/functions/${slug}/replay` },
           ...(isBulkCancellationEnabled.isReady && isBulkCancellationEnabled.value
             ? [

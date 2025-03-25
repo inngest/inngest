@@ -362,8 +362,6 @@ type ExecutorFunction struct {
 	Function *inngest.Function `json:"function"`
 	// Paused indicates whether the function is currently paused.
 	Paused bool `json:"paused"`
-
-	AppIsConnect bool `json:"appIsConnect"`
 }
 
 // Mutater mutates state for a given identifier, storing the state and returning
@@ -399,7 +397,7 @@ type Mutater interface {
 		i Identifier,
 		stepID string,
 		marshalledOutput string,
-	) error
+	) (hasPending bool, err error)
 }
 
 type MemoizedStep struct {

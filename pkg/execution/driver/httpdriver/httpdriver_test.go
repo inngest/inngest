@@ -9,9 +9,11 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/inngest/go-httpstat"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -207,5 +209,33 @@ func TestStreamResponseTooLarge(t *testing.T) {
 	require.NotNil(t, r)
 	require.NotNil(t, r.SysErr)
 	require.Equal(t, r.SysErr.Code, syscode.CodeOutputTooLarge)
+	require.NotNil(t, err)
+}
+
+func TestTiming(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Delay the read by 1 second.
+		<-time.After(time.Second)
+		_, _ = io.ReadAll(r.Body)
+		r.Body.Close()
+		w.WriteHeader(200)
+	}))
+
+	result := &httpstat.Result{}
+
+	defer ts.Close()
+	u, _ := url.Parse(ts.URL)
+	r, err := do(context.Background(), nil, Request{
+		URL:     *u,
+		Input:   []byte("test"),
+		statter: func(r *httpstat.Result) { result = r },
+	})
+
+	require.NotNil(t, r)
 	require.Nil(t, err)
+
+	require.Equal(t, strings.ReplaceAll(ts.URL, "http://", ""), result.ConnectedTo.String())
+	require.True(t, result.StartTransfer > time.Second)
+	require.True(t, result.ServerProcessing > time.Second)
+	require.True(t, result.Total(time.Time{}) > time.Second)
 }

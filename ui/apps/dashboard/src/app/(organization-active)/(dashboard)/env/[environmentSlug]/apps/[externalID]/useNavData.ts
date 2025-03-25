@@ -12,6 +12,7 @@ const query = graphql(`
           platform
           url
         }
+        method
         name
       }
     }

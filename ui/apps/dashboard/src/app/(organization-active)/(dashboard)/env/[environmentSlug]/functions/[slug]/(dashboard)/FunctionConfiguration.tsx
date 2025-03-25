@@ -1,6 +1,4 @@
 import { MetadataGrid, type MetadataItemProps } from '@inngest/components/Metadata';
-import { noCase } from 'change-case';
-import { titleCase } from 'title-case';
 
 import Block from '@/components/Block';
 import type { FunctionConfiguration } from '@/gql/graphql';
@@ -138,7 +136,10 @@ export default function FunctionConfiguration({ configuration }: FunctionConfigu
           const items: MetadataItemProps[] = [
             {
               label: 'Scope',
-              value: titleCase(noCase(concurrencyItem.scope)),
+              title: concurrencyItem.scope,
+              value: (
+                <div className="lowercase first-letter:capitalize">{concurrencyItem.scope}</div>
+              ),
             },
             {
               label: 'Limit',

@@ -2,11 +2,11 @@
 
 import { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { toast } from 'sonner';
 
+import { LegacyRunsToggle } from '../RunDetailsV3/LegacyRunsToggle';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { StatusCell } from '../Table';
-import { Trace } from '../TimelineV2';
+import { Trace as OldTrace } from '../TimelineV2';
 import { TimelineV2 } from '../TimelineV2/Timeline';
 import { TriggerDetails } from '../TriggerDetails';
 import type { Result } from '../types/functionRun';
@@ -16,17 +16,14 @@ import { RunInfo } from './RunInfo';
 
 type Props = {
   standalone: boolean;
-  cancelRun: (runID: string) => Promise<unknown>;
   getResult: (outputID: string) => Promise<Result>;
   getRun: (runID: string) => Promise<Run>;
   initialRunData?: InitialRunData;
   getTrigger: React.ComponentProps<typeof TriggerDetails>['getTrigger'];
   pathCreator: React.ComponentProps<typeof RunInfo>['pathCreator'];
   pollInterval?: number;
-  rerun: React.ComponentProps<typeof RunInfo>['rerun'];
-  rerunFromStep: React.ComponentProps<typeof RunInfo>['rerunFromStep'];
   runID: string;
-  stepAIEnabled?: boolean;
+  traceAIEnabled?: boolean;
 };
 
 type Run = {
@@ -40,12 +37,12 @@ type Run = {
     slug: string;
   };
   id: string;
-  trace: React.ComponentProps<typeof Trace>['trace'];
+  trace: React.ComponentProps<typeof OldTrace>['trace'];
+  hasAI: boolean;
 };
 
 export function RunDetailsV2(props: Props) {
-  const { getResult, getRun, getTrigger, pathCreator, rerun, rerunFromStep, runID, standalone } =
-    props;
+  const { getResult, getRun, getTrigger, pathCreator, runID, standalone } = props;
   const [pollInterval, setPollInterval] = useState(props.pollInterval);
 
   const runRes = useQuery({
@@ -71,16 +68,6 @@ export function RunDetailsV2(props: Props) {
     }, [getResult, outputID]),
   });
 
-  const cancelRun = useCallback(async () => {
-    try {
-      await props.cancelRun(runID);
-      toast.success('Cancelled run');
-    } catch (e) {
-      toast.error('Failed to cancel run');
-      console.error(e);
-    }
-  }, [props.cancelRun]);
-
   const run = runRes.data;
   if (run?.trace.endedAt && pollInterval) {
     // Stop polling since ended runs are immutable
@@ -97,10 +84,13 @@ export function RunDetailsV2(props: Props) {
   return (
     <div>
       {standalone && run && (
-        <div className="mx-8 flex flex-col gap-1 pb-6">
-          <StatusCell status={run.trace.status} />
-          <p className="text-basis text-2xl font-medium">{run.fn.name}</p>
-          <p className="text-subtle font-mono">{runID}</p>
+        <div className="flex flex-row items-start justify-between px-4 pb-4">
+          <div className="flex flex-col gap-1">
+            <StatusCell status={run.trace.status} />
+            <p className="text-basis text-2xl font-medium">{run.fn.name}</p>
+            <p className="text-subtle font-mono">{runID}</p>
+          </div>
+          <LegacyRunsToggle traceAIEnabled={!!props.traceAIEnabled} />
         </div>
       )}
 
@@ -108,17 +98,13 @@ export function RunDetailsV2(props: Props) {
         <div className="grow">
           <div className="ml-8">
             <RunInfo
-              cancelRun={cancelRun}
               className="mb-4"
               pathCreator={pathCreator}
-              rerun={rerun}
-              rerunFromStep={rerunFromStep}
               initialRunData={props.initialRunData}
               run={nullishToLazy(run)}
               runID={runID}
               standalone={standalone}
               result={resultRes.data}
-              stepAIEnabled={props.stepAIEnabled}
             />
             {showError && (
               <ErrorCard
@@ -134,8 +120,6 @@ export function RunDetailsV2(props: Props) {
               pathCreator={pathCreator}
               runID={runID}
               trace={run.trace}
-              stepAIEnabled={props.stepAIEnabled}
-              rerunFromStep={rerunFromStep}
             />
           )}
         </div>

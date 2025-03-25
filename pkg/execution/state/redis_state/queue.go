@@ -153,6 +153,7 @@ func init() {
 type QueueManager interface {
 	osqueue.JobQueueReader
 	osqueue.Queue
+	osqueue.QueueDirectAccess
 
 	Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem) error
 	Requeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, at time.Time) error
@@ -385,6 +386,14 @@ func WithClock(c clockwork.Clock) func(q *queue) {
 	}
 }
 
+// WithQueueContinuationLimit sets the continuation limit in the queue, eg. how many
+// sequential steps cause hints in the queue to continue executing the same partition.
+func WithQueueContinuationLimit(limit uint) QueueOpt {
+	return func(q *queue) {
+		q.continuationLimit = limit
+	}
+}
+
 type QueueShard struct {
 	Name string
 	Kind string
@@ -506,6 +515,10 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		guaranteedCapacityScanTickTime:  GuaranteedCapacityTickTime,
 		guaranteedCapacityLeaseTickTime: AccountLeaseTime,
 		clock:                           clockwork.NewRealClock(),
+		continuesLock:                   &sync.Mutex{},
+		continues:                       map[string]continuation{},
+		continueCooldown:                map[string]time.Time{},
+		continuationLimit:               consts.DefaultQueueContinueLimit,
 	}
 
 	// default to using primary queue client for shard selection
@@ -641,6 +654,15 @@ type queue struct {
 
 	guaranteedCapacityScanTickTime  time.Duration
 	guaranteedCapacityLeaseTickTime time.Duration
+
+	// continues stores a map of all partition IDs to continues for a partition.
+	// this lets us optimize running consecutive steps for a function, as a continuation, to a specific limit.
+	continues        map[string]continuation
+	continueCooldown map[string]time.Time
+
+	// continuesLock protects the continues map.
+	continuesLock     *sync.Mutex
+	continuationLimit uint
 }
 
 type QueueRunMode struct {
@@ -661,6 +683,17 @@ type QueueRunMode struct {
 
 	// GuaranteedAccount determines whether accounts with guaranteed capacity are fetched, and one lease is acquired per instance to process the account
 	GuaranteedCapacity bool
+
+	// Continuations enables continuations
+	Continuations bool
+}
+
+// continuation represents a partition continuation, forcung the queue to continue working
+// on a partition once a job from a partition has been processed.
+type continuation struct {
+	partition *QueuePartition
+	// count is stored and incremented each time the partition is enqueued.
+	count uint
 }
 
 // processItem references the queue partition and queue item to be processed by a worker.
@@ -670,6 +703,9 @@ type processItem struct {
 	P QueuePartition
 	I osqueue.QueueItem
 	G *GuaranteedCapacity
+
+	// PCtr represents the number of times the partition has been continued.
+	PCtr uint
 }
 
 // FnMetadata is stored within the queue for retrieving
@@ -935,7 +971,9 @@ func (q *queue) ItemPartitions(ctx context.Context, shard QueueShard, i osqueue.
 	// queue items above may be outdated.
 	if q.customConcurrencyLimitRefresher != nil {
 		// As an optimization, allow fetching updated concurrency limits if desired.
-		updated := q.customConcurrencyLimitRefresher(ctx, i)
+		updated, _ := duration(ctx, q.primaryQueueShard.Name, "partition_custom_concurrency_getter", q.clock.Now(), func(ctx context.Context) ([]state.CustomConcurrency, error) {
+			return q.customConcurrencyLimitRefresher(ctx, i), nil
+		})
 		for _, update := range updated {
 			// This is quadratic, but concurrency keys are limited to 2 so it's
 			// okay.
@@ -954,9 +992,11 @@ func (q *queue) ItemPartitions(ctx context.Context, shard QueueShard, i osqueue.
 		AccountID:     i.Data.Identifier.AccountID,
 	}
 
-	// Get the function limit from the `concurrencyLimitGetter`.  If this returns
-	// a limit (> 0), create a new PartitionTypeDefault queue partition for the function.
-	limits := q.concurrencyLimitGetter(ctx, fnPartition)
+	limits, _ := duration(ctx, q.primaryQueueShard.Name, "partition_fn_concurrency_getter", q.clock.Now(), func(ctx context.Context) (PartitionConcurrencyLimits, error) {
+		// Get the function limit from the `concurrencyLimitGetter`.  If this returns
+		// a limit (> 0), create a new PartitionTypeDefault queue partition for the function.
+		return q.concurrencyLimitGetter(ctx, fnPartition), nil
+	})
 
 	// The concurrency limit for fns MUST be added for leasing.
 	fnPartition.ConcurrencyLimit = limits.FunctionLimit
@@ -1534,7 +1574,7 @@ func (q *queue) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID
 	}
 }
 
-func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.UUID, limit int64, handler osqueue.QueueMigrationHandler) (int64, error) {
+func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.UUID, limit int64, concurrency int, handler osqueue.QueueMigrationHandler) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "MigrationPeek"), redis_telemetry.ScopeQueue)
 
 	shard, ok := q.queueShardClients[sourceShardName]
@@ -1559,17 +1599,53 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 
 	// Should process in order because we don't want out of order execution when moved over
 	var processed int64
-	for _, qi := range items {
+
+	process := func(qi *osqueue.QueueItem) error {
 		if err := handler(ctx, qi); err != nil {
-			return processed, err
+			return err
 		}
 		if err := q.removeQueueItem(ctx, shard, partitionKey, qi.ID); err != nil {
 			logger.StdlibLogger(ctx).Error("error cleaning up queue item after migration", "error", err)
 		}
-		processed++
+
+		atomic.AddInt64(&processed, 1)
+		return nil
+	}
+
+	if concurrency > 0 {
+		eg := errgroup.Group{}
+		eg.SetLimit(concurrency)
+
+		for _, qi := range items {
+			qi := qi
+			eg.Go(func() error {
+				return process(qi)
+			})
+		}
+
+		err := eg.Wait()
+		if err != nil {
+			return atomic.LoadInt64(&processed), err
+		}
+
+		return atomic.LoadInt64(&processed), nil
+	}
+
+	for _, qi := range items {
+		if err := process(qi); err != nil {
+			return processed, err
+		}
 	}
 
 	return processed, nil
+}
+
+func (q *queue) RemoveQueueItem(ctx context.Context, shardName string, partitionKey string, itemID string) error {
+	queueShard, ok := q.queueShardClients[shardName]
+	if !ok {
+		return fmt.Errorf("queue shard not found %q", shardName)
+	}
+	return q.removeQueueItem(ctx, queueShard, partitionKey, itemID)
 }
 
 // removeQueueItem attempts to remove a specific item in the target queue shard
@@ -1902,7 +1978,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 //
 // Obtaining a lease updates the vesting time for the queue item until now() +
 // lease duration. This returns the newly acquired lease ID on success.
-func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, duration time.Duration, now time.Time, denies *leaseDenies) (*ulid.ULID, error) {
+func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration time.Duration, now time.Time, denies *leaseDenies) (*ulid.ULID, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Lease"), redis_telemetry.ScopeQueue)
 
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
@@ -1926,7 +2002,16 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, duration time
 	}
 
 	// Grab all partitions for the queue item
-	parts, acctLimit := q.ItemPartitions(ctx, q.primaryQueueShard, item)
+	var (
+		parts     []QueuePartition
+		acctLimit int
+	)
+
+	_, _ = duration(ctx, q.primaryQueueShard.Name, "lease_item_partitions", q.clock.Now(), func(ctx context.Context) (any, error) {
+		parts, acctLimit = q.ItemPartitions(ctx, q.primaryQueueShard, item)
+		return nil, nil
+	})
+
 	for _, partition := range parts {
 		// Check to see if this key has already been denied in the lease iteration.
 		// If so, fail early.
@@ -1935,7 +2020,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, duration time
 		}
 	}
 
-	leaseID, err := ulid.New(ulid.Timestamp(q.clock.Now().Add(duration).UTC()), rnd)
+	leaseID, err := ulid.New(ulid.Timestamp(q.clock.Now().Add(leaseDuration).UTC()), rnd)
 	if err != nil {
 		return nil, fmt.Errorf("error generating id: %w", err)
 	}
@@ -3459,6 +3544,77 @@ func (q *queue) setPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) err
 	}
 
 	return nil
+}
+
+// addContinue adds a continuation for the given partition.  This hints that the queue should
+// peek and process this partition on the next loop, allowing us to hint that a partition
+// should be processed when a step finishes (to decrease inter-step latency on non-connect
+// workloads).
+func (q *queue) addContinue(ctx context.Context, p *QueuePartition, ctr uint) {
+	if !q.runMode.Continuations {
+		// continuations are not enabled.
+		return
+	}
+
+	if ctr >= q.continuationLimit {
+		q.removeContinue(ctx, p, true)
+		return
+	}
+
+	q.continuesLock.Lock()
+	defer q.continuesLock.Unlock()
+
+	// If this is the first continuation, check if we're on a cooldown, or if we're
+	// beyond capacity.
+	if ctr == 1 {
+		if len(q.continues) > consts.QueueContinuationMaxPartitions {
+			metrics.IncrQueueContinuationMaxCapcityCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
+			return
+		}
+		if t, ok := q.continueCooldown[p.Queue()]; ok && t.After(time.Now()) {
+			metrics.IncrQueueContinuationCooldownCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
+			return
+		}
+
+		// Remove the continuation cooldown.
+		delete(q.continueCooldown, p.Queue())
+	}
+
+	c, ok := q.continues[p.Queue()]
+	if !ok || c.count < ctr {
+		// Update the continue count if it doesn't exist, or the current counter
+		// is higher.  This ensures that we always have the highest continuation
+		// count stored for queue processing.
+		q.continues[p.Queue()] = continuation{partition: p, count: ctr}
+		metrics.IncrQueueContinuationAddedCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
+	}
+}
+
+func (q *queue) removeContinue(ctx context.Context, p *QueuePartition, cooldown bool) {
+	if !q.runMode.Continuations {
+		// continuations are not enabled.
+		return
+	}
+
+	// This is over the limit for conntinuing the partition, so force it to be
+	// removed in every case.
+	q.continuesLock.Lock()
+	defer q.continuesLock.Unlock()
+
+	metrics.IncrQueueContinuationRemovedCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
+
+	delete(q.continues, p.Queue())
+
+	if cooldown {
+		// Add a cooldown, preventing this partition from being added as a continuation
+		// for a given period of time.
+		//
+		// Note that this isn't shared across replicas;  cooldowns
+		// only exist in the current replica.
+		q.continueCooldown[p.Queue()] = time.Now().Add(
+			consts.QueueContinuationCooldownPeriod,
+		)
+	}
 }
 
 //nolint:all

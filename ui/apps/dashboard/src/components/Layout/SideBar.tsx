@@ -20,10 +20,12 @@ const OnboardingWidget = dynamic(() => import('../Navigation/OnboardingWidget'),
 export default function SideBar({
   collapsed: serverCollapsed,
   activeEnv,
+  enableQuickSearchV2,
   profile,
 }: {
   collapsed: boolean | undefined;
   activeEnv?: Environment;
+  enableQuickSearchV2: boolean;
   profile: ProfileDisplayType;
 }) {
   const navRef = useRef<HTMLDivElement>(null);
@@ -58,7 +60,13 @@ export default function SideBar({
          }  sticky z-[51] shrink-0 overflow-visible border-r`}
       ref={navRef}
     >
-      <Logo collapsed={collapsed} setCollapsed={setCollapsed} />
+      <Logo
+        collapsed={collapsed}
+        enableQuickSearchV2={enableQuickSearchV2}
+        envSlug={activeEnv?.slug ?? 'production'}
+        envName={activeEnv?.name ?? 'Production'}
+        setCollapsed={setCollapsed}
+      />
       <div className="flex grow flex-col justify-between">
         <Navigation collapsed={collapsed} activeEnv={activeEnv} />
 

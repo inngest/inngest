@@ -1,4 +1,4 @@
-package v0
+package connectv0
 
 import (
 	"encoding/json"
@@ -15,7 +15,7 @@ import (
 //
 // Provides query params to further filter the returned data
 //   - app_id
-func (c *router) showConnections(w http.ResponseWriter, r *http.Request) {
+func (c *connectApiRouter) showConnections(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var (
@@ -24,7 +24,7 @@ func (c *router) showConnections(w http.ResponseWriter, r *http.Request) {
 	)
 	switch c.Dev {
 	case true:
-		envID = consts.DevServerEnvId
+		envID = consts.DevServerEnvID
 
 	case false:
 		// Expect UUID

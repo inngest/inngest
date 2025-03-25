@@ -12,26 +12,16 @@ type Props = {
   className?: string;
   result: Result;
   runID: string;
-  rerunFromStep: React.ComponentProps<typeof RerunModal>['rerunFromStep'];
   stepID?: string | null;
   isSuccess?: boolean;
-  stepAIEnabled?: boolean;
 };
 
-export function RunResult({
-  className,
-  result,
-  isSuccess,
-  runID,
-  rerunFromStep,
-  stepID,
-  stepAIEnabled = false,
-}: Props) {
+export function RunResult({ result, isSuccess, runID, stepID }: Props) {
   const prettyInput = usePrettyJson(result.input ?? '') || (result.input ?? '');
   const prettyOutput = usePrettyJson(result.data ?? '') || (result.data ?? '');
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
 
-  return stepAIEnabled ? (
+  return (
     <div className="flex flex-col">
       {result.input && (
         <div className="bg-canvasBase border-l-primary-moderate border-subtle border-r-hidden h-11 w-full border border-l px-6 py-3 text-sm font-normal leading-tight">
@@ -63,7 +53,6 @@ export function RunResult({
                   runID={runID}
                   stepID={stepID}
                   input={prettyInput}
-                  rerunFromStep={rerunFromStep}
                 />
               </>
             )}
@@ -83,45 +72,6 @@ export function RunResult({
           </div>
         )}
       </div>
-      {result.error && (
-        <CodeBlock
-          header={{
-            title:
-              (result.error.name || 'Error') +
-              (result.error.message ? ': ' + result.error.message : ''),
-            status: 'error',
-          }}
-          tab={{
-            content: result.error.stack ?? '',
-          }}
-        />
-      )}
-    </div>
-  ) : (
-    <div className={className}>
-      {result.input && (
-        <CodeBlock
-          header={{
-            title: 'Input',
-          }}
-          tab={{
-            content: prettyInput,
-          }}
-        />
-      )}
-
-      {result.data && (
-        <CodeBlock
-          header={{
-            title: 'Output',
-            status: isSuccess ? 'success' : undefined,
-          }}
-          tab={{
-            content: prettyOutput,
-          }}
-        />
-      )}
-
       {result.error && (
         <CodeBlock
           header={{

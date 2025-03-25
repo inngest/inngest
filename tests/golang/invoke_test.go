@@ -25,13 +25,14 @@ func TestInvoke(t *testing.T) {
 	c := client.New(t)
 
 	appID := "Invoke-" + ulid.MustNew(ulid.Now(), nil).String()
-	h, server, registerFuncs := NewSDKHandler(t, appID)
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appID)
 	defer server.Close()
 
 	invokedFnName := "invoked-fn"
-	invokedFn := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name:    invokedFnName,
+			ID:      invokedFnName,
 			Retries: inngestgo.IntPtr(0),
 		},
 		inngestgo.EventTrigger("none", nil),
@@ -39,33 +40,35 @@ func TestInvoke(t *testing.T) {
 			return "invoked!", nil
 		},
 	)
-
+	r.NoError(err)
 	// This function will invoke the other function
 	runID := ""
 	evtName := "invoke-me"
-	mainFn := inngestgo.CreateFunction(
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "main-fn",
+			ID: "main-fn",
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
 			runID = input.InputCtx.RunID
 
-			_, _ = step.Invoke[any](
+			_, err := step.Invoke[any](
 				ctx,
 				"invoke",
 				step.InvokeOpts{FunctionId: appID + "-" + invokedFnName},
 			)
-
+			if err != nil {
+				return nil, err
+			}
 			return "success", nil
 		},
 	)
-
-	h.Register(invokedFn, mainFn)
+	r.NoError(err)
 	registerFuncs()
 
 	// Trigger the main function and successfully invoke the other function
-	_, err := inngestgo.Send(ctx, &event.Event{Name: evtName})
+	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
@@ -117,13 +120,14 @@ func TestInvokeGroup(t *testing.T) {
 	c := client.New(t)
 
 	appID := "InvokeGroup-" + ulid.MustNew(ulid.Now(), nil).String()
-	h, server, registerFuncs := NewSDKHandler(t, appID)
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appID)
 	defer server.Close()
 
 	invokedFnName := "invoked-fn"
-	invokedFn := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name:    invokedFnName,
+			ID:      invokedFnName,
 			Retries: inngestgo.IntPtr(0),
 		},
 		inngestgo.EventTrigger("none", nil),
@@ -131,6 +135,7 @@ func TestInvokeGroup(t *testing.T) {
 			return "invoked!", nil
 		},
 	)
+	r.NoError(err)
 	var (
 		started int32
 		runID   string
@@ -138,9 +143,10 @@ func TestInvokeGroup(t *testing.T) {
 
 	// This function will invoke the other function
 	evtName := "invoke-group-me"
-	mainFn := inngestgo.CreateFunction(
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "main-fn",
+			ID: "main-fn",
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
@@ -151,21 +157,22 @@ func TestInvokeGroup(t *testing.T) {
 				return nil, inngestgo.RetryAtError(fmt.Errorf("initial error"), time.Now().Add(5*time.Second))
 			}
 
-			_, _ = step.Invoke[any](
+			_, err := step.Invoke[any](
 				ctx,
 				"invoke",
 				step.InvokeOpts{FunctionId: appID + "-" + invokedFnName},
 			)
-
+			if err != nil {
+				return nil, err
+			}
 			return "success", nil
 		},
 	)
-
-	h.Register(invokedFn, mainFn)
+	r.NoError(err)
 	registerFuncs()
 
 	// Trigger the main function and successfully invoke the other function
-	_, err := inngestgo.Send(ctx, &event.Event{Name: evtName})
+	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
 
 	t.Run("in progress", func(t *testing.T) {
@@ -199,7 +206,7 @@ func TestInvokeGroup(t *testing.T) {
 
 			execOutput := c.RunSpanOutput(ctx, *exec.OutputID)
 			as.NotNil(t, execOutput)
-			c.ExpectSpanErrorOutput(t, "", "initial error", execOutput)
+			c.ExpectSpanErrorOutput(t, "initial error", "", execOutput)
 		})
 	})
 
@@ -251,13 +258,14 @@ func TestInvokeTimeout(t *testing.T) {
 	c := client.New(t)
 
 	appID := "InvokeTimeout-" + ulid.MustNew(ulid.Now(), nil).String()
-	h, server, registerFuncs := NewSDKHandler(t, appID)
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appID)
 	defer server.Close()
 
 	invokedFnName := "invoked-fn"
-	invokedFn := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name:    invokedFnName,
+			ID:      invokedFnName,
 			Retries: inngestgo.IntPtr(0),
 		},
 		inngestgo.EventTrigger("none", nil),
@@ -267,33 +275,35 @@ func TestInvokeTimeout(t *testing.T) {
 			return nil, nil
 		},
 	)
-
+	r.NoError(err)
 	// This function will invoke the other function
 	runID := ""
 	evtName := "my-event"
-	mainFn := inngestgo.CreateFunction(
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "main-fn",
+			ID: "main-fn",
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
 			runID = input.InputCtx.RunID
 
-			_, _ = step.Invoke[any](
+			_, err := step.Invoke[any](
 				ctx,
 				"invoke",
 				step.InvokeOpts{FunctionId: appID + "-" + invokedFnName, Timeout: 1 * time.Second},
 			)
-
+			if err != nil {
+				return nil, err
+			}
 			return nil, nil
 		},
 	)
-
-	h.Register(invokedFn, mainFn)
+	r.NoError(err)
 	registerFuncs()
 
 	// Trigger the main function and successfully invoke the other function
-	_, err := inngestgo.Send(ctx, &event.Event{Name: evtName})
+	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
 
 	// The invoke target times out and should fail the main run
@@ -350,14 +360,15 @@ func TestInvokeRateLimit(t *testing.T) {
 	c := client.New(t)
 
 	appID := "InvokeRateLimit-" + ulid.MustNew(ulid.Now(), nil).String()
-	h, server, registerFuncs := NewSDKHandler(t, appID)
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appID)
 	defer server.Close()
 
 	// This function will be invoked by the main function
 	invokedFnName := "invoked-fn"
-	invokedFn := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: invokedFnName,
+			ID: invokedFnName,
 			RateLimit: &inngestgo.RateLimit{
 				Limit:  1,
 				Period: 1 * time.Minute,
@@ -369,39 +380,41 @@ func TestInvokeRateLimit(t *testing.T) {
 			return nil, nil
 		},
 	)
-
+	r.NoError(err)
 	// This function will invoke the other function
 	runID := ""
 	evtName := "my-event"
-	mainFn := inngestgo.CreateFunction(
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "main-fn",
+			ID: "main-fn",
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
 			runID = input.InputCtx.RunID
 
-			_, _ = step.Invoke[any](
+			_, err := step.Invoke[any](
 				ctx,
 				"invoke",
 				step.InvokeOpts{FunctionId: appID + "-" + invokedFnName})
-
+			if err != nil {
+				return nil, err
+			}
 			return nil, nil
 		},
 	)
-
-	h.Register(invokedFn, mainFn)
+	r.NoError(err)
 	registerFuncs()
 
 	// Trigger the main function and successfully invoke the other function
-	_, err := inngestgo.Send(ctx, &event.Event{Name: evtName})
+	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
 	c.WaitForRunStatus(ctx, t, "COMPLETED", &runID)
 
 	// Trigger the main function. It'll fail because the invoked function is
 	// rate limited
 	runID = ""
-	_, err = inngestgo.Send(ctx, &event.Event{Name: evtName})
+	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
 	c.WaitForRunStatus(ctx, t, "FAILED", &runID)
 }

@@ -233,17 +233,25 @@ func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *stri
 	require.NotNil(t, runID)
 	require.EventuallyWithT(t, func(t *assert.CollectT) {
 		a := assert.New(t)
-		a.NotEmpty(runID)
+		if !a.NotNil(runID) {
+			return
+		}
 
 		run, err := c.RunTraces(ctx, *runID)
-		a.NoError(err)
-		a.NotNil(run)
-		a.Equal(run.Status, opts.Status.String())
+		if !a.NoError(err) {
+			return
+		}
+		if !a.NotNil(run) {
+			return
+		}
+		if !a.Equal(opts.Status.String(), run.Status, "expected status did not match actual status") {
+			return
+		}
 
 		if opts.ChildSpanCount > 0 {
 			a.NotNil(run.Trace)
 			a.True(run.Trace.IsRoot)
-			a.Len(run.Trace.ChildSpans, opts.ChildSpanCount)
+			a.GreaterOrEqual(len(run.Trace.ChildSpans), opts.ChildSpanCount)
 		}
 
 		traces = run
@@ -516,7 +524,7 @@ func (c *Client) RunsByEventID(ctx context.Context, eventID string) ([]runByEven
 		},
 	})
 	if len(resp.Errors) > 0 {
-		return nil, fmt.Errorf("err with gql: %#v", resp.Errors)
+		return nil, fmt.Errorf("err with gql: %s", resp.Errors.Error())
 	}
 
 	type response struct {

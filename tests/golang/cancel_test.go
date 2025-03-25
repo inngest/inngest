@@ -17,14 +17,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type testCancelEvt inngestgo.GenericEvent[any, any]
+type testCancelEvt inngestgo.GenericEvent[any]
 
 func TestEventCancellation(t *testing.T) {
 	ctx := context.Background()
 
 	c := client.New(t)
 	appName := uuid.New().String()
-	h, server, registerFuncs := NewSDKHandler(t, appName)
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appName)
 	defer server.Close()
 
 	var (
@@ -36,9 +36,10 @@ func TestEventCancellation(t *testing.T) {
 	triggerEvtName := uuid.New().String()
 	cancelEvtName := uuid.New().String()
 
-	a := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "test-cancel",
+			ID: "test-cancel",
 			Cancel: []inngest.Cancel{
 				{Event: cancelEvtName, If: inngestgo.StrPtr("async.data.cancel == event.data.cancel")},
 			},
@@ -63,9 +64,11 @@ func TestEventCancellation(t *testing.T) {
 			return true, nil
 		},
 	)
+	require.NoError(t, err)
 
-	cf := inngestgo.CreateFunction(
-		inngestgo.FunctionOpts{Name: "handle-cancel"},
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{ID: "handle-cancel"},
 		inngestgo.EventTrigger(
 			"inngest/function.cancelled",
 			inngestgo.StrPtr(fmt.Sprintf(
@@ -81,15 +84,14 @@ func TestEventCancellation(t *testing.T) {
 			return true, nil
 		},
 	)
-
-	h.Register(a, cf)
+	require.NoError(t, err)
 	registerFuncs()
 
 	evt := inngestgo.Event{
 		Name: triggerEvtName,
 		Data: map[string]any{"cancel": 1},
 	}
-	_, err := inngestgo.Send(ctx, evt)
+	_, err = inngestClient.Send(ctx, evt)
 	require.NoError(t, err)
 
 	<-time.After(3 * time.Second)
@@ -101,11 +103,11 @@ func TestEventCancellation(t *testing.T) {
 
 	t.Run("should cancel run", func(t *testing.T) {
 		r := require.New(t)
-		_, err := inngestgo.Send(ctx, inngestgo.Event{
+		_, err = inngestClient.Send(ctx, inngestgo.Event{
 			Name: cancelEvtName,
 			Data: map[string]any{"cancel": 1},
 		})
-		r.NoError(err)
+		require.NoError(t, err)
 
 		r.EventuallyWithT(func(t *assert.CollectT) {
 			a := assert.New(t)

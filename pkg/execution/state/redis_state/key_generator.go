@@ -44,6 +44,10 @@ type RunStateKeyGenerator interface {
 	// ActionInputs returns the key used to store the action inputs for a given
 	// run.
 	ActionInputs(ctx context.Context, isSharded bool, identifier state.Identifier) string
+
+	// Pending returns the key used to store the pending actions for a given
+	// run.
+	Pending(ctx context.Context, isSharded bool, identifier state.Identifier) string
 }
 
 type runStateKeyGenerator struct {
@@ -98,6 +102,10 @@ func (s runStateKeyGenerator) Stack(ctx context.Context, isSharded bool, runID u
 
 func (s runStateKeyGenerator) ActionInputs(ctx context.Context, isSharded bool, identifier state.Identifier) string {
 	return fmt.Sprintf("{%s}:inputs:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, identifier.RunID), identifier.WorkflowID, identifier.RunID)
+}
+
+func (s runStateKeyGenerator) Pending(ctx context.Context, isSharded bool, identifier state.Identifier) string {
+	return fmt.Sprintf("{%s}:pending:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, identifier.RunID), identifier.WorkflowID, identifier.RunID)
 }
 
 type GlobalKeyGenerator interface {
@@ -408,6 +416,9 @@ type PauseKeyGenerator interface {
 	// Pause returns the key used to store an individual pause from its ID.
 	Pause(ctx context.Context, pauseID uuid.UUID) string
 
+	// GlobalPauseIndex returns the key used to index all pauses.
+	GlobalPauseIndex(ctx context.Context) string
+
 	// RunPauses stores pause IDs for each run as a zset
 	RunPauses(ctx context.Context, runID ulid.ULID) string
 
@@ -441,6 +452,10 @@ type pauseKeyGenerator struct {
 
 func (u pauseKeyGenerator) Pause(ctx context.Context, pauseID uuid.UUID) string {
 	return fmt.Sprintf("{%s}:pauses:%s", u.stateDefaultKey, pauseID.String())
+}
+
+func (u pauseKeyGenerator) GlobalPauseIndex(ctx context.Context) string {
+	return fmt.Sprintf("{%s}:pauses-idx", u.stateDefaultKey)
 }
 
 func (u pauseKeyGenerator) RunPauses(ctx context.Context, runID ulid.ULID) string {

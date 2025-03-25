@@ -11,8 +11,10 @@ import (
 	connectproto "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/proto"
 	"io"
 	"net"
+	"net/url"
 	"time"
 )
 
@@ -67,7 +69,7 @@ func (h *connectHandler) connect(ctx context.Context, data connectionEstablishDa
 	}
 
 	// Set up connection lifecycle logic (receiving messages, handling requests, etc.)
-	err = h.handleConnection(ctx, data, preparedConn.ws, preparedConn.gatewayGroupName)
+	err = h.handleConnection(h.workerCtx, data, preparedConn.ws, preparedConn.gatewayGroupName)
 	if err != nil {
 		h.logger.Error("could not handle connection", "err", err)
 
@@ -90,9 +92,9 @@ type connectionEstablishData struct {
 	hashedSigningKey      []byte
 	numCpuCores           int32
 	totalMem              int64
-	marshaledFns          []byte
 	marshaledCapabilities []byte
 	manualReadinessAck    bool
+	apps                  []*connectproto.AppConfiguration
 }
 
 type connection struct {
@@ -109,23 +111,34 @@ func (h *connectHandler) prepareConnection(ctx context.Context, data connectionE
 
 	startRes, err := h.apiClient.start(ctx, data.hashedSigningKey, &connectproto.StartRequest{
 		ExcludeGateways: excludeGateways,
-	})
+	}, h.logger)
 	if err != nil {
-		return connection{}, reconnectError{fmt.Errorf("could not start connection: %w", err)}
+		return connection{}, newReconnectErr(fmt.Errorf("could not start connection: %w", err))
 	}
 
 	h.logger.Debug("handshake successful", "gateway_endpoint", startRes.GetGatewayEndpoint(), "gateway_group", startRes.GetGatewayGroup())
 
-	gatewayHost := startRes.GetGatewayEndpoint()
+	gatewayHost, err := url.Parse(startRes.GetGatewayEndpoint())
+	if err != nil {
+		return connection{}, newReconnectErr(fmt.Errorf("received invalid start gateway host: %w", err))
+	}
+
+	if h.opts.RewriteGatewayEndpoint != nil {
+		newGatewayHost, err := h.opts.RewriteGatewayEndpoint(*gatewayHost)
+		if err != nil {
+			return connection{}, newReconnectErr(fmt.Errorf("rewriting gateway host failed: %w", err))
+		}
+		gatewayHost = &newGatewayHost
+	}
 
 	// Establish WebSocket connection to one of the gateways
-	ws, _, err := websocket.Dial(connectTimeout, gatewayHost, &websocket.DialOptions{
+	ws, _, err := websocket.Dial(connectTimeout, gatewayHost.String(), &websocket.DialOptions{
 		Subprotocols: []string{
 			types.GatewaySubProtocol,
 		},
 	})
 	if err != nil {
-		return connection{}, reconnectError{fmt.Errorf("could not connect to gateway: %w", err)}
+		return connection{}, newReconnectErr(fmt.Errorf("could not connect to gateway: %w", err))
 	}
 
 	// Connection ID is unique per connection, reconnections should get a new ID
@@ -135,7 +148,7 @@ func (h *connectHandler) prepareConnection(ctx context.Context, data connectionE
 
 	err = h.performConnectHandshake(ctx, connectionId.String(), ws, startRes, data, startTime)
 	if err != nil {
-		return connection{}, reconnectError{fmt.Errorf("could not perform connect handshake: %w", err)}
+		return connection{}, newReconnectErr(fmt.Errorf("could not perform connect handshake: %w", err))
 	}
 
 	return connection{
@@ -155,18 +168,11 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 		_ = ws.CloseNow()
 	}()
 
-	// When shutting down the worker, close the connection with a reason
-	go func() {
-		<-ctx.Done()
-		_ = ws.Close(websocket.StatusNormalClosure, connectproto.WorkerDisconnectReason_WORKER_SHUTDOWN.String())
-	}()
-
 	// Send buffered but unsent messages if connection was re-established
-	if len(h.messageBuffer) > 0 {
-		h.logger.Debug("sending buffered messages", "count", len(h.messageBuffer))
-		err := h.sendBufferedMessages(ws)
+	if h.messageBuffer.hasMessages() {
+		err := h.messageBuffer.flush(data.hashedSigningKey)
 		if err != nil {
-			return reconnectError{fmt.Errorf("could not send buffered messages: %w", err)}
+			return newReconnectErr(fmt.Errorf("could not send buffered messages: %w", err))
 		}
 	}
 
@@ -184,8 +190,34 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 				if err != nil {
 					h.logger.Error("failed to send worker heartbeat", "err", err)
 				}
+				h.logger.Debug("sent worker heartbeat")
 			}
 
+		}
+	}()
+
+	readerLifetimeContext, cancelReaderLifetimeContext := context.WithCancel(ctx)
+	defer cancelReaderLifetimeContext()
+
+	var lastGatewayHeartbeatReceived time.Time
+	go func() {
+		// Wait until initial heartbeat was sent out
+		<-time.After(WorkerHeartbeatInterval)
+
+		heartbeatReplyTicker := time.NewTicker(WorkerHeartbeatInterval)
+		defer heartbeatReplyTicker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-heartbeatReplyTicker.C:
+				gracePeriod := 2 * WorkerHeartbeatInterval
+				if lastGatewayHeartbeatReceived.Before(time.Now().Add(-gracePeriod)) {
+					// No heartbeat received in time!
+					h.logger.Error("did not receive gateway heartbeat in time")
+					cancelReaderLifetimeContext()
+				}
+			}
 		}
 	}()
 
@@ -193,7 +225,11 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 	eg.Go(func() error {
 		for {
 			var msg connectproto.ConnectMessage
-			err := wsproto.Read(context.Background(), ws, &msg)
+
+			// The context will be canceled for two reasons only:
+			// - Parent context was canceled (user requested graceful shutdown)
+			// - Gateway heartbeat was missed (unexpected connection loss)
+			err := wsproto.Read(readerLifetimeContext, ws, &msg)
 			if err != nil {
 				h.logger.Error("failed to read message", "err", err)
 
@@ -201,7 +237,7 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 				return err
 			}
 
-			h.logger.Debug("received gateway request", "msg", &msg)
+			h.logger.Debug("received gateway request", "kind", msg.Kind.String())
 
 			switch msg.Kind {
 			case connectproto.GatewayMessageType_GATEWAY_CLOSING:
@@ -214,6 +250,13 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 					msg: &msg,
 					ws:  ws,
 				})
+			case connectproto.GatewayMessageType_GATEWAY_HEARTBEAT:
+				lastGatewayHeartbeatReceived = time.Now()
+			case connectproto.GatewayMessageType_WORKER_REPLY_ACK:
+				if err := h.handleMessageReplyAck(&msg); err != nil {
+					h.logger.Error("could not handle message reply ack", "err", err)
+					continue
+				}
 			default:
 				h.logger.Error("got unknown gateway request", "err", err)
 				continue
@@ -224,7 +267,7 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 	h.logger.Debug("waiting for read loop to end")
 
 	// If read loop ends, this can be for two reasons
-	// - Connection loss (io.EOF), read loop terminated intentionally (CloseError), other error (unexpected)
+	// - Connection loss (io.EOF), read loop terminated intentionally (CloseError), other error (unexpected), missed heartbeat (readerLifetimeContext canceled)
 	// - Worker shutdown, parent context got cancelled
 	if err := eg.Wait(); err != nil && ctx.Err() == nil {
 		if errors.Is(err, errGatewayDraining) {
@@ -261,20 +304,25 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 			h.logger.Error("connection closed with reason", "reason", cerr.Reason)
 
 			// Reconnect!
-			return reconnectError{fmt.Errorf("connection closed with reason %q: %w", cerr.Reason, cerr)}
+			return newReconnectErr(fmt.Errorf("connection closed with reason %q: %w", cerr.Reason, cerr))
 		}
 
 		// connection closed without reason
 		if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
 			h.logger.Error("failed to read message from gateway, lost connection unexpectedly", "err", err)
-			return reconnectError{fmt.Errorf("connection closed unexpectedly: %w", cerr)}
+			return newReconnectErr(fmt.Errorf("connection closed unexpectedly: %w", cerr))
+		}
+
+		// gateway heartbeat missed, we should reconnect
+		if readerLifetimeContext.Err() != nil {
+			return newReconnectErr(fmt.Errorf("connection closed unexpectedly due to missed heartbeat"))
 		}
 
 		// If this is not a worker shutdown, we should reconnect
-		return reconnectError{fmt.Errorf("connection closed unexpectedly: %w", ctx.Err())}
+		return newReconnectErr(fmt.Errorf("connection closed unexpectedly: %w", ctx.Err()))
 	}
 
-	// Perform graceful shutdown routine (context was cancelled)
+	// Perform graceful shutdown routine (parent context was cancelled)
 
 	// Signal gateway that we won't process additional messages!
 	{
@@ -296,40 +344,26 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 	// Attempt to shut down connection if not already done
 	_ = ws.Close(websocket.StatusNormalClosure, connectproto.WorkerDisconnectReason_WORKER_SHUTDOWN.String())
 
+	// Attempt to flush leftover messages before closing
+	if h.messageBuffer.hasMessages() {
+		err := h.messageBuffer.flush(data.hashedSigningKey)
+		if err != nil {
+			h.logger.Error("could not send buffered messages", "err", err)
+		}
+	}
+
+	h.logger.Debug("connection done")
+
 	return nil
 }
 
-func (h *connectHandler) withTemporaryConnection(data connectionEstablishData, handler func(ws *websocket.Conn) error) error {
-	// Prevent this connection from receiving work
-	data.manualReadinessAck = true
-
-	maxAttempts := 4
-
-	var conn *websocket.Conn
-	var attempts int
-	for {
-		if attempts == maxAttempts {
-			return fmt.Errorf("could not establish connection after %d attempts", maxAttempts)
-		}
-
-		ws, err := h.prepareConnection(context.Background(), data, nil)
-		if err != nil {
-			attempts++
-			continue
-		}
-
-		conn = ws.ws
-		break
+func (h *connectHandler) handleMessageReplyAck(msg *connectproto.ConnectMessage) error {
+	var payload connectproto.WorkerReplyAckData
+	if err := proto.Unmarshal(msg.Payload, msg); err != nil {
+		return fmt.Errorf("could not unmarshal reply ack data: %w", err)
 	}
 
-	defer func() {
-		_ = conn.Close(websocket.StatusNormalClosure, connectproto.WorkerDisconnectReason_WORKER_SHUTDOWN.String())
-	}()
-
-	err := handler(conn)
-	if err != nil {
-		return err
-	}
+	h.messageBuffer.acknowledge(payload.RequestId)
 
 	return nil
 }

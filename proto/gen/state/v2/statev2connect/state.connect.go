@@ -44,6 +44,8 @@ const (
 	RunServiceUpdateMetadataProcedure = "/state.v2.RunService/UpdateMetadata"
 	// RunServiceSaveStepProcedure is the fully-qualified name of the RunService's SaveStep RPC.
 	RunServiceSaveStepProcedure = "/state.v2.RunService/SaveStep"
+	// RunServiceSavePendingProcedure is the fully-qualified name of the RunService's SavePending RPC.
+	RunServiceSavePendingProcedure = "/state.v2.RunService/SavePending"
 	// RunServiceLoadMetadataProcedure is the fully-qualified name of the RunService's LoadMetadata RPC.
 	RunServiceLoadMetadataProcedure = "/state.v2.RunService/LoadMetadata"
 	// RunServiceLoadEventsProcedure is the fully-qualified name of the RunService's LoadEvents RPC.
@@ -62,6 +64,7 @@ var (
 	runServiceExistsMethodDescriptor         = runServiceServiceDescriptor.Methods().ByName("Exists")
 	runServiceUpdateMetadataMethodDescriptor = runServiceServiceDescriptor.Methods().ByName("UpdateMetadata")
 	runServiceSaveStepMethodDescriptor       = runServiceServiceDescriptor.Methods().ByName("SaveStep")
+	runServiceSavePendingMethodDescriptor    = runServiceServiceDescriptor.Methods().ByName("SavePending")
 	runServiceLoadMetadataMethodDescriptor   = runServiceServiceDescriptor.Methods().ByName("LoadMetadata")
 	runServiceLoadEventsMethodDescriptor     = runServiceServiceDescriptor.Methods().ByName("LoadEvents")
 	runServiceLoadStepsMethodDescriptor      = runServiceServiceDescriptor.Methods().ByName("LoadSteps")
@@ -75,6 +78,7 @@ type RunServiceClient interface {
 	Exists(context.Context, *connect.Request[v2.ExistsRequest]) (*connect.Response[v2.ExistsResponse], error)
 	UpdateMetadata(context.Context, *connect.Request[v2.UpdateMetadataRequest]) (*connect.Response[v2.UpdateMetadataResponse], error)
 	SaveStep(context.Context, *connect.Request[v2.SaveStepRequest]) (*connect.Response[v2.SaveStepResponse], error)
+	SavePending(context.Context, *connect.Request[v2.SavePendingRequest]) (*connect.Response[v2.SavePendingResponse], error)
 	LoadMetadata(context.Context, *connect.Request[v2.LoadMetadataRequest]) (*connect.Response[v2.LoadMetadataResponse], error)
 	LoadEvents(context.Context, *connect.Request[v2.LoadEventsRequest]) (*connect.Response[v2.LoadEventsResponse], error)
 	LoadSteps(context.Context, *connect.Request[v2.LoadStepsRequest]) (*connect.Response[v2.LoadStepsResponse], error)
@@ -121,6 +125,12 @@ func NewRunServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(runServiceSaveStepMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		savePending: connect.NewClient[v2.SavePendingRequest, v2.SavePendingResponse](
+			httpClient,
+			baseURL+RunServiceSavePendingProcedure,
+			connect.WithSchema(runServiceSavePendingMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		loadMetadata: connect.NewClient[v2.LoadMetadataRequest, v2.LoadMetadataResponse](
 			httpClient,
 			baseURL+RunServiceLoadMetadataProcedure,
@@ -155,6 +165,7 @@ type runServiceClient struct {
 	exists         *connect.Client[v2.ExistsRequest, v2.ExistsResponse]
 	updateMetadata *connect.Client[v2.UpdateMetadataRequest, v2.UpdateMetadataResponse]
 	saveStep       *connect.Client[v2.SaveStepRequest, v2.SaveStepResponse]
+	savePending    *connect.Client[v2.SavePendingRequest, v2.SavePendingResponse]
 	loadMetadata   *connect.Client[v2.LoadMetadataRequest, v2.LoadMetadataResponse]
 	loadEvents     *connect.Client[v2.LoadEventsRequest, v2.LoadEventsResponse]
 	loadSteps      *connect.Client[v2.LoadStepsRequest, v2.LoadStepsResponse]
@@ -186,6 +197,11 @@ func (c *runServiceClient) SaveStep(ctx context.Context, req *connect.Request[v2
 	return c.saveStep.CallUnary(ctx, req)
 }
 
+// SavePending calls state.v2.RunService.SavePending.
+func (c *runServiceClient) SavePending(ctx context.Context, req *connect.Request[v2.SavePendingRequest]) (*connect.Response[v2.SavePendingResponse], error) {
+	return c.savePending.CallUnary(ctx, req)
+}
+
 // LoadMetadata calls state.v2.RunService.LoadMetadata.
 func (c *runServiceClient) LoadMetadata(ctx context.Context, req *connect.Request[v2.LoadMetadataRequest]) (*connect.Response[v2.LoadMetadataResponse], error) {
 	return c.loadMetadata.CallUnary(ctx, req)
@@ -213,6 +229,7 @@ type RunServiceHandler interface {
 	Exists(context.Context, *connect.Request[v2.ExistsRequest]) (*connect.Response[v2.ExistsResponse], error)
 	UpdateMetadata(context.Context, *connect.Request[v2.UpdateMetadataRequest]) (*connect.Response[v2.UpdateMetadataResponse], error)
 	SaveStep(context.Context, *connect.Request[v2.SaveStepRequest]) (*connect.Response[v2.SaveStepResponse], error)
+	SavePending(context.Context, *connect.Request[v2.SavePendingRequest]) (*connect.Response[v2.SavePendingResponse], error)
 	LoadMetadata(context.Context, *connect.Request[v2.LoadMetadataRequest]) (*connect.Response[v2.LoadMetadataResponse], error)
 	LoadEvents(context.Context, *connect.Request[v2.LoadEventsRequest]) (*connect.Response[v2.LoadEventsResponse], error)
 	LoadSteps(context.Context, *connect.Request[v2.LoadStepsRequest]) (*connect.Response[v2.LoadStepsResponse], error)
@@ -255,6 +272,12 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(runServiceSaveStepMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	runServiceSavePendingHandler := connect.NewUnaryHandler(
+		RunServiceSavePendingProcedure,
+		svc.SavePending,
+		connect.WithSchema(runServiceSavePendingMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	runServiceLoadMetadataHandler := connect.NewUnaryHandler(
 		RunServiceLoadMetadataProcedure,
 		svc.LoadMetadata,
@@ -291,6 +314,8 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 			runServiceUpdateMetadataHandler.ServeHTTP(w, r)
 		case RunServiceSaveStepProcedure:
 			runServiceSaveStepHandler.ServeHTTP(w, r)
+		case RunServiceSavePendingProcedure:
+			runServiceSavePendingHandler.ServeHTTP(w, r)
 		case RunServiceLoadMetadataProcedure:
 			runServiceLoadMetadataHandler.ServeHTTP(w, r)
 		case RunServiceLoadEventsProcedure:
@@ -326,6 +351,10 @@ func (UnimplementedRunServiceHandler) UpdateMetadata(context.Context, *connect.R
 
 func (UnimplementedRunServiceHandler) SaveStep(context.Context, *connect.Request[v2.SaveStepRequest]) (*connect.Response[v2.SaveStepResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.SaveStep is not implemented"))
+}
+
+func (UnimplementedRunServiceHandler) SavePending(context.Context, *connect.Request[v2.SavePendingRequest]) (*connect.Response[v2.SavePendingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.SavePending is not implemented"))
 }
 
 func (UnimplementedRunServiceHandler) LoadMetadata(context.Context, *connect.Request[v2.LoadMetadataRequest]) (*connect.Response[v2.LoadMetadataResponse], error) {

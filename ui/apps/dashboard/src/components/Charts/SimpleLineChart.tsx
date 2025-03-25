@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { Error } from '@inngest/components/Error/Error';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { cn } from '@inngest/components/utils/classNames';
+import { minuteTime } from '@inngest/components/utils/date';
 import { RiInformationLine } from '@remixicon/react';
 import {
   CartesianGrid,
@@ -17,7 +18,6 @@ import {
 } from 'recharts';
 
 import LoadingIcon from '@/icons/LoadingIcon';
-import { minuteTime } from '@/utils/date';
 
 type SimpleLineChartProps = {
   className?: string;
@@ -53,7 +53,7 @@ type AxisProps = {
 function CustomizedXAxisTick(props: AxisProps) {
   return (
     <text x={props.x} y={props.y} dy={16} fontSize={12} className="fill-muted" textAnchor="middle">
-      {minuteTime(props.payload.value)}
+      {minuteTime(new Date(props.payload.value))}
     </text>
   );
 }

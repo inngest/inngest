@@ -21,21 +21,17 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/sdk"
+	"github.com/inngest/inngest/pkg/syscode"
 	sdkerrors "github.com/inngest/inngestgo/errors"
+	"github.com/inngest/inngestgo/internal"
+	"github.com/inngest/inngestgo/internal/event"
+	"github.com/inngest/inngestgo/internal/middleware"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"github.com/inngest/inngestgo/internal/types"
 	"github.com/inngest/inngestgo/step"
 )
 
 var (
-	// DefaultHandler provides a default handler for registering and serving functions
-	// globally.
-	//
-	// It's recommended to call SetOptions() to set configuration before serving
-	// this in production environments;  this is set up for development and will
-	// attempt to connect to the dev server.
-	DefaultHandler Handler = NewHandler("Go app", HandlerOpts{})
-
 	ErrTypeMismatch = fmt.Errorf("cannot invoke function with mismatched types")
 
 	errBadRequest      = fmt.Errorf("bad request")
@@ -51,26 +47,9 @@ var (
 		TrustProbe: sdk.TrustProbeV1,
 		Connect:    sdk.ConnectV1,
 	}
-
-	defaultWorkerConcurrency = 1_000
 )
 
-// Register adds the given functions to the default handler for serving.  You must register all
-// functions with a handler prior to serving the handler for them to be enabled.
-func Register(funcs ...ServableFunction) {
-	DefaultHandler.Register(funcs...)
-}
-
-// Serve serves all registered functions within the default handler.
-func Serve(w http.ResponseWriter, r *http.Request) {
-	DefaultHandler.ServeHTTP(w, r)
-}
-
-func Connect(ctx context.Context) error {
-	return DefaultHandler.Connect(ctx)
-}
-
-type HandlerOpts struct {
+type handlerOpts struct {
 	// Logger is the structured logger to use from Go's builtin structured
 	// logging package.
 	Logger *slog.Logger
@@ -110,15 +89,9 @@ type HandlerOpts struct {
 	// This only needs to be set when self hosting.
 	RegisterURL *string
 
-	// InstanceId represents a stable identifier to be used for identifying connected SDKs.
-	// This can be a hostname or other identifier that remains stable across restarts.
-	//
-	// If nil, this defaults to the current machine's hostname.
-	InstanceId *string
-
-	// BuildId supplies an application version identifier. This should change
+	// AppVersion supplies an application version identifier. This should change
 	// whenever code within one of your Inngest function or any dependency thereof changes.
-	BuildId *string
+	AppVersion *string
 
 	// MaxBodySize is the max body size to read for incoming invoke requests
 	MaxBodySize int
@@ -135,19 +108,15 @@ type HandlerOpts struct {
 	// disallowed.
 	AllowInBandSync *bool
 
-	// WorkerConcurrency defines the number of goroutines available to handle
-	// connnect workloads. Defaults to 1000
-	WorkerConcurrency int
-
 	Dev *bool
 }
 
-// GetSigningKey returns the signing key defined within HandlerOpts, or the default
+// GetSigningKey returns the signing key defined within handlerOpts, or the default
 // defined within INNGEST_SIGNING_KEY.
 //
 // This is the private key used to register functions and communicate with the private
 // API.
-func (h HandlerOpts) GetSigningKey() string {
+func (h handlerOpts) GetSigningKey() string {
 	if h.SigningKey == nil {
 		return os.Getenv("INNGEST_SIGNING_KEY")
 	}
@@ -155,12 +124,12 @@ func (h HandlerOpts) GetSigningKey() string {
 }
 
 // GetSigningKeyFallback returns the signing key fallback defined within
-// HandlerOpts, or the default defined within INNGEST_SIGNING_KEY_FALLBACK.
+// handlerOpts, or the default defined within INNGEST_SIGNING_KEY_FALLBACK.
 //
 // This is the fallback private key used to register functions and communicate
 // with the private API. If a request fails auth with the signing key then we'll
 // try again with the fallback
-func (h HandlerOpts) GetSigningKeyFallback() string {
+func (h handlerOpts) GetSigningKeyFallback() string {
 	if h.SigningKeyFallback == nil {
 		return os.Getenv("INNGEST_SIGNING_KEY_FALLBACK")
 	}
@@ -168,15 +137,15 @@ func (h HandlerOpts) GetSigningKeyFallback() string {
 }
 
 // GetAPIOrigin returns the host to use for sending API requests
-func (h HandlerOpts) GetAPIBaseURL() string {
-	if h.isDev() {
-		return DevServerURL()
-	}
-
+func (h handlerOpts) GetAPIBaseURL() string {
 	if h.APIBaseURL == nil {
 		base := os.Getenv("INNGEST_API_BASE_URL")
 		if base != "" {
 			return base
+		}
+
+		if h.isDev() {
+			return DevServerURL()
 		}
 
 		return defaultAPIOrigin
@@ -186,7 +155,7 @@ func (h HandlerOpts) GetAPIBaseURL() string {
 }
 
 // GetEventAPIOrigin returns the host to use for sending events
-func (h HandlerOpts) GetEventAPIBaseURL() string {
+func (h handlerOpts) GetEventAPIBaseURL() string {
 	if h.isDev() {
 		return DevServerURL()
 	}
@@ -203,7 +172,7 @@ func (h HandlerOpts) GetEventAPIBaseURL() string {
 }
 
 // GetServeOrigin returns the host used for HTTP based executions
-func (h HandlerOpts) GetServeOrigin() string {
+func (h handlerOpts) GetServeOrigin() string {
 	if h.ServeOrigin != nil {
 		return *h.ServeOrigin
 	}
@@ -211,34 +180,34 @@ func (h HandlerOpts) GetServeOrigin() string {
 }
 
 // GetServePath returns the path used for HTTP based executions
-func (h HandlerOpts) GetServePath() string {
+func (h handlerOpts) GetServePath() string {
 	if h.ServePath != nil {
 		return *h.ServePath
 	}
 	return ""
 }
 
-// GetEnv returns the env defined within HandlerOpts, or the default
+// GetEnv returns the env defined within handlerOpts, or the default
 // defined within INNGEST_ENV.
 //
 // This is the environment name used for preview/branch environments within Inngest.
-func (h HandlerOpts) GetEnv() string {
+func (h handlerOpts) GetEnv() string {
 	if h.Env == nil {
 		return os.Getenv("INNGEST_ENV")
 	}
 	return *h.Env
 }
 
-// GetRegisterURL returns the registration URL defined wtihin HandlerOpts,
+// GetRegisterURL returns the registration URL defined wtihin handlerOpts,
 // defaulting to the production Inngest URL if nil.
-func (h HandlerOpts) GetRegisterURL() string {
+func (h handlerOpts) GetRegisterURL() string {
 	if h.RegisterURL == nil {
 		return "https://www.inngest.com/fn/register"
 	}
 	return *h.RegisterURL
 }
 
-func (h HandlerOpts) IsInBandSyncAllowed() bool {
+func (h handlerOpts) IsInBandSyncAllowed() bool {
 	if h.AllowInBandSync != nil {
 		return *h.AllowInBandSync
 	}
@@ -251,14 +220,7 @@ func (h HandlerOpts) IsInBandSyncAllowed() bool {
 	return false
 }
 
-func (h HandlerOpts) GetWorkerConcurrency() int {
-	if h.WorkerConcurrency == 0 {
-		return defaultWorkerConcurrency
-	}
-	return h.WorkerConcurrency
-}
-
-func (h HandlerOpts) isDev() bool {
+func (h handlerOpts) isDev() bool {
 	if h.Dev != nil {
 		return *h.Dev
 	}
@@ -266,29 +228,8 @@ func (h HandlerOpts) isDev() bool {
 	return IsDev()
 }
 
-// Handler represents a handler which serves the Inngest API via HTTP.  This provides
-// function registration to Inngest, plus the invocation of registered functions via
-// an HTTP POST.
-type Handler interface {
-	http.Handler
-
-	// SetAppName updates the handler's app name.  This is used to group functions
-	// and track deploys within the UI.
-	SetAppName(name string) Handler
-
-	// SetOptions sets the handler's options used to register functions.
-	SetOptions(h HandlerOpts) Handler
-
-	// Register registers the given functions with the handler, allowing them to
-	// be invoked by Inngest.
-	Register(...ServableFunction)
-
-	// Connect establishes an outbound connection to Inngest
-	Connect(ctx context.Context) error
-}
-
-// NewHandler returns a new Handler for serving Inngest functions.
-func NewHandler(appName string, opts HandlerOpts) Handler {
+// newHandler returns a new Handler for serving Inngest functions.
+func newHandler(c Client, opts handlerOpts) *handler {
 	if opts.Logger == nil {
 		opts.Logger = slog.Default()
 	}
@@ -298,23 +239,37 @@ func NewHandler(appName string, opts HandlerOpts) Handler {
 	}
 
 	return &handler{
-		HandlerOpts: opts,
-		appName:     appName,
+		handlerOpts: opts,
+		appName:     c.AppID(),
+		client:      c,
 		funcs:       []ServableFunction{},
 	}
 }
 
 type handler struct {
-	HandlerOpts
+	handlerOpts
 
 	appName string
+	client  Client
 	funcs   []ServableFunction
 	// lock prevents reading the function maps while serving
 	l sync.RWMutex
 }
 
-func (h *handler) SetOptions(opts HandlerOpts) Handler {
-	h.HandlerOpts = opts
+func (h *handler) GetAppName() string {
+	return h.appName
+}
+
+func (h *handler) GetAppVersion() *string {
+	return h.AppVersion
+}
+
+func (h *handler) GetFunctions() []ServableFunction {
+	return h.funcs
+}
+
+func (h *handler) SetOptions(opts handlerOpts) *handler {
+	h.handlerOpts = opts
 
 	if opts.MaxBodySize == 0 {
 		opts.MaxBodySize = DefaultMaxBodySize
@@ -326,7 +281,7 @@ func (h *handler) SetOptions(opts HandlerOpts) Handler {
 	return h
 }
 
-func (h *handler) SetAppName(name string) Handler {
+func (h *handler) SetAppName(name string) *handler {
 	h.appName = name
 	return h
 }
@@ -339,11 +294,11 @@ func (h *handler) Register(funcs ...ServableFunction) {
 	// that already exists, clear it.
 	slugs := map[string]ServableFunction{}
 	for _, f := range h.funcs {
-		slugs[f.Slug()] = f
+		slugs[f.FullyQualifiedID()] = f
 	}
 
 	for _, f := range funcs {
-		slugs[f.Slug()] = f
+		slugs[f.FullyQualifiedID()] = f
 	}
 
 	newFuncs := make([]ServableFunction, len(slugs))
@@ -412,14 +367,20 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err := h.register(w, r); err != nil {
 			h.Logger.Error("error registering functions", "error", err.Error())
 
+			code := syscode.CodeUnknown
 			status := http.StatusInternalServerError
 			if err, ok := err.(publicerr.Error); ok {
 				status = err.Status
+
+				if err, ok := err.Err.(syscode.Error); ok {
+					code = err.Code
+				}
 			}
 			w.WriteHeader(status)
 
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]string{
+				"code":    code,
 				"message": err.Error(),
 			})
 		}
@@ -486,13 +447,16 @@ func (h *handler) inBandSync(
 	if !h.isDev() {
 		if sig = r.Header.Get(HeaderKeySignature); sig == "" {
 			return publicerr.Error{
-				Err:    fmt.Errorf("missing %s header", HeaderKeySignature),
+				Err: syscode.Error{
+					Code:    syscode.CodeHTTPMissingHeader,
+					Message: fmt.Sprintf("missing %s header", HeaderKeySignature),
+				},
 				Status: 401,
 			}
 		}
 	}
 
-	max := h.HandlerOpts.MaxBodySize
+	max := h.handlerOpts.MaxBodySize
 	if max == 0 {
 		max = DefaultMaxBodySize
 	}
@@ -514,13 +478,19 @@ func (h *handler) inBandSync(
 	)
 	if err != nil {
 		return publicerr.Error{
-			Err:    fmt.Errorf("error validating signature"),
+			Err: syscode.Error{
+				Code:    syscode.CodeSigVerificationFailed,
+				Message: "error validating signature",
+			},
 			Status: 401,
 		}
 	}
 	if !valid {
 		return publicerr.Error{
-			Err:    fmt.Errorf("invalid signature"),
+			Err: syscode.Error{
+				Code:    syscode.CodeSigVerificationFailed,
+				Message: "invalid signature",
+			},
 			Status: 401,
 		}
 	}
@@ -624,6 +594,11 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 
 	pathAndParams := r.URL.String()
 
+	appVersion := ""
+	if h.AppVersion != nil {
+		appVersion = *h.AppVersion
+	}
+
 	config := sdk.RegisterRequest{
 		URL:        fmt.Sprintf("%s://%s%s", scheme, host, pathAndParams),
 		V:          "1",
@@ -635,6 +610,7 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 			Platform: platform(),
 		},
 		Capabilities: capabilities,
+		AppVersion:   appVersion,
 	}
 
 	fns, err := createFunctionConfigs(h.appName, h.funcs, *h.url(r), false)
@@ -748,13 +724,13 @@ func createFunctionConfigs(
 
 		// Modify URL to contain fn ID, step params
 		values := appURL.Query()
-		values.Set("fnId", fn.Slug())
+		values.Set("fnId", fn.FullyQualifiedID()) // This should match the Slug below
 		values.Set("step", "step")
 		appURL.RawQuery = values.Encode()
 
 		f := sdk.SDKFunction{
 			Name:        fn.Name(),
-			Slug:        appName + "-" + fn.Slug(),
+			Slug:        fn.FullyQualifiedID(),
 			Idempotency: c.Idempotency,
 			Priority:    fn.Config().Priority,
 			Triggers:    inngest.MultipleTriggers{},
@@ -825,6 +801,12 @@ func createFunctionConfigs(
 // invoke handles incoming POST calls to invoke a function, delegating to invoke() after validating
 // the request.
 func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
+	cImpl, ok := h.client.(*apiClient)
+	if !ok {
+		return errors.New("invalid client type")
+	}
+	mw := middleware.NewMiddlewareManager().Add(cImpl.Middleware...)
+
 	var sig string
 	defer r.Body.Close()
 
@@ -834,7 +816,7 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-	max := h.HandlerOpts.MaxBodySize
+	max := h.handlerOpts.MaxBodySize
 	if max == 0 {
 		max = DefaultMaxBodySize
 	}
@@ -875,7 +857,8 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	h.l.RLock()
 	var fn ServableFunction
 	for _, f := range h.funcs {
-		if f.Slug() == fnID {
+		isOldFormat := f.ID() == fnID // Only include function slug
+		if f.FullyQualifiedID() == fnID || isOldFormat {
 			fn = f
 			break
 		}
@@ -909,7 +892,15 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	// Invoke the function, then immediately stop the streaming buffer.
-	resp, ops, err := invoke(r.Context(), fn, request, stepID)
+	resp, ops, err := invoke(
+		r.Context(),
+		h.client,
+		mw,
+		fn,
+		h.GetSigningKey(),
+		request,
+		stepID,
+	)
 	streamCancel()
 
 	// NOTE: When triggering step errors, we should have an OpcodeStepError
@@ -1169,7 +1160,7 @@ func (h *handler) trust(
 		}
 	}
 
-	max := h.HandlerOpts.MaxBodySize
+	max := h.handlerOpts.MaxBodySize
 	if max == 0 {
 		max = DefaultMaxBodySize
 	}
@@ -1238,7 +1229,10 @@ type StreamResponse struct {
 // be fully typed.
 func invoke(
 	ctx context.Context,
+	client Client,
+	mw *middleware.MiddlewareManager,
 	sf ServableFunction,
+	signingKey string,
 	input *sdkrequest.Request,
 	stepID *string,
 ) (any, []state.GeneratorOpcode, error) {
@@ -1251,13 +1245,18 @@ func invoke(
 	// Create a new context.  This context is cancellable and stores the opcode that ran
 	// within a step.  This allows us to prevent any execution of future tools after a
 	// tool has run.
-	fCtx, cancel := context.WithCancel(context.Background())
+	fCtx, cancel := context.WithCancel(
+		internal.ContextWithMiddlewareManager(
+			internal.ContextWithEventSender(ctx, client),
+			mw,
+		),
+	)
 	if stepID != nil {
 		fCtx = step.SetTargetStepID(fCtx, *stepID)
 	}
 
 	// This must be a pointer so that it can be mutated from within function tools.
-	mgr := sdkrequest.NewManager(cancel, input)
+	mgr := sdkrequest.NewManager(sf, mw, cancel, input, signingKey)
 	fCtx = sdkrequest.SetManager(fCtx, mgr)
 
 	// Create a new Input type.  We don't know ahead of time the type signature as
@@ -1266,53 +1265,13 @@ func invoke(
 	fVal := reflect.ValueOf(sf.Func())
 	inputVal := reflect.New(fVal.Type().In(1)).Elem()
 
-	// If we have an actual value to add to the event, vs `Input[any]`, set it.
-	if sf.ZeroEvent() != nil {
-		eventType := reflect.TypeOf(sf.ZeroEvent())
-
-		// Create a new copy of the event.
-		evtPtr := reflect.New(eventType).Interface()
-		if err := json.Unmarshal(input.Event, evtPtr); err != nil {
-			return nil, nil, fmt.Errorf("error unmarshalling event for function: %w", err)
-		}
-		evt := reflect.ValueOf(evtPtr).Elem()
-		inputVal.FieldByName("Event").Set(evt)
-
-		// events
-		sliceType := reflect.SliceOf(eventType)
-		evtList := reflect.MakeSlice(sliceType, 0, len(input.Events))
-
-		for _, rawjson := range input.Events {
-			newEvent := reflect.New(eventType).Interface()
-
-			if err := json.Unmarshal(rawjson, &newEvent); err != nil {
-				return nil, nil, fmt.Errorf("non-zero event: error unmarshalling event in event list: %w", err)
-			}
-
-			evtList = reflect.Append(evtList, reflect.ValueOf(newEvent).Elem())
-		}
-		inputVal.FieldByName("Events").Set(evtList)
-	} else {
-		// Use a raw map to hold the input.
-		val := map[string]any{}
-		if err := json.Unmarshal(input.Event, &val); err != nil {
-			return nil, nil, fmt.Errorf("error unmarshalling event for function: %w", err)
-		}
-		inputVal.FieldByName("Event").Set(reflect.ValueOf(val))
-
-		// events
-		events := make([]any, len(input.Events))
-		for i, rawjson := range input.Events {
-			var val map[string]any
-
-			if err := json.Unmarshal(rawjson, &val); err != nil {
-				return nil, nil, fmt.Errorf("zero event: error unmarshalling event in event list: %w", err)
-			}
-
-			events[i] = val
-		}
-		inputVal.FieldByName("Events").Set(reflect.ValueOf(events))
-	}
+	updateInput(
+		mgr,
+		sf,
+		inputVal,
+		input.Event,
+		types.ToAnySlice(input.Events),
+	)
 
 	// Set InputCtx
 	callCtx := InputCtx{
@@ -1325,48 +1284,217 @@ func invoke(
 	inputVal.FieldByName("InputCtx").Set(reflect.ValueOf(callCtx))
 
 	var (
-		res       []reflect.Value
-		panickErr error
+		res      []reflect.Value
+		panicErr error
+
+		// fnResponse is the actual response from the fn
+		fnResponse any
+		// fnError is the actual error from the fn.
+		fnError error
 	)
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
+				callCtx := mgr.MiddlewareCallCtx()
+
 				// Was this us attepmting to prevent functions from continuing, using
 				// panic as a crappy control flow because go doesn't have generators?
 				//
 				// XXX: I'm not very happy with using this;  it is dirty
 				if _, ok := r.(step.ControlHijack); ok {
+					// Step attempt ended (completed or errored).
+					//
+					// Note that if this is a step.Run, middleware has already been invoked
+					// via step.Run and this is skipped due to idempotency in the middleware manager.
+					// Because this isn't a step.Run, it's safe to call this with nil data and error.
+					mw.AfterExecution(ctx, callCtx, nil, nil)
 					return
 				}
-				stack := string(debug.Stack())
-				panickErr = fmt.Errorf("function panicked: %v.  stack:\n%s", r, stack)
+
+				panicStack := string(debug.Stack())
+				panicErr = fmt.Errorf("function panicked: %v.  stack:\n%s", r, panicStack)
+
+				mw.AfterExecution(ctx, callCtx, nil, nil)
+				mw.OnPanic(ctx, callCtx, r, panicStack)
 			}
 		}()
+
+		// Run the TransformInput middleware hook.
+		{
+			// Build TransformableInput.
+			var evt Event
+			_ = json.Unmarshal(input.Event, &evt)
+			evts := make([]*event.Event, len(input.Events))
+			for i, rawjson := range input.Events {
+				var evt event.Event
+				if err := json.Unmarshal(rawjson, &evt); err != nil {
+					mgr.SetErr(fmt.Errorf("error unmarshalling event for function: %w", err))
+					panic(step.ControlHijack{})
+				}
+				evts[i] = &evt
+			}
+			mwInput := &middleware.TransformableInput{
+				Event:  &evt,
+				Events: evts,
+			}
+			mwInput.WithContext(fCtx)
+
+			// Run hook.
+			mw.TransformInput(ctx, mgr.MiddlewareCallCtx(), mwInput)
+
+			// Update the context in case the hook changed it.
+			fCtx = mwInput.Context()
+
+			// Update the input we're passing to the Inngest function.
+			updateInput(
+				mgr,
+				sf,
+				inputVal,
+				mwInput.Event,
+				types.ToAnySlice(mwInput.Events),
+			)
+		}
+
+		if len(input.Steps) == 0 {
+			// There are no memoized steps, so the start of the function is "new
+			// code".
+			mw.BeforeExecution(fCtx, mgr.MiddlewareCallCtx())
+		}
 
 		// Call the defined function with the input data.
 		res = fVal.Call([]reflect.Value{
 			reflect.ValueOf(fCtx),
 			inputVal,
 		})
+
+		// Set the function response.
+		if len(res) >= 1 {
+			fnResponse = res[0].Interface()
+		}
+
+		// Function ended.  Get the types for the middleare call.
+		if len(res) >= 2 && !res[1].IsNil() {
+			fnError = res[1].Interface().(error)
+		}
+
+		mw.AfterExecution(ctx, mgr.MiddlewareCallCtx(), fnResponse, fnError)
+
+		{
+			// Transform output via MW
+			out := &middleware.TransformableOutput{
+				Result: fnResponse,
+				Error:  fnError,
+			}
+			mw.TransformOutput(ctx, mgr.MiddlewareCallCtx(), out)
+			// And update the vars
+			fnResponse = out.Result
+			fnError = out.Error
+		}
 	}()
 
-	var err error
-	if panickErr != nil {
-		err = panickErr
+	// Override errors here.
+	if panicErr != nil {
+		fnError = panicErr
 	} else if mgr.Err() != nil {
 		// This is higher precedence than a return error.
-		err = mgr.Err()
-	} else if res != nil && !res[1].IsNil() {
-		// The function returned an error.
-		err = res[1].Interface().(error)
+		fnError = mgr.Err()
 	}
 
-	var response any
-	if res != nil {
-		// Panicking in tools interferes with grabbing the response;  it's always
-		// an empty array if tools panic to hijack control flow.
-		response = res[0].Interface()
-	}
+	return fnResponse, mgr.Ops(), fnError
+}
 
-	return response, mgr.Ops(), err
+// updateInput applies the middleware input to the function input.
+func updateInput(
+	mgr sdkrequest.InvocationManager,
+	fn ServableFunction,
+	fnInput reflect.Value,
+	// mwInput *middleware.TransformableInput,
+	event any,
+	events []any,
+) {
+	// If we have an actual value to add to the event, vs `Input[any]`, set it.
+	if fn.ZeroEvent() != nil {
+		eventType := reflect.TypeOf(fn.ZeroEvent())
+
+		// Apply event.
+		{
+			// byt, err := json.Marshal(mwInput.Event)
+			byt, err := json.Marshal(event)
+			if err != nil {
+				mgr.SetErr(fmt.Errorf("error marshalling event for function: %w", err))
+				panic(step.ControlHijack{})
+			}
+
+			// The same type as the event.
+			newEvent := reflect.New(eventType).Interface()
+
+			if err := json.Unmarshal(byt, newEvent); err != nil {
+				mgr.SetErr(fmt.Errorf("error unmarshalling event for function: %w", err))
+				panic(step.ControlHijack{})
+			}
+			fnInput.FieldByName("Event").Set(reflect.ValueOf(newEvent).Elem())
+		}
+
+		// Apply events.
+		{
+			eventsType := reflect.SliceOf(eventType)
+			newEvents := reflect.MakeSlice(eventsType, 0, len(events))
+			for _, evt := range events {
+				// events := reflect.MakeSlice(eventsType, 0, len(mwInput.Events))
+				// for _, evt := range mwInput.Events {
+				byt, err := json.Marshal(evt)
+				if err != nil {
+					mgr.SetErr(fmt.Errorf("error marshalling event for function: %w", err))
+					panic(step.ControlHijack{})
+				}
+
+				// The same type as the event.
+				newEvent := reflect.New(eventType).Interface()
+				if err := json.Unmarshal(byt, newEvent); err != nil {
+					mgr.SetErr(fmt.Errorf("error unmarshalling event for function: %w", err))
+					panic(step.ControlHijack{})
+				}
+
+				newEvents = reflect.Append(newEvents, reflect.ValueOf(newEvent).Elem())
+			}
+			fnInput.FieldByName("Events").Set(newEvents)
+		}
+	} else {
+		// Apply event.
+		{
+			byt, err := json.Marshal(event)
+			if err != nil {
+				mgr.SetErr(fmt.Errorf("error marshalling event for function: %w", err))
+				panic(step.ControlHijack{})
+			}
+
+			newEvent := map[string]any{}
+			if err := json.Unmarshal(byt, &newEvent); err != nil {
+				mgr.SetErr(fmt.Errorf("error unmarshalling event for function: %w", err))
+				panic(step.ControlHijack{})
+			}
+			fnInput.FieldByName("Event").Set(reflect.ValueOf(newEvent))
+		}
+
+		// Apply events.
+		{
+			newEvents := make([]any, len(events))
+			for i, evt := range events {
+				byt, err := json.Marshal(evt)
+				if err != nil {
+					mgr.SetErr(fmt.Errorf("error marshalling event for function: %w", err))
+					panic(step.ControlHijack{})
+				}
+
+				var newEvent map[string]any
+				if err := json.Unmarshal(byt, &newEvent); err != nil {
+					mgr.SetErr(fmt.Errorf("error unmarshalling event for function: %w", err))
+					panic(step.ControlHijack{})
+				}
+
+				newEvents[i] = newEvent
+			}
+			fnInput.FieldByName("Events").Set(reflect.ValueOf(newEvents))
+		}
+	}
 }

@@ -22,12 +22,12 @@ type BatchEventData struct {
 	Time time.Time `json:"time"`
 }
 
-type BatchEvent = inngestgo.GenericEvent[BatchEventData, any]
+type BatchEvent = inngestgo.GenericEvent[BatchEventData]
 
 func TestBatchEvents(t *testing.T) {
 	ctx := context.Background()
 	c := client.New(t)
-	h, server, registerFuncs := NewSDKHandler(t, "batch")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "batch")
 	defer server.Close()
 
 	var (
@@ -36,8 +36,9 @@ func TestBatchEvents(t *testing.T) {
 		runID       string
 	)
 
-	a := inngestgo.CreateFunction(
-		inngestgo.FunctionOpts{Name: "batch test", BatchEvents: &inngest.EventBatchConfig{MaxSize: 5, Timeout: "5s"}},
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{ID: "batch-test", BatchEvents: &inngest.EventBatchConfig{MaxSize: 5, Timeout: "5s"}},
 		inngestgo.EventTrigger("test/batch", nil),
 		func(ctx context.Context, input inngestgo.Input[BatchEvent]) (any, error) {
 			if runID == "" {
@@ -49,12 +50,12 @@ func TestBatchEvents(t *testing.T) {
 			return "batched!!", nil
 		},
 	)
-	h.Register(a)
+	require.NoError(t, err)
 	registerFuncs()
 
 	t.Run("trigger batch", func(t *testing.T) {
 		for i := 0; i < 8; i++ {
-			_, err := inngestgo.Send(ctx, BatchEvent{
+			_, err := inngestClient.Send(ctx, BatchEvent{
 				Name: "test/batch",
 				Data: BatchEventData{Time: time.Now()},
 			})
@@ -107,7 +108,7 @@ func TestBatchEvents(t *testing.T) {
 
 func TestBatchInvoke(t *testing.T) {
 	ctx := context.Background()
-	h, server, registerFuncs := NewSDKHandler(t, "batchinvoke")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "batchinvoke")
 	defer server.Close()
 
 	var (
@@ -116,7 +117,8 @@ func TestBatchInvoke(t *testing.T) {
 		invokeCounter int32
 	)
 
-	batcher := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:   "batcher",
 			Name: "test batching",
@@ -133,7 +135,10 @@ func TestBatchInvoke(t *testing.T) {
 			return fmt.Sprintf("batched %d events", len(evts)), nil
 		},
 	)
-	caller := inngestgo.CreateFunction(
+	require.NoError(t, err)
+
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:   "caller",
 			Name: "test batching",
@@ -156,14 +161,14 @@ func TestBatchInvoke(t *testing.T) {
 			return true, nil
 		},
 	)
+	require.NoError(t, err)
 
-	h.Register(batcher, caller)
 	registerFuncs()
 
 	t.Run("trigger a batch", func(t *testing.T) {
 		// Call invoke twice
 		for i := 0; i < 5; i++ {
-			_, err := inngestgo.Send(ctx, BatchEvent{
+			_, err := inngestClient.Send(ctx, BatchEvent{
 				Name: "batchinvoke/caller",
 				Data: BatchEventData{Time: time.Now()},
 			})
@@ -189,10 +194,10 @@ func TestBatchEventsWithKeys(t *testing.T) {
 		Time   time.Time `json:"time"`
 		UserId string    `json:"userId"`
 	}
-	type BatchEventWithKey = inngestgo.GenericEvent[BatchEventDataWithUserId, any]
+	type BatchEventWithKey = inngestgo.GenericEvent[BatchEventDataWithUserId]
 
 	ctx := context.Background()
-	h, server, registerFuncs := NewSDKHandler(t, "user-notifications")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "user-notifications")
 	defer server.Close()
 
 	var (
@@ -205,10 +210,11 @@ func TestBatchEventsWithKeys(t *testing.T) {
 
 	batchKey := "event.data.userId"
 
-	a := inngestgo.CreateFunction(
-		inngestgo.FunctionOpts{Name: "batch test", BatchEvents: &inngest.EventBatchConfig{MaxSize: 3, Timeout: "5s", Key: &batchKey}},
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{ID: "batch-test", Name: "batch test", BatchEvents: &inngest.EventBatchConfig{MaxSize: 3, Timeout: "5s", Key: &batchKey}},
 		inngestgo.EventTrigger("test/notification.send", nil),
-		func(ctx context.Context, input inngestgo.Input[BatchEventWithKey]) (any, error) {
+		func(ctx context.Context, input inngestgo.Input[BatchEventDataWithUserId]) (any, error) {
 			mut.Lock()
 			batchInvokedCounter[input.Events[0].Data.UserId] += 1
 			batchEventsCounter[input.Events[0].Data.UserId] += len(input.Events)
@@ -217,13 +223,13 @@ func TestBatchEventsWithKeys(t *testing.T) {
 			return true, nil
 		},
 	)
-	h.Register(a)
+	require.NoError(t, err)
 	registerFuncs()
 
 	t.Run("trigger batch", func(t *testing.T) {
 		sequence := []string{"a", "b", "c", "a", "b", "c", "a", "b"}
 		for _, userId := range sequence {
-			_, err := inngestgo.Send(ctx, BatchEventWithKey{
+			_, err := inngestClient.Send(ctx, BatchEventWithKey{
 				Name: "test/notification.send",
 				Data: BatchEventDataWithUserId{Time: time.Now(), UserId: userId},
 			})
